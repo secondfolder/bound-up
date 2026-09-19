@@ -11,9 +11,11 @@ import {
 /**
  * One room per partnership, holding only the open connections watching it.
  *
- * **This file and `worker.ts` are a second alias-free zone.** They are bundled
- * by wrangler's esbuild, which resolves neither `$lib` nor any of SvelteKit's
- * aliases — so every import here is relative, and `./index` is the only one.
+ * **This file is a second alias-free zone.** It is bundled by wrangler's esbuild
+ * rather than by vite — the `sveltekit-cloudflare-do` plugin appends
+ * `export { RealtimeRoom }` to the worker the adapter generates, and esbuild
+ * resolves neither `$lib` nor any of SvelteKit's aliases from there — so every
+ * import here is relative, and `./index` is the only one.
  *
  * Written in the classic `(state, env)` + `fetch` style rather than by
  * extending `DurableObject` from `cloudflare:workers`, and that is deliberate:

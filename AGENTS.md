@@ -176,16 +176,24 @@ site it applies to; go read that comment before deciding to break one.
     row and ignores them. Same for the edit action, which re-checks `control`
     against the database rather than trusting that the form was hidden.
 
-15. **`worker.ts` and `src/lib/server/realtime/durable-object.ts` are a second
-    alias-free zone.** They are bundled by wrangler's esbuild, which resolves
-    neither `$lib` nor any of SvelteKit's aliases, so every import in them must
-    be relative. Two traps live here:
+15. **`src/lib/server/realtime/durable-object.ts` is a second alias-free zone.**
+    It is bundled by wrangler's esbuild, which resolves neither `$lib` nor any of
+    SvelteKit's aliases, so every import in it must be relative. Two traps live
+    here:
 
-    - **Do not point `main` at `worker.ts`.** `adapter-cloudflare` treats `main`
-      as its _output_ path and `rimraf`s it before writing, so
-      `"main": "worker.ts"` would make `npm run build` delete the file. `main`
-      stays on the adapter default and wrangler takes the entry positionally —
-      `wrangler dev worker.ts` / `wrangler deploy worker.ts`.
+    - **A Durable Object class must be exported from the worker's own entry
+      module, which the adapter generates** — so nothing in the source tree can
+      export it, and no hand-written file can take its place: the adapter treats
+      `main` as its _output_ path and `rimraf`s it before writing. The
+      `sveltekit-cloudflare-do` plugin in `vite.config.ts` appends the export to
+      the generated worker after the adapter runs; it scans the listed files for
+      exported class names. A new class needs entries in
+      `durable_objects.bindings` and `migrations`, and a new _file_ of classes
+      needs adding to the plugin's `durableObjects` list. Wrangler then needs no
+      custom entry: plain `wrangler dev` / `wrangler deploy` are correct, which
+      is what lets Cloudflare's deploy-on-push run on its default commands.
+      (The `overrides` block in package.json exists only because that package
+      publishes a broken `link:` self-dependency that npm rejects — see README.)
     - **The two `migrations` in `wrangler.jsonc` are unrelated.**
       `d1_databases[0].migrations_dir` is SQL applied by `npm run db:migrate:d1`;
       the top-level `migrations` array is Durable Object class lifecycle, applied

@@ -43,8 +43,9 @@ export function requireRealtime(platform: App.Platform | undefined): RealtimeNam
 				'only runs on Cloudflare Workers. Check that wrangler.jsonc has a ' +
 				'durable_objects binding named "REALTIME" pointing at the ' +
 				'"RealtimeRoom" class, that the top-level `migrations` array declares ' +
-				'it, and that wrangler was given the custom entry — ' +
-				'`wrangler dev worker.ts`, not plain `wrangler dev`. Note that ' +
+				'it, and that the `sveltekit-cloudflare-do` plugin in vite.config.ts ' +
+				'lists the file it is in, since the generated worker has to export ' +
+				'the class. Note that ' +
 				'`npm run dev` never reads this: it uses an in-process Map instead.'
 		);
 	}

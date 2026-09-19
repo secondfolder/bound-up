@@ -1,5 +1,6 @@
 import { svelteTesting } from '@testing-library/svelte/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
+import cloudflareDoExporter from 'sveltekit-cloudflare-do';
 import { defineConfig, type Plugin } from 'vitest/config';
 
 const host: string | undefined = process.env.HOST;
@@ -24,7 +25,33 @@ function removeBareDevalueImport(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [sveltekit(), removeBareDevalueImport()],
+	plugins: [
+		sveltekit(),
+		removeBareDevalueImport(),
+		/**
+		 * Appends `export { RealtimeRoom }` to the worker the Cloudflare adapter
+		 * generates.
+		 *
+		 * A Durable Object class has to be exported from the worker's own entry
+		 * module, and the adapter generates that module — so there is nowhere in the
+		 * source tree to write the export, and no hand-written file can take the
+		 * module's place either, because the adapter treats `main` as its *output*
+		 * path and `rimraf`s it before writing. Appending after the build is the
+		 * one arrangement that leaves the entry where wrangler expects it, so plain
+		 * `wrangler deploy` and `wrangler dev` stay correct — including the
+		 * `npx wrangler deploy` that Cloudflare's deploy-on-push runs for us.
+		 *
+		 * The plugin reads the class names out of the file (rather than emitting
+		 * `export *`) because wrangler only resolves `DurableObjectNamespace<T>` for
+		 * named re-exports. A new class needs no change here, but does need adding
+		 * to `durable_objects.bindings` and `migrations` in wrangler.jsonc.
+		 *
+		 * `apply: 'build'` inside the plugin keeps it out of `vite dev` and vitest.
+		 */
+		cloudflareDoExporter({
+			durableObjects: ['src/lib/server/realtime/durable-object.ts']
+		})
+	],
 
 	test: {
 		projects: [

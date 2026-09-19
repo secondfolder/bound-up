@@ -5,8 +5,9 @@ import type { RealtimeNamespace } from './binding';
  * The production notifier: a Durable Object per partnership.
  *
  * This is the *worker* side — it talks to the object over `fetch`. The object
- * itself is `./durable-object.ts`, which is imported only by `worker.ts` so the
- * SvelteKit bundle never pulls the class in.
+ * itself is `./durable-object.ts`, which nothing here imports: its only importer
+ * is the export `sveltekit-cloudflare-do` appends to the generated worker, so
+ * the SvelteKit bundle never pulls the class in.
  *
  * The URL is a fiction. A Durable Object stub's `fetch` never makes a network
  * request; the host is ignored and only the path is read by the object's own

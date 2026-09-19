@@ -53,12 +53,22 @@ exercises the real Workers runtime (`nodejs_compat`, the assets binding,
 therefore the only one that can catch the dev/production divergences described
 below.
 
-Both it and `deploy` pass the entry **positionally** — `wrangler dev worker.ts`,
-not plain `wrangler dev`. `worker.ts` re-exports the adapter's generated worker
-plus the `RealtimeRoom` Durable Object class, which has to be exported from the
-worker's own module. `main` in `wrangler.jsonc` must stay on the adapter's
-default: the adapter treats `main` as its _output_ and deletes it before writing,
-so pointing it at `worker.ts` would make `npm run build` delete that file.
+Both it and `deploy` run wrangler with no entry argument: `main` in
+`wrangler.jsonc` is the worker the adapter generates, and wrangler is happy with
+that. The one wrinkle is the `RealtimeRoom` Durable Object class, which has to be
+exported from the worker's own module — a module the adapter generates, so there
+is nowhere in the source tree to put the export. The `sveltekit-cloudflare-do`
+plugin in `vite.config.ts` appends it once the adapter has written the file.
+
+Because wrangler needs no custom entry, Cloudflare's deploy-on-push works on its
+defaults — build command `npm run build`, deploy command `npx wrangler deploy`.
+
+> **Why `overrides` in package.json:** `sveltekit-cloudflare-do@0.2.1` ships a
+> self-referential `"sveltekit-cloudflare-do": "link:"` dependency — a pnpm
+> workspace artefact that was published by mistake — and npm refuses it outright
+> with `EUNSUPPORTEDPROTOCOL`. The override redirects that nested self-dependency
+> back at the top-level spec, which is the only way the package installs under
+> npm. Delete it if the package ever ships a fixed release.
 
 > **Known issue:** the built worker currently 500s on every page —
 > `ReferenceError: HTMLElement is not defined`, because the root layout imports
