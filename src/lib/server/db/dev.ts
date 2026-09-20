@@ -27,7 +27,7 @@ let devDb: Db | undefined;
  *     but the PRAGMA below is kept explicit so this does not silently depend on
  *     a libsql default that plain SQLite does not share.
  *   - D1's row/response size limits are not enforced locally.
- * `npm run preview:worker` is the pre-deploy gate that exercises the real path.
+ * `npm run preview` is the pre-deploy gate that exercises the real path.
  */
 export async function createDb(event: RequestEvent): Promise<Db> {
 	// `dev` is a build-time constant, so this whole branch — and with it the

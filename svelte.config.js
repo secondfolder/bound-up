@@ -18,7 +18,7 @@ const config = {
 		// so dropping `emulate` skips workerd entirely and makes the presence of
 		// `platform` mean exactly "running on Workers".
 		//
-		// `vite build` still uses the full adapter. Run `npm run preview:worker`
+		// `vite build` still uses the full adapter. Run `npm run preview`
 		// (real wrangler dev) to exercise the platform path before deploying.
 		adapter: { ...cloudflare, emulate: undefined }
 	}

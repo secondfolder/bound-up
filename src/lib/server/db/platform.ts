@@ -16,8 +16,8 @@ export function requireD1(platform: App.Platform | undefined): AnyD1Database {
 				'Workers. Check that wrangler.jsonc has a d1_databases entry with ' +
 				'"binding": "DB" and a real database_id (create one with ' +
 				'`npx wrangler d1 create bound-up`), and that migrations have been ' +
-				'applied with `npm run db:migrate:d1` (local) or ' +
-				'`npm run db:migrate:remote` (production).'
+				'applied with `npm run db:migrate:preview` (local) or ' +
+				'`npm run db:migrate:production` (production).'
 		);
 	}
 	return platform.env.DB;

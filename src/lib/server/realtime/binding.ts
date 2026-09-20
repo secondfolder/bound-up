@@ -42,8 +42,8 @@ export function requireRealtime(platform: App.Platform | undefined): RealtimeNam
 			'The Durable Object binding "REALTIME" is unavailable. This code path ' +
 				'only runs on Cloudflare Workers. Check that wrangler.jsonc has a ' +
 				'durable_objects binding named "REALTIME" pointing at the ' +
-				'"RealtimeRoom" class, that the top-level `migrations` array declares ' +
-				'it, and that the `sveltekit-cloudflare-do` plugin in vite.config.ts ' +
+				'"RealtimeRoom" class, that the top-level `exports` map declares it, ' +
+				'and that the `sveltekit-cloudflare-do` plugin in vite.config.ts ' +
 				'lists the file it is in, since the generated worker has to export ' +
 				'the class. Note that ' +
 				'`npm run dev` never reads this: it uses an in-process Map instead.'

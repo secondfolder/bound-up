@@ -2,6 +2,7 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import cloudflareDoExporter from 'sveltekit-cloudflare-do';
 import { defineConfig, type Plugin } from 'vitest/config';
+import { cloudflare } from '@cloudflare/vite-plugin';
 
 const host: string | undefined = process.env.HOST;
 const port: number = Number(process.env.PORT) || 58769;
@@ -24,7 +25,36 @@ function removeBareDevalueImport(): Plugin {
 	};
 }
 
-export default defineConfig({
+const getCloudflarePlugin = ({ command }: { command: string }) => {
+	/*
+    We only want to include this for `npm run dev` since we only need it providing a
+    tunnel for `npm run dev` and it fails when building for the first time due to
+    wrangler.jsonc referencing files that don't exist until after the build.
+    */
+	return command === 'serve'
+		? cloudflare({
+				/**
+				 * We rely on the web Crypto API which is only avaliable when the site is
+				 * accessed via HTTPS or localhost. That is an issue if we want to do dev
+				 * testing on a seperate device like a phone. So a Cloudflare tunnel can
+				 * be used to provide access over HTTPS.
+				 */
+				tunnel: {
+					autoStart: process.env.CF_TUNNEL_AUTO_START?.toLowerCase() === 'true',
+					name: process.env.CF_TUNNEL_NAME
+				},
+				/**
+				 * Without this it will try to load the file listed in `main` but that won't
+				 * exist until after running build for the first time.
+				 */
+				config: (userConfig) => {
+					delete userConfig.main;
+				}
+			})
+		: undefined;
+};
+
+export default defineConfig(({ command }) => ({
 	plugins: [
 		sveltekit(),
 		removeBareDevalueImport(),
@@ -44,13 +74,14 @@ export default defineConfig({
 		 * The plugin reads the class names out of the file (rather than emitting
 		 * `export *`) because wrangler only resolves `DurableObjectNamespace<T>` for
 		 * named re-exports. A new class needs no change here, but does need adding
-		 * to `durable_objects.bindings` and `migrations` in wrangler.jsonc.
+		 * to `durable_objects.bindings` and `exports` in wrangler.jsonc.
 		 *
 		 * `apply: 'build'` inside the plugin keeps it out of `vite dev` and vitest.
 		 */
 		cloudflareDoExporter({
 			durableObjects: ['src/lib/server/realtime/durable-object.ts']
-		})
+		}),
+		getCloudflarePlugin({ command })
 	],
 
 	test: {
@@ -108,4 +139,4 @@ export default defineConfig({
 		// its modules and never hydrates.
 		origin: process.env.VITE_DEV_ORIGIN
 	}
-});
+}));

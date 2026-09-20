@@ -188,17 +188,28 @@ site it applies to; go read that comment before deciding to break one.
       `sveltekit-cloudflare-do` plugin in `vite.config.ts` appends the export to
       the generated worker after the adapter runs; it scans the listed files for
       exported class names. A new class needs entries in
-      `durable_objects.bindings` and `migrations`, and a new _file_ of classes
+      `durable_objects.bindings` and `exports`, and a new _file_ of classes
       needs adding to the plugin's `durableObjects` list. Wrangler then needs no
       custom entry: plain `wrangler dev` / `wrangler deploy` are correct, which
       is what lets Cloudflare's deploy-on-push run on its default commands.
       (The `overrides` block in package.json exists only because that package
       publishes a broken `link:` self-dependency that npm rejects — see README.)
-    - **The two `migrations` in `wrangler.jsonc` are unrelated.**
-      `d1_databases[0].migrations_dir` is SQL applied by `npm run db:migrate:d1`;
-      the top-level `migrations` array is Durable Object class lifecycle, applied
-      by wrangler itself. It uses `new_sqlite_classes`, because SQLite-backed
-      Durable Objects are the only kind on the Workers Free plan.
+    - **Durable Object class lifecycle is `exports`, and is not a database
+      migration.** `d1_databases[0].migrations_dir` is SQL applied by
+      `npm run db:migrate:preview`; the top-level `exports` map declares that the
+      class exists and which storage backend its namespace gets, carries no
+      schema, and is applied by wrangler itself on deploy. It replaces the
+      legacy tagged `migrations` array, is mutually exclusive with it, and the
+      move is one-way — once deployed with `exports`, a deploy cannot go back.
+      Renames and deletions are tombstone entries (`"state": "renamed"` and so
+      on) rather than new tags. `"storage": "sqlite"` because SQLite-backed
+      Durable Objects are the only kind on the Workers Free plan, and because
+      storage backends are immutable once provisioned.
+    - **Lifecycle changes only apply through `wrangler deploy`.**
+      `wrangler versions upload` — what Cloudflare runs for non-production
+      branches — cannot apply them, and preview URLs are not generated for
+      Workers with a Durable Object at all. Non-production branch builds are
+      therefore close to useless for this Worker.
 
 16. **Web Awesome's Lit dependencies must resolve to their `node/` builds in
     the wrangler bundle.** `src/routes/+layout.svelte` statically imports the
@@ -212,7 +223,7 @@ site it applies to; go read that comment before deciding to break one.
     signup's `await import('age-encryption')`, leaving the form hung for the
     full timeout. Forcing the global `node` condition fixed Lit but dropped
     `production`, which broke `esm-env` and sent the worker down the dev
-    database path. `npm run preview:worker` plus a real page load is still the
+    database path. `npm run preview` plus a real page load is still the
     only check that exercises this path.
 
 ## Conventions
@@ -361,9 +372,8 @@ say in the comment why it is no longer needed rather than deleting it silently.
 
 ```sh
 # edit src/lib/server/db/schema/app.ts
-npm run db:generate      # then READ drizzle/000N_*.sql
-npm run db:migrate       # local.db
-npm run db:migrate:remote   # production, when deploying
+npm run db:generate         # then READ drizzle/000N_*.sql
+npm run db:migrate:dev      # local.db
 ```
 
 Reuse the `timestamps` helper in `schema/app.ts`; its `timestamp_ms` mode and
@@ -600,9 +610,9 @@ Unless the user explicilty indicates otherwise the plan or major change should i
 - `local.db`, `.env`, and `.dev.vars` are gitignored; `drizzle/` is not. Do not
   commit the first three or gitignore the last.
 - `.env` (vite dev) and `.dev.vars` (wrangler dev) are **separate files**.
-  `preview:worker` reads only the latter.
+  `preview` reads only the latter.
 - `wrangler.jsonc` ships `"database_id": "REPLACE_ME"`. `npm run dev` never
-  reads it; `preview:worker` and `deploy` do.
+  reads it; `preview` and `deploy` do.
 - `vite.config.ts` hardcodes a personal tunnel host in `allowedHosts` /
   `server.origin`. Expect to change it, not to inherit it. `server.origin` is
   overridable with `VITE_DEV_ORIGIN`, which is how the Playwright suite runs

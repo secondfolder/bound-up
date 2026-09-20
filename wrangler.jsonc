@@ -73,6 +73,15 @@
 	"observability": {
 		"enabled": true
 	},
+    "routes": [
+       {
+         "pattern": "boundup.secondfolder.com",
+         "custom_domain": true,
+         "enabled": true,
+         "previews_enabled": false
+       }
+    ],
+    "preview_urls": true,
 	"r2_buckets": [
 		{
 			"binding": "MEDIA",
@@ -94,27 +103,37 @@
 			}
 		]
 	},
-	// NOTHING to do with `d1_databases[0].migrations_dir` below, despite the
-	// shared word. That one is SQL applied by `npm run db:migrate:d1`; this is
-	// the Durable Object *class* lifecycle, which wrangler applies itself on
-	// deploy and which no db script touches.
+	// Durable Object *class* lifecycle — NOTHING to do with
+	// `d1_databases[0].migrations_dir` below, despite that field's name. That one
+	// is SQL applied by `npm run db:migrate:preview`; this one declares that the class
+	// exists and which storage backend its namespace gets, carries no schema, and
+	// is applied by wrangler itself on deploy. No db script touches it.
 	//
-	// `new_sqlite_classes`, not `new_classes`: SQLite-backed Durable Objects are
-	// the only kind available on the Workers Free plan. This class stores
-	// nothing either way, so the backend is a billing decision rather than a
-	// technical one.
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": ["RealtimeRoom"]
+	// This is the declarative replacement for the legacy tagged `migrations`
+	// array (`{ "tag": "v1", "new_sqlite_classes": [...] }`). The two are
+	// mutually exclusive, and the move is one-way: once deployed with `exports`,
+	// a later deploy cannot go back to `migrations`. Renames and deletions are
+	// expressed here too, as `"state": "renamed" | "deleted" | "transferred"`
+	// entries left behind as tombstones rather than as a new tag.
+	//
+	// `"storage": "sqlite"`, not `"legacy-kv"`: SQLite-backed Durable Objects are
+	// the only kind available on the Workers Free plan. This class stores nothing
+	// either way — it holds open SSE connections and no data — so the backend is
+	// a billing decision rather than a technical one. It is also permanent:
+	// storage backends are immutable once provisioned, so changing it later means
+	// deleting the namespace.
+	"exports": {
+		"RealtimeRoom": {
+			"type": "durable-object",
+			"storage": "sqlite"
 		}
-	],
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "bound-up",
 			// Replace with the id from `npx wrangler d1 create bound-up`.
-			// Only needed for `npm run preview:worker` and `npm run deploy` —
+			// Only needed for `npm run preview` and `npm run deploy` —
 			// `npm run dev` uses ./local.db and never reads this file.
 			"database_id": "eb783b31-d64c-4582-b386-d43c3d59ac67",
 			// drizzle-kit's `out`. Applied with `wrangler d1 migrations apply`;
