@@ -1,7 +1,7 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
-import { partnerships, userKeyWraps, userKeys } from './db/schema';
+import { passkey, partnerships, userKeyWraps, userKeys } from './db/schema';
 import type { KeyWrapParams, KeyWrapType } from '../encryption';
 import type { KeyWrapView, PartnerRecipientsView, UnlockBundleView } from '../types';
 
@@ -105,11 +105,18 @@ export async function listWrapsForUser(db: Db, userId: string): Promise<KeyWrapV
  * *every* page in the app, for something needed once per lock.
  */
 export async function getUnlockBundle(db: Db, userId: string): Promise<UnlockBundleView> {
-	const [keys, wraps] = await Promise.all([getUserKeys(db, userId), listWrapsForUser(db, userId)]);
+	const [keys, wraps, passkeys] = await Promise.all([
+		getUserKeys(db, userId),
+		listWrapsForUser(db, userId),
+		// One id is enough: the screens ask whether there is a passkey to offer,
+		// never which. Their names and metadata belong to /settings/security.
+		db.select({ id: passkey.id }).from(passkey).where(eq(passkey.userId, userId)).limit(1)
+	]);
 	return {
 		recipient: keys?.recipient ?? null,
 		historyWarningAcknowledged: keys?.historyWarningAcknowledged ?? false,
-		wraps
+		wraps,
+		hasPasskeys: passkeys.length > 0
 	};
 }
 

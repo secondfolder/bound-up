@@ -37,6 +37,8 @@ export type Keyring =
 			 * than after it — so the prompt can say up front that it will be back.
 			 */
 			tier: KeyTier;
+			/** Whether the account has any passkey, so one can be offered after. */
+			hasPasskeys: boolean;
 	  }
 	/**
 	 * Open. `identity` is a non-extractable `CryptoKey` wherever the browser can
@@ -95,7 +97,7 @@ async function cache(
 	userId: string,
 	recipient: string,
 	identity: string,
-	wraps: KeyWrapView[]
+	offer: { wraps: KeyWrapView[]; hasPasskeys: boolean }
 ): Promise<Keyring> {
 	const store = await keyStore();
 	// The store decides what form to write and hands back the form to hold in
@@ -108,7 +110,16 @@ async function cache(
 	// and nothing turns one of those into a string again. So if a passkey is
 	// worth offering, it has to be offered now or it has to ask for the password
 	// a second time. See docs/encryption.md.
-	if (passkeysAvailable() && !wraps.some((wrap) => wrap.type === 'webauthn-prf')) {
+	// `hasPasskeys` and not just `passkeysAvailable()`: the second says the
+	// browser has WebAuthn, and offering on that alone puts a button in front of
+	// people with no passkey registered, which opens a chooser with nothing in
+	// it. WebAuthn then reports that as a plain `NotAllowedError` — the same one
+	// a dismissal gives — so it cannot be explained afterwards either.
+	if (
+		offer.hasPasskeys &&
+		passkeysAvailable() &&
+		!offer.wraps.some((wrap) => wrap.type === 'webauthn-prf')
+	) {
 		openEnrolmentOffer({ userId, recipient, identity });
 	} else {
 		dismissEnrolmentOffer();
@@ -188,7 +199,7 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 		if (stashed) {
 			// Signup already has the identity in hand; login has to open a wrap.
 			if (stashed.identity && stashed.recipient === bundle.recipient) {
-				keyring = await cache(user.id, bundle.recipient, stashed.identity, bundle.wraps);
+				keyring = await cache(user.id, bundle.recipient, stashed.identity, bundle);
 				return keyring;
 			}
 			const opened = await tryWraps(
@@ -197,7 +208,7 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 				async () => stashed.wrapKey
 			);
 			if (opened) {
-				keyring = await cache(user.id, bundle.recipient, opened.identity, bundle.wraps);
+				keyring = await cache(user.id, bundle.recipient, opened.identity, bundle);
 				void noteWrapUsed(opened.wrapId);
 				return keyring;
 			}
@@ -208,7 +219,8 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 			recipient: bundle.recipient,
 			wraps: bundle.wraps,
 			reason: bundle.wraps.length === 0 ? 'no-usable-wrap' : 'cold',
-			tier: store.tier
+			tier: store.tier,
+			hasPasskeys: bundle.hasPasskeys
 		};
 		return keyring;
 	})();
@@ -230,7 +242,7 @@ export async function unlockWithPassword(
 	password: string
 ): Promise<Keyring> {
 	if (keyring.status !== 'locked') return keyring;
-	const { recipient, wraps } = keyring;
+	const { recipient, wraps, hasPasskeys } = keyring;
 
 	// Cache the master key per parameter set: several wraps can share one, and
 	// each derivation is 650,000 iterations. A plain object rather than a Map
@@ -259,7 +271,7 @@ export async function unlockWithPassword(
 		return keyring;
 	}
 
-	keyring = await cache(user.id, recipient, opened.identity, wraps);
+	keyring = await cache(user.id, recipient, opened.identity, { wraps, hasPasskeys });
 	void noteWrapUsed(opened.wrapId);
 	return keyring;
 }
@@ -335,7 +347,7 @@ export async function unlockWithPasskey(user: { id: string }, wrap: KeyWrapView)
 	const { recipient, wraps } = keyring;
 
 	const identity = await unwrapIdentityWithPasskey({ blob: wrap.blob, rpId: wrap.params.rpId });
-	keyring = await cache(user.id, recipient, identity, wraps);
+	keyring = await cache(user.id, recipient, identity, { wraps, hasPasskeys: true });
 	void noteWrapUsed(wrap.id);
 	return keyring;
 }

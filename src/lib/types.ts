@@ -180,6 +180,16 @@ export type UnlockBundleView = {
 	recipient: string | null;
 	historyWarningAcknowledged: boolean;
 	wraps: KeyWrapView[];
+	/**
+	 * Whether the account has any passkey at all.
+	 *
+	 * Not the same question as "can this browser do WebAuthn". Offering to set
+	 * up a passkey unlock to someone who has never registered one opens a
+	 * chooser with nothing in it, and WebAuthn reports that as the same error as
+	 * a cancelled prompt — so the offer has to be withheld rather than
+	 * explained afterwards.
+	 */
+	hasPasskeys: boolean;
 };
 
 /**

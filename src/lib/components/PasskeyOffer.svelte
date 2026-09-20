@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { currentRpId, describePasskeyFailure, wrapIdentityToPasskey } from '$lib/crypto/passkey';
+	import {
+		currentRpId,
+		describePasskeyFailure,
+		wrapIdentityToPasskey,
+		type PasskeyFailure
+	} from '$lib/crypto/passkey';
 	import {
 		currentEnrolmentOffer,
 		dismissEnrolmentOffer,
@@ -27,7 +32,7 @@
 	 */
 	const offer = $derived(currentEnrolmentOffer());
 	let busy = $state(false);
-	let failure: string | null = $state(null);
+	let failure: PasskeyFailure | null = $state(null);
 
 	const onSubmit: SubmitFunction = async ({ formData, cancel }) => {
 		const current = offer;
@@ -51,11 +56,11 @@
 			prepared = true;
 		} catch (error) {
 			cancel();
-			const described = describePasskeyFailure(error);
-			// A dismissed sheet leaves the offer standing and says nothing: they
-			// may have meant to pick a different passkey, and asking again costs
-			// them a tap rather than their password.
-			failure = described.cancelled ? null : described.message;
+			// The offer stays up whatever went wrong — the identity is still here
+			// and still sealable — but it never fails silently. A passkey that
+			// cannot do PRF and a dismissed sheet arrive as different kinds, and
+			// only the first is the user's problem to solve.
+			failure = describePasskeyFailure(error);
 		} finally {
 			if (!prepared) busy = false;
 		}
@@ -66,7 +71,12 @@
 			// Only on success. A rejected wrap leaves the offer up, because the
 			// identity is still here and still sealable until the window closes.
 			if (result.type === 'success') dismissEnrolmentOffer();
-			else failure = 'That passkey could not be saved. Your password still works.';
+			else {
+				failure = {
+					kind: 'unknown',
+					message: 'That passkey could not be saved. Your password still works.'
+				};
+			}
 			await update();
 		};
 	};
@@ -93,7 +103,7 @@
 			</wa-button>
 		</form>
 		{#if failure}
-			<p class="invalid">{failure}</p>
+			<p class={failure.kind === 'no-assertion' ? 'quiet' : 'invalid'}>{failure.message}</p>
 		{/if}
 	</wa-callout>
 {/if}
@@ -119,10 +129,18 @@
 			align-items: center;
 		}
 
-		.invalid {
+		.invalid,
+		.quiet {
 			margin: 0.5rem 0 0;
-			color: var(--wa-color-text-danger);
 			font-size: 0.8125rem;
+		}
+
+		.invalid {
+			color: var(--wa-color-text-danger);
+		}
+
+		.quiet {
+			color: var(--wa-color-text-quiet);
 		}
 	}
 </style>

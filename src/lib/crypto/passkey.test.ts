@@ -114,26 +114,42 @@ describe('wrapIdentityToPasskey', () => {
 });
 
 describe('describePasskeyFailure', () => {
-	it('treats a dismissed sheet as nothing worth saying', () => {
-		// WebAuthn reports a cancel, a timeout and an absent credential
-		// identically on purpose, so a page cannot learn which it was.
+	it('still says something when nothing answered', () => {
+		// The bug this replaced: WebAuthn reports a cancel, a timeout and an
+		// absent credential identically on purpose, so treating the first as
+		// "nothing to report" made the third look like a dead button.
 		const failure = describePasskeyFailure(
 			new DOMException('The operation either timed out or was not allowed', 'NotAllowedError')
 		);
-		expect(failure).toEqual({ cancelled: true, message: '' });
+		expect(failure.kind).toBe('no-assertion');
+		expect(failure.message).not.toBe('');
 	});
 
-	it('keeps age’s own message for a passkey that cannot do PRF', () => {
+	it('blames the authenticator, not the operating system, for a missing PRF', () => {
 		const failure = describePasskeyFailure(
 			new Error('PRF extension not available (need macOS 15+, Chrome 132+)')
 		);
-		expect(failure.cancelled).toBe(false);
-		expect(failure.message).toContain('PRF extension not available');
+		expect(failure.kind).toBe('no-prf');
+		// age's own text names macOS 15 and Chrome 132, which reads as nonsense
+		// to someone already on macOS 15 whose password manager is the problem.
+		expect(failure.message).not.toContain('macOS 15');
+		expect(failure.message).toMatch(/passkey cannot unlock/i);
+	});
+
+	it('catches the half-answer too', () => {
+		// age needs both PRF outputs; an authenticator returning one is just as
+		// unusable, and says so differently.
+		expect(describePasskeyFailure(new Error('Missing second PRF result')).kind).toBe('no-prf');
+	});
+
+	it('keeps a message nobody predicted, verbatim', () => {
+		const failure = describePasskeyFailure(new Error('something else entirely'));
+		expect(failure).toEqual({ kind: 'unknown', message: 'something else entirely' });
 	});
 
 	it('survives something that is not an Error at all', () => {
 		expect(describePasskeyFailure('gone wrong')).toEqual({
-			cancelled: false,
+			kind: 'unknown',
 			message: 'gone wrong'
 		});
 	});

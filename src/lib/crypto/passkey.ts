@@ -85,23 +85,49 @@ export async function unwrapIdentityWithPasskey(input: {
 }
 
 /**
- * What to say about a ceremony that did not finish.
+ * Why a ceremony produced nothing, and what to say about it.
  *
- * `cancelled` covers a dismissed sheet, a timeout and a passkey the user does
- * not have: WebAuthn reports all of them as `NotAllowedError` deliberately, so
- * that a page cannot use the error to learn which credentials exist. There is
- * nothing to tell the user about it — they were there.
+ * Always a message, never silence. The first version of this returned nothing
+ * for `NotAllowedError` on the grounds that a user who dismisses a sheet does
+ * not need to be told they dismissed it — which was wrong, because WebAuthn
+ * reports "you cancelled", "no credential matched" and "the provider gave up"
+ * as the *same* error, deliberately, so that a page cannot use the failure to
+ * learn which passkeys exist. A device with no usable passkey therefore looked
+ * exactly like a deliberate dismissal: the button did nothing, visibly.
  *
- * Everything else keeps age's own message, which is unusually good at this:
- * "PRF extension not available (need macOS 15+, Chrome 132+)" is more useful
- * than anything this file could say instead.
+ * - `no-assertion` — nothing came back. Quiet: it is usually a dismissal.
+ * - `no-prf` — a passkey answered but its provider returned no PRF output, so
+ *   it cannot be used for this. age's own message blames the OS version, which
+ *   is misleading when the authenticator is a password manager on an
+ *   up-to-date machine, so it is replaced here.
+ * - `unknown` — kept verbatim, because a message nobody predicted is more use
+ *   to whoever reads the bug report than one this file invented.
  */
-export function describePasskeyFailure(error: unknown): { cancelled: boolean; message: string } {
+export type PasskeyFailure = {
+	kind: 'no-assertion' | 'no-prf' | 'unknown';
+	message: string;
+};
+
+/** Matches what `age.webauthn` throws when the PRF results are missing. */
+const NO_PRF = /PRF extension not available|Missing second PRF result/i;
+
+export function describePasskeyFailure(error: unknown): PasskeyFailure {
 	if (error instanceof DOMException && error.name === 'NotAllowedError') {
-		return { cancelled: true, message: '' };
+		return {
+			kind: 'no-assertion',
+			message:
+				'No passkey answered. Dismissing the prompt does that — so does having no passkey saved for this site yet.'
+		};
 	}
-	return {
-		cancelled: false,
-		message: error instanceof Error ? error.message : String(error)
-	};
+
+	const message = error instanceof Error ? error.message : String(error);
+	if (NO_PRF.test(message)) {
+		return {
+			kind: 'no-prf',
+			message:
+				'That passkey cannot unlock your messages: its provider did not return the extra key material this needs. Passkeys saved in iCloud Keychain, Google Password Manager or Windows Hello support it; some password managers do not yet.'
+		};
+	}
+
+	return { kind: 'unknown', message };
 }

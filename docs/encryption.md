@@ -196,9 +196,32 @@ never both on screen. Its side effect is a good one: adding a way in requires
 proving you already have one.
 
 **Nothing is enrolled that has not already worked.** The wrap is produced by a
-real PRF evaluation, which fails loudly there and then if the credential cannot
-do PRF — a stronger check than reading `enabled` at registration, and at a
-better moment than a new device with no password to hand.
+real PRF evaluation, which fails there and then if the credential cannot do
+PRF. That is a stronger check than reading `enabled` at registration — but only
+if the failure is legible, and the first version of this got that wrong twice:
+
+- **An offer needs a passkey to exist.** `UnlockBundleView.hasPasskeys` says
+  whether the account has registered one, which is a different question from
+  whether the browser has WebAuthn. Offering on the second alone opens a chooser
+  with nothing in it, and WebAuthn reports that as a plain `NotAllowedError` —
+  the same error a dismissal gives, deliberately, so that a page cannot learn
+  which credentials exist. The offer is therefore withheld rather than explained
+  afterwards, and `/settings/encryption` points at Security instead.
+- **A failed ceremony always says something.** `describePasskeyFailure` sorts it
+  into `no-assertion` (quiet: usually a dismissal, and indistinguishable from
+  having nothing to offer), `no-prf` (the provider answered without PRF output)
+  and `unknown` (kept verbatim). age's own text for the PRF case names macOS 15
+  and Chrome 132, which reads as nonsense to someone already on macOS 15 whose
+  password manager is the thing at fault, so it is replaced with one that names
+  the authenticator.
+
+Not every provider can do this. Passkeys in iCloud Keychain, Google Password
+Manager and Windows Hello return PRF; some third-party password managers do not
+yet, on some platforms. `e2e/passkey.spec.ts` covers both outcomes against
+Chromium's virtual authenticator, which evaluates the PRF extension when CDP
+creates it with `hasPrf` — Playwright's own cross-browser
+`browserContext.credentials` API cannot, which is why that spec reaches for CDP
+directly.
 
 `params` holds the relying party id and nothing else: no credential id, because
 `allowCredentials` is left empty and the platform offers the user whichever

@@ -25,7 +25,14 @@ function wrap(over: Partial<KeyWrapView> & { id: string }): KeyWrapView {
 }
 
 function locked(wraps: KeyWrapView[]): Keyring {
-	return { status: 'locked', recipient: 'age1mine', wraps, reason: 'cold', tier: 'crypto-key' };
+	return {
+		status: 'locked',
+		recipient: 'age1mine',
+		wraps,
+		reason: 'cold',
+		tier: 'crypto-key',
+		hasPasskeys: true
+	};
 }
 
 describe('passkeyWrapFor', () => {

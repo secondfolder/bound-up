@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { describePasskeyFailure } from '$lib/crypto/passkey';
+	import { describePasskeyFailure, type PasskeyFailure } from '$lib/crypto/passkey';
 	import { MIN_PASSWORD_LENGTH } from '$lib/password-strength';
 	import PasswordField from './PasswordField.svelte';
 
@@ -39,19 +39,19 @@
 	let busy = $state(false);
 	let failed = $state(false);
 	let passkeyBusy = $state(false);
-	let passkeyError: string | null = $state(null);
+	let passkeyFailure: PasskeyFailure | null = $state(null);
 
 	async function onPasskey() {
 		if (!passkeyUnlock || passkeyBusy) return;
-		passkeyError = null;
+		passkeyFailure = null;
 		passkeyBusy = true;
 		try {
 			await passkeyUnlock();
 		} catch (error) {
-			const failure = describePasskeyFailure(error);
-			// A dismissed sheet is not worth a red message: they chose to dismiss
-			// it, and the password field is right there.
-			passkeyError = failure.cancelled ? null : failure.message;
+			// Always says something. A dismissal and a device with no usable
+			// passkey are the same error, so staying quiet about the first leaves
+			// the second looking like a button that does nothing.
+			passkeyFailure = describePasskeyFailure(error);
 		} finally {
 			passkeyBusy = false;
 		}
@@ -81,8 +81,10 @@
 		<wa-button type="button" variant="brand" onclick={onPasskey} disabled={passkeyBusy}>
 			{passkeyBusy ? 'Waiting for your passkey…' : 'Unlock with a passkey'}
 		</wa-button>
-		{#if passkeyError}
-			<span class="invalid">{passkeyError}</span>
+		{#if passkeyFailure}
+			<span class={passkeyFailure.kind === 'no-assertion' ? 'note' : 'invalid'}>
+				{passkeyFailure.message}
+			</span>
 		{/if}
 		<p class="divider">or use your password</p>
 	{/if}

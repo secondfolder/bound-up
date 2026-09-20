@@ -153,9 +153,12 @@
 	 * form that asks for one would be offering the harder way to do the thing
 	 * the callout above is offering to do for free.
 	 */
-	const canAddPasskey = $derived(
+	const passkeySectionApplies = $derived(
 		Boolean(data.bundle.recipient) && passkeysAvailable() && currentEnrolmentOffer() === null
 	);
+	const canAddPasskey = $derived(passkeySectionApplies && data.bundle.hasPasskeys);
+	/** They have no passkey to seal to, so the form would fail on the ceremony. */
+	const needsPasskeyFirst = $derived(passkeySectionApplies && !data.bundle.hasPasskeys);
 
 	/**
 	 * Seals the identity to a passkey, then posts the result as another wrap.
@@ -204,9 +207,8 @@
 			prepared = true;
 		} catch (error) {
 			cancel();
-			const failure = describePasskeyFailure(error);
-			// A dismissed sheet leaves no message: they chose to dismiss it.
-			passkeyErrors = failure.cancelled ? undefined : [failure.message];
+			// Always reported, including a dismissal: see `describePasskeyFailure`.
+			passkeyErrors = [describePasskeyFailure(error).message];
 		} finally {
 			// Never left in the box: on success it is not needed, and on failure
 			// leaving it there invites a retry of the same wrong value.
@@ -379,6 +381,15 @@
 					</li>
 				{/each}
 			</ul>
+
+			{#if needsPasskeyFirst}
+				<h2>Add a passkey</h2>
+				<p class="quiet">
+					You have no passkeys yet.
+					<a href={resolve('/(auth-required)/(app)/settings/security')}>Add one in Security</a>,
+					then come back here to use it for your messages.
+				</p>
+			{/if}
 
 			{#if canAddPasskey}
 				<h2>Add a passkey</h2>

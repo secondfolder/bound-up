@@ -27,6 +27,7 @@ import {
 	replaceUserKeys,
 	touchWrap
 } from './keys';
+import { passkey } from './db/schema';
 
 let harness: TestDb;
 let ada: TestUser;
@@ -125,7 +126,8 @@ describe('getUnlockBundle', () => {
 		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toEqual({
 			recipient: null,
 			historyWarningAcknowledged: false,
-			wraps: []
+			wraps: [],
+			hasPasskeys: false
 		});
 
 		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT });
@@ -135,7 +137,45 @@ describe('getUnlockBundle', () => {
 		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toEqual({
 			recipient: ADA_RECIPIENT,
 			historyWarningAcknowledged: false,
-			wraps: []
+			wraps: [],
+			hasPasskeys: false
+		});
+	});
+
+	/**
+	 * Whether there is a passkey at all, which is a different question from
+	 * whether the browser can do WebAuthn. Offering a passkey unlock to someone
+	 * who has registered none opens a chooser with nothing in it, and WebAuthn
+	 * reports that identically to a dismissed prompt — so the screens have to
+	 * know beforehand rather than explain afterwards.
+	 */
+	it('reports whether the account has a passkey to offer', async () => {
+		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT });
+		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
+			hasPasskeys: false
+		});
+
+		await harness.db.insert(passkey).values({
+			id: 'passkey-ada',
+			name: 'iPhone',
+			publicKey: 'irrelevant',
+			userId: ada.id,
+			credentialID: 'cred-ada',
+			counter: 0,
+			deviceType: 'singleDevice',
+			backedUp: false,
+			transports: 'internal',
+			createdAt: new Date()
+		});
+
+		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
+			hasPasskeys: true
+		});
+
+		// Someone else's passkey is not an offer for this account.
+		const jun = await createTestUser(harness.db, { name: 'Jun' });
+		await expect(getUnlockBundle(harness.db, jun.id)).resolves.toMatchObject({
+			hasPasskeys: false
 		});
 	});
 });

@@ -50,10 +50,10 @@ function browserWithPasskeys() {
 	vi.stubGlobal('navigator', { credentials: {}, platform: 'Test' });
 }
 
-function bundleIs(wraps: KeyWrapView[]) {
+function bundleIs(wraps: KeyWrapView[], hasPasskeys = true) {
 	vi.stubGlobal(
 		'fetch',
-		vi.fn(async () => new Response(JSON.stringify({ recipient, wraps })))
+		vi.fn(async () => new Response(JSON.stringify({ recipient, wraps, hasPasskeys })))
 	);
 }
 
@@ -103,6 +103,16 @@ describe('the offer after an unlock', () => {
 		expect(currentKeyring().status).toBe('unlocked');
 		expect(currentEnrolmentOffer()).toBeNull();
 		expect(enrolmentIdentityFor(ada.id)).toBeNull();
+	});
+
+	it('stays shut when the account has registered no passkey', async () => {
+		// The case that shipped broken: offering here opens a chooser with
+		// nothing in it, and WebAuthn reports that exactly like a dismissal.
+		bundleIs([], false);
+		await signInAs();
+
+		expect(currentKeyring().status).toBe('unlocked');
+		expect(currentEnrolmentOffer()).toBeNull();
 	});
 
 	it('stays shut on a browser with no WebAuthn at all', async () => {
