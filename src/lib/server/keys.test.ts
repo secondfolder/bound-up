@@ -49,8 +49,7 @@ describe('putUserKeys', () => {
 
 		await expect(getUserKeys(harness.db, ada.id)).resolves.toEqual({
 			recipient: ADA_RECIPIENT,
-			historyWarningAcknowledged: false,
-			embedAutoLoad: null
+			historyWarningAcknowledged: false
 		});
 		await expect(readWrapRows(harness.db, ada.id)).resolves.toHaveLength(1);
 	});
@@ -126,7 +125,6 @@ describe('getUnlockBundle', () => {
 		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toEqual({
 			recipient: null,
 			historyWarningAcknowledged: false,
-			embedAutoLoad: null,
 			wraps: []
 		});
 
@@ -137,7 +135,6 @@ describe('getUnlockBundle', () => {
 		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toEqual({
 			recipient: ADA_RECIPIENT,
 			historyWarningAcknowledged: false,
-			embedAutoLoad: null,
 			wraps: []
 		});
 	});

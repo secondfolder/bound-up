@@ -64,11 +64,13 @@ server through `/api/oembed`, because reddit's oEmbed API is CORS-blocked. That
 does widen what the server may transiently receive, but the derived preview is
 still stored only as ciphertext in the database.
 
-By default those URL disclosures happen only at send time or when a viewer
-presses `Show` for an older embed. After the user explicitly opts into
-automatic message-thread embeds, the same URL lookups may happen automatically
-for embeds that are in or near the viewport. The consent prompt says that those
-lookups are sent to Bound Up's servers and are never logged.
+Those URL disclosures happen when a URL is typed into the composer (the embed
+shown there is the real one, resolved the same way), at send time, and when an
+embed with no cached preview reaches the scrollport. There is deliberately no per-account opt-in
+gate in front of them: the lookups are not logged, and an embed only exists
+because the sender put it in the message or because this reader pressed `Show`
+for a link beside it. The scrollport wait that remains is about request volume,
+not consent.
 
 ## Design rule for new features
 

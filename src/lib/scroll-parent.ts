@@ -22,6 +22,24 @@ export function scrollParentOf(node: HTMLElement): HTMLElement {
 }
 
 /**
+ * True when `target` is wholly inside the scrollport that would move to reach it.
+ *
+ * Used to decide whether a smooth scroll is worth making: a reader who reveals
+ * an embed that lands where they are already looking should not have the page
+ * move under them, and one whose embed landed above the fold has no way of
+ * knowing anything happened unless it does.
+ */
+export function isWithinScrollport(target: Element): boolean {
+	const scroller = scrollParentOf(target as HTMLElement);
+	const rect = target.getBoundingClientRect();
+	const bounds =
+		scroller === document.scrollingElement
+			? { top: 0, bottom: window.innerHeight }
+			: scroller.getBoundingClientRect();
+	return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+}
+
+/**
  * Scrolls `target` into view inside whichever ancestor really scrolls.
  *
  * The offset arithmetic is the fiddly half: the document's own rect already

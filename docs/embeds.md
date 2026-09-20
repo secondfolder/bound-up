@@ -7,20 +7,23 @@ URL rendering is split into two jobs:
 2. `UrlEmbed.svelte` decides whether a URL becomes an inline embed, a metadata
    card, or stays a plain link.
 
-For messages specifically, there is now a third piece in the flow: the browser
-may cache resolved preview data for supported URLs in an encrypted
+For messages specifically, there is a third piece in the flow: the browser may
+cache resolved preview data for supported URLs in an encrypted
 `metadataCiphertext` sidecar on the message row. That cache is used first for
 board previews and inline message embeds, and is filled at send time for new
-messages. Older rows are backfilled only when the viewer explicitly presses the
-embed's `Show` button for a URL that does not already have a cached entry.
+messages. Older rows are backfilled the first time an embed with no cached
+entry actually loads.
 
-There is also a per-account auto-load preference for message-thread embeds.
-Until a user answers it, message threads stay on the manual `Show` path. On a
-device where they have never answered before, the third `Show` click opens a
-small consent dialog explaining that loading embeds sends the URL to Bound Up's
-servers and that those lookups are never logged. Saying yes stores an account-
-wide opt-in and this device immediately starts auto-loading message-thread
-embeds; saying no stores an account-wide opt-out and the prompt does not return.
+**Whether a message has an embed is decided by whoever wrote it, not by a
+setting.** There is no per-account preference and no consent gate: an embed the
+sender left in the message renders, and a link they did not embed renders as a
+link with a `Show` button the reader can press for themselves. That reveal is
+view state only — the sender's message is unchanged, and a reload brings the
+button back.
+
+An embed draws at the start of the line its URL is on, in the composer and in
+the thread alike — the composer shows the real `UrlEmbed`, not a placeholder.
+Where the node lives to make that work is [docs/rich-text.md](rich-text.md).
 
 The current scope is every prose field the app renders for a user: message
 bodies, task titles and descriptions, task-completion messages, reward titles
@@ -55,16 +58,15 @@ Reddit is the awkward one.
 The browser cannot fetch reddit's oEmbed endpoint directly because
 `https://www.reddit.com/oembed?url=...` sends no CORS headers, and
 `noembed.com` does not support reddit at all. So reddit URLs are the one case
-that may reach the server.
+that reaches the server.
 
-That is not automatic for the live embed path unless the viewer has explicitly
-opted into automatic message-thread embeds.
-
-- A reddit URL first renders as a link plus a `Show reddit embed` button.
-- Only when the viewer clicks that button does the client call `/api/oembed`.
 - `/api/oembed` accepts only reddit post URLs, requires a session, resolves
   share links (`/r/<sub>/s/<id>`) to their canonical comment thread, and fetches
   reddit's oEmbed server-side.
+- It is called when the embed reaches the scrollport, not on a click. Those
+  lookups are not logged, and the alternative — a button in front of every
+  reddit link somebody deliberately embedded — asked the reader to consent to
+  something the sender had already decided.
 
 The proxy returns two things the client cares about:
 
@@ -79,19 +81,14 @@ for some NSFW posts. When the post links to something we already embed natively
   renders the real media instead of the reddit frame. If there is no embeddable
   outbound URL, the client falls back to `embed.reddit.com` for the post itself.
 
-This is still the only place where a reddit URL is sent for a live embed. By
-default the click gate keeps that explicit. After a user opts into automatic
-message-thread embeds, the same request may happen automatically once the embed
-is near the viewport.
+This is still the only place where a reddit URL is sent for a live embed.
 
-Message metadata caching widens the privacy boundary deliberately: at send time,
-and when a viewer explicitly presses `Show` for an older uncached message URL,
-the browser may send that supported URL to `/api/embed-metadata` so Bound Up
-can resolve a first-party preview and the client can encrypt it into the
-message's metadata sidecar. After a viewer opts into automatic message-thread
-embeds, the browser may also make that request on thread open for embeds that
-are actually on screen or about to be. The database still stores only
-ciphertext for that sidecar.
+Message metadata caching widens the privacy boundary deliberately: while a URL
+is being written, at send time, and the first time an embed with no cached
+entry loads, the browser may send that supported URL to `/api/embed-metadata`
+so Bound Up can resolve a first-party preview and the client can encrypt it
+into the message's metadata sidecar. The database still stores only ciphertext
+for that sidecar.
 
 ## Safety model
 
@@ -114,27 +111,35 @@ navigate the top page away.
 browser. Re-renders and `invalidate()` calls reuse the cached response instead
 of hitting the same provider repeatedly.
 
-Messages now also have a persistent encrypted cache in `messages.metadata_ciphertext`.
-New sends try to fill it before posting the message. Older rows fill it only
-for URLs the viewer explicitly reveals and only when no cached entry for that
-URL exists yet. Once a cached entry exists it is reused by default, but the
-embed also offers a small manual refresh button so the viewer can ask for fresh
-details and rewrite just that one cached URL entry.
+Messages also have a persistent encrypted cache in `messages.metadata_ciphertext`.
+New sends try to fill it before posting the message. Older rows fill it the
+first time an embed loads with no cached entry for that URL — which, because
+activation waits for the scrollport, means the ones the reader actually
+reaches. Once a cached entry exists it is reused, but the embed offers a small
+manual refresh button so the viewer can ask for fresh details and rewrite just
+that one cached URL entry.
 
-`user_keys.embed_auto_load` stores the account-wide default for message-thread
-embeds: `NULL` means no answer yet, `1` means auto-load, `0` means stay manual.
-The initial prompt threshold is device-local, stored in localStorage, so one
-phone can ask after three manual reveals without forcing the same prompt to pop
-immediately on another.
+## Activation
 
-When auto-load is on, `UrlEmbed.svelte` still does not activate every embed at
-once. It first renders stable skeletons for every supported URL in the thread,
-using any cached title/provider details it already has while withholding the
-iframe or remote image itself. A small `IntersectionObserver` scheduler then
-starts the real fetch only when the embed is in or near the scrollport. Faster
-scroll velocity adds a short delay; if the user stops with the embed still near
-view, that delay collapses so the embed can load promptly where they actually
-paused.
+`UrlEmbed.svelte` splits embeds by whether they can draw anything on their own.
+
+- **Images and curated players** (redgifs, youtube, a direct image URL, and
+  anything a cached metadata entry already describes) render straight away.
+  Their URL is deterministic, so they are SSR-safe, and `loading="lazy"` keeps
+  an off-screen one off the network without any help.
+- **oEmbed and reddit embeds with nothing cached** have no picture to draw until
+  a provider answers, so they render a stable skeleton and start the request
+  only when they are in or near the scrollport.
+
+That split is about request volume, not consent: opening a thread must not fire
+a metadata lookup for every link in a year of conversation. The delay heuristic
+lives in `src/lib/embed-activation.ts` — faster scroll velocity adds a short
+delay, and stopping with the embed still near view collapses that delay so it
+loads promptly where the reader actually paused.
+
+The same `IntersectionObserver` decides when to report an activation back to
+the thread, which is what fills the encrypted metadata sidecar for a URL that
+has no cached entry yet.
 
 Failures are cached too as `'error'`, because a dead provider should degrade to
 one quiet plain link, not a refetch storm.

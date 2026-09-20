@@ -3,12 +3,6 @@
 	import { tick } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { invalidate } from '$app/navigation';
-	import {
-		EMBED_AUTO_LOAD_PROMPT_THRESHOLD,
-		embedAutoLoadPromptCountStorageKey,
-		readLocalEmbedAutoLoadPreference,
-		writeLocalEmbedAutoLoadPreference
-	} from '$lib/embed-autoload';
 	import { scrollIntoViewWithin } from '$lib/scroll-parent';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
 	import {
@@ -18,7 +12,6 @@
 		openMessageMetadata,
 		openReaction,
 		refreshMessageMetadata,
-		saveEmbedAutoLoadPreference,
 		sendMessage
 	} from '$lib/messaging/client';
 	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
@@ -32,8 +25,6 @@
 	let {
 		thread,
 		partnershipId,
-		userId,
-		embedAutoLoad = null,
 		tags = [],
 		recipients,
 		/**
@@ -48,8 +39,6 @@
 	}: {
 		thread: ThreadView;
 		partnershipId: string;
-		userId: string;
-		embedAutoLoad?: boolean | null;
 		tags?: TagView[];
 		recipients: PartnerRecipientsView;
 		canSend?: boolean;
@@ -72,21 +61,7 @@
 	let metadata: Record<string, MessageMetadataPayload | null> = $state({});
 	let reactions: Record<string, { emoji: string; mine: boolean }[]> = $state({});
 	let listElement: HTMLElement | undefined = $state();
-	// svelte-ignore state_referenced_locally
-	// Captures the served preference once so the prompt flow can flip this local
-	// state immediately without waiting for a reload.
-	let embedAutoLoadPreference = $state<boolean | null>(
-		readLocalEmbedAutoLoadPreference(userId) ?? embedAutoLoad
-	);
-	let showEmbedAutoLoadPrompt = $state(false);
-	let savingEmbedAutoLoad = $state(false);
-	let embedAutoLoadProblem = $state<string | null>(null);
 	const attemptedMetadataBackfill = new SvelteSet<string>();
-
-	$effect(() => {
-		const local = readLocalEmbedAutoLoadPreference(userId);
-		embedAutoLoadPreference = local ?? embedAutoLoad;
-	});
 
 	$effect(() => {
 		const unlocked = keyring.status === 'unlocked' ? keyring.identity : null;
@@ -195,7 +170,16 @@
 		if (response.ok) await invalidate(`messages:thread:${thread.id}`);
 	}
 
-	async function revealEmbed(message: MessageView, href: string) {
+	/**
+	 * Caches an embed's details on the message the first time one is loaded.
+	 *
+	 * Fired by the embed itself, once it is on screen and has nothing cached.
+	 * The next reader on either side then draws it without a lookup — which is
+	 * the whole point of the encrypted metadata sidecar. Attempts are counted
+	 * per message and URL so a provider that has nothing to say is asked once,
+	 * not once per re-render.
+	 */
+	async function cacheEmbedDetails(message: MessageView, href: string) {
 		if (targets.length === 0) return;
 		const key = `${message.id}:${href}`;
 		if (attemptedMetadataBackfill.has(key)) return;
@@ -209,7 +193,6 @@
 			targets
 		);
 		if (next) metadata[message.id] = next;
-		if (embedAutoLoadPreference === null) maybePromptForEmbedAutoLoad();
 	}
 
 	async function refreshEmbed(message: MessageView, href: string) {
@@ -217,42 +200,6 @@
 		const current = metadata[message.id] ?? null;
 		const next = await refreshMessageMetadata(partnershipId, message.id, href, current, targets);
 		if (next) metadata[message.id] = next;
-	}
-
-	function maybePromptForEmbedAutoLoad() {
-		if (typeof window === 'undefined' || embedAutoLoadPreference !== null) return;
-		const key = embedAutoLoadPromptCountStorageKey(userId);
-		const raw = window.localStorage.getItem(key);
-		const current = Number.parseInt(raw ?? '0', 10);
-		const next = Number.isFinite(current) ? current + 1 : 1;
-		window.localStorage.setItem(key, String(next));
-		if (next >= EMBED_AUTO_LOAD_PROMPT_THRESHOLD) {
-			embedAutoLoadProblem = null;
-			showEmbedAutoLoadPrompt = true;
-		}
-	}
-
-	async function chooseEmbedAutoLoad(enabled: boolean) {
-		savingEmbedAutoLoad = true;
-		embedAutoLoadProblem = null;
-		try {
-			writeLocalEmbedAutoLoadPreference(userId, enabled);
-			const saved = await saveEmbedAutoLoadPreference(enabled);
-			if (!saved) {
-				embedAutoLoadProblem = 'Could not save that preference';
-				return;
-			}
-			embedAutoLoadPreference = enabled;
-			showEmbedAutoLoadPrompt = false;
-			if (typeof window !== 'undefined') {
-				window.localStorage.setItem(
-					embedAutoLoadPromptCountStorageKey(userId),
-					String(EMBED_AUTO_LOAD_PROMPT_THRESHOLD)
-				);
-			}
-		} finally {
-			savingEmbedAutoLoad = false;
-		}
 	}
 </script>
 
@@ -266,8 +213,7 @@
 				{message}
 				payload={message.id in bodies ? bodies[message.id] : undefined}
 				metadata={message.id in metadata ? metadata[message.id] : undefined}
-				autoLoadEmbeds={embedAutoLoadPreference === true}
-				onRevealEmbed={(href) => revealEmbed(message, href)}
+				onEmbedActivated={(href) => cacheEmbedDetails(message, href)}
 				onRefreshEmbed={(href) => refreshEmbed(message, href)}
 				{partnershipId}
 				when={formatWhen(message.createdAt)}
@@ -277,41 +223,6 @@
 			/>
 		{/each}
 	</ul>
-
-	{#if showEmbedAutoLoadPrompt}
-		<wa-dialog class="embed-auto-load-dialog" label="Show embeds automatically" open>
-			<div class="prompt-body">
-				<p>
-					Showing URL embeds sends the linked URL to Bound Up's servers so they can resolve the
-					preview or player. Those lookups are never logged.
-				</p>
-				<p class="quiet">You can change this later in Encrypted messages.</p>
-				<div class="prompt-actions">
-					<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
-					<wa-button
-						type="button"
-						appearance="outlined"
-						disabled={savingEmbedAutoLoad}
-						onclick={() => chooseEmbedAutoLoad(false)}
-					>
-						No, keep Show buttons
-					</wa-button>
-					<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
-					<wa-button
-						type="button"
-						variant="brand"
-						disabled={savingEmbedAutoLoad}
-						onclick={() => chooseEmbedAutoLoad(true)}
-					>
-						Yes, load automatically
-					</wa-button>
-				</div>
-				{#if embedAutoLoadProblem}
-					<span class="invalid">{embedAutoLoadProblem}</span>
-				{/if}
-			</div>
-		</wa-dialog>
-	{/if}
 
 	<!--
 		`position: sticky; bottom: 0` INSIDE the scrolling <main> pins this to the
@@ -362,38 +273,5 @@
 			transparent,
 			var(--wa-color-surface-default, white) 0.75rem
 		);
-	}
-
-	wa-dialog.embed-auto-load-dialog {
-		--width: min(28rem, calc(100vw - 2rem));
-	}
-
-	.prompt-body {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-
-		p {
-			margin: 0;
-		}
-	}
-
-	.prompt-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-	}
-
-	.quiet,
-	.invalid {
-		font-size: 0.875rem;
-	}
-
-	.quiet {
-		color: var(--wa-color-text-quiet);
-	}
-
-	.invalid {
-		color: var(--wa-color-text-danger);
 	}
 </style>

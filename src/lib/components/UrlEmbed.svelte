@@ -7,7 +7,7 @@
 		type EmbedSpec,
 		type OembedResult
 	} from '$lib/embeds';
-	import { embedAutoLoadActivationDelayMs } from '$lib/embed-autoload';
+	import { embedActivationDelayMs } from '$lib/embed-activation';
 	import { scrollParentOf } from '$lib/scroll-parent';
 
 	type CardView = {
@@ -31,17 +31,17 @@
 	 * The inline embed for one supported URL.
 	 *
 	 * Images and curated player iframes (redgifs, youtube) render from a
-	 * deterministic URL, so they are SSR-safe and load immediately. Direct
-	 * oEmbed providers (noembed.com hosts) need a fetch, which runs only after
-	 * mount — never during SSR/prerender, so the server makes no third-party
-	 * requests and message plaintext (client-decrypted anyway) never drives
-	 * server-side behaviour.
+	 * deterministic URL, so they are SSR-safe and draw immediately, leaning on
+	 * `loading="lazy"` to keep a thread full of them off the network until they
+	 * are scrolled to.
 	 *
-	 * `server-oembed` (reddit) is different and stricter: resolving it sends
-	 * the URL to our own server, which is the one thing in this app that leaks
-	 * a fragment of message plaintext server-side (see docs/privacy.md). So it
-	 * never loads on its own — a placeholder card offers the embed, and only a
-	 * click unlocks the fetch. The click is the consent.
+	 * Anything that has to ask a provider what a URL is — a noembed host, or
+	 * reddit through our own proxy — cannot draw anything until that answer
+	 * arrives, so it renders a skeleton and starts the request only once it is
+	 * in or near the scrollport. That is a request-volume decision rather than
+	 * a consent one: opening a thread must not fire a metadata lookup for every
+	 * link in a year of conversation. The privacy boundary those lookups cross
+	 * is documented in docs/privacy.md.
 	 *
 	 * A failed or unknown embed silently falls back to a plain link: embeds are
 	 * decoration, and a dead provider (noembed has no SLA) must not leave a
@@ -53,9 +53,7 @@
 		label,
 		cached = null,
 		cachedPending = false,
-		autoLoad = false,
-		requireExplicitReveal = false,
-		onReveal = undefined,
+		onActivate = undefined,
 		onRefresh = undefined
 	}: {
 		spec: EmbedSpec;
@@ -63,34 +61,34 @@
 		label: string;
 		cached?: CachedEmbedDetails | null;
 		cachedPending?: boolean;
-		autoLoad?: boolean;
-		requireExplicitReveal?: boolean;
-		onReveal?: ((href: string) => void | Promise<void>) | undefined;
+		/** Fired once, when this embed starts loading with nothing cached for it. */
+		onActivate?: ((href: string) => void | Promise<void>) | undefined;
 		onRefresh?: ((href: string) => void | Promise<void>) | undefined;
 	} = $props();
 
-	// Only true after the viewer clicked the placeholder. Gates the
-	// server-proxied fetch. The gate itself stays mounted until the fetch has
-	// resolved, so the button can show a busy state without a layout jump.
-	let unlocked = $state(false);
 	let refreshing = $state(false);
-	let autoActivated = $state(false);
-	let autoTarget: HTMLElement | undefined = $state();
-	let autoSyncedCache = $state(false);
-	const activated = $derived(
-		unlocked ||
-			(autoLoad && autoActivated) ||
-			(!autoLoad && !requireExplicitReveal && spec.kind !== 'server-oembed')
+	let inView = $state(false);
+	let reportedActivation = $state(false);
+	let rootElement: HTMLElement | undefined = $state();
+
+	/**
+	 * True while this URL has nothing to draw until a provider answers.
+	 *
+	 * The one thing that decides whether an embed waits for the viewport. A
+	 * cached entry counts as an answer, which is why a message whose metadata
+	 * sidecar already covers a URL draws its card straight away.
+	 */
+	const needsDetails = $derived(
+		(spec.kind === 'oembed' || spec.kind === 'server-oembed') && cached === null
 	);
-	const gated = $derived(
-		(requireExplicitReveal || spec.kind === 'server-oembed') && !autoLoad && !unlocked
-	);
+	const activated = $derived(!needsDetails || (!cachedPending && inView));
 	const canRefresh = $derived(cached !== null && onRefresh !== undefined);
 
 	// The endpoint actually fetched: direct for noembed hosts, our proxy for
-	// reddit — but only once `unlocked`.
+	// reddit. Null until this embed is activated, and null forever when a
+	// cached entry already answers the question.
 	const endpoint = $derived(
-		cached !== null || cachedPending || gated || !activated
+		!activated || cached !== null || cachedPending
 			? null
 			: spec.kind === 'oembed'
 				? spec.endpoint
@@ -146,24 +144,6 @@
 		return cachedCardImage;
 	});
 
-	const gateVisible = $derived(
-		gated ||
-			(!autoLoad &&
-				spec.kind === 'server-oembed' &&
-				cached === null &&
-				!cachedPending &&
-				unlocked &&
-				oembed === undefined)
-	);
-	const waitingForRedditEmbed = $derived(
-		(spec.kind === 'server-oembed' || spec.kind === 'oembed') && unlocked && oembed === undefined
-	);
-
-	async function reveal(): Promise<void> {
-		unlocked = true;
-		await onReveal?.(href);
-	}
-
 	async function refresh(event: MouseEvent): Promise<void> {
 		event.preventDefault();
 		event.stopPropagation();
@@ -176,15 +156,6 @@
 		}
 	}
 
-	function markAutoTarget(node: HTMLElement) {
-		autoTarget = node;
-		return {
-			destroy() {
-				if (autoTarget === node) autoTarget = undefined;
-			}
-		};
-	}
-
 	function distanceFromViewport(target: HTMLElement, root: HTMLElement | null): number {
 		const rect = target.getBoundingClientRect();
 		const rootRect = root?.getBoundingClientRect();
@@ -195,9 +166,26 @@
 		return 0;
 	}
 
+	/**
+	 * Watches for this embed reaching the scrollport.
+	 *
+	 * Runs for every embed, not only the deferred ones: `inView` is also what
+	 * decides when to tell the caller that a URL with no cached details is
+	 * being loaded, and a thread should not backfill its whole metadata sidecar
+	 * the moment it opens.
+	 *
+	 * Without an `IntersectionObserver` — jsdom, and any browser old enough to
+	 * lack it — everything counts as in view immediately. Degrading to "load it
+	 * all" is right for a fallback: the alternative is an embed that never
+	 * appears.
+	 */
 	$effect(() => {
-		if (!autoLoad || !autoTarget || autoActivated || typeof window === 'undefined') return;
-		const target = autoTarget;
+		const target = rootElement;
+		if (!target || inView || typeof window === 'undefined') return;
+		if (typeof IntersectionObserver === 'undefined') {
+			inView = true;
+			return;
+		}
 		const scroller = scrollParentOf(target);
 		const root = scroller === document.scrollingElement ? null : scroller;
 		let velocityPxPerMs = 0;
@@ -218,7 +206,7 @@
 
 		const activate = () => {
 			clearDelay();
-			autoActivated = true;
+			inView = true;
 		};
 
 		const updateDistance = () => {
@@ -226,9 +214,9 @@
 		};
 
 		const schedule = () => {
-			if (!inRange || autoActivated) return;
+			if (!inRange || inView) return;
 			updateDistance();
-			const delay = embedAutoLoadActivationDelayMs({
+			const delay = embedActivationDelayMs({
 				intersectionRatio,
 				distancePx,
 				velocityPxPerMs
@@ -239,7 +227,7 @@
 			}
 			clearDelay();
 			delayTimer = window.setTimeout(() => {
-				if (inRange && !autoActivated) activate();
+				if (inRange && !inView) activate();
 			}, delay);
 		};
 
@@ -253,13 +241,13 @@
 			if (idleTimer !== undefined) window.clearTimeout(idleTimer);
 			idleTimer = window.setTimeout(() => {
 				velocityPxPerMs = 0;
-				if (inRange && !autoActivated) schedule();
+				if (inRange && !inView) schedule();
 			}, 120);
-			if (inRange && !autoActivated) schedule();
+			if (inRange && !inView) schedule();
 		};
 
 		const onResize = () => {
-			if (inRange && !autoActivated) schedule();
+			if (inRange && !inView) schedule();
 		};
 
 		const observer = new IntersectionObserver(
@@ -305,10 +293,18 @@
 		};
 	});
 
+	/**
+	 * Tells the caller this URL is being loaded with nothing cached for it.
+	 *
+	 * That is the message thread's cue to resolve the preview once and encrypt
+	 * it into the message's metadata sidecar, so the next reader — on either
+	 * side — draws it without a lookup. Gated on `inView` rather than on mount
+	 * so opening a long thread does not backfill every link in it at once.
+	 */
 	$effect(() => {
-		if (!autoLoad || !activated || cachedPending || cached !== null || autoSyncedCache) return;
-		autoSyncedCache = true;
-		void onReveal?.(href);
+		if (!inView || cachedPending || cached !== null || reportedActivation) return;
+		reportedActivation = true;
+		void onActivate?.(href);
 	});
 
 	/**
@@ -506,26 +502,21 @@
 		return 'card';
 	});
 
-	const showSkeleton = $derived.by(() => {
-		if (!autoLoad) return false;
-		if (!activated || cachedPending) return true;
-		if (
-			cachedCard ||
-			cachedStandaloneImage ||
-			cachedIframeEmbed ||
-			card ||
-			standaloneImage ||
-			iframeEmbed
-		) {
-			return false;
-		}
-		if (spec.kind === 'oembed' || spec.kind === 'server-oembed') return oembed !== 'error';
-		return false;
-	});
+	/**
+	 * A stable placeholder for an embed that cannot be drawn yet.
+	 *
+	 * Two windows. While details are on their way — a message's metadata still
+	 * decrypting, or the composer resolving the same preview the reader will
+	 * get — nothing is drawn at all, whatever the kind: a player that appears
+	 * bare and then grows a title card a moment later moves everything under
+	 * it. After that, only the kinds that still have nothing to draw wait:
+	 * anything resolved, including a failure, has something better to show.
+	 */
+	const showSkeleton = $derived(cachedPending || (needsDetails && oembed === undefined));
 
 	const showFallbackLink = $derived.by(() => {
 		if (cachedCard || cachedStandaloneImage || cachedIframeEmbed) return false;
-		if (gateVisible || showSkeleton || card || standaloneImage || iframeEmbed) return false;
+		if (showSkeleton || card || standaloneImage || iframeEmbed) return false;
 		if (spec.kind === 'server-oembed') return true;
 		if (oembed === undefined || oembed === 'error') return true;
 		return !oembedFrame && !oembed.title;
@@ -535,171 +526,169 @@
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
-{#if gateVisible}
-	<!-- The gate. Rendering the reddit embed means asking our server to fetch
-	     reddit for this URL, which hands the URL over — so nothing loads until
-	     the viewer clicks. Once clicked, the gate stays put and the button turns
-	     into a same-size loading state until an embed is actually ready, which
-	     avoids the jump from button to card/iframe on a fast response. -->
-	<span class="gate">
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-		<a {href} target="_blank" rel="noopener noreferrer ugc">{label}</a>
-		<button
-			type="button"
-			aria-label="Show"
-			class:busy={waitingForRedditEmbed}
-			aria-busy={waitingForRedditEmbed}
-			disabled={waitingForRedditEmbed}
-			onclick={reveal}
-		>
-			<span class:visually-hidden={waitingForRedditEmbed}>Show</span>
-			{#if waitingForRedditEmbed}
-				<span class="button-loading" aria-live="polite">
-					<wa-spinner></wa-spinner>
-				</span>
-			{/if}
-		</button>
-	</span>
-{:else if showSkeleton}
-	<span class="embed skeleton-shell" use:markAutoTarget aria-busy="true">
-		<span class="skeleton-card">
-			{#if skeletonCard?.providerName}
-				<span class="provider">{skeletonCard.providerName}</span>
-			{:else}
-				<span class="skeleton-line short"></span>
-			{/if}
-			{#if skeletonCard?.title}
-				<span class="title">{skeletonCard.title}</span>
-			{:else}
-				<span class="skeleton-line"></span>
-			{/if}
-		</span>
-		{#if skeletonKind !== 'card' || skeletonCard?.thumbnailUrl}
-			<span class:skeleton-media={true} class:image={skeletonKind === 'image'}></span>
-		{/if}
-	</span>
-{:else if cachedCard || card}
-	<span class="embed card-shell">
-		{#if canRefresh}
-			<button
-				type="button"
-				class="refresh"
-				aria-label="Refresh preview"
-				title="Refresh preview"
-				aria-busy={refreshing}
-				disabled={refreshing}
-				onclick={refresh}
-			>
-				{#if refreshing}
-					<wa-spinner></wa-spinner>
+<!--
+	One element wraps every branch so the scrollport observer always has
+	something to watch, whatever this embed turns out to be. It also gives the
+	reader's revealed cards a stable box to be scrolled to.
+-->
+<span class="url-embed" bind:this={rootElement}>
+	{#if showSkeleton}
+		<span class="embed skeleton-shell" aria-busy="true">
+			<span class="skeleton-card">
+				{#if skeletonCard?.providerName}
+					<span class="provider">{skeletonCard.providerName}</span>
 				{:else}
-					<wa-icon name="arrows-rotate" variant="solid"></wa-icon>
+					<span class="skeleton-line short"></span>
 				{/if}
-			</button>
-		{/if}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-		<a
-			class="card card-link"
-			href={(cachedCard ?? card)?.href}
-			target="_blank"
-			rel="noopener noreferrer ugc"
-		>
-			<span class="meta">
-				{#if (cachedCard ?? card)?.providerName}
-					<span class="provider">{(cachedCard ?? card)?.providerName}</span>
-				{/if}
-				{#if (cachedCard ?? card)?.title}
-					<span class="title">{(cachedCard ?? card)?.title}</span>
+				{#if skeletonCard?.title}
+					<span class="title">{skeletonCard.title}</span>
+				{:else}
+					<span class="skeleton-line"></span>
 				{/if}
 			</span>
-			{#if (cachedCard ?? card)?.thumbnailUrl}
-				<img
-					src={(cachedCard ?? card)?.thumbnailUrl}
-					alt=""
-					loading="lazy"
-					referrerpolicy="no-referrer"
-				/>
+			{#if skeletonKind !== 'card' || skeletonCard?.thumbnailUrl}
+				<span class:skeleton-media={true} class:image={skeletonKind === 'image'}></span>
 			{/if}
-		</a>
-		{#if cardImage}
+		</span>
+	{:else if cachedCard || card}
+		<span class="embed card-shell">
+			{#if canRefresh}
+				<button
+					type="button"
+					class="refresh"
+					aria-label="Refresh preview"
+					title="Refresh preview"
+					aria-busy={refreshing}
+					disabled={refreshing}
+					onclick={refresh}
+				>
+					{#if refreshing}
+						<wa-spinner></wa-spinner>
+					{:else}
+						<wa-icon name="arrows-rotate" variant="solid"></wa-icon>
+					{/if}
+				</button>
+			{/if}
+			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 			<a
-				class="card-media image"
-				href={cardImage.href}
+				class="card card-link"
+				href={(cachedCard ?? card)?.href}
 				target="_blank"
 				rel="noopener noreferrer ugc"
 			>
-				<img src={cardImage.src} alt={cardImage.alt} loading="lazy" referrerpolicy="no-referrer" />
+				<span class="meta">
+					{#if (cachedCard ?? card)?.providerName}
+						<span class="provider">{(cachedCard ?? card)?.providerName}</span>
+					{/if}
+					{#if (cachedCard ?? card)?.title}
+						<span class="title">{(cachedCard ?? card)?.title}</span>
+					{/if}
+				</span>
+				{#if (cachedCard ?? card)?.thumbnailUrl}
+					<img
+						src={(cachedCard ?? card)?.thumbnailUrl}
+						alt=""
+						loading="lazy"
+						referrerpolicy="no-referrer"
+					/>
+				{/if}
 			</a>
-		{:else if iframeEmbed}
-			<!-- Same sandbox as the curated players: the reddit post pointed here, and
+			{#if cardImage}
+				<a
+					class="card-media image"
+					href={cardImage.href}
+					target="_blank"
+					rel="noopener noreferrer ugc"
+				>
+					<img
+						src={cardImage.src}
+						alt={cardImage.alt}
+						loading="lazy"
+						referrerpolicy="no-referrer"
+					/>
+				</a>
+			{:else if iframeEmbed}
+				<!-- Same sandbox as the curated players: the reddit post pointed here, and
 		     the gate already covered the privacy half. These iframes deliberately do
 		     NOT set `referrerpolicy="no-referrer"`: Redgifs uses the embed origin as
 		     part of its cross-origin checks, and a missing Referer silently leaves
 		     the player blank. -->
-			<span class={iframeEmbed.shellClass} aria-busy={iframeLoading}>
-				{#if iframeLoading}
-					<span class="loading-overlay" aria-live="polite">
-						<wa-spinner></wa-spinner>
-						<span>Loading embed…</span>
-					</span>
-				{/if}
-				<iframe
-					class={iframeEmbed.frameClass ?? undefined}
-					src={iframeEmbed.src}
-					title={iframeEmbed.title}
-					height={iframeEmbed.height ?? undefined}
-					allowfullscreen={iframeEmbed.allowFullscreen}
-					loading="lazy"
-					onload={() => (iframeLoading = false)}
-					onerror={() => (iframeLoading = false)}
-					sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-				></iframe>
-			</span>
-		{/if}
-	</span>
-{:else if showFallbackLink}
-	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-	<a {href} target="_blank" rel="noopener noreferrer ugc">{label}</a>
-{:else if standaloneImage}
-	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-	<a class="embed image" href={standaloneImage.href} target="_blank" rel="noopener noreferrer ugc">
-		<!-- alt from the visible label: the URL text is the only description
+				<span class={iframeEmbed.shellClass} aria-busy={iframeLoading}>
+					{#if iframeLoading}
+						<span class="loading-overlay" aria-live="polite">
+							<wa-spinner></wa-spinner>
+							<span>Loading embed…</span>
+						</span>
+					{/if}
+					<iframe
+						class={iframeEmbed.frameClass ?? undefined}
+						src={iframeEmbed.src}
+						title={iframeEmbed.title}
+						height={iframeEmbed.height ?? undefined}
+						allowfullscreen={iframeEmbed.allowFullscreen}
+						loading="lazy"
+						onload={() => (iframeLoading = false)}
+						onerror={() => (iframeLoading = false)}
+						sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+					></iframe>
+				</span>
+			{/if}
+		</span>
+	{:else if showFallbackLink}
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+		<a {href} target="_blank" rel="noopener noreferrer ugc">{label}</a>
+	{:else if standaloneImage}
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+		<a
+			class="embed image"
+			href={standaloneImage.href}
+			target="_blank"
+			rel="noopener noreferrer ugc"
+		>
+			<!-- alt from the visible label: the URL text is the only description
 		     the sender gave us. -->
-		<img
-			src={standaloneImage.src}
-			alt={standaloneImage.alt}
-			loading="lazy"
-			referrerpolicy="no-referrer"
-		/>
-	</a>
-{:else if iframeEmbed}
-	<!-- The sandbox grants exactly what a hosted video player needs to run,
+			<img
+				src={standaloneImage.src}
+				alt={standaloneImage.alt}
+				loading="lazy"
+				referrerpolicy="no-referrer"
+			/>
+		</a>
+	{:else if iframeEmbed}
+		<!-- The sandbox grants exactly what a hosted video player needs to run,
 	     and no top-level navigation: the embed can play, pop out and go
 	     fullscreen, but it can never navigate this page away. -->
-	<span class={iframeEmbed.shellClass} aria-busy={iframeLoading}>
-		{#if iframeLoading}
-			<span class="loading-overlay" aria-live="polite">
-				<wa-spinner></wa-spinner>
-				<span>Loading embed…</span>
-			</span>
-		{/if}
-		<iframe
-			class={iframeEmbed.frameClass ?? undefined}
-			src={iframeEmbed.src}
-			title={iframeEmbed.title}
-			height={iframeEmbed.height ?? undefined}
-			allowfullscreen={iframeEmbed.allowFullscreen}
-			loading="lazy"
-			onload={() => (iframeLoading = false)}
-			onerror={() => (iframeLoading = false)}
-			sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-		></iframe>
-	</span>
-{/if}
+		<span class={iframeEmbed.shellClass} aria-busy={iframeLoading}>
+			{#if iframeLoading}
+				<span class="loading-overlay" aria-live="polite">
+					<wa-spinner></wa-spinner>
+					<span>Loading embed…</span>
+				</span>
+			{/if}
+			<iframe
+				class={iframeEmbed.frameClass ?? undefined}
+				src={iframeEmbed.src}
+				title={iframeEmbed.title}
+				height={iframeEmbed.height ?? undefined}
+				allowfullscreen={iframeEmbed.allowFullscreen}
+				loading="lazy"
+				onload={() => (iframeLoading = false)}
+				onerror={() => (iframeLoading = false)}
+				sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+			></iframe>
+		</span>
+	{/if}
+</span>
 
 <!-- eslint-enable svelte/no-navigation-without-resolve -->
 
 <style>
+	/* A block of its own: an embed is a block-level thing in the document, and
+	   the observer needs a box with real dimensions to measure. */
+	.url-embed {
+		display: block;
+	}
+
 	.embed {
 		display: block;
 		margin-block: 0.25rem;
@@ -737,12 +726,21 @@
 		}
 	}
 
+	/**
+	 * The embed's chrome is drawn from `currentColor`, never from a fixed black.
+	 *
+	 * An embed inherits whatever it is sitting in: the page, a received message
+	 * (dark in dark mode), or a sent one (always on brand blue). A black border
+	 * at 10% is invisible on two of those. Mixing the inherited text colour
+	 * means the frame follows the text it is next to, in both themes and on
+	 * both sides of a conversation, with no per-bubble overrides.
+	 */
 	.skeleton-shell {
 		display: block;
-		border: 1px solid rgb(0 0 0 / 10%);
+		border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 		border-radius: 0.5rem;
 		overflow: hidden;
-		background: rgb(0 0 0 / 4%);
+		background: color-mix(in srgb, currentColor 7%, transparent);
 	}
 
 	.skeleton-card {
@@ -754,7 +752,12 @@
 
 	.skeleton-line,
 	.skeleton-media {
-		background: linear-gradient(90deg, rgb(0 0 0 / 8%), rgb(255 255 255 / 28%), rgb(0 0 0 / 8%));
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, currentColor 8%, transparent),
+			color-mix(in srgb, currentColor 26%, transparent),
+			color-mix(in srgb, currentColor 8%, transparent)
+		);
 		background-size: 200% 100%;
 		animation: embed-shimmer 1.2s linear infinite;
 	}
@@ -772,7 +775,7 @@
 	.skeleton-media {
 		display: block;
 		aspect-ratio: 16 / 9;
-		border-block-start: 1px solid rgb(0 0 0 / 10%);
+		border-block-start: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 	}
 
 	.skeleton-media.image {
@@ -789,8 +792,8 @@
 	.card-shell {
 		display: block;
 		position: relative;
-		border: 1px solid rgb(0 0 0 / 10%);
-		background: rgb(0 0 0 / 4%);
+		border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+		background: color-mix(in srgb, currentColor 7%, transparent);
 		color: inherit;
 
 		img {
@@ -826,7 +829,7 @@
 
 	.card-media {
 		display: block;
-		border-block-start: 1px solid rgb(0 0 0 / 10%);
+		border-block-start: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 	}
 
 	.refresh {
@@ -843,7 +846,7 @@
 		border: 0;
 		border-radius: 999px;
 		background: transparent;
-		color: var(--wa-color-text-normal);
+		color: inherit;
 		cursor: pointer;
 
 		wa-icon,
@@ -861,49 +864,6 @@
 		display: block;
 		width: 100%;
 		border: 0;
-	}
-
-	.gate {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		vertical-align: baseline;
-
-		button {
-			position: relative;
-			font: inherit;
-			font-size: 0.9em;
-			padding: 0 0.7em;
-			line-height: 0.9lh;
-			height: 1lh;
-			border: 1px solid currentColor;
-			border-radius: 999px;
-			background: transparent;
-			color: inherit;
-			cursor: pointer;
-			min-inline-size: 3.75rem;
-			margin-inline-end: 0.1em;
-
-			&.busy {
-				cursor: pointer;
-			}
-
-			wa-spinner {
-				font-size: 0.875rem;
-			}
-		}
-	}
-
-	.button-loading {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.visually-hidden {
-		visibility: hidden;
 	}
 
 	@keyframes embed-shimmer {

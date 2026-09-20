@@ -130,9 +130,10 @@ function youtubeSpec(url: URL): EmbedSpec | null {
  *
  * Reddit's oEmbed endpoint works but is CORS-blocked, so these resolve
  * through our own `/api/oembed` proxy — which means the URL reaches the
- * server. Because message plaintext never otherwise touches the server (see
- * docs/privacy.md), UrlEmbed gates this kind behind an explicit click: the
- * link is sent only when the viewer asks for the embed.
+ * server. That is the one place message plaintext touches it at all (see
+ * docs/privacy.md), so `UrlEmbed` holds the request until the embed is in or
+ * near the scrollport: the lookup happens for embeds a reader actually
+ * reaches, not for every reddit link in the thread's history.
  */
 function redditSpec(url: URL): EmbedSpec | null {
 	if (!/(?:^|\.)reddit\.com$/i.test(url.hostname)) return null;
@@ -297,7 +298,54 @@ export async function fetchOembed(endpoint: string): Promise<OembedResult | 'err
 	}
 }
 
-/** Test hook: clear the module cache between cases. */
+/**
+ * Preview details for URLs, resolved by our own endpoint.
+ *
+ * The one place `/api/embed-metadata` is called from. Uncached on purpose:
+ * the send path wants what is true now, and the refresh button exists to
+ * replace a cached entry — handing either a remembered answer would defeat
+ * them. `fetchEmbedDetails` is the cached, one-URL form for the composer.
+ */
+export async function fetchEmbedMetadata(urls: string[]): Promise<CachedEmbedDetails[]> {
+	if (urls.length === 0) return [];
+	try {
+		const response = await fetch('/api/embed-metadata', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ urls })
+		});
+		if (!response.ok) return [];
+		const result = (await response.json()) as { embeds?: CachedEmbedDetails[] };
+		return Array.isArray(result.embeds) ? result.embeds : [];
+	} catch {
+		// Same posture as the oEmbed fetch: a preview that cannot be resolved
+		// degrades to a plain link rather than to a console error.
+		return [];
+	}
+}
+
+/**
+ * Details for one URL, remembered for the page.
+ *
+ * The composer draws the same card the reader will, which means resolving the
+ * same details the send path is about to cache. The promise is cached rather
+ * than its result, so an embed that is removed and put back does not ask
+ * twice, and neither do two editors showing the same link.
+ */
+const embedDetailsCache = new Map<string, Promise<CachedEmbedDetails | null>>();
+
+export function fetchEmbedDetails(url: string): Promise<CachedEmbedDetails | null> {
+	const cached = embedDetailsCache.get(url);
+	if (cached) return cached;
+	const pending = fetchEmbedMetadata([url]).then(
+		(embeds) => embeds.find((embed) => embed.href === url) ?? null
+	);
+	embedDetailsCache.set(url, pending);
+	return pending;
+}
+
+/** Test hook: clear the module caches between cases. */
 export function clearOembedCache(): void {
 	oembedCache.clear();
+	embedDetailsCache.clear();
 }

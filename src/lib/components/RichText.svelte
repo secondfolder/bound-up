@@ -1,8 +1,16 @@
 <script lang="ts">
-	import RichTextInline from './RichTextInline.svelte';
+	import { SvelteSet } from 'svelte/reactivity';
+	import RichTextInline, { type InlineEmbedContext } from './RichTextInline.svelte';
 	import UrlEmbed from './UrlEmbed.svelte';
 	import { embedSpecFor, type CachedEmbedDetails } from '$lib/embeds';
-	import { parseStoredRichText } from '$lib/richtext';
+	import { isWithinScrollport, scrollIntoViewWithin } from '$lib/scroll-parent';
+	import {
+		documentEmbedUrls,
+		inlineLinkUrls,
+		parseStoredRichText,
+		withInlineEmbeds,
+		type RichTextInlineNode
+	} from '$lib/richtext';
 
 	/**
 	 * Message, task and reward prose.
@@ -20,7 +28,7 @@
 	 * No `{@html}`: every character goes through ordinary interpolation. The
 	 * only sanitised markup in the app lives inside `UrlEmbed`.
 	 *
-	 * Embeds are their own block nodes rather than a property of the link that
+	 * Embeds are their own nodes rather than a property of the link that
 	 * produced them, which is why there is no `maxEmbeds` any more — a document
 	 * contains exactly the embeds it says it contains. `embedSpecFor` still runs
 	 * here rather than being stored, so a provider we drop degrades to a link
@@ -30,51 +38,137 @@
 		text,
 		cachedEmbeds = [],
 		cachedEmbedsPending = false,
-		autoLoadEmbeds = false,
-		requireExplicitReveal = false,
-		onRevealEmbed = undefined,
+		onEmbedActivated = undefined,
 		onRefreshEmbed = undefined
 	}: {
 		text: string;
 		cachedEmbeds?: CachedEmbedDetails[];
 		cachedEmbedsPending?: boolean;
-		autoLoadEmbeds?: boolean;
-		requireExplicitReveal?: boolean;
-		onRevealEmbed?: ((href: string) => void | Promise<void>) | undefined;
+		/** Called once per URL whose embed starts loading with nothing cached. */
+		onEmbedActivated?: ((href: string) => void | Promise<void>) | undefined;
 		onRefreshEmbed?: ((href: string) => void | Promise<void>) | undefined;
 	} = $props();
 
-	const blocks = $derived(parseStoredRichText(text).root.children);
+	const doc = $derived(parseStoredRichText(text));
+	const blocks = $derived(doc.root.children);
 	const cachedByHref = $derived(new Map(cachedEmbeds.map((embed) => [embed.href, embed])));
+
+	/** The URLs the writer gave an embed of their own. */
+	const embedded = $derived(new Set(documentEmbedUrls(doc)));
+
+	/**
+	 * The reveals this reader asked for, as `blockIndex:url`.
+	 *
+	 * View state and nothing else — deliberately not written back to the
+	 * message. The writer decided what this message looks like; a reader
+	 * expanding a link for themselves is closer to opening it in a tab than to
+	 * editing what was sent, so it lasts exactly as long as the page does.
+	 *
+	 * Keyed by block as well as URL so a link quoted in two paragraphs reveals
+	 * the one the reader pressed, above the line it is actually on.
+	 */
+	const revealed = new SvelteSet<string>();
+
+	/** The URL of the most recent reveal, so only that one is scrolled to. */
+	let scrollTo: string | null = null;
+
+	function canReveal(blockIndex: number, url: string): boolean {
+		return (
+			!embedded.has(url) && !revealed.has(`${blockIndex}:${url}`) && embedSpecFor(url) !== null
+		);
+	}
+
+	function reveal(blockIndex: number, url: string) {
+		scrollTo = url;
+		revealed.add(`${blockIndex}:${url}`);
+	}
+
+	/**
+	 * A paragraph's nodes with this reader's own reveals folded in.
+	 *
+	 * `withInlineEmbeds` is the same placement the composer uses, so a card the
+	 * reader asked for lands exactly where the writer's own would have: at the
+	 * start of the line its link is on.
+	 */
+	function inlineNodes(children: RichTextInlineNode[], blockIndex: number): RichTextInlineNode[] {
+		const urls = inlineLinkUrls(children).filter(
+			(url) =>
+				revealed.has(`${blockIndex}:${url}`) && !embedded.has(url) && embedSpecFor(url) !== null
+		);
+		return urls.length === 0 ? children : withInlineEmbeds(children, urls);
+	}
+
+	/**
+	 * Takes the reader to the card they just asked for.
+	 *
+	 * The card goes above the line, which for a long paragraph is somewhere they
+	 * cannot see. Only the card from the most recent press is considered, and
+	 * only when it actually landed out of view — moving the page for a card
+	 * already on screen is worse than not moving it at all.
+	 */
+	function embedMounted(url: string, node: HTMLElement) {
+		if (url !== scrollTo) return;
+		scrollTo = null;
+		if (isWithinScrollport(node)) return;
+		scrollIntoViewWithin(node, node, { behavior: 'smooth' });
+	}
+
+	/**
+	 * What every embed in this document needs from the message around it.
+	 *
+	 * Passed as one object through the recursive inline renderer rather than as
+	 * four props threaded through every level. The getters keep it live: the
+	 * object is built once, but what it hands back follows the props.
+	 */
+	const embeds: InlineEmbedContext = {
+		get cached() {
+			return cachedByHref;
+		},
+		get pending() {
+			return cachedEmbedsPending;
+		},
+		onActivate: (href) => onEmbedActivated?.(href),
+		onRefresh: (href) => onRefreshEmbed?.(href),
+		onMounted: embedMounted
+	};
 </script>
 
 {#each blocks as block, index (index)}
 	{#if block.type === 'paragraph'}
-		<p><RichTextInline nodes={block.children} /></p>
+		<!-- No whitespace inside the <p>: a newline there renders as a space in
+		     front of the sender's first character. -->
+		<p>
+			<RichTextInline
+				nodes={inlineNodes(block.children, index)}
+				{embeds}
+				canReveal={(url) => canReveal(index, url)}
+				onReveal={(url) => reveal(index, url)}
+			/>
+		</p>
 	{:else if block.type === 'list'}
 		{#if block.listType === 'number'}
 			<ol start={block.start}>
 				{#each block.children as item, itemIndex (itemIndex)}
-					<li><RichTextInline nodes={item.children} /></li>
+					<li><RichTextInline nodes={item.children} {embeds} /></li>
 				{/each}
 			</ol>
 		{:else}
 			<ul>
 				{#each block.children as item, itemIndex (itemIndex)}
-					<li><RichTextInline nodes={item.children} /></li>
+					<li><RichTextInline nodes={item.children} {embeds} /></li>
 				{/each}
 			</ul>
 		{/if}
 	{:else if embedSpecFor(block.url)}
+		<!-- A root-level embed with no paragraph after it for `parseStoredRichText`
+		     to move into. Rare, and older than the inline placement. -->
 		<UrlEmbed
 			spec={embedSpecFor(block.url)!}
 			href={block.url}
 			label={block.url}
 			cached={cachedByHref.get(block.url) ?? null}
 			cachedPending={cachedEmbedsPending}
-			autoLoad={autoLoadEmbeds}
-			{requireExplicitReveal}
-			onReveal={onRevealEmbed}
+			onActivate={onEmbedActivated}
 			onRefresh={onRefreshEmbed}
 		/>
 	{:else}

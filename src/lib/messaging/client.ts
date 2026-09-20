@@ -31,7 +31,7 @@ import {
 	type MessagePayload,
 	type ReactionPayload
 } from '$lib/crypto/messages';
-import { type CachedEmbedDetails } from '$lib/embeds';
+import { fetchEmbedMetadata } from '$lib/embeds';
 
 export type ComposedMessage = {
 	text: string;
@@ -162,22 +162,9 @@ function embeddableUrls(text: string): string[] {
 	return documentEmbedUrls(parseStoredRichText(text));
 }
 
-async function resolveEmbedMetadata(urls: string[]): Promise<CachedEmbedDetails[]> {
-	if (urls.length === 0) return [];
-
-	const response = await fetch('/api/embed-metadata', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ urls })
-	});
-	if (!response.ok) return [];
-	const result = (await response.json()) as { embeds?: CachedEmbedDetails[] };
-	return Array.isArray(result.embeds) ? result.embeds : [];
-}
-
 async function resolveMessageMetadata(text: string): Promise<MessageMetadataPayload | null> {
 	const urls = embeddableUrls(text);
-	const embeds = await resolveEmbedMetadata(urls);
+	const embeds = await fetchEmbedMetadata(urls);
 	if (embeds.length === 0) return null;
 	return { version: 1, embeds };
 }
@@ -306,7 +293,7 @@ async function writeMessageMetadataEntry(
 	recipients: string[],
 	replaceExisting: boolean
 ): Promise<MessageMetadataPayload | null> {
-	const embeds = await resolveEmbedMetadata([href]);
+	const embeds = await fetchEmbedMetadata([href]);
 	const embed = embeds.find((entry) => entry.href === href) ?? null;
 	if (!embed) return null;
 	const existing = current?.embeds ?? [];
@@ -354,17 +341,4 @@ export async function fetchAttachment(
 /** Records the history-warning acknowledgement. */
 export async function acknowledgeWarning(partnershipId: string): Promise<void> {
 	await fetch(`/api/partnerships/${partnershipId}/ack-warning`, { method: 'POST' });
-}
-
-/** Stores whether this account wants message-thread URL embeds to load automatically. */
-export async function saveEmbedAutoLoadPreference(enabled: boolean): Promise<boolean> {
-	const response = await fetch('/api/account/embed-auto-load', {
-		method: 'POST',
-		keepalive: true,
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ enabled })
-	});
-	if (!response.ok) return false;
-	const result = (await response.json().catch(() => null)) as { ok?: boolean } | null;
-	return result?.ok === true;
 }

@@ -5,18 +5,16 @@ stores only ciphertext. This document covers the keys: where they come from,
 where they are kept, and what the guarantee actually is. The messaging feature
 itself is [docs/messaging.md](messaging.md).
 
-Two narrow exceptions now exist for embeds. First, when a new message is sent,
-when an older one is being backfilled with no cached preview yet, or when a
-viewer has explicitly opted into automatic message-thread embeds and a supported
-URL is near the viewport, the client may send that URL to `/api/embed-metadata`
-so the server can resolve preview data and hand it back for encryption into the
-message's metadata sidecar. Second, if a viewer explicitly clicks to expand a
-reddit link, or has already opted into automatic message-thread embeds and the
-reddit embed is near the viewport, the client sends that URL to `/api/oembed`
-so the server can fetch reddit's CORS-blocked oEmbed endpoint. The server still
-does not store message plaintext, but it can now transiently receive those
-explicit URLs because some providers do not expose a browser-callable metadata
-API. The full behaviour lives in [docs/embeds.md](embeds.md).
+Two narrow exceptions exist for embeds. First, when a URL is typed into the
+composer, when a new message is sent, or when an embed with no cached preview
+loads, the client may send that URL to `/api/embed-metadata` so the server can resolve preview data and hand it back
+for encryption into the message's metadata sidecar. Second, a reddit embed
+sends its URL to `/api/oembed` so the server can fetch reddit's CORS-blocked
+oEmbed endpoint. Both happen when the embed reaches the scrollport rather than
+on thread open. The server still does not store message plaintext, but it can
+transiently receive those URLs because some providers do not expose a
+browser-callable metadata API, and those lookups are not logged. The full
+behaviour lives in [docs/embeds.md](embeds.md).
 
 ## What this does and does not promise
 
@@ -106,11 +104,10 @@ meter, why the meter rewards length over punctuation, and why
 Each user has one long-term age X25519 identity, generated in the browser at
 signup.
 
-| Where                       | What                                                                         |
-| --------------------------- | ---------------------------------------------------------------------------- |
-| `user_keys.recipient`       | The public `age1…`. Stored in the clear — it is public by construction.      |
-| `user_keys.embed_auto_load` | Message-thread embed preference. `NULL` means no answer yet.                 |
-| `user_key_wraps`            | One row per way to unlock: `(type, params, blob)`. All opaque to the server. |
+| Where                 | What                                                                         |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `user_keys.recipient` | The public `age1…`. Stored in the clear — it is public by construction.      |
+| `user_key_wraps`      | One row per way to unlock: `(type, params, blob)`. All opaque to the server. |
 
 `blob` is base64url of `12-byte IV ‖ AES-256-GCM(identity) ‖ 16-byte tag`, with
 the additional authenticated data set to `"bound-up-wrap-v1|" + recipient`.

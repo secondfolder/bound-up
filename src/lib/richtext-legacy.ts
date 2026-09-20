@@ -44,9 +44,11 @@ export function legacyTextToDocument(text: string): RichTextDocument {
 		const inlines = inlinesFrom(chunk);
 		if (inlines.length === 0) continue;
 
-		// Embeds sit above the paragraph that mentions them, matching where the
-		// editor puts one now. Deduplicated within the paragraph: the same URL
-		// twice in one breath meant one video, not two.
+		// Embeds sit above the paragraph as root-level blocks, which is the shape
+		// `parseStoredRichText` knows how to move to the start of each URL's own
+		// line — doing it here as well would duplicate that rule in the one file
+		// that is meant to be deletable. Deduplicated within the paragraph: the
+		// same URL twice in one breath meant one video, not two.
 		const seen = new Set<string>();
 		for (const url of embeddableUrlsIn(inlines)) {
 			if (seen.has(url)) continue;

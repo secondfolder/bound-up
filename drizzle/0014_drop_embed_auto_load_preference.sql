@@ -1,0 +1,1 @@
+ALTER TABLE `user_keys` DROP COLUMN `embed_auto_load`;

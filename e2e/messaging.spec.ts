@@ -8,6 +8,7 @@ import {
 	newSide,
 	openBoard,
 	signUp,
+	typeRichText,
 	writeThread
 } from './helpers';
 
@@ -776,37 +777,22 @@ test.describe('embeds', () => {
 					'and https://example.com/plain'
 			);
 
-			/**
-			 * Until the viewer opts into automatic embeds, every supported URL in
-			 * a message sits behind its own click gate — not just the reddit one.
-			 * Loading any of them fetches third-party content for a decrypted
-			 * message, so the click is the consent, per URL.
-			 */
-			const gateFor = (href: string) =>
-				ada.page
-					.locator('.gate')
-					.filter({ has: ada.page.locator(`a[href="${href}"]`) })
-					.getByRole('button', { name: 'Show' });
-
-			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(2);
-
-			// Revealed, the redgifs player renders inline, sandboxed.
-			await gateFor('https://www.redgifs.com/watch/abc123stub').click();
+			// Everything the sender embedded renders. No gate: an embed in a
+			// message is one the sender put there for the reader to see.
 			const player = ada.page.locator('iframe[src="https://www.redgifs.com/ifr/abc123stub"]');
 			await expect(player).toBeVisible();
 			await expect(player).toHaveAttribute('sandbox', /allow-scripts/);
 			await expect(player).not.toHaveAttribute('sandbox', /allow-top-navigation/);
 
-			// Reddit is the strictest of them: resolving it sends the URL to our
-			// own server, which only happens on that explicit click. Then the card
-			// and the provider's iframe html render through the stubbed proxy.
-			await gateFor('https://www.reddit.com/r/askreddit/comments/stub123/a_title/').click();
+			// Reddit included, which is the one that goes through our own server.
+			// It resolves as soon as it is near the scrollport, not on a click.
 			await expect(ada.page.getByText('A stubbed reddit post')).toBeVisible();
 			await expect(
 				ada.page.locator('iframe[src="https://www.redditmedia.com/x/embed"]')
 			).toBeVisible();
 
-			// The plain link stays an anchor, with no gate of its own.
+			// The plain link stays an anchor, and gets no Show button: there is
+			// nothing any provider could make of it.
 			await expect(ada.page.locator('a[href="https://example.com/plain"]')).toBeVisible();
 			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(0);
 		} finally {
@@ -815,65 +801,52 @@ test.describe('embeds', () => {
 		}
 	});
 
-	test('prompts for auto-load on the third Show click and can be turned back off', async ({
-		browser
-	}) => {
+	test('a removed embed stays removed, and the reader can ask for it back', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
-		let serveSingleUrlMetadata = true;
-
-		const embedFor = (href: string) => {
-			const id = new URL(href).pathname.split('/').filter(Boolean).at(-1) ?? 'embed';
-			return {
-				href,
-				fetchedAt: Date.now(),
-				kind: 'iframe',
-				providerName: 'Vimeo',
-				title: `Preview ${id}`,
-				description: null,
-				thumbnailUrl: null,
-				canonicalUrl: href,
-				imageUrl: null,
-				iframeSrc: `https://player.example/${id}`,
-				iframeHeight: 360,
-				faviconUrl: null,
-				themeColor: null
-			};
-		};
 
 		for (const page of [ada.page, jun.page]) {
-			await page.route('**/api/embed-metadata', async (route) => {
-				const body = (route.request().postDataJSON() ?? null) as { urls?: string[] } | null;
-				const urls = Array.isArray(body?.urls) ? body.urls : [];
-				if (urls.length !== 1 || !serveSingleUrlMetadata) {
-					await route.fulfill({
-						contentType: 'application/json',
-						body: JSON.stringify({ embeds: [] })
-					});
-					return;
-				}
-				await route.fulfill({
-					contentType: 'application/json',
-					body: JSON.stringify({ embeds: urls.map(embedFor) })
-				});
-			});
-			await page.route('**noembed.com/**', async (route) => {
-				const target = route.request().url();
-				const url = new URL(target);
-				const href = url.searchParams.get('url') ?? 'https://vimeo.com/embed';
-				const id = new URL(href).pathname.split('/').filter(Boolean).at(-1) ?? 'embed';
-				await route.fulfill({
+			await page.route('**noembed.com/**', (route) =>
+				route.fulfill({
 					contentType: 'application/json',
 					body: JSON.stringify({
-						title: `Preview ${id}`,
+						title: 'A stubbed vimeo clip',
 						provider_name: 'Vimeo',
-						html: `<iframe src="https://player.example/${id}"></iframe>`
+						html: '<iframe src="https://player.example/1"></iframe>'
 					})
-				});
-			});
+				})
+			);
 			await page.route('**player.example/**', (route) =>
 				route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>player</title>' })
 			);
+			await page.route('**/api/embed-metadata', async (route) => {
+				const body = (route.request().postDataJSON() ?? null) as { urls?: string[] } | null;
+				const [url] = Array.isArray(body?.urls) ? body.urls : [];
+				await route.fulfill({
+					contentType: 'application/json',
+					body: JSON.stringify({
+						embeds: url
+							? [
+									{
+										href: url,
+										fetchedAt: Date.now(),
+										kind: 'iframe',
+										providerName: url.includes('reddit') ? 'Reddit' : 'Vimeo',
+										title: 'A stubbed vimeo clip',
+										description: null,
+										thumbnailUrl: null,
+										canonicalUrl: url,
+										imageUrl: null,
+										iframeSrc: 'https://player.example/1',
+										iframeHeight: 360,
+										faviconUrl: null,
+										themeColor: null
+									}
+								]
+							: []
+					})
+				});
+			});
 		}
 
 		try {
@@ -883,51 +856,317 @@ test.describe('embeds', () => {
 
 			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
-			await writeThread(
-				ada.page,
-				[
-					'https://vimeo.com/1',
-					'https://vimeo.com/2',
-					'https://vimeo.com/3',
-					'https://vimeo.com/4'
-				].join('\n')
-			);
+			await clickWaButton(ada.page, 'Write something');
 
-			const threadUrl = ada.page.url();
-			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(4);
+			/**
+			 * A reddit share link embeds in the composer too. It is the one kind
+			 * that cannot resolve itself in the browser — reddit's oEmbed is
+			 * CORS-blocked — so before the composer asked for preview details it
+			 * sat on a skeleton here while the sent message showed a card.
+			 */
+			await typeRichText(ada.page, 'https://www.reddit.com/r/freeuse/s/eBGQNK85qk ');
+			await expect(
+				ada.page.locator('.richtext-editor .composer-embed').getByText('A stubbed vimeo clip')
+			).toBeVisible();
+			// Cleared again so the rest of the test has one link to reason about.
+			const surface = ada.page.locator('.richtext-editor .surface[contenteditable="true"]');
+			await surface.click();
+			await ada.page.keyboard.press('ControlOrMeta+A');
+			await ada.page.keyboard.press('Backspace');
+			await expect(surface).toHaveText('');
 
-			for (const id of ['1', '2']) {
-				await ada.page.getByRole('button', { name: 'Show' }).first().click();
-				await expect(ada.page.getByText(`Preview ${id}`)).toBeVisible();
+			const caretAt = () =>
+				ada.page.evaluate(() => {
+					const selection = document.getSelection();
+					const node = selection?.anchorNode ?? null;
+					return {
+						text: node?.nodeType === Node.TEXT_NODE ? node.textContent : null,
+						offset: selection?.anchorOffset ?? -1
+					};
+				});
+			const decorator = ada.page.locator('.richtext-editor .richtext-embed');
+
+			/**
+			 * Walks the caret left until it reaches `goal`, or gives up.
+			 *
+			 * By goal rather than by a fixed number of presses: how many stops
+			 * Lexical puts inside a URL is its business, and pinning the count
+			 * made this flaky for no benefit. The pause is not decoration —
+			 * Lexical learns where the caret went from `selectionchange`, which is
+			 * asynchronous, and a loop that outruns it walks straight past the
+			 * stop it is looking for.
+			 */
+			const arrowLeftTo = async (goal: { text: string; offset: number }) => {
+				for (let i = 0; i < 60; i += 1) {
+					const at = await caretAt();
+					if (at.text === goal.text && at.offset === goal.offset) return;
+					await ada.page.keyboard.press('ArrowLeft');
+					await ada.page.waitForTimeout(40);
+				}
+			};
+			const arrowLeft = async () => {
+				await ada.page.keyboard.press('ArrowLeft');
+				await ada.page.waitForTimeout(40);
+			};
+			const arrowRight = async () => {
+				await ada.page.keyboard.press('ArrowRight');
+				await ada.page.waitForTimeout(40);
+			};
+
+			/**
+			 * An embed at the very top of the message has nothing to its left.
+			 *
+			 * The left arrow there used to hand the caret to the point in front of
+			 * the embed — a real position that nothing draws a caret for — and the
+			 * press after that sent it to the end of the message. Now the press
+			 * does nothing at all, which is what the left arrow does at the start
+			 * of any message, and the embed stays selected.
+			 */
+			await typeRichText(ada.page, 'hello https://vimeo.com/1 world');
+			await expect(ada.page.locator('.richtext-editor .composer-embed')).toHaveCount(1);
+			await arrowLeftTo({ text: 'hello ', offset: 0 });
+			expect(await caretAt()).toEqual({ text: 'hello ', offset: 0 });
+
+			await arrowLeft();
+			await expect(decorator).toHaveClass(/is-selected/);
+			for (let i = 0; i < 3; i += 1) {
+				await arrowLeft();
+				await expect(decorator).toHaveClass(/is-selected/);
+				await expect(surface).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
 			}
 
-			await ada.page.getByRole('button', { name: 'Show' }).first().click();
+			await surface.click();
+			await ada.page.keyboard.press('ControlOrMeta+A');
+			await ada.page.keyboard.press('Backspace');
+			await expect(surface).toHaveText('');
+
+			await typeRichText(ada.page, 'first line');
+			await ada.page.keyboard.press('Shift+Enter');
+			await typeRichText(ada.page, 'watch https://vimeo.com/1');
+
+			// The caret is still inside the link, so there is no embed yet — and
+			// no offer to add one, because it is about to get one anyway. An offer
+			// here reads as though the automatic insertion had failed.
+			const embed = ada.page.locator('.richtext-editor .composer-embed');
+			const composerLink = ada.page.locator('.richtext-editor .surface a').first();
+			await expect(embed).toHaveCount(0);
+			await composerLink.hover({ position: { x: 4, y: 4 } });
+			await expect(ada.page.getByRole('button', { name: 'Add embed' })).toHaveCount(0);
+
+			// A space finishes the link, which is what moves the caret off it and
+			// puts the embed at the start of that line.
+			await ada.page.keyboard.type(' ');
+
+			// The real embed, in the composer, on its own row between the first
+			// line and the line holding the link — not at the top of the message.
+			await expect(embed).toHaveCount(1);
+			await expect(embed.getByText('A stubbed vimeo clip')).toBeVisible();
 			await expect(
-				ada.page.getByText(/Showing URL embeds sends the linked URL to Bound Up's servers/)
-			).toBeVisible();
-			await clickWaButton(ada.page, 'Yes, load automatically');
+				ada.page
+					.locator('.richtext-editor .richtext-embed')
+					.locator('xpath=preceding-sibling::*[1]')
+			).toHaveJSProperty('tagName', 'BR');
 
+			/**
+			 * Arrowing left off the head of the link's line, one stop at a time.
+			 *
+			 * Three things have to hold, and each of them was wrong at some point:
+			 * the caret stop beside the embed is an ordinary text position and
+			 * must not look selected; the stop *on* the embed has no caret at all,
+			 * so the browser's fallback caret at the top of the field has to stay
+			 * hidden or it reads as the caret having jumped there; and the stop
+			 * after that has to be somewhere a caret is actually drawn, which the
+			 * point in front of the embed is not.
+			 */
+			const lineStart = { text: 'watch ', offset: 0 };
+			await arrowLeftTo(lineStart);
+
+			// Beside the embed, at the head of its link's line: a real caret.
+			expect(await caretAt()).toEqual(lineStart);
+			await expect(decorator).not.toHaveClass(/is-selected/);
+			await expect(surface).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+
+			// One press on: the embed itself is the selection, and there is no
+			// caret to draw.
+			await arrowLeft();
+			await expect(decorator).toHaveClass(/is-selected/);
+			await expect(surface).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+
+			// One more: the end of the line above, not the start of the message.
+			await arrowLeft();
+			await expect(decorator).not.toHaveClass(/is-selected/);
+			expect(await caretAt()).toEqual({ text: 'first line', offset: 'first line'.length });
+			await expect(surface).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+
+			// And back the way it came, press for press: right onto the embed, then
+			// right off it. A stop in front of the embed would show up here as the
+			// embed not being selected yet.
+			await arrowRight();
+			await expect(decorator).toHaveClass(/is-selected/);
+			await arrowRight();
+			await expect(decorator).not.toHaveClass(/is-selected/);
+			expect(await caretAt()).toEqual(lineStart);
+
+			/**
+			 * Up and down, which have the same hole to cross.
+			 *
+			 * The embed is a block, so it has a row of its own — and that row holds
+			 * no text position, so a line move over it lands on the row beyond and
+			 * the embed cannot be reached from above or below at all. Reported as
+			 * pressing up from the line under the embed jumping to the line over it.
+			 */
+			const arrowUp = async () => {
+				await ada.page.keyboard.press('ArrowUp');
+				await ada.page.waitForTimeout(40);
+			};
+			const arrowDown = async () => {
+				await ada.page.keyboard.press('ArrowDown');
+				await ada.page.waitForTimeout(40);
+			};
+
+			await arrowUp();
+			await expect(decorator).toHaveClass(/is-selected/);
+			await expect(surface).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+
+			await arrowUp();
+			await expect(decorator).not.toHaveClass(/is-selected/);
+			expect(await caretAt()).toEqual({ text: 'first line', offset: 'first line'.length });
+
+			// And down again, press for press.
+			await arrowDown();
+			await expect(decorator).toHaveClass(/is-selected/);
+			await arrowDown();
+			await expect(decorator).not.toHaveClass(/is-selected/);
+			expect((await caretAt()).text).toBe('watch ');
+
+			/**
+			 * Except when the line the caret is in wraps.
+			 *
+			 * A wrapped line is several rows on screen and one line to Lexical, so
+			 * the model cannot tell the row above the caret from the line above it
+			 * — and taking the press on the second row would jump the caret clean
+			 * out of the line it is in. The browser is asked where the press was
+			 * going before it is taken over; this is the case that asks.
+			 */
+			await ada.page.keyboard.press('ControlOrMeta+A');
+			await ada.page.keyboard.press('ArrowRight');
+			await ada.page.keyboard.insertText(
+				' and then a good deal more text, enough of it that the line this is on has to be broken across more than one row before it reaches the end'
+			);
+			await ada.page.waitForTimeout(40);
+			const rowsOfCaretLine = () =>
+				ada.page.evaluate(() => {
+					const node = document.getSelection()?.anchorNode ?? null;
+					if (!node) return 0;
+					const range = document.createRange();
+					range.selectNodeContents(node);
+					return range.getClientRects().length;
+				});
+			// Asserted rather than assumed: a line that fitted would make the check
+			// below pass for the wrong reason.
+			expect(await rowsOfCaretLine()).toBeGreaterThan(1);
+
+			await arrowUp();
+			await expect(decorator).not.toHaveClass(/is-selected/);
+			expect((await caretAt()).text).toContain('more text');
+
+			/**
+			 * And a press on the card, which is how a pointer says "that one".
+			 *
+			 * Not the player: the preview is `pointer-events: none` all through,
+			 * so every press inside it lands on the same element and only where it
+			 * landed tells them apart.
+			 */
+			const player = ada.page.locator('.richtext-editor .composer-embed iframe');
+			const box = await player.boundingBox();
+			if (!box) throw new Error('the player has no box to press');
+			await ada.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+			await ada.page.waitForTimeout(40);
+			await expect(decorator).not.toHaveClass(/is-selected/);
+
+			await ada.page
+				.locator('.richtext-editor .composer-embed')
+				.click({ position: { x: 4, y: 4 } });
+			await expect(decorator).toHaveClass(/is-selected/);
+			await expect(surface).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+
+			/**
+			 * An embed caught inside an ordinary text selection is selected too —
+			 * typing over the selection takes it with everything else, so it has
+			 * to look like it is going.
+			 */
+			await surface.click();
+			await ada.page.keyboard.press('ControlOrMeta+A');
+			await expect(decorator).toHaveClass(/is-selected/);
+			// The range has a caret of its own, so nothing is hidden for it.
+			await expect(surface).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+
+			// Back to the end, so what follows starts where it used to.
+			await ada.page.keyboard.press('ControlOrMeta+A');
+			await ada.page.keyboard.press('ArrowRight');
+
+			// Removing it is meant to stick. Typing afterwards runs the same sweep
+			// that inserted it in the first place, so this is the real check.
+			await ada.page.getByRole('button', { name: /^Remove embedded preview/ }).click();
+			await expect(embed).toHaveCount(0);
+			await typeRichText(ada.page, 'later');
+			await expect(embed).toHaveCount(0);
+
+			// Hovering the link offers it back — the one way to undo a removal.
+			// Hovered near its start rather than at its centre on purpose: the
+			// button is drawn *over* the centre of the link, so a default hover
+			// would land on the button that is not there yet and then never be
+			// able to re-check the anchor underneath it.
+			await ada.page
+				.locator('.richtext-editor .surface a')
+				.first()
+				.hover({ position: { x: 4, y: 4 } });
+			await ada.page.getByRole('button', { name: 'Add embed' }).click();
+			await expect(embed).toHaveCount(1);
+			await ada.page.getByRole('button', { name: /^Remove embedded preview/ }).click();
+			await expect(embed).toHaveCount(0);
+
+			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
+			await clickWaButton(ada.page, 'Send');
+			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+
+			// The message went out without the embed, so the reader gets the link
+			// and an offer rather than a card.
+			const message = ada.page.locator('.messages li');
+			await expect(message.locator('a[href="https://vimeo.com/1"]')).toBeVisible();
+			await expect(message.locator('.card')).toHaveCount(0);
+
+			const show = ada.page.getByRole('button', { name: 'Show' });
+			await expect(show).toHaveCount(1);
+			await show.click();
+
+			// The card lands on the link's own line, and the offer goes.
+			await expect(message.getByText('A stubbed vimeo clip')).toBeVisible();
+			await expect(message.locator('.embed-slot')).toHaveCount(1);
 			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(0);
-			await expect(ada.page.getByText('Preview 4')).toBeVisible();
 
+			/**
+			 * The card's frame is mixed from the text colour it inherits, not from
+			 * a fixed black — which is what keeps it visible on a sent message's
+			 * brand-blue bubble and on a received one in dark mode. Asserted on
+			 * the sent bubble, where the text is white in both themes, so a black
+			 * border would be unmistakable.
+			 */
+			const frame = await message.locator('.card-shell').evaluate((node) => ({
+				border: getComputedStyle(node).borderTopColor,
+				text: getComputedStyle(node).color
+			}));
+			expect(frame.text).toContain('255, 255, 255');
+			// Chromium serialises a `color-mix` result in `color(srgb …)` form, so
+			// both spellings of white are accepted; what matters is that it is the
+			// text's colour and not the fixed black it used to be.
+			expect(frame.border).toMatch(/srgb 1 1 1|255, 255, 255/);
+
+			// Revealing is this reader's own view state and nothing more — the
+			// message itself is unchanged, so a reload starts over.
 			await ada.page.reload();
-			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(0);
-			await expect(ada.page.getByText('Preview 4')).toBeVisible();
-
-			await ada.page.goto('/settings/encryption');
-			// Not before hydration: this select saves through a fetch, so until
-			// the client has taken over a change is dropped AND hydration writes
-			// the old value back over it — the page then looks like it kept the
-			// new choice while having saved nothing. `data-ready` is set from
-			// onMount, the same signal waitForEnhancedForm uses for the forms.
-			const embedChoice = ada.page.locator('.embed-choice select[data-ready]');
-			await embedChoice.selectOption('manual');
-			await expect(embedChoice).toHaveValue('manual');
-
-			serveSingleUrlMetadata = false;
-			await ada.page.goto(threadUrl);
-			await reply(ada.page, 'https://vimeo.com/5');
-			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(5);
+			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(1);
+			await expect(ada.page.locator('.messages .embed-slot')).toHaveCount(0);
 		} finally {
 			await ada.close();
 			await jun.close();

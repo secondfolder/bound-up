@@ -1,12 +1,18 @@
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	$createNodeSelection as createNodeSelection,
 	$createTextNode as createTextNode,
+	$getNodeByKey as getNodeByKey,
 	$getRoot as getRoot,
+	$isElementNode as isElementNode,
+	$setSelection as setSelection,
 	type LexicalEditor
 } from 'lexical';
 import RichTextEditorHarness from './RichTextEditorHarness.svelte';
+import { clearOembedCache, type CachedEmbedDetails } from '$lib/embeds';
+import { $isEmbedNode as isEmbedNode } from '$lib/richtext-editor';
 import { FORMAT_BOLD, FORMAT_ITALIC, FORMAT_STRIKETHROUGH } from '$lib/richtext';
 
 /**
@@ -47,6 +53,13 @@ function typeInto(container: HTMLElement, value: string) {
 		{ discrete: true }
 	);
 }
+
+afterEach(() => {
+	// The composer's preview lookup is cached per URL for the page; without
+	// this a stub from one case answers the next one's question.
+	clearOembedCache();
+	vi.unstubAllGlobals();
+});
 
 describe('RichTextEditor', () => {
 	it('mounts an editing surface', async () => {
@@ -167,5 +180,464 @@ describe('RichTextEditor', () => {
 		await tick();
 
 		expect(container.querySelector('.surface')?.textContent).toContain('replaced');
+	});
+});
+
+/* ── embeds ─────────────────────────────────────────────────────────────── */
+
+/**
+ * A document with an embeddable link and the embed the composer would have put
+ * at the start of its line. Written out rather than typed in, because a real
+ * auto-link needs a caret and a keystroke — that half lives in the Playwright
+ * suite.
+ */
+const WITH_EMBED = JSON.stringify({
+	root: {
+		type: 'root',
+		children: [
+			{
+				type: 'paragraph',
+				children: [
+					{ type: 'text', text: 'look', format: 0 },
+					{ type: 'linebreak' },
+					{ type: 'embed', url: 'https://i.imgur.com/cat.jpg' },
+					{
+						type: 'autolink',
+						url: 'https://i.imgur.com/cat.jpg',
+						isUnlinked: false,
+						children: [{ type: 'text', text: 'https://i.imgur.com/cat.jpg', format: 0 }]
+					}
+				]
+			}
+		]
+	}
+});
+
+/** The same, for a URL whose preview is a player — an iframe to press or miss. */
+const WITH_PLAYER = JSON.stringify({
+	root: {
+		type: 'root',
+		children: [
+			{
+				type: 'paragraph',
+				children: [
+					{ type: 'text', text: 'look', format: 0 },
+					{ type: 'linebreak' },
+					{ type: 'embed', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+					{
+						type: 'autolink',
+						url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+						isUnlinked: false,
+						children: [
+							{ type: 'text', text: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', format: 0 }
+						]
+					}
+				]
+			}
+		]
+	}
+});
+
+function embedChips(container: HTMLElement): Element[] {
+	return [...container.querySelectorAll('.richtext-embed')];
+}
+
+/**
+ * Answers the composer's own preview lookup.
+ *
+ * The composer resolves the same details the send path will, so that what the
+ * writer sees is what the reader gets. Without this stub it sits on a skeleton
+ * forever, which is also what it should do.
+ */
+function stubEmbedMetadata(url: string, over: Partial<CachedEmbedDetails> = {}) {
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () =>
+			Response.json({
+				embeds: [
+					{
+						href: url,
+						fetchedAt: Date.now(),
+						kind: 'image',
+						providerName: 'Imgur',
+						title: 'A cat',
+						description: null,
+						thumbnailUrl: null,
+						canonicalUrl: url,
+						imageUrl: url,
+						iframeSrc: null,
+						iframeHeight: null,
+						faviconUrl: null,
+						themeColor: null,
+						...over
+					}
+				]
+			})
+		)
+	);
+}
+
+function removeButton(container: HTMLElement): HTMLElement {
+	const button = container.querySelector('.composer-embed .remove');
+	if (!(button instanceof HTMLElement)) throw new Error('no remove button on the embed');
+	return button;
+}
+
+describe('RichTextEditor, embeds', () => {
+	/**
+	 * The composer shows the real embed, not a stand-in: what the writer sees
+	 * while typing is what the reader gets. Lexical renders nothing for a
+	 * decorator on its own, so this is also the assertion that the mounting in
+	 * `RichTextEditor.svelte` actually runs.
+	 */
+	it('mounts the real embed into the editor, with a remove button', async () => {
+		stubEmbedMetadata('https://i.imgur.com/cat.jpg');
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+
+		// The resolved card, title and all — the same one the reader gets, not a
+		// bare image the writer cannot tell apart from a broken link.
+		await vi.waitFor(() => {
+			expect(container.querySelector('.surface .card')?.textContent).toContain('A cat');
+		});
+		expect(container.querySelector('.surface img')?.getAttribute('src')).toBe(
+			'https://i.imgur.com/cat.jpg'
+		);
+		expect(removeButton(container).getAttribute('aria-label')).toBe(
+			'Remove embedded preview of https://i.imgur.com/cat.jpg'
+		);
+	});
+
+	/**
+	 * The bug this cost the most time to find.
+	 *
+	 * `@lexical/link` unwraps an auto-link whose previous sibling is not text or
+	 * a line break, and an embed at the start of the link's line is exactly
+	 * that. The link silently became plain text on load — and for a description,
+	 * saving afterwards wrote the loss back. The fix is to settle the link, so
+	 * assert on what a reader would see: an anchor, still.
+	 */
+	it('keeps the link a link with an embed sitting in front of it', async () => {
+		const { container, component } = render(RichTextEditorHarness, {
+			props: { initial: WITH_EMBED }
+		});
+		await tick();
+
+		const anchor = container.querySelector('.surface a');
+		expect(anchor?.getAttribute('href')).toBe('https://i.imgur.com/cat.jpg');
+		expect(anchor?.textContent).toBe('https://i.imgur.com/cat.jpg');
+
+		// And it survives being serialised back out, which is what gets stored.
+		const stored = (component as unknown as { current: () => string }).current();
+		expect(stored).toContain('https://i.imgur.com/cat.jpg');
+		expect(JSON.parse(stored || '{}')).toBeTruthy();
+	});
+
+	/**
+	 * What selecting an embed has to look like, and what merely standing next to
+	 * it must not.
+	 *
+	 * Arrowing onto an inline decorator makes the node itself the selection —
+	 * `$createNodeSelection` is that exact state. The caret is then out of the
+	 * text, which is why the next Backspace takes the whole embed and why there
+	 * is nothing on screen to say so unless the embed says it.
+	 *
+	 * The caret stop immediately beside the embed is an ordinary text position
+	 * and is emphatically not that state, so it must not be marked: marking it
+	 * too made the embed look selected for two presses of the arrow key, only
+	 * one of which meant it.
+	 */
+	it('marks the embed only while it is the selection', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+		const editor = editorOf(container);
+		const surface = container.querySelector('.surface');
+		const embed = container.querySelector('.surface .richtext-embed');
+		expect(embed?.classList.contains('is-selected')).toBe(false);
+
+		const embedNode = () =>
+			editor.getEditorState().read(() => {
+				const paragraph = getRoot().getFirstChild();
+				const node = isElementNode(paragraph)
+					? paragraph.getChildren().find(isEmbedNode)
+					: undefined;
+				if (!node) throw new Error('expected an embed node');
+				return node.getKey();
+			});
+		const key = embedNode();
+
+		// Beside it: a caret, in the text, with the embed just behind it.
+		editor.update(
+			() => {
+				const node = getNodeByKey(key);
+				node?.selectNext(0, 0);
+			},
+			{ discrete: true }
+		);
+		await tick();
+		expect(embed?.classList.contains('is-selected')).toBe(false);
+		expect(surface?.classList.contains('widget-selected')).toBe(false);
+
+		// On it: no caret anywhere, the node itself selected.
+		editor.update(
+			() => {
+				const selection = createNodeSelection();
+				selection.add(key);
+				setSelection(selection);
+			},
+			{ discrete: true }
+		);
+		await tick();
+		expect(embed?.classList.contains('is-selected')).toBe(true);
+		// And no text caret is drawn while that is true, because there is no text
+		// position to draw — the browser would otherwise park one at the start.
+		expect(surface?.classList.contains('widget-selected')).toBe(true);
+
+		// And moving off it again clears both.
+		editor.update(
+			() => {
+				getRoot().selectEnd();
+			},
+			{ discrete: true }
+		);
+		await tick();
+		expect(embed?.classList.contains('is-selected')).toBe(false);
+		expect(surface?.classList.contains('widget-selected')).toBe(false);
+	});
+
+	/**
+	 * An embed caught inside an ordinary text selection.
+	 *
+	 * Dragging across one selects it as surely as arrowing onto it does — it is
+	 * in the range, it will go when the range is typed over — so it has to say
+	 * so. The caret is a different matter: the range has one, so it stays drawn,
+	 * unlike when the embed is the whole selection.
+	 */
+	it('marks an embed that a text selection runs across', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+		const editor = editorOf(container);
+		const embed = container.querySelector('.surface .richtext-embed');
+		const surface = container.querySelector('.surface');
+
+		editor.update(
+			() => {
+				const block = getRoot().getFirstChild();
+				if (!isElementNode(block)) throw new Error('expected a paragraph');
+				// From the start of the text above it to the end of the link below.
+				block.select(0, block.getChildrenSize());
+			},
+			{ discrete: true }
+		);
+		await tick();
+		expect(embed?.classList.contains('is-selected')).toBe(true);
+		// The selection has a caret of its own, so nothing is hidden.
+		expect(surface?.classList.contains('widget-selected')).toBe(false);
+	});
+
+	/**
+	 * Pressing the card, which is the gesture that had no effect at all: the
+	 * preview swallows pointer events so the caret simply stayed where it was,
+	 * and the embed read as part of the wallpaper.
+	 */
+	it('selects the embed when its card is pressed', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+		const card = container.querySelector('.composer-embed');
+		if (!card) throw new Error('expected a composer embed');
+
+		await fireEvent.pointerDown(card, { clientX: 4, clientY: 4 });
+		await tick();
+
+		expect(container.querySelector('.richtext-embed')?.classList.contains('is-selected')).toBe(
+			true
+		);
+		expect(container.querySelector('.surface')?.classList.contains('widget-selected')).toBe(true);
+	});
+
+	/**
+	 * Except over a player, which is not the card. Everything inside the preview
+	 * is `pointer-events: none`, so the press lands on the same element wherever
+	 * it was aimed and only the geometry can tell the two apart.
+	 */
+	it('leaves a press on the player alone', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_PLAYER } });
+		await tick();
+		const card = container.querySelector('.composer-embed');
+		if (!card) throw new Error('expected a composer embed');
+		// The player replaces the skeleton once the details lookup has settled,
+		// which it does by failing: there is no server here.
+		const frame = await vi.waitFor(() => {
+			const found = container.querySelector('.composer-embed iframe');
+			if (!found) throw new Error('expected a player in the composer');
+			return found;
+		});
+
+		frame.getBoundingClientRect = () =>
+			({ left: 10, top: 10, right: 60, bottom: 50, width: 50, height: 40 }) as DOMRect;
+
+		await fireEvent.pointerDown(card, { clientX: 30, clientY: 30 });
+		await tick();
+		expect(container.querySelector('.richtext-embed')?.classList.contains('is-selected')).toBe(
+			false
+		);
+
+		// And the card around it still selects, at a point outside the frame.
+		await fireEvent.pointerDown(card, { clientX: 4, clientY: 4 });
+		await tick();
+		expect(container.querySelector('.richtext-embed')?.classList.contains('is-selected')).toBe(
+			true
+		);
+	});
+
+	/**
+	 * An embed has no text of its own — its URL lives in the link that produced
+	 * it — so a composer holding one and nothing else used to be called empty,
+	 * and the placeholder sat on top of the picture.
+	 */
+	it('does not call itself empty when it holds only an embed', async () => {
+		const onlyEmbed = JSON.stringify({
+			root: {
+				type: 'root',
+				children: [
+					{ type: 'paragraph', children: [{ type: 'embed', url: 'https://i.imgur.com/cat.jpg' }] }
+				]
+			}
+		});
+		const { container } = render(RichTextEditorHarness, { props: { initial: onlyEmbed } });
+		await tick();
+
+		expect(container.querySelector('.surface .richtext-embed')).not.toBeNull();
+		expect(container.querySelector('.placeholder')).toBeNull();
+	});
+
+	/** Inside the paragraph, after the line break, not above the whole block. */
+	it('keeps the embed on the line its link is on', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+
+		const embed = container.querySelector('.surface .richtext-embed');
+		expect(embed?.closest('p')).not.toBeNull();
+		expect(embed?.previousElementSibling?.tagName).toBe('BR');
+	});
+
+	/**
+	 * The regression this whole change exists for.
+	 *
+	 * Removing the embed and then moving the caret used to put it straight back,
+	 * because the sweep only knew "this link has no embed above it" and the
+	 * caret leaving a link is exactly what triggers a sweep.
+	 */
+	it('does not put a removed embed back when the caret leaves the link again', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+		expect(embedChips(container)).toHaveLength(1);
+
+		await fireEvent.click(removeButton(container));
+		await tick();
+		expect(embedChips(container)).toHaveLength(0);
+
+		// Any edit runs the sweep, which is what would have re-inserted it.
+		typeInto(container, ' and more');
+		await tick();
+		expect(embedChips(container)).toHaveLength(0);
+	});
+
+	/**
+	 * Two links on one line share a line start, so the second embed has to go
+	 * after the first. Inserting it in front would stack the previews in the
+	 * opposite order to the links they belong to.
+	 */
+	it('stacks embeds for one line in the order their links appear', async () => {
+		const twoLinks = JSON.stringify({
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{
+								type: 'autolink',
+								url: 'https://i.imgur.com/one.jpg',
+								isUnlinked: false,
+								children: [{ type: 'text', text: 'https://i.imgur.com/one.jpg', format: 0 }]
+							},
+							{ type: 'text', text: ' ', format: 0 },
+							{
+								type: 'autolink',
+								url: 'https://i.imgur.com/two.jpg',
+								isUnlinked: false,
+								children: [{ type: 'text', text: 'https://i.imgur.com/two.jpg', format: 0 }]
+							}
+						]
+					}
+				]
+			}
+		});
+		const { container } = render(RichTextEditorHarness, { props: { initial: twoLinks } });
+		await tick();
+		// Any edit runs the sweep, which is what inserts both.
+		typeInto(container, ' x');
+		await tick();
+
+		expect(
+			[...container.querySelectorAll('.surface .richtext-embed')].map((node) =>
+				node.getAttribute('aria-label')
+			)
+		).toEqual([
+			'Embedded preview of https://i.imgur.com/one.jpg',
+			'Embedded preview of https://i.imgur.com/two.jpg'
+		]);
+	});
+
+	it('offers a way back: hovering the link shows a button that re-embeds it', async () => {
+		const { container, getByLabelText, queryByLabelText } = render(RichTextEditorHarness, {
+			props: { initial: WITH_EMBED }
+		});
+		await tick();
+
+		// While the embed is there the link has nothing to offer.
+		await fireEvent.pointerOver(container.querySelector('.surface a')!);
+		await tick();
+		expect(queryByLabelText('Add embed')).toBeNull();
+
+		await fireEvent.click(removeButton(container));
+		await tick();
+
+		await fireEvent.pointerOver(container.querySelector('.surface a')!);
+		await tick();
+		await fireEvent.click(getByLabelText('Add embed'));
+		await tick();
+
+		expect(embedChips(container)).toHaveLength(1);
+	});
+
+	it('shows no embed button over a link no provider can embed', async () => {
+		const plain = JSON.stringify({
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{
+								type: 'autolink',
+								url: 'https://example.com/nothing',
+								isUnlinked: false,
+								children: [{ type: 'text', text: 'https://example.com/nothing', format: 0 }]
+							}
+						]
+					}
+				]
+			}
+		});
+		const { container, queryByLabelText } = render(RichTextEditorHarness, {
+			props: { initial: plain }
+		});
+		await tick();
+
+		await fireEvent.pointerOver(container.querySelector('.surface a')!);
+		await tick();
+		expect(queryByLabelText('Add embed')).toBeNull();
 	});
 });

@@ -21,8 +21,7 @@
 		message,
 		payload,
 		metadata,
-		autoLoadEmbeds = false,
-		onRevealEmbed,
+		onEmbedActivated,
 		onRefreshEmbed,
 		partnershipId,
 		when,
@@ -33,8 +32,7 @@
 		message: MessageView;
 		payload: MessagePayload | null | undefined;
 		metadata: MessageMetadataPayload | null | undefined;
-		autoLoadEmbeds?: boolean;
-		onRevealEmbed: (href: string) => void | Promise<void>;
+		onEmbedActivated: (href: string) => void | Promise<void>;
 		onRefreshEmbed: (href: string) => void | Promise<void>;
 		partnershipId: string;
 		when: string;
@@ -68,9 +66,7 @@
 						text={payload.text}
 						{cachedEmbeds}
 						{cachedEmbedsPending}
-						{autoLoadEmbeds}
-						requireExplicitReveal
-						{onRevealEmbed}
+						{onEmbedActivated}
 						{onRefreshEmbed}
 					/>
 				</div>
@@ -120,19 +116,13 @@
 				color: var(--wa-color-brand-on-loud, white);
 				border-end-end-radius: 0.25rem;
 
+				/* The embed's own chrome is mixed from `currentColor`, so it
+				   follows this bubble's text without being told the colours —
+				   see the note in UrlEmbed.svelte. */
 				:global(.text a),
 				:global(.card-link),
 				:global(.card-shell) {
 					color: inherit;
-				}
-
-				:global(.card-shell) {
-					border-color: rgb(255 255 255 / 22%);
-					background: rgb(255 255 255 / 8%);
-				}
-
-				:global(.card-media) {
-					border-block-start-color: rgb(255 255 255 / 22%);
 				}
 
 				.reactions {

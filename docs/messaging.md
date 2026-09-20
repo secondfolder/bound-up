@@ -200,28 +200,25 @@ the decrypted text. The response is encrypted into
 preview without another metadata fetch. Inline message embeds use that same
 encrypted cache too: when a message already has cached embed details,
 `UrlEmbed.svelte` renders from them instead of starting a fresh metadata
-request. Older rows are backfilled only per revealed URL, not automatically on
-thread open while the user is still on the default manual mode, and a viewer
-can manually refresh one cached URL entry from the embed itself if they want
-fresh details.
+request. Older rows are backfilled per URL the first time an embed
+without a cached entry actually loads, not for the whole thread on open, and a
+viewer can manually refresh one cached URL entry from the embed itself if they
+want fresh details.
 
-Message threads can also switch to an auto-load mode from Encrypted messages.
-Before a user answers, the third manual `Show` click on a device prompts them
-with the privacy note: embed loading sends the URL to Bound Up's servers, but
-those lookups are never logged. Opting in stores an account-wide preference and
-the thread immediately renders skeletons for every supported URL, then activates
-the real embed only when it is in or near the scrollport. Cached titles and
-provider labels can appear in the skeleton immediately; iframe players and
-third-party media stay deferred until activation.
+A thread renders the embeds its messages carry, with nothing in front of them —
+there is no per-account preference and no consent dialog. A link the sender
+left without an embed gets a `Show` button instead, which inserts a card above
+that paragraph for this reader only; it is never written back to the message,
+so a reload brings the button back. Embeds that need a provider lookup show a
+skeleton and start the request when they are in or near the scrollport, which
+is a request-volume decision, not a consent one.
 
 Reddit is still the special case for live embeds. The browser cannot call
 reddit's oEmbed endpoint directly because it is CORS-blocked, and `noembed.com`
-does not support reddit, so the UI gates reddit expansion behind a `Show reddit
-embed` button until the user has explicitly opted into automatic message-thread
-embeds. Clicking that button, or auto-loading it later under that stored opt-in,
-sends only the reddit URL to `/api/oembed`, which resolves share links to their
-canonical post, fetches oEmbed server-side, and tries to extract the post's
-outbound URL from the post RSS feed.
+does not support reddit, so a reddit embed sends only the reddit URL to
+`/api/oembed`, which resolves share links to their canonical post, fetches
+oEmbed server-side, and tries to extract the post's outbound URL from the post
+RSS feed.
 
 That outbound URL is what lets a reddit link post render the actual linked
 media — especially a Redgifs player — instead of reddit's own NSFW preview
@@ -401,23 +398,56 @@ never look like a failure. After several consecutive failures the client falls
 back to slow polling while visible, which is the honest answer to an
 intermediary that buffers the stream for ever.
 
-### The custom worker entry, and the trap in it
+### Exporting the class from a generated worker
 
 A Durable Object class has to be exported from the worker's own module, and the
-SvelteKit adapter _generates_ that module — so `worker.ts` at the repo root
-wraps it and re-exports the class.
+SvelteKit adapter _generates_ that module — so there is nowhere in the source
+tree to write the export.
 
-**Do not point `main` at it.** `@sveltejs/adapter-cloudflare` treats `main` as
-its _output_ path and `rimraf`s it before writing, so `"main": "worker.ts"`
-makes `npm run build` delete the file. `main` stays on the adapter default and
-wrangler takes the entry positionally instead — `wrangler dev worker.ts`,
-`wrangler deploy worker.ts`, which is what `preview:worker` and `deploy` do.
+A hand-written entry that re-exports both cannot fill the gap either, because
+`main` would have to point at it and `@sveltejs/adapter-cloudflare` treats
+`main` as its _output_ path, `rimraf`ing it before writing: the build would
+delete the file. (This repo tried that for a while, with `main` left on the
+adapter default and the real entry passed positionally —
+`wrangler deploy worker.ts`. It works, but every caller has to know, and
+Cloudflare's deploy-on-push runs `npx wrangler deploy` for you, so it silently
+deployed a worker with no Durable Object export and failed.)
 
-`wrangler.jsonc` also gains a top-level `migrations` array, which has **nothing**
-to do with `d1_databases[0].migrations_dir` beside it: that one is SQL applied by
-`npm run db:migrate:d1`, this one is Durable Object class lifecycle. It declares
-`new_sqlite_classes`, not `new_classes`, because SQLite-backed Durable Objects
-are the only kind available on the Workers Free plan.
+So the export is appended to the generated worker instead, by the
+`sveltekit-cloudflare-do` plugin in `vite.config.ts`, which runs after the
+adapter has written the file. It emits a named re-export rather than
+`export * from`, because wrangler only resolves `DurableObjectNamespace<T>`
+through named ones. Wrangler then takes no entry argument anywhere:
+`wrangler dev`, `wrangler deploy`, and Cloudflare's own default deploy command
+are all correct.
+
+`wrangler.jsonc` also gains a top-level `exports` map, which has **nothing** to
+do with `d1_databases[0].migrations_dir` beside it: that one is SQL applied by
+`npm run db:migrate:preview`, this one is Durable Object class lifecycle. It carries
+no schema — the class stores nothing — and wrangler applies it on deploy.
+
+```jsonc
+"exports": {
+	"RealtimeRoom": { "type": "durable-object", "storage": "sqlite" }
+}
+```
+
+This is the declarative replacement for the legacy tagged `migrations` array
+(`{ "tag": "v1", "new_sqlite_classes": ["RealtimeRoom"] }`). The two are mutually
+exclusive and the move is one-way: once a Worker is deployed with `exports`, a
+later deploy cannot return to `migrations`. Renames, deletions and transfers are
+expressed here as tombstones — `"state": "renamed"` with `renamed_to`, and so on
+— rather than as a new tag.
+
+`"storage": "sqlite"`, not `"legacy-kv"`, because SQLite-backed Durable Objects
+are the only kind available on the Workers Free plan. The choice is permanent:
+storage backends are immutable once provisioned, so changing it later means
+deleting the namespace and its data. This class stores nothing either way.
+
+One deployment consequence: Durable Object lifecycle changes apply only through
+`wrangler deploy`. `wrangler versions upload`, which Cloudflare runs for
+non-production branches, cannot apply them — so the namespace has to be created
+by a production-branch deploy.
 
 ## Not built yet
 
@@ -432,7 +462,7 @@ The honest boundary:
 - **The Durable Object is not covered end to end.** The Playwright suite runs
   against `vite dev`, so the live-update tests exercise the in-process notifier.
   The object itself is covered by direct unit tests of the class
-  (`durable-object.test.ts`), and `npm run preview:worker` confirms the custom
+  (`durable-object.test.ts`), and `npm run preview` confirms the custom
   entry builds, the `REALTIME` binding registers as a SQLite-backed class, and
   `GET .../events` reaches the worker and refuses an unauthenticated caller. An
   event has **not** been observed travelling through a real Durable Object,

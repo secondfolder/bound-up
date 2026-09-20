@@ -85,9 +85,9 @@ noise:
     The initial-capture is deliberate: `superForm` registers its lifecycle
     once and its returned stores are the live connection, so re-deriving it on
     every `invalidate()` would reset the form. Add one to new ones.
-- `npm test`: 679 tests. Partners, tasks, and the encryption keys are covered end to end
+- `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
-- `npm run test:e2e`: 51 Playwright specs, about 90 seconds once the browser is installed
+- `npm run test:e2e`: Playwright specs, about 90 seconds once the browser is installed
   (`npx playwright install chromium` first). A run that takes ~2 minutes has
   something hanging on its 90-second timeout, not something slow.
 
@@ -99,7 +99,7 @@ If you add a behaviour worth protecting, add a test. `*.svelte.test.ts` runs in
 the jsdom project; everything else runs in the node project, which excludes
 `src/lib/server/**` from the client project only, not from node.
 
-`npm run preview:worker` is the only local command that exercises the real
+`npm run preview` is the only local command that exercises the real
 Workers runtime. Run it before any change that touches `platform`, the bundle,
 `nodejs_compat`, or the D1 path.
 
@@ -314,8 +314,10 @@ document. The read path — `richtext.ts` and `RichText.svelte` — walks that J
 with no Lexical import at all, which is why a page that only displays
 descriptions ships none of the editor and the worker bundle contains none of
 it. Adding a Lexical import to `richtext.ts` silently undoes that for every
-such page. Everything that writes a document lives in `richtext-editor.ts`.
-See [docs/rich-text.md](docs/rich-text.md).
+such page. Everything that writes a document lives in `richtext-editor.ts`, and
+the caret rules for a node that is inline in the model but a block on screen —
+the URL embed is the only one so far — live in `richtext-widgets.ts`, which
+knows nothing about embeds. See [docs/rich-text.md](docs/rich-text.md).
 
 **Every rich-text length limit counts visible text**, via `documentToPlainText`
 — never the stored string, which is several times larger than the prose in it.

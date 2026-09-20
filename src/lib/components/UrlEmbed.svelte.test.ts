@@ -210,7 +210,10 @@ describe('UrlEmbed', () => {
 		expect(container.querySelector('.player iframe')).toBeNull();
 	});
 
-	it('renders a plain link before the oEmbed resolves', () => {
+	it('holds the space with a skeleton while the oEmbed is in flight', () => {
+		// Not the plain link it used to show: a link that turns into a card a
+		// moment later moves everything under it, which is worse in a thread
+		// than a placeholder of roughly the right size.
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(() => new Promise(() => {}))
@@ -222,7 +225,8 @@ describe('UrlEmbed', () => {
 				label: 'vimeo link'
 			}
 		});
-		expect(container.querySelector('a')?.textContent).toBe('vimeo link');
+		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
+		expect(container.querySelector('a')).toBeNull();
 	});
 
 	it('renders from cached metadata without fetching again', () => {
@@ -257,7 +261,9 @@ describe('UrlEmbed', () => {
 		expect(container.querySelector('.card')?.textContent).toContain('Cached title');
 	});
 
-	it('keeps cached metadata behind Show when manual reveal is required', async () => {
+	it('draws a cached card without waiting for the scrollport', () => {
+		// Nothing to look up, so nothing to defer: the details are already here.
+		installIntersectionObserverMock();
 		const fetchMock = vi.fn(() => new Promise(() => {}));
 		vi.stubGlobal('fetch', fetchMock);
 		const cached = {
@@ -276,28 +282,22 @@ describe('UrlEmbed', () => {
 			themeColor: null
 		} satisfies CachedEmbedDetails;
 
-		const { container, getByRole, queryByText } = render(UrlEmbed, {
+		const { container, queryByRole } = render(UrlEmbed, {
 			props: {
 				spec: { kind: 'oembed', endpoint: 'https://oembed.test/cached-manual' },
 				href: cached.href,
 				label: 'vimeo link',
-				cached,
-				requireExplicitReveal: true
+				cached
 			}
 		});
 
-		expect(getByRole('button', { name: 'Show' })).toBeTruthy();
-		expect(queryByText('Cached title')).toBeNull();
-		expect(fetchMock).not.toHaveBeenCalled();
-
-		await fireEvent.click(getByRole('button', { name: 'Show' }));
-		await vi.waitFor(() => {
-			expect(container.querySelector('.card')?.textContent).toContain('Cached title');
-		});
+		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+		expect(container.querySelector('.card')?.textContent).toContain('Cached title');
+		expect(container.querySelector('.skeleton-shell')).toBeNull();
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it('shows cached text in an auto-load skeleton before it activates', () => {
+	it('holds a not-yet-cached embed in a skeleton until it is in view', () => {
 		installIntersectionObserverMock();
 		const fetchMock = vi.fn(() => new Promise(() => {}));
 		vi.stubGlobal('fetch', fetchMock);
@@ -322,19 +322,18 @@ describe('UrlEmbed', () => {
 				spec: { kind: 'oembed', endpoint: 'https://oembed.test/cached-auto' },
 				href: cached.href,
 				label: 'vimeo link',
-				cached,
-				autoLoad: true
+				// Still being decrypted, so the cached entry is not usable yet.
+				cachedPending: true
 			}
 		});
 
 		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
-		expect(container.textContent).toContain('Cached title');
 		expect(container.querySelector('img')).toBeNull();
 		expect(container.querySelector('iframe')).toBeNull();
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it('waits for visibility before auto-loading an embed', async () => {
+	it('waits for visibility before fetching an embed it has to look up', async () => {
 		installIntersectionObserverMock();
 		const fetchMock = vi.fn(async () =>
 			Response.json({
@@ -349,15 +348,13 @@ describe('UrlEmbed', () => {
 			props: {
 				spec: { kind: 'oembed', endpoint: 'https://oembed.test/auto' },
 				href: 'https://vimeo.com/2',
-				label: 'vimeo link',
-				autoLoad: true
+				label: 'vimeo link'
 			}
 		});
 
-		const skeleton = container.querySelector('.skeleton-shell');
-		expect(skeleton).not.toBeNull();
+		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
 		expect(fetchMock).not.toHaveBeenCalled();
-		emitIntersection(skeleton!, true, 1);
+		emitIntersection(container.querySelector('.url-embed')!, true, 1);
 
 		await vi.waitFor(() => {
 			expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -444,7 +441,8 @@ describe('UrlEmbed', () => {
 		});
 	});
 
-	it('waits for a click before fetching a gated oembed, then fetches on reveal', async () => {
+	it('reports the activation once, so the caller can cache the details', async () => {
+		installIntersectionObserverMock();
 		const fetchMock = vi.fn(async () =>
 			Response.json({
 				title: 'Fetched title',
@@ -453,25 +451,28 @@ describe('UrlEmbed', () => {
 			})
 		);
 		vi.stubGlobal('fetch', fetchMock);
-		const onReveal = vi.fn();
+		const onActivate = vi.fn();
 
-		const { container, getByRole } = render(UrlEmbed, {
+		const { container } = render(UrlEmbed, {
 			props: {
-				spec: { kind: 'oembed', endpoint: 'https://oembed.test/gated' },
+				spec: { kind: 'oembed', endpoint: 'https://oembed.test/activate' },
 				href: 'https://vimeo.com/2',
 				label: 'vimeo link',
-				requireExplicitReveal: true,
-				onReveal
+				onActivate
 			}
 		});
 
+		// Off screen: nothing has been fetched and nothing has been reported, so
+		// opening a long thread does not backfill every link in it at once.
 		expect(fetchMock).not.toHaveBeenCalled();
-		await fireEvent.click(getByRole('button', { name: 'Show' }));
-		expect(onReveal).toHaveBeenCalledWith('https://vimeo.com/2');
+		expect(onActivate).not.toHaveBeenCalled();
+
+		emitIntersection(container.querySelector('.url-embed')!, true, 1);
 		await vi.waitFor(() => {
-			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(onActivate).toHaveBeenCalledWith('https://vimeo.com/2');
 			expect(container.querySelector('.player iframe')).not.toBeNull();
 		});
+		expect(onActivate).toHaveBeenCalledTimes(1);
 	});
 
 	describe('server-proxied reddit embeds', () => {
@@ -485,18 +486,25 @@ describe('UrlEmbed', () => {
 			label: string;
 		};
 
-		it('does not fetch anything until the viewer clicks', () => {
+		it('waits for the scrollport, not for a click, before calling the proxy', async () => {
+			// The click gate is gone: an embed the writer put in a message is one
+			// the reader is meant to see. The viewport wait that is left is about
+			// request volume, not consent.
+			installIntersectionObserverMock();
 			const fetchMock = vi.fn(() => new Promise(() => {}));
 			vi.stubGlobal('fetch', fetchMock);
-			const { container, queryByText } = render(UrlEmbed, { props: redditProps });
-			// The link is present, the gate button is offered, and crucially no
-			// request has gone out — the URL has not left the browser yet.
-			expect(container.querySelector('a')?.getAttribute('href')).toBe(redditProps.href);
-			expect(queryByText('Show')).not.toBeNull();
+			const { container, queryByRole } = render(UrlEmbed, { props: redditProps });
+
+			expect(queryByRole('button', { name: 'Show' })).toBeNull();
 			expect(fetchMock).not.toHaveBeenCalled();
+
+			emitIntersection(container.querySelector('.url-embed')!, true, 1);
+			await vi.waitFor(() => {
+				expect(fetchMock).toHaveBeenCalledTimes(1);
+			});
 		});
 
-		it('keeps the reddit button mounted in a busy state until the proxy resolves', async () => {
+		it('keeps a skeleton up until the proxy resolves', async () => {
 			const resolver: { current: ((response: Response) => void) | null } = { current: null };
 			vi.stubGlobal(
 				'fetch',
@@ -507,13 +515,9 @@ describe('UrlEmbed', () => {
 						})
 				)
 			);
-			const { container, getByRole, queryByText } = render(UrlEmbed, { props: redditProps });
+			const { container, queryByText } = render(UrlEmbed, { props: redditProps });
 
-			await fireEvent.click(getByRole('button', { name: 'Show' }));
-			const button = getByRole('button', { name: 'Show' });
-			expect(button.getAttribute('aria-busy')).toBe('true');
-			expect(button.hasAttribute('disabled')).toBe(true);
-			expect(container.querySelector('.button-loading')).not.toBeNull();
+			expect(container.querySelector('.skeleton-shell')).not.toBeNull();
 			expect(container.querySelector('.card')).toBeNull();
 
 			if (!resolver.current) throw new Error('expected pending fetch resolver');
@@ -547,7 +551,6 @@ describe('UrlEmbed', () => {
 				)
 			);
 			const { container } = render(UrlEmbed, { props: redditProps });
-			container.querySelector('button')?.click();
 			await vi.waitFor(() => {
 				expect(container.querySelector('.player iframe')).not.toBeNull();
 			});
@@ -563,7 +566,7 @@ describe('UrlEmbed', () => {
 			expect(container.querySelector('iframe.reddit-frame')).toBeNull();
 		});
 
-		it('fetches through the same-origin proxy only after the click', async () => {
+		it('fetches through the same-origin proxy and frames the permalink', async () => {
 			const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(async () =>
 				Response.json({
 					title: 'A post',
@@ -576,9 +579,7 @@ describe('UrlEmbed', () => {
 			);
 			vi.stubGlobal('fetch', fetchMock);
 			const { container } = render(UrlEmbed, { props: redditProps });
-			expect(fetchMock).not.toHaveBeenCalled();
 
-			container.querySelector('button')?.click();
 			await vi.waitFor(() => {
 				expect(fetchMock).toHaveBeenCalledTimes(1);
 			});
@@ -588,6 +589,9 @@ describe('UrlEmbed', () => {
 			// The permalink is framed directly at embed.reddit.com — same-origin
 			// is the frame's own origin, not ours — and the sanitized {@html}
 			// path is not used when a permalink frame exists.
+			await vi.waitFor(() => {
+				expect(container.querySelector('iframe.reddit-frame')).not.toBeNull();
+			});
 			const frame = container.querySelector('iframe.reddit-frame');
 			expect(frame?.getAttribute('src')).toBe(
 				'https://embed.reddit.com/r/x/comments/1/a/?embed=true&ref_source=embed' +

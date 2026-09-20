@@ -8,6 +8,8 @@ import {
 	FORMAT_STRIKETHROUGH,
 	FORMAT_UNDERLINE,
 	documentEmbedUrls,
+	inlineLinkUrls,
+	withInlineEmbeds,
 	documentToPlainText,
 	isRichTextDocumentEmpty,
 	parseRichTextDocument,
@@ -197,6 +199,79 @@ describe('documentEmbedUrls', () => {
 	});
 });
 
+describe('withInlineEmbeds', () => {
+	const link = (url: string) => ({
+		type: 'autolink' as const,
+		url,
+		isUnlinked: false,
+		children: [text(url)]
+	});
+
+	it("puts an embed at the start of its link's line", () => {
+		expect(
+			withInlineEmbeds(
+				[text('look'), { type: 'linebreak' }, text('at '), link('https://a.test/1')],
+				['https://a.test/1']
+			).map((node) => node.type)
+		).toEqual(['text', 'linebreak', 'embed', 'text', 'autolink']);
+	});
+
+	/**
+	 * Two URLs on one line share a line start, so the second has to go *after*
+	 * the first's embed. Inserting before it would stack the previews in the
+	 * opposite order to the links they belong to.
+	 */
+	it('stacks embeds for one line in the order their links appear', () => {
+		const nodes = withInlineEmbeds(
+			[link('https://a.test/1'), text(' '), link('https://a.test/2')],
+			['https://a.test/1', 'https://a.test/2']
+		);
+		expect(nodes.map((node) => node.type)).toEqual([
+			'embed',
+			'embed',
+			'autolink',
+			'text',
+			'autolink'
+		]);
+		expect(nodes.filter((node) => node.type === 'embed').map((node) => node.url)).toEqual([
+			'https://a.test/1',
+			'https://a.test/2'
+		]);
+	});
+});
+
+describe('inlineLinkUrls', () => {
+	it('lists the links in a run of nodes, in order and deduplicated', () => {
+		expect(
+			inlineLinkUrls([
+				text('look '),
+				{ type: 'autolink', url: 'https://a.test/1', children: [text('https://a.test/1')] },
+				text(' and '),
+				{ type: 'link', url: 'https://a.test/2', children: [text('two')] },
+				{ type: 'autolink', url: 'https://a.test/1', children: [text('https://a.test/1')] }
+			])
+		).toEqual(['https://a.test/1', 'https://a.test/2']);
+	});
+
+	/**
+	 * Lexical sets `isUnlinked` when somebody removed the link from text that
+	 * still looks like a URL. The reader must not offer to embed it — that
+	 * would undo the decision by another route.
+	 */
+	it('skips a deliberately unlinked node', () => {
+		expect(
+			inlineLinkUrls([
+				{
+					type: 'autolink',
+					url: 'https://a.test/1',
+					isUnlinked: true,
+					children: [text('https://a.test/1')]
+				}
+			])
+		).toEqual([]);
+	});
+});
+
 describe('isRichTextDocumentEmpty', () => {
 	it('is true for an untouched editor', () => {
 		expect(isRichTextDocumentEmpty(doc([]))).toBe(true);
@@ -266,21 +341,30 @@ describe('parseStoredRichText, legacy plain text', () => {
 	 * unlimited embed budget. This is what makes a converted message look like
 	 * it did before rather than approximately like it.
 	 */
-	it('gives every supported URL an embed, above the paragraph that holds it', () => {
+	it('gives every supported URL an embed, at the start of the line that holds it', () => {
 		const result = parseStoredRichText(
-			'first https://i.imgur.com/a.jpg\n\nthen https://www.redgifs.com/watch/abc and https://youtu.be/dQw4w9WgXcQ'
+			'first https://i.imgur.com/a.jpg\n\nthen https://www.redgifs.com/watch/abc\nand https://youtu.be/dQw4w9WgXcQ'
 		);
-		expect(result.root.children.map((block) => block.type)).toEqual([
-			'embed',
-			'paragraph',
-			'embed',
-			'embed',
-			'paragraph'
-		]);
+		// Two paragraphs, each carrying its own embeds inline.
+		expect(result.root.children.map((block) => block.type)).toEqual(['paragraph', 'paragraph']);
 		expect(documentEmbedUrls(result)).toEqual([
 			'https://i.imgur.com/a.jpg',
 			'https://www.redgifs.com/watch/abc',
 			'https://youtu.be/dQw4w9WgXcQ'
+		]);
+
+		// The second paragraph is two lines, so its second embed goes after the
+		// line break rather than up at the top with the first.
+		const second = result.root.children[1];
+		if (second?.type !== 'paragraph') throw new Error('expected a paragraph');
+		expect(second.children.map((node) => node.type)).toEqual([
+			'embed',
+			'text',
+			'autolink',
+			'linebreak',
+			'embed',
+			'text',
+			'autolink'
 		]);
 	});
 
@@ -294,7 +378,10 @@ describe('parseStoredRichText, legacy plain text', () => {
 		const result = parseStoredRichText(
 			'https://i.imgur.com/a.jpg and again https://i.imgur.com/a.jpg'
 		);
-		expect(result.root.children.filter((block) => block.type === 'embed')).toHaveLength(1);
+		expect(documentEmbedUrls(result)).toEqual(['https://i.imgur.com/a.jpg']);
+		const [block] = result.root.children;
+		if (block?.type !== 'paragraph') throw new Error('expected a paragraph');
+		expect(block.children.filter((node) => node.type === 'embed')).toHaveLength(1);
 	});
 
 	it('is idempotent once converted: a converted document parses back unchanged', () => {
@@ -318,7 +405,6 @@ describe('the stored shape', () => {
 	 * so a change here is a migration, not a test edit.
 	 */
 	const GOLDEN: RichTextDocument = doc([
-		{ type: 'embed', url: 'https://i.imgur.com/cat.jpg' },
 		{
 			type: 'paragraph',
 			children: [
@@ -329,6 +415,11 @@ describe('the stored shape', () => {
 				text('code', 16),
 				text('both', 3),
 				{ type: 'linebreak' },
+				// Inline, at the start of its URL's line. Documents written before
+				// that placement have it as a root-level block instead; those still
+				// load, and `parseStoredRichText` moves them here on the way in —
+				// the case below.
+				{ type: 'embed', url: 'https://i.imgur.com/cat.jpg' },
 				{
 					type: 'autolink',
 					url: 'https://i.imgur.com/cat.jpg',
@@ -366,6 +457,42 @@ describe('the stored shape', () => {
 		expect(reserialised.success).toBe(true);
 		if (!reserialised.success) return;
 		expect(reserialised.data).toEqual(GOLDEN);
+	});
+
+	/**
+	 * The shape every document written before embeds moved inline is in. There
+	 * is no migration for those — message bodies are encrypted and the server
+	 * cannot rewrite them — so the read boundary has to keep understanding it.
+	 */
+	it('still accepts the root-level embed older documents were written with', () => {
+		const legacy = doc([
+			{ type: 'embed', url: 'https://i.imgur.com/cat.jpg' },
+			{
+				type: 'paragraph',
+				children: [
+					text('look'),
+					{ type: 'linebreak' },
+					{
+						type: 'autolink',
+						url: 'https://i.imgur.com/cat.jpg',
+						isUnlinked: false,
+						children: [text('https://i.imgur.com/cat.jpg')]
+					}
+				]
+			}
+		]);
+		const read = parseStoredRichText(JSON.stringify(legacy));
+
+		expect(read.root.children.map((block) => block.type)).toEqual(['paragraph']);
+		const [block] = read.root.children;
+		if (block?.type !== 'paragraph') throw new Error('expected a paragraph');
+		// Moved to the start of its URL's line, not left at the top.
+		expect(block.children.map((node) => node.type)).toEqual([
+			'text',
+			'linebreak',
+			'embed',
+			'autolink'
+		]);
 	});
 
 	it('reads back as the prose it holds', () => {

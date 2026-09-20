@@ -179,7 +179,6 @@ export type KeyWrapView = {
 export type UnlockBundleView = {
 	recipient: string | null;
 	historyWarningAcknowledged: boolean;
-	embedAutoLoad: boolean | null;
 	wraps: KeyWrapView[];
 };
 

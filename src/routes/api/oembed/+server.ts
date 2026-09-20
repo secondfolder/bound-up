@@ -15,8 +15,9 @@ import type { RequestHandler } from './$types';
  * plaintext reaches the server, which otherwise never learns message content
  * (see docs/privacy.md). Two mitigations, deliberately:
  *
- * 1. The client only calls this after an explicit click on the embed
- *    placeholder — UrlEmbed gates `server-oembed` links behind user action.
+ * 1. The client only calls this for an embed that has reached the scrollport,
+ *    so a thread's whole back catalogue is never resolved on open. These
+ *    lookups are not logged.
  * 2. This handler whitelists reddit post URLs only, so it is not an open
  *    proxy, and it requires a session.
  *

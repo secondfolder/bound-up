@@ -1,4 +1,4 @@
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import MessageBubble from './MessageBubble.svelte';
 import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
@@ -71,12 +71,6 @@ function installIntersectionObserverMock() {
 	);
 }
 
-function emitIntersection(element: Element, isIntersecting: boolean, intersectionRatio = 1) {
-	const observer = observers.find((candidate) => candidate.elements.has(element));
-	if (!observer) throw new Error('expected observed element');
-	observer.emit(element, isIntersecting, intersectionRatio);
-}
-
 /**
  * jsdom never upgrades `wa-*` elements, so these assert on what the component
  * emits rather than on rendered behaviour — per AGENTS.md. Everything that
@@ -103,7 +97,7 @@ const props = {
 	partnershipId: 'p1',
 	when: '12:00',
 	reactions: [],
-	onRevealEmbed: vi.fn(),
+	onEmbedActivated: vi.fn(),
 	onRefreshEmbed: vi.fn(),
 	onReact: vi.fn(),
 	onClearReaction: vi.fn()
@@ -161,7 +155,7 @@ describe('MessageBubble', () => {
 		expect(getByText('meet me later')).toBeTruthy();
 	});
 
-	it('passes cached embed metadata through to the inline embed renderer in auto-load mode', async () => {
+	it('passes cached embed metadata through to the inline embed renderer', async () => {
 		installIntersectionObserverMock();
 		const fetchMock = vi.fn(() => new Promise(() => {}));
 		vi.stubGlobal('fetch', fetchMock);
@@ -191,24 +185,17 @@ describe('MessageBubble', () => {
 				...props,
 				message: message(),
 				payload: { version: 1, text: 'https://vimeo.com/2', attachments: [] },
-				metadata,
-				autoLoadEmbeds: true
+				metadata
 			}
 		});
 
-		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
-		await vi.waitFor(() => {
-			expect(observers.length).toBeGreaterThan(0);
-		});
-		emitIntersection(container.querySelector('.skeleton-shell')!, true, 1);
+		// Cached details need no lookup, so the card is there from the start.
 		await findByText('Cached title');
-		await vi.waitFor(() => {
-			expect(container.querySelector('.card')).not.toBeNull();
-		});
+		expect(container.querySelector('.card')).not.toBeNull();
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it('keeps cached message embeds behind Show in manual mode', () => {
+	it('renders an embed the sender included, with no gate in front of it', () => {
 		const metadata: MessageMetadataPayload = {
 			version: 1,
 			embeds: [
@@ -230,7 +217,7 @@ describe('MessageBubble', () => {
 			]
 		};
 
-		const { container, getByRole, queryByText } = render(MessageBubble, {
+		const { container, getByText, queryByRole } = render(MessageBubble, {
 			props: {
 				...props,
 				message: message(),
@@ -239,22 +226,59 @@ describe('MessageBubble', () => {
 			}
 		});
 
-		expect(getByRole('button', { name: 'Show' })).toBeTruthy();
-		expect(queryByText('Cached title')).toBeNull();
-		expect(container.querySelector('.card')).toBeNull();
+		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+		expect(getByText('Cached title')).toBeTruthy();
+		expect(container.querySelector('.card')).not.toBeNull();
 	});
 
-	it('shows a reveal button for supported embeds when no cache exists yet', () => {
-		const { getByRole } = render(MessageBubble, {
+	/**
+	 * The reader's own opt-in, and the only `Show` button left. The sender put
+	 * no embed on this URL, so the message renders as they wrote it until the
+	 * reader asks for more.
+	 */
+	it('offers Show for a link the sender left without an embed', async () => {
+		installIntersectionObserverMock();
+		const fetchMock = vi.fn(() => new Promise(() => {}));
+		vi.stubGlobal('fetch', fetchMock);
+		const { container, getByRole, queryByRole } = render(MessageBubble, {
 			props: {
 				...props,
 				message: message(),
-				payload: { version: 1, text: 'https://vimeo.com/2', attachments: [] },
+				payload: {
+					version: 1,
+					// A stored document with a link and deliberately no embed node.
+					text: JSON.stringify({
+						root: {
+							type: 'root',
+							children: [
+								{
+									type: 'paragraph',
+									children: [
+										{
+											type: 'autolink',
+											url: 'https://vimeo.com/2',
+											children: [{ type: 'text', text: 'https://vimeo.com/2', format: 0 }]
+										}
+									]
+								}
+							]
+						}
+					}),
+					attachments: []
+				},
 				metadata: null
 			}
 		});
 
-		expect(getByRole('button', { name: 'Show' })).toBeTruthy();
+		expect(container.querySelector('.url-embed')).toBeNull();
+		await fireEvent.click(getByRole('button', { name: 'Show' }));
+
+		// The card goes at the start of the link's line, and the button that
+		// asked for it is gone.
+		const embed = container.querySelector('.embed-slot');
+		expect(embed).not.toBeNull();
+		expect(embed?.closest('p')).not.toBeNull();
+		expect(queryByRole('button', { name: 'Show' })).toBeNull();
 	});
 
 	it('waits for encrypted message metadata before starting a live embed fetch', () => {
@@ -271,7 +295,7 @@ describe('MessageBubble', () => {
 		});
 
 		expect(fetchMock).not.toHaveBeenCalled();
-		expect(container.querySelector('a')?.getAttribute('href')).toBe('https://vimeo.com/2');
+		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
 	});
 
 	it('marks which side the message is on', () => {

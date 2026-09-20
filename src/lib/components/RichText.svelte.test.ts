@@ -1,4 +1,4 @@
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import RichText from './RichText.svelte';
 import type { RichTextDocument } from '$lib/richtext';
@@ -235,5 +235,133 @@ describe('RichText, legacy plain text', () => {
 		});
 		expect(container.textContent).toBe('before https://example.com/aafter');
 		expect(container.querySelectorAll('br')).toHaveLength(1);
+	});
+});
+
+/* ── the reader's own reveal ─────────────────────────────────────────────── */
+
+function autolink(url: string) {
+	return {
+		type: 'autolink' as const,
+		url,
+		isUnlinked: false,
+		children: [text(url)]
+	};
+}
+
+describe('RichText, revealing an embed the sender left out', () => {
+	it('offers Show beside an embeddable link with no embed of its own', () => {
+		const { getByRole } = render(RichText, {
+			props: {
+				text: stored([
+					{ type: 'paragraph', children: [text('look '), autolink('https://vimeo.com/2')] }
+				])
+			}
+		});
+		expect(getByRole('button', { name: 'Show' })).toBeTruthy();
+	});
+
+	it('offers nothing for a link the sender already embedded', () => {
+		const { queryByRole } = render(RichText, {
+			props: {
+				text: stored([
+					{ type: 'embed', url: 'https://vimeo.com/2' },
+					{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }
+				])
+			}
+		});
+		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+	});
+
+	it('offers nothing for a link no provider can embed', () => {
+		const { queryByRole } = render(RichText, {
+			props: {
+				text: stored([{ type: 'paragraph', children: [autolink('https://example.com/plain')] }])
+			}
+		});
+		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+	});
+
+	// Lexical's own "I removed this link" flag. Offering to embed it would undo
+	// that decision by another route.
+	it('offers nothing for a deliberately unlinked URL', () => {
+		const { queryByRole } = render(RichText, {
+			props: {
+				text: stored([
+					{
+						type: 'paragraph',
+						children: [{ ...autolink('https://vimeo.com/2'), isUnlinked: true }]
+					}
+				])
+			}
+		});
+		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+	});
+
+	/**
+	 * The same placement the writer's own embeds get: the start of the line the
+	 * link is on, inside the paragraph — not above the whole block, which for a
+	 * message typed with line breaks would be the top of the message.
+	 */
+	it("puts the card at the start of the link's line and takes the button away", async () => {
+		const { container, getByRole, queryByRole } = render(RichText, {
+			props: {
+				text: stored([
+					{
+						type: 'paragraph',
+						children: [
+							text('first'),
+							{ type: 'linebreak' },
+							text('look '),
+							autolink('https://vimeo.com/2')
+						]
+					}
+				])
+			}
+		});
+
+		await fireEvent.click(getByRole('button', { name: 'Show' }));
+
+		const revealed = container.querySelector('.embed-slot');
+		expect(revealed).not.toBeNull();
+		expect(revealed?.closest('p')).not.toBeNull();
+		// After the line break, so it draws between "first" and the link's line.
+		expect(revealed?.previousElementSibling?.tagName).toBe('BR');
+		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+	});
+
+	it('puts it at the head of the paragraph when the link is on the first line', async () => {
+		const { container, getByRole } = render(RichText, {
+			props: {
+				text: stored([
+					{ type: 'paragraph', children: [text('first')] },
+					{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }
+				])
+			}
+		});
+
+		await fireEvent.click(getByRole('button', { name: 'Show' }));
+
+		const paragraphs = [...container.querySelectorAll('p')];
+		expect(paragraphs[0]?.textContent).toBe('first');
+		expect(paragraphs[1]?.firstElementChild?.className).toContain('embed-slot');
+	});
+
+	it('reveals the occurrence that was pressed, not every copy of the URL', async () => {
+		const { container, getAllByRole } = render(RichText, {
+			props: {
+				text: stored([
+					{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] },
+					{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }
+				])
+			}
+		});
+
+		const buttons = getAllByRole('button', { name: 'Show' });
+		expect(buttons).toHaveLength(2);
+		await fireEvent.click(buttons[1]!);
+
+		expect(container.querySelectorAll('.embed-slot')).toHaveLength(1);
+		expect(getAllByRole('button', { name: 'Show' })).toHaveLength(1);
 	});
 });
