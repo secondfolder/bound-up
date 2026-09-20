@@ -73,15 +73,15 @@
 	"observability": {
 		"enabled": true
 	},
-    "routes": [
-       {
-         "pattern": "boundup.secondfolder.com",
-         "custom_domain": true,
-         "enabled": true,
-         "previews_enabled": false
-       }
-    ],
-    "preview_urls": true,
+	"routes": [
+		{
+			"pattern": "boundup.secondfolder.com",
+			"custom_domain": true,
+			"enabled": true,
+			"previews_enabled": false
+		}
+	],
+	"preview_urls": true,
 	"r2_buckets": [
 		{
 			"binding": "MEDIA",
