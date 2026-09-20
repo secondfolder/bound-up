@@ -63,7 +63,7 @@
 		background-color: var(--wa-color-surface-raised, var(--wa-color-surface));
 		border-top: 1px solid var(--wa-color-surface-border);
 		/* Home-indicator gutter on iOS; 0 everywhere else. */
-		padding-bottom: env(safe-area-inset-bottom, 0);
+		padding-bottom: var(--safe-area-inset-bottom-min);
 
 		a {
 			flex: 1 1 0;
