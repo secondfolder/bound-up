@@ -5,7 +5,7 @@ import {
 	MASTER_KEY_V1,
 	type MasterKeyParams
 } from '../encryption';
-import { deriveAuthSecret, deriveMasterKey, deriveWrapKey, deriveWrapKeyFromPrf } from './kdf';
+import { deriveAuthSecret, deriveMasterKey, deriveWrapKey } from './kdf';
 
 /**
  * The real work factor is 650,000 iterations. That is ~85 ms in Node, so it is
@@ -137,32 +137,5 @@ describe('deriveWrapKey', () => {
 			);
 		};
 		expect(await seal('pw1')).not.toEqual(await seal('pw2'));
-	});
-});
-
-describe('deriveWrapKeyFromPrf', () => {
-	const prf = () => crypto.getRandomValues(new Uint8Array(32)).buffer;
-
-	it('produces the same kind of key as the password path', async () => {
-		const key = await deriveWrapKeyFromPrf(prf());
-		expect(key.algorithm).toMatchObject({ name: 'AES-GCM', length: 256 });
-		expect(key.extractable).toBe(false);
-		expect([...key.usages].sort()).toEqual(['decrypt', 'encrypt']);
-	});
-
-	it('is deterministic for the same PRF output', async () => {
-		const output = prf();
-		const iv = new Uint8Array(12);
-		const seal = async () => {
-			const key = await deriveWrapKeyFromPrf(output);
-			return new Uint8Array(
-				await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new Uint8Array([7]))
-			);
-		};
-		expect(await seal()).toEqual(await seal());
-	});
-
-	it('refuses a PRF output too short to be a key', async () => {
-		await expect(deriveWrapKeyFromPrf(new Uint8Array(16).buffer)).rejects.toThrow(/at least 32/);
 	});
 });

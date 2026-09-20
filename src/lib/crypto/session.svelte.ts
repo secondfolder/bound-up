@@ -10,8 +10,8 @@
 
 import { normaliseEmail, type KeyWrapParams } from '../encryption';
 import { deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
-import { importIdentityKey, webCryptoX25519Available } from './identity';
-import { keyStore, type CachedIdentity } from './keystore';
+import { keyStore, type KeyTier } from './keystore';
+import { passkeysAvailable, unwrapIdentityWithPasskey } from './passkey';
 import { clearStash, takeUnlock } from './stash';
 import { unwrapIdentity } from './wrap';
 import type { KeyWrapView, UnlockBundleView } from '../types';
@@ -32,6 +32,11 @@ export type Keyring =
 			recipient: string;
 			wraps: KeyWrapView[];
 			reason: 'cold' | 'wrong-password' | 'no-usable-wrap';
+			/**
+			 * Which form this device could store, known before the unlock rather
+			 * than after it — so the prompt can say up front that it will be back.
+			 */
+			tier: KeyTier;
 	  }
 	/**
 	 * Open. `identity` is a non-extractable `CryptoKey` wherever the browser can
@@ -43,9 +48,34 @@ export type Keyring =
 			identity: CryptoKey | string;
 			/** False when the identity is held in memory only, so unlock repeats. */
 			durable: boolean;
+			/** Which form this device could store. See `keystore.ts`. */
+			tier: KeyTier;
+			/** Why this device is not on the best tier, for /settings/encryption. */
+			fallbackReason: string | null;
 	  };
 
 let keyring = $state<Keyring>({ status: 'unknown' });
+
+/**
+ * How long an enrolment offer stands before it is dropped.
+ *
+ * It exists to bound the one thing this feature costs: for as long as an offer
+ * is open, the identity is in memory as a string on a device that would
+ * otherwise hold only a `CryptoKey`. Five minutes is long enough to read a
+ * callout and short enough that a tab left open overnight is not holding it.
+ */
+const ENROLMENT_WINDOW_MS = 5 * 60_000;
+
+/**
+ * The offer to add a passkey, made right after an unlock.
+ *
+ * Reactive, and deliberately holds no secret: a template can ask whether there
+ * is an offer and for whom, and cannot reach the identity by accident. The
+ * string itself sits in a plain module variable below, taken once.
+ */
+let enrolmentOffer = $state<{ userId: string; recipient: string } | null>(null);
+let pendingIdentity: string | undefined;
+let enrolmentTimer: ReturnType<typeof setTimeout> | undefined;
 let initialisingForUserId: string | null = null;
 let initialisingPromise: Promise<Keyring> | null = null;
 
@@ -61,23 +91,36 @@ export function unlockedIdentity(): { recipient: string; identity: CryptoKey | s
 		: null;
 }
 
-async function cache(userId: string, recipient: string, identity: string): Promise<Keyring> {
+async function cache(
+	userId: string,
+	recipient: string,
+	identity: string,
+	wraps: KeyWrapView[]
+): Promise<Keyring> {
 	const store = await keyStore();
-	// A non-extractable CryptoKey where possible, because that is the form no
-	// API can hand back as bytes. Where the browser cannot do X25519, the string
-	// is kept in memory and never written to storage.
-	const usable = store.durable && (await webCryptoX25519Available());
-	const value: CachedIdentity = {
-		userId,
-		recipient,
-		key: usable ? await importIdentityKey(identity) : identity
-	};
-	if (usable) await store.putIdentity(value);
+	// The store decides what form to write and hands back the form to hold in
+	// memory — a non-extractable CryptoKey wherever the browser can do X25519,
+	// the string otherwise. See the tier ladder in `keystore.ts`.
+	const cached = await store.putIdentity({ userId, recipient, identity });
+
+	// This is the only moment the identity exists as bytes on a device that can
+	// store a `CryptoKey` — `getIdentity` will hand back a non-extractable key
+	// and nothing turns one of those into a string again. So if a passkey is
+	// worth offering, it has to be offered now or it has to ask for the password
+	// a second time. See docs/encryption.md.
+	if (passkeysAvailable() && !wraps.some((wrap) => wrap.type === 'webauthn-prf')) {
+		openEnrolmentOffer({ userId, recipient, identity });
+	} else {
+		dismissEnrolmentOffer();
+	}
+
 	return {
 		status: 'unlocked',
 		recipient,
-		identity: value.key,
-		durable: usable
+		identity: cached.key,
+		durable: store.durable,
+		tier: store.tier,
+		fallbackReason: store.fallbackReason
 	};
 }
 
@@ -126,7 +169,9 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 				status: 'unlocked',
 				recipient: cached.recipient,
 				identity: cached.key,
-				durable: store.durable
+				durable: store.durable,
+				tier: store.tier,
+				fallbackReason: store.fallbackReason
 			};
 			return keyring;
 		}
@@ -143,7 +188,7 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 		if (stashed) {
 			// Signup already has the identity in hand; login has to open a wrap.
 			if (stashed.identity && stashed.recipient === bundle.recipient) {
-				keyring = await cache(user.id, bundle.recipient, stashed.identity);
+				keyring = await cache(user.id, bundle.recipient, stashed.identity, bundle.wraps);
 				return keyring;
 			}
 			const opened = await tryWraps(
@@ -152,7 +197,7 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 				async () => stashed.wrapKey
 			);
 			if (opened) {
-				keyring = await cache(user.id, bundle.recipient, opened.identity);
+				keyring = await cache(user.id, bundle.recipient, opened.identity, bundle.wraps);
 				void noteWrapUsed(opened.wrapId);
 				return keyring;
 			}
@@ -162,7 +207,8 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 			status: 'locked',
 			recipient: bundle.recipient,
 			wraps: bundle.wraps,
-			reason: bundle.wraps.length === 0 ? 'no-usable-wrap' : 'cold'
+			reason: bundle.wraps.length === 0 ? 'no-usable-wrap' : 'cold',
+			tier: store.tier
 		};
 		return keyring;
 	})();
@@ -213,8 +259,84 @@ export async function unlockWithPassword(
 		return keyring;
 	}
 
-	keyring = await cache(user.id, recipient, opened.identity);
+	keyring = await cache(user.id, recipient, opened.identity, wraps);
 	void noteWrapUsed(opened.wrapId);
+	return keyring;
+}
+
+function openEnrolmentOffer(value: { userId: string; recipient: string; identity: string }) {
+	clearTimeout(enrolmentTimer);
+	enrolmentOffer = { userId: value.userId, recipient: value.recipient };
+	pendingIdentity = value.identity;
+	enrolmentTimer = setTimeout(dismissEnrolmentOffer, ENROLMENT_WINDOW_MS);
+}
+
+/** Whether to offer a passkey right now, and to whom. Reactive. */
+export function currentEnrolmentOffer(): { userId: string; recipient: string } | null {
+	return enrolmentOffer;
+}
+
+/** Drops the offer and the identity with it. Idempotent. */
+export function dismissEnrolmentOffer(): void {
+	clearTimeout(enrolmentTimer);
+	enrolmentTimer = undefined;
+	enrolmentOffer = null;
+	pendingIdentity = undefined;
+}
+
+/**
+ * The identity to seal to a passkey while the offer stands.
+ *
+ * Unlike `stash.ts` this is *not* cleared as it returns, and the difference is
+ * deliberate: the stash guards against a second sign-in inheriting the first
+ * one's key, which cannot happen here because the offer is keyed by user and
+ * dropped on lock, on sign-out and on a timer. What can happen is a dismissed
+ * Face ID sheet — the single most likely outcome of asking — and taking the
+ * identity away on the first tap would mean the retry had to go and ask for
+ * the password again. The caller dismisses the offer once it has succeeded.
+ */
+export function enrolmentIdentityFor(userId: string): string | null {
+	return enrolmentOffer?.userId === userId ? (pendingIdentity ?? null) : null;
+}
+
+/**
+ * The passkey wrap to offer on the unlock screen, or null when there is none.
+ *
+ * One, not all of them. Every attempt is a biometric prompt, so looping over
+ * wraps the way `tryWraps` loops over password wraps would ask the user to
+ * authenticate repeatedly to discover something they already know. The most
+ * recently used one is the best guess at which passkey they still have.
+ */
+export function passkeyWrapFor(state: Keyring): KeyWrapView | null {
+	if (state.status !== 'locked') return null;
+	const candidates = state.wraps.filter((wrap) => wrap.type === 'webauthn-prf');
+	if (candidates.length === 0) return null;
+	return candidates.reduce((best, wrap) => (lastTouched(wrap) > lastTouched(best) ? wrap : best));
+}
+
+function lastTouched(wrap: KeyWrapView): number {
+	return (wrap.lastUsedAt ?? wrap.createdAt).valueOf();
+}
+
+/**
+ * Unlocks with a passkey: one touch instead of typing the password.
+ *
+ * Reached on exactly the devices the password prompt was reached on — an
+ * evicted store, a new phone, a private tab — and it ends in `cache()`, so the
+ * unlock persists through the storage ladder and the next load is silent.
+ *
+ * Throws whatever the ceremony threw, and leaves the keyring locked so the
+ * password form underneath is still an option. `describePasskeyFailure` in
+ * `passkey.ts` turns the error into something worth showing.
+ */
+export async function unlockWithPasskey(user: { id: string }, wrap: KeyWrapView): Promise<Keyring> {
+	if (keyring.status !== 'locked') return keyring;
+	if (wrap.params.type !== 'webauthn-prf') return keyring;
+	const { recipient, wraps } = keyring;
+
+	const identity = await unwrapIdentityWithPasskey({ blob: wrap.blob, rpId: wrap.params.rpId });
+	keyring = await cache(user.id, recipient, identity, wraps);
+	void noteWrapUsed(wrap.id);
 	return keyring;
 }
 
@@ -227,6 +349,7 @@ export async function unlockWithPassword(
  */
 export async function lock(userId: string): Promise<void> {
 	clearStash();
+	dismissEnrolmentOffer();
 	keyring = { status: 'unknown' };
 	initialisingForUserId = null;
 	initialisingPromise = null;
@@ -237,6 +360,7 @@ export async function lock(userId: string): Promise<void> {
 /** Drops in-memory state without touching storage, e.g. on a user change. */
 export function resetKeyring(): void {
 	clearStash();
+	dismissEnrolmentOffer();
 	keyring = { status: 'unknown' };
 	initialisingForUserId = null;
 	initialisingPromise = null;

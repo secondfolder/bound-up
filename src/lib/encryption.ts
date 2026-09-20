@@ -71,7 +71,10 @@ export const MASTER_KEY_VERSIONS: readonly MasterKeyParams[] = [MASTER_KEY_V1];
 /** HKDF `info` strings. Distinct so one master key yields two unrelated keys. */
 export const AUTH_SECRET_INFO = 'bound-up-auth-v1';
 export const WRAP_KEY_INFO = 'bound-up-wrap-v1';
-export const PRF_WRAP_KEY_INFO = 'bound-up-wrap-prf-v1';
+
+/** Domain separation for the device seal. Not an HKDF info string: the
+ *  device key is generated, not derived, so this is only ever an AAD. */
+export const DEVICE_SEAL_INFO = 'bound-up-device-seal-v1';
 
 /**
  * The PBKDF2 salt.
@@ -109,8 +112,12 @@ export function normaliseEmail(email: string): string {
 /**
  * How a stored wrap can be opened.
  *
- * - `password` — AES-GCM under a key derived from the account password.
- * - `webauthn-prf` — AES-GCM under a key derived from a passkey's PRF output.
+ * - `password` — the AES-GCM envelope in `crypto/wrap.ts`, under a key derived
+ *   from the account password.
+ * - `webauthn-prf` — an age file encrypted to a passkey. A different envelope,
+ *   deliberately: the ceremony and the format arrive together from
+ *   `age-encryption`, and reimplementing either to reach one envelope would be
+ *   hand-rolling the part most worth not hand-rolling. See `crypto/passkey.ts`.
  *
  * The server stores the `type`, an opaque `params` blob it never reads, and the
  * ciphertext. That is the whole extension point: another unlock method is a new
@@ -129,10 +136,14 @@ export type KeyWrapParams =
 	| {
 			type: 'webauthn-prf';
 			version: 1;
-			/** base64url credential id, so unlock knows which passkey to ask for. */
-			credentialId: string;
-			/** base64url PRF salt. Stored because it is an input, not a secret. */
-			salt: string;
+			/**
+			 * The WebAuthn relying party id the wrap was made under — the origin's
+			 * domain. A credential is only offered to its own RP, so a wrap made on
+			 * one host can never be opened on another, and the unlock ceremony needs
+			 * to name it. No credential id: the blob carries its own nonce and the
+			 * platform offers the user their discoverable credentials.
+			 */
+			rpId: string;
 	  };
 
 /** How long a serialised `KeyWrapParams` may be. Generous; it is a few fields. */
@@ -179,6 +190,20 @@ export function parseKeyWrapParams(raw: string): KeyWrapParams | null {
  */
 export function wrapAad(recipient: string): string {
 	return `${WRAP_KEY_INFO}|${recipient}`;
+}
+
+/**
+ * The additional-authenticated-data for a device seal.
+ *
+ * A device seal is the same AES-GCM envelope as a key wrap, under a key that
+ * never leaves this browser profile rather than one derived from a password —
+ * see `crypto/keystore.ts`. It gets its own domain separation so the two can
+ * never be confused, and it *does* name the user id, unlike `wrapAad`: the
+ * signup-ordering reason to leave it out does not apply, because nothing is
+ * ever sealed to a device before the account exists.
+ */
+export function deviceSealAad(userId: string, recipient: string): string {
+	return `${DEVICE_SEAL_INFO}|${userId}|${recipient}`;
 }
 
 // ── base64url ────────────────────────────────────────────────────────────────

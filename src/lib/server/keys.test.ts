@@ -163,7 +163,7 @@ describe('addWrap + deleteOtherPasswordWraps', () => {
 		await createTestUserKeys(harness.db, ada);
 		await addWrap(harness.db, ada.id, {
 			type: 'webauthn-prf',
-			params: { type: 'webauthn-prf', version: 1, credentialId: 'cred', salt: 'c2FsdA' },
+			params: { type: 'webauthn-prf', version: 1, rpId: 'bound-up.test' },
 			blob: FAKE_WRAP_BLOB,
 			label: 'iPhone passkey'
 		});

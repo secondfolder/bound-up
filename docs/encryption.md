@@ -109,16 +109,21 @@ signup.
 | `user_keys.recipient` | The public `age1…`. Stored in the clear — it is public by construction.      |
 | `user_key_wraps`      | One row per way to unlock: `(type, params, blob)`. All opaque to the server. |
 
-`blob` is base64url of `12-byte IV ‖ AES-256-GCM(identity) ‖ 16-byte tag`, with
-the additional authenticated data set to `"bound-up-wrap-v1|" + recipient`.
-That AAD binds a wrap to the public key it belongs to, so a wrap row moved
-between accounts fails its tag check instead of decrypting into someone else's
-identity.
+`blob` is base64url of a ciphertext the server cannot read, in one of two
+formats depending on `type`:
 
-age's own passphrase mode is deliberately not used for this: it would run scrypt
-over a value that is already 650,000 PBKDF2 iterations deep, and would imply to
-anyone reading the stored blob that a passphrase existed which the server does
-not have.
+- **`password`** — `12-byte IV ‖ AES-256-GCM(identity) ‖ 16-byte tag`, with the
+  additional authenticated data set to `"bound-up-wrap-v1|" + recipient`. That
+  AAD binds a wrap to the public key it belongs to, so a wrap row moved between
+  accounts fails its tag check instead of decrypting into someone else's
+  identity.
+- **`webauthn-prf`** — an age file encrypted to a passkey. See
+  [Passkey unlock](#passkey-unlock) for why that one is not the same envelope.
+
+age's own passphrase mode is deliberately not used for the password wrap: it
+would run scrypt over a value that is already 650,000 PBKDF2 iterations deep,
+and would imply to anyone reading the stored blob that a passphrase existed
+which the server does not have.
 
 ### Why there are many wrap rows
 
@@ -147,36 +152,73 @@ and starts a partner-assisted restore — see [docs/messaging.md](messaging.md).
 
 Every passkey is registered with the WebAuthn PRF extension requested
 (`registration.extensions` in `src/lib/server/auth.ts`), so it can later unlock
-the identity with the same touch that signs the user in:
+the identity with a touch instead of the password. This matters most on the
+devices the storage ladder cannot help — an evicted store, a private tab, a new
+phone — which is exactly where the password prompt used to be the only way in.
 
-```
-prfOutput = clientExtensionResults.prf.results.first
-wrapKey   = HKDF-SHA256(prfOutput, info "bound-up-wrap-prf-v1")
-```
+**The ceremony is age's, not ours.** `src/lib/crypto/passkey.ts` is a thin
+layer over `age-encryption`'s `WebAuthnRecipient` and `WebAuthnIdentity`, so a
+passkey wrap is an age file rather than the AES-GCM envelope above. That is a
+deliberate second format, for what upstream does that a local reimplementation
+would have to get right on its own:
 
-The wrap format is identical, so there is exactly one AES-GCM envelope in the
-codebase and one set of tests for it.
+- it derives the file key from **both** PRF outputs, `first` and `second`, so
+  one user-presence check cannot be made to yield two decryptions;
+- it carries a fresh 16-byte nonce in the age stanza, so no salt has to be
+  stored in `params` and no two wraps of one identity are alike;
+- it absorbs the 1Password extension's non-standard PRF result shape.
 
-Four constraints, all of them real:
+`age.webauthn` is marked experimental upstream, which is why `age-encryption` is
+pinned to an exact version in `package.json`.
+
+**Enrolment happens in the window where it is free.** Every unlock except
+reading the cache has the `AGE-SECRET-KEY-1…` string in hand for a moment —
+signup generated it, a password unlock has just unwrapped it — and sealing it to
+a passkey needs exactly that. So `cache()` opens an _enrolment offer_ whenever
+it is handed the string and the account has no passkey wrap yet, and
+`PasskeyOffer` in the app shell asks the question straight away: one tap, no
+password, wherever the user happens to be.
+
+The offer keeps the string in a plain module variable, outside the reactive
+keyring so that no template can reach it by accident, and drops it on
+acceptance, on dismissal, on lock, on sign-out, and after five minutes. That
+bound is the whole cost of the design: while an offer stands, a device that
+would otherwise hold nothing but a non-extractable `CryptoKey` is also holding
+the string. The identity is deliberately **not** taken on read — a dismissed
+Face ID sheet is the likeliest outcome of asking, and confiscating the identity
+on the first tap would make the retry cost a password.
+
+**The fallback still asks for the password**, on `/settings/encryption`, for the
+one case that cannot avoid it: a device unlocked from its own cache, where the
+identity is a `CryptoKey` and no API turns one of those back into a string. That
+form is hidden while an offer is standing, so the easy way and the hard way are
+never both on screen. Its side effect is a good one: adding a way in requires
+proving you already have one.
+
+**Nothing is enrolled that has not already worked.** The wrap is produced by a
+real PRF evaluation, which fails loudly there and then if the credential cannot
+do PRF — a stronger check than reading `enabled` at registration, and at a
+better moment than a new device with no password to hand.
+
+`params` holds the relying party id and nothing else: no credential id, because
+`allowCredentials` is left empty and the platform offers the user whichever
+passkey they like. The unlock screen offers **one** wrap, the most recently
+used, because every attempt is a biometric prompt and looping over wraps would
+ask the user to authenticate to discover something they already know.
+
+Three constraints, all of them real:
 
 - **PRF must be requested at credential creation.** A passkey registered before
   this feature existed can never be used for PRF and cannot be upgraded — the
   user has to register a new one.
-- **`enabled` is only reported by `create()`**, so it is checked and recorded at
-  registration. Discovering the failure at unlock time, on a new device, with no
-  password to hand, is the worst possible moment.
-- **`prf.eval` versus `prf.evalByCredential`.** `eval` is only valid when
-  `allowCredentials` holds at most one entry. Better Auth omits
-  `allowCredentials` for a sign-in with no session, so `eval` is right there —
-  but populates it with every passkey when a session exists, so the
-  unlock-while-signed-in path must use `evalByCredential`.
 - **iOS and iPadOS cannot pass PRF to an external authenticator.** A security
   key on an iPhone will not work; platform passkeys do.
+- **PRF needs iOS 18+, macOS 15+ or Chrome 132+.** Below that, enrolment fails
+  with age's own message saying so.
 
-The PRF salt is passed from the browser per call, never configured server-side —
-extensions configured there are JSON-serialised, and a salt has to arrive as
-real bytes. Better Auth's passkey client strips `clientExtensionResults` before
-posting the assertion, so the derived secret never reaches the server.
+Better Auth's passkey client strips `clientExtensionResults` before posting an
+assertion, and the ceremony here is run directly rather than through it, so the
+PRF output never reaches the server by either route.
 
 ## Import boundaries
 
@@ -250,7 +292,7 @@ already existed.
 `src/lib/crypto/keystore.ts` caches it in IndexedDB, and `session.svelte.ts`
 holds the one piece of state everything reads (`currentKeyring()`).
 
-Four ways a device ends up unlocked, in the order they are tried:
+Five ways a device ends up unlocked, in the order they are tried:
 
 1. **Already cached.** The identity is in IndexedDB from a previous visit.
 2. **Just signed in.** The login or signup form derived the wrap key while it
@@ -259,11 +301,15 @@ Four ways a device ends up unlocked, in the order they are tried:
    what makes signing in on a new device unlock with no second prompt. The
    stash is keyed by email and cleared as it is read, so a second sign-in in the
    same tab cannot inherit the first one's key.
-3. **The unlock prompt.** A cold start: a new device, a passkey sign-in, or —
+3. **A passkey.** When the account has a `webauthn-prf` wrap, the unlock screen
+   offers it above the password field. It ends in the same cache as every other
+   path, so one touch also re-persists the identity through the ladder below and
+   the next load is silent.
+4. **The unlock prompt.** A cold start: a new device, a passkey sign-in, or —
    most often — the browser having evicted its storage. iOS drops IndexedDB
    after about a week of not opening the app, so this is a screen a regular user
    sees regularly, and it is designed as one rather than as an error.
-4. **No keys at all** (`absent`), which is a legacy or passkey-first account.
+5. **No keys at all** (`absent`), which is a legacy or passkey-first account.
    The messaging screens and `/settings/encryption` explain how to set them up
    when that state becomes relevant.
 
@@ -278,15 +324,54 @@ locked or absent key state can strand real data. Only the messaging screens
 and `/settings/encryption` render their own locked state, and the gate keeps
 quiet on those to avoid two identical unlock forms on one page.
 
-### Two things treated as normal rather than exceptional
+### The storage ladder
 
-- **Not every browser will store a `CryptoKey`.** Some WebKit builds throw
-  `DataCloneError` on structured-cloning one, and Safari's private browsing
-  restricts IndexedDB. The keystore probes by writing a real key and reading it
-  back, once, and falls back permanently to memory — where the identity is held
-  as a string and never persisted. The UI says so, because it means an unlock on
-  every page load.
-- **Storage gets evicted**, as above. Hence path 3 being a first-class screen.
+Not every browser will hold the identity in the form we would like, so the
+keystore tries three, best first, by writing a real key and reading it back.
+Whichever survives is the one this browser profile uses, decided once:
+
+| Tier         | What is written                                               | Needs                  |
+| ------------ | ------------------------------------------------------------- | ---------------------- |
+| `crypto-key` | the non-extractable X25519 `CryptoKey` itself                 | X25519 + a clone of it |
+| `sealed`     | the identity string, AES-GCM sealed under a device key        | IndexedDB + AES-GCM    |
+| `memory`     | nothing — the identity lives in a variable until the tab goes | —                      |
+
+**Why the second tier exists.** WebCrypto X25519 only shipped in Safari 18.4 /
+iOS 18.4. Before that a `CryptoKey` identity cannot be made at all, and the
+device was dropped straight to `memory` — an unlock prompt on every page load,
+which is what an iPhone actually did. Nothing about _storing_ the identity ever
+needed X25519, though: age decrypts perfectly well from a string identity via
+`@noble/curves`, and only the `CryptoKey` form of it needs the algorithm. So the
+sealed tier keeps the string, encrypted under an AES-GCM key that is itself a
+non-extractable `CryptoKey` in IndexedDB. On Apple platforms that stored key is
+in turn wrapped by one in the system keychain.
+
+**What the second tier gives up, plainly.** Under `crypto-key`, script injected
+into the page can _use_ the identity for as long as it runs but can never obtain
+its bytes. Under `sealed` it can call decrypt and walk away with the age secret
+key permanently. That is a real downgrade. It is taken only on devices that
+would otherwise persist nothing at all — where the identity already sits in
+memory as a string for the whole session — and never in place of a tier that
+works. A device climbs back to `crypto-key` on its own after an OS update,
+because the probe runs again whenever the best tier is not already in use.
+
+The in-memory form is not the tier. Wherever the browser can do X25519 the
+identity is held as a non-extractable `CryptoKey` in the keyring, even on the
+sealed and memory tiers — the tier decides what reaches disk, not what a
+variable holds.
+
+`fallbackReason` records why a device is not on `crypto-key`, and
+`/settings/encryption` shows it when the device ends up on `memory`. It exists
+because one `catch` around the whole probe made "iOS asks for my password every
+time" indistinguishable from an unsupported curve, a refused database and a
+`DataCloneError` without attaching a remote inspector.
+
+### Storage still gets evicted
+
+iOS drops IndexedDB after about a week of not opening the app, and any browser
+may evict under pressure. The keystore asks `navigator.storage.persist()` once
+after its first durable write, which Safari generally declines unless the site
+is on the Home Screen — so path 3 stays a first-class screen, not an error.
 
 ## Changing and resetting the password
 

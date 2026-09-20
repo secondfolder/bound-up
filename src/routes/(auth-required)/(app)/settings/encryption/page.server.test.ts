@@ -198,7 +198,7 @@ describe('revokeWrap', () => {
 		const { addWrap } = await import('$lib/server/keys');
 		await addWrap(harness.db, ada.id, {
 			type: 'webauthn-prf',
-			params: { type: 'webauthn-prf', version: 1, credentialId: 'c', salt: 's' },
+			params: { type: 'webauthn-prf', version: 1, rpId: 'bound-up.test' },
 			blob: FAKE_WRAP_BLOB,
 			label: 'iPhone'
 		});
@@ -245,6 +245,82 @@ describe('forgetPassword', () => {
 
 	it('refuses an unsigned visitor', async () => {
 		const result = await runAndCatch(() => actions.forgetPassword(fakeEvent({ db: harness.db })));
+		expect(result).toMatchObject({ type: 'error', status: 401 });
+	});
+});
+
+describe('addWrap', () => {
+	const PASSKEY_PARAMS = JSON.stringify({
+		type: 'webauthn-prf',
+		version: 1,
+		rpId: 'bound-up.test'
+	});
+
+	it('stores a passkey as another way in', async () => {
+		await createTestUserKeys(harness.db, ada);
+
+		await actions.addWrap(
+			fakeEvent({
+				db: harness.db,
+				user: ada,
+				formData: { wrapParams: PASSKEY_PARAMS, wrapBlob: FAKE_WRAP_BLOB, label: 'iPhone' }
+			})
+		);
+
+		const wraps = await readWrapRows(harness.db, ada.id);
+		expect(wraps).toHaveLength(2);
+		const added = wraps.find((wrap) => wrap.type === 'webauthn-prf')!;
+		expect(added.label).toBe('iPhone');
+		// Stored verbatim and never read: the server has no key to check it with.
+		expect(added.blob).toBe(FAKE_WRAP_BLOB);
+		expect(added.params).toMatchObject({ rpId: 'bound-up.test' });
+	});
+
+	it('refuses a blob that is not the shape a wrap has', async () => {
+		await createTestUserKeys(harness.db, ada);
+
+		const result = await actions.addWrap(
+			fakeEvent({
+				db: harness.db,
+				user: ada,
+				formData: { wrapParams: PASSKEY_PARAMS, wrapBlob: 'not a wrap!' }
+			})
+		);
+		expect(result).toMatchObject({ status: 400 });
+		await expect(readWrapRows(harness.db, ada.id)).resolves.toHaveLength(1);
+	});
+
+	it('refuses params naming an unlock method this version has never heard of', async () => {
+		await createTestUserKeys(harness.db, ada);
+
+		const result = await actions.addWrap(
+			fakeEvent({
+				db: harness.db,
+				user: ada,
+				formData: {
+					wrapParams: JSON.stringify({ type: 'telepathy', version: 1 }),
+					wrapBlob: FAKE_WRAP_BLOB
+				}
+			})
+		);
+		expect(result).toMatchObject({ status: 400 });
+	});
+
+	it('refuses to add a way into an account that has no identity', async () => {
+		const result = await actions.addWrap(
+			fakeEvent({
+				db: harness.db,
+				user: ada,
+				formData: { wrapParams: PASSKEY_PARAMS, wrapBlob: FAKE_WRAP_BLOB }
+			})
+		);
+		// Otherwise the list of ways to unlock would name one that opens nothing.
+		expect(result).toMatchObject({ status: 400 });
+		await expect(readWrapRows(harness.db, ada.id)).resolves.toHaveLength(0);
+	});
+
+	it('refuses an unsigned visitor', async () => {
+		const result = await runAndCatch(() => actions.addWrap(fakeEvent({ db: harness.db })));
 		expect(result).toMatchObject({ type: 'error', status: 401 });
 	});
 });

@@ -2,7 +2,12 @@
 	import { invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { currentKeyring, unlockWithPassword } from '$lib/crypto/session.svelte';
+	import {
+		currentKeyring,
+		passkeyWrapFor,
+		unlockWithPasskey,
+		unlockWithPassword
+	} from '$lib/crypto/session.svelte';
 	import {
 		acceptKeyChange,
 		markVerified,
@@ -21,6 +26,7 @@
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
+	const passkeyWrap = $derived(passkeyWrapFor(keyring));
 
 	/**
 	 * The same key check as the board, because a reply is a send too.
@@ -99,7 +105,11 @@
 			<p>These messages are locked on this device.</p>
 			<UnlockForm
 				unlock={(password) => unlockWithPassword(user, password).then(() => undefined)}
+				passkeyUnlock={passkeyWrap
+					? () => unlockWithPasskey(user, passkeyWrap).then(() => undefined)
+					: null}
 				wrongPassword={keyring.reason === 'wrong-password'}
+				willRepeat={keyring.tier === 'memory'}
 			/>
 		</div>
 	{:else}
