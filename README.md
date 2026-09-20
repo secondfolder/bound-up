@@ -1,38 +1,178 @@
-# sv
+# Bound Up
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit 2 + Svelte 5 on Cloudflare Workers, with Drizzle ORM over Cloudflare D1
+and Better Auth (email/password + passkeys).
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- Guides made of ordered edge tasks.
+- Self rewards and partnership rewards with shared-control permissions.
+- Self tasks and partnership tasks that award reward credits on completion.
+- Encrypted partner messaging with per-device key handling.
+- Partner-aware timezone handling, including tasks whose dates stay relative to
+  one partner's timezone even if that person later changes their timezone.
 
-```bash
-# create a new project in the current directory
-npx sv create
+> **Breaking change — accounts created before the end-to-end encryption work
+> must be recreated.** Passwords are now turned into a key in the browser and
+> only a derived value is sent to the server, so a credential stored under the
+> old scheme can no longer be matched. There is no migration and cannot be a
+> clean one: any "try the old way first" path would have to post the plaintext
+> password again, and deciding which way to try would mean asking the server
+> about an email before signing in — an account-existence oracle. Run
+> `npm run db:reset` locally; on a deployed instance, recreate the accounts.
+> Nothing is lost, because no messages exist yet. See
+> [docs/encryption.md](docs/encryption.md).
 
-# create a new project in my-app
-npx sv create my-app
-```
+## First-time setup
 
-## Developing
+Local development needs **no Cloudflare account** — it runs against a plain
+SQLite file.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```bash
+```sh
+npm install
+cp .env.example .env
+npm run auth:secret          # paste the value into BETTER_AUTH_SECRET in .env
+npm run db:migrate           # create the tables in ./local.db
+npm run db:seed              # insert the dev guide + edge task
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+## Deploy setup (only when you actually deploy)
 
-To create a production version of your app:
-
-```bash
-npm run build
+```sh
+npx wrangler login
+npx wrangler d1 create bound-up        # paste database_id into wrangler.jsonc
+openssl rand -hex 32 | npx wrangler secret put BETTER_AUTH_SECRET
+npm run db:migrate:production
+npm run deploy
 ```
 
-You can preview the production build with `npm run preview`.
+Run `npm run preview` before every deploy — it is the only local step that
+exercises the real Workers runtime (`nodejs_compat`, the assets binding,
+`platform.env`, the R2 bucket, the Durable Object, the real bundle), and
+therefore the only one that can catch the dev/production divergences described
+below.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Both it and `deploy` run wrangler with no entry argument: `main` in
+`wrangler.jsonc` is the worker the adapter generates, and wrangler is happy with
+that. The one wrinkle is the `RealtimeRoom` Durable Object class, which has to be
+exported from the worker's own module — a module the adapter generates, so there
+is nowhere in the source tree to put the export. The `sveltekit-cloudflare-do`
+plugin in `vite.config.ts` appends it once the adapter has written the file.
+
+Because wrangler needs no custom entry, Cloudflare's deploy-on-push works on its
+defaults — build command `npm run build`, deploy command `npx wrangler deploy`.
+
+> **Why `overrides` in package.json:** `sveltekit-cloudflare-do@0.2.1` ships a
+> self-referential `"sveltekit-cloudflare-do": "link:"` dependency — a pnpm
+> workspace artefact that was published by mistake — and npm refuses it outright
+> with `EUNSUPPORTEDPROTOCOL`. The override redirects that nested self-dependency
+> back at the top-level spec, which is the only way the package installs under
+> npm. Delete it if the package ever ships a fixed release.
+
+> **Known issue:** the built worker currently 500s on every page —
+> `ReferenceError: HTMLElement is not defined`, because the root layout imports
+> Web Awesome's Lit components into the server graph. It predates the messaging
+> work and no test catches it, because the Playwright suite runs against
+> `vite dev`. The diagnosis and two rejected fixes are recorded at the end of
+> [AGENTS.md](AGENTS.md).
+
+## How the database works
+
+|                             | Driver                 | Applier                         |
+| --------------------------- | ---------------------- | ------------------------------- |
+| `npm run dev`, seed, studio | libsql → `./local.db`  | `npm run db:migrate`            |
+| `npm run preview`           | D1 (wrangler-emulated) | `npm run db:migrate:preview`    |
+| production                  | D1                     | `npm run db:migrate:production` |
+
+- Schema: `src/lib/server/db/schema/app.ts` (hand-written) and `schema/auth.ts`
+  (generated by `npm run auth:schema` — regenerate rather than hand-edit).
+- Migrations live in `drizzle/` and **are committed**. One migration set feeds all
+  three databases; each keeps its own ledger table, so there is no double-apply.
+- The Drizzle client and the Better Auth instance are built **per request** in
+  `src/hooks.server.ts` and exposed as `event.locals.db` / `event.locals.auth`.
+  There is no module-level singleton: a D1 binding only exists inside a request.
+
+### Changing the schema
+
+```sh
+npm run auth:schema     # only if Better Auth's own tables need regenerating
+npm run db:generate     # writes drizzle/000N_*.sql — READ IT
+npm run db:migrate      # local
+npm run db:migrate:production   # production
+```
+
+Never run `drizzle-kit push` — see the comment in `drizzle.config.ts`.
+
+## Gotchas
+
+- **Nothing under `src/lib/server/db/` may import `$lib`, `$env` or `$app`.**
+  drizzle-kit and the seed script load those files outside Vite, where SvelteKit's
+  aliases do not resolve. The one exception is `db/dev.ts`, which is imported only
+  by the SvelteKit side.
+- **`db.transaction()` works locally but fails on D1.** Drizzle's D1 driver emits
+  raw `begin`/`commit`; D1 is auto-commit and offers `batch()` instead. Use
+  `batch()`. (Better Auth is unaffected — its adapter runs writes sequentially.)
+- **Secrets come from two places**: `platform.env` in production (wrangler
+  secrets), `.env` in dev (there is no `platform` in dev — `svelte.config.js`
+  strips the adapter's `emulate` hook so `vite dev` needs no workerd).
+- **Passkeys are bound to a hostname.** One registered on `localhost` will not work
+  on a tunnel host or in production, and vice versa. That is WebAuthn, not a bug.
+- **Logging in and signing up need JavaScript, and always did.** Every text
+  field is a `<wa-input>` custom element whose real `<input>` only exists once
+  Web Awesome upgrades it, so with scripting off there are no usable inputs on
+  those pages at all. The client-side key derivation did not change that; it
+  just added a `<noscript>` block that explains it.
+- **The password is also the encryption key.** It is stretched in the browser
+  (PBKDF2-SHA256, 650k iterations) into an auth secret that goes to the server
+  and a wrap key that never leaves the device. Two consequences worth knowing
+  before you touch either: changing the email-normalisation rule or any KDF
+  parameter locks every existing account out of its own message history, and
+  there is a frozen test vector in `src/lib/crypto/kdf.test.ts` whose job is to
+  fail loudly if you do. See [docs/encryption.md](docs/encryption.md).
+- **Partner task dates are timezone-relative, not fixed to one stored offset.**
+  The tasks feature stores local wall-clock values plus which partner they are
+  relative to, so changing an account timezone later changes how that task is
+  interpreted. See [docs/tasks.md](docs/tasks.md) and [docs/timezone.md](docs/timezone.md).
+- `npm run db:reset` uses `rm -f` and is not Windows-portable.
+
+## Tests
+
+```sh
+npm test                          # vitest: unit, server and component tests
+npx playwright install chromium   # once
+npm run test:e2e                  # the invite flow in a real browser
+```
+
+`npm test` needs nothing set up: the server tests build a SQLite database in
+memory from the committed migrations. `npm run test:e2e` starts its own
+`vite dev` on port 5175 against a throwaway `e2e.db`, so it never touches your
+`local.db` — but it does load Web Awesome from the CDN, so it needs a network
+connection. `AGENTS.md` has the details of how each level is meant to be used.
+
+### Pre-commit
+
+`git commit` runs [husky](https://typicode.github.io/husky/) +
+[lint-staged](https://github.com/lint-staged/lint-staged): svelte-check over the
+whole project first, then over the staged files — prettier rewrites them, eslint
+fixes what it can, and `vitest related` runs the unit tests whose files import
+the staged ones (see the `lint-staged` entry in `package.json`). Anything a task
+rewrites is re-staged automatically. It is not a substitute for the full loop in
+`AGENTS.md` — the e2e suite is too slow for a hook and still runs in CI or by
+hand.
+
+## Scripts
+
+| Script                                                        | What it does                                                  |
+| ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `dev` / `build`.                                              | Vite dev server / production build                            |
+| `preview`                                                     | Build, migrate the emulated D1, then run the real worker      |
+| `deploy`                                                      | Build and deploy to Cloudflare                                |
+| `check` / `lint` / `format` / `test`                          | svelte-check / prettier + eslint / prettier write / vitest    |
+| `test:e2e`                                                    | Playwright, in a real browser against `vite dev`              |
+| `db:generate`                                                 | Generate a migration from the schema                          |
+| `db:migrate` / `db:migrate:preview` / `db:migrate:production` | Apply migrations to local.db / emulated D1 / production       |
+| `db:seed` / `db:reset`                                        | Seed dev data / wipe local.db and re-seed                     |
+| `db:studio`                                                   | Drizzle Studio against `./local.db`                           |
+| `auth:schema` / `auth:secret`                                 | Regenerate the Better Auth tables / generate a secret         |
+| `cf-typegen`                                                  | Regenerate Cloudflare binding types (not currently committed) |

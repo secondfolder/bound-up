@@ -2,3 +2,16 @@
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# Generated migrations and snapshots
+drizzle/
+
+# Seed prose — keep one entry per line rather than reflowed
+src/lib/server/db/seed-data.ts
+
+# Vendored agent skills — pinned by skills-lock.json, not ours to reformat
+.agents/
+skills-lock.json
+
+# Frozen historical plans — formatting them would silently rewrite frozen records
+docs/historical-plans/
