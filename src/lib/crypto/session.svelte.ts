@@ -10,8 +10,7 @@
 
 import { normaliseEmail, type KeyWrapParams } from '../encryption';
 import { deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
-import { importIdentityKey, webCryptoX25519Available } from './identity';
-import { keyStore, type CachedIdentity } from './keystore';
+import { keyStore, type KeyTier } from './keystore';
 import { clearStash, takeUnlock } from './stash';
 import { unwrapIdentity } from './wrap';
 import type { KeyWrapView, UnlockBundleView } from '../types';
@@ -43,6 +42,10 @@ export type Keyring =
 			identity: CryptoKey | string;
 			/** False when the identity is held in memory only, so unlock repeats. */
 			durable: boolean;
+			/** Which form this device could store. See `keystore.ts`. */
+			tier: KeyTier;
+			/** Why this device is not on the best tier, for /settings/encryption. */
+			fallbackReason: string | null;
 	  };
 
 let keyring = $state<Keyring>({ status: 'unknown' });
@@ -63,21 +66,17 @@ export function unlockedIdentity(): { recipient: string; identity: CryptoKey | s
 
 async function cache(userId: string, recipient: string, identity: string): Promise<Keyring> {
 	const store = await keyStore();
-	// A non-extractable CryptoKey where possible, because that is the form no
-	// API can hand back as bytes. Where the browser cannot do X25519, the string
-	// is kept in memory and never written to storage.
-	const usable = store.durable && (await webCryptoX25519Available());
-	const value: CachedIdentity = {
-		userId,
-		recipient,
-		key: usable ? await importIdentityKey(identity) : identity
-	};
-	if (usable) await store.putIdentity(value);
+	// The store decides what form to write and hands back the form to hold in
+	// memory — a non-extractable CryptoKey wherever the browser can do X25519,
+	// the string otherwise. See the tier ladder in `keystore.ts`.
+	const cached = await store.putIdentity({ userId, recipient, identity });
 	return {
 		status: 'unlocked',
 		recipient,
-		identity: value.key,
-		durable: usable
+		identity: cached.key,
+		durable: store.durable,
+		tier: store.tier,
+		fallbackReason: store.fallbackReason
 	};
 }
 
@@ -126,7 +125,9 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 				status: 'unlocked',
 				recipient: cached.recipient,
 				identity: cached.key,
-				durable: store.durable
+				durable: store.durable,
+				tier: store.tier,
+				fallbackReason: store.fallbackReason
 			};
 			return keyring;
 		}

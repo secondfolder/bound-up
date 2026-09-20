@@ -73,6 +73,10 @@ export const AUTH_SECRET_INFO = 'bound-up-auth-v1';
 export const WRAP_KEY_INFO = 'bound-up-wrap-v1';
 export const PRF_WRAP_KEY_INFO = 'bound-up-wrap-prf-v1';
 
+/** Domain separation for the device seal. Not an HKDF info string: the
+ *  device key is generated, not derived, so this is only ever an AAD. */
+export const DEVICE_SEAL_INFO = 'bound-up-device-seal-v1';
+
 /**
  * The PBKDF2 salt.
  *
@@ -179,6 +183,20 @@ export function parseKeyWrapParams(raw: string): KeyWrapParams | null {
  */
 export function wrapAad(recipient: string): string {
 	return `${WRAP_KEY_INFO}|${recipient}`;
+}
+
+/**
+ * The additional-authenticated-data for a device seal.
+ *
+ * A device seal is the same AES-GCM envelope as a key wrap, under a key that
+ * never leaves this browser profile rather than one derived from a password —
+ * see `crypto/keystore.ts`. It gets its own domain separation so the two can
+ * never be confused, and it *does* name the user id, unlike `wrapAad`: the
+ * signup-ordering reason to leave it out does not apply, because nothing is
+ * ever sealed to a device before the account exists.
+ */
+export function deviceSealAad(userId: string, recipient: string): string {
+	return `${DEVICE_SEAL_INFO}|${userId}|${recipient}`;
 }
 
 // ── base64url ────────────────────────────────────────────────────────────────

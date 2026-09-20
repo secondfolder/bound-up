@@ -278,15 +278,54 @@ locked or absent key state can strand real data. Only the messaging screens
 and `/settings/encryption` render their own locked state, and the gate keeps
 quiet on those to avoid two identical unlock forms on one page.
 
-### Two things treated as normal rather than exceptional
+### The storage ladder
 
-- **Not every browser will store a `CryptoKey`.** Some WebKit builds throw
-  `DataCloneError` on structured-cloning one, and Safari's private browsing
-  restricts IndexedDB. The keystore probes by writing a real key and reading it
-  back, once, and falls back permanently to memory — where the identity is held
-  as a string and never persisted. The UI says so, because it means an unlock on
-  every page load.
-- **Storage gets evicted**, as above. Hence path 3 being a first-class screen.
+Not every browser will hold the identity in the form we would like, so the
+keystore tries three, best first, by writing a real key and reading it back.
+Whichever survives is the one this browser profile uses, decided once:
+
+| Tier         | What is written                                               | Needs                  |
+| ------------ | ------------------------------------------------------------- | ---------------------- |
+| `crypto-key` | the non-extractable X25519 `CryptoKey` itself                 | X25519 + a clone of it |
+| `sealed`     | the identity string, AES-GCM sealed under a device key        | IndexedDB + AES-GCM    |
+| `memory`     | nothing — the identity lives in a variable until the tab goes | —                      |
+
+**Why the second tier exists.** WebCrypto X25519 only shipped in Safari 18.4 /
+iOS 18.4. Before that a `CryptoKey` identity cannot be made at all, and the
+device was dropped straight to `memory` — an unlock prompt on every page load,
+which is what an iPhone actually did. Nothing about _storing_ the identity ever
+needed X25519, though: age decrypts perfectly well from a string identity via
+`@noble/curves`, and only the `CryptoKey` form of it needs the algorithm. So the
+sealed tier keeps the string, encrypted under an AES-GCM key that is itself a
+non-extractable `CryptoKey` in IndexedDB. On Apple platforms that stored key is
+in turn wrapped by one in the system keychain.
+
+**What the second tier gives up, plainly.** Under `crypto-key`, script injected
+into the page can _use_ the identity for as long as it runs but can never obtain
+its bytes. Under `sealed` it can call decrypt and walk away with the age secret
+key permanently. That is a real downgrade. It is taken only on devices that
+would otherwise persist nothing at all — where the identity already sits in
+memory as a string for the whole session — and never in place of a tier that
+works. A device climbs back to `crypto-key` on its own after an OS update,
+because the probe runs again whenever the best tier is not already in use.
+
+The in-memory form is not the tier. Wherever the browser can do X25519 the
+identity is held as a non-extractable `CryptoKey` in the keyring, even on the
+sealed and memory tiers — the tier decides what reaches disk, not what a
+variable holds.
+
+`fallbackReason` records why a device is not on `crypto-key`, and
+`/settings/encryption` shows it when the device ends up on `memory`. It exists
+because one `catch` around the whole probe made "iOS asks for my password every
+time" indistinguishable from an unsupported curve, a refused database and a
+`DataCloneError` without attaching a remote inspector.
+
+### Storage still gets evicted
+
+iOS drops IndexedDB after about a week of not opening the app, and any browser
+may evict under pressure. The keystore asks `navigator.storage.persist()` once
+after its first durable write, which Safari generally declines unless the site
+is on the Home Screen — so path 3 stays a first-class screen, not an error.
 
 ## Changing and resetting the password
 

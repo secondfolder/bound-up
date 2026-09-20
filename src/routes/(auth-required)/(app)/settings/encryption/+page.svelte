@@ -153,6 +153,11 @@
 				{#if !keyring.durable}
 					<br />This browser cannot store your key securely, so you will be asked for your password
 					each time you open the app.
+					{#if keyring.fallbackReason}
+						<!-- Deliberately raw. Nobody can act on it, but it is the difference
+						     between a support answer and a remote-inspector session. -->
+						<br /><small class="reason">What this browser refused: {keyring.fallbackReason}</small>
+					{/if}
 				{/if}
 			</wa-callout>
 			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
@@ -323,6 +328,12 @@
 
 		.lede {
 			font-size: 0.9375rem;
+		}
+
+		.reason {
+			color: var(--wa-color-text-quiet);
+			/* A DOMException message has no spaces to break on. */
+			overflow-wrap: anywhere;
 		}
 
 		.explainer p + p {

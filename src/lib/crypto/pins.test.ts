@@ -23,12 +23,17 @@ function fakeStore(): KeyStore & { rows: Map<string, PinRow> } {
 	const identities = new Map<string, CachedIdentity>();
 	return {
 		rows,
+		tier: 'crypto-key',
 		durable: true,
+		fallbackReason: null,
 		async getIdentity(userId) {
 			return identities.get(userId);
 		},
-		async putIdentity(value) {
-			identities.set(value.userId, value);
+		async putIdentity({ userId, recipient, identity }) {
+			// The string form, as a store with no WebCrypto X25519 would hold it.
+			const value: CachedIdentity = { userId, recipient, key: identity };
+			identities.set(userId, value);
+			return value;
 		},
 		async getPins(userId) {
 			return [...rows.values()].filter((row) => row.userId === userId);
