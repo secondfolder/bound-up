@@ -35,7 +35,11 @@ export const authSecretField = z
 /** An age recipient. Public by design, so this is a shape check and nothing more. */
 export const recipientField = z.string().regex(RECIPIENT_PATTERN, 'Malformed encryption key');
 
-/** base64url of `IV || AES-256-GCM ciphertext || tag`. Opaque to the server. */
+/**
+ * base64url of a wrap's ciphertext, opaque to the server. Wide enough for
+ * both envelopes: the AES-GCM one a password wrap uses, and the age file a
+ * passkey wrap uses, which carries an age header and so runs longer.
+ */
 export const wrapBlobField = z.string().regex(/^[A-Za-z0-9_-]{40,1024}$/, 'Malformed key wrap');
 
 /**

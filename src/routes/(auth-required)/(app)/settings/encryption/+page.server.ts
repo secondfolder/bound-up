@@ -3,9 +3,16 @@ import { APIError } from 'better-auth/api';
 import { setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { parseKeyWrapParams } from '$lib/encryption';
+import { wrapBlobField } from '$lib/schemas/keyWrap';
 import { encryptionSetupSchema } from '$lib/schemas/encryptionForms';
 import { clearPasswordCredential, hasPasswordCredential } from '$lib/server/credentials';
-import { deleteWrap, getUnlockBundle, putUserKeys, replaceUserKeys } from '$lib/server/keys';
+import {
+	addWrap,
+	deleteWrap,
+	getUnlockBundle,
+	putUserKeys,
+	replaceUserKeys
+} from '$lib/server/keys';
 import { listPartnershipsForUser } from '$lib/server/partnerships';
 import { requestHistoryRestore } from '$lib/server/messaging';
 import type { Actions, PageServerLoad } from './$types';
@@ -117,6 +124,43 @@ export const actions: Actions = {
 		await clearPasswordCredential(locals.db, locals.user.id);
 		void request;
 		return { forgotten: true };
+	},
+
+	/**
+	 * Adds another way to unlock. Today that means a passkey.
+	 *
+	 * Everything that matters already happened in the browser: it opened the
+	 * identity with the password and re-sealed it to a credential. What arrives
+	 * here is what always arrives here — a type, an opaque params blob, and a
+	 * ciphertext — so this validates their shape and nothing about their
+	 * meaning, which it has no way to check and no business checking.
+	 */
+	addWrap: async ({ locals, request }) => {
+		if (!locals.user) error(401, 'Not signed in');
+		const data = await request.formData();
+
+		const params = parseKeyWrapParams(String(data.get('wrapParams') ?? ''));
+		const blob = wrapBlobField.safeParse(String(data.get('wrapBlob') ?? ''));
+		if (!params || !blob.success) {
+			return fail(400, { addWrapError: 'Could not add that unlock method' });
+		}
+
+		// A wrap with no identity behind it is a blob nobody will ever be able to
+		// check against anything, and it would make the list of ways to unlock a
+		// lie. Setup is what creates the first one.
+		const { recipient } = await getUnlockBundle(locals.db, locals.user.id);
+		if (!recipient) {
+			return fail(400, { addWrapError: 'Set up encrypted messages first' });
+		}
+
+		const label = String(data.get('label') ?? '').slice(0, 100);
+		await addWrap(locals.db, locals.user.id, {
+			type: params.type,
+			params,
+			blob: blob.data,
+			label: label || null
+		});
+		return { wrapAdded: true };
 	},
 
 	/** Removes one unlock method — a revoked passkey, say. */

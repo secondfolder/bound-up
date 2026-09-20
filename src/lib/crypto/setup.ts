@@ -10,7 +10,7 @@
  */
 
 import { MASTER_KEY_VERSIONS, type KeyWrapParams } from '../encryption';
-import { deriveAuthSecret, deriveMasterKey, deriveWrapKey } from './kdf';
+import { deriveAuthSecret, deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
 import { generateAgeIdentity } from './identity';
 import { unwrapIdentity, wrapIdentity } from './wrap';
 import type { KeyWrapView } from '../types';
@@ -57,6 +57,41 @@ export async function buildIdentitySubmission(
 	};
 }
 
+/**
+ * Opens the identity with the account password, on this device.
+ *
+ * A loop, because more than one password wrap can legitimately exist: a
+ * password change inserts the new wrap before changing the credential, so a
+ * crash mid-change leaves two. Exactly one of them opens.
+ *
+ * Returns null when the password is wrong — decided here by an AES-GCM tag
+ * check, with no server round trip, so a wrong password is answered instantly
+ * and tells a watcher nothing. The master key comes back with it because the
+ * caller usually needs to prove the same password to Better Auth.
+ */
+export async function openIdentityWithPassword(input: {
+	email: string;
+	password: string;
+	recipient: string;
+	wraps: KeyWrapView[];
+}): Promise<{ identity: string; master: MasterKey } | null> {
+	for (const wrap of input.wraps) {
+		if (wrap.params.type !== 'password') continue;
+		const master = await deriveMasterKey(input.password, input.email, {
+			version: wrap.params.version,
+			kdf: wrap.params.kdf,
+			iterations: wrap.params.iterations
+		});
+		const identity = await unwrapIdentity({
+			wrapKey: await deriveWrapKey(master),
+			blob: wrap.blob,
+			recipient: input.recipient
+		});
+		if (identity) return { identity, master };
+	}
+	return null;
+}
+
 export type PasswordChange = {
 	currentAuthSecret: string;
 	newAuthSecret: string;
@@ -87,30 +122,12 @@ export async function buildPasswordChange(input: {
 	recipient: string;
 	wraps: KeyWrapView[];
 }): Promise<PasswordChange | null> {
-	const passwordWraps = input.wraps.filter((wrap) => wrap.type === 'password');
-
-	// A loop, because more than one password wrap can legitimately exist: a
-	// previous change inserts the new wrap before changing the credential, so a
-	// crash mid-change leaves two. Exactly one of them opens.
-	let opened: { identity: string; master: Awaited<ReturnType<typeof deriveMasterKey>> } | null =
-		null;
-	for (const wrap of passwordWraps) {
-		if (wrap.params.type !== 'password') continue;
-		const master = await deriveMasterKey(input.oldPassword, input.email, {
-			version: wrap.params.version,
-			kdf: wrap.params.kdf,
-			iterations: wrap.params.iterations
-		});
-		const identity = await unwrapIdentity({
-			wrapKey: await deriveWrapKey(master),
-			blob: wrap.blob,
-			recipient: input.recipient
-		});
-		if (identity) {
-			opened = { identity, master };
-			break;
-		}
-	}
+	const opened = await openIdentityWithPassword({
+		email: input.email,
+		password: input.oldPassword,
+		recipient: input.recipient,
+		wraps: input.wraps
+	});
 	if (!opened) return null;
 
 	const newMaster = await deriveMasterKey(input.newPassword, input.email, MASTER_KEY_VERSIONS[0]);

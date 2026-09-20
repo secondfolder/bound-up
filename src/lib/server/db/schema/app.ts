@@ -547,7 +547,11 @@ export const userKeyWraps = sqliteTable(
 			.references(() => user.id, { onDelete: 'cascade' }),
 		type: text('type').$type<KeyWrapType>().notNull(),
 		params: text('params', { mode: 'json' }).$type<KeyWrapParams>().notNull(),
-		/** base64url of `12-byte IV || AES-256-GCM ciphertext || 16-byte tag`. */
+		/**
+		 * base64url of a ciphertext this server has no key for. A password wrap
+		 * is `12-byte IV || AES-256-GCM || 16-byte tag`; a passkey wrap is an age
+		 * file. `type` says which, and nothing here reads either.
+		 */
 		blob: text('blob').notNull(),
 		/** Shown as "this passkey has never been used to unlock". Gates nothing. */
 		lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),

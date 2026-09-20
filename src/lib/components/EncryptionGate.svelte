@@ -4,7 +4,9 @@
 	import {
 		currentKeyring,
 		initialiseKeyring,
+		passkeyWrapFor,
 		resetKeyring,
+		unlockWithPasskey,
 		unlockWithPassword
 	} from '$lib/crypto/session.svelte';
 	import UnlockForm from './UnlockForm.svelte';
@@ -31,6 +33,7 @@
 		handledByPage?: boolean;
 	} = $props();
 	const keyring = $derived(currentKeyring());
+	const passkeyWrap = $derived(passkeyWrapFor(keyring));
 
 	let lastUserId: string | null = null;
 
@@ -66,6 +69,11 @@
 		await unlockWithPassword(user, password);
 	}
 
+	async function onPasskeyUnlock() {
+		if (!user || !passkeyWrap) return;
+		await unlockWithPasskey(user, passkeyWrap);
+	}
+
 	/**
 	 * Where the gate keeps quiet.
 	 *
@@ -82,7 +90,12 @@
 		<wa-icon slot="icon" name="lock" variant="solid"></wa-icon>
 		<strong>Your messages are locked on this device</strong>
 		<p>Unlock them with your password, or carry on — everything else works without it.</p>
-		<UnlockForm unlock={onUnlock} wrongPassword={keyring.reason === 'wrong-password'} />
+		<UnlockForm
+			unlock={onUnlock}
+			passkeyUnlock={passkeyWrap ? onPasskeyUnlock : null}
+			wrongPassword={keyring.reason === 'wrong-password'}
+			willRepeat={keyring.tier === 'memory'}
+		/>
 	</wa-callout>
 {/if}
 

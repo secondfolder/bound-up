@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 
 let mockKeyringStatus = 'locked';
+let mockPasskeyWrap: { id: string } | null = null;
 
 vi.mock('$app/paths', () => ({
 	resolve: (id: string, params?: Record<string, string>) =>
@@ -10,9 +11,11 @@ vi.mock('$app/paths', () => ({
 }));
 
 vi.mock('$lib/crypto/session.svelte', () => ({
-	currentKeyring: () => ({ status: mockKeyringStatus, reason: null }),
+	currentKeyring: () => ({ status: mockKeyringStatus, reason: null, wraps: [] }),
 	initialiseKeyring: vi.fn().mockResolvedValue(undefined),
+	passkeyWrapFor: () => mockPasskeyWrap,
 	resetKeyring: vi.fn(),
+	unlockWithPasskey: vi.fn(),
 	unlockWithPassword: vi.fn()
 }));
 
@@ -23,6 +26,7 @@ const user = { id: 'usr-1', email: 'ada@example.com' };
 describe('EncryptionGate', () => {
 	test('shows locked callout when keyring is locked and the user has message history', () => {
 		mockKeyringStatus = 'locked';
+		mockPasskeyWrap = null;
 		render(EncryptionGate, { user, userHasMessageHistory: true, handledByPage: false });
 
 		expect(screen.getByText('Your messages are locked on this device')).toBeInTheDocument();
@@ -40,5 +44,19 @@ describe('EncryptionGate', () => {
 		render(EncryptionGate, { user, userHasMessageHistory: true, handledByPage: true });
 
 		expect(screen.queryByText('Your messages are locked on this device')).not.toBeInTheDocument();
+	});
+	test('offers the passkey only when the account has one', async () => {
+		mockKeyringStatus = 'locked';
+		mockPasskeyWrap = null;
+		const { unmount } = render(EncryptionGate, { user, userHasMessageHistory: true });
+		expect(screen.queryByText('Unlock with a passkey')).not.toBeInTheDocument();
+		unmount();
+
+		// Nothing else changes: the password field is still there underneath,
+		// because a passkey can be lost and the password cannot be recovered.
+		mockPasskeyWrap = { id: 'wrap-1' };
+		render(EncryptionGate, { user, userHasMessageHistory: true });
+		expect(screen.getByText('Unlock with a passkey')).toBeInTheDocument();
+		expect(screen.getByText('or use your password')).toBeInTheDocument();
 	});
 });

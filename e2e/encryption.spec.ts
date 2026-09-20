@@ -413,6 +413,99 @@ test.describe('getting your keys back', () => {
 		}
 	});
 
+	/**
+	 * The bug the storage ladder exists for: unlock, close the tab, and be asked
+	 * again on the very next load.
+	 *
+	 * `reload()` rather than a click, deliberately. A client-side navigation
+	 * keeps the module holding the unlocked identity alive, so it would pass
+	 * whether or not anything was ever written down.
+	 */
+	test('an unlock survives a full page load', async ({ browser }) => {
+		const who = account('Efe');
+
+		const first = await browser.newContext();
+		let cookies;
+		try {
+			await signUp(await first.newPage(), who);
+			cookies = await first.cookies();
+		} finally {
+			await first.close();
+		}
+
+		const evicted = await browser.newContext();
+		try {
+			await evicted.addCookies(cookies);
+			const page = await evicted.newPage();
+			await page.goto('/settings/encryption');
+			await fillPassword(page, 'unlockPassword', who.password);
+			await clickWaButton(page, 'Unlock messages');
+			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+
+			await page.reload();
+			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			await expect(page.getByText(/Locked on this device/)).toBeHidden();
+		} finally {
+			await evicted.close();
+		}
+	});
+
+	/**
+	 * The same, on a browser that cannot do X25519 in WebCrypto — which is every
+	 * iPhone before iOS 18.4, and is what made this an iOS bug report.
+	 *
+	 * There is no way to store the identity as a `CryptoKey` on such a browser,
+	 * so the keystore seals the string under a device key instead. The unlock
+	 * has to survive anyway, and the warning about being asked every time has to
+	 * stay away — that is the whole difference between tier 2 and tier 3.
+	 *
+	 * The init script goes on the second context only: signup in the first one
+	 * still needs to generate a real identity.
+	 */
+	test('an unlock survives a full page load without WebCrypto X25519', async ({ browser }) => {
+		const who = account('Fen');
+
+		const first = await browser.newContext();
+		let cookies;
+		try {
+			await signUp(await first.newPage(), who);
+			cookies = await first.cookies();
+		} finally {
+			await first.close();
+		}
+
+		const evicted = await browser.newContext();
+		try {
+			await evicted.addCookies(cookies);
+			await evicted.addInitScript(() => {
+				// Init scripts run in every frame, including opaque-origin ones like
+				// `about:blank`, where there is no SubtleCrypto to stub at all.
+				if (!globalThis.crypto?.subtle) return;
+				const real = crypto.subtle.generateKey.bind(crypto.subtle);
+				crypto.subtle.generateKey = ((algorithm: AlgorithmIdentifier, ...rest: unknown[]) => {
+					const name = typeof algorithm === 'string' ? algorithm : algorithm.name;
+					if (name === 'X25519') {
+						return Promise.reject(new DOMException('Unsupported', 'NotSupportedError'));
+					}
+					return real(algorithm, ...(rest as [boolean, KeyUsage[]]));
+				}) as typeof crypto.subtle.generateKey;
+			});
+
+			const page = await evicted.newPage();
+			await page.goto('/settings/encryption');
+			await fillPassword(page, 'unlockPassword', who.password);
+			await clickWaButton(page, 'Unlock messages');
+			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			await expect(page.getByText(/cannot store your key securely/)).toBeHidden();
+
+			await page.reload();
+			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			await expect(page.getByText(/Locked on this device/)).toBeHidden();
+		} finally {
+			await evicted.close();
+		}
+	});
+
 	// The unlock happens against the stored wrap on the device, so a wrong
 	// password is answered locally and instantly, with no request at all.
 	test('rejects a wrong password locally, without asking the server', async ({ browser }) => {

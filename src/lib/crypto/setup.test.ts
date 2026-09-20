@@ -154,7 +154,7 @@ describe('buildPasswordChange', () => {
 		const wraps = [
 			wrapView(built.wrapBlob, {
 				type: 'webauthn-prf',
-				params: { type: 'webauthn-prf', version: 1, credentialId: 'c', salt: 's' }
+				params: { type: 'webauthn-prf', version: 1, rpId: 'bound-up.test' }
 			})
 		];
 		await expect(

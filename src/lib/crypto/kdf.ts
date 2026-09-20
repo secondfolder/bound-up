@@ -32,7 +32,6 @@ import {
 	AUTH_SECRET_INFO,
 	AUTH_SECRET_LENGTH,
 	MASTER_KEY_VERSIONS,
-	PRF_WRAP_KEY_INFO,
 	WRAP_KEY_INFO,
 	masterKeySalt,
 	toBase64Url,
@@ -141,32 +140,6 @@ export async function deriveWrapKey(master: MasterKey): Promise<CryptoKey> {
 	return crypto.subtle.deriveKey(
 		hkdf(WRAP_KEY_INFO),
 		master.key,
-		{ name: 'AES-GCM', length: 256 },
-		false,
-		['encrypt', 'decrypt']
-	);
-}
-
-/**
- * The same, from a passkey's PRF output instead of a password.
- *
- * A different `info` string, so a PRF wrap key and a password wrap key are
- * unrelated even in the impossible case of the two inputs colliding. The wrap
- * *format* is identical, which is the point: there is exactly one AES-GCM
- * envelope in this codebase, and one set of tests for it.
- *
- * `prfOutput` is 32 bytes from `clientExtensionResults.prf.results.first`. It
- * has never been near the server — Better Auth's passkey client strips
- * `clientExtensionResults` before posting the assertion.
- */
-export async function deriveWrapKeyFromPrf(prfOutput: ArrayBuffer): Promise<CryptoKey> {
-	if (prfOutput.byteLength < 32) {
-		throw new Error(`PRF output is ${prfOutput.byteLength} bytes, expected at least 32`);
-	}
-	const key = await crypto.subtle.importKey('raw', prfOutput, 'HKDF', false, ['deriveKey']);
-	return crypto.subtle.deriveKey(
-		hkdf(PRF_WRAP_KEY_INFO),
-		key,
 		{ name: 'AES-GCM', length: 256 },
 		false,
 		['encrypt', 'decrypt']

@@ -11,6 +11,7 @@
 import { normaliseEmail, type KeyWrapParams } from '../encryption';
 import { deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
 import { keyStore, type KeyTier } from './keystore';
+import { unwrapIdentityWithPasskey } from './passkey';
 import { clearStash, takeUnlock } from './stash';
 import { unwrapIdentity } from './wrap';
 import type { KeyWrapView, UnlockBundleView } from '../types';
@@ -31,6 +32,11 @@ export type Keyring =
 			recipient: string;
 			wraps: KeyWrapView[];
 			reason: 'cold' | 'wrong-password' | 'no-usable-wrap';
+			/**
+			 * Which form this device could store, known before the unlock rather
+			 * than after it — so the prompt can say up front that it will be back.
+			 */
+			tier: KeyTier;
 	  }
 	/**
 	 * Open. `identity` is a non-extractable `CryptoKey` wherever the browser can
@@ -163,7 +169,8 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 			status: 'locked',
 			recipient: bundle.recipient,
 			wraps: bundle.wraps,
-			reason: bundle.wraps.length === 0 ? 'no-usable-wrap' : 'cold'
+			reason: bundle.wraps.length === 0 ? 'no-usable-wrap' : 'cold',
+			tier: store.tier
 		};
 		return keyring;
 	})();
@@ -216,6 +223,47 @@ export async function unlockWithPassword(
 
 	keyring = await cache(user.id, recipient, opened.identity);
 	void noteWrapUsed(opened.wrapId);
+	return keyring;
+}
+
+/**
+ * The passkey wrap to offer on the unlock screen, or null when there is none.
+ *
+ * One, not all of them. Every attempt is a biometric prompt, so looping over
+ * wraps the way `tryWraps` loops over password wraps would ask the user to
+ * authenticate repeatedly to discover something they already know. The most
+ * recently used one is the best guess at which passkey they still have.
+ */
+export function passkeyWrapFor(state: Keyring): KeyWrapView | null {
+	if (state.status !== 'locked') return null;
+	const candidates = state.wraps.filter((wrap) => wrap.type === 'webauthn-prf');
+	if (candidates.length === 0) return null;
+	return candidates.reduce((best, wrap) => (lastTouched(wrap) > lastTouched(best) ? wrap : best));
+}
+
+function lastTouched(wrap: KeyWrapView): number {
+	return (wrap.lastUsedAt ?? wrap.createdAt).valueOf();
+}
+
+/**
+ * Unlocks with a passkey: one touch instead of typing the password.
+ *
+ * Reached on exactly the devices the password prompt was reached on — an
+ * evicted store, a new phone, a private tab — and it ends in `cache()`, so the
+ * unlock persists through the storage ladder and the next load is silent.
+ *
+ * Throws whatever the ceremony threw, and leaves the keyring locked so the
+ * password form underneath is still an option. `describePasskeyFailure` in
+ * `passkey.ts` turns the error into something worth showing.
+ */
+export async function unlockWithPasskey(user: { id: string }, wrap: KeyWrapView): Promise<Keyring> {
+	if (keyring.status !== 'locked') return keyring;
+	if (wrap.params.type !== 'webauthn-prf') return keyring;
+	const { recipient } = keyring;
+
+	const identity = await unwrapIdentityWithPasskey({ blob: wrap.blob, rpId: wrap.params.rpId });
+	keyring = await cache(user.id, recipient, identity);
+	void noteWrapUsed(wrap.id);
 	return keyring;
 }
 

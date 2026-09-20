@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -6,11 +7,19 @@
 	import { superForm } from 'sveltekit-superforms';
 	import PasswordField from '$lib/components/PasswordField.svelte';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
-	import { buildIdentitySubmission } from '$lib/crypto/setup';
+	import { buildIdentitySubmission, openIdentityWithPassword } from '$lib/crypto/setup';
+	import {
+		currentRpId,
+		describePasskeyFailure,
+		passkeysAvailable,
+		wrapIdentityToPasskey
+	} from '$lib/crypto/passkey';
 	import {
 		currentKeyring,
 		initialiseKeyring,
 		lock,
+		passkeyWrapFor,
+		unlockWithPasskey,
 		unlockWithPassword
 	} from '$lib/crypto/session.svelte';
 	import UnlockForm from '$lib/components/UnlockForm.svelte';
@@ -22,6 +31,7 @@
 		WEBCRYPTO_UNAVAILABLE
 	} from '$lib/crypto/kdf';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -29,6 +39,7 @@
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
+	const passkeyWrap = $derived(passkeyWrapFor(keyring));
 	const wraps = $derived(data.bundle.wraps);
 
 	let generated: { phrase: string; entropyBits: number } | null = $state(null);
@@ -124,6 +135,80 @@
 	async function onUnlockHere(password: string) {
 		await unlockWithPassword(user, password);
 	}
+
+	async function onPasskeyUnlockHere() {
+		if (!passkeyWrap) return;
+		await unlockWithPasskey(user, passkeyWrap);
+	}
+
+	let passkeyPassword = $state('');
+	let passkeyErrors: string[] | undefined = $state(undefined);
+	let addingPasskey = $state(false);
+	const canAddPasskey = $derived(Boolean(data.bundle.recipient) && passkeysAvailable());
+
+	/**
+	 * Seals the identity to a passkey, then posts the result as another wrap.
+	 *
+	 * Why this asks for the password even when the messages are unlocked on this
+	 * very device: the identity is cached as a non-extractable `CryptoKey`
+	 * wherever it can be, and there is no API anywhere that turns one of those
+	 * back into the string a new wrap has to seal. Opening a password wrap is
+	 * the only way to get it — which has the happy side effect that adding a way
+	 * in requires proving you already have one.
+	 *
+	 * Everything that can fail does so before the form is submitted: a wrong
+	 * password fails its tag check here, and a passkey without PRF fails its
+	 * ceremony here. The server only ever sees a wrap that already works.
+	 */
+	const onAddPasskey: SubmitFunction = async ({ formData, cancel }) => {
+		passkeyErrors = undefined;
+		if (!webCryptoAvailable()) {
+			cancel();
+			passkeyErrors = [WEBCRYPTO_UNAVAILABLE];
+			return;
+		}
+
+		addingPasskey = true;
+		let prepared = false;
+		try {
+			const opened = await openIdentityWithPassword({
+				email: user.email,
+				password: passkeyPassword,
+				recipient: data.bundle.recipient ?? '',
+				wraps
+			});
+			if (!opened) {
+				cancel();
+				passkeyErrors = ['That password did not unlock your messages'];
+				return;
+			}
+
+			const rpId = currentRpId();
+			formData.set('wrapBlob', await wrapIdentityToPasskey({ identity: opened.identity, rpId }));
+			formData.set('wrapParams', JSON.stringify({ type: 'webauthn-prf', version: 1, rpId }));
+			formData.set(
+				'label',
+				`${navigator.platform || 'Device'} — ${new Date().toLocaleDateString()}`
+			);
+			prepared = true;
+		} catch (error) {
+			cancel();
+			const failure = describePasskeyFailure(error);
+			// A dismissed sheet leaves no message: they chose to dismiss it.
+			passkeyErrors = failure.cancelled ? undefined : [failure.message];
+		} finally {
+			// Never left in the box: on success it is not needed, and on failure
+			// leaving it there invites a retry of the same wrong value.
+			passkeyPassword = '';
+			if (!prepared) addingPasskey = false;
+		}
+
+		if (!prepared) return;
+		return async ({ update }) => {
+			addingPasskey = false;
+			await update();
+		};
+	};
 </script>
 
 <section>
@@ -170,7 +255,12 @@
 					Normal — it happens on a new phone, after signing in with a passkey, or when the browser
 					has cleared its storage.
 				</p>
-				<UnlockForm unlock={onUnlockHere} wrongPassword={keyring.reason === 'wrong-password'} />
+				<UnlockForm
+					unlock={onUnlockHere}
+					passkeyUnlock={passkeyWrap ? onPasskeyUnlockHere : null}
+					wrongPassword={keyring.reason === 'wrong-password'}
+					willRepeat={keyring.tier === 'memory'}
+				/>
 			</wa-callout>
 		{:else if keyring.status === 'absent'}
 			<wa-callout variant="neutral">
@@ -279,6 +369,36 @@
 				{/each}
 			</ul>
 
+			{#if canAddPasskey}
+				<h2>Add a passkey</h2>
+				<div class="explainer">
+					<p>
+						A passkey lets this device unlock your messages with Face ID or a fingerprint instead of
+						your password. Worth having: browsers clear their storage every so often, and iPhones do
+						it after about a week of not opening the app.
+					</p>
+					<p class="quiet">
+						Your password keeps working and still cannot be recovered. The passkey has to be one you
+						already use to sign in, and removing it from your device removes this way in.
+					</p>
+				</div>
+				<form method="POST" action="?/addWrap" use:enhance={onAddPasskey}>
+					<PasswordField
+						bind:value={passkeyPassword}
+						field="passkeyPassword"
+						label="Your password"
+						autocomplete="current-password"
+						errors={passkeyErrors}
+					/>
+					<input type="hidden" name="wrapParams" value="" />
+					<input type="hidden" name="wrapBlob" value="" />
+					<input type="hidden" name="label" value="" />
+					<wa-button type="submit" appearance="outlined" disabled={addingPasskey}>
+						{addingPasskey ? 'Waiting for your passkey…' : 'Add a passkey'}
+					</wa-button>
+				</form>
+			{/if}
+
 			<h2>Forgotten your password?</h2>
 			<wa-callout variant="danger">
 				<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
@@ -288,6 +408,12 @@
 					this does is let you set a <em>new</em> password and a new key, and then ask each partner to
 					re-encrypt your shared history to it. They will need to check a safety number with you first.
 				</p>
+				{#if wraps.some((wrap) => wrap.type === 'webauthn-prf')}
+					<p>
+						Your passkeys will stop unlocking your messages too — they seal the old key, which is
+						the one being replaced. You can add them again afterwards.
+					</p>
+				{/if}
 				<form method="POST" action="?/forgetPassword">
 					<wa-button type="submit" variant="danger" appearance="outlined">
 						Set a new password and start again
