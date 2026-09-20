@@ -506,6 +506,46 @@ test.describe('getting your keys back', () => {
 		}
 	});
 
+	/**
+	 * The offer only exists in the moment after an unlock, so this checks the
+	 * moment rather than the ceremony — Chromium has no authenticator that can
+	 * evaluate PRF, and the wrap itself is covered by `passkey.test.ts`.
+	 */
+	test('offers a passkey right after an unlock, and takes no for an answer', async ({
+		browser
+	}) => {
+		const who = account('Gil');
+
+		const first = await browser.newContext();
+		let cookies;
+		try {
+			await signUp(await first.newPage(), who);
+			cookies = await first.cookies();
+		} finally {
+			await first.close();
+		}
+
+		const evicted = await browser.newContext();
+		try {
+			await evicted.addCookies(cookies);
+			const page = await evicted.newPage();
+			await page.goto('/settings/encryption');
+			await fillPassword(page, 'unlockPassword', who.password);
+			await clickWaButton(page, 'Unlock messages');
+
+			await expect(page.getByText('Unlock with a passkey next time?')).toBeVisible();
+			// The password form for the same thing stays out of the way while the
+			// free version of it is on screen.
+			await expect(page.getByRole('heading', { name: 'Add a passkey' })).toBeHidden();
+
+			await clickWaButton(page, 'Not now');
+			await expect(page.getByText('Unlock with a passkey next time?')).toBeHidden();
+			await expect(page.getByRole('heading', { name: 'Add a passkey' })).toBeVisible();
+		} finally {
+			await evicted.close();
+		}
+	});
+
 	// The unlock happens against the stored wrap on the device, so a wrong
 	// password is answered locally and instantly, with no request at all.
 	test('rejects a wrong password locally, without asking the server', async ({ browser }) => {

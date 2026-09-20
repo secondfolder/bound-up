@@ -9,6 +9,7 @@
 		unlockWithPasskey,
 		unlockWithPassword
 	} from '$lib/crypto/session.svelte';
+	import PasskeyOffer from './PasskeyOffer.svelte';
 	import UnlockForm from './UnlockForm.svelte';
 
 	/**
@@ -84,6 +85,12 @@
 	 * exactly the sort of duplicate accessible name AGENTS.md warns about.
 	 */
 </script>
+
+<!-- Not gated on `handledByPage`: the offer follows an unlock rather than
+     replacing a locked screen, so there is no duplicate form to avoid. -->
+{#if user}
+	<PasskeyOffer />
+{/if}
 
 {#if user && userHasMessageHistory && keyring.status === 'locked' && !handledByPage}
 	<wa-callout variant="warning" class="gate">

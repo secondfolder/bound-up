@@ -10,7 +10,13 @@ vi.mock('$app/paths', () => ({
 		params ? id.replace(/\[(\w+)\]/g, (_, key) => params[key]) : id
 }));
 
+// `PasskeyOffer` renders inside the gate and posts to a form action.
+vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+
 vi.mock('$lib/crypto/session.svelte', () => ({
+	currentEnrolmentOffer: () => null,
+	dismissEnrolmentOffer: vi.fn(),
+	enrolmentIdentityFor: () => null,
 	currentKeyring: () => ({ status: mockKeyringStatus, reason: null, wraps: [] }),
 	initialiseKeyring: vi.fn().mockResolvedValue(undefined),
 	passkeyWrapFor: () => mockPasskeyWrap,

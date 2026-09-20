@@ -15,6 +15,7 @@
 		wrapIdentityToPasskey
 	} from '$lib/crypto/passkey';
 	import {
+		currentEnrolmentOffer,
 		currentKeyring,
 		initialiseKeyring,
 		lock,
@@ -144,7 +145,17 @@
 	let passkeyPassword = $state('');
 	let passkeyErrors: string[] | undefined = $state(undefined);
 	let addingPasskey = $state(false);
-	const canAddPasskey = $derived(Boolean(data.bundle.recipient) && passkeysAvailable());
+	/**
+	 * Hidden while the app shell is already offering the same thing.
+	 *
+	 * `PasskeyOffer` appears right after an unlock and needs no password,
+	 * because the identity is still in memory as a string. Showing a second
+	 * form that asks for one would be offering the harder way to do the thing
+	 * the callout above is offering to do for free.
+	 */
+	const canAddPasskey = $derived(
+		Boolean(data.bundle.recipient) && passkeysAvailable() && currentEnrolmentOffer() === null
+	);
 
 	/**
 	 * Seals the identity to a passkey, then posts the result as another wrap.

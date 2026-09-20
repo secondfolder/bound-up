@@ -171,12 +171,29 @@ would have to get right on its own:
 `age.webauthn` is marked experimental upstream, which is why `age-encryption` is
 pinned to an exact version in `package.json`.
 
-**Enrolment asks for the password**, on `/settings/encryption`, even when the
-messages are already unlocked on that device. The identity is cached as a
-non-extractable `CryptoKey` wherever it can be, and nothing turns one of those
-back into the string a new wrap has to seal — so a password wrap is opened to
-get it. The side effect is a good one: adding a way in requires proving you
-already have one.
+**Enrolment happens in the window where it is free.** Every unlock except
+reading the cache has the `AGE-SECRET-KEY-1…` string in hand for a moment —
+signup generated it, a password unlock has just unwrapped it — and sealing it to
+a passkey needs exactly that. So `cache()` opens an _enrolment offer_ whenever
+it is handed the string and the account has no passkey wrap yet, and
+`PasskeyOffer` in the app shell asks the question straight away: one tap, no
+password, wherever the user happens to be.
+
+The offer keeps the string in a plain module variable, outside the reactive
+keyring so that no template can reach it by accident, and drops it on
+acceptance, on dismissal, on lock, on sign-out, and after five minutes. That
+bound is the whole cost of the design: while an offer stands, a device that
+would otherwise hold nothing but a non-extractable `CryptoKey` is also holding
+the string. The identity is deliberately **not** taken on read — a dismissed
+Face ID sheet is the likeliest outcome of asking, and confiscating the identity
+on the first tap would make the retry cost a password.
+
+**The fallback still asks for the password**, on `/settings/encryption`, for the
+one case that cannot avoid it: a device unlocked from its own cache, where the
+identity is a `CryptoKey` and no API turns one of those back into a string. That
+form is hidden while an offer is standing, so the easy way and the hard way are
+never both on screen. Its side effect is a good one: adding a way in requires
+proving you already have one.
 
 **Nothing is enrolled that has not already worked.** The wrap is produced by a
 real PRF evaluation, which fails loudly there and then if the credential cannot
