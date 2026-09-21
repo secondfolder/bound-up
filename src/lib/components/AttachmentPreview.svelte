@@ -58,7 +58,10 @@
 		<span>Decrypting {info.fileName}…</span>
 	</div>
 {:else if info.kind === 'video'}
-	<!-- svelte-ignore a11y_media_has_caption -->
+	<!-- svelte-ignore a11y_media_has_caption 
+      (Since this is a user uploaded video we don't have captions for it although at somepoint in the future we'd like
+      to offer on-device auto-captioning)
+    -->
 	<video src={url} controls playsinline preload="metadata"></video>
 {:else}
 	<img src={url} alt={info.fileName} />

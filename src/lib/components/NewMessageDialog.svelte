@@ -48,7 +48,6 @@
 	<div class="composer">
 		<div class="top-row">
 			<TagPicker {partnershipId} {tags} bind:selectedIds={selectedTagIds} startEditing />
-			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 			<wa-button appearance="plain" class="dialog-close" aria-label="Close" onclick={close}>
 				<wa-icon name="xmark" variant="solid" label="Close"></wa-icon>
 			</wa-button>

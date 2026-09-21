@@ -211,11 +211,9 @@
 		{/if}
 
 		{#if threadId}
-			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 			<wa-button size="s" variant="brand" appearance="filled" disabled={saving} onclick={save}>
 				Save
 			</wa-button>
-			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 			<wa-button size="s" appearance="plain" disabled={saving} onclick={cancel}>Cancel</wa-button>
 		{/if}
 

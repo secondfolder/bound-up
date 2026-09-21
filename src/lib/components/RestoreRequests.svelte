@@ -139,7 +139,6 @@
 
 			<div class="actions">
 				<!-- disabled={busy !== null}, never `|| undefined` — invariant 11. -->
-				<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 				<wa-button
 					size="s"
 					variant="brand"
@@ -152,7 +151,6 @@
 							: 'Restoring…'
 						: `The number matches — restore it`}
 				</wa-button>
-				<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 				<wa-button
 					size="s"
 					appearance="outlined"

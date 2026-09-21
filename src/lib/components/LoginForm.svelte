@@ -197,7 +197,6 @@
 	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 
 	<div class="divider">or</div>
-	<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 	<wa-button type="button" appearance="outlined" onclick={signInWithPasskey}>
 		Sign in with a passkey
 	</wa-button>

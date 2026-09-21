@@ -90,11 +90,9 @@
 		<strong>This device is in a different timezone</strong>
 		<p>Your account is set to {user.timezone}, but this device is set to {deviceTimezone}.</p>
 		<div class="actions">
-			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 			<wa-button type="button" size="s" variant="brand" onclick={useDeviceTimezone} disabled={busy}
 				>Use {deviceTimezone}</wa-button
 			>
-			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 			<wa-button type="button" size="s" appearance="plain" onclick={dismiss} disabled={busy}
 				>Dismiss</wa-button
 			>

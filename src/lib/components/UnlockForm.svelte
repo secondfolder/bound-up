@@ -77,7 +77,6 @@
 
 <form onsubmit={onSubmit}>
 	{#if passkeyUnlock}
-		<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 		<wa-button type="button" variant="brand" onclick={onPasskey} disabled={passkeyBusy}>
 			{passkeyBusy ? 'Waiting for your passkey…' : 'Unlock with a passkey'}
 		</wa-button>

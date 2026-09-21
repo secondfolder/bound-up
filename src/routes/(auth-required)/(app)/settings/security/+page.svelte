@@ -158,7 +158,6 @@
 		<!-- `disabled={busy}`, not `disabled={busy || undefined}`: once Web Awesome
 	     upgrades the element Svelte assigns to the `disabled` property, this alpha
 	     coerces `undefined` to true and leaves the button permanently disabled. -->
-		<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 		<wa-button onclick={addPasskey} disabled={busy}>Add a passkey</wa-button>
 		{#if message}<p class="invalid">{message}</p>{/if}
 
@@ -172,7 +171,6 @@
 							{passkey.name ?? 'Unnamed passkey'}
 							<small>{passkey.deviceType}{passkey.backedUp ? ' · synced' : ''}</small>
 						</span>
-						<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 						<wa-button appearance="plain" onclick={() => remove(passkey.id)}>Remove</wa-button>
 					</li>
 				{/each}

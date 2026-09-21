@@ -97,7 +97,6 @@
 			<wa-button type="submit" variant="brand" size="s" disabled={busy}>
 				{busy ? 'Waiting for your passkey…' : 'Set it up'}
 			</wa-button>
-			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 			<wa-button type="button" appearance="plain" size="s" onclick={() => dismissEnrolmentOffer()}>
 				Not now
 			</wa-button>

@@ -66,7 +66,6 @@
 						value={data.inviteUrl}
 						aria-label="Invite link"
 					/>
-					<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 					<wa-button onclick={() => data.inviteUrl && share(data.inviteUrl)}>
 						<wa-icon slot="start" name="share-nodes" variant="solid"></wa-icon>
 						Share link again

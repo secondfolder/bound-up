@@ -181,7 +181,6 @@
 					<!-- "Write something" rather than "New message": /home already has
 					     a "new messages from …" link, and two controls must not share an
 					     accessible name. -->
-					<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 					<wa-button
 						variant="brand"
 						appearance="filled"

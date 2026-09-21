@@ -70,17 +70,35 @@ noise:
   first two because `skills-lock.json` pins them, the last because formatting
   would silently rewrite frozen records (it reflows their tables and changes
   emphasis markers). Keep new files formatted; keep those ignored.
-- `npm run check`: **0 errors, 0 warnings.** All TypeScript files across the workspace (root configs, `vitest-setup-client.ts`, `e2e/**/*.ts`) are included in `tsconfig.json` and type-aware ESLint (`eslint.config.js`) so command-line checks catch all errors visible in VS Code. Two `svelte-ignore` conventions
-  keep it clean, both because svelte-check ignores `onwarn` in
-  `svelte.config.js` — a comment is the only suppression both it and the vite
-  dev server respect:
-  - Every `<wa-button>` with an `onclick` carries
-    `<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->`.
-    The a11y warnings are false positives: `wa-*` elements upgrade to real
-    interactive controls, but the compiler only sees an unknown element (it
-    classifies interactivity by tag name against HTML-only schemas, so no
-    attribute can tell it otherwise — `role="button"`/`tabindex` placate it by
-    lying to assistive tech instead). Add one to new ones.
+- `npm run check`: **0 errors, 0 warnings.** All TypeScript files across the workspace (root configs, `vitest-setup-client.ts`, `e2e/**/*.ts`) are included in `tsconfig.json` and type-aware ESLint (`eslint.config.js`) so command-line checks catch all errors visible in VS Code. Two
+  suppressions keep it clean. Both are ones svelte-check and the vite dev
+  server respect alike — svelte-check ignores `onwarn`, so that hook is not an
+  option:
+  - **Custom elements that satisfy an a11y check are allowlisted per warning
+    in `warningFilter`** (`compilerOptions` in `svelte.config.js`). Custom
+    elements, Web Awesome's or anyone's, upgrade to real controls at runtime,
+    but the compiler only sees an unknown element: it classifies
+    interactivity by tag name against HTML-only schemas, so no attribute can
+    tell it otherwise, and `role="button"`/`tabindex` only placate it by
+    lying to assistive tech. So a warning like
+    ``Visible, non-interactive element `<wa-button>` with a click event must be
+accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
+    usually alongside `a11y_no_static_element_interactions`) can be a false
+    positive. When one fires on an element not yet allowlisted, first verify
+    that the component really handles the thing the warning checks for. For
+    the two interactivity warnings, that means it renders a focusable native
+    control, activates from the keyboard, and is exposed with an interactive
+    role. Only then add it to the list for that warning in
+    `A11Y_WARNING_ALLOWLIST` (for those two, `INTERACTIVE_CUSTOM_ELEMENTS`).
+    The lists are per warning code on purpose: an element that passes one
+    a11y check has not passed the others, so never add a single list that
+    silences every a11y warning for an element. If the element does not
+    handle it (a `wa-card` with an `onclick`, say), the warning is real, so
+    fix the markup instead. The filter must stay in `svelte.config.js`:
+    passing _any_ options to `sveltekit()` in `vite.config.ts` makes
+    SvelteKit ignore `svelte.config.js` wholesale, adapter included. A
+    `svelte-ignore` comment is still right for a one-off exception on a
+    native element, where no allowlist applies.
   - Every `superForm(...)` / `formFieldProxy(...)` call seeded from a `data`
     prop carries `// svelte-ignore state_referenced_locally` in the script.
     The initial-capture is deliberate: `superForm` registers its lifecycle
