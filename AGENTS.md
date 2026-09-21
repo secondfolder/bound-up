@@ -32,6 +32,7 @@ one entry stays on one line).
 | `src/lib/types.ts`            | Types both server and components need. Alias-free so the schema can import it                |
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
+| `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on port 5175 with their own SQLite file             |
 | `src/routes/(public)/`        | Anonymous-reachable routes. `+layout.svelte` here owns `SiteHeader`                          |

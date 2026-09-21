@@ -1113,15 +1113,16 @@ test.describe('embeds', () => {
 			await expect(embed).toHaveCount(0);
 
 			// Hovering the link offers it back — the one way to undo a removal.
-			// Hovered near its start rather than at its centre on purpose: the
-			// button is drawn *over* the centre of the link, so a default hover
-			// would land on the button that is not there yet and then never be
-			// able to re-check the anchor underneath it.
-			await ada.page
-				.locator('.richtext-editor .surface a')
-				.first()
-				.hover({ position: { x: 4, y: 4 } });
-			await ada.page.getByRole('button', { name: 'Add embed' }).click();
+			// The button lives inside the link's own wrapper and is revealed by
+			// CSS, so nothing but the hover is needed, and it is hidden (not
+			// just unclickable) until then. The wrapper is what gets hovered, not
+			// the `<a>`: the button is drawn over the anchor's centre as its
+			// sibling, and Playwright refuses a hover that lands on anything but
+			// the target or its descendants.
+			const addEmbed = ada.page.getByRole('button', { name: 'Add embed' });
+			await expect(addEmbed).toBeHidden();
+			await ada.page.locator('.richtext-editor .surface .link-with-embed-offer').first().hover();
+			await addEmbed.click();
 			await expect(embed).toHaveCount(1);
 			await ada.page.getByRole('button', { name: /^Remove embedded preview/ }).click();
 			await expect(embed).toHaveCount(0);
@@ -1167,6 +1168,101 @@ test.describe('embeds', () => {
 			await ada.page.reload();
 			await expect(ada.page.getByRole('button', { name: 'Show' })).toHaveCount(1);
 			await expect(ada.page.locator('.messages .embed-slot')).toHaveCount(0);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	/**
+	 * The composer's embed lifecycle for a URL typed mid-sentence, one
+	 * requirement per step:
+	 *
+	 * 1. finishing the URL embeds it on its own, with no "Add embed" offer;
+	 * 2. removing the embed makes the offer appear on hover;
+	 * 3. moving the caret onto the URL and off again does not re-embed it;
+	 * 4. editing the URL does, because it is a different URL now.
+	 */
+	test('a typed URL embeds itself, and a removed one waits to be asked', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		// The embed's iframe, stubbed so the suite never loads YouTube.
+		await ada.page.route('**youtube-nocookie.com/**', (route) =>
+			route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>player</title>' })
+		);
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await clickWaButton(ada.page, 'Write something');
+
+			const url = 'https://www.youtube.com/watch?v=GTx1UYV9Y-o';
+			const embed = ada.page.locator('.richtext-editor .composer-embed');
+			const link = ada.page.locator('.richtext-editor .surface .link-with-embed-offer').first();
+			const addEmbed = ada.page.getByRole('button', { name: 'Add embed' });
+
+			// 1. Typed mid-sentence, the URL embeds as soon as the caret leaves
+			// it, and there is nothing to offer while the embed is there.
+			await typeRichText(ada.page, `hello ${url} world`);
+			await expect(embed).toHaveCount(1);
+			await expect(link).not.toHaveClass(/embed-available/);
+			await link.hover();
+			await expect(addEmbed).toBeHidden();
+
+			// 2. Removed, it stays removed, and hovering the link offers it back.
+			await ada.page.getByRole('button', { name: /^Remove embedded preview/ }).click();
+			await expect(embed).toHaveCount(0);
+			await ada.page.mouse.move(0, 0);
+			await expect(addEmbed).toBeHidden();
+			await link.hover();
+			await expect(addEmbed).toBeVisible();
+			await ada.page.mouse.move(0, 0);
+
+			// 3. Walking the caret into the URL and back out is exactly the
+			// gesture that inserts an embed the first time — for a removed one it
+			// must do nothing.
+			// Clicked at its very start rather than its centre, which is where the
+			// link — and so the button — may be.
+			const surface = ada.page.locator('.richtext-editor .surface[contenteditable="true"]');
+			await surface.click({ position: { x: 2, y: 2 } });
+			await ada.page.keyboard.press('End');
+			for (let i = 0; i < ' world'.length + 3; i += 1) {
+				await ada.page.keyboard.press('ArrowLeft');
+				await ada.page.waitForTimeout(40);
+			}
+			// Otherwise the check below passes for the wrong reason.
+			const caretInLink = () =>
+				ada.page.evaluate(
+					() => !!document.getSelection()?.anchorNode?.parentElement?.closest('.surface a')
+				);
+			expect(await caretInLink()).toBe(true);
+			for (let i = 0; i < ' world'.length + 3; i += 1) {
+				await ada.page.keyboard.press('ArrowRight');
+				await ada.page.waitForTimeout(40);
+			}
+			expect(await caretInLink()).toBe(false);
+			await ada.page.keyboard.type('!');
+			await expect(embed).toHaveCount(0);
+
+			// 4. Editing the URL makes it a different URL, which has never been
+			// dismissed, so it gets an embed again. The caret is put at the end of
+			// the URL by walking left from the end of the line.
+			await ada.page.keyboard.press('End');
+			for (let i = 0; i < ' world!'.length; i += 1) {
+				await ada.page.keyboard.press('ArrowLeft');
+				await ada.page.waitForTimeout(40);
+			}
+			await ada.page.keyboard.type('0');
+			await ada.page.keyboard.press('End');
+			await expect(embed).toHaveCount(1);
+			await expect(ada.page.locator('.richtext-editor .richtext-embed')).toHaveAttribute(
+				'aria-label',
+				`Embedded preview of ${url}0`
+			);
 		} finally {
 			await ada.close();
 			await jun.close();

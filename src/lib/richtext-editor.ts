@@ -1,7 +1,10 @@
 import {
 	$applyNodeReplacement,
+	$findMatchingParent,
 	$getRoot,
+	$getSelection,
 	$isElementNode,
+	$isRangeSelection,
 	COMMAND_PRIORITY_NORMAL,
 	FORMAT_TEXT_COMMAND,
 	createEditor,
@@ -39,6 +42,7 @@ import {
 import { find as findLinks } from 'linkifyjs';
 import { embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
 import { WidgetNode, registerWidgetSelection } from '$lib/richtext-widgets';
+import { EDITOR_NODE_REPLACEMENTS, EMBED_OFFER_CLASS } from '$lib/lexical/nodes';
 import type { RichTextDocument, RichTextInlineNode } from '$lib/richtext';
 
 /**
@@ -460,6 +464,47 @@ export function trackEmbedDismissals(
 	}
 }
 
+/* ── the embed offer on a link ─────────────────────────────────────────── */
+
+/**
+ * Marks each link whose button has something to offer, after every update.
+ *
+ * The button itself is drawn by the editor's link nodes in
+ * `$lib/lexical/nodes`; this decides when it is eligible to show. It stays
+ * here, beside the sweep, because it follows the same embed rules.
+ *
+ * A link qualifies when a provider can embed its URL, the document has no
+ * embed for it yet, and the caret is not inside it. The last is because a URL
+ * being typed has no embed yet for the same reason the sweep leaves it alone —
+ * it is not finished — and a button offering to add one it is about to get
+ * anyway reads as though something has gone wrong.
+ *
+ * Checked here rather than in `updateDOM`, which only runs for a link that
+ * itself changed: removing an embed three lines away has to reveal the offer
+ * on a link nobody touched.
+ */
+export function registerEmbedOffers(editor: LexicalEditor): () => void {
+	return editor.registerUpdateListener(({ editorState }) => {
+		editorState.read(() => {
+			const embedded = $embeddedUrls();
+			const selection = $getSelection();
+			const caretLink = $isRangeSelection(selection)
+				? $findMatchingParent(selection.anchor.getNode(), $isLinkNode)
+				: null;
+			const caretUrl = $isLinkNode(caretLink) ? caretLink.getURL() : null;
+			for (const block of $getRoot().getChildren()) {
+				if (!$isElementNode(block)) continue;
+				for (const child of block.getChildren()) {
+					if (!$isLinkNode(child)) continue;
+					const url = child.getURL();
+					const offered = !!embedSpecFor(url) && !embedded.has(url) && url !== caretUrl;
+					editor.getElementByKey(child.getKey())?.classList.toggle(EMBED_OFFER_CLASS, offered);
+				}
+			}
+		});
+	});
+}
+
 /* ── the editor ────────────────────────────────────────────────────────── */
 
 /**
@@ -512,7 +557,7 @@ export function createRichTextEditor(options: {
 }): RichTextEditorHandle {
 	const editor = createEditor({
 		namespace: options.namespace,
-		nodes: [...RICH_TEXT_NODES],
+		nodes: [...RICH_TEXT_NODES, ...EDITOR_NODE_REPLACEMENTS],
 		theme: EDITOR_THEME,
 		onError:
 			options.onError ??
@@ -536,6 +581,7 @@ export function createRichTextEditor(options: {
 			excludeParents: []
 		}),
 		registerMarkdownShortcuts(editor, typingTransformersFor(options.features)),
+		registerEmbedOffers(editor),
 		/**
 		 * Underline is bound natively by lexical core (Ctrl+U → FORMAT_TEXT_COMMAND)
 		 * but has no place in the stored format, so it is swallowed rather than

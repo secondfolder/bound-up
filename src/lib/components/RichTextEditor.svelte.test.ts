@@ -590,26 +590,48 @@ describe('RichTextEditor, embeds', () => {
 		]);
 	});
 
-	it('offers a way back: hovering the link shows a button that re-embeds it', async () => {
-		const { container, getByLabelText, queryByLabelText } = render(RichTextEditorHarness, {
-			props: { initial: WITH_EMBED }
-		});
+	/**
+	 * jsdom has no `:hover`, so these check the half the script owns — the
+	 * class that makes a link's button eligible to show — and click the button
+	 * directly. Revealing it on hover is plain CSS, covered by the e2e suite.
+	 */
+	const linkWrapper = (container: HTMLElement) =>
+		container.querySelector('.surface .link-with-embed-offer')!;
+
+	it('offers a way back: the link carries a button that re-embeds it', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
 		await tick();
 
 		// While the embed is there the link has nothing to offer.
-		await fireEvent.pointerOver(container.querySelector('.surface a')!);
-		await tick();
-		expect(queryByLabelText('Add embed')).toBeNull();
+		expect(linkWrapper(container)).not.toHaveClass('embed-available');
 
 		await fireEvent.click(removeButton(container));
 		await tick();
+		expect(linkWrapper(container)).toHaveClass('embed-available');
 
-		await fireEvent.pointerOver(container.querySelector('.surface a')!);
-		await tick();
-		await fireEvent.click(getByLabelText('Add embed'));
+		await fireEvent.click(linkWrapper(container).querySelector('button[aria-label="Add embed"]')!);
 		await tick();
 
 		expect(embedChips(container)).toHaveLength(1);
+		expect(linkWrapper(container)).not.toHaveClass('embed-available');
+	});
+
+	it('keeps the button out of the stored document', async () => {
+		const { container, component } = render(RichTextEditorHarness, {
+			props: { initial: WITH_EMBED }
+		});
+		await tick();
+		await fireEvent.click(removeButton(container));
+		await tick();
+
+		// The editor draws links under its own node types; what it hands back
+		// must still be the stored `link` / `autolink`, or the schema rejects it.
+		const types = component.current().match(/"type":"[a-z-]+"/g);
+		expect(types).not.toContain('"type":"editor-link"');
+		expect(types).not.toContain('"type":"editor-autolink"');
+		expect(types?.some((type) => type === '"type":"link"' || type === '"type":"autolink"')).toBe(
+			true
+		);
 	});
 
 	it('shows no embed button over a link no provider can embed', async () => {
@@ -631,13 +653,9 @@ describe('RichTextEditor, embeds', () => {
 				]
 			}
 		});
-		const { container, queryByLabelText } = render(RichTextEditorHarness, {
-			props: { initial: plain }
-		});
+		const { container } = render(RichTextEditorHarness, { props: { initial: plain } });
 		await tick();
 
-		await fireEvent.pointerOver(container.querySelector('.surface a')!);
-		await tick();
-		expect(queryByLabelText('Add embed')).toBeNull();
+		expect(linkWrapper(container)).not.toHaveClass('embed-available');
 	});
 });

@@ -71,6 +71,7 @@ cannot be cut at a character offset without corrupting it.
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `src/lib/richtext.ts`                             | The document type, its Zod schema, and the read helpers. **Imports no Lexical, and must not.** |
 | `src/lib/richtext-editor.ts`                      | The Lexical half: node set, typing shortcuts, the link matcher, `EmbedNode`.                   |
+| `src/lib/lexical/nodes/`                          | Editor-only nodes, one per file: the link classes and their shared "Add embed" button.         |
 | `src/lib/components/RichText.svelte`              | Renders a stored document. Walks JSON; no `{@html}`.                                           |
 | `src/lib/components/RichTextInline.svelte`        | The inline half of the renderer: text, breaks, links, embeds, the `Show` button.               |
 | `src/lib/components/ComposerEmbed.svelte`         | One embed inside the editor: the real `UrlEmbed` plus its remove button.                       |
@@ -121,6 +122,34 @@ right and the screen is wrong, which is a confusing way to lose a format. The
 theme therefore covers exactly the formats that have no tag of their own: not
 `code`, which Lexical gives a real `<code>` element, and not `underline`, which
 is not part of the stored format at all.
+
+**The editor draws links with its own node classes, and never stores them.**
+`EditorLinkNode` and `EditorAutoLinkNode` subclass `LinkNode` and
+`AutoLinkNode` only to change their DOM. Each one wraps its `<a>` in a
+`span.link-with-embed-offer` that also holds the link's "Add embed" button (see
+the way back from a removed embed, below), and points Lexical's `getDOMSlot` at
+the anchor, so the text is reconciled into the `<a>` and the button is left
+alone. They are swapped in through Lexical's node replacement in
+`createRichTextEditor`, so `$createLinkNode`, the auto-linker and document
+loading all produce them without knowing.
+
+Lexical keys registered nodes by type name and refuses a second class under a
+name that is taken, so they serialise as `editor-link` and `editor-autolink`.
+**Read an editor's JSON through `exportEditorDocument`, never `toJSON()`
+directly**: it maps those names back to `link` and `autolink`, and without it
+the schema rejects every document with a link in it. `RICH_TEXT_NODES` stays the
+stored node set; the replacements are added only in `createRichTextEditor`.
+
+These live in `src/lib/lexical/nodes/`, one file per node. Code the nodes
+share but that is not a node itself goes in `nodes/shared/` — today that is
+`embed-offer.ts`, the DOM code the two links share. Each node file exports an
+`EditorNodeDefinition` — its class, its own type name, the stored type it
+stands in for, and its replacement — and `index.ts` lists them. The editor's
+node config (`EDITOR_NODE_REPLACEMENTS`) and `exportEditorDocument`'s renaming
+are both derived from that list, so a new editor-only node is a new file and one
+line in `index.ts`. Lexical transformers, when there are ones of our own, belong
+beside it in `src/lib/lexical/transformers/`, and anything shared between nodes
+and transformers in `src/lib/lexical/shared/`.
 
 ## Widgets: objects in the text, not characters
 
@@ -297,11 +326,19 @@ Four things follow:
   remove button would look broken. Removing a link _and_ its embed together is
   not a dismissal: deleting the sentence says nothing about the URL.
 - The way back is hovering the link, which shows a small embed button centred
-  over it. Deliberately pointer-driven: the caret cannot be the trigger,
-  because moving it onto and off a link is the gesture that must _not_
-  re-embed. The button sits on the link rather than beside it so the pointer
-  never has to cross plain text to reach it, which does mean it covers the
-  middle of the link while it is showing.
+  over it. The button is part of the link's own DOM (see "The editor draws
+  links with its own node classes" above), always present and hidden by CSS.
+  `registerEmbedOffers` puts `embed-available` on a link's wrapper after every
+  update when a provider can embed the URL, the document has no embed for it,
+  and the caret is not inside it. The stylesheet shows the button only on
+  `.embed-available:hover`, so no script watches the pointer. Pressing it
+  dispatches `ADD_EMBED_COMMAND`, which `RichTextEditor.svelte` answers by
+  lifting the dismissal and inserting the embed. Deliberately pointer-driven:
+  the caret cannot be the trigger, because moving it onto and off a link is the
+  gesture that must _not_ re-embed. The button sits on the link rather than
+  beside it, inside the hovered wrapper, so the pointer never stops hovering on
+  the way to it. That does mean it covers the middle of the link while it is
+  showing.
 - Because the decision is made while authoring, **adding a provider later does
   not retroactively embed old content.** A document without an embed node has
   no embed, whatever `embedSpecFor` learns afterwards. The one exception is the

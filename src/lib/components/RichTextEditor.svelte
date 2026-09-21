@@ -12,7 +12,7 @@
 		KEY_ENTER_COMMAND,
 		type LexicalEditor
 	} from 'lexical';
-	import { $isAutoLinkNode as isAutoLinkNode, $isLinkNode as isLinkNode } from '@lexical/link';
+	import { $isAutoLinkNode as isAutoLinkNode } from '@lexical/link';
 	import { $findMatchingParent as findMatchingParent } from '@lexical/utils';
 	import ComposerEmbed from './ComposerEmbed.svelte';
 	import FloatingFormatToolbar from './FloatingFormatToolbar.svelte';
@@ -29,8 +29,8 @@
 		type RichTextEditorHandle,
 		type RichTextFeature
 	} from '$lib/richtext-editor';
+	import { ADD_EMBED_COMMAND, exportEditorDocument } from '$lib/lexical/nodes';
 	import { parseStoredRichText, richTextDocumentSchema } from '$lib/richtext';
-	import { embedSpecFor } from '$lib/embeds';
 
 	/**
 	 * The one editor, in both of its moods.
@@ -77,7 +77,6 @@
 	} = $props();
 
 	let root: HTMLDivElement | undefined = $state();
-	let shell: HTMLDivElement | undefined = $state();
 	let handle: RichTextEditorHandle | null = $state(null);
 	let isEmpty = $state(true);
 
@@ -91,10 +90,6 @@
 	 */
 	const dismissedEmbeds = new SvelteSet<string>();
 
-	/** The link the pointer is over, when it could have an embed and has none. */
-	let hoveredLink: { url: string; x: number; y: number } | null = $state(null);
-	let embedButton: HTMLButtonElement | undefined = $state();
-
 	/**
 	 * The value the editor and its parent already agree on.
 	 *
@@ -107,7 +102,7 @@
 	let agreedValue: string | null = null;
 
 	function serialise(editor: LexicalEditor): string {
-		const full = editor.getEditorState().toJSON();
+		const full = exportEditorDocument(editor);
 		/**
 		 * The stored form is the *validated* form — the same schema the server
 		 * applies to descriptions. It drops Lexical's default-valued noise
@@ -278,8 +273,6 @@
 			// embed it is about to re-insert was just deleted on purpose.
 			trackEmbedDismissals(prevEditorState, editorState, dismissedEmbeds);
 			sweepEmbeds();
-			// The chip that was under the pointer may have just gone.
-			if (hoveredLink) hoveredLink = null;
 
 			const next = serialise(editor);
 			editorState.read(() => {
@@ -297,6 +290,22 @@
 			() => {
 				sweepEmbeds(true);
 				return false;
+			},
+			COMMAND_PRIORITY_LOW
+		);
+
+		/**
+		 * A link's own "Add embed" button — see `ADD_EMBED_COMMAND`. Handled
+		 * here rather than in `richtext-editor.ts` because putting the embed back
+		 * also lifts the dismissal, and `dismissedEmbeds` lives in this component.
+		 * Command listeners already run inside an update.
+		 */
+		const offAddEmbed = editor.registerCommand(
+			ADD_EMBED_COMMAND,
+			(url) => {
+				dismissedEmbeds.delete(url);
+				insertEmbedForUrl(url);
+				return true;
 			},
 			COMMAND_PRIORITY_LOW
 		);
@@ -319,6 +328,7 @@
 		return () => {
 			offUpdate();
 			offBlur();
+			offAddEmbed();
 			offEnter();
 			offDecorators();
 			for (const mounted of embeds.values()) void unmount(mounted.component);
@@ -348,79 +358,6 @@
 	});
 
 	/**
-	 * The way back from a removed embed.
-	 *
-	 * Deletion is sticky on purpose, so there has to be a gesture that means
-	 * "actually, do embed this one". Hovering the link is it: the button sits
-	 * centred **on** the link rather than beside it, which keeps the pointer
-	 * inside the anchor's own box all the way from hovering to clicking. A
-	 * button placed next to the link would vanish as the pointer crossed the
-	 * plain text in between.
-	 *
-	 * Pointer-only, and that is a real gap for keyboard users — but the caret
-	 * cannot be used as the trigger here, because moving it onto and off the
-	 * link is exactly the gesture that must *not* re-embed.
-	 *
-	 * Not offered for the link the caret is still inside. A URL being typed has
-	 * no embed yet for the same reason the sweep leaves it alone — it is not
-	 * finished — and a button offering to add one it is about to get anyway
-	 * reads as though something has gone wrong.
-	 */
-	function embeddableWithoutEmbed(url: string): boolean {
-		const editor = handle?.editor;
-		if (!editor || !embedSpecFor(url)) return false;
-		return editor.getEditorState().read(() => {
-			if (embeddedUrls().has(url)) return false;
-			return caretLinkUrl() !== url;
-		});
-	}
-
-	/** The URL of the link the caret is inside, if it is inside one. */
-	function caretLinkUrl(): string | null {
-		const selection = getSelection();
-		if (!isRangeSelection(selection)) return null;
-		const link = findMatchingParent(selection.anchor.getNode(), isLinkNode);
-		return isLinkNode(link) ? link.getURL() : null;
-	}
-
-	function onSurfaceHover(event: PointerEvent) {
-		const target = event.target as HTMLElement | null;
-		// The button sits over the link, so it is the target for most of the
-		// gesture. Treating that as "not on a link" would hide it mid-click.
-		if (embedButton && target && embedButton.contains(target)) return;
-
-		const anchor = target?.closest?.('a');
-		const host = shell;
-		if (!anchor || !host || !root?.contains(anchor)) {
-			hoveredLink = null;
-			return;
-		}
-		const url = anchor.getAttribute('href') ?? '';
-		if (!embeddableWithoutEmbed(url)) {
-			hoveredLink = null;
-			return;
-		}
-		const rect = anchor.getBoundingClientRect();
-		const bounds = host.getBoundingClientRect();
-		hoveredLink = {
-			url,
-			x: rect.left - bounds.left + rect.width / 2,
-			y: rect.top - bounds.top + rect.height / 2
-		};
-	}
-
-	function insertHoveredEmbed() {
-		const url = hoveredLink?.url;
-		const editor = handle?.editor;
-		hoveredLink = null;
-		if (!url || !editor) return;
-		dismissedEmbeds.delete(url);
-		editor.update(() => {
-			insertEmbedForUrl(url);
-		});
-	}
-
-	/**
 	 * Whether there is nothing here for the placeholder to sit behind.
 	 *
 	 * Not just "no text": an embed carries no text content of its own — its URL
@@ -448,20 +385,7 @@
 	}
 </script>
 
-<!--
-	Pointer events rather than `mouseover`/`mouseout`: they carry touch as well,
-	and they are not the pair svelte's a11y rule asks to see paired with a
-	`focus` handler — which would be the wrong trigger here anyway, since moving
-	the caret into a link is precisely the gesture that must not re-embed it.
--->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-	bind:this={shell}
-	class="richtext-editor {editorClass}"
-	onpointerover={onSurfaceHover}
-	onpointermove={onSurfaceHover}
-	onpointerleave={() => (hoveredLink = null)}
->
+<div class="richtext-editor {editorClass}">
 	<!--
 		`contenteditable` is switched on only once Lexical has attached.
 
@@ -482,29 +406,6 @@
 	></div>
 	{#if isEmpty && placeholder}
 		<div class="placeholder" aria-hidden="true">{placeholder}</div>
-	{/if}
-	{#if hoveredLink}
-		<button
-			bind:this={embedButton}
-			type="button"
-			class="embed-again"
-			aria-label="Add embed"
-			title="Add embed"
-			style:inset-block-start="{hoveredLink.y}px"
-			style:inset-inline-start="{hoveredLink.x}px"
-			onpointerdown={(event) => {
-				// Keeps the caret where it was: a press inside the editor moves it,
-				// and the sweep treats "the caret is in this link" as "still typing".
-				event.preventDefault();
-			}}
-			onclick={insertHoveredEmbed}
-		>
-			<!-- A plus beside the embed icon: the icon alone says "embed", which
-			     reads as a state ("this has one") rather than as the action the
-			     button performs. -->
-			<wa-icon name="plus" variant="solid"></wa-icon>
-			<wa-icon name="image" variant="solid"></wa-icon>
-		</button>
 	{/if}
 	{#if toolbar && handle}
 		<FloatingFormatToolbar editor={handle.editor} {features} />
@@ -531,33 +432,6 @@
 		color: var(--wa-color-text-quiet);
 	}
 
-	/* Centred on the link it belongs to, not next to it — see the note on
-	   `onSurfaceHover`. Translated by half its own size rather than positioned
-	   from a measured corner, so a link that wraps across two lines still gets
-	   the button in the middle of the box it occupies. */
-	.embed-again {
-		position: absolute;
-		z-index: 2;
-		transform: translate(-50%, -50%);
-		display: flex;
-		align-items: center;
-		gap: 0.2rem;
-		block-size: 1.75rem;
-		padding-inline: 0.5rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: var(--wa-color-surface-raised, white);
-		color: var(--wa-color-text-normal);
-		box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 22%);
-		cursor: pointer;
-		font-size: 0.75rem;
-
-		wa-icon {
-			margin-inline-start: 0;
-			margin-inline-end: 0;
-		}
-	}
-
 	/* Lexical owns the markup inside `.surface`, so these have to be global —
 	   scoped CSS only reaches elements this component's template declares. */
 	.surface :global(p),
@@ -578,6 +452,49 @@
 	.surface :global(a) {
 		color: inherit;
 		text-decoration: underline;
+	}
+
+	/* A link's own "Add embed" button, built in `richtext-editor.ts` — see
+	   `ADD_EMBED_COMMAND` there. Hidden until the link is both hovered and
+	   marked as having an embed to offer, so what decides whether it shows is
+	   the link's class and the pointer, with no script watching either.
+
+	   Centred on the link rather than beside it: the button is inside the
+	   hovered wrapper, so the pointer can travel onto it without the link
+	   ever stopping being hovered. Translated by half its own size, so a link
+	   that wraps across two lines still gets it in the middle of its box. */
+	.surface :global(.link-with-embed-offer) {
+		position: relative;
+	}
+
+	.surface :global(.embed-again) {
+		display: none;
+		position: absolute;
+		inset-block-start: 50%;
+		inset-inline-start: 50%;
+		z-index: 2;
+		transform: translate(-50%, -50%);
+		align-items: center;
+		gap: 0.2rem;
+		block-size: 1.75rem;
+		padding-inline: 0.5rem;
+		border: 1px solid var(--wa-color-surface-border);
+		border-radius: 999px;
+		background: var(--wa-color-surface-raised, white);
+		color: var(--wa-color-text-normal);
+		box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 22%);
+		cursor: pointer;
+		font-size: 0.75rem;
+		user-select: none;
+		white-space: nowrap;
+	}
+
+	.surface :global(.embed-again wa-icon) {
+		margin-inline: 0;
+	}
+
+	.surface :global(.link-with-embed-offer.embed-available:hover > .embed-again) {
+		display: flex;
 	}
 
 	/* The formats Lexical cannot express through its one tag per text node —
