@@ -2,12 +2,7 @@
 	import { invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import {
-		currentKeyring,
-		passkeyWrapFor,
-		unlockWithPasskey,
-		unlockWithPassword
-	} from '$lib/crypto/session.svelte';
+	import { currentKeyring } from '$lib/crypto/session.svelte';
 	import {
 		acceptKeyChange,
 		markVerified,
@@ -19,14 +14,15 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
 	import ThreadView from '$lib/components/ThreadView.svelte';
-	import UnlockForm from '$lib/components/UnlockForm.svelte';
+	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
-	const passkeyWrap = $derived(passkeyWrapFor(keyring));
+	/** Keeps the unlock screen mounted while its passkey dialogs are open. */
+	let settingUpUnlock = $state(false);
 
 	/**
 	 * The same key check as the board, because a reply is a send too.
@@ -100,18 +96,25 @@
 			recipients={data.recipients}
 			{canSend}
 		/>
-	{:else if keyring.status === 'locked'}
-		<div class="locked">
-			<p>These messages are locked on this device.</p>
-			<UnlockForm
-				unlock={(password) => unlockWithPassword(user, password).then(() => undefined)}
-				passkeyUnlock={passkeyWrap
-					? () => unlockWithPasskey(user, passkeyWrap).then(() => undefined)
-					: null}
-				wrongPassword={keyring.reason === 'wrong-password'}
-				willRepeat={keyring.tier === 'memory'}
-			/>
+	{:else if keyring.status === 'unknown'}
+		<!-- Never the thread while the keyring is unresolved: every message would
+		     render as "…". See the note on the board. -->
+		<div class="locked" aria-busy="true" data-testid="messages-settling">
+			<wa-spinner></wa-spinner>
+			<p>Checking your keys…</p>
 		</div>
+	{:else if keyring.status === 'locked' || settingUpUnlock}
+		<!-- `settingUpUnlock` keeps this branch on screen for a moment after the
+		     unlock succeeds: `MessageUnlock` owns the passkey dialogs, and
+		     unmounting it mid-ceremony would take them with it. -->
+		<MessageUnlock {user} onFlowOpen={(open) => (settingUpUnlock = open)}>
+			{#snippet chrome(panel)}
+				<div class="locked">
+					<p>These messages are locked on this device.</p>
+					{@render panel()}
+				</div>
+			{/snippet}
+		</MessageUnlock>
 	{:else}
 		<ThreadView
 			thread={data.thread}

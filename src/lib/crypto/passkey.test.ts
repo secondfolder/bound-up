@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateAgeIdentity } from './identity';
+import { generateAgeIdentity, loadAge } from './identity';
 import {
 	describePasskeyFailure,
+	encodeAgeCredentialIdentity,
 	unwrapIdentityWithPasskey,
 	wrapIdentityToPasskey
 } from './passkey';
@@ -103,6 +104,30 @@ describe('wrapIdentityToPasskey', () => {
 		expect(first).not.toBe(second);
 	});
 
+	it('pins allowCredentials when given an age identity', async () => {
+		const { identity } = await generateAgeIdentity();
+		const get = install('credential-one');
+		const credentialId = new Uint8Array([9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
+
+		await wrapIdentityToPasskey({
+			identity,
+			rpId,
+			ageIdentity: encodeAgeCredentialIdentity({
+				credentialId,
+				rpId,
+				transports: ['internal']
+			})
+		});
+
+		const options = get.mock.calls[0][0].publicKey!;
+		expect(options.allowCredentials).toHaveLength(1);
+		const allowed = options.allowCredentials![0];
+		expect(new Uint8Array(allowed.id as ArrayBuffer)).toEqual(credentialId);
+		expect(allowed.transports).toEqual(['internal']);
+		// The rp id comes out of the identity string, not the argument.
+		expect(options.rpId).toBe(rpId);
+	});
+
 	it('will not open under a different credential', async () => {
 		const { identity } = await generateAgeIdentity();
 		install('credential-one');
@@ -152,5 +177,70 @@ describe('describePasskeyFailure', () => {
 			kind: 'unknown',
 			message: 'gone wrong'
 		});
+	});
+});
+
+/**
+ * The one piece of `age-encryption`'s private format this app reproduces.
+ *
+ * `createCredential()` builds these strings and exports neither the encoder nor
+ * a usable way to get one for a credential Better Auth registered. So the
+ * encoding is hand-rolled, and these are the tests that make that safe: a
+ * frozen vector, and a round trip through age's own decoder. If a version bump
+ * ever changes the format, this fails in CI rather than on a phone.
+ */
+describe('encodeAgeCredentialIdentity', () => {
+	const credentialId = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+	it('matches a frozen vector', () => {
+		expect(
+			encodeAgeCredentialIdentity({
+				credentialId,
+				rpId: 'example.com',
+				transports: ['internal', 'hybrid']
+			})
+		).toBe(
+			'AGE-PLUGIN-FIDO2PRF-1Q9GQZQSRQSZSVPCGPY9QKRQDPC83Q6M90PSK6URVV5HXXMMDSF5XJMN5V4EXUCTVVE58JCNJD9JQXV52FR'
+		);
+	});
+
+	it('decodes back to the same three values, in age itself', async () => {
+		const age = await loadAge();
+		const encoded = encodeAgeCredentialIdentity({
+			credentialId,
+			rpId: 'example.com',
+			transports: ['internal', 'hybrid']
+		});
+
+		// `credId`, `rpId` and `transports` are `private` in TypeScript only, so
+		// reading them is how the decoder's output can be inspected at all —
+		// age exports `decodeIdentity` no more than it exports the encoder.
+		const decoded = new age.webauthn.WebAuthnIdentity({ identity: encoded }) as unknown as {
+			credId: Uint8Array;
+			rpId: string;
+			transports: string[];
+		};
+		expect(new Uint8Array(decoded.credId)).toEqual(credentialId);
+		expect(decoded.rpId).toBe('example.com');
+		expect(decoded.transports).toEqual(['internal', 'hybrid']);
+	});
+
+	it('handles an empty transport list and a long credential id', async () => {
+		const age = await loadAge();
+		// Real credential ids run well past the 23-byte CBOR short form, which is
+		// the boundary the length encoding gets wrong if it is written carelessly.
+		const long = new Uint8Array(64).map((_, index) => (index * 7) & 0xff);
+		const encoded = encodeAgeCredentialIdentity({
+			credentialId: long,
+			rpId: 'bound-up.test',
+			transports: []
+		});
+
+		const decoded = new age.webauthn.WebAuthnIdentity({ identity: encoded }) as unknown as {
+			credId: Uint8Array;
+			transports: string[];
+		};
+		expect(new Uint8Array(decoded.credId)).toEqual(long);
+		expect(decoded.transports).toEqual([]);
 	});
 });

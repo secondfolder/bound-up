@@ -17,14 +17,15 @@ import { listPartnershipsForUser } from '$lib/server/partnerships';
 import { requestHistoryRestore } from '$lib/server/messaging';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, request }) => {
 	// The group guard has already run for a layout load, but narrowing here also
 	// means this page degrades rather than throwing if that ever changes.
 	if (!locals.user) error(401, 'Not signed in');
 
-	const [bundle, hasPassword] = await Promise.all([
+	const [bundle, hasPassword, passkeys] = await Promise.all([
 		getUnlockBundle(locals.db, locals.user.id),
-		hasPasswordCredential(locals.db, locals.user.id)
+		hasPasswordCredential(locals.db, locals.user.id),
+		locals.auth.api.listPasskeys({ headers: request.headers })
 	]);
 
 	return {
@@ -32,6 +33,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// `blob` is deliberately included: the browser needs it to open the
 		// identity, and it is useless without a key the server does not have.
 		bundle,
+		/**
+		 * Passkey names by id, so a wrap can be listed under the *current* name
+		 * of the passkey it is sealed to rather than the label frozen into it
+		 * when it was made. Only wraps carrying a `passkeyId` can be matched;
+		 * ones sealed through the platform chooser are not bound to a known
+		 * credential and keep their label.
+		 */
+		passkeyNames: Object.fromEntries(
+			passkeys.map((entry) => [entry.id, entry.name ?? null]).filter(([, name]) => name)
+		) as Record<string, string>,
 		setupForm: await superValidate(zod4(encryptionSetupSchema))
 	};
 };

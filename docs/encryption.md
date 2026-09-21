@@ -171,13 +171,21 @@ would have to get right on its own:
 `age.webauthn` is marked experimental upstream, which is why `age-encryption` is
 pinned to an exact version in `package.json`.
 
-**Enrolment happens in the window where it is free.** Every unlock except
-reading the cache has the `AGE-SECRET-KEY-1…` string in hand for a moment —
-signup generated it, a password unlock has just unwrapped it — and sealing it to
-a passkey needs exactly that. So `cache()` opens an _enrolment offer_ whenever
-it is handed the string and the account has no passkey wrap yet, and
-`PasskeyOffer` in the app shell asks the question straight away: one tap, no
-password, wherever the user happens to be.
+**There are two ways in, and they are different moments.**
+
+_Adding a passkey_ — from Security or from Encrypted messages — asks for the
+password, registers a credential, and seals the identity to it in one act. The
+password is unavoidable there: it re-authenticates, and it is the only thing
+that can open the identity as a string. That flow, what it does with the PRF
+result and what it calls the passkey are all in [docs/passkeys.md](passkeys.md).
+
+_The free offer_ is the other one. Every unlock except reading the cache has the
+`AGE-SECRET-KEY-1…` string in hand for a moment — signup generated it, a
+password unlock has just unwrapped it — and sealing it to a passkey needs
+exactly that. So `cache()` opens an _enrolment offer_ whenever it is handed the
+string and the account has a passkey but no passkey wrap, and `PasskeyOffer` in
+the app shell asks the question straight away: one tap, no password, wherever
+the user happens to be.
 
 The offer keeps the string in a plain module variable, outside the reactive
 keyring so that no template can reach it by accident, and drops it on
@@ -188,17 +196,17 @@ the string. The identity is deliberately **not** taken on read — a dismissed
 Face ID sheet is the likeliest outcome of asking, and confiscating the identity
 on the first tap would make the retry cost a password.
 
-**The fallback still asks for the password**, on `/settings/encryption`, for the
-one case that cannot avoid it: a device unlocked from its own cache, where the
-identity is a `CryptoKey` and no API turns one of those back into a string. That
-form is hidden while an offer is standing, so the easy way and the hard way are
-never both on screen. Its side effect is a good one: adding a way in requires
-proving you already have one.
+The add-a-passkey flow is hidden while an offer is standing, so the easy way and
+the hard way are never both on screen.
 
 **Nothing is enrolled that has not already worked.** The wrap is produced by a
 real PRF evaluation, which fails there and then if the credential cannot do
-PRF. That is a stronger check than reading `enabled` at registration — but only
-if the failure is legible, and the first version of this got that wrong twice:
+PRF. That is a stronger check than reading `enabled` at registration, and the
+two genuinely disagree in both directions in the field — see
+[docs/passkeys.md](passkeys.md), which also covers how the outcome is recorded
+per passkey so a credential that cannot unlock says so on the Security page
+rather than only in the moment it was made. But it is only useful if the failure
+is legible, and the first version of this got that wrong twice:
 
 - **An offer needs a passkey to exist.** `UnlockBundleView.hasPasskeys` says
   whether the account has registered one, which is a different question from
@@ -216,18 +224,26 @@ if the failure is legible, and the first version of this got that wrong twice:
   the authenticator.
 
 Not every provider can do this. Passkeys in iCloud Keychain, Google Password
-Manager and Windows Hello return PRF; some third-party password managers do not
-yet, on some platforms. `e2e/passkey.spec.ts` covers both outcomes against
+Manager and Windows Hello return PRF; several third-party password managers do
+not, and a few disagree with themselves depending on whether they are asked at
+creation or at assertion. The surveyed list, and what the app does about it,
+are in [docs/passkeys.md](passkeys.md). `e2e/passkey.spec.ts` covers both
+outcomes against
 Chromium's virtual authenticator, which evaluates the PRF extension when CDP
 creates it with `hasPrf` — Playwright's own cross-browser
 `browserContext.credentials` API cannot, which is why that spec reaches for CDP
 directly.
 
-`params` holds the relying party id and nothing else: no credential id, because
-`allowCredentials` is left empty and the platform offers the user whichever
-passkey they like. The unlock screen offers **one** wrap, the most recently
-used, because every attempt is a biometric prompt and looping over wraps would
-ask the user to authenticate to discover something they already know.
+`params` holds the relying party id, and — for wraps written by the add-a-passkey
+flow — the passkey it was sealed to and age's own handle for that credential, so
+the unlock ceremony goes straight to the right passkey instead of opening a
+chooser. Both are optional: wraps written before that existed, and wraps written
+by `PasskeyOffer` (which seals to whichever passkey the user picks), carry
+neither and still open through the chooser. See [docs/passkeys.md](passkeys.md).
+
+The unlock screen offers **one** wrap, the most recently used, because every
+attempt is a biometric prompt and looping over wraps would ask the user to
+authenticate to discover something they already know.
 
 Three constraints, all of them real:
 
@@ -339,6 +355,20 @@ Five ways a device ends up unlocked, in the order they are tried:
 A wrong password is caught by the AES-GCM tag **on the device**, with no server
 round trip — so it is answered instantly and tells a watcher nothing.
 
+**Locking returns the keyring to `unknown`, not to `locked`**, because what the
+device can do next depends on what the account still has, and that is a question
+for `initialiseKeyring`. `EncryptionGate` re-asks it whenever the status goes
+back to `unknown`. Every screen that switches on the status has an explicit
+`unknown` branch that renders a placeholder and never content — see the last
+section of [docs/passkeys.md](passkeys.md) for what went wrong when it did not.
+
+**Every screen that can be reached while locked renders the same component.**
+`UnlockPanel.svelte`, wired up by `MessageUnlock.svelte`, and what it offers is
+decided by the pure `unlockMode`. That is not tidiness: there used to be four
+copies, and two of them passed no passkey callback at all, so passkey unlock
+silently did not exist on the messaging screens. The four shapes it takes are
+described in [docs/passkeys.md](passkeys.md).
+
 `EncryptionGate` in the app shell decides which of these applies, once. It is
 deliberately not a wall: the guides and the partner screens need no keys, so a
 locked device gets a callout and everything else keeps working. The gate only
@@ -401,7 +431,7 @@ is on the Home Screen — so path 3 stays a first-class screen, not an error.
 The settings split is now deliberate:
 
 - `/settings/security` handles ordinary account-password changes and passkey
-  management.
+  management — see [docs/passkeys.md](passkeys.md).
 - `/settings/encryption` handles message-key setup, unlock-method management,
   and forgotten-password recovery for message history.
 
@@ -494,10 +524,6 @@ says so instead.
 
 The honest boundary of the above:
 
-- **Passkey unlock.** Passkeys are already registered with PRF requested, so
-  the credentials can do it, but nothing derives from the PRF output yet and no
-  `webauthn-prf` wrap is ever written. The schema and the derivation
-  (`deriveWrapKeyFromPrf`) are in place and tested.
 - **Pins do not survive a new device.** They live in IndexedDB, per device, so a
   new phone trusts what it is first told and a device change is
   indistinguishable from a substitution until the number is compared again.

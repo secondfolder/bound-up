@@ -19,6 +19,7 @@
 	import '@awesome.me/webawesome/dist/components/icon/icon.js';
 	import '@awesome.me/webawesome/dist/components/input/input.js';
 	import '@awesome.me/webawesome/dist/components/divider/divider.js';
+	import '@awesome.me/webawesome/dist/components/skeleton/skeleton.js';
 	import '@awesome.me/webawesome/dist/components/spinner/spinner.js';
 	import '@awesome.me/webawesome/dist/components/textarea/textarea.js';
 

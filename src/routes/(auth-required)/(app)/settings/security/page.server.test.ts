@@ -10,7 +10,8 @@ import {
 import { FAKE_WRAP_BLOB } from '$lib/testing/crypto';
 import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import { currentPasswordWrapParams } from '$lib/crypto/setup';
-import { account } from '$lib/server/db/schema';
+import { account, passkey } from '$lib/server/db/schema';
+import { recordPasskeyPrfStatus } from '$lib/server/keys';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;
@@ -39,6 +40,30 @@ beforeEach(async () => {
 
 afterEach(() => harness.close());
 
+function loadEvent(passkeys: Record<string, unknown>[] = []) {
+	return fakeEvent({
+		db: harness.db,
+		user: ada,
+		authApi: { listPasskeys: vi.fn().mockResolvedValue(passkeys) }
+	});
+}
+
+/** A real `passkey` row, which is what the PRF verdict's foreign key needs. */
+async function givePasskeyRow(id: string) {
+	await harness.db.insert(passkey).values({
+		id,
+		name: id,
+		publicKey: 'irrelevant',
+		userId: ada.id,
+		credentialID: `cred-${id}`,
+		counter: 0,
+		deviceType: 'singleDevice',
+		backedUp: false,
+		transports: 'internal',
+		createdAt: new Date()
+	});
+}
+
 describe('load', () => {
 	it('refuses an unsigned visitor', async () => {
 		const result = await runAndCatch(() => load(fakeEvent({ db: harness.db })));
@@ -49,21 +74,58 @@ describe('load', () => {
 		await givePassword(ada.id);
 		const keys = await createTestUserKeys(harness.db, ada);
 
-		const data = await runLoad(
-			load(
-				fakeEvent({
-					db: harness.db,
-					user: ada,
-					authApi: {
-						listPasskeys: vi.fn().mockResolvedValue([{ id: 'pk-1', name: 'Laptop' }])
-					}
-				})
-			)
-		);
+		const data = await runLoad(load(loadEvent([{ id: 'pk-1', name: 'Laptop' }])));
 
 		expect(data.hasPassword).toBe(true);
 		expect(data.bundle.recipient).toBe(keys.recipient);
 		expect(data.passkeys).toMatchObject([{ id: 'pk-1', name: 'Laptop' }]);
+	});
+
+	/**
+	 * Three states, and the third is the one that is easy to get wrong: a passkey
+	 * nothing has ever tried is not a passkey that failed. Every passkey
+	 * registered before this check existed is in that state, and flagging them
+	 * would put a warning on every account that had one.
+	 */
+	it('reports a verdict only for a passkey that has actually been tried', async () => {
+		await givePasskeyRow('pk-good');
+		await givePasskeyRow('pk-bad');
+		await givePasskeyRow('pk-untried');
+		await recordPasskeyPrfStatus(harness.db, ada.id, {
+			passkeyId: 'pk-good',
+			prfStatus: 'supported'
+		});
+		await recordPasskeyPrfStatus(harness.db, ada.id, {
+			passkeyId: 'pk-bad',
+			prfStatus: 'unsupported'
+		});
+
+		const data = await runLoad(
+			load(loadEvent([{ id: 'pk-good' }, { id: 'pk-bad' }, { id: 'pk-untried' }]))
+		);
+
+		expect(data.passkeys.map((entry: { prfStatus?: string }) => entry.prfStatus)).toEqual([
+			'supported',
+			'unsupported',
+			undefined
+		]);
+	});
+
+	/** So the warning can name the manager rather than leaving the user to guess. */
+	it('resolves the provider from the AAGUID Better Auth stored', async () => {
+		const data = await runLoad(
+			load(
+				loadEvent([
+					{ id: 'pk-1', aaguid: '531126d6-e717-415c-9320-3d9aa6981239' },
+					// Apple zeroes it under the default attestation, which is not an
+					// error and has to come back as "no provider".
+					{ id: 'pk-2', aaguid: '00000000-0000-0000-0000-000000000000' }
+				])
+			)
+		);
+
+		expect(data.passkeys[0].provider).toMatchObject({ name: 'Dashlane', prf: 'none' });
+		expect(data.passkeys[1].provider).toBeNull();
 	});
 });
 

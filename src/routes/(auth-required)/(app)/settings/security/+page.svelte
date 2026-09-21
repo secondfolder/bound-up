@@ -4,8 +4,10 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
+	import AddPasskeyFlow from '$lib/components/AddPasskeyFlow.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PasswordField from '$lib/components/PasswordField.svelte';
+	import PrfProviderList from '$lib/components/PrfProviderList.svelte';
 	import { buildPasswordChange } from '$lib/crypto/setup';
 	import {
 		deriveAuthSecret,
@@ -40,18 +42,34 @@
 	let changeError: string[] | undefined = $state(undefined);
 	let changeConfirmError: string[] | undefined = $state(undefined);
 
-	async function addPasskey() {
-		busy = true;
+	let addPasskeyFlow = $state<AddPasskeyFlow | undefined>(undefined);
+
+	/**
+	 * Opens the add-passkey flow, which asks for the password first.
+	 *
+	 * It used to register one straight from this click. Two things were wrong
+	 * with that: a session someone had walked away from could mint a credential
+	 * that then signs in on its own, and the new passkey could not open a single
+	 * message — because sealing the identity to it needs the password, and
+	 * nothing ever asked. See `AddPasskeyFlow.svelte`.
+	 */
+	function addPasskey() {
 		message = null;
-		const res = await authClient.passkey.addPasskey({
-			name: `${navigator.platform || 'Device'} — ${new Date().toLocaleDateString()}`
-		});
-		busy = false;
-		if (res?.error) {
-			message = res.error.message ?? 'Could not add passkey';
-			return;
-		}
-		await invalidateAll();
+		addPasskeyFlow?.start();
+	}
+
+	/**
+	 * What to say beside a passkey that cannot unlock messages.
+	 *
+	 * Only for `prfStatus === 'unsupported'`, which means this credential was
+	 * actually tried and actually failed. A passkey with no verdict — every one
+	 * registered before this check existed — gets nothing, because "we have not
+	 * checked" is not a warning.
+	 */
+	function unusableReason(provider: { name: string } | null): string {
+		return provider
+			? `${provider.name} can sign you in, but it does not return the extra key material your encrypted messages need.`
+			: 'It signs you in, but the password manager holding it does not return the extra key material your encrypted messages need.';
 	}
 
 	async function remove(id: string) {
@@ -159,6 +177,13 @@
 	     upgrades the element Svelte assigns to the `disabled` property, this alpha
 	     coerces `undefined` to true and leaves the button permanently disabled. -->
 		<wa-button onclick={addPasskey} disabled={busy}>Add a passkey</wa-button>
+		<AddPasskeyFlow
+			bind:this={addPasskeyFlow}
+			{user}
+			recipient={data.bundle.recipient}
+			wraps={data.bundle.wraps}
+			hasPassword={data.hasPassword}
+		/>
 		{#if message}<p class="invalid">{message}</p>{/if}
 
 		{#if data.passkeys.length === 0}
@@ -167,10 +192,33 @@
 			<ul class="passkeys">
 				{#each data.passkeys as passkey (passkey.id)}
 					<li>
-						<span>
+						<!-- A block, not a span: it holds a `<small>`, a warning and a
+						     `<details>`, and block children inside an inline box lay
+						     out unpredictably — the provider list ended up flush
+						     against "Your password still works." -->
+						<div class="what">
 							{passkey.name ?? 'Unnamed passkey'}
-							<small>{passkey.deviceType}{passkey.backedUp ? ' · synced' : ''}</small>
-						</span>
+							<small>
+								{passkey.provider
+									? `${passkey.provider.name} · `
+									: ''}{passkey.deviceType}{passkey.backedUp ? ' · synced' : ''}
+							</small>
+							{#if passkey.prfStatus === 'unsupported'}
+								<!-- Shown only for a passkey that was tried and failed. A
+								     passkey with no verdict says nothing, because "not
+								     checked" is not a problem to report. -->
+								<span class="warning" data-testid="passkey-no-unlock">
+									<wa-icon name="triangle-exclamation" variant="solid"></wa-icon>
+									<span>
+										<strong>Cannot unlock your messages.</strong>
+										{unusableReason(passkey.provider)} Your password still works.
+									</span>
+								</span>
+								<PrfProviderList />
+							{:else if passkey.prfStatus === 'supported'}
+								<span class="ok" data-testid="passkey-unlocks">Unlocks your messages</span>
+							{/if}
+						</div>
 						<wa-button appearance="plain" onclick={() => remove(passkey.id)}>Remove</wa-button>
 					</li>
 				{/each}
@@ -273,6 +321,28 @@
 			gap: 0.75rem;
 		}
 
+		.what {
+			display: flex;
+			flex-direction: column;
+			min-width: 0;
+		}
+
+		.warning,
+		.ok {
+			display: flex;
+			gap: 0.4rem;
+			font-size: 0.8125rem;
+			margin-top: 0.25rem;
+		}
+
+		.warning {
+			color: var(--wa-color-text-danger);
+		}
+
+		.ok {
+			color: var(--wa-color-text-quiet);
+		}
+
 		.passkeys {
 			padding: 0;
 			margin: 0;
@@ -280,7 +350,7 @@
 			li {
 				list-style-type: none;
 				display: flex;
-				align-items: center;
+				align-items: flex-start;
 				justify-content: space-between;
 				gap: 1rem;
 				padding: 0.5rem 0;

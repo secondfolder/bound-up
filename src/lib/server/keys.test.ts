@@ -23,11 +23,14 @@ import {
 	getUnlockBundle,
 	getUserKeys,
 	listWrapsForUser,
+	passkeyPrfStatusFor,
 	putUserKeys,
+	recordPasskeyPrfStatus,
 	replaceUserKeys,
 	touchWrap
 } from './keys';
 import { passkey } from './db/schema';
+import { eq } from 'drizzle-orm';
 
 let harness: TestDb;
 let ada: TestUser;
@@ -127,7 +130,9 @@ describe('getUnlockBundle', () => {
 			recipient: null,
 			historyWarningAcknowledged: false,
 			wraps: [],
-			hasPasskeys: false
+			passkeyCount: 0,
+			passkeysKnownUnusable: 0,
+			unusableProviderAaguid: null
 		});
 
 		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT });
@@ -138,7 +143,9 @@ describe('getUnlockBundle', () => {
 			recipient: ADA_RECIPIENT,
 			historyWarningAcknowledged: false,
 			wraps: [],
-			hasPasskeys: false
+			passkeyCount: 0,
+			passkeysKnownUnusable: 0,
+			unusableProviderAaguid: null
 		});
 	});
 
@@ -152,7 +159,7 @@ describe('getUnlockBundle', () => {
 	it('reports whether the account has a passkey to offer', async () => {
 		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT });
 		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
-			hasPasskeys: false
+			passkeyCount: 0
 		});
 
 		await harness.db.insert(passkey).values({
@@ -169,13 +176,115 @@ describe('getUnlockBundle', () => {
 		});
 
 		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
-			hasPasskeys: true
+			passkeyCount: 1,
+			// Nothing has been tried yet, which is not the same as "cannot".
+			passkeysKnownUnusable: 0
 		});
 
 		// Someone else's passkey is not an offer for this account.
 		const jun = await createTestUser(harness.db, { name: 'Jun' });
 		await expect(getUnlockBundle(harness.db, jun.id)).resolves.toMatchObject({
-			hasPasskeys: false
+			passkeyCount: 0
+		});
+	});
+});
+
+describe('recordPasskeyPrfStatus', () => {
+	async function givePasskey(userId: string, id: string, aaguid: string | null = null) {
+		await harness.db.insert(passkey).values({
+			id,
+			name: 'A passkey',
+			publicKey: 'irrelevant',
+			userId,
+			credentialID: `cred-${id}`,
+			counter: 0,
+			deviceType: 'singleDevice',
+			backedUp: false,
+			transports: 'internal',
+			createdAt: new Date(),
+			aaguid
+		});
+	}
+
+	it('records a verdict and surfaces it in the bundle', async () => {
+		await givePasskey(ada.id, 'passkey-ada', '531126d6-e717-415c-9320-3d9aa6981239');
+
+		await expect(
+			recordPasskeyPrfStatus(harness.db, ada.id, {
+				passkeyId: 'passkey-ada',
+				prfStatus: 'unsupported'
+			})
+		).resolves.toBe(true);
+
+		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
+			passkeyCount: 1,
+			passkeysKnownUnusable: 1,
+			// Carried so the unlock screen can name the provider rather than
+			// leaving the user to guess which of their managers is at fault.
+			unusableProviderAaguid: '531126d6-e717-415c-9320-3d9aa6981239'
+		});
+
+		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(
+			new Map([['passkey-ada', 'unsupported']])
+		);
+	});
+
+	/**
+	 * A provider that refused once can be retried and succeed — Samsung Pass and
+	 * KeePassXC both do — so pinning the first answer for ever would leave a
+	 * permanent warning on a passkey that now works.
+	 */
+	it('replaces an earlier verdict rather than failing on the second one', async () => {
+		await givePasskey(ada.id, 'passkey-ada');
+
+		await recordPasskeyPrfStatus(harness.db, ada.id, {
+			passkeyId: 'passkey-ada',
+			prfStatus: 'unsupported'
+		});
+		await recordPasskeyPrfStatus(harness.db, ada.id, {
+			passkeyId: 'passkey-ada',
+			prfStatus: 'supported'
+		});
+
+		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(
+			new Map([['passkey-ada', 'supported']])
+		);
+		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
+			passkeysKnownUnusable: 0
+		});
+	});
+
+	it("records nothing against someone else's passkey", async () => {
+		const jun = await createTestUser(harness.db, { name: 'Jun' });
+		await givePasskey(jun.id, 'passkey-jun');
+
+		await expect(
+			recordPasskeyPrfStatus(harness.db, ada.id, {
+				passkeyId: 'passkey-jun',
+				prfStatus: 'unsupported'
+			})
+		).resolves.toBe(false);
+
+		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(new Map());
+		await expect(getUnlockBundle(harness.db, jun.id)).resolves.toMatchObject({
+			passkeysKnownUnusable: 0
+		});
+	});
+
+	/** Deleting a passkey must not leave a verdict counting against the account. */
+	it('goes away with the passkey it describes', async () => {
+		await givePasskey(ada.id, 'passkey-ada');
+		await recordPasskeyPrfStatus(harness.db, ada.id, {
+			passkeyId: 'passkey-ada',
+			prfStatus: 'unsupported'
+		});
+
+		await harness.db.delete(passkey).where(eq(passkey.id, 'passkey-ada'));
+
+		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(new Map());
+		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
+			passkeyCount: 0,
+			passkeysKnownUnusable: 0
 		});
 	});
 });

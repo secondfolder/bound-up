@@ -42,6 +42,15 @@ beforeEach(async () => {
 
 afterEach(() => harness.close());
 
+/** The load lists passkeys, so it needs a Better Auth api even to say "none". */
+function loadEvent(passkeys: { id: string; name: string | null }[] = []) {
+	return fakeEvent({
+		db: harness.db,
+		user: ada,
+		authApi: { listPasskeys: vi.fn().mockResolvedValue(passkeys) }
+	});
+}
+
 describe('load', () => {
 	it('refuses an unsigned visitor', async () => {
 		const result = await runAndCatch(() => load(fakeEvent({ db: harness.db })));
@@ -49,7 +58,7 @@ describe('load', () => {
 	});
 
 	it('reports no keys and no password on a bare account', async () => {
-		const data = await runLoad(load(fakeEvent({ db: harness.db, user: ada })));
+		const data = await runLoad(load(loadEvent()));
 		expect(data.hasPassword).toBe(false);
 		expect(data.bundle).toMatchObject({ recipient: null, wraps: [] });
 	});
@@ -57,10 +66,27 @@ describe('load', () => {
 	it('reports the recipient and wraps once set up', async () => {
 		await givePassword(ada.id);
 		const keys = await createTestUserKeys(harness.db, ada);
-		const data = await runLoad(load(fakeEvent({ db: harness.db, user: ada })));
+		const data = await runLoad(load(loadEvent()));
 		expect(data.hasPassword).toBe(true);
 		expect(data.bundle.recipient).toBe(keys.recipient);
 		expect(data.bundle.wraps).toHaveLength(1);
+	});
+
+	/**
+	 * So a wrap can be listed under the passkey's *current* name rather than the
+	 * label frozen into it when it was sealed — renaming a passkey in Security
+	 * would otherwise leave two names for one thing.
+	 */
+	it('maps passkey ids to their names, skipping unnamed ones', async () => {
+		const data = await runLoad(
+			load(
+				loadEvent([
+					{ id: 'pk-1', name: 'Laptop' },
+					{ id: 'pk-2', name: null }
+				])
+			)
+		);
+		expect(data.passkeyNames).toEqual({ 'pk-1': 'Laptop' });
 	});
 });
 
