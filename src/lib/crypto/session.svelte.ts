@@ -37,8 +37,12 @@ export type Keyring =
 			 * than after it — so the prompt can say up front that it will be back.
 			 */
 			tier: KeyTier;
-			/** Whether the account has any passkey, so one can be offered after. */
-			hasPasskeys: boolean;
+			/** How many passkeys the account has, so one can be offered after. */
+			passkeyCount: number;
+			/** How many of those were tried against PRF and could not do it. */
+			passkeysKnownUnusable: number;
+			/** The AAGUID of one that failed, so the prompt can name the provider. */
+			unusableProviderAaguid: string | null;
 	  }
 	/**
 	 * Open. `identity` is a non-extractable `CryptoKey` wherever the browser can
@@ -97,7 +101,7 @@ async function cache(
 	userId: string,
 	recipient: string,
 	identity: string,
-	offer: { wraps: KeyWrapView[]; hasPasskeys: boolean }
+	offer: { wraps: KeyWrapView[]; passkeyCount: number }
 ): Promise<Keyring> {
 	const store = await keyStore();
 	// The store decides what form to write and hands back the form to hold in
@@ -110,13 +114,14 @@ async function cache(
 	// and nothing turns one of those into a string again. So if a passkey is
 	// worth offering, it has to be offered now or it has to ask for the password
 	// a second time. See docs/encryption.md.
-	// `hasPasskeys` and not just `passkeysAvailable()`: the second says the
-	// browser has WebAuthn, and offering on that alone puts a button in front of
-	// people with no passkey registered, which opens a chooser with nothing in
-	// it. WebAuthn then reports that as a plain `NotAllowedError` — the same one
-	// a dismissal gives — so it cannot be explained afterwards either.
+	// A passkey has to already exist, and `passkeysAvailable()` does not say
+	// that: the second says only that the browser has WebAuthn, and offering on
+	// that alone puts a button in front of people with no passkey registered,
+	// which opens a chooser with nothing in it. WebAuthn then reports that as a
+	// plain `NotAllowedError` — the same one a dismissal gives — so it cannot be
+	// explained afterwards either.
 	if (
-		offer.hasPasskeys &&
+		offer.passkeyCount > 0 &&
 		passkeysAvailable() &&
 		!offer.wraps.some((wrap) => wrap.type === 'webauthn-prf')
 	) {
@@ -220,7 +225,9 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 			wraps: bundle.wraps,
 			reason: bundle.wraps.length === 0 ? 'no-usable-wrap' : 'cold',
 			tier: store.tier,
-			hasPasskeys: bundle.hasPasskeys
+			passkeyCount: bundle.passkeyCount,
+			passkeysKnownUnusable: bundle.passkeysKnownUnusable,
+			unusableProviderAaguid: bundle.unusableProviderAaguid
 		};
 		return keyring;
 	})();
@@ -242,7 +249,7 @@ export async function unlockWithPassword(
 	password: string
 ): Promise<Keyring> {
 	if (keyring.status !== 'locked') return keyring;
-	const { recipient, wraps, hasPasskeys } = keyring;
+	const { recipient, wraps, passkeyCount } = keyring;
 
 	// Cache the master key per parameter set: several wraps can share one, and
 	// each derivation is 650,000 iterations. A plain object rather than a Map
@@ -271,7 +278,7 @@ export async function unlockWithPassword(
 		return keyring;
 	}
 
-	keyring = await cache(user.id, recipient, opened.identity, { wraps, hasPasskeys });
+	keyring = await cache(user.id, recipient, opened.identity, { wraps, passkeyCount });
 	void noteWrapUsed(opened.wrapId);
 	return keyring;
 }
@@ -344,16 +351,35 @@ function lastTouched(wrap: KeyWrapView): number {
 export async function unlockWithPasskey(user: { id: string }, wrap: KeyWrapView): Promise<Keyring> {
 	if (keyring.status !== 'locked') return keyring;
 	if (wrap.params.type !== 'webauthn-prf') return keyring;
-	const { recipient, wraps } = keyring;
+	const { recipient, wraps, passkeyCount } = keyring;
 
-	const identity = await unwrapIdentityWithPasskey({ blob: wrap.blob, rpId: wrap.params.rpId });
-	keyring = await cache(user.id, recipient, identity, { wraps, hasPasskeys: true });
+	const identity = await unwrapIdentityWithPasskey({
+		blob: wrap.blob,
+		rpId: wrap.params.rpId,
+		// Present on wraps written since the credential binding landed, absent on
+		// older ones — which then fall back to the platform's chooser.
+		ageIdentity: wrap.params.ageIdentity
+	});
+	keyring = await cache(user.id, recipient, identity, { wraps, passkeyCount });
 	void noteWrapUsed(wrap.id);
 	return keyring;
 }
 
 /**
  * Forgets the identity on this device.
+ *
+ * Leaves the keyring at `unknown`, not `locked`, and that is deliberate: what
+ * the device can do next depends on what the account still has, which is a
+ * question for `initialiseKeyring`. `EncryptionGate` re-asks it whenever the
+ * status goes back to `unknown`, so the screens settle on the right panel
+ * without a reload.
+ *
+ * That re-ask is load-bearing rather than tidy. Without it the status stayed
+ * `unknown` for the rest of the session: `/settings/encryption` showed no panel
+ * at all after "Lock on this device", and — worse — the messaging board fell
+ * through to rendering the board itself, every thread and message showing "…"
+ * where the plaintext should be, because nothing on the page had been told the
+ * device was locked.
  *
  * Note what this cannot do: another device that has already unlocked holds the
  * identity and needs neither the password nor this server to keep reading what

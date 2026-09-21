@@ -181,7 +181,7 @@ export type UnlockBundleView = {
 	historyWarningAcknowledged: boolean;
 	wraps: KeyWrapView[];
 	/**
-	 * Whether the account has any passkey at all.
+	 * How many passkeys the account has registered.
 	 *
 	 * Not the same question as "can this browser do WebAuthn". Offering to set
 	 * up a passkey unlock to someone who has never registered one opens a
@@ -189,7 +189,25 @@ export type UnlockBundleView = {
 	 * a cancelled prompt — so the offer has to be withheld rather than
 	 * explained afterwards.
 	 */
-	hasPasskeys: boolean;
+	passkeyCount: number;
+	/**
+	 * How many of those were tried against PRF and could not do it.
+	 *
+	 * Sent alongside the total rather than as a boolean, because the unlock
+	 * screen has to tell three cases apart: a passkey that works, passkeys that
+	 * are all known not to, and a passkey nothing has ever tried — which is any
+	 * passkey registered before this check existed, and might work fine. Only
+	 * the middle case gets the "your password manager cannot do this" message.
+	 */
+	passkeysKnownUnusable: number;
+	/**
+	 * The AAGUID of one passkey that was tried and failed, when it has one.
+	 *
+	 * So the unlock screen can say which password manager is at fault rather
+	 * than leaving the user to guess. Often null: Apple reports the anonymous
+	 * AAGUID under the default attestation, so the copy has to work without it.
+	 */
+	unusableProviderAaguid: string | null;
 };
 
 /**

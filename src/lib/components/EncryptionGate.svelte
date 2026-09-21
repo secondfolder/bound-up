@@ -1,16 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import {
-		currentKeyring,
-		initialiseKeyring,
-		passkeyWrapFor,
-		resetKeyring,
-		unlockWithPasskey,
-		unlockWithPassword
-	} from '$lib/crypto/session.svelte';
+	import { currentKeyring, initialiseKeyring, resetKeyring } from '$lib/crypto/session.svelte';
+	import MessageUnlock from './MessageUnlock.svelte';
 	import PasskeyOffer from './PasskeyOffer.svelte';
-	import UnlockForm from './UnlockForm.svelte';
 
 	/**
 	 * Works out whether this device can read the user's messages, once.
@@ -34,7 +27,6 @@
 		handledByPage?: boolean;
 	} = $props();
 	const keyring = $derived(currentKeyring());
-	const passkeyWrap = $derived(passkeyWrapFor(keyring));
 
 	let lastUserId: string | null = null;
 
@@ -45,7 +37,16 @@
 	$effect(() => {
 		// A different account in the same tab must not inherit the previous one's
 		// keyring — it would fail to unwrap, but it would fail confusingly.
-		if (user?.id !== lastUserId) void refresh();
+		if (user?.id !== lastUserId) {
+			void refresh();
+			return;
+		}
+
+		// `unknown` means nobody has worked out where this device stands — the
+		// state `lock()` leaves behind. Re-asking here is what makes locking
+		// settle on the right panel without a reload; `initialiseKeyring` returns
+		// early unless the status is `unknown`, so this cannot loop.
+		if (keyring.status === 'unknown') void refresh();
 	});
 
 	async function refresh() {
@@ -65,16 +66,6 @@
 		}
 	}
 
-	async function onUnlock(password: string) {
-		if (!user) return;
-		await unlockWithPassword(user, password);
-	}
-
-	async function onPasskeyUnlock() {
-		if (!user || !passkeyWrap) return;
-		await unlockWithPasskey(user, passkeyWrap);
-	}
-
 	/**
 	 * Where the gate keeps quiet.
 	 *
@@ -92,18 +83,21 @@
 	<PasskeyOffer />
 {/if}
 
-{#if user && userHasMessageHistory && keyring.status === 'locked' && !handledByPage}
-	<wa-callout variant="warning" class="gate">
-		<wa-icon slot="icon" name="lock" variant="solid"></wa-icon>
-		<strong>Your messages are locked on this device</strong>
-		<p>Unlock them with your password, or carry on — everything else works without it.</p>
-		<UnlockForm
-			unlock={onUnlock}
-			passkeyUnlock={passkeyWrap ? onPasskeyUnlock : null}
-			wrongPassword={keyring.reason === 'wrong-password'}
-			willRepeat={keyring.tier === 'memory'}
-		/>
-	</wa-callout>
+<!-- Mounted whenever there is a user, with the callout passed in as chrome
+     rather than wrapped around it. Unlocking flips the keyring, and wrapping
+     would unmount the whole thing — dialogs included — half way through
+     "unlock, then set up a passkey". -->
+{#if user && userHasMessageHistory && !handledByPage}
+	<MessageUnlock {user}>
+		{#snippet chrome(panel)}
+			<wa-callout variant="warning" class="gate">
+				<wa-icon slot="icon" name="lock" variant="solid"></wa-icon>
+				<strong>Your messages are locked on this device</strong>
+				<p>Unlock them with your password, or carry on — everything else works without it.</p>
+				{@render panel()}
+			</wa-callout>
+		{/snippet}
+	</MessageUnlock>
 {/if}
 
 {#if user && userHasMessageHistory && keyring.status === 'absent' && !handledByPage}
@@ -120,7 +114,12 @@
 <style>
 	.gate {
 		display: block;
-		margin: var(--wa-space-m);
+		/* Matches the 40rem column the settings pages use. Without it the
+		   callout ran the full width of a desktop window, which made a short
+		   unlock form look like a page-wide error banner. */
+		max-width: 40rem;
+		margin: var(--wa-space-m) auto;
+		width: calc(100% - 2 * var(--wa-space-m));
 
 		strong {
 			display: block;

@@ -25,6 +25,15 @@ export type FakeEventOptions = {
 	/** Body for an action. Values are sent as a real multipart FormData. */
 	formData?: Record<string, string>;
 	/**
+	 * Body for an API endpoint, sent as real JSON.
+	 *
+	 * The `+server.ts` routes read `request.json()` rather than FormData — they
+	 * are driven by fetch from the browser, not by a form — so they need a
+	 * request that actually parses. `null` sends a body that does not, which is
+	 * how the "malformed request" branches get exercised.
+	 */
+	json?: unknown;
+	/**
 	 * A stand-in for `locals.auth.api`, for routes that do call Better Auth.
 	 *
 	 * Only the handful of endpoints a route under test actually invokes need to
@@ -46,7 +55,13 @@ export function fakeEvent(options: FakeEventOptions): any {
 	const url = new URL(options.path ?? '/', origin);
 
 	let request: Request;
-	if (options.formData) {
+	if ('json' in options) {
+		request = new Request(url, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: options.json === undefined ? 'not json' : JSON.stringify(options.json)
+		});
+	} else if (options.formData) {
 		const body = new FormData();
 		for (const [key, value] of Object.entries(options.formData)) body.append(key, value);
 		request = new Request(url, { method: 'POST', body });

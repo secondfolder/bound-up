@@ -25,6 +25,7 @@
  * is pinned rather than carets in package.json.
  */
 
+import { bech32 } from '@scure/base';
 import { fromBase64Url, toBase64Url } from '../encryption';
 import { loadAge } from './identity';
 
@@ -48,21 +49,98 @@ export function passkeysAvailable(): boolean {
 }
 
 /**
- * Seals the identity to a passkey, prompting for one.
+ * age's handle for one specific credential: `AGE-PLUGIN-FIDO2PRF-1…`.
  *
- * `allowCredentials` is left empty — `WebAuthnRecipient` is given only the RP
- * id — so the platform offers the user whichever of their passkeys they like.
- * The alternative, `age.webauthn.createCredential()`, would register a second
- * passkey that Better Auth knows nothing about and that never appears in the
- * Security page's list, which is harder to explain than a picker.
+ * Handed to `WebAuthnRecipient`/`WebAuthnIdentity` as `identity`, where it
+ * pins `allowCredentials` to exactly this passkey. Without it both ceremonies
+ * pass an empty `allowCredentials` and the platform opens a chooser — which
+ * right after registering a passkey is a confusing second prompt, and which
+ * makes "which passkey does this wrap belong to" unanswerable, because the user
+ * may well pick a different one.
+ *
+ * ## Why this is hand-rolled
+ *
+ * `age-encryption` builds this string in `createCredential()` and exports
+ * neither that encoder nor `createCredential`'s usefulness here —
+ * `createCredential` registers a credential Better Auth knows nothing about,
+ * which would never appear in the Security page's list. So the encoding is
+ * reproduced: bech32 (no length limit, as upstream) over CTAP2-flavoured CBOR
+ * of version, credential id, rp id and transports, upper-cased.
+ *
+ * That is a private format, which is normally a bad thing to depend on. Two
+ * things make it acceptable: `age-encryption` is pinned to an exact version in
+ * package.json precisely because `age.webauthn` is experimental, so the format
+ * cannot move underneath us without a deliberate bump; and
+ * `passkey.test.ts` holds a frozen vector and round-trips the result through
+ * `WebAuthnIdentity`, so a bump that did change it fails in CI rather than on
+ * someone's phone.
+ *
+ * Everything in here is public: a credential id, a hostname and transport
+ * hints. It is stored in the wrap's `params`, beside a ciphertext the server
+ * cannot read either way.
+ */
+export function encodeAgeCredentialIdentity(input: {
+	credentialId: Uint8Array;
+	rpId: string;
+	transports: readonly string[];
+}): string {
+	const data = new Uint8Array([
+		...cborUint(1),
+		...cborByteString(input.credentialId),
+		...cborTextString(input.rpId),
+		...cborArray(input.transports)
+	]);
+	return bech32.encode('AGE-PLUGIN-FIDO2PRF-', bech32.toWords(data), false).toUpperCase();
+}
+
+// A tiny subset of CTAP2's subset of CBOR: unsigned integers, byte strings,
+// text strings and arrays of text strings, with 16-bit arguments. Mirrors
+// `cbor.ts` in age-encryption, which is not exported from the package.
+function cborHead(major: number, length: number): number[] {
+	if (length <= 23) return [(major << 5) | length];
+	if (length <= 0xff) return [(major << 5) | 24, length];
+	if (length <= 0xffff) return [(major << 5) | 25, length >> 8, length & 0xff];
+	throw new Error('cbor: argument too large');
+}
+
+function cborUint(n: number): number[] {
+	return cborHead(0, n);
+}
+
+function cborByteString(bytes: Uint8Array): number[] {
+	return [...cborHead(2, bytes.length), ...bytes];
+}
+
+function cborTextString(text: string): number[] {
+	const bytes = new TextEncoder().encode(text);
+	return [...cborHead(3, bytes.length), ...bytes];
+}
+
+function cborArray(items: readonly string[]): number[] {
+	return [...cborHead(4, items.length), ...items.flatMap(cborTextString)];
+}
+
+/**
+ * Seals the identity to a passkey.
+ *
+ * With `ageIdentity`, the ceremony goes straight to that credential. Without
+ * it, `WebAuthnRecipient` gets only the RP id and the platform offers the user
+ * whichever of their passkeys they like — which is what `PasskeyOffer` does,
+ * because it is sealing to a passkey the user has already chosen to have and
+ * has no particular one in mind.
  */
 export async function wrapIdentityToPasskey(input: {
 	identity: string;
 	rpId: string;
+	ageIdentity?: string;
 }): Promise<string> {
 	const age = await loadAge();
 	const encrypter = new age.Encrypter();
-	encrypter.addRecipient(new age.webauthn.WebAuthnRecipient({ rpId: input.rpId }));
+	encrypter.addRecipient(
+		new age.webauthn.WebAuthnRecipient(
+			input.ageIdentity ? { identity: input.ageIdentity } : { rpId: input.rpId }
+		)
+	);
 	return toBase64Url(await encrypter.encrypt(input.identity));
 }
 
@@ -73,14 +151,22 @@ export async function wrapIdentityToPasskey(input: {
  * fails is worth distinguishing for the user — a dismissed sheet, a passkey
  * without PRF, the wrong passkey — and `describePasskeyFailure` is what turns
  * the result into something to show.
+ *
+ * `ageIdentity` is absent on wraps written before the credential binding
+ * existed, and those still open through the chooser exactly as they used to.
  */
 export async function unwrapIdentityWithPasskey(input: {
 	blob: string;
 	rpId: string;
+	ageIdentity?: string;
 }): Promise<string> {
 	const age = await loadAge();
 	const decrypter = new age.Decrypter();
-	decrypter.addIdentity(new age.webauthn.WebAuthnIdentity({ rpId: input.rpId }));
+	decrypter.addIdentity(
+		new age.webauthn.WebAuthnIdentity(
+			input.ageIdentity ? { identity: input.ageIdentity } : { rpId: input.rpId }
+		)
+	);
 	return decrypter.decrypt(fromBase64Url(input.blob), 'text');
 }
 

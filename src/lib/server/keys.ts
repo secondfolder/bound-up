@@ -1,8 +1,8 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
-import { passkey, partnerships, userKeyWraps, userKeys } from './db/schema';
-import type { KeyWrapParams, KeyWrapType } from '../encryption';
+import { passkey, partnerships, passkeyDetails, userKeyWraps, userKeys } from './db/schema';
+import type { KeyWrapParams, KeyWrapType, PasskeyPrfStatusValue } from '../encryption';
 import type { KeyWrapView, PartnerRecipientsView, UnlockBundleView } from '../types';
 
 /**
@@ -105,19 +105,97 @@ export async function listWrapsForUser(db: Db, userId: string): Promise<KeyWrapV
  * *every* page in the app, for something needed once per lock.
  */
 export async function getUnlockBundle(db: Db, userId: string): Promise<UnlockBundleView> {
-	const [keys, wraps, passkeys] = await Promise.all([
+	const [keys, wraps, passkeys, unusable] = await Promise.all([
 		getUserKeys(db, userId),
 		listWrapsForUser(db, userId),
-		// One id is enough: the screens ask whether there is a passkey to offer,
-		// never which. Their names and metadata belong to /settings/security.
-		db.select({ id: passkey.id }).from(passkey).where(eq(passkey.userId, userId)).limit(1)
+		// Ids only: the screens ask how many passkeys there are, never which.
+		// Their names and metadata belong to /settings/security.
+		db.select({ id: passkey.id }).from(passkey).where(eq(passkey.userId, userId)),
+		db
+			.select({ aaguid: passkeyDetails.aaguid })
+			.from(passkeyDetails)
+			.innerJoin(passkey, eq(passkey.id, passkeyDetails.passkeyId))
+			.where(and(eq(passkeyDetails.userId, userId), eq(passkeyDetails.prfStatus, 'unsupported')))
 	]);
 	return {
 		recipient: keys?.recipient ?? null,
 		historyWarningAcknowledged: keys?.historyWarningAcknowledged ?? false,
 		wraps,
-		hasPasskeys: passkeys.length > 0
+		passkeyCount: passkeys.length,
+		// Joined against `passkey` rather than counted alone, so a verdict whose
+		// passkey has been deleted cannot make the account look worse off than it
+		// is. The cascade should already have removed it; this is the belt to
+		// that braces, and costs nothing on a table with a handful of rows.
+		passkeysKnownUnusable: unusable.length,
+		// One is enough to name the provider in the unlock message, and naming
+		// one is the whole value: "Dashlane cannot do this" is actionable where
+		// "your passkey cannot do this" is not. Anonymous AAGUIDs are common —
+		// Apple reports one — so this is frequently null and the copy has a
+		// fallback for that.
+		unusableProviderAaguid: unusable.find((row) => row.aaguid)?.aaguid ?? null
 	};
+}
+
+/**
+ * Records what a real PRF evaluation against one passkey did.
+ *
+ * Upsert, because the answer can change: a provider that refused at creation
+ * can be retried later and succeed, and pinning the first verdict for ever
+ * would leave a permanent warning on a passkey that now works.
+ *
+ * Scoped to the owner in the same statement as the write rather than checked
+ * first — a passkey id belonging to someone else must not produce a row at all,
+ * and a check-then-write would be a race as well as an extra read.
+ */
+export async function recordPasskeyPrfStatus(
+	db: Db,
+	userId: string,
+	input: { passkeyId: string; prfStatus: PasskeyPrfStatusValue; aaguid?: string | null }
+): Promise<boolean> {
+	const owned = await db
+		.select({ id: passkey.id, aaguid: passkey.aaguid })
+		.from(passkey)
+		.where(and(eq(passkey.id, input.passkeyId), eq(passkey.userId, userId)))
+		.limit(1);
+	if (owned.length === 0) return false;
+
+	await db
+		.insert(passkeyDetails)
+		.values({
+			passkeyId: input.passkeyId,
+			userId,
+			prfStatus: input.prfStatus,
+			aaguid: input.aaguid ?? owned[0].aaguid ?? null
+		})
+		.onConflictDoUpdate({
+			target: passkeyDetails.passkeyId,
+			set: { prfStatus: input.prfStatus, updatedAt: new Date() }
+		});
+	return true;
+}
+
+/**
+ * Every PRF verdict this user has, keyed by passkey id.
+ *
+ * A Map rather than a list because the only caller zips it against
+ * `listPasskeys`, and a passkey with no entry is the meaningful third state —
+ * "never checked" — which a lookup miss expresses and a filtered list does not.
+ */
+export async function passkeyPrfStatusFor(
+	db: Db,
+	userId: string
+): Promise<Map<string, PasskeyPrfStatusValue>> {
+	const rows = await db
+		.select({ passkeyId: passkeyDetails.passkeyId, prfStatus: passkeyDetails.prfStatus })
+		.from(passkeyDetails)
+		.where(eq(passkeyDetails.userId, userId));
+	return new Map(
+		rows
+			.filter(
+				(row): row is typeof row & { prfStatus: PasskeyPrfStatusValue } => row.prfStatus !== null
+			)
+			.map((row) => [row.passkeyId, row.prfStatus])
+	);
 }
 
 /** Adds another way to unlock: a re-wrap under a new password, or a passkey. */

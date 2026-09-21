@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -7,23 +6,16 @@
 	import { superForm } from 'sveltekit-superforms';
 	import PasswordField from '$lib/components/PasswordField.svelte';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
-	import { buildIdentitySubmission, openIdentityWithPassword } from '$lib/crypto/setup';
-	import {
-		currentRpId,
-		describePasskeyFailure,
-		passkeysAvailable,
-		wrapIdentityToPasskey
-	} from '$lib/crypto/passkey';
+	import { buildIdentitySubmission } from '$lib/crypto/setup';
+	import { passkeysAvailable } from '$lib/crypto/passkey';
 	import {
 		currentEnrolmentOffer,
 		currentKeyring,
 		initialiseKeyring,
-		lock,
-		passkeyWrapFor,
-		unlockWithPasskey,
-		unlockWithPassword
+		lock
 	} from '$lib/crypto/session.svelte';
-	import UnlockForm from '$lib/components/UnlockForm.svelte';
+	import AddPasskeyFlow from '$lib/components/AddPasskeyFlow.svelte';
+	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import { stashUnlock } from '$lib/crypto/stash';
 	import {
 		deriveMasterKey,
@@ -32,7 +24,7 @@
 		WEBCRYPTO_UNAVAILABLE
 	} from '$lib/crypto/kdf';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
-	import type { SubmitFunction } from '@sveltejs/kit';
+	import type { KeyWrapView } from '$lib/types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -40,7 +32,6 @@
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
-	const passkeyWrap = $derived(passkeyWrapFor(keyring));
 	const wraps = $derived(data.bundle.wraps);
 
 	let generated: { phrase: string; entropyBits: number } | null = $state(null);
@@ -133,95 +124,37 @@
 		await lock(user.id);
 	}
 
-	async function onUnlockHere(password: string) {
-		await unlockWithPassword(user, password);
+	/**
+	 * What to call a passkey wrap.
+	 *
+	 * Prefers the passkey's *current* name over the label frozen into the wrap
+	 * when it was made, so renaming a passkey in Security is reflected here
+	 * rather than leaving two names for one thing. Falls back to the label for
+	 * wraps sealed through the chooser, which are not bound to a known
+	 * credential and so cannot be looked up.
+	 */
+	function wrapName(wrap: KeyWrapView): string {
+		const passkeyId = wrap.params.type === 'webauthn-prf' ? wrap.params.passkeyId : undefined;
+		const named = passkeyId ? data.passkeyNames[passkeyId] : undefined;
+		return named ?? wrap.label ?? 'A passkey';
 	}
 
-	async function onPasskeyUnlockHere() {
-		if (!passkeyWrap) return;
-		await unlockWithPasskey(user, passkeyWrap);
-	}
-
-	let passkeyPassword = $state('');
-	let passkeyErrors: string[] | undefined = $state(undefined);
-	let addingPasskey = $state(false);
+	let addPasskeyFlow = $state<AddPasskeyFlow | undefined>(undefined);
 	/**
 	 * Hidden while the app shell is already offering the same thing.
 	 *
 	 * `PasskeyOffer` appears right after an unlock and needs no password,
 	 * because the identity is still in memory as a string. Showing a second
-	 * form that asks for one would be offering the harder way to do the thing
+	 * route to the same place would be offering the harder way to do the thing
 	 * the callout above is offering to do for free.
+	 *
+	 * No longer gated on the account already having a passkey: `AddPasskeyFlow`
+	 * registers one when there is none, so there is nothing left to send the
+	 * user to Security for.
 	 */
-	const passkeySectionApplies = $derived(
+	const canAddPasskey = $derived(
 		Boolean(data.bundle.recipient) && passkeysAvailable() && currentEnrolmentOffer() === null
 	);
-	const canAddPasskey = $derived(passkeySectionApplies && data.bundle.hasPasskeys);
-	/** They have no passkey to seal to, so the form would fail on the ceremony. */
-	const needsPasskeyFirst = $derived(passkeySectionApplies && !data.bundle.hasPasskeys);
-
-	/**
-	 * Seals the identity to a passkey, then posts the result as another wrap.
-	 *
-	 * Why this asks for the password even when the messages are unlocked on this
-	 * very device: the identity is cached as a non-extractable `CryptoKey`
-	 * wherever it can be, and there is no API anywhere that turns one of those
-	 * back into the string a new wrap has to seal. Opening a password wrap is
-	 * the only way to get it — which has the happy side effect that adding a way
-	 * in requires proving you already have one.
-	 *
-	 * Everything that can fail does so before the form is submitted: a wrong
-	 * password fails its tag check here, and a passkey without PRF fails its
-	 * ceremony here. The server only ever sees a wrap that already works.
-	 */
-	const onAddPasskey: SubmitFunction = async ({ formData, cancel }) => {
-		passkeyErrors = undefined;
-		if (!webCryptoAvailable()) {
-			cancel();
-			passkeyErrors = [WEBCRYPTO_UNAVAILABLE];
-			return;
-		}
-
-		addingPasskey = true;
-		let prepared = false;
-		try {
-			const opened = await openIdentityWithPassword({
-				email: user.email,
-				password: passkeyPassword,
-				recipient: data.bundle.recipient ?? '',
-				wraps
-			});
-			if (!opened) {
-				cancel();
-				passkeyErrors = ['That password did not unlock your messages'];
-				return;
-			}
-
-			const rpId = currentRpId();
-			formData.set('wrapBlob', await wrapIdentityToPasskey({ identity: opened.identity, rpId }));
-			formData.set('wrapParams', JSON.stringify({ type: 'webauthn-prf', version: 1, rpId }));
-			formData.set(
-				'label',
-				`${navigator.platform || 'Device'} — ${new Date().toLocaleDateString()}`
-			);
-			prepared = true;
-		} catch (error) {
-			cancel();
-			// Always reported, including a dismissal: see `describePasskeyFailure`.
-			passkeyErrors = [describePasskeyFailure(error).message];
-		} finally {
-			// Never left in the box: on success it is not needed, and on failure
-			// leaving it there invites a retry of the same wrong value.
-			passkeyPassword = '';
-			if (!prepared) addingPasskey = false;
-		}
-
-		if (!prepared) return;
-		return async ({ update }) => {
-			addingPasskey = false;
-			await update();
-		};
-	};
 </script>
 
 <section>
@@ -260,27 +193,52 @@
 			</wa-callout>
 			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 			<wa-button appearance="outlined" onclick={lockNow}>Lock on this device</wa-button>
-		{:else if keyring.status === 'locked'}
-			<wa-callout variant="warning">
-				<wa-icon slot="icon" name="lock" variant="solid"></wa-icon>
-				<strong>Locked on this device</strong>
-				<p>
-					Normal — it happens on a new phone, after signing in with a passkey, or when the browser
-					has cleared its storage.
-				</p>
-				<UnlockForm
-					unlock={onUnlockHere}
-					passkeyUnlock={passkeyWrap ? onPasskeyUnlockHere : null}
-					wrongPassword={keyring.reason === 'wrong-password'}
-					willRepeat={keyring.tier === 'memory'}
-				/>
-			</wa-callout>
 		{:else if keyring.status === 'absent'}
 			<wa-callout variant="neutral">
 				<wa-icon slot="icon" name="key" variant="solid"></wa-icon>
 				This account has no message keys yet.
 			</wa-callout>
+		{:else if keyring.status === 'unknown'}
+			<!--
+				A placeholder the same height as the callouts it will become.
+
+				Working out where a device stands means reading IndexedDB and
+				fetching the wrap bundle, so there is always a moment with no
+				answer — on first load, and again after "Lock on this device",
+				which deliberately returns the keyring to `unknown`. Rendering
+				nothing for that moment made the whole section appear late and
+				shove everything below it down the page.
+			-->
+			<div class="settling" aria-busy="true" data-testid="device-state-settling">
+				<wa-skeleton effect="sheen"></wa-skeleton>
+				<span class="visually-hidden">Checking this device…</span>
+			</div>
 		{/if}
+
+		<!-- Outside the chain above, and mounted whether or not the keyring is
+		     locked: it owns the add-a-passkey dialogs, and those outlive the
+		     unlock that started them. It renders nothing once unlocked. -->
+		<AddPasskeyFlow
+			bind:this={addPasskeyFlow}
+			{user}
+			recipient={data.bundle.recipient}
+			wraps={data.bundle.wraps}
+			hasPassword={data.hasPassword}
+		/>
+
+		<MessageUnlock {user} hasPassword={data.hasPassword}>
+			{#snippet chrome(panel)}
+				<wa-callout variant="warning">
+					<wa-icon slot="icon" name="lock" variant="solid"></wa-icon>
+					<strong>Locked on this device</strong>
+					<p>
+						Normal — it happens on a new phone, after signing in with a passkey, or when the browser
+						has cleared its storage.
+					</p>
+					{@render panel()}
+				</wa-callout>
+			{/snippet}
+		</MessageUnlock>
 
 		{#if !data.bundle.recipient}
 			<h2>{data.hasPassword ? 'Turn on encrypted messages' : 'Choose a password'}</h2>
@@ -365,7 +323,7 @@
 				{#each wraps as wrap (wrap.id)}
 					<li>
 						<span class="what">
-							{wrap.type === 'password' ? 'Your password' : (wrap.label ?? 'A passkey')}
+							{wrap.type === 'password' ? 'Your password' : wrapName(wrap)}
 						</span>
 						<span class="quiet">
 							{wrap.lastUsedAt
@@ -382,15 +340,6 @@
 				{/each}
 			</ul>
 
-			{#if needsPasskeyFirst}
-				<h2>Add a passkey</h2>
-				<p class="quiet">
-					You have no passkeys yet.
-					<a href={resolve('/(auth-required)/(app)/settings/security')}>Add one in Security</a>,
-					then come back here to use it for your messages.
-				</p>
-			{/if}
-
 			{#if canAddPasskey}
 				<h2>Add a passkey</h2>
 				<div class="explainer">
@@ -400,25 +349,17 @@
 						it after about a week of not opening the app.
 					</p>
 					<p class="quiet">
-						Your password keeps working and still cannot be recovered. The passkey has to be one you
-						already use to sign in, and removing it from your device removes this way in.
+						Your password keeps working and still cannot be recovered. You will be asked for it
+						once, because it is the only thing that can open the key the new passkey has to seal.
 					</p>
 				</div>
-				<form method="POST" action="?/addWrap" use:enhance={onAddPasskey}>
-					<PasswordField
-						bind:value={passkeyPassword}
-						field="passkeyPassword"
-						label="Your password"
-						autocomplete="current-password"
-						errors={passkeyErrors}
-					/>
-					<input type="hidden" name="wrapParams" value="" />
-					<input type="hidden" name="wrapBlob" value="" />
-					<input type="hidden" name="label" value="" />
-					<wa-button type="submit" appearance="outlined" disabled={addingPasskey}>
-						{addingPasskey ? 'Waiting for your passkey…' : 'Add a passkey'}
-					</wa-button>
-				</form>
+				<!-- The same component and the same dialogs as Security, rather than
+				     a second password field inline. Two screens doing the same job
+				     two different ways is exactly the drift this replaced. -->
+				<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
+				<wa-button appearance="outlined" onclick={() => addPasskeyFlow?.start()}>
+					Add a passkey
+				</wa-button>
 			{/if}
 
 			<h2>Forgotten your password?</h2>
@@ -447,6 +388,23 @@
 </section>
 
 <style>
+	.settling {
+		wa-skeleton {
+			display: block;
+			height: 3.5rem;
+			--border-radius: var(--wa-border-radius-l);
+		}
+	}
+
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
 	section {
 		max-width: 40rem;
 		margin: 0 auto;

@@ -125,6 +125,17 @@ export function normaliseEmail(email: string): string {
  */
 export type KeyWrapType = 'password' | 'webauthn-prf';
 
+/**
+ * What a PRF evaluation against one registered passkey actually did.
+ *
+ * Two values and no "unknown": absence of a row is the unknown, and conflating
+ * the two would turn "never checked" into a warning on every passkey registered
+ * before the check existed. Lives here rather than in `passkey-providers.ts`
+ * because the Drizzle schema imports it, and drizzle-kit loads the schema
+ * outside Vite where `$lib` does not resolve.
+ */
+export type PasskeyPrfStatusValue = 'supported' | 'unsupported';
+
 export type KeyWrapParams =
 	| {
 			type: 'password';
@@ -140,10 +151,31 @@ export type KeyWrapParams =
 			 * The WebAuthn relying party id the wrap was made under — the origin's
 			 * domain. A credential is only offered to its own RP, so a wrap made on
 			 * one host can never be opened on another, and the unlock ceremony needs
-			 * to name it. No credential id: the blob carries its own nonce and the
-			 * platform offers the user their discoverable credentials.
+			 * to name it.
 			 */
 			rpId: string;
+			/**
+			 * Which passkey this wrap was sealed to, as Better Auth knows it.
+			 *
+			 * Optional because it is only knowable when the ceremony was pinned to
+			 * one credential — see `ageIdentity`. Without it the Security page can
+			 * say the account has passkey unlock but not which passkey provides it,
+			 * which is exactly the state wraps written by `PasskeyOffer` are in.
+			 */
+			passkeyId?: string;
+			/**
+			 * age's own `AGE-PLUGIN-FIDO2PRF-1…` handle for that credential.
+			 *
+			 * Encodes the credential id, the rp id and the transport hints, and
+			 * pins `allowCredentials` so the unlock ceremony goes straight to the
+			 * right passkey instead of opening a chooser. Optional: wraps written
+			 * before this existed have only `rpId`, and `unwrapIdentityWithPasskey`
+			 * falls back to the chooser for them.
+			 *
+			 * Not a secret — it is a public credential id and a hostname, and it is
+			 * stored beside a ciphertext the server cannot read either way.
+			 */
+			ageIdentity?: string;
 	  };
 
 /** How long a serialised `KeyWrapParams` may be. Generous; it is a few fields. */

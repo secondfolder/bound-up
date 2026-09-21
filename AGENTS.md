@@ -149,6 +149,19 @@ site it applies to; go read that comment before deciding to break one.
 10. **Passkeys are bound to a hostname.** One registered on `localhost` will not
     work on the tunnel host or in production. WebAuthn, not a bug.
 
+    Two more that cost a debugging round each, both in
+    [docs/passkeys.md](docs/passkeys.md):
+
+    - **`clientExtensionResults.prf.enabled` is a hint, not a verdict.**
+      Providers disagree with themselves in both directions — Samsung Pass and
+      KeePassXC say no at creation and then work, Microsoft Password Manager
+      says yes and then fails every unlock. Whether a credential can unlock
+      messages is decided by attempting a real seal, never by reading the flag.
+    - **An absent PRF verdict is a third state.** `passkey_details.prf_status`
+      is NULL for every passkey registered before the check existed, and that
+      must render as silence. Showing it as a warning would flag working
+      passkeys on every existing account.
+
 11. **Never pass `undefined` to a boolean attribute on a `wa-*` element.**
     `disabled={busy || undefined}` looks like the usual "omit the attribute"
     idiom, but once Web Awesome upgrades the element Svelte assigns to the
@@ -227,6 +240,27 @@ site it applies to; go read that comment before deciding to break one.
     only check that exercises this path.
 
 ## Conventions
+
+**There is one unlock form, and one add-a-passkey flow.** `UnlockPanel.svelte`
+(wired up by `MessageUnlock.svelte`) is rendered by the app-shell callout, the
+messaging board, a thread and `/settings/encryption`; `AddPasskeyFlow.svelte` is
+rendered by both Security and Encrypted messages. A second copy of either is
+drift, and it is not hypothetical — there used to be four unlock forms, of which
+two passed no passkey callback at all, so passkey unlock silently did not exist
+on the messaging screens. Two things about `MessageUnlock` are load-bearing:
+
+- **Its chrome goes in through a snippet, not around it.** Unlocking flips the
+  keyring, so a caller that wraps it in its own `{#if locked}` unmounts it — and
+  the add-a-passkey dialogs with it — while "unlock, then set up a passkey" is
+  still half way through the ceremony.
+- **A screen that swaps itself out on unlock holds the branch open** via
+  `onFlowOpen`, for the same reason.
+
+**A keyring status of `unknown` renders a placeholder, never content.** `lock()`
+deliberately returns the keyring to `unknown`, and until `EncryptionGate`
+re-resolves it nothing knows whether the device is locked. Falling through to
+the content was a real bug: the messaging board rendered every thread preview
+and every message as "…", which is ciphertext presented as if it were the text.
 
 **Auth state flows one way: server load → `page.data`.** Better Auth's cookies
 are httpOnly, there is no client-side auth store, and there must not be one.
@@ -533,19 +567,20 @@ Four places, split on scope:
 
 ### Feature docs
 
-| Doc                                              | Feature                                                                   |
-| ------------------------------------------------ | ------------------------------------------------------------------------- |
-| [docs/partners.md](docs/partners.md)             | Linking two accounts: invites, the control permission, the nav tabs       |
-| [docs/privacy.md](docs/privacy.md)               | General privacy boundaries: who may see which user data, and why          |
-| [docs/rewards.md](docs/rewards.md)               | Self rewards and partnership rewards: credits, claims, control            |
-| [docs/tasks.md](docs/tasks.md)                   | Self tasks and partnership tasks: scheduling, credits, timezone ownership |
-| [docs/encryption.md](docs/encryption.md)         | Message keys: the client-side KDF, the wraps, what the guarantee is       |
-| [docs/halftone.md](docs/halftone.md)             | The landing page's halftone overlay: the screen model and its fixtures    |
-| [docs/embeds.md](docs/embeds.md)                 | URL linkification and inline embeds: providers, privacy gate, reddit path |
-| [docs/messaging.md](docs/messaging.md)           | Encrypted partner messages: threads, the board, unread, restore           |
-| [docs/rich-text.md](docs/rich-text.md)           | The rich-text document: Lexical serialisation, the editors, embed blocks  |
-| [docs/timezone.md](docs/timezone.md)             | Account timezone storage, mismatch prompts, and device-local dismissal    |
-| [docs/temporary-code.md](docs/temporary-code.md) | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text  |
+| Doc                                              | Feature                                                                       |
+| ------------------------------------------------ | ----------------------------------------------------------------------------- |
+| [docs/partners.md](docs/partners.md)             | Linking two accounts: invites, the control permission, the nav tabs           |
+| [docs/privacy.md](docs/privacy.md)               | General privacy boundaries: who may see which user data, and why              |
+| [docs/rewards.md](docs/rewards.md)               | Self rewards and partnership rewards: credits, claims, control                |
+| [docs/tasks.md](docs/tasks.md)                   | Self tasks and partnership tasks: scheduling, credits, timezone ownership     |
+| [docs/encryption.md](docs/encryption.md)         | Message keys: the client-side KDF, the wraps, what the guarantee is           |
+| [docs/passkeys.md](docs/passkeys.md)             | Passkeys: the password gate, PRF detection, provider naming, the unlock panel |
+| [docs/halftone.md](docs/halftone.md)             | The landing page's halftone overlay: the screen model and its fixtures        |
+| [docs/embeds.md](docs/embeds.md)                 | URL linkification and inline embeds: providers, privacy gate, reddit path     |
+| [docs/messaging.md](docs/messaging.md)           | Encrypted partner messages: threads, the board, unread, restore               |
+| [docs/rich-text.md](docs/rich-text.md)           | The rich-text document: Lexical serialisation, the editors, embed blocks      |
+| [docs/timezone.md](docs/timezone.md)             | Account timezone storage, mismatch prompts, and device-local dismissal        |
+| [docs/temporary-code.md](docs/temporary-code.md) | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text      |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

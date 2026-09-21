@@ -31,7 +31,9 @@ function locked(wraps: KeyWrapView[]): Keyring {
 		wraps,
 		reason: 'cold',
 		tier: 'crypto-key',
-		hasPasskeys: true
+		passkeyCount: 1,
+		passkeysKnownUnusable: 0,
+		unusableProviderAaguid: null
 	};
 }
 
