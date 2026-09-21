@@ -344,3 +344,91 @@ export type RestoreRequestView = {
 	/** True when the viewer is the one who lost their key. */
 	mine: boolean;
 };
+
+/**
+ * One line in a section widget's preview body: what it is, and one short note.
+ *
+ * Deliberately not a narrowed task/reward view. A widget row shows a title and
+ * at most one number, and giving each domain its own row type would mean three
+ * near-identical list components instead of `WidgetItems.svelte`.
+ */
+export type WidgetItemView = {
+	id: string;
+	title: string;
+	/** A credit award, a cost — rendered as a pill, or omitted when null. */
+	note: string | null;
+	/**
+	 * Whose section this row comes from on the full page, or null for your own.
+	 *
+	 * /home merges your things with every partner's into one list, so a row has
+	 * to say which. Without it "Kneel at eight" and "Kneel at eight" from two
+	 * different partners are the same line twice.
+	 */
+	context: string | null;
+};
+
+/**
+ * One reward balance, and who it is with.
+ *
+ * A list rather than a number because credits do not pool: a partnership's
+ * credits buy that partnership's rewards and nothing else, so adding them up
+ * would state a spending power nobody has. `label` is null for your own.
+ */
+export type WidgetBalanceView = {
+	id: string;
+	label: string | null;
+	credits: number;
+};
+
+/**
+ * What the tasks card previews.
+ *
+ * `viewerActs` is false for the side of a partnership that manages tasks rather
+ * than completing them; "ready to complete" means nothing to them, so the card
+ * shows `activeCount` instead. It is always true on /home, where there is only
+ * one side.
+ */
+export type TasksWidgetView = {
+	viewerActs: boolean;
+	/** Ready to complete right now. Capped — `readyCount` is the real total. */
+	ready: WidgetItemView[];
+	readyCount: number;
+	/** Active, but waiting on a schedule. */
+	waitingCount: number;
+	activeCount: number;
+};
+
+/** What the rewards card previews. `viewerActs` as in `TasksWidgetView`. */
+export type RewardsWidgetView = {
+	viewerActs: boolean;
+	/** One entry per scope: your own on /home, the partnership on a partner page. */
+	balances: WidgetBalanceView[];
+	/** Affordable right now. Capped — `claimableCount` is the real total. */
+	claimable: WidgetItemView[];
+	claimableCount: number;
+	/**
+	 * Every active reward in scope, for the managing side's count.
+	 *
+	 * There is deliberately no count of the *unaffordable* ones. The card does
+	 * not mention a reward you cannot claim yet — see docs/section-widgets.md.
+	 */
+	activeCount: number;
+};
+
+/** What the guides card previews. `total` may exceed `guides.length`. */
+export type GuidesWidgetView = {
+	guides: GuideView[];
+	total: number;
+};
+
+/**
+ * What one partnership's messages card previews.
+ *
+ * Counts only: every body is encrypted to keys the server does not hold, so
+ * there is no preview text it could return. See docs/encryption.md.
+ */
+export type PartnerMessagesWidgetView = {
+	unreadThreads: number;
+	totalThreads: number;
+	newestAt: Date | null;
+};

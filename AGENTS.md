@@ -322,7 +322,10 @@ knows nothing about embeds. See [docs/rich-text.md](docs/rich-text.md).
 **Every rich-text length limit counts visible text**, via `documentToPlainText`
 — never the stored string, which is several times larger than the prose in it.
 
-**UI is Web Awesome 3 alpha, loaded from a CDN in `src/app.html`.** Components
+**UI is Web Awesome 3 alpha, installed from npm and cherry-picked in
+`src/routes/+layout.svelte`.** Each component is imported there by hand rather
+than autoloaded, so an element the registration list does not name renders as an
+inert unknown tag — add the import when you reach for a new one. Components
 are custom elements (`wa-button`, `wa-input`, …) with no TypeScript definitions,
 which is why Svelte's a11y warnings fire on them. Style with `--wa-*` custom
 properties and `::part()`. Pinned to `3.0.0-alpha.11` — an alpha, so treat a
@@ -451,7 +454,8 @@ calls `superForm()` can only be tested through a wrapper component, because
 `superForm` registers an `onDestroy` and throws outside initialisation — which
 is why `PartnerFields` is exercised through `PartnerAcceptForm`.
 
-`wa-*` elements are never upgraded in jsdom (they come from a CDN), so assert on
+`wa-*` elements are never upgraded in jsdom — the registrations live in the root
+layout, which a component test does not render — so assert on
 the attributes the component emits, not on rendered behaviour. Anything that
 depends on Web Awesome actually working belongs in the Playwright suite.
 
@@ -533,19 +537,20 @@ Four places, split on scope:
 
 ### Feature docs
 
-| Doc                                              | Feature                                                                   |
-| ------------------------------------------------ | ------------------------------------------------------------------------- |
-| [docs/partners.md](docs/partners.md)             | Linking two accounts: invites, the control permission, the nav tabs       |
-| [docs/privacy.md](docs/privacy.md)               | General privacy boundaries: who may see which user data, and why          |
-| [docs/rewards.md](docs/rewards.md)               | Self rewards and partnership rewards: credits, claims, control            |
-| [docs/tasks.md](docs/tasks.md)                   | Self tasks and partnership tasks: scheduling, credits, timezone ownership |
-| [docs/encryption.md](docs/encryption.md)         | Message keys: the client-side KDF, the wraps, what the guarantee is       |
-| [docs/halftone.md](docs/halftone.md)             | The landing page's halftone overlay: the screen model and its fixtures    |
-| [docs/embeds.md](docs/embeds.md)                 | URL linkification and inline embeds: providers, privacy gate, reddit path |
-| [docs/messaging.md](docs/messaging.md)           | Encrypted partner messages: threads, the board, unread, restore           |
-| [docs/rich-text.md](docs/rich-text.md)           | The rich-text document: Lexical serialisation, the editors, embed blocks  |
-| [docs/timezone.md](docs/timezone.md)             | Account timezone storage, mismatch prompts, and device-local dismissal    |
-| [docs/temporary-code.md](docs/temporary-code.md) | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text  |
+| Doc                                                | Feature                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| [docs/partners.md](docs/partners.md)               | Linking two accounts: invites, the control permission, the nav tabs       |
+| [docs/privacy.md](docs/privacy.md)                 | General privacy boundaries: who may see which user data, and why          |
+| [docs/rewards.md](docs/rewards.md)                 | Self rewards and partnership rewards: credits, claims, control            |
+| [docs/tasks.md](docs/tasks.md)                     | Self tasks and partnership tasks: scheduling, credits, timezone ownership |
+| [docs/encryption.md](docs/encryption.md)           | Message keys: the client-side KDF, the wraps, what the guarantee is       |
+| [docs/halftone.md](docs/halftone.md)               | The landing page's halftone overlay: the screen model and its fixtures    |
+| [docs/embeds.md](docs/embeds.md)                   | URL linkification and inline embeds: providers, privacy gate, reddit path |
+| [docs/messaging.md](docs/messaging.md)             | Encrypted partner messages: threads, the board, unread, restore           |
+| [docs/rich-text.md](docs/rich-text.md)             | The rich-text document: Lexical serialisation, the editors, embed blocks  |
+| [docs/section-widgets.md](docs/section-widgets.md) | The /home and /partner cards: the shell, the per-section bodies, the data |
+| [docs/timezone.md](docs/timezone.md)               | Account timezone storage, mismatch prompts, and device-local dismissal    |
+| [docs/temporary-code.md](docs/temporary-code.md)   | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text  |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

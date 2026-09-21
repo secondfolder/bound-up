@@ -82,7 +82,15 @@ export function fakeEvent(options: FakeEventOptions): any {
 		url,
 		params: options.params ?? {},
 		request,
-		locals
+		locals,
+		// A no-op, unlike the rest of this object. `depends()` only registers an
+		// invalidation key with the router, which has no meaning outside a real
+		// navigation — but a load that calls it would otherwise crash here, and
+		// failing a route test over cache plumbing teaches nobody anything.
+		depends: () => {}
+		// `parent()` IS left off deliberately: a load that reads parent data is
+		// reading something the test has to decide, so it should fail loudly
+		// until the test says what the parent returned.
 	};
 }
 

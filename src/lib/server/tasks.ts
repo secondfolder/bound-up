@@ -10,7 +10,12 @@ import {
 	selfTasks
 } from './db/schema';
 import { getPartnershipForUser } from './partnerships';
-import { canViewPartnershipTask, isTaskCompletableAt, type TaskInput } from '../tasks';
+import {
+	canCompleteFromPartnership,
+	canViewPartnershipTask,
+	isTaskCompletableAt,
+	type TaskInput
+} from '../tasks';
 import {
 	initialNextEligibleAt,
 	nextEligibleAtAfterCompletion,
@@ -25,6 +30,7 @@ import type {
 	SelfTaskView,
 	TaskCompletionView,
 	TaskSchedule,
+	TasksWidgetView,
 	TaskTimeZoneNoteView
 } from '../types';
 
@@ -897,4 +903,201 @@ export async function listHomePartnerTaskSections(
 			}
 		];
 	});
+}
+
+/**
+ * How many rows a section widget's body lists before it stops and counts.
+ *
+ * Three fits a phone under the other cards; the card's own header link is the
+ * way to see the rest, so a longer list would just push the next card down.
+ */
+const WIDGET_PREVIEW_LIMIT = 3;
+
+type TaskWidgetRow = {
+	id: string;
+	title: string;
+	active: boolean;
+	creditsAwarded: number;
+	nextEligibleAt: Date | null;
+	/** Whose section this came from on /home/tasks. Null for your own. */
+	context?: string | null;
+};
+
+function toTasksWidgetView(rows: TaskWidgetRow[], viewerActs: boolean, now: Date): TasksWidgetView {
+	const ready = rows.filter((row) => isTaskCompletableAt(row, now));
+	return {
+		viewerActs,
+		// The managing side never sees a "ready" list: they do not complete these,
+		// so the card shows activeCount instead. Withheld here rather than in the
+		// component so the titles are not serialised into the page for nothing.
+		ready: viewerActs
+			? ready.slice(0, WIDGET_PREVIEW_LIMIT).map((row) => ({
+					id: row.id,
+					title: row.title,
+					note: row.creditsAwarded > 0 ? `+${row.creditsAwarded}` : null,
+					context: row.context ?? null
+				}))
+			: [],
+		readyCount: ready.length,
+		waitingCount: rows.length - ready.length,
+		activeCount: rows.length
+	};
+}
+
+/**
+ * The /home tasks card: your own tasks AND every partner task assigned to you.
+ *
+ * It has to be both, because /home/tasks — the page the card links to — is both.
+ * A card that counted only self tasks said "nothing to do" while a partner task
+ * sat waiting one tap away, which is exactly the thing the cards exist to stop.
+ *
+ * Which partner tasks count is decided the same way `listHomePartnerTaskSections`
+ * decides it: the partnerships where you are on the completing side, minus the
+ * ones you wrote yourself. Partnerships you *manage* contribute nothing here —
+ * managing them happens on their own partner page, and that is also why
+ * `viewerActs` is always true on /home.
+ *
+ * Active rows only, and only the columns the card reads — deliberately not
+ * `getSelfTasksSection`, which also pulls every completion ever recorded for a
+ * body that shows at most three titles. D1 charges for rows read.
+ */
+export async function getHomeTasksWidget(
+	db: Db,
+	userId: string,
+	partners: PartnerView[],
+	now: Date = new Date()
+): Promise<TasksWidgetView> {
+	const partnershipIds = partners.map((partner) => partner.id);
+
+	const [selfRows, partnershipRows, partnerTaskRows] = await Promise.all([
+		db
+			.select({
+				id: selfTasks.id,
+				title: selfTasks.title,
+				active: selfTasks.active,
+				creditsAwarded: selfTasks.creditsAwarded,
+				nextEligibleAt: selfTasks.nextEligibleAt
+			})
+			.from(selfTasks)
+			.where(and(eq(selfTasks.ownerId, userId), eq(selfTasks.active, true))),
+		// `in ()` is a syntax error in SQLite, and a fresh account has no partners.
+		partnershipIds.length === 0
+			? Promise.resolve([])
+			: db
+					.select({
+						id: partnerships.id,
+						status: partnerships.status,
+						control: partnerships.control,
+						inviterId: partnerships.inviterId,
+						inviteeId: partnerships.inviteeId
+					})
+					.from(partnerships)
+					.where(inArray(partnerships.id, partnershipIds)),
+		partnershipIds.length === 0
+			? Promise.resolve([])
+			: db
+					.select({
+						id: partnershipTasks.id,
+						partnershipId: partnershipTasks.partnershipId,
+						createdByUserId: partnershipTasks.createdByUserId,
+						title: partnershipTasks.title,
+						active: partnershipTasks.active,
+						creditsAwarded: partnershipTasks.creditsAwarded,
+						nextEligibleAt: partnershipTasks.nextEligibleAt
+					})
+					.from(partnershipTasks)
+					.where(
+						and(
+							inArray(partnershipTasks.partnershipId, partnershipIds),
+							eq(partnershipTasks.active, true)
+						)
+					)
+	]);
+
+	const completable = new Map(
+		partnershipRows.map((row) => [row.id, canCompleteFromPartnership(row, userId)])
+	);
+	const nameById = new Map(partners.map((partner) => [partner.id, partner.name]));
+
+	const partnerRows: TaskWidgetRow[] = partnerTaskRows.flatMap((row) => {
+		if (!completable.get(row.partnershipId)) return [];
+		// Authorship is independent of control: under shared control you complete
+		// their tasks, never your own.
+		if (row.createdByUserId === userId) return [];
+		const name = nameById.get(row.partnershipId);
+		if (!name) return [];
+		return [{ ...row, context: name }];
+	});
+
+	// Sorted across both sources rather than per source, so the three rows the
+	// card shows are the three most overdue, not the first three self tasks.
+	// SQLite sorts nulls first and so does this: no nextEligibleAt means always
+	// ready, which belongs at the top.
+	const rows = [...selfRows, ...partnerRows].sort((a, b) => {
+		const left = a.nextEligibleAt?.getTime() ?? -Infinity;
+		const right = b.nextEligibleAt?.getTime() ?? -Infinity;
+		return left - right;
+	});
+
+	// /home only ever shows the completing side, so the viewer always acts.
+	return toTasksWidgetView(rows, true, now);
+}
+
+/** The /partner/[id] tasks card. Null when this viewer has no business here. */
+export async function getPartnershipTasksWidget(
+	db: Db,
+	partnershipId: string,
+	userId: string,
+	viewerTimezone: string,
+	now: Date = new Date()
+): Promise<TasksWidgetView | null> {
+	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
+	if (!membership) return null;
+
+	const rows = await db
+		.select({
+			id: partnershipTasks.id,
+			partnershipId: partnershipTasks.partnershipId,
+			createdByUserId: partnershipTasks.createdByUserId,
+			title: partnershipTasks.title,
+			active: partnershipTasks.active,
+			creditsAwarded: partnershipTasks.creditsAwarded,
+			nextEligibleAt: partnershipTasks.nextEligibleAt
+		})
+		.from(partnershipTasks)
+		.where(
+			and(eq(partnershipTasks.partnershipId, partnershipId), eq(partnershipTasks.active, true))
+		)
+		.orderBy(
+			asc(partnershipTasks.nextEligibleAt),
+			desc(partnershipTasks.createdAt),
+			asc(partnershipTasks.id)
+		);
+
+	const visibilityRecord = {
+		status: membership.partnership.status,
+		control: membership.partnership.control,
+		inviterId:
+			membership.partnership.role === 'inviter'
+				? membership.viewerId
+				: membership.counterpartUserId,
+		inviteeId:
+			membership.partnership.role === 'invitee' ? membership.viewerId : membership.counterpartUserId
+	};
+
+	const visible = rows.filter((row) =>
+		canViewPartnershipTask({ ...visibilityRecord, ...row }, userId)
+	);
+
+	// Authorship is independent of control: under shared control both sides can
+	// complete, but never their own task, so these drop out of "ready" even
+	// though `canComplete` is true for the partnership as a whole.
+	const actionable = membership.canComplete
+		? visible.filter((row) => row.createdByUserId !== userId)
+		: visible;
+
+	const view = toTasksWidgetView(actionable, membership.canComplete, now);
+	// The managing side's count is of everything they can see, not just the
+	// subset someone else could complete.
+	return membership.canComplete ? view : { ...view, activeCount: visible.length };
 }

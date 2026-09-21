@@ -92,6 +92,48 @@ test.describe('tasks', () => {
 		}
 	});
 
+	/**
+	 * The /home cards, which only this level can check.
+	 *
+	 * `wa-card` never upgrades in jsdom, so nothing in the component suite can
+	 * say whether the header link survives the custom element or whether the
+	 * body renders beside it. The accessible name is the load-bearing part: the
+	 * cards replaced `wa-button`s that every other spec here locates by these
+	 * exact words.
+	 */
+	test('the home cards preview what is behind them and still link there', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await ada.page.waitForURL('**/home');
+
+			/**
+			 * A fresh account has nothing in any section, so every card is a
+			 * header and nothing else — no "Nothing to do right now." line. Only
+			 * a real browser can check that: the body div lives in wa-card's
+			 * shadow root and is collapsed through `::part`, which jsdom never
+			 * upgrades far enough to apply.
+			 */
+			const tasks = ada.page.locator('wa-card').filter({ hasText: 'Tasks' });
+			await expect(tasks).toHaveText('Tasks');
+			await expect(tasks.locator('wa-card')).toHaveCount(0);
+
+			const rewards = ada.page.locator('wa-card').filter({ hasText: 'Rewards' });
+			await expect(rewards).toHaveText('Rewards');
+
+			// Nothing is unread, so the messages card is absent entirely rather
+			// than present and empty.
+			await expect(ada.page.locator('wa-card').filter({ hasText: 'Messages' })).toHaveCount(0);
+
+			// Still the bare word, upgraded element and all.
+			await ada.page.getByRole('link', { name: 'Rewards' }).click();
+			await ada.page.waitForURL(/\/home\/rewards$/);
+		} finally {
+			await ada.close();
+		}
+	});
+
 	test('the controlling side can create a partner task and the other side can complete it', async ({
 		browser
 	}) => {
@@ -124,6 +166,19 @@ test.describe('tasks', () => {
 			await clickWaButton(jun.page, 'Add task');
 			await jun.page.waitForURL(/\/tasks$/);
 			await expect(jun.page.getByRole('heading', { name: 'Make tea' })).toBeVisible();
+
+			/**
+			 * The bug the home cards shipped with: the tasks card read `selfTasks`
+			 * only, so it said "Nothing to do right now." while this very task sat
+			 * assigned one tap away. /home is an overview of /home/tasks, and that
+			 * page shows your own section plus one per partner.
+			 */
+			await ada.page.goto('/home');
+			const tasksCard = ada.page.locator('wa-card').filter({ hasText: 'Tasks' });
+			await expect(tasksCard).toContainText('Make tea');
+			// Attributed, because two partners can name a task the same thing.
+			await expect(tasksCard).toContainText('Jun');
+			await expect(tasksCard).not.toContainText('Nothing to do right now.');
 
 			await ada.page.goto('/home/tasks');
 			await expect(ada.page.locator('.partner-sections')).toContainText("Jun's Tasks");

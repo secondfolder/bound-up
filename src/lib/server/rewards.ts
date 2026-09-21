@@ -16,6 +16,8 @@ import type {
 	PartnershipRewardView,
 	PartnerView,
 	RewardHistoryView,
+	RewardsWidgetView,
+	WidgetBalanceView,
 	SelfRewardsSectionView,
 	SelfRewardView
 } from '../types';
@@ -643,4 +645,226 @@ export async function listHomePartnerRewardSections(
 			}
 		];
 	});
+}
+
+/** Matches the tasks widget: three rows, then a count. See `tasks.ts`. */
+const WIDGET_PREVIEW_LIMIT = 3;
+
+type RewardWidgetRow = {
+	id: string;
+	title: string;
+	cost: number;
+	/** Whose section this came from on /home/rewards. Null for your own. */
+	context?: string | null;
+	/**
+	 * The balance this row is priced against.
+	 *
+	 * Per row, not per view, because credits do not pool: a partnership's
+	 * credits buy that partnership's rewards and nothing else. Comparing every
+	 * row against one total would offer claims the claim path then refuses.
+	 */
+	credits: number;
+};
+
+function toRewardsWidgetView(
+	rows: RewardWidgetRow[],
+	viewerActs: boolean,
+	balances: WidgetBalanceView[]
+): RewardsWidgetView {
+	const claimable = rows.filter((row) => row.credits >= row.cost);
+	return {
+		viewerActs,
+		balances,
+		// Withheld from the managing side for the same reason the tasks widget
+		// withholds its ready list: they do not claim these, so the titles would
+		// be serialised into the page for a body that never shows them.
+		claimable: viewerActs
+			? claimable.slice(0, WIDGET_PREVIEW_LIMIT).map((row) => ({
+					id: row.id,
+					title: row.title,
+					note: `${row.cost}`,
+					context: row.context ?? null
+				}))
+			: [],
+		claimableCount: claimable.length,
+		activeCount: rows.length
+	};
+}
+
+/**
+ * The /home rewards card: your own rewards AND every partner reward you can claim.
+ *
+ * Both, for the same reason the tasks card is both — /home/rewards, the page
+ * this links to, shows both, and a card that counted only self rewards would
+ * claim there was nothing to claim while a partner reward sat waiting.
+ *
+ * Which partner rewards count is decided the same way
+ * `listHomePartnerRewardSections` decides it: the partnerships where you are on
+ * the claiming side, minus the ones you wrote yourself. Partnerships you
+ * *manage* contribute nothing, which is why `viewerActs` is always true here.
+ *
+ * Every balance is returned separately rather than summed. Partnership credits
+ * are not spendable on self rewards and vice versa, so one total would state a
+ * spending power nobody has.
+ *
+ * Active rows and three columns, deliberately not `getSelfRewardsSection` —
+ * that also reads every claim ever made, and the card shows at most three titles.
+ */
+export async function getHomeRewardsWidget(
+	db: Db,
+	userId: string,
+	partners: PartnerView[]
+): Promise<RewardsWidgetView> {
+	const partnershipIds = partners.map((partner) => partner.id);
+
+	const [selfCredits, selfRows, partnershipRows, creditRows, partnerRewardRows] = await Promise.all(
+		[
+			readSelfCredits(db, userId),
+			db
+				.select({ id: selfRewards.id, title: selfRewards.title, cost: selfRewards.cost })
+				.from(selfRewards)
+				.where(and(eq(selfRewards.ownerId, userId), eq(selfRewards.active, true))),
+			// `in ()` is a syntax error in SQLite, and a fresh account has no partners.
+			partnershipIds.length === 0
+				? Promise.resolve([])
+				: db
+						.select({
+							id: partnerships.id,
+							status: partnerships.status,
+							control: partnerships.control,
+							inviterId: partnerships.inviterId,
+							inviteeId: partnerships.inviteeId
+						})
+						.from(partnerships)
+						.where(inArray(partnerships.id, partnershipIds)),
+			partnershipIds.length === 0
+				? Promise.resolve([])
+				: db
+						.select({
+							partnershipId: partnershipRewardCredits.partnershipId,
+							credits: partnershipRewardCredits.credits
+						})
+						.from(partnershipRewardCredits)
+						.where(
+							and(
+								inArray(partnershipRewardCredits.partnershipId, partnershipIds),
+								eq(partnershipRewardCredits.userId, userId)
+							)
+						),
+			partnershipIds.length === 0
+				? Promise.resolve([])
+				: db
+						.select({
+							id: partnershipRewards.id,
+							partnershipId: partnershipRewards.partnershipId,
+							createdByUserId: partnershipRewards.createdByUserId,
+							title: partnershipRewards.title,
+							cost: partnershipRewards.cost
+						})
+						.from(partnershipRewards)
+						.where(
+							and(
+								inArray(partnershipRewards.partnershipId, partnershipIds),
+								eq(partnershipRewards.active, true)
+							)
+						)
+		]
+	);
+
+	const claimable = new Map(
+		partnershipRows.map((row) => [row.id, canClaimFromPartnership(row, userId)])
+	);
+	const creditsByPartnership = new Map(creditRows.map((row) => [row.partnershipId, row.credits]));
+	const nameById = new Map(partners.map((partner) => [partner.id, partner.name]));
+
+	const partnerRows: RewardWidgetRow[] = partnerRewardRows.flatMap((row) => {
+		if (!claimable.get(row.partnershipId)) return [];
+		// Authorship is independent of control: under shared control you claim
+		// their rewards, never your own.
+		if (row.createdByUserId === userId) return [];
+		const name = nameById.get(row.partnershipId);
+		if (!name) return [];
+		return [
+			{
+				id: row.id,
+				title: row.title,
+				cost: row.cost,
+				context: name,
+				credits: creditsByPartnership.get(row.partnershipId) ?? 0
+			}
+		];
+	});
+
+	const balances: WidgetBalanceView[] = [
+		{ id: 'self', label: null, credits: selfCredits },
+		// Only the partnerships that contribute rewards get a balance line. A
+		// balance with nothing to spend it on is a number with no question.
+		...partners.flatMap((partner) =>
+			claimable.get(partner.id)
+				? [
+						{
+							id: partner.id,
+							label: partner.name,
+							credits: creditsByPartnership.get(partner.id) ?? 0
+						}
+					]
+				: []
+		)
+	];
+
+	// Cheapest first across both sources, so the three rows the card shows are
+	// the three nearest to hand rather than the first three self rewards.
+	const rows = [...selfRows.map((row) => ({ ...row, credits: selfCredits })), ...partnerRows].sort(
+		(a, b) => a.cost - b.cost
+	);
+
+	// /home only ever shows the claiming side, so the viewer always acts.
+	return toRewardsWidgetView(rows, true, balances);
+}
+
+/** The /partner/[id] rewards card. Null when this viewer has no business here. */
+export async function getPartnershipRewardsWidget(
+	db: Db,
+	partnershipId: string,
+	userId: string
+): Promise<RewardsWidgetView | null> {
+	const membership = await requireRewardMembership(db, partnershipId, userId);
+	if (!membership) return null;
+
+	const [credits, rows] = await Promise.all([
+		readPartnershipCredits(db, partnershipId, userId),
+		db
+			.select({
+				id: partnershipRewards.id,
+				createdByUserId: partnershipRewards.createdByUserId,
+				title: partnershipRewards.title,
+				cost: partnershipRewards.cost
+			})
+			.from(partnershipRewards)
+			.where(
+				and(
+					eq(partnershipRewards.partnershipId, partnershipId),
+					eq(partnershipRewards.active, true)
+				)
+			)
+			.orderBy(
+				asc(partnershipRewards.cost),
+				desc(partnershipRewards.createdAt),
+				asc(partnershipRewards.id)
+			)
+	]);
+
+	// Authorship is independent of control, exactly as it is for tasks: under
+	// shared control both sides can claim, but never their own reward.
+	const visible = membership.canClaim
+		? rows.filter((row) => row.createdByUserId !== userId)
+		: rows.filter((row) => row.createdByUserId === userId);
+
+	// One scope here, so one balance and no label — there is nothing to tell it
+	// apart from. /home is the page that has several.
+	return toRewardsWidgetView(
+		visible.map((row) => ({ ...row, credits })),
+		membership.canClaim,
+		[{ id: partnershipId, label: null, credits }]
+	);
 }

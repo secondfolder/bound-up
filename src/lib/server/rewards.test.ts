@@ -21,7 +21,9 @@ import {
 	claimPartnershipReward,
 	claimSelfReward,
 	createPartnershipReward,
+	getHomeRewardsWidget,
 	getPartnershipRewardsPage,
+	getPartnershipRewardsWidget,
 	getSelfRewardsSection,
 	listHomePartnerRewardSections,
 	requireRewardMembership,
@@ -254,5 +256,132 @@ describe('home rewards aggregation', () => {
 			]
 		});
 		expect(sections[1].rewards).toHaveLength(1);
+	});
+});
+
+describe('reward widgets', () => {
+	it('splits affordable from out of reach against the current balance', async () => {
+		await setTestSelfRewardCredits(harness.db, ada, 5);
+		await createTestSelfReward(harness.db, ada, { title: 'Exactly affordable', cost: 5 });
+		await createTestSelfReward(harness.db, ada, { title: 'One too many', cost: 6 });
+		await createTestSelfReward(harness.db, ada, { title: 'Shelved', cost: 1, active: false });
+
+		const widget = await getHomeRewardsWidget(harness.db, ada.id, []);
+		expect(widget).toMatchObject({
+			viewerActs: true,
+			balances: [{ id: 'self', label: null, credits: 5 }],
+			// Cost equal to the balance is affordable, matching `claimSelfReward`'s
+			// own `credits >= cost`. An off-by-one here would offer a claim the
+			// claim path then refuses.
+			claimable: [{ title: 'Exactly affordable', note: '5', context: null }],
+			claimableCount: 1,
+			activeCount: 2
+		});
+	});
+
+	it('omits your own reward from your claimable list even under shared control', async () => {
+		// 'mix' is the *answer* the invite form asks; it stores control 'both'.
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun, { control: 'mix' }))
+			.id;
+		await createTestPartnershipReward(harness.db, partnershipId, ada, {
+			title: 'Ada wrote this',
+			cost: 1
+		});
+		await createTestPartnershipReward(harness.db, partnershipId, jun, {
+			title: 'Jun wrote this',
+			cost: 1
+		});
+		// Jun sets Ada's balance, not Ada herself: `setPartnershipRewardCredits`
+		// refuses a self-target whoever holds control.
+		await setTestPartnershipRewardCredits(harness.db, partnershipId, jun, ada, 10);
+
+		const widget = await getPartnershipRewardsWidget(harness.db, partnershipId, ada.id);
+		expect(widget).toMatchObject({
+			viewerActs: true,
+			claimable: [{ title: 'Jun wrote this' }],
+			claimableCount: 1
+		});
+	});
+
+	it('shows the managing side only what it authored, and no claim list', async () => {
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun, { control: 'me' })).id;
+		await createTestPartnershipReward(harness.db, partnershipId, ada, { title: 'Ada set this' });
+
+		const widget = await getPartnershipRewardsWidget(harness.db, partnershipId, ada.id);
+		expect(widget).toMatchObject({ viewerActs: false, activeCount: 1, claimable: [] });
+	});
+
+	it('returns null for someone who is not in the partnership', async () => {
+		const stranger = await createTestUser(harness.db);
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun)).id;
+
+		await expect(
+			getPartnershipRewardsWidget(harness.db, partnershipId, stranger.id)
+		).resolves.toBeNull();
+	});
+
+	/** The rewards half of the same bug: /home showed self rewards only. */
+	it('merges partner rewards you can claim with your own, naming whose is whose', async () => {
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun, { control: 'them' }))
+			.id;
+		await setTestSelfRewardCredits(harness.db, ada, 5);
+		await createTestSelfReward(harness.db, ada, { title: 'Ada set this for herself', cost: 5 });
+		await createTestPartnershipReward(harness.db, partnershipId, jun, {
+			title: 'Jun set this',
+			cost: 2
+		});
+		await setTestPartnershipRewardCredits(harness.db, partnershipId, jun, ada, 2);
+
+		const widget = await getHomeRewardsWidget(harness.db, ada.id, [
+			{ id: partnershipId, name: 'Jun', image: null }
+		]);
+
+		expect(widget.activeCount).toBe(2);
+		expect(widget.claimable).toEqual([
+			// Cheapest first across BOTH sources, not self first.
+			expect.objectContaining({ title: 'Jun set this', context: 'Jun' }),
+			expect.objectContaining({ title: 'Ada set this for herself', context: null })
+		]);
+	});
+
+	/**
+	 * Credits do not pool, and this is what goes wrong if they are summed: 5
+	 * self credits plus 2 partnership credits would "afford" a 6-credit
+	 * partnership reward the claim path then refuses.
+	 */
+	it('prices each reward against its own balance, never a total', async () => {
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun, { control: 'them' }))
+			.id;
+		await setTestSelfRewardCredits(harness.db, ada, 5);
+		await createTestPartnershipReward(harness.db, partnershipId, jun, {
+			title: 'Out of reach',
+			cost: 6
+		});
+		await setTestPartnershipRewardCredits(harness.db, partnershipId, jun, ada, 2);
+
+		const widget = await getHomeRewardsWidget(harness.db, ada.id, [
+			{ id: partnershipId, name: 'Jun', image: null }
+		]);
+		// Unaffordable, so it is not offered and not counted anywhere the card
+		// can render — only `activeCount`, which the claiming side never shows.
+		expect(widget).toMatchObject({ claimable: [], claimableCount: 0, activeCount: 1 });
+		// And both balances are reported separately, so the card can show them.
+		expect(widget.balances).toEqual([
+			{ id: 'self', label: null, credits: 5 },
+			{ id: partnershipId, label: 'Jun', credits: 2 }
+		]);
+	});
+
+	it('leaves out a partnership you manage — that side is the partner page', async () => {
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun, { control: 'me' })).id;
+		await createTestPartnershipReward(harness.db, partnershipId, ada, { title: 'Ada set this' });
+
+		const widget = await getHomeRewardsWidget(harness.db, ada.id, [
+			{ id: partnershipId, name: 'Jun', image: null }
+		]);
+		expect(widget).toMatchObject({ activeCount: 0, claimable: [] });
+		// No balance line either: a balance with nothing to spend it on is a
+		// number with no question attached.
+		expect(widget.balances).toEqual([{ id: 'self', label: null, credits: 0 }]);
 	});
 });

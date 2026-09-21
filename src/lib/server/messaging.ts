@@ -26,6 +26,7 @@ import {
 import { attachmentKey, partnershipMediaPrefix, type MediaStore } from './media';
 import type {
 	MessageView,
+	PartnerMessagesWidgetView,
 	ThreadStickerView,
 	ThreadView,
 	UnreadPartnerView,
@@ -1396,4 +1397,46 @@ export async function purgePartnershipMedia(
 	} catch {
 		return { deleted: 0, failed: true };
 	}
+}
+
+/**
+ * The /partner/[id] messages card.
+ *
+ * Counts only, and that is not a shortcut: every body is encrypted to keys the
+ * server does not hold, so there is no preview text it could return. The board
+ * itself decrypts in the browser — see docs/encryption.md.
+ *
+ * The unread predicate is `listUnreadCounts`'s, character for character. It has
+ * to stay that way, or the partner card and /home would disagree about what
+ * "unread" means for the same partnership.
+ */
+export async function getPartnerMessagesWidget(
+	db: Db,
+	partnershipId: string,
+	userId: string
+): Promise<PartnerMessagesWidgetView> {
+	const rows = await db
+		.select({
+			totalThreads: sql<number>`count(*)`,
+			unreadThreads: sql<number>`sum(
+				case when ${messageThreads.lastMessageSenderId} <> ${userId}
+				      and (${threadReads.lastReadMessageAt} is null
+				           or ${messageThreads.lastMessageAt} > ${threadReads.lastReadMessageAt})
+				     then 1 else 0 end
+			)`,
+			newestAt: sql<number | null>`max(${messageThreads.lastMessageAt})`
+		})
+		.from(messageThreads)
+		.leftJoin(
+			threadReads,
+			and(eq(threadReads.threadId, messageThreads.id), eq(threadReads.userId, userId))
+		)
+		.where(eq(messageThreads.partnershipId, partnershipId));
+
+	const row = rows[0];
+	return {
+		unreadThreads: Number(row?.unreadThreads ?? 0),
+		totalThreads: Number(row?.totalThreads ?? 0),
+		newestAt: row?.newestAt == null ? null : new Date(Number(row.newestAt))
+	};
 }

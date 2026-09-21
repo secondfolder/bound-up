@@ -21,6 +21,7 @@ import {
 	clearReaction,
 	declineHistoryRestore,
 	getAttachmentForDownload,
+	getPartnerMessagesWidget,
 	getThread,
 	listBoard,
 	listHistoryForRestore,
@@ -1186,5 +1187,44 @@ describe('migrateMessageBodies', () => {
 				messages: [{ id: messageId, ciphertext: 'a'.repeat(MAX_CIPHERTEXT_BYTES + 1) }]
 			})
 		).resolves.toEqual({ ok: false, reason: 'too-big' });
+	});
+});
+
+describe('getPartnerMessagesWidget', () => {
+	it('agrees with listUnreadCounts about what unread means', async () => {
+		await createTestThread(harness.db, partnershipId, ada);
+		await createTestThread(harness.db, partnershipId, ada);
+		await createTestThread(harness.db, partnershipId, jun);
+
+		const junsWidget = await getPartnerMessagesWidget(harness.db, partnershipId, jun.id);
+		expect(junsWidget).toMatchObject({ totalThreads: 3, unreadThreads: 2 });
+
+		// The same number the /home card shows for the same partnership. These
+		// two predicates have to stay identical or the two screens disagree.
+		const [fromHome] = await listUnreadCounts(harness.db, jun.id, [
+			{ id: partnershipId, name: 'Ada', image: null }
+		]);
+		expect(fromHome.unreadThreads).toBe(junsWidget.unreadThreads);
+	});
+
+	it('stops counting a thread once it has been opened', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, ada);
+
+		await markThreadOpened(harness.db, threadId, jun.id);
+
+		expect(await getPartnerMessagesWidget(harness.db, partnershipId, jun.id)).toMatchObject({
+			totalThreads: 1,
+			unreadThreads: 0
+		});
+	});
+
+	it('reports zeroes rather than nulls for a partnership with no threads', async () => {
+		// `sum()` over no rows is SQL NULL, and a null reaching the card would
+		// render as "null unread threads".
+		expect(await getPartnerMessagesWidget(harness.db, partnershipId, ada.id)).toEqual({
+			totalThreads: 0,
+			unreadThreads: 0,
+			newestAt: null
+		});
 	});
 });

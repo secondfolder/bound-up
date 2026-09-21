@@ -3,7 +3,13 @@
 	import { initialsFor } from '$lib/initials';
 	import type { UnreadPartnerView } from '$lib/types';
 
-	/** One link per partner with something waiting. Nothing at all otherwise. */
+	/**
+	 * One link per partner with something waiting. Nothing at all otherwise.
+	 *
+	 * The card around it is `UnreadMessagesWidget`'s, not this component's —
+	 * which is why the rows below carry a background tint but no border of their
+	 * own. Two nested borders read as a mistake.
+	 */
 	let { unread }: { unread: UnreadPartnerView[] } = $props();
 </script>
 
@@ -47,7 +53,6 @@
 		flex-direction: column;
 		gap: 0.5rem;
 		inline-size: 100%;
-		max-inline-size: 22rem;
 
 		a {
 			display: flex;
@@ -55,7 +60,6 @@
 			gap: 0.625rem;
 			padding: 0.625rem 0.75rem;
 			border-radius: var(--wa-panel-border-radius, 0.5rem);
-			border: 1px solid var(--wa-color-surface-border);
 			background-color: var(--wa-color-brand-fill-quiet, transparent);
 			text-decoration: none;
 			color: inherit;

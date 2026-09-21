@@ -3,6 +3,9 @@
 	import { page } from '$app/state';
 	import { initialsFor } from '$lib/initials';
 	import { UTC_TIMEZONE } from '$lib/timezone';
+	import PartnerMessagesWidget from '$lib/components/PartnerMessagesWidget.svelte';
+	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
+	import TasksWidget from '$lib/components/TasksWidget.svelte';
 	import TimeZoneDisplay from '$lib/components/TimeZoneDisplay.svelte';
 	import type { PageData } from './$types';
 
@@ -29,33 +32,29 @@
 		/>
 	</header>
 
-	<div class="actions">
-		<wa-button
-			variant="brand"
-			size="l"
+	<div class="widgets">
+		<PartnerMessagesWidget
+			messages={data.messages}
 			href={resolve('/(auth-required)/(app)/partner/[id]/messages', { id: partner.id })}
-		>
-			<wa-icon slot="start" name="envelope" variant="solid"></wa-icon>
-			Messages
-		</wa-button>
+		/>
 
-		<wa-button
-			variant="brand"
-			size="l"
-			href={resolve('/(auth-required)/(app)/partner/[id]/tasks', { id: partner.id })}
-		>
-			<wa-icon slot="start" name="list-check" variant="solid"></wa-icon>
-			Tasks
-		</wa-button>
+		<!-- `tasks` and `rewards` are null only when the widget's own membership
+		     check said this viewer has no business with that section, which the
+		     404 above has already ruled out for an accepted partnership. Guarded
+		     rather than asserted so a future control mode cannot crash the page. -->
+		{#if data.tasks}
+			<TasksWidget
+				tasks={data.tasks}
+				href={resolve('/(auth-required)/(app)/partner/[id]/tasks', { id: partner.id })}
+			/>
+		{/if}
 
-		<wa-button
-			variant="brand"
-			size="l"
-			href={resolve('/(auth-required)/(app)/partner/[id]/rewards', { id: partner.id })}
-		>
-			<wa-icon slot="start" name="gift" variant="solid"></wa-icon>
-			Rewards
-		</wa-button>
+		{#if data.rewards}
+			<RewardsWidget
+				rewards={data.rewards}
+				href={resolve('/(auth-required)/(app)/partner/[id]/rewards', { id: partner.id })}
+			/>
+		{/if}
 	</div>
 
 	<a href={resolve('/(auth-required)/(app)/settings/partners/[id]', { id: partner.id })}>
@@ -98,16 +97,14 @@
 			margin: 0;
 		}
 
-		.actions {
+		/* The cards read left-aligned, unlike the centred header above them: a
+		   preview list centred under its own title is much harder to scan. */
+		.widgets {
+			inline-size: 100%;
 			display: flex;
+			flex-direction: column;
 			gap: 1rem;
-			flex-wrap: wrap;
-			justify-content: center;
-			width: min(100%, 32rem);
-
-			wa-button {
-				flex: 1 1 14rem;
-			}
+			text-align: start;
 		}
 	}
 </style>

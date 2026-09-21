@@ -30,6 +30,29 @@ const { default: Page } = await import('./+page.svelte');
 
 function data(timezone: string | null): PageData {
 	return {
+		// Layout data the page itself never reads, but `PageData` includes — so
+		// the cast below stays a narrowing rather than a lie.
+		user: {
+			id: 'u1',
+			name: 'Ada',
+			email: 'ada@example.com',
+			image: null,
+			timezone: 'Europe/London'
+		},
+		partners: [],
+		userHasMessageHistory: false,
+		// The cards are exercised on their own and through the load; here they
+		// only need to be present, because the page renders them unconditionally
+		// and a missing prop would fail for the wrong reason.
+		messages: { unreadThreads: 0, totalThreads: 0, newestAt: null },
+		tasks: { viewerActs: true, ready: [], readyCount: 0, waitingCount: 0, activeCount: 0 },
+		rewards: {
+			viewerActs: true,
+			balances: [{ id: 'p1', label: null, credits: 0 }],
+			claimable: [],
+			claimableCount: 0,
+			activeCount: 0
+		},
 		partner: {
 			id: 'p1',
 			name: 'Jun',
