@@ -48,7 +48,7 @@ export async function fillPassword(page: Page, field: string, value: string) {
  * Waiting on the custom element registry is the precise check: it is exactly
  * the condition that makes the click meaningful.
  */
-export async function clickWaButton(page: Page, name: string) {
+export async function clickWaButton(page: Page, name: string | RegExp) {
 	await page.waitForFunction(() => customElements.get('wa-button') !== undefined);
 	await page.getByRole('button', { name }).click();
 }

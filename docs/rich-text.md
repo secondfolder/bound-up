@@ -166,11 +166,15 @@ a paragraph's line breaks are `LineBreakNode`s, so something that belongs to _a
 line_ has to live inside the paragraph that holds the line.
 
 **Lexical's own decorator machinery is written for the other kind** — the
-block-level node that is a sibling of paragraphs. `registerRichText` selects
-those on a click, steps on and off them with the arrow keys, navigates lines
-around them and gives them a block cursor either side. Every one of those paths
-tests `!isInline()` first, so none of it reaches a widget, and
-`$needsBlockCursorBeside` never fires for one either. `registerWidgetSelection`
+block-level node that is a sibling of paragraphs. It steps on and off those
+with the arrow keys, moves the caret up and down past them, and draws a **block
+cursor** beside them: a real element parked next to the node, with the text
+caret hidden, precisely because there is no line box there to draw one in.
+Every one of those paths tests `!isInline()` first, so none of it reaches a
+widget, and `$needsBlockCursorBeside` never fires for one either. (Selecting a
+decorator on a click is not among them — Lexical leaves that to the decorator's
+own component, and the playground's React components do it with
+`useLexicalNodeSelection`.) `registerWidgetSelection`
 is what `registerRichText` would do if it knew about this kind, and it is
 registered in `createRichTextEditor` alongside it — above it in priority, so it
 gets each key first and hands back what is not its business.
@@ -300,6 +304,58 @@ Splitting the paragraph in two around a block-level embed would place it
 correctly too, and was rejected: the halves stay apart once the embed is
 removed, so taking an embed away would silently turn a line break into a
 paragraph break.
+
+**The other way round — making every line its own paragraph — would work, and
+is the real fork in the road.** If Shift+Enter inserted a paragraph break
+instead of a line break, `hello` / embed / `world` would be three children of
+the root, the embed could be an ordinary block decorator, and Lexical's own
+arrow-key and line-navigation handling would apply to it with nothing split.
+It is not done because of what a line break _means_ here, not because it could
+not be made to work:
+
+- **A chat's Shift+Enter is a new line, not a new paragraph.** One editor
+  serves messages and descriptions, and `p + p` carries `margin-block-start:
+0.5em` in both the composer and the reader. Paragraph-per-line puts that gap
+  between every line of every message, and dropping the gap costs the
+  distinction between a line break and a deliberate blank line.
+- **Stored documents cannot be migrated.** Message bodies are encrypted, so
+  every message already sent keeps the shape it was written in. Embeds have
+  already moved once — root-level blocks became inline nodes, which is what
+  `parseStoredRichText` fixes up on the way in — and moving back would leave
+  three eras to read rather than two.
+
+The behaviour itself would be right, and the playground's YouTube node is the
+proof: it is a `DecoratorBlockNode` — a decorator whose `isInline()` is false —
+it keeps a line to itself, and there is no caret stop either side of it.
+Arrowing towards one never stops beside it, because `RangeSelection.modify`
+reaches across the block boundary and converts straight to a node selection on
+any keyboard-selectable decorator, inline or not; arrowing off it goes to the
+adjacent paragraph. The block cursor appears only when the selection genuinely
+lands at an element point beside the node — a click in the gap, or a decorator
+that opens or closes the document — and there it _draws_ a position that would
+otherwise be invisible, which is the same problem the widget rules solve by
+skipping it. Click-to-select is the decorator's own job there too:
+`BlockWithAlignableContents` registers `CLICK_COMMAND` and calls
+`useLexicalNodeSelection`.
+
+Plain text is the one thing that would _not_ change: `documentToPlainText`
+already joins blocks with `\n` and renders a `linebreak` as `\n`, so every
+length limit and preview would come out identical either way.
+
+**Half-measures do not reach it.** Converting only _two_ line breaks in a row
+into a paragraph break — the markdown rule, soft break versus blank line — is a
+reasonable thing to want for its own sake, but it does not make the embed a
+block. An embed goes at the head of the line its URL is on, and a URL whose
+line is not the first of its paragraph still has line breaks either side of it:
+
+```
+hello
+look at this https://youtube.com/…
+```
+
+is one paragraph whichever rule blank lines follow, so the embed still has to
+live inside it. Only paragraph-per-_line_ gives every line a slot at the root,
+and that is the trade the list above describes.
 
 **Older documents have the embed as a root-level block instead**, above the
 whole paragraph, because that is where it used to go. Message bodies are

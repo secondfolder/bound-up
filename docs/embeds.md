@@ -105,6 +105,71 @@ The iframe sandbox is the same posture used for the rest of the app's hosted
 players: scripts may run inside the embedded origin, but the frame cannot
 navigate the top page away.
 
+## The head row
+
+Every embed that has something to say about itself, or something that can be
+done to it, draws a head row: the site and title on the left as a link, and an
+actions section on the right.
+
+**The actions section exists only when something is in it.** An embed with no
+buttons has no row, so a bare player or a lone image looks exactly as it did
+before the row existed. The reverse is also true and is the point of the
+design: an embed with no card of its own grows a head _because_ of its buttons,
+so they have something to sit beside instead of floating over the media.
+
+Three sources feed it, in this order:
+
+1. Whatever the surrounding component passes as the `actions` snippet prop.
+   `ComposerEmbed.svelte` puts its "remove" button there.
+2. The "Open" button, on a narrow window (below). It is the row's one labelled
+   action, because it is the only way to reach the embed's content there.
+3. The refresh button, when the embed is drawn from a cached entry the viewer
+   can ask to have re-resolved.
+
+Buttons floated over a corner of the media before this, which does not survive
+a second one — remove and refresh would have landed on top of each other. Two
+details are load-bearing:
+
+- **Action buttons are sized in absolute units, not around their contents.** A
+  `wa-icon` fetches its SVG, so a button sized to its icon is one height before
+  that lands and another after, reflowing the row under whatever is being read
+  or pressed.
+- **The card's thumbnail is no longer a link.** It used to sit inside the card's
+  anchor; the head row's anchor holds only the text. A second link to the same
+  place with no text of its own is a name-less entry in a screen reader's link
+  list, so the title above it carries the link instead.
+
+In the composer everything in the preview is inert except remove: a click
+inside the editable surface belongs to the editor, which selects the widget it
+landed on.
+
+## Narrow windows
+
+Below 640px — the same breakpoint the rest of the app treats as "phone" — an
+embed that would be an iframe is not framed in place. A hosted player's chrome
+is built for a desktop-sized frame: squeezed into a phone-width message bubble,
+reddit's header, vote rail and "open in app" bar cover most of the post they
+wrap. Rather than restyle an iframe we do not control, `UrlEmbed.svelte` puts an
+"Open" button in the head row and builds the frame inside a near-fullscreen
+`wa-dialog` when the reader presses it. The dialog is headed by the site and the
+title, and carries its own close button.
+
+Three consequences worth knowing:
+
+- **Nothing loads until it is asked for.** The frame is built when the dialog
+  opens and unmounted when it closes, which is also the only thing that
+  reliably stops a player left running.
+- **The breakpoint is live.** Turning a phone landscape crosses back over it,
+  the inline frame returns, and an open dialog closes with it.
+- **`narrow` starts false and is corrected in an effect**, rather than read
+  from `matchMedia` during initialisation, because the first client render has
+  to match the server's or Svelte logs a hydration mismatch — which the e2e
+  fixture fails a run on. So an SSR-rendered page briefly carries the iframe in
+  its markup on a phone. A message thread never does: it is decrypted and
+  rendered client-side well after the effect has settled.
+
+Cards and images are untouched: they read fine at any width.
+
 ## Caching
 
 `src/lib/embeds.ts` keeps a module-level cache of oEmbed responses in the

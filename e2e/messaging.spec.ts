@@ -801,6 +801,90 @@ test.describe('embeds', () => {
 		}
 	});
 
+	/**
+	 * A phone-width window gets a button, not a frame.
+	 *
+	 * This is the only level that can check it: jsdom never upgrades `wa-dialog`
+	 * and has no layout, so nothing there can say whether the overlay actually
+	 * covers the screen — which is the whole reason it exists.
+	 */
+	test('a narrow window opens an embed over the screen instead of framing it inline', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		for (const page of [ada.page, jun.page]) {
+			await page.route('**www.redgifs.com/**', (route) =>
+				route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>gif</title>' })
+			);
+			await page.route('**noembed.com/**', (route) =>
+				route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
+			);
+			await page.route('**/api/embed-metadata', (route) =>
+				route.fulfill({ contentType: 'application/json', body: JSON.stringify({ embeds: [] }) })
+			);
+		}
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			// Narrowed only now: the invite round trip is not what is under test.
+			await ada.page.setViewportSize({ width: 390, height: 844 });
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			// The trailing word is load-bearing. An embed node is only inserted
+			// once the caret leaves its link, so a message that *ends* with the
+			// URL still has none when the composer says it is ready to send —
+			// and the click on Send is what inserts it, growing the composer out
+			// from under the press. The test then hangs for its full timeout on
+			// a send that never happened, with nothing logged anywhere.
+			await writeThread(ada.page, 'look https://www.redgifs.com/watch/abc123stub please');
+
+			const player = ada.page.locator('iframe[src="https://www.redgifs.com/ifr/abc123stub"]');
+			// The visible label is "Open"; the title after it is the visually
+			// hidden half, which is what keeps a thread of these distinguishable.
+			// Matched loosely because the two are separate elements and the
+			// accessible name joins them.
+			const open = ada.page.getByRole('button', { name: /^Open\s+Redgifs video$/ });
+
+			// Nothing framed, and nothing fetched from the provider either.
+			await expect(open).toBeVisible();
+			await expect(player).toHaveCount(0);
+
+			// Through the custom element, which only submits once it has upgraded.
+			await clickWaButton(ada.page, /^Open\s+Redgifs video$/);
+			await expect(player).toBeVisible();
+
+			// Nearly the whole screen, which is the point: the player's own
+			// chrome is what made the inline frame unusable at this width.
+			const coverage = await ada.page.evaluate(() => {
+				const host = document.querySelector('wa-dialog.embed-dialog');
+				const rect = host?.shadowRoot?.querySelector('dialog')?.getBoundingClientRect();
+				if (!rect) throw new Error('expected the dialog to be laid out');
+				return { width: rect.width / window.innerWidth, height: rect.height / window.innerHeight };
+			});
+			expect(coverage.width).toBeGreaterThan(0.9);
+			expect(coverage.height).toBeGreaterThan(0.9);
+
+			// The header says where this came from and what it is.
+			const header = ada.page.locator('wa-dialog.embed-dialog .dialog-header');
+			await expect(header).toContainText('redgifs.com');
+			await expect(header).toContainText('Redgifs video');
+
+			// Closing takes the frame with it, which is what stops a player that
+			// was left running.
+			await clickWaButton(ada.page, 'Close embed');
+			await expect(player).toHaveCount(0);
+			await expect(open).toBeVisible();
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
 	test('a removed embed stays removed, and the reader can ask for it back', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');

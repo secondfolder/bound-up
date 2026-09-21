@@ -36,11 +36,13 @@ import { mergeRegister } from '@lexical/utils';
  * a whole message is usually one paragraph full of them — and something that
  * belongs to *a line* has to live inside the paragraph that holds the line.
  * Lexical's own machinery for decorators is written for the other kind, the
- * block-level node that is a sibling of paragraphs: `registerRichText` selects
- * those on a click, steps on and off them with the arrow keys, and gives them
- * a block cursor either side. Every one of those paths tests `!isInline()`
- * first, so none of it reaches a widget, and `$needsBlockCursorBeside` never
- * fires for one either.
+ * block-level node that is a sibling of paragraphs: it steps on and off those
+ * with the arrow keys, moves the caret up and down past them, and draws a
+ * block cursor beside them — a real element, because there is no line box
+ * there either. Every one of those paths tests `!isInline()` first, so none of
+ * it reaches a widget, and `$needsBlockCursorBeside` never fires for one.
+ * Selecting a decorator on a click is nobody's job in Lexical: the playground
+ * does it from inside each decorator's own React component.
  *
  * Which leaves the caret. A widget's row holds no text position at all, and
  * the model points immediately either side of it are drawn by nothing — there

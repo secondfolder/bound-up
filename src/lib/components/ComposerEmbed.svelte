@@ -44,15 +44,17 @@
 	});
 </script>
 
-<div class="composer-embed">
-	{#if spec}
-		<UrlEmbed {spec} href={url} label={url} cached={details} cachedPending={resolving} />
-	{/if}
+<!--
+	Remove goes in the embed's own actions row rather than floating over its
+	corner, so it lines up with whatever else the embed offers instead of
+	covering it. `UrlEmbed` draws that row only because this snippet exists.
+-->
+{#snippet actions()}
 	<wa-button
 		type="button"
 		class="remove"
 		size="s"
-		appearance="outlined"
+		appearance="plain"
 		pill
 		title="Remove embed"
 		onpointerdown={(event: PointerEvent) => {
@@ -65,6 +67,18 @@
 	>
 		<wa-icon name="xmark" variant="solid" label="Remove embedded preview of {url}"></wa-icon>
 	</wa-button>
+{/snippet}
+
+<div class="composer-embed">
+	{#if spec}
+		<UrlEmbed {spec} href={url} label={url} cached={details} cachedPending={resolving} {actions} />
+	{:else}
+		<!-- No spec means no embed to draw, which the editor does not normally
+		     produce — a node whose provider support was dropped is filtered out
+		     before it reaches here. Remove stays reachable anyway, since the
+		     alternative is a node the writer cannot delete. -->
+		<span class="orphan">{@render actions()}</span>
+	{/if}
 </div>
 
 <style>
@@ -90,17 +104,16 @@
 		pointer-events: none;
 	}
 
+	/* The one thing in the preview that is meant to be pressed. Everything else
+	   in there, the fullscreen button included, stays inert: a click inside the
+	   editable surface belongs to the editor, which selects the widget it
+	   landed on. */
 	.remove {
-		position: absolute;
-		inset-block-start: 0.35rem;
-		inset-inline-end: 0.35rem;
-		z-index: 1;
-		--wa-form-control-height: 1.6rem;
-		font-size: 0.7rem;
+		pointer-events: auto;
+	}
 
-		&::part(base) {
-			background: var(--wa-color-surface-raised, white);
-			box-shadow: 0 0.125rem 0.5rem rgb(0 0 0 / 25%);
-		}
+	.orphan {
+		display: flex;
+		justify-content: flex-end;
 	}
 </style>

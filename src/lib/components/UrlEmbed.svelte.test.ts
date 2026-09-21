@@ -1,6 +1,7 @@
+import { createRawSnippet } from 'svelte';
 import { fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import UrlEmbed from './UrlEmbed.svelte';
+import UrlEmbed, { NARROW_EMBED_MEDIA_QUERY } from './UrlEmbed.svelte';
 import { clearOembedCache, type CachedEmbedDetails, type EmbedSpec } from '$lib/embeds';
 
 const observers: MockIntersectionObserver[] = [];
@@ -94,9 +95,54 @@ function emitIntersection(element: Element, isIntersecting: boolean, intersectio
 	observer.emit(element, isIntersecting, intersectionRatio);
 }
 
+/**
+ * A `matchMedia` that can be flipped, because jsdom has none.
+ *
+ * `vitest-setup-client.ts` installs a permanently non-matching stub, which is
+ * what every other test wants; the narrow-window path needs one that matches
+ * and can emit a `change` when the window is resized or the phone turned.
+ * Assigned rather than `vi.stubGlobal`ed because the setup file defines the
+ * property non-configurably.
+ */
+const realMatchMedia = window.matchMedia;
+
+function installMatchMedia(matching: boolean) {
+	const listeners = new Set<(event: MediaQueryListEvent) => void>();
+	let matches = matching;
+	const list = {
+		get matches() {
+			return matches;
+		},
+		media: NARROW_EMBED_MEDIA_QUERY,
+		onchange: null,
+		addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => {
+			listeners.add(listener);
+		},
+		removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => {
+			listeners.delete(listener);
+		},
+		addListener: () => {},
+		removeListener: () => {},
+		dispatchEvent: () => true,
+		/** Test-only: crosses the breakpoint the way a resize would. */
+		set(next: boolean) {
+			matches = next;
+			for (const listener of [...listeners]) {
+				listener({ matches: next, media: NARROW_EMBED_MEDIA_QUERY } as MediaQueryListEvent);
+			}
+		}
+	};
+	window.matchMedia = ((query: string) =>
+		query === NARROW_EMBED_MEDIA_QUERY
+			? list
+			: realMatchMedia(query)) as unknown as typeof window.matchMedia;
+	return list;
+}
+
 afterEach(() => {
 	clearOembedCache();
 	vi.unstubAllGlobals();
+	window.matchMedia = realMatchMedia;
 });
 
 describe('UrlEmbed', () => {
@@ -613,6 +659,244 @@ describe('UrlEmbed', () => {
 			);
 			expect(frame?.getAttribute('height')).toBe('600');
 			expect(container.querySelector('.player iframe')).toBeNull();
+		});
+	});
+
+	/**
+	 * The Open button, which is a `wa-button` and so never upgrades in jsdom.
+	 *
+	 * There is no role to query for on an element the browser has not made
+	 * interactive, so the host is both the assertion target and what a click
+	 * goes to — Svelte's `onclick` is on the host, not on the shadow button a
+	 * real browser would build. The accessible name it ends up with is the
+	 * Playwright suite's business.
+	 */
+	function openButton(container: HTMLElement): HTMLElement {
+		const button = container.querySelector('wa-button.open');
+		if (!button) throw new Error('expected an Open button');
+		return button as HTMLElement;
+	}
+
+	/**
+	 * A hosted player's own chrome is built for a desktop-sized frame. Squeezed
+	 * into a phone-width bubble, reddit's header and action bars cover the post
+	 * itself, so below the breakpoint the frame is not built at all until the
+	 * reader asks for it full screen.
+	 */
+	describe('on a narrow window', () => {
+		const playerProps = {
+			spec: {
+				kind: 'iframe',
+				src: 'https://www.redgifs.com/ifr/abc123',
+				title: 'Redgifs video'
+			} as EmbedSpec,
+			href: 'https://www.redgifs.com/watch/abc123',
+			label: 'https://www.redgifs.com/watch/abc123'
+		};
+
+		it('draws a button naming the embed instead of the frame', async () => {
+			installMatchMedia(true);
+			const { container } = render(UrlEmbed, { props: playerProps });
+
+			await vi.waitFor(() => openButton(container));
+			// Nothing loads until it is asked for: no frame, so no request.
+			expect(container.querySelector('iframe')).toBeNull();
+			// A curated player has no card of its own, so the head row it gets in
+			// order to hold the button also has to say what the embed is.
+			expect(container.querySelector('.head')?.textContent).toContain('redgifs.com');
+			expect(container.querySelector('.head')?.textContent).toContain('Redgifs video');
+		});
+
+		it('builds the frame in a dialog headed by the site and title', async () => {
+			installMatchMedia(true);
+			const { container } = render(UrlEmbed, { props: playerProps });
+
+			await vi.waitFor(() => openButton(container));
+			await fireEvent.click(openButton(container));
+
+			const dialog = container.querySelector('wa-dialog.embed-dialog');
+			expect(dialog).not.toBeNull();
+			// The dialog's own accessible name, for the browsers where the
+			// header below is the thing that is visually hidden.
+			expect(dialog?.getAttribute('label')).toBe('Redgifs video');
+			const header = container.querySelector('.dialog-header');
+			expect(header?.textContent).toContain('redgifs.com');
+			expect(header?.textContent).toContain('Redgifs video');
+			expect(
+				header?.querySelector('wa-button.dialog-close wa-icon[label="Close embed"]')
+			).not.toBeNull();
+
+			const frame = container.querySelector('.dialog-frame iframe');
+			expect(frame?.getAttribute('src')).toBe('https://www.redgifs.com/ifr/abc123');
+			// The same sandbox the inline frame gets: opening it bigger is not
+			// a reason to hand message content top-level navigation.
+			expect(frame?.getAttribute('sandbox')).toContain('allow-scripts');
+			expect(frame?.getAttribute('sandbox')).not.toContain('allow-top-navigation');
+		});
+
+		it('unmounts the frame when the dialog closes, so a player stops', async () => {
+			installMatchMedia(true);
+			const { container } = render(UrlEmbed, { props: playerProps });
+
+			await vi.waitFor(() => openButton(container));
+			await fireEvent.click(openButton(container));
+			expect(container.querySelector('iframe')).not.toBeNull();
+
+			const close = container.querySelector('wa-button.dialog-close');
+			if (!close) throw new Error('expected a close button');
+			await fireEvent.click(close);
+
+			expect(container.querySelector('wa-dialog.embed-dialog')).toBeNull();
+			expect(container.querySelector('iframe')).toBeNull();
+		});
+
+		it('puts the frame back inline when the window widens', async () => {
+			const media = installMatchMedia(true);
+			const { container } = render(UrlEmbed, { props: playerProps });
+
+			await vi.waitFor(() => openButton(container));
+			await fireEvent.click(openButton(container));
+			expect(container.querySelector('wa-dialog.embed-dialog')).not.toBeNull();
+
+			// Turning a phone landscape crosses back over the breakpoint. The
+			// overlay would otherwise sit over an embed that is now readable
+			// where it is.
+			media.set(false);
+			await vi.waitFor(() => {
+				expect(container.querySelector('.player iframe')).not.toBeNull();
+			});
+			expect(container.querySelector('wa-dialog.embed-dialog')).toBeNull();
+			// And with nothing left to act on, the row it needed goes too.
+			expect(container.querySelector('.actions')).toBeNull();
+			expect(container.querySelector('.head')).toBeNull();
+		});
+
+		it('keeps the card and only replaces the frame under it', async () => {
+			installMatchMedia(true);
+			const cached = {
+				href: 'https://provider.example/post',
+				fetchedAt: Date.now(),
+				kind: 'iframe',
+				providerName: 'Provider',
+				title: 'A framed post',
+				description: null,
+				thumbnailUrl: null,
+				canonicalUrl: 'https://provider.example/post',
+				imageUrl: null,
+				iframeSrc: 'https://player.example/1',
+				iframeHeight: 360,
+				faviconUrl: null,
+				themeColor: null
+			} satisfies CachedEmbedDetails;
+
+			const { container } = render(UrlEmbed, {
+				props: {
+					spec: { kind: 'oembed', endpoint: 'https://oembed.test/narrow-card' },
+					href: cached.href,
+					label: 'provider link',
+					cached
+				}
+			});
+
+			await vi.waitFor(() => openButton(container));
+			// The title rides along hidden, so the button is still distinguishable
+			// from every other "Open" in a thread.
+			expect(openButton(container).textContent).toContain('A framed post');
+			// The card is the head's own left half, so nothing is said twice.
+			expect(container.querySelector('.card')?.textContent).toContain('A framed post');
+			expect(container.querySelectorAll('.head .card')).toHaveLength(1);
+			expect(container.querySelector('iframe')).toBeNull();
+		});
+	});
+
+	/**
+	 * One row for every button an embed offers, wherever it came from.
+	 *
+	 * Buttons used to float over a corner of the media, which does not survive
+	 * a second one: the composer's remove and a refresh would have landed on
+	 * top of each other.
+	 */
+	describe('the actions row', () => {
+		const removeAction = createRawSnippet(() => ({
+			render: () =>
+				'<wa-button type="button"><wa-icon name="xmark" label="Remove this embed"></wa-icon></wa-button>'
+		}));
+
+		const playerProps = {
+			spec: {
+				kind: 'iframe',
+				src: 'https://www.redgifs.com/ifr/abc123',
+				title: 'Redgifs video'
+			} as EmbedSpec,
+			href: 'https://www.redgifs.com/watch/abc123',
+			label: 'https://www.redgifs.com/watch/abc123'
+		};
+
+		it('is not drawn at all when there is nothing to put in it', () => {
+			const { container } = render(UrlEmbed, { props: playerProps });
+
+			// A bare player is still exactly as bare as it was.
+			expect(container.querySelector('.actions')).toBeNull();
+			expect(container.querySelector('.head')).toBeNull();
+			expect(container.querySelector('.player iframe')).not.toBeNull();
+		});
+
+		it("holds the caller's own buttons, and names the embed beside them", () => {
+			const { container } = render(UrlEmbed, {
+				props: { ...playerProps, actions: removeAction }
+			});
+
+			expect(container.querySelector('.actions wa-icon[label="Remove this embed"]')).not.toBeNull();
+			// The row exists because of that button, so it has to say what the
+			// button belongs to.
+			expect(container.querySelector('.head .card')?.textContent).toContain('Redgifs video');
+			// And the embed itself is unaffected: still framed, still inline.
+			expect(container.querySelector('.player iframe')).not.toBeNull();
+		});
+
+		it('puts the refresh button in the row rather than over the card', async () => {
+			const cached = {
+				href: 'https://vimeo.com/2',
+				fetchedAt: Date.now(),
+				kind: 'card',
+				providerName: 'Vimeo',
+				title: 'Cached title',
+				description: null,
+				thumbnailUrl: 'https://example.com/thumb.jpg',
+				canonicalUrl: 'https://vimeo.com/2',
+				imageUrl: null,
+				iframeSrc: null,
+				iframeHeight: null,
+				faviconUrl: null,
+				themeColor: null
+			} satisfies CachedEmbedDetails;
+			const onRefresh = vi.fn();
+
+			const { container } = render(UrlEmbed, {
+				props: {
+					spec: { kind: 'oembed', endpoint: 'https://oembed.test/refresh-row' },
+					href: cached.href,
+					label: 'vimeo link',
+					cached,
+					onRefresh,
+					actions: removeAction
+				}
+			});
+
+			// Both buttons, side by side, in the order the caller's comes first.
+			// Named by their icons, which is where a `wa-button` takes its name.
+			const buttons = [...container.querySelectorAll('.actions wa-button')].map((button) =>
+				button.querySelector('wa-icon')?.getAttribute('label')
+			);
+			expect(buttons).toEqual(['Remove this embed', 'Refresh preview']);
+
+			await fireEvent.click(refreshButton(container));
+			expect(onRefresh).toHaveBeenCalledWith(cached.href);
+
+			// The thumbnail sits under the row now, so it is no longer a second
+			// link to the same place with no accessible name of its own.
+			expect(container.querySelectorAll('a[href="https://vimeo.com/2"]')).toHaveLength(1);
+			expect(container.querySelector('img.thumb')).not.toBeNull();
 		});
 	});
 });

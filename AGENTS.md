@@ -106,9 +106,13 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
     every `invalidate()` would reset the form. Add one to new ones.
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
-- `npm run test:e2e`: Playwright specs, about 90 seconds once the browser is installed
-  (`npx playwright install chromium` first). A run that takes ~2 minutes has
-  something hanging on its 90-second timeout, not something slow.
+- `npm run test:e2e`: Playwright specs, a little over two minutes for the
+  current ~66 of them once the browser is installed (`npx playwright install
+chromium` first). Read the per-spec times rather than the total: the suite is
+  `workers: 1`, so one spec sitting at ~90 seconds is one hanging on its
+  timeout, and the reported failure is usually the `finally` that could not
+  close its contexts rather than the step that actually stalled — the trace's
+  last unfinished call is what names it.
 
 Internal links go through `resolve()` from `$app/paths` — `href="/guides"` and a
 bare `goto('/')` are both eslint errors under
@@ -347,7 +351,9 @@ than autoloaded, so an element the registration list does not name renders as an
 inert unknown tag — add the import when you reach for a new one. Components
 are custom elements (`wa-button`, `wa-input`, …) with no TypeScript definitions,
 which is why Svelte's a11y warnings fire on them. Style with `--wa-*` custom
-properties and `::part()`. Pinned to `3.0.0-alpha.11` — an alpha, so treat a
+properties and `::part()`. Sizes are the short spellings (`size="s"`): the
+long-form ones still work but log a deprecation warning, which the e2e
+fixture fails a run on. Pinned to `3.0.0-alpha.11` — an alpha, so treat a
 version bump as a change that needs the app actually opened.
 
 **Prefer a `wa-*` component wherever an appropriate one exists** — a

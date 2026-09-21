@@ -1,3 +1,18 @@
+<script module lang="ts">
+	/**
+	 * The width below which an embedded iframe is opened on demand instead of
+	 * drawn in place.
+	 *
+	 * A hosted player's own chrome is sized for a desktop frame: on a phone,
+	 * reddit's header, vote rail and "open in app" bar cover most of the post
+	 * they are wrapped around. Rather than shrink an iframe we do not control,
+	 * anything narrower than the app's existing phone breakpoint gets a button
+	 * and a near-fullscreen dialog. Exported so the tests do not have to
+	 * restate the number.
+	 */
+	export const NARROW_EMBED_MEDIA_QUERY = '(max-width: 640px)';
+</script>
+
 <script lang="ts">
 	import {
 		cachedOembed,
@@ -9,6 +24,7 @@
 	} from '$lib/embeds';
 	import { embedActivationDelayMs } from '$lib/embed-activation';
 	import { scrollParentOf } from '$lib/scroll-parent';
+	import type { Snippet } from 'svelte';
 
 	type CardView = {
 		href: string;
@@ -23,6 +39,8 @@
 		frameClass: string | null;
 		src: string;
 		title: string;
+		/** The site, for the fullscreen header. Falls back to the host. */
+		providerName: string | null;
 		height: number | null;
 		allowFullscreen: boolean;
 	};
@@ -54,7 +72,8 @@
 		cached = null,
 		cachedPending = false,
 		onActivate = undefined,
-		onRefresh = undefined
+		onRefresh = undefined,
+		actions = undefined
 	}: {
 		spec: EmbedSpec;
 		href: string;
@@ -64,12 +83,35 @@
 		/** Fired once, when this embed starts loading with nothing cached for it. */
 		onActivate?: ((href: string) => void | Promise<void>) | undefined;
 		onRefresh?: ((href: string) => void | Promise<void>) | undefined;
+		/**
+		 * Extra buttons for the head row, from whoever is showing this embed —
+		 * the composer's "remove", for one. They land beside the embed's own
+		 * actions rather than floating over it, and their presence is what
+		 * makes the head row appear on an embed that has no card of its own.
+		 */
+		actions?: Snippet | undefined;
 	} = $props();
 
 	let refreshing = $state(false);
 	let inView = $state(false);
 	let reportedActivation = $state(false);
 	let rootElement: HTMLElement | undefined = $state();
+	let narrow = $state(false);
+	let fullscreen = $state(false);
+
+	/**
+	 * The site an iframe points at, when no provider named itself.
+	 *
+	 * The fullscreen header has to say where the reader is about to be taken,
+	 * and a curated player (redgifs, youtube) has a title but never a provider.
+	 */
+	function hostLabel(url: string): string | null {
+		try {
+			return new URL(url).hostname.replace(/^www\./, '');
+		} catch {
+			return null;
+		}
+	}
 
 	/**
 	 * True while this URL has nothing to draw until a provider answers.
@@ -134,6 +176,7 @@
 			frameClass: null,
 			src: cached.iframeSrc,
 			title: cached.title ?? cached.providerName ?? 'Embedded content',
+			providerName: cached.providerName ?? hostLabel(cached.canonicalUrl ?? href),
 			height: cached.iframeHeight,
 			allowFullscreen: true
 		} satisfies IframeView;
@@ -427,6 +470,7 @@
 					frameClass: null,
 					src: nativeSpec.src,
 					title: nativeSpec.title,
+					providerName: hostLabel(nativeSpec.src),
 					height: null,
 					allowFullscreen: true
 				} satisfies IframeView;
@@ -438,6 +482,7 @@
 					frameClass: 'reddit-frame',
 					src: redditFrame.src,
 					title: redditOembed?.title ?? 'Reddit embed',
+					providerName: card.providerName ?? hostLabel(href),
 					height: redditFrame.height,
 					allowFullscreen: false
 				} satisfies IframeView;
@@ -449,6 +494,7 @@
 					frameClass: null,
 					src: oembedFrame.src,
 					title: oembedFrame.title,
+					providerName: card.providerName ?? hostLabel(oembedFrame.src),
 					height: oembedFrame.height,
 					allowFullscreen: true
 				} satisfies IframeView;
@@ -463,6 +509,7 @@
 				frameClass: null,
 				src: spec.src,
 				title: spec.title,
+				providerName: hostLabel(href),
 				height: null,
 				allowFullscreen: true
 			} satisfies IframeView;
@@ -474,6 +521,7 @@
 				frameClass: null,
 				src: oembedFrame.src,
 				title: oembedFrame.title,
+				providerName: card.providerName ?? hostLabel(oembedFrame.src),
 				height: oembedFrame.height,
 				allowFullscreen: true
 			} satisfies IframeView;
@@ -523,35 +571,153 @@
 	});
 
 	let iframeLoading = $derived(iframeEmbed !== null);
+
+	/**
+	 * Whether the window is too narrow to use an iframe where it sits.
+	 *
+	 * Deliberately starts `false` and is only corrected once an effect has run,
+	 * rather than being read from `matchMedia` while the component initialises.
+	 * The initial client render has to produce the same branches the server
+	 * sent, or Svelte logs `hydration_mismatch` — which the e2e fixture fails a
+	 * run on. The cost is that a phone loading an SSR-rendered page briefly has
+	 * the iframe in its markup; the surface this mostly exists for, a message
+	 * thread, is decrypted and rendered client-side well after this has
+	 * settled, so no frame is ever built there.
+	 */
+	$effect(() => {
+		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+		const query = window.matchMedia(NARROW_EMBED_MEDIA_QUERY);
+		narrow = query.matches;
+		const onChange = (event: MediaQueryListEvent) => {
+			narrow = event.matches;
+			// Turning a phone landscape crosses back over the breakpoint and the
+			// inline frame returns, so the overlay of the same thing must go.
+			if (!narrow) fullscreen = false;
+		};
+		query.addEventListener('change', onChange);
+		return () => query.removeEventListener('change', onChange);
+	});
+
+	const fullscreenView = $derived(fullscreen && iframeEmbed ? iframeEmbed : null);
+
+	function openFullscreen(): void {
+		// The frame is built fresh on every open — closing unmounts it, which is
+		// also what stops a video that was left playing — so the spinner has to
+		// come back with it.
+		iframeLoading = true;
+		fullscreen = true;
+	}
+
+	function closeFullscreen(): void {
+		fullscreen = false;
+	}
+
+	function onDialogHide(event: Event): void {
+		// `wa-after-hide` bubbles from nested Web Awesome controls, so only the
+		// dialog's own hide unmounts the frame. Same trap as NewMessageDialog.
+		if (event.target !== event.currentTarget) return;
+		fullscreen = false;
+	}
+
+	/**
+	 * The head row: what the embed calls itself, and what can be done to it.
+	 *
+	 * One place for every button, rather than each one floating over a corner
+	 * of the media. That matters most where there is more than one — the
+	 * composer's remove next to a refresh — but it is also what gives a bare
+	 * player somewhere to put the fullscreen button, since a curated player has
+	 * no card of its own.
+	 */
+	const headCard = $derived(cachedCard ?? card);
+	const showExpand = $derived(narrow && iframeEmbed !== null);
+	const hasActions = $derived(actions !== undefined || canRefresh || showExpand);
+
+	const headMeta = $derived.by(() => {
+		if (headCard) return headCard;
+		if (!hasActions) return null;
+		// No card, but there are buttons: name the thing they belong to rather
+		// than leaving a bar of icons attached to nothing.
+		return {
+			href,
+			providerName: iframeEmbed?.providerName ?? hostLabel(href),
+			title: iframeEmbed?.title ?? null,
+			thumbnailUrl: null,
+			mediaHref: href
+		} satisfies CardView;
+	});
+
+	/**
+	 * Whether this embed draws as a bordered box.
+	 *
+	 * A card has always been one. Anything else only becomes one once it has a
+	 * head row, so a bare player or a lone image is still exactly as bare as it
+	 * was before there was anything to put above it.
+	 */
+	const boxed = $derived(headMeta !== null);
 </script>
 
-<!-- eslint-disable svelte/no-navigation-without-resolve -->
 <!--
-	One element wraps every branch so the scrollport observer always has
-	something to watch, whatever this embed turns out to be. It also gives the
-	reader's revealed cards a stable box to be scrolled to.
+	The iframe, wherever it is drawn. The sandbox grants exactly what a hosted
+	player needs to run, and no top-level navigation: the embed can play, pop
+	out and go fullscreen, but it can never navigate this page away.
+
+	These iframes deliberately do NOT set `referrerpolicy="no-referrer"`:
+	Redgifs uses the embed origin as part of its cross-origin checks, and a
+	missing Referer silently leaves the player blank.
 -->
-<span class="url-embed" bind:this={rootElement}>
-	{#if showSkeleton}
-		<span class="embed skeleton-shell" aria-busy="true">
-			<span class="skeleton-card">
-				{#if skeletonCard?.providerName}
-					<span class="provider">{skeletonCard.providerName}</span>
-				{:else}
-					<span class="skeleton-line short"></span>
-				{/if}
-				{#if skeletonCard?.title}
-					<span class="title">{skeletonCard.title}</span>
-				{:else}
-					<span class="skeleton-line"></span>
-				{/if}
+{#snippet frame(view: IframeView, inDialog: boolean)}
+	<span class={inDialog ? 'dialog-frame' : view.shellClass} aria-busy={iframeLoading}>
+		{#if iframeLoading}
+			<span class="loading-overlay" aria-live="polite">
+				<wa-spinner></wa-spinner>
+				<span>Loading embed…</span>
 			</span>
-			{#if skeletonKind !== 'card' || skeletonCard?.thumbnailUrl}
-				<span class:skeleton-media={true} class:image={skeletonKind === 'image'}></span>
+		{/if}
+		<iframe
+			class={inDialog ? undefined : (view.frameClass ?? undefined)}
+			src={view.src}
+			title={view.title}
+			height={inDialog ? undefined : (view.height ?? undefined)}
+			allowfullscreen={view.allowFullscreen}
+			loading={inDialog ? 'eager' : 'lazy'}
+			onload={() => (iframeLoading = false)}
+			onerror={() => (iframeLoading = false)}
+			sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+		></iframe>
+	</span>
+{/snippet}
+
+<!--
+	The head row: the site and title on the left, the actions on the right.
+
+	The actions section is drawn only when something is in it, so an embed with
+	nothing to do to it looks exactly as it did before there was a row at all.
+	Buttons from the caller come first — the composer's remove is the one the
+	writer reaches for — then the embed's own. Every one of them is a
+	`wa-button`, sized once on the row below rather than each on its own.
+-->
+{#snippet actionBar()}
+	{#if hasActions}
+		<span class="actions">
+			{@render actions?.()}
+			{#if showExpand && iframeEmbed}
+				<!--
+					Labelled, not an icon on its own: this is the only way to reach the
+					embed's content on a narrow window, so it has to read as the thing
+					to press rather than as one more piece of chrome.
+
+					The title rides along visually hidden rather than as an
+					`aria-label` on the host, because `wa-button` does not forward one:
+					its inner `<button>` takes its name from the slotted content. A
+					thread can hold a dozen of these and a list of identical "Open"
+					buttons names none of them — for a screen reader and a test
+					locator alike.
+				-->
+				<wa-button class="open" appearance="outlined" size="s" onclick={openFullscreen}>
+					Open<span class="sr-only"> {iframeEmbed.title}</span>
+					<wa-icon slot="end" name="expand" variant="solid"></wa-icon>
+				</wa-button>
 			{/if}
-		</span>
-	{:else if cachedCard || card}
-		<span class="embed card-shell">
 			{#if canRefresh}
 				<!--
 					Named through the icon's `label`, which is what `wa-button` takes its
@@ -579,30 +745,72 @@
 					{/if}
 				</wa-button>
 			{/if}
+		</span>
+	{/if}
+{/snippet}
+
+{#snippet head()}
+	<span class="head">
+		{#if headMeta}
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-			<a
-				class="card card-link"
-				href={(cachedCard ?? card)?.href}
-				target="_blank"
-				rel="noopener noreferrer ugc"
-			>
+			<a class="card card-link" href={headMeta.href} target="_blank" rel="noopener noreferrer ugc">
 				<span class="meta">
-					{#if (cachedCard ?? card)?.providerName}
-						<span class="provider">{(cachedCard ?? card)?.providerName}</span>
+					{#if headMeta.providerName}
+						<span class="provider">{headMeta.providerName}</span>
 					{/if}
-					{#if (cachedCard ?? card)?.title}
-						<span class="title">{(cachedCard ?? card)?.title}</span>
+					{#if headMeta.title}
+						<span class="title">{headMeta.title}</span>
 					{/if}
 				</span>
-				{#if (cachedCard ?? card)?.thumbnailUrl}
-					<img
-						src={(cachedCard ?? card)?.thumbnailUrl}
-						alt=""
-						loading="lazy"
-						referrerpolicy="no-referrer"
-					/>
-				{/if}
 			</a>
+		{/if}
+		{@render actionBar()}
+	</span>
+{/snippet}
+
+<!-- eslint-disable svelte/no-navigation-without-resolve -->
+<!--
+	One element wraps every branch so the scrollport observer always has
+	something to watch, whatever this embed turns out to be. It also gives the
+	reader's revealed cards a stable box to be scrolled to.
+-->
+<span class="url-embed" bind:this={rootElement}>
+	{#if showSkeleton}
+		<span class="embed skeleton-shell" aria-busy="true">
+			<span class="head">
+				<span class="skeleton-card">
+					{#if skeletonCard?.providerName}
+						<span class="provider">{skeletonCard.providerName}</span>
+					{:else}
+						<span class="skeleton-line short"></span>
+					{/if}
+					{#if skeletonCard?.title}
+						<span class="title">{skeletonCard.title}</span>
+					{:else}
+						<span class="skeleton-line"></span>
+					{/if}
+				</span>
+				{@render actionBar()}
+			</span>
+			{#if skeletonKind !== 'card' || skeletonCard?.thumbnailUrl}
+				<span class:skeleton-media={true} class:image={skeletonKind === 'image'}></span>
+			{/if}
+		</span>
+	{:else if boxed}
+		<span class="embed card-shell">
+			{@render head()}
+			{#if headCard?.thumbnailUrl}
+				<!-- Not a link any more: the title above it is, and a second link to
+			     the same place with no text of its own is a name-less entry in
+			     every screen reader's link list. -->
+				<img
+					class="thumb"
+					src={headCard.thumbnailUrl}
+					alt=""
+					loading="lazy"
+					referrerpolicy="no-referrer"
+				/>
+			{/if}
 			{#if cardImage}
 				<a
 					class="card-media image"
@@ -617,38 +825,31 @@
 						referrerpolicy="no-referrer"
 					/>
 				</a>
-			{:else if iframeEmbed}
-				<!-- Same sandbox as the curated players: the reddit post pointed here, and
-		     the gate already covered the privacy half. These iframes deliberately do
-		     NOT set `referrerpolicy="no-referrer"`: Redgifs uses the embed origin as
-		     part of its cross-origin checks, and a missing Referer silently leaves
-		     the player blank. -->
-				<span class={iframeEmbed.shellClass} aria-busy={iframeLoading}>
-					{#if iframeLoading}
-						<span class="loading-overlay" aria-live="polite">
-							<wa-spinner></wa-spinner>
-							<span>Loading embed…</span>
-						</span>
-					{/if}
-					<iframe
-						class={iframeEmbed.frameClass ?? undefined}
-						src={iframeEmbed.src}
-						title={iframeEmbed.title}
-						height={iframeEmbed.height ?? undefined}
-						allowfullscreen={iframeEmbed.allowFullscreen}
+			{:else if standaloneImage}
+				<a
+					class="card-media image"
+					href={standaloneImage.href}
+					target="_blank"
+					rel="noopener noreferrer ugc"
+				>
+					<img
+						src={standaloneImage.src}
+						alt={standaloneImage.alt}
 						loading="lazy"
-						onload={() => (iframeLoading = false)}
-						onerror={() => (iframeLoading = false)}
-						sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-					></iframe>
-				</span>
+						referrerpolicy="no-referrer"
+					/>
+				</a>
+			{:else if iframeEmbed && !narrow}
+				{@render frame(iframeEmbed, false)}
+			{:else if showFallbackLink}
+				<a class="card-media fallback" {href} target="_blank" rel="noopener noreferrer ugc"
+					>{label}</a
+				>
 			{/if}
 		</span>
 	{:else if showFallbackLink}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a {href} target="_blank" rel="noopener noreferrer ugc">{label}</a>
 	{:else if standaloneImage}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a
 			class="embed image"
 			href={standaloneImage.href}
@@ -665,28 +866,44 @@
 			/>
 		</a>
 	{:else if iframeEmbed}
-		<!-- The sandbox grants exactly what a hosted video player needs to run,
-	     and no top-level navigation: the embed can play, pop out and go
-	     fullscreen, but it can never navigate this page away. -->
-		<span class={iframeEmbed.shellClass} aria-busy={iframeLoading}>
-			{#if iframeLoading}
-				<span class="loading-overlay" aria-live="polite">
-					<wa-spinner></wa-spinner>
-					<span>Loading embed…</span>
+		{@render frame(iframeEmbed, false)}
+	{/if}
+
+	<!--
+		The frame the narrow window did not draw, on request.
+
+		Built inside the dialog rather than moved into it, so nothing loads until
+		the reader asks — and unmounted again on close, which is the only thing
+		that reliably stops a player that was left running. `wa-dialog` uses a
+		native `<dialog>` in the top layer, so it escapes the app shell's
+		non-scrolling `<body>` and the scrollport it was rendered inside; see the
+		positioning note in AGENTS.md.
+
+		Spans rather than divs throughout: this component renders inside the `<p>`
+		of a rich-text document, and only phrasing content is valid there.
+	-->
+	{#if fullscreenView}
+		<wa-dialog
+			class="embed-dialog"
+			label={fullscreenView.title}
+			open
+			onwa-after-hide={onDialogHide}
+		>
+			<span class="dialog-body">
+				<span class="dialog-header">
+					<span class="dialog-meta">
+						{#if fullscreenView.providerName}
+							<span class="provider">{fullscreenView.providerName}</span>
+						{/if}
+						<span class="title">{fullscreenView.title}</span>
+					</span>
+					<wa-button appearance="plain" pill class="dialog-close" onclick={closeFullscreen}>
+						<wa-icon name="xmark" variant="solid" label="Close embed"></wa-icon>
+					</wa-button>
 				</span>
-			{/if}
-			<iframe
-				class={iframeEmbed.frameClass ?? undefined}
-				src={iframeEmbed.src}
-				title={iframeEmbed.title}
-				height={iframeEmbed.height ?? undefined}
-				allowfullscreen={iframeEmbed.allowFullscreen}
-				loading="lazy"
-				onload={() => (iframeLoading = false)}
-				onerror={() => (iframeLoading = false)}
-				sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-			></iframe>
-		</span>
+				{@render frame(fullscreenView, true)}
+			</span>
+		</wa-dialog>
 	{/if}
 </span>
 
@@ -755,9 +972,11 @@
 
 	.skeleton-card {
 		display: flex;
+		flex: 1 1 auto;
 		flex-direction: column;
 		gap: 0.35rem;
 		padding: 0.5rem;
+		min-inline-size: 0;
 	}
 
 	.skeleton-line,
@@ -812,22 +1031,42 @@
 		}
 	}
 
+	/**
+	 * The head row.
+	 *
+	 * `min-inline-size: 0` on the link is what stops a long title pushing the
+	 * actions off the end: a flex item's default minimum is its content, so
+	 * without it the row simply overflows instead of wrapping the title.
+	 */
+	.head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.25rem;
+	}
+
 	.card {
 		display: flex;
+		flex: 1 1 auto;
 		flex-direction: column;
 		gap: 0.25rem;
 		padding: 0.5rem;
+		min-inline-size: 0;
 		text-decoration: none;
 		color: inherit;
 
 		.meta {
 			display: flex;
 			flex-direction: column;
+			min-inline-size: 0;
 		}
 
 		.provider {
 			font-size: 0.75rem;
 			opacity: 0.75;
+		}
+
+		.title {
+			overflow-wrap: anywhere;
 		}
 	}
 
@@ -837,24 +1076,165 @@
 		color: inherit;
 	}
 
+	/**
+	 * Where every button on an embed lives, whoever put it there.
+	 *
+	 * Sized in absolute units rather than around their contents: a `wa-icon`
+	 * fetches its SVG, so a button sized to its icon is one height before that
+	 * lands and another after, which reflows the row under whatever is being
+	 * read or pressed.
+	 */
+	.actions {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 0.1rem;
+		padding: 0.35rem 0.35rem 0 0;
+
+		/* Every action is a `wa-button`, whoever supplied it — the caller's
+		   through the `actions` snippet included — so the size is set here, on
+		   the row, rather than by each of them. */
+		:global(wa-button) {
+			--wa-form-control-height: 2rem;
+			font-size: 0.9rem;
+		}
+
+		/* The one action with a visible label rather than an icon. */
+		wa-button.open {
+			align-self: center;
+			font-size: 0.85rem;
+		}
+
+		/* Named in the accessible name, drawn nowhere. */
+		.sr-only {
+			position: absolute;
+			inline-size: 1px;
+			block-size: 1px;
+			padding: 0;
+			margin: -1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+			border: 0;
+		}
+	}
+
+	/* A link that never resolved into anything, inside a box it only has
+	   because something else — the composer's remove — needed a row. */
+	.fallback {
+		display: block;
+		padding: 0.5rem;
+		overflow-wrap: anywhere;
+	}
+
 	.card-media {
 		display: block;
 		border-block-start: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-	}
-
-	.refresh {
-		position: absolute;
-		inset-block-start: 0.35rem;
-		inset-inline-end: 0.35rem;
-		z-index: 1;
-		--wa-form-control-height: 1.6rem;
-		font-size: 0.9rem;
 	}
 
 	.reddit-frame {
 		display: block;
 		width: 100%;
 		border: 0;
+	}
+
+	/**
+	 * Nearly the whole screen, which is the entire point: the provider's own
+	 * chrome needs room before the content it wraps is reachable.
+	 *
+	 * `100svh` rather than `100vh` so a mobile browser's collapsing address bar
+	 * does not put the close button under it, less the home indicator's inset.
+	 */
+	wa-dialog.embed-dialog {
+		--width: calc(100vw - 1rem);
+		--spacing: 0;
+		--backdrop-filter: brightness(0.4) blur(0.25rem);
+	}
+
+	wa-dialog.embed-dialog::part(dialog) {
+		inline-size: calc(100vw - 1rem);
+		max-inline-size: none;
+		block-size: calc(100svh - 1rem - var(--safe-area-inset-bottom-min, 0px));
+		max-block-size: none;
+		margin: auto;
+		padding: 0;
+		overflow: hidden;
+		border-radius: 0.75rem;
+		border: 1px solid var(--wa-color-surface-border);
+		background: var(--wa-color-surface-raised, var(--wa-color-surface-default, white));
+	}
+
+	/* Our own header instead: `label` alone cannot show the site and the title
+	   as two lines, and it still supplies the dialog's accessible name. */
+	wa-dialog.embed-dialog::part(header) {
+		display: none;
+	}
+
+	wa-dialog.embed-dialog::part(body) {
+		display: flex;
+		min-block-size: 0;
+		block-size: 100%;
+		padding: 0;
+		overflow: hidden;
+	}
+
+	/* The embed inherits the colour of whatever it was rendered in — white, on
+	   a sent bubble. The dialog is its own surface, so it takes its own. */
+	.dialog-body {
+		display: flex;
+		flex-direction: column;
+		inline-size: 100%;
+		min-block-size: 0;
+		color: var(--wa-color-text-normal);
+		white-space: initial;
+	}
+
+	.dialog-header {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.4rem 0.4rem 0.4rem 0.75rem;
+		border-block-end: 1px solid var(--wa-color-surface-border);
+	}
+
+	.dialog-meta {
+		display: flex;
+		flex: 1 1 auto;
+		flex-direction: column;
+		min-inline-size: 0;
+
+		.provider {
+			font-size: 0.75rem;
+			opacity: 0.75;
+		}
+
+		.title {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+	}
+
+	wa-button.dialog-close {
+		--wa-form-control-height: 2.5rem;
+	}
+
+	/* Fills what the header leaves. A 16/9 player letterboxes itself inside it,
+	   which is better than a fixed ratio for the frames this exists for —
+	   reddit's post embed is tall and has no ratio worth honouring. */
+	.dialog-frame {
+		display: block;
+		position: relative;
+		flex: 1 1 auto;
+		min-block-size: 0;
+
+		iframe {
+			inline-size: 100%;
+			block-size: 100%;
+			border: 0;
+			display: block;
+		}
 	}
 
 	@keyframes embed-shimmer {
