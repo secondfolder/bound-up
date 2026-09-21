@@ -553,21 +553,31 @@
 	{:else if cachedCard || card}
 		<span class="embed card-shell">
 			{#if canRefresh}
-				<button
+				<!--
+					Named through the icon's `label`, which is what `wa-button` takes its
+					name from — an `aria-label` on the host never reaches the inner
+					`<button>`, and an icon-only button without one logs a warning.
+
+					The spinner is swapped in by hand rather than through `loading`:
+					`loading` is not an attribute Svelte's SSR knows to omit when false,
+					so it would render `loading="false"`, which Lit reads as true.
+				-->
+				<wa-button
 					type="button"
 					class="refresh"
-					aria-label="Refresh preview"
 					title="Refresh preview"
-					aria-busy={refreshing}
+					size="s"
+					appearance="plain"
+					pill
 					disabled={refreshing}
 					onclick={refresh}
 				>
 					{#if refreshing}
 						<wa-spinner></wa-spinner>
 					{:else}
-						<wa-icon name="arrows-rotate" variant="solid"></wa-icon>
+						<wa-icon name="arrows-rotate" variant="solid" label="Refresh preview"></wa-icon>
 					{/if}
-				</button>
+				</wa-button>
 			{/if}
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 			<a
@@ -837,27 +847,8 @@
 		inset-block-start: 0.35rem;
 		inset-inline-end: 0.35rem;
 		z-index: 1;
-		display: grid;
-		place-items: center;
-		font: inherit;
+		--wa-form-control-height: 1.6rem;
 		font-size: 0.9rem;
-		line-height: 1;
-		padding: 0.2rem;
-		border: 0;
-		border-radius: 999px;
-		background: transparent;
-		color: inherit;
-		cursor: pointer;
-
-		wa-icon,
-		wa-spinner {
-			font-size: 0.95rem;
-		}
-
-		&:disabled {
-			cursor: default;
-			opacity: 0.7;
-		}
 	}
 
 	.reddit-frame {

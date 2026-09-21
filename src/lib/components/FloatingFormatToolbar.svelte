@@ -276,6 +276,9 @@
 		aria-label="Text formatting"
 	>
 		{#each shown as button (button.label)}
+			<!-- Native on purpose: these are toggles, and `aria-pressed` is what tells
+			     a screen reader whether bold is on. `wa-button` does not forward ARIA
+			     state to the `<button>` inside its shadow root, so it would be lost. -->
 			<button
 				type="button"
 				class:active={button.active()}

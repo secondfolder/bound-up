@@ -43,6 +43,6 @@ describe('TaskTimeZoneOwnerToggle', () => {
 
 		const yourTime = screen.getByText('Your time');
 		await fireEvent.click(yourTime);
-		expect(container.querySelector('button.selected')?.textContent).toContain('Your time');
+		expect(container.querySelector('wa-button.selected')?.textContent).toContain('Your time');
 	});
 });

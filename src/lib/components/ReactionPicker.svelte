@@ -34,6 +34,13 @@
 	const triggerId = $derived(`react-${messageId}`);
 </script>
 
+<!--
+	The one native button left in the picker, on purpose: it carries
+	`aria-expanded`, and `wa-button` does not forward ARIA state to the
+	`<button>` inside its shadow root, so a screen reader would lose whether
+	the menu is open. `wa-dropdown` would manage that itself, but lays its
+	items out as a list rather than as this row of tapbacks.
+-->
 <button
 	id={triggerId}
 	type="button"
@@ -50,15 +57,16 @@
 {#if open}
 	<div class="menu" role="group" aria-label="Reactions">
 		{#each REACTIONS as emoji (emoji)}
-			<button
+			<wa-button
 				type="button"
+				appearance="plain"
+				pill
 				class:chosen={emoji === current}
 				disabled={busy}
-				aria-label={emoji}
 				onclick={() => choose(emoji)}
 			>
 				{emoji}
-			</button>
+			</wa-button>
 		{/each}
 	</div>
 {/if}
@@ -89,17 +97,12 @@
 		border: 1px solid var(--wa-color-surface-border);
 		box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
 
-		button {
-			border: none;
-			background: none;
-			cursor: pointer;
+		wa-button {
 			font-size: 2rem;
-			line-height: 1;
-			padding: 0.125rem 0.25rem;
-			border-radius: 0.75rem;
-			height: 1.2em;
+			--wa-form-control-height: 1.2em;
+			--wa-form-control-padding-inline: 0.125em;
 
-			&.chosen {
+			&.chosen::part(base) {
 				background: var(--wa-color-brand-fill-quiet, rgb(0 0 0 / 8%));
 			}
 		}

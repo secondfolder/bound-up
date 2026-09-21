@@ -70,6 +70,16 @@ class MockIntersectionObserver {
 	}
 }
 
+/**
+ * The refresh button. A `wa-button`, which jsdom never upgrades, so it has no
+ * role to find it by — see AGENTS.md on testing `wa-*` elements.
+ */
+function refreshButton(container: HTMLElement): HTMLElement {
+	const button = container.querySelector<HTMLElement>('wa-button.refresh');
+	if (!button) throw new Error('expected a refresh button');
+	return button;
+}
+
 function installIntersectionObserverMock() {
 	observers.length = 0;
 	vi.stubGlobal(
@@ -382,7 +392,7 @@ describe('UrlEmbed', () => {
 			themeColor: null
 		} satisfies CachedEmbedDetails;
 
-		const { getByRole } = render(UrlEmbed, {
+		const { container } = render(UrlEmbed, {
 			props: {
 				spec: { kind: 'oembed', endpoint: 'https://oembed.test/cached' },
 				href: cached.href,
@@ -392,7 +402,10 @@ describe('UrlEmbed', () => {
 			}
 		});
 
-		await fireEvent.click(getByRole('button', { name: 'Refresh preview' }));
+		expect(refreshButton(container).querySelector('wa-icon')?.getAttribute('label')).toBe(
+			'Refresh preview'
+		);
+		await fireEvent.click(refreshButton(container));
 		expect(onRefresh).toHaveBeenCalledWith('https://vimeo.com/2');
 	});
 
@@ -420,7 +433,7 @@ describe('UrlEmbed', () => {
 			themeColor: null
 		} satisfies CachedEmbedDetails;
 
-		const { container, getByRole } = render(UrlEmbed, {
+		const { container } = render(UrlEmbed, {
 			props: {
 				spec: { kind: 'oembed', endpoint: 'https://oembed.test/cached' },
 				href: cached.href,
@@ -430,7 +443,7 @@ describe('UrlEmbed', () => {
 			}
 		});
 
-		await fireEvent.click(getByRole('button', { name: 'Refresh preview' }));
+		await fireEvent.click(refreshButton(container));
 		expect(container.querySelector('wa-spinner')).not.toBeNull();
 		expect(container.querySelector('wa-icon')).toBeNull();
 		if (!resolver.current) throw new Error('expected refresh resolver');

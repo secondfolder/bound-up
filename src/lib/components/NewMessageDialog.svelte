@@ -48,7 +48,7 @@
 	<div class="composer">
 		<div class="top-row">
 			<TagPicker {partnershipId} {tags} bind:selectedIds={selectedTagIds} startEditing />
-			<wa-button appearance="plain" class="dialog-close" aria-label="Close" onclick={close}>
+			<wa-button appearance="plain" pill class="dialog-close" aria-label="Close" onclick={close}>
 				<wa-icon name="xmark" variant="solid" label="Close"></wa-icon>
 			</wa-button>
 		</div>
@@ -116,17 +116,6 @@
 	wa-button.dialog-close {
 		flex: none;
 		margin-inline-start: auto;
-	}
-
-	wa-button.dialog-close::part(button) {
-		inline-size: 2.75rem;
-		block-size: 2.75rem;
-		padding: 0;
-		border-radius: 999px;
-	}
-
-	wa-button.dialog-close::part(label) {
-		display: grid;
-		place-items: center;
+		--wa-form-control-height: 2.75rem;
 	}
 </style>

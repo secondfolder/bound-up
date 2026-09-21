@@ -92,11 +92,13 @@
 			target="_blank"
 			rel="noopener noreferrer ugc"
 			><Self nodes={node.children} {embeds} {canReveal} {onReveal} /></a
-		>{#if canReveal?.(node.url)}<button
+		>{#if canReveal?.(node.url)}<wa-button
 				type="button"
 				class="reveal"
-				aria-label="Show"
-				onclick={() => onReveal?.(node.url)}>Show</button
+				size="s"
+				appearance="outlined"
+				pill
+				onclick={() => onReveal?.(node.url)}>Show</wa-button
 			>{/if}{/if}{/each}
 
 <style>
@@ -110,18 +112,19 @@
 	   Sized in `em` and `lh` so it matches whatever text it is sitting in —
 	   a message bubble and a task description have different type scales. */
 	.reveal {
-		font: inherit;
+		--wa-form-control-height: 1lh;
+		--wa-form-control-padding-inline: 0.7em;
 		font-size: 0.9em;
-		padding: 0 0.7em;
-		line-height: 0.9lh;
-		height: 1lh;
 		margin-inline: 0.35em 0.1em;
-		border: 1px solid currentColor;
-		border-radius: 999px;
-		background: transparent;
-		color: inherit;
-		cursor: pointer;
 		vertical-align: baseline;
-		white-space: nowrap;
+		color: inherit;
+
+		/* Drawn in the text's own colour, so it reads the same in either side's
+		   bubble, rather than in the button's neutral palette. */
+		&::part(base) {
+			border-color: currentColor;
+			background: transparent;
+			color: inherit;
+		}
 	}
 </style>

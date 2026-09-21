@@ -115,9 +115,9 @@
 				<li>
 					<span class="name">{file.name}</span>
 					<span class="size">{sizeOf(file.size)}</span>
-					<button type="button" onclick={() => remove(index)} aria-label={`Remove ${file.name}`}>
-						×
-					</button>
+					<wa-button type="button" size="s" appearance="plain" pill onclick={() => remove(index)}>
+						<wa-icon name="xmark" variant="solid" label={`Remove ${file.name}`}></wa-icon>
+					</wa-button>
 				</li>
 			{/each}
 		</ul>
@@ -261,14 +261,10 @@
 				margin-inline-start: auto;
 			}
 
-			button {
-				border: none;
-				background: none;
-				cursor: pointer;
-				font-size: 1.125rem;
-				line-height: 1;
+			/* Row-sized rather than form-control-sized, so a file list stays compact. */
+			wa-button {
+				--wa-form-control-height: 1.75rem;
 				color: var(--wa-color-text-quiet);
-				padding: 0 0.25rem;
 			}
 		}
 	}

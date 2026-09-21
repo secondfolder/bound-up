@@ -62,30 +62,26 @@
 				aria-label={editable.inputLabel}
 			/>
 			<div class="credit-actions">
-				<button type="submit" class="icon-button" aria-label={editable.saveLabel}>
-					<wa-icon name="check" variant="solid"></wa-icon>
-				</button>
-				<button
+				<wa-button type="submit" class="icon-button" appearance="plain" pill>
+					<wa-icon name="check" variant="solid" label={editable.saveLabel}></wa-icon>
+				</wa-button>
+				<wa-button
 					type="button"
 					class="icon-button"
-					aria-label={editable.cancelLabel}
+					appearance="plain"
+					pill
 					onclick={cancelEditing}
 				>
-					<wa-icon name="xmark" variant="solid"></wa-icon>
-				</button>
+					<wa-icon name="xmark" variant="solid" label={editable.cancelLabel}></wa-icon>
+				</wa-button>
 			</div>
 		{:else}
 			<div class="credit-display">
 				<strong class="credit-value">{credits}</strong>
 				{#if unit}<span class="credit-unit">{unit}</span>{/if}
-				<button
-					type="button"
-					class="icon-button"
-					aria-label={editable.editLabel}
-					onclick={startEditing}
-				>
-					<wa-icon name="pen-to-square" variant="solid"></wa-icon>
-				</button>
+				<wa-button type="button" class="icon-button" appearance="plain" pill onclick={startEditing}>
+					<wa-icon name="pen-to-square" variant="solid" label={editable.editLabel}></wa-icon>
+				</wa-button>
 			</div>
 		{/if}
 	</form>
@@ -158,22 +154,10 @@
 		flex-wrap: nowrap;
 	}
 
+	/* The same 2.25rem round target these had as native buttons. */
 	.icon-button {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		inline-size: 2.25rem;
-		block-size: 2.25rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: transparent;
+		--wa-form-control-height: 2.25rem;
 		color: var(--wa-color-text-quiet);
-		cursor: pointer;
-		padding: 0;
-
-		wa-icon {
-			font-size: 1rem;
-		}
 	}
 
 	@media (max-width: 640px) {

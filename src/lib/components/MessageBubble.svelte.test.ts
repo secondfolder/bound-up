@@ -217,7 +217,7 @@ describe('MessageBubble', () => {
 			]
 		};
 
-		const { container, getByText, queryByRole } = render(MessageBubble, {
+		const { container, getByText } = render(MessageBubble, {
 			props: {
 				...props,
 				message: message(),
@@ -226,7 +226,7 @@ describe('MessageBubble', () => {
 			}
 		});
 
-		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+		expect(container.querySelector('wa-button.reveal')).toBeNull();
 		expect(getByText('Cached title')).toBeTruthy();
 		expect(container.querySelector('.card')).not.toBeNull();
 	});
@@ -240,7 +240,7 @@ describe('MessageBubble', () => {
 		installIntersectionObserverMock();
 		const fetchMock = vi.fn(() => new Promise(() => {}));
 		vi.stubGlobal('fetch', fetchMock);
-		const { container, getByRole, queryByRole } = render(MessageBubble, {
+		const { container } = render(MessageBubble, {
 			props: {
 				...props,
 				message: message(),
@@ -271,14 +271,14 @@ describe('MessageBubble', () => {
 		});
 
 		expect(container.querySelector('.url-embed')).toBeNull();
-		await fireEvent.click(getByRole('button', { name: 'Show' }));
+		await fireEvent.click(container.querySelector('wa-button.reveal')!);
 
 		// The card goes at the start of the link's line, and the button that
 		// asked for it is gone.
 		const embed = container.querySelector('.embed-slot');
 		expect(embed).not.toBeNull();
 		expect(embed?.closest('p')).not.toBeNull();
-		expect(queryByRole('button', { name: 'Show' })).toBeNull();
+		expect(container.querySelector('wa-button.reveal')).toBeNull();
 	});
 
 	it('waits for encrypted message metadata before starting a live embed fetch', () => {

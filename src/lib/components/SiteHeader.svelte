@@ -21,7 +21,7 @@
 					     does goto + invalidateAll for a redirect result. The old
 					     callback existed only to clear pb.authStore. -->
 					<form method="POST" action="/logout" use:enhance>
-						<button>Log out</button>
+						<wa-button type="submit" appearance="plain" size="s">Log out</wa-button>
 					</form>
 				</li>
 			{:else}

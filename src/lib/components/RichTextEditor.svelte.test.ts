@@ -303,7 +303,8 @@ describe('RichTextEditor, embeds', () => {
 		expect(container.querySelector('.surface img')?.getAttribute('src')).toBe(
 			'https://i.imgur.com/cat.jpg'
 		);
-		expect(removeButton(container).getAttribute('aria-label')).toBe(
+		// A `wa-button` takes its name from its icon's label.
+		expect(removeButton(container).querySelector('wa-icon')?.getAttribute('label')).toBe(
 			'Remove embedded preview of https://i.imgur.com/cat.jpg'
 		);
 	});
@@ -609,7 +610,7 @@ describe('RichTextEditor, embeds', () => {
 		await tick();
 		expect(linkWrapper(container)).toHaveClass('embed-available');
 
-		await fireEvent.click(linkWrapper(container).querySelector('button[aria-label="Add embed"]')!);
+		await fireEvent.click(linkWrapper(container).querySelector('wa-button.embed-again')!);
 		await tick();
 
 		expect(embedChips(container)).toHaveLength(1);

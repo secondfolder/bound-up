@@ -60,4 +60,25 @@
 			calc(env(safe-area-inset-bottom, 0) - var(--safe-area-inset-bottom-min-max-delta))
 		);
 	}
+
+	/**
+    * Elements that have the "plain" and "outlined" appearance have no background
+    * and the "neutral" variant indicates they aren't aiming to standout with a particular colour. So intead of just using 
+    * the neutral varient default of grey it makes more sense to use the current text
+    * colour to make sure it stands out against whatever background it finds itself on.
+    */
+	:global(.wa-plain.wa-neutral),
+	:global([appearance='plain'][variant='neutral']),
+	:global(.wa-outlined.wa-neutral),
+	:global([appearance='outlined'][variant='neutral']) {
+		--wa-color-fill-loud: color-mix(in oklab, contrast-color(currentColor) 20%, transparent);
+		--wa-color-fill-normal: color-mix(in oklab, contrast-color(currentColor) 20%, transparent);
+		--wa-color-fill-quiet: color-mix(in oklab, contrast-color(currentColor) 20%, transparent);
+		--wa-color-border-loud: currentColor;
+		--wa-color-border-normal: currentColor;
+		--wa-color-border-quiet: currentColor;
+		--wa-color-on-loud: currentColor;
+		--wa-color-on-normal: currentColor;
+		--wa-color-on-quiet: currentColor;
+	}
 </style>

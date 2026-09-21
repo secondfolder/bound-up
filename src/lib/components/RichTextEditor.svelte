@@ -474,27 +474,24 @@
 		inset-inline-start: 50%;
 		z-index: 2;
 		transform: translate(-50%, -50%);
-		align-items: center;
-		gap: 0.2rem;
-		block-size: 1.75rem;
-		padding-inline: 0.5rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: var(--wa-color-surface-raised, white);
-		color: var(--wa-color-text-normal);
-		box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 22%);
-		cursor: pointer;
+		--wa-form-control-height: 1.75rem;
+		--wa-form-control-padding-inline: 0.5rem;
 		font-size: 0.75rem;
 		user-select: none;
 		white-space: nowrap;
 	}
 
-	.surface :global(.embed-again wa-icon) {
-		margin-inline: 0;
+	/* Two icons and no text makes this an "icon button" to Web Awesome, which
+	   squares it off to the control's height. It is a pill holding both. */
+	.surface :global(.embed-again::part(base)) {
+		width: auto;
+		aspect-ratio: auto;
+		background: var(--wa-color-surface-raised, white);
+		box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 22%);
 	}
 
 	.surface :global(.link-with-embed-offer.embed-available:hover > .embed-again) {
-		display: flex;
+		display: inline-block;
 	}
 
 	/* The formats Lexical cannot express through its one tag per text node —

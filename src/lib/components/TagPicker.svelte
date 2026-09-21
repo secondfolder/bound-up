@@ -156,24 +156,33 @@
 							<wa-icon name="paintbrush" variant="solid"></wa-icon>
 							<input aria-label="Tag colour" type="color" bind:value={draftColor} />
 						</label>
-						<button type="button" aria-label="Save tag" onclick={saveEdit}>
-							<wa-icon name="check" variant="solid"></wa-icon>
-						</button>
-						<button type="button" class="remove" aria-label="Remove tag" onclick={removeEditing}>
-							<wa-icon name="trash" variant="solid"></wa-icon>
-						</button>
+						<wa-button type="button" size="s" appearance="plain" pill onclick={saveEdit}>
+							<wa-icon name="check" variant="solid" label="Save tag"></wa-icon>
+						</wa-button>
+						<wa-button
+							type="button"
+							size="s"
+							variant="danger"
+							appearance="plain"
+							pill
+							onclick={removeEditing}
+						>
+							<wa-icon name="trash" variant="solid" label="Remove tag"></wa-icon>
+						</wa-button>
 					</span>
 				{:else}
 					<span class="swatch" style={`background: ${tag.color}`}></span>
 					{tag.name}
-					<button
+					<wa-button
 						type="button"
 						class="mini"
-						aria-label={`Edit ${tag.name}`}
+						size="s"
+						appearance="plain"
+						pill
 						onclick={() => beginEdit(tag)}
 					>
-						<wa-icon name="pencil" variant="solid"></wa-icon>
-					</button>
+						<wa-icon name="pencil" variant="solid" label={`Edit ${tag.name}`}></wa-icon>
+					</wa-button>
 				{/if}
 			</span>
 		{/each}
@@ -205,7 +214,7 @@
 						<wa-icon name="paintbrush" variant="solid"></wa-icon>
 						<input aria-label="New tag colour" type="color" bind:value={newColor} />
 					</label>
-					<button type="button" onclick={addTag}>Add</button>
+					<wa-button type="button" size="s" appearance="outlined" onclick={addTag}>Add</wa-button>
 				</span>
 			</span>
 		{/if}
@@ -224,18 +233,15 @@
 		{#each selectedTags as tag (tag.id)}
 			<span class="tag" style={`--tag-color: ${tag.color}`}>{tag.name}</span>
 		{/each}
-		<button
-			type="button"
-			class="mini standalone"
-			aria-label="Edit tags"
-			onclick={() => (editing = true)}
-		>
-			<wa-icon name="pencil" variant="solid"></wa-icon>
-		</button>
+		<wa-button type="button" size="s" appearance="plain" pill onclick={() => (editing = true)}>
+			<wa-icon name="pencil" variant="solid" label="Edit tags"></wa-icon>
+		</wa-button>
 	</div>
 {:else}
 	<div class="tag-picker display">
-		<button type="button" class="add-tags" onclick={() => (editing = true)}>Add tags</button>
+		<wa-button type="button" size="s" appearance="outlined" pill onclick={() => (editing = true)}>
+			Add tags
+		</wa-button>
 	</div>
 {/if}
 
@@ -279,39 +285,16 @@
 		flex: none;
 	}
 
-	button {
-		font: inherit;
-		cursor: pointer;
-	}
-
-	.mini {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0 0.3rem;
-		border: 0;
-		background: transparent;
-		/* Inside a chip, so it inherits the chip's readable foreground. */
-		color: inherit;
+	/* Buttons inside a chip are sized to the chip's text rather than to a form
+	   control, or the pill would grow to fit them. The pencil also takes the
+	   chip's readable foreground rather than the button's own. */
+	.tag wa-button {
 		font-size: 0.75rem;
-		line-height: 1;
+		--wa-form-control-height: 1.6em;
 
-		&.standalone {
-			padding: 0.25rem 0.35rem;
-			border: 1px solid var(--wa-color-surface-border);
-			border-radius: 999px;
-			background: var(--wa-color-surface-default, white);
-			color: var(--wa-color-text-normal, #17202a);
+		&.mini {
+			color: inherit;
 		}
-	}
-
-	.add-tags {
-		padding: 0.2rem 0.55rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: var(--wa-color-surface-default, white);
-		color: var(--wa-color-text-normal, #17202a);
-		font-size: 0.75rem;
 	}
 
 	.field-row {
@@ -334,11 +317,6 @@
 				block-size: 2.6em;
 				flex: 0 0 auto;
 			}
-
-			button {
-				padding: 0.15rem 0.35rem;
-				font-size: 0.75rem;
-			}
 		}
 
 		input:not([type='color']) {
@@ -348,18 +326,6 @@
 			border-radius: 0.35rem;
 			background: var(--wa-color-surface-default, white);
 			color: var(--wa-color-text-normal, #17202a);
-		}
-
-		button {
-			padding: 0.3rem 0.6rem;
-			border: 1px solid var(--wa-color-surface-border);
-			border-radius: 0.35rem;
-			background: var(--wa-color-surface-default, white);
-			color: var(--wa-color-text-normal, #17202a);
-
-			&.remove {
-				color: var(--wa-color-danger-text, #a52a2a);
-			}
 		}
 	}
 

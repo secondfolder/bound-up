@@ -350,6 +350,32 @@ which is why Svelte's a11y warnings fire on them. Style with `--wa-*` custom
 properties and `::part()`. Pinned to `3.0.0-alpha.11` — an alpha, so treat a
 version bump as a change that needs the app actually opened.
 
+**Prefer a `wa-*` component wherever an appropriate one exists** — a
+`wa-button` rather than a `<button>`, a `wa-dropdown` rather than a hand-built
+menu — and style it through its attributes and variables before reaching for
+CSS. For buttons in particular:
+
+- **An icon-only button is named by its icon:** `<wa-icon label="…">`. The
+  inner `<button>` takes its accessible name from the slotted content, so an
+  `aria-label` on the host never reaches it, and Web Awesome logs a console
+  warning — which fails the e2e fixture — for an icon button whose icon has no
+  `label`.
+- **A round icon button is `appearance="plain" pill`,** not a
+  `border-radius: 999px`. An icon-only `wa-button` is already square at the
+  control's height, so `pill` is all it takes to make it a circle. Size it with
+  `--wa-form-control-height` (and `--wa-form-control-padding-inline` for one
+  with text) rather than by sizing `::part(button)`.
+- **`wa-button` forwards no ARIA state.** `aria-pressed`, `aria-expanded`,
+  `aria-selected` or a `role` on the host stay on the host, while the inner
+  `<button>` keeps `role="button"`. A toggle, a disclosure trigger or a listbox
+  option therefore stays a native `<button>`, with a comment at the site saying
+  which of those it is — unless a `wa-*` component manages the state itself, as
+  `wa-dropdown` does for its trigger's `aria-expanded`.
+- **Boolean properties with no SSR special case stay out of markup.** Svelte's
+  server renderer only drops a `false` boolean for attributes it knows, like
+  `disabled`; `loading={busy}` renders `loading="false"`, which Lit reads as
+  true until hydration corrects it. Swap the content by hand instead.
+
 **Save buttons start outlined and become solid only when there is something valid to save.**
 An idle save action is secondary, not a call to act. When a form becomes dirty, if the contents is valid then
 promote its save button to a solid brand style. On `superForm(...)` screens,
@@ -475,8 +501,11 @@ is why `PartnerFields` is exercised through `PartnerAcceptForm`.
 
 `wa-*` elements are never upgraded in jsdom — the registrations live in the root
 layout, which a component test does not render — so assert on
-the attributes the component emits, not on rendered behaviour. Anything that
-depends on Web Awesome actually working belongs in the Playwright suite.
+the attributes the component emits, not on rendered behaviour. That includes
+finding them: an un-upgraded `wa-button` has no role, so `getByRole('button')`
+cannot see it — select the element (by class, or `type` for a submit) and read
+an icon button's name from its `wa-icon`'s `label`. Anything that depends on
+Web Awesome actually working belongs in the Playwright suite.
 
 **End to end** — `e2e/*.spec.ts`. This is the only level that sees the auth
 hook, real session cookies, the `(auth-required)` guard and the round trip

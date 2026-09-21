@@ -176,6 +176,10 @@
 						{#if visibleOptions.length > 0}
 							{#each visibleOptions as timezone, index (timezone)}
 								<li>
+									<!-- Native on purpose: this is a listbox option that happens to be
+									     clickable, not a button. `wa-button` keeps `role="button"` on the
+									     `<button>` inside its shadow root whatever the host says, which
+									     would break the listbox for a screen reader. -->
 									<button
 										type="button"
 										role="option"

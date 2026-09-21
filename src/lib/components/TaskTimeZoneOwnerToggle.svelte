@@ -27,28 +27,28 @@
 	);
 </script>
 
+{#snippet option(userId: string, label: string)}
+	{@const selected = value === userId}
+	<wa-button
+		type="button"
+		size="s"
+		pill
+		variant={selected ? 'brand' : 'neutral'}
+		appearance={selected ? 'filled-outlined' : 'outlined'}
+		class:selected
+		onclick={() => {
+			value = userId;
+			onSelect();
+		}}
+	>
+		{label}
+	</wa-button>
+{/snippet}
+
 {#if visible}
 	<div class="toggle" role="group" aria-label="Timezone owner">
-		<button
-			type="button"
-			class:selected={value === viewerUserId}
-			onclick={() => {
-				value = viewerUserId;
-				onSelect();
-			}}
-		>
-			Your time
-		</button>
-		<button
-			type="button"
-			class:selected={value === counterpartUserId}
-			onclick={() => {
-				value = counterpartUserId;
-				onSelect();
-			}}
-		>
-			{counterpartName}'s time ({counterpartOffset})
-		</button>
+		{@render option(viewerUserId, 'Your time')}
+		{@render option(counterpartUserId, `${counterpartName}'s time (${counterpartOffset})`)}
 	</div>
 {/if}
 
@@ -57,20 +57,5 @@
 		display: inline-flex;
 		gap: 0.35rem;
 		flex-wrap: wrap;
-	}
-
-	button {
-		font: inherit;
-		padding: 0.35rem 0.65rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: var(--wa-color-surface-default);
-		color: var(--wa-color-text-normal);
-		cursor: pointer;
-	}
-
-	button.selected {
-		background: color-mix(in srgb, var(--wa-color-brand-fill-quiet) 70%, white);
-		border-color: var(--wa-color-brand-border-loud);
 	}
 </style>

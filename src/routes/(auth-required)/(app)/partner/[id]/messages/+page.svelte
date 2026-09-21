@@ -236,13 +236,12 @@
 		}
 	}
 
+	/* An icon button is square at the control's height, and `pill` rounds it. */
+	wa-button.fab {
+		--wa-form-control-height: 3.75rem;
+	}
+
 	wa-button.fab::part(button) {
-		display: grid;
-		place-items: center;
-		inline-size: 3.75rem;
-		block-size: 3.75rem;
-		padding: 0;
-		border-radius: 999px;
 		box-shadow: 0 0.8rem 1.6rem rgb(0 0 0 / 18%);
 	}
 

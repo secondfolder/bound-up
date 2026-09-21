@@ -56,20 +56,27 @@ export function withEmbedOffer(
 	const wrapper = document.createElement('span');
 	wrapper.className = LINK_WRAPPER_CLASS;
 
-	const button = document.createElement('button');
-	button.type = 'button';
+	const button = document.createElement('wa-button');
+	button.setAttribute('type', 'button');
 	button.className = 'embed-again';
+	button.setAttribute('size', 's');
+	button.setAttribute('appearance', 'outlined');
+	button.setAttribute('pill', '');
 	button.contentEditable = 'false';
-	button.setAttribute('aria-label', 'Add embed');
 	button.title = 'Add embed';
 	// A plus beside the embed icon: the icon alone says "embed", which reads as
 	// a state ("this has one") rather than as the action the button performs.
-	for (const name of ['plus', 'image']) {
-		const icon = document.createElement('wa-icon');
-		icon.setAttribute('name', name);
-		icon.setAttribute('variant', 'solid');
-		button.append(icon);
-	}
+	// The labelled icon is what names the button — `wa-button` takes its name
+	// from its content, not from an `aria-label` on the host.
+	const plus = document.createElement('wa-icon');
+	plus.setAttribute('slot', 'start');
+	plus.setAttribute('name', 'plus');
+	plus.setAttribute('variant', 'solid');
+	const image = document.createElement('wa-icon');
+	image.setAttribute('name', 'image');
+	image.setAttribute('variant', 'solid');
+	image.setAttribute('label', 'Add embed');
+	button.append(plus, image);
 	// Keeps the caret where it was: a press inside the editor moves it, and the
 	// sweep treats "the caret is in this link" as "still typing".
 	button.addEventListener('pointerdown', (event) => event.preventDefault());

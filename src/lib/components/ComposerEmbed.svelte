@@ -48,12 +48,14 @@
 	{#if spec}
 		<UrlEmbed {spec} href={url} label={url} cached={details} cachedPending={resolving} />
 	{/if}
-	<button
+	<wa-button
 		type="button"
 		class="remove"
-		aria-label="Remove embedded preview of {url}"
+		size="s"
+		appearance="outlined"
+		pill
 		title="Remove embed"
-		onpointerdown={(event) => {
+		onpointerdown={(event: PointerEvent) => {
 			// Without this the press lands in the contenteditable first, moving the
 			// caret into a node that is about to be deleted — which leaves Lexical
 			// reconciling a selection pointing at nothing.
@@ -61,8 +63,8 @@
 		}}
 		onclick={onRemove}
 	>
-		<wa-icon name="xmark" variant="solid"></wa-icon>
-	</button>
+		<wa-icon name="xmark" variant="solid" label="Remove embedded preview of {url}"></wa-icon>
+	</wa-button>
 </div>
 
 <style>
@@ -93,17 +95,12 @@
 		inset-block-start: 0.35rem;
 		inset-inline-end: 0.35rem;
 		z-index: 1;
-		display: grid;
-		place-items: center;
-		inline-size: 1.6rem;
-		block-size: 1.6rem;
-		padding: 0;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: var(--wa-color-surface-raised, white);
-		color: var(--wa-color-text-normal);
-		box-shadow: 0 0.125rem 0.5rem rgb(0 0 0 / 25%);
+		--wa-form-control-height: 1.6rem;
 		font-size: 0.7rem;
-		cursor: pointer;
+
+		&::part(base) {
+			background: var(--wa-color-surface-raised, white);
+			box-shadow: 0 0.125rem 0.5rem rgb(0 0 0 / 25%);
+		}
 	}
 </style>
