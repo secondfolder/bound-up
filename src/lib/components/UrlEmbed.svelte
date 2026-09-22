@@ -938,7 +938,6 @@
 
 	.image img {
 		max-inline-size: 100%;
-		max-block-size: 20rem;
 		display: block;
 	}
 

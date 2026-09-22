@@ -72,7 +72,6 @@
 	video {
 		display: block;
 		max-inline-size: 100%;
-		max-block-size: 22rem;
 		border-radius: var(--wa-panel-border-radius, 0.5rem);
 	}
 
