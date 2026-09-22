@@ -1,4 +1,5 @@
 import { createClient } from '@libsql/client';
+import { E2E_DATABASE_URL } from './run-paths';
 import type { Browser, Response } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
@@ -11,7 +12,12 @@ import {
 } from './helpers';
 
 function db() {
-	return createClient({ url: 'file:e2e.db' });
+	return createClient({
+		url: E2E_DATABASE_URL,
+		// Other workers are writing through the dev server meanwhile; wait out a
+		// lock rather than fail with SQLITE_BUSY.
+		timeout: 5_000
+	});
 }
 
 async function readTimezone(email: string): Promise<string> {

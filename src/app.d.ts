@@ -28,7 +28,7 @@ declare global {
 			// @cloudflare/workers-types on purpose — that package exposes its
 			// types as ambient globals, and pulling them in would overwrite the
 			// DOM's Request/Response/fetch/Cache for the whole project,
-			// including the jsdom test project.
+			// including the component test project.
 			env: {
 				DB: AnyD1Database;
 				BETTER_AUTH_SECRET: string;

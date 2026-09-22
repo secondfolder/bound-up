@@ -2,11 +2,9 @@ import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
 import type { ThreadStickerView } from '$lib/types';
+import { waProp } from '$lib/testing/web-awesome';
 
-vi.mock('$app/paths', () => ({
-	resolve: (id: string, params?: Record<string, string>) =>
-		params ? id.replace(/\[(\w+)\]/g, (_, key) => params[key]) : id
-}));
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 vi.mock('$lib/sticker', () => ({
 	stickerStyle: () => '--jx: 0%; --jy: 0%; --tilt: 0deg;'
@@ -92,7 +90,7 @@ describe('ThreadSticker', () => {
 			}
 		});
 
-		expect(container.querySelector('wa-icon')?.getAttribute('name')).toBe('envelope');
+		expect(waProp(container.querySelector('wa-icon'), 'name')).toBe('envelope');
 		expect(queryByText('secret')).toBeNull();
 		expect(openMessage).not.toHaveBeenCalled();
 	});

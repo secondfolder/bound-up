@@ -4,10 +4,9 @@ import { describe, expect, test } from 'vitest';
 import SectionWidgetHarness from './SectionWidgetHarness.svelte';
 
 /**
- * `wa-card` is never upgraded in jsdom, so nothing here can say what the card
- * looks like — these assert on the markup the component emits, which is the
- * part that decides the accessible name and the SSR shape. How it renders is
- * the Playwright suite's problem.
+ * These assert on the markup the component emits, which is the part that
+ * decides the accessible name and the SSR shape. How the card looks is the
+ * Playwright suite's problem.
  */
 describe('SectionWidget', () => {
 	test('links the title when it has somewhere to go', () => {

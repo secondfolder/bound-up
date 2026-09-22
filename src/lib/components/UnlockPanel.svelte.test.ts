@@ -1,49 +1,43 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { userEvent } from 'vitest/browser';
 
 /**
  * The one unlock form, in each of the four shapes it takes.
  *
  * Everything that touches WebCrypto, IndexedDB or WebAuthn is injected, which
- * is what makes this testable in jsdom at all — and which is also how the real
- * callers stay honest, because the component can express no opinion about how
- * an unlock happens.
+ * is what makes this testable without a real authenticator — and which is also
+ * how the real callers stay honest, because the component can express no
+ * opinion about how an unlock happens.
  *
- * `wa-*` elements are never upgraded here (they come from a CDN), so these
- * assert on what the component emits rather than on rendered behaviour.
- * Anything needing Web Awesome to actually work is in `e2e/passkey.spec.ts`.
+ * The `wa-*` elements here are the real, upgraded ones, so a password is typed
+ * into the native control inside `<wa-input>`'s shadow root — the only place
+ * `PasswordField` will read it from.
  */
 
-vi.mock('$app/paths', () => ({ resolve: (id: string) => id }));
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 /**
- * A stand-in for Web Awesome's `<wa-input>`, because `PasswordField` reads the
- * native control inside the shadow root and refuses to read anything else.
- *
- * That refusal is deliberate and load-bearing — see the autofill note in
- * `PasswordField.svelte` — so a test that wants to type a password has to
- * provide the thing it insists on rather than work around it. Web Awesome comes
- * from a CDN and never upgrades in jsdom, so nothing real is being shadowed.
+ * The panel hides its passkey controls without WebAuthn. Chromium has it, but
+ * it is stubbed anyway so no test can reach a real authenticator — every
+ * ceremony goes through the injected functions.
  */
-class FakeWaInput extends HTMLElement {
-	readonly input = document.createElement('input');
-	readonly updateComplete = Promise.resolve(true);
-}
-
-/** jsdom has no WebAuthn, and the panel correctly hides passkey controls then. */
 beforeAll(() => {
 	vi.stubGlobal('PublicKeyCredential', class {});
 	Object.defineProperty(navigator, 'credentials', { value: {}, configurable: true });
-	customElements.define('wa-input', FakeWaInput);
 });
 
-/** Types into a password box the way a person does. */
+type WaInput = HTMLElement & { input: HTMLInputElement; updateComplete: Promise<unknown> };
+
+/**
+ * Types into a password box the way a person does: real, trusted keystrokes
+ * into the native control `<wa-input>` renders, driven through Playwright.
+ */
 async function typePassword(container: HTMLElement, field: string, value: string) {
-	const host = container.querySelector(`wa-input[data-field="${field}"]`) as FakeWaInput;
+	const host = container.querySelector(`wa-input[data-field="${field}"]`) as WaInput;
 	await host.updateComplete;
-	host.input.value = value;
-	await fireEvent.input(host.input);
+	await userEvent.fill(host.input, value);
 }
 
 const { default: UnlockPanel } = await import('./UnlockPanel.svelte');

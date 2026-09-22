@@ -661,8 +661,7 @@ test.describe('thread tags', () => {
 	// The composer dialog used to have `light-dismiss`, and the tag dropdown's
 	// popup counts as an outside click: selecting a tag flashed the chip and
 	// closed the whole dialog. Only a real browser can see that, because it is
-	// Web Awesome's popup layering doing the dismissing — jsdom never upgrades
-	// `wa-dialog`, so the component tests are blind to it by design.
+	// Web Awesome's popup layering doing the dismissing.
 	test('picking a tag in the composer keeps the dialog open', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
@@ -804,9 +803,9 @@ test.describe('embeds', () => {
 	/**
 	 * A phone-width window gets a button, not a frame.
 	 *
-	 * This is the only level that can check it: jsdom never upgrades `wa-dialog`
-	 * and has no layout, so nothing there can say whether the overlay actually
-	 * covers the screen — which is the whole reason it exists.
+	 * Checked at this level because what matters is whether the overlay covers
+	 * the real screen of a real page — which is the whole reason it exists — not
+	 * how one component draws in a test frame.
 	 */
 	test('a narrow window opens an embed over the screen instead of framing it inline', async ({
 		browser

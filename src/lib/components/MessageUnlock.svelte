@@ -13,9 +13,9 @@
 	/**
 	 * `UnlockPanel` wired to the real keyring, in one place.
 	 *
-	 * The panel itself takes injected callbacks so it can be tested in jsdom,
-	 * which has no WebCrypto, IndexedDB or WebAuthn. This is the other half: the
-	 * wiring every caller would otherwise repeat.
+	 * The panel itself takes injected callbacks so it can be tested without a
+	 * real keyring or authenticator. This is the other half: the wiring every
+	 * caller would otherwise repeat.
 	 *
 	 * That repetition is not hypothetical. Before this, four screens each built
 	 * their own — and the messaging board's copy passed no `passkeyUnlock` at

@@ -1,7 +1,54 @@
 import { expect, test } from './fixtures';
-import { clickWaButton, createInvite, fillRichText, newSide, signUp } from './helpers';
+import {
+	account,
+	clickWaButton,
+	createInvite,
+	fillRichText,
+	newSide,
+	signUp,
+	typeRichText,
+	waitForHydration
+} from './helpers';
 
 test.describe('rewards', () => {
+	/**
+	 * A title typed before the description has to survive it.
+	 *
+	 * `RewardForm` used to hold its native fields with `value={…}`. Svelte does
+	 * not write an input's value while hydrating, so the first re-run of the
+	 * form's template — which typing in the description causes — wrote the
+	 * server's value back over the field. The add page lost the title; the edit
+	 * page silently reverted it to the stored one.
+	 *
+	 * Only a page loaded in full is hydrated, so both are reached with `goto`:
+	 * the click-through from /home/rewards the other tests use is a client-side
+	 * navigation, which mounts instead, and never showed it.
+	 */
+	test('keeps a title typed before the description, adding and editing', async ({ page }) => {
+		await signUp(page, account('Ada'));
+
+		await page.goto('/home/rewards/add');
+		const title = page.locator('.add-form input[name="title"]');
+		await waitForHydration(page);
+		await title.fill('Long bath');
+		await typeRichText(page.locator('.add-form'), 'No interruptions');
+		await expect(title).toHaveValue('Long bath');
+
+		await page.locator('.add-form input[name="cost"]').fill('2');
+		await clickWaButton(page, 'Add reward');
+		await page.waitForURL(/\/home\/rewards$/);
+
+		const edit = await page.getByRole('link', { name: 'Edit Long bath' }).getAttribute('href');
+		if (!edit) throw new Error('expected an edit link');
+		await page.goto(edit);
+		await waitForHydration(page);
+		// Seeded from the stored reward, which a `defaultValue` still renders.
+		await expect(title).toHaveValue('Long bath');
+		await title.fill('Longer bath');
+		await typeRichText(page.locator('.add-form'), ' and a book');
+		await expect(title).toHaveValue('Longer bath');
+	});
+
 	test('a user can manage and claim self rewards from home', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 
@@ -19,6 +66,7 @@ test.describe('rewards', () => {
 
 			await ada.page.getByRole('link', { name: 'Add a reward' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/add$/);
+			await waitForHydration(ada.page);
 			await ada.page.locator('.add-form input[name="title"]').first().fill('Long bath');
 			await fillRichText(ada.page.locator('.add-form'), 'No interruptions');
 			await ada.page.locator('.add-form input[name="cost"]').first().fill('2');
@@ -69,6 +117,7 @@ test.describe('rewards', () => {
 
 			await jun.page.getByRole('link', { name: 'Add a reward' }).click();
 			await jun.page.waitForURL(/\/rewards\/add$/);
+			await waitForHydration(jun.page);
 			await jun.page.locator('.add-form input[name="title"]').fill('Tea service');
 			await fillRichText(jun.page.locator('.add-form'), 'Fresh pot first');
 			await jun.page.locator('.add-form input[name="cost"]').fill('2');

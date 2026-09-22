@@ -5,6 +5,7 @@ import { superValidate, type Infer, type SuperValidated } from 'sveltekit-superf
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { accountFormSchema, type AccountFormSchema } from '$lib/schemas/accountForm';
 import TimezoneSelectHarness from './TimezoneSelectHarness.svelte';
+import { waButtonOfType } from '$lib/testing/web-awesome';
 
 vi.mock('$lib/timezone', () => ({
 	canonicalizeTimeZone: (value: string) =>
@@ -87,8 +88,7 @@ describe('TimezoneSelect', () => {
 		});
 		expect(getByText('Set to America/New_York')).toBeTruthy();
 
-		const button = container.querySelector('wa-button[type="button"]');
-		if (!(button instanceof HTMLElement)) throw new Error('missing use-device-timezone button');
+		const button = waButtonOfType(container, 'button');
 		await fireEvent.click(button);
 
 		await waitFor(() => {

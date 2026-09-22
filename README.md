@@ -139,16 +139,21 @@ Never run `drizzle-kit push` — see the comment in `drizzle.config.ts`.
 ## Tests
 
 ```sh
-npm test                          # vitest: unit, server and component tests
-npx playwright install chromium   # once
-npm run test:e2e                  # the invite flow in a real browser
+npx playwright install chromium   # once — both suites use it
+npm test                          # everything: vitest, then the Playwright suite
+npm run test:unit                 # vitest alone, in watch mode
+npm run test:e2e                  # the Playwright suite alone
 ```
 
-`npm test` needs nothing set up: the server tests build a SQLite database in
-memory from the committed migrations. `npm run test:e2e` starts its own
-`vite dev` on port 5175 against a throwaway `e2e.db`, so it never touches your
-`local.db` — but it does load Web Awesome from the CDN, so it needs a network
-connection. `AGENTS.md` has the details of how each level is meant to be used.
+The server tests build a SQLite database in memory from the committed
+migrations. The component tests run in headless Chromium (Vitest's browser
+mode), sealed off from the network. The Playwright suite starts its own
+`vite dev` against a throwaway database under the OS temp directory, on a port
+derived from the checkout's path, so it never touches your `local.db` or
+`npm run dev`, and two worktrees can run it at once. A second run in the same
+checkout is refused until the first finishes. The app fetches its icons from
+Font Awesome's CDN, so the Playwright suite expects a network connection.
+`AGENTS.md` has the details of how each level is meant to be used.
 
 ### Pre-commit
 
@@ -168,8 +173,8 @@ hand.
 | `dev` / `build`.                                              | Vite dev server / production build                            |
 | `preview`                                                     | Build, migrate the emulated D1, then run the real worker      |
 | `deploy`                                                      | Build and deploy to Cloudflare                                |
-| `check` / `lint` / `format` / `test`                          | svelte-check / prettier + eslint / prettier write / vitest    |
-| `test:e2e`                                                    | Playwright, in a real browser against `vite dev`              |
+| `check` / `lint` / `format` / `test`                          | svelte-check / prettier + eslint / prettier write / all tests |
+| `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against `vite dev`          |
 | `db:generate`                                                 | Generate a migration from the schema                          |
 | `db:migrate` / `db:migrate:preview` / `db:migrate:production` | Apply migrations to local.db / emulated D1 / production       |
 | `db:seed` / `db:reset`                                        | Seed dev data / wipe local.db and re-seed                     |

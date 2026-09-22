@@ -5,6 +5,7 @@ import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { taskEditorFormValuesForCreate, type TaskEditorFormValues } from '$lib/task-editor-form';
 import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
+import { waButtonOfType, waProp } from '$lib/testing/web-awesome';
 
 const { default: TaskFormHarness } = await import('$lib/testing/TaskFormHarness.svelte');
 
@@ -31,19 +32,18 @@ describe('TaskForm', () => {
 			data,
 			submitLabel: 'Add task'
 		});
-		const save = container.querySelector('wa-button[type="submit"]');
+		const save = waButtonOfType(container, 'submit');
 		const title = container.querySelector('input[name="title"]');
-		if (!(save instanceof HTMLElement)) throw new Error('missing submit button');
 		if (!(title instanceof HTMLInputElement)) throw new Error('missing title input');
 
-		expect(save.getAttribute('appearance')).toBe('outlined');
-		expect(save.getAttribute('variant')).toBeNull();
+		expect(waProp(save, 'appearance')).toBe('outlined');
+		expect(waProp(save, 'variant')).toBeUndefined();
 
 		await fireEvent.input(title, { target: { value: 'Long shower' } });
 
 		await waitFor(() => {
-			expect(save.getAttribute('appearance')).toBe('filled');
-			expect(save.getAttribute('variant')).toBe('brand');
+			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'variant')).toBe('brand');
 		});
 	});
 
@@ -53,26 +53,25 @@ describe('TaskForm', () => {
 			data,
 			submitLabel: 'Save task'
 		});
-		const save = container.querySelector('wa-button[type="submit"]');
+		const save = waButtonOfType(container, 'submit');
 		const title = container.querySelector('input[name="title"]');
-		if (!(save instanceof HTMLElement)) throw new Error('missing submit button');
 		if (!(title instanceof HTMLInputElement)) throw new Error('missing title input');
 
-		expect(save.getAttribute('appearance')).toBe('outlined');
-		expect(save.getAttribute('variant')).toBeNull();
+		expect(waProp(save, 'appearance')).toBe('outlined');
+		expect(waProp(save, 'variant')).toBeUndefined();
 
 		await fireEvent.input(title, { target: { value: '' } });
 
 		await waitFor(() => {
-			expect(save.getAttribute('appearance')).toBe('outlined');
-			expect(save.getAttribute('variant')).toBeNull();
+			expect(waProp(save, 'appearance')).toBe('outlined');
+			expect(waProp(save, 'variant')).toBeUndefined();
 		});
 
 		await fireEvent.input(title, { target: { value: 'Long shower deluxe' } });
 
 		await waitFor(() => {
-			expect(save.getAttribute('appearance')).toBe('filled');
-			expect(save.getAttribute('variant')).toBe('brand');
+			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'variant')).toBe('brand');
 		});
 	});
 

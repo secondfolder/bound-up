@@ -71,8 +71,6 @@
 		const control = host?.input;
 		// No control means Web Awesome has not upgraded the element, so there is
 		// nothing anyone could have put in it and nothing authoritative to read.
-		// (Also the jsdom case, where `wa-*` never upgrades — so a component test
-		// can never have its value silently blanked by this.)
 		if (!control) return;
 		if (control.value !== value) value = control.value;
 	}

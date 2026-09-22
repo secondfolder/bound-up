@@ -36,7 +36,7 @@ export type MediaStore = {
  * `@cloudflare/workers-types` is deliberately not imported, for the reason
  * `app.d.ts` already gives: it publishes its types as ambient globals, and
  * pulling them in would overwrite the DOM's `Request`/`Response`/`fetch` for
- * the whole project — including the jsdom test project.
+ * the whole project — including the component test project.
  */
 export type MediaBucket = {
 	put(

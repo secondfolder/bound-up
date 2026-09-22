@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, type Browser, type Locator, type Page } from '@playwright/test';
 
 /**
@@ -11,6 +12,7 @@ import { expect, type Browser, type Locator, type Page } from '@playwright/test'
  */
 
 export async function fillWaInput(page: Page, name: string, value: string) {
+	await waitForHydration(page);
 	await page.locator(`wa-input[name="${name}"] input`).first().fill(value);
 }
 
@@ -26,6 +28,7 @@ export async function fillWaInput(page: Page, name: string, value: string) {
  * Not `getByLabel('Password')`, which is ambiguous against "Confirm password".
  */
 export async function fillPassword(page: Page, field: string, value: string) {
+	await waitForHydration(page);
 	await page.locator(`wa-input[data-field="${field}"] input`).first().fill(value);
 }
 
@@ -45,12 +48,38 @@ export async function fillPassword(page: Page, field: string, value: string) {
  * dev-only race — but the suite runs against `vite dev`, and it reproduced
  * about half the time on a fast machine.
  *
- * Waiting on the custom element registry is the precise check: it is exactly
- * the condition that makes the click meaningful.
+ * Waiting on the custom element registry is half the check. The other half is
+ * hydration: the element can be registered while Svelte has yet to attach its
+ * `onclick`, and a click then does nothing just as silently. That half showed
+ * up once the suite ran in parallel — "Add a passkey" clicked straight after a
+ * page load, and the dialog never opened.
  */
 export async function clickWaButton(page: Page, name: string | RegExp) {
+	await waitForHydration(page);
 	await page.waitForFunction(() => customElements.get('wa-button') !== undefined);
 	await page.getByRole('button', { name }).click();
+}
+
+/**
+ * Waits until the page's components are live, BEFORE touching anything on it.
+ *
+ * A page loaded in full is server-rendered first and hydrated after, and
+ * anything done to it in between is lost: a click reaches no handler, and a
+ * filled field is written over when hydration sets its value (see
+ * waitForEnhancedForm for how that looks). The root layout marks the document
+ * once hydration is done — see `src/routes/+layout.svelte` — and the helpers
+ * that click or fill wait on it, so a spec rarely needs to call this itself.
+ * One that fills a field with a bare `locator.fill()` does.
+ *
+ * Serially the page almost always won that race, which is why the suite got
+ * away without this for so long. Running four workers at once slowed
+ * hydration enough to lose it, in a different flow each run.
+ *
+ * Harmless after a client-side navigation: the mark survives it, and a page
+ * rendered on the client has no hydration to wait for.
+ */
+export async function waitForHydration(page: Page) {
+	await page.locator('html[data-hydrated]').waitFor({ state: 'attached' });
 }
 
 /**
@@ -75,10 +104,10 @@ export async function clickWaButton(page: Page, name: string | RegExp) {
  * long before then, and even `customElements.get('wa-button')` can resolve
  * while Svelte has yet to attach anything.
  *
- * NOTE: only those two forms carry the marker. The other superforms screens
- * (the partner forms) have the same latent race — they use the same
- * `InputField` — but have not been seen to lose it. Worth adding the marker
- * there if one ever starts flaking.
+ * NOTE: only some forms carry the marker — login, signup, and the account and
+ * security settings. For every other page, `waitForHydration` is the same
+ * guarantee without a per-form marker, and the fill helpers already wait on
+ * it.
  */
 export async function waitForEnhancedForm(page: Page) {
 	await page.locator('form[data-ready]').first().waitFor();
@@ -90,12 +119,18 @@ export async function submitEnhancedForm(page: Page, buttonName: string) {
 	await clickWaButton(page, buttonName);
 }
 
-let accountCounter = 0;
-
-/** A fresh email per call, so a rerun inside one database cannot collide. */
+/**
+ * A fresh email per call, so no two accounts in one database can collide —
+ * across reruns, and across the parallel workers sharing that database.
+ *
+ * Random rather than `Date.now()` plus a counter, which is what this was. The
+ * counter lived in this module, so it was per worker process: two workers
+ * making their first account in the same millisecond produced the same
+ * address, the second signup failed on the unique email, and its test hung
+ * waiting for a navigation that never came.
+ */
 export function uniqueEmail(prefix: string): string {
-	accountCounter += 1;
-	return `${prefix}-${Date.now()}-${accountCounter}@example.test`;
+	return `${prefix}-${randomUUID()}@example.test`;
 }
 
 export type Account = { name: string; email: string; password: string };
@@ -231,8 +266,15 @@ export async function openBoard(page: Page, partnerName: string): Promise<void> 
 	await page.getByRole('link', { name: 'Messages' }).click();
 	await page.waitForURL(/\/messages$/);
 
+	// Waits for the screen to settle on one or the other before deciding. The
+	// board shows a placeholder while the keyring resolves, and only then the
+	// warning — so an instant `isVisible()` check could land on the placeholder,
+	// skip the warning, and leave it blocking every later step. Serially it
+	// always resolved first; the parallel suite's load made it lose that race.
 	const warning = page.getByText(/Your password is the only key/);
-	if (await warning.isVisible().catch(() => false)) {
+	const board = page.getByRole('button', { name: 'Write something' });
+	await expect(warning.or(board).first()).toBeVisible();
+	if (await warning.isVisible()) {
 		await page.getByRole('checkbox').check();
 		await clickWaButton(page, 'Start messaging');
 		await expect(warning).toBeHidden();
@@ -300,6 +342,7 @@ export async function typeRichText(scope: Page | Locator, value: string): Promis
  * than clicking whatever is on screen.
  */
 async function readyRichText(scope: Page | Locator): Promise<Locator> {
+	await waitForHydration('goto' in scope ? scope : scope.page());
 	const surface = scope.locator('.richtext-editor .surface[contenteditable="true"]').first();
 	await surface.click();
 	await expect(surface).toBeFocused();
@@ -341,9 +384,10 @@ export async function fillRichText(scope: Page | Locator, value: string): Promis
  * dispatches trusted composed events and is therefore fine, which is why this
  * only reproduces with an extension.
  *
- * There is no lower level that can test this. jsdom never upgrades a `wa-*`
- * element, so there is no shadow root and no boundary to fail to cross — a
- * component test would have to stub the very behaviour under test.
+ * Written when the component tests ran in jsdom, which never upgraded a `wa-*`
+ * element — no shadow root, so no boundary to fail to cross. They run in a real
+ * browser now, where the boundary exists; this stays the check that the whole
+ * signup and unlock flows survive it.
  */
 export async function autofillPassword(page: Page, field: string, value: string) {
 	await autofillWaInput(page, `wa-input[data-field="${field}"]`, value);

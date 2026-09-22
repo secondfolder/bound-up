@@ -2,10 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, test, vi } from 'vitest';
 
-vi.mock('$app/paths', () => ({
-	resolve: (id: string, params?: Record<string, string>) =>
-		params ? id.replace(/\[(\w+)\]/g, (_, key) => params[key]) : id
-}));
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 const { default: UnreadMessagesWidget } = await import('./UnreadMessagesWidget.svelte');
 

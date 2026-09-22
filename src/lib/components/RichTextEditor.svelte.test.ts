@@ -14,11 +14,11 @@ import RichTextEditorHarness from './RichTextEditorHarness.svelte';
 import { clearOembedCache, type CachedEmbedDetails } from '$lib/embeds';
 import { $isEmbedNode as isEmbedNode } from '$lib/richtext-editor';
 import { FORMAT_BOLD, FORMAT_ITALIC, FORMAT_STRIKETHROUGH } from '$lib/richtext';
+import { waProp } from '$lib/testing/web-awesome';
 
 /**
- * jsdom never upgrades `wa-*` elements, so these assert on what the component
- * emits rather than on rendered behaviour — per AGENTS.md. Real typing, with a
- * real caret, lives in the Playwright suite.
+ * Keystroke-by-keystroke typing, with a real caret, lives in the Playwright
+ * suite.
  *
  * Everything here goes through `RichTextEditorHarness`, which feeds each change
  * back into `value` the way a form does. That loop is what the editor has to
@@ -132,8 +132,7 @@ describe('RichTextEditor', () => {
 	 * all, while the stored document had the bits set all along.
 	 *
 	 * Asserting on the class names rather than on computed style is deliberate:
-	 * the class is the whole mechanism, and jsdom does not apply the component's
-	 * stylesheet anyway.
+	 * the class is the whole mechanism.
 	 */
 	it('marks every format on a text node, not just the first', async () => {
 		const stored = JSON.stringify({
@@ -304,7 +303,7 @@ describe('RichTextEditor, embeds', () => {
 			'https://i.imgur.com/cat.jpg'
 		);
 		// A `wa-button` takes its name from its icon's label.
-		expect(removeButton(container).querySelector('wa-icon')?.getAttribute('label')).toBe(
+		expect(waProp(removeButton(container).querySelector('wa-icon'), 'label')).toBe(
 			'Remove embedded preview of https://i.imgur.com/cat.jpg'
 		);
 	});
@@ -592,9 +591,9 @@ describe('RichTextEditor, embeds', () => {
 	});
 
 	/**
-	 * jsdom has no `:hover`, so these check the half the script owns — the
-	 * class that makes a link's button eligible to show — and click the button
-	 * directly. Revealing it on hover is plain CSS, covered by the e2e suite.
+	 * These check the half the script owns — the class that makes a link's
+	 * button eligible to show — and click the button directly. Revealing it on
+	 * hover is plain CSS, covered by the e2e suite.
 	 */
 	const linkWrapper = (container: HTMLElement) =>
 		container.querySelector('.surface .link-with-embed-offer')!;

@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 import type { PartnerView } from '$lib/types';
+import { waSettled } from '$lib/testing/web-awesome';
 
 /**
  * `$app/state` is a live store fed by the router, and `resolve()` needs the
@@ -18,10 +19,7 @@ vi.mock('$app/state', () => ({
 		return pageState;
 	}
 }));
-vi.mock('$app/paths', () => ({
-	resolve: (id: string, params?: Record<string, string>) =>
-		params ? id.replace(/\[(\w+)\]/g, (_, key) => params[key]) : id
-}));
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 const { default: AppNav } = await import('./AppNav.svelte');
 
@@ -79,13 +77,15 @@ describe('AppNav', () => {
 		expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
 	});
 
-	test('falls back to initials when a partner has no picture', () => {
+	test('falls back to initials when a partner has no picture', async () => {
 		const { container } = renderNav('/(auth-required)/(app)/home');
-		const avatars = container.querySelectorAll('wa-avatar');
+		await waSettled(container);
+		const [ada, jun] = [...container.querySelectorAll('wa-avatar')];
 
-		expect(avatars[0]).toHaveAttribute('initials', 'A');
-		// An empty image="" would render as a broken image, so it is left off.
-		expect(avatars[0].hasAttribute('image')).toBe(false);
-		expect(avatars[1]).toHaveAttribute('image', '/jun.png');
+		// What the avatar actually draws. An empty image="" would render as a
+		// broken image, so for Ada the image is left off and the initials show.
+		expect(ada.shadowRoot?.querySelector('img')).toBeNull();
+		expect(ada.shadowRoot?.textContent).toContain('A');
+		expect(jun.shadowRoot?.querySelector('img')?.getAttribute('src')).toBe('/jun.png');
 	});
 });

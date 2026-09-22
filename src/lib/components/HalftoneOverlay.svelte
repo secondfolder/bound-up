@@ -288,8 +288,9 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 		   `ready` class note in capture()). :global because the class is added
 		   imperatively from onMount, which the compiler cannot see — a scoped
 		   selector would be pruned as unused and the canvas would stay at
-		   opacity 0. Transitions only run in the browser, and jsdom never runs
-		   capture(), so tests are unaffected either way. */
+		   opacity 0. The landing page's component test does mount the overlay,
+		   and in its real browser capture() runs, but it asserts nothing about
+		   the canvas, so it is unaffected either way. */
 		--overlay-opacity: 1;
 		opacity: 0;
 		transition: opacity 1.2s ease-out;

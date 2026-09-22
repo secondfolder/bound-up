@@ -34,7 +34,7 @@ one entry stays on one line).
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
-| `e2e/`                        | Playwright specs. Run against `vite dev` on port 5175 with their own SQLite file             |
+| `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
 | `src/routes/(public)/`        | Anonymous-reachable routes. `+layout.svelte` here owns `SiteHeader`                          |
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
 | `.../(auth-required)/(app)/`  | The signed-in app shell: fixed-viewport layout plus the `AppNav` bottom bar                  |
@@ -47,8 +47,8 @@ Run before declaring anything done:
 ```sh
 npm run check    # svelte-check
 npm run lint     # prettier --check && eslint
-npm test         # vitest, both projects, single run
-npm run test:e2e # playwright, real browser against vite dev
+npm test         # everything: vitest (node + browser projects), then playwright
+npm run test:e2e # playwright alone, real browser against vite dev
 npm run format   # fixes prettier complaints
 ```
 
@@ -70,7 +70,7 @@ noise:
   first two because `skills-lock.json` pins them, the last because formatting
   would silently rewrite frozen records (it reflows their tables and changes
   emphasis markers). Keep new files formatted; keep those ignored.
-- `npm run check`: **0 errors, 0 warnings.** All TypeScript files across the workspace (root configs, `vitest-setup-client.ts`, `e2e/**/*.ts`) are included in `tsconfig.json` and type-aware ESLint (`eslint.config.js`) so command-line checks catch all errors visible in VS Code. Two
+- `npm run check`: **0 errors, 0 warnings.** All TypeScript files across the workspace (root configs, `vitest-setup-browser.ts`, `e2e/**/*.ts`) are included in `tsconfig.json` and type-aware ESLint (`eslint.config.js`) so command-line checks catch all errors visible in VS Code. Two
   suppressions keep it clean. Both are ones svelte-check and the vite dev
   server respect alike — svelte-check ignores `onwarn`, so that hook is not an
   option:
@@ -106,20 +106,20 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
     every `invalidate()` would reset the form. Add one to new ones.
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
-- `npm run test:e2e`: Playwright specs, a little over two minutes for the
-  current ~66 of them once the browser is installed (`npx playwright install
-chromium` first). Read the per-spec times rather than the total: the suite is
-  `workers: 1`, so one spec sitting at ~90 seconds is one hanging on its
+- `npm run test:e2e`: Playwright specs, about a minute for the current ~76 of
+  them at four workers, once the browser is installed (`npx playwright install
+chromium` first). A spec sitting at ~90 seconds is one hanging on its
   timeout, and the reported failure is usually the `finally` that could not
   close its contexts rather than the step that actually stalled — the trace's
-  last unfinished call is what names it.
+  last unfinished call is what names it, and `error-context.md` beside it has
+  the page as it was.
 
 Internal links go through `resolve()` from `$app/paths` — `href="/guides"` and a
 bare `goto('/')` are both eslint errors under
 `svelte/no-navigation-without-resolve`.
 
 If you add a behaviour worth protecting, add a test. `*.svelte.test.ts` runs in
-the jsdom project; everything else runs in the node project, which excludes
+the browser project; everything else runs in the node project, which excludes
 `src/lib/server/**` from the client project only, not from node.
 
 `npm run preview` is the only local command that exercises the real
@@ -249,7 +249,8 @@ site it applies to; go read that comment before deciding to break one.
 
 16. **Web Awesome's Lit dependencies must resolve to their `node/` builds in
     the wrangler bundle.** `src/routes/+layout.svelte` statically imports the
-    registrations so hydration does not have to fetch them after load, which
+    registrations (`src/lib/webawesome.ts`) so hydration does not have to fetch
+    them after load, which
     also puts Lit in the server graph. workerd has no `HTMLElement`, so
     `wrangler.jsonc` remaps `@lit/reactive-element` and `lit-html` to their
     packaged `node/` shims; the browser build stays on the normal entries.
@@ -380,9 +381,12 @@ knows nothing about embeds. See [docs/rich-text.md](docs/rich-text.md).
 — never the stored string, which is several times larger than the prose in it.
 
 **UI is Web Awesome 3 alpha, installed from npm and cherry-picked in
-`src/routes/+layout.svelte`.** Each component is imported there by hand rather
-than autoloaded, so an element the registration list does not name renders as an
-inert unknown tag — add the import when you reach for a new one. Components
+`src/lib/webawesome.ts`.** The root layout imports that list, and so do the
+component tests, so the two cannot drift. Each component is imported there by
+hand rather than autoloaded, so an element the list does not name renders as an
+inert unknown tag — add the import when you reach for a new one. The icons are
+the exception to "from npm": `wa-icon` fetches each SVG from Font Awesome's kit
+CDN at runtime. Components
 are custom elements (`wa-button`, `wa-input`, …) with no TypeScript definitions,
 which is why Svelte's a11y warnings fire on them. Style with `--wa-*` custom
 properties and `::part()`. Sizes are the short spellings (`size="s"`): the
@@ -533,26 +537,66 @@ const data = await runLoad(load(fakeEvent({ db, user: ada }))); // $lib/testing/
   and refuses to build. Name them `page.server.test.ts`, as the existing
   `page.svelte.test.ts` does.
 
-**Component** — `*.svelte.test.ts`, jsdom project. `$app/state` and `$app/paths`
-have to be mocked (`AppNav.svelte.test.ts` shows the shape). A component that
-calls `superForm()` can only be tested through a wrapper component, because
-`superForm` registers an `onDestroy` and throws outside initialisation — which
-is why `PartnerFields` is exercised through `PartnerAcceptForm`.
+**Component** — `*.svelte.test.ts`, the browser project: Vitest's browser
+mode, in headless Chromium through the Playwright provider, rendered with
+`@testing-library/svelte`. `$app/state` and `$app/paths` have to be mocked
+(`AppNav.svelte.test.ts` shows the shape); mock `$app/paths` with
+`vi.mock('$app/paths', () => import('$lib/testing/app-paths'))` rather than a
+factory of your own. A browser refuses to link a module missing a named import
+that jsdom would have left `undefined`, and SvelteKit's own runtime imports
+`base` from it. A component that calls `superForm()` can only be tested through
+a wrapper component, because `superForm` registers an `onDestroy` and throws
+outside initialisation — which is why `PartnerFields` is exercised through
+`PartnerAcceptForm`.
 
-`wa-*` elements are never upgraded in jsdom — the registrations live in the root
-layout, which a component test does not render — so assert on
-the attributes the component emits, not on rendered behaviour. That includes
-finding them: an un-upgraded `wa-button` has no role, so `getByRole('button')`
-cannot see it — select the element (by class, or `type` for a submit) and read
-an icon button's name from its `wa-icon`'s `label`. Anything that depends on
-Web Awesome actually working belongs in the Playwright suite.
+The `wa-*` elements are real: `vitest-setup-browser.ts` imports
+`$lib/webawesome`, so they upgrade, with shadow roots and form association.
+(They could not under jsdom, the previous environment — it lacks
+`ElementInternals.setFormValue`, so `wa-input` threw as it upgraded. happy-dom
+lacks `ElementInternals` altogether.) That changes how to read them:
+
+- Svelte sets an upgraded element's **properties**, and Lit reflects only some
+  back to attributes, later. Read with `waProp()` from `$lib/testing/web-awesome`,
+  not `getAttribute()`, and find a `wa-button` by type with `waButtonOfType()` —
+  `wa-button[type="submit"]` matches nothing.
+- An element renders a microtask after its properties are set. Await
+  `waSettled(container)` before reading a shadow root, a form's `FormData`, or
+  clicking a `wa-button` (whose `click()` forwards to a native button that does
+  not exist until then).
+- Testing-library's role queries do not look inside shadow roots, so a
+  `wa-button`'s role is out of their reach; find it by element or class.
+- `userEvent` from `vitest/browser` types real, trusted keystrokes through
+  Playwright — what `UnlockPanel.svelte.test.ts` uses for the password box.
+
+The test browser is sealed off. Every host but localhost resolves to a black
+hole (`--host-resolver-rules` in `vite.config.ts`), so an iframe never loads
+and a test decides when `load` fires. A component's `fetch('/api/…')`, and an
+`<img>` for a picture `static/` does not ship, get a prompt 404 instead of
+reaching SvelteKit's dev middleware (`componentTestServer()`). The frame is
+desktop-sized (1280×800); a test that wants a narrow window fakes `matchMedia`,
+as `UrlEmbed.svelte.test.ts` does.
+
+What still belongs in the Playwright suite is anything that needs a whole
+page: routing, the server, real sessions, hydration.
 
 **End to end** — `e2e/*.spec.ts`. This is the only level that sees the auth
 hook, real session cookies, the `(auth-required)` guard and the round trip
-through `/signup?redirectTo=`. It runs `vite dev` on port 5175 against its own
-`e2e.db`, rebuilt from the migrations as part of the server command (not in a
-`globalSetup` — Playwright starts the web server first, and deleting the file
-underneath it leaves every write failing with `SQLITE_READONLY_DBMOVED`).
+through `/signup?redirectTo=`. It runs `vite dev` against an `e2e.db` of its
+own, rebuilt from the migrations by the server command (`e2e/server.mjs`) —
+not in a `globalSetup`: Playwright starts the web server first, and deleting
+the file underneath it leaves every write failing with
+`SQLITE_READONLY_DBMOVED`.
+
+The port, the database and the media directory are derived from the checkout
+path (`e2e/run-paths.ts`), so separate worktrees run the suite at the same time
+without touching each other. A second run in the **same** checkout is refused
+with a message: `server.mjs` holds a lock (a Unix socket, which the OS frees
+however the process dies) for as long as the server runs. The database lives
+under the OS temp directory and is left there after a run, to be inspected.
+
+The suite runs four workers in parallel against one server and one database.
+That is safe because tests are isolated by data, not by database: every
+account is fresh (`uniqueEmail()`), and nothing asserts on global state.
 
 Notes that cost a debugging round each:
 
@@ -577,19 +621,30 @@ Notes that cost a debugging round each:
   never matches a bare `/`. Pass `'/'`.
 - Signing in or up is asynchronous; wait for the form to be left behind before
   the next step or it races the session cookie.
-- **Wait for hydration before filling a superforms field, not just before
-  submitting.** `InputField.svelte` renders each field's `value` from `$form`,
-  so hydration writes the store's value — empty on a fresh form — over anything
-  already typed into the DOM. `waitForEnhancedForm` in `e2e/helpers.ts` waits on
-  a `data-ready` marker the login and signup forms set from `onMount`. Without
-  it, filling email then password then submitting would intermittently leave the
-  _email_ box empty (hydration landing between the two fills), native validation
-  would refuse to submit the empty required field, and the test hung for its
-  full timeout **with no request made and no error anywhere** — about one
-  full-suite run in two.
-- A `<wa-button type="submit">` only submits once Web Awesome has upgraded it;
-  before that a click is silently a no-op that Playwright's actionability checks
-  do not catch. `clickWaButton` waits on the custom element registry.
+- **Wait for hydration before touching a page loaded in full.** Before it, a
+  click reaches no handler and a filled field is written over when hydration
+  sets its value: filling email then password would intermittently leave the
+  _email_ box empty, native validation would refuse to submit, and the test
+  hung for its full timeout **with no request made and no error anywhere**.
+  The root layout sets `data-hydrated` on `<html>` from `onMount`, and
+  `waitForHydration` in `e2e/helpers.ts` waits on it. `clickWaButton` and the
+  fill helpers already call it; a bare `locator.fill()` needs it first.
+  (`waitForEnhancedForm`, on a per-form `data-ready`, is the older version of
+  the same check.) Serially the page almost always won this race; four workers
+  made it lose, in a different flow each run.
+- **Anything a test waits for has to be waited for, not sampled.** `openBoard`
+  used to check for the one-time history warning with an instant
+  `isVisible()`, which could land on the placeholder shown while the keyring
+  resolves, skip the warning, and leave it blocking the page. It now waits for
+  the warning or the board, whichever comes.
+- **Test data must be unique across workers, not just within one.**
+  `uniqueEmail()` was `Date.now()` plus a counter kept in module scope — so per
+  worker process — and two workers' first accounts could share an address.
+  It is random now.
+- A `<wa-button type="submit">` only submits once Web Awesome has upgraded it,
+  and its `onclick` only runs once Svelte has hydrated; before either, a click
+  is silently a no-op that Playwright's actionability checks do not catch.
+  `clickWaButton` waits on both.
 - Anything reached only through `await import()` needs listing in
   `optimizeDeps.include`. Otherwise Vite discovers it mid-run, forces a
   re-optimization, and tells every connected client to reload — which loses an
@@ -606,9 +661,8 @@ Notes that cost a debugging round each:
   'focus')" as it upgrades, and the symptom was a send button that never
   enabled — nowhere near the cause. Worth checking `page.on('pageerror')` early
   when a component seems inert.
-- The suite is `workers: 1` and not parallel: it shares one database, and each
-  test drives two browser contexts so the two accounts hold genuinely separate
-  cookies.
+- Each test that needs two people drives two browser contexts, so the two
+  accounts hold genuinely separate cookies.
 
 ## Documentation
 
@@ -714,10 +768,11 @@ Unless the user explicilty indicates otherwise the plan or major change should i
   overridable with `VITE_DEV_ORIGIN`, which is how the Playwright suite runs
   against localhost — with the tunnel baked in, the page asks the tunnel for its
   modules and never hydrates.
-- `npm run db:reset` is `rm -f` — destructive and not Windows-portable. So is
-  the e2e server command, which deletes `e2e.db` on every run.
+- `npm run db:reset` is `rm -f` — destructive and not Windows-portable. The e2e
+  server command (`e2e/server.mjs`) likewise deletes its run directory on every
+  run, though only under the OS temp directory.
 - `.npmrc` sets `engine-strict=true` against `node >= 20`.
 - Do not add `@cloudflare/workers-types` to a `types` array. It publishes
   ambient globals that would overwrite the DOM's `Request`/`Response`/`fetch`
-  for the whole project, including the jsdom test project. This is why
+  for the whole project, including the component test project. This is why
   `app.d.ts` takes `AnyD1Database` from `drizzle-orm/d1` instead.

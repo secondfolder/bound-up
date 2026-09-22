@@ -3,8 +3,8 @@ import { test as base, type Browser, type Page } from '@playwright/test';
 /**
  * The one net the suite did not have: browser-engine diagnostics.
  *
- * Neither the jsdom component tests (where `wa-*` elements never upgrade) nor
- * these specs asserted on the browser console, so a `pattern` attribute that
+ * Neither the component tests (then on jsdom, where `wa-*` elements never
+ * upgraded) nor these specs asserted on the browser console, so a `pattern` attribute that
  * Chromium cannot compile — Zod's `z.email()` regex, invalid under the `v` flag
  * pattern attributes are compiled with — shipped while logging
  * "Unable to check <input pattern=…> because … is not a valid regexp" on every
@@ -15,10 +15,14 @@ import { test as base, type Browser, type Page } from '@playwright/test';
  * This fixture wraps `browser` so that every context the tests create — the
  * default `page` fixture goes through `browser.newContext()` too — gets its
  * pages watched. Any console warning or error, or any uncaught `pageerror`, is
- * collected and fails the run at worker teardown, when it can no longer break
- * the steps that follow. `browser` is worker-scoped, so the collection spans
- * every test in the file rather than one test — with the suite pinned to a
- * single worker that still points at the spec file, which is enough to act on.
+ * collected, and fails the test that was running when it arrived — checked at
+ * that test's teardown, so it can no longer break the steps that follow.
+ *
+ * The collection is per test rather than per worker because the suite runs in
+ * parallel: a worker serves several spec files, so a worker-level report could
+ * only say "somewhere in these files". Anything that lands after a worker's
+ * last test has been checked (a context closed lazily, a late `pageerror`) is
+ * still reported, at worker teardown, rather than silently dropped.
  *
  * Two deliberate exclusions:
  *
@@ -32,8 +36,9 @@ import { test as base, type Browser, type Page } from '@playwright/test';
  *   overlay reads back its canvas. That readback is deliberate — the overlay's
  *   own e2e assertion depends on it — and the warning is browser noise rather
  *   than a functional failure.
- * - The list of watchers is per-test (the fixture rebuilds it), so nothing
- *   leaks between tests even though contexts are closed lazily.
+ * - A message from a context a previous test left open lazily is blamed on the
+ *   test running when it arrives. That is rare, and the text itself names the
+ *   page, so it is still enough to act on.
  *
  * `browser.newPage()` would bypass the proxy — it creates its context
  * server-side — but nothing in the suite calls it; if a spec ever does, route
@@ -47,19 +52,42 @@ const IGNORED = [
 ];
 const FAILING_CONSOLE_TYPES = new Set(['warning', 'error']);
 
-export const test = base.extend<{ browser: Browser }>({
-	browser: [
-		async ({ browser }, use) => {
-			const diagnostics: string[] = [];
+function report(where: string, diagnostics: string[]): Error {
+	return new Error(
+		`Browser reported diagnostics during ${where}:\n${[...new Set(diagnostics)]
+			.map((text) => `  - ${text}`)
+			.join('\n')}`
+	);
+}
 
+type WorkerFixtures = { diagnostics: { all: string[]; reported: number } };
+
+export const test = base.extend<{ checkDiagnostics: void }, WorkerFixtures>({
+	diagnostics: [
+		// Playwright reads a fixture's dependencies off its first parameter's
+		// destructuring pattern, so a fixture with none must still spell out `{}`.
+		// eslint-disable-next-line no-empty-pattern
+		async ({}, use) => {
+			const diagnostics = { all: [] as string[], reported: 0 };
+			await use(diagnostics);
+			const unreported = diagnostics.all.slice(diagnostics.reported);
+			// Thrown from worker teardown, so the run still fails on anything that
+			// arrived after the last test's own check.
+			if (unreported.length > 0) throw report('this worker, after its last test', unreported);
+		},
+		{ scope: 'worker' }
+	],
+
+	browser: [
+		async ({ browser, diagnostics }, use) => {
 			function watchPage(page: Page) {
 				page.on('console', (message) => {
 					if (!FAILING_CONSOLE_TYPES.has(message.type())) return;
 					const text = message.text();
 					if (IGNORED.some((pattern) => pattern.test(text))) return;
-					diagnostics.push(`${message.type()}: ${text}`);
+					diagnostics.all.push(`${message.type()}: ${text}`);
 				});
-				page.on('pageerror', (error) => diagnostics.push(`pageerror: ${String(error)}`));
+				page.on('pageerror', (error) => diagnostics.all.push(`pageerror: ${String(error)}`));
 			}
 
 			const watched = new Proxy(browser, {
@@ -76,18 +104,21 @@ export const test = base.extend<{ browser: Browser }>({
 			});
 
 			await use(watched);
-
-			if (diagnostics.length > 0) {
-				// Thrown from worker teardown, so the run fails with the messages
-				// even though every behavioural assertion still passed.
-				throw new Error(
-					`Browser reported diagnostics during this spec file:\n${[...new Set(diagnostics)]
-						.map((text) => `  - ${text}`)
-						.join('\n')}`
-				);
-			}
 		},
 		{ scope: 'worker' }
+	],
+
+	checkDiagnostics: [
+		async ({ diagnostics }, use) => {
+			diagnostics.reported = diagnostics.all.length;
+			await use();
+			const fresh = diagnostics.all.slice(diagnostics.reported);
+			diagnostics.reported = diagnostics.all.length;
+			// Thrown from test teardown, so the test fails with the messages even
+			// though every behavioural assertion in it passed.
+			if (fresh.length > 0) throw report('this test', fresh);
+		},
+		{ auto: true }
 	]
 });
 

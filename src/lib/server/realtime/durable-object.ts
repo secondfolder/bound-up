@@ -22,7 +22,7 @@ import {
  * that base class has no types without `@cloudflare/workers-types`, a package
  * AGENTS.md forbids because it publishes its types as ambient globals and would
  * overwrite the DOM's `Request`/`Response`/`fetch` for the whole project,
- * including the jsdom test project. The classic style needs no types at all.
+ * including the component test project. The classic style needs no types at all.
  *
  * The object holds **no storage** and never sees message content — see the note
  * on `RealtimeEvent`. Everything it knows is which sockets are open, which is

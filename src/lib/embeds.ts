@@ -3,7 +3,7 @@ import { find as findLinks } from 'linkifyjs';
 /**
  * URL → embed classification, plus the oEmbed fetch with its module cache.
  *
- * Pure string/URL logic only, so it runs anywhere (SSR, jsdom, node tests).
+ * Pure string/URL logic only, so it runs anywhere (SSR, the browser, node tests).
  * The fetch half uses global `fetch` and is only ever called from the browser
  * after mount — never during SSR or prerender, so no third-party request
  * happens on the server.

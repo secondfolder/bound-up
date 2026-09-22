@@ -2,8 +2,9 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { shareInviteLink } from './share';
 
 /**
- * Runs in the node project with a stubbed `navigator` rather than in jsdom:
- * jsdom implements neither `navigator.share` nor `navigator.clipboard`, so it
+ * Runs in the node project with a stubbed `navigator` rather than in the
+ * browser project: whether a browser offers `navigator.share` or a usable
+ * `navigator.clipboard` depends on the platform and its permissions, so they
  * would have to be stubbed there too, and this way the test says exactly which
  * platform capability each case is about.
  */

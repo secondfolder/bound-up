@@ -1,9 +1,12 @@
 import { svelteTesting } from '@testing-library/svelte/vite';
+import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import cloudflareDoExporter from 'sveltekit-cloudflare-do';
 import { defineConfig, type Plugin } from 'vitest/config';
 import { cloudflare } from '@cloudflare/vite-plugin';
 import { loadEnv } from 'vite';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 
 const host: string | undefined = process.env.HOST;
 const port: number = Number(process.env.PORT) || 58769;
@@ -22,6 +25,42 @@ function removeBareDevalueImport(): Plugin {
 					file.code = file.code.replace(/import\s*["']devalue["'];?\n?/g, '');
 				}
 			}
+		}
+	};
+}
+
+/**
+ * Keeps requests the component tests make from falling through to SvelteKit.
+ *
+ * Browser-mode component tests are served by Vitest's own Vite server, which
+ * carries the `sveltekit()` plugin and so SvelteKit's dev middleware. Anything
+ * Vite itself does not serve lands there, and SvelteKit's hooks cannot
+ * initialise outside a real `vite dev`: the request drags on and logs a
+ * `wrapDynamicImport` stack trace. Two kinds of request get that far, because a
+ * real browser makes requests jsdom never did:
+ *
+ * - `fetch('/api/…')` from a component. The tests are written for "there is no
+ *   server here, so the lookup fails" — this makes that true again, promptly.
+ * - An `<img>` naming a picture the app does not ship, such as a fixture
+ *   avatar URL. Pictures in `static/` are still served.
+ *
+ * Registered directly rather than from a returned function, so it runs before
+ * SvelteKit's middleware, which is added post.
+ */
+function componentTestServer(): Plugin {
+	return {
+		name: 'component-test-server',
+		configureServer(server) {
+			server.middlewares.use((req, res, next) => {
+				const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+				const isAppApi = pathname.startsWith('/api/');
+				const isUnshippedImage =
+					req.headers['sec-fetch-dest'] === 'image' &&
+					!existsSync(path.join(server.config.root, 'static', pathname));
+				if (!isAppApi && !isUnshippedImage) return next();
+				res.statusCode = 404;
+				res.end();
+			});
 		}
 	};
 }
@@ -97,15 +136,48 @@ export default defineConfig(({ command, mode }) => {
 			projects: [
 				{
 					extends: './vite.config.ts',
-					plugins: [svelteTesting()],
+					// `resolveBrowser: false` because that option ASSIGNS
+					// `resolve.conditions` — an empty list when none were configured — which
+					// wipes Vite's default client conditions, `browser` among them. Svelte's
+					// package.json falls back to its server build without `browser`, so every
+					// mount failed with "`mount(...)` is not available on the server". The
+					// option only existed to steer jsdom's Node resolution toward the client
+					// build; a real browser resolves that way already.
+					plugins: [svelteTesting({ resolveBrowser: false }), componentTestServer()],
 
 					test: {
 						name: 'client',
-						environment: 'jsdom',
 						clearMocks: true,
 						include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
 						exclude: ['src/lib/server/**'],
-						setupFiles: ['./vitest-setup-client.ts']
+						setupFiles: ['./vitest-setup-browser.ts'],
+						browser: {
+							enabled: true,
+							headless: true,
+							provider: playwright({
+								launchOptions: {
+									// Hermetic: every host but localhost goes to 192.0.2.1, a reserved
+									// address nothing answers on. A real browser actually loads the
+									// iframes these tests render — redgifs, reddit — which jsdom never
+									// did, and a unit test must neither depend on the network nor pull
+									// third-party content into CI.
+									//
+									// A black hole rather than `~NOTFOUND` on purpose: a failed lookup
+									// fires the frame's `load` at once (on Chromium's error page), which
+									// races every assertion about the state before a player loads. A
+									// connection that never completes never loads, so each test decides
+									// when `load` happens — the same guarantee jsdom gave.
+									args: ['--host-resolver-rules=MAP * 192.0.2.1, EXCLUDE localhost']
+								}
+							}),
+							instances: [{ browser: 'chromium' }],
+							// Desktop-sized, because Vitest's default frame is phone-sized and the
+							// app has real breakpoints: under 640px an embed opens in a dialog
+							// instead of framing inline (see NARROW_EMBED_MEDIA_QUERY in
+							// UrlEmbed.svelte). A test that wants the narrow layout asks for it.
+							viewport: { width: 1280, height: 800 },
+							screenshotFailures: false
+						}
 					}
 				},
 				{

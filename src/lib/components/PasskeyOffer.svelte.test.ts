@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
+import { waSettled } from '$lib/testing/web-awesome';
 
 let mockOffer: { userId: string; recipient: string } | null = null;
 const dismiss = vi.fn();
@@ -24,7 +25,10 @@ describe('PasskeyOffer', () => {
 
 	test('offers the passkey, and a way to decline it', async () => {
 		mockOffer = { userId: 'usr-1', recipient: 'age1mine' };
-		render(PasskeyOffer);
+		const { container } = render(PasskeyOffer);
+		// `wa-button` forwards `click()` to the native button it renders, which
+		// does not exist until its first update.
+		await waSettled(container);
 
 		expect(screen.getByText('Unlock with a passkey next time?')).toBeInTheDocument();
 		expect(screen.getByText('Set it up')).toBeInTheDocument();

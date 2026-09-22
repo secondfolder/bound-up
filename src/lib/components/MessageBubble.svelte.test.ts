@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import MessageBubble from './MessageBubble.svelte';
 import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
 import type { MessageView } from '$lib/types';
+import { isWaIconRequest } from '$lib/testing/web-awesome';
 
 const observers: MockIntersectionObserver[] = [];
 
@@ -70,12 +71,6 @@ function installIntersectionObserverMock() {
 		MockIntersectionObserver as unknown as typeof IntersectionObserver
 	);
 }
-
-/**
- * jsdom never upgrades `wa-*` elements, so these assert on what the component
- * emits rather than on rendered behaviour — per AGENTS.md. Everything that
- * needs Web Awesome to actually work is in the Playwright suite.
- */
 
 const CIPHERTEXT = 'YWdlLWVuY3J5cHRpb24ub3JnL3YxCg==SUPERSECRETCIPHERTEXT';
 
@@ -192,7 +187,8 @@ describe('MessageBubble', () => {
 		// Cached details need no lookup, so the card is there from the start.
 		await findByText('Cached title');
 		expect(container.querySelector('.card')).not.toBeNull();
-		expect(fetchMock).not.toHaveBeenCalled();
+		const lookups = fetchMock.mock.calls.filter((args: unknown[]) => !isWaIconRequest(args[0]));
+		expect(lookups).toEqual([]);
 	});
 
 	it('renders an embed the sender included, with no gate in front of it', () => {

@@ -4,7 +4,7 @@
  * Hand-declared rather than imported from `@cloudflare/workers-types`, for the
  * reason `app.d.ts` and `server/media/index.ts` both give: that package
  * publishes its types as ambient globals and would overwrite the DOM's
- * `Request`/`Response`/`fetch` project-wide, including the jsdom test project.
+ * `Request`/`Response`/`fetch` project-wide, including the component test project.
  * Only the two methods this app calls are declared, so the two implementations
  * cannot drift apart on anything wider.
  */

@@ -4,13 +4,11 @@ import RichText from './RichText.svelte';
 import type { RichTextDocument } from '$lib/richtext';
 
 /**
- * jsdom never upgrades `wa-*` elements, so these assert on what the component
- * emits rather than on rendered behaviour — per AGENTS.md. RichText renders
- * native elements apart from the reader's Show button, which is found by its
- * element rather than its role, so these assertions are close to real
- * behaviour. The one thing jsdom cannot exercise is the third-party fetch in
- * UrlEmbed, which is covered here with providers that need no fetch and in the
- * e2e suite with stubbed routes.
+ * RichText renders native elements apart from the reader's Show button, so
+ * these assertions are close to real behaviour. The one thing not exercised
+ * here is the third-party fetch in UrlEmbed — the test browser can reach no
+ * host but localhost — which is covered here with providers that need no fetch
+ * and in the e2e suite with stubbed routes.
  */
 
 function links(container: HTMLElement): HTMLAnchorElement[] {
@@ -251,8 +249,9 @@ function autolink(url: string) {
 }
 
 /**
- * The Show buttons. `wa-button`s, which jsdom never upgrades, so they have no
- * role to find them by — see AGENTS.md on testing `wa-*` elements.
+ * The Show buttons. `wa-button`s, whose role belongs to the native button in
+ * their shadow root, where testing-library's role queries do not look — so they
+ * are found by element instead.
  */
 function showButtons(container: HTMLElement): HTMLElement[] {
 	return [...container.querySelectorAll<HTMLElement>('wa-button.reveal')].filter(

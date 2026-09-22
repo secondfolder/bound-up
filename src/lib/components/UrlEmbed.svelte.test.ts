@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import UrlEmbed, { NARROW_EMBED_MEDIA_QUERY } from './UrlEmbed.svelte';
 import { clearOembedCache, type CachedEmbedDetails, type EmbedSpec } from '$lib/embeds';
+import { waProp } from '$lib/testing/web-awesome';
 
 const observers: MockIntersectionObserver[] = [];
 
@@ -72,8 +73,9 @@ class MockIntersectionObserver {
 }
 
 /**
- * The refresh button. A `wa-button`, which jsdom never upgrades, so it has no
- * role to find it by — see AGENTS.md on testing `wa-*` elements.
+ * The refresh button. A `wa-button`, whose role belongs to the native button in
+ * its shadow root, where testing-library's role queries do not look — so it is
+ * found by element instead.
  */
 function refreshButton(container: HTMLElement): HTMLElement {
 	const button = container.querySelector<HTMLElement>('wa-button.refresh');
@@ -96,13 +98,13 @@ function emitIntersection(element: Element, isIntersecting: boolean, intersectio
 }
 
 /**
- * A `matchMedia` that can be flipped, because jsdom has none.
+ * A `matchMedia` that can be flipped.
  *
- * `vitest-setup-client.ts` installs a permanently non-matching stub, which is
- * what every other test wants; the narrow-window path needs one that matches
- * and can emit a `change` when the window is resized or the phone turned.
- * Assigned rather than `vi.stubGlobal`ed because the setup file defines the
- * property non-configurably.
+ * The real one answers from the test frame, which the Vitest config pins at a
+ * desktop width, so the narrow query never matches — which is what every other
+ * test wants. The narrow-window path needs one that matches and can emit a
+ * `change` when the window is resized or the phone turned. Only the narrow
+ * query is faked; everything else still goes to the browser.
  */
 const realMatchMedia = window.matchMedia;
 
@@ -448,7 +450,7 @@ describe('UrlEmbed', () => {
 			}
 		});
 
-		expect(refreshButton(container).querySelector('wa-icon')?.getAttribute('label')).toBe(
+		expect(waProp(refreshButton(container).querySelector('wa-icon'), 'label')).toBe(
 			'Refresh preview'
 		);
 		await fireEvent.click(refreshButton(container));
@@ -579,8 +581,15 @@ describe('UrlEmbed', () => {
 			expect(container.querySelector('.skeleton-shell')).not.toBeNull();
 			expect(container.querySelector('.card')).toBeNull();
 
-			if (!resolver.current) throw new Error('expected pending fetch resolver');
-			resolver.current(
+			// Waited for rather than read straight after render: the lookup is gated
+			// on the embed scrolling into view, and a real IntersectionObserver
+			// reports that a frame later, not synchronously.
+			const settle = await vi.waitFor(() => {
+				if (!resolver.current) throw new Error('expected pending fetch resolver');
+				return resolver.current;
+			});
+			expect(container.querySelector('.card')).toBeNull();
+			settle(
 				Response.json({
 					title: 'A post',
 					provider_name: 'Reddit',
@@ -655,7 +664,9 @@ describe('UrlEmbed', () => {
 			expect(frame?.getAttribute('src')).toBe(
 				'https://embed.reddit.com/r/x/comments/1/a/?embed=true&ref_source=embed' +
 					'&embed_host_url=' +
-					encodeURIComponent('http://localhost:3000')
+					// Wherever the page is actually served from — the test server's port
+					// is not fixed.
+					encodeURIComponent(window.location.origin)
 			);
 			expect(frame?.getAttribute('height')).toBe('600');
 			expect(container.querySelector('.player iframe')).toBeNull();
@@ -663,13 +674,13 @@ describe('UrlEmbed', () => {
 	});
 
 	/**
-	 * The Open button, which is a `wa-button` and so never upgrades in jsdom.
+	 * The Open button, a `wa-button`.
 	 *
-	 * There is no role to query for on an element the browser has not made
-	 * interactive, so the host is both the assertion target and what a click
-	 * goes to — Svelte's `onclick` is on the host, not on the shadow button a
-	 * real browser would build. The accessible name it ends up with is the
-	 * Playwright suite's business.
+	 * Its role belongs to the native button in its shadow root, where
+	 * testing-library's role queries do not look, so the host is both the
+	 * assertion target and what a click goes to — Svelte's `onclick` is on the
+	 * host. The accessible name it ends up with is the Playwright suite's
+	 * business.
 	 */
 	function openButton(container: HTMLElement): HTMLElement {
 		const button = container.querySelector('wa-button.open');
@@ -722,9 +733,9 @@ describe('UrlEmbed', () => {
 			const header = container.querySelector('.dialog-header');
 			expect(header?.textContent).toContain('redgifs.com');
 			expect(header?.textContent).toContain('Redgifs video');
-			expect(
-				header?.querySelector('wa-button.dialog-close wa-icon[label="Close embed"]')
-			).not.toBeNull();
+			expect(waProp(header?.querySelector('wa-button.dialog-close wa-icon'), 'label')).toBe(
+				'Close embed'
+			);
 
 			const frame = container.querySelector('.dialog-frame iframe');
 			expect(frame?.getAttribute('src')).toBe('https://www.redgifs.com/ifr/abc123');
@@ -886,7 +897,7 @@ describe('UrlEmbed', () => {
 			// Both buttons, side by side, in the order the caller's comes first.
 			// Named by their icons, which is where a `wa-button` takes its name.
 			const buttons = [...container.querySelectorAll('.actions wa-button')].map((button) =>
-				button.querySelector('wa-icon')?.getAttribute('label')
+				waProp(button.querySelector('wa-icon'), 'label')
 			);
 			expect(buttons).toEqual(['Remove this embed', 'Refresh preview']);
 

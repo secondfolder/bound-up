@@ -21,10 +21,7 @@ vi.mock('$app/state', () => ({
 	}
 }));
 
-vi.mock('$app/paths', () => ({
-	resolve: (id: string, params?: Record<string, string>) =>
-		params ? id.replace(/\[(\w+)\]/g, (_, key) => params[key]) : id
-}));
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 const { default: Page } = await import('./+page.svelte');
 

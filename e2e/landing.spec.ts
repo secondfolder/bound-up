@@ -4,9 +4,9 @@ import { test } from './fixtures';
 /**
  * The halftone overlay on the logged-out landing page.
  *
- * This is the only level that can test it: the effect depends on html2canvas
- * parsing the page's real CSS, on WebGL, and on the browser actually
- * compositing — none of which exist under jsdom.
+ * Tested at this level because the effect depends on html2canvas parsing the
+ * page's real, served CSS, on WebGL, and on the browser compositing the whole
+ * page — not one component in a test frame.
  *
  * The unhandled-rejection net matters here specifically: the overlay's first
  * version threw `Attempting to parse an unsupported color function "oklab"`

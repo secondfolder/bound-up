@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { superValidate, type Infer, type SuperValidated } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { partnerInviteFormSchema, type PartnerInviteFormSchema } from '$lib/schemas/partnerForm';
+import { waByProp, waProp, waSettled } from '$lib/testing/web-awesome';
 import PartnerAcceptForm from './PartnerAcceptForm.svelte';
 
 /**
@@ -44,13 +45,17 @@ const controlValues = () =>
 	[...document.querySelectorAll('input[name="control"]')].map((el) => el.getAttribute('value'));
 
 const waInputNames = (container: HTMLElement) =>
-	[...container.querySelectorAll('wa-input')].map((el) => el.getAttribute('name'));
+	[...container.querySelectorAll('wa-input')].map((el) => waProp(el, 'name'));
+
+const waInput = (container: HTMLElement, name: string) => {
+	const [found] = waByProp(container, 'wa-input', 'name', name);
+	if (!found) throw new Error(`no wa-input named ${name}`);
+	return found;
+};
 
 describe('when the accepter is allowed to edit', () => {
 	test('renders the names and roles as inputs', async () => {
 		const { container } = render(PartnerAcceptForm, { data: await formData(), editable: true });
-		// wa-input is a custom element the CDN upgrades at runtime; in jsdom it
-		// is inert, so the assertion is on what the component emits.
 		expect(waInputNames(container)).toEqual(['partnerName', 'yourName', 'partnerRole', 'yourRole']);
 	});
 
@@ -65,9 +70,7 @@ describe('when the accepter is allowed to edit', () => {
 
 	test('labels each field theirs or yours', async () => {
 		const { container } = render(PartnerAcceptForm, { data: await formData(), editable: true });
-		const labels = [...container.querySelectorAll('wa-input')].map((el) =>
-			el.getAttribute('label')
-		);
+		const labels = [...container.querySelectorAll('wa-input')].map((el) => waProp(el, 'label'));
 		expect(labels).toEqual(['Theirs', 'Yours', 'Theirs', 'Yours']);
 	});
 
@@ -92,14 +95,21 @@ describe('when the accepter is allowed to edit', () => {
 	test('renders the values the server prefilled, not blank fields', async () => {
 		// The regression this guards: InputField had no `value` at all, so every
 		// prefilled form came up empty and then posted those blanks back.
+		//
+		// Asserted on what the form would actually POST. `wa-input` is
+		// form-associated, so its value only reaches the FormData if the element
+		// genuinely upgraded — which a simulated DOM could never show.
 		const { container } = render(PartnerAcceptForm, { data: await formData(), editable: true });
-		const values = Object.fromEntries(
-			[...container.querySelectorAll('wa-input')].map((el) => [
-				el.getAttribute('name'),
-				el.getAttribute('value')
-			])
-		);
-		expect(values).toEqual({
+		const form = container.querySelector('form');
+		if (!form) throw new Error('missing form');
+		await waSettled(container);
+		const posted = new FormData(form);
+		expect({
+			partnerName: posted.get('partnerName'),
+			yourName: posted.get('yourName'),
+			partnerRole: posted.get('partnerRole'),
+			yourRole: posted.get('yourRole')
+		}).toEqual({
 			partnerName: 'Ada',
 			yourName: 'Jun',
 			partnerRole: 'dom',
@@ -109,10 +119,8 @@ describe('when the accepter is allowed to edit', () => {
 
 	test('shows each role input with a dimmed name prefix from its matching name field', async () => {
 		const { container } = render(PartnerAcceptForm, { data: await formData(), editable: true });
-		const partnerRole = container.querySelector('wa-input[name="partnerRole"]');
-		const yourRole = container.querySelector('wa-input[name="yourRole"]');
-		expect(partnerRole?.textContent).toContain("Jun's");
-		expect(yourRole?.textContent).toContain("Ada's");
+		expect(waInput(container, 'partnerRole').textContent).toContain("Jun's");
+		expect(waInput(container, 'yourRole').textContent).toContain("Ada's");
 	});
 
 	test('renders an absent role as an empty field, not the string "null"', async () => {
@@ -120,7 +128,7 @@ describe('when the accepter is allowed to edit', () => {
 			data: await formData({ partnerRole: null }),
 			editable: true
 		});
-		expect(container.querySelector('wa-input[name="partnerRole"]')?.getAttribute('value')).toBe('');
+		expect(waProp(waInput(container, 'partnerRole'), 'value')).toBe('');
 	});
 
 	test('emits no hidden duplicates of the visible fields', async () => {

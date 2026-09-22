@@ -37,7 +37,16 @@ export async function createDb(event: RequestEvent): Promise<Db> {
 		if (!devDb) {
 			const { createClient } = await import('@libsql/client');
 			const { drizzle } = await import('drizzle-orm/libsql');
-			const client = createClient({ url: env.DATABASE_URL || 'file:./local.db' });
+			const client = createClient({
+				url: env.DATABASE_URL || 'file:./local.db',
+				// libsql keeps a pool of connections to the file, and by default a
+				// write that finds another connection mid-write fails at once with
+				// SQLITE_BUSY instead of waiting its turn. D1 queues writes itself, so
+				// that failure has no production counterpart — it only surfaces once
+				// requests overlap, as they do under the parallel e2e suite, where it
+				// showed up as sessions failing to load.
+				timeout: 5_000
+			});
 			// Redundant on libsql (it defaults to on) but explicit so that FK
 			// behaviour matches D1 regardless of driver defaults.
 			await client.execute('PRAGMA foreign_keys = ON');

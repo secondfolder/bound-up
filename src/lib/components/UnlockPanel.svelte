@@ -28,8 +28,8 @@
 	 *
 	 * What it offers is decided by `unlockMode`, which is pure and tested
 	 * separately. Everything that touches WebCrypto, IndexedDB or WebAuthn is
-	 * injected, so the component tests can drive it in jsdom, which has none of
-	 * the three.
+	 * injected, so the component tests can drive it without a real keyring or
+	 * authenticator.
 	 */
 	let {
 		unlock,

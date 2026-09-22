@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures';
 import { createClient } from '@libsql/client';
+import { E2E_DATABASE_URL } from './run-paths';
 import {
 	account,
 	autofillPassword,
@@ -27,7 +28,12 @@ import {
 
 /** The database the Playwright web server rebuilt for this run. */
 function db() {
-	return createClient({ url: 'file:e2e.db' });
+	return createClient({
+		url: E2E_DATABASE_URL,
+		// Other workers are writing through the dev server meanwhile; wait out a
+		// lock rather than fail with SQLITE_BUSY.
+		timeout: 5_000
+	});
 }
 
 test.describe('the password never leaves the browser', () => {
@@ -106,7 +112,7 @@ test.describe('what signing up stores', () => {
 	 * The server should end up holding a public recipient and a wrap it cannot
 	 * open — and nothing that looks like a password.
 	 *
-	 * Reads `e2e.db` directly because there is no UI for keys yet. That is a
+	 * Reads the e2e database directly because there is no UI for keys yet. That is a
 	 * deliberate seam in this one spec: it asserts the shape of what was
 	 * persisted, which no other level can see end to end.
 	 */

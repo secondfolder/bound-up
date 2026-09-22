@@ -5,7 +5,8 @@ import {
 	fillRichText,
 	newSide,
 	signUp,
-	typeRichText
+	typeRichText,
+	waitForHydration
 } from './helpers';
 
 test.describe('tasks', () => {
@@ -62,6 +63,7 @@ test.describe('tasks', () => {
 
 			await ada.page.getByRole('link', { name: 'Add a task' }).click();
 			await ada.page.waitForURL(/\/home\/tasks\/add$/);
+			await waitForHydration(ada.page);
 			await ada.page.locator('input[name="title"]').fill('Long shower');
 			/**
 			 * Typed key by key, not bulk-filled, and that is the point.
@@ -95,9 +97,9 @@ test.describe('tasks', () => {
 	/**
 	 * The /home cards, which only this level can check.
 	 *
-	 * `wa-card` never upgrades in jsdom, so nothing in the component suite can
-	 * say whether the header link survives the custom element or whether the
-	 * body renders beside it. The accessible name is the load-bearing part: the
+	 * Checked against the real page: whether the header link survives the
+	 * custom element, and whether the body renders beside it. The accessible
+	 * name is the load-bearing part: the
 	 * cards replaced `wa-button`s that every other spec here locates by these
 	 * exact words.
 	 */
@@ -112,8 +114,7 @@ test.describe('tasks', () => {
 			 * A fresh account has nothing in any section, so every card is a
 			 * header and nothing else — no "Nothing to do right now." line. Only
 			 * a real browser can check that: the body div lives in wa-card's
-			 * shadow root and is collapsed through `::part`, which jsdom never
-			 * upgrades far enough to apply.
+			 * shadow root and is collapsed through `::part`.
 			 */
 			const tasks = ada.page.locator('wa-card').filter({ hasText: 'Tasks' });
 			await expect(tasks).toHaveText('Tasks');
@@ -159,6 +160,7 @@ test.describe('tasks', () => {
 			await jun.page.waitForURL(/\/tasks$/);
 			await jun.page.getByRole('link', { name: 'Add a task' }).click();
 			await jun.page.waitForURL(/\/tasks\/add$/);
+			await waitForHydration(jun.page);
 			await jun.page.locator('input[name="title"]').fill('Make tea');
 			await fillRichText(jun.page.locator('.task-form'), 'With the good teapot');
 			await jun.page.locator('input[name="creditsAwarded"]').fill('3');

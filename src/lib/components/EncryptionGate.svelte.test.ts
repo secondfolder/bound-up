@@ -3,9 +3,9 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 
 /**
- * jsdom has no WebAuthn, and `UnlockPanel` correctly refuses to offer a passkey
- * button that could not run — so without this every case here collapses to
- * `password-only` and the modes cannot be told apart. Stubbed once rather than
+ * `UnlockPanel` refuses to offer a passkey button without WebAuthn, so it has
+ * to be present for the modes to be told apart. Chromium has it, but it is
+ * stubbed so no test can reach a real authenticator. Stubbed once rather than
  * per test, because it is a property of the environment and not of any case.
  */
 beforeAll(() => {
@@ -18,10 +18,7 @@ let mockPasskeyWrap: { id: string } | null = null;
 let mockPasskeyCount = 0;
 let mockPasskeysKnownUnusable = 0;
 
-vi.mock('$app/paths', () => ({
-	resolve: (id: string, params?: Record<string, string>) =>
-		params ? id.replace(/\[(\w+)\]/g, (_, key) => params[key]) : id
-}));
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 // `PasskeyOffer` renders inside the gate and posts to a form action.
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));

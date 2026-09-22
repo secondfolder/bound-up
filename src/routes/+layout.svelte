@@ -1,27 +1,11 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 
-	// Web Awesome is installed from npm rather than pulled off a CDN, so the
-	// components are cherry-picked here (in the root layout) instead of being
-	// autoloaded at runtime. Anything new a page reaches for needs its import
-	// added below, otherwise the custom element never registers and the markup
-	// renders as an inert unknown tag.
-	import '@awesome.me/webawesome/dist/styles/webawesome.css';
-	import '@awesome.me/webawesome/dist/components/avatar/avatar.js';
-	import '@awesome.me/webawesome/dist/components/callout/callout.js';
-	import '@awesome.me/webawesome/dist/components/checkbox/checkbox.js';
-	import '@awesome.me/webawesome/dist/components/button/button.js';
-	import '@awesome.me/webawesome/dist/components/button-group/button-group.js';
-	import '@awesome.me/webawesome/dist/components/card/card.js';
-	import '@awesome.me/webawesome/dist/components/dialog/dialog.js';
-	import '@awesome.me/webawesome/dist/components/dropdown/dropdown.js';
-	import '@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js';
-	import '@awesome.me/webawesome/dist/components/icon/icon.js';
-	import '@awesome.me/webawesome/dist/components/input/input.js';
-	import '@awesome.me/webawesome/dist/components/divider/divider.js';
-	import '@awesome.me/webawesome/dist/components/skeleton/skeleton.js';
-	import '@awesome.me/webawesome/dist/components/spinner/spinner.js';
-	import '@awesome.me/webawesome/dist/components/textarea/textarea.js';
+	// Registers every Web Awesome element the app uses. Statically imported from
+	// the root layout so hydration never waits on fetching them — see
+	// src/lib/webawesome.ts, and invariant 16 in AGENTS.md for why that puts Lit
+	// in the server graph.
+	import '$lib/webawesome';
 
 	interface Props {
 		children?: Snippet;
@@ -38,6 +22,17 @@
 	// SiteHeader used to live here. It now belongs to (public) only: the
 	// (auth-required)/(app) group has its own shell with a bottom nav, and
 	// stacking a second navigation on top of it defeats the point.
+
+	// Marks the document once the client has taken over. Hydration of the whole
+	// tree finishes before any `onMount` runs, so this means every component on
+	// the page is live — handlers attached, and superforms done writing its
+	// values over the fields. The e2e helpers wait on it before touching a page
+	// that was loaded in full: before it, a click on a `wa-button` is a silent
+	// no-op and a filled field is erased (see waitForHydration in
+	// e2e/helpers.ts). Client-side navigations keep the mark, and need no wait.
+	onMount(() => {
+		document.documentElement.dataset.hydrated = '';
+	});
 </script>
 
 {@render children?.()}

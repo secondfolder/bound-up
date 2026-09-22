@@ -37,11 +37,6 @@ local.db
 local.db-shm
 local.db-wal
 
-# Playwright's database. Rebuilt from drizzle/ at the start of every e2e run.
-e2e.db
-e2e.db-shm
-e2e.db-wal
-
 # Encrypted attachments written by `npm run dev` (R2 stands in for this in production)
 local-media/
 

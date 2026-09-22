@@ -5,6 +5,7 @@ import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { accountFormSchema } from '$lib/schemas/accountForm';
 import type { PageData } from './$types';
+import { waButtonOfType, waProp } from '$lib/testing/web-awesome';
 
 const pageState = {
 	data: {
@@ -24,12 +25,12 @@ vi.mock('$app/state', () => ({
 	}
 }));
 
-vi.mock('$app/paths', () => ({
-	resolve: (id: string, params?: Record<string, string>) =>
-		params ? id.replace(/\[(\w+)\]/g, (_, key) => params[key]) : id
-}));
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 vi.mock('$app/navigation', () => ({
+	// Unused by the page, but superforms imports it, and a real browser refuses
+	// to link a module whose named import is missing.
+	goto: vi.fn(),
 	afterNavigate: vi.fn(),
 	beforeNavigate: vi.fn(),
 	invalidateAll: vi.fn().mockResolvedValue(undefined)
@@ -68,11 +69,10 @@ describe('/settings/account/+page.svelte', () => {
 
 	test('renders the save button outlined before there are changes', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
-		const save = container.querySelector('wa-button[type="submit"]');
-		if (!(save instanceof HTMLElement)) throw new Error('missing save button');
+		const save = waButtonOfType(container, 'submit');
 
-		expect(save.getAttribute('appearance')).toBe('outlined');
-		expect(save.getAttribute('variant')).toBeNull();
+		expect(waProp(save, 'appearance')).toBe('outlined');
+		expect(waProp(save, 'variant')).toBeUndefined();
 	});
 
 	test('clicking moves the current timezone into the placeholder and clears the value', async () => {
@@ -92,20 +92,18 @@ describe('/settings/account/+page.svelte', () => {
 	test('keeps the save button outlined while the timezone field is only being searched', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
 		const input = container.querySelector('input[role="combobox"]');
-		const save = container.querySelector('wa-button[type="submit"]');
+		const save = waButtonOfType(container, 'submit');
 		if (!(input instanceof HTMLInputElement)) throw new Error('missing timezone combobox');
-		if (!(save instanceof HTMLElement)) throw new Error('missing save button');
 
 		await fireEvent.click(input);
 
-		expect(save.getAttribute('appearance')).toBe('outlined');
-		expect(save.getAttribute('variant')).toBeNull();
+		expect(waProp(save, 'appearance')).toBe('outlined');
+		expect(waProp(save, 'variant')).toBeUndefined();
 	});
 
 	test('copies the current device timezone into the form', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
-		const button = container.querySelector('wa-button[type="button"]');
-		if (!(button instanceof HTMLElement)) throw new Error('missing use-device-timezone button');
+		const button = waButtonOfType(container, 'button');
 
 		await fireEvent.click(button);
 
@@ -118,16 +116,14 @@ describe('/settings/account/+page.svelte', () => {
 
 	test('promotes the save button to a solid brand style once there are changes', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
-		const button = container.querySelector('wa-button[type="button"]');
-		const save = container.querySelector('wa-button[type="submit"]');
-		if (!(button instanceof HTMLElement)) throw new Error('missing use-device-timezone button');
-		if (!(save instanceof HTMLElement)) throw new Error('missing save button');
+		const button = waButtonOfType(container, 'button');
+		const save = waButtonOfType(container, 'submit');
 
 		await fireEvent.click(button);
 
 		await waitFor(() => {
-			expect(save.getAttribute('appearance')).toBe('filled');
-			expect(save.getAttribute('variant')).toBe('brand');
+			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'variant')).toBe('brand');
 		});
 	});
 
@@ -137,8 +133,7 @@ describe('/settings/account/+page.svelte', () => {
 		});
 		expect(getByText('Set to America/New_York')).toBeTruthy();
 
-		const button = container.querySelector('wa-button[type="button"]');
-		if (!(button instanceof HTMLElement)) throw new Error('missing use-device-timezone button');
+		const button = waButtonOfType(container, 'button');
 		await fireEvent.click(button);
 
 		await waitFor(() => {

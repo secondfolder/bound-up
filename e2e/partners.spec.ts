@@ -6,7 +6,8 @@ import {
 	logOut,
 	navTabs,
 	newSide,
-	signUp
+	signUp,
+	waitForHydration
 } from './helpers';
 
 /**
@@ -279,6 +280,8 @@ test.describe('managing a link', () => {
 
 			await ada.page.goto('/settings/partners');
 			await ada.page.getByRole('main').getByRole('link', { name: /Jun/ }).click();
+			// Before filling, not just before saving: hydration overwrites the field.
+			await waitForHydration(ada.page);
 			await ada.page.locator('wa-input[name="partnerName"] input').fill('Junie');
 			await clickWaButton(ada.page, 'Save');
 

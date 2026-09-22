@@ -24,12 +24,28 @@
 	 */
 	// svelte-ignore state_referenced_locally
 	let description = $state(values.description);
+
+	/*
+	 * The native fields are seeded with `defaultValue` / `defaultChecked`, not
+	 * `value` / `checked`, because this form posts natively: the server's values
+	 * are where the fields start, not something to hold them to.
+	 *
+	 * `value={…}` lost what the user typed. Svelte does not write an input's
+	 * value while hydrating, so it has no record of having set it — and the first
+	 * time this template's effect re-ran for any reason, it wrote `values.title`
+	 * over the field. Typing in the description is such a reason: it updates the
+	 * hidden input below, in the same effect. So on a page loaded in full, a
+	 * title typed before the description was erased (the add page) or reverted to
+	 * the stored one (the edit pages). A client-side navigation mounts rather
+	 * than hydrates, which is why it only showed on a refresh, a direct link, or
+	 * a slow page — first seen as a flaky e2e run.
+	 */
 </script>
 
 <form method="POST" class="panel reward-form add-form">
 	<label>
 		<span>Title</span>
-		<input name="title" maxlength="80" required value={values.title} />
+		<input name="title" maxlength="80" required defaultValue={values.title} />
 	</label>
 	<label>
 		<span>Description</span>
@@ -48,10 +64,10 @@
 	<div class="editor-row">
 		<label>
 			<span>Cost</span>
-			<input type="number" min="0" step="1" name="cost" required value={values.cost} />
+			<input type="number" min="0" step="1" name="cost" required defaultValue={values.cost} />
 		</label>
 		<label class="checkbox">
-			<input type="checkbox" name="active" checked={values.active} />
+			<input type="checkbox" name="active" defaultChecked={values.active} />
 			<span>Active</span>
 		</label>
 	</div>

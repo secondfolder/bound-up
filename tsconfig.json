@@ -22,7 +22,7 @@
 		"src/**/*.ts",
 		"src/**/*.svelte",
 		"e2e/**/*.ts",
-		"vitest-setup-client.ts",
+		"vitest-setup-browser.ts",
 		"better-auth.config.ts",
 		"drizzle.config.ts",
 		"playwright.config.ts"

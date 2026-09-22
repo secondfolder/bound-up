@@ -77,10 +77,21 @@ function namingDialog(page: Page) {
 	return page.getByRole('heading', { name: 'Name this passkey' });
 }
 
-/** Accepts whatever the naming dialog suggests. */
+/**
+ * Accepts whatever the naming dialog suggests, and waits for it to land.
+ *
+ * The dialog closes before the name is saved: `saveName()` hides it, then
+ * renames the passkey, then calls `invalidateAll()`. A step that navigates
+ * straight after the dialog closes can have that navigation superseded by the
+ * invalidation — SvelteKit lets the newest of the two win — and stay on the
+ * page it left, with the link it clicked focused and nothing else happening.
+ * Waiting for the invalidation's own data request is what closes that window.
+ */
 async function finishNaming(page: Page) {
+	const refreshed = page.waitForResponse((response) => response.url().includes('/__data.json'));
 	await clickWaButton(page, 'Done');
 	await expect(namingDialog(page)).toBeHidden();
+	await refreshed;
 }
 
 /**
@@ -322,7 +333,8 @@ test.describe('the unlock panel', () => {
 
 	/**
 	 * The same component on the messaging screens, which is the point of
-	 * `MessageUnlock`. Asserted here rather than only in jsdom because the drift
+	 * `MessageUnlock`. Asserted here rather than only in the component tests
+	 * because the drift
 	 * it replaced was invisible to every test that existed.
 	 */
 	test('is the same panel on the messages board', async ({ browser }) => {

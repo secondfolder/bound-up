@@ -45,7 +45,7 @@ import {
  * knows: where a caret is actually drawn, and where a line move really lands.
  *
  * Named `.svelte.test.ts` despite holding no component: that suffix is what
- * puts a file in the jsdom project, and an editor with no DOM under it is not
+ * puts a file in the browser project, and an editor with no DOM under it is not
  * an editor — see AGENTS.md.
  */
 
@@ -128,9 +128,8 @@ afterEach(() => {
  */
 function withDocument(...blocks: Build[]): { editor: LexicalEditor; element: HTMLElement } {
 	const element = document.createElement('div');
-	// The attribute rather than the property: jsdom does not implement
-	// `contentEditable`, and a surface that is not editable in the DOM is not
-	// the ancestor every press inside the editor really has.
+	// A surface that is not editable in the DOM is not the ancestor every press
+	// inside the editor really has.
 	element.setAttribute('contenteditable', 'true');
 	document.body.append(element);
 
@@ -432,10 +431,11 @@ describe('widget selection', () => {
 	 * beyond, which is how it was reported: up from the line under an embed
 	 * jumped to the line over it.
 	 *
-	 * jsdom has no `Selection.modify`, so the browser probe that keeps this
-	 * away from a wrapped line cannot run here and the model's answer stands.
-	 * The wrapping half is a Playwright matter; what is checked here is which
-	 * widget the model picks, and when it picks none.
+	 * The browser probe that keeps this away from a wrapped line runs here too,
+	 * through the real `Selection.modify` — but nothing on these one-line
+	 * surfaces wraps, so it agrees with the model. The wrapping half is a
+	 * Playwright matter; what is checked here is which widget the model picks,
+	 * and when it picks none.
 	 */
 	it('selects the widget on the row a line move steps onto', () => {
 		const afterTheWidget = (offset: number) => () => {
@@ -542,7 +542,8 @@ describe('widget selection', () => {
 
 		const button = document.createElement('button');
 		const frame = document.createElement('iframe');
-		// jsdom lays nothing out, so the frame is given a box to be pressed in.
+		// Given a known box, so the presses below land inside or outside it for
+		// certain rather than by the browser's default iframe size.
 		frame.getBoundingClientRect = () =>
 			({ left: 10, top: 10, right: 60, bottom: 50, width: 50, height: 40 }) as DOMRect;
 		target.append(button, frame);

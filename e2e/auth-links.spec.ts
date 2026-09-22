@@ -4,7 +4,7 @@ import { test } from './fixtures';
 /**
  * The cross-links between the login and signup pages.
  *
- * This is e2e rather than jsdom because the interesting assertions are about
+ * This is e2e rather than a component test because the interesting assertions are about
  * real URLs: that each page links to the other, and that a `redirectTo`
  * carrying an invite link survives the hop in both directions.
  */
