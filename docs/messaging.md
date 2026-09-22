@@ -209,9 +209,10 @@ A thread renders the embeds its messages carry, with nothing in front of them â€
 there is no per-account preference and no consent dialog. A link the sender
 left without an embed gets a `Show` button instead, which inserts a card above
 that paragraph for this reader only; it is never written back to the message,
-so a reload brings the button back. Embeds that need a provider lookup show a
-skeleton and start the request when they are in or near the scrollport, which
-is a request-volume decision, not a consent one.
+so a reload brings the button back. Embeds that need a provider lookup draw
+nothing until it answers, start the request when they are in or near the
+scrollport, and share a page-wide queue of three lookups at a time â€” all
+request-volume decisions, not consent ones. See [embeds.md](embeds.md).
 
 Reddit is still the special case for live embeds. The browser cannot call
 reddit's oEmbed endpoint directly because it is CORS-blocked, and `noembed.com`

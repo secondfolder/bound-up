@@ -1,5 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
+import { mapWithConcurrency } from '$lib/concurrency';
+import { MAX_CONCURRENT_EMBED_REQUESTS } from '$lib/embeds';
 import { fetchEmbedMetadata } from '$lib/server/embed-metadata';
 import type { RequestHandler } from './$types';
 
@@ -21,9 +23,16 @@ export const POST: RequestHandler = async ({ locals, request, fetch }) => {
 	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed request');
 
 	const urls = [...new Set(parsed.data.urls)];
-	const embeds = (await Promise.all(urls.map((url) => fetchEmbedMetadata(url, fetch)))).filter(
-		(embed): embed is NonNullable<typeof embed> => embed !== null
-	);
+	// Capped rather than all at once: a message can carry up to 50 links, and
+	// firing every provider lookup in the same instant is exactly the burst the
+	// browser's embed queue exists to avoid. Per request rather than per isolate,
+	// since a Worker isolate is shared by unrelated requests and a module-level
+	// queue would make one person's paste slow down everyone else's.
+	const embeds = (
+		await mapWithConcurrency(urls, MAX_CONCURRENT_EMBED_REQUESTS, (url) =>
+			fetchEmbedMetadata(url, fetch)
+		)
+	).filter((embed): embed is NonNullable<typeof embed> => embed !== null);
 
 	return json(
 		{ embeds },

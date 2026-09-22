@@ -1,4 +1,5 @@
 import { find as findLinks } from 'linkifyjs';
+import { createLimiter } from './concurrency';
 
 /**
  * URL → embed classification, plus the oEmbed fetch with its module cache.
@@ -251,6 +252,50 @@ export interface OembedResult {
  */
 const oembedCache = new Map<string, OembedResult | 'error'>();
 
+/**
+ * How many embed lookups may be in flight at once, across the whole page.
+ *
+ * One queue shared by the reader's oEmbed fetches, the composer's preview
+ * lookups and the thread's metadata backfill, because they end up at the
+ * same providers: pasting a hundred links
+ * would otherwise fire a hundred requests at noembed and reddit in the same
+ * instant. Three keeps the first screenful quick without hammering anyone.
+ * The send path and the refresh button deliberately skip it — someone is
+ * waiting on those, so they must not queue behind background previews — and
+ * the server caps its own fan-out to the providers.
+ */
+export const MAX_CONCURRENT_EMBED_REQUESTS = 3;
+const embedRequestLimit = createLimiter(MAX_CONCURRENT_EMBED_REQUESTS);
+
+/**
+ * How long a queued lookup may hold its slot.
+ *
+ * Without a cap, three requests that never answer would stall every embed on
+ * the page behind them — a failure mode the queue itself introduced, since
+ * before it a hung request only ever held up its own embed. A timed-out
+ * lookup fails like any other, and is remembered like any other failure.
+ */
+export const EMBED_REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * Runs `task` with a signal that aborts after `EMBED_REQUEST_TIMEOUT_MS`.
+ *
+ * Built from `setTimeout` rather than `AbortSignal.timeout`, so the timer is
+ * cleared as soon as the task settles and follows fake timers in tests.
+ */
+async function withRequestTimeout<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T> {
+	const controller = new AbortController();
+	const timer = setTimeout(
+		() => controller.abort(new DOMException('Embed lookup timed out', 'TimeoutError')),
+		EMBED_REQUEST_TIMEOUT_MS
+	);
+	try {
+		return await task(controller.signal);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 export function cachedOembed(endpoint: string): OembedResult | 'error' | undefined {
 	return oembedCache.get(endpoint);
 }
@@ -259,9 +304,18 @@ export async function fetchOembed(endpoint: string): Promise<OembedResult | 'err
 	const cached = oembedCache.get(endpoint);
 	if (cached) return cached;
 	try {
-		const response = await fetch(endpoint, { headers: { accept: 'application/json' } });
-		if (!response.ok) throw new Error(`oembed ${response.status}`);
-		const data: unknown = await response.json();
+		// The body is read inside the queued task so a slot is held until the
+		// response is fully in, not only until its headers are.
+		const data: unknown = await embedRequestLimit(() =>
+			withRequestTimeout(async (signal) => {
+				const response = await fetch(endpoint, {
+					headers: { accept: 'application/json' },
+					signal
+				});
+				if (!response.ok) throw new Error(`oembed ${response.status}`);
+				return response.json();
+			})
+		);
 		if (typeof data !== 'object' || data === null || !('html' in data || 'title' in data)) {
 			throw new Error('oembed payload unrecognised');
 		}
@@ -299,24 +353,78 @@ export async function fetchOembed(endpoint: string): Promise<OembedResult | 'err
 }
 
 /**
+ * Why a preview lookup came back empty, in words a reader can be shown.
+ *
+ * Thrown by `requestEmbedMetadata` so the one caller that surfaces failures —
+ * the reader's Show button, which inserts a card titled with the reason —
+ * has something better than "it did not work". Everyone else catches it and
+ * degrades to a plain link as before.
+ */
+export class EmbedLookupError extends Error {}
+
+async function requestEmbedMetadata(
+	urls: string[],
+	queued: boolean
+): Promise<CachedEmbedDetails[]> {
+	const request = async (signal?: AbortSignal) => {
+		let response: Response;
+		try {
+			response = await fetch('/api/embed-metadata', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ urls }),
+				signal
+			});
+		} catch (error) {
+			throw new EmbedLookupError(
+				error instanceof DOMException && error.name === 'TimeoutError'
+					? 'Timed out loading this preview'
+					: "Couldn't reach the server to load this preview"
+			);
+		}
+		if (!response.ok) {
+			// SvelteKit's `error()` answers with `{ message }`; use it when there is
+			// one, since "Not signed in" says more than a bare 401.
+			const body = (await response.json().catch(() => null)) as { message?: unknown } | null;
+			const reason =
+				typeof body?.message === 'string' && body.message
+					? body.message
+					: `HTTP ${response.status}`;
+			throw new EmbedLookupError(`Couldn't load this preview (${reason})`);
+		}
+		// Read inside the queued task so the slot is held until the body is in,
+		// not only until the headers are.
+		const result = (await response.json().catch(() => null)) as {
+			embeds?: CachedEmbedDetails[];
+		} | null;
+		if (!result || !Array.isArray(result.embeds)) {
+			throw new EmbedLookupError("Couldn't load this preview (unexpected response)");
+		}
+		return result.embeds;
+	};
+	// Only a queued request holds a slot others are waiting for, so only it
+	// needs the timeout.
+	return queued ? embedRequestLimit(() => withRequestTimeout(request)) : request();
+}
+
+/**
  * Preview details for URLs, resolved by our own endpoint.
  *
  * The one place `/api/embed-metadata` is called from. Uncached on purpose:
  * the send path wants what is true now, and the refresh button exists to
  * replace a cached entry — handing either a remembered answer would defeat
  * them. `fetchEmbedDetails` is the cached, one-URL form for the composer.
+ *
+ * `queued` puts the request through the page-wide embed queue; see
+ * `MAX_CONCURRENT_EMBED_REQUESTS` for who uses it and who does not.
  */
-export async function fetchEmbedMetadata(urls: string[]): Promise<CachedEmbedDetails[]> {
+export async function fetchEmbedMetadata(
+	urls: string[],
+	{ queued = false }: { queued?: boolean } = {}
+): Promise<CachedEmbedDetails[]> {
 	if (urls.length === 0) return [];
 	try {
-		const response = await fetch('/api/embed-metadata', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ urls })
-		});
-		if (!response.ok) return [];
-		const result = (await response.json()) as { embeds?: CachedEmbedDetails[] };
-		return Array.isArray(result.embeds) ? result.embeds : [];
+		return await requestEmbedMetadata(urls, queued);
 	} catch {
 		// Same posture as the oEmbed fetch: a preview that cannot be resolved
 		// degrades to a plain link rather than to a console error.
@@ -324,24 +432,79 @@ export async function fetchEmbedMetadata(urls: string[]): Promise<CachedEmbedDet
 	}
 }
 
+/** One URL's preview, or why there is not one. */
+export type EmbedDetailsResult =
+	{ ok: true; details: CachedEmbedDetails } | { ok: false; error: string };
+
 /**
  * Details for one URL, remembered for the page.
  *
  * The composer draws the same card the reader will, which means resolving the
  * same details the send path is about to cache. The promise is cached rather
  * than its result, so an embed that is removed and put back does not ask
- * twice, and neither do two editors showing the same link.
+ * twice, and neither do two editors showing the same link. Failures are
+ * remembered too, for the same reason `oembedCache` remembers them: a dead
+ * provider should not be asked again for every copy of the link on the page.
  */
-const embedDetailsCache = new Map<string, Promise<CachedEmbedDetails | null>>();
+const embedDetailsCache = new Map<string, Promise<EmbedDetailsResult>>();
 
-export function fetchEmbedDetails(url: string): Promise<CachedEmbedDetails | null> {
+export function fetchEmbedDetailsResult(url: string): Promise<EmbedDetailsResult> {
 	const cached = embedDetailsCache.get(url);
 	if (cached) return cached;
-	const pending = fetchEmbedMetadata([url]).then(
-		(embeds) => embeds.find((embed) => embed.href === url) ?? null
+	const pending = requestEmbedMetadata([url], true).then(
+		(embeds): EmbedDetailsResult => {
+			const details = embeds.find((embed) => embed.href === url);
+			// The endpoint leaves out a URL its provider could not describe,
+			// without saying why — so this is as specific as it can be.
+			return details
+				? { ok: true, details }
+				: { ok: false, error: 'No preview is available for this link' };
+		},
+		(error: unknown): EmbedDetailsResult => ({
+			ok: false,
+			error: error instanceof EmbedLookupError ? error.message : "Couldn't load this preview"
+		})
 	);
 	embedDetailsCache.set(url, pending);
 	return pending;
+}
+
+/** `fetchEmbedDetailsResult` for callers that only care whether it worked. */
+export async function fetchEmbedDetails(url: string): Promise<CachedEmbedDetails | null> {
+	const result = await fetchEmbedDetailsResult(url);
+	return result.ok ? result.details : null;
+}
+
+/**
+ * A card that says why a preview could not be loaded.
+ *
+ * Shaped as ordinary cached details so `UrlEmbed` draws it like any other
+ * card, with the reason as its title and the link's host as its provider.
+ * Anything the URL alone can still draw — a direct image, a curated player —
+ * appears under it, because a `card` entry leaves those to the spec.
+ */
+export function embedErrorDetails(url: string, error: string): CachedEmbedDetails {
+	let host: string | null = null;
+	try {
+		host = new URL(url).hostname.replace(/^www\./, '');
+	} catch {
+		// Left null: the title is the part that matters.
+	}
+	return {
+		href: url,
+		fetchedAt: Date.now(),
+		kind: 'card',
+		providerName: host,
+		title: error,
+		description: null,
+		thumbnailUrl: null,
+		canonicalUrl: null,
+		imageUrl: null,
+		iframeSrc: null,
+		iframeHeight: null,
+		faviconUrl: null,
+		themeColor: null
+	};
 }
 
 /** Test hook: clear the module caches between cases. */

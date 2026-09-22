@@ -1,8 +1,13 @@
 <script lang="ts">
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import RichTextInline, { type InlineEmbedContext } from './RichTextInline.svelte';
 	import UrlEmbed from './UrlEmbed.svelte';
-	import { embedSpecFor, type CachedEmbedDetails } from '$lib/embeds';
+	import {
+		embedErrorDetails,
+		embedSpecFor,
+		fetchEmbedDetailsResult,
+		type CachedEmbedDetails
+	} from '$lib/embeds';
 	import { isWithinScrollport, scrollIntoViewWithin } from '$lib/scroll-parent';
 	import {
 		documentEmbedUrls,
@@ -53,6 +58,20 @@
 	const blocks = $derived(doc.root.children);
 	const cachedByHref = $derived(new Map(cachedEmbeds.map((embed) => [embed.href, embed])));
 
+	/**
+	 * Details this reader's own reveals looked up, by URL — or, when the lookup
+	 * failed, a card saying why.
+	 *
+	 * Folded in under the message's own cached entries, which win: a refresh
+	 * that writes a real entry for the URL replaces an error card here too.
+	 */
+	const revealedDetails = new SvelteMap<string, CachedEmbedDetails>();
+	const embedDetails = $derived.by(() => {
+		if (revealedDetails.size === 0) return cachedByHref;
+		// Later entries win, so the message's own come second.
+		return new Map([...revealedDetails, ...cachedByHref]);
+	});
+
 	/** The URLs the writer gave an embed of their own. */
 	const embedded = $derived(new Set(documentEmbedUrls(doc)));
 
@@ -69,6 +88,9 @@
 	 */
 	const revealed = new SvelteSet<string>();
 
+	/** Reveals whose details are still on their way, keyed like `revealed`. */
+	const revealing = new SvelteSet<string>();
+
 	/** The URL of the most recent reveal, so only that one is scrolled to. */
 	let scrollTo: string | null = null;
 
@@ -78,9 +100,29 @@
 		);
 	}
 
-	function reveal(blockIndex: number, url: string) {
+	/**
+	 * Inserts the card once it has something to show, not before.
+	 *
+	 * The button keeps a spinner while the details load, and the card goes in
+	 * complete — rather than going in straight away and drawing nothing until
+	 * its lookup lands, which left the reader with a button that vanished and
+	 * no sign anything was happening. A failed lookup still inserts a card,
+	 * titled with the reason: the reader asked for something, and a silent
+	 * nothing reads as a button that does not work.
+	 *
+	 * A URL the message already has cached details for needs no lookup.
+	 */
+	async function reveal(blockIndex: number, url: string) {
+		const key = `${blockIndex}:${url}`;
+		if (revealing.has(key)) return;
+		if (!embedDetails.has(url)) {
+			revealing.add(key);
+			const result = await fetchEmbedDetailsResult(url);
+			revealing.delete(key);
+			revealedDetails.set(url, result.ok ? result.details : embedErrorDetails(url, result.error));
+		}
 		scrollTo = url;
-		revealed.add(`${blockIndex}:${url}`);
+		revealed.add(key);
 	}
 
 	/**
@@ -122,7 +164,7 @@
 	 */
 	const embeds: InlineEmbedContext = {
 		get cached() {
-			return cachedByHref;
+			return embedDetails;
 		},
 		get pending() {
 			return cachedEmbedsPending;
@@ -142,6 +184,7 @@
 				nodes={inlineNodes(block.children, index)}
 				{embeds}
 				canReveal={(url) => canReveal(index, url)}
+				isRevealing={(url) => revealing.has(`${index}:${url}`)}
 				onReveal={(url) => reveal(index, url)}
 			/>
 		</p>

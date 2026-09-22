@@ -19,7 +19,9 @@ setting.** There is no per-account preference and no consent gate: an embed the
 sender left in the message renders, and a link they did not embed renders as a
 link with a `Show` button the reader can press for themselves. That reveal is
 view state only — the sender's message is unchanged, and a reload brings the
-button back.
+button back. The button spins until the details are in, and a failed lookup
+still inserts a card titled with the error; see
+[docs/rich-text.md](rich-text.md).
 
 An embed draws at the start of the line its URL is on, in the composer and in
 the thread alike — the composer shows the real `UrlEmbed`, not a placeholder.
@@ -193,8 +195,17 @@ that one cached URL entry.
   Their URL is deterministic, so they are SSR-safe, and `loading="lazy"` keeps
   an off-screen one off the network without any help.
 - **oEmbed and reddit embeds with nothing cached** have no picture to draw until
-  a provider answers, so they render a stable skeleton and start the request
-  only when they are in or near the scrollport.
+  a provider answers, so they render nothing and start the request only when
+  they are in or near the scrollport. The same holds while a message's cached
+  metadata is still decrypting, and in the composer while it resolves the
+  preview the reader will get.
+
+There is no loading skeleton. It used to draw one, and every embed flashed
+twice — the skeleton, then the real thing replacing it a moment later. In the
+composer those lookups run while the writer is still typing, so nothing is
+waiting on them and the immediacy was not worth the second flash. An embed now
+appears once, fully formed. The empty `.url-embed` wrapper is still in the
+document while it waits, because the `IntersectionObserver` below watches it.
 
 That split is about request volume, not consent: opening a thread must not fire
 a metadata lookup for every link in a year of conversation. The delay heuristic
@@ -208,3 +219,34 @@ has no cached entry yet.
 
 Failures are cached too as `'error'`, because a dead provider should degrade to
 one quiet plain link, not a refetch storm.
+
+## Request queue
+
+Every background embed lookup in the browser — the reader's oEmbed fetch
+(noembed direct, or `/api/oembed` for reddit), the composer's per-URL
+`fetchEmbedDetails`, and the metadata backfill a thread fires as an uncached
+embed scrolls into view — goes
+through one page-wide FIFO queue in `src/lib/embeds.ts` that lets at most
+`MAX_CONCURRENT_EMBED_REQUESTS` (3) run at once. Pasting text with a hundred
+links in it makes a hundred embed nodes, and without the queue that was a
+hundred simultaneous requests at noembed and reddit. They share one queue
+because they end up at the same providers. A request holds its slot until its
+body has been read, not just its headers. The queue itself is
+`createLimiter` in `src/lib/concurrency.ts`.
+
+A queued lookup gives up after `EMBED_REQUEST_TIMEOUT_MS` (15 seconds). The
+queue introduced that need: without it, a request that never answered held up
+only its own embed, but with it three such requests would stall every embed on
+the page. A timed-out lookup fails, and is remembered, like any other failure.
+
+The send path's batched `fetchEmbedMetadata(urls)` and the refresh button skip
+the queue: the writer is waiting on those, and they should not sit behind
+background previews. They are one request to our own server anyway, and
+`/api/embed-metadata` caps its own fan-out to the providers at the same three
+per request (`mapWithConcurrency`). Per request rather than per isolate, because
+a Worker isolate is shared by unrelated requests and a module-level queue would
+let one person's paste slow down everyone else's.
+
+A queued lookup is not cancelled if its embed is removed or scrolled away
+before it starts. It still runs, and its answer lands in the page cache, where
+the next embed for that URL uses it.

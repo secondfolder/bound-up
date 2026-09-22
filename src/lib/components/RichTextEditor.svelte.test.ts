@@ -245,8 +245,8 @@ function embedChips(container: HTMLElement): Element[] {
  * Answers the composer's own preview lookup.
  *
  * The composer resolves the same details the send path will, so that what the
- * writer sees is what the reader gets. Without this stub it sits on a skeleton
- * forever, which is also what it should do.
+ * writer sees is what the reader gets. Without this stub it draws nothing
+ * until the lookup fails, which is also what it should do.
  */
 function stubEmbedMetadata(url: string, over: Partial<CachedEmbedDetails> = {}) {
 	vi.stubGlobal(
@@ -276,10 +276,19 @@ function stubEmbedMetadata(url: string, over: Partial<CachedEmbedDetails> = {}) 
 	);
 }
 
-function removeButton(container: HTMLElement): HTMLElement {
-	const button = container.querySelector('.composer-embed .remove');
-	if (!(button instanceof HTMLElement)) throw new Error('no remove button on the embed');
-	return button;
+/**
+ * The embed's remove button, once it is there.
+ *
+ * Waited for because the embed draws nothing — its actions row included —
+ * until its preview lookup settles, rather than a skeleton that flashes and
+ * is replaced a moment later.
+ */
+function removeButton(container: HTMLElement): Promise<HTMLElement> {
+	return vi.waitFor(() => {
+		const button = container.querySelector('.composer-embed .remove');
+		if (!(button instanceof HTMLElement)) throw new Error('no remove button on the embed');
+		return button;
+	});
 }
 
 describe('RichTextEditor, embeds', () => {
@@ -303,9 +312,63 @@ describe('RichTextEditor, embeds', () => {
 			'https://i.imgur.com/cat.jpg'
 		);
 		// A `wa-button` takes its name from its icon's label.
-		expect(waProp(removeButton(container).querySelector('wa-icon'), 'label')).toBe(
+		expect(waProp((await removeButton(container)).querySelector('wa-icon'), 'label')).toBe(
 			'Remove embedded preview of https://i.imgur.com/cat.jpg'
 		);
+	});
+
+	/**
+	 * One appearance, not two. The lookup runs while the writer is still
+	 * typing, so nothing is waiting on it — a skeleton that is replaced by the
+	 * card a moment later is just a second flash.
+	 */
+	it('draws nothing until the preview is ready, then the finished card', async () => {
+		let answer: ((response: Response) => void) | undefined;
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(
+				() =>
+					new Promise<Response>((resolve) => {
+						answer = resolve;
+					})
+			)
+		);
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+
+		const embed = await vi.waitFor(() => {
+			const found = container.querySelector('.composer-embed .url-embed');
+			if (!found) throw new Error('expected the embed to be mounted');
+			return found;
+		});
+		await vi.waitFor(() => expect(answer).toBeDefined());
+		// Mounted and asking, but drawing nothing: no placeholder, no bare image.
+		expect(embed.children.length).toBe(0);
+
+		answer?.(
+			Response.json({
+				embeds: [
+					{
+						href: 'https://i.imgur.com/cat.jpg',
+						fetchedAt: Date.now(),
+						kind: 'image',
+						providerName: 'Imgur',
+						title: 'A cat',
+						description: null,
+						thumbnailUrl: null,
+						canonicalUrl: null,
+						imageUrl: 'https://i.imgur.com/cat.jpg',
+						iframeSrc: null,
+						iframeHeight: null,
+						faviconUrl: null,
+						themeColor: null
+					}
+				]
+			})
+		);
+		await vi.waitFor(() => {
+			expect(embed.querySelector('.card')?.textContent).toContain('A cat');
+		});
 	});
 
 	/**
@@ -465,7 +528,7 @@ describe('RichTextEditor, embeds', () => {
 		await tick();
 		const card = container.querySelector('.composer-embed');
 		if (!card) throw new Error('expected a composer embed');
-		// The player replaces the skeleton once the details lookup has settled,
+		// The player appears once the details lookup has settled,
 		// which it does by failing: there is no server here.
 		const frame = await vi.waitFor(() => {
 			const found = container.querySelector('.composer-embed iframe');
@@ -533,7 +596,7 @@ describe('RichTextEditor, embeds', () => {
 		await tick();
 		expect(embedChips(container)).toHaveLength(1);
 
-		await fireEvent.click(removeButton(container));
+		await fireEvent.click(await removeButton(container));
 		await tick();
 		expect(embedChips(container)).toHaveLength(0);
 
@@ -605,7 +668,7 @@ describe('RichTextEditor, embeds', () => {
 		// While the embed is there the link has nothing to offer.
 		expect(linkWrapper(container)).not.toHaveClass('embed-available');
 
-		await fireEvent.click(removeButton(container));
+		await fireEvent.click(await removeButton(container));
 		await tick();
 		expect(linkWrapper(container)).toHaveClass('embed-available');
 
@@ -621,7 +684,7 @@ describe('RichTextEditor, embeds', () => {
 			props: { initial: WITH_EMBED }
 		});
 		await tick();
-		await fireEvent.click(removeButton(container));
+		await fireEvent.click(await removeButton(container));
 		await tick();
 
 		// The editor draws links under its own node types; what it hands back

@@ -234,8 +234,31 @@ describe('MessageBubble', () => {
 	 */
 	it('offers Show for a link the sender left without an embed', async () => {
 		installIntersectionObserverMock();
-		const fetchMock = vi.fn(() => new Promise(() => {}));
-		vi.stubGlobal('fetch', fetchMock);
+		// The preview lookup Show makes before it inserts anything.
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () =>
+				Response.json({
+					embeds: [
+						{
+							href: 'https://vimeo.com/2',
+							fetchedAt: Date.now(),
+							kind: 'card',
+							providerName: 'Vimeo',
+							title: 'Revealed title',
+							description: null,
+							thumbnailUrl: null,
+							canonicalUrl: null,
+							imageUrl: null,
+							iframeSrc: null,
+							iframeHeight: null,
+							faviconUrl: null,
+							themeColor: null
+						}
+					]
+				})
+			)
+		);
 		const { container } = render(MessageBubble, {
 			props: {
 				...props,
@@ -269,11 +292,16 @@ describe('MessageBubble', () => {
 		expect(container.querySelector('.url-embed')).toBeNull();
 		await fireEvent.click(container.querySelector('wa-button.reveal')!);
 
-		// The card goes at the start of the link's line, and the button that
-		// asked for it is gone.
-		const embed = container.querySelector('.embed-slot');
+		// The card goes at the start of the link's line once its details are
+		// in, and the button that asked for it is gone.
+		const embed = await vi.waitFor(() => {
+			const found = container.querySelector('.embed-slot');
+			if (!found) throw new Error('expected the revealed embed');
+			return found;
+		});
 		expect(embed).not.toBeNull();
-		expect(embed?.closest('p')).not.toBeNull();
+		expect(embed.closest('p')).not.toBeNull();
+		expect(embed.textContent).toContain('Revealed title');
 		expect(container.querySelector('wa-button.reveal')).toBeNull();
 	});
 
@@ -291,7 +319,11 @@ describe('MessageBubble', () => {
 		});
 
 		expect(fetchMock).not.toHaveBeenCalled();
-		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
+		// Drawn as nothing until the metadata is in, rather than as a skeleton
+		// that flashes and is replaced — see UrlEmbed.svelte.
+		const embed = container.querySelector('.url-embed');
+		expect(embed).not.toBeNull();
+		expect(embed?.children.length).toBe(0);
 	});
 
 	it('marks which side the message is on', () => {

@@ -24,7 +24,7 @@
 	 * `<p>` this renders into is still valid markup.
 	 *
 	 * `embeds` carries what `UrlEmbed` needs from the message around it, and
-	 * `canReveal` / `onReveal` are the reader's own opt-in for a link the
+	 * `canReveal` / `isRevealing` / `onReveal` are the reader's own opt-in for a link the
 	 * **writer** left without an embed. `RichText` owns both; all that happens
 	 * here is the button next to the link, because this is the only component
 	 * that knows where the link is.
@@ -42,11 +42,14 @@
 		nodes,
 		embeds = undefined,
 		canReveal = undefined,
+		isRevealing = undefined,
 		onReveal = undefined
 	}: {
 		nodes: RichTextInlineNode[];
 		embeds?: InlineEmbedContext | undefined;
 		canReveal?: ((url: string) => boolean) | undefined;
+		/** True while a pressed Show is still loading what it will insert. */
+		isRevealing?: ((url: string) => boolean) | undefined;
 		onReveal?: ((url: string) => void) | undefined;
 	} = $props();
 
@@ -91,14 +94,20 @@
 			href={node.url}
 			target="_blank"
 			rel="noopener noreferrer ugc"
-			><Self nodes={node.children} {embeds} {canReveal} {onReveal} /></a
-		>{#if canReveal?.(node.url)}<wa-button
+			><Self nodes={node.children} {embeds} {canReveal} {isRevealing} {onReveal} /></a
+		>{#if canReveal?.(node.url)}<!--
+				The spinner is swapped in by hand rather than through `loading`:
+				Svelte's SSR does not know to omit a false `loading`, and Lit reads
+				`loading="false"` as true. Same reason as UrlEmbed's refresh button.
+			--><wa-button
 				type="button"
 				class="reveal"
 				size="s"
 				appearance="outlined"
 				pill
-				onclick={() => onReveal?.(node.url)}>Show</wa-button
+				disabled={isRevealing?.(node.url) ?? false}
+				onclick={() => onReveal?.(node.url)}
+				>{#if isRevealing?.(node.url)}<wa-spinner slot="end"></wa-spinner>{/if}Show</wa-button
 			>{/if}{/if}{/each}
 
 <style>
@@ -116,8 +125,15 @@
 		--wa-form-control-padding-inline: 0.7em;
 		font-size: 0.9em;
 		margin-inline: 0.35em 0.1em;
-		vertical-align: baseline;
 		color: inherit;
+
+		wa-spinner {
+			font-size: 0.9em;
+			position: absolute;
+			left: 50%;
+			translate: -50%;
+			margin-inline-start: 0em;
+		}
 
 		/* Drawn in the text's own colour, so it reads the same in either side's
 		   bubble, rather than in the button's neutral palette. */
@@ -125,6 +141,8 @@
 			border-color: currentColor;
 			background: transparent;
 			color: inherit;
+			vertical-align: 0.75ex;
+			position: relative;
 		}
 	}
 </style>

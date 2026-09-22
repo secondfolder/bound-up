@@ -293,7 +293,10 @@ async function writeMessageMetadataEntry(
 	recipients: string[],
 	replaceExisting: boolean
 ): Promise<MessageMetadataPayload | null> {
-	const embeds = await fetchEmbedMetadata([href]);
+	// A backfill is fired by an embed scrolling into view, so a long thread can
+	// ask for many at once and they wait in the page's embed queue. A refresh
+	// is someone pressing a button and waiting on it, so it goes straight out.
+	const embeds = await fetchEmbedMetadata([href], { queued: !replaceExisting });
 	const embed = embeds.find((entry) => entry.href === href) ?? null;
 	if (!embed) return null;
 	const existing = current?.embeds ?? [];

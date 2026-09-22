@@ -55,8 +55,11 @@
 	 *
 	 * Anything that has to ask a provider what a URL is — a noembed host, or
 	 * reddit through our own proxy — cannot draw anything until that answer
-	 * arrives, so it renders a skeleton and starts the request only once it is
-	 * in or near the scrollport. That is a request-volume decision rather than
+	 * arrives, so it renders nothing and starts the request only once it is in
+	 * or near the scrollport — then appears once, fully formed. There is no
+	 * loading skeleton: the composer resolves embeds while the writer is still
+	 * typing, and a skeleton that is swapped for the real thing a moment later
+	 * was two flashes for one embed, which nobody was waiting on anyway. That is a request-volume decision rather than
 	 * a consent one: opening a thread must not fire a metadata lookup for every
 	 * link in a year of conversation. The privacy boundary those lookups cross
 	 * is documented in docs/privacy.md.
@@ -540,31 +543,26 @@
 		};
 	});
 
-	const skeletonCard = $derived(cachedCard);
-	const skeletonKind = $derived.by(() => {
-		if (cached?.kind === 'image' || spec.kind === 'image') return 'image';
-		if (cached?.kind === 'iframe' || spec.kind === 'iframe' || spec.kind === 'server-oembed') {
-			return 'player';
-		}
-		if (cached?.thumbnailUrl || cached?.iframeSrc || cached?.imageUrl) return 'player';
-		return 'card';
-	});
-
 	/**
-	 * A stable placeholder for an embed that cannot be drawn yet.
+	 * True while this embed has nothing to draw yet, during which it draws
+	 * nothing at all.
 	 *
 	 * Two windows. While details are on their way — a message's metadata still
 	 * decrypting, or the composer resolving the same preview the reader will
-	 * get — nothing is drawn at all, whatever the kind: a player that appears
-	 * bare and then grows a title card a moment later moves everything under
-	 * it. After that, only the kinds that still have nothing to draw wait:
-	 * anything resolved, including a failure, has something better to show.
+	 * get — nothing is drawn whatever the kind: a player that appears bare and
+	 * then grows a title card a moment later moves everything under it. After
+	 * that, only the kinds that still have nothing to draw wait: anything
+	 * resolved, including a failure, has something better to show.
+	 *
+	 * This used to draw a shimmering skeleton, which made every embed flash
+	 * twice — once for the skeleton, once for the real thing. See the component
+	 * comment above for why appearing once, late, is the better trade.
 	 */
-	const showSkeleton = $derived(cachedPending || (needsDetails && oembed === undefined));
+	const holding = $derived(cachedPending || (needsDetails && oembed === undefined));
 
 	const showFallbackLink = $derived.by(() => {
 		if (cachedCard || cachedStandaloneImage || cachedIframeEmbed) return false;
-		if (showSkeleton || card || standaloneImage || iframeEmbed) return false;
+		if (holding || card || standaloneImage || iframeEmbed) return false;
 		if (spec.kind === 'server-oembed') return true;
 		if (oembed === undefined || oembed === 'error') return true;
 		return !oembedFrame && !oembed.title;
@@ -771,31 +769,14 @@
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
 <!--
 	One element wraps every branch so the scrollport observer always has
-	something to watch, whatever this embed turns out to be. It also gives the
+	something to watch, whatever this embed turns out to be — including while
+	it is still holding and draws nothing, when this is an empty box that the
+	observer still reports on. It also gives the
 	reader's revealed cards a stable box to be scrolled to.
 -->
 <span class="url-embed" bind:this={rootElement}>
-	{#if showSkeleton}
-		<span class="embed skeleton-shell" aria-busy="true">
-			<span class="head">
-				<span class="skeleton-card">
-					{#if skeletonCard?.providerName}
-						<span class="provider">{skeletonCard.providerName}</span>
-					{:else}
-						<span class="skeleton-line short"></span>
-					{/if}
-					{#if skeletonCard?.title}
-						<span class="title">{skeletonCard.title}</span>
-					{:else}
-						<span class="skeleton-line"></span>
-					{/if}
-				</span>
-				{@render actionBar()}
-			</span>
-			{#if skeletonKind !== 'card' || skeletonCard?.thumbnailUrl}
-				<span class:skeleton-media={true} class:image={skeletonKind === 'image'}></span>
-			{/if}
-		</span>
+	{#if holding}
+		<!-- Nothing yet: the embed appears once it has something real to show. -->
 	{:else if boxed}
 		<span class="embed card-shell">
 			{@render head()}
@@ -910,8 +891,10 @@
 <!-- eslint-enable svelte/no-navigation-without-resolve -->
 
 <style>
-	/* A block of its own: an embed is a block-level thing in the document, and
-	   the observer needs a box with real dimensions to measure. */
+	/* A block of its own: an embed is a block-level thing in the document.
+	   While an embed is holding this box is empty and zero-height, which the
+	   observer still handles — a zero-area target intersects when it sits
+	   inside the root's margin-expanded bounds. */
 	.url-embed {
 		display: block;
 	}
@@ -953,6 +936,12 @@
 		}
 	}
 
+	.image img {
+		max-inline-size: 100%;
+		max-block-size: 20rem;
+		display: block;
+	}
+
 	/**
 	 * The embed's chrome is drawn from `currentColor`, never from a fixed black.
 	 *
@@ -962,62 +951,6 @@
 	 * means the frame follows the text it is next to, in both themes and on
 	 * both sides of a conversation, with no per-bubble overrides.
 	 */
-	.skeleton-shell {
-		display: block;
-		border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-		border-radius: 0.5rem;
-		overflow: hidden;
-		background: color-mix(in srgb, currentColor 7%, transparent);
-	}
-
-	.skeleton-card {
-		display: flex;
-		flex: 1 1 auto;
-		flex-direction: column;
-		gap: 0.35rem;
-		padding: 0.5rem;
-		min-inline-size: 0;
-	}
-
-	.skeleton-line,
-	.skeleton-media {
-		background: linear-gradient(
-			90deg,
-			color-mix(in srgb, currentColor 8%, transparent),
-			color-mix(in srgb, currentColor 26%, transparent),
-			color-mix(in srgb, currentColor 8%, transparent)
-		);
-		background-size: 200% 100%;
-		animation: embed-shimmer 1.2s linear infinite;
-	}
-
-	.skeleton-line {
-		display: block;
-		block-size: 0.85rem;
-		border-radius: 999px;
-	}
-
-	.skeleton-line.short {
-		inline-size: 40%;
-	}
-
-	.skeleton-media {
-		display: block;
-		aspect-ratio: 16 / 9;
-		border-block-start: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-	}
-
-	.skeleton-media.image {
-		aspect-ratio: 4 / 3;
-		max-block-size: 20rem;
-	}
-
-	.image img {
-		max-inline-size: 100%;
-		max-block-size: 20rem;
-		display: block;
-	}
-
 	.card-shell {
 		display: block;
 		position: relative;
@@ -1234,16 +1167,6 @@
 			block-size: 100%;
 			border: 0;
 			display: block;
-		}
-	}
-
-	@keyframes embed-shimmer {
-		from {
-			background-position: 200% 0;
-		}
-
-		to {
-			background-position: -200% 0;
 		}
 	}
 </style>

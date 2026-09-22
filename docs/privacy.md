@@ -65,8 +65,9 @@ does widen what the server may transiently receive, but the derived preview is
 still stored only as ciphertext in the database.
 
 Those URL disclosures happen when a URL is typed into the composer (the embed
-shown there is the real one, resolved the same way), at send time, and when an
-embed with no cached preview reaches the scrollport. There is deliberately no per-account opt-in
+shown there is the real one, resolved the same way), at send time, when a reader
+presses `Show` on a link (the details are looked up before the card goes in),
+and when an embed with no cached preview reaches the scrollport. There is deliberately no per-account opt-in
 gate in front of them: the lookups are not logged, and an embed only exists
 because the sender put it in the message or because this reader pressed `Show`
 for a link beside it. The scrollport wait that remains is about request volume,

@@ -1,7 +1,9 @@
 import { fireEvent, render } from '@testing-library/svelte';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import RichText from './RichText.svelte';
+import { clearOembedCache, type CachedEmbedDetails } from '$lib/embeds';
 import type { RichTextDocument } from '$lib/richtext';
+import { waProp, waSettled } from '$lib/testing/web-awesome';
 
 /**
  * RichText renders native elements apart from the reader's Show button, so
@@ -259,7 +261,51 @@ function showButtons(container: HTMLElement): HTMLElement[] {
 	);
 }
 
+/** What `/api/embed-metadata` says about a URL, for a lookup that works. */
+function details(url: string, over: Partial<CachedEmbedDetails> = {}): CachedEmbedDetails {
+	return {
+		href: url,
+		fetchedAt: Date.now(),
+		kind: 'card',
+		providerName: 'Vimeo',
+		title: 'A vimeo clip',
+		description: null,
+		thumbnailUrl: null,
+		canonicalUrl: url,
+		imageUrl: null,
+		iframeSrc: null,
+		iframeHeight: null,
+		faviconUrl: null,
+		themeColor: null,
+		...over
+	};
+}
+
+/** Answers every preview lookup with a card for the URL it was asked about. */
+function stubLookup() {
+	const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+		const { urls } = JSON.parse(String(init?.body)) as { urls: string[] };
+		return Response.json({ embeds: urls.map((url) => details(url)) });
+	});
+	vi.stubGlobal('fetch', fetchMock);
+	return fetchMock;
+}
+
+/** Presses Show and waits for the card it asked for to go in. */
+async function reveal(container: HTMLElement, button: HTMLElement, count = 1) {
+	await fireEvent.click(button);
+	await vi.waitFor(() => {
+		expect(container.querySelectorAll('.embed-slot')).toHaveLength(count);
+	});
+}
+
 describe('RichText, revealing an embed the sender left out', () => {
+	afterEach(() => {
+		// Lookups are remembered per URL for the page, so each case starts clean.
+		clearOembedCache();
+		vi.unstubAllGlobals();
+	});
+
 	it('offers Show beside an embeddable link with no embed of its own', () => {
 		const { container } = render(RichText, {
 			props: {
@@ -314,6 +360,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 	 * message typed with line breaks would be the top of the message.
 	 */
 	it("puts the card at the start of the link's line and takes the button away", async () => {
+		stubLookup();
 		const { container } = render(RichText, {
 			props: {
 				text: stored([
@@ -330,7 +377,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await fireEvent.click(showButtons(container)[0]);
+		await reveal(container, showButtons(container)[0]!);
 
 		const revealed = container.querySelector('.embed-slot');
 		expect(revealed).not.toBeNull();
@@ -341,6 +388,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 	});
 
 	it('puts it at the head of the paragraph when the link is on the first line', async () => {
+		stubLookup();
 		const { container } = render(RichText, {
 			props: {
 				text: stored([
@@ -350,7 +398,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await fireEvent.click(showButtons(container)[0]);
+		await reveal(container, showButtons(container)[0]!);
 
 		const paragraphs = [...container.querySelectorAll('p')];
 		expect(paragraphs[0]?.textContent).toBe('first');
@@ -358,6 +406,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 	});
 
 	it('reveals the occurrence that was pressed, not every copy of the URL', async () => {
+		stubLookup();
 		const { container } = render(RichText, {
 			props: {
 				text: stored([
@@ -369,9 +418,122 @@ describe('RichText, revealing an embed the sender left out', () => {
 
 		const buttons = showButtons(container);
 		expect(buttons).toHaveLength(2);
-		await fireEvent.click(buttons[1]!);
+		await reveal(container, buttons[1]!);
 
 		expect(container.querySelectorAll('.embed-slot')).toHaveLength(1);
 		expect(showButtons(container)).toHaveLength(1);
+	});
+
+	/**
+	 * The card goes in once it is ready, not before, so the button is the only
+	 * sign anything is happening in the meantime.
+	 */
+	it('spins the button until the details arrive, then inserts the finished card', async () => {
+		let answer: ((response: Response) => void) | undefined;
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(
+				() =>
+					new Promise<Response>((resolve) => {
+						answer = resolve;
+					})
+			)
+		);
+		const { container } = render(RichText, {
+			props: {
+				text: stored([{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }])
+			}
+		});
+
+		const button = showButtons(container)[0]!;
+		await fireEvent.click(button);
+		await vi.waitFor(() => expect(answer).toBeDefined());
+		await waSettled(container);
+
+		expect(button.querySelector('wa-spinner')).not.toBeNull();
+		expect(waProp(button, 'disabled')).toBe(true);
+		expect(container.querySelector('.embed-slot')).toBeNull();
+
+		answer?.(Response.json({ embeds: [details('https://vimeo.com/2')] }));
+		await vi.waitFor(() => {
+			expect(container.querySelector('.embed-slot .card')?.textContent).toContain('A vimeo clip');
+		});
+		expect(showButtons(container)).toHaveLength(0);
+	});
+
+	it('inserts a card titled with the error when the lookup fails', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => Response.json({ message: 'Provider timed out' }, { status: 502 }))
+		);
+		const { container } = render(RichText, {
+			props: {
+				text: stored([{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }])
+			}
+		});
+
+		await reveal(container, showButtons(container)[0]!);
+
+		const card = container.querySelector('.embed-slot .card');
+		expect(card?.querySelector('.title')?.textContent).toBe(
+			"Couldn't load this preview (Provider timed out)"
+		);
+		expect(card?.querySelector('.provider')?.textContent).toBe('vimeo.com');
+		// Still the link it was made from, so the reader can go and look anyway.
+		expect(card?.getAttribute('href')).toBe('https://vimeo.com/2');
+		expect(showButtons(container)).toHaveLength(0);
+	});
+
+	it('says so when the server cannot be reached at all', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				throw new TypeError('Failed to fetch');
+			})
+		);
+		const { container } = render(RichText, {
+			props: {
+				text: stored([{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }])
+			}
+		});
+
+		await reveal(container, showButtons(container)[0]!);
+
+		expect(container.querySelector('.embed-slot .card .title')?.textContent).toBe(
+			"Couldn't reach the server to load this preview"
+		);
+	});
+
+	it('says so when the server has no preview for the link', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => Response.json({ embeds: [] }))
+		);
+		const { container } = render(RichText, {
+			props: {
+				text: stored([{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }])
+			}
+		});
+
+		await reveal(container, showButtons(container)[0]!);
+
+		expect(container.querySelector('.embed-slot .card .title')?.textContent).toBe(
+			'No preview is available for this link'
+		);
+	});
+
+	it('inserts straight away when the message already has details for the URL', async () => {
+		const fetchMock = stubLookup();
+		const { container } = render(RichText, {
+			props: {
+				text: stored([{ type: 'paragraph', children: [autolink('https://vimeo.com/2')] }]),
+				cachedEmbeds: [details('https://vimeo.com/2', { title: 'From the sidecar' })]
+			}
+		});
+
+		await fireEvent.click(showButtons(container)[0]!);
+
+		expect(container.querySelector('.embed-slot .card')?.textContent).toContain('From the sidecar');
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

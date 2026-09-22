@@ -77,6 +77,18 @@ class MockIntersectionObserver {
  * its shadow root, where testing-library's role queries do not look — so it is
  * found by element instead.
  */
+/**
+ * True while the embed is waiting for something to show and draws nothing.
+ *
+ * The wrapper is always there — the scrollport observer watches it — so
+ * "nothing" means a wrapper with no elements in it.
+ */
+function isHolding(container: HTMLElement): boolean {
+	const root = container.querySelector('.url-embed');
+	if (!root) throw new Error('expected the embed wrapper');
+	return root.children.length === 0;
+}
+
 function refreshButton(container: HTMLElement): HTMLElement {
 	const button = container.querySelector<HTMLElement>('wa-button.refresh');
 	if (!button) throw new Error('expected a refresh button');
@@ -268,10 +280,11 @@ describe('UrlEmbed', () => {
 		expect(container.querySelector('.player iframe')).toBeNull();
 	});
 
-	it('holds the space with a skeleton while the oEmbed is in flight', () => {
-		// Not the plain link it used to show: a link that turns into a card a
-		// moment later moves everything under it, which is worse in a thread
-		// than a placeholder of roughly the right size.
+	it('draws nothing at all while the oEmbed is in flight', () => {
+		// Not the plain link it used to show — a link that turns into a card a
+		// moment later moves everything under it — and not a skeleton either,
+		// which was swapped for the card a moment later: two flashes for one
+		// embed. It appears once, when it has something real to show.
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(() => new Promise(() => {}))
@@ -283,7 +296,7 @@ describe('UrlEmbed', () => {
 				label: 'vimeo link'
 			}
 		});
-		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
+		expect(isHolding(container)).toBe(true);
 		expect(container.querySelector('a')).toBeNull();
 	});
 
@@ -351,11 +364,11 @@ describe('UrlEmbed', () => {
 
 		expect(queryByRole('button', { name: 'Show' })).toBeNull();
 		expect(container.querySelector('.card')?.textContent).toContain('Cached title');
-		expect(container.querySelector('.skeleton-shell')).toBeNull();
+		expect(isHolding(container)).toBe(false);
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it('holds a not-yet-cached embed in a skeleton until it is in view', () => {
+	it('draws nothing for an embed whose cached details are still decrypting', () => {
 		installIntersectionObserverMock();
 		const fetchMock = vi.fn(() => new Promise(() => {}));
 		vi.stubGlobal('fetch', fetchMock);
@@ -385,7 +398,7 @@ describe('UrlEmbed', () => {
 			}
 		});
 
-		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
+		expect(isHolding(container)).toBe(true);
 		expect(container.querySelector('img')).toBeNull();
 		expect(container.querySelector('iframe')).toBeNull();
 		expect(fetchMock).not.toHaveBeenCalled();
@@ -410,8 +423,10 @@ describe('UrlEmbed', () => {
 			}
 		});
 
-		expect(container.querySelector('.skeleton-shell')).not.toBeNull();
+		expect(isHolding(container)).toBe(true);
 		expect(fetchMock).not.toHaveBeenCalled();
+		// Empty, but still observed: an embed that draws nothing until it loads
+		// must still be able to tell when it has scrolled into view.
 		emitIntersection(container.querySelector('.url-embed')!, true, 1);
 
 		await vi.waitFor(() => {
@@ -565,7 +580,7 @@ describe('UrlEmbed', () => {
 			});
 		});
 
-		it('keeps a skeleton up until the proxy resolves', async () => {
+		it('draws nothing until the proxy resolves', async () => {
 			const resolver: { current: ((response: Response) => void) | null } = { current: null };
 			vi.stubGlobal(
 				'fetch',
@@ -578,7 +593,7 @@ describe('UrlEmbed', () => {
 			);
 			const { container, queryByText } = render(UrlEmbed, { props: redditProps });
 
-			expect(container.querySelector('.skeleton-shell')).not.toBeNull();
+			expect(isHolding(container)).toBe(true);
 			expect(container.querySelector('.card')).toBeNull();
 
 			// Waited for rather than read straight after render: the lookup is gated

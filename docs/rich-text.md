@@ -466,6 +466,23 @@ Pressing it inserts a card at the start of that link's line — the same
 placement the composer uses, through the same `withInlineEmbeds` helper — and
 takes the button away.
 
+The card goes in only once it has something to show. Pressing `Show` looks the
+URL's details up first (`fetchEmbedDetailsResult`, the composer's queued,
+page-cached lookup), and until that answers the button stays, disabled, with a
+spinner in it. Inserting straight away would draw nothing until the lookup
+landed — see "no loading skeleton" in [embeds.md](embeds.md) — leaving a button
+that vanished with no sign anything was happening. A URL the message already
+has cached details for skips the lookup and goes in at once.
+
+A failed lookup still inserts a card, titled with the reason — the server's own
+error message where it gave one, otherwise "No preview is available for this
+link", "Timed out loading this preview" and the like — and named for the link's
+host (`embedErrorDetails`). The reader asked for something, and a silent
+nothing reads as a button that does not work. Anything the URL alone can still
+draw, a direct image or a curated player, appears under that title. The looked
+up details, or the error card, sit under the message's own cached entries, so a
+refresh that writes a real entry replaces them.
+
 That reveal lives in `RichText.svelte` as view state keyed by block and URL. It
 is never written back: the document belongs to whoever wrote it, and a reader
 expanding a link for themselves is closer to opening it in a tab than to
