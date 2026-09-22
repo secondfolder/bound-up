@@ -18,6 +18,12 @@
 	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import { stashUnlock } from '$lib/crypto/stash';
 	import {
+		requestStoragePersistence,
+		storageExplanationVisible,
+		storagePersistenceState,
+		type StoragePersistenceState
+	} from '$lib/crypto/storage-persistence.svelte';
+	import {
 		deriveMasterKey,
 		deriveWrapKey,
 		webCryptoAvailable,
@@ -125,6 +131,42 @@
 	}
 
 	/**
+	 * Whether the browser has agreed not to evict the stored key.
+	 *
+	 * Only asked while unlocked on a durable tier: on `memory` nothing is stored
+	 * to keep. Re-read when the app shell's explanation closes, so pressing OK
+	 * there updates this page too. The button is the way back for a dismissed
+	 * explanation, and for a browser that said no the first time.
+	 */
+	let storageState = $state<StoragePersistenceState | null>(null);
+	let storageRequest = $state<'idle' | 'busy' | 'refused'>('idle');
+	const storedDurably = $derived(keyring.status === 'unlocked' && keyring.durable);
+	$effect(() => {
+		// Read for the dependency: the dialog closing is when a grant can land.
+		void storageExplanationVisible();
+		if (!storedDurably) {
+			storageState = null;
+			return;
+		}
+		let stale = false;
+		void storagePersistenceState().then((state) => {
+			if (!stale) storageState = state;
+		});
+		return () => {
+			stale = true;
+		};
+	});
+
+	async function askToKeepStorage() {
+		storageRequest = 'busy';
+		// Nothing awaited before this: Firefox prompts only while the click's
+		// user activation is live.
+		const granted = await requestStoragePersistence();
+		storageState = granted ? 'granted' : await storagePersistenceState();
+		storageRequest = storageState === 'granted' ? 'idle' : 'refused';
+	}
+
+	/**
 	 * What to call a passkey wrap.
 	 *
 	 * Prefers the passkey's *current* name over the label frozen into the wrap
@@ -191,6 +233,27 @@
 					{/if}
 				{/if}
 			</wa-callout>
+			{#if storageState === 'not-granted'}
+				<div class="storage">
+					<p class="quiet">
+						Your browser has not agreed to keep your key stored, so it may clear it — an iPhone does
+						after about a week without a visit — and you would have to unlock again.
+					</p>
+					<wa-button
+						appearance="outlined"
+						disabled={storageRequest === 'busy'}
+						onclick={askToKeepStorage}
+					>
+						Ask the browser to keep it
+					</wa-button>
+					{#if storageRequest === 'refused'}
+						<p class="quiet" role="status">
+							Your browser said no. Safari generally only agrees once this app is on your Home
+							Screen.
+						</p>
+					{/if}
+				</div>
+			{/if}
 			<wa-button appearance="outlined" onclick={lockNow}>Lock on this device</wa-button>
 		{:else if keyring.status === 'absent'}
 			<wa-callout variant="neutral">
@@ -432,6 +495,13 @@
 
 		.lede {
 			font-size: 0.9375rem;
+		}
+
+		.storage {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.5rem;
 		}
 
 		.reason {

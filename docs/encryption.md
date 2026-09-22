@@ -422,9 +422,33 @@ time" indistinguishable from an unsupported curve, a refused database and a
 ### Storage still gets evicted
 
 iOS drops IndexedDB after about a week of not opening the app, and any browser
-may evict under pressure. The keystore asks `navigator.storage.persist()` once
-after its first durable write, which Safari generally declines unless the site
-is on the Home Screen — so path 3 stays a first-class screen, not an error.
+may evict under pressure. Asking `navigator.storage.persist()` helps where the
+browser agrees, which Safari generally does not unless the site is on the Home
+Screen — so path 3 stays a first-class screen, not an error.
+
+The request is never made unprompted. Chrome and Safari decide it silently, but
+Firefox shows a permission prompt, and the keystore used to fire it on its first
+durable write — the silent unlock straight after signing in, with nothing on
+screen to say why. Now (`src/lib/crypto/storage-persistence.svelte.ts`):
+
+- **Only an explicit unlock makes the explanation due** — a password or passkey
+  unlock through `unlockWithPassword` / `unlockWithPasskey`. The stash unlock
+  after login or signup, and a load that finds the key already cached, do not.
+  An explicit unlock is the moment eviction has just cost the user something.
+- **It is skipped** when the device is on the `memory` tier (nothing is stored to
+  keep), when the Storage API is missing, when `persisted()` already says yes,
+  or once this device has pressed OK (the `bound-up:storage-persistence-asked`
+  localStorage key — per origin, because the permission is).
+- **`StoragePersistenceDialog`, in the app shell, explains; only its OK asks.**
+  `persist()` is called in the click handler before anything is awaited, because
+  Firefox prompts only while the click's user activation is live. Closing the
+  dialog any other way asks nothing and records nothing, so it comes back after
+  the next explicit unlock.
+- **It waits out "unlock, then set up a passkey".** `MessageUnlock` holds it shut
+  while the add-a-passkey dialogs are open, rather than stacking two modals.
+- **`/settings/encryption` can ask again** whenever the device is unlocked on a
+  durable tier and `persisted()` says no — whether the dialog was dismissed or
+  the browser refused an OK.
 
 ## Changing and resetting the password
 

@@ -598,3 +598,112 @@ test.describe('getting your keys back', () => {
 		}
 	});
 });
+
+test.describe('asking the browser to keep the key', () => {
+	/**
+	 * `navigator.storage.persist()` is a permission prompt on Firefox, so it
+	 * must never fire on its own — not on signup's silent unlock, and not when
+	 * the explanation is dismissed. Chromium decides silently and may already
+	 * report the origin as persisted, which would skip the explanation
+	 * altogether, so both calls are stubbed: `persisted()` says no, and
+	 * `persist()` counts and refuses.
+	 */
+	async function stubbedStorage(browser: import('@playwright/test').Browser) {
+		const context = await browser.newContext();
+		await context.addInitScript(() => {
+			const storage = globalThis.navigator?.storage;
+			if (!storage) return;
+			const counted = globalThis as unknown as { persistCalls: number };
+			counted.persistCalls = 0;
+			storage.persisted = async () => false;
+			storage.persist = async () => {
+				counted.persistCalls += 1;
+				return false;
+			};
+		});
+		return context;
+	}
+
+	const persistCalls = (page: import('@playwright/test').Page) =>
+		page.evaluate(() => (globalThis as unknown as { persistCalls: number }).persistCalls);
+
+	const explanation = (page: import('@playwright/test').Page) =>
+		// By its heading: this alpha's `wa-dialog` gives the dialog no accessible
+		// name, so `getByRole('dialog', { name })` matches nothing.
+		page.getByRole('dialog').filter({
+			has: page.getByRole('heading', { name: 'Keep your messages unlocked here' })
+		});
+
+	async function lockAndUnlock(page: import('@playwright/test').Page, password: string) {
+		await clickWaButton(page, 'Lock on this device');
+		await expect(page.getByText(/Locked on this device/)).toBeVisible();
+		await fillPassword(page, 'unlockPassword', password);
+		await clickWaButton(page, 'Unlock messages');
+		await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+	}
+
+	test('explains after an explicit unlock, and asks only on OK', async ({ browser }) => {
+		const who = account('Gus');
+		const context = await stubbedStorage(browser);
+		try {
+			const page = await context.newPage();
+			await signUp(page, who);
+			await page.waitForURL('**/home');
+
+			// Signup unlocks silently: no explanation, and nothing asked.
+			await page.goto('/settings/encryption');
+			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			await expect(explanation(page)).toBeHidden();
+			expect(await persistCalls(page)).toBe(0);
+
+			await lockAndUnlock(page, who.password);
+
+			await expect(explanation(page)).toBeVisible();
+			expect(await persistCalls(page)).toBe(0);
+
+			await clickWaButton(page, 'OK');
+			await expect(explanation(page)).toBeHidden();
+			await expect.poll(() => persistCalls(page)).toBe(1);
+
+			// The browser said no, so settings offers to ask again.
+			await clickWaButton(page, 'Ask the browser to keep it');
+			await expect.poll(() => persistCalls(page)).toBe(2);
+			await expect(page.getByText(/Your browser said no/)).toBeVisible();
+
+			// Once OK has been pressed on this device, an unlock does not explain again.
+			await lockAndUnlock(page, who.password);
+			await expect(explanation(page)).toBeHidden();
+		} finally {
+			await context.close();
+		}
+	});
+
+	test('dismissing asks nothing, and the explanation comes back next unlock', async ({
+		browser
+	}) => {
+		const who = account('Hal');
+		const context = await stubbedStorage(browser);
+		try {
+			const page = await context.newPage();
+			await signUp(page, who);
+			await page.waitForURL('**/home');
+			await page.goto('/settings/encryption');
+
+			await lockAndUnlock(page, who.password);
+			await expect(explanation(page)).toBeVisible();
+
+			await page.keyboard.press('Escape');
+			await expect(explanation(page)).toBeHidden();
+			expect(await persistCalls(page)).toBe(0);
+
+			// Settings is the way back meanwhile.
+			await expect(page.getByRole('button', { name: 'Ask the browser to keep it' })).toBeVisible();
+
+			await lockAndUnlock(page, who.password);
+			await expect(explanation(page)).toBeVisible();
+			expect(await persistCalls(page)).toBe(0);
+		} finally {
+			await context.close();
+		}
+	});
+});

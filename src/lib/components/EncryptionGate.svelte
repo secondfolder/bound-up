@@ -4,6 +4,7 @@
 	import { currentKeyring, initialiseKeyring, resetKeyring } from '$lib/crypto/session.svelte';
 	import MessageUnlock from './MessageUnlock.svelte';
 	import PasskeyOffer from './PasskeyOffer.svelte';
+	import StoragePersistenceDialog from './StoragePersistenceDialog.svelte';
 
 	/**
 	 * Works out whether this device can read the user's messages, once.
@@ -77,10 +78,11 @@
 	 */
 </script>
 
-<!-- Not gated on `handledByPage`: the offer follows an unlock rather than
-     replacing a locked screen, so there is no duplicate form to avoid. -->
+<!-- Not gated on `handledByPage`: both follow an unlock rather than replacing
+     a locked screen, so there is no duplicate form to avoid. -->
 {#if user}
 	<PasskeyOffer />
+	<StoragePersistenceDialog />
 {/if}
 
 <!-- Mounted whenever there is a user, with the callout passed in as chrome

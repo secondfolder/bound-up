@@ -247,22 +247,6 @@ async function deviceKey(db: IDBPDatabase<KeyDb>): Promise<CryptoKey> {
 	return candidate;
 }
 
-let persistenceRequested = false;
-
-/**
- * Ask the browser not to evict this origin, once.
- *
- * Best effort and deliberately not awaited. Chrome and Safari decide silently
- * from engagement — Safari usually says no unless the site is on the Home
- * Screen — while Firefox may show a permission prompt, which is the one reason
- * this is worth a second thought. It changes nothing when denied.
- */
-function requestPersistence(): void {
-	if (persistenceRequested) return;
-	persistenceRequested = true;
-	void navigator.storage?.persist?.().catch(() => {});
-}
-
 function createIndexedDbStore(
 	db: IDBPDatabase<KeyDb>,
 	tier: 'crypto-key' | 'sealed',
@@ -298,11 +282,14 @@ function createIndexedDbStore(
 			return { userId: row.userId, recipient: row.recipient, key: await inMemoryForm(identity) };
 		},
 
+		// No `navigator.storage.persist()` here any more. Asking on the first
+		// durable write meant asking during the silent unlock after sign-in, which
+		// on Firefox is a permission prompt with no context at all. It is asked
+		// after an explanation instead — see `storage-persistence.svelte.ts`.
 		async putIdentity({ userId, recipient, identity }) {
 			if (tier === 'crypto-key') {
 				const key = await importIdentityKey(identity);
 				await db.put(IDENTITY_STORE, { userId, recipient, key });
-				requestPersistence();
 				return { userId, recipient, key };
 			}
 
@@ -312,7 +299,6 @@ function createIndexedDbStore(
 				aad: deviceSealAad(userId, recipient)
 			});
 			await db.put(IDENTITY_STORE, { userId, recipient, sealed });
-			requestPersistence();
 			return { userId, recipient, key: await inMemoryForm(identity) };
 		},
 
@@ -430,7 +416,6 @@ export function keyStore(): Promise<KeyStore> {
 /** Test seam: forget the probed backend. */
 export function resetKeyStore(): void {
 	storePromise = undefined;
-	persistenceRequested = false;
 }
 
 export { createMemoryStore };

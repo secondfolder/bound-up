@@ -5,9 +5,10 @@
 		unlockWithPasskey,
 		unlockWithPassword
 	} from '$lib/crypto/session.svelte';
+	import { holdStorageExplanation } from '$lib/crypto/storage-persistence.svelte';
 	import AddPasskeyFlow from './AddPasskeyFlow.svelte';
 	import UnlockPanel from './UnlockPanel.svelte';
-	import type { Snippet } from 'svelte';
+	import { onDestroy, type Snippet } from 'svelte';
 	import type { KeyWrapView } from '$lib/types';
 
 	/**
@@ -96,12 +97,28 @@
 		await unlockWithPasskey(user, passkeyWrap);
 	}
 
+	let releaseStorageExplanation: (() => void) | undefined;
+	// Leaving mid-ceremony must not keep the explanation shut for the session.
+	onDestroy(() => releaseStorageExplanation?.());
+
 	async function onSetUpPasskey(password: string) {
 		// Reached only after a password unlock that worked — the panel guarantees
 		// the ordering, because a passkey sealed off a wrong password would open
 		// nothing and would look like it had.
 		onFlowOpen?.(true);
+		// The unlock just made the storage explanation due, and it must not open
+		// on top of the passkey dialogs. No race: this runs in the same microtask
+		// chain as the unlock resolving, while the offer is still waiting on the
+		// browser's `persisted()` answer.
+		releaseStorageExplanation?.();
+		releaseStorageExplanation = holdStorageExplanation();
 		addPasskey?.start(password);
+	}
+
+	function onFlowDone() {
+		releaseStorageExplanation?.();
+		releaseStorageExplanation = undefined;
+		onFlowOpen?.(false);
 	}
 </script>
 
@@ -112,7 +129,7 @@
 		recipient={snapshot.recipient}
 		wraps={snapshot.wraps}
 		{hasPassword}
-		onDone={() => onFlowOpen?.(false)}
+		onDone={onFlowDone}
 	/>
 {/if}
 

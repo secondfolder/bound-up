@@ -13,6 +13,7 @@ import { deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
 import { keyStore, type KeyTier } from './keystore';
 import { passkeysAvailable, unwrapIdentityWithPasskey } from './passkey';
 import { clearStash, takeUnlock } from './stash';
+import { dismissStorageExplanation, offerStorageExplanation } from './storage-persistence.svelte';
 import { unwrapIdentity } from './wrap';
 import type { KeyWrapView, UnlockBundleView } from '../types';
 
@@ -280,7 +281,18 @@ export async function unlockWithPassword(
 
 	keyring = await cache(user.id, recipient, opened.identity, { wraps, passkeyCount });
 	void noteWrapUsed(opened.wrapId);
+	offerAfterExplicitUnlock();
 	return keyring;
+}
+
+/**
+ * Only the two explicit unlocks call this — never `initialiseKeyring`, whose
+ * stash path is the silent unlock right after signing in. That is the moment
+ * the old unprompted `persist()` fired, and why it read as a prompt with no
+ * context. See `storage-persistence.svelte.ts`.
+ */
+function offerAfterExplicitUnlock(): void {
+	if (keyring.status === 'unlocked') void offerStorageExplanation(keyring.durable);
 }
 
 function openEnrolmentOffer(value: { userId: string; recipient: string; identity: string }) {
@@ -362,6 +374,7 @@ export async function unlockWithPasskey(user: { id: string }, wrap: KeyWrapView)
 	});
 	keyring = await cache(user.id, recipient, identity, { wraps, passkeyCount });
 	void noteWrapUsed(wrap.id);
+	offerAfterExplicitUnlock();
 	return keyring;
 }
 
@@ -388,6 +401,7 @@ export async function unlockWithPasskey(user: { id: string }, wrap: KeyWrapView)
 export async function lock(userId: string): Promise<void> {
 	clearStash();
 	dismissEnrolmentOffer();
+	dismissStorageExplanation();
 	keyring = { status: 'unknown' };
 	initialisingForUserId = null;
 	initialisingPromise = null;
@@ -399,6 +413,7 @@ export async function lock(userId: string): Promise<void> {
 export function resetKeyring(): void {
 	clearStash();
 	dismissEnrolmentOffer();
+	dismissStorageExplanation();
 	keyring = { status: 'unknown' };
 	initialisingForUserId = null;
 	initialisingPromise = null;
