@@ -124,7 +124,9 @@ changed since the page was rendered.
 
 ### Privacy boundaries matter here
 
-The general rule lives in [`docs/privacy.md`](privacy.md): a user must not be
+The general rule lives in the Privacy section of
+[`docs/user-commitments-and-product-goals.md`](user-commitments-and-product-goals.md#privacy):
+a user must not be
 able to probe another user's information unless the app has already established
 they are allowed to see that specific data.
 

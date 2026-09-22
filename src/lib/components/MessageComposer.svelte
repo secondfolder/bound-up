@@ -26,14 +26,26 @@
 	let {
 		send,
 		placeholder = 'Say something…',
-		submitLabel = 'Send'
+		submitLabel = 'Send',
+		initialText = '',
+		onTextChange = undefined
 	}: {
 		send: (message: { text: string; files: File[] }) => Promise<string | null>;
 		placeholder?: string;
 		submitLabel?: string;
+		/** A restored draft. Initial only, like the editor's own `value`. */
+		initialText?: string;
+		/**
+		 * Every change to the text, including the reset to '' after a send.
+		 *
+		 * This is how a draft is kept (`src/lib/messaging/drafts.ts`): the
+		 * composer stays presentational and the caller decides where it goes.
+		 */
+		onTextChange?: ((text: string) => void) | undefined;
 	} = $props();
 
-	let text = $state('');
+	// svelte-ignore state_referenced_locally
+	let text = $state(initialText);
 	let files: File[] = $state([]);
 	let sending = $state(false);
 	let problem: string | null = $state(null);
@@ -46,6 +58,7 @@
 
 	function onChange(next: string) {
 		text = next;
+		onTextChange?.(next);
 		if (problem) problem = checkComposed({ text, files })?.message ?? null;
 	}
 
@@ -92,6 +105,10 @@
 			files = [];
 			// The editor owns its document, so resetting the state is not enough.
 			editor?.setValue('');
+			// Said explicitly rather than left to the editor's change event: the
+			// draft must go once the message is sent, whether or not the reset
+			// emits one.
+			onTextChange?.('');
 		} finally {
 			sending = false;
 		}
@@ -137,7 +154,7 @@
 		<div class="field">
 			<RichTextEditor
 				bind:this={editor}
-				value=""
+				value={initialText}
 				{onChange}
 				onSubmit={submit}
 				{placeholder}

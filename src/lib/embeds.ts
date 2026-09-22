@@ -132,7 +132,7 @@ function youtubeSpec(url: URL): EmbedSpec | null {
  * Reddit's oEmbed endpoint works but is CORS-blocked, so these resolve
  * through our own `/api/oembed` proxy — which means the URL reaches the
  * server. That is the one place message plaintext touches it at all (see
- * docs/privacy.md), so `UrlEmbed` holds the request until the embed is in or
+ * docs/user-commitments-and-product-goals.md), so `UrlEmbed` holds the request until the embed is in or
  * near the scrollport: the lookup happens for embeds a reader actually
  * reaches, not for every reddit link in the thread's history.
  */

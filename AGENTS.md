@@ -106,7 +106,7 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
     every `invalidate()` would reset the form. Add one to new ones.
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
-- `npm run test:e2e`: Playwright specs, about a minute for the current ~76 of
+- `npm run test:e2e`: Playwright specs, about a minute for the current ~80 of
   them at four workers, once the browser is installed (`npx playwright install
 chromium` first). A spec sitting at ~90 seconds is one hanging on its
   timeout, and the reported failure is usually the `finally` that could not
@@ -348,6 +348,12 @@ load data is serialised into the HTML of every page. Whitelist fields, as
   are in `e2e/encryption.spec.ts` under "password manager autofill", and
   `e2e/helpers.ts` documents the measurement. Any future field whose Svelte
   state is load-bearing needs the same treatment.
+
+**Never lose something a user typed.** Every message composer keeps an
+encrypted draft on the device until it is sent or emptied, and a new place
+people write needs the same treatment. The commitment, and how it sits beside
+privacy (drafts are sealed to the writer's own key, never stored in the clear),
+is in [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md).
 
 **Never log a form object.** It no longer contains a plaintext password —
 the browser posts a derived value instead (see
@@ -679,21 +685,21 @@ Four places, split on scope:
 
 ### Feature docs
 
-| Doc                                                | Feature                                                                       |
-| -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [docs/partners.md](docs/partners.md)               | Linking two accounts: invites, the control permission, the nav tabs           |
-| [docs/privacy.md](docs/privacy.md)                 | General privacy boundaries: who may see which user data, and why              |
-| [docs/rewards.md](docs/rewards.md)                 | Self rewards and partnership rewards: credits, claims, control                |
-| [docs/tasks.md](docs/tasks.md)                     | Self tasks and partnership tasks: scheduling, credits, timezone ownership     |
-| [docs/encryption.md](docs/encryption.md)           | Message keys: the client-side KDF, the wraps, what the guarantee is           |
-| [docs/passkeys.md](docs/passkeys.md)               | Passkeys: the password gate, PRF detection, provider naming, the unlock panel |
-| [docs/halftone.md](docs/halftone.md)               | The landing page's halftone overlay: the screen model and its fixtures        |
-| [docs/embeds.md](docs/embeds.md)                   | URL linkification and inline embeds: providers, privacy gate, reddit path     |
-| [docs/messaging.md](docs/messaging.md)             | Encrypted partner messages: threads, the board, unread, restore               |
-| [docs/rich-text.md](docs/rich-text.md)             | The rich-text document: Lexical serialisation, the editors, embed blocks      |
-| [docs/section-widgets.md](docs/section-widgets.md) | The /home and /partner cards: the shell, the per-section bodies, the data     |
-| [docs/timezone.md](docs/timezone.md)               | Account timezone storage, mismatch prompts, and device-local dismissal        |
-| [docs/temporary-code.md](docs/temporary-code.md)   | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text      |
+| Doc                                                                                      | Feature                                                                       |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [docs/partners.md](docs/partners.md)                                                     | Linking two accounts: invites, the control permission, the nav tabs           |
+| [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md) | What the app promises users: never losing their data, and privacy boundaries  |
+| [docs/rewards.md](docs/rewards.md)                                                       | Self rewards and partnership rewards: credits, claims, control                |
+| [docs/tasks.md](docs/tasks.md)                                                           | Self tasks and partnership tasks: scheduling, credits, timezone ownership     |
+| [docs/encryption.md](docs/encryption.md)                                                 | Message keys: the client-side KDF, the wraps, what the guarantee is           |
+| [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: the password gate, PRF detection, provider naming, the unlock panel |
+| [docs/halftone.md](docs/halftone.md)                                                     | The landing page's halftone overlay: the screen model and its fixtures        |
+| [docs/embeds.md](docs/embeds.md)                                                         | URL linkification and inline embeds: providers, privacy gate, reddit path     |
+| [docs/messaging.md](docs/messaging.md)                                                   | Encrypted partner messages: threads, the board, unread, restore               |
+| [docs/rich-text.md](docs/rich-text.md)                                                   | The rich-text document: Lexical serialisation, the editors, embed blocks      |
+| [docs/section-widgets.md](docs/section-widgets.md)                                       | The /home and /partner cards: the shell, the per-section bodies, the data     |
+| [docs/timezone.md](docs/timezone.md)                                                     | Account timezone storage, mismatch prompts, and device-local dismissal        |
+| [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text      |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

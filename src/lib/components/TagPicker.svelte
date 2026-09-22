@@ -6,13 +6,16 @@
 		tags,
 		selectedIds = $bindable<string[]>([]),
 		threadId,
-		startEditing = false
+		startEditing = false,
+		onTagCreated = undefined
 	}: {
 		partnershipId: string;
 		tags: TagView[];
 		selectedIds?: string[];
 		threadId?: string;
 		startEditing?: boolean;
+		/** After a tag is created here, so the caller can refresh its own list. */
+		onTagCreated?: ((tag: TagView) => void) | undefined;
 	} = $props();
 
 	// The picker owns this editable list after initial load; re-capturing it on
@@ -74,6 +77,7 @@
 		const tag = (await response.json()) as TagView;
 		localTags = [...localTags, tag].sort((left, right) => left.name.localeCompare(right.name));
 		selectedIds = [...selectedIds, tag.id];
+		onTagCreated?.(tag);
 		newName = '';
 		newColor = '#5d7fc2';
 		addingNew = false;

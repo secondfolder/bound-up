@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
 	clickWaButton,
@@ -1346,6 +1347,228 @@ test.describe('embeds', () => {
 				'aria-label',
 				`Embedded preview of ${url}0`
 			);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+});
+
+test.describe('drafts', () => {
+	/**
+	 * Unsent words must never be lost: every composer keeps its draft on the
+	 * device, sealed to the writer's own key, until it is sent or emptied. See
+	 * `src/lib/messaging/drafts.ts` and docs/user-commitments-and-product-goals.md.
+	 */
+	const surface = (scope: Page | Locator) => scope.locator('.richtext-editor .surface').first();
+
+	/**
+	 * The stored ciphertext for one composer, or null when there is none.
+	 * `scope` is the key's scope part: `:thread:<id>`, or `:new-thread:`, which
+	 * the partnership id follows.
+	 */
+	function storedDraft(page: Page, scope: string): Promise<string | null> {
+		return page.evaluate((part) => {
+			const key = Object.keys(localStorage).find(
+				(candidate) => candidate.startsWith('bound-up:draft:') && candidate.includes(part)
+			);
+			return key ? localStorage.getItem(key) : null;
+		}, scope);
+	}
+
+	/**
+	 * Waits for a composer's draft to be written, and returns it.
+	 *
+	 * A draft is encrypted before it is stored, so the write lands a moment
+	 * after the keystroke. A person does not reload in that moment; a test
+	 * would, so it waits for the stored value to move off `previous`.
+	 */
+	async function draftWritten(
+		page: Page,
+		scope: string,
+		previous: string | null = null
+	): Promise<string> {
+		await expect
+			.poll(async () => {
+				const stored = await storedDraft(page, scope);
+				return stored !== null && stored !== previous;
+			})
+			.toBe(true);
+		return (await storedDraft(page, scope))!;
+	}
+
+	const threadIdOf = (url: string) => url.match(/\/messages\/([0-9a-f-]{36})$/)![1];
+
+	test('a reply draft survives a reload and stays with its own thread', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			const board = ada.page.url();
+			await writeThread(ada.page, 'the first thread');
+			const first = ada.page.url();
+			await ada.page.goto(board);
+			await writeThread(ada.page, 'the second thread');
+			const second = ada.page.url();
+			const firstScope = `:thread:${threadIdOf(first)}`;
+			const secondScope = `:thread:${threadIdOf(second)}`;
+
+			// 1. A draft in the first thread comes back after a reload.
+			await ada.page.goto(first);
+			await fillRichText(ada.page, 'unsent reply to the first');
+			let firstStored = await draftWritten(ada.page, firstScope);
+			await ada.page.reload();
+			await expect(surface(ada.page)).toHaveText('unsent reply to the first');
+
+			// 2. The second thread has its own, which starts empty and is kept too.
+			await ada.page.goto(second);
+			await expect(surface(ada.page)).toHaveText('');
+			await fillRichText(ada.page, 'unsent reply to the second');
+			const secondStored = await draftWritten(ada.page, secondScope);
+			await ada.page.reload();
+			await expect(surface(ada.page)).toHaveText('unsent reply to the second');
+
+			// 3. Editing the first leaves the second exactly as it was, stored
+			// bytes included.
+			await ada.page.goto(first);
+			await expect(surface(ada.page)).toHaveText('unsent reply to the first');
+			await fillRichText(ada.page, 'unsent reply to the first, edited');
+			firstStored = await draftWritten(ada.page, firstScope, firstStored);
+			expect(await storedDraft(ada.page, secondScope)).toBe(secondStored);
+
+			// Reached by a client-side navigation this time, not a load.
+			await ada.page.getByRole('link', { name: 'Back to messages' }).click();
+			await ada.page.waitForURL(/\/messages$/);
+			await ada.page.getByRole('link').filter({ hasText: 'the second thread' }).click();
+			await ada.page.waitForURL(second);
+			await expect(surface(ada.page)).toHaveText('unsent reply to the second');
+
+			// 4. Neither reply draft leaks into the new-message dialog, and writing
+			// there touches neither of them.
+			await ada.page.goto(board);
+			await clickWaButton(ada.page, 'Write something');
+			const dialog = ada.page.locator('wa-dialog');
+			await expect(ada.page.getByLabel('Message to Jun')).toBeVisible();
+			await expect(surface(dialog)).toHaveText('');
+			await fillRichText(dialog, 'the start of a new thread');
+			await draftWritten(ada.page, ':new-thread:', null);
+			expect(await storedDraft(ada.page, firstScope)).toBe(firstStored);
+			expect(await storedDraft(ada.page, secondScope)).toBe(secondStored);
+
+			await ada.page.goto(first);
+			await expect(surface(ada.page)).toHaveText('unsent reply to the first, edited');
+
+			// 5. Sending is what ends a draft — and only that thread's.
+			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
+			await clickWaButton(ada.page, 'Send');
+			await expect(ada.page.locator('.messages')).toContainText(
+				'unsent reply to the first, edited'
+			);
+			await expect(surface(ada.page)).toHaveText('');
+			await expect.poll(() => storedDraft(ada.page, firstScope)).toBeNull();
+			await ada.page.reload();
+			await expect(ada.page.locator('.messages')).toContainText(
+				'unsent reply to the first, edited'
+			);
+			await expect(surface(ada.page)).toHaveText('');
+
+			await ada.page.goto(second);
+			await expect(surface(ada.page)).toHaveText('unsent reply to the second');
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	test('the new-message draft keeps its tags, but only while it has text', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+
+			const dialog = ada.page.locator('wa-dialog');
+			const composer = ada.page.getByLabel('Message to Jun');
+			const chip = dialog.getByRole('button', { name: 'Edit planning' });
+
+			async function openDialog() {
+				await clickWaButton(ada.page, 'Write something');
+				await expect(composer).toBeVisible();
+			}
+			async function closeDialog() {
+				await clickWaButton(ada.page, 'Close');
+				await expect(composer).toBeHidden();
+			}
+
+			// 1. Text and a freshly created tag.
+			await openDialog();
+			await clickWaButton(ada.page, 'Add tag');
+			await ada.page.locator('wa-dropdown-item').filter({ hasText: 'New tag' }).click();
+			await ada.page.getByLabel('New tag', { exact: true }).fill('planning');
+			await ada.page.getByRole('button', { name: 'Add', exact: true }).click();
+			await expect(chip).toBeVisible();
+			await fillRichText(dialog, 'a thought about the weekend');
+			await draftWritten(ada.page, ':new-thread:');
+
+			// 2. Closed and reopened, both are there.
+			await closeDialog();
+			await openDialog();
+			await expect(surface(dialog)).toHaveText('a thought about the weekend');
+			await expect(chip).toBeVisible();
+
+			// 3. And across a reload.
+			await ada.page.reload();
+			await openDialog();
+			await expect(surface(dialog)).toHaveText('a thought about the weekend');
+			await expect(chip).toBeVisible();
+
+			// 4. Emptied, the draft goes — tags with it.
+			await surface(dialog).click();
+			await ada.page.keyboard.press('ControlOrMeta+a');
+			await ada.page.keyboard.press('Backspace');
+			await expect(surface(dialog)).toHaveText('');
+			await expect.poll(() => storedDraft(ada.page, ':new-thread:')).toBeNull();
+			await closeDialog();
+			await openDialog();
+			await expect(surface(dialog)).toHaveText('');
+			await expect(chip).toHaveCount(0);
+
+			// 5. A tag on its own is not a draft, either.
+			await clickWaButton(ada.page, 'Add tag');
+			await ada.page.locator('wa-dropdown-item').filter({ hasText: 'planning' }).click();
+			await expect(chip).toBeVisible();
+			await closeDialog();
+			await openDialog();
+			await expect(chip).toHaveCount(0);
+			expect(await storedDraft(ada.page, ':new-thread:')).toBeNull();
+
+			// 6. Sending ends it: the thread is tagged, and the dialog starts fresh.
+			await clickWaButton(ada.page, 'Add tag');
+			await ada.page.locator('wa-dropdown-item').filter({ hasText: 'planning' }).click();
+			await fillRichText(dialog, 'sent with its tag');
+			await draftWritten(ada.page, ':new-thread:');
+			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
+			await clickWaButton(ada.page, 'Send');
+			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+			await expect(ada.page.locator('.thread-tags')).toContainText('planning');
+			expect(await storedDraft(ada.page, ':new-thread:')).toBeNull();
+
+			await ada.page.getByRole('link', { name: 'Back to messages' }).click();
+			await ada.page.waitForURL(/\/messages$/);
+			await openDialog();
+			await expect(surface(dialog)).toHaveText('');
+			await expect(chip).toHaveCount(0);
 		} finally {
 			await ada.close();
 			await jun.close();

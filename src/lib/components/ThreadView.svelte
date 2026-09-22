@@ -4,7 +4,8 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { invalidate } from '$app/navigation';
 	import { scrollIntoViewWithin } from '$lib/scroll-parent';
-	import { currentKeyring } from '$lib/crypto/session.svelte';
+	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
+	import { openDraft } from '$lib/messaging/drafts';
 	import {
 		buildReaction,
 		fillMissingMessageMetadata,
@@ -130,6 +131,24 @@
 		});
 	});
 
+	/**
+	 * The reply box's draft, one per thread.
+	 *
+	 * Keyed on a `$derived` string, never on `thread`: the page component is
+	 * reused across threads, and `invalidate()` reassigns `thread` on every
+	 * reply that arrives. Depending on the prop would re-open the draft and
+	 * remount the composer under someone mid-sentence; depending on the id
+	 * re-opens it only when the thread really changes, which is also exactly
+	 * when one thread's words must stop being saved under the other's key.
+	 *
+	 * The identity is read untracked so a lock elsewhere does not remount it
+	 * either — the page swaps this whole view out for the unlock panel anyway.
+	 */
+	const threadId = $derived(thread.id);
+	function draftFor(id: string) {
+		return openDraft({ kind: 'thread', threadId: id }, untrack(unlockedIdentity));
+	}
+
 	const targets = $derived(
 		[recipients.mine, recipients.theirs].filter((value): value is string => value !== null)
 	);
@@ -233,7 +252,18 @@
 	-->
 	{#if canSend}
 		<footer>
-			<MessageComposer {send} placeholder="Reply…" />
+			{#key threadId}
+				<!-- Nothing until the draft is read: an editor shown empty and then
+				     filled would take whatever was typed in between and drop it. -->
+				{#await draftFor(threadId) then draft}
+					<MessageComposer
+						{send}
+						placeholder="Reply…"
+						initialText={draft.initial?.text ?? ''}
+						onTextChange={(text) => draft.save({ text, tagIds: [] })}
+					/>
+				{/await}
+			{/key}
 		</footer>
 	{/if}
 </div>

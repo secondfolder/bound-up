@@ -62,7 +62,7 @@
 	 * was two flashes for one embed, which nobody was waiting on anyway. That is a request-volume decision rather than
 	 * a consent one: opening a thread must not fire a metadata lookup for every
 	 * link in a year of conversation. The privacy boundary those lookups cross
-	 * is documented in docs/privacy.md.
+	 * is documented in docs/user-commitments-and-product-goals.md.
 	 *
 	 * A failed or unknown embed silently falls back to a plain link: embeds are
 	 * decoration, and a dead provider (noembed has no SLA) must not leave a

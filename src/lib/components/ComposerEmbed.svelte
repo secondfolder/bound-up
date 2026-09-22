@@ -26,7 +26,7 @@
 	 * answers — while the sent message shows a titled card, because the send
 	 * path resolves exactly this and encrypts it into the message. Asking for
 	 * it here is what makes the two agree. It is also the lookup that was going
-	 * to happen at send time anyway; see docs/privacy.md.
+	 * to happen at send time anyway; see docs/user-commitments-and-product-goals.md.
 	 */
 	let details: CachedEmbedDetails | null = $state(null);
 	let resolving = $state(true);

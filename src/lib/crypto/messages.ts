@@ -53,6 +53,14 @@ export type MessageAttachmentInfo = {
 /** A reaction's plaintext. Its own type so a stray string cannot be stored. */
 export type ReactionPayload = { version: 1; emoji: string };
 
+/**
+ * An unsent draft, sealed to its writer alone and kept on this device.
+ *
+ * `tagIds` rides along only for the new-thread composer, whose tags have
+ * nowhere else to live until the thread exists. See `src/lib/messaging/drafts.ts`.
+ */
+export type DraftPayload = { version: 1; text: string; tagIds: string[] };
+
 const encoder = new TextEncoder();
 
 function encodeBase64(bytes: Uint8Array): string {
@@ -73,7 +81,7 @@ function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
 
 /** Encrypts a payload to every given recipient. Both partners, in practice. */
 export async function encryptPayload(
-	payload: MessagePayload | MessageMetadataPayload | ReactionPayload,
+	payload: MessagePayload | MessageMetadataPayload | ReactionPayload | DraftPayload,
 	recipients: string[]
 ): Promise<string> {
 	if (recipients.length === 0) throw new Error('A message needs at least one recipient');

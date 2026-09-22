@@ -13,7 +13,7 @@ import type { RequestHandler } from './$types';
  *
  * Privacy: this endpoint is the one place a URL from decrypted message
  * plaintext reaches the server, which otherwise never learns message content
- * (see docs/privacy.md). Two mitigations, deliberately:
+ * (see docs/user-commitments-and-product-goals.md). Two mitigations, deliberately:
  *
  * 1. The client only calls this for an embed that has reached the scrollport,
  *    so a thread's whole back catalogue is never resolved on open. These

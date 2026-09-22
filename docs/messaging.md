@@ -285,6 +285,50 @@ Two honest caveats:
 - **If both partners lose their passwords, the history is gone.** So is the
   history of anyone with no partner. There is no other copy.
 
+## Drafts
+
+Unsent words are never lost (see
+[`docs/user-commitments-and-product-goals.md`](user-commitments-and-product-goals.md)).
+Every composer keeps a draft in `localStorage` from the first keystroke until
+the message is sent or its text deleted. The code is `src/lib/messaging/drafts.ts`.
+
+- **One draft per composer.** Each thread's reply box has its own
+  (`thread:<threadId>`), and so does each partnership's "Write something"
+  dialog (`new-thread:<partnershipId>`). Writing in one never touches another.
+- **Encrypted to the writer alone.** A draft is an age file encrypted to the
+  account's own recipient (`DraftPayload` in `src/lib/crypto/messages.ts`).
+  Writing it needs only the public key; reading it needs the unlocked
+  identity, which every composer has because none renders while the device is
+  locked. The draft therefore survives "Lock on this device" and signing out,
+  as ciphertext. The storage key includes the recipient, so two accounts in
+  one browser never read or overwrite each other's drafts. An `absent`
+  account (no message keys) has nothing to seal to and keeps no draft.
+- **The new-message dialog stores its tags with its text**, only while there
+  is text. A draft whose text is emptied is removed, tags and all, so an
+  emptied dialog that is closed and reopened comes back with neither. Tags on
+  their own are never stored. On restore, tag ids that no longer exist are
+  dropped, because sending one would fail as `no-such-tag`. A tag created
+  inside the dialog invalidates the board, so it is in the board's tag list the
+  next time the dialog opens.
+- **Cleared only on a confirmed send.** A failed send keeps the draft.
+- **Nothing renders until the draft is read.** The composer (and, in the
+  dialog, the tag picker) mounts only once the stored draft has been
+  decrypted. If an empty editor showed first, the restore would overwrite
+  whatever had been typed in the meantime.
+- **The thread composer is keyed on a derived thread id**, never on the
+  `thread` prop. `invalidate()` reassigns that prop whenever a reply arrives,
+  and a dependency on it would remount the composer under someone
+  mid-sentence.
+- **Writes are serialised and coalesced.** Encryption is async, so writes
+  queue behind one another and a queued write that a newer one has overtaken
+  is skipped. A removal cancels any write still in flight, so deleted text
+  cannot reappear when its encryption finishes late.
+
+Not kept: attachments (the files are still on the device, but have to be
+picked again after a reload), and drafts that can no longer be decrypted
+after a key change. Those are left in storage, not deleted, and the next save
+replaces them.
+
 ## What the server still knows
 
 Encrypting the content does not hide the shape of the conversation. Stated
