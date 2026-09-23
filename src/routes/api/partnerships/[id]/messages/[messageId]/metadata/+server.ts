@@ -8,10 +8,14 @@ import type { RequestHandler } from './$types';
  * valid preview data it wants to persist.
  */
 export const PUT: RequestHandler = async ({ locals, params, request }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = messageMetadataSchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed metadata');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed metadata');
+	}
 
 	const updated = await setMessageMetadataCiphertext(locals.db, {
 		partnershipId: params.id,
@@ -19,6 +23,8 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 		viewerId: locals.user.id,
 		metadataCiphertext: parsed.data.metadataCiphertext
 	});
-	if (!updated) error(404, 'Not found');
+	if (!updated) {
+		error(404, 'Not found');
+	}
 	return json({ ok: true });
 };

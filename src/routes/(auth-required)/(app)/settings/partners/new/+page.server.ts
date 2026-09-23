@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
 import { fail, message, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { controlFromAnswer } from '$lib/partnership';
 import { inviteUrl } from '$lib/invite-url';
+import { controlFromAnswer } from '$lib/partnership';
 import { partnerInviteFormSchema } from '$lib/schemas/partnerForm';
 import { createInvite } from '$lib/server/partnerships';
 import type { Actions, PageServerLoad } from './$types';
@@ -34,7 +34,9 @@ export const actions: Actions = {
 	// Form actions run BEFORE layout loads, so the (auth-required) group guard
 	// has not run yet — the session check here is not redundant.
 	default: async ({ locals, request, url }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const partnerInviteForm = await superValidate(request, zod4(partnerInviteFormSchema));
 		if (!partnerInviteForm.valid) {

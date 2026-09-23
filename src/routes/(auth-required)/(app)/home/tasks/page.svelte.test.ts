@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
 import type { PageData } from './$types';
@@ -36,7 +36,7 @@ function data(partnerTasks: PageData['partnerTasks'] = []): PageData {
 }
 
 describe('/home/tasks/+page.svelte', () => {
-	test('shows self task actions directly when there are no partner task sections', () => {
+	it('shows self task actions directly when there are no partner task sections', () => {
 		const { container } = render(Page, { data: data() });
 		const buttons = Array.from(container.querySelectorAll('wa-button')).map((node) =>
 			node.textContent?.trim()
@@ -47,7 +47,7 @@ describe('/home/tasks/+page.svelte', () => {
 		expect(container.querySelectorAll('.panel')).toHaveLength(0);
 	});
 
-	test('wraps sections in panels once partner task sections exist', () => {
+	it('wraps sections in panels once partner task sections exist', () => {
 		const { container } = render(Page, {
 			data: data([{ partnershipId: 'p1', name: 'Jun', image: null, tasks: [] }])
 		});

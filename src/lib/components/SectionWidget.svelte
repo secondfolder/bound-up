@@ -52,10 +52,7 @@
 			<!--
 				`href` arrives already resolved — every caller builds it with
 				`resolve()`, because only the page knows which route params to pass.
-				The rule cannot see through a prop, so it fires on the one link in
-				this codebase that has nothing left to resolve.
 			-->
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 			<a {href}>
 				{#if icon}
 					<wa-icon name={icon} variant="solid"></wa-icon>
@@ -103,6 +100,11 @@
 			gap: 0.625rem;
 		}
 
+		.title {
+			flex: 1 1 auto;
+			min-inline-size: 0;
+		}
+
 		a {
 			text-decoration: none;
 			color: inherit;
@@ -114,11 +116,6 @@
 			&:focus-visible .title {
 				text-decoration: underline;
 			}
-		}
-
-		.title {
-			flex: 1 1 auto;
-			min-inline-size: 0;
 		}
 
 		wa-icon {

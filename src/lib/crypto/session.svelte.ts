@@ -8,14 +8,14 @@
  * read it through `currentKeyring()`; nothing else may reassign it.
  */
 
-import { normaliseEmail, type KeyWrapParams } from '../encryption';
+import { type KeyWrapParams, normaliseEmail } from '../encryption';
+import type { KeyWrapView, UnlockBundleView } from '../types';
 import { deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
-import { keyStore, type KeyTier } from './keystore';
+import { type KeyTier, keyStore } from './keystore';
 import { passkeysAvailable, unwrapIdentityWithPasskey } from './passkey';
 import { clearStash, takeUnlock } from './stash';
 import { dismissStorageExplanation, offerStorageExplanation } from './storage-persistence.svelte';
 import { unwrapIdentity } from './wrap';
-import type { KeyWrapView, UnlockBundleView } from '../types';
 
 export type Keyring =
 	/** Not looked at yet. The gate has not run. */
@@ -156,9 +156,13 @@ async function tryWraps(
 ): Promise<{ identity: string; wrapId: string } | null> {
 	for (const wrap of wraps) {
 		const wrapKey = await wrapKeyFor(wrap.params);
-		if (!wrapKey) continue;
+		if (!wrapKey) {
+			continue;
+		}
 		const identity = await unwrapIdentity({ wrapKey, blob: wrap.blob, recipient });
-		if (identity) return { identity, wrapId: wrap.id };
+		if (identity) {
+			return { identity, wrapId: wrap.id };
+		}
 	}
 	return null;
 }
@@ -172,8 +176,12 @@ async function tryWraps(
  * keys at all, which is `absent` rather than locked.
  */
 export async function initialiseKeyring(user: { id: string; email: string }): Promise<Keyring> {
-	if (keyring.status !== 'unknown') return keyring;
-	if (initialisingForUserId === user.id && initialisingPromise) return initialisingPromise;
+	if (keyring.status !== 'unknown') {
+		return keyring;
+	}
+	if (initialisingForUserId === user.id && initialisingPromise !== null) {
+		return await initialisingPromise;
+	}
 
 	const run = (async (): Promise<Keyring> => {
 		const storePromise = keyStore();
@@ -241,7 +249,7 @@ export async function initialiseKeyring(user: { id: string; email: string }): Pr
 		}
 	});
 
-	return initialisingPromise;
+	return await initialisingPromise;
 }
 
 /** Unlocks with the account password. The ordinary path on a new device. */
@@ -249,7 +257,9 @@ export async function unlockWithPassword(
 	user: { id: string; email: string },
 	password: string
 ): Promise<Keyring> {
-	if (keyring.status !== 'locked') return keyring;
+	if (keyring.status !== 'locked') {
+		return keyring;
+	}
 	const { recipient, wraps, passkeyCount } = keyring;
 
 	// Cache the master key per parameter set: several wraps can share one, and
@@ -261,7 +271,9 @@ export async function unlockWithPassword(
 		wraps.filter((wrap) => wrap.type === 'password'),
 		recipient,
 		async (params) => {
-			if (params.type !== 'password') return null;
+			if (params.type !== 'password') {
+				return null;
+			}
 			const cacheKey = `${params.version}:${params.iterations}`;
 			masters[cacheKey] ??= await deriveMasterKey(password, user.email, {
 				version: params.version,
@@ -292,7 +304,9 @@ export async function unlockWithPassword(
  * context. See `storage-persistence.svelte.ts`.
  */
 function offerAfterExplicitUnlock(): void {
-	if (keyring.status === 'unlocked') void offerStorageExplanation(keyring.durable);
+	if (keyring.status === 'unlocked') {
+		void offerStorageExplanation(keyring.durable);
+	}
 }
 
 function openEnrolmentOffer(value: { userId: string; recipient: string; identity: string }) {
@@ -339,9 +353,13 @@ export function enrolmentIdentityFor(userId: string): string | null {
  * recently used one is the best guess at which passkey they still have.
  */
 export function passkeyWrapFor(state: Keyring): KeyWrapView | null {
-	if (state.status !== 'locked') return null;
+	if (state.status !== 'locked') {
+		return null;
+	}
 	const candidates = state.wraps.filter((wrap) => wrap.type === 'webauthn-prf');
-	if (candidates.length === 0) return null;
+	if (candidates.length === 0) {
+		return null;
+	}
 	return candidates.reduce((best, wrap) => (lastTouched(wrap) > lastTouched(best) ? wrap : best));
 }
 
@@ -361,8 +379,12 @@ function lastTouched(wrap: KeyWrapView): number {
  * `passkey.ts` turns the error into something worth showing.
  */
 export async function unlockWithPasskey(user: { id: string }, wrap: KeyWrapView): Promise<Keyring> {
-	if (keyring.status !== 'locked') return keyring;
-	if (wrap.params.type !== 'webauthn-prf') return keyring;
+	if (keyring.status !== 'locked') {
+		return keyring;
+	}
+	if (wrap.params.type !== 'webauthn-prf') {
+		return keyring;
+	}
 	const { recipient, wraps, passkeyCount } = keyring;
 
 	const identity = await unwrapIdentityWithPasskey({
@@ -423,7 +445,9 @@ export function resetKeyring(): void {
 
 async function fetchBundle(): Promise<UnlockBundleView> {
 	const response = await fetch('/api/keys/unlock-bundle');
-	if (!response.ok) throw new Error(`Could not load encryption keys (${response.status})`);
+	if (!response.ok) {
+		throw new Error(`Could not load encryption keys (${response.status})`);
+	}
 	return response.json();
 }
 

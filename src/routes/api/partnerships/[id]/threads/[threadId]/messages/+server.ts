@@ -1,15 +1,17 @@
 import { error, json } from '@sveltejs/kit';
 import { replySchema } from '$lib/schemas/messageForm';
 import { createMediaStore } from '$lib/server/media/dev';
-import { createNotifier } from '$lib/server/realtime/dev';
 import { requireThreadMembership, sendMessage } from '$lib/server/messaging';
-import type { RequestHandler } from './$types';
+import { createNotifier } from '$lib/server/realtime/dev';
 import { parseSend, sendFailureStatus } from '../../../send';
+import type { RequestHandler } from './$types';
 
 /** A reply to an existing thread. */
 export const POST: RequestHandler = async (event) => {
 	const { locals, params, request, platform } = event;
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	// The thread id from the URL is re-joined against this partnership rather
 	// than trusted. Without that, anyone in *any* partnership could post into
@@ -23,7 +25,9 @@ export const POST: RequestHandler = async (event) => {
 		ciphertext: form.get('ciphertext'),
 		metadataCiphertext: form.get('metadataCiphertext')
 	});
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed message');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed message');
+	}
 
 	const store = await createMediaStore({ platform });
 	const result = await sendMessage(locals.db, store, {
@@ -35,7 +39,9 @@ export const POST: RequestHandler = async (event) => {
 		attachments
 	});
 
-	if (!result.ok) error(sendFailureStatus(result.reason), result.reason);
+	if (!result.ok) {
+		error(sendFailureStatus(result.reason), result.reason);
+	}
 
 	const notifier = await createNotifier({ platform });
 	await notifier.publish(params.id, { kind: 'message', threadId: params.threadId });

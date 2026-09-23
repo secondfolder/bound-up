@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import type { NormalizedRgbaImage } from '../halftone';
 
+/** Channels per PNG colour type: truecolour with alpha, truecolour; greyscale otherwise. */
+const CHANNELS_BY_COLOR_TYPE: Record<number, number> = { 6: 4, 2: 3 };
 export function decodePngToNormalizedImage(filePath: string): NormalizedRgbaImage {
 	const bytes = fs.readFileSync(filePath);
 	let position = 8;
@@ -17,19 +19,24 @@ export function decodePngToNormalizedImage(filePath: string): NormalizedRgbaImag
 		if (type === 'IHDR') {
 			width = data.readUInt32BE(0);
 			height = data.readUInt32BE(4);
-			colorType = data[9];
+			colorType = data.readUInt8(9);
 		}
-		if (type === 'IDAT') idatChunks.push(data);
-		if (type === 'IEND') break;
+		if (type === 'IDAT') {
+			idatChunks.push(data);
+		}
+		if (type === 'IEND') {
+			break;
+		}
 	}
-	const channels = colorType === 6 ? 4 : colorType === 2 ? 3 : 1;
+	const channels = CHANNELS_BY_COLOR_TYPE[colorType] ?? 1;
 	const stride = width * channels;
 	const raw = zlib.inflateSync(Buffer.concat(idatChunks));
 	const rgba = new Float32Array(width * height * 4);
 	let previous = Buffer.alloc(stride);
 	let inputPosition = 0;
 	for (let y = 0; y < height; y += 1) {
-		const filter = raw[inputPosition++];
+		const filter = raw[inputPosition];
+		inputPosition += 1;
 		const source = raw.subarray(inputPosition, inputPosition + stride);
 		inputPosition += stride;
 		const current = Buffer.alloc(stride);
@@ -38,20 +45,24 @@ export function decodePngToNormalizedImage(filePath: string): NormalizedRgbaImag
 			const up = previous[x];
 			const upLeft = x >= channels ? previous[x - channels] : 0;
 			let value = source[x];
-			if (filter === 1) value += left;
-			else if (filter === 2) value += up;
-			else if (filter === 3) value += (left + up) >> 1;
-			else if (filter === 4) {
+			if (filter === 1) {
+				value += left;
+			} else if (filter === 2) {
+				value += up;
+			} else if (filter === 3) {
+				value += (left + up) >> 1;
+			} else if (filter === 4) {
 				const predict = left + up - upLeft;
 				const distanceLeft = Math.abs(predict - left);
 				const distanceUp = Math.abs(predict - up);
 				const distanceUpLeft = Math.abs(predict - upLeft);
-				value +=
-					distanceLeft <= distanceUp && distanceLeft <= distanceUpLeft
-						? left
-						: distanceUp <= distanceUpLeft
-							? up
-							: upLeft;
+				if (distanceLeft <= distanceUp && distanceLeft <= distanceUpLeft) {
+					value += left;
+				} else if (distanceUp <= distanceUpLeft) {
+					value += up;
+				} else {
+					value += upLeft;
+				}
 			}
 			current[x] = value & 255;
 		}

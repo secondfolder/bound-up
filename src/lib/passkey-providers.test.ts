@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
 import { commonAuthenticatorNames, getAuthenticatorName } from '@better-auth/passkey';
+import { describe, expect, it } from 'vitest';
 import {
 	lookupProviderName,
-	providerForAaguid,
+	type PasskeyProvider,
 	PRF_PROVIDERS,
-	type PasskeyProvider
+	providerForAaguid
 } from './passkey-providers';
 
 /**
@@ -96,7 +96,9 @@ describe('the provider survey', () => {
 		// to do. NordPass is the one exception — it simply does not implement
 		// the extension, and there is nothing further to say.
 		for (const provider of PRF_PROVIDERS) {
-			if (provider.prf === 'full' || provider.name === 'NordPass') continue;
+			if (provider.prf === 'full' || provider.name === 'NordPass') {
+				continue;
+			}
 			expect(provider.note, provider.name).toBeTruthy();
 		}
 	});

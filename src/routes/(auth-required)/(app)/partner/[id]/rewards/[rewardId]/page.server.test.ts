@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { actions, load } from './+page.server';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestPartnershipReward,
@@ -9,7 +9,7 @@ import {
 	readPartnershipRewardRow,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
+import { actions, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -18,7 +18,7 @@ let jun: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada' });
 	jun = await createTestUser(db, { name: 'Jun' });
 });
@@ -40,7 +40,7 @@ const at = (
 	});
 
 describe('load', () => {
-	test('loads one existing partnership reward for the controlling side', async () => {
+	it('loads one existing partnership reward for the controlling side', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const reward = await createTestPartnershipReward(db, id, ada, { title: 'Tea', cost: 2 });
 		await expect(runLoad(load(at(id, reward.id, ada)))).resolves.toMatchObject({
@@ -49,7 +49,7 @@ describe('load', () => {
 		});
 	});
 
-	test('403s for the non-controlling side', async () => {
+	it('403s for the non-controlling side', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const reward = await createTestPartnershipReward(db, id, ada, { title: 'Tea', cost: 2 });
 		const result = await runAndCatch(() => runLoad(load(at(id, reward.id, jun))));
@@ -58,7 +58,7 @@ describe('load', () => {
 });
 
 describe('actions', () => {
-	test('updates the reward and redirects back to the partnership rewards page', async () => {
+	it('updates the reward and redirects back to the partnership rewards page', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const reward = await createTestPartnershipReward(db, id, ada, { title: 'Tea', cost: 2 });
 		const result = await runAndCatch(() =>

@@ -7,7 +7,9 @@ import { taskEditorFormValuesForCreate, taskInputFromEditorForm } from '$lib/tas
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	return {
 		taskForm: await superValidate(
@@ -20,10 +22,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	default: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const taskForm = await superValidate(request, zod4(taskEditorFormSchema));
-		if (!taskForm.valid) return fail(400, { taskForm });
+		if (!taskForm.valid) {
+			return fail(400, { taskForm });
+		}
 
 		await createSelfTask(
 			locals.db,

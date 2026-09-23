@@ -1,18 +1,20 @@
 import { and, desc, eq, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import type { Db } from './db';
-import { partnerships, user } from './db/schema';
 import {
-	INVITE_TTL_MS,
 	canEditPartnership,
+	INVITE_TTL_MS,
 	isInviteUsable,
-	roleOf,
-	viewPartnership,
 	type PartnershipControl,
 	type PartnershipRecord,
-	type PartnershipView
+	type PartnershipView,
+	roleOf,
+	viewPartnership
 } from '../partnership';
 import type { PartnerView } from '../types';
+import type { Db } from './db';
+import { partnerships, user } from './db/schema';
+
+const BASE64_PADDING = /[=]+$/;
 
 /**
  * Every database access for the partners feature.
@@ -123,8 +125,10 @@ export async function getPartnershipForUser(
 	const rows = (await baseQuery(db)
 		.where(and(eq(partnerships.id, id), memberOf(userId)))
 		.limit(1)) as PartnershipRow[];
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 	return {
 		...toView(row, userId),
 		inviteToken: row.inviteToken,
@@ -152,8 +156,10 @@ export async function findPendingInviteByToken(
 	const rows = (await baseQuery(db)
 		.where(eq(partnerships.inviteToken, token))
 		.limit(1)) as PartnershipRow[];
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 	return row;
 }
 
@@ -167,8 +173,22 @@ export async function findPendingInviteByToken(
 export function generateInviteToken(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(32));
 	let binary = '';
-	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(BASE64_PADDING, '');
+}
+
+/**
+ * The caller's value when they gave one, and the stored one when they left it
+ * out. Not `??`: a role of `null` is an answer — "no role" — and must replace
+ * the stored one rather than fall back to it.
+ */
+function supplied<T>(next: T | undefined, current: T): T {
+	if (next === undefined) {
+		return current;
+	}
+	return next;
 }
 
 export type CreateInviteInput = {
@@ -267,11 +287,15 @@ export async function acceptInvite(
 	now: Date = new Date()
 ): Promise<AcceptInviteResult> {
 	const existing = await findPendingInviteByToken(db, input.token);
-	if (!existing) return { ok: false, reason: 'not-found' };
+	if (!existing) {
+		return { ok: false, reason: 'not-found' };
+	}
 	if (!isInviteUsable(existing, now)) {
 		return { ok: false, reason: existing.status === 'accepted' ? 'not-found' : 'expired' };
 	}
-	if (existing.inviterId === input.inviteeId) return { ok: false, reason: 'self' };
+	if (existing.inviterId === input.inviteeId) {
+		return { ok: false, reason: 'self' };
+	}
 
 	if (await partnershipExistsBetween(db, existing.inviterId, input.inviteeId)) {
 		return { ok: false, reason: 'already-linked' };
@@ -299,8 +323,8 @@ export async function acceptInvite(
 				? {
 						inviterName: input.inviterName ?? existing.inviterName,
 						inviteeName: input.inviteeName ?? existing.inviteeName,
-						inviterRole: input.inviterRole === undefined ? existing.inviterRole : input.inviterRole,
-						inviteeRole: input.inviteeRole === undefined ? existing.inviteeRole : input.inviteeRole,
+						inviterRole: supplied(input.inviterRole, existing.inviterRole),
+						inviteeRole: supplied(input.inviteeRole, existing.inviteeRole),
 						control: input.control ?? existing.control
 					}
 				: {})
@@ -308,8 +332,10 @@ export async function acceptInvite(
 		.where(and(eq(partnerships.inviteToken, input.token), eq(partnerships.status, 'pending')))
 		.returning({ id: partnerships.id });
 
-	const row = rows[0];
-	if (!row) return { ok: false, reason: 'not-found' };
+	const [row] = rows;
+	if (!row) {
+		return { ok: false, reason: 'not-found' };
+	}
 	return { ok: true, id: row.id };
 }
 
@@ -352,7 +378,9 @@ export async function updatePartnership(
 	input: UpdatePartnershipInput
 ): Promise<boolean> {
 	const current = await getPartnershipForUser(db, id, userId);
-	if (!current || !current.canEdit) return false;
+	if (!current?.canEdit) {
+		return false;
+	}
 
 	await db.update(partnerships).set(input).where(eq(partnerships.id, id));
 	return true;

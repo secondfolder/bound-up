@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { actions, load } from './+page.server';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestInvite,
 	createTestPartnership,
@@ -12,7 +12,7 @@ import {
 	readPartnershipRewardRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
+import { actions, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -22,7 +22,7 @@ let stranger: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada' });
 	jun = await createTestUser(db, { name: 'Jun' });
 	stranger = await createTestUser(db, { name: 'Stranger' });
@@ -31,17 +31,12 @@ beforeEach(async () => {
 afterEach(() => harness.close());
 
 const at = (id: string, user: TestUser | null, formData?: Record<string, string>) =>
-	Object.assign(fakeEvent({ db, user, params: { id }, formData, path: `/partner/${id}/rewards` }), {
-		depends: () => {}
-	});
+	fakeEvent({ db, user, params: { id }, formData, path: `/partner/${id}/rewards` });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const run = (name: keyof typeof actions, ...args: Parameters<any>) =>
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	(actions[name] as any)(...args);
+const run = (name: string, event: never) => runAction(actions, name, event);
 
 describe('load', () => {
-	test('returns the partner rewards page view for a member', async () => {
+	it('returns the partner rewards page view for a member', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		await createTestPartnershipReward(db, id, jun, { title: 'Treat', cost: 2 });
 
@@ -59,13 +54,13 @@ describe('load', () => {
 		);
 	});
 
-	test('404s for a pending invite', async () => {
+	it('404s for a pending invite', async () => {
 		const invite = await createTestInvite(db, ada);
 		const result = await runAndCatch(() => runLoad(load(at(invite.id, ada))));
 		expect(result).toMatchObject({ type: 'error', status: 404 });
 	});
 
-	test('404s for someone else’s partnership', async () => {
+	it('404s for someone else’s partnership', async () => {
 		const { id } = await createTestPartnership(db, ada, jun);
 		const result = await runAndCatch(() => runLoad(load(at(id, stranger))));
 		expect(result).toMatchObject({ type: 'error', status: 404 });
@@ -73,12 +68,12 @@ describe('load', () => {
 });
 
 describe('actions', () => {
-	test('refuses reward creation from the non-controlling side', async () => {
+	it('refuses reward creation from the non-controlling side', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		await expect(readPartnershipRewardRows(db, id)).resolves.toEqual([]);
 	});
 
-	test("lets the controller set the other person's reward credits", async () => {
+	it("lets the controller set the other person's reward credits", async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const result = await run('setCredits', at(id, ada, { targetUserId: jun.id, credits: '7' }));
 
@@ -88,7 +83,7 @@ describe('actions', () => {
 		});
 	});
 
-	test('lets the claimant side claim a partner reward', async () => {
+	it('lets the claimant side claim a partner reward', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		const reward = await createTestPartnershipReward(db, id, jun, { title: 'Snack', cost: 2 });
 		await run('setCredits', at(id, jun, { targetUserId: ada.id, credits: '4' }));
@@ -103,7 +98,7 @@ describe('actions', () => {
 		);
 	});
 
-	test('blocks claiming your own shared-control reward', async () => {
+	it('blocks claiming your own shared-control reward', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
 		const reward = await createTestPartnershipReward(db, id, ada, { title: 'Own reward', cost: 2 });
 

@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 
@@ -20,12 +20,12 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 const { default: Page } = await import('./+page.svelte');
 
 describe('/+page.svelte', () => {
-	test('should render h1', () => {
+	it('should render h1', () => {
 		render(Page);
 		expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
 	});
 
-	test('logged out: a signup CTA plus a small log-in link', () => {
+	it('logged out: a signup CTA plus a small log-in link', () => {
 		pageState.data.user = null;
 		render(Page);
 
@@ -36,7 +36,7 @@ describe('/+page.svelte', () => {
 		expect(screen.queryByRole('link', { name: 'Sign up' })).not.toBeInTheDocument();
 	});
 
-	test('logged in: the CTA becomes Start and points at the app', () => {
+	it('logged in: the CTA becomes Start and points at the app', () => {
 		pageState.data.user = { id: 'u-ada' };
 		render(Page);
 

@@ -47,7 +47,9 @@
 		// state `lock()` leaves behind. Re-asking here is what makes locking
 		// settle on the right panel without a reload; `initialiseKeyring` returns
 		// early unless the status is `unknown`, so this cannot loop.
-		if (keyring.status === 'unknown') void refresh();
+		if (keyring.status === 'unknown') {
+			void refresh();
+		}
 	});
 
 	async function refresh() {

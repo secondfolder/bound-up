@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
@@ -15,7 +15,7 @@ const jun = {
 };
 
 describe('UnreadMessagesWidget', () => {
-	test('renders nothing at all when nothing is waiting', () => {
+	it('renders nothing at all when nothing is waiting', () => {
 		const { container } = render(UnreadMessagesWidget, { unread: [] });
 
 		// Not an empty card: /home is read at a glance, and a permanent
@@ -23,7 +23,7 @@ describe('UnreadMessagesWidget', () => {
 		expect(container.querySelector('wa-card')).not.toBeInTheDocument();
 	});
 
-	test('heads the card with plain text, because there is no single messages page', () => {
+	it('heads the card with plain text, because there is no single messages page', () => {
 		render(UnreadMessagesWidget, { unread: [jun] });
 
 		expect(screen.getByRole('heading', { level: 2, name: 'Messages' })).toBeInTheDocument();
@@ -34,7 +34,7 @@ describe('UnreadMessagesWidget', () => {
 		expect(links[0]).toHaveAttribute('href', '/(auth-required)/(app)/partner/p1/messages');
 	});
 
-	test('names each row for its partner and count, distinctly from the nav tab', () => {
+	it('names each row for its partner and count, distinctly from the nav tab', () => {
 		render(UnreadMessagesWidget, { unread: [jun] });
 
 		expect(screen.getByRole('link', { name: /2 new messages from Jun/ })).toBeInTheDocument();

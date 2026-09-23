@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { superForm } from 'sveltekit-superforms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import InputField from '$lib/components/InputField.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import TimezoneSelect from '$lib/components/TimezoneSelect.svelte';
-	import { superForm } from 'sveltekit-superforms';
 	import { currentTimeZoneOrUtc } from '$lib/timezone';
 	import type { PageData } from './$types';
 
@@ -28,7 +28,9 @@
 	const superform = superForm(data.accountForm, {
 		resetForm: false,
 		async onUpdated({ form }) {
-			if (!form.valid) return;
+			if (!form.valid) {
+				return;
+			}
 			await invalidateAll();
 		}
 	});

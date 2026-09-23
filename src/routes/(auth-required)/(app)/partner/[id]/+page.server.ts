@@ -6,14 +6,18 @@ import { getPartnershipTasksWidget } from '$lib/server/tasks';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const partnership = await getPartnershipForUser(locals.db, params.id, locals.user.id);
 	// A pending invite has no partner behind it yet, so it gets no partner page
 	// — the nav does not link to one either. 404 rather than 403 for a
 	// partnership belonging to someone else: distinguishing them would confirm
 	// the id is real.
-	if (!partnership || partnership.status !== 'accepted') error(404, 'Partner not found');
+	if (partnership?.status !== 'accepted') {
+		error(404, 'Partner not found');
+	}
 
 	// The same keys the sections' own pages use, so completing a task, claiming
 	// a reward or reading a thread refreshes the cards here too.

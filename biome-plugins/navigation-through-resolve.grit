@@ -1,0 +1,16 @@
+// Internal navigation goes through `resolve()` from `$app/paths`, so a route
+// that moves (or a base path) cannot leave a hard-coded URL pointing nowhere.
+// Takes over the script half of eslint-plugin-svelte's
+// `svelte/no-navigation-without-resolve`; Biome's plugins cannot yet match
+// Svelte markup, so an `href` is checked in review rather than here.
+language js
+
+or {
+	`goto($target)`,
+	`goto($target, $_)`,
+	`pushState($target, $_)`,
+	`replaceState($target, $_)`
+} where {
+	$target <: not `resolve($...)`,
+	register_diagnostic(span=$target, message="Build internal navigation targets with resolve() from $app/paths.")
+}

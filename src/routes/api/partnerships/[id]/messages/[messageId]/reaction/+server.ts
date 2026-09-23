@@ -6,10 +6,14 @@ import type { RequestHandler } from './$types';
 
 /** Sets or replaces the viewer's tapback. One per person per message. */
 export const PUT: RequestHandler = async ({ locals, params, request, platform }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = reactionSchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed reaction');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed reaction');
+	}
 
 	const result = await setReaction(locals.db, {
 		partnershipId: params.id,
@@ -32,14 +36,18 @@ export const PUT: RequestHandler = async ({ locals, params, request, platform })
 };
 
 export const DELETE: RequestHandler = async ({ locals, params, platform }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const result = await clearReaction(locals.db, {
 		partnershipId: params.id,
 		messageId: params.messageId,
 		viewerId: locals.user.id
 	});
-	if (!result.ok) error(404, 'Not found');
+	if (!result.ok) {
+		error(404, 'Not found');
+	}
 
 	const notifier = await createNotifier({ platform });
 	await notifier.publish(params.id, { kind: 'reaction', threadId: result.threadId });

@@ -6,8 +6,8 @@ import {
 	decryptPayload,
 	encryptAttachment,
 	encryptPayload,
-	normaliseBody,
 	type MessagePayload,
+	normaliseBody,
 	type ReactionPayload
 } from './messages';
 
@@ -18,7 +18,9 @@ async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
 	const reader = stream.getReader();
 	for (;;) {
 		const { done, value } = await reader.read();
-		if (done) break;
+		if (done) {
+			break;
+		}
 		chunks.push(value);
 	}
 	const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));

@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ locals: { db } }) => {
 		// PocketBase's getFullList() had no sort, so ordering was whatever SQLite
 		// returned. `id` is the tiebreaker because createdAt can collide when
 		// several rows are seeded in the same millisecond.
-		orderBy: (guides, { asc }) => [asc(guides.createdAt), asc(guides.id)]
+		orderBy: (table, { asc }) => [asc(table.createdAt), asc(table.id)]
 	});
 
 	return { guides };

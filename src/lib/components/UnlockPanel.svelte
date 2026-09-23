@@ -2,11 +2,11 @@
 	import { resolve } from '$app/paths';
 	import {
 		describePasskeyFailure,
-		passkeysAvailable,
-		type PasskeyFailure
+		type PasskeyFailure,
+		passkeysAvailable
 	} from '$lib/crypto/passkey';
-	import { unlockMode } from '$lib/passkey-unlock';
 	import { providerForAaguid } from '$lib/passkey-providers';
+	import { unlockMode } from '$lib/passkey-unlock';
 	import { MIN_PASSWORD_LENGTH } from '$lib/password-strength';
 	import PasswordField from './PasswordField.svelte';
 	import PrfProviderList from './PrfProviderList.svelte';
@@ -97,7 +97,9 @@
 	const showPassword = $derived(mode !== 'passkey-ready' || passwordRevealed);
 
 	async function onPasskey() {
-		if (!passkeyUnlock || passkeyBusy) return;
+		if (!passkeyUnlock || passkeyBusy) {
+			return;
+		}
 		passkeyFailure = null;
 		passkeyBusy = true;
 		try {
@@ -113,7 +115,9 @@
 	}
 
 	async function submit(alsoSetUpPasskey: boolean) {
-		if (busy || password.length === 0) return;
+		if (busy || password.length === 0) {
+			return;
+		}
 		failed = false;
 		busy = true;
 		const entered = password;
@@ -122,7 +126,9 @@
 			// Only after the unlock worked. Registering a passkey off the back of a
 			// password that turned out to be wrong would leave a credential behind
 			// that can never open anything.
-			if (alsoSetUpPasskey && setUpPasskey) await setUpPasskey(entered);
+			if (alsoSetUpPasskey && setUpPasskey) {
+				await setUpPasskey(entered);
+			}
 		} finally {
 			busy = false;
 			// Cleared whether it worked or not: on success it is not needed, and on
@@ -152,7 +158,7 @@
 		{/if}
 		{#if !passwordRevealed}
 			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
-			<wa-button type="button" appearance="plain" onclick={() => (passwordRevealed = true)}>
+			<wa-button type="button" appearance="plain" onclick={() => { passwordRevealed = true; }}>
 				Use your password instead
 			</wa-button>
 		{:else}

@@ -3,8 +3,8 @@ import { APIError } from 'better-auth/api';
 import { setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { parseKeyWrapParams } from '$lib/encryption';
-import { wrapBlobField } from '$lib/schemas/keyWrap';
 import { encryptionSetupSchema } from '$lib/schemas/encryptionForms';
+import { wrapBlobField } from '$lib/schemas/keyWrap';
 import { clearPasswordCredential, hasPasswordCredential } from '$lib/server/credentials';
 import {
 	addWrap,
@@ -13,14 +13,16 @@ import {
 	putUserKeys,
 	replaceUserKeys
 } from '$lib/server/keys';
-import { listPartnershipsForUser } from '$lib/server/partnerships';
 import { requestHistoryRestore } from '$lib/server/messaging';
+import { listPartnershipsForUser } from '$lib/server/partnerships';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, request }) => {
 	// The group guard has already run for a layout load, but narrowing here also
 	// means this page degrades rather than throwing if that ever changes.
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const [bundle, hasPassword, passkeys] = await Promise.all([
 		getUnlockBundle(locals.db, locals.user.id),
@@ -58,12 +60,18 @@ export const actions: Actions = {
 	 */
 	setup: async ({ locals, request }) => {
 		// Actions run BEFORE layout loads, so the group guard does not gate this.
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const form = await superValidate(request, zod4(encryptionSetupSchema));
-		if (!form.valid) return fail(400, { form });
+		if (!form.valid) {
+			return fail(400, { form });
+		}
 
 		const params = parseKeyWrapParams(form.data.wrapParams);
-		if (!params) return setError(form, '', 'Could not set up encryption keys');
+		if (!params) {
+			return setError(form, '', 'Could not set up encryption keys');
+		}
 
 		const userId = locals.user.id;
 		const hadPassword = await hasPasswordCredential(locals.db, userId);
@@ -112,7 +120,9 @@ export const actions: Actions = {
 			// each partner is asked to re-encrypt the shared history to the new key.
 			await replaceUserKeys(locals.db, userId, { recipient: form.data.recipient, wrap });
 			for (const partnership of await listPartnershipsForUser(locals.db, userId)) {
-				if (partnership.status !== 'accepted') continue;
+				if (partnership.status !== 'accepted') {
+					continue;
+				}
 				await requestHistoryRestore(locals.db, {
 					partnershipId: partnership.id,
 					requesterId: userId,
@@ -128,7 +138,9 @@ export const actions: Actions = {
 
 	/** Starts a forgotten-password reset by removing the unusable credential. */
 	forgetPassword: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		// Only reachable for someone already signed in — today that means a
 		// passkey. It does not let anyone in; it lets someone already in choose a
 		// new password. See the comment on clearPasswordCredential.
@@ -147,12 +159,14 @@ export const actions: Actions = {
 	 * meaning, which it has no way to check and no business checking.
 	 */
 	addWrap: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const data = await request.formData();
 
 		const params = parseKeyWrapParams(String(data.get('wrapParams') ?? ''));
 		const blob = wrapBlobField.safeParse(String(data.get('wrapBlob') ?? ''));
-		if (!params || !blob.success) {
+		if (!(params && blob.success)) {
 			return fail(400, { addWrapError: 'Could not add that unlock method' });
 		}
 
@@ -176,7 +190,9 @@ export const actions: Actions = {
 
 	/** Removes one unlock method — a revoked passkey, say. */
 	revokeWrap: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const data = await request.formData();
 		const wrapId = String(data.get('wrapId') ?? '');
 
@@ -190,7 +206,9 @@ export const actions: Actions = {
 		}
 
 		const removed = await deleteWrap(locals.db, wrapId, locals.user.id);
-		if (!removed) return fail(404, { revokeError: 'That unlock method is already gone' });
+		if (!removed) {
+			return fail(404, { revokeError: 'That unlock method is already gone' });
+		}
 		return { revoked: true };
 	}
 };

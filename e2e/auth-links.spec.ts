@@ -29,7 +29,7 @@ test.describe('login/signup cross-links', () => {
 		const link = page.getByRole('link', { name: 'New here? Create an account' });
 		await expect(link).toHaveAttribute(
 			'href',
-			'/signup?redirectTo=' + encodeURIComponent('/invite/some-token')
+			`/signup?redirectTo=${encodeURIComponent('/invite/some-token')}`
 		);
 	});
 
@@ -38,7 +38,7 @@ test.describe('login/signup cross-links', () => {
 		const link = page.getByRole('link', { name: 'Already have an account? Log in' });
 		await expect(link).toHaveAttribute(
 			'href',
-			'/login?redirectTo=' + encodeURIComponent('/invite/some-token')
+			`/login?redirectTo=${encodeURIComponent('/invite/some-token')}`
 		);
 	});
 
@@ -50,6 +50,6 @@ test.describe('login/signup cross-links', () => {
 		await page.waitForURL(/\/signup\?redirectTo=/);
 
 		await page.getByRole('link', { name: 'Already have an account? Log in' }).click();
-		await page.waitForURL(/\/login\?redirectTo=%2Finvite%2Fsome-token$/);
+		await expect(page).toHaveURL(/\/login\?redirectTo=%2Finvite%2Fsome-token$/);
 	});
 });

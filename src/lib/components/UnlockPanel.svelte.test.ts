@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { userEvent } from 'vitest/browser';
@@ -68,7 +68,7 @@ function passwordBox(container: HTMLElement): Element | null {
 }
 
 describe('with a passkey that can unlock', () => {
-	test('leads with the passkey and keeps the password one click away', async () => {
+	it('leads with the passkey and keeps the password one click away', () => {
 		const { container } = mount({ passkeyUnlock, passkeyCount: 1 });
 
 		expect(mode(container)).toBe('passkey-ready');
@@ -79,7 +79,7 @@ describe('with a passkey that can unlock', () => {
 		expect(passwordBox(container)).toBeNull();
 	});
 
-	test('reveals the field once the password button is pressed', async () => {
+	it('reveals the field once the password button is pressed', async () => {
 		const { container } = mount({ passkeyUnlock, passkeyCount: 1 });
 
 		// `fireEvent` and not a bare `MouseEvent`: Svelte 5 delegates `click` to
@@ -94,7 +94,7 @@ describe('with a passkey that can unlock', () => {
 	 * A working wrap outranks a failed verdict on some other passkey: one that
 	 * works and one that does not still means the button should be there.
 	 */
-	test('still leads with the passkey when another one is known to fail', () => {
+	it('still leads with the passkey when another one is known to fail', () => {
 		const { container } = mount({
 			passkeyUnlock,
 			passkeyCount: 2,
@@ -105,7 +105,7 @@ describe('with a passkey that can unlock', () => {
 });
 
 describe('with passkeys that cannot unlock', () => {
-	test('says so, names the provider, and shows the field straight away', () => {
+	it('says so, names the provider, and shows the field straight away', () => {
 		const { container } = mount({
 			passkeyCount: 1,
 			passkeysKnownUnusable: 1,
@@ -121,21 +121,21 @@ describe('with passkeys that cannot unlock', () => {
 	});
 
 	/** Apple reports the anonymous AAGUID, so the copy has to work with no name. */
-	test('still explains itself when the provider cannot be named', () => {
+	it('still explains itself when the provider cannot be named', () => {
 		mount({ passkeyCount: 1, passkeysKnownUnusable: 1, unusableProviderAaguid: null });
 		expect(
 			screen.getByText(/It signs you in, but the password manager holding it/)
 		).toBeInTheDocument();
 	});
 
-	test('does not offer to set one up, which would go round the same loop', () => {
+	it('does not offer to set one up, which would go round the same loop', () => {
 		mount({ passkeyCount: 1, passkeysKnownUnusable: 1 });
 		expect(screen.queryByText(/set up a passkey/i)).not.toBeInTheDocument();
 	});
 });
 
 describe('with no usable wrap yet', () => {
-	test('offers to create one when the account has no passkey', () => {
+	it('offers to create one when the account has no passkey', () => {
 		const { container } = mount({ passkeyCount: 0 });
 
 		expect(mode(container)).toBe('offer-setup');
@@ -151,14 +151,14 @@ describe('with no usable wrap yet', () => {
 	 * before the check existed — so it gets the offer, worded for a passkey that
 	 * already exists.
 	 */
-	test('offers to use an existing passkey that has never been tried', () => {
+	it('offers to use an existing passkey that has never been tried', () => {
 		const { container } = mount({ passkeyCount: 1, passkeysKnownUnusable: 0 });
 
 		expect(mode(container)).toBe('offer-setup');
 		expect(screen.getByText('Unlock and use my passkey next time')).toBeInTheDocument();
 	});
 
-	test('unlocks before it registers anything', async () => {
+	it('unlocks before it registers anything', async () => {
 		const order: string[] = [];
 		unlock.mockImplementation(async () => void order.push('unlock'));
 		setUpPasskey.mockImplementation(async () => void order.push('setup'));
@@ -173,14 +173,14 @@ describe('with no usable wrap yet', () => {
 		expect(setUpPasskey).toHaveBeenCalledWith('correct horse battery staple');
 	});
 
-	test('does nothing at all with an empty password', async () => {
+	it('does nothing at all with an empty password', async () => {
 		mount({ passkeyCount: 0 });
 		await fireEvent.click(screen.getByText('Unlock and set up a passkey'));
 		expect(unlock).not.toHaveBeenCalled();
 		expect(setUpPasskey).not.toHaveBeenCalled();
 	});
 
-	test('omits the offer entirely when the caller cannot honour it', () => {
+	it('omits the offer entirely when the caller cannot honour it', () => {
 		const { container } = mount({ passkeyCount: 0, setUpPasskey: null });
 		expect(mode(container)).toBe('offer-setup');
 		expect(screen.queryByText('Unlock and set up a passkey')).not.toBeInTheDocument();
@@ -189,7 +189,7 @@ describe('with no usable wrap yet', () => {
 });
 
 describe('the password half', () => {
-	test('reports a wrong password', () => {
+	it('reports a wrong password', () => {
 		mount({ passkeyCount: 0, wrongPassword: true });
 		expect(screen.getByText('That password did not unlock your messages')).toBeInTheDocument();
 	});
@@ -199,14 +199,14 @@ describe('the password half', () => {
 	 * deciding whether to bother, and being surprised by the same prompt tomorrow
 	 * is what made this feel broken rather than limited.
 	 */
-	test('warns up front when this browser will not remember the key', () => {
+	it('warns up front when this browser will not remember the key', () => {
 		mount({ passkeyCount: 0, willRepeat: true });
 		expect(screen.getByText(/asked again each time you open the app/)).toBeInTheDocument();
 	});
 });
 
 describe('without WebAuthn', () => {
-	test('shows the password alone, whatever the account has', () => {
+	it('shows the password alone, whatever the account has', () => {
 		const credentials = Object.getOwnPropertyDescriptor(navigator, 'credentials');
 		Object.defineProperty(navigator, 'credentials', { value: undefined, configurable: true });
 		try {
@@ -215,7 +215,13 @@ describe('without WebAuthn', () => {
 			expect(screen.queryByText('Unlock with a passkey')).not.toBeInTheDocument();
 			expect(passwordBox(container)).not.toBeNull();
 		} finally {
-			Object.defineProperty(navigator, 'credentials', credentials!);
+			// Usually an accessor on the prototype, so there may be no own
+			// descriptor to put back — then removing the override restores it.
+			if (credentials) {
+				Object.defineProperty(navigator, 'credentials', credentials);
+			} else {
+				Reflect.deleteProperty(navigator, 'credentials');
+			}
 		}
 	});
 });

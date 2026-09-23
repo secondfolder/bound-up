@@ -1,6 +1,6 @@
 import { encryptPayload, type MessagePayload } from '$lib/crypto/messages';
-import { legacyTextToDocument } from '$lib/richtext-legacy';
 import { looksLikeRichTextDocument } from '$lib/richtext';
+import { legacyTextToDocument } from '$lib/richtext-legacy';
 
 /**
  * TEMPORARY — converts content written before rich text and writes it back.
@@ -45,17 +45,23 @@ export async function migrateLegacyMessages(input: {
 	/** age recipients for the re-encryption: the same two the send path uses. */
 	targets: string[];
 }): Promise<number> {
-	if (input.targets.length === 0) return 0;
+	if (input.targets.length === 0) {
+		return 0;
+	}
 
 	const converted: { id: string; ciphertext: string }[] = [];
 	for (const entry of input.entries) {
-		const payload = entry.payload;
+		const { payload } = entry;
 		// `undefined` is still decrypting; `null` is a body encrypted to a key
 		// this device no longer has. Neither can be converted, and the null case
 		// never will be — see the residue note in docs/temporary-code.md.
-		if (!payload) continue;
+		if (!payload) {
+			continue;
+		}
 		// Belt and braces: never rewrite something already converted.
-		if (looksLikeRichTextDocument(payload.text)) continue;
+		if (looksLikeRichTextDocument(payload.text)) {
+			continue;
+		}
 
 		const next: MessagePayload = {
 			...payload,
@@ -64,7 +70,9 @@ export async function migrateLegacyMessages(input: {
 		converted.push({ id: entry.id, ciphertext: await encryptPayload(next, input.targets) });
 	}
 
-	if (converted.length === 0) return 0;
+	if (converted.length === 0) {
+		return 0;
+	}
 
 	try {
 		const response = await fetch(`/api/partnerships/${input.partnershipId}/legacy-bodies`, {
@@ -72,7 +80,9 @@ export async function migrateLegacyMessages(input: {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ messages: converted })
 		});
-		if (!response.ok) return 0;
+		if (!response.ok) {
+			return 0;
+		}
 	} catch {
 		return 0;
 	}
@@ -87,8 +97,12 @@ export async function migrateLegacyMessages(input: {
  * conversion; the caller posts it to the endpoint that re-checks permission.
  */
 export function convertLegacyDescription(description: string | null): string | null {
-	if (description === null || description.trim() === '') return null;
-	if (looksLikeRichTextDocument(description)) return null;
+	if (description === null || description.trim() === '') {
+		return null;
+	}
+	if (looksLikeRichTextDocument(description)) {
+		return null;
+	}
 	return JSON.stringify(legacyTextToDocument(description));
 }
 
@@ -102,15 +116,25 @@ export type LegacyDescriptionItem = { id: string; description: string | null };
  * anyway, so this is about not making pointless requests rather than about
  * safety. Silent on failure, like the message path: nobody asked for this.
  */
-export async function migrateLegacyDescriptions(input: {
+/** The body of `/api/legacy-descriptions`, one entry per converted row. */
+type DescriptionUpdate = {
 	kind: 'self-task' | 'self-reward' | 'partnership-task' | 'partnership-reward';
+	id: string;
+	partnershipId?: string;
+	description: string;
+};
+
+export async function migrateLegacyDescriptions(input: {
+	kind: DescriptionUpdate['kind'];
 	partnershipId?: string | null;
 	items: LegacyDescriptionItem[];
 }): Promise<number> {
-	const updates = [];
+	const updates: DescriptionUpdate[] = [];
 	for (const item of input.items) {
 		const converted = convertLegacyDescription(item.description);
-		if (converted === null) continue;
+		if (converted === null) {
+			continue;
+		}
 		updates.push({
 			kind: input.kind,
 			id: item.id,
@@ -118,7 +142,9 @@ export async function migrateLegacyDescriptions(input: {
 			description: converted
 		});
 	}
-	if (updates.length === 0) return 0;
+	if (updates.length === 0) {
+		return 0;
+	}
 
 	try {
 		const response = await fetch('/api/legacy-descriptions', {
@@ -126,7 +152,9 @@ export async function migrateLegacyDescriptions(input: {
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ updates })
 		});
-		if (!response.ok) return 0;
+		if (!response.ok) {
+			return 0;
+		}
 	} catch {
 		return 0;
 	}

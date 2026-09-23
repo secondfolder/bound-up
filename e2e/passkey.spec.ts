@@ -1,5 +1,6 @@
-import { expect, test } from './fixtures';
 import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
 import {
 	account,
 	clickWaButton,

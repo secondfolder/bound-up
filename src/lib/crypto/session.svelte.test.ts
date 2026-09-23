@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { passkeyWrapFor, type Keyring } from './session.svelte';
 import type { KeyWrapView } from '../types';
+import { type Keyring, passkeyWrapFor } from './session.svelte';
 
 /**
  * Which passkey the unlock screen offers.

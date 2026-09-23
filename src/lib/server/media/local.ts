@@ -1,6 +1,8 @@
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertStorageKey, type MediaStore } from './index';
+
+const TRAILING_SLASH = /\/$/;
 
 /**
  * The development store: encrypted attachments in a local directory.
@@ -40,7 +42,9 @@ export function createLocalStore(root: string): MediaStore {
 		const reader = body.getReader();
 		for (;;) {
 			const { done, value } = await reader.read();
-			if (done) break;
+			if (done) {
+				break;
+			}
 			chunks.push(value);
 		}
 		const out = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
@@ -71,29 +75,37 @@ export function createLocalStore(root: string): MediaStore {
 					byteSize: bytes.byteLength
 				};
 			} catch (error) {
-				if ((error as { code?: string }).code === 'ENOENT') return null;
+				if ((error as { code?: string }).code === 'ENOENT') {
+					return null;
+				}
 				throw error;
 			}
 		},
 
 		async delete(keys) {
-			for (const key of keys) await rm(resolve(key), { force: true });
+			for (const key of keys) {
+				await rm(resolve(key), { force: true });
+			}
 		},
 
 		async deletePrefix(prefix) {
 			// Prefixes here are always `messages/<id>/`, i.e. a directory, so this
 			// counts the files it is about to remove and then drops the tree.
-			const directory = path.resolve(root, prefix.replace(/\/$/, ''));
+			const directory = path.resolve(root, prefix.replace(TRAILING_SLASH, ''));
 			if (!directory.startsWith(path.resolve(root) + path.sep)) {
 				throw new Error(`Refusing a prefix that escapes the media root: ${prefix}`);
 			}
 			let deleted = 0;
 			try {
 				for (const entry of await readdir(directory, { recursive: true, withFileTypes: true })) {
-					if (entry.isFile()) deleted += 1;
+					if (entry.isFile()) {
+						deleted += 1;
+					}
 				}
 			} catch (error) {
-				if ((error as { code?: string }).code === 'ENOENT') return 0;
+				if ((error as { code?: string }).code === 'ENOENT') {
+					return 0;
+				}
 				throw error;
 			}
 			await rm(directory, { recursive: true, force: true });

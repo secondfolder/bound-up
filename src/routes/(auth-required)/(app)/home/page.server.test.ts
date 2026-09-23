@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { load } from './+page.server';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestPartnershipReward,
@@ -14,7 +14,7 @@ import {
 	setTestSelfRewardCredits,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runLoad } from '$lib/testing/events';
+import { load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -23,7 +23,7 @@ let jun: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada' });
 	jun = await createTestUser(db, { name: 'Jun' });
 });
@@ -34,13 +34,11 @@ function at(
 	user: TestUser | null,
 	partners = [] as { id: string; name: string; image: string | null }[]
 ) {
-	return Object.assign(fakeEvent({ db, user, path: '/home' }), {
-		parent: async () => ({ partners })
-	});
+	return fakeEvent({ db, user, path: '/home', parentData: { partners } });
 }
 
 describe('load', () => {
-	test('returns unread partner links from the layout partner list', async () => {
+	it('returns unread partner links from the layout partner list', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		await createTestThread(db, id, jun, { at: new Date('2026-09-13T12:00:00Z') });
 
@@ -54,7 +52,7 @@ describe('load', () => {
 		);
 	});
 
-	test('previews the tasks that are ready to do right now', async () => {
+	it('previews the tasks that are ready to do right now', async () => {
 		await createTestSelfTask(db, ada, { title: 'Morning stretches', creditsAwarded: 2 });
 		await createTestSelfTask(db, ada, { title: 'Shelved for later', active: false });
 
@@ -68,7 +66,7 @@ describe('load', () => {
 		]);
 	});
 
-	test('previews only the rewards the balance actually covers', async () => {
+	it('previews only the rewards the balance actually covers', async () => {
 		await setTestSelfRewardCredits(db, ada, 5);
 		await createTestSelfReward(db, ada, { title: 'Long bath', cost: 5 });
 		await createTestSelfReward(db, ada, { title: 'Weekend away', cost: 50 });
@@ -90,7 +88,7 @@ describe('load', () => {
 	 * only the self half reported "nothing to do" with a partner task waiting,
 	 * which is the opposite of what the cards are for.
 	 */
-	test('carries partner tasks and rewards into the cards, not just your own', async () => {
+	it('carries partner tasks and rewards into the cards, not just your own', async () => {
 		// Jun controls, so what Jun sets up is Ada's to do and to claim.
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		await createTestSelfTask(db, ada, { title: 'Ada’s own task' });
@@ -116,7 +114,7 @@ describe('load', () => {
 		]);
 	});
 
-	test('degrades to an empty home feed without a session', async () => {
+	it('degrades to an empty home feed without a session', async () => {
 		const data = await runLoad(load(at(null)));
 		expect(data).toEqual({
 			unread: [],

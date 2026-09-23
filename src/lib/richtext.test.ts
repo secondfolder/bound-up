@@ -1,22 +1,22 @@
+import { createEditor, IS_BOLD, IS_CODE, IS_ITALIC, IS_STRIKETHROUGH, IS_UNDERLINE } from 'lexical';
 import { describe, expect, it } from 'vitest';
-import { IS_BOLD, IS_CODE, IS_ITALIC, IS_STRIKETHROUGH, IS_UNDERLINE, createEditor } from 'lexical';
-import { RICH_TEXT_NODES } from './richtext-editor';
 import {
+	documentEmbedUrls,
+	documentToPlainText,
 	FORMAT_BOLD,
 	FORMAT_CODE,
 	FORMAT_ITALIC,
 	FORMAT_STRIKETHROUGH,
 	FORMAT_UNDERLINE,
-	documentEmbedUrls,
 	inlineLinkUrls,
-	withInlineEmbeds,
-	documentToPlainText,
 	isRichTextDocumentEmpty,
 	parseRichTextDocument,
 	parseStoredRichText,
+	type RichTextDocument,
 	richTextDocumentSchema,
-	type RichTextDocument
+	withInlineEmbeds
 } from './richtext';
+import { RICH_TEXT_NODES } from './richtext-editor';
 
 function doc(children: RichTextDocument['root']['children']): RichTextDocument {
 	return { root: { type: 'root', children } };
@@ -73,6 +73,7 @@ describe('parseRichTextDocument', () => {
 								type: 'autolink',
 								url: 'https://example.com/a',
 								isUnlinked: false,
+								// biome-ignore lint/style/useNamingConvention: Lexical keeps a node's serialised state under `$`, which is what this is testing.
 								$: { junk: 'x'.repeat(1000) },
 								children: [text('https://example.com/a')]
 							}
@@ -355,8 +356,10 @@ describe('parseStoredRichText, legacy plain text', () => {
 
 		// The second paragraph is two lines, so its second embed goes after the
 		// line break rather than up at the top with the first.
-		const second = result.root.children[1];
-		if (second?.type !== 'paragraph') throw new Error('expected a paragraph');
+		const [, second] = result.root.children;
+		if (second?.type !== 'paragraph') {
+			throw new Error('expected a paragraph');
+		}
 		expect(second.children.map((node) => node.type)).toEqual([
 			'embed',
 			'text',
@@ -380,7 +383,9 @@ describe('parseStoredRichText, legacy plain text', () => {
 		);
 		expect(documentEmbedUrls(result)).toEqual(['https://i.imgur.com/a.jpg']);
 		const [block] = result.root.children;
-		if (block?.type !== 'paragraph') throw new Error('expected a paragraph');
+		if (block?.type !== 'paragraph') {
+			throw new Error('expected a paragraph');
+		}
 		expect(block.children.filter((node) => node.type === 'embed')).toHaveLength(1);
 	});
 
@@ -404,7 +409,7 @@ describe('the stored shape', () => {
 	 * Every message and description already in the database is in the old shape,
 	 * so a change here is a migration, not a test edit.
 	 */
-	const GOLDEN: RichTextDocument = doc([
+	const Golden: RichTextDocument = doc([
 		{
 			type: 'paragraph',
 			children: [
@@ -451,12 +456,14 @@ describe('the stored shape', () => {
 			}
 		});
 		(editor as unknown as { _headless: boolean })._headless = true;
-		editor.setEditorState(editor.parseEditorState(JSON.stringify(GOLDEN)));
+		editor.setEditorState(editor.parseEditorState(JSON.stringify(Golden)));
 
 		const reserialised = richTextDocumentSchema.safeParse(editor.getEditorState().toJSON());
 		expect(reserialised.success).toBe(true);
-		if (!reserialised.success) return;
-		expect(reserialised.data).toEqual(GOLDEN);
+		if (!reserialised.success) {
+			return;
+		}
+		expect(reserialised.data).toEqual(Golden);
 	});
 
 	/**
@@ -483,9 +490,11 @@ describe('the stored shape', () => {
 		]);
 		const read = parseStoredRichText(JSON.stringify(legacy));
 
-		expect(read.root.children.map((block) => block.type)).toEqual(['paragraph']);
+		expect(read.root.children.map((node) => node.type)).toEqual(['paragraph']);
 		const [block] = read.root.children;
-		if (block?.type !== 'paragraph') throw new Error('expected a paragraph');
+		if (block?.type !== 'paragraph') {
+			throw new Error('expected a paragraph');
+		}
 		// Moved to the start of its URL's line, not left at the top.
 		expect(block.children.map((node) => node.type)).toEqual([
 			'text',
@@ -496,9 +505,9 @@ describe('the stored shape', () => {
 	});
 
 	it('reads back as the prose it holds', () => {
-		expect(documentToPlainText(GOLDEN)).toBe(
+		expect(documentToPlainText(Golden)).toBe(
 			'plain bolditalicstruckcodeboth\nhttps://i.imgur.com/cat.jpglabelled\na bullet\na number'
 		);
-		expect(documentEmbedUrls(GOLDEN)).toEqual(['https://i.imgur.com/cat.jpg']);
+		expect(documentEmbedUrls(Golden)).toEqual(['https://i.imgur.com/cat.jpg']);
 	});
 });

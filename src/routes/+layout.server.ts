@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = ({ locals }) => {
 	// Whitelisted rather than returning locals.user wholesale: that is the full
 	// DB row and this object is serialised into the HTML of every page.
 	return {

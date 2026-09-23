@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { initialsFor } from '$lib/initials';
 	import type { PartnerView } from '$lib/types';
 
@@ -34,7 +34,7 @@
 	</a>
 
 	{#each partners as partner (partner.id)}
-		{@const href = resolve('/(auth-required)/(app)/partner/[id]', { id: partner.id })}
+		{const href = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: partner.id }))}
 		<a {href} aria-current={isPartner(partner.id) ? 'page' : undefined}>
 			<!-- `image` is left off entirely when null: wa-avatar falls back to
 			     initials, and an empty image="" would render a broken image. -->

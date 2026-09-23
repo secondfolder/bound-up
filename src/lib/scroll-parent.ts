@@ -15,7 +15,9 @@ export function scrollParentOf(node: HTMLElement): HTMLElement {
 	let candidate = node.parentElement;
 	while (candidate) {
 		const { overflowY } = getComputedStyle(candidate);
-		if (overflowY === 'auto' || overflowY === 'scroll') return candidate;
+		if (overflowY === 'auto' || overflowY === 'scroll') {
+			return candidate;
+		}
 		candidate = candidate.parentElement;
 	}
 	return (document.scrollingElement ?? document.documentElement ?? document.body) as HTMLElement;

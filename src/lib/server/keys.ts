@@ -1,9 +1,9 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import type { Db } from './db';
-import { passkey, partnerships, passkeyDetails, userKeyWraps, userKeys } from './db/schema';
 import type { KeyWrapParams, KeyWrapType, PasskeyPrfStatusValue } from '../encryption';
 import type { KeyWrapView, PartnerRecipientsView, UnlockBundleView } from '../types';
+import type { Db } from './db';
+import { partnerships, passkey, passkeyDetails, userKeys, userKeyWraps } from './db/schema';
 
 /**
  * Every database access for encryption keys.
@@ -80,8 +80,10 @@ export async function getUserKeys(
 		.where(eq(userKeys.userId, userId))
 		.limit(1);
 
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 	return {
 		recipient: row.recipient,
 		historyWarningAcknowledged: row.historyWarningAckAt !== null
@@ -90,7 +92,7 @@ export async function getUserKeys(
 
 /** Every wrap for this user, newest last, for the unlock loop to try in turn. */
 export async function listWrapsForUser(db: Db, userId: string): Promise<KeyWrapView[]> {
-	return db
+	return await db
 		.select(wrapColumns)
 		.from(userKeyWraps)
 		.where(eq(userKeyWraps.userId, userId))
@@ -157,7 +159,9 @@ export async function recordPasskeyPrfStatus(
 		.from(passkey)
 		.where(and(eq(passkey.id, input.passkeyId), eq(passkey.userId, userId)))
 		.limit(1);
-	if (owned.length === 0) return false;
+	if (owned.length === 0) {
+		return false;
+	}
 
 	await db
 		.insert(passkeyDetails)
@@ -334,8 +338,10 @@ export async function getRecipientsForPartnership(
 		.where(and(eq(partnerships.id, partnershipId), eq(partnerships.status, 'accepted')))
 		.limit(1);
 
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 
 	// Which recipient is "mine" flips with who is looking — the same trap as the
 	// name columns (invariant 12), so it is resolved here and nowhere else.

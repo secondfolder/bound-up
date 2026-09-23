@@ -1,15 +1,15 @@
-import { svelteTesting } from '@testing-library/svelte/vite';
-import { playwright } from '@vitest/browser-playwright';
-import { sveltekit } from '@sveltejs/kit/vite';
-import cloudflareDoExporter from 'sveltekit-cloudflare-do';
-import { defineConfig, type Plugin } from 'vitest/config';
-import { cloudflare } from '@cloudflare/vite-plugin';
-import { loadEnv } from 'vite';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { cloudflare } from '@cloudflare/vite-plugin';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { svelteTesting } from '@testing-library/svelte/vite';
+import { playwright } from '@vitest/browser-playwright';
+import cloudflareDoExporter from 'sveltekit-cloudflare-do';
+import { loadEnv } from 'vite';
+import { defineConfig, type Plugin } from 'vitest/config';
 
 const host: string | undefined = process.env.HOST;
-const port: number = Number(process.env.PORT) || 58769;
+const port: number = Number(process.env.PORT) || 58_769;
 
 /**
  * Removes bare `import "devalue";` statements generated into server chunks by
@@ -52,12 +52,14 @@ function componentTestServer(): Plugin {
 		name: 'component-test-server',
 		configureServer(server) {
 			server.middlewares.use((req, res, next) => {
-				const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+				const { pathname } = new URL(req.url ?? '/', 'http://localhost');
 				const isAppApi = pathname.startsWith('/api/');
 				const isUnshippedImage =
 					req.headers['sec-fetch-dest'] === 'image' &&
 					!existsSync(path.join(server.config.root, 'static', pathname));
-				if (!isAppApi && !isUnshippedImage) return next();
+				if (!(isAppApi || isUnshippedImage)) {
+					return next();
+				}
 				res.statusCode = 404;
 				res.end();
 			});
@@ -70,7 +72,8 @@ const getCloudflarePlugin = ({
 	env
 }: {
 	command: string;
-	env: Record<string, string>;
+	// Not `Record<string, string>`: an unset variable is simply absent.
+	env: Record<string, string | undefined>;
 }) => {
 	/*
     We only want to include this for `npm run dev` since we only need it providing a
@@ -91,10 +94,12 @@ const getCloudflarePlugin = ({
 				},
 				/**
 				 * Without this it will try to load the file listed in `main` but that won't
-				 * exist until after running build for the first time.
+				 * exist until after running build for the first time. Cleared rather
+				 * than deleted: the plugin only checks `!config.main`, which treats the
+				 * worker as assets-only either way.
 				 */
 				config: (userConfig) => {
-					delete userConfig.main;
+					userConfig.main = undefined;
 				}
 			})
 		: undefined;
@@ -213,8 +218,8 @@ export default defineConfig(({ command, mode }) => {
 		},
 
 		server: {
-			host: host,
-			port: port,
+			host,
+			port,
 			// Overridable so the Playwright suite can run against localhost: with the
 			// tunnel host baked in, a page served from 127.0.0.1 asks the tunnel for
 			// its modules and never hydrates.

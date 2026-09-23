@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import { load } from './+layout.server';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
 	createTestInvite,
 	createTestPartnership,
 	createTestUser,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runLoad } from '$lib/testing/events';
+import { load } from './+layout.server';
 
 let harness: TestDb;
 let db: Db;
@@ -17,7 +17,7 @@ let jun: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada', image: '/ada.png' });
 	jun = await createTestUser(db, { name: 'Jun' });
 });

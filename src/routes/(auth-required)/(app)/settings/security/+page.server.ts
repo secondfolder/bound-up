@@ -3,6 +3,7 @@ import { APIError } from 'better-auth/api';
 import { setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { parseKeyWrapParams } from '$lib/encryption';
+import { providerForAaguid } from '$lib/passkey-providers';
 import { changePasswordSchema } from '$lib/schemas/encryptionForms';
 import { hasPasswordCredential } from '$lib/server/credentials';
 import {
@@ -12,11 +13,12 @@ import {
 	getUnlockBundle,
 	passkeyPrfStatusFor
 } from '$lib/server/keys';
-import { providerForAaguid } from '$lib/passkey-providers';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, request }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const [bundle, hasPassword, passkeys, prfStatus] = await Promise.all([
 		getUnlockBundle(locals.db, locals.user.id),
@@ -54,9 +56,13 @@ export const actions: Actions = {
 	 * account already has encrypted-message history.
 	 */
 	changePassword: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const form = await superValidate(request, zod4(changePasswordSchema));
-		if (!form.valid) return fail(400, { form });
+		if (!form.valid) {
+			return fail(400, { form });
+		}
 
 		const bundle = await getUnlockBundle(locals.db, locals.user.id);
 		if (!bundle.recipient) {
@@ -85,7 +91,7 @@ export const actions: Actions = {
 		}
 
 		const params = parseKeyWrapParams(form.data.wrapParams ?? '');
-		if (!params || params.type !== 'password' || !form.data.wrapBlob) {
+		if (params?.type !== 'password' || !form.data.wrapBlob) {
 			return setError(form, '', 'Could not re-seal your keys');
 		}
 

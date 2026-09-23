@@ -1,11 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 const { default: Toggle } = await import('./TaskTimeZoneOwnerToggle.svelte');
 
 describe('TaskTimeZoneOwnerToggle', () => {
-	test('shows the partner-relative toggle text when timezones differ', () => {
+	it('shows the partner-relative toggle text when timezones differ', () => {
 		render(Toggle, {
 			viewerUserId: 'u1',
 			viewerTimezone: 'Europe/London',
@@ -18,7 +18,7 @@ describe('TaskTimeZoneOwnerToggle', () => {
 		expect(screen.getByText("Jun's time (5 hours behind you)")).toBeInTheDocument();
 	});
 
-	test('hides itself when both sides share the same timezone', () => {
+	it('hides itself when both sides share the same timezone', () => {
 		const { container } = render(Toggle, {
 			viewerUserId: 'u1',
 			viewerTimezone: 'Europe/London',
@@ -31,7 +31,7 @@ describe('TaskTimeZoneOwnerToggle', () => {
 		expect(container.textContent).toBe('');
 	});
 
-	test('switches the selection when a button is clicked', async () => {
+	it('switches the selection when a button is clicked', async () => {
 		const { container } = render(Toggle, {
 			viewerUserId: 'u1',
 			viewerTimezone: 'Europe/London',

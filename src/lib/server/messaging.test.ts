@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_CIPHERTEXT_BYTES, RESTORE_PAGE_SIZE } from '../messaging';
 import { createTestDb, type TestDb } from '../testing/db';
 import {
 	createTestInvite,
@@ -14,7 +15,6 @@ import {
 	type TestUser
 } from '../testing/fixtures';
 import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '../testing/media';
-import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_CIPHERTEXT_BYTES, RESTORE_PAGE_SIZE } from '../messaging';
 import { attachmentKey, partnershipMediaPrefix } from './media';
 import {
 	applyHistoryRestore,
@@ -27,8 +27,8 @@ import {
 	listHistoryForRestore,
 	listRestoreRequests,
 	listUnreadCounts,
-	migrateMessageBodies,
 	markThreadOpened,
+	migrateMessageBodies,
 	purgePartnershipMedia,
 	requestHistoryRestore,
 	requireMembership,
@@ -121,7 +121,9 @@ describe('startThread', () => {
 			at(5000)
 		);
 		expect(result).toMatchObject({ ok: true });
-		if (!result.ok) return;
+		if (!result.ok) {
+			return;
+		}
 
 		const thread = await readThreadRow(harness.db, result.threadId);
 		expect(thread).toMatchObject({
@@ -231,7 +233,9 @@ describe('startThread', () => {
 			ciphertext: 'eA',
 			attachments: [outgoingAttachment(bytes)]
 		});
-		if (!result.ok) throw new Error('expected a send');
+		if (!result.ok) {
+			throw new Error('expected a send');
+		}
 
 		const rows = await readAttachmentRows(harness.db, result.messageId);
 		expect(rows).toHaveLength(1);
@@ -637,7 +641,9 @@ describe('getAttachmentForDownload', () => {
 			ciphertext: 'eA',
 			attachments: [outgoingAttachment(new Uint8Array([4, 5]))]
 		});
-		if (!result.ok) throw new Error('expected a send');
+		if (!result.ok) {
+			throw new Error('expected a send');
+		}
 		const [row] = await readAttachmentRows(harness.db, result.messageId);
 
 		await expect(
@@ -660,7 +666,9 @@ describe('getAttachmentForDownload', () => {
 			ciphertext: 'eA',
 			attachments: [outgoingAttachment(new Uint8Array([4]))]
 		});
-		if (!result.ok) throw new Error('expected a send');
+		if (!result.ok) {
+			throw new Error('expected a send');
+		}
 		const [row] = await readAttachmentRows(harness.db, result.messageId);
 
 		await expect(getAttachmentForDownload(harness.db, other.id, row.id)).resolves.toBeNull();
@@ -695,9 +703,7 @@ describe('purgePartnershipMedia', () => {
 	it('reports a failure rather than throwing', async () => {
 		const broken = {
 			...store,
-			deletePrefix: async () => {
-				throw new Error('R2 is having a day');
-			}
+			deletePrefix: () => Promise.reject(new Error('R2 is having a day'))
 		};
 		await expect(purgePartnershipMedia(broken, partnershipId)).resolves.toEqual({
 			deleted: 0,
@@ -718,7 +724,9 @@ describe('history restore', () => {
 			recipient: 'age1newkey'
 		});
 		expect(request).toMatchObject({ ok: true });
-		if (!request.ok) return;
+		if (!request.ok) {
+			return;
+		}
 
 		// Ada sees her own request; Jun sees it as someone else's to act on.
 		await expect(listRestoreRequests(harness.db, partnershipId, ada.id)).resolves.toMatchObject([
@@ -752,7 +760,9 @@ describe('history restore', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) return;
+		if (!request.ok) {
+			return;
+		}
 
 		await expect(
 			applyHistoryRestore(harness.db, {
@@ -775,7 +785,9 @@ describe('history restore', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) return;
+		if (!request.ok) {
+			return;
+		}
 
 		await applyHistoryRestore(harness.db, {
 			partnershipId,
@@ -811,7 +823,9 @@ describe('history restore', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) return;
+		if (!request.ok) {
+			return;
+		}
 
 		await expect(
 			declineHistoryRestore(harness.db, {
@@ -850,7 +864,9 @@ describe('listHistoryForRestore', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) throw new Error('fixture could not open a request');
+		if (!request.ok) {
+			throw new Error('fixture could not open a request');
+		}
 		return request.id;
 	}
 
@@ -915,7 +931,9 @@ describe('listHistoryForRestore', () => {
 			requesterId: ada.id,
 			recipient: 'age1elsewhere'
 		});
-		if (!elsewhere.ok) return;
+		if (!elsewhere.ok) {
+			return;
+		}
 
 		// Jun is a member of `partnershipId` but the request lives in `other`.
 		await expect(
@@ -955,7 +973,7 @@ describe('listHistoryForRestore', () => {
 	it('pages through everything without skipping or repeating a row', async () => {
 		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun);
 		const expected = [messageId];
-		for (let i = 0; i < RESTORE_PAGE_SIZE + 5; i++) {
+		for (let i = 0; i < RESTORE_PAGE_SIZE + 5; i += 1) {
 			const extra = await createTestMessage(harness.db, partnershipId, threadId, i % 2 ? ada : jun);
 			expected.push(extra.messageId);
 		}
@@ -971,7 +989,9 @@ describe('listHistoryForRestore', () => {
 				actorId: jun.id,
 				cursor
 			});
-			if (!page) throw new Error('page was refused');
+			if (!page) {
+				throw new Error('page was refused');
+			}
 			seen.push(...page.messages.map((row) => row.id));
 			cursor = page.nextCursor;
 			pages += 1;
@@ -1015,7 +1035,9 @@ describe('applyHistoryRestore reactions', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) return;
+		if (!request.ok) {
+			return;
+		}
 
 		const page = await listHistoryForRestore(harness.db, {
 			partnershipId,
@@ -1064,7 +1086,9 @@ describe('applyHistoryRestore reactions', () => {
 			requesterId: ada.id,
 			recipient: 'age1x'
 		});
-		if (!theirRequest.ok) return;
+		if (!theirRequest.ok) {
+			return;
+		}
 		const theirPage = await listHistoryForRestore(harness.db, {
 			partnershipId: other.id,
 			requestId: theirRequest.id,
@@ -1079,7 +1103,9 @@ describe('applyHistoryRestore reactions', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!mine.ok) return;
+		if (!mine.ok) {
+			return;
+		}
 
 		await applyHistoryRestore(harness.db, {
 			partnershipId,

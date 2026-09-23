@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
 import type { PageData } from './$types';
@@ -42,12 +42,12 @@ function data(claimCount: number, claimable = true): PageData {
 }
 
 describe('/partner/[id]/rewards/+page.svelte', () => {
-	test('hides claim history when the partnership has no claims', () => {
+	it('hides claim history when the partnership has no claims', () => {
 		const { container } = render(Page, { data: data(0) });
 		expect(container.textContent).not.toContain('Claim history');
 	});
 
-	test('shows claim history when the partnership has claims', () => {
+	it('shows claim history when the partnership has claims', () => {
 		const { container } = render(Page, { data: data(1) });
 		const buttons = Array.from(container.querySelectorAll('wa-button')).map((node) =>
 			node.textContent?.trim()
@@ -55,7 +55,7 @@ describe('/partner/[id]/rewards/+page.svelte', () => {
 		expect(buttons).toContain('Claim history');
 	});
 
-	test('hides claim-side credits and claim controls for the controller-only view', () => {
+	it('hides claim-side credits and claim controls for the controller-only view', () => {
 		const { container } = render(Page, { data: data(0, false) });
 		expect(container.querySelector('.title-row')?.textContent).toContain("Jun's Rewards");
 		expect(container.querySelector('.title-row')?.textContent).toContain('Credits:');

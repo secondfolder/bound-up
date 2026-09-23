@@ -7,9 +7,9 @@
 	// in the server graph.
 	import '$lib/webawesome';
 
-	interface Props {
+	type Props = {
 		children?: Snippet;
-	}
+	};
 
 	let { children }: Props = $props();
 
@@ -42,10 +42,10 @@
 		--wa-color-text-danger: var(--wa-color-red-40);
 
 		/* safe area inset on iOS takes into account the corner radius of the screen 
-        which in some situations is too aggressive and we only want the safe area 
-        inset to include the home indicator bar so --safe-area-inset-bottom-min is
-        provided for those situations. We use the ugly hack of 
-        `@supports (-webkit-touch-callout: none)` to detect if the device is iOS */
+	        which in some situations is too aggressive and we only want the safe area 
+	        inset to include the home indicator bar so --safe-area-inset-bottom-min is
+	        provided for those situations. We use the ugly hack of 
+	        `@supports (-webkit-touch-callout: none)` to detect if the device is iOS */
 		--safe-area-inset-bottom-min-max-delta: 0px;
 		@supports (-webkit-touch-callout: none) {
 			--safe-area-inset-bottom-min-max-delta: 1.25rem;
@@ -58,11 +58,11 @@
 	}
 
 	/**
-    * Elements that have the "plain" and "outlined" appearance have no background
-    * and the "neutral" variant indicates they aren't aiming to standout with a particular colour. So intead of just using 
-    * the neutral varient default of grey it makes more sense to use the current text
-    * colour to make sure it stands out against whatever background it finds itself on.
-    */
+	 * Elements that have the "plain" and "outlined" appearance have no background
+	 * and the "neutral" variant indicates they aren't aiming to standout with a particular colour. So intead of just using
+	 * the neutral varient default of grey it makes more sense to use the current text
+	 * colour to make sure it stands out against whatever background it finds itself on.
+	 */
 	:global(.wa-plain.wa-neutral),
 	:global([appearance='plain'][variant='neutral']),
 	:global(.wa-outlined.wa-neutral),

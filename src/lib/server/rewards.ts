@@ -1,4 +1,16 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { canClaimFromPartnership, type RewardInput } from '../rewards';
+import type {
+	HomePartnerRewardsSectionView,
+	PartnershipRewardClaimView,
+	PartnershipRewardView,
+	PartnerView,
+	RewardHistoryView,
+	RewardsWidgetView,
+	SelfRewardsSectionView,
+	SelfRewardView,
+	WidgetBalanceView
+} from '../types';
 import type { Db } from './db';
 import {
 	partnershipRewardClaims,
@@ -9,18 +21,6 @@ import {
 	selfRewardCredits,
 	selfRewards
 } from './db/schema';
-import { canClaimFromPartnership, type RewardInput } from '../rewards';
-import type {
-	HomePartnerRewardsSectionView,
-	PartnershipRewardClaimView,
-	PartnershipRewardView,
-	PartnerView,
-	RewardHistoryView,
-	RewardsWidgetView,
-	WidgetBalanceView,
-	SelfRewardsSectionView,
-	SelfRewardView
-} from '../types';
 import { getPartnershipForUser } from './partnerships';
 
 const selfRewardColumns = {
@@ -112,7 +112,8 @@ export type PartnershipRewardsPageView = {
 
 type RewardResult<TReason extends string> = { ok: true } | { ok: false; reason: TReason };
 type CreateRewardResult<TReason extends string> =
-	{ ok: true; id: string } | { ok: false; reason: TReason };
+	| { ok: true; id: string }
+	| { ok: false; reason: TReason };
 
 function canClaimFromPartnershipView(partnership: RewardMembership['partnership']): boolean {
 	// The claimant side is the non-controller when control is one-sided, and
@@ -197,8 +198,9 @@ export async function requireRewardMembership(
 	userId: string
 ): Promise<RewardMembership | null> {
 	const partnership = await getPartnershipForUser(db, partnershipId, userId);
-	if (!partnership || partnership.status !== 'accepted' || !partnership.counterpart?.userId)
+	if (partnership?.status !== 'accepted' || !partnership.counterpart?.userId) {
 		return null;
+	}
 	return {
 		partnership,
 		viewerId: userId,
@@ -243,8 +245,10 @@ export async function getSelfRewardForUser(
 		.from(selfRewards)
 		.where(and(eq(selfRewards.id, rewardId), eq(selfRewards.ownerId, userId)))
 		.limit(1);
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 	return toSelfRewardView(row, await readSelfCredits(db, userId));
 }
 
@@ -306,12 +310,18 @@ export async function claimSelfReward(
 		.from(selfRewards)
 		.where(and(eq(selfRewards.id, rewardId), eq(selfRewards.ownerId, userId)))
 		.limit(1);
-	const reward = rows[0];
-	if (!reward) return { ok: false, reason: 'not-found' };
-	if (!reward.active) return { ok: false, reason: 'inactive' };
+	const [reward] = rows;
+	if (!reward) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (!reward.active) {
+		return { ok: false, reason: 'inactive' };
+	}
 
 	const credits = await readSelfCredits(db, userId);
-	if (credits < reward.cost) return { ok: false, reason: 'insufficient-credits' };
+	if (credits < reward.cost) {
+		return { ok: false, reason: 'insufficient-credits' };
+	}
 
 	const nextCredits = credits - reward.cost;
 	await db.batch([
@@ -342,7 +352,9 @@ export async function getPartnershipRewardsPage(
 	userId: string
 ): Promise<PartnershipRewardsPageView | null> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const [viewerCredits, counterpartCredits, rewards, claims] = await Promise.all([
 		readPartnershipCredits(db, partnershipId, userId),
@@ -400,7 +412,9 @@ export async function getPartnershipRewardForUser(
 	reward: PartnershipRewardView;
 } | null> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const rows = await db
 		.select(partnershipRewardColumns)
@@ -409,8 +423,10 @@ export async function getPartnershipRewardForUser(
 			and(eq(partnershipRewards.id, rewardId), eq(partnershipRewards.partnershipId, partnershipId))
 		)
 		.limit(1);
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 
 	return {
 		partner: {
@@ -434,8 +450,12 @@ export async function createPartnershipReward(
 	input: RewardInput
 ): Promise<CreateRewardResult<'not-a-member' | 'forbidden'>> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (!membership.canManage) return { ok: false, reason: 'forbidden' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canManage) {
+		return { ok: false, reason: 'forbidden' };
+	}
 
 	const [row] = await db
 		.insert(partnershipRewards)
@@ -460,8 +480,12 @@ export async function updatePartnershipReward(
 	input: RewardInput
 ): Promise<RewardResult<'not-a-member' | 'forbidden' | 'not-found'>> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (!membership.canManage) return { ok: false, reason: 'forbidden' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canManage) {
+		return { ok: false, reason: 'forbidden' };
+	}
 
 	const rows = await db
 		.update(partnershipRewards)
@@ -475,7 +499,9 @@ export async function updatePartnershipReward(
 			and(eq(partnershipRewards.id, rewardId), eq(partnershipRewards.partnershipId, partnershipId))
 		)
 		.returning({ id: partnershipRewards.id });
-	if (rows.length === 0) return { ok: false, reason: 'not-found' };
+	if (rows.length === 0) {
+		return { ok: false, reason: 'not-found' };
+	}
 	return { ok: true };
 }
 
@@ -488,9 +514,15 @@ export async function setPartnershipRewardCredits(
 	now: Date = new Date()
 ): Promise<RewardResult<'not-a-member' | 'forbidden' | 'bad-target'>> {
 	const membership = await requireRewardMembership(db, partnershipId, actorUserId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (!membership.canManage) return { ok: false, reason: 'forbidden' };
-	if (targetUserId !== membership.counterpartUserId) return { ok: false, reason: 'bad-target' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canManage) {
+		return { ok: false, reason: 'forbidden' };
+	}
+	if (targetUserId !== membership.counterpartUserId) {
+		return { ok: false, reason: 'bad-target' };
+	}
 
 	await db
 		.insert(partnershipRewardCredits)
@@ -518,8 +550,12 @@ export async function claimPartnershipReward(
 	>
 > {
 	const membership = await requireRewardMembership(db, input.partnershipId, input.userId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (!membership.canClaim) return { ok: false, reason: 'not-allowed' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canClaim) {
+		return { ok: false, reason: 'not-allowed' };
+	}
 
 	const rows = await db
 		.select(partnershipRewardColumns)
@@ -531,13 +567,21 @@ export async function claimPartnershipReward(
 			)
 		)
 		.limit(1);
-	const reward = rows[0];
-	if (!reward) return { ok: false, reason: 'not-found' };
-	if (!reward.active) return { ok: false, reason: 'inactive' };
-	if (reward.createdByUserId === input.userId) return { ok: false, reason: 'own-reward' };
+	const [reward] = rows;
+	if (!reward) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (!reward.active) {
+		return { ok: false, reason: 'inactive' };
+	}
+	if (reward.createdByUserId === input.userId) {
+		return { ok: false, reason: 'own-reward' };
+	}
 
 	const credits = await readPartnershipCredits(db, input.partnershipId, input.userId);
-	if (credits < reward.cost) return { ok: false, reason: 'insufficient-credits' };
+	if (credits < reward.cost) {
+		return { ok: false, reason: 'insufficient-credits' };
+	}
 
 	const nextCredits = credits - reward.cost;
 	await db.batch([
@@ -575,7 +619,9 @@ export async function listHomePartnerRewardSections(
 	userId: string,
 	partners: PartnerView[]
 ): Promise<HomePartnerRewardsSectionView[]> {
-	if (partners.length === 0) return [];
+	if (partners.length === 0) {
+		return [];
+	}
 
 	const partnershipIds = partners.map((partner) => partner.id);
 	const [partnershipRows, creditRows, rewardRows] = await Promise.all([
@@ -624,8 +670,12 @@ export async function listHomePartnerRewardSections(
 	const rewardsByPartnership = new Map<string, PartnershipRewardView[]>();
 
 	for (const row of rewardRows) {
-		if (!claimablePartnerships.get(row.partnershipId)) continue;
-		if (row.createdByUserId === userId) continue;
+		if (!claimablePartnerships.get(row.partnershipId)) {
+			continue;
+		}
+		if (row.createdByUserId === userId) {
+			continue;
+		}
 		const credits = creditsByPartnership.get(row.partnershipId) ?? 0;
 		const list = rewardsByPartnership.get(row.partnershipId) ?? [];
 		list.push(toPartnershipRewardView(row, userId, credits, true));
@@ -633,7 +683,9 @@ export async function listHomePartnerRewardSections(
 	}
 
 	return partners.flatMap((partner) => {
-		if (!claimablePartnerships.get(partner.id)) return [];
+		if (!claimablePartnerships.get(partner.id)) {
+			return [];
+		}
 		const rewards = rewardsByPartnership.get(partner.id) ?? [];
 		return [
 			{
@@ -778,12 +830,18 @@ export async function getHomeRewardsWidget(
 	const nameById = new Map(partners.map((partner) => [partner.id, partner.name]));
 
 	const partnerRows: RewardWidgetRow[] = partnerRewardRows.flatMap((row) => {
-		if (!claimable.get(row.partnershipId)) return [];
+		if (!claimable.get(row.partnershipId)) {
+			return [];
+		}
 		// Authorship is independent of control: under shared control you claim
 		// their rewards, never your own.
-		if (row.createdByUserId === userId) return [];
+		if (row.createdByUserId === userId) {
+			return [];
+		}
 		const name = nameById.get(row.partnershipId);
-		if (!name) return [];
+		if (!name) {
+			return [];
+		}
 		return [
 			{
 				id: row.id,
@@ -829,7 +887,9 @@ export async function getPartnershipRewardsWidget(
 	userId: string
 ): Promise<RewardsWidgetView | null> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const [credits, rows] = await Promise.all([
 		readPartnershipCredits(db, partnershipId, userId),

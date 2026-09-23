@@ -47,8 +47,9 @@ describe('createLimiter', () => {
 		const started: number[] = [];
 		await Promise.all(
 			[0, 1, 2, 3].map((n) =>
-				limit(async () => {
+				limit(() => {
 					started.push(n);
+					return Promise.resolve();
 				})
 			)
 		);

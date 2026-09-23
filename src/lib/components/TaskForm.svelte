@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import type { Infer, SuperForm } from 'sveltekit-superforms';
-	import TaskTimeZoneOwnerToggle from '$lib/components/TaskTimeZoneOwnerToggle.svelte';
+	import { assertNever } from '$lib/assert-never';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import TaskTimeZoneOwnerToggle from '$lib/components/TaskTimeZoneOwnerToggle.svelte';
 	import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
-	import { taskEditorFormSchema, type TaskEditorFormSchema } from '$lib/schemas/taskEditorForm';
+	import { type TaskEditorFormSchema, taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
 	import type { TaskWeekday } from '$lib/types';
 
 	type NumericStringField =
@@ -71,20 +72,26 @@
 	});
 
 	function markUserEdited() {
-		if (!mounted) return;
+		if (!mounted) {
+			return;
+		}
 		userEdited = true;
 	}
 
 	function setNumericStringField(field: NumericStringField, event: Event) {
 		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement)) return;
+		if (!(input instanceof HTMLInputElement)) {
+			return;
+		}
 		markUserEdited();
 		$form[field] = input.value;
 	}
 
 	function setStringField(field: StringField, event: Event) {
 		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return;
+		if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
+			return;
+		}
 		markUserEdited();
 		$form[field] = input.value;
 	}
@@ -102,14 +109,18 @@
 
 	function setBooleanField(field: BooleanField, event: Event) {
 		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement)) return;
+		if (!(input instanceof HTMLInputElement)) {
+			return;
+		}
 		markUserEdited();
 		$form[field] = input.checked;
 	}
 
 	function setSelectField(field: SelectField, event: Event) {
 		const select = event.currentTarget;
-		if (!(select instanceof HTMLSelectElement)) return;
+		if (!(select instanceof HTMLSelectElement)) {
+			return;
+		}
 		markUserEdited();
 
 		switch (field) {
@@ -184,12 +195,16 @@
 					$form.scheduledEndKind = select.value;
 				}
 				break;
+			default:
+				assertNever(field, 'task form field');
 		}
 	}
 
 	function toggleScheduledWeekday(weekday: TaskWeekday, event: Event) {
 		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement)) return;
+		if (!(input instanceof HTMLInputElement)) {
+			return;
+		}
 		markUserEdited();
 
 		if (input.checked) {
@@ -203,26 +218,36 @@
 	}
 
 	function firstErrorMessage(value: unknown): string | null {
-		if (typeof value === 'string') return value;
+		if (typeof value === 'string') {
+			return value;
+		}
 
 		if (Array.isArray(value)) {
 			for (const entry of value) {
 				const message = firstErrorMessage(entry);
-				if (message) return message;
+				if (message) {
+					return message;
+				}
 			}
 			return null;
 		}
 
-		if (!value || typeof value !== 'object') return null;
+		if (!value || typeof value !== 'object') {
+			return null;
+		}
 
 		if ('_errors' in value) {
 			const message = firstErrorMessage((value as { _errors?: unknown })._errors);
-			if (message) return message;
+			if (message) {
+				return message;
+			}
 		}
 
 		for (const entry of Object.values(value)) {
 			const message = firstErrorMessage(entry);
-			if (message) return message;
+			if (message) {
+				return message;
+			}
 		}
 
 		return null;

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SSE_KEEPALIVE, SSE_KEEPALIVE_MS, SSE_PREAMBLE, encodeSseEvent } from './index';
+import { defined } from '../../testing/defined';
 import { RealtimeRoom } from './durable-object';
+import { encodeSseEvent, SSE_KEEPALIVE, SSE_KEEPALIVE_MS, SSE_PREAMBLE } from './index';
 
 /**
  * The Durable Object class, exercised directly.
@@ -25,17 +26,23 @@ const decoder = new TextDecoder();
 const ORIGIN = 'https://realtime.invalid';
 
 function room() {
-	return new RealtimeRoom({}, {});
+	return new RealtimeRoom();
 }
 
 async function subscribe(instance: RealtimeRoom) {
 	const response = await instance.fetch(new Request(`${ORIGIN}/subscribe`));
-	expect(response.headers.get('content-type')).toBe('text/event-stream');
-	const reader = response.body!.getReader();
+	const contentType = response.headers.get('content-type');
+	if (contentType !== 'text/event-stream') {
+		throw new Error(`Expected an event stream, got ${contentType}`);
+	}
+	const reader = defined(response.body, 'the stream body').getReader();
 
 	// The preamble proves the stream is live. EventSource does not fire `onopen`
 	// until something arrives, so a client's reconnect backoff depends on it.
-	expect(decoder.decode((await reader.read()).value)).toBe(SSE_PREAMBLE);
+	const preamble = decoder.decode((await reader.read()).value);
+	if (preamble !== SSE_PREAMBLE) {
+		throw new Error(`Expected the preamble first, got ${JSON.stringify(preamble)}`);
+	}
 	return reader;
 }
 

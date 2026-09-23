@@ -1,9 +1,9 @@
 import { relations, sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
-import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { KeyWrapParams, KeyWrapType, PasskeyPrfStatusValue } from '../../../encryption';
 import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
+import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
+import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
 import { passkey, user } from './auth';
 
 /**

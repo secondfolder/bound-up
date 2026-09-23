@@ -185,7 +185,9 @@ export function looksLikeRichTextDocument(stored: string): boolean {
  * gone by the time a caller sees it.
  */
 export function parseRichTextDocument(stored: string): RichTextDocument | null {
-	if (!looksLikeRichTextDocument(stored)) return null;
+	if (!looksLikeRichTextDocument(stored)) {
+		return null;
+	}
 	let raw: unknown;
 	try {
 		raw = JSON.parse(stored);
@@ -224,7 +226,9 @@ export function parseStoredRichText(stored: string): RichTextDocument {
  */
 function hoistBlockEmbeds(doc: RichTextDocument): RichTextDocument {
 	const blocks = doc.root.children;
-	if (!blocks.some((block) => block.type === 'embed')) return doc;
+	if (!blocks.some((block) => block.type === 'embed')) {
+		return doc;
+	}
 
 	const out: RichTextBlockNode[] = [];
 	let waiting: string[] = [];
@@ -239,11 +243,15 @@ function hoistBlockEmbeds(doc: RichTextDocument): RichTextDocument {
 			continue;
 		}
 		// A list, or a paragraph that never came: the embeds stay as blocks.
-		for (const url of waiting) out.push({ type: 'embed', url });
+		for (const url of waiting) {
+			out.push({ type: 'embed', url });
+		}
 		waiting = [];
 		out.push(block);
 	}
-	for (const url of waiting) out.push({ type: 'embed', url });
+	for (const url of waiting) {
+		out.push({ type: 'embed', url });
+	}
 	return { root: { type: 'root', children: out } };
 }
 
@@ -288,10 +296,14 @@ export function embedInsertIndexFor(children: RichTextInlineNode[], url: string)
 			node.url === url &&
 			node.isUnlinked !== true
 	);
-	if (linkIndex === -1) return null;
+	if (linkIndex === -1) {
+		return null;
+	}
 	for (let index = linkIndex - 1; index >= 0; index -= 1) {
 		const type = children[index]?.type;
-		if (type === 'linebreak' || type === 'embed') return index + 1;
+		if (type === 'linebreak' || type === 'embed') {
+			return index + 1;
+		}
 	}
 	return 0;
 }
@@ -311,9 +323,13 @@ export function emptyRichTextDocument(): RichTextDocument {
 export function documentToPlainText(doc: RichTextDocument): string {
 	const lines: string[] = [];
 	for (const block of doc.root.children) {
-		if (block.type === 'paragraph') lines.push(inlineText(block.children));
-		else if (block.type === 'list')
-			for (const item of block.children) lines.push(inlineText(item.children));
+		if (block.type === 'paragraph') {
+			lines.push(inlineText(block.children));
+		} else if (block.type === 'list') {
+			for (const item of block.children) {
+				lines.push(inlineText(item.children));
+			}
+		}
 	}
 	return lines.join('\n').trim();
 }
@@ -321,11 +337,16 @@ export function documentToPlainText(doc: RichTextDocument): string {
 function inlineText(nodes: RichTextInlineNode[]): string {
 	let out = '';
 	for (const node of nodes) {
-		if (node.type === 'text') out += node.text;
-		else if (node.type === 'linebreak') out += '\n';
+		if (node.type === 'text') {
+			out += node.text;
+		} else if (node.type === 'linebreak') {
+			out += '\n';
+		}
 		// An embed contributes no prose: its URL is already in the link that
 		// produced it, and a preview reading out a raw URL twice is noise.
-		else if (node.type !== 'embed') out += inlineText(node.children);
+		else if (node.type !== 'embed') {
+			out += inlineText(node.children);
+		}
 	}
 	return out;
 }
@@ -343,14 +364,23 @@ export function documentEmbedUrls(doc: RichTextDocument): string[] {
 	const seen = new Set<string>();
 	const walk = (nodes: RichTextInlineNode[]) => {
 		for (const node of nodes) {
-			if (node.type === 'embed') seen.add(node.url);
-			else if (node.type === 'link' || node.type === 'autolink') walk(node.children);
+			if (node.type === 'embed') {
+				seen.add(node.url);
+			} else if (node.type === 'link' || node.type === 'autolink') {
+				walk(node.children);
+			}
 		}
 	};
 	for (const block of doc.root.children) {
-		if (block.type === 'embed') seen.add(block.url);
-		else if (block.type === 'paragraph') walk(block.children);
-		else for (const item of block.children) walk(item.children);
+		if (block.type === 'embed') {
+			seen.add(block.url);
+		} else if (block.type === 'paragraph') {
+			walk(block.children);
+		} else {
+			for (const item of block.children) {
+				walk(item.children);
+			}
+		}
 	}
 	return [...seen];
 }
@@ -368,8 +398,12 @@ export function inlineLinkUrls(nodes: RichTextInlineNode[]): string[] {
 	const urls: string[] = [];
 	const walk = (children: RichTextInlineNode[]) => {
 		for (const node of children) {
-			if (node.type === 'text' || node.type === 'linebreak' || node.type === 'embed') continue;
-			if (node.isUnlinked !== true && !urls.includes(node.url)) urls.push(node.url);
+			if (node.type === 'text' || node.type === 'linebreak' || node.type === 'embed') {
+				continue;
+			}
+			if (node.isUnlinked !== true && !urls.includes(node.url)) {
+				urls.push(node.url);
+			}
 			walk(node.children);
 		}
 	};

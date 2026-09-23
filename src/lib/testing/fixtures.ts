@@ -1,35 +1,34 @@
 import { and, eq } from 'drizzle-orm';
+import { generateAgeIdentity } from '../crypto/identity';
+import type { ThreadIcon } from '../messaging';
+import type { ControlAnswer } from '../partnership';
+import { controlFromAnswer } from '../partnership';
+import type { RewardInput } from '../rewards';
 import type { Db } from '../server/db';
 import {
 	messageAttachments,
-	messageThreads,
 	messages,
-	partnershipTaskCompletions,
-	partnershipTasks,
+	messageThreads,
 	partnershipRewardClaims,
 	partnershipRewardCredits,
 	partnershipRewards,
 	partnerships,
-	selfTaskCompletions,
-	selfTasks,
+	partnershipTaskCompletions,
+	partnershipTasks,
 	selfRewardClaims,
 	selfRewardCredits,
 	selfRewards,
+	selfTaskCompletions,
+	selfTasks,
 	threadReads,
 	user,
-	userKeyWraps,
-	userKeys
+	userKeys,
+	userKeyWraps
 } from '../server/db/schema';
-import { acceptInvite, createInvite } from '../server/partnerships';
 import { acknowledgeHistoryWarning, putUserKeys } from '../server/keys';
-import { FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from './crypto';
-import { generateAgeIdentity } from '../crypto/identity';
-import { sendMessage, startThread, type OutgoingAttachment } from '../server/messaging';
 import type { MediaStore } from '../server/media';
-import { createTestMediaStore } from './media';
-import type { ThreadIcon } from '../messaging';
-import type { ControlAnswer } from '../partnership';
-import { controlFromAnswer } from '../partnership';
+import { type OutgoingAttachment, sendMessage, startThread } from '../server/messaging';
+import { acceptInvite, createInvite } from '../server/partnerships';
 import {
 	claimPartnershipReward,
 	claimSelfReward,
@@ -38,10 +37,11 @@ import {
 	setPartnershipRewardCredits,
 	setSelfRewardCredits
 } from '../server/rewards';
-import type { RewardInput } from '../rewards';
 import { createPartnershipTask, createSelfTask } from '../server/tasks';
 import type { TaskInput } from '../tasks';
 import type { TaskSchedule } from '../types';
+import { FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from './crypto';
+import { createTestMediaStore } from './media';
 
 /**
  * Fixtures for the partners tests.
@@ -106,7 +106,7 @@ export async function createTestUser(db: Db, overrides: Partial<TestUser> = {}):
 }
 
 /** A pending invite, as `/settings/partners/new` would create it. */
-export async function createTestInvite(
+export function createTestInvite(
 	db: Db,
 	inviter: TestUser,
 	options: {
@@ -142,7 +142,9 @@ export async function createTestPartnership(
 ): Promise<{ id: string }> {
 	const invite = await createTestInvite(db, inviter, options);
 	const result = await acceptInvite(db, { token: invite.inviteToken, inviteeId: invitee.id });
-	if (!result.ok) throw new Error(`fixture could not accept invite: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not accept invite: ${result.reason}`);
+	}
 	return { id: result.id };
 }
 
@@ -182,7 +184,9 @@ export async function createTestUserKeys(
 		recipient,
 		wrap: { type: 'password', params: PASSWORD_WRAP_PARAMS, blob: FAKE_WRAP_BLOB }
 	});
-	if (options.acknowledged) await acknowledgeHistoryWarning(db, owner.id);
+	if (options.acknowledged) {
+		await acknowledgeHistoryWarning(db, owner.id);
+	}
 	return { identity: generated.identity, recipient };
 }
 
@@ -194,7 +198,7 @@ export async function readUserKeysRow(db: Db, userId: string) {
 
 /** Every wrap row for a user, for counting after a password change. */
 export async function readWrapRows(db: Db, userId: string) {
-	return db.select().from(userKeyWraps).where(eq(userKeyWraps.userId, userId));
+	return await db.select().from(userKeyWraps).where(eq(userKeyWraps.userId, userId));
 }
 
 export async function createTestSelfReward(
@@ -225,7 +229,9 @@ export async function claimTestSelfReward(
 	rewardId: string
 ): Promise<void> {
 	const result = await claimSelfReward(db, owner.id, rewardId);
-	if (!result.ok) throw new Error(`fixture could not claim self reward: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not claim self reward: ${result.reason}`);
+	}
 }
 
 export async function readSelfRewardRow(db: Db, id: string) {
@@ -243,7 +249,7 @@ export async function readSelfRewardCreditRow(db: Db, ownerId: string) {
 }
 
 export async function readSelfRewardClaimRows(db: Db, ownerId: string) {
-	return db
+	return await db
 		.select()
 		.from(selfRewardClaims)
 		.where(eq(selfRewardClaims.ownerId, ownerId))
@@ -262,7 +268,9 @@ export async function createTestPartnershipReward(
 		cost: input.cost ?? 2,
 		active: input.active ?? true
 	});
-	if (!result.ok) throw new Error(`fixture could not create partnership reward: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not create partnership reward: ${result.reason}`);
+	}
 	return { id: result.id };
 }
 
@@ -274,7 +282,9 @@ export async function setTestPartnershipRewardCredits(
 	credits: number
 ): Promise<void> {
 	const result = await setPartnershipRewardCredits(db, partnershipId, actor.id, target.id, credits);
-	if (!result.ok) throw new Error(`fixture could not set partnership credits: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not set partnership credits: ${result.reason}`);
+	}
 }
 
 export async function claimTestPartnershipReward(
@@ -284,7 +294,9 @@ export async function claimTestPartnershipReward(
 	rewardId: string
 ): Promise<void> {
 	const result = await claimPartnershipReward(db, { partnershipId, rewardId, userId: viewer.id });
-	if (!result.ok) throw new Error(`fixture could not claim partnership reward: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not claim partnership reward: ${result.reason}`);
+	}
 }
 
 export async function readPartnershipRewardRow(db: Db, id: string) {
@@ -297,7 +309,7 @@ export async function readPartnershipRewardRow(db: Db, id: string) {
 }
 
 export async function readPartnershipRewardRows(db: Db, partnershipId: string) {
-	return db
+	return await db
 		.select()
 		.from(partnershipRewards)
 		.where(eq(partnershipRewards.partnershipId, partnershipId))
@@ -323,7 +335,7 @@ export async function readPartnershipRewardCreditRow(
 }
 
 export async function readPartnershipRewardClaimRows(db: Db, partnershipId: string) {
-	return db
+	return await db
 		.select()
 		.from(partnershipRewardClaims)
 		.where(eq(partnershipRewardClaims.partnershipId, partnershipId))
@@ -366,7 +378,9 @@ export async function createTestPartnershipTask(
 		schedule: input.schedule ?? defaultTaskSchedule(),
 		timezoneOwnerUserId: input.timezoneOwnerUserId ?? viewer.id
 	});
-	if (!result.ok) throw new Error(`fixture could not create partnership task: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not create partnership task: ${result.reason}`);
+	}
 	return { id: result.id };
 }
 
@@ -376,7 +390,7 @@ export async function readSelfTaskRow(db: Db, id: string) {
 }
 
 export async function readSelfTaskCompletionRows(db: Db, ownerId: string) {
-	return db
+	return await db
 		.select()
 		.from(selfTaskCompletions)
 		.where(eq(selfTaskCompletions.ownerId, ownerId))
@@ -389,7 +403,7 @@ export async function readPartnershipTaskRow(db: Db, id: string) {
 }
 
 export async function readPartnershipTaskRows(db: Db, partnershipId: string) {
-	return db
+	return await db
 		.select()
 		.from(partnershipTasks)
 		.where(eq(partnershipTasks.partnershipId, partnershipId))
@@ -397,7 +411,7 @@ export async function readPartnershipTaskRows(db: Db, partnershipId: string) {
 }
 
 export async function readPartnershipTaskCompletionRows(db: Db, partnershipId: string) {
-	return db
+	return await db
 		.select()
 		.from(partnershipTaskCompletions)
 		.where(eq(partnershipTaskCompletions.partnershipId, partnershipId))
@@ -436,7 +450,9 @@ export async function createTestThread(
 		},
 		options.at ?? nextFixtureTime()
 	);
-	if (!result.ok) throw new Error(`fixture could not start a thread: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not start a thread: ${result.reason}`);
+	}
 	return { threadId: result.threadId, messageId: result.messageId };
 }
 
@@ -467,7 +483,9 @@ export async function createTestMessage(
 		},
 		options.at ?? nextFixtureTime()
 	);
-	if (!result.ok) throw new Error(`fixture could not send a message: ${result.reason}`);
+	if (!result.ok) {
+		throw new Error(`fixture could not send a message: ${result.reason}`);
+	}
 	return { messageId: result.messageId };
 }
 
@@ -483,17 +501,20 @@ export async function readThreadRow(db: Db, threadId: string) {
 
 /** Every read-state row for a thread, for counting who has opened it. */
 export async function readThreadReadRows(db: Db, threadId: string) {
-	return db.select().from(threadReads).where(eq(threadReads.threadId, threadId));
+	return await db.select().from(threadReads).where(eq(threadReads.threadId, threadId));
 }
 
 /** All attachment rows for a message. */
 export async function readAttachmentRows(db: Db, messageId: string) {
-	return db.select().from(messageAttachments).where(eq(messageAttachments.messageId, messageId));
+	return await db
+		.select()
+		.from(messageAttachments)
+		.where(eq(messageAttachments.messageId, messageId));
 }
 
 /** Every message row in a thread, oldest first. */
 export async function readMessageRows(db: Db, threadId: string) {
-	return db
+	return await db
 		.select()
 		.from(messages)
 		.where(eq(messages.threadId, threadId))

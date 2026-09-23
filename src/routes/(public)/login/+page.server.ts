@@ -2,8 +2,8 @@ import { redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
 import { fail, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { loginFormSchema } from '$lib/schemas/loginForm';
 import { redirectTargetOrHome, safeRedirect } from '$lib/safe-redirect';
+import { loginFormSchema } from '$lib/schemas/loginForm';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -11,7 +11,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// in as well as on the way out, so a hostile value never even reaches the
 	// page as a link.
 	const redirectTo = safeRedirect(url.searchParams.get('redirectTo'));
-	if (locals.user) redirect(303, redirectTo ?? '/home');
+	if (locals.user) {
+		redirect(303, redirectTo ?? '/home');
+	}
 	return { loginForm: await superValidate(zod4(loginFormSchema)), redirectTo };
 };
 

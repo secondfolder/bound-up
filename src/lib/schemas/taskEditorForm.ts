@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+const WHOLE_NUMBER = /^\d+$/;
+const LINE_BREAK = /\r?\n/;
+
 const localDateTimeSchema = z
 	.string()
 	.trim()
@@ -48,18 +51,18 @@ export const taskEditorFormSchema = z
 			ctx.addIssue({ code: 'custom', path: ['title'], message: 'Please enter a task title' });
 		}
 
-		if (!/^\d+$/.test(data.creditsAwarded) || Number(data.creditsAwarded) < 0) {
+		if (!WHOLE_NUMBER.test(data.creditsAwarded) || Number(data.creditsAwarded) < 0) {
 			ctx.addIssue({
 				code: 'custom',
 				path: ['creditsAwarded'],
-				message: /^\d+$/.test(data.creditsAwarded)
+				message: WHOLE_NUMBER.test(data.creditsAwarded)
 					? 'Credits cannot be negative'
 					: 'Please enter a whole number'
 			});
 		}
 
 		const completionMessages = data.completionMessagesText
-			.split(/\r?\n/)
+			.split(LINE_BREAK)
 			.map((value) => value.trim())
 			.filter((value) => value.length > 0);
 		if (completionMessages.length > 20) {
@@ -71,14 +74,17 @@ export const taskEditorFormSchema = z
 		}
 
 		if (data.scheduleMode === 'rolling-window' && data.rollingLimitEnabled) {
-			if (!/^\d+$/.test(data.rollingLimitCompletions) || Number(data.rollingLimitCompletions) < 1) {
+			if (
+				!WHOLE_NUMBER.test(data.rollingLimitCompletions) ||
+				Number(data.rollingLimitCompletions) < 1
+			) {
 				ctx.addIssue({
 					code: 'custom',
 					path: ['rollingLimitCompletions'],
 					message: 'Please enter at least 1'
 				});
 			}
-			if (!/^\d+$/.test(data.rollingLimitEvery) || Number(data.rollingLimitEvery) < 1) {
+			if (!WHOLE_NUMBER.test(data.rollingLimitEvery) || Number(data.rollingLimitEvery) < 1) {
 				ctx.addIssue({
 					code: 'custom',
 					path: ['rollingLimitEvery'],
@@ -87,14 +93,15 @@ export const taskEditorFormSchema = z
 			}
 		}
 
-		if (data.scheduleMode === 'after-completion') {
-			if (!/^\d+$/.test(data.afterEvery) || Number(data.afterEvery) < 1) {
-				ctx.addIssue({
-					code: 'custom',
-					path: ['afterEvery'],
-					message: 'Please enter at least 1'
-				});
-			}
+		if (
+			data.scheduleMode === 'after-completion' &&
+			(!WHOLE_NUMBER.test(data.afterEvery) || Number(data.afterEvery) < 1)
+		) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['afterEvery'],
+				message: 'Please enter at least 1'
+			});
 		}
 
 		if (data.scheduleMode === 'scheduled') {
@@ -105,7 +112,7 @@ export const taskEditorFormSchema = z
 					message: 'Please choose a valid date and time'
 				});
 			}
-			if (!/^\d+$/.test(data.scheduledInterval) || Number(data.scheduledInterval) < 1) {
+			if (!WHOLE_NUMBER.test(data.scheduledInterval) || Number(data.scheduledInterval) < 1) {
 				ctx.addIssue({
 					code: 'custom',
 					path: ['scheduledInterval'],
@@ -122,7 +129,7 @@ export const taskEditorFormSchema = z
 			if (
 				data.scheduledFrequency === 'month' &&
 				data.scheduledMonthlyPatternKind === 'day-of-month' &&
-				(!/^\d+$/.test(data.scheduledDayOfMonth) ||
+				(!WHOLE_NUMBER.test(data.scheduledDayOfMonth) ||
 					Number(data.scheduledDayOfMonth) < 1 ||
 					Number(data.scheduledDayOfMonth) > 31)
 			) {
@@ -144,7 +151,7 @@ export const taskEditorFormSchema = z
 			}
 			if (
 				data.scheduledEndKind === 'count' &&
-				(!/^\d+$/.test(data.scheduledCount) || Number(data.scheduledCount) < 1)
+				(!WHOLE_NUMBER.test(data.scheduledCount) || Number(data.scheduledCount) < 1)
 			) {
 				ctx.addIssue({
 					code: 'custom',

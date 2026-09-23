@@ -7,15 +7,21 @@ import { taskEditorFormValuesForCreate, taskInputFromEditorForm } from '$lib/tas
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 	const page = await getPartnershipTasksPage(
 		locals.db,
 		params.id,
 		locals.user.id,
 		locals.user.timezone
 	);
-	if (!page) error(404, 'Partner not found');
-	if (!page.partner.canManageTasks) error(403, 'Only the controlling side can add tasks here.');
+	if (!page) {
+		error(404, 'Partner not found');
+	}
+	if (!page.partner.canManageTasks) {
+		error(403, 'Only the controlling side can add tasks here.');
+	}
 	return {
 		...page,
 		taskForm: await superValidate(
@@ -28,18 +34,26 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 export const actions: Actions = {
 	default: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const page = await getPartnershipTasksPage(
 			locals.db,
 			params.id,
 			locals.user.id,
 			locals.user.timezone
 		);
-		if (!page) error(404, 'Partner not found');
-		if (!page.partner.canManageTasks) error(403, 'Only the controlling side can add tasks here.');
+		if (!page) {
+			error(404, 'Partner not found');
+		}
+		if (!page.partner.canManageTasks) {
+			error(403, 'Only the controlling side can add tasks here.');
+		}
 
 		const taskForm = await superValidate(request, zod4(taskEditorFormSchema));
-		if (!taskForm.valid) return fail(400, { taskForm });
+		if (!taskForm.valid) {
+			return fail(400, { taskForm });
+		}
 
 		const result = await createPartnershipTask(
 			locals.db,

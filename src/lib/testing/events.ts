@@ -16,7 +16,11 @@ import type { TestUser } from './fixtures';
  */
 
 export type FakeEventOptions = {
-	db: Db;
+	/**
+	 * Left out by tests whose route never touches the database; reaching for
+	 * `locals.db` then fails loudly, the same way `locals.auth` does.
+	 */
+	db?: Db;
 	user?: TestUser | null;
 	params?: Record<string, string>;
 	/** Path plus query. Resolved against `origin`. */
@@ -42,15 +46,30 @@ export type FakeEventOptions = {
 	 * throws by default. Booting the real thing is not an option: it needs a
 	 * live request context for `sveltekitCookies`.
 	 */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	authApi?: Record<string, (...args: any[]) => unknown>;
+	// `never[]` parameters: every function is assignable to this, whatever it
+	// takes, which is what a bag of stubs for different endpoints needs.
+	authApi?: Record<string, (...args: never[]) => unknown>;
+	/** `event.fetch`, for a route that calls out through it. Absent otherwise. */
+	fetch?: typeof fetch;
+	/**
+	 * What `parent()` resolves to. Without it `parent` is absent, so a load that
+	 * reads its layout's data fails until the test says what that data is.
+	 */
+	parentData?: Record<string, unknown>;
 };
 
-// The route modules are typed against SvelteKit's `RequestEvent`, which carries
-// far more than any of them reads. Returning `any` keeps the cast in one place
-// instead of repeating it at every call site.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function fakeEvent(options: FakeEventOptions): any {
+/**
+ * The route modules are typed against SvelteKit's `RequestEvent`, which carries
+ * far more than any of them reads, so the fake is cast once here rather than at
+ * every call site.
+ *
+ * `Event` is inferred from where the result is passed — `load(fakeEvent(…))`
+ * gets exactly that load's event type. Where nothing says (a helper that
+ * builds one for later), it falls back to `never`: that is assignable to any
+ * route's event, like `any` would be, but cannot be read from, since a test
+ * poking at the fake is testing the fake rather than the route.
+ */
+export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 	const origin = options.origin ?? 'https://app.test';
 	const url = new URL(options.path ?? '/', origin);
 
@@ -63,17 +82,29 @@ export function fakeEvent(options: FakeEventOptions): any {
 		});
 	} else if (options.formData) {
 		const body = new FormData();
-		for (const [key, value] of Object.entries(options.formData)) body.append(key, value);
+		for (const [key, value] of Object.entries(options.formData)) {
+			body.append(key, value);
+		}
 		request = new Request(url, { method: 'POST', body });
 	} else {
 		request = new Request(url);
 	}
 
 	const locals: Record<string, unknown> = {
-		db: options.db,
 		user: options.user ?? null,
 		session: null
 	};
+	if (options.db) {
+		locals.db = options.db;
+	} else {
+		Object.defineProperty(locals, 'db', {
+			enumerable: true,
+			configurable: true,
+			get(): never {
+				throw new Error('fakeEvent was given no db — pass `db` for a route that queries');
+			}
+		});
+	}
 
 	if (options.authApi) {
 		locals.auth = { api: options.authApi };
@@ -93,7 +124,7 @@ export function fakeEvent(options: FakeEventOptions): any {
 		});
 	}
 
-	return {
+	const event = {
 		url,
 		params: options.params ?? {},
 		request,
@@ -102,11 +133,32 @@ export function fakeEvent(options: FakeEventOptions): any {
 		// invalidation key with the router, which has no meaning outside a real
 		// navigation — but a load that calls it would otherwise crash here, and
 		// failing a route test over cache plumbing teaches nobody anything.
-		depends: () => {}
-		// `parent()` IS left off deliberately: a load that reads parent data is
-		// reading something the test has to decide, so it should fail loudly
-		// until the test says what the parent returned.
+		...(options.fetch ? { fetch: options.fetch } : {}),
+		...(options.parentData ? { parent: () => Promise.resolve(options.parentData) } : {}),
+		depends: () => undefined
 	};
+	return event as unknown as Event;
+}
+
+/**
+ * Runs one of a route's form actions by name, the action counterpart of
+ * `runLoad`.
+ *
+ * SvelteKit types a route's `actions` as a record of actions that may return
+ * nothing, so every result would need narrowing before a test could read it.
+ * An action under test always returns something — the test is about what — so
+ * the `void` is dropped here once instead of cast away in every file.
+ */
+export async function runAction<
+	Actions extends Record<string, (event: never) => unknown>,
+	Name extends keyof Actions & string
+>(
+	actions: Actions,
+	name: Name,
+	event: Parameters<Actions[Name]>[0]
+): Promise<Exclude<Awaited<ReturnType<Actions[Name]>>, void>> {
+	const action = actions[name] as (event: Parameters<Actions[Name]>[0]) => unknown;
+	return (await action(event)) as Exclude<Awaited<ReturnType<Actions[Name]>>, void>;
 }
 
 /**
@@ -117,10 +169,12 @@ export function fakeEvent(options: FakeEventOptions): any {
  * TypeScript cannot know that at the call site, and without this every property
  * access in a test is an error.
  */
-export async function runLoad<T>(result: T | void | Promise<T | void>): Promise<T> {
+export async function runLoad<Data>(result: Data | Promise<Data>): Promise<Exclude<Data, void>> {
 	const data = await result;
-	if (data === undefined) throw new Error('load returned nothing');
-	return data;
+	if (data === undefined) {
+		throw new Error('load returned nothing');
+	}
+	return data as Exclude<Data, void>;
 }
 
 /**
@@ -137,7 +191,11 @@ export async function runAndCatch<T>(
 	try {
 		return { type: 'ok', value: await fn() };
 	} catch (thrown) {
-		const candidate = thrown as { status?: number; location?: string; body?: { message?: string } };
+		// Anything can be thrown, `null` included — hence the optional chaining.
+		const candidate = thrown as
+			| { status?: number; location?: string; body?: { message?: string } }
+			| null
+			| undefined;
 		if (typeof candidate?.status === 'number' && typeof candidate.location === 'string') {
 			return { type: 'redirect', status: candidate.status, location: candidate.location };
 		}

@@ -1,6 +1,6 @@
 <script lang="ts">
+	import { type CachedEmbedDetails, embedSpecFor, fetchEmbedDetails } from '$lib/embeds';
 	import UrlEmbed from './UrlEmbed.svelte';
-	import { embedSpecFor, fetchEmbedDetails, type CachedEmbedDetails } from '$lib/embeds';
 
 	/**
 	 * What an `EmbedNode` looks like inside the editor.
@@ -37,7 +37,9 @@
 		void fetchEmbedDetails(wanted).then((resolved) => {
 			// Guarded because the prop can change under a slow lookup, and the
 			// answer to the old question must not be drawn as the new one.
-			if (wanted !== url) return;
+			if (wanted !== url) {
+				return;
+			}
 			details = resolved;
 			resolving = false;
 		});

@@ -14,7 +14,9 @@ import type { RequestHandler } from './$types';
  * acknowledgement itself is per user.
  */
 export const POST: RequestHandler = async ({ locals }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 	await acknowledgeHistoryWarning(locals.db, locals.user.id);
 	return json({ ok: true });
 };

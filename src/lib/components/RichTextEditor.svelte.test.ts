@@ -1,20 +1,23 @@
 import { fireEvent, render } from '@testing-library/svelte';
-import { tick } from 'svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	$createNodeSelection as createNodeSelection,
 	$createTextNode as createTextNode,
+	getNearestEditorFromDOMNode,
+	// biome-ignore lint/suspicious/noDeprecatedImports: only the overload that takes a type argument is deprecated, and this calls the plain one.
 	$getNodeByKey as getNodeByKey,
 	$getRoot as getRoot,
 	$isElementNode as isElementNode,
-	$setSelection as setSelection,
-	type LexicalEditor
+	type LexicalEditor,
+	$setSelection as setSelection
 } from 'lexical';
-import RichTextEditorHarness from './RichTextEditorHarness.svelte';
-import { clearOembedCache, type CachedEmbedDetails } from '$lib/embeds';
-import { $isEmbedNode as isEmbedNode } from '$lib/richtext-editor';
+import { tick } from 'svelte';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { type CachedEmbedDetails, clearOembedCache } from '$lib/embeds';
 import { FORMAT_BOLD, FORMAT_ITALIC, FORMAT_STRIKETHROUGH } from '$lib/richtext';
+import { $isEmbedNode as isEmbedNode } from '$lib/richtext-editor';
+import { defined } from '$lib/testing/defined';
 import { waProp } from '$lib/testing/web-awesome';
+import RichTextEditorHarness from './RichTextEditorHarness.svelte';
 
 /**
  * Keystroke-by-keystroke typing, with a real caret, lives in the Playwright
@@ -35,9 +38,10 @@ import { waProp } from '$lib/testing/web-awesome';
  * component emit, and the bug under test only appears once it has.
  */
 function editorOf(container: HTMLElement): LexicalEditor {
-	const surface = container.querySelector('.surface');
-	const editor = (surface as unknown as { __lexicalEditor?: LexicalEditor })?.__lexicalEditor;
-	if (!editor) throw new Error('no Lexical editor mounted on .surface');
+	const editor = getNearestEditorFromDOMNode(container.querySelector('.surface'));
+	if (!editor) {
+		throw new Error('no Lexical editor mounted on .surface');
+	}
 	return editor;
 }
 
@@ -286,7 +290,9 @@ function stubEmbedMetadata(url: string, over: Partial<CachedEmbedDetails> = {}) 
 function removeButton(container: HTMLElement): Promise<HTMLElement> {
 	return vi.waitFor(() => {
 		const button = container.querySelector('.composer-embed .remove');
-		if (!(button instanceof HTMLElement)) throw new Error('no remove button on the embed');
+		if (!(button instanceof HTMLElement)) {
+			throw new Error('no remove button on the embed');
+		}
 		return button;
 	});
 }
@@ -338,7 +344,9 @@ describe('RichTextEditor, embeds', () => {
 
 		const embed = await vi.waitFor(() => {
 			const found = container.querySelector('.composer-embed .url-embed');
-			if (!found) throw new Error('expected the embed to be mounted');
+			if (!found) {
+				throw new Error('expected the embed to be mounted');
+			}
 			return found;
 		});
 		await vi.waitFor(() => expect(answer).toBeDefined());
@@ -424,7 +432,9 @@ describe('RichTextEditor, embeds', () => {
 				const node = isElementNode(paragraph)
 					? paragraph.getChildren().find(isEmbedNode)
 					: undefined;
-				if (!node) throw new Error('expected an embed node');
+				if (!node) {
+					throw new Error('expected an embed node');
+				}
 				return node.getKey();
 			});
 		const key = embedNode();
@@ -486,7 +496,9 @@ describe('RichTextEditor, embeds', () => {
 		editor.update(
 			() => {
 				const block = getRoot().getFirstChild();
-				if (!isElementNode(block)) throw new Error('expected a paragraph');
+				if (!isElementNode(block)) {
+					throw new Error('expected a paragraph');
+				}
 				// From the start of the text above it to the end of the link below.
 				block.select(0, block.getChildrenSize());
 			},
@@ -507,7 +519,9 @@ describe('RichTextEditor, embeds', () => {
 		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
 		await tick();
 		const card = container.querySelector('.composer-embed');
-		if (!card) throw new Error('expected a composer embed');
+		if (!card) {
+			throw new Error('expected a composer embed');
+		}
 
 		await fireEvent.pointerDown(card, { clientX: 4, clientY: 4 });
 		await tick();
@@ -527,12 +541,16 @@ describe('RichTextEditor, embeds', () => {
 		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_PLAYER } });
 		await tick();
 		const card = container.querySelector('.composer-embed');
-		if (!card) throw new Error('expected a composer embed');
+		if (!card) {
+			throw new Error('expected a composer embed');
+		}
 		// The player appears once the details lookup has settled,
 		// which it does by failing: there is no server here.
 		const frame = await vi.waitFor(() => {
 			const found = container.querySelector('.composer-embed iframe');
-			if (!found) throw new Error('expected a player in the composer');
+			if (!found) {
+				throw new Error('expected a player in the composer');
+			}
 			return found;
 		});
 
@@ -659,7 +677,7 @@ describe('RichTextEditor, embeds', () => {
 	 * hover is plain CSS, covered by the e2e suite.
 	 */
 	const linkWrapper = (container: HTMLElement) =>
-		container.querySelector('.surface .link-with-embed-offer')!;
+		defined(container.querySelector('.surface .link-with-embed-offer'), 'the link wrapper');
 
 	it('offers a way back: the link carries a button that re-embeds it', async () => {
 		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
@@ -672,7 +690,12 @@ describe('RichTextEditor, embeds', () => {
 		await tick();
 		expect(linkWrapper(container)).toHaveClass('embed-available');
 
-		await fireEvent.click(linkWrapper(container).querySelector('wa-button.embed-again')!);
+		await fireEvent.click(
+			defined(
+				linkWrapper(container).querySelector('wa-button.embed-again'),
+				'the embed-again button'
+			)
+		);
 		await tick();
 
 		expect(embedChips(container)).toHaveLength(1);

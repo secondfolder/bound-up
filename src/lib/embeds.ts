@@ -74,6 +74,15 @@ const NOEMBED_HOSTS = new Set([
 ]);
 
 const IMAGE_EXTENSION = /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i;
+const HTTP_SCHEME = /^https?:\/\//i;
+const REDGIFS_PATH = /^\/(?:watch|ifr)\/(?<id>[a-z0-9-]+)/i;
+const YOUTUBE_HOST = /(?:^|\.)youtube\.com$/i;
+const YOUTUBE_NOCOOKIE_HOST = /(?:^|\.)youtube-nocookie\.com$/i;
+const YOUTUBE_SHORTS_PATH = /^\/shorts\/(?<id>[a-zA-Z0-9_-]+)/;
+const YOUTUBE_ID = /^[a-zA-Z0-9_-]{6,20}$/;
+const REDDIT_HOST = /(?:^|\.)reddit\.com$/i;
+const REDDIT_EMBEDDABLE_PATH = /\/(?:comments|s)\//;
+const LEADING_WWW = /^www\./;
 
 /**
  * `http:`/`https:` only. Everything else — `javascript:`, `data:`, `vbscript:`
@@ -81,7 +90,9 @@ const IMAGE_EXTENSION = /\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)/i;
  * src. Message text is partner-controlled input; this is the gate.
  */
 export function isSafeHttpUrl(href: string): boolean {
-	if (!/^https?:\/\//i.test(href)) return false;
+	if (!HTTP_SCHEME.test(href)) {
+		return false;
+	}
 	try {
 		const url = new URL(href);
 		return url.protocol === 'http:' || url.protocol === 'https:';
@@ -92,13 +103,16 @@ export function isSafeHttpUrl(href: string): boolean {
 
 /** `redgifs.com/watch/<id>` (and `/ifr/<id>`) → the documented player iframe. */
 function redgifsSpec(url: URL): EmbedSpec | null {
-	const match = url.pathname.match(/^\/(?:watch|ifr)\/([a-z0-9-]+)/i);
-	if (!match) return null;
+	const match: RegExpExecArray | null = REDGIFS_PATH.exec(url.pathname);
+	if (!match) {
+		return null;
+	}
+	const [, id] = match;
 	// Redgifs' own embed path. No API call, no key — this is the player they
 	// hand out for exactly this purpose.
 	return {
 		kind: 'iframe',
-		src: `https://www.redgifs.com/ifr/${match[1]}`,
+		src: `https://www.redgifs.com/ifr/${id}`,
 		title: 'Redgifs video'
 	};
 }
@@ -107,16 +121,20 @@ function youtubeSpec(url: URL): EmbedSpec | null {
 	let id: string | null = null;
 	if (url.hostname === 'youtu.be') {
 		id = url.pathname.slice(1).split('/')[0] || null;
-	} else if (/(?:^|\.)youtube\.com$/i.test(url.hostname)) {
+	} else if (YOUTUBE_HOST.test(url.hostname)) {
 		const v = url.searchParams.get('v');
 		if (v) {
 			id = v;
 		} else {
-			const shorts = url.pathname.match(/^\/shorts\/([a-zA-Z0-9_-]+)/);
-			if (shorts) id = shorts[1];
+			const shorts: RegExpExecArray | null = YOUTUBE_SHORTS_PATH.exec(url.pathname);
+			if (shorts) {
+				[, id] = shorts;
+			}
 		}
 	}
-	if (!id || !/^[a-zA-Z0-9_-]{6,20}$/.test(id)) return null;
+	if (!(id && YOUTUBE_ID.test(id))) {
+		return null;
+	}
 	// -nocookie keeps the player off the tracking domain; it is the same player.
 	return {
 		kind: 'iframe',
@@ -137,8 +155,12 @@ function youtubeSpec(url: URL): EmbedSpec | null {
  * reaches, not for every reddit link in the thread's history.
  */
 function redditSpec(url: URL): EmbedSpec | null {
-	if (!/(?:^|\.)reddit\.com$/i.test(url.hostname)) return null;
-	if (!/\/(?:comments|s)\//.test(url.pathname)) return null;
+	if (!REDDIT_HOST.test(url.hostname)) {
+		return null;
+	}
+	if (!REDDIT_EMBEDDABLE_PATH.test(url.pathname)) {
+		return null;
+	}
 	return { kind: 'server-oembed', url: url.href };
 }
 
@@ -147,7 +169,9 @@ function redditSpec(url: URL): EmbedSpec | null {
  * The scheme check runs first — see isSafeHttpUrl.
  */
 export function embedSpecFor(href: string): EmbedSpec | null {
-	if (!isSafeHttpUrl(href)) return null;
+	if (!isSafeHttpUrl(href)) {
+		return null;
+	}
 	let url: URL;
 	try {
 		url = new URL(href);
@@ -158,21 +182,23 @@ export function embedSpecFor(href: string): EmbedSpec | null {
 
 	if (host === 'redgifs.com' || host === 'www.redgifs.com') {
 		const spec = redgifsSpec(url);
-		if (spec) return spec;
+		if (spec) {
+			return spec;
+		}
 		return null;
 	}
-	if (
-		host === 'youtu.be' ||
-		/(^|\.)youtube\.com$/.test(host) ||
-		/(^|\.)youtube-nocookie\.com$/.test(host)
-	) {
+	if (host === 'youtu.be' || YOUTUBE_HOST.test(host) || YOUTUBE_NOCOOKIE_HOST.test(host)) {
 		const spec = youtubeSpec(url);
-		if (spec) return spec;
+		if (spec) {
+			return spec;
+		}
 		return null;
 	}
-	if (/(^|\.)reddit\.com$/.test(host)) {
+	if (REDDIT_HOST.test(host)) {
 		const spec = redditSpec(url);
-		if (spec) return spec;
+		if (spec) {
+			return spec;
+		}
 		return null;
 	}
 	// Direct image links embed natively — most often Imgur/i.imgur, but any
@@ -196,7 +222,10 @@ export function embedSpecFor(href: string): EmbedSpec | null {
  * function so the set of URLs that gets cached cannot drift from the set the
  * UI later tries to render.
  */
-export function findRenderableLinks(text: string, maxEmbeds = Infinity): ResolvedLinkMatch[] {
+export function findRenderableLinks(
+	text: string,
+	maxEmbeds = Number.POSITIVE_INFINITY
+): ResolvedLinkMatch[] {
 	const found = findLinks(text).filter(
 		(match) => match.type === 'url' && isSafeHttpUrl(match.href)
 	);
@@ -205,7 +234,9 @@ export function findRenderableLinks(text: string, maxEmbeds = Infinity): Resolve
 	let embedsUsed = 0;
 	for (const match of found) {
 		const embed = embedsUsed < maxEmbeds ? embedSpecFor(match.href) : null;
-		if (embed) embedsUsed += 1;
+		if (embed) {
+			embedsUsed += 1;
+		}
 		result.push({
 			value: match.value,
 			href: match.href,
@@ -217,7 +248,7 @@ export function findRenderableLinks(text: string, maxEmbeds = Infinity): Resolve
 	return result;
 }
 
-export interface OembedResult {
+export type OembedResult = {
 	title: string | null;
 	providerName: string | null;
 	description: string | null;
@@ -242,7 +273,7 @@ export interface OembedResult {
 	 * posts, so the outbound link is the only way to show the actual media.
 	 */
 	outbound: string | null;
-}
+};
 
 /**
  * Module-level cache: messages re-render on every invalidate() and the board
@@ -302,7 +333,9 @@ export function cachedOembed(endpoint: string): OembedResult | 'error' | undefin
 
 export async function fetchOembed(endpoint: string): Promise<OembedResult | 'error'> {
 	const cached = oembedCache.get(endpoint);
-	if (cached) return cached;
+	if (cached) {
+		return cached;
+	}
 	try {
 		// The body is read inside the queued task so a slot is held until the
 		// response is fully in, not only until its headers are.
@@ -312,7 +345,9 @@ export async function fetchOembed(endpoint: string): Promise<OembedResult | 'err
 					headers: { accept: 'application/json' },
 					signal
 				});
-				if (!response.ok) throw new Error(`oembed ${response.status}`);
+				if (!response.ok) {
+					throw new Error(`oembed ${response.status}`);
+				}
 				return response.json();
 			})
 		);
@@ -362,10 +397,7 @@ export async function fetchOembed(endpoint: string): Promise<OembedResult | 'err
  */
 export class EmbedLookupError extends Error {}
 
-async function requestEmbedMetadata(
-	urls: string[],
-	queued: boolean
-): Promise<CachedEmbedDetails[]> {
+function requestEmbedMetadata(urls: string[], queued: boolean): Promise<CachedEmbedDetails[]> {
 	const request = async (signal?: AbortSignal) => {
 		let response: Response;
 		try {
@@ -379,7 +411,8 @@ async function requestEmbedMetadata(
 			throw new EmbedLookupError(
 				error instanceof DOMException && error.name === 'TimeoutError'
 					? 'Timed out loading this preview'
-					: "Couldn't reach the server to load this preview"
+					: "Couldn't reach the server to load this preview",
+				{ cause: error }
 			);
 		}
 		if (!response.ok) {
@@ -397,7 +430,7 @@ async function requestEmbedMetadata(
 		const result = (await response.json().catch(() => null)) as {
 			embeds?: CachedEmbedDetails[];
 		} | null;
-		if (!result || !Array.isArray(result.embeds)) {
+		if (!(result && Array.isArray(result.embeds))) {
 			throw new EmbedLookupError("Couldn't load this preview (unexpected response)");
 		}
 		return result.embeds;
@@ -422,7 +455,9 @@ export async function fetchEmbedMetadata(
 	urls: string[],
 	{ queued = false }: { queued?: boolean } = {}
 ): Promise<CachedEmbedDetails[]> {
-	if (urls.length === 0) return [];
+	if (urls.length === 0) {
+		return [];
+	}
 	try {
 		return await requestEmbedMetadata(urls, queued);
 	} catch {
@@ -434,7 +469,8 @@ export async function fetchEmbedMetadata(
 
 /** One URL's preview, or why there is not one. */
 export type EmbedDetailsResult =
-	{ ok: true; details: CachedEmbedDetails } | { ok: false; error: string };
+	| { ok: true; details: CachedEmbedDetails }
+	| { ok: false; error: string };
 
 /**
  * Details for one URL, remembered for the page.
@@ -450,7 +486,9 @@ const embedDetailsCache = new Map<string, Promise<EmbedDetailsResult>>();
 
 export function fetchEmbedDetailsResult(url: string): Promise<EmbedDetailsResult> {
 	const cached = embedDetailsCache.get(url);
-	if (cached) return cached;
+	if (cached !== undefined) {
+		return cached;
+	}
 	const pending = requestEmbedMetadata([url], true).then(
 		(embeds): EmbedDetailsResult => {
 			const details = embeds.find((embed) => embed.href === url);
@@ -486,7 +524,7 @@ export async function fetchEmbedDetails(url: string): Promise<CachedEmbedDetails
 export function embedErrorDetails(url: string, error: string): CachedEmbedDetails {
 	let host: string | null = null;
 	try {
-		host = new URL(url).hostname.replace(/^www\./, '');
+		host = new URL(url).hostname.replace(LEADING_WWW, '');
 	} catch {
 		// Left null: the title is the part that matters.
 	}

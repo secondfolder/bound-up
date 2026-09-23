@@ -132,7 +132,9 @@ const ANONYMOUS_AAGUID = '00000000-0000-0000-0000-000000000000';
 /** The provider's name, or null when the AAGUID is absent, zeroed or unknown. */
 export function lookupProviderName(aaguid: string | null | undefined): string | null {
 	const normalised = aaguid?.trim().toLowerCase();
-	if (!normalised || normalised === ANONYMOUS_AAGUID) return null;
+	if (!normalised || normalised === ANONYMOUS_AAGUID) {
+		return null;
+	}
 	return AAGUID_NAMES[normalised] ?? null;
 }
 
@@ -158,7 +160,9 @@ const PROVIDER_ALIASES: Readonly<Record<string, string>> = {
  */
 export function providerForAaguid(aaguid: string | null | undefined): PasskeyProvider | null {
 	const name = lookupProviderName(aaguid);
-	if (!name) return null;
+	if (!name) {
+		return null;
+	}
 
 	const rowName = PROVIDER_ALIASES[name] ?? name;
 	return PRF_PROVIDERS.find((provider) => provider.name === rowName) ?? { name, prf: 'partial' };

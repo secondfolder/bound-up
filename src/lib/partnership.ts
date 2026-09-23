@@ -75,8 +75,12 @@ export function roleOf(
 	record: Pick<PartnershipRecord, 'inviterId' | 'inviteeId'>,
 	userId: string
 ): PartnershipRole | null {
-	if (record.inviterId === userId) return 'inviter';
-	if (record.inviteeId === userId) return 'invitee';
+	if (record.inviterId === userId) {
+		return 'inviter';
+	}
+	if (record.inviteeId === userId) {
+		return 'invitee';
+	}
 	return null;
 }
 
@@ -91,7 +95,9 @@ export function canEditPartnership(
 	userId: string
 ): boolean {
 	const role = roleOf(record, userId);
-	if (!role) return false;
+	if (!role) {
+		return false;
+	}
 	return record.control === 'both' || record.control === role;
 }
 
@@ -140,7 +146,9 @@ export function controlFromAnswer(
 	answer: ControlAnswer,
 	answerRole: PartnershipRole
 ): PartnershipControl {
-	if (answer === 'mix') return 'both';
+	if (answer === 'mix') {
+		return 'both';
+	}
 	const otherRole: PartnershipRole = answerRole === 'inviter' ? 'invitee' : 'inviter';
 	return answer === 'me' ? answerRole : otherRole;
 }
@@ -150,7 +158,9 @@ export function answerFromControl(
 	control: PartnershipControl,
 	answerRole: PartnershipRole
 ): ControlAnswer {
-	if (control === 'both') return 'mix';
+	if (control === 'both') {
+		return 'mix';
+	}
 	return control === answerRole ? 'me' : 'them';
 }
 
@@ -165,8 +175,14 @@ export function isInviteUsable(
 	},
 	now: Date = new Date()
 ): boolean {
-	if (record.status !== 'pending') return false;
-	if (!record.inviteToken) return false;
-	if (!record.inviteExpiresAt) return false;
+	if (record.status !== 'pending') {
+		return false;
+	}
+	if (!record.inviteToken) {
+		return false;
+	}
+	if (!record.inviteExpiresAt) {
+		return false;
+	}
 	return record.inviteExpiresAt.getTime() > now.getTime();
 }

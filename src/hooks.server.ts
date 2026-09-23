@@ -1,17 +1,19 @@
+import type { Handle } from '@sveltejs/kit';
+import { getSessionCookie } from 'better-auth/cookies';
+import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building } from '$app/environment';
 import { env as privateEnv } from '$env/dynamic/private';
 import { createAuth } from '$lib/server/auth';
 import { createDb } from '$lib/server/db/dev';
-import type { Handle } from '@sveltejs/kit';
-import { getSessionCookie } from 'better-auth/cookies';
-import { svelteKitHandler } from 'better-auth/svelte-kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	// Bail before touching platform.env. During prerendering adapter-cloudflare
 	// substitutes a platform whose env getters throw. svelteKitHandler also
 	// short-circuits on `building`, but only after we would have dereferenced
 	// the binding.
-	if (building) return resolve(event);
+	if (building) {
+		return resolve(event);
+	}
 
 	const db = await createDb(event);
 

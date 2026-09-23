@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { fetchAttachment } from '$lib/messaging/client';
 	import type { MessageAttachmentInfo } from '$lib/crypto/messages';
+	import { fetchAttachment } from '$lib/messaging/client';
 
 	/**
 	 * One decrypted image or video.
@@ -36,16 +36,20 @@
 					return;
 				}
 				current = result.url;
-				url = result.url;
+				({ url } = result);
 			} catch (error) {
 				console.error('could not open attachment', error);
-				if (!cancelled) failed = true;
+				if (!cancelled) {
+					failed = true;
+				}
 			}
 		})();
 
 		return () => {
 			cancelled = true;
-			if (current) URL.revokeObjectURL(current);
+			if (current) {
+				URL.revokeObjectURL(current);
+			}
 		};
 	});
 </script>
@@ -58,10 +62,11 @@
 		<span>Decrypting {info.fileName}…</span>
 	</div>
 {:else if info.kind === 'video'}
-	<!-- svelte-ignore a11y_media_has_caption 
-      (Since this is a user uploaded video we don't have captions for it although at somepoint in the future we'd like
-      to offer on-device auto-captioning)
-    -->
+	<!-- svelte-ignore a11y_media_has_caption
+	     (Since this is a user uploaded video we don't have captions for it although at somepoint in the future we'd like
+	     to offer on-device auto-captioning)
+	-->
+	<!-- biome-ignore lint/a11y/useMediaCaption: as above — an uploaded video has no caption track to offer. -->
 	<video src={url} controls playsinline preload="metadata"></video>
 {:else}
 	<img src={url} alt={info.fileName} />

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 
 	// Server data is the source of truth — no context store, no client authStore.
 	const user = $derived(page.data.user);

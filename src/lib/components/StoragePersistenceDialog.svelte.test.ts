@@ -1,13 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { waSettled } from '$lib/testing/web-awesome';
 import {
 	offerStorageExplanation,
 	resetStorageExplanation,
 	STORAGE_PERSISTENCE_ASKED_KEY
 } from '$lib/crypto/storage-persistence.svelte';
+import { defined } from '$lib/testing/defined';
+import { waSettled } from '$lib/testing/web-awesome';
 import StoragePersistenceDialog from './StoragePersistenceDialog.svelte';
 
 const TITLE = 'Keep your messages unlocked here';
@@ -35,12 +36,12 @@ async function renderDue() {
 }
 
 describe('StoragePersistenceDialog', () => {
-	test('says nothing until an unlock makes it due', () => {
+	it('says nothing until an unlock makes it due', () => {
 		const { container } = render(StoragePersistenceDialog);
 		expect(container.querySelector('wa-dialog')).toBeNull();
 	});
 
-	test('explains first, and asks the browser only on OK', async () => {
+	it('explains first, and asks the browser only on OK', async () => {
 		const { container } = await renderDue();
 
 		expect(container.querySelector('wa-dialog')).not.toBeNull();
@@ -54,11 +55,13 @@ describe('StoragePersistenceDialog', () => {
 		expect(container.querySelector('wa-dialog')).toBeNull();
 	});
 
-	test('closing it any other way asks nothing and records nothing', async () => {
+	it('closing it any other way asks nothing and records nothing', async () => {
 		const { container } = await renderDue();
 
 		// What Escape or the close button ends in, once the hide animation is done.
-		container.querySelector('wa-dialog')!.dispatchEvent(new CustomEvent('wa-after-hide'));
+		defined(container.querySelector('wa-dialog'), 'the dialog').dispatchEvent(
+			new CustomEvent('wa-after-hide')
+		);
 		await tick();
 
 		expect(container.querySelector('wa-dialog')).toBeNull();
@@ -66,7 +69,7 @@ describe('StoragePersistenceDialog', () => {
 		expect(localStorage.getItem(STORAGE_PERSISTENCE_ASKED_KEY)).toBeNull();
 	});
 
-	test('has the title the user sees', async () => {
+	it('has the title the user sees', async () => {
 		const { container } = await renderDue();
 		expect((container.querySelector('wa-dialog') as unknown as { label: string }).label).toBe(
 			TITLE

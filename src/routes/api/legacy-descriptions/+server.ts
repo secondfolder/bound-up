@@ -43,10 +43,14 @@ const updateSchema = z.object({
 const bodySchema = z.object({ updates: z.array(updateSchema).max(200, 'Too many at once') });
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed request');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed request');
+	}
 
 	const updated = await migrateLegacyDescriptions(locals.db, locals.user.id, parsed.data.updates);
 	return json({ ok: true, updated });

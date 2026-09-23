@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, type Browser, type Locator, type Page } from '@playwright/test';
+import { type Browser, expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Shared steps for the invite flows.
@@ -193,8 +193,12 @@ export async function createInvite(
 
 	await fillWaInput(page, 'partnerName', answers.partnerName);
 	await fillWaInput(page, 'yourName', answers.yourName);
-	if (answers.partnerRole) await fillWaInput(page, 'partnerRole', answers.partnerRole);
-	if (answers.yourRole) await fillWaInput(page, 'yourRole', answers.yourRole);
+	if (answers.partnerRole) {
+		await fillWaInput(page, 'partnerRole', answers.partnerRole);
+	}
+	if (answers.yourRole) {
+		await fillWaInput(page, 'yourRole', answers.yourRole);
+	}
 	await page.locator(`input[name="control"][value="${answers.control}"]`).check();
 
 	await clickWaButton(page, 'Create invite link');
@@ -277,7 +281,9 @@ export async function openBoard(page: Page, partnerName: string): Promise<void> 
 	if (await warning.isVisible()) {
 		await page.getByRole('checkbox').check();
 		await clickWaButton(page, 'Start messaging');
-		await expect(warning).toBeHidden();
+		// A wait rather than an assertion: whether this branch runs at all is
+		// the account's history, not something the calling test is checking.
+		await warning.waitFor({ state: 'hidden' });
 	}
 }
 
@@ -405,12 +411,16 @@ export async function autofillWaInput(page: Page, selector: string, value: strin
 	// The shadow root only exists once Web Awesome has upgraded the element, and
 	// an extension would likewise have nothing to fill before then.
 	await page.waitForFunction(
-		(sel) => document.querySelector(sel)?.shadowRoot?.querySelector('input') != null,
+		(sel) =>
+			document.querySelector(sel)?.shadowRoot?.querySelector('input') instanceof HTMLInputElement,
 		selector
 	);
 	await page.evaluate(
 		({ sel, text }) => {
-			const input = document.querySelector(sel)!.shadowRoot!.querySelector('input')!;
+			const input = document.querySelector(sel)?.shadowRoot?.querySelector('input');
+			if (!input) {
+				throw new Error(`${sel} has no inner <input> to fill`);
+			}
 			input.value = text;
 			input.dispatchEvent(new Event('input', { bubbles: true }));
 			input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -430,13 +440,40 @@ export async function autofillWaInput(page: Page, selector: string, value: strin
 export async function autofillPasswordSilently(page: Page, field: string, value: string) {
 	const selector = `wa-input[data-field="${field}"]`;
 	await page.waitForFunction(
-		(sel) => document.querySelector(sel)?.shadowRoot?.querySelector('input') != null,
+		(sel) =>
+			document.querySelector(sel)?.shadowRoot?.querySelector('input') instanceof HTMLInputElement,
 		selector
 	);
 	await page.evaluate(
 		({ sel, text }) => {
-			document.querySelector(sel)!.shadowRoot!.querySelector('input')!.value = text;
+			const input = document.querySelector(sel)?.shadowRoot?.querySelector('input');
+			if (!input) {
+				throw new Error(`${sel} has no inner <input> to fill`);
+			}
+			input.value = text;
 		},
 		{ sel: selector, text: value }
+	);
+}
+
+/**
+ * Lets the page finish handling the last key press or click before the next.
+ *
+ * Lexical learns where the caret went from `selectionchange`, which the
+ * browser dispatches as a task *after* the input that moved the selection —
+ * so a loop that presses again straight away can outrun it and walk past the
+ * stop it is looking for. An animation frame and then a task, run inside the
+ * page, come after everything the input queued: the event, Lexical's handler
+ * and the update it schedules. That is the ordering a fixed sleep only hoped
+ * for.
+ */
+export async function settle(page: Page): Promise<void> {
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve) => {
+				requestAnimationFrame(() => {
+					setTimeout(resolve, 0);
+				});
+			})
 	);
 }

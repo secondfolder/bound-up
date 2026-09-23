@@ -1,26 +1,15 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
-import type { Db } from './db';
 import {
-	partnershipRewardCredits,
-	partnershipTaskCompletions,
-	partnershipTasks,
-	partnerships,
-	selfRewardCredits,
-	selfTaskCompletions,
-	selfTasks
-} from './db/schema';
-import { getPartnershipForUser } from './partnerships';
+	initialNextEligibleAt,
+	nextEligibleAtAfterCompletion,
+	scheduleReferenceDate
+} from '../task-schedule';
 import {
 	canCompleteFromPartnership,
 	canViewPartnershipTask,
 	isTaskCompletableAt,
 	type TaskInput
 } from '../tasks';
-import {
-	initialNextEligibleAt,
-	nextEligibleAtAfterCompletion,
-	scheduleReferenceDate
-} from '../task-schedule';
 import type {
 	HomePartnerTasksSectionView,
 	PartnershipTaskCompletionView,
@@ -33,6 +22,17 @@ import type {
 	TasksWidgetView,
 	TaskTimeZoneNoteView
 } from '../types';
+import type { Db } from './db';
+import {
+	partnershipRewardCredits,
+	partnerships,
+	partnershipTaskCompletions,
+	partnershipTasks,
+	selfRewardCredits,
+	selfTaskCompletions,
+	selfTasks
+} from './db/schema';
+import { getPartnershipForUser } from './partnerships';
 
 const selfTaskColumns = {
 	id: selfTasks.id,
@@ -156,7 +156,8 @@ export type PartnershipTasksPageView = {
 
 type TaskResult<TReason extends string> = { ok: true } | { ok: false; reason: TReason };
 type CreateTaskResult<TReason extends string> =
-	{ ok: true; id: string } | { ok: false; reason: TReason };
+	| { ok: true; id: string }
+	| { ok: false; reason: TReason };
 
 function canCompleteFromPartnershipView(partnership: TaskMembership['partnership']): boolean {
 	return partnership.control === 'both' || !partnership.canEdit;
@@ -166,9 +167,15 @@ function taskReferenceDate(
 	schedule: TaskSchedule,
 	row: Pick<SelfTaskRow, 'createdAt' | 'lastCompletedAt' | 'nextEligibleAt'>
 ): Date | null {
-	if (row.nextEligibleAt) return row.nextEligibleAt;
-	if (row.lastCompletedAt) return row.lastCompletedAt;
-	if (schedule.mode !== 'scheduled' && schedule.mode !== 'one-off') return row.createdAt;
+	if (row.nextEligibleAt) {
+		return row.nextEligibleAt;
+	}
+	if (row.lastCompletedAt) {
+		return row.lastCompletedAt;
+	}
+	if (schedule.mode !== 'scheduled' && schedule.mode !== 'one-off') {
+		return row.createdAt;
+	}
 	return null;
 }
 
@@ -178,7 +185,9 @@ function toTimeZoneNote(
 	date: Date | null,
 	showCurrentTime = false
 ): TaskTimeZoneNoteView | null {
-	if (!timeZone || timeZone === referenceTimeZone || !date) return null;
+	if (!timeZone || timeZone === referenceTimeZone || !date) {
+		return null;
+	}
 	return { timeZone, referenceTimeZone, date, showCurrentTime };
 }
 
@@ -205,9 +214,12 @@ function resolveTimeZoneForPartnershipTask(
 	row: Pick<PartnershipTaskRow, 'timezoneOwnerUserId'>,
 	membership: TaskMembership
 ): string | null {
-	if (row.timezoneOwnerUserId === membership.viewerId) return membership.viewerTimezone;
-	if (row.timezoneOwnerUserId === membership.counterpartUserId)
+	if (row.timezoneOwnerUserId === membership.viewerId) {
+		return membership.viewerTimezone;
+	}
+	if (row.timezoneOwnerUserId === membership.counterpartUserId) {
 		return membership.counterpartTimezone;
+	}
 	return null;
 }
 
@@ -305,7 +317,9 @@ async function recentSelfTaskCompletionTimes(
 	taskId: string,
 	limit: number
 ): Promise<Date[]> {
-	if (limit <= 0) return [];
+	if (limit <= 0) {
+		return [];
+	}
 	const rows = await db
 		.select({ createdAt: selfTaskCompletions.createdAt })
 		.from(selfTaskCompletions)
@@ -320,7 +334,9 @@ async function recentPartnershipTaskCompletionTimes(
 	taskId: string,
 	limit: number
 ): Promise<Date[]> {
-	if (limit <= 0) return [];
+	if (limit <= 0) {
+		return [];
+	}
 	const rows = await db
 		.select({ createdAt: partnershipTaskCompletions.createdAt })
 		.from(partnershipTaskCompletions)
@@ -331,7 +347,9 @@ async function recentPartnershipTaskCompletionTimes(
 }
 
 function chooseCompletionMessage(messages: string[]): string | null {
-	if (messages.length === 0) return null;
+	if (messages.length === 0) {
+		return null;
+	}
 	const index = Math.floor(Math.random() * messages.length);
 	return messages[index] ?? null;
 }
@@ -359,8 +377,9 @@ export async function requireTaskMembership(
 	viewerTimezone: string
 ): Promise<TaskMembership | null> {
 	const partnership = await getPartnershipForUser(db, partnershipId, userId);
-	if (!partnership || partnership.status !== 'accepted' || !partnership.counterpart?.userId)
+	if (partnership?.status !== 'accepted' || !partnership.counterpart?.userId) {
 		return null;
+	}
 	return {
 		partnership,
 		viewerId: userId,
@@ -433,8 +452,10 @@ export async function getSelfTaskForUser(
 		.from(selfTasks)
 		.where(and(eq(selfTasks.id, taskId), eq(selfTasks.ownerId, userId)))
 		.limit(1);
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 	return toSelfTaskView(row, viewerTimezone);
 }
 
@@ -471,7 +492,9 @@ export async function getPartnershipTasksPage(
 	viewerTimezone: string
 ): Promise<PartnershipTasksPageView | null> {
 	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 	const visibilityRecord = {
 		status: membership.partnership.status,
 		control: membership.partnership.control,
@@ -535,8 +558,12 @@ export async function createPartnershipTask(
 	input: TaskInput
 ): Promise<CreateTaskResult<'not-a-member' | 'forbidden' | 'bad-timezone-owner'>> {
 	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (!membership.canManage) return { ok: false, reason: 'forbidden' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canManage) {
+		return { ok: false, reason: 'forbidden' };
+	}
 	if (
 		input.timezoneOwnerUserId !== membership.viewerId &&
 		input.timezoneOwnerUserId !== membership.counterpartUserId
@@ -588,15 +615,19 @@ export async function getPartnershipTaskForUser(
 	task: PartnershipTaskView;
 } | null> {
 	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const rows = await db
 		.select(partnershipTaskColumns)
 		.from(partnershipTasks)
 		.where(and(eq(partnershipTasks.id, taskId), eq(partnershipTasks.partnershipId, partnershipId)))
 		.limit(1);
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 
 	return {
 		partner: {
@@ -620,8 +651,12 @@ export async function updatePartnershipTask(
 	input: TaskInput
 ): Promise<TaskResult<'not-a-member' | 'forbidden' | 'not-found' | 'bad-timezone-owner'>> {
 	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (!membership.canManage) return { ok: false, reason: 'forbidden' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canManage) {
+		return { ok: false, reason: 'forbidden' };
+	}
 	if (
 		input.timezoneOwnerUserId !== membership.viewerId &&
 		input.timezoneOwnerUserId !== membership.counterpartUserId
@@ -638,9 +673,13 @@ export async function updatePartnershipTask(
 		.from(partnershipTasks)
 		.where(and(eq(partnershipTasks.id, taskId), eq(partnershipTasks.partnershipId, partnershipId)))
 		.limit(1);
-	const existing = existingRows[0];
-	if (!existing) return { ok: false, reason: 'not-found' };
-	if (existing.createdByUserId !== userId) return { ok: false, reason: 'forbidden' };
+	const [existing] = existingRows;
+	if (!existing) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (existing.createdByUserId !== userId) {
+		return { ok: false, reason: 'forbidden' };
+	}
 
 	const rows = await db
 		.update(partnershipTasks)
@@ -657,7 +696,9 @@ export async function updatePartnershipTask(
 		})
 		.where(and(eq(partnershipTasks.id, taskId), eq(partnershipTasks.partnershipId, partnershipId)))
 		.returning({ id: partnershipTasks.id });
-	if (rows.length === 0) return { ok: false, reason: 'not-found' };
+	if (rows.length === 0) {
+		return { ok: false, reason: 'not-found' };
+	}
 	return { ok: true };
 }
 
@@ -673,10 +714,16 @@ export async function completeSelfTask(
 		.from(selfTasks)
 		.where(and(eq(selfTasks.id, taskId), eq(selfTasks.ownerId, userId)))
 		.limit(1);
-	const task = rows[0];
-	if (!task) return { ok: false, reason: 'not-found' };
-	if (!task.active) return { ok: false, reason: 'inactive' };
-	if (!isTaskCompletableAt(task, now)) return { ok: false, reason: 'not-ready' };
+	const [task] = rows;
+	if (!task) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (!task.active) {
+		return { ok: false, reason: 'inactive' };
+	}
+	if (!isTaskCompletableAt(task, now)) {
+		return { ok: false, reason: 'not-ready' };
+	}
 
 	const ownerTimeZone = viewerTimezone;
 	const recentCompletions =
@@ -743,8 +790,12 @@ export async function completePartnershipTask(
 		input.userId,
 		input.viewerTimezone
 	);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (!membership.canComplete) return { ok: false, reason: 'not-allowed' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canComplete) {
+		return { ok: false, reason: 'not-allowed' };
+	}
 
 	const rows = await db
 		.select(partnershipTaskColumns)
@@ -756,11 +807,19 @@ export async function completePartnershipTask(
 			)
 		)
 		.limit(1);
-	const task = rows[0];
-	if (!task) return { ok: false, reason: 'not-found' };
-	if (!task.active) return { ok: false, reason: 'inactive' };
-	if (task.createdByUserId === input.userId) return { ok: false, reason: 'own-task' };
-	if (!isTaskCompletableAt(task, now)) return { ok: false, reason: 'not-ready' };
+	const [task] = rows;
+	if (!task) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (!task.active) {
+		return { ok: false, reason: 'inactive' };
+	}
+	if (task.createdByUserId === input.userId) {
+		return { ok: false, reason: 'own-task' };
+	}
+	if (!isTaskCompletableAt(task, now)) {
+		return { ok: false, reason: 'not-ready' };
+	}
 
 	const ownerTimeZone =
 		task.timezoneOwnerUserId === membership.viewerId
@@ -838,7 +897,9 @@ export async function listHomePartnerTaskSections(
 	viewerTimezone: string,
 	partners: PartnerView[]
 ): Promise<HomePartnerTasksSectionView[]> {
-	if (partners.length === 0) return [];
+	if (partners.length === 0) {
+		return [];
+	}
 
 	const partnershipIds = partners.map((partner) => partner.id);
 	const [partnershipRows, taskRows] = await Promise.all([
@@ -871,29 +932,36 @@ export async function listHomePartnerTaskSections(
 	const completablePartnerships = new Map(
 		partnershipRows.map((row) => [
 			row.id,
-			row.status === 'accepted' &&
-				(row.control === 'both' ||
-					row.control !==
-						(row.inviterId === userId ? 'inviter' : row.inviteeId === userId ? 'invitee' : null))
+			row.status === 'accepted' && (row.control === 'both' || row.control !== sideOf(row, userId))
 		])
 	);
 	const tasksByPartnership = new Map<string, PartnershipTaskView[]>();
 	const partnerById = new Map(partners.map((partner) => [partner.id, partner]));
 
 	for (const row of taskRows) {
-		if (!completablePartnerships.get(row.partnershipId)) continue;
-		if (row.createdByUserId === userId) continue;
+		if (!completablePartnerships.get(row.partnershipId)) {
+			continue;
+		}
+		if (row.createdByUserId === userId) {
+			continue;
+		}
 		const partner = partnerById.get(row.partnershipId);
-		if (!partner) continue;
+		if (!partner) {
+			continue;
+		}
 		const membership = await requireTaskMembership(db, row.partnershipId, userId, viewerTimezone);
-		if (!membership) continue;
+		if (!membership) {
+			continue;
+		}
 		const list = tasksByPartnership.get(row.partnershipId) ?? [];
 		list.push(toPartnershipTaskView(row, membership));
 		tasksByPartnership.set(row.partnershipId, list);
 	}
 
 	return partners.flatMap((partner) => {
-		if (!completablePartnerships.get(partner.id)) return [];
+		if (!completablePartnerships.get(partner.id)) {
+			return [];
+		}
 		return [
 			{
 				partnershipId: partner.id,
@@ -1020,12 +1088,18 @@ export async function getHomeTasksWidget(
 	const nameById = new Map(partners.map((partner) => [partner.id, partner.name]));
 
 	const partnerRows: TaskWidgetRow[] = partnerTaskRows.flatMap((row) => {
-		if (!completable.get(row.partnershipId)) return [];
+		if (!completable.get(row.partnershipId)) {
+			return [];
+		}
 		// Authorship is independent of control: under shared control you complete
 		// their tasks, never your own.
-		if (row.createdByUserId === userId) return [];
+		if (row.createdByUserId === userId) {
+			return [];
+		}
 		const name = nameById.get(row.partnershipId);
-		if (!name) return [];
+		if (!name) {
+			return [];
+		}
 		return [{ ...row, context: name }];
 	});
 
@@ -1034,8 +1108,8 @@ export async function getHomeTasksWidget(
 	// SQLite sorts nulls first and so does this: no nextEligibleAt means always
 	// ready, which belongs at the top.
 	const rows = [...selfRows, ...partnerRows].sort((a, b) => {
-		const left = a.nextEligibleAt?.getTime() ?? -Infinity;
-		const right = b.nextEligibleAt?.getTime() ?? -Infinity;
+		const left = a.nextEligibleAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+		const right = b.nextEligibleAt?.getTime() ?? Number.NEGATIVE_INFINITY;
 		return left - right;
 	});
 
@@ -1052,7 +1126,9 @@ export async function getPartnershipTasksWidget(
 	now: Date = new Date()
 ): Promise<TasksWidgetView | null> {
 	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const rows = await db
 		.select({
@@ -1100,4 +1176,18 @@ export async function getPartnershipTasksWidget(
 	// The managing side's count is of everything they can see, not just the
 	// subset someone else could complete.
 	return membership.canComplete ? view : { ...view, activeCount: visible.length };
+}
+
+/** Which side of the partnership row `userId` is on, or null for neither. */
+function sideOf(
+	row: { inviterId: string; inviteeId: string | null },
+	userId: string
+): 'inviter' | 'invitee' | null {
+	if (row.inviterId === userId) {
+		return 'inviter';
+	}
+	if (row.inviteeId === userId) {
+		return 'invitee';
+	}
+	return null;
 }

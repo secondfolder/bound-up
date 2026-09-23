@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { currentTimeZoneOrUtc, timezoneBannerStorageKey } from '$lib/timezone';
 
 	let {
@@ -26,7 +26,9 @@
 	});
 
 	$effect(() => {
-		if (user?.id !== lastUserId) refresh();
+		if (user?.id !== lastUserId) {
+			refresh();
+		}
 	});
 
 	const visible = $derived(
@@ -38,19 +40,23 @@
 		deviceTimezone = currentTimeZoneOrUtc();
 		problem = null;
 		dismissed = user
-			? window.localStorage.getItem(timezoneBannerStorageKey(user.id)) === deviceTimezone
+			? localStorage.getItem(timezoneBannerStorageKey(user.id)) === deviceTimezone
 			: false;
 		checked = true;
 	}
 
 	function dismiss() {
-		if (!user) return;
-		window.localStorage.setItem(timezoneBannerStorageKey(user.id), deviceTimezone);
+		if (!user) {
+			return;
+		}
+		localStorage.setItem(timezoneBannerStorageKey(user.id), deviceTimezone);
 		dismissed = true;
 	}
 
 	async function useDeviceTimezone() {
-		if (!user) return;
+		if (!user) {
+			return;
+		}
 
 		busy = true;
 		problem = null;
@@ -67,12 +73,12 @@
 				error?: string;
 			} | null;
 
-			if (!response.ok || !result?.ok) {
+			if (!(response.ok && result?.ok)) {
 				problem = result?.error ?? 'Could not update your timezone';
 				return;
 			}
 
-			window.localStorage.removeItem(timezoneBannerStorageKey(user.id));
+			localStorage.removeItem(timezoneBannerStorageKey(user.id));
 			dismissed = false;
 			await invalidateAll();
 		} catch (caught) {

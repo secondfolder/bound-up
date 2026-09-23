@@ -1,9 +1,11 @@
 import { fireEvent, render } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
-import MessageBubble from './MessageBubble.svelte';
 import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
-import type { MessageView } from '$lib/types';
+import { defined } from '$lib/testing/defined';
+import { pending } from '$lib/testing/pending';
 import { isWaIconRequest } from '$lib/testing/web-awesome';
+import type { MessageView } from '$lib/types';
+import MessageBubble from './MessageBubble.svelte';
 
 const observers: MockIntersectionObserver[] = [];
 
@@ -152,7 +154,7 @@ describe('MessageBubble', () => {
 
 	it('passes cached embed metadata through to the inline embed renderer', async () => {
 		installIntersectionObserverMock();
-		const fetchMock = vi.fn(() => new Promise(() => {}));
+		const fetchMock = vi.fn(() => pending());
 		vi.stubGlobal('fetch', fetchMock);
 		const metadata: MessageMetadataPayload = {
 			version: 1,
@@ -290,13 +292,15 @@ describe('MessageBubble', () => {
 		});
 
 		expect(container.querySelector('.url-embed')).toBeNull();
-		await fireEvent.click(container.querySelector('wa-button.reveal')!);
+		await fireEvent.click(defined(container.querySelector('wa-button.reveal'), 'the Show button'));
 
 		// The card goes at the start of the link's line once its details are
 		// in, and the button that asked for it is gone.
 		const embed = await vi.waitFor(() => {
 			const found = container.querySelector('.embed-slot');
-			if (!found) throw new Error('expected the revealed embed');
+			if (!found) {
+				throw new Error('expected the revealed embed');
+			}
 			return found;
 		});
 		expect(embed).not.toBeNull();
@@ -306,7 +310,7 @@ describe('MessageBubble', () => {
 	});
 
 	it('waits for encrypted message metadata before starting a live embed fetch', () => {
-		const fetchMock = vi.fn(() => new Promise(() => {}));
+		const fetchMock = vi.fn(() => pending());
 		vi.stubGlobal('fetch', fetchMock);
 
 		const { container } = render(MessageBubble, {

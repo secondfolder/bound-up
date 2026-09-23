@@ -23,7 +23,9 @@ function firstError(
 	formErrors: string[]
 ): string {
 	for (const errorList of Object.values(fieldErrors)) {
-		if (errorList?.[0]) return errorList[0];
+		if (errorList?.[0]) {
+			return errorList[0];
+		}
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
@@ -39,7 +41,9 @@ function parseRewardForm(formData: FormData) {
 
 export const actions: Actions = {
 	default: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = parseRewardForm(formData);

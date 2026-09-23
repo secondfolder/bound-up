@@ -20,7 +20,7 @@ import { mkdirSync, rmSync, unlinkSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 
 const { E2E_PORT, E2E_RUN_DIR, E2E_MEDIA_DIR, E2E_LOCK_PATH } = process.env;
-if (!E2E_PORT || !E2E_RUN_DIR || !E2E_MEDIA_DIR || !E2E_LOCK_PATH) {
+if (!(E2E_PORT && E2E_RUN_DIR && E2E_MEDIA_DIR && E2E_LOCK_PATH)) {
 	console.error('e2e/server.mjs is started by playwright.config.ts, which sets its environment.');
 	process.exit(2);
 }
@@ -38,7 +38,9 @@ function acquireLock() {
 	return new Promise((resolve) => {
 		const lock = createServer();
 		lock.once('error', (error) => {
-			if (error.code !== 'EADDRINUSE') throw error;
+			if (error.code !== 'EADDRINUSE') {
+				throw error;
+			}
 			const probe = createConnection(E2E_LOCK_PATH);
 			probe.once('connect', () => {
 				probe.destroy();

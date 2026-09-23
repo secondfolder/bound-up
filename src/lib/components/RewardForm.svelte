@@ -53,7 +53,7 @@
 		<div class="richtext-field">
 			<RichTextEditor
 				value={values.description}
-				onChange={(next) => (description = next)}
+				onChange={(next) => { description = next; }}
 				features={DOCUMENT_FEATURES}
 				toolbar
 				placeholder="What is this reward?"

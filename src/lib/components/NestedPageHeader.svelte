@@ -23,9 +23,8 @@
 
 			`backHref` is resolved by the caller. This component takes a runtime
 			string so it can be reused from different route depths, and there is no
-			route id for eslint to resolve against here.
+			route id to resolve against here.
 		-->
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a href={backHref} aria-label={backLabel}>
 			<wa-icon name="chevron-left" variant="solid"></wa-icon>
 			<span>{backText}</span>

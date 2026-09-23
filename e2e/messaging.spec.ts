@@ -1,13 +1,16 @@
 import { Buffer } from 'node:buffer';
 import type { Locator, Page } from '@playwright/test';
-import { expect, test } from './fixtures';
+import { expect } from '@playwright/test';
+import { defined } from '../src/lib/testing/defined';
+import { test } from './fixtures';
 import {
 	clickWaButton,
 	fillRichText,
-	reply,
 	linkAccounts,
 	newSide,
 	openBoard,
+	reply,
+	settle,
 	signUp,
 	typeRichText,
 	writeThread
@@ -92,7 +95,9 @@ test.describe('a message between partners', () => {
 			ada.page.on('request', (request) => {
 				if (request.method() === 'POST') {
 					const body = request.postData();
-					if (body) bodies.push(body);
+					if (body) {
+						bodies.push(body);
+					}
 				}
 			});
 
@@ -236,13 +241,15 @@ test.describe('the board', () => {
 			await expect(shell).toHaveCount(0);
 			await clickWaButton(ada.page, 'Write something');
 			await expect(shell).toHaveCount(1);
-			const sizing = await shell.evaluate((element) => {
+			const measured = await shell.evaluate((element) => {
 				const root = element.shadowRoot;
 				const body = root?.querySelector<HTMLElement>('[part~="body"]');
 				const panel = root?.querySelector<HTMLElement>('[part~="dialog"]');
 				const title = root?.querySelector<HTMLElement>('[part~="title"]');
 				const composer = element.querySelector<HTMLElement>('.composer');
-				if (!body || !panel || !title || !composer) return null;
+				if (!(body && panel && title && composer)) {
+					return null;
+				}
 				const bodyRect = body.getBoundingClientRect();
 				const composerRect = composer.getBoundingClientRect();
 				const panelRect = panel.getBoundingClientRect();
@@ -257,12 +264,12 @@ test.describe('the board', () => {
 					rightGap: window.innerWidth - panelRect.right
 				};
 			});
-			expect(sizing).not.toBeNull();
-			expect(sizing!.open).toBe(true);
-			expect(sizing!.title).toBe('Send to Jun');
-			expect(Math.abs(sizing!.composerWidth - sizing!.bodyWidth)).toBeLessThanOrEqual(1);
-			expect(Math.abs(sizing!.composerHeight - sizing!.bodyHeight)).toBeLessThanOrEqual(1);
-			expect(Math.abs(sizing!.leftGap - sizing!.rightGap)).toBeLessThanOrEqual(8);
+			const sizing = defined(measured, 'the dialog body, panel, title and composer');
+			expect(sizing.open).toBe(true);
+			expect(sizing.title).toBe('Send to Jun');
+			expect(Math.abs(sizing.composerWidth - sizing.bodyWidth)).toBeLessThanOrEqual(1);
+			expect(Math.abs(sizing.composerHeight - sizing.bodyHeight)).toBeLessThanOrEqual(1);
+			expect(Math.abs(sizing.leftGap - sizing.rightGap)).toBeLessThanOrEqual(8);
 			await reply(ada.page, 'one');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
 			await ada.page.goBack();
@@ -311,15 +318,15 @@ test.describe('live updates', () => {
 			// on every document, so the count survives the full page loads earlier in
 			// the flow.
 			await ada.page.addInitScript(() => {
-				const target = window as unknown as { EventSource: unknown; __streams?: number };
+				const target = globalThis as unknown as { EventSource: unknown; streamCount?: number };
 				const Real = target.EventSource as {
 					new (url: string, eventSourceInitDict?: EventSourceInit): EventSource;
 				};
-				target.__streams = 0;
+				target.streamCount = 0;
 				target.EventSource = class extends Real {
 					constructor(url: string) {
 						super(url);
-						target.__streams = (target.__streams ?? 0) + 1;
+						target.streamCount = (target.streamCount ?? 0) + 1;
 					}
 				};
 			});
@@ -341,7 +348,7 @@ test.describe('live updates', () => {
 			// How many streams Ada's page has opened so far. Counted by wrapping the
 			// constructor before any app code runs.
 			const streamsBefore = await ada.page.evaluate(
-				() => (window as unknown as { __streams?: number }).__streams ?? 0
+				() => (globalThis as unknown as { streamCount?: number }).streamCount ?? 0
 			);
 
 			await reply(jun.page, 'come over');
@@ -363,7 +370,7 @@ test.describe('live updates', () => {
 			 * those is a fresh billed request to the Durable Object.
 			 */
 			const streamsAfter = await ada.page.evaluate(
-				() => (window as unknown as { __streams?: number }).__streams ?? 0
+				() => (globalThis as unknown as { streamCount?: number }).streamCount ?? 0
 			);
 			expect(streamsAfter).toBe(streamsBefore);
 		} finally {
@@ -411,7 +418,7 @@ test.describe('attachments', () => {
 	 * A tiny real PNG, built in the test rather than checked in, so there is no
 	 * binary fixture to keep in the repo.
 	 */
-	const PNG = Buffer.from(
+	const Png = Buffer.from(
 		'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==',
 		'base64'
 	);
@@ -431,7 +438,7 @@ test.describe('attachments', () => {
 			await clickWaButton(ada.page, 'Write something');
 			await ada.page
 				.locator('input[type="file"]')
-				.setInputFiles({ name: 'sunset.png', mimeType: 'image/png', buffer: PNG });
+				.setInputFiles({ name: 'sunset.png', mimeType: 'image/png', buffer: Png });
 			// The chip confirms the composer took it before the send.
 			await expect(ada.page.getByText('sunset.png')).toBeVisible();
 
@@ -442,9 +449,11 @@ test.describe('attachments', () => {
 			const boardThumb = ada.page.locator('ul[aria-label] img.thumb').first();
 			await expect(boardThumb).toBeVisible();
 			await expect(boardThumb).toHaveAttribute('src', /^blob:/);
-			const previewSizing = await boardThumb.evaluate((thumb) => {
+			const previewMeasured = await boardThumb.evaluate((thumb) => {
 				const preview = thumb.closest<HTMLElement>('.preview');
-				if (!preview) return null;
+				if (!preview) {
+					return null;
+				}
 				const previewRect = preview.getBoundingClientRect();
 				const thumbRect = thumb.getBoundingClientRect();
 				const style = getComputedStyle(thumb);
@@ -454,10 +463,10 @@ test.describe('attachments', () => {
 					objectFit: style.objectFit
 				};
 			});
-			expect(previewSizing).not.toBeNull();
-			expect(previewSizing!.widthDelta).toBeLessThanOrEqual(1);
-			expect(previewSizing!.heightDelta).toBeLessThanOrEqual(1);
-			expect(previewSizing!.objectFit).toBe('cover');
+			const previewSizing = defined(previewMeasured, 'the thumbnail preview box');
+			expect(previewSizing.widthDelta).toBeLessThanOrEqual(1);
+			expect(previewSizing.heightDelta).toBeLessThanOrEqual(1);
+			expect(previewSizing.objectFit).toBe('cover');
 
 			// Jun reads it and the decrypted image renders from a blob: URL, which
 			// is the proof it was decrypted in the browser rather than served.
@@ -493,11 +502,11 @@ test.describe('attachments', () => {
 			await clickWaButton(ada.page, 'Write something');
 			await fillRichText(ada.page, 'look at these');
 			await ada.page.locator('input[type="file"]').setInputFiles([
-				{ name: 'one.png', mimeType: 'image/png', buffer: PNG },
-				{ name: 'two.png', mimeType: 'image/png', buffer: PNG },
-				{ name: 'three.png', mimeType: 'image/png', buffer: PNG },
-				{ name: 'four.png', mimeType: 'image/png', buffer: PNG },
-				{ name: 'five.png', mimeType: 'image/png', buffer: PNG }
+				{ name: 'one.png', mimeType: 'image/png', buffer: Png },
+				{ name: 'two.png', mimeType: 'image/png', buffer: Png },
+				{ name: 'three.png', mimeType: 'image/png', buffer: Png },
+				{ name: 'four.png', mimeType: 'image/png', buffer: Png },
+				{ name: 'five.png', mimeType: 'image/png', buffer: Png }
 			]);
 
 			await expect(ada.page.getByText('one.png')).toBeVisible();
@@ -515,7 +524,9 @@ test.describe('attachments', () => {
 			const fanSpread = async () =>
 				fan.evaluate((element) => {
 					const cards = Array.from(element.querySelectorAll<HTMLElement>('.fan-card'));
-					if (cards.length === 0) return null;
+					if (cards.length === 0) {
+						return null;
+					}
 					const fanRect = element.getBoundingClientRect();
 					const rects = cards.map((card) => card.getBoundingClientRect());
 					const minLeft = Math.min(...rects.map((rect) => rect.left));
@@ -527,10 +538,9 @@ test.describe('attachments', () => {
 					};
 				});
 
-			const before = await fanSpread();
-			expect(before).not.toBeNull();
-			expect(before!.leftGap).toBeLessThanOrEqual(24);
-			expect(before!.rightGap).toBeLessThanOrEqual(24);
+			const before = defined(await fanSpread(), 'the fanned cards');
+			expect(before.leftGap).toBeLessThanOrEqual(24);
+			expect(before.rightGap).toBeLessThanOrEqual(24);
 			const transition = await fan
 				.locator('.fan-card')
 				.first()
@@ -545,7 +555,7 @@ test.describe('attachments', () => {
 			await expect
 				.poll(async () => {
 					const after = await fanSpread();
-					return after ? after.spread - before!.spread : 0;
+					return after ? after.spread - before.spread : 0;
 				})
 				.toBeGreaterThan(10);
 			await expect
@@ -582,7 +592,9 @@ test.describe('attachments', () => {
 			// genuine rather than guessed.
 			const requested: string[] = [];
 			ada.page.on('request', (request) => {
-				if (request.url().includes('/attachments/')) requested.push(request.url());
+				if (request.url().includes('/attachments/')) {
+					requested.push(request.url());
+				}
 			});
 
 			await ada.page.goto('/home');
@@ -592,7 +604,7 @@ test.describe('attachments', () => {
 			await fillRichText(ada.page, 'private');
 			await ada.page
 				.locator('input[type="file"]')
-				.setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: PNG });
+				.setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: Png });
 			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
 			await clickWaButton(ada.page, 'Send');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -600,13 +612,13 @@ test.describe('attachments', () => {
 
 			expect(requested.length).toBeGreaterThan(0);
 			expect(new Set(requested).size).toBe(1);
-			const path = new URL(requested[0]!).pathname;
-			const junPartnership = path.split('/')[3];
+			const path = new URL(defined(requested[0], 'an attachment request')).pathname;
+			const [, , , junPartnership] = path.split('/');
 			const attachmentId = path.split('/').at(-1);
 
 			// Ada's other partnership, which she really is in.
 			const casPartnership = await cas.page.evaluate(
-				() => new URL(window.location.href).pathname.split('/')[2]
+				() => new URL(globalThis.location.href).pathname.split('/')[2]
 			);
 			expect(casPartnership).not.toBe(junPartnership);
 
@@ -643,7 +655,7 @@ test.describe('attachments', () => {
 
 			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
-			const partnershipId = new URL(ada.page.url()).pathname.split('/')[2];
+			const [, , partnershipId] = new URL(ada.page.url()).pathname.split('/');
 
 			const status = await ada.page.evaluate(async (id) => {
 				const response = await fetch(`/api/partnerships/${id}/threads`, { method: 'POST' });
@@ -863,7 +875,9 @@ test.describe('embeds', () => {
 			const coverage = await ada.page.evaluate(() => {
 				const host = document.querySelector('wa-dialog.embed-dialog');
 				const rect = host?.shadowRoot?.querySelector('dialog')?.getBoundingClientRect();
-				if (!rect) throw new Error('expected the dialog to be laid out');
+				if (!rect) {
+					throw new Error('expected the dialog to be laid out');
+				}
 				return { width: rect.width / window.innerWidth, height: rect.height / window.innerHeight };
 			});
 			expect(coverage.width).toBeGreaterThan(0.9);
@@ -975,7 +989,7 @@ test.describe('embeds', () => {
 			 *
 			 * By goal rather than by a fixed number of presses: how many stops
 			 * Lexical puts inside a URL is its business, and pinning the count
-			 * made this flaky for no benefit. The pause is not decoration —
+			 * made this flaky for no benefit. The `settle` is not decoration —
 			 * Lexical learns where the caret went from `selectionchange`, which is
 			 * asynchronous, and a loop that outruns it walks straight past the
 			 * stop it is looking for.
@@ -983,18 +997,20 @@ test.describe('embeds', () => {
 			const arrowLeftTo = async (goal: { text: string; offset: number }) => {
 				for (let i = 0; i < 60; i += 1) {
 					const at = await caretAt();
-					if (at.text === goal.text && at.offset === goal.offset) return;
+					if (at.text === goal.text && at.offset === goal.offset) {
+						return;
+					}
 					await ada.page.keyboard.press('ArrowLeft');
-					await ada.page.waitForTimeout(40);
+					await settle(ada.page);
 				}
 			};
 			const arrowLeft = async () => {
 				await ada.page.keyboard.press('ArrowLeft');
-				await ada.page.waitForTimeout(40);
+				await settle(ada.page);
 			};
 			const arrowRight = async () => {
 				await ada.page.keyboard.press('ArrowRight');
-				await ada.page.waitForTimeout(40);
+				await settle(ada.page);
 			};
 
 			/**
@@ -1101,11 +1117,11 @@ test.describe('embeds', () => {
 			 */
 			const arrowUp = async () => {
 				await ada.page.keyboard.press('ArrowUp');
-				await ada.page.waitForTimeout(40);
+				await settle(ada.page);
 			};
 			const arrowDown = async () => {
 				await ada.page.keyboard.press('ArrowDown');
-				await ada.page.waitForTimeout(40);
+				await settle(ada.page);
 			};
 
 			await arrowUp();
@@ -1137,11 +1153,13 @@ test.describe('embeds', () => {
 			await ada.page.keyboard.insertText(
 				' and then a good deal more text, enough of it that the line this is on has to be broken across more than one row before it reaches the end'
 			);
-			await ada.page.waitForTimeout(40);
+			await settle(ada.page);
 			const rowsOfCaretLine = () =>
 				ada.page.evaluate(() => {
 					const node = document.getSelection()?.anchorNode ?? null;
-					if (!node) return 0;
+					if (!node) {
+						return 0;
+					}
 					const range = document.createRange();
 					range.selectNodeContents(node);
 					return range.getClientRects().length;
@@ -1163,9 +1181,11 @@ test.describe('embeds', () => {
 			 */
 			const player = ada.page.locator('.richtext-editor .composer-embed iframe');
 			const box = await player.boundingBox();
-			if (!box) throw new Error('the player has no box to press');
+			if (!box) {
+				throw new Error('the player has no box to press');
+			}
 			await ada.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-			await ada.page.waitForTimeout(40);
+			await settle(ada.page);
 			await expect(decorator).not.toHaveClass(/is-selected/);
 
 			await ada.page
@@ -1316,17 +1336,17 @@ test.describe('embeds', () => {
 			await ada.page.keyboard.press('End');
 			for (let i = 0; i < ' world'.length + 3; i += 1) {
 				await ada.page.keyboard.press('ArrowLeft');
-				await ada.page.waitForTimeout(40);
+				await settle(ada.page);
 			}
 			// Otherwise the check below passes for the wrong reason.
 			const caretInLink = () =>
-				ada.page.evaluate(
-					() => !!document.getSelection()?.anchorNode?.parentElement?.closest('.surface a')
+				ada.page.evaluate(() =>
+					Boolean(document.getSelection()?.anchorNode?.parentElement?.closest('.surface a'))
 				);
 			expect(await caretInLink()).toBe(true);
 			for (let i = 0; i < ' world'.length + 3; i += 1) {
 				await ada.page.keyboard.press('ArrowRight');
-				await ada.page.waitForTimeout(40);
+				await settle(ada.page);
 			}
 			expect(await caretInLink()).toBe(false);
 			await ada.page.keyboard.type('!');
@@ -1336,9 +1356,9 @@ test.describe('embeds', () => {
 			// dismissed, so it gets an embed again. The caret is put at the end of
 			// the URL by walking left from the end of the line.
 			await ada.page.keyboard.press('End');
-			for (let i = 0; i < ' world!'.length; i += 1) {
+			for (const _ of ' world!') {
 				await ada.page.keyboard.press('ArrowLeft');
-				await ada.page.waitForTimeout(40);
+				await settle(ada.page);
 			}
 			await ada.page.keyboard.type('0');
 			await ada.page.keyboard.press('End');
@@ -1394,10 +1414,16 @@ test.describe('drafts', () => {
 				return stored !== null && stored !== previous;
 			})
 			.toBe(true);
-		return (await storedDraft(page, scope))!;
+		return defined(await storedDraft(page, scope), `the stored ${scope} draft`);
 	}
 
-	const threadIdOf = (url: string) => url.match(/\/messages\/([0-9a-f-]{36})$/)![1];
+	const threadIdOf = (url: string) => {
+		const [, threadId] = defined(
+			/\/messages\/(?<threadId>[0-9a-f-]{36})$/.exec(url),
+			`a thread URL, not ${url}`
+		);
+		return defined(threadId, `the thread id in ${url}`);
+	};
 
 	test('a reply draft survives a reload and stays with its own thread', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');

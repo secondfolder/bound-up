@@ -2,16 +2,18 @@ import { redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
 import { fail, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { signupFormSchema } from '$lib/schemas/signupForm';
 import { parseKeyWrapParams } from '$lib/encryption';
-import { putUserKeys } from '$lib/server/keys';
 import { redirectTargetOrHome, safeRedirect } from '$lib/safe-redirect';
+import { signupFormSchema } from '$lib/schemas/signupForm';
+import { putUserKeys } from '$lib/server/keys';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	// See the note in the login load: this is how an invite survives signup.
 	const redirectTo = safeRedirect(url.searchParams.get('redirectTo'));
-	if (locals.user) redirect(303, redirectTo ?? '/home');
+	if (locals.user) {
+		redirect(303, redirectTo ?? '/home');
+	}
 	return { signupForm: await superValidate(zod4(signupFormSchema)), redirectTo };
 };
 
@@ -31,7 +33,9 @@ export const actions: Actions = {
 		// typed. `parseKeyWrapParams` is the one definition of "valid params", so
 		// the two cannot disagree.
 		const params = parseKeyWrapParams(wrapParams);
-		if (!params) return setError(signupForm, '', 'Could not set up encryption keys');
+		if (!params) {
+			return setError(signupForm, '', 'Could not set up encryption keys');
+		}
 
 		let userId: string;
 		try {

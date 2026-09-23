@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
 	import { resolve } from '$app/paths';
 	import type {
 		MessageAttachmentInfo,
@@ -8,6 +7,7 @@
 	} from '$lib/crypto/messages';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
 	import { fetchAttachment, openMessage, openMessageMetadata } from '$lib/messaging/client';
+	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
 	import type { ThreadStickerView } from '$lib/types';
 
 	type PreviewMedia = {
@@ -55,13 +55,19 @@
 	let mediaLoading = $state(false);
 
 	$effect(() => {
-		if (sealed) return;
-		if (keyring.status !== 'unlocked') return;
+		if (sealed) {
+			return;
+		}
+		if (keyring.status !== 'unlocked') {
+			return;
+		}
 
 		let cancelled = false;
 		preview = undefined;
 		void openMessage(thread.previewCiphertext, keyring.identity).then((payload) => {
-			if (!cancelled) preview = payload;
+			if (!cancelled) {
+				preview = payload;
+			}
 		});
 
 		return () => {
@@ -70,8 +76,12 @@
 	});
 
 	$effect(() => {
-		if (sealed) return;
-		if (keyring.status !== 'unlocked') return;
+		if (sealed) {
+			return;
+		}
+		if (keyring.status !== 'unlocked') {
+			return;
+		}
 		if (thread.previewMetadataCiphertext === null) {
 			previewMetadata = null;
 			return;
@@ -80,7 +90,9 @@
 		let cancelled = false;
 		previewMetadata = undefined;
 		void openMessageMetadata(thread.previewMetadataCiphertext, keyring.identity).then((payload) => {
-			if (!cancelled) previewMetadata = payload;
+			if (!cancelled) {
+				previewMetadata = payload;
+			}
 		});
 
 		return () => {
@@ -110,7 +122,9 @@
 		)
 			.then((results) => {
 				if (cancelled) {
-					for (const result of results) URL.revokeObjectURL(result.url);
+					for (const result of results) {
+						URL.revokeObjectURL(result.url);
+					}
 					return;
 				}
 				current = results.map((result) => result.url);
@@ -126,7 +140,9 @@
 
 		return () => {
 			cancelled = true;
-			for (const url of current) URL.revokeObjectURL(url);
+			for (const url of current) {
+				URL.revokeObjectURL(url);
+			}
 		};
 	});
 
@@ -169,7 +185,9 @@
 	}
 
 	function fanOffset(index: number, count: number): number {
-		if (count <= 1) return 0;
+		if (count <= 1) {
+			return 0;
+		}
 		return (index / (count - 1) - 0.5) * 2;
 	}
 
@@ -205,9 +223,7 @@
 
 	const when = $derived(formatSent(thread.lastMessageAt));
 	const opened = $derived(
-		!thread.unread &&
-			thread.lastFullyReadAt &&
-			!sameDay(thread.lastFullyReadAt, thread.lastMessageAt)
+		!thread.unread && thread.lastFullyReadAt && !sameDay(thread.lastFullyReadAt, thread.lastMessageAt)
 			? `opened ${formatOpened(thread.lastFullyReadAt)}`
 			: null
 	);
@@ -229,6 +245,13 @@
 		previewValue ? previewAttachments(previewValue).length + (textPreview ? 1 : 0) : 0
 	);
 	const singlePreview = $derived(previewItemCount === 1);
+	/** Undefined while decrypting; null once decrypted to nothing showable. */
+	const previewState = $derived.by(() => {
+		if (preview === undefined) {
+			return 'pending';
+		}
+		return preview === null ? 'missing' : 'ready';
+	});
 	const showFan = $derived(previewItemCount > 1);
 	const fanCards = $derived([
 		...mediaPreviews.map(
@@ -249,13 +272,13 @@
 				<div
 					class:preview-single={singlePreview}
 					class:preview-text={hasTextPreview && !showFan}
-					class:preview-media={Boolean(mediaPreviews.length) && !showFan}
+					class:preview-media={mediaPreviews.length > 0 && !showFan}
 					class:preview-fan={showFan}
 					class="preview"
-					data-state={preview === undefined ? 'pending' : preview === null ? 'missing' : 'ready'}
+					data-state={previewState}
 				>
 					{#if preview === undefined}
-						<span class="pending" aria-label="Decrypting">···</span>
+						<span class="pending" role="img" aria-label="Decrypting">···</span>
 					{:else if embedPreview}
 						<div class:with-thumbnail={Boolean(embedThumbnail)} class="embed-preview">
 							{#if embedThumbnail}
@@ -297,7 +320,7 @@
 								</div>
 							{/each}
 							{#if mediaLoading && mediaPreviews.length === 0 && !hasTextPreview}
-								<span class="pending" aria-label="Decrypting">···</span>
+								<span class="pending" role="img" aria-label="Decrypting">···</span>
 							{/if}
 						</div>
 					{:else if mediaPreviews[0]?.kind === 'video'}
@@ -317,11 +340,11 @@
 			</div>
 
 			{#if thread.tags?.length}
-				<div class="tags" aria-label="Tags">
+				<ul class="tags" aria-label="Tags">
 					{#each thread.tags as tag (tag.id)}
-						<span class="tag" style={`--tag-color: ${tag.color}`}>{tag.name}</span>
+						<li class="tag" style={`--tag-color: ${tag.color}`}>{tag.name}</li>
 					{/each}
-				</div>
+				</ul>
 			{/if}
 
 			{#if thread.unread && thread.lastFullyReadAt !== null}
@@ -344,14 +367,6 @@
 		/* Kills the grey flash on tap that makes a web app feel non-native. */
 		-webkit-tap-highlight-color: transparent;
 
-		&:hover,
-		&:focus-visible {
-			.card {
-				transform: translateY(-0.125rem);
-				box-shadow: 0 0.8rem 1.6rem rgb(0 0 0 / 12%);
-			}
-		}
-
 		.card {
 			position: relative;
 			display: flex;
@@ -366,6 +381,14 @@
 			transition:
 				transform var(--wa-transition-fast, 100ms) ease,
 				box-shadow var(--wa-transition-fast, 100ms) ease;
+		}
+
+		&:hover,
+		&:focus-visible {
+			.card {
+				transform: translateY(-0.125rem);
+				box-shadow: 0 0.8rem 1.6rem rgb(0 0 0 / 12%);
+			}
 		}
 
 		.preview {
@@ -525,10 +548,6 @@
 			overflow: hidden;
 			background: var(--wa-color-surface-default, white);
 			border: 1px solid color-mix(in srgb, var(--wa-color-surface-border) 85%, transparent);
-
-			&.with-thumbnail .embed-copy {
-				justify-content: flex-start;
-			}
 		}
 
 		.embed-thumb {
@@ -546,6 +565,10 @@
 			padding: 0.55rem 0.65rem;
 			min-inline-size: 0;
 			text-align: left;
+		}
+
+		.embed-preview.with-thumbnail .embed-copy {
+			justify-content: flex-start;
 		}
 
 		.provider,
@@ -582,6 +605,9 @@
 		}
 
 		.tags {
+			list-style: none;
+			margin: 0;
+			padding: 0;
 			display: flex;
 			flex-wrap: wrap;
 			justify-content: center;
@@ -619,15 +645,17 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
+		/* `a .card`, not `.card`: it has to match the base rule's specificity to
+		   override its transition, and a bare `.card` silently lost. */
+		a .card {
+			transition: none;
+		}
+
 		a:hover,
 		a:focus-visible {
 			.card {
 				transform: none;
 			}
-		}
-
-		.card {
-			transition: none;
 		}
 	}
 </style>

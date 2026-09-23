@@ -17,7 +17,9 @@
 
 /** A property of a Web Awesome element, as the component set it. */
 export function waProp(element: Element | null | undefined, name: string): unknown {
-	if (!element) return undefined;
+	if (!element) {
+		return undefined;
+	}
 	return (element as unknown as Record<string, unknown>)[name];
 }
 
@@ -41,8 +43,12 @@ export function waByProp(
  */
 export function waButtonOfType(root: ParentNode, type: 'submit' | 'button'): HTMLElement {
 	const [button, ...rest] = waByProp(root, 'wa-button', 'type', type);
-	if (!button) throw new Error(`expected a wa-button of type "${type}"`);
-	if (rest.length > 0) throw new Error(`expected one wa-button of type "${type}", found several`);
+	if (!button) {
+		throw new Error(`expected a wa-button of type "${type}"`);
+	}
+	if (rest.length > 0) {
+		throw new Error(`expected one wa-button of type "${type}", found several`);
+	}
 	return button;
 }
 
@@ -74,5 +80,5 @@ export async function waSettled(root: ParentNode): Promise<void> {
  */
 export function isWaIconRequest(input: unknown): boolean {
 	const url = input instanceof Request ? input.url : String(input);
-	return new URL(url, window.location.href).hostname.endsWith('fontawesome.com');
+	return new URL(url, globalThis.location.href).hostname.endsWith('fontawesome.com');
 }

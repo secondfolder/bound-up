@@ -19,7 +19,9 @@ async function collect(body: ReadableStream<Uint8Array>): Promise<Uint8Array> {
 	const reader = body.getReader();
 	for (;;) {
 		const { done, value } = await reader.read();
-		if (done) break;
+		if (done) {
+			break;
+		}
 		chunks.push(value);
 	}
 	const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -52,20 +54,25 @@ export function createTestMediaStore(): TestMediaStore {
 			objects.set(key, bytes);
 		},
 
-		async get(key) {
+		get(key) {
 			const bytes = objects.get(key);
-			if (!bytes) return null;
-			return {
+			if (!bytes) {
+				return Promise.resolve(null);
+			}
+			return Promise.resolve({
 				body: new Blob([bytes as BlobPart]).stream() as ReadableStream<Uint8Array>,
 				byteSize: bytes.length
-			};
+			});
 		},
 
-		async delete(keys) {
-			for (const key of keys) objects.delete(key);
+		delete(keys) {
+			for (const key of keys) {
+				objects.delete(key);
+			}
+			return Promise.resolve();
 		},
 
-		async deletePrefix(prefix) {
+		deletePrefix(prefix) {
 			let deleted = 0;
 			for (const key of [...objects.keys()]) {
 				if (key.startsWith(prefix)) {
@@ -73,7 +80,7 @@ export function createTestMediaStore(): TestMediaStore {
 					deleted += 1;
 				}
 			}
-			return deleted;
+			return Promise.resolve(deleted);
 		}
 	};
 

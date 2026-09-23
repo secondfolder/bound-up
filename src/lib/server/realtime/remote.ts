@@ -1,5 +1,5 @@
-import type { Notifier } from './index';
 import type { RealtimeNamespace } from './binding';
+import type { Notifier } from './index';
 
 /**
  * The production notifier: a Durable Object per partnership.
@@ -42,7 +42,7 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 			// The object's streaming Response is returned straight through. No
 			// buffering step: reading it here would hold the whole stream in the
 			// worker and defeat the point.
-			return room(partnershipId).fetch(`${ROOM_ORIGIN}/subscribe`);
+			return await room(partnershipId).fetch(`${ROOM_ORIGIN}/subscribe`);
 		}
 	};
 }

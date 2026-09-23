@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { actions, load } from './+page.server';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestPartnershipReward,
@@ -14,8 +14,8 @@ import {
 	setTestSelfRewardCredits,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import type { SelfRewardView } from '$lib/types';
+import { actions, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -24,7 +24,7 @@ let jun: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada' });
 	jun = await createTestUser(db, { name: 'Jun' });
 });
@@ -36,19 +36,13 @@ function at(
 	formData?: Record<string, string>,
 	partners = [] as { id: string; name: string; image: string | null }[]
 ) {
-	return Object.assign(fakeEvent({ db, user, formData, path: '/home/rewards' }), {
-		depends: () => {},
-		parent: async () => ({ partners })
-	});
+	return fakeEvent({ db, user, formData, path: '/home/rewards', parentData: { partners } });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const run = (name: keyof typeof actions, ...args: Parameters<any>) =>
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	(actions[name] as any)(...args);
+const run = (name: string, event: never) => runAction(actions, name, event);
 
 describe('load', () => {
-	test('returns self rewards and partner sections', async () => {
+	it('returns self rewards and partner sections', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		await createTestSelfReward(db, ada, { title: 'Self treat', cost: 1 });
 		await setTestSelfRewardCredits(db, ada, 3);
@@ -69,7 +63,7 @@ describe('load', () => {
 		);
 	});
 
-	test('includes an empty section for a partner with no claimable rewards', async () => {
+	it('includes an empty section for a partner with no claimable rewards', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
 		expect(data.partnerRewards).toContainEqual(
@@ -77,7 +71,7 @@ describe('load', () => {
 		);
 	});
 
-	test('omits a controller-only partnership from the claimable partner sections', async () => {
+	it('omits a controller-only partnership from the claimable partner sections', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		await createTestPartnershipReward(db, id, ada, { title: 'Tea', cost: 2 });
 
@@ -85,7 +79,7 @@ describe('load', () => {
 		expect(data.partnerRewards).toEqual([]);
 	});
 
-	test('degrades to an empty rewards page without a session', async () => {
+	it('degrades to an empty rewards page without a session', async () => {
 		await expect(runLoad(load(at(null)))).resolves.toEqual({
 			selfRewards: { credits: 0, rewards: [], claims: [] },
 			partnerRewards: []
@@ -94,13 +88,15 @@ describe('load', () => {
 });
 
 describe('actions', () => {
-	test('updates a self reward from the rewards hub', async () => {
+	it('updates a self reward from the rewards hub', async () => {
 		await createTestSelfReward(db, ada, { title: 'Bath', description: 'Long soak', cost: 2 });
 		const section = await runLoad(load(at(ada)));
 		const reward = section.selfRewards.rewards.find(
 			(entry: SelfRewardView) => entry.title === 'Bath'
 		);
-		if (!reward) throw new Error('reward not created');
+		if (!reward) {
+			throw new Error('reward not created');
+		}
 
 		await run(
 			'selfUpdateReward',
@@ -119,7 +115,7 @@ describe('actions', () => {
 		});
 	});
 
-	test('claims a self reward and deducts credits', async () => {
+	it('claims a self reward and deducts credits', async () => {
 		const reward = await createTestSelfReward(db, ada, { title: 'Nap', cost: 2 });
 		await setTestSelfRewardCredits(db, ada, 5);
 
@@ -128,7 +124,7 @@ describe('actions', () => {
 		await expect(readSelfRewardCreditRow(db, ada.id)).resolves.toMatchObject({ credits: 3 });
 	});
 
-	test('claims a partner reward from the rewards hub', async () => {
+	it('claims a partner reward from the rewards hub', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		const reward = await createTestPartnershipReward(db, id, jun, { title: 'Tea', cost: 2 });
 		await setTestPartnershipRewardCredits(db, id, jun, ada, 4);
@@ -143,7 +139,7 @@ describe('actions', () => {
 		);
 	});
 
-	test('401s without a session when an action runs', async () => {
+	it('401s without a session when an action runs', async () => {
 		const result = await runAndCatch(() => run('selfSetCredits', at(null, { credits: '1' })));
 		expect(result).toMatchObject({ type: 'error', status: 401 });
 	});

@@ -144,12 +144,12 @@
 						<wa-button size="s" disabled={working} onclick={() => run(verify)}>
 							It matches
 						</wa-button>
-						<wa-button size="s" appearance="plain" onclick={() => (showNumber = false)}>
+						<wa-button size="s" appearance="plain" onclick={() => { showNumber = false; }}>
 							Not now
 						</wa-button>
 					</div>
 				{:else}
-					<wa-button size="s" appearance="plain" onclick={() => (showNumber = true)}>
+					<wa-button size="s" appearance="plain" onclick={() => { showNumber = true; }}>
 						Check your safety number
 					</wa-button>
 				{/if}

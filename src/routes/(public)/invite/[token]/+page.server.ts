@@ -32,13 +32,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 
 	// A missing token and an expired one are reported the same way. There is no
 	// value in telling an anonymous visitor which of the two they found.
-	if (!invite || !isInviteUsable(invite, new Date())) {
+	if (!(invite && isInviteUsable(invite, new Date()))) {
 		return { state: 'invalid' as const, inviterName: null };
 	}
 
 	// The name the *inviter* chose for themselves is the only thing shown before
 	// sign-in. No email, no real name, nothing else off the user row.
-	const inviterName = invite.inviterName;
+	const { inviterName } = invite;
 
 	if (!locals.user) {
 		return {
@@ -86,10 +86,14 @@ export const actions: Actions = {
 	default: async ({ locals, params, request }) => {
 		// `(public)` means anyone can reach this, and actions run before layout
 		// loads regardless — so this is the only session check there is.
-		if (!locals.user) error(401, 'Sign in to accept this invite');
+		if (!locals.user) {
+			error(401, 'Sign in to accept this invite');
+		}
 
 		const partnerAcceptForm = await superValidate(request, zod4(partnerAcceptFormSchema));
-		if (!partnerAcceptForm.valid) return fail(400, { partnerAcceptForm });
+		if (!partnerAcceptForm.valid) {
+			return fail(400, { partnerAcceptForm });
+		}
 
 		const { partnerName, yourName, partnerRole, yourRole, control } = partnerAcceptForm.data;
 		const result = await acceptInvite(locals.db, {

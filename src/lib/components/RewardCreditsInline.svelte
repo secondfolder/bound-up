@@ -40,7 +40,7 @@
 </script>
 
 {#if editable}
-	<form method="POST" action={editable.action} class="credit-shell" class:compact class:editing>
+	<form method="POST" action={editable.action} class="credit-shell" class:compact={compact} class:editing>
 		{#if editable.targetUserId}
 			<input
 				type="hidden"
@@ -86,7 +86,7 @@
 		{/if}
 	</form>
 {:else}
-	<div class="credit-shell" class:compact>
+	<div class="credit-shell" class:compact={compact}>
 		{#if showLabel && label}<span class="credit-label">{label}</span>{/if}
 		<div class="credit-display">
 			<strong class="credit-value">{credits}</strong>

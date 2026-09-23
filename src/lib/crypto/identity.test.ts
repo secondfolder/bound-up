@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-	IDENTITY_PREFIX,
-	RECIPIENT_PATTERN,
 	generateAgeIdentity,
+	IDENTITY_PREFIX,
 	importIdentityKey,
 	loadAge,
+	RECIPIENT_PATTERN,
 	recipientFor,
 	webCryptoX25519Available
 } from './identity';
@@ -33,7 +33,7 @@ describe('generateAgeIdentity', () => {
 	});
 
 	it('matches the pattern the Zod schema will check', async () => {
-		for (let i = 0; i < 25; i++) {
+		for (let i = 0; i < 25; i += 1) {
 			const { recipient } = await generateAgeIdentity();
 			expect(recipient).toMatch(RECIPIENT_PATTERN);
 			expect(recipient).toHaveLength(62);
@@ -48,7 +48,7 @@ describe('webCryptoX25519Available', () => {
 		await expect(webCryptoX25519Available()).resolves.toBe(true);
 	});
 
-	it('memoises, so the probe costs one keypair and not one per call', async () => {
+	it('memoises, so the probe costs one keypair and not one per call', () => {
 		const first = webCryptoX25519Available();
 		expect(webCryptoX25519Available()).toBe(first);
 	});

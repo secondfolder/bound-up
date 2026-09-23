@@ -1,5 +1,7 @@
 import { assertStorageKey, type MediaBucket, type MediaStore } from './index';
 
+const TRAILING_SLASH = /\/$/;
+
 /** The production store: encrypted attachments in an R2 bucket. */
 export function createR2Store(bucket: MediaBucket): MediaStore {
 	return {
@@ -13,12 +15,16 @@ export function createR2Store(bucket: MediaBucket): MediaStore {
 		async get(key) {
 			assertStorageKey(key);
 			const object = await bucket.get(key);
-			if (!object) return null;
+			if (!object) {
+				return null;
+			}
 			return { body: object.body, byteSize: object.size };
 		},
 
 		async delete(keys) {
-			if (keys.length === 0) return;
+			if (keys.length === 0) {
+				return;
+			}
 			// R2 accepts at most 1000 keys per call.
 			for (let i = 0; i < keys.length; i += 1000) {
 				await bucket.delete(keys.slice(i, i + 1000));
@@ -26,7 +32,7 @@ export function createR2Store(bucket: MediaBucket): MediaStore {
 		},
 
 		async deletePrefix(prefix) {
-			assertStorageKey(prefix.replace(/\/$/, ''));
+			assertStorageKey(prefix.replace(TRAILING_SLASH, ''));
 			let deleted = 0;
 			let cursor: string | undefined;
 			// Paged, because `list` returns at most 1000 objects and a long-running

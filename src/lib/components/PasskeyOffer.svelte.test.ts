@@ -1,12 +1,13 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
+import { defined } from '$lib/testing/defined';
 import { waSettled } from '$lib/testing/web-awesome';
 
 let mockOffer: { userId: string; recipient: string } | null = null;
 const dismiss = vi.fn();
 
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => undefined }) }));
 
 vi.mock('$lib/crypto/session.svelte', () => ({
 	currentEnrolmentOffer: () => mockOffer,
@@ -17,13 +18,13 @@ vi.mock('$lib/crypto/session.svelte', () => ({
 const { default: PasskeyOffer } = await import('./PasskeyOffer.svelte');
 
 describe('PasskeyOffer', () => {
-	test('says nothing when there is no offer standing', () => {
+	it('says nothing when there is no offer standing', () => {
 		mockOffer = null;
 		render(PasskeyOffer);
 		expect(screen.queryByText('Unlock with a passkey next time?')).not.toBeInTheDocument();
 	});
 
-	test('offers the passkey, and a way to decline it', async () => {
+	it('offers the passkey, and a way to decline it', async () => {
 		mockOffer = { userId: 'usr-1', recipient: 'age1mine' };
 		const { container } = render(PasskeyOffer);
 		// `wa-button` forwards `click()` to the native button it renders, which
@@ -39,11 +40,11 @@ describe('PasskeyOffer', () => {
 		expect(dismiss).toHaveBeenCalled();
 	});
 
-	test('posts to the action that already knows how to store a wrap', () => {
+	it('posts to the action that already knows how to store a wrap', () => {
 		mockOffer = { userId: 'usr-1', recipient: 'age1mine' };
 		const { container } = render(PasskeyOffer);
 
-		const form = container.querySelector('form')!;
+		const form = defined(container.querySelector('form'), 'the offer form');
 		expect(form.getAttribute('action')).toBe('/settings/encryption?/addWrap');
 		// Filled in by the submit handler once the ceremony has produced them.
 		expect(form.querySelector('input[name="wrapBlob"]')).toBeInTheDocument();

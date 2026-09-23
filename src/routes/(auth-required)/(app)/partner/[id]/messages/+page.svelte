@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import HistoryWarning from '$lib/components/HistoryWarning.svelte';
+	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
+	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import NewMessageDialog from '$lib/components/NewMessageDialog.svelte';
+	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
+	import RestoreRequests from '$lib/components/RestoreRequests.svelte';
+	import StickerBoard from '$lib/components/StickerBoard.svelte';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
 	import {
 		acceptKeyChange,
@@ -11,14 +19,6 @@
 	} from '$lib/crypto/trust.svelte';
 	import { acknowledgeWarning, sendMessage } from '$lib/messaging/client';
 	import { watchPartnership } from '$lib/messaging/live';
-	import { page } from '$app/state';
-	import HistoryWarning from '$lib/components/HistoryWarning.svelte';
-	import NewMessageDialog from '$lib/components/NewMessageDialog.svelte';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
-	import RestoreRequests from '$lib/components/RestoreRequests.svelte';
-	import StickerBoard from '$lib/components/StickerBoard.svelte';
-	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -42,7 +42,9 @@
 	 * locked, so a warning about what to send to would be noise.
 	 */
 	$effect(() => {
-		if (keyring.status !== 'unlocked') return;
+		if (keyring.status !== 'unlocked') {
+			return;
+		}
 		void refreshTrust(user.id, data.partner.id, data.recipients);
 	});
 
@@ -73,16 +75,12 @@
 			onChange: () => void invalidate(`messages:board:${id}`)
 		});
 	});
-	const backHref = $derived(
-		resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id })
-	);
+	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 
 	let composing = $state(false);
 
 	const targets = $derived(
-		[data.recipients.mine, data.recipients.theirs].filter(
-			(value): value is string => value !== null
-		)
+		[data.recipients.mine, data.recipients.theirs].filter((value): value is string => value !== null)
 	);
 
 	async function send(
@@ -94,7 +92,9 @@
 			message,
 			targets
 		);
-		if (!outcome.ok) return outcome.message;
+		if (!outcome.ok) {
+			return outcome.message;
+		}
 
 		composing = false;
 		await invalidate(`messages:board:${data.partner.id}`);
@@ -143,7 +143,7 @@
 	<!-- `settingUpUnlock` keeps this branch on screen for a moment after the
 	     unlock succeeds, because `MessageUnlock` owns the passkey dialogs and
 	     unmounting it mid-ceremony would take them with it. -->
-	<MessageUnlock {user} onFlowOpen={(open) => (settingUpUnlock = open)}>
+	<MessageUnlock {user} onFlowOpen={(open) => { settingUpUnlock = open; }}>
 		{#snippet chrome(panel)}
 			<section class="notice">
 				<h1>Unlock your messages</h1>
@@ -208,7 +208,7 @@
 						pill
 						class="fab"
 						aria-label="Write something"
-						onclick={() => (composing = true)}
+						onclick={() => { composing = true; }}
 					>
 						<wa-icon name="paper-plane" variant="solid" label="Write something"></wa-icon>
 					</wa-button>
@@ -221,7 +221,7 @@
 					partnershipId={data.partner.id}
 					tags={data.tags}
 					{send}
-					close={() => (composing = false)}
+					close={() => { composing = false; }}
 				/>
 			{/if}
 		</div>

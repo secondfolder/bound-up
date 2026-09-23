@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestDb, type TestDb } from '$lib/testing/db';
-import { createTestUser, type TestUser } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import { user } from '$lib/server/db/schema/auth';
+import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
+import { createTestUser, type TestUser } from '$lib/testing/fixtures';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;
@@ -94,9 +94,7 @@ describe('update', () => {
 				user: ada,
 				formData: { name: 'Ada Lovelace', timezone: 'UTC' },
 				authApi: {
-					updateUser: async () => {
-						throw new Error('boom');
-					}
+					updateUser: () => Promise.reject(new Error('boom'))
 				}
 			})
 		);

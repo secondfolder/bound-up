@@ -1,8 +1,8 @@
 <script lang="ts">
-	import PartnerFields from './PartnerFields.svelte';
-	import type { PartnerAcceptFormSchema } from '$lib/schemas/partnerForm';
 	import type { Snippet } from 'svelte';
-	import { superForm, type Infer, type SuperValidated } from 'sveltekit-superforms';
+	import { type Infer, type SuperValidated, superForm } from 'sveltekit-superforms';
+	import type { PartnerAcceptFormSchema } from '$lib/schemas/partnerForm';
+	import PartnerFields from './PartnerFields.svelte';
 
 	/**
 	 * The accept half of the invite page.

@@ -1,3 +1,4 @@
+const WHITESPACE = /\s/;
 /**
  * A rough password strength signal for the signup and change-password screens.
  *
@@ -34,8 +35,10 @@ const SEQUENCES = ['abcdefghijklmnopqrstuvwxyz', '01234567890', 'qwertyuiop', 'a
 function hasRun(value: string): boolean {
 	const lower = value.toLowerCase();
 	for (const sequence of SEQUENCES) {
-		for (let i = 0; i + 4 <= sequence.length; i++) {
-			if (lower.includes(sequence.slice(i, i + 4))) return true;
+		for (let i = 0; i + 4 <= sequence.length; i += 1) {
+			if (lower.includes(sequence.slice(i, i + 4))) {
+				return true;
+			}
 		}
 	}
 	return false;
@@ -50,7 +53,7 @@ function hasRun(value: string): boolean {
  * opposite.
  */
 export function scorePassword(password: string): PasswordStrength {
-	const length = password.length;
+	const { length } = password;
 
 	if (length === 0) {
 		return { score: 0, hint: null, acceptable: false };
@@ -81,7 +84,7 @@ export function scorePassword(password: string): PasswordStrength {
 		return { score: 1, hint: 'Too much repetition — mix in more characters', acceptable: true };
 	}
 
-	const hasSpaces = /\s/.test(password);
+	const hasSpaces = WHITESPACE.test(password);
 	if (length >= 20 || (length >= 16 && hasSpaces)) {
 		return { score: 4, hint: null, acceptable: true };
 	}

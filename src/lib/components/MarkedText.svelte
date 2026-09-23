@@ -1,5 +1,4 @@
 <script lang="ts">
-	import Self from './MarkedText.svelte';
 	import {
 		FORMAT_BOLD,
 		FORMAT_CODE,
@@ -7,6 +6,7 @@
 		FORMAT_STRIKETHROUGH,
 		hasFormat
 	} from '$lib/richtext';
+	import Self from './MarkedText.svelte';
 
 	/**
 	 * One text node, wrapped in whatever its format bits ask for.

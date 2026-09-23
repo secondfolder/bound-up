@@ -7,14 +7,18 @@ import { taskEditorFormValuesFromTask, taskInputFromEditorForm } from '$lib/task
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 	const task = await getSelfTaskForUser(
 		locals.db,
 		locals.user.id,
 		locals.user.timezone,
 		params.taskId
 	);
-	if (!task) error(404, 'Task not found');
+	if (!task) {
+		error(404, 'Task not found');
+	}
 	return {
 		taskForm: await superValidate(taskEditorFormValuesFromTask(task), zod4(taskEditorFormSchema), {
 			errors: false
@@ -24,10 +28,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 export const actions: Actions = {
 	default: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const taskForm = await superValidate(request, zod4(taskEditorFormSchema));
-		if (!taskForm.valid) return fail(400, { taskForm });
+		if (!taskForm.valid) {
+			return fail(400, { taskForm });
+		}
 
 		const updated = await updateSelfTask(
 			locals.db,
@@ -36,7 +44,9 @@ export const actions: Actions = {
 			params.taskId,
 			taskInputFromEditorForm(taskForm.data)
 		);
-		if (!updated) error(404, 'Task not found');
+		if (!updated) {
+			error(404, 'Task not found');
+		}
 		return message(taskForm, 'Task saved.');
 	}
 };

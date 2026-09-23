@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestThread,
 	createTestUser,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import { load } from './+page.server';
 
 let harness: TestDb;

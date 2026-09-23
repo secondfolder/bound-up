@@ -26,8 +26,8 @@
  * wrapper the app uses.
  */
 
-import { pinStateFor, type PinRecord, type PinState } from '../encryption';
-import { keyStore, type KeyStore, type PinRow } from './keystore';
+import { type PinRecord, type PinState, pinStateFor } from '../encryption';
+import { type KeyStore, keyStore, type PinRow } from './keystore';
 
 /**
  * The pseudo-partnership id under which a user's **own** recipient is pinned.
@@ -102,7 +102,9 @@ export async function verifyPin(
 ): Promise<PinRecord | null> {
 	const pins = await readPins(store, userId);
 	const pinned = pins.get(partnershipId);
-	if (!pinned || pinned.recipient !== recipient) return null;
+	if (!pinned || pinned.recipient !== recipient) {
+		return null;
+	}
 
 	const row: PinRow = {
 		id: pinRowId(userId, partnershipId),
@@ -132,7 +134,7 @@ export async function acceptPin(
 	recipient: string,
 	now: number = Date.now()
 ): Promise<PinRecord> {
-	return writePin(store, userId, partnershipId, recipient, { now });
+	return await writePin(store, userId, partnershipId, recipient, { now });
 }
 
 /**

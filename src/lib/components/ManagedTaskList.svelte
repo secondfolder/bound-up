@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import RichText from '$lib/components/RichText.svelte';
+	import TimeZoneDisplay from '$lib/components/TimeZoneDisplay.svelte';
 	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
 	import { migrateLegacyDescriptions } from '$lib/richtext-legacy-migrate';
-	import TimeZoneDisplay from '$lib/components/TimeZoneDisplay.svelte';
-	import RichText from '$lib/components/RichText.svelte';
 	import { describeTaskSchedule } from '$lib/task-schedule';
 	import type { PartnershipTaskView, SelfTaskView } from '$lib/types';
 
 	type TaskView = SelfTaskView | PartnershipTaskView;
 
-	interface Props {
+	type Props = {
 		tasks: TaskView[];
 		emptyMessage: string;
 		completeAction?: string | null;
 		completePartnershipId?: string | null;
 		editHref?: ((taskId: string) => string) | null;
-	}
+	};
 
 	let {
 		tasks,
@@ -45,10 +45,18 @@
 	}
 
 	function availabilityText(task: TaskView): string | null {
-		if (!task.active) return 'Inactive';
-		if (task.nextEligibleAt) return `Next available ${formatDateTime(task.nextEligibleAt)}`;
-		if (task.canComplete) return null;
-		if (isPartnershipTask(task) && task.createdByMe) return null;
+		if (!task.active) {
+			return 'Inactive';
+		}
+		if (task.nextEligibleAt) {
+			return `Next available ${formatDateTime(task.nextEligibleAt)}`;
+		}
+		if (task.canComplete) {
+			return null;
+		}
+		if (isPartnershipTask(task) && task.createdByMe) {
+			return null;
+		}
 		return 'Not available right now';
 	}
 
@@ -63,7 +71,9 @@
 	 * does not re-run on every unrelated update.
 	 */
 	$effect(() => {
-		if (!editHref) return;
+		if (!editHref) {
+			return;
+		}
 		void migrateLegacyDescriptions({
 			kind: completePartnershipId ? 'partnership-task' : 'self-task',
 			partnershipId: completePartnershipId,

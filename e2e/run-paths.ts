@@ -22,9 +22,9 @@ import { join } from 'node:path';
  * 20000–39999 stays clear of the vite dev default and below macOS's ephemeral
  * range (49152+), which transient outgoing sockets are drawn from.
  */
-const KEY = createHash('sha1').update(process.cwd()).digest().readUInt16BE(0) % 20000;
+const KEY = createHash('sha1').update(process.cwd()).digest().readUInt16BE(0) % 20_000;
 
-export const E2E_PORT = 20000 + KEY;
+export const E2E_PORT = 20_000 + KEY;
 export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 export const E2E_RUN_DIR = join(tmpdir(), `bound-up-e2e-${KEY}`);
 export const E2E_MEDIA_DIR = join(E2E_RUN_DIR, 'media');

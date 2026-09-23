@@ -16,13 +16,13 @@
 
 <svelte:head>
 	<style>
-		body {
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			min-height: 100svh;
-		}
-	</style>
+	body {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		min-height: 100svh;
+	}
+</style>
 </svelte:head>
 {#if !isLanding}<SiteHeader />{/if}
 <div class="container">

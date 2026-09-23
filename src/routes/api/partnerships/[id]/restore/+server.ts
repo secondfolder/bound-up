@@ -26,10 +26,14 @@ import type { RequestHandler } from './$types';
 
 /** A page of ciphertext to re-encrypt. `cursor` comes from the previous page. */
 export const GET: RequestHandler = async ({ locals, params, url }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const requestId = url.searchParams.get('requestId');
-	if (!requestId) error(400, 'Which request?');
+	if (!requestId) {
+		error(400, 'Which request?');
+	}
 
 	const page = await listHistoryForRestore(locals.db, {
 		partnershipId: params.id,
@@ -41,16 +45,22 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	// 404 for "not a member", "no such request" and "that request is yours" all
 	// alike: distinguishing them would confirm which partnerships and requests
 	// exist, and the client has nothing different to do in any of the cases.
-	if (!page) error(404, 'Not found');
+	if (!page) {
+		error(404, 'Not found');
+	}
 	return json(page);
 };
 
 /** Writes back one page of re-encrypted bodies. */
 export const POST: RequestHandler = async ({ locals, params, request }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = restoreApplySchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed restore');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed restore');
+	}
 
 	const result = await applyHistoryRestore(locals.db, {
 		partnershipId: params.id,
@@ -61,7 +71,9 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 		final: parsed.data.final
 	});
 
-	if (!result.ok) error(404, 'Not found');
+	if (!result.ok) {
+		error(404, 'Not found');
+	}
 	return json({ ok: true, updated: result.updated });
 };
 
@@ -74,16 +86,22 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
  * waiting indefinitely.
  */
 export const DELETE: RequestHandler = async ({ locals, params, request }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = restoreDeclineSchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed request');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed request');
+	}
 
 	const done = await declineHistoryRestore(locals.db, {
 		partnershipId: params.id,
 		requestId: parsed.data.requestId,
 		actorId: locals.user.id
 	});
-	if (!done) error(404, 'Not found');
+	if (!done) {
+		error(404, 'Not found');
+	}
 	return json({ ok: true });
 };

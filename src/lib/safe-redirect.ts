@@ -8,10 +8,16 @@
  * absolute URL is an open redirect by definition.
  */
 export function safeRedirect(value: string | null | undefined): string | null {
-	if (!value) return null;
-	if (!value.startsWith('/')) return null;
+	if (!value) {
+		return null;
+	}
+	if (!value.startsWith('/')) {
+		return null;
+	}
 	// Second character decides: '/' or '\' makes it protocol-relative.
-	if (value.length > 1 && (value[1] === '/' || value[1] === '\\')) return null;
+	if (value.length > 1 && (value[1] === '/' || value[1] === '\\')) {
+		return null;
+	}
 	return value;
 }
 

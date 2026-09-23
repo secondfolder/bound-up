@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { RewardsWidgetView, TasksWidgetView } from '$lib/types';
 import RewardsWidget from './RewardsWidget.svelte';
 import TasksWidget from './TasksWidget.svelte';
-import type { RewardsWidgetView, TasksWidgetView } from '$lib/types';
 
 function tasks(overrides: Partial<TasksWidgetView> = {}): TasksWidgetView {
 	return {
@@ -28,7 +28,7 @@ function rewards(overrides: Partial<RewardsWidgetView> = {}): RewardsWidgetView 
 }
 
 describe('TasksWidget', () => {
-	test('lists what is ready and counts what is hidden behind it', () => {
+	it('lists what is ready and counts what is hidden behind it', () => {
 		render(TasksWidget, {
 			href: '/home/tasks',
 			tasks: tasks({
@@ -43,7 +43,7 @@ describe('TasksWidget', () => {
 		expect(screen.getByText('and 3 more ready')).toBeInTheDocument();
 	});
 
-	test('says what is waiting when nothing is ready, rather than that nothing is', () => {
+	it('says what is waiting when nothing is ready, rather than that nothing is', () => {
 		render(TasksWidget, {
 			href: '/home/tasks',
 			tasks: tasks({ waitingCount: 2, activeCount: 2 })
@@ -54,7 +54,7 @@ describe('TasksWidget', () => {
 		expect(screen.getByText('2 waiting on a schedule')).toBeInTheDocument();
 	});
 
-	test('renders no body at all when there is nothing to say', () => {
+	it('renders no body at all when there is nothing to say', () => {
 		const { container } = render(TasksWidget, { href: '/home/tasks', tasks: tasks() });
 
 		// The header still stands; the body is gone, collapsed by the class
@@ -65,7 +65,7 @@ describe('TasksWidget', () => {
 		expect(container.querySelector('wa-card')?.textContent?.trim()).toBe('Tasks');
 	});
 
-	test('shows the managing side a count instead of somebody else’s to-do list', () => {
+	it('shows the managing side a count instead of somebody else’s to-do list', () => {
 		render(TasksWidget, {
 			href: '/partner/p1/tasks',
 			tasks: tasks({ viewerActs: false, activeCount: 1 })
@@ -77,7 +77,7 @@ describe('TasksWidget', () => {
 });
 
 describe('RewardsWidget', () => {
-	test('leads with the balance the costs beside it are read against', () => {
+	it('leads with the balance the costs beside it are read against', () => {
 		render(RewardsWidget, {
 			href: '/home/rewards',
 			rewards: rewards({
@@ -96,7 +96,7 @@ describe('RewardsWidget', () => {
 		expect(screen.queryByText(/out of reach/)).not.toBeInTheDocument();
 	});
 
-	test('renders no body at all on a fresh account with no rewards and no credits', () => {
+	it('renders no body at all on a fresh account with no rewards and no credits', () => {
 		const { container } = render(RewardsWidget, {
 			href: '/home/rewards',
 			rewards: rewards({ activeCount: 0 })
@@ -106,7 +106,7 @@ describe('RewardsWidget', () => {
 		expect(container.querySelector('wa-card')?.textContent?.trim()).toBe('Rewards');
 	});
 
-	test('says nothing at all about rewards the balance does not cover', () => {
+	it('says nothing at all about rewards the balance does not cover', () => {
 		const { container } = render(RewardsWidget, {
 			href: '/home/rewards',
 			rewards: rewards({
@@ -122,7 +122,7 @@ describe('RewardsWidget', () => {
 		expect(container.querySelector('wa-card')?.textContent?.trim()).toBe('Rewards');
 	});
 
-	test('shows the managing side a count instead of a claim list', () => {
+	it('shows the managing side a count instead of a claim list', () => {
 		render(RewardsWidget, {
 			href: '/partner/p1/rewards',
 			rewards: rewards({ viewerActs: false, activeCount: 2 })

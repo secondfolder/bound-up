@@ -26,7 +26,7 @@ const A11Y_WARNING_ALLOWLIST = {
  * The compiler names the offending element as `<tag>` in the message. A custom
  * element name always contains a hyphen, so a native tag never matches.
  */
-const CUSTOM_ELEMENT_IN_MESSAGE = /`<([a-z][a-z0-9]*-[a-z0-9-]*)>`/;
+const CUSTOM_ELEMENT_IN_MESSAGE = /`<(?<tag>[a-z][a-z0-9]*-[a-z0-9-]*)>`/;
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -45,8 +45,12 @@ const config = {
 		// ignore this whole file, adapter included.
 		warningFilter: (warning) => {
 			const allowed = A11Y_WARNING_ALLOWLIST[warning.code];
-			const element = warning.message.match(CUSTOM_ELEMENT_IN_MESSAGE)?.[1];
-			return !(allowed && element && allowed.includes(element));
+			const match = CUSTOM_ELEMENT_IN_MESSAGE.exec(warning.message);
+			if (!(allowed && match)) {
+				return true;
+			}
+			const [, element] = match;
+			return !allowed.includes(element);
 		}
 	},
 

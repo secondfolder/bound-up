@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { defined } from '$lib/testing/defined';
 import { AUTH_SECRET_PATTERN, parseKeyWrapParams } from '../encryption';
-import { RECIPIENT_PATTERN, loadAge } from './identity';
+import type { KeyWrapView } from '../types';
+import { loadAge, RECIPIENT_PATTERN } from './identity';
+import { deriveMasterKey, deriveWrapKey } from './kdf';
 import { buildIdentitySubmission, buildPasswordChange, currentPasswordWrapParams } from './setup';
 import { unwrapIdentity } from './wrap';
-import { deriveMasterKey, deriveWrapKey } from './kdf';
-import type { KeyWrapView } from '../types';
 
 const EMAIL = 'ada@example.test';
 const OLD = 'correct-horse-battery';
@@ -84,7 +85,11 @@ describe('buildPasswordChange', () => {
 
 		const newKey = await deriveWrapKey(await deriveMasterKey(NEW, EMAIL));
 		await expect(
-			unwrapIdentity({ wrapKey: newKey, blob: change!.wrapBlob, recipient: built.recipient })
+			unwrapIdentity({
+				wrapKey: newKey,
+				blob: defined(change, 'the password change').wrapBlob,
+				recipient: built.recipient
+			})
 		).resolves.toBe(built.identity);
 	});
 
@@ -103,8 +108,8 @@ describe('buildPasswordChange', () => {
 		const newSecret = await import('./kdf').then(async (m) =>
 			m.deriveAuthSecret(await m.deriveMasterKey(NEW, EMAIL))
 		);
-		expect(change!.currentAuthSecret).toBe(oldSecret);
-		expect(change!.newAuthSecret).toBe(newSecret);
+		expect(defined(change, 'the password change').currentAuthSecret).toBe(oldSecret);
+		expect(defined(change, 'the password change').newAuthSecret).toBe(newSecret);
 	});
 
 	/**
@@ -145,7 +150,11 @@ describe('buildPasswordChange', () => {
 		expect(change).not.toBeNull();
 		const newKey = await deriveWrapKey(await deriveMasterKey(NEW, EMAIL));
 		await expect(
-			unwrapIdentity({ wrapKey: newKey, blob: change!.wrapBlob, recipient: built.recipient })
+			unwrapIdentity({
+				wrapKey: newKey,
+				blob: defined(change, 'the password change').wrapBlob,
+				recipient: built.recipient
+			})
 		).resolves.toBe(built.identity);
 	});
 
@@ -187,12 +196,12 @@ describe('buildPasswordChange', () => {
 		const newKey = await deriveWrapKey(await deriveMasterKey(NEW, EMAIL));
 		const identity = await unwrapIdentity({
 			wrapKey: newKey,
-			blob: change!.wrapBlob,
+			blob: defined(change, 'the password change').wrapBlob,
 			recipient: built.recipient
 		});
 
 		const decrypter = new age.Decrypter();
-		decrypter.addIdentity(identity!);
+		decrypter.addIdentity(defined(identity, 'the unwrapped identity'));
 		await expect(decrypter.decrypt(ciphertext, 'text')).resolves.toBe('sent before the change');
 	});
 });

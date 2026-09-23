@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { superForm } from 'sveltekit-superforms';
+	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import TaskForm from '$lib/components/TaskForm.svelte';
 	import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
-	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { superForm } from 'sveltekit-superforms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -17,7 +17,9 @@
 		resetForm: false,
 		validators: zod4Client(taskEditorFormSchema),
 		async onUpdated({ form }) {
-			if (!form.valid) return;
+			if (!form.valid) {
+				return;
+			}
 			await invalidateAll();
 		}
 	});

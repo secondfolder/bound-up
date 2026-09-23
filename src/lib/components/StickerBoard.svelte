@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ThreadSticker from './ThreadSticker.svelte';
 	import type { ThreadStickerView } from '$lib/types';
+	import ThreadSticker from './ThreadSticker.svelte';
 
 	/**
 	 * The board: unread threads first, then a divider, then the read ones.

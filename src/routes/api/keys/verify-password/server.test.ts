@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APIError } from 'better-auth/api';
-import { createTestDb, type TestDb } from '$lib/testing/db';
-import { createTestUser, type TestUser } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch } from '$lib/testing/events';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { account } from '$lib/server/db/schema';
+import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch } from '$lib/testing/events';
+import { createTestUser, type TestUser } from '$lib/testing/fixtures';
 import { POST } from './+server';
 
 /**

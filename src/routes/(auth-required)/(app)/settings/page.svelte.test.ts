@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 import type { PageData } from './$types';
@@ -24,7 +24,7 @@ function renderPage(hasMessageHistory: boolean) {
 }
 
 describe('/settings/+page.svelte', () => {
-	test('renders the signed-in panel with the logout form inside it', () => {
+	it('renders the signed-in panel with the logout form inside it', () => {
 		const { container } = renderPage(false);
 
 		expect(screen.getByText('Signed in as')).toBeInTheDocument();
@@ -38,7 +38,7 @@ describe('/settings/+page.svelte', () => {
 		expect(panel?.textContent).toContain('Log out');
 	});
 
-	test('always shows the account, security, and partners links', () => {
+	it('always shows the account, security, and partners links', () => {
 		renderPage(false);
 
 		expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
@@ -55,12 +55,12 @@ describe('/settings/+page.svelte', () => {
 		);
 	});
 
-	test('hides the encrypted-messages link without message history', () => {
+	it('hides the encrypted-messages link without message history', () => {
 		renderPage(false);
 		expect(screen.queryByRole('link', { name: 'Encrypted messages' })).not.toBeInTheDocument();
 	});
 
-	test('shows the encrypted-messages link once message history exists', () => {
+	it('shows the encrypted-messages link once message history exists', () => {
 		renderPage(true);
 		expect(screen.getByRole('link', { name: 'Encrypted messages' })).toHaveAttribute(
 			'href',

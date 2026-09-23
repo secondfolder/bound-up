@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
-	import { openDraft, type DraftSession } from '$lib/messaging/drafts';
+	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import type { TagView } from '$lib/types';
 	import MessageComposer from './MessageComposer.svelte';
 	import TagPicker from './TagPicker.svelte';
@@ -75,7 +75,9 @@
 	function onAfterHide(event: Event) {
 		// `wa-after-hide` bubbles from nested Web Awesome controls such as the tag
 		// dropdown. Only the dialog's own hide should unmount the composer.
-		if (event.target !== event.currentTarget) return;
+		if (event.target !== event.currentTarget) {
+			return;
+		}
 		close();
 	}
 
@@ -83,7 +85,9 @@
 		// Held on to until the send has landed: a failed send keeps its draft.
 		const session = draft;
 		const failure = await send(message, selectedTagIds);
-		if (!failure) session?.clear();
+		if (!failure) {
+			session?.clear();
+		}
 		return failure;
 	}
 </script>

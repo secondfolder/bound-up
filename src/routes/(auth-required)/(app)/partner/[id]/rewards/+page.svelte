@@ -1,26 +1,25 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardCreditsInline from '$lib/components/RewardCreditsInline.svelte';
 	import RewardList from '$lib/components/RewardList.svelte';
-	import { resolve } from '$app/paths';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
-	const backHref = $derived(
-		resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id })
-	);
+	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 	const editHref = (rewardId: string) =>
 		resolve('/(auth-required)/(app)/partner/[id]/rewards/[rewardId]', {
 			id: data.partner.id,
 			rewardId
 		});
-	const description = $derived(
-		data.partner.canManageRewards && data.partner.canClaimRewards
+	const description = $derived.by(() => {
+		if (!data.partner.canManageRewards) {
+			return 'You can claim rewards from this list when you have enough credits.';
+		}
+		return data.partner.canClaimRewards
 			? 'You can manage this reward list and claim rewards your partner created.'
-			: data.partner.canManageRewards
-				? 'You control this reward list and set the credits they can spend.'
-				: 'You can claim rewards from this list when you have enough credits.'
-	);
+			: 'You control this reward list and set the credits they can spend.';
+	});
 </script>
 
 <section class="page">

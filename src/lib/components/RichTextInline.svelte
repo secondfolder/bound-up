@@ -1,9 +1,9 @@
 <script lang="ts">
-	import Self from './RichTextInline.svelte';
-	import MarkedText from './MarkedText.svelte';
-	import UrlEmbed from './UrlEmbed.svelte';
-	import { embedSpecFor, isSafeHttpUrl, type CachedEmbedDetails } from '$lib/embeds';
+	import { type CachedEmbedDetails, embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
 	import type { RichTextInlineNode } from '$lib/richtext';
+	import MarkedText from './MarkedText.svelte';
+	import Self from './RichTextInline.svelte';
+	import UrlEmbed from './UrlEmbed.svelte';
 
 	/**
 	 * The inline half of the renderer: text, line breaks, links and embeds.
@@ -40,10 +40,10 @@
 
 	let {
 		nodes,
-		embeds = undefined,
-		canReveal = undefined,
-		isRevealing = undefined,
-		onReveal = undefined
+		embeds,
+		canReveal,
+		isRevealing,
+		onReveal
 	}: {
 		nodes: RichTextInlineNode[];
 		embeds?: InlineEmbedContext | undefined;
@@ -78,11 +78,11 @@
 			text={node.text}
 			format={node.format}
 		/>{:else if node.type === 'linebreak'}<br
-		/>{:else if node.type === 'embed'}{#if embedSpecFor(node.url)}<span
+		/>{:else if node.type === 'embed'}{const spec = $derived(embedSpecFor(node.url))}{#if spec}<span
 				class="embed-slot"
 				use:mounted={node.url}
 				><UrlEmbed
-					spec={embedSpecFor(node.url)!}
+					{spec}
 					href={node.url}
 					label={node.url}
 					cached={embeds?.cached.get(node.url) ?? null}

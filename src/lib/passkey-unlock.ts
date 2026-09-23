@@ -57,8 +57,12 @@ export type UnlockModeInput = {
 };
 
 export function unlockMode(input: UnlockModeInput): UnlockMode {
-	if (!input.passkeysAvailable) return 'password-only';
-	if (input.hasPasskeyWrap) return 'passkey-ready';
+	if (!input.passkeysAvailable) {
+		return 'password-only';
+	}
+	if (input.hasPasskeyWrap) {
+		return 'passkey-ready';
+	}
 	if (input.passkeyCount > 0 && input.passkeysKnownUnusable >= input.passkeyCount) {
 		return 'passkeys-unusable';
 	}

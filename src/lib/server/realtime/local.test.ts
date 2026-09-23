@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { SSE_PREAMBLE, encodeSseEvent } from './index';
+import { defined } from '$lib/testing/defined';
+import { encodeSseEvent, SSE_PREAMBLE } from './index';
 import { createLocalNotifier, localRoomSize } from './local';
 
 /**
@@ -20,14 +21,19 @@ const decoder = new TextDecoder();
 /** Subscribes and returns a reader plus a way to let go of it. */
 async function subscribe(notifier: ReturnType<typeof createLocalNotifier>, id: string) {
 	const response = await notifier.stream(id);
-	expect(response.headers.get('content-type')).toBe('text/event-stream');
-	const reader = response.body!.getReader();
+	const contentType = response.headers.get('content-type');
+	if (contentType !== 'text/event-stream') {
+		throw new Error(`Expected an event stream, got ${contentType}`);
+	}
+	const reader = defined(response.body, 'the stream body').getReader();
 
 	// Every stream opens with a comment frame. Not cosmetic: EventSource does not
 	// fire `onopen` until something arrives, so without it a client cannot tell
 	// "connected and idle" from "still connecting".
-	const first = await reader.read();
-	expect(decoder.decode(first.value)).toBe(SSE_PREAMBLE);
+	const preamble = decoder.decode((await reader.read()).value);
+	if (preamble !== SSE_PREAMBLE) {
+		throw new Error(`Expected the preamble first, got ${JSON.stringify(preamble)}`);
+	}
 
 	return { reader, release: () => reader.cancel() };
 }

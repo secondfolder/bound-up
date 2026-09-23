@@ -26,7 +26,9 @@ function emptyPage() {
 export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	// The group guard has already run for a layout load. Degrade rather than
 	// throw if that ever changes.
-	if (!locals.user) return emptyPage();
+	if (!locals.user) {
+		return emptyPage();
+	}
 
 	// The app shell's layout has already loaded the partner list for the bottom
 	// nav, so take it from there rather than reading `partnerships` a second

@@ -1,12 +1,18 @@
 <script lang="ts">
+	import { superForm } from 'sveltekit-superforms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import AddPasskeyFlow from '$lib/components/AddPasskeyFlow.svelte';
+	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import { superForm } from 'sveltekit-superforms';
 	import PasswordField from '$lib/components/PasswordField.svelte';
-	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
-	import { buildIdentitySubmission } from '$lib/crypto/setup';
+	import {
+		deriveMasterKey,
+		deriveWrapKey,
+		WEBCRYPTO_UNAVAILABLE,
+		webCryptoAvailable
+	} from '$lib/crypto/kdf';
 	import { passkeysAvailable } from '$lib/crypto/passkey';
 	import {
 		currentEnrolmentOffer,
@@ -14,22 +20,16 @@
 		initialiseKeyring,
 		lock
 	} from '$lib/crypto/session.svelte';
-	import AddPasskeyFlow from '$lib/components/AddPasskeyFlow.svelte';
-	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
+	import { buildIdentitySubmission } from '$lib/crypto/setup';
 	import { stashUnlock } from '$lib/crypto/stash';
 	import {
 		requestStoragePersistence,
+		type StoragePersistenceState,
 		storageExplanationVisible,
-		storagePersistenceState,
-		type StoragePersistenceState
+		storagePersistenceState
 	} from '$lib/crypto/storage-persistence.svelte';
-	import {
-		deriveMasterKey,
-		deriveWrapKey,
-		webCryptoAvailable,
-		WEBCRYPTO_UNAVAILABLE
-	} from '$lib/crypto/kdf';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
+	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
 	import type { KeyWrapView } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -116,7 +116,9 @@
 			}
 		},
 		async onUpdated({ form }) {
-			if (!form.valid) return;
+			if (!form.valid) {
+				return;
+			}
 			setupPassword = '';
 			setupConfirm = '';
 			await initialiseKeyring(user);
@@ -150,7 +152,9 @@
 		}
 		let stale = false;
 		void storagePersistenceState().then((state) => {
-			if (!stale) storageState = state;
+			if (!stale) {
+				storageState = state;
+			}
 		});
 		return () => {
 			stale = true;

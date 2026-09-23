@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { registerRichText } from '@lexical/rich-text';
 import {
+	createEditor,
 	$createLineBreakNode as createLineBreakNode,
 	$createNodeSelection as createNodeSelection,
 	$createParagraphNode as createParagraphNode,
@@ -10,24 +11,23 @@ import {
 	$isNodeSelection as isNodeSelection,
 	$isRangeSelection as isRangeSelection,
 	$isTextNode as isTextNode,
-	$setSelection as setSelection,
 	KEY_ARROW_DOWN_COMMAND,
 	KEY_ARROW_LEFT_COMMAND,
 	KEY_ARROW_RIGHT_COMMAND,
 	KEY_ARROW_UP_COMMAND,
-	createEditor,
 	type LexicalEditor,
 	type LexicalNode,
 	type NodeKey,
 	type SerializedLexicalNode,
-	type Spread
+	type Spread,
+	$setSelection as setSelection
 } from 'lexical';
-import { registerRichText } from '@lexical/rich-text';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
 	$isWidgetNode as isWidgetNode,
+	registerWidgetSelection,
 	$selectWidgetAheadOfCaret as selectWidgetAheadOfCaret,
-	WidgetNode,
-	registerWidgetSelection
+	WidgetNode
 } from '$lib/richtext-widgets';
 
 /**
@@ -71,7 +71,7 @@ class TestWidgetNode extends WidgetNode<string> {
 		this.__label = label;
 	}
 
-	getWidgetClass(): string {
+	override getWidgetClass(): string {
 		return 'test-widget';
 	}
 
@@ -79,7 +79,7 @@ class TestWidgetNode extends WidgetNode<string> {
 		return this.__label;
 	}
 
-	updateDOM(): boolean {
+	override updateDOM(): boolean {
 		return false;
 	}
 
@@ -109,14 +109,18 @@ const paragraph =
 	(...children: Build[]): Build =>
 	() => {
 		const node = createParagraphNode();
-		for (const child of children) node.append(child());
+		for (const child of children) {
+			node.append(child());
+		}
 		return node;
 	};
 
 const mounted: (() => void)[] = [];
 
 afterEach(() => {
-	for (const teardown of mounted.splice(0)) teardown();
+	for (const teardown of mounted.splice(0)) {
+		teardown();
+	}
 });
 
 /**
@@ -146,13 +150,17 @@ function withDocument(...blocks: Build[]): { editor: LexicalEditor; element: HTM
 		() => {
 			const root = getRoot();
 			root.clear();
-			for (const block of blocks) root.append(block());
+			for (const block of blocks) {
+				root.append(block());
+			}
 		},
 		{ discrete: true }
 	);
 
 	mounted.push(() => {
-		for (const off of teardown) off();
+		for (const off of teardown) {
+			off();
+		}
 		editor.setRootElement(null);
 		element.remove();
 	});
@@ -175,7 +183,12 @@ function widgets(): LexicalNode[] {
  * from before the press. An empty discrete update flushes the queue.
  */
 function settle(editor: LexicalEditor): void {
-	editor.update(() => {}, { discrete: true });
+	editor.update(
+		() => {
+			// Nothing to change: committing is the point.
+		},
+		{ discrete: true }
+	);
 }
 
 /** Where the selection is, in one line, for comparing whole cases at a time. */
@@ -184,10 +197,12 @@ function describeSelection(editor: LexicalEditor): string {
 	return editor.getEditorState().read(() => {
 		const selection = getSelection();
 		if (isNodeSelection(selection)) {
-			const node = selection.getNodes()[0];
+			const [node] = selection.getNodes();
 			return `node(${node?.getType()}#${node?.getIndexWithinParent()})`;
 		}
-		if (!isRangeSelection(selection)) return 'none';
+		if (!isRangeSelection(selection)) {
+			return 'none';
+		}
 		const { anchor } = selection;
 		return anchor.type === 'element'
 			? `element@${anchor.offset}`
@@ -200,9 +215,11 @@ function selectedWidgetLabel(editor: LexicalEditor): string | null {
 	settle(editor);
 	return editor.getEditorState().read(() => {
 		const selection = getSelection();
-		if (!isNodeSelection(selection)) return null;
-		const widget = selection.getNodes().find(isWidgetNode);
-		return widget?.getWidgetLabel() ?? null;
+		if (!isNodeSelection(selection)) {
+			return null;
+		}
+		const selected = selection.getNodes().find(isWidgetNode);
+		return selected?.getWidgetLabel() ?? null;
 	});
 }
 
@@ -221,7 +238,9 @@ const selectWidget = (editor: LexicalEditor, index: number) =>
 	editor.update(
 		() => {
 			const found = widgets()[index];
-			if (!found) throw new Error(`no widget ${index}`);
+			if (!found) {
+				throw new Error(`no widget ${index}`);
+			}
 			const selection = createNodeSelection();
 			selection.add(found.getKey());
 			setSelection(selection);
@@ -344,17 +363,23 @@ describe('widget selection', () => {
 		const endOfFirstLine = () => {
 			const block = getRoot().getFirstChild();
 			const first = isElementNode(block) ? block.getFirstChild() : null;
-			if (!isTextNode(first)) throw new Error('expected the block to open with text');
+			if (!isTextNode(first)) {
+				throw new Error('expected the block to open with text');
+			}
 			first.select(first.getTextContentSize(), first.getTextContentSize());
 		};
 		const pointInFirstBlock = (offset: number) => () => {
 			const block = getRoot().getFirstChild();
-			if (!isElementNode(block)) throw new Error('expected a paragraph');
+			if (!isElementNode(block)) {
+				throw new Error('expected a paragraph');
+			}
 			block.select(offset, offset);
 		};
 		const endOfBlock = (index: number) => () => {
 			const block = getRoot().getChildren()[index];
-			if (!isElementNode(block)) throw new Error(`no block ${index}`);
+			if (!isElementNode(block)) {
+				throw new Error(`no block ${index}`);
+			}
 			block.selectEnd();
 		};
 
@@ -441,17 +466,23 @@ describe('widget selection', () => {
 		const afterTheWidget = (offset: number) => () => {
 			const block = getRoot().getChildren().at(-1);
 			const after = isElementNode(block) ? block.getChildren().at(-1) : null;
-			if (!isTextNode(after)) throw new Error('expected text after the widget');
+			if (!isTextNode(after)) {
+				throw new Error('expected text after the widget');
+			}
 			after.select(offset, offset);
 		};
 		const pointInFirstBlock = (offset: number) => () => {
 			const block = getRoot().getFirstChild();
-			if (!isElementNode(block)) throw new Error('expected a paragraph');
+			if (!isElementNode(block)) {
+				throw new Error('expected a paragraph');
+			}
 			block.select(offset, offset);
 		};
 		const endOfBlock = (index: number) => () => {
 			const block = getRoot().getChildren()[index];
-			if (!isElementNode(block)) throw new Error(`no block ${index}`);
+			if (!isElementNode(block)) {
+				throw new Error(`no block ${index}`);
+			}
 			block.selectEnd();
 		};
 
@@ -515,7 +546,9 @@ describe('widget selection', () => {
 	it('selects the widget a press lands on', () => {
 		const { editor, element } = withDocument(paragraph(text('look'), br, widget(), text('after')));
 		const target = element.querySelector('.richtext-widget');
-		if (!target) throw new Error('expected a widget element');
+		if (!target) {
+			throw new Error('expected a widget element');
+		}
 
 		const press = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
 		target.dispatchEvent(press);
@@ -538,7 +571,9 @@ describe('widget selection', () => {
 	it('leaves a press alone over a button or a frame', () => {
 		const { editor, element } = withDocument(paragraph(text('look'), br, widget(), text('after')));
 		const target = element.querySelector('.richtext-widget');
-		if (!target) throw new Error('expected a widget element');
+		if (!target) {
+			throw new Error('expected a widget element');
+		}
 
 		const button = document.createElement('button');
 		const frame = document.createElement('iframe');

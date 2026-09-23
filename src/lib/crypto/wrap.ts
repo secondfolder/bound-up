@@ -85,7 +85,9 @@ export async function unseal(input: {
 		// WebCrypto reports every authentication failure as OperationError with no
 		// detail, which is correct of it — distinguishing "wrong key" from "wrong
 		// AAD" from "flipped byte" would be an oracle. Anything else is a real bug.
-		if (error instanceof DOMException && error.name === 'OperationError') return null;
+		if (error instanceof DOMException && error.name === 'OperationError') {
+			return null;
+		}
 		throw error;
 	}
 }
@@ -102,7 +104,11 @@ export async function wrapIdentity(input: {
 	identity: string;
 	recipient: string;
 }): Promise<string> {
-	return seal({ key: input.wrapKey, plaintext: input.identity, aad: wrapAad(input.recipient) });
+	return await seal({
+		key: input.wrapKey,
+		plaintext: input.identity,
+		aad: wrapAad(input.recipient)
+	});
 }
 
 /** Opens a wrap, or returns null when the key is wrong. See `unseal`. */
@@ -111,5 +117,5 @@ export async function unwrapIdentity(input: {
 	blob: string;
 	recipient: string;
 }): Promise<string | null> {
-	return unseal({ key: input.wrapKey, blob: input.blob, aad: wrapAad(input.recipient) });
+	return await unseal({ key: input.wrapKey, blob: input.blob, aad: wrapAad(input.recipient) });
 }

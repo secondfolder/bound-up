@@ -7,7 +7,7 @@
 		selectedIds = $bindable<string[]>([]),
 		threadId,
 		startEditing = false,
-		onTagCreated = undefined
+		onTagCreated
 	}: {
 		partnershipId: string;
 		tags: TagView[];
@@ -51,9 +51,11 @@
 	const addableTags = $derived(localTags.filter((tag) => !selectedIds.includes(tag.id)));
 
 	function onAddTagSelect(event: CustomEvent) {
-		const item = (event.detail as { item?: { value?: string } }).item;
+		const { item } = event.detail as { item?: { value?: string } };
 		const value = item?.value;
-		if (!value) return;
+		if (!value) {
+			return;
+		}
 		if (value === NEW_TAG_VALUE) {
 			addingNew = true;
 			problem = null;
@@ -64,7 +66,9 @@
 	}
 
 	async function addTag() {
-		if (!newName.trim()) return;
+		if (!newName.trim()) {
+			return;
+		}
 		const response = await fetch(`/api/partnerships/${partnershipId}/tags`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -92,7 +96,9 @@
 	}
 
 	async function saveEdit() {
-		if (!editingTagId) return;
+		if (!editingTagId) {
+			return;
+		}
 		const response = await fetch(`/api/partnerships/${partnershipId}/tags/${editingTagId}`, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
@@ -110,7 +116,9 @@
 
 	/** The only removal path while editing: inside the pencil's edit options. */
 	function removeEditing() {
-		if (!editingTagId) return;
+		if (!editingTagId) {
+			return;
+		}
 		selectedIds = selectedIds.filter((value) => value !== editingTagId);
 		editingTagId = null;
 	}
@@ -149,7 +157,7 @@
 {#if editing}
 	<!-- Everything on one wrapping line: chips, the Add tag dropdown, any
 	     in-progress field, and Done. No stacked sections. -->
-	<div class="tag-picker editing" role="group" aria-label="Edit tags">
+	<fieldset class="tag-picker editing" aria-label="Edit tags">
 		{#each selectedTags as tag (tag.id)}
 			<!-- The pill stays; only its contents are swapped for the edit controls. -->
 			<span class="tag" style={`--tag-color: ${tag.color}`}>
@@ -231,19 +239,19 @@
 		{/if}
 
 		{#if problem}<p class="problem">{problem}</p>{/if}
-	</div>
+	</fieldset>
 {:else if selectedTags.length > 0}
 	<div class="tag-picker display">
 		{#each selectedTags as tag (tag.id)}
 			<span class="tag" style={`--tag-color: ${tag.color}`}>{tag.name}</span>
 		{/each}
-		<wa-button type="button" size="s" appearance="plain" pill onclick={() => (editing = true)}>
+		<wa-button type="button" size="s" appearance="plain" pill onclick={() => { editing = true; }}>
 			<wa-icon name="pencil" variant="solid" label="Edit tags"></wa-icon>
 		</wa-button>
 	</div>
 {:else}
 	<div class="tag-picker display">
-		<wa-button type="button" size="s" appearance="outlined" pill onclick={() => (editing = true)}>
+		<wa-button type="button" size="s" appearance="outlined" pill onclick={() => { editing = true; }}>
 			Add tags
 		</wa-button>
 	</div>
@@ -251,6 +259,12 @@
 
 <style>
 	.tag-picker {
+		/* The editing picker is a fieldset, for its group semantics; none of its
+		   default box. */
+		margin: 0;
+		padding: 0;
+		border: 0;
+		min-inline-size: 0;
 		display: flex;
 		flex-direction: column;
 		gap: 0.4rem;
@@ -301,38 +315,6 @@
 		}
 	}
 
-	.field-row {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
-
-		/* Inside a chip the controls must fit the pill, not stretch it sideways. */
-		.tag & {
-			gap: 0.2rem;
-
-			input:not([type='color']) {
-				min-inline-size: 4.5rem;
-				padding: 0.1rem 0.35rem;
-				font-size: 0.75rem;
-			}
-
-			.colour {
-				inline-size: 2.6em;
-				block-size: 2.6em;
-				flex: 0 0 auto;
-			}
-		}
-
-		input:not([type='color']) {
-			min-inline-size: 7rem;
-			padding: 0.3rem 0.5rem;
-			border: 1px solid var(--wa-color-surface-border);
-			border-radius: 0.35rem;
-			background: var(--wa-color-surface-default, white);
-			color: var(--wa-color-text-normal, #17202a);
-		}
-	}
-
 	/*
 	 * The colour control shows the chosen colour AS the field, with a brush icon
 	 * on top. The native input is invisible but fills the label, so the whole
@@ -360,6 +342,38 @@
 			inset: 0;
 			opacity: 0;
 			cursor: pointer;
+		}
+	}
+
+	.field-row {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+
+		input:not([type='color']) {
+			min-inline-size: 7rem;
+			padding: 0.3rem 0.5rem;
+			border: 1px solid var(--wa-color-surface-border);
+			border-radius: 0.35rem;
+			background: var(--wa-color-surface-default, white);
+			color: var(--wa-color-text-normal, #17202a);
+		}
+
+		/* Inside a chip the controls must fit the pill, not stretch it sideways. */
+		.tag & {
+			gap: 0.2rem;
+
+			input:not([type='color']) {
+				min-inline-size: 4.5rem;
+				padding: 0.1rem 0.35rem;
+				font-size: 0.75rem;
+			}
+
+			.colour {
+				inline-size: 2.6em;
+				block-size: 2.6em;
+				flex: 0 0 auto;
+			}
 		}
 	}
 

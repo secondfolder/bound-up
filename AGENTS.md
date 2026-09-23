@@ -18,8 +18,8 @@ Auth. Data is Drizzle over Cloudflare D1 (production) and a local SQLite file
 
 Guides, edge tasks, and `src/lib/server/db/seed-data.ts` are explicit adult content.
 That is the point of the app, not a mistake. Treat that prose as data: do not
-rewrite it, sanitise it, or reflow it (it is in `.prettierignore` precisely so
-one entry stays on one line).
+rewrite it, sanitise it, or reflow it (it is excluded from Biome in
+`biome.jsonc` precisely so one entry stays on one line).
 
 ## Repo map
 
@@ -46,18 +46,18 @@ Run before declaring anything done:
 
 ```sh
 npm run check    # svelte-check
-npm run lint     # prettier --check && eslint
+npm run lint     # biome ci + the Svelte <script>/<style> format check
 npm test         # everything: vitest (node + browser projects), then playwright
 npm run test:e2e # playwright alone, real browser against vite dev
-npm run format   # fixes prettier complaints
+npm run format   # fixes everything `lint` complains about that is mechanical
 ```
 
 `git commit` also runs husky over the staged files: `npm run check` first
 (svelte-check is project-wide, so it cannot be scoped by lint-staged), then
-lint-staged (prettier, eslint --fix, then `vitest related --run` on the tests
-that import them — config lives in `package.json`). It is a fast partial gate,
-not the loop: it does not run the e2e suite, and a commit passing it is not
-"done".
+lint-staged (`biome check --write`, the Svelte block formatter, then
+`vitest related --run` on the tests that import them — config lives in
+`package.json`). It is a fast partial gate, not the loop: it does not run the
+e2e suite, and a commit passing it is not "done".
 
 Honest baseline as of this writing — `lint`, `check`, `test` and `test:e2e` are
 all clean. It was not always so; both suppression conventions below exist
@@ -65,12 +65,39 @@ because a warning was either a false positive or an intentional pattern, and
 **`npm run check` reporting anything at all means a new problem**, not baseline
 noise:
 
-- `npm run lint`: clean. The vendored `.agents/` skills, `skills-lock.json` and
-  the frozen `docs/historical-plans/` are excluded in `.prettierignore` — the
-  first two because `skills-lock.json` pins them, the last because formatting
-  would silently rewrite frozen records (it reflows their tables and changes
-  emphasis markers). Keep new files formatted; keep those ignored.
-- `npm run check`: **0 errors, 0 warnings.** All TypeScript files across the workspace (root configs, `vitest-setup-browser.ts`, `e2e/**/*.ts`) are included in `tsconfig.json` and type-aware ESLint (`eslint.config.js`) so command-line checks catch all errors visible in VS Code. Two
+- `npm run lint`: clean. Lint and formatting are one tool, Biome, and
+  **every rule in every group is on and raised to `error`** — see
+  [docs/linting-and-formatting.md](docs/linting-and-formatting.md) for how that
+  is put together and what the exceptions are. Read that before adding a rule
+  to the exception list in `biome.jsonc`: the list is short, every entry says
+  why, and the fix for a new diagnostic is almost always the code. A per-site
+  `biome-ignore` needs a real reason too. The vendored `.agents/` skills,
+  `skills-lock.json`, `drizzle/`, `static/`, the seed prose and the frozen
+  `docs/historical-plans/` are excluded in `files.includes` — the skills
+  because `skills-lock.json` pins them, the plans because formatting would
+  silently rewrite frozen records. Keep new files formatted; keep those
+  ignored.
+  - **Biome does not format Markdown**, so `*.md` is hand-wrapped: match the
+    width of the file you are editing rather than reflowing it.
+  - **Biome does not format Svelte markup here either** — only the `<script>`
+    and `<style>` blocks, through `scripts/format-svelte.mjs`, because its own
+    Svelte formatter deletes and duplicates template comments. Markup layout is
+    a matter for review.
+  - **`resolve()` for internal navigation is enforced by a GritQL plugin**
+    (`biome-plugins/navigation-through-resolve.grit`) for `goto`, `pushState`
+    and `replaceState` only. Biome's plugins cannot match markup, so an
+    `href` built without `resolve()` is now caught in review rather than by the
+    linter. Suppress a plugin diagnostic with `// biome-ignore lint/plugin:`.
+  - **Two Biome false positives have a shape worth knowing.** Its inference
+    believes `RegExp.prototype.exec` never returns null, so a `const match =
+    …exec(x)` needs an explicit `: RegExpExecArray | null` annotation or the
+    null check is reported as unnecessary. And a switch over an indexed access
+    into superforms' `Infer<>` overflows its stack and takes the whole run
+    with it — `z.output<Schema>` is the same type and does not.
+- `npm run check`: **0 errors, 0 warnings.** All TypeScript files across the
+  workspace (root configs, `vitest-setup-browser.ts`, `e2e/**/*.ts`) are
+  included in `tsconfig.json`, so command-line checks catch every error visible
+  in VS Code. Two
   suppressions keep it clean. Both are ones svelte-check and the vite dev
   server respect alike — svelte-check ignores `onwarn`, so that hook is not an
   option:
@@ -114,9 +141,10 @@ chromium` first). A spec sitting at ~90 seconds is one hanging on its
   last unfinished call is what names it, and `error-context.md` beside it has
   the page as it was.
 
-Internal links go through `resolve()` from `$app/paths` — `href="/guides"` and a
-bare `goto('/')` are both eslint errors under
-`svelte/no-navigation-without-resolve`.
+Internal links go through `resolve()` from `$app/paths`. `goto('/')` is a lint
+error (`biome-plugins/navigation-through-resolve.grit`); `href="/guides"` is
+not — Biome's plugins cannot match markup — so that half is on you and on
+review.
 
 If you add a behaviour worth protecting, add a test. `*.svelte.test.ts` runs in
 the browser project; everything else runs in the node project, which excludes
@@ -538,7 +566,21 @@ const data = await runLoad(load(fakeEvent({ db, user: ada }))); // $lib/testing/
 - Fixtures insert `user` rows directly rather than booting Better Auth, which
   would need a live request context for `sveltekitCookies`.
 - `runLoad()` exists only to drop the `void` from `PageServerLoad`'s return
-  type; `runAndCatch()` turns a thrown `redirect()` / `error()` into a value.
+  type; `runAndCatch()` turns a thrown `redirect()` / `error()` into a value;
+  `runAction(actions, name, event)` is the same idea for a form action, so a
+  test does not have to cast the route's loosely typed `actions` record.
+- `fakeEvent()` fills in only what a route reads, and everything optional is
+  absent until asked for: leave out `db` for a route that never queries, and
+  pass `parentData` / `fetch` for one that calls `parent()` or `event.fetch`.
+  Reaching for anything it was not given fails loudly rather than as
+  `undefined`. Its return type is inferred from the call it is passed to.
+- **A test asserts on a value, it does not assume one.** `defined(value, what)`
+  from `$lib/testing/defined` replaces `value!`: the non-null assertion only
+  silences the type checker, so a missing value surfaced as "Cannot read
+  properties of undefined" several lines later, naming neither the thing that
+  was missing nor the step that should have produced it. `pending()` from
+  `$lib/testing/pending` is the promise that never settles, for asserting on
+  what a component shows while it waits.
 - **Route test files may not start with `+`** — SvelteKit reserves that prefix
   and refuses to build. Name them `page.server.test.ts`, as the existing
   `page.svelte.test.ts` does.
@@ -643,6 +685,12 @@ Notes that cost a debugging round each:
   `isVisible()`, which could land on the placeholder shown while the keyring
   resolves, skip the warning, and leave it blocking the page. It now waits for
   the warning or the board, whichever comes.
+- **Waiting for the page to catch up is `settle(page)`, not a sleep.** Lexical
+  learns where the caret went from `selectionchange`, which the browser
+  dispatches as a task after the key press, so a loop that presses again
+  straight away outruns it. `settle` runs an animation frame and then a task
+  inside the page, which comes after everything that press queued — the
+  ordering a fixed `waitForTimeout` only hoped for.
 - **Test data must be unique across workers, not just within one.**
   `uniqueEmail()` was `Date.now()` plus a counter kept in module scope — so per
   worker process — and two workers' first accounts could share an address.
@@ -700,6 +748,7 @@ Four places, split on scope:
 | [docs/section-widgets.md](docs/section-widgets.md)                                       | The /home and /partner cards: the shell, the per-section bodies, the data     |
 | [docs/timezone.md](docs/timezone.md)                                                     | Account timezone storage, mismatch prompts, and device-local dismissal        |
 | [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text      |
+| [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin           |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

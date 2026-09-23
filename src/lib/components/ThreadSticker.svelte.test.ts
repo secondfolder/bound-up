@@ -1,8 +1,8 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
-import type { ThreadStickerView } from '$lib/types';
 import { waProp } from '$lib/testing/web-awesome';
+import type { ThreadStickerView } from '$lib/types';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
@@ -61,13 +61,14 @@ beforeEach(() => {
 	openMessageMetadata.mockReset();
 	fetchAttachment.mockReset();
 	Intl.DateTimeFormat = class {
-		constructor(
-			_: string | string[] | undefined,
-			private readonly options?: Intl.DateTimeFormatOptions
-		) {}
+		readonly #options: Intl.DateTimeFormatOptions | undefined;
+
+		constructor(_: string | string[] | undefined, options?: Intl.DateTimeFormatOptions) {
+			this.#options = options;
+		}
 
 		format() {
-			return this.options?.hour ? 'TIME' : 'DATE';
+			return this.#options?.hour ? 'TIME' : 'DATE';
 		}
 	} as unknown as typeof Intl.DateTimeFormat;
 });

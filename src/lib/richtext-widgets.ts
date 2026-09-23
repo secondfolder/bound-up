@@ -1,3 +1,4 @@
+import { mergeRegister } from '@lexical/utils';
 import {
 	$createNodeSelection,
 	$getEditor,
@@ -16,12 +17,11 @@ import {
 	KEY_ARROW_LEFT_COMMAND,
 	KEY_ARROW_RIGHT_COMMAND,
 	KEY_ARROW_UP_COMMAND,
-	SELECTION_CHANGE_COMMAND,
 	type LexicalEditor,
 	type LexicalNode,
-	type PointType
+	type PointType,
+	SELECTION_CHANGE_COMMAND
 } from 'lexical';
-import { mergeRegister } from '@lexical/utils';
 
 /**
  * Widgets: the things in a document that are objects rather than characters.
@@ -103,7 +103,7 @@ export abstract class WidgetNode<T> extends DecoratorNode<T> {
 	/** What this widget is, for anyone who cannot see it. */
 	abstract getWidgetLabel(): string;
 
-	isInline(): true {
+	override isInline(): true {
 		return true;
 	}
 
@@ -155,9 +155,13 @@ export function registerWidgetSelection(editor: LexicalEditor): () => void {
 	const sync = () => {
 		const { keys, caretless } = editor.getEditorState().read($selectedWidgets);
 		for (const key of marked) {
-			if (!keys.has(key)) editor.getElementByKey(key)?.classList.remove(WIDGET_SELECTED_CLASS);
+			if (!keys.has(key)) {
+				editor.getElementByKey(key)?.classList.remove(WIDGET_SELECTED_CLASS);
+			}
 		}
-		for (const key of keys) editor.getElementByKey(key)?.classList.add(WIDGET_SELECTED_CLASS);
+		for (const key of keys) {
+			editor.getElementByKey(key)?.classList.add(WIDGET_SELECTED_CLASS);
+		}
 		marked = [...keys];
 		editor.getRootElement()?.classList.toggle(WIDGET_SELECTION_CLASS, caretless);
 	};
@@ -174,27 +178,39 @@ export function registerWidgetSelection(editor: LexicalEditor): () => void {
 	 * never moves, so the editor is focused by hand.
 	 */
 	const onPointerDown = (event: PointerEvent) => {
-		if (!editor.isEditable()) return;
-		const target = event.target;
-		if (!(target instanceof Element)) return;
+		if (!editor.isEditable()) {
+			return;
+		}
+		const { target } = event;
+		if (!(target instanceof Element)) {
+			return;
+		}
 		const element = target.closest(`.${WIDGET_CLASS}`);
-		if (!element) return;
+		if (!element) {
+			return;
+		}
 		// Inside the widget, because the editor's own surface is an ancestor of
 		// every press and is itself `contenteditable`.
 		const interactive = target.closest(INTERACTIVE);
-		if (interactive !== null && element.contains(interactive)) return;
-		if (overPassThrough(element, event)) return;
+		if (interactive !== null && element.contains(interactive)) {
+			return;
+		}
+		if (overPassThrough(element, event)) {
+			return;
+		}
 
 		event.preventDefault();
 		editor.getRootElement()?.focus({ preventScroll: true });
 		editor.update(() => {
 			const node = $getNearestNodeFromDOMNode(element);
-			if ($isWidgetNode(node)) $selectWidget(node);
+			if ($isWidgetNode(node)) {
+				$selectWidget(node);
+			}
 		});
 	};
 
 	const plainArrow = (event: KeyboardEvent | null) =>
-		!event || !(event.shiftKey || event.metaKey || event.altKey || event.ctrlKey);
+		!(event && (event.shiftKey || event.metaKey || event.altKey || event.ctrlKey));
 
 	/**
 	 * One arrow key: off the widget when one is selected, onto the widget when
@@ -218,11 +234,16 @@ export function registerWidgetSelection(editor: LexicalEditor): () => void {
 	 */
 	const arrow =
 		(isBackward: boolean, onto: (() => boolean) | null) => (event: KeyboardEvent | null) => {
-			if (!plainArrow(event)) return false;
+			if (!plainArrow(event)) {
+				return false;
+			}
 			const widget = $selectedWidget();
 			if (widget) {
-				if (isBackward) $selectBeforeWidget(widget);
-				else $selectAfterWidget(widget);
+				if (isBackward) {
+					$selectBeforeWidget(widget);
+				} else {
+					$selectAfterWidget(widget);
+				}
 			} else if (onto === null || !onto()) {
 				return false;
 			}
@@ -284,7 +305,9 @@ export function registerWidgetSelection(editor: LexicalEditor): () => void {
  */
 function $selectedWidgets(): { keys: Set<string>; caretless: boolean } {
 	const selection = $getSelection();
-	if (selection === null) return { keys: new Set(), caretless: false };
+	if (selection === null) {
+		return { keys: new Set(), caretless: false };
+	}
 	if ($isRangeSelection(selection) && selection.isCollapsed()) {
 		return { keys: new Set(), caretless: false };
 	}
@@ -300,7 +323,9 @@ function $selectedWidgets(): { keys: Set<string>; caretless: boolean } {
 /** The widget that is *the* selection, if one is. Inside a `read` or `update`. */
 function $selectedWidget(): WidgetNode<unknown> | null {
 	const selection = $getSelection();
-	if (!$isNodeSelection(selection)) return null;
+	if (!$isNodeSelection(selection)) {
+		return null;
+	}
 	return selection.getNodes().find($isWidgetNode) ?? null;
 }
 
@@ -355,17 +380,23 @@ function $selectBeforeWidget(widget: LexicalNode): void {
 
 	if ($isLineBreakNode(previous)) {
 		const before = previous.getPreviousSibling();
-		if ($selectEndOf(before)) return;
+		if ($selectEndOf(before)) {
+			return;
+		}
 		// Nothing on the line the break ends, so the break *is* that line and the
 		// point in front of it is drawn. Anything else here would skip an empty
 		// line the writer put in on purpose.
 		const block = widget.getParent();
 		const index = previous.getIndexWithinParent();
-		if ($isElementNode(block)) block.select(index, index);
+		if ($isElementNode(block)) {
+			block.select(index, index);
+		}
 		return;
 	}
 
-	if ($selectEndOf(previous)) return;
+	if ($selectEndOf(previous)) {
+		return;
+	}
 	$selectEndOf(widget.getParent()?.getPreviousSibling() ?? null);
 }
 
@@ -390,16 +421,22 @@ function $selectAfterWidget(widget: LexicalNode): void {
 			$selectWidget(after);
 			return;
 		}
-		if ($selectStartOf(after)) return;
+		if ($selectStartOf(after)) {
+			return;
+		}
 		// Nothing on the line the break opens, so the point just past the break
 		// is the empty line itself — which has a line box, and a caret.
 		const block = widget.getParent();
 		const index = next.getIndexWithinParent() + 1;
-		if ($isElementNode(block)) block.select(index, index);
+		if ($isElementNode(block)) {
+			block.select(index, index);
+		}
 		return;
 	}
 
-	if ($selectStartOf(next)) return;
+	if ($selectStartOf(next)) {
+		return;
+	}
 	$selectStartOf(widget.getParent()?.getNextSibling() ?? null);
 }
 
@@ -425,18 +462,24 @@ function $selectAfterWidget(widget: LexicalNode): void {
  */
 export function $selectWidgetAheadOfCaret(): boolean {
 	const selection = $getSelection();
-	if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false;
+	if (!($isRangeSelection(selection) && selection.isCollapsed())) {
+		return false;
+	}
 
-	const anchor = selection.anchor;
+	const { anchor } = selection;
 	const node = anchor.getNode();
 	let next: LexicalNode | null;
 	if (anchor.type === 'element') {
 		next = $isElementNode(node) ? (node.getChildren()[anchor.offset] ?? null) : null;
-		if (next === null) next = node.getNextSibling();
+		if (next === null) {
+			next = node.getNextSibling();
+		}
 	} else {
 		// Only from the very end of the text — anywhere else there are characters
 		// to cross first.
-		if (anchor.offset !== node.getTextContentSize()) return false;
+		if (anchor.offset !== node.getTextContentSize()) {
+			return false;
+		}
 		next = node.getNextSibling() ?? node.getParent()?.getNextSibling() ?? null;
 		// The break that ends the line the caret is already on. The position
 		// after it is drawn at the end of that same line, so hopping it skips
@@ -444,14 +487,22 @@ export function $selectWidgetAheadOfCaret(): boolean {
 		// take a press more than the way out when an empty line sat above the
 		// widget. A *second* empty line still stops, because only one break is
 		// crossed here.
-		if ($isLineBreakNode(next)) next = next.getNextSibling();
+		if ($isLineBreakNode(next)) {
+			next = next.getNextSibling();
+		}
 	}
 	// A block boundary, when the paragraph the caret is in has run out: what
 	// matters is whether the next one opens with a widget.
-	if ($isElementNode(next) && next.getParent() === $getRoot()) next = next.getFirstChild();
+	if ($isElementNode(next) && next.getParent() === $getRoot()) {
+		next = next.getFirstChild();
+	}
 	// And the break that leads onto the widget's own row.
-	if ($isLineBreakNode(next)) next = next.getNextSibling();
-	if (!$isWidgetNode(next)) return false;
+	if ($isLineBreakNode(next)) {
+		next = next.getNextSibling();
+	}
+	if (!$isWidgetNode(next)) {
+		return false;
+	}
 
 	$selectWidget(next);
 	return true;
@@ -483,11 +534,17 @@ export function $selectWidgetAheadOfCaret(): boolean {
  */
 function $selectWidgetOnAdjacentLine(isBackward: boolean): boolean {
 	const selection = $getSelection();
-	if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false;
+	if (!($isRangeSelection(selection) && selection.isCollapsed())) {
+		return false;
+	}
 
 	const widget = $widgetOnAdjacentLine(selection.anchor, isBackward);
-	if (widget === null) return false;
-	if (!lineMoveLeavesThisLine($getEditor(), widget, isBackward)) return false;
+	if (widget === null) {
+		return false;
+	}
+	if (!lineMoveLeavesThisLine($getEditor(), widget, isBackward)) {
+		return false;
+	}
 
 	$selectWidget(widget);
 	return true;
@@ -499,7 +556,9 @@ function $widgetOnAdjacentLine(anchor: PointType, isBackward: boolean): LexicalN
 	let block: LexicalNode | null;
 	let from: LexicalNode | null;
 	if (anchor.type === 'element') {
-		if (!$isElementNode(node)) return null;
+		if (!$isElementNode(node)) {
+			return null;
+		}
 		block = node;
 		// The children either side of the caret: scanning starts outside it.
 		from = node.getChildren()[isBackward ? anchor.offset - 1 : anchor.offset] ?? null;
@@ -507,7 +566,9 @@ function $widgetOnAdjacentLine(anchor: PointType, isBackward: boolean): LexicalN
 		// Up from the text itself to whatever sits on the line — a link wraps the
 		// text of a URL, and it is the link that has line breaks for siblings.
 		const item = $lineItem(node);
-		if (item === null) return null;
+		if (item === null) {
+			return null;
+		}
 		block = item.getParent();
 		from = isBackward ? item.getPreviousSibling() : item.getNextSibling();
 	}
@@ -524,7 +585,9 @@ function $widgetOnAdjacentLine(anchor: PointType, isBackward: boolean): LexicalN
 		edge = step(edge);
 	}
 
-	if ($isWidgetNode(edge)) return edge;
+	if ($isWidgetNode(edge)) {
+		return edge;
+	}
 	if (edge !== null) {
 		const beyond = step(edge);
 		return $isWidgetNode(beyond) ? beyond : null;
@@ -533,11 +596,10 @@ function $widgetOnAdjacentLine(anchor: PointType, isBackward: boolean): LexicalN
 	// No break that way, so the caret is on the first or last line of its block
 	// and the row beyond it belongs to the block next door.
 	const beside = isBackward ? block?.getPreviousSibling() : block?.getNextSibling();
-	const end = $isElementNode(beside)
-		? isBackward
-			? beside.getLastChild()
-			: beside.getFirstChild()
-		: (beside ?? null);
+	let end: LexicalNode | null = beside ?? null;
+	if ($isElementNode(beside)) {
+		end = isBackward ? beside.getLastChild() : beside.getFirstChild();
+	}
 	return $isWidgetNode(end) ? end : null;
 }
 
@@ -546,8 +608,12 @@ function $lineItem(node: LexicalNode): LexicalNode | null {
 	let current: LexicalNode | null = node;
 	while (current !== null) {
 		const parent: LexicalNode | null = current.getParent();
-		if (parent === null) return null;
-		if (parent.getParent() === $getRoot()) return current;
+		if (parent === null) {
+			return null;
+		}
+		if (parent.getParent() === $getRoot()) {
+			return current;
+		}
 		current = parent;
 	}
 	return null;
@@ -594,7 +660,9 @@ function lineMoveLeavesThisLine(
 		domSelection.setBaseAndExtent(anchorNode, anchorOffset, focusNode ?? anchorNode, focusOffset);
 	}
 
-	if (moved === null) return false;
+	if (moved === null) {
+		return false;
+	}
 	return isBackward ? !widget.isBefore(moved) : !moved.isBefore(widget);
 }
 
@@ -604,7 +672,9 @@ function overPassThrough(element: Element, event: PointerEvent): boolean {
 		const rect = frame.getBoundingClientRect();
 		// A box with no size has not been laid out — jsdom, or content still
 		// loading — and cannot have been pressed.
-		if (rect.width === 0 || rect.height === 0) continue;
+		if (rect.width === 0 || rect.height === 0) {
+			continue;
+		}
 		if (
 			event.clientX >= rect.left &&
 			event.clientX <= rect.right &&

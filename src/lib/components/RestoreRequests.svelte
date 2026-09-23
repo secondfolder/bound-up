@@ -3,8 +3,8 @@
 	import { safetyNumber } from '$lib/crypto/fingerprint';
 	import {
 		declineHistoryRestore,
-		runHistoryRestore,
-		type RestoreProgress
+		type RestoreProgress,
+		runHistoryRestore
 	} from '$lib/messaging/restore';
 	import type { RestoreRequestView } from '$lib/types';
 	import SafetyNumber from './SafetyNumber.svelte';
@@ -57,7 +57,9 @@
 		// afterwards, so there is nothing for reactivity to observe. Same call as
 		// the `masters` object in `session.svelte.ts`.
 		const entries: Record<string, string> = {};
-		if (!mine) return entries;
+		if (!mine) {
+			return entries;
+		}
 		for (const request of requests) {
 			entries[request.id] = await safetyNumber(mine, request.requestedRecipient);
 		}
@@ -66,6 +68,14 @@
 
 	type Busy = { id: string; progress: RestoreProgress | null };
 	let busy: Busy | null = $state(null);
+
+	/** The confirm button's text: its own progress, or the question it asks. */
+	function restoreLabel(requestId: string): string {
+		if (busy?.id !== requestId) {
+			return 'The number matches — restore it';
+		}
+		return busy.progress ? `Restoring… ${busy.progress.done} done` : 'Restoring…';
+	}
 	let failure: string | null = $state(null);
 
 	async function restore(request: RestoreRequestView) {
@@ -78,10 +88,14 @@
 				(progress) => {
 					// Rebuilt rather than mutated: `busy` is the $state reference and
 					// reassigning the object is what makes the label update.
-					if (busy) busy = { id: request.id, progress };
+					if (busy) {
+						busy = { id: request.id, progress };
+					}
 				}
 			);
-			if (!outcome.ok) failure = outcome.message;
+			if (!outcome.ok) {
+				failure = outcome.message;
+			}
 		} finally {
 			busy = null;
 			await invalidate(`messages:board:${partnershipId}`);
@@ -131,7 +145,7 @@
 				{partnerName} reads back to you, someone else is asking — and confirming would hand them everything.
 			</p>
 			{#await numbers then resolved}
-				{@const number = resolved[request.id]}
+				{const number = $derived(resolved[request.id])}
 				{#if number}
 					<SafetyNumber value={number} {partnerName} tone="warning" />
 				{/if}
@@ -145,11 +159,7 @@
 					disabled={busy !== null}
 					onclick={() => restore(request)}
 				>
-					{busy?.id === request.id
-						? busy.progress
-							? `Restoring… ${busy.progress.done} done`
-							: 'Restoring…'
-						: `The number matches — restore it`}
+					{restoreLabel(request.id)}
 				</wa-button>
 				<wa-button
 					size="s"

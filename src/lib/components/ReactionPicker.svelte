@@ -23,8 +23,11 @@
 		try {
 			// Tapping the one you already chose removes it, which is what every
 			// other tapback UI does and what people will try.
-			if (emoji === current) await clear();
-			else await react(emoji);
+			if (emoji === current) {
+				await clear();
+			} else {
+				await react(emoji);
+			}
 			open = false;
 		} finally {
 			busy = false;
@@ -47,7 +50,7 @@
 	class="trigger"
 	aria-label={current ? `Change your reaction (${current})` : 'Add a reaction'}
 	aria-expanded={open}
-	onclick={() => (open = !open)}
+	onclick={() => { open = !open; }}
 >
 	<!-- Always the same smiley, never the chosen emoji: the reaction itself is
 	     already shown under the message, so echoing it here duplicated it. -->
@@ -55,7 +58,7 @@
 </button>
 
 {#if open}
-	<div class="menu" role="group" aria-label="Reactions">
+	<fieldset class="menu" aria-label="Reactions">
 		{#each REACTIONS as emoji (emoji)}
 			<wa-button
 				type="button"
@@ -68,7 +71,7 @@
 				{emoji}
 			</wa-button>
 		{/each}
-	</div>
+	</fieldset>
 {/if}
 
 <style>
@@ -89,6 +92,9 @@
 	}
 
 	.menu {
+		/* A fieldset, for its group semantics; none of its default box. */
+		margin: 0;
+		min-inline-size: 0;
 		display: flex;
 		gap: 0.125rem;
 		padding: 0.25rem;

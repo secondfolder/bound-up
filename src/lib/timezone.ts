@@ -1,10 +1,14 @@
-import { getAllCountries, getTimezone } from 'countries-and-timezones';
+import { getAllCountries, getTimezone, type Timezone } from 'countries-and-timezones';
+
+const GMT_OFFSET = /^GMT(?<sign>[+-])(?<hours>\d{1,2})(?::(?<minutes>\d{2}))?$/;
 
 export const UTC_TIMEZONE = 'UTC';
 
 export function canonicalizeTimeZone(value: string): string | null {
 	const candidate = value.trim();
-	if (candidate.length === 0) return null;
+	if (candidate.length === 0) {
+		return null;
+	}
 
 	try {
 		return new Intl.DateTimeFormat('en-US', { timeZone: candidate }).resolvedOptions().timeZone;
@@ -20,10 +24,12 @@ export function currentTimeZoneOrUtc(): string {
 }
 
 export function humanizeTimeZone(timeZone: string): string {
-	if (timeZone === UTC_TIMEZONE) return UTC_TIMEZONE;
+	if (timeZone === UTC_TIMEZONE) {
+		return UTC_TIMEZONE;
+	}
 
 	const pieces = timeZone.split('/');
-	return (pieces[pieces.length - 1] ?? timeZone).replace(/_/g, ' ');
+	return (pieces.at(-1) ?? timeZone).replaceAll('_', ' ');
 }
 
 function offsetMinutesForTimeZone(timeZone: string, date: Date): number {
@@ -35,10 +41,14 @@ function offsetMinutesForTimeZone(timeZone: string, date: Date): number {
 		.formatToParts(date)
 		.find((value) => value.type === 'timeZoneName')?.value;
 
-	if (!part || part === 'GMT') return 0;
+	if (!part || part === 'GMT') {
+		return 0;
+	}
 
-	const match = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(part);
-	if (!match) return 0;
+	const match: RegExpExecArray | null = GMT_OFFSET.exec(part);
+	if (!match) {
+		return 0;
+	}
 
 	const [, sign, hours, minutes] = match;
 	const total = Number(hours) * 60 + Number(minutes ?? '0');
@@ -52,14 +62,20 @@ export function describeTimeZoneDifference(
 ): string {
 	const diffMinutes =
 		offsetMinutesForTimeZone(timeZone, date) - offsetMinutesForTimeZone(referenceTimeZone, date);
-	if (diffMinutes === 0) return 'same time';
+	if (diffMinutes === 0) {
+		return 'same time';
+	}
 
 	const absolute = Math.abs(diffMinutes);
 	const hours = Math.floor(absolute / 60);
 	const minutes = absolute % 60;
 	const parts: string[] = [];
-	if (hours > 0) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
-	if (minutes > 0) parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+	if (hours > 0) {
+		parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+	}
+	if (minutes > 0) {
+		parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+	}
 
 	return `${parts.join(' ')} ${diffMinutes > 0 ? 'ahead of you' : 'behind you'}`;
 }
@@ -113,7 +129,9 @@ const FALLBACK_TIMEZONES = [
 ] as const;
 
 export function supportedTimeZones(): string[] {
-	if (typeof Intl.supportedValuesOf !== 'function') return [...FALLBACK_TIMEZONES];
+	if (typeof Intl.supportedValuesOf !== 'function') {
+		return [...FALLBACK_TIMEZONES];
+	}
 
 	const values = Intl.supportedValuesOf('timeZone');
 	return [UTC_TIMEZONE, ...values.filter((timezone) => timezone !== UTC_TIMEZONE)];
@@ -130,11 +148,15 @@ type TimeZoneSearchEntry = {
 let cachedTimeZoneSearchEntries: TimeZoneSearchEntry[] | null = null;
 
 function timeZoneSearchEntries(): TimeZoneSearchEntry[] {
-	if (cachedTimeZoneSearchEntries) return cachedTimeZoneSearchEntries;
+	if (cachedTimeZoneSearchEntries) {
+		return cachedTimeZoneSearchEntries;
+	}
 
 	const countries = getAllCountries();
 	cachedTimeZoneSearchEntries = supportedTimeZones().map((timezone) => {
-		const metadata = getTimezone(timezone);
+		// Annotated: the overload taking a known zone name says non-null, but
+		// this is any supported zone, which the library may not know.
+		const metadata: Timezone | null = getTimezone(timezone);
 		const countryNames = [
 			...new Set(
 				(metadata?.countries ?? [])
@@ -160,9 +182,15 @@ function scoreTimeZoneSearch(
 	rawQuery: string,
 	normalizedQuery: string
 ): number | null {
-	if (rawQuery === entry.rawLower || normalizedQuery === entry.normalizedTimezone) return 0;
-	if (normalizedQuery === entry.normalizedHumanName) return 1;
-	if (entry.normalizedCountryNames.includes(normalizedQuery)) return 2;
+	if (rawQuery === entry.rawLower || normalizedQuery === entry.normalizedTimezone) {
+		return 0;
+	}
+	if (normalizedQuery === entry.normalizedHumanName) {
+		return 1;
+	}
+	if (entry.normalizedCountryNames.includes(normalizedQuery)) {
+		return 2;
+	}
 
 	if (
 		entry.rawLower.startsWith(rawQuery) ||
@@ -193,7 +221,9 @@ function scoreTimeZoneSearch(
 
 export function searchTimeZones(query: string, limit = supportedTimeZones().length): string[] {
 	const trimmedQuery = query.trim();
-	if (trimmedQuery.length === 0) return supportedTimeZones().slice(0, limit);
+	if (trimmedQuery.length === 0) {
+		return supportedTimeZones().slice(0, limit);
+	}
 
 	const rawQuery = trimmedQuery.toLowerCase();
 	const normalizedQuery = normalizeSearchText(trimmedQuery);

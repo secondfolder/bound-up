@@ -2,10 +2,10 @@
 	import type { EdgeTaskView, GuideView } from '$lib/types';
 	import EdgeTask from './EdgeTask.svelte';
 
-	interface Props {
+	type Props = {
 		guide: GuideView;
 		edgeTasks: EdgeTaskView[];
-	}
+	};
 
 	let { guide, edgeTasks }: Props = $props();
 	let currentEdgeTaskIndex: number = $state(0);

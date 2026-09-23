@@ -14,7 +14,7 @@
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { createAuth } from './src/lib/server/auth';
-import { schema, type Db } from './src/lib/server/db';
+import { type Db, schema } from './src/lib/server/db';
 
 const throwawayDb = drizzle(createClient({ url: ':memory:' }), { schema });
 

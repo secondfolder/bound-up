@@ -37,7 +37,9 @@ export type TaskRepeatUnit = 'minute' | 'hour' | 'day' | 'week' | 'month' | 'yea
 export type TaskWeekday = 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su';
 
 export type TaskScheduleEnd =
-	{ kind: 'never' } | { kind: 'until'; untilLocal: string } | { kind: 'count'; count: number };
+	| { kind: 'never' }
+	| { kind: 'until'; untilLocal: string }
+	| { kind: 'count'; count: number };
 
 export type TaskMonthlyPattern =
 	| { kind: 'day-of-month'; day: number }

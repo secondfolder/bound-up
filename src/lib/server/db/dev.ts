@@ -1,7 +1,7 @@
+import type { RequestEvent } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
-import type { RequestEvent } from '@sveltejs/kit';
-import { createD1Db, schema, type Db } from './index';
+import { createD1Db, type Db, schema } from './index';
 import { requireD1 } from './platform';
 
 let devDb: Db | undefined;
@@ -45,7 +45,7 @@ export async function createDb(event: RequestEvent): Promise<Db> {
 				// that failure has no production counterpart — it only surfaces once
 				// requests overlap, as they do under the parallel e2e suite, where it
 				// showed up as sessions failing to load.
-				timeout: 5_000
+				timeout: 5000
 			});
 			// Redundant on libsql (it defaults to on) but explicit so that FK
 			// behaviour matches D1 regardless of driver defaults.

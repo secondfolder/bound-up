@@ -1,9 +1,9 @@
 <script lang="ts">
+	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
+	import type { MessageView } from '$lib/types';
 	import AttachmentPreview from './AttachmentPreview.svelte';
 	import ReactionPicker from './ReactionPicker.svelte';
 	import RichText from './RichText.svelte';
-	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
-	import type { MessageView } from '$lib/types';
 
 	/**
 	 * One message.
@@ -45,15 +45,13 @@
 	const mine = $derived(message.mine);
 	const myReaction = $derived(reactions.find((reaction) => reaction.mine)?.emoji ?? null);
 	const cachedEmbeds = $derived(metadata?.embeds ?? []);
-	const cachedEmbedsPending = $derived(
-		message.metadataCiphertext !== null && metadata === undefined
-	);
+	const cachedEmbedsPending = $derived(message.metadataCiphertext !== null && metadata === undefined);
 </script>
 
 <li class:mine class:theirs={!mine}>
 	<div class="bubble">
 		{#if payload === undefined}
-			<span class="pending" aria-label="Decrypting">···</span>
+			<span class="pending" role="img" aria-label="Decrypting">···</span>
 		{:else if payload === null}
 			<span class="unreadable">
 				You can't read this one — it was sent to a key you no longer have. Ask your partner to
@@ -107,40 +105,6 @@
 		gap: 0.125rem;
 		max-inline-size: min(78%, 34rem);
 
-		&.mine {
-			margin-inline-start: auto;
-			align-items: flex-end;
-
-			.bubble {
-				background: var(--wa-color-brand-fill-loud, #2563eb);
-				color: var(--wa-color-brand-on-loud, white);
-				border-end-end-radius: 0.25rem;
-
-				/* The embed's own chrome is mixed from `currentColor`, so it
-				   follows this bubble's text without being told the colours —
-				   see the note in UrlEmbed.svelte. */
-				:global(.text a),
-				:global(.card-link),
-				:global(.card-shell) {
-					color: inherit;
-				}
-
-				.reactions {
-					inset-inline-start: unset;
-					inset-inline-end: 0.5rem;
-				}
-			}
-		}
-
-		&.theirs {
-			margin-inline-end: auto;
-			align-items: flex-start;
-
-			.bubble {
-				background: var(--wa-color-neutral-fill-quiet, rgb(0 0 0 / 6%));
-				border-end-start-radius: 0.25rem;
-			}
-		}
 		.bubble {
 			position: relative;
 			padding: 0.5rem 0.75rem;
@@ -184,12 +148,11 @@
 		.reactions {
 			list-style: none;
 			margin: 0;
-			padding: 0;
 			display: flex;
 			gap: 0.125rem;
 			/* Half-overlapping the bubble's bottom edge, the way a tapback sits.
-               Absolute inside a relative bubble — not against the viewport, which
-               would not work in this shell. */
+	               Absolute inside a relative bubble — not against the viewport, which
+	               would not work in this shell. */
 			position: absolute;
 			inset-block-end: -0.75rem;
 			inset-inline-start: 0.5rem;
@@ -201,6 +164,41 @@
 
 			li {
 				margin: 0;
+			}
+		}
+
+		&.mine {
+			margin-inline-start: auto;
+			align-items: flex-end;
+
+			.bubble {
+				background: var(--wa-color-brand-fill-loud, #2563eb);
+				color: var(--wa-color-brand-on-loud, white);
+				border-end-end-radius: 0.25rem;
+
+				/* The embed's own chrome is mixed from `currentColor`, so it
+				   follows this bubble's text without being told the colours —
+				   see the note in UrlEmbed.svelte. */
+				:global(.text a),
+				:global(.card-link),
+				:global(.card-shell) {
+					color: inherit;
+				}
+
+				.reactions {
+					inset-inline-start: unset;
+					inset-inline-end: 0.5rem;
+				}
+			}
+		}
+
+		&.theirs {
+			margin-inline-end: auto;
+			align-items: flex-start;
+
+			.bubble {
+				background: var(--wa-color-neutral-fill-quiet, rgb(0 0 0 / 6%));
+				border-end-start-radius: 0.25rem;
 			}
 		}
 

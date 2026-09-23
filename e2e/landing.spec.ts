@@ -34,12 +34,17 @@ test('the halftone overlay paints over the landing page', async ({ page }) => {
 		const scratch = document.createElement('canvas');
 		scratch.width = canvasEl.width;
 		scratch.height = canvasEl.height;
-		const ctx = scratch.getContext('2d')!;
+		const ctx = scratch.getContext('2d');
+		if (!ctx) {
+			throw new Error('no 2D context to read the overlay back through');
+		}
 		ctx.drawImage(canvasEl, 0, 0);
 		const { data } = ctx.getImageData(0, 0, scratch.width, scratch.height);
 		let painted = 0;
 		for (let i = 3; i < data.length; i += 4) {
-			if (data[i]! > 0) painted++;
+			if ((data.at(i) ?? 0) > 0) {
+				painted += 1;
+			}
 		}
 		return painted / (scratch.width * scratch.height);
 	});
@@ -56,26 +61,35 @@ test('the halftone overlay paints over the landing page', async ({ page }) => {
 			const scratch = document.createElement('canvas');
 			scratch.width = canvasEl.width;
 			scratch.height = canvasEl.height;
-			const ctx = scratch.getContext('2d')!;
+			const ctx = scratch.getContext('2d');
+			if (!ctx) {
+				throw new Error('no 2D context to read the overlay back through');
+			}
 			ctx.drawImage(canvasEl, 0, 0);
 			const { data } = ctx.getImageData(0, 0, scratch.width, scratch.height);
 			let opaque = 0;
 			let total = 0;
 			let channelDeltaSum = 0;
 			for (let i = 3; i < data.length; i += 4) {
-				if (data[i]! >= 230) opaque++;
-				channelDeltaSum +=
-					Math.abs(data[i - 3]! - data[i - 2]!) + Math.abs(data[i - 2]! - data[i - 1]!);
-				total++;
+				const [red = 0, green = 0, blue = 0, alpha = 0] = data.subarray(i - 3, i + 1);
+				if (alpha >= 230) {
+					opaque += 1;
+				}
+				channelDeltaSum += Math.abs(red - green) + Math.abs(green - blue);
+				total += 1;
 			}
 
 			const sampleColumn = (x: number) => {
 				let min = 255;
 				let max = 0;
-				for (let y = 0; y < scratch.height; y++) {
-					const v = data[(y * scratch.width + x) * 4]!;
-					if (v < min) min = v;
-					if (v > max) max = v;
+				for (let y = 0; y < scratch.height; y += 1) {
+					const v = data.at((y * scratch.width + x) * 4) ?? 0;
+					if (v < min) {
+						min = v;
+					}
+					if (v > max) {
+						max = v;
+					}
 				}
 				return { min: min / 255, max: max / 255 };
 			};

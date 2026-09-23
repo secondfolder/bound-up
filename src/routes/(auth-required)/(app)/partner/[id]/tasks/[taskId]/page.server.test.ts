@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { actions, load } from './+page.server';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestPartnershipTask,
@@ -9,7 +9,7 @@ import {
 	readPartnershipTaskRow,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
+import { actions, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -18,7 +18,7 @@ let jun: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada', timezone: 'Europe/London' });
 	jun = await createTestUser(db, { name: 'Jun', timezone: 'America/New_York' });
 });
@@ -35,7 +35,7 @@ const at = (id: string, taskId: string, user: TestUser | null, formData?: Record
 	});
 
 describe('load', () => {
-	test('loads one existing partnership task for its creator on the managing side', async () => {
+	it('loads one existing partnership task for its creator on the managing side', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
 		const task = await createTestPartnershipTask(db, id, ada, { title: 'Tea' });
 
@@ -45,7 +45,7 @@ describe('load', () => {
 		});
 	});
 
-	test('403s for the other partner under shared control', async () => {
+	it('403s for the other partner under shared control', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
 		const task = await createTestPartnershipTask(db, id, ada, { title: 'Tea' });
 		const result = await runAndCatch(() => runLoad(load(at(id, task.id, jun))));
@@ -54,7 +54,7 @@ describe('load', () => {
 });
 
 describe('actions', () => {
-	test('updates a partnership task for its creator', async () => {
+	it('updates a partnership task for its creator', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
 		const task = await createTestPartnershipTask(db, id, ada, { title: 'Tea', creditsAwarded: 2 });
 
@@ -91,7 +91,7 @@ describe('actions', () => {
 		});
 	});
 
-	test('403s when the other partner posts an edit under shared control', async () => {
+	it('403s when the other partner posts an edit under shared control', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
 		const task = await createTestPartnershipTask(db, id, ada, { title: 'Tea', creditsAwarded: 2 });
 

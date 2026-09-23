@@ -2,6 +2,9 @@ import { find as findLinks } from 'linkifyjs';
 import { embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
 import type { RichTextBlockNode, RichTextDocument, RichTextInlineNode } from '$lib/richtext';
 
+/** A paragraph break: a blank line, which may hold stray spaces or tabs. */
+const BLANK_LINES = /\n[ \t]*\n+/;
+
 /**
  * TEMPORARY — reads content written before rich text existed.
  *
@@ -40,9 +43,11 @@ import type { RichTextBlockNode, RichTextDocument, RichTextInlineNode } from '$l
 export function legacyTextToDocument(text: string): RichTextDocument {
 	const children: RichTextBlockNode[] = [];
 
-	for (const chunk of text.split(/\n[ \t]*\n+/)) {
+	for (const chunk of text.split(BLANK_LINES)) {
 		const inlines = inlinesFrom(chunk);
-		if (inlines.length === 0) continue;
+		if (inlines.length === 0) {
+			continue;
+		}
 
 		// Embeds sit above the paragraph as root-level blocks, which is the shape
 		// `parseStoredRichText` knows how to move to the start of each URL's own
@@ -51,7 +56,9 @@ export function legacyTextToDocument(text: string): RichTextDocument {
 		// same URL twice in one breath meant one video, not two.
 		const seen = new Set<string>();
 		for (const url of embeddableUrlsIn(inlines)) {
-			if (seen.has(url)) continue;
+			if (seen.has(url)) {
+				continue;
+			}
 			seen.add(url);
 			children.push({ type: 'embed', url });
 		}
@@ -64,8 +71,12 @@ export function legacyTextToDocument(text: string): RichTextDocument {
 function embeddableUrlsIn(inlines: RichTextInlineNode[]): string[] {
 	const urls: string[] = [];
 	for (const node of inlines) {
-		if (node.type !== 'link' && node.type !== 'autolink') continue;
-		if (embedSpecFor(node.url)) urls.push(node.url);
+		if (node.type !== 'link' && node.type !== 'autolink') {
+			continue;
+		}
+		if (embedSpecFor(node.url)) {
+			urls.push(node.url);
+		}
 	}
 	return urls;
 }
@@ -81,23 +92,31 @@ function embeddableUrlsIn(inlines: RichTextInlineNode[]): string[] {
  */
 function inlinesFrom(chunk: string): RichTextInlineNode[] {
 	// A run of nothing but whitespace is not a paragraph.
-	if (chunk.trim() === '') return [];
+	if (chunk.trim() === '') {
+		return [];
+	}
 
 	const out: RichTextInlineNode[] = [];
 	chunk.split('\n').forEach((line, index) => {
-		if (index > 0) out.push({ type: 'linebreak' });
+		if (index > 0) {
+			out.push({ type: 'linebreak' });
+		}
 		out.push(...linkify(line));
 	});
 	return out;
 }
 
 function linkify(line: string): RichTextInlineNode[] {
-	if (line === '') return [];
+	if (line === '') {
+		return [];
+	}
 
 	const matches = findLinks(line).filter(
 		(match) => match.type === 'url' && isSafeHttpUrl(match.href)
 	);
-	if (matches.length === 0) return [{ type: 'text', text: line, format: 0 }];
+	if (matches.length === 0) {
+		return [{ type: 'text', text: line, format: 0 }];
+	}
 
 	const out: RichTextInlineNode[] = [];
 	let cursor = 0;

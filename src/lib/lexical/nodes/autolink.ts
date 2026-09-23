@@ -1,7 +1,7 @@
-import type { EditorConfig, LexicalEditor } from 'lexical';
 import { AutoLinkNode } from '@lexical/link';
-import { innerLink, withEmbedOffer } from './shared/embed-offer';
+import type { EditorConfig, LexicalEditor } from 'lexical';
 import type { EditorNodeDefinition } from './index';
+import { innerLink, withEmbedOffer } from './shared/embed-offer';
 
 /**
  * Lexical's `AutoLinkNode`, extended with an "Add embed" button.

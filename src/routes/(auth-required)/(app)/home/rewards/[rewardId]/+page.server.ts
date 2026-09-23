@@ -23,7 +23,9 @@ function firstError(
 	formErrors: string[]
 ): string {
 	for (const errorList of Object.values(fieldErrors)) {
-		if (errorList?.[0]) return errorList[0];
+		if (errorList?.[0]) {
+			return errorList[0];
+		}
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
@@ -38,17 +40,23 @@ function parseRewardForm(formData: FormData) {
 }
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const reward = await getSelfRewardForUser(locals.db, locals.user.id, params.rewardId);
-	if (!reward) error(404, 'Reward not found');
+	if (!reward) {
+		error(404, 'Reward not found');
+	}
 
 	return { reward };
 };
 
 export const actions: Actions = {
 	default: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = parseRewardForm(formData);
@@ -66,7 +74,9 @@ export const actions: Actions = {
 		}
 
 		const updated = await updateSelfReward(locals.db, locals.user.id, params.rewardId, parsed.data);
-		if (!updated) error(404, 'Reward not found');
+		if (!updated) {
+			error(404, 'Reward not found');
+		}
 
 		redirect(303, '/home/rewards');
 	}

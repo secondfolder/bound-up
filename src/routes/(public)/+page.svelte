@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { isSafari } from '$lib/browser-engine';
 	import HalftoneOverlay from '$lib/components/HalftoneOverlay.svelte';
 
 	// The root layout whitelists this — `locals.user` itself never crosses.
@@ -13,12 +14,7 @@
 
 	onMount(() => {
 		const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-		const userAgent = navigator.userAgent;
-		const isSafari =
-			navigator.vendor === 'Apple Computer, Inc.' &&
-			!/CriOS|FxiOS|EdgiOS|Chrome|Chromium|Android/.test(userAgent);
-		if (isSafari) {
-			console.log('Safari detected, adjusting CTA blur.');
+		if (isSafari()) {
 			// Safari rasterizes this already-displaced SVG edge softer than
 			// Chromium/Firefox, so the same post-displacement blur reads as fuzz.
 			// Lower its cleanup blur there instead of changing the whole filter.
@@ -59,11 +55,11 @@
 	     On both body and html — the html one is what paints the overscroll
 	     area, and without it dragging past the top reveals the default white. -->
 	<style>
-		html,
-		body {
-			background: linear-gradient(to right, #943700 10%, #711500 100%);
-		}
-	</style>
+	html,
+	body {
+		background: linear-gradient(to right, #943700 10%, #711500 100%);
+	}
+</style>
 </svelte:head>
 
 <HalftoneOverlay
@@ -222,8 +218,33 @@
 		align-items: center;
 	}
 
+	.small {
+		position: absolute;
+		top: calc(100% + 0.75rem);
+		left: 50%;
+		transform: translateX(-50%);
+		color: #ffcf7a;
+		text-decoration: underline;
+		white-space: nowrap;
+		margin-top: 1em;
+		font-weight: bold;
+		font-size: 1.2em;
+		transition: color 0.1s ease;
+
+		&:hover {
+			color: #ffac00;
+		}
+
+		&:focus-visible {
+			outline: 2px solid #ffcf7a;
+			outline-offset: 3px;
+		}
+	}
+
 	/* Short viewports: dead-centring the CTA puts it on top of the title, so
 	   give the centre back and let the stack flow under the header instead.
+	   After the base `.cta` and `.small` rules on purpose: same specificity,
+	   so only a later rule can override them.
 	   The rings' origin is still the page centre — the CTA just no longer
 	   claims it. */
 	@media (max-height: 30em) {
@@ -279,30 +300,6 @@
 			&:hover {
 				scale: 1.03;
 			}
-		}
-
-		&:focus-visible {
-			outline: 2px solid #ffcf7a;
-			outline-offset: 3px;
-		}
-	}
-
-	.small {
-		position: absolute;
-		top: calc(100% + 0.75rem);
-		left: 50%;
-		transform: translateX(-50%);
-		color: #ffcf7a;
-		text-decoration: underline;
-		font-size: 1rem;
-		white-space: nowrap;
-		margin-top: 1em;
-		font-weight: bold;
-		font-size: 1.2em;
-		transition: color 0.1s ease;
-
-		&:hover {
-			color: #ffac00;
 		}
 
 		&:focus-visible {

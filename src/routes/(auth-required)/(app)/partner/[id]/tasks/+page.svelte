@@ -5,9 +5,7 @@
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
-	const backHref = $derived(
-		resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id })
-	);
+	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 	const addTaskHref = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/tasks/add', { id: data.partner.id })
 	);
@@ -19,13 +17,14 @@
 	const hasSharedControl = $derived(data.partner.canManageTasks && data.partner.canCompleteTasks);
 	const tasksForViewer = $derived(data.tasks.filter((task) => !task.createdByMe));
 	const tasksForPartner = $derived(data.tasks.filter((task) => task.createdByMe));
-	const description = $derived(
-		data.partner.canManageTasks && data.partner.canCompleteTasks
+	const description = $derived.by(() => {
+		if (!data.partner.canManageTasks) {
+			return 'You can complete tasks from this list when they are available.';
+		}
+		return data.partner.canCompleteTasks
 			? 'You can manage this task list and complete the tasks your partner created.'
-			: data.partner.canManageTasks
-				? 'You control this task list and set the tasks your partner can complete.'
-				: 'You can complete tasks from this list when they are available.'
-	);
+			: 'You control this task list and set the tasks your partner can complete.';
+	});
 </script>
 
 <section class="page">

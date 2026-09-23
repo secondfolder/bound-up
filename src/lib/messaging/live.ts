@@ -62,12 +62,16 @@ export type LiveOptions = {
 /**
  * Starts watching. Returns the teardown, for an `$effect`'s cleanup.
  *
- * Safe to call during SSR: it no-ops without a `window`, so a caller does not
+ * Safe to call during SSR: it no-ops outside a browser, so a caller does not
  * need its own guard.
  */
 export function watchPartnership(options: LiveOptions): () => void {
-	if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
-		return () => {};
+	// `document`, not `EventSource`: Node has a global EventSource of its own,
+	// and a server render must not open a stream.
+	if (typeof document === 'undefined' || typeof EventSource === 'undefined') {
+		return () => {
+			// Nothing was opened, so there is nothing to close.
+		};
 	}
 
 	const { partnershipId, onChange } = options;
@@ -80,8 +84,12 @@ export function watchPartnership(options: LiveOptions): () => void {
 	let stopped = false;
 
 	function clearTimers() {
-		if (retry) clearTimeout(retry);
-		if (poll) clearInterval(poll);
+		if (retry) {
+			clearTimeout(retry);
+		}
+		if (poll) {
+			clearInterval(poll);
+		}
 		retry = undefined;
 		poll = undefined;
 	}
@@ -93,14 +101,20 @@ export function watchPartnership(options: LiveOptions): () => void {
 	}
 
 	function startPolling() {
-		if (poll) return;
+		if (poll) {
+			return;
+		}
 		poll = setInterval(() => {
-			if (!stopped && document.visibilityState === 'visible') onChange(null);
+			if (!stopped && document.visibilityState === 'visible') {
+				onChange(null);
+			}
 		}, POLL_INTERVAL_MS);
 	}
 
 	function connect() {
-		if (stopped || source || document.visibilityState !== 'visible') return;
+		if (stopped || source || document.visibilityState !== 'visible') {
+			return;
+		}
 
 		if (failures >= FALLBACK_AFTER_FAILURES) {
 			startPolling();
@@ -127,7 +141,9 @@ export function watchPartnership(options: LiveOptions): () => void {
 			// EventSource would retry on its own, immediately and forever, so the
 			// connection is closed first and rescheduled below.
 			disconnect();
-			if (stopped) return;
+			if (stopped) {
+				return;
+			}
 
 			failures += 1;
 			if (failures >= FALLBACK_AFTER_FAILURES) {
@@ -143,7 +159,9 @@ export function watchPartnership(options: LiveOptions): () => void {
 	}
 
 	function onVisibilityChange() {
-		if (stopped) return;
+		if (stopped) {
+			return;
+		}
 		if (document.visibilityState === 'visible') {
 			// The unconditional refetch that makes hanging up safe — see the note
 			// at the top. It comes BEFORE reconnecting, so the gap is closed even if

@@ -32,10 +32,10 @@ import {
 	AUTH_SECRET_INFO,
 	AUTH_SECRET_LENGTH,
 	MASTER_KEY_VERSIONS,
-	WRAP_KEY_INFO,
+	type MasterKeyParams,
 	masterKeySalt,
 	toBase64Url,
-	type MasterKeyParams
+	WRAP_KEY_INFO
 } from '../encryption';
 
 /**
@@ -58,7 +58,7 @@ const encoder = new TextEncoder();
  * check this before they start and show `WEBCRYPTO_UNAVAILABLE` instead.
  */
 export function webCryptoAvailable(): boolean {
-	return typeof crypto !== 'undefined' && crypto.subtle != null;
+	return typeof crypto !== 'undefined' && crypto.subtle !== undefined && crypto.subtle !== null;
 }
 
 export const WEBCRYPTO_UNAVAILABLE =
@@ -80,7 +80,9 @@ export async function deriveMasterKey(
 	email: string,
 	params: MasterKeyParams = MASTER_KEY_VERSIONS[0]
 ): Promise<MasterKey> {
-	if (!webCryptoAvailable()) throw new Error(WEBCRYPTO_UNAVAILABLE);
+	if (!webCryptoAvailable()) {
+		throw new Error(WEBCRYPTO_UNAVAILABLE);
+	}
 
 	const base = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, [
 		'deriveBits'
@@ -137,7 +139,7 @@ export async function deriveAuthSecret(master: MasterKey): Promise<string> {
  * that use it.
  */
 export async function deriveWrapKey(master: MasterKey): Promise<CryptoKey> {
-	return crypto.subtle.deriveKey(
+	return await crypto.subtle.deriveKey(
 		hkdf(WRAP_KEY_INFO),
 		master.key,
 		{ name: 'AES-GCM', length: 256 },

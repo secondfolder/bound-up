@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { initialsFor } from '$lib/initials';
-	import { UTC_TIMEZONE } from '$lib/timezone';
 	import PartnerMessagesWidget from '$lib/components/PartnerMessagesWidget.svelte';
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
 	import TasksWidget from '$lib/components/TasksWidget.svelte';
 	import TimeZoneDisplay from '$lib/components/TimeZoneDisplay.svelte';
+	import { initialsFor } from '$lib/initials';
+	import { UTC_TIMEZONE } from '$lib/timezone';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

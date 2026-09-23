@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { describeTimeZoneDifference } from '$lib/timezone';
 
-	interface Props {
+	type Props = {
 		viewerUserId: string;
 		viewerTimezone: string;
 		counterpartUserId: string;
@@ -9,7 +9,7 @@
 		counterpartName: string;
 		onSelect?: () => void;
 		value: string;
-	}
+	};
 
 	let {
 		viewerUserId,
@@ -17,18 +17,16 @@
 		counterpartUserId,
 		counterpartTimezone,
 		counterpartName,
-		onSelect = () => {},
+		onSelect = () => undefined,
 		value = $bindable()
 	}: Props = $props();
 
 	const visible = $derived(viewerTimezone !== counterpartTimezone);
-	const counterpartOffset = $derived(
-		describeTimeZoneDifference(counterpartTimezone, viewerTimezone)
-	);
+	const counterpartOffset = $derived(describeTimeZoneDifference(counterpartTimezone, viewerTimezone));
 </script>
 
 {#snippet option(userId: string, label: string)}
-	{@const selected = value === userId}
+	{const selected = $derived(value === userId)}
 	<wa-button
 		type="button"
 		size="s"
@@ -46,14 +44,19 @@
 {/snippet}
 
 {#if visible}
-	<div class="toggle" role="group" aria-label="Timezone owner">
+	<fieldset class="toggle" aria-label="Timezone owner">
 		{@render option(viewerUserId, 'Your time')}
 		{@render option(counterpartUserId, `${counterpartName}'s time (${counterpartOffset})`)}
-	</div>
+	</fieldset>
 {/if}
 
 <style>
 	.toggle {
+		/* A fieldset, for its group semantics; none of its default box. */
+		margin: 0;
+		padding: 0;
+		border: 0;
+		min-inline-size: 0;
 		display: inline-flex;
 		gap: 0.35rem;
 		flex-wrap: wrap;

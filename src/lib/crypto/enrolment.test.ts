@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { KeyWrapView } from '../types';
 import { generateAgeIdentity, resetX25519Probe } from './identity';
 import { resetKeyStore } from './keystore';
 import {
@@ -13,7 +14,6 @@ import {
 	resetKeyring
 } from './session.svelte';
 import { stashUnlock } from './stash';
-import type { KeyWrapView } from '../types';
 
 /**
  * The window in which a passkey can be offered for free.
@@ -45,7 +45,7 @@ beforeAll(async () => {
 
 /** A browser that has WebAuthn, which is what makes an offer worth making. */
 function browserWithPasskeys() {
-	vi.stubGlobal('window', { location: { hostname: 'bound-up.test' } });
+	vi.stubGlobal('location', { hostname: 'bound-up.test' });
 	vi.stubGlobal('PublicKeyCredential', class {});
 	vi.stubGlobal('navigator', { credentials: {}, platform: 'Test' });
 }
@@ -53,17 +53,16 @@ function browserWithPasskeys() {
 function bundleIs(wraps: KeyWrapView[], passkeyCount = 1) {
 	vi.stubGlobal(
 		'fetch',
-		vi.fn(
-			async () =>
-				new Response(
-					JSON.stringify({
-						recipient,
-						wraps,
-						passkeyCount,
-						passkeysKnownUnusable: 0,
-						unusableProviderAaguid: null
-					})
-				)
+		vi.fn(() =>
+			Promise.resolve(
+				Response.json({
+					recipient,
+					wraps,
+					passkeyCount,
+					passkeysKnownUnusable: 0,
+					unusableProviderAaguid: null
+				})
+			)
 		)
 	);
 }

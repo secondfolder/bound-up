@@ -1,38 +1,39 @@
 import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import {
+	BOARD_LIMIT,
+	isThreadIcon,
+	MAX_ATTACHMENT_TOTAL_BYTES,
+	MAX_ATTACHMENTS_PER_MESSAGE,
+	MAX_CIPHERTEXT_BYTES,
+	MAX_REACTION_CIPHERTEXT_BYTES,
+	RESTORE_PAGE_SIZE,
+	type ThreadIcon
+} from '../messaging';
+import type { PartnershipView } from '../partnership';
+import type {
+	MessageView,
+	PartnerMessagesWidgetView,
+	PartnerView,
+	RestoreRequestView,
+	TagView,
+	ThreadStickerView,
+	ThreadView,
+	UnreadPartnerView
+} from '../types';
 import type { Db } from './db';
 import {
 	historyRestoreRequests,
 	messageAttachments,
 	messageReactions,
-	messageTags,
-	messageThreadTags,
-	messageThreads,
 	messages,
+	messageTags,
+	messageThreads,
+	messageThreadTags,
 	partnerships,
 	threadReads
 } from './db/schema';
+import { attachmentKey, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
-import type { PartnershipView } from '../partnership';
-import {
-	BOARD_LIMIT,
-	MAX_ATTACHMENTS_PER_MESSAGE,
-	MAX_ATTACHMENT_TOTAL_BYTES,
-	MAX_CIPHERTEXT_BYTES,
-	MAX_REACTION_CIPHERTEXT_BYTES,
-	RESTORE_PAGE_SIZE,
-	isThreadIcon,
-	type ThreadIcon
-} from '../messaging';
-import { attachmentKey, partnershipMediaPrefix, type MediaStore } from './media';
-import type {
-	MessageView,
-	PartnerMessagesWidgetView,
-	ThreadStickerView,
-	ThreadView,
-	UnreadPartnerView,
-	RestoreRequestView
-} from '../types';
-import type { PartnerView, TagView } from '../types';
 
 /** Whether message-key settings are relevant for this user yet. */
 export async function userHasMessageHistory(db: Db, userId: string): Promise<boolean> {
@@ -123,7 +124,9 @@ export async function requireMembership(
 	userId: string
 ): Promise<Membership | null> {
 	const partnership = await getPartnershipForUser(db, partnershipId, userId);
-	if (!partnership || partnership.status !== 'accepted') return null;
+	if (partnership?.status !== 'accepted') {
+		return null;
+	}
 	return { partnership, viewerId: userId };
 }
 
@@ -142,7 +145,9 @@ export async function requireThreadMembership(
 	userId: string
 ): Promise<(Membership & { threadId: string; icon: ThreadIcon }) | null> {
 	const membership = await requireMembership(db, partnershipId, userId);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const rows = await db
 		.select({ id: messageThreads.id, icon: messageThreads.icon })
@@ -150,8 +155,10 @@ export async function requireThreadMembership(
 		.where(and(eq(messageThreads.id, threadId), eq(messageThreads.partnershipId, partnershipId)))
 		.limit(1);
 
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 	return { ...membership, threadId: row.id, icon: row.icon };
 }
 
@@ -163,7 +170,9 @@ export async function requireMessageMembership(
 	userId: string
 ): Promise<(Membership & { messageId: string; threadId: string; senderId: string }) | null> {
 	const membership = await requireMembership(db, partnershipId, userId);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const rows = await db
 		.select({
@@ -176,8 +185,10 @@ export async function requireMessageMembership(
 		.where(and(eq(messages.id, messageId), eq(messageThreads.partnershipId, partnershipId)))
 		.limit(1);
 
-	const row = rows[0];
-	if (!row) return null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
 	return { ...membership, messageId: row.id, threadId: row.threadId, senderId: row.senderId };
 }
 
@@ -240,19 +251,20 @@ export async function listBoard(
 		)
 		.limit(BOARD_LIMIT);
 	const threadIds = rows.map((row) => row.id);
-	const tagRows = threadIds.length
-		? await db
-				.select({
-					threadId: messageThreadTags.threadId,
-					id: messageTags.id,
-					name: messageTags.name,
-					color: messageTags.color
-				})
-				.from(messageThreadTags)
-				.innerJoin(messageTags, eq(messageTags.id, messageThreadTags.tagId))
-				.where(inArray(messageThreadTags.threadId, threadIds))
-				.orderBy(asc(messageTags.createdAt), asc(messageTags.id))
-		: [];
+	const tagRows =
+		threadIds.length > 0
+			? await db
+					.select({
+						threadId: messageThreadTags.threadId,
+						id: messageTags.id,
+						name: messageTags.name,
+						color: messageTags.color
+					})
+					.from(messageThreadTags)
+					.innerJoin(messageTags, eq(messageTags.id, messageThreadTags.tagId))
+					.where(inArray(messageThreadTags.threadId, threadIds))
+					.orderBy(asc(messageTags.createdAt), asc(messageTags.id))
+			: [];
 	const tagsByThread = new Map<string, TagView[]>();
 	for (const tag of tagRows) {
 		const values = tagsByThread.get(tag.threadId) ?? [];
@@ -299,7 +311,7 @@ export async function getThread(
 
 	const ids = rows.map((row) => row.id);
 	const [attachments, reactions, tags] = await Promise.all([
-		ids.length
+		ids.length > 0
 			? db
 					.select({
 						id: messageAttachments.id,
@@ -310,7 +322,7 @@ export async function getThread(
 					.where(inArray(messageAttachments.messageId, ids))
 					.orderBy(asc(messageAttachments.createdAt), asc(messageAttachments.id))
 			: [],
-		ids.length
+		ids.length > 0
 			? db
 					.select({
 						messageId: messageReactions.messageId,
@@ -380,7 +392,9 @@ export async function listUnreadCounts(
 ): Promise<UnreadPartnerView[]> {
 	// `in ()` is a syntax error in SQLite, and a user with no partners is the
 	// common case on a fresh account.
-	if (partners.length === 0) return [];
+	if (partners.length === 0) {
+		return [];
+	}
 
 	const rows = await db
 		.select({
@@ -415,7 +429,9 @@ export async function listUnreadCounts(
 	// links do not reshuffle under a thumb as messages arrive.
 	return partners.flatMap((partner) => {
 		const row = counts.get(partner.id);
-		if (!row) return [];
+		if (!row) {
+			return [];
+		}
 		return [
 			{
 				partnershipId: partner.id,
@@ -488,18 +504,27 @@ export type SendFailure =
 	| 'duplicate-attachment';
 
 export type SendResult =
-	{ ok: true; threadId: string; messageId: string } | { ok: false; reason: SendFailure };
+	| { ok: true; threadId: string; messageId: string }
+	| { ok: false; reason: SendFailure };
 
 function checkPayload(ciphertext: string, attachments: OutgoingAttachment[]): SendFailure | null {
-	if (ciphertext.length === 0 || ciphertext.length > MAX_CIPHERTEXT_BYTES) return 'body-too-large';
-	if (attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) return 'too-many-attachments';
+	if (ciphertext.length === 0 || ciphertext.length > MAX_CIPHERTEXT_BYTES) {
+		return 'body-too-large';
+	}
+	if (attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+		return 'too-many-attachments';
+	}
 	const total = attachments.reduce((sum, attachment) => sum + attachment.byteSize, 0);
-	if (total > MAX_ATTACHMENT_TOTAL_BYTES) return 'too-many-bytes';
+	if (total > MAX_ATTACHMENT_TOTAL_BYTES) {
+		return 'too-many-bytes';
+	}
 	// Caught here rather than left to the primary key, so the failure is a
 	// refusal with a reason instead of a database error after objects have been
 	// written to the store.
 	const ids = new Set(attachments.map((attachment) => attachment.id));
-	if (ids.size !== attachments.length) return 'duplicate-attachment';
+	if (ids.size !== attachments.length) {
+		return 'duplicate-attachment';
+	}
 	return null;
 }
 
@@ -517,7 +542,7 @@ async function writeAttachments(
 	messageId: string,
 	attachments: OutgoingAttachment[]
 ): Promise<{ id: string; messageId: string; byteSize: number; storageKey: string }[]> {
-	const rows = [];
+	const rows: { id: string; messageId: string; byteSize: number; storageKey: string }[] = [];
 	for (const attachment of attachments) {
 		const storageKey = attachmentKey(partnershipId, messageId, attachment.id);
 		await store.put(storageKey, attachment.body, attachment.byteSize);
@@ -565,6 +590,7 @@ function markSenderRead(db: Db, threadId: string, senderId: string, now: Date) {
 		});
 }
 
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const TAG_COLORS = ['#d95f59', '#d98c3f', '#c5a33d', '#55a36b', '#3f9caa', '#5d7fc2', '#8b67b5'];
 
 function validTagName(name: string): string | null {
@@ -573,12 +599,14 @@ function validTagName(name: string): string | null {
 }
 
 function validTagColor(color: string): boolean {
-	return /^#[0-9a-f]{6}$/i.test(color);
+	return HEX_COLOR.test(color);
 }
 
 async function tagRowsForPartnership(db: Db, partnershipId: string, tagIds: string[]) {
 	const uniqueIds = [...new Set(tagIds)];
-	if (uniqueIds.length === 0) return [];
+	if (uniqueIds.length === 0) {
+		return [];
+	}
 	const rows = await db
 		.select({ id: messageTags.id })
 		.from(messageTags)
@@ -591,7 +619,9 @@ export async function listTags(
 	partnershipId: string,
 	userId: string
 ): Promise<TagView[] | null> {
-	if (!(await requireMembership(db, partnershipId, userId))) return null;
+	if (!(await requireMembership(db, partnershipId, userId))) {
+		return null;
+	}
 	return db
 		.select({ id: messageTags.id, name: messageTags.name, color: messageTags.color })
 		.from(messageTags)
@@ -613,16 +643,21 @@ export async function createTag(
 	name: string,
 	color?: string
 ): Promise<TagMutationResult> {
-	if (!(await requireMembership(db, partnershipId, userId)))
+	if (!(await requireMembership(db, partnershipId, userId))) {
 		return { ok: false, reason: 'not-a-member' };
+	}
 	const validName = validTagName(name);
-	if (!validName) return { ok: false, reason: 'invalid-name' };
+	if (!validName) {
+		return { ok: false, reason: 'invalid-name' };
+	}
 	const existing = await db
 		.select({ id: messageTags.id })
 		.from(messageTags)
 		.where(and(eq(messageTags.partnershipId, partnershipId), eq(messageTags.name, validName)))
 		.limit(1);
-	if (existing[0]) return { ok: false, reason: 'duplicate-name' };
+	if (existing[0]) {
+		return { ok: false, reason: 'duplicate-name' };
+	}
 	// A chosen colour wins; anything malformed falls back to the random pick
 	// rather than refusing, so the picker's default never blocks creation.
 	const chosen = color !== undefined && validTagColor(color) ? color : null;
@@ -643,18 +678,25 @@ export async function updateTag(
 	tagId: string,
 	input: { name?: string; color?: string }
 ): Promise<TagMutationResult> {
-	if (!(await requireMembership(db, partnershipId, userId)))
+	if (!(await requireMembership(db, partnershipId, userId))) {
 		return { ok: false, reason: 'not-a-member' };
+	}
 	const current = await db
 		.select({ id: messageTags.id, name: messageTags.name, color: messageTags.color })
 		.from(messageTags)
 		.where(and(eq(messageTags.id, tagId), eq(messageTags.partnershipId, partnershipId)))
 		.limit(1);
-	if (!current[0]) return { ok: false, reason: 'no-such-tag' };
+	if (!current[0]) {
+		return { ok: false, reason: 'no-such-tag' };
+	}
 	const name = input.name === undefined ? current[0].name : validTagName(input.name);
 	const color = input.color ?? current[0].color;
-	if (!name) return { ok: false, reason: 'invalid-name' };
-	if (!validTagColor(color)) return { ok: false, reason: 'invalid-color' };
+	if (!name) {
+		return { ok: false, reason: 'invalid-name' };
+	}
+	if (!validTagColor(color)) {
+		return { ok: false, reason: 'invalid-color' };
+	}
 	const duplicate = await db
 		.select({ id: messageTags.id })
 		.from(messageTags)
@@ -666,7 +708,9 @@ export async function updateTag(
 			)
 		)
 		.limit(1);
-	if (duplicate[0]) return { ok: false, reason: 'duplicate-name' };
+	if (duplicate[0]) {
+		return { ok: false, reason: 'duplicate-name' };
+	}
 	await db.update(messageTags).set({ name, color }).where(eq(messageTags.id, tagId));
 	return { ok: true, tag: { id: tagId, name, color } };
 }
@@ -681,9 +725,13 @@ export async function setThreadTags(
 	{ ok: true } | { ok: false; reason: 'not-a-member' | 'no-such-thread' | 'no-such-tag' }
 > {
 	const membership = await requireThreadMembership(db, partnershipId, threadId, userId);
-	if (!membership) return { ok: false, reason: 'no-such-thread' };
+	if (!membership) {
+		return { ok: false, reason: 'no-such-thread' };
+	}
 	const tags = await tagRowsForPartnership(db, partnershipId, tagIds);
-	if (!tags) return { ok: false, reason: 'no-such-tag' };
+	if (!tags) {
+		return { ok: false, reason: 'no-such-tag' };
+	}
 	await db.batch([
 		db.delete(messageThreadTags).where(eq(messageThreadTags.threadId, threadId)),
 		...tags.map((tag) => db.insert(messageThreadTags).values({ threadId, tagId: tag.id }))
@@ -713,7 +761,9 @@ export async function setMessageMetadataCiphertext(
 		input.messageId,
 		input.viewerId
 	);
-	if (!membership) return false;
+	if (!membership) {
+		return false;
+	}
 
 	await db
 		.update(messages)
@@ -738,17 +788,25 @@ export async function startThread(
 	now: Date = new Date()
 ): Promise<SendResult> {
 	const membership = await requireMembership(db, input.partnershipId, input.senderId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
 
 	// Re-validated here as well as in the endpoint's Zod schema. `icon` is the
 	// one plaintext column in the feature, and a closed list is only closed if
 	// every writer checks it.
-	if (!isThreadIcon(input.icon)) return { ok: false, reason: 'bad-icon' };
+	if (!isThreadIcon(input.icon)) {
+		return { ok: false, reason: 'bad-icon' };
+	}
 
 	const problem = checkPayload(input.ciphertext, input.attachments);
-	if (problem) return { ok: false, reason: problem };
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 	const tags = await tagRowsForPartnership(db, input.partnershipId, input.tagIds ?? []);
-	if (!tags) return { ok: false, reason: 'no-such-tag' };
+	if (!tags) {
+		return { ok: false, reason: 'no-such-tag' };
+	}
 
 	const threadId = crypto.randomUUID();
 	const messageId = crypto.randomUUID();
@@ -811,7 +869,9 @@ export async function sendMessage(
 	}
 
 	const problem = checkPayload(input.ciphertext, input.attachments);
-	if (problem) return { ok: false, reason: problem };
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 
 	const messageId = crypto.randomUUID();
 	const attachmentRows = await writeAttachments(
@@ -864,8 +924,10 @@ export async function markThreadOpened(
 		.where(eq(messageThreads.id, threadId))
 		.limit(1);
 
-	const row = rows[0];
-	if (!row) return;
+	const [row] = rows;
+	if (!row) {
+		return;
+	}
 
 	await db
 		.insert(threadReads)
@@ -916,8 +978,12 @@ export async function setReaction(
 		input.messageId,
 		input.viewerId
 	);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
-	if (membership.senderId === input.viewerId) return { ok: false, reason: 'own-message' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (membership.senderId === input.viewerId) {
+		return { ok: false, reason: 'own-message' };
+	}
 	if (input.ciphertext.length === 0 || input.ciphertext.length > MAX_REACTION_CIPHERTEXT_BYTES) {
 		return { ok: false, reason: 'too-large' };
 	}
@@ -947,7 +1013,9 @@ export async function clearReaction(
 		input.messageId,
 		input.viewerId
 	);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
 
 	await db
 		.delete(messageReactions)
@@ -976,7 +1044,9 @@ export async function requestHistoryRestore(
 	now: Date = new Date()
 ): Promise<{ ok: true; id: string } | { ok: false; reason: 'not-a-member' }> {
 	const membership = await requireMembership(db, input.partnershipId, input.requesterId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
 
 	const id = crypto.randomUUID();
 	await db.batch([
@@ -1055,7 +1125,9 @@ export async function listHistoryForRestore(
 	input: { partnershipId: string; requestId: string; actorId: string; cursor?: string | null }
 ): Promise<RestorePage | null> {
 	const request = await findRestorableRequest(db, input);
-	if (!request) return null;
+	if (!request) {
+		return null;
+	}
 
 	const after = parseRestoreCursor(input.cursor);
 
@@ -1086,14 +1158,15 @@ export async function listHistoryForRestore(
 		.limit(RESTORE_PAGE_SIZE);
 
 	const ids = rows.map((row) => row.id);
-	const reactions = ids.length
-		? await db
-				.select({ id: messageReactions.id, ciphertext: messageReactions.ciphertext })
-				.from(messageReactions)
-				.where(inArray(messageReactions.messageId, ids))
-		: [];
+	const reactions =
+		ids.length > 0
+			? await db
+					.select({ id: messageReactions.id, ciphertext: messageReactions.ciphertext })
+					.from(messageReactions)
+					.where(inArray(messageReactions.messageId, ids))
+			: [];
 
-	const last = rows[rows.length - 1];
+	const last = rows.at(-1);
 	return {
 		messages: rows.map((row) => ({
 			id: row.id,
@@ -1113,12 +1186,18 @@ export async function listHistoryForRestore(
 function parseRestoreCursor(
 	cursor: string | null | undefined
 ): { createdAt: Date; id: string } | null {
-	if (!cursor) return null;
+	if (!cursor) {
+		return null;
+	}
 	const separator = cursor.indexOf(':');
-	if (separator < 1) return null;
+	if (separator < 1) {
+		return null;
+	}
 	const millis = Number(cursor.slice(0, separator));
 	const id = cursor.slice(separator + 1);
-	if (!Number.isSafeInteger(millis) || id.length === 0) return null;
+	if (!Number.isSafeInteger(millis) || id.length === 0) {
+		return null;
+	}
 	return { createdAt: new Date(millis), id };
 }
 
@@ -1134,7 +1213,9 @@ async function findRestorableRequest(
 	input: { partnershipId: string; requestId: string; actorId: string }
 ): Promise<{ id: string; requesterId: string } | null> {
 	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) return null;
+	if (!membership) {
+		return null;
+	}
 
 	const rows = await db
 		.select({ id: historyRestoreRequests.id, requesterId: historyRestoreRequests.requesterId })
@@ -1148,10 +1229,12 @@ async function findRestorableRequest(
 		)
 		.limit(1);
 
-	const request = rows[0];
+	const [request] = rows;
 	// The actor must be the OTHER member: the person who lost their key cannot
 	// re-encrypt anything, since they cannot read it.
-	if (!request || request.requesterId === input.actorId) return null;
+	if (!request || request.requesterId === input.actorId) {
+		return null;
+	}
 	return request;
 }
 
@@ -1193,10 +1276,14 @@ export async function applyHistoryRestore(
 	{ ok: true; updated: number } | { ok: false; reason: 'not-a-member' | 'no-such-request' }
 > {
 	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
 
 	const request = await findRestorableRequest(db, input);
-	if (!request) return { ok: false, reason: 'no-such-request' };
+	if (!request) {
+		return { ok: false, reason: 'no-such-request' };
+	}
 
 	const reactions = input.reactions ?? [];
 	const tooBig = (value: string, cap: number) => value.length === 0 || value.length > cap;
@@ -1303,7 +1390,9 @@ export async function migrateMessageBodies(
 	}
 ): Promise<{ ok: true; updated: number } | { ok: false; reason: 'not-a-member' | 'too-big' }> {
 	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) return { ok: false, reason: 'not-a-member' };
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
 
 	const tooBig = (value: string) => value.length === 0 || value.length > MAX_CIPHERTEXT_BYTES;
 	if (
@@ -1315,7 +1404,9 @@ export async function migrateMessageBodies(
 	) {
 		return { ok: false, reason: 'too-big' };
 	}
-	if (input.messages.length === 0) return { ok: true, updated: 0 };
+	if (input.messages.length === 0) {
+		return { ok: true, updated: 0 };
+	}
 
 	const inThisPartnership = db
 		.select({ id: messageThreads.id })
@@ -1353,7 +1444,9 @@ export async function declineHistoryRestore(
 	now: Date = new Date()
 ): Promise<boolean> {
 	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) return false;
+	if (!membership) {
+		return false;
+	}
 
 	const rows = await db
 		.update(historyRestoreRequests)
@@ -1433,10 +1526,11 @@ export async function getPartnerMessagesWidget(
 		)
 		.where(eq(messageThreads.partnershipId, partnershipId));
 
-	const row = rows[0];
+	const [row] = rows;
+	const newestAt = row?.newestAt ?? null;
 	return {
 		unreadThreads: Number(row?.unreadThreads ?? 0),
 		totalThreads: Number(row?.totalThreads ?? 0),
-		newestAt: row?.newestAt == null ? null : new Date(Number(row.newestAt))
+		newestAt: newestAt === null ? null : new Date(Number(newestAt))
 	};
 }

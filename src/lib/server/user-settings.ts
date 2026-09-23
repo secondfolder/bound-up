@@ -10,5 +10,5 @@ export async function updateCurrentUserProfile(
 	headers: Headers,
 	changes: UserProfileChanges
 ) {
-	return auth.api.updateUser({ body: changes, headers });
+	return await auth.api.updateUser({ body: changes, headers });
 }

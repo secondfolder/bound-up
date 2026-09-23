@@ -9,7 +9,9 @@ import {
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, parent, depends }) => {
-	if (!locals.user) return { selfTasks: { tasks: [], completions: [] }, partnerTasks: [] };
+	if (!locals.user) {
+		return { selfTasks: { tasks: [], completions: [] }, partnerTasks: [] };
+	}
 
 	const { partners } = await parent();
 
@@ -33,14 +35,18 @@ function firstError(
 	formErrors: string[]
 ): string {
 	for (const errorList of Object.values(fieldErrors)) {
-		if (errorList?.[0]) return errorList[0];
+		if (errorList?.[0]) {
+			return errorList[0];
+		}
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
 
 export const actions: Actions = {
 	selfCompleteTask: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const formData = await request.formData();
 		const parsed = taskCompleteSchema.safeParse({ taskId: stringField(formData, 'taskId') });
 		if (!parsed.success) {
@@ -55,7 +61,9 @@ export const actions: Actions = {
 			parsed.data.taskId
 		);
 		if (!result.ok) {
-			if (result.reason === 'not-found') error(404, 'Task not found');
+			if (result.reason === 'not-found') {
+				error(404, 'Task not found');
+			}
 			return fail(400, {
 				error:
 					result.reason === 'inactive'
@@ -68,7 +76,9 @@ export const actions: Actions = {
 	},
 
 	partnerCompleteTask: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const formData = await request.formData();
 		const parsed = partnerTaskCompleteSchema.safeParse({
 			partnershipId: stringField(formData, 'partnershipId'),
@@ -86,8 +96,9 @@ export const actions: Actions = {
 			viewerTimezone: locals.user.timezone
 		});
 		if (!result.ok) {
-			if (result.reason === 'not-a-member' || result.reason === 'not-found')
+			if (result.reason === 'not-a-member' || result.reason === 'not-found') {
 				error(404, 'Task not found');
+			}
 			if (result.reason === 'not-allowed' || result.reason === 'own-task') {
 				return fail(403, {
 					error: 'You cannot complete that task from this side of the partnership.'

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import SectionWidgetHarness from './SectionWidgetHarness.svelte';
 
 /**
@@ -9,7 +9,7 @@ import SectionWidgetHarness from './SectionWidgetHarness.svelte';
  * Playwright suite's problem.
  */
 describe('SectionWidget', () => {
-	test('links the title when it has somewhere to go', () => {
+	it('links the title when it has somewhere to go', () => {
 		render(SectionWidgetHarness, { title: 'Tasks', href: '/home/tasks', body: 'two ready' });
 
 		// The bare word, not "Tasks chevron-right": the chevron carries no label,
@@ -20,20 +20,20 @@ describe('SectionWidget', () => {
 		expect(screen.getByRole('heading', { level: 2 })).toContainElement(link);
 	});
 
-	test('leaves the title unlinked when there is nowhere to go', () => {
+	it('leaves the title unlinked when there is nowhere to go', () => {
 		render(SectionWidgetHarness, { title: 'Messages', body: 'two waiting' });
 
 		expect(screen.queryByRole('link')).not.toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 2, name: 'Messages' })).toBeInTheDocument();
 	});
 
-	test('sets with-header, without which wa-card server-renders only the body', () => {
+	it('sets with-header, without which wa-card server-renders only the body', () => {
 		const { container } = render(SectionWidgetHarness, { title: 'Guides', body: 'nothing' });
 
 		expect(container.querySelector('wa-card')).toHaveAttribute('with-header');
 	});
 
-	test('renders the body it is given', () => {
+	it('renders the body it is given', () => {
 		render(SectionWidgetHarness, { title: 'Guides', body: 'three guides' });
 
 		expect(screen.getByText('three guides')).toBeInTheDocument();

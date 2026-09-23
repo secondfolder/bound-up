@@ -29,7 +29,9 @@ export function richTextFieldSchema(maxChars: number) {
 		.string()
 		.transform((raw, ctx) => {
 			const trimmed = raw.trim();
-			if (trimmed === '') return null;
+			if (trimmed === '') {
+				return null;
+			}
 
 			const document = parseRichTextDocument(trimmed);
 			if (document) {
@@ -37,7 +39,9 @@ export function richTextFieldSchema(maxChars: number) {
 					ctx.addIssue({ code: 'custom', message: tooLong });
 					return z.NEVER;
 				}
-				if (isRichTextDocumentEmpty(document)) return null;
+				if (isRichTextDocumentEmpty(document)) {
+					return null;
+				}
 				// The stripped form: smaller than what the editor emitted, and
 				// carrying nothing we did not ask for.
 				return JSON.stringify(document);

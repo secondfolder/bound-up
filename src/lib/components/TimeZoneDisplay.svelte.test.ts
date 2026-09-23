@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { default: TimeZoneDisplay } = await import('./TimeZoneDisplay.svelte');
 
@@ -14,7 +14,7 @@ describe('TimeZoneDisplay', () => {
 		vi.useRealTimers();
 	});
 
-	test('shows the partner-page format when the current time is included', () => {
+	it('shows the partner-page format when the current time is included', () => {
 		render(TimeZoneDisplay, {
 			timeZone: 'America/New_York',
 			referenceTimeZone: 'Europe/London',
@@ -33,7 +33,7 @@ describe('TimeZoneDisplay', () => {
 		).toBeInTheDocument();
 	});
 
-	test('shows the task-style format when the current time is omitted', () => {
+	it('shows the task-style format when the current time is omitted', () => {
 		render(TimeZoneDisplay, {
 			timeZone: 'America/New_York',
 			referenceTimeZone: 'Europe/London'
@@ -42,7 +42,7 @@ describe('TimeZoneDisplay', () => {
 		expect(screen.getByText('New York time (5 hours behind you)')).toBeInTheDocument();
 	});
 
-	test('shows the date before the time when the local day differs from the viewer', () => {
+	it('shows the date before the time when the local day differs from the viewer', () => {
 		vi.setSystemTime(new Date('2026-01-15T23:30:00Z'));
 
 		render(TimeZoneDisplay, {
@@ -69,7 +69,7 @@ describe('TimeZoneDisplay', () => {
 		).toBeInTheDocument();
 	});
 
-	test('renders nothing when both timezones are the same', () => {
+	it('renders nothing when both timezones are the same', () => {
 		const { container } = render(TimeZoneDisplay, {
 			timeZone: 'Europe/London',
 			referenceTimeZone: 'Europe/London',

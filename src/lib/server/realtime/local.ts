@@ -1,11 +1,10 @@
 import {
+	encodeSseEvent,
+	type Notifier,
 	SSE_HEADERS,
 	SSE_KEEPALIVE,
 	SSE_KEEPALIVE_MS,
-	SSE_PREAMBLE,
-	encodeSseEvent,
-	type Notifier,
-	type RealtimeEvent
+	SSE_PREAMBLE
 } from './index';
 
 /**
@@ -28,9 +27,11 @@ const rooms = new Map<string, Set<ReadableStreamDefaultController<Uint8Array>>>(
 
 export function createLocalNotifier(): Notifier {
 	return {
-		async publish(partnershipId, event) {
+		publish(partnershipId, event) {
 			const room = rooms.get(partnershipId);
-			if (!room) return;
+			if (!room) {
+				return Promise.resolve();
+			}
 
 			const frame = encoder.encode(encodeSseEvent(event));
 			// A copy, because a failed enqueue removes the controller from the set
@@ -44,26 +45,35 @@ export function createLocalNotifier(): Notifier {
 					room.delete(controller);
 				}
 			}
-			if (room.size === 0) rooms.delete(partnershipId);
+			if (room.size === 0) {
+				rooms.delete(partnershipId);
+			}
+			return Promise.resolve();
 		},
 
-		async stream(partnershipId) {
+		stream(partnershipId) {
 			let own: ReadableStreamDefaultController<Uint8Array> | undefined;
 			let keepalive: ReturnType<typeof setInterval> | undefined;
 
 			const drop = () => {
-				if (keepalive) clearInterval(keepalive);
+				if (keepalive) {
+					clearInterval(keepalive);
+				}
 				const room = rooms.get(partnershipId);
-				if (!room || !own) return;
+				if (!(room && own)) {
+					return;
+				}
 				room.delete(own);
-				if (room.size === 0) rooms.delete(partnershipId);
+				if (room.size === 0) {
+					rooms.delete(partnershipId);
+				}
 			};
 
 			const body = new ReadableStream<Uint8Array>({
 				start(controller) {
 					own = controller;
-					let room = rooms.get(partnershipId);
-					if (!room) rooms.set(partnershipId, (room = new Set()));
+					const room = rooms.get(partnershipId) ?? new Set();
+					rooms.set(partnershipId, room);
 					room.add(controller);
 
 					controller.enqueue(encoder.encode(SSE_PREAMBLE));
@@ -80,7 +90,7 @@ export function createLocalNotifier(): Notifier {
 				cancel: drop
 			});
 
-			return new Response(body, { headers: SSE_HEADERS });
+			return Promise.resolve(new Response(body, { headers: SSE_HEADERS }));
 		}
 	};
 }
@@ -90,4 +100,4 @@ export function localRoomSize(partnershipId: string): number {
 	return rooms.get(partnershipId)?.size ?? 0;
 }
 
-export type { RealtimeEvent };
+export type { RealtimeEvent } from './index';

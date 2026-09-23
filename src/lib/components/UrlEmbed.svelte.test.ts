@@ -1,9 +1,11 @@
-import { createRawSnippet } from 'svelte';
 import { fireEvent, render } from '@testing-library/svelte';
+import { createRawSnippet } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import UrlEmbed, { NARROW_EMBED_MEDIA_QUERY } from './UrlEmbed.svelte';
-import { clearOembedCache, type CachedEmbedDetails, type EmbedSpec } from '$lib/embeds';
+import { type CachedEmbedDetails, clearOembedCache, type EmbedSpec } from '$lib/embeds';
+import { defined } from '$lib/testing/defined';
+import { pending } from '$lib/testing/pending';
 import { waProp } from '$lib/testing/web-awesome';
+import UrlEmbed, { NARROW_EMBED_MEDIA_QUERY } from './UrlEmbed.svelte';
 
 const observers: MockIntersectionObserver[] = [];
 
@@ -12,7 +14,7 @@ class MockIntersectionObserver {
 	elements = new Set<Element>();
 	root: Element | Document | null;
 	rootMargin: string;
-	thresholds: ReadonlyArray<number>;
+	thresholds: readonly number[];
 	observe = vi.fn((element: Element) => {
 		this.elements.add(element);
 	});
@@ -85,13 +87,17 @@ class MockIntersectionObserver {
  */
 function isHolding(container: HTMLElement): boolean {
 	const root = container.querySelector('.url-embed');
-	if (!root) throw new Error('expected the embed wrapper');
+	if (!root) {
+		throw new Error('expected the embed wrapper');
+	}
 	return root.children.length === 0;
 }
 
 function refreshButton(container: HTMLElement): HTMLElement {
 	const button = container.querySelector<HTMLElement>('wa-button.refresh');
-	if (!button) throw new Error('expected a refresh button');
+	if (!button) {
+		throw new Error('expected a refresh button');
+	}
 	return button;
 }
 
@@ -105,7 +111,9 @@ function installIntersectionObserverMock() {
 
 function emitIntersection(element: Element, isIntersecting: boolean, intersectionRatio = 1) {
 	const observer = observers.find((candidate) => candidate.elements.has(element));
-	if (!observer) throw new Error('expected observed element');
+	if (!observer) {
+		throw new Error('expected observed element');
+	}
 	observer.emit(element, isIntersecting, intersectionRatio);
 }
 
@@ -118,7 +126,7 @@ function emitIntersection(element: Element, isIntersecting: boolean, intersectio
  * `change` when the window is resized or the phone turned. Only the narrow
  * query is faked; everything else still goes to the browser.
  */
-const realMatchMedia = window.matchMedia;
+const realMatchMedia = globalThis.matchMedia;
 
 function installMatchMedia(matching: boolean) {
 	const listeners = new Set<(event: MediaQueryListEvent) => void>();
@@ -135,8 +143,8 @@ function installMatchMedia(matching: boolean) {
 		removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => {
 			listeners.delete(listener);
 		},
-		addListener: () => {},
-		removeListener: () => {},
+		addListener: vi.fn(),
+		removeListener: vi.fn(),
 		dispatchEvent: () => true,
 		/** Test-only: crosses the breakpoint the way a resize would. */
 		set(next: boolean) {
@@ -146,17 +154,17 @@ function installMatchMedia(matching: boolean) {
 			}
 		}
 	};
-	window.matchMedia = ((query: string) =>
+	globalThis.matchMedia = ((query: string) =>
 		query === NARROW_EMBED_MEDIA_QUERY
 			? list
-			: realMatchMedia(query)) as unknown as typeof window.matchMedia;
+			: realMatchMedia(query)) as unknown as typeof globalThis.matchMedia;
 	return list;
 }
 
 afterEach(() => {
 	clearOembedCache();
 	vi.unstubAllGlobals();
-	window.matchMedia = realMatchMedia;
+	globalThis.matchMedia = realMatchMedia;
 });
 
 describe('UrlEmbed', () => {
@@ -195,7 +203,9 @@ describe('UrlEmbed', () => {
 		});
 		const frame = container.querySelector('iframe');
 		expect(container.querySelector('.loading-overlay')).not.toBeNull();
-		if (!frame) throw new Error('expected iframe');
+		if (!frame) {
+			throw new Error('expected iframe');
+		}
 		await fireEvent.load(frame);
 		expect(container.querySelector('.loading-overlay')).toBeNull();
 	});
@@ -287,7 +297,7 @@ describe('UrlEmbed', () => {
 		// embed. It appears once, when it has something real to show.
 		vi.stubGlobal(
 			'fetch',
-			vi.fn(() => new Promise(() => {}))
+			vi.fn(() => pending())
 		);
 		const { container } = render(UrlEmbed, {
 			props: {
@@ -301,7 +311,7 @@ describe('UrlEmbed', () => {
 	});
 
 	it('renders from cached metadata without fetching again', () => {
-		const fetchMock = vi.fn(() => new Promise(() => {}));
+		const fetchMock = vi.fn(() => pending());
 		vi.stubGlobal('fetch', fetchMock);
 		const cached = {
 			href: 'https://vimeo.com/2',
@@ -335,7 +345,7 @@ describe('UrlEmbed', () => {
 	it('draws a cached card without waiting for the scrollport', () => {
 		// Nothing to look up, so nothing to defer: the details are already here.
 		installIntersectionObserverMock();
-		const fetchMock = vi.fn(() => new Promise(() => {}));
+		const fetchMock = vi.fn(() => pending());
 		vi.stubGlobal('fetch', fetchMock);
 		const cached = {
 			href: 'https://vimeo.com/2',
@@ -370,7 +380,7 @@ describe('UrlEmbed', () => {
 
 	it('draws nothing for an embed whose cached details are still decrypting', () => {
 		installIntersectionObserverMock();
-		const fetchMock = vi.fn(() => new Promise(() => {}));
+		const fetchMock = vi.fn(() => pending());
 		vi.stubGlobal('fetch', fetchMock);
 		const cached = {
 			href: 'https://vimeo.com/2',
@@ -427,7 +437,7 @@ describe('UrlEmbed', () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 		// Empty, but still observed: an embed that draws nothing until it loads
 		// must still be able to tell when it has scrolled into view.
-		emitIntersection(container.querySelector('.url-embed')!, true, 1);
+		emitIntersection(defined(container.querySelector('.url-embed'), 'the embed root'), true, 1);
 
 		await vi.waitFor(() => {
 			expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -509,7 +519,9 @@ describe('UrlEmbed', () => {
 		await fireEvent.click(refreshButton(container));
 		expect(container.querySelector('wa-spinner')).not.toBeNull();
 		expect(container.querySelector('wa-icon')).toBeNull();
-		if (!resolver.current) throw new Error('expected refresh resolver');
+		if (!resolver.current) {
+			throw new Error('expected refresh resolver');
+		}
 		resolver.current();
 		await vi.waitFor(() => {
 			expect(container.querySelector('wa-spinner')).toBeNull();
@@ -543,7 +555,7 @@ describe('UrlEmbed', () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 		expect(onActivate).not.toHaveBeenCalled();
 
-		emitIntersection(container.querySelector('.url-embed')!, true, 1);
+		emitIntersection(defined(container.querySelector('.url-embed'), 'the embed root'), true, 1);
 		await vi.waitFor(() => {
 			expect(onActivate).toHaveBeenCalledWith('https://vimeo.com/2');
 			expect(container.querySelector('.player iframe')).not.toBeNull();
@@ -567,14 +579,14 @@ describe('UrlEmbed', () => {
 			// the reader is meant to see. The viewport wait that is left is about
 			// request volume, not consent.
 			installIntersectionObserverMock();
-			const fetchMock = vi.fn(() => new Promise(() => {}));
+			const fetchMock = vi.fn(() => pending());
 			vi.stubGlobal('fetch', fetchMock);
 			const { container, queryByRole } = render(UrlEmbed, { props: redditProps });
 
 			expect(queryByRole('button', { name: 'Show' })).toBeNull();
 			expect(fetchMock).not.toHaveBeenCalled();
 
-			emitIntersection(container.querySelector('.url-embed')!, true, 1);
+			emitIntersection(defined(container.querySelector('.url-embed'), 'the embed root'), true, 1);
 			await vi.waitFor(() => {
 				expect(fetchMock).toHaveBeenCalledTimes(1);
 			});
@@ -600,7 +612,9 @@ describe('UrlEmbed', () => {
 			// on the embed scrolling into view, and a real IntersectionObserver
 			// reports that a frame later, not synchronously.
 			const settle = await vi.waitFor(() => {
-				if (!resolver.current) throw new Error('expected pending fetch resolver');
+				if (!resolver.current) {
+					throw new Error('expected pending fetch resolver');
+				}
 				return resolver.current;
 			});
 			expect(container.querySelector('.card')).toBeNull();
@@ -681,7 +695,7 @@ describe('UrlEmbed', () => {
 					'&embed_host_url=' +
 					// Wherever the page is actually served from — the test server's port
 					// is not fixed.
-					encodeURIComponent(window.location.origin)
+					encodeURIComponent(globalThis.location.origin)
 			);
 			expect(frame?.getAttribute('height')).toBe('600');
 			expect(container.querySelector('.player iframe')).toBeNull();
@@ -699,7 +713,9 @@ describe('UrlEmbed', () => {
 	 */
 	function openButton(container: HTMLElement): HTMLElement {
 		const button = container.querySelector('wa-button.open');
-		if (!button) throw new Error('expected an Open button');
+		if (!button) {
+			throw new Error('expected an Open button');
+		}
 		return button as HTMLElement;
 	}
 
@@ -769,7 +785,9 @@ describe('UrlEmbed', () => {
 			expect(container.querySelector('iframe')).not.toBeNull();
 
 			const close = container.querySelector('wa-button.dialog-close');
-			if (!close) throw new Error('expected a close button');
+			if (!close) {
+				throw new Error('expected a close button');
+			}
 			await fireEvent.click(close);
 
 			expect(container.querySelector('wa-dialog.embed-dialog')).toBeNull();

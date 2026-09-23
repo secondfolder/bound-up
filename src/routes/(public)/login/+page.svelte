@@ -19,7 +19,6 @@
 <!-- Not plain "Sign up": the (public) header already has a link by that name,
      and two links with the same accessible name going to different places is a
      real problem for anyone navigating by link list (see AGENTS.md). -->
-<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 <a class="cross-link" href={signupHref}>New here? Create an account</a>
 
 <style>

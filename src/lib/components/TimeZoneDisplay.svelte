@@ -6,13 +6,13 @@
 		UTC_TIMEZONE
 	} from '$lib/timezone';
 
-	interface Props {
+	type Props = {
 		timeZone: string | null;
 		referenceTimeZone?: string;
 		date?: Date;
 		showCurrentTime?: boolean;
 		className?: string;
-	}
+	};
 
 	let {
 		timeZone,

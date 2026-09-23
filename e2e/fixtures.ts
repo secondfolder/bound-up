@@ -1,4 +1,4 @@
-import { test as base, type Browser, type Page } from '@playwright/test';
+import { type Browser, test as base, type Page } from '@playwright/test';
 
 /**
  * The one net the suite did not have: browser-engine diagnostics.
@@ -62,18 +62,18 @@ function report(where: string, diagnostics: string[]): Error {
 
 type WorkerFixtures = { diagnostics: { all: string[]; reported: number } };
 
-export const test = base.extend<{ checkDiagnostics: void }, WorkerFixtures>({
+export const test = base.extend<{ checkDiagnostics: undefined }, WorkerFixtures>({
 	diagnostics: [
-		// Playwright reads a fixture's dependencies off its first parameter's
-		// destructuring pattern, so a fixture with none must still spell out `{}`.
-		// eslint-disable-next-line no-empty-pattern
+		// biome-ignore lint/correctness/noEmptyPattern: Playwright reads a fixture's dependencies off the source text of its first parameter's destructuring pattern, so a fixture with none must still spell out `{}`.
 		async ({}, use) => {
 			const diagnostics = { all: [] as string[], reported: 0 };
 			await use(diagnostics);
 			const unreported = diagnostics.all.slice(diagnostics.reported);
 			// Thrown from worker teardown, so the run still fails on anything that
 			// arrived after the last test's own check.
-			if (unreported.length > 0) throw report('this worker, after its last test', unreported);
+			if (unreported.length > 0) {
+				throw report('this worker, after its last test', unreported);
+			}
 		},
 		{ scope: 'worker' }
 	],
@@ -82,9 +82,13 @@ export const test = base.extend<{ checkDiagnostics: void }, WorkerFixtures>({
 		async ({ browser, diagnostics }, use) => {
 			function watchPage(page: Page) {
 				page.on('console', (message) => {
-					if (!FAILING_CONSOLE_TYPES.has(message.type())) return;
+					if (!FAILING_CONSOLE_TYPES.has(message.type())) {
+						return;
+					}
 					const text = message.text();
-					if (IGNORED.some((pattern) => pattern.test(text))) return;
+					if (IGNORED.some((pattern) => pattern.test(text))) {
+						return;
+					}
 					diagnostics.all.push(`${message.type()}: ${text}`);
 				});
 				page.on('pageerror', (error) => diagnostics.all.push(`pageerror: ${String(error)}`));
@@ -111,15 +115,15 @@ export const test = base.extend<{ checkDiagnostics: void }, WorkerFixtures>({
 	checkDiagnostics: [
 		async ({ diagnostics }, use) => {
 			diagnostics.reported = diagnostics.all.length;
-			await use();
+			await use(undefined);
 			const fresh = diagnostics.all.slice(diagnostics.reported);
 			diagnostics.reported = diagnostics.all.length;
 			// Thrown from test teardown, so the test fails with the messages even
 			// though every behavioural assertion in it passed.
-			if (fresh.length > 0) throw report('this test', fresh);
+			if (fresh.length > 0) {
+				throw report('this test', fresh);
+			}
 		},
 		{ auto: true }
 	]
 });
-
-export { expect } from '@playwright/test';

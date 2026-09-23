@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { JITTER_MAX_PERCENT, TILT_MAX_DEGREES, stickerJitter, stickerStyle } from './sticker';
+import { JITTER_MAX_PERCENT, stickerJitter, stickerStyle, TILT_MAX_DEGREES } from './sticker';
 
 const ids = Array.from({ length: 2000 }, () => crypto.randomUUID());
 

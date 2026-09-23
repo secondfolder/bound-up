@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { unlockMode, type UnlockModeInput } from './passkey-unlock';
+import { type UnlockModeInput, unlockMode } from './passkey-unlock';
 
 function input(overrides: Partial<UnlockModeInput> = {}): UnlockModeInput {
 	return {

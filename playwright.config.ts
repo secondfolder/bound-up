@@ -30,7 +30,7 @@ export default defineConfig({
 	// One shared server also means one shared, warm route-compile cache.
 	workers: process.env.CI ? 2 : 4,
 	fullyParallel: true,
-	forbidOnly: !!process.env.CI,
+	forbidOnly: Boolean(process.env.CI),
 	// Generous because these run against `vite dev`, which compiles each route
 	// the first time it is requested — the first pass through a flow pays for
 	// every screen in it.

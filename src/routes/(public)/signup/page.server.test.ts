@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest';
+import { user as users } from '$lib/server/db/schema/auth';
 import { ADA_RECIPIENT, FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
-import { user as users } from '$lib/server/db/schema/auth';
-import { actions, load } from './+page.server';
 import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
+import { actions, load } from './+page.server';
 
 // See the note in the login test: this covers only the invite round-trip.
 
@@ -18,28 +18,24 @@ beforeEach(async () => {
 afterEach(() => harness.close());
 
 test('offers a validated redirectTo to the page', async () => {
-	const data = await runLoad(
-		load(fakeEvent({ db: null!, path: '/signup?redirectTo=%2Finvite%2Fabc' }))
-	);
+	const data = await runLoad(load(fakeEvent({ path: '/signup?redirectTo=%2Finvite%2Fabc' })));
 	expect(data.redirectTo).toBe('/invite/abc');
 });
 
 test('drops a redirectTo that would leave the site', async () => {
-	const data = await runLoad(
-		load(fakeEvent({ db: null!, path: '/signup?redirectTo=%2F%5Cevil.example' }))
-	);
+	const data = await runLoad(load(fakeEvent({ path: '/signup?redirectTo=%2F%5Cevil.example' })));
 	expect(data.redirectTo).toBeNull();
 });
 
 test('sends an already-signed-in visitor on to their invite', async () => {
 	const result = await runAndCatch(() =>
-		load(fakeEvent({ db: null!, user, path: '/signup?redirectTo=%2Finvite%2Fabc' }))
+		load(fakeEvent({ user, path: '/signup?redirectTo=%2Finvite%2Fabc' }))
 	);
 	expect(result).toMatchObject({ type: 'redirect', location: '/invite/abc' });
 });
 
 describe('default action', () => {
-	test('persists the submitted timezone on signup', async () => {
+	it('persists the submitted timezone on signup', async () => {
 		const signUpEmail = vi.fn(
 			async ({ body }: { body: { name: string; email: string; timezone: string } }) => {
 				await harness.db.insert(users).values({
@@ -91,7 +87,7 @@ describe('default action', () => {
 		expect(rows[0]?.timezone).toBe('Europe/London');
 	});
 
-	test('rejects an invalid timezone before calling Better Auth', async () => {
+	it('rejects an invalid timezone before calling Better Auth', async () => {
 		const signUpEmail = vi.fn();
 
 		const result = await actions.default(

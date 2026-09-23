@@ -35,14 +35,17 @@ function firstError(
 	formErrors: string[]
 ): string {
 	for (const errorList of Object.values(fieldErrors)) {
-		if (errorList?.[0]) return errorList[0];
+		if (errorList?.[0]) {
+			return errorList[0];
+		}
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
 
 export const load: PageServerLoad = async ({ locals, parent, depends }) => {
-	if (!locals.user)
+	if (!locals.user) {
 		return { selfRewards: { credits: 0, rewards: [], claims: [] }, partnerRewards: [] };
+	}
 
 	const { partners } = await parent();
 
@@ -58,7 +61,9 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 
 export const actions: Actions = {
 	selfUpdateReward: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = rewardUpdateSchema.safeParse({
@@ -78,12 +83,16 @@ export const actions: Actions = {
 
 		const { rewardId, ...input } = parsed.data;
 		const updated = await updateSelfReward(locals.db, locals.user.id, rewardId, input);
-		if (!updated) error(404, 'Reward not found');
+		if (!updated) {
+			error(404, 'Reward not found');
+		}
 		return { action: 'selfUpdateReward', message: 'Reward saved.' };
 	},
 
 	selfSetCredits: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = rewardCreditsSchema.safeParse({
@@ -103,7 +112,9 @@ export const actions: Actions = {
 	},
 
 	selfClaimReward: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = rewardClaimSchema.safeParse({ rewardId: stringField(formData, 'rewardId') });
@@ -117,7 +128,9 @@ export const actions: Actions = {
 
 		const result = await claimSelfReward(locals.db, locals.user.id, parsed.data.rewardId);
 		if (!result.ok) {
-			if (result.reason === 'not-found') error(404, 'Reward not found');
+			if (result.reason === 'not-found') {
+				error(404, 'Reward not found');
+			}
 			return fail(400, {
 				action: 'selfClaimReward',
 				error:
@@ -131,7 +144,9 @@ export const actions: Actions = {
 	},
 
 	partnerClaimReward: async ({ locals, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = partnerRewardClaimSchema.safeParse({

@@ -11,9 +11,9 @@
  */
 
 import { pinBlocksSending } from '../encryption';
-import { keyStore } from './keystore';
 import { safetyNumber } from './fingerprint';
-import { acceptPin, deviceTrust, verifyPin, OWN_KEY_PIN, type PartnershipTrust } from './pins';
+import { keyStore } from './keystore';
+import { acceptPin, deviceTrust, OWN_KEY_PIN, type PartnershipTrust, verifyPin } from './pins';
 
 /** What one partnership's trust looks like while it is being worked out. */
 export type TrustView =
@@ -75,9 +75,13 @@ export async function refreshTrust(
  * user was about to be warned about.
  */
 export function trustAllowsSending(view: TrustView): boolean {
-	if (view.status === 'unknown') return false;
-	if (view.status === 'unavailable') return true;
-	return !pinBlocksSending(view.partner) && !pinBlocksSending(view.own);
+	if (view.status === 'unknown') {
+		return false;
+	}
+	if (view.status === 'unavailable') {
+		return true;
+	}
+	return !(pinBlocksSending(view.partner) || pinBlocksSending(view.own));
 }
 
 /** "We read the number to each other and it matched." */
@@ -86,7 +90,9 @@ export async function markVerified(
 	partnershipId: string,
 	served: { mine: string | null; theirs: string | null }
 ): Promise<void> {
-	if (!served.theirs) return;
+	if (!served.theirs) {
+		return;
+	}
 	await verifyPin(await keyStore(), userId, partnershipId, served.theirs);
 	await refreshTrust(userId, partnershipId, served);
 }
@@ -116,5 +122,7 @@ export async function acceptKeyChange(
 
 /** Drops the cache — on sign-out, or a different account in the same tab. */
 export function resetTrust(): void {
-	for (const key of Object.keys(views)) delete views[key];
+	for (const key of Object.keys(views)) {
+		delete views[key];
+	}
 }

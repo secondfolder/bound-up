@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
 import type { PageData } from './$types';
@@ -40,7 +40,7 @@ function data({
 }
 
 describe('/partner/[id]/tasks/+page.svelte', () => {
-	test('shows task and history actions together for one-sided managing control', () => {
+	it('shows task and history actions together for one-sided managing control', () => {
 		const { container } = render(Page, {
 			data: data({ canManageTasks: true, canCompleteTasks: false })
 		});
@@ -53,7 +53,7 @@ describe('/partner/[id]/tasks/+page.svelte', () => {
 		expect(container.querySelectorAll('.panel')).toHaveLength(0);
 	});
 
-	test('shows a single unsplit task section for the non-managing side', () => {
+	it('shows a single unsplit task section for the non-managing side', () => {
 		const { container } = render(Page, {
 			data: data({ canManageTasks: false, canCompleteTasks: true })
 		});
@@ -64,7 +64,7 @@ describe('/partner/[id]/tasks/+page.svelte', () => {
 		expect(container.querySelectorAll('.panel')).toHaveLength(0);
 	});
 
-	test('splits shared-control tasks into sections for you and your partner', () => {
+	it('splits shared-control tasks into sections for you and your partner', () => {
 		const tasks = [
 			{
 				id: 'task-1',

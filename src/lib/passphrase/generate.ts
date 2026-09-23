@@ -17,6 +17,8 @@
 
 import { EFF_LONG_WORDLIST } from './eff-long';
 
+const LOWERCASE_WORD = /^[a-z]+$/;
+
 /**
  * The words this generator will actually pick from.
  *
@@ -30,7 +32,7 @@ import { EFF_LONG_WORDLIST } from './eff-long';
  * stay checkable against any other EFF-wordlist tool.
  */
 export const PASSPHRASE_POOL: readonly string[] = EFF_LONG_WORDLIST.filter((word) =>
-	/^[a-z]+$/.test(word)
+	LOWERCASE_WORD.test(word)
 );
 
 /** Bits of entropy per word, from the pool actually drawn from. */
@@ -60,14 +62,16 @@ export const PASSPHRASE_SEPARATOR = '-';
  * uniform. About 5% of draws are rejected for this pool.
  */
 function uniformIndex(size: number): number {
-	if (size <= 0 || size > 0x10000) {
+	if (size <= 0 || size > 0x1_00_00) {
 		throw new Error(`Pool size ${size} is out of range for 16-bit sampling`);
 	}
-	const limit = Math.floor(0x10000 / size) * size;
+	const limit = Math.floor(0x1_00_00 / size) * size;
 	const buffer = new Uint16Array(1);
 	for (;;) {
 		crypto.getRandomValues(buffer);
-		if (buffer[0] < limit) return buffer[0] % size;
+		if (buffer[0] < limit) {
+			return buffer[0] % size;
+		}
 	}
 }
 
@@ -93,7 +97,7 @@ export function generatePassphrase(words: number = PASSPHRASE_WORDS): GeneratedP
 		throw new Error('A passphrase needs at least one word');
 	}
 	const picked: string[] = [];
-	for (let i = 0; i < words; i++) {
+	for (let i = 0; i < words; i += 1) {
 		picked.push(PASSPHRASE_POOL[uniformIndex(PASSPHRASE_POOL.length)]);
 	}
 	return {

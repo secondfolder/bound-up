@@ -9,10 +9,10 @@
  * cannot drift apart on anything wider.
  */
 
-export type DurableObjectIdLike = { toString(): string };
+export type DurableObjectIdLike = { toString: () => string };
 
 export type DurableObjectStubLike = {
-	fetch(input: string | Request, init?: RequestInit): Promise<Response>;
+	fetch: (input: string | Request, init?: RequestInit) => Promise<Response>;
 };
 
 export type RealtimeNamespace = {
@@ -23,8 +23,8 @@ export type RealtimeNamespace = {
 	 * storing an id anywhere: both partners' devices derive the same object from
 	 * the same partnership id.
 	 */
-	idFromName(name: string): DurableObjectIdLike;
-	get(id: DurableObjectIdLike): DurableObjectStubLike;
+	idFromName: (name: string) => DurableObjectIdLike;
+	get: (id: DurableObjectIdLike) => DurableObjectStubLike;
 };
 
 /**

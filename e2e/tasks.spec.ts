@@ -1,4 +1,6 @@
-import { expect, test } from './fixtures';
+import { expect } from '@playwright/test';
+import { defined } from '../src/lib/testing/defined';
+import { test } from './fixtures';
 import {
 	clickWaButton,
 	createInvite,
@@ -31,7 +33,7 @@ test.describe('tasks', () => {
 			const surface = ada.page.locator('.task-form .richtext-editor .surface').first();
 			await typeRichText(ada.page.locator('.task-form'), 'Take your time');
 
-			const box = (await surface.boundingBox())!;
+			const box = defined(await surface.boundingBox(), 'the editor surface box');
 			await ada.page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
 
 			const toolbar = ada.page.getByRole('toolbar', { name: 'Text formatting' });

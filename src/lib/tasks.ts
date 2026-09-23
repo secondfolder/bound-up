@@ -1,4 +1,4 @@
-import { canEditPartnership, roleOf, type PartnershipRecord } from './partnership';
+import { canEditPartnership, type PartnershipRecord, roleOf } from './partnership';
 import type { TaskSchedule } from './types';
 
 export type TaskInput = {
@@ -40,7 +40,9 @@ export function canCompleteFromPartnership(
 	userId: string
 ): boolean {
 	const role = roleOf(record, userId);
-	if (!role || record.status !== 'accepted') return false;
+	if (!role || record.status !== 'accepted') {
+		return false;
+	}
 	return record.control === 'both' || record.control !== role;
 }
 
@@ -56,9 +58,15 @@ export function canViewPartnershipTask(record: PartnershipTaskRecord, userId: st
 	const canManage = canManagePartnershipTasks(record, userId);
 	const canComplete = canCompleteFromPartnership(record, userId);
 
-	if (!canManage && !canComplete) return false;
-	if (canManage && canComplete) return true;
-	if (canManage) return record.createdByUserId === userId;
+	if (!(canManage || canComplete)) {
+		return false;
+	}
+	if (canManage && canComplete) {
+		return true;
+	}
+	if (canManage) {
+		return record.createdByUserId === userId;
+	}
 	return record.createdByUserId !== userId;
 }
 
@@ -67,8 +75,12 @@ export function isTaskCompletableAt(
 	record: Pick<PartnershipTaskRecord, 'active' | 'nextEligibleAt'>,
 	now: Date = new Date()
 ): boolean {
-	if (!record.active) return false;
-	if (!record.nextEligibleAt) return true;
+	if (!record.active) {
+		return false;
+	}
+	if (!record.nextEligibleAt) {
+		return true;
+	}
 	return record.nextEligibleAt.getTime() <= now.getTime();
 }
 
@@ -83,7 +95,11 @@ export function canCompletePartnershipTask(
 	viewerId: string,
 	now: Date = new Date()
 ): boolean {
-	if (!canCompleteFromPartnership(record, viewerId)) return false;
-	if (record.createdByUserId === viewerId) return false;
+	if (!canCompleteFromPartnership(record, viewerId)) {
+		return false;
+	}
+	if (record.createdByUserId === viewerId) {
+		return false;
+	}
 	return isTaskCompletableAt(record, now);
 }

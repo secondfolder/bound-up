@@ -1,16 +1,16 @@
 <script lang="ts">
+	import type { WaSelectEvent } from '@awesome.me/webawesome/dist/events/select.js';
+	import { tick } from 'svelte';
 	import RichText from '$lib/components/RichText.svelte';
 	import { scrollIntoViewWithin } from '$lib/scroll-parent';
 	import type { EdgeTaskView } from '$lib/types';
-	import type { WaSelectEvent } from '@awesome.me/webawesome/dist/events/select.js';
-	import { tick } from 'svelte';
 
 	let { edgeTask }: { edgeTask: EdgeTaskView } = $props();
 	let count: number = $state(0);
 	const increment = () => {
 		count += 1;
 	};
-	const decrement = (amountToDecrementBy: number = 1) => {
+	const decrement = (amountToDecrementBy = 1) => {
 		count -= amountToDecrementBy;
 	};
 	// <wa-dropdown> reports selections via `wa-select` rather than a click on the
@@ -34,9 +34,13 @@
 		// scrolling to a paragraph that is no longer the last.
 		const countAtRun = count;
 		void tick().then(() => {
-			if (countAtRun !== count) return;
+			if (countAtRun !== count) {
+				return;
+			}
 			const lastInstruction = mainElm?.querySelector(' & > p:last-child');
-			if (!lastInstruction || !mainElm) return;
+			if (!(lastInstruction && mainElm)) {
+				return;
+			}
 			// Shared with ThreadView, which needs exactly this. The comment about
 			// why the window cannot be scrolled here now lives in scroll-parent.ts.
 			scrollIntoViewWithin(lastInstruction, mainElm);
@@ -60,7 +64,7 @@
 	     nav bar, which is where it wanted to be all along. -->
 	<footer>
 		<div class="info">
-			{count} edge{count !== 1 ? 's' : ''}, {remaining} to go
+			{count} edge{count === 1 ? '' : 's'}, {remaining} to go
 		</div>
 		<div class="controls">
 			<wa-button onclick={increment}>Record Edge</wa-button>

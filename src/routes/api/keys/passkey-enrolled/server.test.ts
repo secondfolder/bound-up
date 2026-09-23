@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { passkey } from '$lib/server/db/schema';
+import { passkeyPrfStatusFor } from '$lib/server/keys';
+import { FAKE_WRAP_BLOB } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import {
 	createTestUser,
 	createTestUserKeys,
 	readWrapRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { FAKE_WRAP_BLOB } from '$lib/testing/crypto';
-import { fakeEvent, runAndCatch } from '$lib/testing/events';
-import { passkeyPrfStatusFor } from '$lib/server/keys';
-import { passkey } from '$lib/server/db/schema';
 import { POST } from './+server';
 
 /**

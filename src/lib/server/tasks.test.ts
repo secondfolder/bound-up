@@ -1,25 +1,25 @@
 import { and, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { partnerships, selfTasks } from './db/schema';
 import { createTestDb, type TestDb } from '../testing/db';
 import {
-	readPartnershipRewardCreditRow,
 	createTestInvite,
 	createTestPartnership,
 	createTestPartnershipTask,
 	createTestSelfTask,
 	createTestUser,
-	readSelfRewardCreditRow,
+	readPartnershipRewardCreditRow,
 	readPartnershipTaskRow,
+	readSelfRewardCreditRow,
 	readSelfTaskRow,
 	type TestUser
 } from '../testing/fixtures';
+import { partnerships, selfTasks } from './db/schema';
 import {
 	completePartnershipTask,
 	completeSelfTask,
 	createPartnershipTask,
-	getPartnershipTasksPage,
 	getHomeTasksWidget,
+	getPartnershipTasksPage,
 	getPartnershipTasksWidget,
 	getSelfTaskForUser,
 	getSelfTasksSection,

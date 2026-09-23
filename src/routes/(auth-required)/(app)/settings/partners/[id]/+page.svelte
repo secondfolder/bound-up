@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { superForm } from 'sveltekit-superforms';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerFields from '$lib/components/PartnerFields.svelte';
 	import { initialsFor } from '$lib/initials';
 	import { shareInviteLink } from '$lib/share';
-	import { superForm } from 'sveltekit-superforms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -24,11 +24,13 @@
 
 	async function share(url: string) {
 		const outcome = await shareInviteLink(url);
-		shareStatus = outcome.shared
-			? 'Shared.'
-			: outcome.copied
-				? 'Link copied to your clipboard.'
-				: 'Could not copy automatically — select the link above.';
+		if (outcome.shared) {
+			shareStatus = 'Shared.';
+		} else if (outcome.copied) {
+			shareStatus = 'Link copied to your clipboard.';
+		} else {
+			shareStatus = 'Could not copy automatically — select the link above.';
+		}
 	}
 </script>
 
@@ -136,8 +138,10 @@
 				method="POST"
 				action="?/disconnect"
 				use:enhance={({ cancel }) => {
-					if (!confirm(`Disconnect from ${partnership.partnerName}? This cannot be undone.`))
+					// biome-ignore lint/suspicious/noAlert: the native confirm is the whole confirmation step today; a styled dialog would be a UI change of its own.
+					if (!confirm(`Disconnect from ${partnership.partnerName}? This cannot be undone.`)) {
 						cancel();
+					}
 					return async ({ update }) => update();
 				}}
 			>

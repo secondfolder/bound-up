@@ -1,6 +1,7 @@
-import { expect, test } from './fixtures';
 import { createClient } from '@libsql/client';
-import { E2E_DATABASE_URL } from './run-paths';
+import type { Cookie } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
 import {
 	account,
 	autofillPassword,
@@ -15,6 +16,7 @@ import {
 	submitEnhancedForm,
 	waitForEnhancedForm
 } from './helpers';
+import { E2E_DATABASE_URL } from './run-paths';
 
 /**
  * The client-side key derivation, over HTTP, in a real browser.
@@ -32,7 +34,7 @@ function db() {
 		url: E2E_DATABASE_URL,
 		// Other workers are writing through the dev server meanwhile; wait out a
 		// lock rather than fail with SQLITE_BUSY.
-		timeout: 5_000
+		timeout: 5000
 	});
 }
 
@@ -51,9 +53,13 @@ test.describe('the password never leaves the browser', () => {
 		const bodies: string[] = [];
 
 		page.on('request', (request) => {
-			if (request.method() !== 'POST') return;
+			if (request.method() !== 'POST') {
+				return;
+			}
 			const body = request.postData();
-			if (body) bodies.push(body);
+			if (body) {
+				bodies.push(body);
+			}
 		});
 
 		await signUp(page, who);
@@ -78,7 +84,9 @@ test.describe('the password never leaves the browser', () => {
 		page.on('request', (request) => {
 			if (request.method() === 'POST') {
 				const body = request.postData();
-				if (body) bodies.push(body);
+				if (body) {
+					bodies.push(body);
+				}
 			}
 		});
 
@@ -237,7 +245,9 @@ test.describe('password strength', () => {
 	test('refuses a short password without asking the server', async ({ page }) => {
 		let posts = 0;
 		page.on('request', (request) => {
-			if (request.method() === 'POST') posts += 1;
+			if (request.method() === 'POST') {
+				posts += 1;
+			}
 		});
 
 		const who = account('Zadie');
@@ -257,7 +267,9 @@ test.describe('password strength', () => {
 	test('refuses a mismatched confirmation without asking the server', async ({ page }) => {
 		let posts = 0;
 		page.on('request', (request) => {
-			if (request.method() === 'POST') posts += 1;
+			if (request.method() === 'POST') {
+				posts += 1;
+			}
 		});
 
 		const who = account('Ansel');
@@ -328,7 +340,7 @@ test.describe('password manager autofill', () => {
 		await autofillPassword(page, 'password', who.password);
 		await submitEnhancedForm(page, 'Login');
 
-		await page.waitForURL('**/home');
+		await expect(page).toHaveURL(/\/home$/);
 	});
 
 	/**
@@ -347,7 +359,7 @@ test.describe('password manager autofill', () => {
 		await autofillPasswordSilently(page, 'passwordConfirm', who.password);
 
 		await submitEnhancedForm(page, 'Sign Up');
-		await page.waitForURL('**/home');
+		await expect(page).toHaveURL(/\/home$/);
 	});
 });
 
@@ -394,7 +406,7 @@ test.describe('getting your keys back', () => {
 		const who = account('Cleo');
 
 		const first = await browser.newContext();
-		let cookies;
+		let cookies: Cookie[] = [];
 		try {
 			await signUp(await first.newPage(), who);
 			cookies = await first.cookies();
@@ -431,7 +443,7 @@ test.describe('getting your keys back', () => {
 		const who = account('Efe');
 
 		const first = await browser.newContext();
-		let cookies;
+		let cookies: Cookie[] = [];
 		try {
 			await signUp(await first.newPage(), who);
 			cookies = await first.cookies();
@@ -472,7 +484,7 @@ test.describe('getting your keys back', () => {
 		const who = account('Fen');
 
 		const first = await browser.newContext();
-		let cookies;
+		let cookies: Cookie[] = [];
 		try {
 			await signUp(await first.newPage(), who);
 			cookies = await first.cookies();
@@ -486,7 +498,9 @@ test.describe('getting your keys back', () => {
 			await evicted.addInitScript(() => {
 				// Init scripts run in every frame, including opaque-origin ones like
 				// `about:blank`, where there is no SubtleCrypto to stub at all.
-				if (!globalThis.crypto?.subtle) return;
+				if (!globalThis.crypto?.subtle) {
+					return;
+				}
 				const real = crypto.subtle.generateKey.bind(crypto.subtle);
 				crypto.subtle.generateKey = ((algorithm: AlgorithmIdentifier, ...rest: unknown[]) => {
 					const name = typeof algorithm === 'string' ? algorithm : algorithm.name;
@@ -518,7 +532,7 @@ test.describe('getting your keys back', () => {
 		const who = account('Dov');
 
 		const first = await browser.newContext();
-		let cookies;
+		let cookies: Cookie[] = [];
 		try {
 			await signUp(await first.newPage(), who);
 			cookies = await first.cookies();
@@ -532,7 +546,9 @@ test.describe('getting your keys back', () => {
 			const page = await evicted.newPage();
 			let posts = 0;
 			page.on('request', (request) => {
-				if (request.method() === 'POST') posts += 1;
+				if (request.method() === 'POST') {
+					posts += 1;
+				}
 			});
 
 			await page.goto('/settings/encryption');
@@ -557,7 +573,7 @@ test.describe('getting your keys back', () => {
 		const newPassword = 'vocalist-hazy-radar-plunge';
 
 		const first = await browser.newContext();
-		let cookies;
+		let cookies: Cookie[] = [];
 		try {
 			const page = await first.newPage();
 			await signUp(page, who);
@@ -612,13 +628,15 @@ test.describe('asking the browser to keep the key', () => {
 		const context = await browser.newContext();
 		await context.addInitScript(() => {
 			const storage = globalThis.navigator?.storage;
-			if (!storage) return;
+			if (!storage) {
+				return;
+			}
 			const counted = globalThis as unknown as { persistCalls: number };
 			counted.persistCalls = 0;
-			storage.persisted = async () => false;
-			storage.persist = async () => {
+			storage.persisted = () => Promise.resolve(false);
+			storage.persist = () => {
 				counted.persistCalls += 1;
-				return false;
+				return Promise.resolve(false);
 			};
 		});
 		return context;

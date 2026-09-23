@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { PartnershipRecord } from './partnership';
 import {
 	canCompleteFromPartnership,
 	canCompletePartnershipTask,
@@ -7,7 +8,6 @@ import {
 	isTaskCompletableAt,
 	type PartnershipTaskRecord
 } from './tasks';
-import type { PartnershipRecord } from './partnership';
 
 const INVITER = 'inviter-user';
 const INVITEE = 'invitee-user';
@@ -40,7 +40,7 @@ function task(overrides: Partial<PartnershipTaskRecord> = {}): PartnershipTaskRe
 }
 
 describe('canManagePartnershipTasks', () => {
-	test('matches the existing control rule', () => {
+	it('matches the existing control rule', () => {
 		expect(canManagePartnershipTasks(partnership({ control: 'both' }), INVITER)).toBe(true);
 		expect(canManagePartnershipTasks(partnership({ control: 'both' }), INVITEE)).toBe(true);
 		expect(canManagePartnershipTasks(partnership({ control: 'inviter' }), INVITER)).toBe(true);
@@ -49,19 +49,19 @@ describe('canManagePartnershipTasks', () => {
 });
 
 describe('canCompleteFromPartnership', () => {
-	test('lets the non-controller complete when control is one-sided', () => {
+	it('lets the non-controller complete when control is one-sided', () => {
 		expect(canCompleteFromPartnership(partnership({ control: 'inviter' }), INVITEE)).toBe(true);
 		expect(canCompleteFromPartnership(partnership({ control: 'inviter' }), INVITER)).toBe(false);
 		expect(canCompleteFromPartnership(partnership({ control: 'invitee' }), INVITER)).toBe(true);
 		expect(canCompleteFromPartnership(partnership({ control: 'invitee' }), INVITEE)).toBe(false);
 	});
 
-	test('lets both members complete under shared control', () => {
+	it('lets both members complete under shared control', () => {
 		expect(canCompleteFromPartnership(partnership({ control: 'both' }), INVITER)).toBe(true);
 		expect(canCompleteFromPartnership(partnership({ control: 'both' }), INVITEE)).toBe(true);
 	});
 
-	test('refuses pending links and strangers', () => {
+	it('refuses pending links and strangers', () => {
 		expect(
 			canCompleteFromPartnership(partnership({ status: 'pending', inviteeId: null }), INVITER)
 		).toBe(false);
@@ -72,18 +72,18 @@ describe('canCompleteFromPartnership', () => {
 describe('isTaskCompletableAt', () => {
 	const now = new Date('2026-09-14T12:00:00Z');
 
-	test('allows an active task with no next eligibility gate', () => {
+	it('allows an active task with no next eligibility gate', () => {
 		expect(isTaskCompletableAt({ active: true, nextEligibleAt: null }, now)).toBe(true);
 	});
 
-	test('blocks inactive tasks and future-gated tasks', () => {
+	it('blocks inactive tasks and future-gated tasks', () => {
 		expect(isTaskCompletableAt({ active: false, nextEligibleAt: null }, now)).toBe(false);
 		expect(
 			isTaskCompletableAt({ active: true, nextEligibleAt: new Date('2026-09-14T12:01:00Z') }, now)
 		).toBe(false);
 	});
 
-	test('allows a task exactly when its gate is reached', () => {
+	it('allows a task exactly when its gate is reached', () => {
 		expect(
 			isTaskCompletableAt({ active: true, nextEligibleAt: new Date('2026-09-14T12:00:00Z') }, now)
 		).toBe(true);
@@ -93,13 +93,13 @@ describe('isTaskCompletableAt', () => {
 describe('canCompletePartnershipTask', () => {
 	const now = new Date('2026-09-14T12:00:00Z');
 
-	test('blocks the author even under shared control', () => {
+	it('blocks the author even under shared control', () => {
 		expect(
 			canCompletePartnershipTask(task({ control: 'both', createdByUserId: INVITER }), INVITER, now)
 		).toBe(false);
 	});
 
-	test('lets the other member complete when control allows it and the task is ready', () => {
+	it('lets the other member complete when control allows it and the task is ready', () => {
 		expect(
 			canCompletePartnershipTask(
 				task({ control: 'both', createdByUserId: INVITEE, nextEligibleAt: now }),
@@ -109,7 +109,7 @@ describe('canCompletePartnershipTask', () => {
 		).toBe(true);
 	});
 
-	test('rejects inactive and not-yet-eligible tasks', () => {
+	it('rejects inactive and not-yet-eligible tasks', () => {
 		expect(canCompletePartnershipTask(task({ active: false }), INVITEE, now)).toBe(false);
 		expect(
 			canCompletePartnershipTask(
@@ -122,7 +122,7 @@ describe('canCompletePartnershipTask', () => {
 });
 
 describe('canViewPartnershipTask', () => {
-	test('shows both sides all tasks under shared control', () => {
+	it('shows both sides all tasks under shared control', () => {
 		expect(
 			canViewPartnershipTask(task({ control: 'both', createdByUserId: INVITER }), INVITER)
 		).toBe(true);
@@ -131,7 +131,7 @@ describe('canViewPartnershipTask', () => {
 		).toBe(true);
 	});
 
-	test('shows only counterpart-authored tasks to the completing side', () => {
+	it('shows only counterpart-authored tasks to the completing side', () => {
 		expect(
 			canViewPartnershipTask(task({ control: 'inviter', createdByUserId: INVITER }), INVITEE)
 		).toBe(true);
@@ -140,7 +140,7 @@ describe('canViewPartnershipTask', () => {
 		).toBe(false);
 	});
 
-	test('shows only self-authored tasks to the managing side', () => {
+	it('shows only self-authored tasks to the managing side', () => {
 		expect(
 			canViewPartnershipTask(task({ control: 'inviter', createdByUserId: INVITER }), INVITER)
 		).toBe(true);

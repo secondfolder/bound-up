@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import RichText from '$lib/components/RichText.svelte';
 	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
 	import { migrateLegacyDescriptions } from '$lib/richtext-legacy-migrate';
-	import RichText from '$lib/components/RichText.svelte';
 	import type { PartnershipRewardView, SelfRewardView } from '$lib/types';
 
 	type RewardView = SelfRewardView | PartnershipRewardView;
@@ -35,7 +35,9 @@
 	 * does not re-run on every unrelated update.
 	 */
 	$effect(() => {
-		if (!editHref) return;
+		if (!editHref) {
+			return;
+		}
 		void migrateLegacyDescriptions({
 			kind: claimPartnershipId ? 'partnership-reward' : 'self-reward',
 			partnershipId: claimPartnershipId,
@@ -59,9 +61,9 @@
 					</div>
 					<div class="reward-meta">
 						{#if editHref}
-							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-							<a class="icon-link" href={editHref(reward.id)} aria-label={`Edit ${reward.title}`}>
+							<a class="icon-link" href={editHref(reward.id)}>
 								<wa-icon name="pen-to-square" variant="solid"></wa-icon>
+								<span class="wa-visually-hidden">Edit {reward.title}</span>
 							</a>
 						{/if}
 					</div>

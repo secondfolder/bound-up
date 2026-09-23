@@ -10,7 +10,10 @@ const OTHER_RECIPIENT = 'age1qqqqc8jekhtaalglq59kh7v95xvfpsn9tsu6k8vhselxm0s2592
  *  own tests, so a failure here points at the envelope and not at PBKDF2. */
 async function aesKey(seed = 1): Promise<CryptoKey> {
 	const raw = new Uint8Array(32).fill(seed);
-	return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+	return await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, [
+		'encrypt',
+		'decrypt'
+	]);
 }
 
 describe('wrapIdentity / unwrapIdentity', () => {

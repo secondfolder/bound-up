@@ -1,36 +1,37 @@
 <script lang="ts">
-	import { mount, unmount, untrack } from 'svelte';
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import { $isAutoLinkNode as isAutoLinkNode } from '@lexical/link';
+	import { $findMatchingParent as findMatchingParent } from '@lexical/utils';
 	import {
-		$createParagraphNode as createParagraphNode,
-		$getRoot as getRoot,
-		$getNodeByKey as getNodeByKey,
-		$getSelection as getSelection,
-		$isRangeSelection as isRangeSelection,
 		BLUR_COMMAND,
 		COMMAND_PRIORITY_LOW,
+		$createParagraphNode as createParagraphNode,
+		$getNodeByKey as getNodeByKey,
+		$getRoot as getRoot,
+		$getSelection as getSelection,
+		$isRangeSelection as isRangeSelection,
 		KEY_ENTER_COMMAND,
 		type LexicalEditor
 	} from 'lexical';
-	import { $isAutoLinkNode as isAutoLinkNode } from '@lexical/link';
-	import { $findMatchingParent as findMatchingParent } from '@lexical/utils';
-	import ComposerEmbed from './ComposerEmbed.svelte';
-	import FloatingFormatToolbar from './FloatingFormatToolbar.svelte';
+	import { mount, unmount, untrack } from 'svelte';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import { exportEditorDocument } from '$lib/lexical/nodes';
+	import { ADD_EMBED_COMMAND } from '$lib/lexical/nodes/shared/embed-offer';
+	import { parseStoredRichText, richTextDocumentSchema } from '$lib/richtext';
 	import {
 		$autoLinksAwaitingEmbeds as autoLinksAwaitingEmbeds,
+		createRichTextEditor,
 		$embeddedUrls as embeddedUrls,
 		$insertEmbedForLink as insertEmbedForLink,
 		$insertEmbedForUrl as insertEmbedForUrl,
 		$isEmbedNode as isEmbedNode,
 		MESSAGE_FEATURES,
-		createRichTextEditor,
-		settleLinksAfterEmbeds,
-		trackEmbedDismissals,
 		type RichTextEditorHandle,
-		type RichTextFeature
+		type RichTextFeature,
+		settleLinksAfterEmbeds,
+		trackEmbedDismissals
 	} from '$lib/richtext-editor';
-	import { ADD_EMBED_COMMAND, exportEditorDocument } from '$lib/lexical/nodes';
-	import { parseStoredRichText, richTextDocumentSchema } from '$lib/richtext';
+	import ComposerEmbed from './ComposerEmbed.svelte';
+	import FloatingFormatToolbar from './FloatingFormatToolbar.svelte';
 
 	/**
 	 * The one editor, in both of its moods.
@@ -58,11 +59,11 @@
 		/** Initial content only — see the note above. Use `setValue()` after mount. */
 		value = '',
 		onChange,
-		onSubmit = undefined,
+		onSubmit,
 		placeholder = '',
 		features = MESSAGE_FEATURES,
 		toolbar = false,
-		ariaLabel = undefined,
+		ariaLabel,
 		editorClass = ''
 	}: {
 		value?: string;
@@ -141,7 +142,9 @@
 
 	$effect(() => {
 		const element = root;
-		if (!element) return;
+		if (!element) {
+			return;
+		}
 
 		const created = createRichTextEditor({ features, namespace: 'bound-up-richtext' });
 		const { editor } = created;
@@ -187,19 +190,27 @@
 		const removeEmbed = (key: string) =>
 			editor.update(() => {
 				const node = getNodeByKey(key);
-				if (isEmbedNode(node)) node.remove();
+				if (isEmbedNode(node)) {
+					node.remove();
+				}
 			});
 
 		const offDecorators = editor.registerDecoratorListener<string>((decorators) => {
 			for (const [key, mounted] of embeds) {
-				if (decorators[key] === mounted.url) continue;
+				if (decorators[key] === mounted.url) {
+					continue;
+				}
 				void unmount(mounted.component);
 				embeds.delete(key);
 			}
 			for (const [key, url] of Object.entries(decorators)) {
-				if (embeds.has(key)) continue;
+				if (embeds.has(key)) {
+					continue;
+				}
 				const target = editor.getElementByKey(key);
-				if (!target) continue;
+				if (!target) {
+					continue;
+				}
 				const component = mount(ComposerEmbed, {
 					target,
 					props: { url, onRemove: () => removeEmbed(key) }
@@ -240,18 +251,24 @@
 
 		const caretLinkKey = (): string | null => {
 			const selection = getSelection();
-			if (!isRangeSelection(selection)) return null;
+			if (!isRangeSelection(selection)) {
+				return null;
+			}
 			return findMatchingParent(selection.anchor.getNode(), isAutoLinkNode)?.getKey() ?? null;
 		};
 
 		const sweepEmbeds = (ignoreCaret = false) => {
-			if (settling) return;
+			if (settling) {
+				return;
+			}
 			let work = false;
 			editor.getEditorState().read(() => {
 				work =
 					autoLinksAwaitingEmbeds(ignoreCaret ? null : caretLinkKey(), dismissedEmbeds).length > 0;
 			});
-			if (!work) return;
+			if (!work) {
+				return;
+			}
 			// Guarded because this runs *from* an update listener, and an
 			// unguarded update from there is an infinite loop.
 			settling = true;
@@ -264,7 +281,11 @@
 						insertEmbedForLink(link);
 					}
 				},
-				{ onUpdate: () => (settling = false) }
+				{
+					onUpdate: () => {
+						settling = false;
+					}
+				}
 			);
 		};
 
@@ -278,7 +299,9 @@
 			editorState.read(() => {
 				isEmpty = isEditorEmpty();
 			});
-			if (next === agreedValue) return;
+			if (next === agreedValue) {
+				return;
+			}
 			agreedValue = next;
 			onChange(next);
 		});
@@ -314,7 +337,9 @@
 			? editor.registerCommand(
 					KEY_ENTER_COMMAND,
 					(event) => {
-						if (!event || event.shiftKey) return false;
+						if (!event || event.shiftKey) {
+							return false;
+						}
 						event.preventDefault();
 						// Anything typed right up to Enter still deserves its embed.
 						sweepEmbeds(true);
@@ -323,7 +348,9 @@
 					},
 					COMMAND_PRIORITY_LOW
 				)
-			: () => {};
+			: () => {
+					// No Enter handler was registered, so there is nothing to remove.
+				};
 
 		return () => {
 			offUpdate();
@@ -331,7 +358,9 @@
 			offAddEmbed();
 			offEnter();
 			offDecorators();
-			for (const mounted of embeds.values()) void unmount(mounted.component);
+			for (const mounted of embeds.values()) {
+				void unmount(mounted.component);
+			}
 			embeds.clear();
 			editor.setRootElement(null);
 			created.destroy();
@@ -350,7 +379,9 @@
 	$effect(() => {
 		const next = value;
 		const editor = handle?.editor;
-		if (!editor || next === agreedValue) return;
+		if (!editor || next === agreedValue) {
+			return;
+		}
 		// Marked before loading so the emission this triggers is recognised as
 		// ours and does not bounce back through the parent.
 		agreedValue = next;
@@ -375,7 +406,9 @@
 	/** Replace the contents from outside — used to clear the composer on send. */
 	export function setValue(next: string) {
 		const editor = handle?.editor;
-		if (!editor) return;
+		if (!editor) {
+			return;
+		}
 		load(editor, next);
 		agreedValue = next;
 	}
@@ -395,6 +428,7 @@
 		Lexical wipes it on attach — which presented as the first few characters
 		vanishing when you clicked and typed immediately after a page load.
 	-->
+	<!-- biome-ignore lint/a11y/useSemanticElements lint/a11y/useFocusableInteractive: rich text needs a contenteditable surface, which no native textbox is, and it is focusable exactly when it is editable. -->
 	<div
 		bind:this={root}
 		class="surface"

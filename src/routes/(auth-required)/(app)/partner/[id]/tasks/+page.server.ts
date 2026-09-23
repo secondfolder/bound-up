@@ -4,7 +4,9 @@ import { completePartnershipTask, getPartnershipTasksPage } from '$lib/server/ta
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	depends(`tasks:partner:${params.id}`);
 
@@ -14,7 +16,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		locals.user.id,
 		locals.user.timezone
 	);
-	if (!page) error(404, 'Partner not found');
+	if (!page) {
+		error(404, 'Partner not found');
+	}
 	return page;
 };
 
@@ -28,14 +32,18 @@ function firstError(
 	formErrors: string[]
 ): string {
 	for (const errorList of Object.values(fieldErrors)) {
-		if (errorList?.[0]) return errorList[0];
+		if (errorList?.[0]) {
+			return errorList[0];
+		}
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
 
 export const actions: Actions = {
 	completeTask: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const formData = await request.formData();
 		const parsed = taskCompleteSchema.safeParse({ taskId: stringField(formData, 'taskId') });
 		if (!parsed.success) {
@@ -50,8 +58,12 @@ export const actions: Actions = {
 			viewerTimezone: locals.user.timezone
 		});
 		if (!result.ok) {
-			if (result.reason === 'not-a-member') error(404, 'Partner not found');
-			if (result.reason === 'not-found') error(404, 'Task not found');
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			if (result.reason === 'not-found') {
+				error(404, 'Task not found');
+			}
 			if (result.reason === 'not-allowed' || result.reason === 'own-task') {
 				return fail(403, {
 					error: 'You cannot complete that task from this side of the partnership.'

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, it, test, vi } from 'vitest';
+import { pending } from '$lib/testing/pending';
 import { shareInviteLink } from './share';
 
 /**
@@ -43,12 +44,14 @@ test('starts the clipboard write before awaiting the share sheet', async () => {
 	// navigator.share needs, and Safari then rejects the share outright.
 	const order: string[] = [];
 	stubNavigator({
-		share: vi.fn(async () => {
+		share: vi.fn(() => {
 			order.push('share');
+			return Promise.resolve();
 		}),
 		clipboard: {
-			writeText: vi.fn(async () => {
+			writeText: vi.fn(() => {
 				order.push('clipboard');
+				return Promise.resolve();
 			})
 		}
 	});
@@ -58,8 +61,8 @@ test('starts the clipboard write before awaiting the share sheet', async () => {
 });
 
 describe('when the user dismisses the share sheet', () => {
-	test('reports it as not shared, without logging a warning', async () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+	it('reports it as not shared, without logging a warning', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 		stubNavigator({
 			share: vi.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError')),
 			clipboard: { writeText: vi.fn().mockResolvedValue(undefined) }
@@ -72,7 +75,7 @@ describe('when the user dismisses the share sheet', () => {
 });
 
 test('warns but still reports the copy when the share sheet genuinely fails', async () => {
-	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+	const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 	stubNavigator({
 		share: vi.fn().mockRejectedValue(new Error('boom')),
 		clipboard: { writeText: vi.fn().mockResolvedValue(undefined) }
@@ -108,11 +111,11 @@ test('gives up on a clipboard write that never settles', async () => {
 	// permanently pending promise would leave the page stuck mid-submit.
 	vi.useFakeTimers();
 	try {
-		stubNavigator({ clipboard: { writeText: vi.fn(() => new Promise(() => {})) } });
+		stubNavigator({ clipboard: { writeText: vi.fn(() => pending()) } });
 
-		const pending = shareInviteLink(URL_UNDER_TEST);
+		const outcome = shareInviteLink(URL_UNDER_TEST);
 		await vi.advanceTimersByTimeAsync(2000);
-		expect(await pending).toEqual({ copied: false, shared: false });
+		expect(await outcome).toEqual({ copied: false, shared: false });
 	} finally {
 		vi.useRealTimers();
 	}

@@ -1,4 +1,6 @@
-import { expect, test } from './fixtures';
+import type { Cookie } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
 import {
 	account,
 	clickWaButton,
@@ -119,7 +121,7 @@ test.describe('settings actions', () => {
 		const newPassword = 'vocalist-hazy-radar-plunge';
 
 		const first = await browser.newContext();
-		let cookies;
+		let cookies: Cookie[] = [];
 		try {
 			const page = await first.newPage();
 			await signUp(page, who);

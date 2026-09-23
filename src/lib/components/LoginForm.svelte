@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { Infer, SuperValidated } from 'sveltekit-superforms';
+	import { superForm } from 'sveltekit-superforms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { authClient } from '$lib/auth-client';
-	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import {
 		deriveAuthSecret,
 		deriveMasterKey,
@@ -12,9 +13,8 @@
 		webCryptoAvailable
 	} from '$lib/crypto/kdf';
 	import { stashUnlock } from '$lib/crypto/stash';
+	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import type { LoginFormSchema } from '$lib/schemas/loginForm';
-	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import { superForm } from 'sveltekit-superforms';
 	import InputField from './InputField.svelte';
 	import PasswordField from './PasswordField.svelte';
 
@@ -128,11 +128,11 @@
 		// passkey ceremony never touches the server action, so it has to apply
 		// the same destination itself or an invite would be dropped here.
 		//
-		// no-navigation-without-resolve wants a resolve() call, but this is a
-		// runtime path from a query string, not a known route id — there is
+		// The navigation-through-resolve plugin wants a resolve() call, but this
+		// is a runtime path from a query string, not a known route id — there is
 		// nothing to resolve against. It is safe because the server ran it
 		// through `safeRedirect` in the load before it ever reached this prop.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		// biome-ignore lint/plugin: see above — a validated runtime path, not a route id.
 		await goto(redirectTo ?? resolve('/'), { invalidateAll: true });
 	}
 
@@ -151,10 +151,16 @@
 	$effect(() => {
 		let cancelled = false;
 		void (async () => {
-			if (typeof PublicKeyCredential === 'undefined') return;
-			if (!(await PublicKeyCredential.isConditionalMediationAvailable?.())) return;
+			if (typeof PublicKeyCredential === 'undefined') {
+				return;
+			}
+			if (!(await PublicKeyCredential.isConditionalMediationAvailable?.())) {
+				return;
+			}
 			const res = await authClient.signIn.passkey({ autoFill: true });
-			if (cancelled || !res || res.error) return;
+			if (cancelled || !res || res.error) {
+				return;
+			}
 			await afterPasskeySignIn();
 		})();
 		return () => {

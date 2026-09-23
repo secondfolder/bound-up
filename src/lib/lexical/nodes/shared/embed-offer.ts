@@ -1,12 +1,13 @@
+import { $isLinkNode } from '@lexical/link';
 import {
+	// biome-ignore lint/suspicious/noDeprecatedImports: only the overload that takes a type argument is deprecated, and this calls the plain one.
 	$getNodeByKey,
 	createCommand,
-	setDOMUnmanaged,
 	type LexicalCommand,
 	type LexicalEditor,
-	type NodeKey
+	type NodeKey,
+	setDOMUnmanaged
 } from 'lexical';
-import { $isLinkNode } from '@lexical/link';
 
 /**
  * The DOM half of a link's "Add embed" button, shared by `EditorLinkNode` and
@@ -88,7 +89,9 @@ export function withEmbedOffer(
 			const link = $getNodeByKey(key);
 			return $isLinkNode(link) ? link.getURL() : null;
 		});
-		if (url) editor.dispatchCommand(ADD_EMBED_COMMAND, url);
+		if (url) {
+			editor.dispatchCommand(ADD_EMBED_COMMAND, url);
+		}
 	});
 	// Tells Lexical this element is not document content, so its mutation
 	// observer leaves it alone and a DOM point inside it maps to no node.

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { actions, load } from './+page.server';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestPartnershipTask,
@@ -12,7 +12,7 @@ import {
 	readSelfTaskRow,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
+import { actions, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -21,7 +21,7 @@ let jun: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada', timezone: 'Europe/London' });
 	jun = await createTestUser(db, { name: 'Jun', timezone: 'America/New_York' });
 });
@@ -33,19 +33,13 @@ function at(
 	formData?: Record<string, string>,
 	partners = [] as { id: string; name: string; image: string | null }[]
 ) {
-	return Object.assign(fakeEvent({ db, user, formData, path: '/home/tasks' }), {
-		depends: () => {},
-		parent: async () => ({ partners })
-	});
+	return fakeEvent({ db, user, formData, path: '/home/tasks', parentData: { partners } });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const run = (name: keyof typeof actions, ...args: Parameters<any>) =>
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	(actions[name] as any)(...args);
+const run = (name: string, event: never) => runAction(actions, name, event);
 
 describe('load', () => {
-	test('returns self tasks and partner sections', async () => {
+	it('returns self tasks and partner sections', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		await createTestSelfTask(db, ada, { title: 'Self task' });
 		await createTestPartnershipTask(db, id, jun, {
@@ -64,7 +58,7 @@ describe('load', () => {
 		);
 	});
 
-	test('degrades to an empty tasks page without a session', async () => {
+	it('degrades to an empty tasks page without a session', async () => {
 		await expect(runLoad(load(at(null)))).resolves.toEqual({
 			selfTasks: { tasks: [], completions: [] },
 			partnerTasks: []
@@ -73,7 +67,7 @@ describe('load', () => {
 });
 
 describe('actions', () => {
-	test('completes a self task from the tasks hub', async () => {
+	it('completes a self task from the tasks hub', async () => {
 		const task = await createTestSelfTask(db, ada, { title: 'Nap', creditsAwarded: 2 });
 
 		const result = await run('selfCompleteTask', at(ada, { taskId: task.id }));
@@ -82,7 +76,7 @@ describe('actions', () => {
 		await expect(readSelfTaskRow(db, task.id)).resolves.toMatchObject({ active: false });
 	});
 
-	test('completes a partner task from the home tasks hub', async () => {
+	it('completes a partner task from the home tasks hub', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		const task = await createTestPartnershipTask(db, id, jun, { title: 'Tea', creditsAwarded: 3 });
 
@@ -96,7 +90,7 @@ describe('actions', () => {
 		});
 	});
 
-	test('401s without a session when an action runs', async () => {
+	it('401s without a session when an action runs', async () => {
 		const result = await runAndCatch(() =>
 			run('selfCompleteTask', at(null, { taskId: crypto.randomUUID() }))
 		);

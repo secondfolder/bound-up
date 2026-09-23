@@ -2,6 +2,10 @@
 	import { invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
+	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
+	import ThreadView from '$lib/components/ThreadView.svelte';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
 	import {
 		acceptKeyChange,
@@ -11,10 +15,6 @@
 		trustFor
 	} from '$lib/crypto/trust.svelte';
 	import { watchPartnership } from '$lib/messaging/live';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
-	import ThreadView from '$lib/components/ThreadView.svelte';
-	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -35,7 +35,9 @@
 	const canSend = $derived(trustAllowsSending(trust));
 
 	$effect(() => {
-		if (keyring.status !== 'unlocked') return;
+		if (keyring.status !== 'unlocked') {
+			return;
+		}
 		void refreshTrust(user.id, data.partner.id, data.recipients);
 	});
 
@@ -61,7 +63,9 @@
 		return watchPartnership({
 			partnershipId: partnership,
 			onChange: (event) => {
-				if (event && event.threadId && event.threadId !== thread) return;
+				if (event?.threadId && event.threadId !== thread) {
+					return;
+				}
 				void invalidate(`messages:thread:${thread}`);
 			}
 		});
@@ -107,7 +111,7 @@
 		<!-- `settingUpUnlock` keeps this branch on screen for a moment after the
 		     unlock succeeds: `MessageUnlock` owns the passkey dialogs, and
 		     unmounting it mid-ceremony would take them with it. -->
-		<MessageUnlock {user} onFlowOpen={(open) => (settingUpUnlock = open)}>
+		<MessageUnlock {user} onFlowOpen={(open) => { settingUpUnlock = open; }}>
 			{#snippet chrome(panel)}
 				<div class="locked">
 					<p>These messages are locked on this device.</p>

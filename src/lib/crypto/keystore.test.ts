@@ -2,8 +2,9 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { openDB } from 'idb';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defined } from '$lib/testing/defined';
 import { generateAgeIdentity, resetX25519Probe } from './identity';
-import { keyStore, resetKeyStore, type PinRow } from './keystore';
+import { keyStore, type PinRow, resetKeyStore } from './keystore';
 
 /**
  * The tier ladder, against a real IndexedDB implementation.
@@ -57,7 +58,8 @@ async function rawIdentityRow(userId: string) {
 	const db = await openDB('bound-up-keys');
 	try {
 		return (await db.get('identity', userId)) as
-			{ userId: string; recipient: string; key?: CryptoKey; sealed?: string } | undefined;
+			| { userId: string; recipient: string; key?: CryptoKey; sealed?: string }
+			| undefined;
 	} finally {
 		db.close();
 	}
@@ -152,7 +154,10 @@ describe('tier sealed', () => {
 
 		const row = await rawIdentityRow(ada);
 		const db = await openDB('bound-up-keys');
-		await db.put('identity', { ...row!, recipient: 'age1someone-else' });
+		await db.put('identity', {
+			...defined(row, 'the stored identity row'),
+			recipient: 'age1someone-else'
+		});
 		db.close();
 
 		resetKeyStore();
@@ -182,8 +187,8 @@ describe('tier sealed', () => {
 describe('tier memory', () => {
 	it('is used when there is no IndexedDB at all', async () => {
 		const real = globalThis.indexedDB;
-		// @ts-expect-error — modelling a browser that withholds it entirely.
-		delete globalThis.indexedDB;
+		// Modelling a browser that withholds it entirely.
+		Reflect.deleteProperty(globalThis, 'indexedDB');
 		try {
 			const store = await keyStore();
 			expect(store.tier).toBe('memory');

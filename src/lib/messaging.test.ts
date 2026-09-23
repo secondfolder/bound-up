@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
 	BOARD_LIMIT,
-	DEFAULT_THREAD_ICON,
-	MAX_ATTACHMENT_TOTAL_BYTES,
-	MAX_VIDEO_BYTES,
-	THREAD_ICONS,
+	type BoardThread,
 	compareBoardThreads,
+	DEFAULT_THREAD_ICON,
 	isThreadIcon,
 	isUnreadFor,
-	type BoardThread
+	MAX_ATTACHMENT_TOTAL_BYTES,
+	MAX_VIDEO_BYTES,
+	THREAD_ICONS
 } from './messaging';
 
 const at = (ms: number) => new Date(ms);
@@ -31,13 +31,17 @@ describe('THREAD_ICONS', () => {
 	// These land in a `wa-icon name=` attribute and, on the local store, in an
 	// object key. Anything outside this shape is a bug waiting to happen.
 	it('are all plain lowercase kebab-case names', () => {
-		for (const icon of THREAD_ICONS) expect(icon).toMatch(/^[a-z]+(-[a-z]+)*$/);
+		for (const icon of THREAD_ICONS) {
+			expect(icon).toMatch(/^[a-z]+(?:-[a-z]+)*$/);
+		}
 	});
 });
 
 describe('isThreadIcon', () => {
 	it('accepts every member of the list', () => {
-		for (const icon of THREAD_ICONS) expect(isThreadIcon(icon)).toBe(true);
+		for (const icon of THREAD_ICONS) {
+			expect(isThreadIcon(icon)).toBe(true);
+		}
 	});
 
 	// This is the guard that keeps the one plaintext column from becoming a

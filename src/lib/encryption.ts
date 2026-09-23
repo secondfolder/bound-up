@@ -15,6 +15,11 @@
 
 import { base32crockford } from '@scure/base';
 
+const BASE64_PADDING = /[=]+$/;
+const BASE64URL = /^[A-Za-z0-9_-]*$/;
+/** Every run of four characters that has more after it. */
+const GROUP_OF_FOUR = /(?<group>.{4})(?=.)/g;
+
 // ── the auth secret ──────────────────────────────────────────────────────────
 
 /**
@@ -193,7 +198,9 @@ export const MAX_WRAP_PARAMS_LENGTH = 512;
  * Shared by the Zod field and by the action, so "valid" means one thing.
  */
 export function parseKeyWrapParams(raw: string): KeyWrapParams | null {
-	if (raw.length === 0 || raw.length > MAX_WRAP_PARAMS_LENGTH) return null;
+	if (raw.length === 0 || raw.length > MAX_WRAP_PARAMS_LENGTH) {
+		return null;
+	}
 
 	let parsed: unknown;
 	try {
@@ -201,10 +208,14 @@ export function parseKeyWrapParams(raw: string): KeyWrapParams | null {
 	} catch {
 		return null;
 	}
-	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+		return null;
+	}
 
-	const type = (parsed as { type?: unknown }).type;
-	if (type !== 'password' && type !== 'webauthn-prf') return null;
+	const { type } = parsed as { type?: unknown };
+	if (type !== 'password' && type !== 'webauthn-prf') {
+		return null;
+	}
 
 	return parsed as KeyWrapParams;
 }
@@ -250,8 +261,10 @@ export function deviceSealAad(userId: string, recipient: string): string {
  */
 export function toBase64Url(bytes: Uint8Array): string {
 	let binary = '';
-	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(BASE64_PADDING, '');
 }
 
 /**
@@ -265,13 +278,15 @@ export function toBase64Url(bytes: Uint8Array): string {
  * age-encryption carries the same workaround in its `domBuffer` helper.
  */
 export function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
-	if (!/^[A-Za-z0-9_-]*$/.test(value)) {
+	if (!BASE64URL.test(value)) {
 		throw new Error('Not base64url');
 	}
-	const padded = value.replace(/-/g, '+').replace(/_/g, '/');
+	const padded = value.replaceAll('-', '+').replaceAll('_', '/');
 	const binary = atob(padded);
 	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+	for (let i = 0; i < binary.length; i += 1) {
+		bytes[i] = binary.charCodeAt(i);
+	}
 	return bytes;
 }
 
@@ -310,7 +325,7 @@ export function formatSafetyNumber(digest: Uint8Array): string {
 		throw new Error(`Digest must be at least ${SAFETY_NUMBER_BYTES} bytes`);
 	}
 	const encoded = base32crockford.encode(digest.subarray(0, SAFETY_NUMBER_BYTES));
-	return encoded.replace(/(.{4})(?=.)/g, '$1-');
+	return encoded.replace(GROUP_OF_FOUR, '$<group>-');
 }
 
 // ── trust on first use ───────────────────────────────────────────────────────
@@ -345,10 +360,18 @@ export type PinState =
  * entire point of having pinned it.
  */
 export function pinStateFor(pinned: PinRecord | undefined, served: string | null): PinState {
-	if (!served) return { kind: 'missing' };
-	if (!pinned) return { kind: 'new' };
-	if (pinned.recipient !== served) return { kind: 'changed', pinned, served };
-	if (pinned.verifiedAt !== null) return { kind: 'verified', verifiedAt: pinned.verifiedAt };
+	if (!served) {
+		return { kind: 'missing' };
+	}
+	if (!pinned) {
+		return { kind: 'new' };
+	}
+	if (pinned.recipient !== served) {
+		return { kind: 'changed', pinned, served };
+	}
+	if (pinned.verifiedAt !== null) {
+		return { kind: 'verified', verifiedAt: pinned.verifiedAt };
+	}
 	return { kind: 'pinned', pinnedAt: pinned.pinnedAt };
 }
 

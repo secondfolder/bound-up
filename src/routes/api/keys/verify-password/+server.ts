@@ -28,10 +28,14 @@ const bodySchema = z.object({ authSecret: authSecretField });
  */
 export const POST: RequestHandler = async ({ locals, request }) => {
 	// See the note in ../unlock-bundle: endpoints carry their own auth check.
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, 'Malformed request');
+	if (!parsed.success) {
+		error(400, 'Malformed request');
+	}
 
 	// A passkey-only account has no password to prove, and asking for one would
 	// be asking for something that does not exist. The caller does not offer the

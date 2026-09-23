@@ -31,7 +31,7 @@ export const GET: RequestHandler = async ({ url, locals, fetch }) => {
 	}
 
 	const requested = url.searchParams.get('url');
-	if (!requested || !isSupportedRedditEmbedUrl(requested)) {
+	if (!(requested && isSupportedRedditEmbedUrl(requested))) {
 		return json({ error: 'unsupported url' }, { status: 400 });
 	}
 

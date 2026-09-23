@@ -1,11 +1,11 @@
 import {
+	encodeSseEvent,
+	type RealtimeEvent,
 	SSE_HEADERS,
-	SSE_QUEUE_LIMIT,
 	SSE_KEEPALIVE,
 	SSE_KEEPALIVE_MS,
 	SSE_PREAMBLE,
-	encodeSseEvent,
-	type RealtimeEvent
+	SSE_QUEUE_LIMIT
 } from './index';
 
 /**
@@ -30,15 +30,6 @@ import {
  * clients reconnecting.
  */
 
-/**
- * The slice of `DurableObjectState` this class uses — which is none of it.
- *
- * Declared rather than imported, and kept as a name rather than dropped, so the
- * constructor signature stays recognisable to anyone comparing it against
- * Cloudflare's docs.
- */
-type DurableObjectStateLike = object;
-
 const encoder = new TextEncoder();
 
 export class RealtimeRoom {
@@ -49,29 +40,24 @@ export class RealtimeRoom {
 	 * what Workers gives back for a streaming `Response`, and a failed `write`
 	 * is how a hung-up client announces itself.
 	 */
-	#writers = new Set<WritableStreamDefaultWriter<Uint8Array>>();
+	readonly #writers = new Set<WritableStreamDefaultWriter<Uint8Array>>();
 
-	constructor(
-		private state: DurableObjectStateLike,
-		private env: unknown
-	) {
-		// Both retained only to match the runtime's constructor contract. Reading
-		// them would be a mistake: this object deliberately has no storage and no
-		// bindings of its own.
-		void this.state;
-		void this.env;
-	}
+	// No constructor. The runtime passes `(state, env)`, and this object
+	// deliberately keeps neither: it has no storage and no bindings of its own,
+	// so reading either would be a mistake.
 
 	async fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 
 		if (url.pathname === '/publish') {
 			const event = (await request.json()) as RealtimeEvent;
-			await this.#broadcast(event);
+			this.#broadcast(event);
 			return new Response(null, { status: 204 });
 		}
 
-		if (url.pathname === '/subscribe') return this.#subscribe(request);
+		if (url.pathname === '/subscribe') {
+			return this.#subscribe(request);
+		}
 
 		// Unreachable through the app — `remote.ts` is the only caller and it only
 		// ever asks for these two paths. A 404 rather than a throw so a mistake
@@ -94,7 +80,7 @@ export class RealtimeRoom {
 	 * Ordering per client is still guaranteed: writes queue on the writable in
 	 * call order whether or not anyone awaits them.
 	 */
-	async #broadcast(event: RealtimeEvent): Promise<void> {
+	#broadcast(event: RealtimeEvent): void {
 		const frame = encoder.encode(encodeSseEvent(event));
 		// Copied first: `#drop` mutates the set we would otherwise be iterating.
 		for (const writer of [...this.#writers]) {
@@ -138,7 +124,9 @@ export class RealtimeRoom {
 				await writer.write(encoder.encode(SSE_PREAMBLE));
 				while (this.#writers.has(writer)) {
 					await sleep(SSE_KEEPALIVE_MS);
-					if (!this.#writers.has(writer)) break;
+					if (!this.#writers.has(writer)) {
+						break;
+					}
 					await writer.write(encoder.encode(SSE_KEEPALIVE));
 				}
 			} catch {
@@ -153,7 +141,9 @@ export class RealtimeRoom {
 		this.#writers.delete(writer);
 		// The close can itself throw if the stream is already gone, which is
 		// exactly the case that got us here.
-		void writer.close().catch(() => {});
+		void writer.close().catch(() => {
+			// Already closed or errored — nothing left to tidy.
+		});
 	}
 }
 

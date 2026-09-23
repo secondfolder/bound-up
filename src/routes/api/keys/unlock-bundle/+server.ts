@@ -16,7 +16,9 @@ export const GET: RequestHandler = async ({ locals }) => {
 	// is a layout load, and layout loads never run for a `+server.ts` at all.
 	// Putting these under (auth-required) would advertise protection that does
 	// not exist — worse than having none, because the next reader would trust it.
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	return json(await getUnlockBundle(locals.db, locals.user.id));
 };

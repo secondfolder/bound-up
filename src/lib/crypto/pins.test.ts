@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CachedIdentity, KeyStore, PinRow } from './keystore';
 import {
-	OWN_KEY_PIN,
 	acceptPin,
 	evaluateTrust,
+	OWN_KEY_PIN,
 	pinRowId,
 	readPins,
 	verifyPin,
@@ -26,24 +26,30 @@ function fakeStore(): KeyStore & { rows: Map<string, PinRow> } {
 		tier: 'crypto-key',
 		durable: true,
 		fallbackReason: null,
-		async getIdentity(userId) {
-			return identities.get(userId);
+		getIdentity(userId) {
+			return Promise.resolve(identities.get(userId));
 		},
-		async putIdentity({ userId, recipient, identity }) {
+		putIdentity({ userId, recipient, identity }) {
 			// The string form, as a store with no WebCrypto X25519 would hold it.
 			const value: CachedIdentity = { userId, recipient, key: identity };
 			identities.set(userId, value);
-			return value;
+			return Promise.resolve(value);
 		},
-		async getPins(userId) {
-			return [...rows.values()].filter((row) => row.userId === userId);
+		getPins(userId) {
+			return Promise.resolve([...rows.values()].filter((row) => row.userId === userId));
 		},
-		async putPin(row) {
+		putPin(row) {
 			rows.set(row.id, row);
+			return Promise.resolve();
 		},
-		async clear(userId) {
+		clear(userId) {
 			identities.delete(userId);
-			for (const [id, row] of rows) if (row.userId === userId) rows.delete(id);
+			for (const [id, row] of rows) {
+				if (row.userId === userId) {
+					rows.delete(id);
+				}
+			}
+			return Promise.resolve();
 		}
 	};
 }

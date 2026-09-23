@@ -1,17 +1,17 @@
 <script lang="ts">
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { enhance } from '$app/forms';
 	import {
 		currentRpId,
 		describePasskeyFailure,
-		wrapIdentityToPasskey,
-		type PasskeyFailure
+		type PasskeyFailure,
+		wrapIdentityToPasskey
 	} from '$lib/crypto/passkey';
 	import {
 		currentEnrolmentOffer,
 		dismissEnrolmentOffer,
 		enrolmentIdentityFor
 	} from '$lib/crypto/session.svelte';
-	import type { SubmitFunction } from '@sveltejs/kit';
 
 	/**
 	 * "Use a passkey here next time?", asked once, right after an unlock.
@@ -49,10 +49,7 @@
 			const rpId = currentRpId();
 			formData.set('wrapBlob', await wrapIdentityToPasskey({ identity, rpId }));
 			formData.set('wrapParams', JSON.stringify({ type: 'webauthn-prf', version: 1, rpId }));
-			formData.set(
-				'label',
-				`${navigator.platform || 'Device'} — ${new Date().toLocaleDateString()}`
-			);
+			formData.set('label', `${navigator.platform || 'Device'} — ${new Date().toLocaleDateString()}`);
 			prepared = true;
 		} catch (error) {
 			cancel();
@@ -62,16 +59,21 @@
 			// only the first is the user's problem to solve.
 			failure = describePasskeyFailure(error);
 		} finally {
-			if (!prepared) busy = false;
+			if (!prepared) {
+				busy = false;
+			}
 		}
 
-		if (!prepared) return;
+		if (!prepared) {
+			return;
+		}
 		return async ({ update, result }) => {
 			busy = false;
 			// Only on success. A rejected wrap leaves the offer up, because the
 			// identity is still here and still sealable until the window closes.
-			if (result.type === 'success') dismissEnrolmentOffer();
-			else {
+			if (result.type === 'success') {
+				dismissEnrolmentOffer();
+			} else {
 				failure = {
 					kind: 'unknown',
 					message: 'That passkey could not be saved. Your password still works.'

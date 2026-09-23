@@ -1,11 +1,11 @@
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, test, vi } from 'vitest';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
+import { describe, expect, it, vi } from 'vitest';
 import { accountFormSchema } from '$lib/schemas/accountForm';
-import type { PageData } from './$types';
 import { waButtonOfType, waProp } from '$lib/testing/web-awesome';
+import type { PageData } from './$types';
 
 const pageState = {
 	data: {
@@ -60,14 +60,16 @@ async function data(timezone = 'Europe/London'): Promise<PageData> {
 }
 
 describe('/settings/account/+page.svelte', () => {
-	test('renders the stored timezone value', async () => {
+	it('renders the stored timezone value', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
 		const input = container.querySelector('input[role="combobox"]');
-		if (!(input instanceof HTMLInputElement)) throw new Error('missing timezone combobox');
+		if (!(input instanceof HTMLInputElement)) {
+			throw new Error('missing timezone combobox');
+		}
 		expect(input.value).toBe('Europe/London');
 	});
 
-	test('renders the save button outlined before there are changes', async () => {
+	it('renders the save button outlined before there are changes', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
 		const save = waButtonOfType(container, 'submit');
 
@@ -75,12 +77,16 @@ describe('/settings/account/+page.svelte', () => {
 		expect(waProp(save, 'variant')).toBeUndefined();
 	});
 
-	test('clicking moves the current timezone into the placeholder and clears the value', async () => {
+	it('clicking moves the current timezone into the placeholder and clears the value', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
 		const input = container.querySelector('input[role="combobox"]');
 		const hidden = container.querySelector('input[type="hidden"][name="timezone"]');
-		if (!(input instanceof HTMLInputElement)) throw new Error('missing timezone combobox');
-		if (!(hidden instanceof HTMLInputElement)) throw new Error('missing hidden timezone input');
+		if (!(input instanceof HTMLInputElement)) {
+			throw new Error('missing timezone combobox');
+		}
+		if (!(hidden instanceof HTMLInputElement)) {
+			throw new Error('missing hidden timezone input');
+		}
 
 		await fireEvent.click(input);
 
@@ -89,11 +95,13 @@ describe('/settings/account/+page.svelte', () => {
 		expect(hidden.value).toBe('Europe/London');
 	});
 
-	test('keeps the save button outlined while the timezone field is only being searched', async () => {
+	it('keeps the save button outlined while the timezone field is only being searched', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
 		const input = container.querySelector('input[role="combobox"]');
 		const save = waButtonOfType(container, 'submit');
-		if (!(input instanceof HTMLInputElement)) throw new Error('missing timezone combobox');
+		if (!(input instanceof HTMLInputElement)) {
+			throw new Error('missing timezone combobox');
+		}
 
 		await fireEvent.click(input);
 
@@ -101,7 +109,7 @@ describe('/settings/account/+page.svelte', () => {
 		expect(waProp(save, 'variant')).toBeUndefined();
 	});
 
-	test('copies the current device timezone into the form', async () => {
+	it('copies the current device timezone into the form', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
 		const button = waButtonOfType(container, 'button');
 
@@ -109,12 +117,14 @@ describe('/settings/account/+page.svelte', () => {
 
 		await waitFor(() => {
 			const input = container.querySelector('input[role="combobox"]');
-			if (!(input instanceof HTMLInputElement)) throw new Error('missing timezone combobox');
+			if (!(input instanceof HTMLInputElement)) {
+				throw new Error('missing timezone combobox');
+			}
 			expect(input.value).toBe('America/New_York');
 		});
 	});
 
-	test('promotes the save button to a solid brand style once there are changes', async () => {
+	it('promotes the save button to a solid brand style once there are changes', async () => {
 		const { container } = render(Page, { data: await data('Europe/London') });
 		const button = waButtonOfType(container, 'button');
 		const save = waButtonOfType(container, 'submit');
@@ -127,7 +137,7 @@ describe('/settings/account/+page.svelte', () => {
 		});
 	});
 
-	test('shows the inline Set to action only while the field differs from this device', async () => {
+	it('shows the inline Set to action only while the field differs from this device', async () => {
 		const { container, getByText, queryByText } = render(Page, {
 			data: await data('Europe/London')
 		});
@@ -141,7 +151,7 @@ describe('/settings/account/+page.svelte', () => {
 		});
 	});
 
-	test('filters the timezone options and stores the selected result', async () => {
+	it('filters the timezone options and stores the selected result', async () => {
 		const { container, getByRole, getByText } = render(Page, { data: await data('Europe/London') });
 		const combobox = getByRole('combobox');
 
@@ -155,8 +165,12 @@ describe('/settings/account/+page.svelte', () => {
 		await waitFor(() => {
 			const input = container.querySelector('input[role="combobox"]');
 			const hidden = container.querySelector('input[type="hidden"][name="timezone"]');
-			if (!(input instanceof HTMLInputElement)) throw new Error('missing timezone combobox');
-			if (!(hidden instanceof HTMLInputElement)) throw new Error('missing hidden timezone input');
+			if (!(input instanceof HTMLInputElement)) {
+				throw new Error('missing timezone combobox');
+			}
+			if (!(hidden instanceof HTMLInputElement)) {
+				throw new Error('missing hidden timezone input');
+			}
 			expect(input.value).toBe('America/Los_Angeles');
 			expect(hidden.value).toBe('America/Los_Angeles');
 		});

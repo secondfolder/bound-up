@@ -14,10 +14,10 @@
  * two similar UUIDs land in different places.
  */
 function hash32(input: string): number {
-	let hash = 0x811c9dc5;
-	for (let i = 0; i < input.length; i++) {
+	let hash = 0x81_1c_9d_c5;
+	for (let i = 0; i < input.length; i += 1) {
 		hash ^= input.charCodeAt(i);
-		hash = Math.imul(hash, 0x01000193) >>> 0;
+		hash = Math.imul(hash, 0x01_00_01_93) >>> 0;
 	}
 	return hash >>> 0;
 }

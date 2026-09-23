@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { THREAD_ICONS, THREAD_ICON_LABELS, type ThreadIcon } from '$lib/messaging';
+	import { THREAD_ICON_LABELS, THREAD_ICONS, type ThreadIcon } from '$lib/messaging';
 
 	/**
 	 * Which sticker the thread will show on the other person's board.

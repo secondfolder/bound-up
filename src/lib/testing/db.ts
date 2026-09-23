@@ -1,8 +1,8 @@
-import { createClient } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { schema, type Db } from '../server/db';
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
+import { type Db, schema } from '../server/db';
 
 /**
  * A throwaway database for a single test.
@@ -25,7 +25,9 @@ const migrationsDir = path.resolve(process.cwd(), 'drizzle');
 let cachedMigrationSql: string[] | undefined;
 
 async function migrationStatements(): Promise<string[]> {
-	if (cachedMigrationSql) return cachedMigrationSql;
+	if (cachedMigrationSql) {
+		return cachedMigrationSql;
+	}
 
 	const journal = JSON.parse(
 		await readFile(path.join(migrationsDir, 'meta', '_journal.json'), 'utf8')

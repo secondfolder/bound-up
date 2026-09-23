@@ -43,5 +43,5 @@ for (const seed of guideSeeds) {
 		);
 	}
 
-	console.log(`seeded guide ${seed.id} (${seed.edgeTasks.length} edge task(s))`);
+	console.info(`seeded guide ${seed.id} (${seed.edgeTasks.length} edge task(s))`);
 }

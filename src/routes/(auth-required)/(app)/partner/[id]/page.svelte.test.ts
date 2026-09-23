@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PageData } from './$types';
 
 const pageState = {
@@ -73,13 +73,13 @@ describe('/partner/[id]/+page.svelte', () => {
 		vi.useRealTimers();
 	});
 
-	test("shows the partner role as the current user's name plus role", () => {
+	it("shows the partner role as the current user's name plus role", () => {
 		render(Page, { data: data('America/New_York') });
 		expect(screen.getByText("Ada's sub")).toBeInTheDocument();
 		expect(screen.queryByText(/dom \/ sub|sub \/ dom/)).not.toBeInTheDocument();
 	});
 
-	test('shows partner local time when their timezone differs from the viewer', () => {
+	it('shows partner local time when their timezone differs from the viewer', () => {
 		render(Page, { data: data('America/New_York') });
 
 		const localTime = new Intl.DateTimeFormat(undefined, {
@@ -94,7 +94,7 @@ describe('/partner/[id]/+page.svelte', () => {
 		).toBeInTheDocument();
 	});
 
-	test('shows the date before the time when their local day differs from the viewer', () => {
+	it('shows the date before the time when their local day differs from the viewer', () => {
 		vi.setSystemTime(new Date('2026-01-15T23:30:00Z'));
 		render(Page, { data: data('Asia/Tokyo') });
 
@@ -116,7 +116,7 @@ describe('/partner/[id]/+page.svelte', () => {
 		).toBeInTheDocument();
 	});
 
-	test('hides partner local time when both accounts share the same timezone', () => {
+	it('hides partner local time when both accounts share the same timezone', () => {
 		render(Page, { data: data('Europe/London') });
 		expect(screen.queryByText(/time - /)).not.toBeInTheDocument();
 	});

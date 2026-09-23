@@ -1,8 +1,8 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
-import type { PartnerView } from '$lib/types';
 import { waSettled } from '$lib/testing/web-awesome';
+import type { PartnerView } from '$lib/types';
 
 /**
  * `$app/state` is a live store fed by the router, and `resolve()` needs the
@@ -35,20 +35,20 @@ function renderNav(routeId: string, params: Record<string, string> = {}) {
 }
 
 describe('AppNav', () => {
-	test('renders one tab per partner, between Home and Settings', () => {
+	it('renders one tab per partner, between Home and Settings', () => {
 		renderNav('/(auth-required)/(app)/home');
 
 		const labels = screen.getAllByRole('link').map((link) => link.textContent?.trim());
 		expect(labels).toEqual(['Home', 'Ada', 'Jun', 'Settings']);
 	});
 
-	test('renders no partner tabs when there are none', () => {
+	it('renders no partner tabs when there are none', () => {
 		pageState.route.id = '/(auth-required)/(app)/home';
 		render(AppNav, { partners: [] });
 		expect(screen.getAllByRole('link')).toHaveLength(2);
 	});
 
-	test('links each tab by partnership id', () => {
+	it('links each tab by partnership id', () => {
 		renderNav('/(auth-required)/(app)/home');
 		expect(screen.getByRole('link', { name: /Ada/ })).toHaveAttribute(
 			'href',
@@ -56,13 +56,13 @@ describe('AppNav', () => {
 		);
 	});
 
-	test('marks Home current on a child route, not just the index', () => {
+	it('marks Home current on a child route, not just the index', () => {
 		// Both tabs own child routes, which is why the check is a prefix match.
 		renderNav('/(auth-required)/(app)/home/guides/[id]', { id: 'g1' });
 		expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
 	});
 
-	test('marks Settings current inside the partners screens', () => {
+	it('marks Settings current inside the partners screens', () => {
 		renderNav('/(auth-required)/(app)/settings/partners/[id]', { id: 'p-ada' });
 		expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
 		// The partner tab must NOT light up just because a partner id is in the
@@ -70,14 +70,14 @@ describe('AppNav', () => {
 		expect(screen.getByRole('link', { name: /Ada/ })).not.toHaveAttribute('aria-current');
 	});
 
-	test('marks only the partner whose page is open', () => {
+	it('marks only the partner whose page is open', () => {
 		renderNav('/(auth-required)/(app)/partner/[id]', { id: 'p-jun' });
 		expect(screen.getByRole('link', { name: /Jun/ })).toHaveAttribute('aria-current', 'page');
 		expect(screen.getByRole('link', { name: /Ada/ })).not.toHaveAttribute('aria-current');
 		expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
 	});
 
-	test('falls back to initials when a partner has no picture', async () => {
+	it('falls back to initials when a partner has no picture', async () => {
 		const { container } = renderNav('/(auth-required)/(app)/home');
 		await waSettled(container);
 		const [ada, jun] = [...container.querySelectorAll('wa-avatar')];

@@ -9,15 +9,15 @@
  * security-relevant in the change-password case — lives in one testable place.
  */
 
-import { MASTER_KEY_VERSIONS, type KeyWrapParams } from '../encryption';
-import { deriveAuthSecret, deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
-import { generateAgeIdentity } from './identity';
-import { unwrapIdentity, wrapIdentity } from './wrap';
+import { type KeyWrapParams, MASTER_KEY_VERSIONS } from '../encryption';
 import type { KeyWrapView } from '../types';
+import { generateAgeIdentity } from './identity';
+import { deriveAuthSecret, deriveMasterKey, deriveWrapKey, type MasterKey } from './kdf';
+import { unwrapIdentity, wrapIdentity } from './wrap';
 
 /** The params recorded alongside a password wrap made right now. */
 export function currentPasswordWrapParams(): KeyWrapParams {
-	const current = MASTER_KEY_VERSIONS[0];
+	const [current] = MASTER_KEY_VERSIONS;
 	return {
 		type: 'password',
 		kdf: current.kdf,
@@ -76,7 +76,9 @@ export async function openIdentityWithPassword(input: {
 	wraps: KeyWrapView[];
 }): Promise<{ identity: string; master: MasterKey } | null> {
 	for (const wrap of input.wraps) {
-		if (wrap.params.type !== 'password') continue;
+		if (wrap.params.type !== 'password') {
+			continue;
+		}
 		const master = await deriveMasterKey(input.password, input.email, {
 			version: wrap.params.version,
 			kdf: wrap.params.kdf,
@@ -87,7 +89,9 @@ export async function openIdentityWithPassword(input: {
 			blob: wrap.blob,
 			recipient: input.recipient
 		});
-		if (identity) return { identity, master };
+		if (identity) {
+			return { identity, master };
+		}
 	}
 	return null;
 }
@@ -128,7 +132,9 @@ export async function buildPasswordChange(input: {
 		recipient: input.recipient,
 		wraps: input.wraps
 	});
-	if (!opened) return null;
+	if (!opened) {
+		return null;
+	}
 
 	const newMaster = await deriveMasterKey(input.newPassword, input.email, MASTER_KEY_VERSIONS[0]);
 	const newWrapKey = await deriveWrapKey(newMaster);

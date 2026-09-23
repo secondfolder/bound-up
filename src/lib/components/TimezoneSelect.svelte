@@ -3,7 +3,7 @@
 </script>
 
 <script lang="ts" generics="T extends Record<string, unknown>">
-	import { formFieldProxy, type FormPathLeaves, type SuperForm } from 'sveltekit-superforms';
+	import { type FormPathLeaves, formFieldProxy, type SuperForm } from 'sveltekit-superforms';
 	import { searchTimeZones } from '$lib/timezone';
 
 	let {
@@ -33,7 +33,7 @@
 	let searchValue = $state('');
 	let searchPlaceholder = $state('Search for a timezone');
 
-	const committedValue = $derived($value == null ? '' : String($value));
+	const committedValue = $derived(String($value ?? ''));
 	const displayValue = $derived(searching ? searchValue : committedValue);
 	const showDeviceTimezoneAction = $derived(
 		Boolean(deviceTimezone && committedValue !== deviceTimezone)
@@ -63,7 +63,9 @@
 		const target = event.target as HTMLInputElement | null;
 		if (!searching) {
 			searching = true;
-			if (committedValue.length > 0) searchPlaceholder = committedValue;
+			if (committedValue.length > 0) {
+				searchPlaceholder = committedValue;
+			}
 		}
 		searchValue = target?.value ?? '';
 		highlightedIndex = 0;
@@ -75,8 +77,12 @@
 	}
 
 	function beginSearch() {
-		if (searching) return;
-		if (committedValue.length > 0) searchPlaceholder = committedValue;
+		if (searching) {
+			return;
+		}
+		if (committedValue.length > 0) {
+			searchPlaceholder = committedValue;
+		}
 		searchValue = '';
 		searching = true;
 		highlightedIndex = 0;
@@ -85,7 +91,9 @@
 
 	function onBlur() {
 		queueMicrotask(() => {
-			if (root?.contains(document.activeElement)) return;
+			if (root?.contains(document.activeElement)) {
+				return;
+			}
 
 			if (searching) {
 				searching = false;
@@ -105,7 +113,9 @@
 	}
 
 	function useDeviceTimezone() {
-		if (!deviceTimezone) return;
+		if (!deviceTimezone) {
+			return;
+		}
 		$value = deviceTimezone as typeof $value;
 		searching = false;
 		searchValue = '';
@@ -131,8 +141,7 @@
 			event.preventDefault();
 			showOptions();
 			if (visibleOptions.length > 0) {
-				highlightedIndex =
-					highlightedIndex === 0 ? visibleOptions.length - 1 : highlightedIndex - 1;
+				highlightedIndex = highlightedIndex === 0 ? visibleOptions.length - 1 : highlightedIndex - 1;
 			}
 			return;
 		}
@@ -172,30 +181,28 @@
 
 			{#if open}
 				<div class="menu">
-					<ul id={listId} role="listbox">
+					<div class="options" id={listId} role="listbox">
 						{#if visibleOptions.length > 0}
 							{#each visibleOptions as timezone, index (timezone)}
-								<li>
-									<!-- Native on purpose: this is a listbox option that happens to be
-									     clickable, not a button. `wa-button` keeps `role="button"` on the
-									     `<button>` inside its shadow root whatever the host says, which
-									     would break the listbox for a screen reader. -->
-									<button
-										type="button"
-										role="option"
-										class:selected={index === highlightedIndex}
-										aria-selected={index === highlightedIndex ? 'true' : 'false'}
-										onmousedown={(event) => event.preventDefault()}
-										onclick={() => select(timezone)}
-									>
-										{timezone}
-									</button>
-								</li>
+								<!-- Native on purpose: this is a listbox option that happens to be
+								     clickable, not a button. `wa-button` keeps `role="button"` on the
+								     `<button>` inside its shadow root whatever the host says, which
+								     would break the listbox for a screen reader. -->
+								<button
+									type="button"
+									role="option"
+									class:selected={index === highlightedIndex}
+									aria-selected={index === highlightedIndex ? 'true' : 'false'}
+									onmousedown={(event) => event.preventDefault()}
+									onclick={() => select(timezone)}
+								>
+									{timezone}
+								</button>
 							{/each}
 						{:else}
-							<li class="empty">No matching timezones</li>
+							<div class="empty">No matching timezones</div>
 						{/if}
-					</ul>
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -280,10 +287,12 @@
 			max-height: 16rem;
 			overflow: auto;
 
-			ul {
-				list-style: none;
+			/* A listbox owns its options directly, so no list markup to reset —
+			   just stack the full-width option buttons. */
+			.options {
+				display: flex;
+				flex-direction: column;
 				padding: 0.25rem;
-				margin: 0;
 			}
 
 			button {

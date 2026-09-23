@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { invalidate } from '$app/navigation';
-	import { scrollIntoViewWithin } from '$lib/scroll-parent';
+	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
 	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
-	import { openDraft } from '$lib/messaging/drafts';
 	import {
 		buildReaction,
 		fillMissingMessageMetadata,
@@ -15,12 +13,13 @@
 		refreshMessageMetadata,
 		sendMessage
 	} from '$lib/messaging/client';
-	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
+	import { openDraft } from '$lib/messaging/drafts';
+	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
+	import { migrateLegacyMessages } from '$lib/richtext-legacy-migrate';
+	import { scrollIntoViewWithin } from '$lib/scroll-parent';
 	import type { MessageView, PartnerRecipientsView, TagView, ThreadView } from '$lib/types';
 	import MessageBubble from './MessageBubble.svelte';
 	import MessageComposer from './MessageComposer.svelte';
-	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
-	import { migrateLegacyMessages } from '$lib/richtext-legacy-migrate';
 	import TagPicker from './TagPicker.svelte';
 
 	let {
@@ -66,16 +65,20 @@
 
 	$effect(() => {
 		const unlocked = keyring.status === 'unlocked' ? keyring.identity : null;
-		if (!unlocked) return;
+		if (!unlocked) {
+			return;
+		}
 
 		// Captured so a run superseded by a newer one bails out rather than
 		// writing stale plaintext over fresh — the same guard EdgeTask.svelte uses.
-		const messages = thread.messages;
+		const { messages } = thread;
 		let cancelled = false;
 
 		void (async () => {
 			for (const message of messages) {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				if (!(message.id in bodies)) {
 					bodies[message.id] = await openMessage(message.ciphertext, unlocked);
 				}
@@ -85,9 +88,13 @@
 				const decoded: { emoji: string; mine: boolean }[] = [];
 				for (const reaction of message.reactions) {
 					const emoji = await openReaction(reaction.ciphertext, unlocked);
-					if (emoji) decoded.push({ emoji, mine: reaction.mine });
+					if (emoji) {
+						decoded.push({ emoji, mine: reaction.mine });
+					}
 				}
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				reactions[message.id] = decoded;
 			}
 
@@ -96,7 +103,9 @@
 			// Runs last and its failures are swallowed: this is housekeeping, and
 			// it must never get in the way of reading a thread. See
 			// docs/temporary-code.md.
-			if (cancelled) return;
+			if (cancelled) {
+				return;
+			}
 			// `bodies` and `targets` are read through `untrack` on purpose. Both
 			// are reactive, and this effect already *writes* `bodies`; making it
 			// depend on them as well would rebuild the whole decryption pass on
@@ -125,9 +134,13 @@
 	$effect(() => {
 		const count = thread.messages.length;
 		void tick().then(() => {
-			if (!listElement || count !== thread.messages.length) return;
+			if (!listElement || count !== thread.messages.length) {
+				return;
+			}
 			const last = listElement.lastElementChild;
-			if (last) scrollIntoViewWithin(last, listElement, { behavior: 'auto', gap: 8 });
+			if (last) {
+				scrollIntoViewWithin(last, listElement, { behavior: 'auto', gap: 8 });
+			}
 		});
 	});
 
@@ -163,7 +176,9 @@
 			message,
 			targets
 		);
-		if (!outcome.ok) return outcome.message;
+		if (!outcome.ok) {
+			return outcome.message;
+		}
 		await invalidate(`messages:thread:${thread.id}`);
 		return null;
 	}
@@ -178,7 +193,9 @@
 				body: JSON.stringify({ ciphertext })
 			}
 		);
-		if (response.ok) await invalidate(`messages:thread:${thread.id}`);
+		if (response.ok) {
+			await invalidate(`messages:thread:${thread.id}`);
+		}
 	}
 
 	async function clearReaction(message: MessageView) {
@@ -186,7 +203,9 @@
 			`/api/partnerships/${partnershipId}/messages/${message.id}/reaction`,
 			{ method: 'DELETE' }
 		);
-		if (response.ok) await invalidate(`messages:thread:${thread.id}`);
+		if (response.ok) {
+			await invalidate(`messages:thread:${thread.id}`);
+		}
 	}
 
 	/**
@@ -199,26 +218,30 @@
 	 * not once per re-render.
 	 */
 	async function cacheEmbedDetails(message: MessageView, href: string) {
-		if (targets.length === 0) return;
+		if (targets.length === 0) {
+			return;
+		}
 		const key = `${message.id}:${href}`;
-		if (attemptedMetadataBackfill.has(key)) return;
+		if (attemptedMetadataBackfill.has(key)) {
+			return;
+		}
 		attemptedMetadataBackfill.add(key);
 		const current = metadata[message.id] ?? null;
-		const next = await fillMissingMessageMetadata(
-			partnershipId,
-			message.id,
-			href,
-			current,
-			targets
-		);
-		if (next) metadata[message.id] = next;
+		const next = await fillMissingMessageMetadata(partnershipId, message.id, href, current, targets);
+		if (next) {
+			metadata[message.id] = next;
+		}
 	}
 
 	async function refreshEmbed(message: MessageView, href: string) {
-		if (targets.length === 0) return;
+		if (targets.length === 0) {
+			return;
+		}
 		const current = metadata[message.id] ?? null;
 		const next = await refreshMessageMetadata(partnershipId, message.id, href, current, targets);
-		if (next) metadata[message.id] = next;
+		if (next) {
+			metadata[message.id] = next;
+		}
 	}
 </script>
 

@@ -31,7 +31,7 @@
  * storage to spare a re-pick is the wrong trade.
  */
 
-import { decryptPayload, encryptPayload, type DraftPayload } from '$lib/crypto/messages';
+import { type DraftPayload, decryptPayload, encryptPayload } from '$lib/crypto/messages';
 import { isRichTextDocumentEmpty, parseStoredRichText } from '$lib/richtext';
 
 /** Which composer a draft belongs to. One draft per scope. */
@@ -56,11 +56,11 @@ export type DraftSession = {
 	 * removed rather than stored — tags included, because tags on their own are
 	 * not a message anyone is in the middle of writing.
 	 */
-	save(draft: Draft): void;
+	save: (draft: Draft) => void;
 	/** Removes the draft, e.g. once it has been sent. */
-	clear(): void;
+	clear: () => void;
 	/** Resolves once every queued write has landed. For tests. */
-	settled(): Promise<void>;
+	settled: () => Promise<void>;
 };
 
 /** Versioned so a later shape can ignore, rather than misread, this one. */
@@ -101,11 +101,21 @@ export async function openDraft(
 	owner: DraftOwner | null,
 	storage: DraftStorage | null = browserStorage()
 ): Promise<DraftSession> {
-	if (!owner || !storage) {
-		return { initial: null, save() {}, clear() {}, settled: () => Promise.resolve() };
+	if (!(owner && storage)) {
+		// Nothing to seal with or nowhere to put it, so every call is a no-op.
+		return {
+			initial: null,
+			save: () => undefined,
+			clear: () => undefined,
+			settled: () => Promise.resolve()
+		};
 	}
 
 	const key = draftStorageKey(owner, scope);
+	// Bound once the guard above has ruled out null, so the closures below see
+	// the narrowed types (a parameter with a default does not stay narrowed).
+	const { recipient } = owner;
+	const store = storage;
 	// Never a rejection: a composer waits on this before it renders, so a
 	// failure here has to mean "no draft", not "no composer".
 	const initial = await read(storage, key, owner.identity).catch(() => null);
@@ -130,10 +140,10 @@ export async function openDraft(
 	let chain: Promise<void> = Promise.resolve();
 
 	function clear() {
-		latest++;
-		clears++;
+		latest += 1;
+		clears += 1;
 		try {
-			storage!.removeItem(key);
+			store.removeItem(key);
 		} catch {
 			// Nothing to do: a storage that cannot remove cannot have stored.
 		}
@@ -144,15 +154,20 @@ export async function openDraft(
 			clear();
 			return;
 		}
-		const ticket = ++latest;
+		latest += 1;
+		const ticket = latest;
 		const clearsAtQueue = clears;
 		const payload: DraftPayload = { version: 1, text: draft.text, tagIds: [...draft.tagIds] };
 		chain = chain.then(async () => {
-			if (ticket !== latest) return;
+			if (ticket !== latest) {
+				return;
+			}
 			try {
-				const ciphertext = await encryptPayload(payload, [owner!.recipient]);
-				if (clears !== clearsAtQueue) return;
-				storage!.setItem(key, ciphertext);
+				const ciphertext = await encryptPayload(payload, [recipient]);
+				if (clears !== clearsAtQueue) {
+					return;
+				}
+				store.setItem(key, ciphertext);
 			} catch (problem) {
 				// Quota, or a storage that refuses writes. The composer still holds
 				// the text on screen, so this is logged rather than surfaced. Never
@@ -176,13 +191,17 @@ async function read(
 	} catch {
 		return null;
 	}
-	if (!stored) return null;
+	if (!stored) {
+		return null;
+	}
 
 	// Null when this identity cannot open it. The stored copy is left alone
 	// rather than deleted: the next save replaces it anyway, and deleting
 	// something unreadable is the one move here that could not be undone.
 	const opened = await decryptPayload<DraftPayload>(stored, identity);
-	if (!opened || typeof opened.text !== 'string') return null;
+	if (!opened || typeof opened.text !== 'string') {
+		return null;
+	}
 	return {
 		text: opened.text,
 		tagIds: Array.isArray(opened.tagIds)

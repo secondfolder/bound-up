@@ -3,7 +3,7 @@
 </script>
 
 <script lang="ts" generics="T extends Record<string, unknown>">
-	import { formFieldProxy, type SuperForm, type FormPathLeaves } from 'sveltekit-superforms';
+	import { type FormPathLeaves, formFieldProxy, type SuperForm } from 'sveltekit-superforms';
 
 	let {
 		superform,
@@ -41,8 +41,7 @@
 	 * authoritative gate anyway.
 	 */
 	const attributes = $derived.by(() => {
-		const rest = { ...$constraints };
-		delete rest.pattern;
+		const { pattern: _pattern, ...rest } = $constraints ?? {};
 		return rest;
 	});
 
@@ -69,7 +68,7 @@
 
 	// null is a legitimate stored value (an omitted relationship label), but it
 	// would render as the literal string "null".
-	const displayValue = $derived($value == null ? '' : String($value));
+	const displayValue = $derived(String($value ?? ''));
 </script>
 
 <div class="field">

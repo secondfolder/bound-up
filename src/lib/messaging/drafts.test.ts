@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateAgeIdentity, importIdentityKey } from '$lib/crypto/identity';
 import { emptyRichTextDocument } from '$lib/richtext';
+import { defined } from '$lib/testing/defined';
 import {
-	draftStorageKey,
-	isDraftEmpty,
-	openDraft,
 	type DraftOwner,
 	type DraftScope,
-	type DraftStorage
+	type DraftStorage,
+	draftStorageKey,
+	isDraftEmpty,
+	openDraft
 } from './drafts';
 
 /** A `localStorage` stand-in that can be inspected. */
@@ -123,7 +124,10 @@ describe('openDraft', () => {
 		const other = await openDraft(threadA, impostor, storage);
 		other.save({ text: 'not for ada', tagIds: [] });
 		await other.settled();
-		storage.setItem(key, storage.getItem(draftStorageKey(impostor, threadA))!);
+		storage.setItem(
+			key,
+			defined(storage.getItem(draftStorageKey(impostor, threadA)), "the impostor's draft")
+		);
 
 		const session = await openDraft(threadA, ada, storage);
 		expect(session.initial).toBeNull();
@@ -215,7 +219,7 @@ describe('openDraft', () => {
 				throw new Error('SecurityError');
 			}
 		};
-		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
 		const session = await openDraft(threadA, ada, refuses);
 		expect(session.initial).toBeNull();

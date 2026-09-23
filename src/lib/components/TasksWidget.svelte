@@ -10,13 +10,12 @@
 	}: { tasks: TasksWidgetView; href: string; title?: string } = $props();
 
 	const hidden = $derived(Math.max(0, tasks.readyCount - tasks.ready.length));
-	const more = $derived(
-		hidden > 0
-			? `and ${hidden} more ready`
-			: tasks.waitingCount > 0
-				? `${tasks.waitingCount} waiting on a schedule`
-				: null
-	);
+	const more = $derived.by(() => {
+		if (hidden > 0) {
+			return `and ${hidden} more ready`;
+		}
+		return tasks.waitingCount > 0 ? `${tasks.waitingCount} waiting on a schedule` : null;
+	});
 
 	/**
 	 * Whether there is anything worth a line at all.

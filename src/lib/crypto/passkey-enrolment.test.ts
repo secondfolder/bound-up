@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defined } from '$lib/testing/defined';
 
 /**
  * Registering a passkey, and deciding what it proved.
@@ -44,7 +45,7 @@ function registrationResponse(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-	vi.stubGlobal('window', { location: { hostname: 'bound-up.test' } });
+	vi.stubGlobal('location', { hostname: 'bound-up.test' });
 });
 
 afterEach(() => {
@@ -226,7 +227,10 @@ describe('sealToPasskey', () => {
 	}
 
 	function saltedBytes(request: CredentialRequestOptions, which: 'first' | 'second'): Uint8Array {
-		const salt = request.publicKey!.extensions!.prf!.eval![which] as Uint8Array;
+		const salt = defined(
+			request.publicKey?.extensions?.prf?.eval?.[which],
+			`the ${which} PRF salt`
+		) as Uint8Array;
 		return new Uint8Array(32).map((_, index) => (salt[index % salt.length] ^ index) & 0xff);
 	}
 
@@ -235,7 +239,9 @@ describe('sealToPasskey', () => {
 
 		const result = await sealToPasskey({ identity: 'AGE-SECRET-KEY-1TEST', registration });
 		expect(result.kind).toBe('sealed');
-		if (result.kind !== 'sealed') return;
+		if (result.kind !== 'sealed') {
+			return;
+		}
 		expect(JSON.parse(result.wrapParams)).toEqual({
 			type: 'webauthn-prf',
 			version: 1,
@@ -256,9 +262,7 @@ describe('sealToPasskey', () => {
 	it('keeps a dismissal separate from a PRF failure', async () => {
 		vi.stubGlobal('navigator', {
 			credentials: {
-				get: vi.fn(async () => {
-					throw new DOMException('not allowed', 'NotAllowedError');
-				})
+				get: vi.fn(() => Promise.reject(new DOMException('not allowed', 'NotAllowedError')))
 			}
 		});
 

@@ -1,4 +1,3 @@
-import { getRequestEvent } from '$app/server';
 import { passkey } from '@better-auth/passkey';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 // `better-auth/minimal` rather than `better-auth`: the full entry's `init`
@@ -6,8 +5,9 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 // would otherwise be bundled into the worker. The core is identical.
 import { betterAuth } from 'better-auth/minimal';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
-import { schema, type Db } from './db';
+import { getRequestEvent } from '$app/server';
 import { AUTH_SECRET_LENGTH } from '../encryption';
+import { type Db, schema } from './db';
 
 /**
  * The type `@better-auth/passkey` accepts for WebAuthn extensions, derived from
@@ -38,7 +38,7 @@ type PasskeyExtensions = NonNullable<
  */
 const PRF_REGISTRATION_EXTENSIONS = { prf: {} } as PasskeyExtensions;
 
-export interface AuthRequestConfig {
+export type AuthRequestConfig = {
 	/** `platform.env.BETTER_AUTH_SECRET` in production, `.env` in dev. */
 	secret: string;
 	/**
@@ -51,7 +51,7 @@ export interface AuthRequestConfig {
 	rpID: string;
 	/** `event.url.host` — used to also trust the https form of this host. */
 	host: string;
-}
+};
 
 /**
  * Builds a Better Auth instance for one request.

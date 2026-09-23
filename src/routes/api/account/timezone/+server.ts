@@ -1,11 +1,13 @@
-import { APIError } from 'better-auth/api';
 import { error, json } from '@sveltejs/kit';
-import { canonicalizeTimeZone } from '$lib/timezone';
+import { APIError } from 'better-auth/api';
 import { updateCurrentUserProfile } from '$lib/server/user-settings';
+import { canonicalizeTimeZone } from '$lib/timezone';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const form = await request.formData();
 	const timezone = canonicalizeTimeZone(String(form.get('timezone') ?? ''));

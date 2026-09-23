@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<script>
+		<script>'use strict';
 			globalThis.litIssuedWarnings ??= new Set();
 			globalThis.litIssuedWarnings.add('dev-mode');
 			globalThis.litIssuedWarnings.add(
@@ -16,18 +16,20 @@
 		<meta name="apple-mobile-web-app-title" content="MyWebSite" />
 		<link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
 		<script type="module">
-			const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
-			const applyDark = function (event = systemDark) {
+			const systemDark = globalThis.matchMedia('(prefers-color-scheme: dark)');
+			const applyDark = (event = systemDark) => {
 				const isDark = event.matches;
 				document.documentElement.classList.toggle('wa-dark', isDark);
 			};
 			systemDark.addEventListener('change', applyDark);
 			applyDark();
 		</script>
+		<!-- biome-ignore-start lint/nursery/noNonScalableViewport: zoom has been disabled since the first commit, with no reason recorded. It fails WCAG 1.4.4 (resize text); whether to allow it is a product call, not a lint fix. A range because a plain biome-ignore does not reach a diagnostic on an attribute. -->
 		<meta
 			name="viewport"
 			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no"
 		/>
+		<!-- biome-ignore-end lint/nursery/noNonScalableViewport: end of the viewport tag above -->
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

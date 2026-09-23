@@ -208,8 +208,12 @@ export type ThreadUnreadInput = {
  * just read would flicker back to unread.
  */
 export function isUnreadFor(thread: ThreadUnreadInput, viewerId: string): boolean {
-	if (thread.lastMessageSenderId === viewerId) return false;
-	if (thread.lastReadMessageAt === null) return true;
+	if (thread.lastMessageSenderId === viewerId) {
+		return false;
+	}
+	if (thread.lastReadMessageAt === null) {
+		return true;
+	}
 	return thread.lastMessageAt.getTime() > thread.lastReadMessageAt.getTime();
 }
 
@@ -238,18 +242,27 @@ export type BoardThread = {
  * problem.
  */
 export function compareBoardThreads(a: BoardThread, b: BoardThread): number {
-	if (a.unread !== b.unread) return a.unread ? -1 : 1;
+	if (a.unread !== b.unread) {
+		return a.unread ? -1 : 1;
+	}
 
 	if (a.unread) {
 		const byRecency = b.lastMessageAt.getTime() - a.lastMessageAt.getTime();
-		if (byRecency !== 0) return byRecency;
+		if (byRecency !== 0) {
+			return byRecency;
+		}
 	} else {
-		const aOpened = a.lastFullyReadAt?.getTime() ?? -Infinity;
-		const bOpened = b.lastFullyReadAt?.getTime() ?? -Infinity;
-		if (aOpened !== bOpened) return bOpened - aOpened;
+		const aOpened = a.lastFullyReadAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+		const bOpened = b.lastFullyReadAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+		if (aOpened !== bOpened) {
+			return bOpened - aOpened;
+		}
 	}
 
 	// UUIDs, so this is only ever a tiebreak for two rows that genuinely share a
 	// millisecond — never a meaningful order in itself. See AGENTS.md invariant 8.
-	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+	if (a.id === b.id) {
+		return 0;
+	}
+	return a.id < b.id ? -1 : 1;
 }

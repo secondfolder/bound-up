@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { HALFTONE_CAPTURE_IGNORE_SELECTOR, buildHalftoneFragmentShader } from '$lib/halftone';
+	import { isSafari } from '$lib/browser-engine';
+	import { buildHalftoneFragmentShader, HALFTONE_CAPTURE_IGNORE_SELECTOR } from '$lib/halftone';
 
 	/**
 	 * A halftone overlay rendered over the live page.
@@ -16,7 +17,7 @@
 	 * the SSR graph — it touches `document`/`window` at module scope and the
 	 * server bundle must stay free of browser-only libraries.
 	 */
-	interface Props {
+	type Props = {
 		/** Which halftone motif to draw: concentric rings or parallel lines. */
 		pattern?: 'circle' | 'line';
 		/** Line pattern only: the angle of the lines, in degrees from horizontal. */
@@ -33,7 +34,7 @@
 		noiseStrength?: number;
 		/** Pattern drift, in CSS px per second. */
 		speed?: number;
-	}
+	};
 
 	let {
 		pattern = 'circle',
@@ -44,7 +45,7 @@
 		speed = 0
 	}: Props = $props();
 
-	let canvas: HTMLCanvasElement;
+	let canvas: HTMLCanvasElement | undefined = $state();
 
 	const vertSrc = `
 attribute vec2 aPos;
@@ -53,29 +54,36 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 	const fragSrc = buildHalftoneFragmentShader();
 
 	onMount(() => {
-		const userAgent = navigator.userAgent;
-		const isSafari =
-			navigator.vendor === 'Apple Computer, Inc.' &&
-			!/CriOS|FxiOS|EdgiOS|Chrome|Chromium|Android/.test(userAgent);
-		if (isSafari) {
+		// Bound by the markup below, so always set by the time this runs; the
+		// guard is for the type, which cannot know that.
+		if (!canvas) {
+			return;
+		}
+		const surface = canvas;
+		if (isSafari()) {
 			// Safari's soft-light compositing still reads punchier on this
 			// grayscale overlay than Chromium's and Firefox's so we tone it down with brightness()
-			canvas.style.setProperty('filter', 'brightness(0.9)');
+			surface.style.setProperty('filter', 'brightness(0.9)');
 		}
 
 		// preserveDrawingBuffer so the composited frame survives past the
 		// browser's composite step — without it, reading the canvas back (as the
 		// e2e spec does to assert the overlay actually painted) races the buffer
 		// clear and can read all-transparent pixels even after a good render.
-		const maybeGl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
-		if (!maybeGl) return;
+		const maybeGl = surface.getContext('webgl', { preserveDrawingBuffer: true });
+		if (!maybeGl) {
+			return;
+		}
 		// Narrowed alias: TS does not carry the null-guard above into the
 		// nested render()/capture() closures, and re-checking there would be
 		// noise — by this point the context exists for the component's life.
 		const gl: WebGLRenderingContext = maybeGl;
 
 		const compile = (type: number, src: string) => {
-			const shader = gl.createShader(type)!;
+			const shader = gl.createShader(type);
+			if (!shader) {
+				return null;
+			}
 			gl.shaderSource(shader, src);
 			gl.compileShader(shader);
 			// A failed compile otherwise renders nothing, silently, forever —
@@ -87,16 +95,24 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 			}
 			return shader;
 		};
-		const prog = gl.createProgram()!;
-		gl.attachShader(prog, compile(gl.VERTEX_SHADER, vertSrc));
-		gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragSrc));
+		const vertexShader = compile(gl.VERTEX_SHADER, vertSrc);
+		const fragmentShader = compile(gl.FRAGMENT_SHADER, fragSrc);
+		const prog = gl.createProgram();
+		const buf = gl.createBuffer();
+		const texture = gl.createTexture();
+		// Each is null only when the context has been lost, which leaves nothing
+		// to draw with — so no overlay, the same as having no WebGL at all.
+		if (!(vertexShader && fragmentShader && prog && buf && texture)) {
+			return;
+		}
+		gl.attachShader(prog, vertexShader);
+		gl.attachShader(prog, fragmentShader);
 		gl.linkProgram(prog);
 		if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
 			console.error('HalftoneOverlay program failed to link:', gl.getProgramInfoLog(prog));
 		}
 		gl.useProgram(prog);
 
-		const buf = gl.createBuffer()!;
 		gl.bindBuffer(gl.ARRAY_BUFFER, buf);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
 		const aPos = gl.getAttribLocation(prog, 'aPos');
@@ -113,7 +129,6 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 		const uTime = gl.getUniformLocation(prog, 'uTime');
 		const uSpeed = gl.getUniformLocation(prog, 'uSpeed');
 
-		const texture = gl.createTexture()!;
 		gl.bindTexture(gl.TEXTURE_2D, texture);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -121,10 +136,10 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
 		function render(timeSeconds: number) {
-			gl.viewport(0, 0, canvas.width, canvas.height);
-			gl.uniform2f(uResolution, canvas.width, canvas.height);
+			gl.viewport(0, 0, surface.width, surface.height);
+			gl.uniform2f(uResolution, surface.width, surface.height);
 			// gl_FragCoord y runs bottom-up; the picked center is top-down.
-			gl.uniform2f(uCenter, canvas.width / 2, canvas.height / 2);
+			gl.uniform2f(uCenter, surface.width / 2, surface.height / 2);
 			// uPattern/uAngle are read once per frame, so re-reading the props
 			// here keeps a changed pattern live without a re-init.
 			gl.uniform1i(uPattern, pattern === 'line' ? 1 : 0);
@@ -174,7 +189,9 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 		let start: number | null = null;
 		let rafId = 0;
 		const tick = (now: number) => {
-			if (start === null) start = now;
+			if (start === null) {
+				start = now;
+			}
 			const bounds = measureBounds();
 			if (
 				bounds.viewportWidth !== lastBounds.viewportWidth ||
@@ -184,7 +201,9 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 			) {
 				lastBounds = bounds;
 				captureQueued = true;
-				if (!captureInFlight) void capture();
+				if (!captureInFlight) {
+					void capture();
+				}
 			}
 			render((now - start) / 1000);
 			rafId = requestAnimationFrame(tick);
@@ -217,17 +236,17 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 				useCORS: true,
 				logging: false,
 				ignoreElements: (el) =>
-					el === canvas || el.closest(HALFTONE_CAPTURE_IGNORE_SELECTOR) !== null
+					el === surface || el.closest(HALFTONE_CAPTURE_IGNORE_SELECTOR) !== null
 			});
 			if (cancelled) {
 				captureInFlight = false;
 				return;
 			}
 
-			canvas.width = captured.width;
-			canvas.height = captured.height;
-			canvas.style.width = `${captured.width}px`;
-			canvas.style.height = `${captured.height}px`;
+			surface.width = captured.width;
+			surface.height = captured.height;
+			surface.style.width = `${captured.width}px`;
+			surface.style.height = `${captured.height}px`;
 
 			gl.bindTexture(gl.TEXTURE_2D, texture);
 			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, captured);
@@ -236,7 +255,7 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 			// Revealing it with a CSS transition covers the seam between "the
 			// page has loaded" and "the effect has rendered". The class stays
 			// across recaptures — only the first reveal is animated.
-			canvas.classList.add('ready');
+			surface.classList.add('ready');
 			// No explicit render here: the rAF loop draws the next frame with
 			// the fresh texture, which is never more than one frame away.
 			captureInFlight = false;

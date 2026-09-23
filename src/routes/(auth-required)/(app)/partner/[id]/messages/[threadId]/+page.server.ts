@@ -9,7 +9,9 @@ import {
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	// The thread id is re-joined against this partnership rather than trusted:
 	// being in *a* partnership is not being in *this* one.
@@ -19,7 +21,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		params.threadId,
 		locals.user.id
 	);
-	if (!membership) error(404, 'Not found');
+	if (!membership) {
+		error(404, 'Not found');
+	}
 
 	depends(`messages:thread:${params.threadId}`);
 

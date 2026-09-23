@@ -1,16 +1,18 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import AppNav from '$lib/components/AppNav.svelte';
 	import EncryptionGate from '$lib/components/EncryptionGate.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
-	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
 	const showTimezoneWarning = $derived.by(() => {
 		const routeId = page.route.id;
-		if (!routeId) return false;
+		if (!routeId) {
+			return false;
+		}
 
 		return (
 			routeId === '/(auth-required)/(app)/home' ||
@@ -22,14 +24,14 @@
 
 <svelte:head>
 	<style>
-		/* The app shell owns the viewport: only <main> scrolls, so the nav stays
+	/* The app shell owns the viewport: only <main> scrolls, so the nav stays
 		   put instead of scrolling away like a document footer. Scoped to this
 		   layout — Svelte removes it again on the way out to a (public) route. */
-		body {
-			margin: 0;
-			overflow: hidden;
-		}
-	</style>
+	body {
+		margin: 0;
+		overflow: hidden;
+	}
+</style>
 </svelte:head>
 
 <div class="shell">

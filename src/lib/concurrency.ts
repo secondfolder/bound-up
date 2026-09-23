@@ -31,8 +31,11 @@ export function createLimiter(max: number): Limiter {
 				// instead of wedging the queue for everything behind it.
 				Promise.resolve().then(task).then(resolve, reject).finally(next);
 			};
-			if (active < max) start();
-			else waiting.push(start);
+			if (active < max) {
+				start();
+			} else {
+				waiting.push(start);
+			}
 		});
 }
 

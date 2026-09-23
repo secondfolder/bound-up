@@ -1,6 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APIError } from 'better-auth/api';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { currentPasswordWrapParams } from '$lib/crypto/setup';
+import { account } from '$lib/server/db/schema';
+import { listRestoreRequests } from '$lib/server/messaging';
+import { FAKE_WRAP_BLOB, JUN_RECIPIENT } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { defined } from '$lib/testing/defined';
+import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestUser,
@@ -9,11 +15,6 @@ import {
 	readWrapRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { FAKE_WRAP_BLOB, JUN_RECIPIENT } from '$lib/testing/crypto';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
-import { currentPasswordWrapParams } from '$lib/crypto/setup';
-import { account } from '$lib/server/db/schema';
-import { listRestoreRequests } from '$lib/server/messaging';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;
@@ -229,7 +230,10 @@ describe('revokeWrap', () => {
 			label: 'iPhone'
 		});
 		const wraps = await readWrapRows(harness.db, ada.id);
-		const passwordWrap = wraps.find((w) => w.type === 'password')!;
+		const passwordWrap = defined(
+			wraps.find((w) => w.type === 'password'),
+			'the password wrap'
+		);
 
 		await actions.revokeWrap(
 			fakeEvent({ db: harness.db, user: ada, formData: { wrapId: passwordWrap.id } })
@@ -276,7 +280,7 @@ describe('forgetPassword', () => {
 });
 
 describe('addWrap', () => {
-	const PASSKEY_PARAMS = JSON.stringify({
+	const PasskeyParams = JSON.stringify({
 		type: 'webauthn-prf',
 		version: 1,
 		rpId: 'bound-up.test'
@@ -289,13 +293,16 @@ describe('addWrap', () => {
 			fakeEvent({
 				db: harness.db,
 				user: ada,
-				formData: { wrapParams: PASSKEY_PARAMS, wrapBlob: FAKE_WRAP_BLOB, label: 'iPhone' }
+				formData: { wrapParams: PasskeyParams, wrapBlob: FAKE_WRAP_BLOB, label: 'iPhone' }
 			})
 		);
 
 		const wraps = await readWrapRows(harness.db, ada.id);
 		expect(wraps).toHaveLength(2);
-		const added = wraps.find((wrap) => wrap.type === 'webauthn-prf')!;
+		const added = defined(
+			wraps.find((wrap) => wrap.type === 'webauthn-prf'),
+			'the passkey wrap'
+		);
 		expect(added.label).toBe('iPhone');
 		// Stored verbatim and never read: the server has no key to check it with.
 		expect(added.blob).toBe(FAKE_WRAP_BLOB);
@@ -309,7 +316,7 @@ describe('addWrap', () => {
 			fakeEvent({
 				db: harness.db,
 				user: ada,
-				formData: { wrapParams: PASSKEY_PARAMS, wrapBlob: 'not a wrap!' }
+				formData: { wrapParams: PasskeyParams, wrapBlob: 'not a wrap!' }
 			})
 		);
 		expect(result).toMatchObject({ status: 400 });
@@ -337,7 +344,7 @@ describe('addWrap', () => {
 			fakeEvent({
 				db: harness.db,
 				user: ada,
-				formData: { wrapParams: PASSKEY_PARAMS, wrapBlob: FAKE_WRAP_BLOB }
+				formData: { wrapParams: PasskeyParams, wrapBlob: FAKE_WRAP_BLOB }
 			})
 		);
 		// Otherwise the list of ways to unlock would name one that opens nothing.

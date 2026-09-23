@@ -16,11 +16,11 @@ export type MediaStore = {
 	 * Writes an object. `byteSize` is passed separately because R2 wants a
 	 * length for a stream and the caller already knows it.
 	 */
-	put(key: string, body: ReadableStream<Uint8Array>, byteSize: number): Promise<void>;
-	get(key: string): Promise<{ body: ReadableStream<Uint8Array>; byteSize: number } | null>;
-	delete(keys: string[]): Promise<void>;
+	put: (key: string, body: ReadableStream<Uint8Array>, byteSize: number) => Promise<void>;
+	get: (key: string) => Promise<{ body: ReadableStream<Uint8Array>; byteSize: number } | null>;
+	delete: (keys: string[]) => Promise<void>;
 	/** Returns how many objects went. R2 deletes at most 1000 keys per call. */
-	deletePrefix(prefix: string): Promise<number>;
+	deletePrefix: (prefix: string) => Promise<number>;
 };
 
 /**
@@ -39,18 +39,18 @@ export type MediaStore = {
  * the whole project — including the component test project.
  */
 export type MediaBucket = {
-	put(
+	put: (
 		key: string,
 		body: ReadableStream<Uint8Array>,
 		options?: { httpMetadata?: Record<string, string>; contentLength?: number }
-	): Promise<unknown>;
-	get(key: string): Promise<{ body: ReadableStream<Uint8Array>; size: number } | null>;
-	delete(keys: string | string[]): Promise<void>;
-	list(options?: {
+	) => Promise<unknown>;
+	get: (key: string) => Promise<{ body: ReadableStream<Uint8Array>; size: number } | null>;
+	delete: (keys: string | string[]) => Promise<void>;
+	list: (options?: {
 		prefix?: string;
 		cursor?: string;
 		limit?: number;
-	}): Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
+	}) => Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
 };
 
 export function attachmentKey(

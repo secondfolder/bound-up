@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_TOTAL_BYTES } from '$lib/messaging';
+import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from '$lib/messaging';
 import type { OutgoingAttachment, SendFailure } from '$lib/server/messaging';
 
 /**

@@ -13,8 +13,8 @@
  * `MessagePayload`.
  */
 
-import { MAX_BODY_CHARS } from '../messaging';
 import type { CachedEmbedDetails } from '../embeds';
+import { MAX_BODY_CHARS } from '../messaging';
 import { loadAge } from './identity';
 
 /**
@@ -68,14 +68,18 @@ function encodeBase64(bytes: Uint8Array): string {
 	// column, and the Zod field checks `[A-Za-z0-9+/=]`. base64url is reserved
 	// for values that travel in a URL.
 	let binary = '';
-	for (const byte of bytes) binary += String.fromCharCode(byte);
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
 	return btoa(binary);
 }
 
 function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
 	const binary = atob(value);
 	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+	for (let i = 0; i < binary.length; i += 1) {
+		bytes[i] = binary.charCodeAt(i);
+	}
 	return bytes;
 }
 
@@ -84,14 +88,18 @@ export async function encryptPayload(
 	payload: MessagePayload | MessageMetadataPayload | ReactionPayload | DraftPayload,
 	recipients: string[]
 ): Promise<string> {
-	if (recipients.length === 0) throw new Error('A message needs at least one recipient');
+	if (recipients.length === 0) {
+		throw new Error('A message needs at least one recipient');
+	}
 
 	const age = await loadAge();
 	const encrypter = new age.Encrypter();
 	// Deduplicated because encrypting to the same recipient twice would put two
 	// identical stanzas in the header for no reason — and it happens naturally
 	// if someone ever messages themselves.
-	for (const recipient of [...new Set(recipients)]) encrypter.addRecipient(recipient);
+	for (const recipient of [...new Set(recipients)]) {
+		encrypter.addRecipient(recipient);
+	}
 
 	return encodeBase64(await encrypter.encrypt(encoder.encode(JSON.stringify(payload))));
 }
@@ -124,21 +132,21 @@ export async function encryptMessageMetadata(
 	payload: MessageMetadataPayload,
 	recipients: string[]
 ): Promise<string> {
-	return encryptPayload(payload, recipients);
+	return await encryptPayload(payload, recipients);
 }
 
 export async function decryptMessageMetadata(
 	ciphertext: string,
 	identity: CryptoKey | string
 ): Promise<MessageMetadataPayload | null> {
-	return decryptPayload<MessageMetadataPayload>(ciphertext, identity);
+	return await decryptPayload<MessageMetadataPayload>(ciphertext, identity);
 }
 
 /** Trims and bounds what the composer collected, before it is encrypted. */
 export function normaliseBody(text: string): string {
 	// Trailing whitespace only: leading indentation can be deliberate in a long
 	// message, and collapsing interior newlines would rewrite what was typed.
-	return text.replace(/\s+$/, '').slice(0, MAX_BODY_CHARS);
+	return text.trimEnd().slice(0, MAX_BODY_CHARS);
 }
 
 // ── attachments ──────────────────────────────────────────────────────────────

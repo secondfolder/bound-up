@@ -1,4 +1,11 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+	ADA_RECIPIENT,
+	FAKE_WRAP_BLOB,
+	JUN_RECIPIENT,
+	PASSWORD_WRAP_PARAMS
+} from '../testing/crypto';
 import { createTestDb, type TestDb } from '../testing/db';
 import {
 	createTestPartnership,
@@ -8,12 +15,7 @@ import {
 	readWrapRows,
 	type TestUser
 } from '../testing/fixtures';
-import {
-	ADA_RECIPIENT,
-	FAKE_WRAP_BLOB,
-	JUN_RECIPIENT,
-	PASSWORD_WRAP_PARAMS
-} from '../testing/crypto';
+import { passkey } from './db/schema';
 import {
 	acknowledgeHistoryWarning,
 	addWrap,
@@ -29,8 +31,6 @@ import {
 	replaceUserKeys,
 	touchWrap
 } from './keys';
-import { passkey } from './db/schema';
-import { eq } from 'drizzle-orm';
 
 let harness: TestDb;
 let ada: TestUser;
@@ -182,8 +182,8 @@ describe('getUnlockBundle', () => {
 		});
 
 		// Someone else's passkey is not an offer for this account.
-		const jun = await createTestUser(harness.db, { name: 'Jun' });
-		await expect(getUnlockBundle(harness.db, jun.id)).resolves.toMatchObject({
+		const someoneElse = await createTestUser(harness.db, { name: 'Jun' });
+		await expect(getUnlockBundle(harness.db, someoneElse.id)).resolves.toMatchObject({
 			passkeyCount: 0
 		});
 	});
@@ -255,8 +255,8 @@ describe('recordPasskeyPrfStatus', () => {
 	});
 
 	it("records nothing against someone else's passkey", async () => {
-		const jun = await createTestUser(harness.db, { name: 'Jun' });
-		await givePasskey(jun.id, 'passkey-jun');
+		const someoneElse = await createTestUser(harness.db, { name: 'Jun' });
+		await givePasskey(someoneElse.id, 'passkey-jun');
 
 		await expect(
 			recordPasskeyPrfStatus(harness.db, ada.id, {
@@ -266,7 +266,7 @@ describe('recordPasskeyPrfStatus', () => {
 		).resolves.toBe(false);
 
 		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(new Map());
-		await expect(getUnlockBundle(harness.db, jun.id)).resolves.toMatchObject({
+		await expect(getUnlockBundle(harness.db, someoneElse.id)).resolves.toMatchObject({
 			passkeysKnownUnusable: 0
 		});
 	});

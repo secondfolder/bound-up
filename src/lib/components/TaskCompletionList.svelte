@@ -4,10 +4,10 @@
 
 	type CompletionView = TaskCompletionView | PartnershipTaskCompletionView;
 
-	interface Props {
+	type Props = {
 		completions: CompletionView[];
 		emptyMessage: string;
-	}
+	};
 
 	let { completions, emptyMessage }: Props = $props();
 

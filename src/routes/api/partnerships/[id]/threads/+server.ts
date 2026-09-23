@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
 import { newThreadSchema } from '$lib/schemas/messageForm';
 import { createMediaStore } from '$lib/server/media/dev';
-import { createNotifier } from '$lib/server/realtime/dev';
 import { requireMembership, startThread } from '$lib/server/messaging';
-import type { RequestHandler } from './$types';
+import { createNotifier } from '$lib/server/realtime/dev';
 import { parseSend, sendFailureStatus } from '../send';
+import type { RequestHandler } from './$types';
 
 /**
  * Starts a thread: its sticker, its first message, and any attachments.
@@ -18,7 +18,9 @@ export const POST: RequestHandler = async (event) => {
 	// `src/routes/api/` sits outside both route groups on purpose: a group guard
 	// is a layout load, and layout loads never run for a `+server.ts`. So every
 	// handler carries its own check. See src/routes/api/keys/unlock-bundle.
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	// Membership before the body is read, so a stranger cannot make the server
 	// buffer 25 MB for them.
@@ -32,13 +34,15 @@ export const POST: RequestHandler = async (event) => {
 		ciphertext: form.get('ciphertext'),
 		metadataCiphertext: form.get('metadataCiphertext')
 	});
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed message');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed message');
+	}
 	const rawTagIds = form.get('tagIds');
 	let tagIds: string[] = [];
 	if (rawTagIds !== null) {
 		try {
 			const parsedTagIds: unknown = JSON.parse(String(rawTagIds));
-			if (!Array.isArray(parsedTagIds) || !parsedTagIds.every((id) => typeof id === 'string')) {
+			if (!(Array.isArray(parsedTagIds) && parsedTagIds.every((id) => typeof id === 'string'))) {
 				error(400, 'Malformed tag ids');
 			}
 			tagIds = parsedTagIds;
@@ -58,7 +62,9 @@ export const POST: RequestHandler = async (event) => {
 		tagIds
 	});
 
-	if (!result.ok) error(sendFailureStatus(result.reason), result.reason);
+	if (!result.ok) {
+		error(sendFailureStatus(result.reason), result.reason);
+	}
 
 	// After the write, and awaited but unable to fail — `publish` swallows its
 	// own errors, because the message is already stored and a fan-out problem

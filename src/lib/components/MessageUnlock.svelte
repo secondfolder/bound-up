@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy, type Snippet } from 'svelte';
 	import {
 		currentKeyring,
 		passkeyWrapFor,
@@ -6,10 +7,9 @@
 		unlockWithPassword
 	} from '$lib/crypto/session.svelte';
 	import { holdStorageExplanation } from '$lib/crypto/storage-persistence.svelte';
+	import type { KeyWrapView } from '$lib/types';
 	import AddPasskeyFlow from './AddPasskeyFlow.svelte';
 	import UnlockPanel from './UnlockPanel.svelte';
-	import { onDestroy, type Snippet } from 'svelte';
-	import type { KeyWrapView } from '$lib/types';
 
 	/**
 	 * `UnlockPanel` wired to the real keyring, in one place.
@@ -32,8 +32,8 @@
 		hasPassword = true,
 		busyLabel = 'Unlocking…',
 		submitLabel = 'Unlock messages',
-		chrome = undefined,
-		onFlowOpen = undefined
+		chrome,
+		onFlowOpen
 	}: {
 		user: { id: string; email: string };
 		/**
@@ -93,7 +93,9 @@
 	}
 
 	async function onPasskeyUnlock() {
-		if (!passkeyWrap) return;
+		if (!passkeyWrap) {
+			return;
+		}
 		await unlockWithPasskey(user, passkeyWrap);
 	}
 
@@ -101,7 +103,7 @@
 	// Leaving mid-ceremony must not keep the explanation shut for the session.
 	onDestroy(() => releaseStorageExplanation?.());
 
-	async function onSetUpPasskey(password: string) {
+	function onSetUpPasskey(password: string) {
 		// Reached only after a password unlock that worked — the panel guarantees
 		// the ordering, because a passkey sealed off a wrong password would open
 		// nothing and would look like it had.
@@ -113,6 +115,7 @@
 		releaseStorageExplanation?.();
 		releaseStorageExplanation = holdStorageExplanation();
 		addPasskey?.start(password);
+		return Promise.resolve();
 	}
 
 	function onFlowDone() {

@@ -25,7 +25,7 @@
 		field,
 		/** Show a strength meter. On for setting a password, off for entering one. */
 		strength = false,
-		errors = undefined
+		errors
 	}: {
 		value?: string;
 		label: string;
@@ -56,7 +56,7 @@
 		/** Lit's "the render you just triggered has landed". */
 		updateComplete?: Promise<unknown>;
 	};
-	let host: WaInput | undefined = undefined;
+	let host: WaInput | undefined = $state();
 
 	/**
 	 * Copies the control's value into our state.
@@ -71,8 +71,12 @@
 		const control = host?.input;
 		// No control means Web Awesome has not upgraded the element, so there is
 		// nothing anyone could have put in it and nothing authoritative to read.
-		if (!control) return;
-		if (control.value !== value) value = control.value;
+		if (!control) {
+			return;
+		}
+		if (control.value !== value) {
+			({ value } = control);
+		}
 	}
 
 	onMount(() => {
@@ -98,7 +102,9 @@
 		document.addEventListener(
 			'submit',
 			(event) => {
-				if (event.target === host?.closest('form')) sync();
+				if (event.target === host?.closest('form')) {
+					sync();
+				}
 			},
 			{ capture: true, signal }
 		);
@@ -107,7 +113,9 @@
 			// The shadow root, and so the control, only exist after the upgrade.
 			await customElements.whenDefined('wa-input');
 			await host?.updateComplete;
-			if (signal.aborted) return;
+			if (signal.aborted) {
+				return;
+			}
 
 			/**
 			 * `addEventListener` on the inner control as well as the host, rather
@@ -129,7 +137,9 @@
 			 * extension installed.
 			 */
 			for (const target of [host, host?.input]) {
-				if (!target) continue;
+				if (!target) {
+					continue;
+				}
 				target.addEventListener('input', sync, { signal });
 				target.addEventListener('change', sync, { signal });
 			}

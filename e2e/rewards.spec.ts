@@ -1,4 +1,5 @@
-import { expect, test } from './fixtures';
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
 import {
 	account,
 	clickWaButton,
@@ -39,7 +40,9 @@ test.describe('rewards', () => {
 		await page.waitForURL(/\/home\/rewards$/);
 
 		const edit = await page.getByRole('link', { name: 'Edit Long bath' }).getAttribute('href');
-		if (!edit) throw new Error('expected an edit link');
+		if (!edit) {
+			throw new Error('expected an edit link');
+		}
 		await page.goto(edit);
 		await waitForHydration(page);
 		// Seeded from the stored reward, which a `defaultValue` still renders.

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { MAX_ATTACHMENTS_PER_MESSAGE } from '$lib/messaging';
 	import { checkComposed } from '$lib/messaging/client';
-	import RichTextEditor from './RichTextEditor.svelte';
 	import { MESSAGE_FEATURES } from '$lib/richtext-editor';
+	import RichTextEditor from './RichTextEditor.svelte';
 
 	/**
 	 * Where a message is written. Presentational: it collects a document and
@@ -28,7 +28,7 @@
 		placeholder = 'Say something…',
 		submitLabel = 'Send',
 		initialText = '',
-		onTextChange = undefined
+		onTextChange
 	}: {
 		send: (message: { text: string; files: File[] }) => Promise<string | null>;
 		placeholder?: string;
@@ -59,7 +59,9 @@
 	function onChange(next: string) {
 		text = next;
 		onTextChange?.(next);
-		if (problem) problem = checkComposed({ text, files })?.message ?? null;
+		if (problem) {
+			problem = checkComposed({ text, files })?.message ?? null;
+		}
 	}
 
 	function onPick(event: Event) {
@@ -69,7 +71,9 @@
 		files = [...files, ...picked].slice(0, MAX_ATTACHMENTS_PER_MESSAGE);
 		problem = checkComposed({ text, files })?.message ?? null;
 		// Cleared so re-picking the same file fires `change` again.
-		if (fileInput) fileInput.value = '';
+		if (fileInput) {
+			fileInput.value = '';
+		}
 	}
 
 	function remove(index: number) {
@@ -85,7 +89,9 @@
 	 * second, less reliable path to the same function.
 	 */
 	async function submit() {
-		if (sending || nothingToSend) return;
+		if (sending || nothingToSend) {
+			return;
+		}
 
 		const local = checkComposed({ text, files });
 		if (local) {
@@ -168,7 +174,7 @@
 				<input
 					bind:this={fileInput}
 					type="file"
-					accept="image/*,video/*"
+					accept="image/*, video/*"
 					multiple
 					onchange={onPick}
 				/>

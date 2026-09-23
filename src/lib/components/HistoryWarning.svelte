@@ -23,7 +23,9 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (!confirmed || busy) return;
+		if (!confirmed || busy) {
+			return;
+		}
 		busy = true;
 		try {
 			await acknowledge();

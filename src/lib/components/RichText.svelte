@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import RichTextInline, { type InlineEmbedContext } from './RichTextInline.svelte';
-	import UrlEmbed from './UrlEmbed.svelte';
 	import {
+		type CachedEmbedDetails,
 		embedErrorDetails,
 		embedSpecFor,
-		fetchEmbedDetailsResult,
-		type CachedEmbedDetails
+		fetchEmbedDetailsResult
 	} from '$lib/embeds';
-	import { isWithinScrollport, scrollIntoViewWithin } from '$lib/scroll-parent';
 	import {
 		documentEmbedUrls,
 		inlineLinkUrls,
 		parseStoredRichText,
-		withInlineEmbeds,
-		type RichTextInlineNode
+		type RichTextInlineNode,
+		withInlineEmbeds
 	} from '$lib/richtext';
+	import { isWithinScrollport, scrollIntoViewWithin } from '$lib/scroll-parent';
+	import RichTextInline, { type InlineEmbedContext } from './RichTextInline.svelte';
+	import UrlEmbed from './UrlEmbed.svelte';
 
 	/**
 	 * Message, task and reward prose.
@@ -43,8 +43,8 @@
 		text,
 		cachedEmbeds = [],
 		cachedEmbedsPending = false,
-		onEmbedActivated = undefined,
-		onRefreshEmbed = undefined
+		onEmbedActivated,
+		onRefreshEmbed
 	}: {
 		text: string;
 		cachedEmbeds?: CachedEmbedDetails[];
@@ -67,7 +67,9 @@
 	 */
 	const revealedDetails = new SvelteMap<string, CachedEmbedDetails>();
 	const embedDetails = $derived.by(() => {
-		if (revealedDetails.size === 0) return cachedByHref;
+		if (revealedDetails.size === 0) {
+			return cachedByHref;
+		}
 		// Later entries win, so the message's own come second.
 		return new Map([...revealedDetails, ...cachedByHref]);
 	});
@@ -95,9 +97,7 @@
 	let scrollTo: string | null = null;
 
 	function canReveal(blockIndex: number, url: string): boolean {
-		return (
-			!embedded.has(url) && !revealed.has(`${blockIndex}:${url}`) && embedSpecFor(url) !== null
-		);
+		return !(embedded.has(url) || revealed.has(`${blockIndex}:${url}`)) && embedSpecFor(url) !== null;
 	}
 
 	/**
@@ -114,7 +114,9 @@
 	 */
 	async function reveal(blockIndex: number, url: string) {
 		const key = `${blockIndex}:${url}`;
-		if (revealing.has(key)) return;
+		if (revealing.has(key)) {
+			return;
+		}
 		if (!embedDetails.has(url)) {
 			revealing.add(key);
 			const result = await fetchEmbedDetailsResult(url);
@@ -149,9 +151,13 @@
 	 * already on screen is worse than not moving it at all.
 	 */
 	function embedMounted(url: string, node: HTMLElement) {
-		if (url !== scrollTo) return;
+		if (url !== scrollTo) {
+			return;
+		}
 		scrollTo = null;
-		if (isWithinScrollport(node)) return;
+		if (isWithinScrollport(node)) {
+			return;
+		}
 		scrollIntoViewWithin(node, node, { behavior: 'smooth' });
 	}
 
@@ -202,24 +208,27 @@
 				{/each}
 			</ul>
 		{/if}
-	{:else if embedSpecFor(block.url)}
-		<!-- A root-level embed with no paragraph after it for `parseStoredRichText`
-		     to move into. Rare, and older than the inline placement. -->
-		<UrlEmbed
-			spec={embedSpecFor(block.url)!}
-			href={block.url}
-			label={block.url}
-			cached={cachedByHref.get(block.url) ?? null}
-			cachedPending={cachedEmbedsPending}
-			onActivate={onEmbedActivated}
-			onRefresh={onRefreshEmbed}
-		/>
 	{:else}
-		<!-- An embed whose provider we no longer support. It degrades to the
-		     link it was made from rather than vanishing. -->
-		<p>
-			<a href={block.url} target="_blank" rel="noopener noreferrer ugc">{block.url}</a>
-		</p>
+		{const spec = $derived(embedSpecFor(block.url))}
+		{#if spec}
+			<!-- A root-level embed with no paragraph after it for `parseStoredRichText`
+			     to move into. Rare, and older than the inline placement. -->
+			<UrlEmbed
+				{spec}
+				href={block.url}
+				label={block.url}
+				cached={cachedByHref.get(block.url) ?? null}
+				cachedPending={cachedEmbedsPending}
+				onActivate={onEmbedActivated}
+				onRefresh={onRefreshEmbed}
+			/>
+		{:else}
+			<!-- An embed whose provider we no longer support. It degrades to the
+			     link it was made from rather than vanishing. -->
+			<p>
+				<a href={block.url} target="_blank" rel="noopener noreferrer ugc">{block.url}</a>
+			</p>
+		{/if}
 	{/if}
 {/each}
 
@@ -230,14 +239,6 @@
 		margin: 0;
 	}
 
-	p + p,
-	p + ul,
-	p + ol,
-	ul + p,
-	ol + p {
-		margin-block-start: 0.5em;
-	}
-
 	ul,
 	ol {
 		padding-inline-start: 1.5em;
@@ -246,5 +247,13 @@
 	/* Long URLs and unbroken strings must not widen a message bubble. */
 	p {
 		overflow-wrap: anywhere;
+	}
+
+	p + p,
+	p + ul,
+	p + ol,
+	ul + p,
+	ol + p {
+		margin-block-start: 0.5em;
 	}
 </style>

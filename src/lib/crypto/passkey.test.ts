@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { defined } from '$lib/testing/defined';
 import { generateAgeIdentity, loadAge } from './identity';
 import {
 	describePasskeyFailure,
@@ -25,10 +26,12 @@ const rpId = 'bound-up.test';
  * from its own secret and the salt it is handed, and not knowable without it.
  */
 function install(secret: string) {
-	const get = vi.fn(async (options: CredentialRequestOptions) => {
+	const get = vi.fn((options: CredentialRequestOptions) => {
 		const evaluated = options.publicKey?.extensions?.prf?.eval;
-		if (!evaluated) throw new Error('the ceremony asked for no PRF');
-		return {
+		if (!evaluated) {
+			return Promise.reject(new Error('the ceremony asked for no PRF'));
+		}
+		return Promise.resolve({
 			getClientExtensionResults: () => ({
 				prf: {
 					results: {
@@ -37,7 +40,7 @@ function install(secret: string) {
 					}
 				}
 			})
-		};
+		});
 	});
 	vi.stubGlobal('navigator', { credentials: { get } });
 	return get;
@@ -51,7 +54,7 @@ function prf(secret: string, salt: BufferSource): Uint8Array {
 	// Not a real PRF, and it does not need to be: it only has to be a stable
 	// function of (secret, salt) that a different secret does not reproduce.
 	const out = new Uint8Array(32);
-	for (let i = 0; i < 32; i++) {
+	for (let i = 0; i < 32; i += 1) {
 		out[i] = (key[i % key.length] ^ bytes[i % bytes.length] ^ (i * 31)) & 0xff;
 	}
 	return out;
@@ -87,7 +90,7 @@ describe('wrapIdentityToPasskey', () => {
 
 		await wrapIdentityToPasskey({ identity, rpId });
 
-		const options = get.mock.calls[0][0].publicKey!;
+		const options = defined(get.mock.calls[0]?.[0].publicKey, 'the ceremony options');
 		expect(options.userVerification).toBe('required');
 		expect(options.rpId).toBe(rpId);
 		// Empty, so the platform offers the user whichever passkey they like
@@ -119,9 +122,9 @@ describe('wrapIdentityToPasskey', () => {
 			})
 		});
 
-		const options = get.mock.calls[0][0].publicKey!;
+		const options = defined(get.mock.calls[0]?.[0].publicKey, 'the ceremony options');
 		expect(options.allowCredentials).toHaveLength(1);
-		const allowed = options.allowCredentials![0];
+		const [allowed] = defined(options.allowCredentials, 'the allowed credentials');
 		expect(new Uint8Array(allowed.id as ArrayBuffer)).toEqual(credentialId);
 		expect(allowed.transports).toEqual(['internal']);
 		// The rp id comes out of the identity string, not the argument.

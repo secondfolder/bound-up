@@ -17,13 +17,25 @@ export function embedActivationDelayMs(input: {
 }): number {
 	const speed = Math.abs(input.velocityPxPerMs);
 	// Well inside the scrollport: the reader is looking at it now.
-	if (input.intersectionRatio >= 0.6) return 0;
+	if (input.intersectionRatio >= 0.6) {
+		return 0;
+	}
 	// Just off the edge and not moving fast — about to be looked at.
-	if (input.distancePx <= 48 && speed < 1.4) return 0;
+	if (input.distancePx <= 48 && speed < 1.4) {
+		return 0;
+	}
 	// Stopped, or nearly. Nothing is gained by holding it back.
-	if (speed < 0.2) return 0;
-	if (speed < 0.7) return 120;
-	if (input.distancePx < 120) return 120;
-	if (speed < 1.4) return 220;
+	if (speed < 0.2) {
+		return 0;
+	}
+	if (speed < 0.7) {
+		return 120;
+	}
+	if (input.distancePx < 120) {
+		return 120;
+	}
+	if (speed < 1.4) {
+		return 220;
+	}
 	return 360;
 }

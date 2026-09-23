@@ -17,10 +17,14 @@ const requestSchema = z.object({
  * before it encrypts that metadata into the message sidecar.
  */
 export const POST: RequestHandler = async ({ locals, request, fetch }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = requestSchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, parsed.error.issues[0]?.message ?? 'Malformed request');
+	if (!parsed.success) {
+		error(400, parsed.error.issues[0]?.message ?? 'Malformed request');
+	}
 
 	const urls = [...new Set(parsed.data.urls)];
 	// Capped rather than all at once: a message can carry up to 50 links, and

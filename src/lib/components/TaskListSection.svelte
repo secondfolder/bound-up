@@ -4,7 +4,7 @@
 
 	type TaskView = SelfTaskView | PartnershipTaskView;
 
-	interface Props {
+	type Props = {
 		title: string;
 		tasks: TaskView[];
 		emptyMessage: string;
@@ -18,7 +18,7 @@
 		extraHref?: string | null;
 		extraLabel?: string;
 		wrapInPanel?: boolean;
-	}
+	};
 
 	let {
 		title,

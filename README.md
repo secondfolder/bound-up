@@ -159,12 +159,17 @@ Font Awesome's CDN, so the Playwright suite expects a network connection.
 
 `git commit` runs [husky](https://typicode.github.io/husky/) +
 [lint-staged](https://github.com/lint-staged/lint-staged): svelte-check over the
-whole project first, then over the staged files — prettier rewrites them, eslint
-fixes what it can, and `vitest related` runs the unit tests whose files import
-the staged ones (see the `lint-staged` entry in `package.json`). Anything a task
-rewrites is re-staged automatically. It is not a substitute for the full loop in
-`AGENTS.md` — the e2e suite is too slow for a hook and still runs in CI or by
-hand.
+whole project first, then over the staged files — [Biome](https://biomejs.dev)
+formats them and fixes what it can, `scripts/format-svelte.mjs` formats the
+`<script>` and `<style>` blocks of any staged component, and `vitest related`
+runs the unit tests whose files import the staged ones (see the `lint-staged`
+entry in `package.json`). Anything a task rewrites is re-staged automatically.
+It is not a substitute for the full loop in `AGENTS.md` — the e2e suite is too
+slow for a hook and still runs in CI or by hand.
+
+How the linter and formatter are set up, and why one is a Biome config and the
+other is half a script, is in
+[docs/linting-and-formatting.md](docs/linting-and-formatting.md).
 
 ## Scripts
 
@@ -173,7 +178,7 @@ hand.
 | `dev` / `build`.                                              | Vite dev server / production build                            |
 | `preview`                                                     | Build, migrate the emulated D1, then run the real worker      |
 | `deploy`                                                      | Build and deploy to Cloudflare                                |
-| `check` / `lint` / `format` / `test`                          | svelte-check / prettier + eslint / prettier write / all tests |
+| `check` / `lint` / `format` / `test`                          | svelte-check / Biome check / Biome write / all tests          |
 | `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against `vite dev`          |
 | `db:generate`                                                 | Generate a migration from the schema                          |
 | `db:migrate` / `db:migrate:preview` / `db:migrate:production` | Apply migrations to local.db / emulated D1 / production       |

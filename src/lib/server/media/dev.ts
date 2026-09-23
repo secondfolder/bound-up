@@ -36,4 +36,4 @@ export async function createMediaStore(event: {
 	return createR2Store(requireR2(event.platform));
 }
 
-export type { MediaStore };
+export type { MediaStore } from './index';

@@ -1,9 +1,10 @@
 import { fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import RichText from './RichText.svelte';
-import { clearOembedCache, type CachedEmbedDetails } from '$lib/embeds';
+import { type CachedEmbedDetails, clearOembedCache } from '$lib/embeds';
 import type { RichTextDocument } from '$lib/richtext';
+import { defined } from '$lib/testing/defined';
 import { waProp, waSettled } from '$lib/testing/web-awesome';
+import RichText from './RichText.svelte';
 
 /**
  * RichText renders native elements apart from the reader's Show button, so
@@ -261,6 +262,10 @@ function showButtons(container: HTMLElement): HTMLElement[] {
 	);
 }
 
+function showButton(container: HTMLElement): HTMLElement {
+	return defined(showButtons(container)[0], 'a Show button');
+}
+
 /** What `/api/embed-metadata` says about a URL, for a lookup that works. */
 function details(url: string, over: Partial<CachedEmbedDetails> = {}): CachedEmbedDetails {
 	return {
@@ -283,9 +288,9 @@ function details(url: string, over: Partial<CachedEmbedDetails> = {}): CachedEmb
 
 /** Answers every preview lookup with a card for the URL it was asked about. */
 function stubLookup() {
-	const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+	const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
 		const { urls } = JSON.parse(String(init?.body)) as { urls: string[] };
-		return Response.json({ embeds: urls.map((url) => details(url)) });
+		return Promise.resolve(Response.json({ embeds: urls.map((url) => details(url)) }));
 	});
 	vi.stubGlobal('fetch', fetchMock);
 	return fetchMock;
@@ -294,8 +299,12 @@ function stubLookup() {
 /** Presses Show and waits for the card it asked for to go in. */
 async function reveal(container: HTMLElement, button: HTMLElement, count = 1) {
 	await fireEvent.click(button);
+	// A wait, not an assertion: each test asserts on what the card shows.
 	await vi.waitFor(() => {
-		expect(container.querySelectorAll('.embed-slot')).toHaveLength(count);
+		const slots = container.querySelectorAll('.embed-slot').length;
+		if (slots !== count) {
+			throw new Error(`Expected ${count} embed slot(s), found ${slots}`);
+		}
 	});
 }
 
@@ -377,7 +386,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await reveal(container, showButtons(container)[0]!);
+		await reveal(container, showButton(container));
 
 		const revealed = container.querySelector('.embed-slot');
 		expect(revealed).not.toBeNull();
@@ -398,7 +407,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await reveal(container, showButtons(container)[0]!);
+		await reveal(container, showButton(container));
 
 		const paragraphs = [...container.querySelectorAll('p')];
 		expect(paragraphs[0]?.textContent).toBe('first');
@@ -418,7 +427,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 
 		const buttons = showButtons(container);
 		expect(buttons).toHaveLength(2);
-		await reveal(container, buttons[1]!);
+		await reveal(container, defined(buttons[1], 'the second Show button'));
 
 		expect(container.querySelectorAll('.embed-slot')).toHaveLength(1);
 		expect(showButtons(container)).toHaveLength(1);
@@ -445,7 +454,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		const button = showButtons(container)[0]!;
+		const button = showButton(container);
 		await fireEvent.click(button);
 		await vi.waitFor(() => expect(answer).toBeDefined());
 		await waSettled(container);
@@ -472,7 +481,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await reveal(container, showButtons(container)[0]!);
+		await reveal(container, showButton(container));
 
 		const card = container.querySelector('.embed-slot .card');
 		expect(card?.querySelector('.title')?.textContent).toBe(
@@ -487,9 +496,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 	it('says so when the server cannot be reached at all', async () => {
 		vi.stubGlobal(
 			'fetch',
-			vi.fn(async () => {
-				throw new TypeError('Failed to fetch');
-			})
+			vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
 		);
 		const { container } = render(RichText, {
 			props: {
@@ -497,7 +504,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await reveal(container, showButtons(container)[0]!);
+		await reveal(container, showButton(container));
 
 		expect(container.querySelector('.embed-slot .card .title')?.textContent).toBe(
 			"Couldn't reach the server to load this preview"
@@ -515,7 +522,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await reveal(container, showButtons(container)[0]!);
+		await reveal(container, showButton(container));
 
 		expect(container.querySelector('.embed-slot .card .title')?.textContent).toBe(
 			'No preview is available for this link'
@@ -531,7 +538,7 @@ describe('RichText, revealing an embed the sender left out', () => {
 			}
 		});
 
-		await fireEvent.click(showButtons(container)[0]!);
+		await fireEvent.click(showButton(container));
 
 		expect(container.querySelector('.embed-slot .card')?.textContent).toContain('From the sidecar');
 		expect(fetchMock).not.toHaveBeenCalled();

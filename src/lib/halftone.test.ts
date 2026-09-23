@@ -1,15 +1,15 @@
-import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import {
 	applyMonochromeNoiseRgb,
+	type HalftoneRenderOptions,
 	halftoneContrastSlope,
 	halftoneNoiseDelta,
 	halftoneScreenValue,
+	type NormalizedRgbaImage,
 	renderHalftoneGrayscaleImage,
 	renderSoftLightHalftoneImage,
-	rgbToLuma,
-	type HalftoneRenderOptions,
-	type NormalizedRgbaImage
+	rgbToLuma
 } from './halftone';
 import { decodePngToNormalizedImage } from './testing/png';
 
@@ -81,15 +81,15 @@ function statsOf(values: ArrayLike<number>): {
 	let min = Number.POSITIVE_INFINITY;
 	let max = Number.NEGATIVE_INFINITY;
 	let sum = 0;
-	for (let index = 0; index < values.length; index += 1) {
-		min = Math.min(min, values[index]);
-		max = Math.max(max, values[index]);
-		sum += values[index];
+	for (const value of Array.from(values)) {
+		min = Math.min(min, value);
+		max = Math.max(max, value);
+		sum += value;
 	}
 	const mean = sum / values.length;
 	let variance = 0;
-	for (let index = 0; index < values.length; index += 1) {
-		variance += (values[index] - mean) ** 2;
+	for (const value of Array.from(values)) {
+		variance += (value - mean) ** 2;
 	}
 	return { min, max, mean, std: Math.sqrt(variance / values.length) };
 }
@@ -267,7 +267,11 @@ describe('halftone reference regressions', () => {
 			lineOptions({ contrast: 1, cellSize: 80 })
 		);
 		let ink = 0;
-		for (const value of rendered) if (value < 0.5) ink += 1;
+		for (const value of rendered) {
+			if (value < 0.5) {
+				ink += 1;
+			}
+		}
 		expect(ink / rendered.length).toBeCloseTo(0.6, 2);
 	});
 

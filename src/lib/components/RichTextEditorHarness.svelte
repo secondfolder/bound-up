@@ -1,6 +1,6 @@
 <script lang="ts">
-	import RichTextEditor from './RichTextEditor.svelte';
 	import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
+	import RichTextEditor from './RichTextEditor.svelte';
 
 	/**
 	 * A parent that feeds every change straight back into `value` — exactly what
@@ -38,7 +38,7 @@
 <RichTextEditor
 	bind:this={editor}
 	{value}
-	onChange={(next) => (value = next)}
+	onChange={(next) => { value = next; }}
 	features={DOCUMENT_FEATURES}
 	placeholder="Describe it"
 />

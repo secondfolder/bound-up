@@ -51,7 +51,9 @@ export async function shareInviteLink(
 const CLIPBOARD_TIMEOUT_MS = 2000;
 
 async function writeClipboard(text: string): Promise<boolean> {
-	if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return false;
+	if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+		return false;
+	}
 	try {
 		return await Promise.race([
 			navigator.clipboard.writeText(text).then(() => true),

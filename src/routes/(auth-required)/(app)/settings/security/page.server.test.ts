@@ -1,17 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APIError } from 'better-auth/api';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { currentPasswordWrapParams } from '$lib/crypto/setup';
+import { account, passkey } from '$lib/server/db/schema';
+import { recordPasskeyPrfStatus } from '$lib/server/keys';
+import { FAKE_WRAP_BLOB } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestUser,
 	createTestUserKeys,
 	readWrapRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { FAKE_WRAP_BLOB } from '$lib/testing/crypto';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
-import { currentPasswordWrapParams } from '$lib/crypto/setup';
-import { account, passkey } from '$lib/server/db/schema';
-import { recordPasskeyPrfStatus } from '$lib/server/keys';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;

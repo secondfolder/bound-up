@@ -1,6 +1,7 @@
-import type { Infer } from 'sveltekit-superforms';
-import type { TaskInput } from './tasks';
+import type { z } from 'zod';
+import { assertNever } from './assert-never';
 import type { TaskEditorFormSchema } from './schemas/taskEditorForm';
+import type { TaskInput } from './tasks';
 import type {
 	PartnershipTaskView,
 	SelfTaskView,
@@ -9,9 +10,14 @@ import type {
 	TaskScheduleEnd
 } from './types';
 
-export type TaskEditorFormValues = Infer<TaskEditorFormSchema>;
+// `z.output` rather than superforms' `Infer<>`, which is the same type for a
+// Zod schema: Biome 2.5's type inference recurses on `Infer<>` until it
+// overflows its stack, crashing the whole lint run rather than one rule.
+export type TaskEditorFormValues = z.output<TaskEditorFormSchema>;
 
 type TaskEditableView = SelfTaskView | PartnershipTaskView;
+
+const LINE_BREAK = /\r?\n/;
 
 function parseScheduledOrdinal(
 	value: TaskEditorFormValues['scheduledOrdinal']
@@ -27,12 +33,14 @@ function parseScheduledOrdinal(
 			return 3;
 		case '4':
 			return 4;
+		default:
+			return assertNever(value, 'ordinal');
 	}
 }
 
 function parseCompletionMessages(text: string | undefined): string[] {
 	return (text ?? '')
-		.split(/\r?\n/)
+		.split(LINE_BREAK)
 		.map((value) => value.trim())
 		.filter((value) => value.length > 0);
 }
@@ -80,6 +88,9 @@ export function taskEditorFormValuesFromTask(task: TaskEditableView): TaskEditor
 	values.scheduleMode = task.schedule.mode;
 
 	switch (task.schedule.mode) {
+		case 'one-off':
+			// Nothing beyond the mode itself, which is already set above.
+			break;
 		case 'rolling-window':
 			values.rollingLimitEnabled = task.schedule.limit !== null;
 			values.rollingLimitCompletions = String(task.schedule.limit?.completions ?? 1);
@@ -105,16 +116,7 @@ export function taskEditorFormValuesFromTask(task: TaskEditableView): TaskEditor
 				task.schedule.monthlyPattern?.kind === 'nth-weekday'
 					? task.schedule.monthlyPattern.ordinal
 					: 1;
-			values.scheduledOrdinal =
-				ordinal === -1
-					? '-1'
-					: ordinal === 1
-						? '1'
-						: ordinal === 2
-							? '2'
-							: ordinal === 3
-								? '3'
-								: '4';
+			values.scheduledOrdinal = `${ordinal}` as const;
 			values.scheduledWeekday =
 				task.schedule.monthlyPattern?.kind === 'nth-weekday'
 					? task.schedule.monthlyPattern.weekday
@@ -126,6 +128,8 @@ export function taskEditorFormValuesFromTask(task: TaskEditableView): TaskEditor
 				task.schedule.end.kind === 'count' ? String(task.schedule.end.count) : '1';
 			break;
 		}
+		default:
+			assertNever(task.schedule, 'task schedule');
 	}
 
 	return values;
@@ -153,35 +157,46 @@ function scheduleFromValues(values: TaskEditorFormValues): TaskSchedule {
 				unit: values.afterUnit
 			};
 		case 'scheduled': {
-			const end: TaskScheduleEnd =
-				values.scheduledEndKind === 'until'
-					? { kind: 'until', untilLocal: values.scheduledUntilLocal }
-					: values.scheduledEndKind === 'count'
-						? { kind: 'count', count: Number(values.scheduledCount) }
-						: { kind: 'never' };
-
-			const monthlyPattern: TaskMonthlyPattern | undefined =
-				values.scheduledFrequency === 'month'
-					? values.scheduledMonthlyPatternKind === 'nth-weekday'
-						? {
-								kind: 'nth-weekday',
-								ordinal: parseScheduledOrdinal(values.scheduledOrdinal),
-								weekday: values.scheduledWeekday
-							}
-						: { kind: 'day-of-month', day: Number(values.scheduledDayOfMonth) }
-					: undefined;
-
 			return {
 				mode: 'scheduled',
 				anchorLocal: values.scheduledAnchorLocal,
 				frequency: values.scheduledFrequency,
 				interval: Number(values.scheduledInterval),
 				weekdays: values.scheduledWeekdays,
-				monthlyPattern,
-				end
+				monthlyPattern: monthlyPatternFromValues(values),
+				end: scheduleEndFromValues(values)
 			};
 		}
+		default:
+			return assertNever(values.scheduleMode, 'schedule mode');
 	}
+}
+
+function scheduleEndFromValues(values: TaskEditorFormValues): TaskScheduleEnd {
+	switch (values.scheduledEndKind) {
+		case 'until':
+			return { kind: 'until', untilLocal: values.scheduledUntilLocal };
+		case 'count':
+			return { kind: 'count', count: Number(values.scheduledCount) };
+		case 'never':
+			return { kind: 'never' };
+		default:
+			return assertNever(values.scheduledEndKind, 'schedule end');
+	}
+}
+
+function monthlyPatternFromValues(values: TaskEditorFormValues): TaskMonthlyPattern | undefined {
+	if (values.scheduledFrequency !== 'month') {
+		return undefined;
+	}
+	if (values.scheduledMonthlyPatternKind === 'nth-weekday') {
+		return {
+			kind: 'nth-weekday',
+			ordinal: parseScheduledOrdinal(values.scheduledOrdinal),
+			weekday: values.scheduledWeekday
+		};
+	}
+	return { kind: 'day-of-month', day: Number(values.scheduledDayOfMonth) };
 }
 
 export function taskInputFromEditorForm(values: TaskEditorFormValues): TaskInput {

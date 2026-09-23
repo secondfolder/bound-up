@@ -33,7 +33,7 @@
  *   is a designed screen and not an error state.
  */
 
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { type DBSchema, type IDBPDatabase, openDB } from 'idb';
 import { deviceSealAad } from '../encryption';
 import { importIdentityKey, webCryptoX25519Available } from './identity';
 import { seal, unseal } from './wrap';
@@ -98,13 +98,13 @@ export type NewIdentityInput = {
 };
 
 export type KeyStore = {
-	getIdentity(userId: string): Promise<CachedIdentity | undefined>;
+	getIdentity: (userId: string) => Promise<CachedIdentity | undefined>;
 	/** Stores the identity in the best form available, and returns that form. */
-	putIdentity(value: NewIdentityInput): Promise<CachedIdentity>;
-	getPins(userId: string): Promise<PinRow[]>;
-	putPin(row: PinRow): Promise<void>;
+	putIdentity: (value: NewIdentityInput) => Promise<CachedIdentity>;
+	getPins: (userId: string) => Promise<PinRow[]>;
+	putPin: (row: PinRow) => Promise<void>;
 	/** Everything for one user, on sign-out. */
-	clear(userId: string): Promise<void>;
+	clear: (userId: string) => Promise<void>;
 	readonly tier: KeyTier;
 	/** Whether writes actually persist. False means unlock repeats every load. */
 	readonly durable: boolean;
@@ -127,7 +127,9 @@ export type KeyStore = {
  * a variable, and the `CryptoKey` is the form script cannot exfiltrate.
  */
 async function inMemoryForm(identity: string): Promise<CryptoKey | string> {
-	if (!(await webCryptoX25519Available())) return identity;
+	if (!(await webCryptoX25519Available())) {
+		return identity;
+	}
 	try {
 		return await importIdentityKey(identity);
 	} catch {
@@ -138,7 +140,7 @@ async function inMemoryForm(identity: string): Promise<CryptoKey | string> {
 	}
 }
 
-function describe(error: unknown): string {
+function describeError(error: unknown): string {
 	if (error instanceof DOMException || error instanceof Error) {
 		return `${error.name}: ${error.message}`;
 	}
@@ -155,23 +157,29 @@ function createMemoryStore(fallbackReason: string | null = null): KeyStore {
 		tier: 'memory',
 		durable: false,
 		fallbackReason,
-		async getIdentity(userId) {
-			return identities.get(userId);
+		getIdentity(userId) {
+			return Promise.resolve(identities.get(userId));
 		},
 		async putIdentity({ userId, recipient, identity }) {
 			const value: CachedIdentity = { userId, recipient, key: await inMemoryForm(identity) };
 			identities.set(userId, value);
 			return value;
 		},
-		async getPins(userId) {
-			return [...pins.values()].filter((row) => row.userId === userId);
+		getPins(userId) {
+			return Promise.resolve([...pins.values()].filter((row) => row.userId === userId));
 		},
-		async putPin(row) {
+		putPin(row) {
 			pins.set(row.id, row);
+			return Promise.resolve();
 		},
-		async clear(userId) {
+		clear(userId) {
 			identities.delete(userId);
-			for (const [id, row] of pins) if (row.userId === userId) pins.delete(id);
+			for (const [id, row] of pins) {
+				if (row.userId === userId) {
+					pins.delete(id);
+				}
+			}
+			return Promise.resolve();
 		}
 	};
 }
@@ -224,7 +232,9 @@ function openDatabase(): Promise<IDBPDatabase<KeyDb>> {
  */
 async function deviceKey(db: IDBPDatabase<KeyDb>): Promise<CryptoKey> {
 	const existing = await db.get(DEVICE_STORE, DEVICE_KEY_ID);
-	if (existing) return existing;
+	if (existing) {
+		return existing;
+	}
 
 	// Generated *before* the transaction opens: awaiting a non-IndexedDB promise
 	// inside one lets it auto-commit out from under the rest of the work. The
@@ -259,14 +269,18 @@ function createIndexedDbStore(
 
 		async getIdentity(userId) {
 			const row = await db.get(IDENTITY_STORE, userId);
-			if (!row) return undefined;
+			if (!row) {
+				return;
+			}
 
 			// On the row's shape, not on `tier`: a device that has just been
 			// promoted to tier 1 by an OS update still has to read what it sealed.
 			if (row.key instanceof CryptoKey) {
 				return { userId: row.userId, recipient: row.recipient, key: row.key };
 			}
-			if (typeof row.sealed !== 'string') return undefined;
+			if (typeof row.sealed !== 'string') {
+				return;
+			}
 
 			const identity = await unseal({
 				key: await deviceKey(db),
@@ -277,7 +291,7 @@ function createIndexedDbStore(
 				// The device key is gone or was replaced. This row will never open
 				// again, so drop it rather than let every load retry it.
 				await db.delete(IDENTITY_STORE, userId);
-				return undefined;
+				return;
 			}
 			return { userId: row.userId, recipient: row.recipient, key: await inMemoryForm(identity) };
 		},
@@ -302,7 +316,7 @@ function createIndexedDbStore(
 			return { userId, recipient, key: await inMemoryForm(identity) };
 		},
 
-		async getPins(userId) {
+		getPins(userId) {
 			return db.getAllFromIndex(PIN_STORE, 'userId', userId);
 		},
 
@@ -332,7 +346,7 @@ async function probeClone(
 		const readBack = await write();
 		return readBack instanceof CryptoKey ? null : 'read back something other than a CryptoKey';
 	} catch (error) {
-		return describe(error);
+		return describeError(error);
 	} finally {
 		try {
 			await db.delete(IDENTITY_STORE, PROBE_ID);
@@ -378,7 +392,9 @@ async function chooseTier(
 		});
 		return (await db.get(IDENTITY_STORE, PROBE_ID))?.key;
 	});
-	if (cryptoKeyFailure === null) return { tier: 'crypto-key', reason: null };
+	if (cryptoKeyFailure === null) {
+		return { tier: 'crypto-key', reason: null };
+	}
 
 	const sealedFailure = await probeClone(db, async () => {
 		const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
@@ -388,7 +404,9 @@ async function chooseTier(
 		await db.put(DEVICE_STORE, key, PROBE_ID);
 		return db.get(DEVICE_STORE, PROBE_ID);
 	});
-	if (sealedFailure === null) return { tier: 'sealed', reason: cryptoKeyFailure };
+	if (sealedFailure === null) {
+		return { tier: 'sealed', reason: cryptoKeyFailure };
+	}
 
 	return { tier: 'memory', reason: `${cryptoKeyFailure} (and AES-GCM: ${sealedFailure})` };
 }
@@ -397,20 +415,25 @@ let storePromise: Promise<KeyStore> | undefined;
 
 /** The store for this device, probed once. */
 export function keyStore(): Promise<KeyStore> {
-	return (storePromise ??= (async () => {
-		if (typeof indexedDB === 'undefined') return createMemoryStore('no-indexeddb');
+	storePromise ??= (async () => {
+		if (typeof indexedDB === 'undefined') {
+			return createMemoryStore('no-indexeddb');
+		}
 
 		try {
 			const db = await openDatabase();
 			const { tier, reason } = await chooseTier(db);
-			if (tier === 'memory') return createMemoryStore(reason);
+			if (tier === 'memory') {
+				return createMemoryStore(reason);
+			}
 			return createIndexedDbStore(db, tier, reason);
 		} catch (error) {
 			// A blocked open, private browsing, a quota refusal — all of them mean
 			// the same thing here, and all of them are survivable.
-			return createMemoryStore(describe(error));
+			return createMemoryStore(describeError(error));
 		}
-	})());
+	})();
+	return storePromise;
 }
 
 /** Test seam: forget the probed backend. */

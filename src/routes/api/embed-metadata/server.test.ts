@@ -14,9 +14,7 @@ import { POST } from './+server';
 const ada = { id: 'user-ada', name: 'Ada', email: 'ada@example.test' } as TestUser;
 
 function postWith(urls: string[], fetchFn: typeof fetch) {
-	const event = fakeEvent({ db: undefined as never, user: ada, json: { urls } });
-	event.fetch = fetchFn;
-	return POST(event);
+	return POST(fakeEvent({ user: ada, json: { urls }, fetch: fetchFn }));
 }
 
 describe('POST /api/embed-metadata', () => {
@@ -59,8 +57,7 @@ describe('POST /api/embed-metadata', () => {
 	});
 
 	it('refuses a caller with no session', async () => {
-		const event = fakeEvent({ db: undefined as never, user: null, json: { urls: [] } });
-		const result = await runAndCatch(() => POST(event));
+		const result = await runAndCatch(() => POST(fakeEvent({ user: null, json: { urls: [] } })));
 		expect(result).toMatchObject({ status: 401 });
 	});
 });

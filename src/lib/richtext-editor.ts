@@ -1,3 +1,26 @@
+import { createEmptyHistoryState, registerHistory } from '@lexical/history';
+import {
+	$createLinkNode,
+	$isAutoLinkNode,
+	$isLinkNode,
+	AutoLinkNode,
+	type LinkMatcher,
+	LinkNode,
+	registerAutoLink
+} from '@lexical/link';
+import { ListItemNode, ListNode, registerList } from '@lexical/list';
+import {
+	BOLD_STAR,
+	INLINE_CODE,
+	ITALIC_UNDERSCORE,
+	ORDERED_LIST,
+	registerMarkdownShortcuts,
+	STRIKETHROUGH,
+	type TextFormatTransformer,
+	type Transformer,
+	UNORDERED_LIST
+} from '@lexical/markdown';
+import { registerRichText } from '@lexical/rich-text';
 import {
 	$applyNodeReplacement,
 	$findMatchingParent,
@@ -6,9 +29,9 @@ import {
 	$isElementNode,
 	$isRangeSelection,
 	COMMAND_PRIORITY_NORMAL,
-	FORMAT_TEXT_COMMAND,
 	createEditor,
 	type EditorState,
+	FORMAT_TEXT_COMMAND,
 	type Klass,
 	type LexicalEditor,
 	type LexicalNode,
@@ -16,34 +39,12 @@ import {
 	type SerializedLexicalNode,
 	type Spread
 } from 'lexical';
-import { registerRichText } from '@lexical/rich-text';
-import { registerHistory, createEmptyHistoryState } from '@lexical/history';
-import { ListItemNode, ListNode, registerList } from '@lexical/list';
-import {
-	AutoLinkNode,
-	LinkNode,
-	$createLinkNode,
-	$isAutoLinkNode,
-	$isLinkNode,
-	registerAutoLink,
-	type LinkMatcher
-} from '@lexical/link';
-import {
-	BOLD_STAR,
-	INLINE_CODE,
-	ITALIC_UNDERSCORE,
-	ORDERED_LIST,
-	STRIKETHROUGH,
-	UNORDERED_LIST,
-	registerMarkdownShortcuts,
-	type TextFormatTransformer,
-	type Transformer
-} from '@lexical/markdown';
 import { find as findLinks } from 'linkifyjs';
 import { embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
-import { WidgetNode, registerWidgetSelection } from '$lib/richtext-widgets';
-import { EDITOR_NODE_REPLACEMENTS, EMBED_OFFER_CLASS } from '$lib/lexical/nodes';
+import { EDITOR_NODE_REPLACEMENTS } from '$lib/lexical/nodes';
+import { EMBED_OFFER_CLASS } from '$lib/lexical/nodes/shared/embed-offer';
 import type { RichTextDocument, RichTextInlineNode } from '$lib/richtext';
+import { registerWidgetSelection, WidgetNode } from '$lib/richtext-widgets';
 
 /**
  * The editor half of rich text: the node set, the typing shortcuts, and the
@@ -124,7 +125,7 @@ export class EmbedNode extends WidgetNode<string> {
 		return this.__url;
 	}
 
-	getWidgetClass(): string {
+	override getWidgetClass(): string {
 		return 'richtext-embed';
 	}
 
@@ -230,7 +231,9 @@ export const linkifyMatcher: LinkMatcher = (text: string) => {
 	const match = findLinks(text).find(
 		(candidate) => candidate.type === 'url' && isSafeHttpUrl(candidate.href)
 	);
-	if (!match) return null;
+	if (!match) {
+		return null;
+	}
 	return {
 		index: match.start,
 		length: match.end - match.start,
@@ -259,14 +262,20 @@ export function $insertEmbedForLink(link: LexicalNode): boolean {
 
 function $insertEmbedBefore(link: AutoLinkNode | LinkNode): boolean {
 	const url = link.getURL();
-	if (!embedSpecFor(url)) return false;
+	if (!embedSpecFor(url)) {
+		return false;
+	}
 
 	const block = link.getParent();
-	if (!block || !$isElementNode(block) || block.getParent() !== $getRoot()) return false;
+	if (!(block && $isElementNode(block)) || block.getParent() !== $getRoot()) {
+		return false;
+	}
 
 	// Idempotent, and document-wide rather than per line: typing the same URL
 	// again, or leaving and re-entering the link, must not stack duplicates.
-	if ($embeddedUrls().has(url)) return false;
+	if ($embeddedUrls().has(url)) {
+		return false;
+	}
 
 	const lineStart = $lineStartFor(link);
 	// When the link *is* the start of its line the embed lands directly in
@@ -313,9 +322,13 @@ function $settleLink(link: AutoLinkNode): LinkNode {
 export function settleLinksAfterEmbeds(doc: RichTextDocument): RichTextDocument {
 	let changed = false;
 	const children = doc.root.children.map((block) => {
-		if (block.type !== 'paragraph') return block;
+		if (block.type !== 'paragraph') {
+			return block;
+		}
 		const nodes = block.children.map((node, index) => {
-			if (node.type !== 'autolink' || block.children[index - 1]?.type !== 'embed') return node;
+			if (node.type !== 'autolink' || block.children[index - 1]?.type !== 'embed') {
+				return node;
+			}
 			changed = true;
 			// `isUnlinked` is an auto-link's flag and means nothing on a link, so
 			// it goes rather than travelling along as dead state.
@@ -342,7 +355,9 @@ export function settleLinksAfterEmbeds(doc: RichTextDocument): RichTextDocument 
 function $lineStartFor(link: LexicalNode): LexicalNode {
 	let candidate: LexicalNode = link;
 	for (const previous of link.getPreviousSiblings().reverse()) {
-		if (previous.getType() === 'linebreak' || $isEmbedNode(previous)) return candidate;
+		if (previous.getType() === 'linebreak' || $isEmbedNode(previous)) {
+			return candidate;
+		}
 		candidate = previous;
 	}
 	return candidate;
@@ -371,12 +386,22 @@ export function $autoLinksAwaitingEmbeds(
 	const embedded = $embeddedUrls();
 	const waiting: AutoLinkNode[] = [];
 	for (const block of $getRoot().getChildren()) {
-		if (!$isElementNode(block)) continue;
+		if (!$isElementNode(block)) {
+			continue;
+		}
 		for (const child of block.getChildren()) {
-			if (!$isAutoLinkNode(child) || child.getKey() === exceptKey) continue;
-			if (dismissed.has(child.getURL())) continue;
-			if (!embedSpecFor(child.getURL())) continue;
-			if (embedded.has(child.getURL())) continue;
+			if (!$isAutoLinkNode(child) || child.getKey() === exceptKey) {
+				continue;
+			}
+			if (dismissed.has(child.getURL())) {
+				continue;
+			}
+			if (!embedSpecFor(child.getURL())) {
+				continue;
+			}
+			if (embedded.has(child.getURL())) {
+				continue;
+			}
 			waiting.push(child);
 		}
 	}
@@ -396,11 +421,19 @@ export function $autoLinksAwaitingEmbeds(
  */
 export function $insertEmbedForUrl(url: string): boolean {
 	for (const block of $getRoot().getChildren()) {
-		if (!$isElementNode(block)) continue;
+		if (!$isElementNode(block)) {
+			continue;
+		}
 		for (const child of block.getChildren()) {
-			if (!$isLinkNode(child) && !$isAutoLinkNode(child)) continue;
-			if (child.getURL() !== url) continue;
-			if ($insertEmbedBefore(child)) return true;
+			if (!($isLinkNode(child) || $isAutoLinkNode(child))) {
+				continue;
+			}
+			if (child.getURL() !== url) {
+				continue;
+			}
+			if ($insertEmbedBefore(child)) {
+				return true;
+			}
 		}
 	}
 	return false;
@@ -413,10 +446,13 @@ export function $embeddedUrls(): Set<string> {
 		// Root level should not happen any more — `parseStoredRichText` moves
 		// legacy block embeds inline before the editor ever sees them — but it
 		// costs one branch to stay right if one slips through.
-		if ($isEmbedNode(block)) urls.add(block.getUrl());
-		else if ($isElementNode(block)) {
+		if ($isEmbedNode(block)) {
+			urls.add(block.getUrl());
+		} else if ($isElementNode(block)) {
 			for (const child of block.getChildren()) {
-				if ($isEmbedNode(child)) urls.add(child.getUrl());
+				if ($isEmbedNode(child)) {
+					urls.add(child.getUrl());
+				}
 			}
 		}
 	}
@@ -427,9 +463,13 @@ export function $embeddedUrls(): Set<string> {
 export function $linkedUrls(): Set<string> {
 	const urls = new Set<string>();
 	for (const block of $getRoot().getChildren()) {
-		if (!$isElementNode(block)) continue;
+		if (!$isElementNode(block)) {
+			continue;
+		}
 		for (const child of block.getChildren()) {
-			if ($isLinkNode(child) || $isAutoLinkNode(child)) urls.add(child.getURL());
+			if ($isLinkNode(child) || $isAutoLinkNode(child)) {
+				urls.add(child.getURL());
+			}
 		}
 	}
 	return urls;
@@ -453,14 +493,22 @@ export function trackEmbedDismissals(
 ): void {
 	const had = before.read($embeddedUrls);
 	const has = after.read($embeddedUrls);
-	if (had.size === 0 && has.size === 0) return;
+	if (had.size === 0 && has.size === 0) {
+		return;
+	}
 
-	for (const url of has) dismissed.delete(url);
-	if (had.size === 0) return;
+	for (const url of has) {
+		dismissed.delete(url);
+	}
+	if (had.size === 0) {
+		return;
+	}
 
 	const linked = after.read($linkedUrls);
 	for (const url of had) {
-		if (!has.has(url) && linked.has(url)) dismissed.add(url);
+		if (!has.has(url) && linked.has(url)) {
+			dismissed.add(url);
+		}
 	}
 }
 
@@ -493,11 +541,15 @@ export function registerEmbedOffers(editor: LexicalEditor): () => void {
 				: null;
 			const caretUrl = $isLinkNode(caretLink) ? caretLink.getURL() : null;
 			for (const block of $getRoot().getChildren()) {
-				if (!$isElementNode(block)) continue;
+				if (!$isElementNode(block)) {
+					continue;
+				}
 				for (const child of block.getChildren()) {
-					if (!$isLinkNode(child)) continue;
+					if (!$isLinkNode(child)) {
+						continue;
+					}
 					const url = child.getURL();
-					const offered = !!embedSpecFor(url) && !embedded.has(url) && url !== caretUrl;
+					const offered = embedSpecFor(url) !== null && !embedded.has(url) && url !== caretUrl;
 					editor.getElementByKey(child.getKey())?.classList.toggle(EMBED_OFFER_CLASS, offered);
 				}
 			}
@@ -594,12 +646,16 @@ export function createRichTextEditor(options: {
 		)
 	];
 
-	if (options.features.includes('list')) teardown.push(registerList(editor));
+	if (options.features.includes('list')) {
+		teardown.push(registerList(editor));
+	}
 
 	return {
 		editor,
 		destroy: () => {
-			for (const off of teardown) off();
+			for (const off of teardown) {
+				off();
+			}
 		}
 	};
 }

@@ -36,15 +36,18 @@ import { loadAge } from './identity';
  * Auth as `rpID` — a credential registered under one is invisible to the other.
  */
 export function currentRpId(): string {
-	return window.location.hostname;
+	return location.hostname;
 }
 
 /** Whether this browser could be asked at all. Says nothing about PRF. */
 export function passkeysAvailable(): boolean {
 	return (
-		typeof window !== 'undefined' &&
+		// `PublicKeyCredential` existing is itself the browser check: nothing
+		// else defines it.
 		typeof PublicKeyCredential !== 'undefined' &&
-		navigator.credentials != null
+		typeof navigator !== 'undefined' &&
+		navigator.credentials !== undefined &&
+		navigator.credentials !== null
 	);
 }
 
@@ -97,9 +100,15 @@ export function encodeAgeCredentialIdentity(input: {
 // text strings and arrays of text strings, with 16-bit arguments. Mirrors
 // `cbor.ts` in age-encryption, which is not exported from the package.
 function cborHead(major: number, length: number): number[] {
-	if (length <= 23) return [(major << 5) | length];
-	if (length <= 0xff) return [(major << 5) | 24, length];
-	if (length <= 0xffff) return [(major << 5) | 25, length >> 8, length & 0xff];
+	if (length <= 23) {
+		return [(major << 5) | length];
+	}
+	if (length <= 0xff) {
+		return [(major << 5) | 24, length];
+	}
+	if (length <= 0xff_ff) {
+		return [(major << 5) | 25, length >> 8, length & 0xff];
+	}
 	throw new Error('cbor: argument too large');
 }
 

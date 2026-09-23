@@ -120,7 +120,7 @@
 						name="control"
 						value={option.value}
 						checked={$form.control === option.value}
-						onchange={() => ($form.control = option.value)}
+						onchange={() => { $form.control = option.value; }}
 					/>
 					{option.label}
 				</label>

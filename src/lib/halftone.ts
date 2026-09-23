@@ -1,12 +1,15 @@
+const TRAILING_ZEROES = /\.0+$|(?<=\..*?)0+$/g;
+const TRAILING_POINT = /\.$/;
+const HAS_POINT_OR_EXPONENT = /[.eE]/;
 export type HalftonePattern = 'circle' | 'line';
 
-export interface NormalizedRgbaImage {
+export type NormalizedRgbaImage = {
 	width: number;
 	height: number;
 	rgba: Float32Array;
-}
+};
 
-export interface HalftoneRenderOptions {
+export type HalftoneRenderOptions = {
 	pattern?: HalftonePattern;
 	angleRadians?: number;
 	/** 0..1, matching Affinity's 0..100 contrast slider divided by 100. */
@@ -19,7 +22,7 @@ export interface HalftoneRenderOptions {
 	drift?: number;
 	centerX?: number;
 	centerY?: number;
-}
+};
 
 export const HALFTONE_CAPTURE_IGNORE_SELECTOR = '[data-halftone-ignore="true"]';
 
@@ -197,7 +200,9 @@ export function halftoneCoordAlong(
 ): number {
 	const deltaX = x - centerX;
 	const deltaY = y - centerY;
-	if (pattern === 'circle') return Math.hypot(deltaX, deltaY);
+	if (pattern === 'circle') {
+		return Math.hypot(deltaX, deltaY);
+	}
 	return deltaX * Math.sin(angleRadians) + deltaY * Math.cos(angleRadians);
 }
 
@@ -266,8 +271,8 @@ export function renderSoftLightHalftoneImage(
 
 function formatFloat(value: number): string {
 	const fixed = value.toFixed(7);
-	const trimmed = fixed.replace(/\.0+$|(?<=\..*?)0+$/g, '').replace(/\.$/, '');
-	return /[.eE]/.test(trimmed) ? trimmed : `${trimmed}.0`;
+	const trimmed = fixed.replace(TRAILING_ZEROES, '').replace(TRAILING_POINT, '');
+	return HAS_POINT_OR_EXPONENT.test(trimmed) ? trimmed : `${trimmed}.0`;
 }
 
 /**

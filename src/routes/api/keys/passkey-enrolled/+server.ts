@@ -45,10 +45,14 @@ const bodySchema = z.object({
  */
 export const POST: RequestHandler = async ({ locals, request }) => {
 	// See the note in ../unlock-bundle: endpoints carry their own auth check.
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-	if (!parsed.success) error(400, 'Malformed request');
+	if (!parsed.success) {
+		error(400, 'Malformed request');
+	}
 	const { passkeyId, prfStatus, wrap } = parsed.data;
 
 	// Scoped to the owner inside the query, so a passkey id belonging to someone
@@ -64,10 +68,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		// A wrap with no identity behind it is a blob nobody can ever check
 		// against anything, and it would make the list of ways to unlock a lie.
 		const { recipient } = await getUnlockBundle(locals.db, locals.user.id);
-		if (!recipient) error(409, 'Set up encrypted messages first');
+		if (!recipient) {
+			error(409, 'Set up encrypted messages first');
+		}
 
 		const params = parseKeyWrapParams(wrap.params);
-		if (!params) error(400, 'Malformed key wrap parameters');
+		if (!params) {
+			error(400, 'Malformed key wrap parameters');
+		}
 
 		await addWrap(locals.db, locals.user.id, {
 			type: params.type,

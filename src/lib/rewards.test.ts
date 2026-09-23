@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { PartnershipRecord } from './partnership';
 import {
 	canClaimFromPartnership,
 	canClaimPartnershipReward,
@@ -6,7 +7,6 @@ import {
 	canSetPartnershipCredits,
 	type PartnershipRewardRecord
 } from './rewards';
-import type { PartnershipRecord } from './partnership';
 
 const INVITER = 'user-inviter';
 const INVITEE = 'user-invitee';
@@ -39,7 +39,7 @@ function reward(overrides: Partial<PartnershipRewardRecord> = {}): PartnershipRe
 }
 
 describe('canManagePartnershipRewards', () => {
-	test('matches the existing control rule', () => {
+	it('matches the existing control rule', () => {
 		expect(canManagePartnershipRewards(partnership({ control: 'both' }), INVITER)).toBe(true);
 		expect(canManagePartnershipRewards(partnership({ control: 'both' }), INVITEE)).toBe(true);
 		expect(canManagePartnershipRewards(partnership({ control: 'inviter' }), INVITER)).toBe(true);
@@ -48,19 +48,19 @@ describe('canManagePartnershipRewards', () => {
 });
 
 describe('canClaimFromPartnership', () => {
-	test('lets the non-controller claim when control is one-sided', () => {
+	it('lets the non-controller claim when control is one-sided', () => {
 		expect(canClaimFromPartnership(partnership({ control: 'inviter' }), INVITEE)).toBe(true);
 		expect(canClaimFromPartnership(partnership({ control: 'inviter' }), INVITER)).toBe(false);
 		expect(canClaimFromPartnership(partnership({ control: 'invitee' }), INVITER)).toBe(true);
 		expect(canClaimFromPartnership(partnership({ control: 'invitee' }), INVITEE)).toBe(false);
 	});
 
-	test('lets both members claim under shared control', () => {
+	it('lets both members claim under shared control', () => {
 		expect(canClaimFromPartnership(partnership({ control: 'both' }), INVITER)).toBe(true);
 		expect(canClaimFromPartnership(partnership({ control: 'both' }), INVITEE)).toBe(true);
 	});
 
-	test('refuses pending links and strangers', () => {
+	it('refuses pending links and strangers', () => {
 		expect(
 			canClaimFromPartnership(partnership({ status: 'pending', inviteeId: null }), INVITER)
 		).toBe(false);
@@ -69,14 +69,14 @@ describe('canClaimFromPartnership', () => {
 });
 
 describe('canSetPartnershipCredits', () => {
-	test("lets the controller set only the other person's credits", () => {
+	it("lets the controller set only the other person's credits", () => {
 		const row = partnership({ control: 'inviter' });
 		expect(canSetPartnershipCredits(row, INVITER, INVITEE)).toBe(true);
 		expect(canSetPartnershipCredits(row, INVITER, INVITER)).toBe(false);
 		expect(canSetPartnershipCredits(row, INVITEE, INVITER)).toBe(false);
 	});
 
-	test('keeps the same rule under shared control', () => {
+	it('keeps the same rule under shared control', () => {
 		const row = partnership({ control: 'both' });
 		expect(canSetPartnershipCredits(row, INVITER, INVITEE)).toBe(true);
 		expect(canSetPartnershipCredits(row, INVITEE, INVITER)).toBe(true);
@@ -84,13 +84,13 @@ describe('canSetPartnershipCredits', () => {
 });
 
 describe('canClaimPartnershipReward', () => {
-	test('blocks the author even under shared control', () => {
+	it('blocks the author even under shared control', () => {
 		expect(
 			canClaimPartnershipReward(reward({ control: 'both', createdByUserId: INVITER }), INVITER, 10)
 		).toBe(false);
 	});
 
-	test('lets the other member claim when control allows it and credits are enough', () => {
+	it('lets the other member claim when control allows it and credits are enough', () => {
 		expect(
 			canClaimPartnershipReward(
 				reward({ control: 'invitee', createdByUserId: INVITEE }),
@@ -103,7 +103,7 @@ describe('canClaimPartnershipReward', () => {
 		).toBe(true);
 	});
 
-	test('rejects inactive rewards and insufficient credits', () => {
+	it('rejects inactive rewards and insufficient credits', () => {
 		expect(canClaimPartnershipReward(reward({ active: false }), INVITEE, 10)).toBe(false);
 		expect(canClaimPartnershipReward(reward({ cost: 4 }), INVITEE, 3)).toBe(false);
 	});

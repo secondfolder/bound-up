@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { attachmentKey, type MediaStore, partnershipMediaPrefix } from './index';
 import { createLocalStore } from './local';
-import { attachmentKey, partnershipMediaPrefix, type MediaStore } from './index';
 
 let root: string;
 let store: MediaStore;
@@ -12,7 +12,9 @@ const stream = (bytes: Uint8Array) =>
 	new Blob([bytes as BlobPart]).stream() as ReadableStream<Uint8Array>;
 
 async function read(result: Awaited<ReturnType<MediaStore['get']>>): Promise<Uint8Array> {
-	if (!result) throw new Error('expected an object');
+	if (!result) {
+		throw new Error('expected an object');
+	}
 	return new Uint8Array(await new Response(result.body).arrayBuffer());
 }
 
@@ -74,7 +76,9 @@ describe('createLocalStore', () => {
 	 */
 	it('refuses a key that would escape the media root', async () => {
 		const outside = path.join(root, '..', 'escaped.txt');
-		await writeFile(outside, 'secret').catch(() => {});
+		await writeFile(outside, 'secret').catch(() => {
+			// Best effort: the refusal below is what is under test, not this write.
+		});
 		try {
 			for (const key of [
 				'../escaped.txt',

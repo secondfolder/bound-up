@@ -31,9 +31,7 @@
 	const balances = $derived(rewards.balances.filter((balance) => balance.credits > 0));
 
 	const hasBody = $derived(
-		rewards.viewerActs
-			? balances.length > 0 || rewards.claimable.length > 0
-			: rewards.activeCount > 0
+		rewards.viewerActs ? balances.length > 0 || rewards.claimable.length > 0 : rewards.activeCount > 0
 	);
 </script>
 

@@ -29,13 +29,13 @@
  *   Stopping there would mean no restore ever completes for those two.
  */
 
+import type { MessageMetadataPayload, MessagePayload, ReactionPayload } from '../crypto/messages';
 import {
 	decryptMessageMetadata,
 	decryptPayload,
 	encryptMessageMetadata,
 	encryptPayload
 } from '../crypto/messages';
-import type { MessageMetadataPayload, MessagePayload, ReactionPayload } from '../crypto/messages';
 import { unlockedIdentity } from '../crypto/session.svelte';
 
 type RestorePage = {
@@ -125,7 +125,9 @@ export async function runHistoryRestore(
 			progress.done += messages.length + reactions.length;
 			onProgress?.({ ...progress });
 
-			if (final) return { ok: true, ...progress };
+			if (final) {
+				return { ok: true, ...progress };
+			}
 			cursor = page.nextCursor;
 		}
 	} catch (error) {
@@ -144,10 +146,14 @@ async function fetchPage(
 ): Promise<RestorePage> {
 	const url = new URL(`/api/partnerships/${partnershipId}/restore`, location.origin);
 	url.searchParams.set('requestId', requestId);
-	if (cursor) url.searchParams.set('cursor', cursor);
+	if (cursor) {
+		url.searchParams.set('cursor', cursor);
+	}
 
 	const response = await fetch(url);
-	if (!response.ok) throw new Error(`Could not read the history (${response.status})`);
+	if (!response.ok) {
+		throw new Error(`Could not read the history (${response.status})`);
+	}
 	return response.json();
 }
 
@@ -161,7 +167,9 @@ async function applyPage(
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ requestId, ...body })
 	});
-	if (!response.ok) throw new Error(`Could not save the restored history (${response.status})`);
+	if (!response.ok) {
+		throw new Error(`Could not save the restored history (${response.status})`);
+	}
 }
 
 /** Says no, so the requester is told rather than left waiting. */

@@ -1,12 +1,12 @@
 <script lang="ts">
+	import { superForm } from 'sveltekit-superforms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerFields from '$lib/components/PartnerFields.svelte';
 	import { shareInviteLink } from '$lib/share';
-	import { superForm } from 'sveltekit-superforms';
-	import type { PageData } from './$types';
 	import type { InviteCreated } from './+page.server';
+	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const backHref = resolve('/(auth-required)/(app)/settings/partners');
@@ -22,7 +22,9 @@
 			// `message()` is how the action smuggles the link back without a
 			// redirect; superforms hands it over on `form.message`.
 			const created = form.message as InviteCreated | undefined;
-			if (!created) return;
+			if (!created) {
+				return;
+			}
 
 			// Started, deliberately NOT awaited. The share sheet has to open inside
 			// the click's transient user activation, but it stays open until the

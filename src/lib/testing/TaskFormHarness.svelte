@@ -3,7 +3,7 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import TaskForm from '$lib/components/TaskForm.svelte';
-	import { taskEditorFormSchema, type TaskEditorFormSchema } from '$lib/schemas/taskEditorForm';
+	import { type TaskEditorFormSchema, taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
 
 	type TimeZoneContext = {
 		viewerUserId: string;

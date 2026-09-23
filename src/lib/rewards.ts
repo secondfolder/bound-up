@@ -1,4 +1,4 @@
-import { canEditPartnership, roleOf, type PartnershipRecord } from './partnership';
+import { canEditPartnership, type PartnershipRecord, roleOf } from './partnership';
 
 /** The editable fields on a reward in either scope. */
 export type RewardInput = {
@@ -35,7 +35,9 @@ export function canClaimFromPartnership(
 	userId: string
 ): boolean {
 	const role = roleOf(record, userId);
-	if (!role || record.status !== 'accepted') return false;
+	if (!role || record.status !== 'accepted') {
+		return false;
+	}
 	return record.control === 'both' || record.control !== role;
 }
 
@@ -45,10 +47,16 @@ export function canSetPartnershipCredits(
 	actorUserId: string,
 	targetUserId: string
 ): boolean {
-	if (!canManagePartnershipRewards(record, actorUserId)) return false;
-	if (actorUserId === targetUserId) return false;
+	if (!canManagePartnershipRewards(record, actorUserId)) {
+		return false;
+	}
+	if (actorUserId === targetUserId) {
+		return false;
+	}
 	const actorRole = roleOf(record, actorUserId);
-	if (!actorRole || record.status !== 'accepted') return false;
+	if (!actorRole || record.status !== 'accepted') {
+		return false;
+	}
 	const counterpartId = actorRole === 'inviter' ? record.inviteeId : record.inviterId;
 	return counterpartId === targetUserId;
 }
@@ -64,8 +72,14 @@ export function canClaimPartnershipReward(
 	viewerId: string,
 	availableCredits: number
 ): boolean {
-	if (!canClaimFromPartnership(record, viewerId)) return false;
-	if (!record.active) return false;
-	if (record.createdByUserId === viewerId) return false;
+	if (!canClaimFromPartnership(record, viewerId)) {
+		return false;
+	}
+	if (!record.active) {
+		return false;
+	}
+	if (record.createdByUserId === viewerId) {
+		return false;
+	}
 	return availableCredits >= record.cost;
 }

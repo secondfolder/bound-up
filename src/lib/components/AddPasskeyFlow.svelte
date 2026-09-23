@@ -1,27 +1,27 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import PasswordField from './PasswordField.svelte';
-	import PrfProviderList from './PrfProviderList.svelte';
-	import {
-		recordEnrolment,
-		registerPasskey,
-		renamePasskey,
-		sealToPasskey,
-		verifyPasswordWithServer,
-		verdictFor,
-		type PasskeyRegistration,
-		type SealResult
-	} from '$lib/crypto/passkey-enrolment';
 	import {
 		deriveAuthSecret,
 		deriveMasterKey,
-		webCryptoAvailable,
-		WEBCRYPTO_UNAVAILABLE
+		WEBCRYPTO_UNAVAILABLE,
+		webCryptoAvailable
 	} from '$lib/crypto/kdf';
+	import {
+		type PasskeyRegistration,
+		recordEnrolment,
+		registerPasskey,
+		renamePasskey,
+		type SealResult,
+		sealToPasskey,
+		verdictFor,
+		verifyPasswordWithServer
+	} from '$lib/crypto/passkey-enrolment';
 	import { openIdentityWithPassword } from '$lib/crypto/setup';
-	import { providerForAaguid } from '$lib/passkey-providers';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
+	import { providerForAaguid } from '$lib/passkey-providers';
 	import type { KeyWrapView } from '$lib/types';
+	import PasswordField from './PasswordField.svelte';
+	import PrfProviderList from './PrfProviderList.svelte';
 
 	/**
 	 * Adding a passkey: password first, then the credential, then the seal.
@@ -54,7 +54,7 @@
 		recipient,
 		wraps,
 		hasPassword,
-		onDone = undefined
+		onDone
 	}: {
 		/**
 		 * Only the email, because only the KDF needs it — the account is settled
@@ -72,7 +72,7 @@
 	type Stage = 'idle' | 'password' | 'working' | 'name';
 	let stage: Stage = $state('idle');
 	let busyLabel = $state('');
-	let error = $state<string | null>(null);
+	let failure = $state<string | null>(null);
 	let passwordErrors = $state<string[] | undefined>(undefined);
 
 	let password = $state('');
@@ -115,7 +115,7 @@
 	 * trigger and this component owns every state in between.
 	 */
 	export function start(withPassword?: string) {
-		error = null;
+		failure = null;
 		passwordErrors = undefined;
 		registration = null;
 		seal = null;
@@ -124,7 +124,7 @@
 		supplied = withPassword ?? null;
 
 		if (!webCryptoAvailable()) {
-			error = WEBCRYPTO_UNAVAILABLE;
+			failure = WEBCRYPTO_UNAVAILABLE;
 			stage = 'password';
 			return;
 		}
@@ -148,7 +148,9 @@
 
 	async function onPasswordSubmit(event: SubmitEvent) {
 		event.preventDefault();
-		if (password.length === 0) return;
+		if (password.length === 0) {
+			return;
+		}
 		const entered = password;
 		// Never left in the box: on success it is not needed, and on failure
 		// leaving it there invites a retry of the same wrong value.
@@ -158,7 +160,7 @@
 
 	async function run(entered: string) {
 		stage = 'working';
-		error = null;
+		failure = null;
 		passwordErrors = undefined;
 
 		try {
@@ -177,8 +179,10 @@
 						recipient,
 						wraps
 					});
-					if (!opened) return refusePassword();
-					identity = opened.identity;
+					if (!opened) {
+						return refusePassword();
+					}
+					({ identity } = opened);
 				}
 
 				const master = await deriveMasterKey(entered, user.email, MASTER_KEY_VERSIONS[0]);
@@ -219,7 +223,7 @@
 			await invalidateAll();
 		} catch (caught) {
 			console.error(caught);
-			error = caught instanceof Error ? caught.message : 'Could not add that passkey';
+			failure = caught instanceof Error ? caught.message : 'Could not add that passkey';
 			// Back to the prompt only when the password is what failed. A cancelled
 			// ceremony is not a password problem, and asking for it again would say
 			// it was.
@@ -250,9 +254,7 @@
 	 * `navigator.platform` is the same one the old code used.
 	 */
 	function defaultName(): string {
-		return (
-			provider?.name ?? `${navigator.platform || 'Device'} — ${new Date().toLocaleDateString()}`
-		);
+		return provider?.name ?? `${navigator.platform || 'Device'} — ${new Date().toLocaleDateString()}`;
 	}
 
 	async function saveName() {
@@ -274,7 +276,7 @@
 				// Cosmetic: the passkey works, it just keeps a duller label. Worth
 				// saying, not worth undoing anything for.
 				console.error(caught);
-				error = 'That passkey was added, but could not be renamed.';
+				failure = 'That passkey was added, but could not be renamed.';
 			}
 		}
 		onDone?.();
@@ -295,7 +297,7 @@
 				autocomplete="current-password"
 				errors={passwordErrors}
 			/>
-			{#if error}<p class="invalid">{error}</p>{/if}
+			{#if failure}<p class="invalid">{failure}</p>{/if}
 			<div class="actions">
 				<!-- disabled is never `x || undefined` — invariant 11. -->
 				<wa-button type="submit" variant="brand">Continue</wa-button>
@@ -348,7 +350,7 @@
 			{/if}
 
 			<wa-input bind:this={nameHost} label="Name" value={name} data-field="passkeyName"></wa-input>
-			{#if error}<p class="invalid">{error}</p>{/if}
+			{#if failure}<p class="invalid">{failure}</p>{/if}
 			<div class="actions">
 				<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
 				<wa-button variant="brand" onclick={saveName}>Done</wa-button>
@@ -357,8 +359,8 @@
 	</wa-dialog>
 {/if}
 
-{#if stage === 'idle' && error}
-	<p class="invalid">{error}</p>
+{#if stage === 'idle' && failure}
+	<p class="invalid">{failure}</p>
 {/if}
 
 <style>

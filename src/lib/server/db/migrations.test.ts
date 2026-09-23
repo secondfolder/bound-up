@@ -1,7 +1,7 @@
-import { createClient, type Client } from '@libsql/client';
-import { afterEach, expect, test } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { type Client, createClient } from '@libsql/client';
+import { afterEach, expect, test } from 'vitest';
 
 let client: Client | null = null;
 

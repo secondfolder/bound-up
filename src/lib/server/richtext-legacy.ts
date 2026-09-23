@@ -1,4 +1,5 @@
 import { and, eq, notLike } from 'drizzle-orm';
+import { assertNever } from '../assert-never';
 import type { Db } from './db';
 import { partnershipRewards, partnershipTasks, selfRewards, selfTasks } from './db/schema';
 import { requireRewardMembership } from './rewards';
@@ -28,7 +29,10 @@ import { requireTaskMembership } from './tasks';
 const LEGACY_PREFIX = '{"root"%';
 
 export type LegacyDescriptionKind =
-	'self-task' | 'self-reward' | 'partnership-task' | 'partnership-reward';
+	| 'self-task'
+	| 'self-reward'
+	| 'partnership-task'
+	| 'partnership-reward';
 
 export type LegacyDescriptionUpdate = {
 	kind: LegacyDescriptionKind;
@@ -46,7 +50,9 @@ export async function migrateLegacyDescriptions(
 ): Promise<number> {
 	let updated = 0;
 	for (const update of updates) {
-		if (await applyOne(db, userId, update)) updated += 1;
+		if (await applyOne(db, userId, update)) {
+			updated += 1;
+		}
 	}
 	return updated;
 }
@@ -88,11 +94,15 @@ async function applyOne(db: Db, userId: string, update: LegacyDescriptionUpdate)
 			return rows.length > 0;
 		}
 		case 'partnership-task': {
-			if (!update.partnershipId) return false;
+			if (!update.partnershipId) {
+				return false;
+			}
 			// The timezone argument only shapes the view this returns; the
 			// `canManage` flag it is consulted for does not depend on it.
 			const membership = await requireTaskMembership(db, update.partnershipId, userId, 'UTC');
-			if (!membership?.canManage) return false;
+			if (!membership?.canManage) {
+				return false;
+			}
 			const rows = await db
 				.update(partnershipTasks)
 				.set({ description: update.description })
@@ -107,9 +117,13 @@ async function applyOne(db: Db, userId: string, update: LegacyDescriptionUpdate)
 			return rows.length > 0;
 		}
 		case 'partnership-reward': {
-			if (!update.partnershipId) return false;
+			if (!update.partnershipId) {
+				return false;
+			}
 			const membership = await requireRewardMembership(db, update.partnershipId, userId);
-			if (!membership?.canManage) return false;
+			if (!membership?.canManage) {
+				return false;
+			}
 			const rows = await db
 				.update(partnershipRewards)
 				.set({ description: update.description })
@@ -123,5 +137,7 @@ async function applyOne(db: Db, userId: string, update: LegacyDescriptionUpdate)
 				.returning({ id: partnershipRewards.id });
 			return rows.length > 0;
 		}
+		default:
+			return assertNever(update.kind, 'legacy description kind');
 	}
 }

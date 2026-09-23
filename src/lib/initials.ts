@@ -1,3 +1,4 @@
+const WHITESPACE = /\s+/;
 /**
  * First letters of the first two words of a name, for avatar fallbacks.
  *
@@ -7,7 +8,7 @@
  */
 export function initialsFor(name: string): string {
 	return name
-		.split(/\s+/)
+		.split(WHITESPACE)
 		.filter(Boolean)
 		.slice(0, 2)
 		.map((word) => word[0]?.toUpperCase() ?? '')

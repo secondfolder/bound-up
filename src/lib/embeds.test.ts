@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	cachedOembed,
+	clearOembedCache,
+	EMBED_REQUEST_TIMEOUT_MS,
+	embedErrorDetails,
 	embedSpecFor,
-	fetchOembed,
 	fetchEmbedDetails,
 	fetchEmbedDetailsResult,
 	fetchEmbedMetadata,
-	embedErrorDetails,
+	fetchOembed,
 	isSafeHttpUrl,
-	clearOembedCache,
-	cachedOembed,
-	EMBED_REQUEST_TIMEOUT_MS,
 	MAX_CONCURRENT_EMBED_REQUESTS
 } from './embeds';
 
@@ -68,7 +68,7 @@ describe('embedSpecFor', () => {
 
 	it('rejects malformed youtube ids', () => {
 		expect(embedSpecFor('https://youtu.be/')).toBeNull();
-		expect(embedSpecFor('https://youtu.be/' + 'x'.repeat(40))).toBeNull();
+		expect(embedSpecFor(`https://youtu.be/${'x'.repeat(40)}`)).toBeNull();
 	});
 
 	it('classifies reddit comment threads as server-proxied embeds', () => {
@@ -162,7 +162,9 @@ describe('fetchOembed', () => {
 		);
 		const result = await fetchOembed('https://noembed.test/2');
 		expect(result).not.toBe('error');
-		if (result === 'error') throw new Error('expected oEmbed result');
+		if (result === 'error') {
+			throw new Error('expected oEmbed result');
+		}
 		expect(result.thumbnailUrl).toBeNull();
 	});
 

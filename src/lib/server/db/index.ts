@@ -1,5 +1,6 @@
-import { drizzle, type AnyD1Database } from 'drizzle-orm/d1';
-import * as schema from './schema';
+import { type AnyD1Database, drizzle } from 'drizzle-orm/d1';
+// biome-ignore lint/performance/noNamespaceImport: Drizzle takes the schema as one object holding every table, and the namespace is how a new table joins it without anyone having to remember to list it.
+import * as tables from './schema';
 
 /**
  * Creates a Drizzle client over a D1 binding.
@@ -23,4 +24,5 @@ export function createD1Db(d1: AnyD1Database) {
  */
 export type Db = ReturnType<typeof createD1Db>;
 
-export { schema };
+/** Every table, as the one object Drizzle's relational queries and Better Auth's adapter take. */
+export const schema = tables;

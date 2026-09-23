@@ -1,7 +1,7 @@
 import { createClient } from '@libsql/client';
-import { E2E_DATABASE_URL } from './run-paths';
-import type { Browser, Response } from '@playwright/test';
-import { expect, test } from './fixtures';
+import type { Browser, BrowserContextOptions, Response } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './fixtures';
 import {
 	account,
 	clickWaButton,
@@ -10,13 +10,14 @@ import {
 	signUp,
 	waitForEnhancedForm
 } from './helpers';
+import { E2E_DATABASE_URL } from './run-paths';
 
 function db() {
 	return createClient({
 		url: E2E_DATABASE_URL,
 		// Other workers are writing through the dev server meanwhile; wait out a
 		// lock rather than fail with SQLITE_BUSY.
-		timeout: 5_000
+		timeout: 5000
 	});
 }
 
@@ -33,7 +34,7 @@ async function readTimezone(email: string): Promise<string> {
 	}
 }
 
-async function newDevice(browser: Browser, timezoneId: string) {
+function newDevice(browser: Browser, timezoneId: string) {
 	return browser.newContext({
 		permissions: ['clipboard-read', 'clipboard-write'],
 		timezoneId
@@ -148,7 +149,7 @@ test.describe('timezone settings', () => {
 		}
 
 		const device = await newDevice(browser, 'America/New_York');
-		let state;
+		let state: BrowserContextOptions['storageState'];
 		try {
 			const page = await device.newPage();
 			await logIn(page, who);

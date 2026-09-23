@@ -10,10 +10,6 @@ import type {
 import { editorAutoLinkNode } from './autolink';
 import { editorLinkNode } from './link';
 
-export { EditorLinkNode } from './link';
-export { EditorAutoLinkNode } from './autolink';
-export { ADD_EMBED_COMMAND, EMBED_OFFER_CLASS } from './shared/embed-offer';
-
 /**
  * Editor-only nodes: subclasses of stored node types that change how the
  * editor draws or behaves, and never reach a stored document.
@@ -62,9 +58,11 @@ const STORED_TYPE_FOR = new Map(
  */
 export function exportEditorDocument(editor: LexicalEditor): SerializedEditorState {
 	const rename = (node: SerializedLexicalNode): SerializedLexicalNode => {
-		const children = (node as { children?: SerializedLexicalNode[] }).children;
+		const { children } = node as { children?: SerializedLexicalNode[] };
 		const type = STORED_TYPE_FOR.get(node.type) ?? node.type;
-		if (!children && type === node.type) return node;
+		if (!children && type === node.type) {
+			return node;
+		}
 		return { ...node, type, ...(children ? { children: children.map(rename) } : {}) };
 	};
 	const state = editor.getEditorState().toJSON();

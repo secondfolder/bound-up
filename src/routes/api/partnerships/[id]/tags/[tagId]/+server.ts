@@ -4,7 +4,9 @@ import { createNotifier } from '$lib/server/realtime/dev';
 import type { RequestHandler } from './$types';
 
 export const PATCH: RequestHandler = async ({ locals, params, request, platform }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 	const body = (await request.json().catch(() => null)) as {
 		name?: unknown;
 		color?: unknown;
@@ -14,9 +16,12 @@ export const PATCH: RequestHandler = async ({ locals, params, request, platform 
 		color: typeof body?.color === 'string' ? body.color : undefined
 	});
 	if (!result.ok) {
-		if (result.reason === 'not-a-member' || result.reason === 'no-such-tag')
+		if (result.reason === 'not-a-member' || result.reason === 'no-such-tag') {
 			error(404, 'Not found');
-		if (result.reason === 'duplicate-name') error(409, 'That tag already exists');
+		}
+		if (result.reason === 'duplicate-name') {
+			error(409, 'That tag already exists');
+		}
 		error(400, 'Invalid tag');
 	}
 	const notifier = await createNotifier({ platform });

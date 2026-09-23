@@ -44,7 +44,9 @@ export function stashUnlock(value: Stashed): void {
 export function takeUnlock(email: string): Stashed | undefined {
 	const value = stashed;
 	stashed = undefined;
-	if (!value) return undefined;
+	if (!value) {
+		return undefined;
+	}
 	return value.email === email ? value : undefined;
 }
 

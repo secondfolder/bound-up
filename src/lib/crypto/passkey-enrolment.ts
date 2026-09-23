@@ -16,14 +16,14 @@
  */
 
 import { authClient } from '../auth-client';
-import { fromBase64Url } from '../encryption';
 import type { PasskeyPrfStatusValue } from '../encryption';
+import { fromBase64Url } from '../encryption';
 import {
 	currentRpId,
 	describePasskeyFailure,
 	encodeAgeCredentialIdentity,
-	wrapIdentityToPasskey,
-	type PasskeyFailure
+	type PasskeyFailure,
+	wrapIdentityToPasskey
 } from './passkey';
 
 /** What the registration ceremony told us about the credential it made. */
@@ -79,17 +79,20 @@ export async function registerPasskey(): Promise<PasskeyRegistration> {
 
 	const row = result?.data as { id?: string; aaguid?: string | null } | null | undefined;
 	const webauthn = (
-		result as {
-			webauthn?: {
-				response?: { id?: string; response?: { transports?: string[] } };
-				clientExtensionResults?: { prf?: { enabled?: boolean } };
-			};
-		}
+		result as
+			| {
+					webauthn?: {
+						response?: { id?: string; response?: { transports?: string[] } };
+						clientExtensionResults?: { prf?: { enabled?: boolean } };
+					};
+			  }
+			| null
+			| undefined
 	)?.webauthn;
 
 	const passkeyId = row?.id;
 	const credentialId = webauthn?.response?.id;
-	if (!passkeyId || !credentialId) {
+	if (!(passkeyId && credentialId)) {
 		// Better Auth returned a shape this code does not understand, which is
 		// worth failing loudly on rather than silently registering a passkey
 		// nothing can ever seal to.
@@ -166,7 +169,9 @@ export function verdictFor(input: {
 	prfEnabled: boolean;
 }): PasskeyPrfStatusValue | null {
 	if (input.seal) {
-		if (input.seal.kind === 'sealed') return 'supported';
+		if (input.seal.kind === 'sealed') {
+			return 'supported';
+		}
 		return input.seal.kind === 'no-prf' ? 'unsupported' : null;
 	}
 	return input.prfEnabled ? null : 'unsupported';
@@ -189,8 +194,12 @@ export async function verifyPasswordWithServer(authSecret: string): Promise<bool
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ authSecret })
 	});
-	if (response.status === 403) return false;
-	if (!response.ok) throw new Error(`Could not check your password (${response.status})`);
+	if (response.status === 403) {
+		return false;
+	}
+	if (!response.ok) {
+		throw new Error(`Could not check your password (${response.status})`);
+	}
 	return true;
 }
 
@@ -211,7 +220,9 @@ export async function recordEnrolment(input: {
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify(input)
 	});
-	if (!response.ok) throw new Error(`Could not save that passkey (${response.status})`);
+	if (!response.ok) {
+		throw new Error(`Could not save that passkey (${response.status})`);
+	}
 }
 
 /**
@@ -224,5 +235,7 @@ export async function recordEnrolment(input: {
  */
 export async function renamePasskey(id: string, name: string): Promise<void> {
 	const result = await authClient.passkey.updatePasskey({ id, name });
-	if (result?.error) throw new Error(result.error.message ?? 'Could not rename that passkey');
+	if (result?.error) {
+		throw new Error(result.error.message ?? 'Could not rename that passkey');
+	}
 }

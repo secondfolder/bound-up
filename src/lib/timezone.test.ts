@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 import {
 	canonicalizeTimeZone,
 	describeTimeZoneDifference,
@@ -9,11 +9,11 @@ import {
 } from './timezone';
 
 describe('canonicalizeTimeZone', () => {
-	test('accepts a valid IANA timezone', () => {
+	it('accepts a valid IANA timezone', () => {
 		expect(canonicalizeTimeZone('Europe/London')).toBe('Europe/London');
 	});
 
-	test('rejects an invalid timezone', () => {
+	it('rejects an invalid timezone', () => {
 		expect(canonicalizeTimeZone('Mars/Base')).toBeNull();
 	});
 });

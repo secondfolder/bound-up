@@ -7,7 +7,9 @@ import { taskEditorFormValuesFromTask, taskInputFromEditorForm } from '$lib/task
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 	const data = await getPartnershipTaskForUser(
 		locals.db,
 		params.id,
@@ -15,9 +17,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		locals.user.timezone,
 		params.taskId
 	);
-	if (!data) error(404, 'Task not found');
-	if (!data.partner.canManageTasks || !data.task.createdByMe)
+	if (!data) {
+		error(404, 'Task not found');
+	}
+	if (!(data.partner.canManageTasks && data.task.createdByMe)) {
 		error(403, 'Only the partner who created a task can edit it.');
+	}
 	return {
 		partner: data.partner,
 		taskForm: await superValidate(
@@ -32,7 +37,9 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 export const actions: Actions = {
 	default: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 		const current = await getPartnershipTaskForUser(
 			locals.db,
 			params.id,
@@ -40,12 +47,17 @@ export const actions: Actions = {
 			locals.user.timezone,
 			params.taskId
 		);
-		if (!current) error(404, 'Task not found');
-		if (!current.partner.canManageTasks || !current.task.createdByMe)
+		if (!current) {
+			error(404, 'Task not found');
+		}
+		if (!(current.partner.canManageTasks && current.task.createdByMe)) {
 			error(403, 'Only the partner who created a task can edit it.');
+		}
 
 		const taskForm = await superValidate(request, zod4(taskEditorFormSchema));
-		if (!taskForm.valid) return fail(400, { taskForm });
+		if (!taskForm.valid) {
+			return fail(400, { taskForm });
+		}
 
 		const result = await updatePartnershipTask(
 			locals.db,
@@ -56,8 +68,12 @@ export const actions: Actions = {
 			taskInputFromEditorForm(taskForm.data)
 		);
 		if (!result.ok) {
-			if (result.reason === 'not-a-member') error(404, 'Partner not found');
-			if (result.reason === 'not-found') error(404, 'Task not found');
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			if (result.reason === 'not-found') {
+				error(404, 'Task not found');
+			}
 			return setError(
 				taskForm,
 				'',

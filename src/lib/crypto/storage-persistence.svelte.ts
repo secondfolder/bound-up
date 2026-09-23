@@ -65,7 +65,9 @@ function rememberAsked(): void {
 /** Whether the browser has already agreed not to evict this origin. */
 export async function storagePersistenceState(): Promise<StoragePersistenceState> {
 	const storage = storageManager();
-	if (!supported(storage)) return 'unsupported';
+	if (!supported(storage)) {
+		return 'unsupported';
+	}
 	try {
 		return (await storage.persisted()) ? 'granted' : 'not-granted';
 	} catch {
@@ -81,10 +83,16 @@ export async function storagePersistenceState(): Promise<StoragePersistenceState
  * would keep nothing, so asking for it would be a prompt for no benefit.
  */
 export async function offerStorageExplanation(durable: boolean): Promise<void> {
-	if (!durable || askedBefore()) return;
+	if (!durable || askedBefore()) {
+		return;
+	}
 	const offeredIn = generation;
-	if ((await storagePersistenceState()) !== 'not-granted') return;
-	if (offeredIn === generation) due = true;
+	if ((await storagePersistenceState()) !== 'not-granted') {
+		return;
+	}
+	if (offeredIn === generation) {
+		due = true;
+	}
 }
 
 /** Whether the dialog should be open right now. Reactive. */
@@ -104,7 +112,9 @@ export function holdStorageExplanation(): () => void {
 	holds += 1;
 	let released = false;
 	return () => {
-		if (released) return;
+		if (released) {
+			return;
+		}
 		released = true;
 		holds -= 1;
 	};
@@ -137,7 +147,9 @@ export function dismissStorageExplanation(): void {
  */
 export function requestStoragePersistence(): Promise<boolean> {
 	const storage = storageManager();
-	if (!supported(storage)) return Promise.resolve(false);
+	if (!supported(storage)) {
+		return Promise.resolve(false);
+	}
 	return storage.persist().catch(() => false);
 }
 

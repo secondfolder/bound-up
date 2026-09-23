@@ -1,3 +1,15 @@
 {
-	"editor.detectIndentation": false
+	"editor.detectIndentation": false,
+	// Biome replaces Prettier and ESLint here; see docs/linting-and-formatting.md.
+	"editor.defaultFormatter": "biomejs.biome",
+	"editor.codeActionsOnSave": {
+		"source.fixAll.biome": "explicit",
+		"source.organizeImports.biome": "explicit"
+	},
+	// Biome's Svelte formatter is not safe on this codebase yet, so the markup is
+	// left alone and `npm run format` handles the <script> and <style> blocks.
+	"[svelte]": {
+		"editor.defaultFormatter": null,
+		"editor.formatOnSave": false
+	}
 }

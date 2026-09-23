@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, test } from 'vitest';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { taskEditorFormValuesForCreate, type TaskEditorFormValues } from '$lib/task-editor-form';
+import { describe, expect, it } from 'vitest';
 import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
+import { type TaskEditorFormValues, taskEditorFormValuesForCreate } from '$lib/task-editor-form';
 import { waButtonOfType, waProp } from '$lib/testing/web-awesome';
 
 const { default: TaskFormHarness } = await import('$lib/testing/TaskFormHarness.svelte');
@@ -20,7 +20,7 @@ function editValues(): TaskEditorFormValues {
 }
 
 describe('TaskForm', () => {
-	test('starts outlined on a fresh add form and becomes solid once edited', async () => {
+	it('starts outlined on a fresh add form and becomes solid once edited', async () => {
 		const data = await superValidate(
 			taskEditorFormValuesForCreate('u1'),
 			zod4(taskEditorFormSchema),
@@ -34,7 +34,9 @@ describe('TaskForm', () => {
 		});
 		const save = waButtonOfType(container, 'submit');
 		const title = container.querySelector('input[name="title"]');
-		if (!(title instanceof HTMLInputElement)) throw new Error('missing title input');
+		if (!(title instanceof HTMLInputElement)) {
+			throw new Error('missing title input');
+		}
 
 		expect(waProp(save, 'appearance')).toBe('outlined');
 		expect(waProp(save, 'variant')).toBeUndefined();
@@ -47,7 +49,7 @@ describe('TaskForm', () => {
 		});
 	});
 
-	test('starts outlined on an edit form and stays outlined until something changes', async () => {
+	it('starts outlined on an edit form and stays outlined until something changes', async () => {
 		const data = await superValidate(editValues(), zod4(taskEditorFormSchema), { errors: false });
 		const { container } = render(TaskFormHarness, {
 			data,
@@ -55,7 +57,9 @@ describe('TaskForm', () => {
 		});
 		const save = waButtonOfType(container, 'submit');
 		const title = container.querySelector('input[name="title"]');
-		if (!(title instanceof HTMLInputElement)) throw new Error('missing title input');
+		if (!(title instanceof HTMLInputElement)) {
+			throw new Error('missing title input');
+		}
 
 		expect(waProp(save, 'appearance')).toBe('outlined');
 		expect(waProp(save, 'variant')).toBeUndefined();
@@ -75,7 +79,7 @@ describe('TaskForm', () => {
 		});
 	});
 
-	test('shows the weekly Days validation error as text', async () => {
+	it('shows the weekly Days validation error as text', async () => {
 		const data = await superValidate(
 			{
 				...taskEditorFormValuesForCreate('u1'),

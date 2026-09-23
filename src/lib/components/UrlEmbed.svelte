@@ -11,20 +11,24 @@
 	 * restate the number.
 	 */
 	export const NARROW_EMBED_MEDIA_QUERY = '(max-width: 640px)';
+
+	const LEADING_WWW = /^www\./;
+	const IFRAME_SRC = /<iframe[^>]*\ssrc=["'](?<src>[^"']+)["']/i;
+	const HTTP_URL = /^https?:\/\//i;
 </script>
 
 <script lang="ts">
+	import type { Snippet } from 'svelte';
+	import { embedActivationDelayMs } from '$lib/embed-activation';
 	import {
+		type CachedEmbedDetails,
 		cachedOembed,
+		type EmbedSpec,
 		embedSpecFor,
 		fetchOembed,
-		type CachedEmbedDetails,
-		type EmbedSpec,
 		type OembedResult
 	} from '$lib/embeds';
-	import { embedActivationDelayMs } from '$lib/embed-activation';
 	import { scrollParentOf } from '$lib/scroll-parent';
-	import type { Snippet } from 'svelte';
 
 	type CardView = {
 		href: string;
@@ -74,9 +78,9 @@
 		label,
 		cached = null,
 		cachedPending = false,
-		onActivate = undefined,
-		onRefresh = undefined,
-		actions = undefined
+		onActivate,
+		onRefresh,
+		actions
 	}: {
 		spec: EmbedSpec;
 		href: string;
@@ -110,7 +114,7 @@
 	 */
 	function hostLabel(url: string): string | null {
 		try {
-			return new URL(url).hostname.replace(/^www\./, '');
+			return new URL(url).hostname.replace(LEADING_WWW, '');
 		} catch {
 			return null;
 		}
@@ -132,15 +136,18 @@
 	// The endpoint actually fetched: direct for noembed hosts, our proxy for
 	// reddit. Null until this embed is activated, and null forever when a
 	// cached entry already answers the question.
-	const endpoint = $derived(
-		!activated || cached !== null || cachedPending
-			? null
-			: spec.kind === 'oembed'
-				? spec.endpoint
-				: spec.kind === 'server-oembed'
-					? `/api/oembed?url=${encodeURIComponent(spec.url)}`
-					: null
-	);
+	const endpoint = $derived.by(() => {
+		if (!activated || cached !== null || cachedPending) {
+			return null;
+		}
+		if (spec.kind === 'oembed') {
+			return spec.endpoint;
+		}
+		if (spec.kind === 'server-oembed') {
+			return `/api/oembed?url=${encodeURIComponent(spec.url)}`;
+		}
+		return null;
+	});
 
 	// svelte-ignore state_referenced_locally
 	// Deliberate initial capture: the cached value seeds the state and the
@@ -150,8 +157,10 @@
 		endpoint === null ? undefined : cachedOembed(endpoint)
 	);
 	const cachedCard = $derived.by(() => {
-		if (!cached) return null;
-		if (!cached.title && !cached.providerName && !cached.thumbnailUrl && !cached.description) {
+		if (!cached) {
+			return null;
+		}
+		if (!(cached.title || cached.providerName || cached.thumbnailUrl || cached.description)) {
 			return null;
 		}
 		return {
@@ -164,7 +173,9 @@
 	});
 
 	const cachedCardImage = $derived.by(() => {
-		if (!cached || cached.kind !== 'image' || !cached.imageUrl) return null;
+		if (cached?.kind !== 'image' || !cached.imageUrl) {
+			return null;
+		}
 		return {
 			href: cached.canonicalUrl ?? href,
 			src: cached.imageUrl,
@@ -173,7 +184,9 @@
 	});
 
 	const cachedIframeEmbed = $derived.by(() => {
-		if (!cached || cached.kind !== 'iframe' || !cached.iframeSrc) return null;
+		if (cached?.kind !== 'iframe' || !cached.iframeSrc) {
+			return null;
+		}
 		return {
 			shellClass: cachedCard ? 'card-media player iframe-shell' : 'embed player iframe-shell',
 			frameClass: null,
@@ -186,14 +199,18 @@
 	});
 
 	const cachedStandaloneImage = $derived.by(() => {
-		if (!cachedCardImage || cachedCard) return null;
+		if (!cachedCardImage || cachedCard) {
+			return null;
+		}
 		return cachedCardImage;
 	});
 
 	async function refresh(event: MouseEvent): Promise<void> {
 		event.preventDefault();
 		event.stopPropagation();
-		if (!onRefresh || refreshing) return;
+		if (!onRefresh || refreshing) {
+			return;
+		}
 		refreshing = true;
 		try {
 			await onRefresh(href);
@@ -207,8 +224,12 @@
 		const rootRect = root?.getBoundingClientRect();
 		const rootTop = rootRect?.top ?? 0;
 		const rootBottom = rootRect?.bottom ?? window.innerHeight;
-		if (rect.bottom < rootTop) return rootTop - rect.bottom;
-		if (rect.top > rootBottom) return rect.top - rootBottom;
+		if (rect.bottom < rootTop) {
+			return rootTop - rect.bottom;
+		}
+		if (rect.top > rootBottom) {
+			return rect.top - rootBottom;
+		}
 		return 0;
 	}
 
@@ -227,7 +248,9 @@
 	 */
 	$effect(() => {
 		const target = rootElement;
-		if (!target || inView || typeof window === 'undefined') return;
+		if (!target || inView) {
+			return;
+		}
 		if (typeof IntersectionObserver === 'undefined') {
 			inView = true;
 			return;
@@ -240,12 +263,12 @@
 		let inRange = false;
 		let intersectionRatio = 0;
 		let distancePx = Number.POSITIVE_INFINITY;
-		let delayTimer: number | undefined;
-		let idleTimer: number | undefined;
+		let delayTimer: ReturnType<typeof setTimeout> | undefined;
+		let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
 		const clearDelay = () => {
 			if (delayTimer !== undefined) {
-				window.clearTimeout(delayTimer);
+				clearTimeout(delayTimer);
 				delayTimer = undefined;
 			}
 		};
@@ -260,7 +283,9 @@
 		};
 
 		const schedule = () => {
-			if (!inRange || inView) return;
+			if (!inRange || inView) {
+				return;
+			}
 			updateDistance();
 			const delay = embedActivationDelayMs({
 				intersectionRatio,
@@ -272,8 +297,10 @@
 				return;
 			}
 			clearDelay();
-			delayTimer = window.setTimeout(() => {
-				if (inRange && !inView) activate();
+			delayTimer = setTimeout(() => {
+				if (inRange && !inView) {
+					activate();
+				}
 			}, delay);
 		};
 
@@ -284,24 +311,33 @@
 			velocityPxPerMs = (nextTop - lastScrollTop) / elapsed;
 			lastScrollTop = nextTop;
 			lastScrollAt = now;
-			if (idleTimer !== undefined) window.clearTimeout(idleTimer);
-			idleTimer = window.setTimeout(() => {
+			if (idleTimer !== undefined) {
+				clearTimeout(idleTimer);
+			}
+			idleTimer = setTimeout(() => {
 				velocityPxPerMs = 0;
-				if (inRange && !inView) schedule();
+				if (inRange && !inView) {
+					schedule();
+				}
 			}, 120);
-			if (inRange && !inView) schedule();
+			if (inRange && !inView) {
+				schedule();
+			}
 		};
 
 		const onResize = () => {
-			if (inRange && !inView) schedule();
+			if (inRange && !inView) {
+				schedule();
+			}
 		};
 
 		const observer = new IntersectionObserver(
 			(entries) => {
 				const entry = entries.at(-1);
-				if (!entry) return;
-				inRange = entry.isIntersecting;
-				intersectionRatio = entry.intersectionRatio;
+				if (!entry) {
+					return;
+				}
+				({ isIntersecting: inRange, intersectionRatio } = entry);
 				if (!inRange) {
 					clearDelay();
 					return;
@@ -324,15 +360,21 @@
 			scroller.removeEventListener('scroll', onScroll);
 			window.removeEventListener('resize', onResize);
 			clearDelay();
-			if (idleTimer !== undefined) window.clearTimeout(idleTimer);
+			if (idleTimer !== undefined) {
+				clearTimeout(idleTimer);
+			}
 		};
 	});
 
 	$effect(() => {
-		if (endpoint === null) return;
+		if (endpoint === null) {
+			return;
+		}
 		let cancelled = false;
 		void fetchOembed(endpoint).then((result) => {
-			if (!cancelled) oembed = result;
+			if (!cancelled) {
+				oembed = result;
+			}
 		});
 		return () => {
 			cancelled = true;
@@ -348,7 +390,9 @@
 	 * so opening a long thread does not backfill every link in it at once.
 	 */
 	$effect(() => {
-		if (!inView || cachedPending || cached !== null || reportedActivation) return;
+		if (!inView || cachedPending || cached !== null || reportedActivation) {
+			return;
+		}
 		reportedActivation = true;
 		void onActivate?.(href);
 	});
@@ -360,11 +404,17 @@
 	 * metadata card rather than opening an HTML injection surface.
 	 */
 	const oembedFrame = $derived.by(() => {
-		if (!oembed || oembed === 'error' || !oembed.html) return null;
-		const match = oembed.html.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
-		if (!match) return null;
-		const src = match[1];
-		if (!src || !/^https?:\/\//i.test(src)) return null;
+		if (!oembed || oembed === 'error' || !oembed.html) {
+			return null;
+		}
+		const match: RegExpExecArray | null = IFRAME_SRC.exec(oembed.html);
+		if (!match) {
+			return null;
+		}
+		const [, src] = match;
+		if (!(src && HTTP_URL.test(src))) {
+			return null;
+		}
 		return {
 			src,
 			title: oembed.title ?? oembed.providerName ?? 'Embedded content',
@@ -413,13 +463,13 @@
 		}
 		let pathname: string;
 		try {
-			pathname = new URL(oembed.permalink).pathname;
+			({ pathname } = new URL(oembed.permalink));
 		} catch {
 			return null;
 		}
 		// embed_host_url is where the widget's links point back at; nullsrcdoc
 		// is exactly what breaks the widget path, so give it the real origin.
-		const origin = typeof window === 'undefined' ? '' : window.location.origin;
+		const origin = typeof location === 'undefined' ? '' : location.origin;
 		const src =
 			`https://embed.reddit.com${pathname}?embed=true&ref_source=embed` +
 			(origin ? `&embed_host_url=${encodeURIComponent(origin)}` : '');
@@ -440,7 +490,7 @@
 		if (
 			!oembed ||
 			oembed === 'error' ||
-			(!oembedFrame && !oembed.title && !oembed.providerName && !oembed.thumbnailUrl)
+			!(oembedFrame || oembed.title || oembed.providerName || oembed.thumbnailUrl)
 		) {
 			return null;
 		}
@@ -455,8 +505,12 @@
 	});
 
 	const cardImage = $derived.by(() => {
-		if (cachedCardImage && cachedCard) return cachedCardImage;
-		if (spec.kind !== 'server-oembed' || !card || nativeSpec?.kind !== 'image') return null;
+		if (cachedCardImage && cachedCard) {
+			return cachedCardImage;
+		}
+		if (spec.kind !== 'server-oembed' || !card || nativeSpec?.kind !== 'image') {
+			return null;
+		}
 		return {
 			href: card.mediaHref,
 			src: nativeSpec.url,
@@ -465,7 +519,9 @@
 	});
 
 	const iframeEmbed = $derived.by(() => {
-		if (cachedIframeEmbed) return cachedIframeEmbed;
+		if (cachedIframeEmbed) {
+			return cachedIframeEmbed;
+		}
 		if (card && spec.kind === 'server-oembed') {
 			if (nativeSpec?.kind === 'iframe') {
 				return {
@@ -534,8 +590,12 @@
 	});
 
 	const standaloneImage = $derived.by(() => {
-		if (cachedStandaloneImage) return cachedStandaloneImage;
-		if (spec.kind !== 'image') return null;
+		if (cachedStandaloneImage) {
+			return cachedStandaloneImage;
+		}
+		if (spec.kind !== 'image') {
+			return null;
+		}
 		return {
 			href,
 			src: spec.url,
@@ -561,11 +621,19 @@
 	const holding = $derived(cachedPending || (needsDetails && oembed === undefined));
 
 	const showFallbackLink = $derived.by(() => {
-		if (cachedCard || cachedStandaloneImage || cachedIframeEmbed) return false;
-		if (holding || card || standaloneImage || iframeEmbed) return false;
-		if (spec.kind === 'server-oembed') return true;
-		if (oembed === undefined || oembed === 'error') return true;
-		return !oembedFrame && !oembed.title;
+		if (cachedCard || cachedStandaloneImage || cachedIframeEmbed) {
+			return false;
+		}
+		if (holding || card || standaloneImage || iframeEmbed) {
+			return false;
+		}
+		if (spec.kind === 'server-oembed') {
+			return true;
+		}
+		if (oembed === undefined || oembed === 'error') {
+			return true;
+		}
+		return !(oembedFrame || oembed.title);
 	});
 
 	let iframeLoading = $derived(iframeEmbed !== null);
@@ -583,14 +651,19 @@
 	 * settled, so no frame is ever built there.
 	 */
 	$effect(() => {
-		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-		const query = window.matchMedia(NARROW_EMBED_MEDIA_QUERY);
+		// An effect never runs on the server; this is for any browser without it.
+		if (typeof matchMedia !== 'function') {
+			return;
+		}
+		const query = matchMedia(NARROW_EMBED_MEDIA_QUERY);
 		narrow = query.matches;
 		const onChange = (event: MediaQueryListEvent) => {
 			narrow = event.matches;
 			// Turning a phone landscape crosses back over the breakpoint and the
 			// inline frame returns, so the overlay of the same thing must go.
-			if (!narrow) fullscreen = false;
+			if (!narrow) {
+				fullscreen = false;
+			}
 		};
 		query.addEventListener('change', onChange);
 		return () => query.removeEventListener('change', onChange);
@@ -613,7 +686,9 @@
 	function onDialogHide(event: Event): void {
 		// `wa-after-hide` bubbles from nested Web Awesome controls, so only the
 		// dialog's own hide unmounts the frame. Same trap as NewMessageDialog.
-		if (event.target !== event.currentTarget) return;
+		if (event.target !== event.currentTarget) {
+			return;
+		}
 		fullscreen = false;
 	}
 
@@ -631,8 +706,12 @@
 	const hasActions = $derived(actions !== undefined || canRefresh || showExpand);
 
 	const headMeta = $derived.by(() => {
-		if (headCard) return headCard;
-		if (!hasActions) return null;
+		if (headCard) {
+			return headCard;
+		}
+		if (!hasActions) {
+			return null;
+		}
 		// No card, but there are buttons: name the thing they belong to rather
 		// than leaving a bar of icons attached to nothing.
 		return {
@@ -671,6 +750,8 @@
 				<span>Loading embed…</span>
 			</span>
 		{/if}
+		<!-- biome-ignore-start lint/nursery/noUnsafeIframeSandbox: every src here is a third-party player (see redditFrame), so `allow-same-origin` grants the frame its own origin, not ours. A range because a plain biome-ignore does not reach a diagnostic on an attribute. -->
+		<!-- biome-ignore lint/a11y/noNoninteractiveElementInteractions: `load` and `error` are the frame's resource events, not user interactions. They stay Svelte handlers because Svelte replays ones fired before hydration, which an attachment would miss, leaving the spinner up for good. -->
 		<iframe
 			class={inDialog ? undefined : (view.frameClass ?? undefined)}
 			src={view.src}
@@ -678,10 +759,15 @@
 			height={inDialog ? undefined : (view.height ?? undefined)}
 			allowfullscreen={view.allowFullscreen}
 			loading={inDialog ? 'eager' : 'lazy'}
-			onload={() => (iframeLoading = false)}
-			onerror={() => (iframeLoading = false)}
+			onload={() => {
+				iframeLoading = false;
+			}}
+			onerror={() => {
+				iframeLoading = false;
+			}}
 			sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
 		></iframe>
+		<!-- biome-ignore-end lint/nursery/noUnsafeIframeSandbox: end of the frame above -->
 	</span>
 {/snippet}
 
@@ -750,7 +836,6 @@
 {#snippet head()}
 	<span class="head">
 		{#if headMeta}
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 			<a class="card card-link" href={headMeta.href} target="_blank" rel="noopener noreferrer ugc">
 				<span class="meta">
 					{#if headMeta.providerName}
@@ -766,7 +851,6 @@
 	</span>
 {/snippet}
 
-<!-- eslint-disable svelte/no-navigation-without-resolve -->
 <!--
 	One element wraps every branch so the scrollport observer always has
 	something to watch, whatever this embed turns out to be — including while
@@ -888,7 +972,6 @@
 	{/if}
 </span>
 
-<!-- eslint-enable svelte/no-navigation-without-resolve -->
 
 <style>
 	/* A block of its own: an embed is a block-level thing in the document.

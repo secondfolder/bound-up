@@ -1,9 +1,10 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { KeyWrapParams } from '../encryption';
+import type { KeyWrapView } from '../types';
 import { resetX25519Probe } from './identity';
 import { resetKeyStore } from './keystore';
-import { buildIdentitySubmission } from './setup';
 import {
 	currentKeyring,
 	initialiseKeyring,
@@ -12,6 +13,7 @@ import {
 	unlockWithPasskey,
 	unlockWithPassword
 } from './session.svelte';
+import { buildIdentitySubmission } from './setup';
 import { stashUnlock } from './stash';
 import {
 	acceptStorageExplanation,
@@ -22,8 +24,6 @@ import {
 	STORAGE_PERSISTENCE_ASKED_KEY,
 	storageExplanationVisible
 } from './storage-persistence.svelte';
-import type { KeyWrapParams } from '../encryption';
-import type { KeyWrapView } from '../types';
 
 vi.mock('./passkey', async (importOriginal) => ({
 	...(await importOriginal<typeof import('./passkey')>()),
@@ -89,17 +89,16 @@ function browser({ alreadyPersisted = false } = {}) {
 function bundleIs(wraps: KeyWrapView[]) {
 	vi.stubGlobal(
 		'fetch',
-		vi.fn(
-			async () =>
-				new Response(
-					JSON.stringify({
-						recipient,
-						wraps,
-						passkeyCount: 0,
-						passkeysKnownUnusable: 0,
-						unusableProviderAaguid: null
-					})
-				)
+		vi.fn(() =>
+			Promise.resolve(
+				Response.json({
+					recipient,
+					wraps,
+					passkeyCount: 0,
+					passkeysKnownUnusable: 0,
+					unusableProviderAaguid: null
+				})
+			)
 		)
 	);
 }
@@ -110,7 +109,11 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 async function lockedDevice(wraps: KeyWrapView[] = [passwordWrap]) {
 	bundleIs(wraps);
 	await initialiseKeyring(ada);
-	expect(currentKeyring().status).toBe('locked');
+	// A precondition rather than an assertion: every test here starts locked.
+	const { status } = currentKeyring();
+	if (status !== 'locked') {
+		throw new Error(`Expected a locked keyring to start from, got ${status}`);
+	}
 }
 
 beforeEach(() => {

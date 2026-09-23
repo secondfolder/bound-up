@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AUTH_SECRET_LENGTH, MAX_WRAP_PARAMS_LENGTH, parseKeyWrapParams } from '$lib/encryption';
 import { RECIPIENT_PATTERN } from '$lib/crypto/identity';
+import { AUTH_SECRET_LENGTH, MAX_WRAP_PARAMS_LENGTH, parseKeyWrapParams } from '$lib/encryption';
 
 /**
  * The fields the browser posts in place of a password, shared by every form

@@ -9,11 +9,7 @@
 	 * component. Same reason `RichTextEditorHarness` and `TimezoneSelectHarness`
 	 * exist. A null `body` is how a test asks for the bodyless card.
 	 */
-	let {
-		title,
-		href,
-		body = null
-	}: { title: string; href?: string; body?: string | null } = $props();
+	let { title, href, body = null }: { title: string; href?: string; body?: string | null } = $props();
 </script>
 
 <SectionWidget {title} {href} body={body === null ? undefined : text} />

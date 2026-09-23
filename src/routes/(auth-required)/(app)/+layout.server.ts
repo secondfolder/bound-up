@@ -8,7 +8,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	// has already run by the time a layout load does, so `locals.user` is set —
 	// but this narrows for TypeScript and degrades to an empty nav rather than
 	// throwing if that ever stops being true.
-	if (!locals.user) return { partners: [], userHasMessageHistory: false };
+	if (!locals.user) {
+		return { partners: [], userHasMessageHistory: false };
+	}
 
 	const [partners, hasMessageHistory] = await Promise.all([
 		listPartnersForNav(locals.db, locals.user.id),

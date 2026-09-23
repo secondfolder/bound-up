@@ -23,7 +23,8 @@ let agePromise: Promise<Age> | undefined;
 
 /** Loads age-encryption once, on first use. See the file comment for why. */
 export function loadAge(): Promise<Age> {
-	return (agePromise ??= import('age-encryption'));
+	agePromise ??= import('age-encryption');
+	return agePromise;
 }
 
 export type NewIdentity = {
@@ -106,7 +107,7 @@ let x25519Probe: Promise<boolean> | undefined;
  * Memoised: it costs a keypair and a scalar multiplication.
  */
 export function webCryptoX25519Available(): Promise<boolean> {
-	return (x25519Probe ??= (async () => {
+	x25519Probe ??= (async () => {
 		try {
 			const pair = (await crypto.subtle.generateKey({ name: 'X25519' }, false, [
 				'deriveBits'
@@ -120,7 +121,8 @@ export function webCryptoX25519Available(): Promise<boolean> {
 		} catch {
 			return false;
 		}
-	})());
+	})();
+	return x25519Probe;
 }
 
 /** Test seam: forget the memoised probe result. */

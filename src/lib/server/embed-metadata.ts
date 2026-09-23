@@ -1,8 +1,24 @@
-import { embedSpecFor, isSafeHttpUrl, type CachedEmbedDetails } from '$lib/embeds';
+import { type CachedEmbedDetails, embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
 
 const REDDIT_POST = /^https:\/\/(?:[a-z-]+\.)?reddit\.com\/r\/[^/]+\/(?:comments|s)\//i;
 const REDDIT_SHARE = /^https:\/\/(?:[a-z-]+\.)?reddit\.com\/r\/[^/]+\/s\//i;
 const USER_AGENT = 'BoundUp/1.0 (embed metadata)';
+const IFRAME_SRC = /<iframe[^>]*\ssrc=["'](?<src>[^"']+)["']/i;
+const TRAILING_SLASH = /\/$/;
+const ANY_URL_IN_XML = /https?:\/\/(?:[^\s"'<>]|&amp;|&quot;|&lt;)+/gi;
+const REDGIFS_PLAYER = /^https?:\/\/(?:www\.)?redgifs\.com\/(?:watch|ifr)\//i;
+/**
+ * Links an RSS feed carries that are never the post's media: reddit's own
+ * pages and CDNs, and the namespaces and search links in the feed's markup.
+ */
+const NOT_OUTBOUND = [
+	/https?:\/\/(?:www\.)?reddit\.com\//i,
+	/https?:\/\/[a-z.]*redd\.it\//i,
+	/https?:\/\/(?:www\.)?w3\.org\//i,
+	/https?:\/\/search\.yahoo\.com\//i,
+	/https?:\/\/(?:[^/]+\.)?redditstatic\.com\//i,
+	/https?:\/\/(?:[^/]+\.)?redditmedia\.com\//i
+];
 
 type FetchLike = typeof fetch;
 
@@ -49,25 +65,42 @@ function numberValue(record: Record<string, unknown>, key: string): number | nul
 
 function providerNameForIframe(src: string, href: string): string | null {
 	const host = new URL(src).hostname.toLowerCase();
-	if (host.includes('youtube')) return 'YouTube';
-	if (host.includes('redgifs')) return 'Redgifs';
+	if (host.includes('youtube')) {
+		return 'YouTube';
+	}
+	if (host.includes('redgifs')) {
+		return 'Redgifs';
+	}
 	return providerNameForUrl(href);
 }
 
 function providerNameForUrl(href: string): string | null {
 	const host = new URL(href).hostname.toLowerCase();
-	if (host === 'youtu.be' || host.includes('youtube')) return 'YouTube';
-	if (host.includes('redgifs')) return 'Redgifs';
-	if (host.includes('reddit')) return 'Reddit';
-	if (host.startsWith('www.')) return host.slice(4);
+	if (host === 'youtu.be' || host.includes('youtube')) {
+		return 'YouTube';
+	}
+	if (host.includes('redgifs')) {
+		return 'Redgifs';
+	}
+	if (host.includes('reddit')) {
+		return 'Reddit';
+	}
+	if (host.startsWith('www.')) {
+		return host.slice(4);
+	}
 	return host;
 }
 
 function iframeFromHtml(html: string | null): { src: string; height: number | null } | null {
-	if (!html) return null;
-	const match = html.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
-	if (!match || !isSafeHttpUrl(match[1] ?? '')) return null;
-	return { src: match[1] as string, height: null };
+	if (!html) {
+		return null;
+	}
+	const match: RegExpExecArray | null = IFRAME_SRC.exec(html);
+	const [, src] = match ?? [];
+	if (!(src && isSafeHttpUrl(src))) {
+		return null;
+	}
+	return { src, height: null };
 }
 
 function normaliseOutboundCandidate(candidate: string): string | null {
@@ -80,18 +113,22 @@ function normaliseOutboundCandidate(candidate: string): string | null {
 }
 
 async function resolveShareLink(target: string, fetchFn: FetchLike): Promise<string> {
-	if (!REDDIT_SHARE.test(target)) return target;
+	if (!REDDIT_SHARE.test(target)) {
+		return target;
+	}
 	const response = await fetchFn(target, {
 		redirect: 'manual',
 		headers: { 'user-agent': USER_AGENT }
 	});
 	const location = response.headers.get('location');
-	if (location && REDDIT_POST.test(location)) return location;
+	if (location && REDDIT_POST.test(location)) {
+		return location;
+	}
 	throw new Error('share link did not resolve to a post');
 }
 
 async function outboundLink(permalink: string, fetchFn: FetchLike): Promise<string | null> {
-	const path = new URL(permalink).pathname.replace(/\/$/, '');
+	const path = new URL(permalink).pathname.replace(TRAILING_SLASH, '');
 	const variants = [
 		`https://www.reddit.com${path}.rss?utm_source=embed&cb=${Date.now()}`,
 		`https://www.reddit.com${path}.rss?cb=${Date.now()}`,
@@ -104,26 +141,25 @@ async function outboundLink(permalink: string, fetchFn: FetchLike): Promise<stri
 		const response = await fetchFn(variant, {
 			headers: { 'user-agent': USER_AGENT, accept: 'application/xml' }
 		});
-		if (!response.ok) continue;
+		if (!response.ok) {
+			continue;
+		}
 		xml = await response.text();
 		break;
 	}
-	if (xml === null) return null;
+	if (xml === null) {
+		return null;
+	}
 
-	const urls = [...xml.matchAll(/https?:\/\/(?:[^\s"'<>]|&amp;|&quot;|&lt;)+/gi)]
-		.map((match) => normaliseOutboundCandidate(match[0]))
+	const urls = [...xml.matchAll(ANY_URL_IN_XML)]
+		.map(([found]) => normaliseOutboundCandidate(found))
 		.filter((candidate): candidate is string => candidate !== null)
-		.filter((candidate) => !/https?:\/\/(?:www\.)?reddit\.com\//i.test(candidate))
-		.filter((candidate) => !/https?:\/\/[a-z.]*redd\.it\//i.test(candidate))
-		.filter((candidate) => !/https?:\/\/(?:www\.)?w3\.org\//i.test(candidate))
-		.filter((candidate) => !/https?:\/\/search\.yahoo\.com\//i.test(candidate))
-		.filter((candidate) => !/https?:\/\/(?:[^/]+\.)?redditstatic\.com\//i.test(candidate))
-		.filter((candidate) => !/https?:\/\/(?:[^/]+\.)?redditmedia\.com\//i.test(candidate));
+		.filter((candidate) => !NOT_OUTBOUND.some((pattern) => pattern.test(candidate)));
 
-	const redgifs = urls.find((candidate) =>
-		/^https?:\/\/(?:www\.)?redgifs\.com\/(?:watch|ifr)\//i.test(candidate)
-	);
-	if (redgifs) return redgifs;
+	const redgifs = urls.find((candidate) => REDGIFS_PLAYER.test(candidate));
+	if (redgifs) {
+		return redgifs;
+	}
 	return urls[0] ?? null;
 }
 
@@ -135,7 +171,9 @@ export async function fetchRedditOembedPayload(
 	requested: string,
 	fetchFn: FetchLike
 ): Promise<RedditOembedPayload | null> {
-	if (!REDDIT_POST.test(requested)) return null;
+	if (!REDDIT_POST.test(requested)) {
+		return null;
+	}
 
 	let target: string;
 	try {
@@ -163,7 +201,7 @@ export async function fetchRedditOembedPayload(
 		title: stringValue(payload, 'title'),
 		providerName: stringValue(payload, 'provider_name'),
 		description: stringValue(payload, 'description'),
-		thumbnailUrl: safeUrl(payload['thumbnail_url']),
+		thumbnailUrl: safeUrl(payload.thumbnail_url),
 		html: stringValue(payload, 'html'),
 		height: numberValue(payload, 'height'),
 		permalink,
@@ -178,16 +216,20 @@ async function fetchNoembedPreview(
 	fetchedAt: number
 ): Promise<CachedEmbedDetails | null> {
 	const response = await fetchFn(endpoint, { headers: { accept: 'application/json' } });
-	if (!response.ok) return null;
+	if (!response.ok) {
+		return null;
+	}
 	const data = (await response.json()) as Record<string, unknown>;
 	const title = stringValue(data, 'title');
 	const providerName = stringValue(data, 'provider_name');
 	const description = stringValue(data, 'description');
-	const thumbnailUrl = safeUrl(data['thumbnail_url']);
-	const canonicalUrl = safeUrl(data['url']) ?? href;
+	const thumbnailUrl = safeUrl(data.thumbnail_url);
+	const canonicalUrl = safeUrl(data.url) ?? href;
 	const iframe = iframeFromHtml(stringValue(data, 'html'));
 	const height = numberValue(data, 'height');
-	if (!title && !providerName && !description && !thumbnailUrl && !iframe) return null;
+	if (!(title || providerName || description || thumbnailUrl || iframe)) {
+		return null;
+	}
 	return {
 		...emptyPreview(href, fetchedAt),
 		kind: iframe ? 'iframe' : 'card',
@@ -205,9 +247,13 @@ export async function fetchEmbedMetadata(
 	href: string,
 	fetchFn: FetchLike
 ): Promise<CachedEmbedDetails | null> {
-	if (!isSafeHttpUrl(href)) return null;
+	if (!isSafeHttpUrl(href)) {
+		return null;
+	}
 	const spec = embedSpecFor(href);
-	if (!spec) return null;
+	if (!spec) {
+		return null;
+	}
 
 	const fetchedAt = Date.now();
 	if (spec.kind === 'image') {
@@ -238,7 +284,9 @@ export async function fetchEmbedMetadata(
 	}
 
 	const reddit = await fetchRedditOembedPayload(href, fetchFn);
-	if (!reddit) return null;
+	if (!reddit) {
+		return null;
+	}
 	const preview = emptyPreview(href, fetchedAt);
 	const outbound = reddit.outbound ? embedSpecFor(reddit.outbound) : null;
 	if (outbound?.kind === 'image') {
@@ -265,7 +313,9 @@ export async function fetchEmbedMetadata(
 			iframeSrc: outbound.src
 		};
 	}
-	if (!reddit.title && !reddit.providerName && !reddit.thumbnailUrl) return null;
+	if (!(reddit.title || reddit.providerName || reddit.thumbnailUrl)) {
+		return null;
+	}
 	return {
 		...preview,
 		kind: 'card',

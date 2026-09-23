@@ -7,19 +7,6 @@
  */
 
 import {
-	DEFAULT_THREAD_ICON,
-	MAX_ATTACHMENTS_PER_MESSAGE,
-	MAX_ATTACHMENT_TOTAL_BYTES,
-	MAX_BODY_CHARS,
-	MAX_VIDEO_BYTES
-} from '$lib/messaging';
-import {
-	documentEmbedUrls,
-	documentToPlainText,
-	isRichTextDocumentEmpty,
-	parseStoredRichText
-} from '$lib/richtext';
-import {
 	decryptAttachment,
 	decryptMessageMetadata,
 	decryptPayload,
@@ -32,6 +19,19 @@ import {
 	type ReactionPayload
 } from '$lib/crypto/messages';
 import { fetchEmbedMetadata } from '$lib/embeds';
+import {
+	DEFAULT_THREAD_ICON,
+	MAX_ATTACHMENT_TOTAL_BYTES,
+	MAX_ATTACHMENTS_PER_MESSAGE,
+	MAX_BODY_CHARS,
+	MAX_VIDEO_BYTES
+} from '$lib/messaging';
+import {
+	documentEmbedUrls,
+	documentToPlainText,
+	isRichTextDocumentEmpty,
+	parseStoredRichText
+} from '$lib/richtext';
 
 export type ComposedMessage = {
 	text: string;
@@ -118,7 +118,7 @@ async function buildBody(message: ComposedMessage, recipients: string[]): Promis
 	const body = new FormData();
 	// Already canonical: the editor serialises through the same schema the
 	// reader validates with, so there is nothing left to normalise.
-	const text = message.text;
+	const { text } = message;
 	const metadataPromise = resolveMessageMetadata(text);
 
 	for (const file of message.files) {
@@ -165,7 +165,9 @@ function embeddableUrls(text: string): string[] {
 async function resolveMessageMetadata(text: string): Promise<MessageMetadataPayload | null> {
 	const urls = embeddableUrls(text);
 	const embeds = await fetchEmbedMetadata(urls);
-	if (embeds.length === 0) return null;
+	if (embeds.length === 0) {
+		return null;
+	}
 	return { version: 1, embeds };
 }
 
@@ -174,7 +176,8 @@ export type SendTarget =
 	| { kind: 'reply'; partnershipId: string; threadId: string };
 
 export type SendOutcome =
-	{ ok: true; threadId: string; messageId: string } | { ok: false; message: string };
+	| { ok: true; threadId: string; messageId: string }
+	| { ok: false; message: string };
 
 function endpointFor(target: SendTarget): string {
 	return target.kind === 'new-thread'
@@ -188,7 +191,9 @@ export async function sendMessage(
 	recipients: string[]
 ): Promise<SendOutcome> {
 	const problem = checkComposed(message);
-	if (problem) return { ok: false, message: problem.message };
+	if (problem) {
+		return { ok: false, message: problem.message };
+	}
 	if (recipients.length === 0) {
 		return { ok: false, message: 'Your partner has not set up encrypted messaging yet' };
 	}
@@ -213,9 +218,15 @@ export async function sendMessage(
 }
 
 async function describeFailure(response: Response): Promise<string> {
-	if (response.status === 413) return 'That is too large to send';
-	if (response.status === 404) return 'That conversation is no longer there';
-	if (response.status === 401) return 'You have been signed out';
+	if (response.status === 413) {
+		return 'That is too large to send';
+	}
+	if (response.status === 404) {
+		return 'That conversation is no longer there';
+	}
+	if (response.status === 401) {
+		return 'You have been signed out';
+	}
 	// SvelteKit's `error()` bodies are JSON with a `message`.
 	const body = (await response.json().catch(() => null)) as { message?: string } | null;
 	return body?.message ?? 'Could not send that';
@@ -239,14 +250,14 @@ export async function openMessage(
 	ciphertext: string,
 	identity: CryptoKey | string
 ): Promise<MessagePayload | null> {
-	return decryptPayload<MessagePayload>(ciphertext, identity);
+	return await decryptPayload<MessagePayload>(ciphertext, identity);
 }
 
 export async function openMessageMetadata(
 	ciphertext: string,
 	identity: CryptoKey | string
 ): Promise<MessageMetadataPayload | null> {
-	return decryptMessageMetadata(ciphertext, identity);
+	return await decryptMessageMetadata(ciphertext, identity);
 }
 
 export async function openReaction(
@@ -258,7 +269,7 @@ export async function openReaction(
 }
 
 export async function buildReaction(emoji: string, recipients: string[]): Promise<string> {
-	return encryptPayload({ version: 1, emoji }, recipients);
+	return await encryptPayload({ version: 1, emoji }, recipients);
 }
 
 export async function fillMissingMessageMetadata(
@@ -268,10 +279,21 @@ export async function fillMissingMessageMetadata(
 	current: MessageMetadataPayload | null,
 	recipients: string[]
 ): Promise<MessageMetadataPayload | null> {
-	if (recipients.length === 0) return null;
-	if (current?.embeds.some((embed) => embed.href === href)) return current;
+	if (recipients.length === 0) {
+		return null;
+	}
+	if (current?.embeds.some((embed) => embed.href === href)) {
+		return current;
+	}
 
-	return writeMessageMetadataEntry(partnershipId, messageId, href, current, recipients, false);
+	return await writeMessageMetadataEntry(
+		partnershipId,
+		messageId,
+		href,
+		current,
+		recipients,
+		false
+	);
 }
 
 export async function refreshMessageMetadata(
@@ -281,8 +303,10 @@ export async function refreshMessageMetadata(
 	current: MessageMetadataPayload | null,
 	recipients: string[]
 ): Promise<MessageMetadataPayload | null> {
-	if (recipients.length === 0) return null;
-	return writeMessageMetadataEntry(partnershipId, messageId, href, current, recipients, true);
+	if (recipients.length === 0) {
+		return null;
+	}
+	return await writeMessageMetadataEntry(partnershipId, messageId, href, current, recipients, true);
 }
 
 async function writeMessageMetadataEntry(
@@ -298,10 +322,14 @@ async function writeMessageMetadataEntry(
 	// is someone pressing a button and waiting on it, so it goes straight out.
 	const embeds = await fetchEmbedMetadata([href], { queued: !replaceExisting });
 	const embed = embeds.find((entry) => entry.href === href) ?? null;
-	if (!embed) return null;
+	if (!embed) {
+		return null;
+	}
 	const existing = current?.embeds ?? [];
 	const present = existing.some((entry) => entry.href === href);
-	if (present && !replaceExisting) return current;
+	if (present && !replaceExisting) {
+		return current;
+	}
 
 	const metadata: MessageMetadataPayload = {
 		version: 1,
@@ -319,7 +347,9 @@ async function writeMessageMetadataEntry(
 			body: JSON.stringify({ metadataCiphertext })
 		}
 	);
-	if (!response.ok) return null;
+	if (!response.ok) {
+		return null;
+	}
 	return metadata;
 }
 
@@ -336,7 +366,9 @@ export async function fetchAttachment(
 	info: MessageAttachmentInfo
 ): Promise<{ url: string; blob: Blob }> {
 	const response = await fetch(`/api/partnerships/${partnershipId}/attachments/${info.id}`);
-	if (!response.ok) throw new Error(`Could not download attachment (${response.status})`);
+	if (!response.ok) {
+		throw new Error(`Could not download attachment (${response.status})`);
+	}
 	const blob = await decryptAttachment(await response.arrayBuffer(), info);
 	return { url: URL.createObjectURL(blob), blob };
 }

@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { EFF_LONG_WORDLIST } from './eff-long';
 import {
 	BITS_PER_WORD,
+	generatePassphrase,
 	PASSPHRASE_POOL,
 	PASSPHRASE_SEPARATOR,
-	PASSPHRASE_WORDS,
-	generatePassphrase
+	PASSPHRASE_WORDS
 } from './generate';
 
 describe('EFF_LONG_WORDLIST', () => {
@@ -23,7 +23,9 @@ describe('EFF_LONG_WORDLIST', () => {
 	});
 
 	it('contains no whitespace or empty entries — the split would be off by one', () => {
-		for (const word of EFF_LONG_WORDLIST) expect(word).toMatch(/^[a-z]+(-[a-z]+)*$/);
+		for (const word of EFF_LONG_WORDLIST) {
+			expect(word).toMatch(/^[a-z]+(?:-[a-z]+)*$/);
+		}
 	});
 });
 
@@ -46,13 +48,15 @@ describe('generatePassphrase', () => {
 	it('returns the requested number of words from the pool', () => {
 		const result = generatePassphrase();
 		expect(result.words).toHaveLength(PASSPHRASE_WORDS);
-		for (const word of result.words) expect(PASSPHRASE_POOL).toContain(word);
+		for (const word of result.words) {
+			expect(PASSPHRASE_POOL).toContain(word);
+		}
 	});
 
 	it('joins with the separator and nothing else', () => {
 		const { phrase, words } = generatePassphrase();
 		expect(phrase).toBe(words.join(PASSPHRASE_SEPARATOR));
-		expect(phrase).toMatch(/^[a-z]+(-[a-z]+)*$/);
+		expect(phrase).toMatch(/^[a-z]+(?:-[a-z]+)*$/);
 		// No stray whitespace: a phrase that round-trips through a form field and
 		// back must be byte-identical or the master key changes.
 		expect(phrase.trim()).toBe(phrase);
@@ -94,9 +98,9 @@ describe('generatePassphrase', () => {
 		const buckets = new Array(20).fill(0);
 		const size = PASSPHRASE_POOL.length;
 		const draws = 40_000;
-		for (let i = 0; i < draws; i++) {
+		for (let i = 0; i < draws; i += 1) {
 			const index = PASSPHRASE_POOL.indexOf(generatePassphrase(1).words[0]);
-			buckets[Math.floor((index / size) * buckets.length)]++;
+			buckets[Math.floor((index / size) * buckets.length)] += 1;
 		}
 		const expected = draws / buckets.length;
 		const chiSquared = buckets.reduce((sum, n) => sum + (n - expected) ** 2 / expected, 0);

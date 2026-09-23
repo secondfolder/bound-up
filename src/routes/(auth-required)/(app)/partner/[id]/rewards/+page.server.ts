@@ -32,24 +32,32 @@ function firstError(
 	formErrors: string[]
 ): string {
 	for (const errorList of Object.values(fieldErrors)) {
-		if (errorList?.[0]) return errorList[0];
+		if (errorList?.[0]) {
+			return errorList[0];
+		}
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
 
 export const load: PageServerLoad = async ({ locals, params, depends }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	depends(`rewards:partner:${params.id}`);
 
 	const page = await getPartnershipRewardsPage(locals.db, params.id, locals.user.id);
-	if (!page) error(404, 'Partner not found');
+	if (!page) {
+		error(404, 'Partner not found');
+	}
 	return page;
 };
 
 export const actions: Actions = {
 	updateReward: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = rewardUpdateSchema.safeParse({
@@ -76,8 +84,12 @@ export const actions: Actions = {
 			input
 		);
 		if (!result.ok) {
-			if (result.reason === 'not-a-member') error(404, 'Partner not found');
-			if (result.reason === 'not-found') error(404, 'Reward not found');
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			if (result.reason === 'not-found') {
+				error(404, 'Reward not found');
+			}
 			return fail(403, {
 				action: 'updateReward',
 				error: 'Only the controlling side can edit rewards here.'
@@ -88,7 +100,9 @@ export const actions: Actions = {
 	},
 
 	setCredits: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = rewardCreditsSchema.safeParse({
@@ -111,7 +125,9 @@ export const actions: Actions = {
 			parsed.data.credits
 		);
 		if (!result.ok) {
-			if (result.reason === 'not-a-member') error(404, 'Partner not found');
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
 			if (result.reason === 'forbidden') {
 				return fail(403, {
 					action: 'setCredits',
@@ -128,7 +144,9 @@ export const actions: Actions = {
 	},
 
 	claimReward: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const formData = await request.formData();
 		const parsed = rewardClaimSchema.safeParse({ rewardId: stringField(formData, 'rewardId') });
@@ -146,8 +164,12 @@ export const actions: Actions = {
 			userId: locals.user.id
 		});
 		if (!result.ok) {
-			if (result.reason === 'not-a-member') error(404, 'Partner not found');
-			if (result.reason === 'not-found') error(404, 'Reward not found');
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			if (result.reason === 'not-found') {
+				error(404, 'Reward not found');
+			}
 			if (result.reason === 'not-allowed' || result.reason === 'own-reward') {
 				return fail(403, {
 					action: 'claimReward',

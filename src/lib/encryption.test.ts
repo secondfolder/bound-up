@@ -2,18 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
 	AUTH_SECRET_LENGTH,
 	AUTH_SECRET_PATTERN,
-	MASTER_KEY_V1,
-	MASTER_KEY_VERSIONS,
 	formatSafetyNumber,
 	fromBase64Url,
+	MASTER_KEY_V1,
+	MASTER_KEY_VERSIONS,
 	masterKeySalt,
 	normaliseEmail,
+	type PinRecord,
 	pinBlocksSending,
 	pinStateFor,
 	safetyNumberSource,
 	toBase64Url,
-	wrapAad,
-	type PinRecord
+	wrapAad
 } from './encryption';
 
 describe('normaliseEmail', () => {
@@ -68,8 +68,11 @@ describe('MASTER_KEY_VERSIONS', () => {
 	});
 
 	it('meets the OWASP floor for PBKDF2-SHA256', () => {
-		for (const entry of MASTER_KEY_VERSIONS) {
-			if (entry.kdf === 'PBKDF2-SHA256') expect(entry.iterations).toBeGreaterThanOrEqual(600_000);
+		const pbkdf2Iterations = MASTER_KEY_VERSIONS.flatMap((entry) =>
+			entry.kdf === 'PBKDF2-SHA256' ? [entry.iterations] : []
+		);
+		for (const iterations of pbkdf2Iterations) {
+			expect(iterations).toBeGreaterThanOrEqual(600_000);
 		}
 	});
 });
@@ -83,7 +86,7 @@ describe('base64url', () => {
 	});
 
 	it('emits no padding and no +/ characters', () => {
-		for (let i = 0; i < 50; i++) {
+		for (let i = 0; i < 50; i += 1) {
 			const encoded = toBase64Url(crypto.getRandomValues(new Uint8Array(i + 1)));
 			expect(encoded).toMatch(/^[A-Za-z0-9_-]*$/);
 		}
@@ -139,7 +142,7 @@ describe('formatSafetyNumber', () => {
 	// No I, L, O or U — that is the reason for Crockford over plain base32, and
 	// it is the whole point of a number meant to be read down a phone line.
 	it('contains no ambiguous letters', () => {
-		for (let i = 0; i < 200; i++) {
+		for (let i = 0; i < 200; i += 1) {
 			const formatted = formatSafetyNumber(crypto.getRandomValues(new Uint8Array(10)));
 			expect(formatted).not.toMatch(/[ILOU]/);
 		}

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { SuperValidated, Infer } from 'sveltekit-superforms';
+	import type { Infer, SuperValidated } from 'sveltekit-superforms';
 	import { superForm } from 'sveltekit-superforms';
-	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
+	import { generateAgeIdentity } from '$lib/crypto/identity';
 	import {
 		deriveAuthSecret,
 		deriveMasterKey,
@@ -10,9 +10,9 @@
 		WEBCRYPTO_UNAVAILABLE,
 		webCryptoAvailable
 	} from '$lib/crypto/kdf';
-	import { generateAgeIdentity } from '$lib/crypto/identity';
-	import { wrapIdentity } from '$lib/crypto/wrap';
 	import { stashUnlock } from '$lib/crypto/stash';
+	import { wrapIdentity } from '$lib/crypto/wrap';
+	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
 	import type { SignupFormSchema } from '$lib/schemas/signupForm';
 	import { currentTimeZoneOrUtc } from '$lib/timezone';

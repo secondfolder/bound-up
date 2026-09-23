@@ -1,22 +1,22 @@
 <script lang="ts">
 	import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
-	import {
-		$getSelection as getSelection,
-		$isRangeSelection as isRangeSelection,
-		COMMAND_PRIORITY_LOW,
-		FORMAT_TEXT_COMMAND,
-		SELECTION_CHANGE_COMMAND,
-		type LexicalEditor,
-		type TextFormatType
-	} from 'lexical';
+	import { $isLinkNode as isLinkNode, $toggleLink as toggleLink } from '@lexical/link';
 	import {
 		INSERT_ORDERED_LIST_COMMAND,
 		INSERT_UNORDERED_LIST_COMMAND,
-		REMOVE_LIST_COMMAND,
-		$isListNode as isListNode
+		$isListNode as isListNode,
+		REMOVE_LIST_COMMAND
 	} from '@lexical/list';
-	import { $isLinkNode as isLinkNode, $toggleLink as toggleLink } from '@lexical/link';
 	import { $findMatchingParent as findMatchingParent } from '@lexical/utils';
+	import {
+		COMMAND_PRIORITY_LOW,
+		FORMAT_TEXT_COMMAND,
+		$getSelection as getSelection,
+		$isRangeSelection as isRangeSelection,
+		type LexicalEditor,
+		SELECTION_CHANGE_COMMAND,
+		type TextFormatType
+	} from 'lexical';
 	import { isSafeHttpUrl } from '$lib/embeds';
 	import type { RichTextFeature } from '$lib/richtext-editor';
 
@@ -144,12 +144,18 @@
 			editor.update(() => toggleLink(null));
 			return;
 		}
-		const entered = window.prompt('Link address');
-		if (entered === null) return;
+		// biome-ignore lint/suspicious/noAlert: deliberate for now — see the note above.
+		const entered = globalThis.prompt('Link address');
+		if (entered === null) {
+			return;
+		}
 		const url = entered.trim();
-		if (url === '') return;
+		if (url === '') {
+			return;
+		}
 		if (!isSafeHttpUrl(url)) {
-			window.alert('That needs to be an http or https address.');
+			// biome-ignore lint/suspicious/noAlert: the other half of the prompt above.
+			globalThis.alert('That needs to be an http or https address.');
 			return;
 		}
 		editor.update(() => toggleLink(url));
@@ -157,22 +163,32 @@
 
 	/** The live selection rectangle, as a Floating UI virtual element. */
 	function selectionReference() {
-		const domSelection = window.getSelection();
-		if (!domSelection || domSelection.rangeCount === 0) return null;
+		const domSelection = globalThis.getSelection();
+		if (!domSelection || domSelection.rangeCount === 0) {
+			return null;
+		}
 		const range = domSelection.getRangeAt(0);
-		if (range.collapsed) return null;
+		if (range.collapsed) {
+			return null;
+		}
 		const rect = range.getBoundingClientRect();
-		if (rect.width === 0 && rect.height === 0) return null;
+		if (rect.width === 0 && rect.height === 0) {
+			return null;
+		}
 		return { getBoundingClientRect: () => range.getBoundingClientRect() };
 	}
 
 	function readSelection() {
-		if (dragging) return;
+		if (dragging) {
+			return;
+		}
 
 		let hasRange = false;
 		editor.getEditorState().read(() => {
 			const selection = getSelection();
-			if (!isRangeSelection(selection) || selection.isCollapsed()) return;
+			if (!isRangeSelection(selection) || selection.isCollapsed()) {
+				return;
+			}
 
 			const anchor = selection.anchor.getNode();
 			const list = findMatchingParent(anchor, isListNode);
@@ -199,9 +215,13 @@
 	 */
 	$effect(() => {
 		const element = bar;
-		if (!visible || !element) return;
+		if (!(visible && element)) {
+			return;
+		}
 		const reference = selectionReference();
-		if (!reference) return;
+		if (!reference) {
+			return;
+		}
 
 		const place = () => {
 			void computePosition(reference, element, {
@@ -224,7 +244,9 @@
 	 */
 	$effect(() => {
 		const element = bar;
-		if (!element) return;
+		if (!element) {
+			return;
+		}
 		document.body.append(element);
 		return () => element.remove();
 	});
@@ -245,7 +267,9 @@
 		const onSelectionChange = () => queueMicrotask(readSelection);
 		const onPointerDown = (event: PointerEvent) => {
 			// A press on the toolbar is not a drag, and must not hide it.
-			if (bar?.contains(event.target as Node)) return;
+			if (bar?.contains(event.target as Node)) {
+				return;
+			}
 			dragging = true;
 			visible = false;
 		};

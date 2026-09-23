@@ -1,8 +1,8 @@
 import { error, fail as kitFail, redirect } from '@sveltejs/kit';
 import { fail, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { answerFromControl, controlFromAnswer, isInviteUsable } from '$lib/partnership';
 import { inviteUrl } from '$lib/invite-url';
+import { answerFromControl, controlFromAnswer, isInviteUsable } from '$lib/partnership';
 import { partnerEditFormSchema } from '$lib/schemas/partnerForm';
 import {
 	deletePartnership,
@@ -13,12 +13,16 @@ import {
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
-	if (!locals.user) error(401, 'Not signed in');
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
 
 	const partnership = await getPartnershipForUser(locals.db, params.id, locals.user.id);
 	// 404 rather than 403 for a partnership that exists but is someone else's:
 	// distinguishing the two would confirm the id is real.
-	if (!partnership) error(404, 'Partner not found');
+	if (!partnership) {
+		error(404, 'Partner not found');
+	}
 
 	const usable = isInviteUsable(partnership, new Date());
 
@@ -61,13 +65,19 @@ export const actions: Actions = {
 	// The (auth-required) guard is a layout load, which does not run before an
 	// action — every action here checks the session itself.
 	update: async ({ locals, params, request }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const partnerEditForm = await superValidate(request, zod4(partnerEditFormSchema));
-		if (!partnerEditForm.valid) return fail(400, { partnerEditForm });
+		if (!partnerEditForm.valid) {
+			return fail(400, { partnerEditForm });
+		}
 
 		const current = await getPartnershipForUser(locals.db, params.id, locals.user.id);
-		if (!current) error(404, 'Partner not found');
+		if (!current) {
+			error(404, 'Partner not found');
+		}
 
 		const { partnerName, yourName, partnerRole, yourRole, control } = partnerEditForm.data;
 		// The submitted names are in the *viewer's* terms; storage is in the
@@ -83,7 +93,9 @@ export const actions: Actions = {
 
 		// Re-checked against the stored row rather than trusting the page having
 		// hidden the form: control can have changed since it was rendered.
-		if (!ok) return kitFail(403, { partnerEditForm, denied: true });
+		if (!ok) {
+			return kitFail(403, { partnerEditForm, denied: true });
+		}
 
 		redirect(303, '/settings/partners');
 	},
@@ -95,10 +107,14 @@ export const actions: Actions = {
 	 * into the share sheet while the click's user activation is still live.
 	 */
 	rotate: async ({ locals, params, url }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const rotated = await rotateInviteToken(locals.db, params.id, locals.user.id);
-		if (!rotated) return kitFail(400, { rotateError: 'That invite can no longer be renewed.' });
+		if (!rotated) {
+			return kitFail(400, { rotateError: 'That invite can no longer be renewed.' });
+		}
 
 		return { url: inviteUrl(url.origin, rotated.inviteToken) };
 	},
@@ -110,10 +126,14 @@ export const actions: Actions = {
 	 * partner must still be able to get out. See `deletePartnership`.
 	 */
 	disconnect: async ({ locals, params }) => {
-		if (!locals.user) error(401, 'Not signed in');
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
 
 		const removed = await deletePartnership(locals.db, params.id, locals.user.id);
-		if (!removed) error(404, 'Partner not found');
+		if (!removed) {
+			error(404, 'Partner not found');
+		}
 
 		redirect(303, '/settings/partners');
 	}

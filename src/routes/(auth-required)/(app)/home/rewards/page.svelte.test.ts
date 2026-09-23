@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
 import type { PageData } from './$types';
@@ -36,12 +36,12 @@ function data(claimCount: number): PageData {
 }
 
 describe('/home/rewards/+page.svelte', () => {
-	test('hides claim history when there are no self claims', () => {
+	it('hides claim history when there are no self claims', () => {
 		const { container } = render(Page, { data: data(0) });
 		expect(container.textContent).not.toContain('Claim history');
 	});
 
-	test('shows claim history when self claims exist', () => {
+	it('shows claim history when self claims exist', () => {
 		const { container } = render(Page, { data: data(1) });
 		const buttons = Array.from(container.querySelectorAll('wa-button')).map((node) =>
 			node.textContent?.trim()
@@ -49,7 +49,7 @@ describe('/home/rewards/+page.svelte', () => {
 		expect(buttons).toContain('Claim history');
 	});
 
-	test('uses the controller-style header format for self and partner sections', () => {
+	it('uses the controller-style header format for self and partner sections', () => {
 		const { container } = render(Page, { data: data(0) });
 		const rows = container.querySelectorAll('.title-row');
 		expect(rows[0]?.textContent).toContain('Your Rewards');

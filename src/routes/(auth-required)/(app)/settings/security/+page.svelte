@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { superForm } from 'sveltekit-superforms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -8,15 +9,14 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PasswordField from '$lib/components/PasswordField.svelte';
 	import PrfProviderList from '$lib/components/PrfProviderList.svelte';
-	import { buildPasswordChange } from '$lib/crypto/setup';
 	import {
 		deriveAuthSecret,
 		deriveMasterKey,
-		webCryptoAvailable,
-		WEBCRYPTO_UNAVAILABLE
+		WEBCRYPTO_UNAVAILABLE,
+		webCryptoAvailable
 	} from '$lib/crypto/kdf';
+	import { buildPasswordChange } from '$lib/crypto/setup';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
-	import { superForm } from 'sveltekit-superforms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -147,7 +147,9 @@
 			}
 		},
 		async onUpdated({ form }) {
-			if (!form.valid) return;
+			if (!form.valid) {
+				return;
+			}
 			oldPassword = '';
 			newPassword = '';
 			newConfirm = '';

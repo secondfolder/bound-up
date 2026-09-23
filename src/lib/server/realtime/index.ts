@@ -45,9 +45,9 @@ export type Notifier = {
 	 * follows has already committed, and turning that into a 500 would make the
 	 * client retry a send that actually succeeded.
 	 */
-	publish(partnershipId: string, event: RealtimeEvent): Promise<void>;
+	publish: (partnershipId: string, event: RealtimeEvent) => Promise<void>;
 	/** A long-lived SSE `Response` for one partnership. */
-	stream(partnershipId: string): Promise<Response>;
+	stream: (partnershipId: string) => Promise<Response>;
 };
 
 /**

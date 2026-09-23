@@ -37,4 +37,4 @@ export async function createNotifier(event: {
 	return createDurableObjectNotifier(requireRealtime(event.platform));
 }
 
-export type { Notifier };
+export type { Notifier } from './index';

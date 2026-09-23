@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 
@@ -21,7 +21,7 @@ let mockPasskeysKnownUnusable = 0;
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 // `PasskeyOffer` renders inside the gate and posts to a form action.
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
+vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => undefined }) }));
 
 const initialiseKeyring = vi.fn().mockResolvedValue(undefined);
 
@@ -51,7 +51,7 @@ const { default: EncryptionGate } = await import('./EncryptionGate.svelte');
 const user = { id: 'usr-1', email: 'ada@example.com' };
 
 describe('EncryptionGate', () => {
-	test('shows locked callout when keyring is locked and the user has message history', () => {
+	it('shows locked callout when keyring is locked and the user has message history', () => {
 		mockKeyringStatus = 'locked';
 		mockPasskeyWrap = null;
 		render(EncryptionGate, { user, userHasMessageHistory: true, handledByPage: false });
@@ -59,20 +59,20 @@ describe('EncryptionGate', () => {
 		expect(screen.getByText('Your messages are locked on this device')).toBeInTheDocument();
 	});
 
-	test('does NOT show locked callout when keyring is locked but the user has no message history', () => {
+	it('does NOT show locked callout when keyring is locked but the user has no message history', () => {
 		mockKeyringStatus = 'locked';
 		render(EncryptionGate, { user, userHasMessageHistory: false, handledByPage: false });
 
 		expect(screen.queryByText('Your messages are locked on this device')).not.toBeInTheDocument();
 	});
 
-	test('does NOT show locked callout when handledByPage is true even if the user has message history', () => {
+	it('does NOT show locked callout when handledByPage is true even if the user has message history', () => {
 		mockKeyringStatus = 'locked';
 		render(EncryptionGate, { user, userHasMessageHistory: true, handledByPage: true });
 
 		expect(screen.queryByText('Your messages are locked on this device')).not.toBeInTheDocument();
 	});
-	test('offers the passkey only when the account has a wrap for one', async () => {
+	it('offers the passkey only when the account has a wrap for one', () => {
 		mockKeyringStatus = 'locked';
 		mockPasskeyWrap = null;
 		const { unmount } = render(EncryptionGate, { user, userHasMessageHistory: true });
@@ -98,14 +98,14 @@ describe('EncryptionGate', () => {
 	 * re-ask what that meant — so the locked panel only appeared after a reload,
 	 * and the messaging screens fell through to rendering ciphertext.
 	 */
-	test('re-resolves the keyring when it goes back to unknown', async () => {
+	it('re-resolves the keyring when it goes back to unknown', async () => {
 		mockKeyringStatus = 'unknown';
 		render(EncryptionGate, { user, userHasMessageHistory: true });
 
 		await vi.waitFor(() => expect(initialiseKeyring).toHaveBeenCalled());
 	});
 
-	test('passes the keyring straight through to one unlock panel', () => {
+	it('passes the keyring straight through to one unlock panel', () => {
 		mockKeyringStatus = 'locked';
 		mockPasskeyWrap = null;
 		mockPasskeyCount = 1;

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { actions, load } from './+page.server';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import {
 	createTestInvite,
 	createTestPartnership,
@@ -9,7 +9,7 @@ import {
 	readPartnershipRewardRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
+import { actions, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -19,7 +19,7 @@ let stranger: TestUser;
 
 beforeEach(async () => {
 	harness = await createTestDb();
-	db = harness.db;
+	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada' });
 	jun = await createTestUser(db, { name: 'Jun' });
 	stranger = await createTestUser(db, { name: 'Stranger' });
@@ -31,20 +31,20 @@ const at = (id: string, user: TestUser | null, formData?: Record<string, string>
 	fakeEvent({ db, user, params: { id }, formData, path: `/partner/${id}/rewards/add` });
 
 describe('load', () => {
-	test('lets the controlling side open the add page', async () => {
+	it('lets the controlling side open the add page', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		await expect(runLoad(load(at(id, ada)))).resolves.toMatchObject({
 			partner: { id, name: 'Them' }
 		});
 	});
 
-	test('403s for the non-controlling side', async () => {
+	it('403s for the non-controlling side', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const result = await runAndCatch(() => runLoad(load(at(id, jun))));
 		expect(result).toMatchObject({ type: 'error', status: 403 });
 	});
 
-	test('404s for a pending invite or stranger', async () => {
+	it('404s for a pending invite or stranger', async () => {
 		const invite = await createTestInvite(db, ada);
 		const pending = await runAndCatch(() => runLoad(load(at(invite.id, ada))));
 		expect(pending).toMatchObject({ type: 'error', status: 404 });
@@ -56,7 +56,7 @@ describe('load', () => {
 });
 
 describe('actions', () => {
-	test('creates a reward and redirects back to the rewards page', async () => {
+	it('creates a reward and redirects back to the rewards page', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const result = await runAndCatch(() =>
 			actions.default?.(
