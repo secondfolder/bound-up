@@ -12,7 +12,7 @@ One shell, one component per destination.
 
 ```
 SectionWidget            the card: wa-card, header, optional header link, body
-├─ GuidesWidget          first few guide titles
+├─ GuidesWidget          first few guide titles — not rendered for now
 ├─ TasksWidget           tasks ready to complete now
 ├─ RewardsWidget         credit balance + rewards claimable now
 ├─ PartnerMessagesWidget unread / total threads for one partnership
@@ -25,8 +25,14 @@ Guides, Tasks and Rewards all want, so that list exists once.
 
 | Page            | Cards                                          |
 | --------------- | ---------------------------------------------- |
-| `/home`         | Messages (conditional), Guides, Tasks, Rewards |
+| `/home`         | Messages (conditional), Tasks, Rewards         |
 | `/partner/[id]` | Messages, Tasks, Rewards                       |
+
+The Guides card is **hidden from `/home` for now**: guides need more work before
+they are advertised. `GuidesWidget` and `GuidesWidgetView` are kept for when it
+returns, but the `/home` load no longer queries guides — D1 charges for rows
+read by a card nobody sees — so bringing it back means restoring that query as
+well as the markup. `/home/guides` itself still works; nothing links to it.
 
 Every `/home` card shows self **and** partner data wherever both exist — see
 below.
@@ -157,7 +163,7 @@ only what the preview shows:
 | --------------------------- | ----------------------------------------------------- | --------------------- |
 | `TasksWidgetView`           | `getHomeTasksWidget`, `getPartnershipTasksWidget`     | `server/tasks.ts`     |
 | `RewardsWidgetView`         | `getHomeRewardsWidget`, `getPartnershipRewardsWidget` | `server/rewards.ts`   |
-| `GuidesWidgetView`          | inline in the `/home` load                            | —                     |
+| `GuidesWidgetView`          | nothing while the card is hidden                      | —                     |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
 
 These deliberately do **not** reuse `getSelfTasksSection`, `getSelfRewardsSection`

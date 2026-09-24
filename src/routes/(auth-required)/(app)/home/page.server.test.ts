@@ -118,7 +118,6 @@ describe('load', () => {
 		const data = await runLoad(load(at(null)));
 		expect(data).toEqual({
 			unread: [],
-			guides: { guides: [], total: 0 },
 			tasks: { viewerActs: true, ready: [], readyCount: 0, waitingCount: 0, activeCount: 0 },
 			rewards: {
 				viewerActs: true,

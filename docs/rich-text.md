@@ -202,6 +202,11 @@ paragraph too.) Two details are ours:
 - **No empty halves.** `$shouldSplit: () => false` keeps the cut from making a
   half with nothing in it, so an embed at the head of a paragraph does not leave
   a blank row above itself.
+- **No leftover line end.** The break that separated the two lines goes with the
+  cut, because the paragraph boundary separates them now. Left in place it ends
+  the first half, and Lexical adds a managed `<br>` after any block that ends in
+  a line break — which is right for a trailing Shift+Enter, and an extra row
+  nobody typed for this. The join puts exactly one back.
 - **The far half is marked**, with node state, as the tail of the block the
   decorator was cut out of (`src/lib/lexical/transformers/mend-split-blocks.ts`). Lexical has no notion of a block boundary that exists
   because of something else, so the fact has to be carried. `$mendSplitBlocks`
