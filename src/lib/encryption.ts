@@ -100,9 +100,9 @@ export function masterKeySalt(email: string, params: MasterKeyParams): string {
  * Every derivation of a master key runs the address through here. If two paths
  * disagree by a single byte — a stray space, a different case — the wrap will
  * not open and the user is locked out of their own message history with no way
- * to tell why. Better Auth lowercases the stored address, but the unlock prompt
- * reads `page.data.user.email` and must still go through this rather than
- * assuming it arrives normalised.
+ * to tell why. Better Auth lowercases the stored address, but the Security
+ * page's password checks read `page.data.user.email` and must still go through
+ * this rather than assuming it arrives normalised.
  *
  * Deliberately NOT doing anything cleverer: no Gmail dot-stripping, no
  * plus-address trimming. Both would be reasonable product behaviour and both
@@ -117,29 +117,29 @@ export function normaliseEmail(email: string): string {
 /**
  * How a stored wrap can be opened.
  *
- * - `password` — the AES-GCM envelope in `crypto/wrap.ts`, under a key derived
- *   from the account password.
- * - `webauthn-prf` — an age file encrypted to a passkey. A different envelope,
- *   deliberately: the ceremony and the format arrive together from
- *   `age-encryption`, and reimplementing either to reach one envelope would be
- *   hand-rolling the part most worth not hand-rolling. See `crypto/passkey.ts`.
+ * All three are the same AES-GCM envelope (`crypto/wrap.ts`), bound to the
+ * recipient by its AAD. They differ only in where the wrap key comes from:
+ *
+ * - `password` — derived from the account password (`crypto/kdf.ts`).
+ * - `passkey-prf` — derived from a passkey's PRF output, evaluated in the same
+ *   ceremony that signs in. The strongest: the secret never leaves the
+ *   authenticator.
+ * - `passkey-handle` — derived from 32 random bytes the browser stored in the
+ *   passkey's user handle when it created it. For passkeys whose provider will
+ *   not do PRF. The secret lives in the passkey provider's vault, like a strong
+ *   password would, and never reaches this server — see
+ *   docs/passkeys.md for the trade.
+ *
+ * Every passkey has exactly one of the last two, written as it is created.
  *
  * The server stores the `type`, an opaque `params` blob it never reads, and the
  * ciphertext. That is the whole extension point: another unlock method is a new
  * member of this union plus client code, not a migration.
  */
-export type KeyWrapType = 'password' | 'webauthn-prf';
+export type KeyWrapType = 'password' | 'passkey-prf' | 'passkey-handle';
 
-/**
- * What a PRF evaluation against one registered passkey actually did.
- *
- * Two values and no "unknown": absence of a row is the unknown, and conflating
- * the two would turn "never checked" into a warning on every passkey registered
- * before the check existed. Lives here rather than in `passkey-providers.ts`
- * because the Drizzle schema imports it, and drizzle-kit loads the schema
- * outside Vite where `$lib` does not resolve.
- */
-export type PasskeyPrfStatusValue = 'supported' | 'unsupported';
+/** The two passkey wrap types, which share their params. */
+export type PasskeyWrapType = Exclude<KeyWrapType, 'password'>;
 
 export type KeyWrapParams =
 	| {
@@ -150,38 +150,49 @@ export type KeyWrapParams =
 			iterations: number;
 	  }
 	| {
-			type: 'webauthn-prf';
+			type: PasskeyWrapType;
 			version: 1;
 			/**
-			 * The WebAuthn relying party id the wrap was made under — the origin's
-			 * domain. A credential is only offered to its own RP, so a wrap made on
-			 * one host can never be opened on another, and the unlock ceremony needs
-			 * to name it.
+			 * The credential this wrap belongs to, as WebAuthn reports it (base64url).
+			 *
+			 * What sign-in matches on: the assertion names its credential, and the
+			 * wrap with that id is the one its secret opens. Also how deleting a
+			 * passkey finds its wrap. Public — the server has it on the passkey row.
+			 */
+			credentialId: string;
+			/**
+			 * The relying party id the passkey was made under — the page's hostname.
+			 * A credential is only offered to its own RP, so a wrap made on one host
+			 * can never be opened on another; recorded so that is visible.
 			 */
 			rpId: string;
-			/**
-			 * Which passkey this wrap was sealed to, as Better Auth knows it.
-			 *
-			 * Optional because it is only knowable when the ceremony was pinned to
-			 * one credential — see `ageIdentity`. Without it the Security page can
-			 * say the account has passkey unlock but not which passkey provides it,
-			 * which is exactly the state wraps written by `PasskeyOffer` are in.
-			 */
-			passkeyId?: string;
-			/**
-			 * age's own `AGE-PLUGIN-FIDO2PRF-1…` handle for that credential.
-			 *
-			 * Encodes the credential id, the rp id and the transport hints, and
-			 * pins `allowCredentials` so the unlock ceremony goes straight to the
-			 * right passkey instead of opening a chooser. Optional: wraps written
-			 * before this existed have only `rpId`, and `unwrapIdentityWithPasskey`
-			 * falls back to the chooser for them.
-			 *
-			 * Not a secret — it is a public credential id and a hostname, and it is
-			 * stored beside a ciphertext the server cannot read either way.
-			 */
-			ageIdentity?: string;
 	  };
+
+/**
+ * The PRF input every passkey is evaluated with, at creation and at sign-in.
+ *
+ * Fixed and app-wide rather than per wrap, and that is what lets sign-in and
+ * unlock be one ceremony: the salt has to be in the request before the
+ * browser knows which passkey the user will pick, and passkey autofill
+ * requires an empty `allowCredentials`, which rules out `evalByCredential`.
+ * Nothing is lost by sharing it — PRF output is already unique to each
+ * credential. Hashed so the raw bytes are exactly 32, which is what PRF takes.
+ */
+export const PASSKEY_PRF_SALT_SOURCE = 'bound-up-prf-salt-v1';
+
+/** HKDF `info` for each passkey wrap key. Distinct so the two can never collide. */
+export const PASSKEY_PRF_WRAP_INFO = 'bound-up-passkey-prf-v1';
+export const PASSKEY_HANDLE_WRAP_INFO = 'bound-up-passkey-handle-v1';
+
+/**
+ * The first byte of a user handle that carries a secret.
+ *
+ * A format version, not a flag: a handle without it is simply not a secret —
+ * notably one Better Auth generated itself, which passed through the server.
+ */
+export const USER_HANDLE_SECRET_PREFIX = 0x01;
+/** The random part of the handle. 32 bytes, well under WebAuthn's 64-byte cap. */
+export const USER_HANDLE_SECRET_BYTES = 32;
 
 /** How long a serialised `KeyWrapParams` may be. Generous; it is a few fields. */
 export const MAX_WRAP_PARAMS_LENGTH = 512;
@@ -189,7 +200,8 @@ export const MAX_WRAP_PARAMS_LENGTH = 512;
 /**
  * Parses the `params` a client submitted alongside a wrap.
  *
- * The server never uses these values — it stores them and hands them back — so
+ * The server barely uses these values — it stores them and hands them back, and
+ * reads only a passkey wrap's `credentialId` to delete it with its passkey — so
  * this checks only that the blob is a bounded JSON object naming a wrap type
  * this version understands. Validating the contents any harder would be the
  * server pretending to an authority it does not have, and would mean a new
@@ -213,11 +225,19 @@ export function parseKeyWrapParams(raw: string): KeyWrapParams | null {
 	}
 
 	const { type } = parsed as { type?: unknown };
-	if (type !== 'password' && type !== 'webauthn-prf') {
-		return null;
+	if (type === 'password') {
+		return parsed as KeyWrapParams;
 	}
-
-	return parsed as KeyWrapParams;
+	if (type === 'passkey-prf' || type === 'passkey-handle') {
+		// The one field the server does read: deleting a passkey deletes the
+		// wrap that names its credential, so it has to be there to match on.
+		const { credentialId } = parsed as { credentialId?: unknown };
+		if (typeof credentialId !== 'string' || credentialId.length === 0) {
+			return null;
+		}
+		return parsed as KeyWrapParams;
+	}
+	return null;
 }
 
 /**
@@ -328,6 +348,33 @@ export function formatSafetyNumber(digest: Uint8Array): string {
 	return encoded.replace(GROUP_OF_FOUR, '$<group>-');
 }
 
+// ── partner-assisted sign-in ─────────────────────────────────────────────────
+
+/**
+ * Where a partner-assisted sign-in has got to. See docs/account-recovery.md.
+ *
+ * Expiry is not a status: it is read from `expires_at` at use.
+ */
+export type AccountRecoveryStatus =
+	| 'pending'
+	| 'approved'
+	| 'completed'
+	| 'declined'
+	| 'superseded';
+
+/**
+ * The bytes the recovery code is computed over: the requester's new recipient.
+ *
+ * One recipient, not a pair like the safety number, because the requester is
+ * not signed in and cannot be told their partner's key without the endpoint
+ * confirming that the account exists. It does not need the pair: the code's job
+ * is to prove the partner is re-encrypting to the key the requester holds, and
+ * a server that swapped the recipient would change the code the partner sees.
+ */
+export function recoveryCodeSource(recipient: string): string {
+	return `bound-up-recovery-v1\n${recipient}`;
+}
+
 // ── trust on first use ───────────────────────────────────────────────────────
 
 /** A partner's public key as this device first saw it. Stored locally only. */
@@ -340,8 +387,6 @@ export type PinRecord = {
 };
 
 export type PinState =
-	/** They have not set up encrypted messaging yet. Nothing to pin. */
-	| { kind: 'missing' }
 	/** First sight on this device. Sending is allowed — that is what TOFU means. */
 	| { kind: 'new' }
 	/** Matches what we pinned, but never compared out of band. */
@@ -359,10 +404,7 @@ export type PinState =
  * still-verified. Carrying verification across a key change would defeat the
  * entire point of having pinned it.
  */
-export function pinStateFor(pinned: PinRecord | undefined, served: string | null): PinState {
-	if (!served) {
-		return { kind: 'missing' };
-	}
+export function pinStateFor(pinned: PinRecord | undefined, served: string): PinState {
 	if (!pinned) {
 		return { kind: 'new' };
 	}
@@ -377,5 +419,5 @@ export function pinStateFor(pinned: PinRecord | undefined, served: string | null
 
 /** True when this state must stop the user sending until they act on it. */
 export function pinBlocksSending(state: PinState): boolean {
-	return state.kind === 'missing' || state.kind === 'changed';
+	return state.kind === 'changed';
 }

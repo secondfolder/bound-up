@@ -19,9 +19,9 @@
 	// the client to read. Server load data is the single source of truth, read
 	// via `page.data.user` wherever it is needed.
 	//
-	// SiteHeader used to live here. It now belongs to (public) only: the
-	// (auth-required)/(app) group has its own shell with a bottom nav, and
-	// stacking a second navigation on top of it defeats the point.
+	// No navigation lives here. The (auth-required)/(app) group has its own
+	// shell with a bottom nav, and a top nav stacked on it defeated the point;
+	// the (public) pages link onwards from their own content instead.
 
 	// Marks the document once the client has taken over. Hydration of the whole
 	// tree finishes before any `onMount` runs, so this means every component on

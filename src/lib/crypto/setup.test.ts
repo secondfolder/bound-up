@@ -19,7 +19,6 @@ function wrapView(blob: string, over: Partial<KeyWrapView> = {}): KeyWrapView {
 		params: currentPasswordWrapParams(),
 		blob,
 		label: null,
-		lastUsedAt: null,
 		createdAt: new Date(),
 		...over
 	};
@@ -162,8 +161,8 @@ describe('buildPasswordChange', () => {
 		const { built } = await existing();
 		const wraps = [
 			wrapView(built.wrapBlob, {
-				type: 'webauthn-prf',
-				params: { type: 'webauthn-prf', version: 1, rpId: 'bound-up.test' }
+				type: 'passkey-prf',
+				params: { type: 'passkey-prf', version: 1, credentialId: 'cred', rpId: 'bound-up.test' }
 			})
 		];
 		await expect(

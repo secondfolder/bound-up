@@ -145,9 +145,9 @@
 		{#if user}
 			<a class="big" href={resolve('/(auth-required)/(app)/home')}><span>Start</span></a>
 		{:else}
-			<!-- aria-labels keep the accessible names distinct from the site
-			     header's "Login"/"Sign up" — two links sharing a name is both an
-			     a11y problem and an ambiguous test locator. -->
+			<!-- The aria-label says where the big "Sign up" goes, since on its own
+			     the word is a verb with no object for anyone navigating by link
+			     list. -->
 			<a class="big" href={resolve('/(public)/signup')} aria-label="Sign up for Bound Up">
 				<span>Sign up</span>
 			</a>

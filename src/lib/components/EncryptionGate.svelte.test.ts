@@ -1,123 +1,101 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * `UnlockPanel` refuses to offer a passkey button without WebAuthn, so it has
- * to be present for the modes to be told apart. Chromium has it, but it is
- * stubbed so no test can reach a real authenticator. Stubbed once rather than
- * per test, because it is a property of the environment and not of any case.
- */
-beforeAll(() => {
-	vi.stubGlobal('PublicKeyCredential', class {});
-	Object.defineProperty(navigator, 'credentials', { value: {}, configurable: true });
-});
+type MockKeyring =
+	| { status: 'unknown' }
+	| { status: 'locked'; signInFailed: boolean }
+	| { status: 'unlocked'; durable: true };
 
-let mockKeyringStatus = 'locked';
-let mockPasskeyWrap: { id: string } | null = null;
-let mockPasskeyCount = 0;
-let mockPasskeysKnownUnusable = 0;
+let mockKeyring: MockKeyring = { status: 'unknown' };
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
-// `PasskeyOffer` renders inside the gate and posts to a form action.
-vi.mock('$app/forms', () => ({ enhance: () => ({ destroy: () => undefined }) }));
+const goto = vi.fn().mockResolvedValue(undefined);
+vi.mock('$app/navigation', () => ({ goto }));
+
+vi.mock('$app/state', () => ({
+	page: { url: new URL('http://localhost/home/guides?tab=2') }
+}));
+
+const signOut = vi.fn().mockResolvedValue({ data: null, error: null });
+vi.mock('$lib/auth-client', () => ({ authClient: { signOut } }));
 
 const initialiseKeyring = vi.fn().mockResolvedValue(undefined);
+const lock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('$lib/crypto/session.svelte', () => ({
-	currentEnrolmentOffer: () => null,
-	dismissEnrolmentOffer: vi.fn(),
-	enrolmentIdentityFor: () => null,
-	currentKeyring: () => ({
-		status: mockKeyringStatus,
-		reason: null,
-		recipient: 'age1mine',
-		wraps: [],
-		tier: 'crypto-key',
-		passkeyCount: mockPasskeyCount,
-		passkeysKnownUnusable: mockPasskeysKnownUnusable,
-		unusableProviderAaguid: null
-	}),
+	currentKeyring: () => mockKeyring,
 	initialiseKeyring,
-	passkeyWrapFor: () => mockPasskeyWrap,
-	resetKeyring: vi.fn(),
-	unlockWithPasskey: vi.fn(),
-	unlockWithPassword: vi.fn()
+	lock,
+	resetKeyring: vi.fn()
 }));
 
 const { default: EncryptionGate } = await import('./EncryptionGate.svelte');
 
 const user = { id: 'usr-1', email: 'ada@example.com' };
 
+beforeEach(() => {
+	vi.clearAllMocks();
+	sessionStorage.clear();
+});
+
 describe('EncryptionGate', () => {
-	it('shows locked callout when keyring is locked and the user has message history', () => {
-		mockKeyringStatus = 'locked';
-		mockPasskeyWrap = null;
-		render(EncryptionGate, { user, userHasMessageHistory: true, handledByPage: false });
+	/**
+	 * `unknown` is also what signing out leaves behind, so the gate has to
+	 * re-ask whenever it comes back — not only on first mount.
+	 */
+	it('works out where the device stands when the keyring is unknown', async () => {
+		mockKeyring = { status: 'unknown' };
+		render(EncryptionGate, { user });
 
-		expect(screen.getByText('Your messages are locked on this device')).toBeInTheDocument();
-	});
-
-	it('does NOT show locked callout when keyring is locked but the user has no message history', () => {
-		mockKeyringStatus = 'locked';
-		render(EncryptionGate, { user, userHasMessageHistory: false, handledByPage: false });
-
-		expect(screen.queryByText('Your messages are locked on this device')).not.toBeInTheDocument();
-	});
-
-	it('does NOT show locked callout when handledByPage is true even if the user has message history', () => {
-		mockKeyringStatus = 'locked';
-		render(EncryptionGate, { user, userHasMessageHistory: true, handledByPage: true });
-
-		expect(screen.queryByText('Your messages are locked on this device')).not.toBeInTheDocument();
-	});
-	it('offers the passkey only when the account has a wrap for one', () => {
-		mockKeyringStatus = 'locked';
-		mockPasskeyWrap = null;
-		const { unmount } = render(EncryptionGate, { user, userHasMessageHistory: true });
-		expect(screen.queryByText('Unlock with a passkey')).not.toBeInTheDocument();
-		unmount();
-
-		// The password is never taken away, because a passkey can be lost and the
-		// password cannot be recovered — but it moves behind a button, because
-		// someone who set up a passkey did so to stop typing it.
-		mockPasskeyWrap = { id: 'wrap-1' };
-		render(EncryptionGate, { user, userHasMessageHistory: true });
-		expect(screen.getByText('Unlock with a passkey')).toBeInTheDocument();
-		expect(screen.getByText('Use your password instead')).toBeInTheDocument();
+		await vi.waitFor(() => expect(initialiseKeyring).toHaveBeenCalledWith(user));
+		expect(goto).not.toHaveBeenCalled();
 	});
 
 	/**
-	 * The gate and the messaging screens render the same component, which is the
-	 * point of `MessageUnlock` — before it, the messaging board passed no passkey
-	 * callback at all and silently had no passkey button.
+	 * There is no unlock screen: a device without its key signs out and sends
+	 * the user to sign in again, which is what unlocks.
 	 */
-	/**
-	 * `lock()` deliberately returns the keyring to `unknown`, and nothing used to
-	 * re-ask what that meant — so the locked panel only appeared after a reload,
-	 * and the messaging screens fell through to rendering ciphertext.
-	 */
-	it('re-resolves the keyring when it goes back to unknown', async () => {
-		mockKeyringStatus = 'unknown';
-		render(EncryptionGate, { user, userHasMessageHistory: true });
+	it('sends a device without its key back to sign in', async () => {
+		mockKeyring = { status: 'locked', signInFailed: false };
+		render(EncryptionGate, { user });
 
-		await vi.waitFor(() => expect(initialiseKeyring).toHaveBeenCalled());
+		await vi.waitFor(() => expect(goto).toHaveBeenCalled());
+		expect(lock).toHaveBeenCalledWith(user.id);
+		expect(signOut).toHaveBeenCalled();
+
+		const [target] = goto.mock.calls[0] as [string];
+		const url = new URL(target, 'http://localhost');
+		expect(url.pathname).toBe('/(public)/login');
+		// Back to where they were, and marked so the storage explanation can
+		// follow — but nothing about keys or messages in what is shown.
+		expect(url.searchParams.get('redirectTo')).toBe('/home/guides?tab=2');
+		expect(url.searchParams.get('reason')).toBe('device');
+		// The email is kept on the device for the login page to pre-fill, never
+		// put in the URL.
+		expect(target).not.toContain('ada@example.com');
+		expect(sessionStorage.getItem('bound-up:sign-in-again-email')).toBe('ada@example.com');
 	});
 
-	it('passes the keyring straight through to one unlock panel', () => {
-		mockKeyringStatus = 'locked';
-		mockPasskeyWrap = null;
-		mockPasskeyCount = 1;
-		mockPasskeysKnownUnusable = 1;
-		const { container } = render(EncryptionGate, { user, userHasMessageHistory: true });
+	/**
+	 * A sign-in that handed over its secret and still did not unlock is a bug,
+	 * and sending the user round again would bury it in a loop.
+	 */
+	it('does not loop when a sign-in just failed to unlock', async () => {
+		mockKeyring = { status: 'locked', signInFailed: true };
+		render(EncryptionGate, { user });
 
-		expect(container.querySelectorAll('form[data-unlock-mode]')).toHaveLength(1);
-		expect(container.querySelector('form[data-unlock-mode]')).toHaveAttribute(
-			'data-unlock-mode',
-			'passkeys-unusable'
-		);
-		mockPasskeyCount = 0;
-		mockPasskeysKnownUnusable = 0;
+		await new Promise((settle) => setTimeout(settle, 50));
+		expect(goto).not.toHaveBeenCalled();
+		expect(signOut).not.toHaveBeenCalled();
+	});
+
+	it('leaves an unlocked device alone', async () => {
+		mockKeyring = { status: 'unlocked', durable: true };
+		render(EncryptionGate, { user });
+
+		await new Promise((settle) => setTimeout(settle, 50));
+		expect(goto).not.toHaveBeenCalled();
+		expect(lock).not.toHaveBeenCalled();
 	});
 });

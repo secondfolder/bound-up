@@ -1,12 +1,15 @@
 import { createClient } from '@libsql/client';
-import type { Browser, BrowserContextOptions, Response } from '@playwright/test';
+import type { Browser, BrowserContextOptions, Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { test } from './fixtures';
 import {
+	type Account,
 	account,
 	clickWaButton,
 	createInvite,
+	expectSentToSignIn,
 	logIn,
+	logInHere,
 	signUp,
 	waitForEnhancedForm
 } from './helpers';
@@ -39,6 +42,22 @@ function newDevice(browser: Browser, timezoneId: string) {
 		permissions: ['clipboard-read', 'clipboard-write'],
 		timezoneId
 	});
+}
+
+/**
+ * Opens /home on a context built from another's `storageState`.
+ *
+ * That copies cookies and localStorage — the dismissal under test — but not
+ * the message key, which lives in IndexedDB as a non-extractable `CryptoKey`
+ * that cannot be serialised. So the copy is a signed-in device without its
+ * key, and the app sends it to sign in again first; the localStorage the test
+ * is about survives that.
+ */
+async function backOnCopiedProfile(page: Page, who: Account) {
+	await page.goto('/home');
+	await expectSentToSignIn(page, '/home');
+	await logInHere(page, who);
+	await page.waitForURL('/home');
 }
 
 test.describe('timezone settings', () => {
@@ -171,7 +190,7 @@ test.describe('timezone settings', () => {
 		});
 		try {
 			const page = await sameTimezone.newPage();
-			await page.goto('/home');
+			await backOnCopiedProfile(page, who);
 			await expect(page.getByText('This device is in a different timezone')).toHaveCount(0);
 		} finally {
 			await sameTimezone.close();
@@ -184,7 +203,7 @@ test.describe('timezone settings', () => {
 		});
 		try {
 			const page = await changedTimezone.newPage();
-			await page.goto('/home');
+			await backOnCopiedProfile(page, who);
 			await expect(page.getByText('This device is in a different timezone')).toBeVisible();
 		} finally {
 			await changedTimezone.close();

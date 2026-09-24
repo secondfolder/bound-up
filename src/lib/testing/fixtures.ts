@@ -6,6 +6,8 @@ import { controlFromAnswer } from '../partnership';
 import type { RewardInput } from '../rewards';
 import type { Db } from '../server/db';
 import {
+	accountRecoveryRequests,
+	historyRestoreRequests,
 	messageAttachments,
 	messages,
 	messageThreads,
@@ -25,7 +27,7 @@ import {
 	userKeys,
 	userKeyWraps
 } from '../server/db/schema';
-import { acknowledgeHistoryWarning, putUserKeys } from '../server/keys';
+import { putUserKeys } from '../server/keys';
 import type { MediaStore } from '../server/media';
 import { type OutgoingAttachment, sendMessage, startThread } from '../server/messaging';
 import { acceptInvite, createInvite } from '../server/partnerships';
@@ -176,7 +178,7 @@ export async function readPartnershipRow(db: Db, id: string) {
 export async function createTestUserKeys(
 	db: Db,
 	owner: TestUser,
-	options: { recipient?: string; acknowledged?: boolean } = {}
+	options: { recipient?: string } = {}
 ): Promise<{ identity: string; recipient: string }> {
 	const generated = await generateAgeIdentity();
 	const recipient = options.recipient ?? generated.recipient;
@@ -184,10 +186,49 @@ export async function createTestUserKeys(
 		recipient,
 		wrap: { type: 'password', params: PASSWORD_WRAP_PARAMS, blob: FAKE_WRAP_BLOB }
 	});
-	if (options.acknowledged) {
-		await acknowledgeHistoryWarning(db, owner.id);
-	}
 	return { identity: generated.identity, recipient };
+}
+
+/**
+ * A restore request, as a partner-assisted sign-in opens one.
+ *
+ * Inserted directly — a pending `account_recovery_requests` row with its one
+ * restore request — rather than through `startAccountRecovery`, which needs an
+ * auth secret and derives hashes that no messaging test cares about. The
+ * recovery flow itself is tested through the real function in
+ * `server/recovery.test.ts`.
+ */
+export async function createTestRestoreRequest(
+	db: Db,
+	input: {
+		partnershipId: string;
+		requesterId: string;
+		recipient: string;
+		expiresAt?: Date;
+	}
+): Promise<{ id: string; recoveryRequestId: string }> {
+	const recoveryRequestId = crypto.randomUUID();
+	const id = crypto.randomUUID();
+	await db.batch([
+		db.insert(accountRecoveryRequests).values({
+			id: recoveryRequestId,
+			userId: input.requesterId,
+			emailHash: `test-${recoveryRequestId}`,
+			tokenHash: `test-${recoveryRequestId}`,
+			recipient: input.recipient,
+			wrapParams: PASSWORD_WRAP_PARAMS,
+			wrapBlob: FAKE_WRAP_BLOB,
+			expiresAt: input.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000)
+		}),
+		db.insert(historyRestoreRequests).values({
+			id,
+			partnershipId: input.partnershipId,
+			requesterId: input.requesterId,
+			requestedRecipient: input.recipient,
+			recoveryRequestId
+		})
+	]);
+	return { id, recoveryRequestId };
 }
 
 /** The raw key row, for assertions about columns the view layer hides. */

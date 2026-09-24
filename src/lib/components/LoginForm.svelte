@@ -4,7 +4,6 @@
 	import { superForm } from 'sveltekit-superforms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { authClient } from '$lib/auth-client';
 	import {
 		deriveAuthSecret,
 		deriveMasterKey,
@@ -12,16 +11,30 @@
 		WEBCRYPTO_UNAVAILABLE,
 		webCryptoAvailable
 	} from '$lib/crypto/kdf';
-	import { stashUnlock } from '$lib/crypto/stash';
+	import { describePasskeyFailure } from '$lib/crypto/passkey';
+	import { signInWithPasskey as runPasskeySignIn } from '$lib/crypto/passkey-ceremony';
+	import type { PasskeySecrets } from '$lib/crypto/passkey-wraps';
+	import { type SignInReason, stashUnlock } from '$lib/crypto/stash';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import type { LoginFormSchema } from '$lib/schemas/loginForm';
+	import { takeSignInEmail } from '$lib/sign-in-again';
 	import InputField from './InputField.svelte';
 	import PasswordField from './PasswordField.svelte';
 
 	let {
 		data,
-		redirectTo = null
-	}: { data: SuperValidated<Infer<LoginFormSchema>>; redirectTo?: string | null } = $props();
+		redirectTo = null,
+		reason = null
+	}: {
+		data: SuperValidated<Infer<LoginFormSchema>>;
+		redirectTo?: string | null;
+		/**
+		 * Set when the app sent the user here because this device lost its key.
+		 * Changes nothing on screen — it is passed on in the stash, so the storage
+		 * explanation can follow the sign-in. See `stash.ts`.
+		 */
+		reason?: SignInReason | null;
+	} = $props();
 
 	/**
 	 * Whether the form can actually do anything yet.
@@ -44,6 +57,12 @@
 	// svelte/prefer-writable-derived for suggesting it should be.
 	onMount(() => {
 		hydrated = true;
+		// Pre-filled when the app sent the user back to sign in, so a password
+		// manager or passkey autofill matches the right account straight away.
+		const email = takeSignInEmail();
+		if (email) {
+			superform.form.update((form) => ({ ...form, email }));
+		}
 	});
 
 	let password = $state('');
@@ -101,9 +120,14 @@
 				// use?" endpoint, which would be an account-existence oracle.
 				const master = await deriveMasterKey(password, email, MASTER_KEY_VERSIONS[0]);
 				formData.set('authSecret', await deriveAuthSecret(master));
-				// Handed to EncryptionGate on the next screen, so a fresh sign-in does
-				// not immediately ask for the same password again.
-				stashUnlock({ email, wrapKey: await deriveWrapKey(master) });
+				// Handed to EncryptionGate on the next screen: signing in is what
+				// unlocks, so this is how the password opens the message key too.
+				stashUnlock({
+					kind: 'password',
+					email,
+					wrapKey: await deriveWrapKey(master),
+					...(reason ? { reason } : {})
+				});
 			} catch (error) {
 				// Cancel rather than let this throw: superforms turns a thrown
 				// onSubmit into an onError 500, which would surface as "Internal
@@ -120,30 +144,36 @@
 
 	let passkeyError: string | null = $state(null);
 
-	async function afterPasskeySignIn() {
+	async function afterPasskeySignIn(secrets: PasskeySecrets) {
+		// Signing in with a passkey unlocks too: the same ceremony returned the
+		// secret that opens this passkey's wrap. See `passkey-ceremony.ts`.
+		stashUnlock({ kind: 'passkey', ...secrets, ...(reason ? { reason } : {}) });
 		// The ceremony set the session cookie client-side, so server load data is
 		// now stale — refetch before navigating.
 		await invalidateAll();
 		// The password path gets `redirectTo` back from the action's 303; the
 		// passkey ceremony never touches the server action, so it has to apply
-		// the same destination itself or an invite would be dropped here.
+		// the same destination itself or an invite would be dropped here — and
+		// the same default, `/home`, rather than the landing page.
 		//
 		// The navigation-through-resolve plugin wants a resolve() call, but this
 		// is a runtime path from a query string, not a known route id — there is
 		// nothing to resolve against. It is safe because the server ran it
 		// through `safeRedirect` in the load before it ever reached this prop.
 		// biome-ignore lint/plugin: see above — a validated runtime path, not a route id.
-		await goto(redirectTo ?? resolve('/'), { invalidateAll: true });
+		await goto(redirectTo ?? resolve('/(auth-required)/(app)/home'), { invalidateAll: true });
 	}
 
 	async function signInWithPasskey() {
 		passkeyError = null;
-		const res = await authClient.signIn.passkey();
-		if (res?.error) {
-			passkeyError = res.error.message ?? 'Passkey sign-in failed';
+		let secrets: PasskeySecrets;
+		try {
+			secrets = await runPasskeySignIn();
+		} catch (error) {
+			passkeyError = describePasskeyFailure(error).message;
 			return;
 		}
-		await afterPasskeySignIn();
+		await afterPasskeySignIn(secrets);
 	}
 
 	// Conditional UI: offers passkeys from inside the email field's autofill
@@ -157,11 +187,18 @@
 			if (!(await PublicKeyCredential.isConditionalMediationAvailable?.())) {
 				return;
 			}
-			const res = await authClient.signIn.passkey({ autoFill: true });
-			if (cancelled || !res || res.error) {
+			let secrets: PasskeySecrets;
+			try {
+				secrets = await runPasskeySignIn({ autoFill: true });
+			} catch {
+				// Autofill is best-effort: an aborted or refused request just means
+				// the user signs in another way. Nothing to say about it.
 				return;
 			}
-			await afterPasskeySignIn();
+			if (cancelled) {
+				return;
+			}
+			await afterPasskeySignIn(secrets);
 		})();
 		return () => {
 			cancelled = true;
@@ -179,6 +216,14 @@
 			to the server, so there is nothing for the server to check without it.
 		</p>
 	</noscript>
+
+	<!-- First, and styled as the Login button is: a passkey is the one-tap way
+	     in, and it unlocks messages in the same touch. `type="button"` so Enter
+	     in the password box still submits the password. -->
+	<wa-button type="button" onclick={signInWithPasskey}>Sign in with a passkey</wa-button>
+	{#if passkeyError}<span class="invalid">{passkeyError}</span>{/if}
+
+	<div class="divider">or</div>
 
 	<InputField
 		{superform}
@@ -202,11 +247,9 @@
 	{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
 	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 
-	<div class="divider">or</div>
-	<wa-button type="button" appearance="outlined" onclick={signInWithPasskey}>
-		Sign in with a passkey
-	</wa-button>
-	{#if passkeyError}<span class="invalid">{passkeyError}</span>{/if}
+	<hr />
+	<!-- For someone who has lost every way in. See docs/account-recovery.md. -->
+	<a class="recover" href={resolve('/(public)/login/recover')}>Forgot password</a>
 </form>
 
 <style>
@@ -226,10 +269,32 @@
 			color: var(--wa-color-text-danger);
 		}
 
-		.divider {
-			text-align: center;
+		hr {
+			inline-size: 100%;
+			margin: 0;
+			border: none;
+			border-top: 1px solid var(--wa-color-surface-border);
+		}
+
+		.recover {
+			align-self: center;
 			color: var(--wa-color-text-quiet);
 			font-size: 0.875em;
+		}
+
+		.divider {
+			display: flex;
+			align-items: center;
+			gap: var(--wa-space-s);
+			color: var(--wa-color-text-quiet);
+			font-size: 0.875em;
+
+			&::before,
+			&::after {
+				content: '';
+				flex: 1 1 auto;
+				border-top: 1px solid var(--wa-color-surface-border);
+			}
 		}
 	}
 </style>

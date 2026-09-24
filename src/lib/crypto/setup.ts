@@ -1,6 +1,6 @@
 /**
- * The multi-step client flows: first setup, changing a password, and starting
- * again after forgetting one.
+ * The multi-step client flows: a new identity (signup, and a partner-assisted
+ * sign-in), and changing a password.
  *
  * BROWSER ONLY — see the note at the top of `kdf.ts`.
  *
@@ -36,14 +36,14 @@ export type IdentitySubmission = {
 /**
  * A brand-new identity, sealed under a brand-new password.
  *
- * Used by signup, by an account that has no keys yet, and by the
- * forgotten-password path — which is the same operation, just with an existing
- * account and the knowledge that the old identity is gone.
+ * Used by signup and by a partner-assisted sign-in — which is the same
+ * operation, just with an existing account and the knowledge that the old
+ * identity is gone. See docs/account-recovery.md.
  */
 export async function buildIdentitySubmission(
 	email: string,
 	password: string
-): Promise<IdentitySubmission & { identity: string }> {
+): Promise<IdentitySubmission & { identity: string; wrapKey: CryptoKey }> {
 	const master = await deriveMasterKey(password, email, MASTER_KEY_VERSIONS[0]);
 	const wrapKey = await deriveWrapKey(master);
 	const { identity, recipient } = await generateAgeIdentity();
@@ -53,7 +53,10 @@ export async function buildIdentitySubmission(
 		recipient,
 		wrapParams: JSON.stringify(currentPasswordWrapParams()),
 		wrapBlob: await wrapIdentity({ wrapKey, identity, recipient }),
-		identity
+		identity,
+		// Handed on so a caller can stash it for the sign-in that follows,
+		// without paying for the PBKDF2 derivation a second time.
+		wrapKey
 	};
 }
 

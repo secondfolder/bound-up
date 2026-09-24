@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
-import type { PageData } from './$types';
 
 const pageState = {
 	data: {
@@ -19,13 +18,13 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 const { default: Page } = await import('./+page.svelte');
 
-function renderPage(hasMessageHistory: boolean) {
-	return render(Page, { data: { hasMessageHistory } as PageData });
+function renderPage() {
+	return render(Page);
 }
 
 describe('/settings/+page.svelte', () => {
 	it('renders the signed-in panel with the logout form inside it', () => {
-		const { container } = renderPage(false);
+		const { container } = renderPage();
 
 		expect(screen.getByText('Signed in as')).toBeInTheDocument();
 		expect(screen.getByText('Ada')).toBeInTheDocument();
@@ -39,7 +38,7 @@ describe('/settings/+page.svelte', () => {
 	});
 
 	it('always shows the account, security, and partners links', () => {
-		renderPage(false);
+		renderPage();
 
 		expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
 			'href',
@@ -55,16 +54,12 @@ describe('/settings/+page.svelte', () => {
 		);
 	});
 
-	it('hides the encrypted-messages link without message history', () => {
-		renderPage(false);
+	/**
+	 * There is nothing to set up or unlock any more — signing in is what unlocks
+	 * — so the page that used to live here is gone, and so is its link.
+	 */
+	it('has no encrypted-messages settings', () => {
+		renderPage();
 		expect(screen.queryByRole('link', { name: 'Encrypted messages' })).not.toBeInTheDocument();
-	});
-
-	it('shows the encrypted-messages link once message history exists', () => {
-		renderPage(true);
-		expect(screen.getByRole('link', { name: 'Encrypted messages' })).toHaveAttribute(
-			'href',
-			'/(auth-required)/(app)/settings/encryption'
-		);
 	});
 });

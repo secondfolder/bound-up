@@ -55,10 +55,7 @@ test.describe('a message between partners', () => {
 			// ── Jun reads it ────────────────────────────────────────────────────
 			await link.click();
 			await jun.page.waitForURL(/\/messages$/);
-			// Past the one-time warning, then the unopened envelope Jun sees.
-			await jun.page.getByRole('checkbox').check();
-			await clickWaButton(jun.page, 'Start messaging');
-
+			// The unopened envelope Jun sees.
 			const sticker = jun.page.getByRole('link', { name: /^Unread message 1 of 1/ });
 			await expect(sticker).toBeVisible();
 			await expect(sticker.locator('wa-icon')).toHaveAttribute('name', 'envelope');

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
 	import LoginForm from '$lib/components/LoginForm.svelte';
 
 	let { data } = $props();
@@ -14,12 +15,11 @@
 		: resolve('/signup');
 </script>
 
-<LoginForm data={data.loginForm} redirectTo={data.redirectTo} />
+<LoginForm data={data.loginForm} redirectTo={data.redirectTo} reason={data.reason} />
 
-<!-- Not plain "Sign up": the (public) header already has a link by that name,
-     and two links with the same accessible name going to different places is a
-     real problem for anyone navigating by link list (see AGENTS.md). -->
-<a class="cross-link" href={signupHref}>New here? Create an account</a>
+<a class="cross-link" href={signupHref}>Create an account</a>
+
+<HomeScreenHint />
 
 <style>
 	.cross-link {

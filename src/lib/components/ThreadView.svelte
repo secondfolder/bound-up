@@ -162,9 +162,7 @@
 		return openDraft({ kind: 'thread', threadId: id }, untrack(unlockedIdentity));
 	}
 
-	const targets = $derived(
-		[recipients.mine, recipients.theirs].filter((value): value is string => value !== null)
-	);
+	const targets = $derived([recipients.mine, recipients.theirs]);
 
 	function formatWhen(date: Date): string {
 		return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);

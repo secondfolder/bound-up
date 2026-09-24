@@ -16,6 +16,7 @@
  *   node scripts/format-svelte.mjs a.svelte  only the named files
  */
 import { execFileSync, spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import ts from 'typescript';
 
@@ -40,7 +41,10 @@ const files =
 				encoding: 'utf8'
 			})
 				.split('\n')
-				.filter(Boolean);
+				.filter(Boolean)
+				// `--cached` still lists a file deleted in the working tree until the
+				// deletion is committed, and reading it would crash the whole run.
+				.filter((file) => existsSync(file));
 
 /**
  * Lines that start inside a template literal. Their leading whitespace is

@@ -12,11 +12,17 @@
 		value,
 		partnerName,
 		/** Shown when the key has changed, where the framing has to be different. */
-		tone = 'neutral'
+		tone = 'neutral',
+		/**
+		 * What to do with the number, when it is not a safety number — the
+		 * recovery code, which is compared the same way but means something else.
+		 */
+		instructions = null
 	}: {
 		value: string;
 		partnerName: string;
 		tone?: 'neutral' | 'warning';
+		instructions?: string | null;
 	} = $props();
 </script>
 
@@ -29,8 +35,12 @@
 	-->
 	<p class="number">{value}</p>
 	<p class="how">
-		Say this to {partnerName} in person, or over a call — somewhere other than this app. If their number
-		is the same, nobody is reading your messages. If it is different, stop and tell each other.
+		{#if instructions}
+			{instructions}
+		{:else}
+			Say this to {partnerName} in person, or over a call — somewhere other than this app. If their
+			number is the same, nobody is reading your messages. If it is different, stop and tell each other.
+		{/if}
 	</p>
 </div>
 

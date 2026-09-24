@@ -1,89 +1,22 @@
 /**
- * Which passkey provider a credential came from, and whether it can do PRF.
+ * Which passkey provider a credential came from, for its label.
  *
  * Pure and alias-free, like `encryption.ts` and `partnership.ts`: the Security
- * page's `load` resolves a name on the server, and the warning dialog renders
- * the table in the browser, so this file is in both graphs and must not reach
- * for `$lib`, `$env` or anything with a runtime.
+ * page's `load` resolves a name on the server, and the add-a-passkey dialog
+ * does the same in the browser, so this file is in both graphs and must not
+ * reach for `$lib`, `$env` or anything with a runtime.
  *
- * Two separate questions live here, and conflating them is the mistake this
- * file exists to prevent:
- *
- * 1. **Who made this credential?** Answered by the AAGUID, which identifies an
- *    authenticator *model* and arrives only in the registration response.
- * 2. **Can that provider return PRF output to this site?** Answered by
- *    `PRF_PROVIDERS`, which is a hand-maintained survey and is **never** used
- *    to decide anything. The verdict for a real credential always comes from
- *    actually trying it — see `docs/passkeys.md`. This table is copy: it tells
- *    someone whose passkey just failed which manager to use instead.
+ * The AAGUID identifies an authenticator *model* and arrives only in the
+ * registration response. It used to feed a survey of which providers could do
+ * PRF, too; that went when every passkey became able to unlock (a provider
+ * without PRF gets a user-handle wrap instead — see docs/passkeys.md), leaving
+ * nothing for the survey to warn about.
  */
-
-/**
- * How well a provider supports the WebAuthn PRF extension for third-party
- * sites, as surveyed in September 2026.
- *
- * `partial` is the interesting one and the reason nothing here is load-bearing:
- * several providers answer `prf.enabled: false` at credential *creation* and
- * then return PRF output perfectly well at assertion (Samsung Pass, KeePassXC),
- * and at least one does the reverse (Microsoft Password Manager). A flow that
- * trusted the creation-time flag would write off working authenticators.
- */
-export type PrfSupport = 'full' | 'partial' | 'none';
 
 export type PasskeyProvider = {
 	/** Verbatim from the community AAGUID list, so names match other apps. */
 	name: string;
-	prf: PrfSupport;
-	/** Shown beside `partial` and `none` rows. Says what actually breaks. */
-	note?: string;
 };
-
-/**
- * The providers people actually ask about, worst-case-first within each group.
- *
- * Rendered as-is by the "this passkey cannot unlock your messages" dialog, so
- * the copy has exactly one source. Ordered `full` → `partial` → `none` because
- * someone reading it is choosing where to put their next passkey.
- */
-export const PRF_PROVIDERS: readonly PasskeyProvider[] = [
-	{ name: 'Apple Passwords (iCloud Keychain)', prf: 'full' },
-	{ name: 'Google Password Manager', prf: 'full' },
-	{
-		name: 'Windows Hello',
-		prf: 'full',
-		note: 'Needs the February 2026 Windows 11 update and Chrome/Edge 147+ or Firefox 148+.'
-	},
-	{ name: '1Password', prf: 'full' },
-	{ name: 'Proton Pass', prf: 'full' },
-	{ name: 'Keeper', prf: 'full' },
-	{ name: 'Enpass', prf: 'full' },
-	{
-		name: 'Bitwarden',
-		prf: 'partial',
-		note: 'Depends on the platform — works on Linux with Firefox, not on iOS or Safari.'
-	},
-	{
-		name: 'KeePassXC',
-		prf: 'partial',
-		note: 'Usually refuses at the moment a passkey is created, then works afterwards.'
-	},
-	{
-		name: 'Samsung Pass',
-		prf: 'partial',
-		note: 'Says no when the passkey is created, then works when it is used.'
-	},
-	{
-		name: 'Microsoft Password Manager',
-		prf: 'partial',
-		note: 'Accepts the passkey, then refuses every time it is used to unlock.'
-	},
-	{
-		name: 'Dashlane',
-		prf: 'none',
-		note: 'Uses this feature for its own vault, but does not offer it to other sites.'
-	},
-	{ name: 'NordPass', prf: 'none' }
-];
 
 /**
  * AAGUID to provider, for the ones this app can name.
@@ -96,9 +29,8 @@ export const PRF_PROVIDERS: readonly PasskeyProvider[] = [
  * imports the upstream map and asserts the two agree, so the copy cannot drift
  * silently.
  *
- * Names are verbatim from upstream except where a `PRF_PROVIDERS` row already
- * says the same thing more usefully — `lookupProviderName` returns the upstream
- * spelling and `providerForAaguid` maps it onto a row.
+ * Names are verbatim from upstream; `lookupProviderName` returns them as-is and
+ * `providerForAaguid` tidies the two Apple spellings into one.
  */
 const AAGUID_NAMES: Readonly<Record<string, string>> = {
 	'ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4': 'Google Password Manager',
@@ -139,31 +71,22 @@ export function lookupProviderName(aaguid: string | null | undefined): string | 
 }
 
 /**
- * Upstream's spelling to the `PRF_PROVIDERS` row that describes it.
+ * Upstream's two Apple spellings, shown as one.
  *
- * An explicit map rather than a fuzzy match on the name: the two Apple entries
- * differ only in a parenthetical, and a prefix or substring rule that got them
- * right today would go wrong the first time upstream renamed anything.
+ * An explicit map rather than a fuzzy match on the name: the two entries differ
+ * only in a parenthetical, and a prefix or substring rule that got them right
+ * today would go wrong the first time upstream renamed anything.
  */
 const PROVIDER_ALIASES: Readonly<Record<string, string>> = {
 	'Apple Passwords': 'Apple Passwords (iCloud Keychain)',
 	'iCloud Keychain (Managed)': 'Apple Passwords (iCloud Keychain)'
 };
 
-/**
- * The provider and its PRF standing, or null when the AAGUID says nothing.
- *
- * A name with no `PRF_PROVIDERS` row — LastPass today — comes back as
- * `prf: 'partial'` with no note. That is the honest answer rather than a
- * placeholder: an unsurveyed provider is precisely one whose behaviour is
- * unknown, and `partial` is the value that promises nothing either way.
- */
+/** The provider to label a passkey with, or null when the AAGUID says nothing. */
 export function providerForAaguid(aaguid: string | null | undefined): PasskeyProvider | null {
 	const name = lookupProviderName(aaguid);
 	if (!name) {
 		return null;
 	}
-
-	const rowName = PROVIDER_ALIASES[name] ?? name;
-	return PRF_PROVIDERS.find((provider) => provider.name === rowName) ?? { name, prf: 'partial' };
+	return { name: PROVIDER_ALIASES[name] ?? name };
 }

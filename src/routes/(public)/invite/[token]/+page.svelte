@@ -17,10 +17,8 @@
 		<!-- "Create an account" is primary on purpose: someone reaching an invite
 		     link while signed out most likely does not have an account yet, so
 		     that is the more probable action — and more probable actions get the
-		     solid button. Not plain "Log in" / "Sign up": the (public) header
-		     already offers links by those names, and two links with the same
-		     accessible name going to different places is a real problem for anyone
-		     navigating by link list, not just for a test's locator. -->
+		     solid button. "Log in to accept" rather than plain "Log in", because
+		     it says what happens next: the invite is waiting on the other side. -->
 		<div class="actions">
 			<wa-button
 				appearance="outlined"

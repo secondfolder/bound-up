@@ -55,7 +55,8 @@ export async function seal(input: {
  * Opens a seal, or returns null when the key or the AAD is wrong.
  *
  * Null rather than a throw for a failed tag check, because "wrong password" is
- * an ordinary outcome that the unlock screen has to render as a message. A
+ * an ordinary outcome that a screen has to render as a message — adding a
+ * passkey and changing the password both check the password this way. A
  * *malformed* blob still throws: that is a different problem — corrupt or
  * tampered storage — and silently reporting it as a bad password would send
  * whoever hits it looking in entirely the wrong place.

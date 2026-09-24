@@ -73,8 +73,7 @@ the published critique of Bitwarden's design, and it applies here identically.
 
 So the confidentiality of your whole message history is capped by the entropy of
 your password. That is why the signup minimum is 12 characters with a strength
-meter, why the meter rewards length over punctuation, and why
-`/settings/encryption` offers a generated five-word passphrase (~64 bits).
+meter, and why the meter rewards length over punctuation.
 
 ### Things that must never change quietly
 
@@ -109,16 +108,17 @@ signup.
 | `user_keys.recipient` | The public `age1…`. Stored in the clear — it is public by construction.      |
 | `user_key_wraps`      | One row per way to unlock: `(type, params, blob)`. All opaque to the server. |
 
-`blob` is base64url of a ciphertext the server cannot read, in one of two
-formats depending on `type`:
+`blob` is base64url of a ciphertext the server cannot read, in one format for
+every `type`: `12-byte IV ‖ AES-256-GCM(identity) ‖ 16-byte tag`, with the
+additional authenticated data set to `"bound-up-wrap-v1|" + recipient`. That AAD
+binds a wrap to the public key it belongs to, so a wrap row moved between
+accounts fails its tag check instead of decrypting into someone else's
+identity. What differs between types is only where the wrap key comes from:
 
-- **`password`** — `12-byte IV ‖ AES-256-GCM(identity) ‖ 16-byte tag`, with the
-  additional authenticated data set to `"bound-up-wrap-v1|" + recipient`. That
-  AAD binds a wrap to the public key it belongs to, so a wrap row moved between
-  accounts fails its tag check instead of decrypting into someone else's
-  identity.
-- **`webauthn-prf`** — an age file encrypted to a passkey. See
-  [Passkey unlock](#passkey-unlock) for why that one is not the same envelope.
+- **`password`** — derived from the account password (above).
+- **`passkey-prf`** — from a passkey's PRF output. See [Passkeys](#passkeys).
+- **`passkey-handle`** — from a secret this app stores in a passkey's user
+  handle, for providers that will not do PRF. See [Passkeys](#passkeys).
 
 age's own passphrase mode is deliberately not used for the password wrap: it
 would run scrypt over a value that is already 650,000 PBKDF2 iterations deep,
@@ -135,7 +135,7 @@ Two reasons, and the first is load-bearing:
    `user_key_wraps` has **no unique index on `(user_id, type)`**; adding one
    would break password changes in a way that only shows up on a mid-request
    failure.
-2. A user may hold a password wrap and a passkey wrap at the same time.
+2. Every passkey has a wrap of its own, beside the password's.
 
 ### One identity, never rotated
 
@@ -145,119 +145,55 @@ history. A compromised identity exposes everything, past and future. Rotating
 is not an escape either: the server holds ciphertext only, so there is nothing
 to re-encrypt from.
 
-The single exception is a forgotten password, which loses the identity outright
-and starts a partner-assisted restore — see [docs/messaging.md](messaging.md).
+The single exception is losing every way in — the password and every passkey —
+which loses the identity outright. A partner-assisted sign-in then replaces it
+and a partner re-encrypts the shared history; see
+[docs/account-recovery.md](account-recovery.md).
 
-### Passkey unlock
+### Passkeys
 
-Every passkey is registered with the WebAuthn PRF extension requested
-(`registration.extensions` in `src/lib/server/auth.ts`), so it can later unlock
-the identity with a touch instead of the password. This matters most on the
-devices the storage ladder cannot help — an evicted store, a private tab, a new
-phone — which is exactly where the password prompt used to be the only way in.
+Signing in with a passkey unlocks, in the same touch — that is the whole design,
+and [docs/passkeys.md](passkeys.md) has it in full. In brief:
 
-**The ceremony is age's, not ours.** `src/lib/crypto/passkey.ts` is a thin
-layer over `age-encryption`'s `WebAuthnRecipient` and `WebAuthnIdentity`, so a
-passkey wrap is an age file rather than the AES-GCM envelope above. That is a
-deliberate second format, for what upstream does that a local reimplementation
-would have to get right on its own:
+- **One ceremony.** The sign-in assertion asks for the PRF extension with a
+  fixed, app-wide salt (`PASSKEY_PRF_SALT_SOURCE`). Fixed because the salt has
+  to be in the request before anyone knows which passkey will answer, and
+  passkey autofill needs an empty `allowCredentials`, which rules out a salt
+  per credential. PRF output is already unique to each credential, so nothing
+  is lost.
+- **A fallback that always works.** Every passkey is created with `user.id`
+  set, by the browser, to `0x01 ‖ 32 random bytes`. Every discoverable passkey
+  stores its user handle and returns it on every assertion, whatever the
+  provider — so a passkey whose provider will not do PRF is sealed to that
+  instead (`passkey-handle`).
+- **Exactly one wrap per passkey**, written as it is created: `passkey-prf`
+  when the provider returned PRF output (at creation, or in one extra
+  evaluation straight after), `passkey-handle` otherwise. Never both — a
+  credential with both would be only as strong as the weaker one.
+- **Neither secret reaches the server.** The ceremonies call Better Auth's
+  endpoints directly (`crypto/passkey-ceremony.ts`) and strip
+  `clientExtensionResults` and `userHandle` before posting. Better Auth never
+  needed either: it verifies the signature against the stored public key and
+  looks the passkey up by credential id.
 
-- it derives the file key from **both** PRF outputs, `first` and `second`, so
-  one user-presence check cannot be made to yield two decryptions;
-- it carries a fresh 16-byte nonce in the age stanza, so no salt has to be
-  stored in `params` and no two wraps of one identity are alike;
-- it absorbs the 1Password extension's non-standard PRF result shape.
+**The trade the user-handle wrap makes, plainly.** A PRF key never leaves the
+authenticator. A user handle is stored in the passkey provider's vault — like a
+strong random password would be — and is exported with the passkey (CXF) and
+visible to browser extensions that wrap WebAuthn. It is never visible to this
+server. That is weaker than PRF and it is the reason PRF is always preferred;
+it is still far stronger than the alternative it replaced, which was a passkey
+that could sign in but could never read a message.
 
-`age.webauthn` is marked experimental upstream, which is why `age-encryption` is
-pinned to an exact version in `package.json`.
+Both wrap keys go through HKDF with their own `info`
+(`PASSKEY_PRF_WRAP_INFO`, `PASSKEY_HANDLE_WRAP_INFO`) into a non-extractable
+AES-GCM key, and `crypto/passkey-wraps.test.ts` holds frozen vectors for both,
+made by an independent implementation — the same reason as the KDF's frozen
+vector.
 
-**There are two ways in, and they are different moments.**
-
-_Adding a passkey_ — from Security or from Encrypted messages — asks for the
-password, registers a credential, and seals the identity to it in one act. The
-password is unavoidable there: it re-authenticates, and it is the only thing
-that can open the identity as a string. That flow, what it does with the PRF
-result and what it calls the passkey are all in [docs/passkeys.md](passkeys.md).
-
-_The free offer_ is the other one. Every unlock except reading the cache has the
-`AGE-SECRET-KEY-1…` string in hand for a moment — signup generated it, a
-password unlock has just unwrapped it — and sealing it to a passkey needs
-exactly that. So `cache()` opens an _enrolment offer_ whenever it is handed the
-string and the account has a passkey but no passkey wrap, and `PasskeyOffer` in
-the app shell asks the question straight away: one tap, no password, wherever
-the user happens to be.
-
-The offer keeps the string in a plain module variable, outside the reactive
-keyring so that no template can reach it by accident, and drops it on
-acceptance, on dismissal, on lock, on sign-out, and after five minutes. That
-bound is the whole cost of the design: while an offer stands, a device that
-would otherwise hold nothing but a non-extractable `CryptoKey` is also holding
-the string. The identity is deliberately **not** taken on read — a dismissed
-Face ID sheet is the likeliest outcome of asking, and confiscating the identity
-on the first tap would make the retry cost a password.
-
-The add-a-passkey flow is hidden while an offer is standing, so the easy way and
-the hard way are never both on screen.
-
-**Nothing is enrolled that has not already worked.** The wrap is produced by a
-real PRF evaluation, which fails there and then if the credential cannot do
-PRF. That is a stronger check than reading `enabled` at registration, and the
-two genuinely disagree in both directions in the field — see
-[docs/passkeys.md](passkeys.md), which also covers how the outcome is recorded
-per passkey so a credential that cannot unlock says so on the Security page
-rather than only in the moment it was made. But it is only useful if the failure
-is legible, and the first version of this got that wrong twice:
-
-- **An offer needs a passkey to exist.** `UnlockBundleView.hasPasskeys` says
-  whether the account has registered one, which is a different question from
-  whether the browser has WebAuthn. Offering on the second alone opens a chooser
-  with nothing in it, and WebAuthn reports that as a plain `NotAllowedError` —
-  the same error a dismissal gives, deliberately, so that a page cannot learn
-  which credentials exist. The offer is therefore withheld rather than explained
-  afterwards, and `/settings/encryption` points at Security instead.
-- **A failed ceremony always says something.** `describePasskeyFailure` sorts it
-  into `no-assertion` (quiet: usually a dismissal, and indistinguishable from
-  having nothing to offer), `no-prf` (the provider answered without PRF output)
-  and `unknown` (kept verbatim). age's own text for the PRF case names macOS 15
-  and Chrome 132, which reads as nonsense to someone already on macOS 15 whose
-  password manager is the thing at fault, so it is replaced with one that names
-  the authenticator.
-
-Not every provider can do this. Passkeys in iCloud Keychain, Google Password
-Manager and Windows Hello return PRF; several third-party password managers do
-not, and a few disagree with themselves depending on whether they are asked at
-creation or at assertion. The surveyed list, and what the app does about it,
-are in [docs/passkeys.md](passkeys.md). `e2e/passkey.spec.ts` covers both
-outcomes against
-Chromium's virtual authenticator, which evaluates the PRF extension when CDP
-creates it with `hasPrf` — Playwright's own cross-browser
-`browserContext.credentials` API cannot, which is why that spec reaches for CDP
-directly.
-
-`params` holds the relying party id, and — for wraps written by the add-a-passkey
-flow — the passkey it was sealed to and age's own handle for that credential, so
-the unlock ceremony goes straight to the right passkey instead of opening a
-chooser. Both are optional: wraps written before that existed, and wraps written
-by `PasskeyOffer` (which seals to whichever passkey the user picks), carry
-neither and still open through the chooser. See [docs/passkeys.md](passkeys.md).
-
-The unlock screen offers **one** wrap, the most recently used, because every
-attempt is a biometric prompt and looping over wraps would ask the user to
-authenticate to discover something they already know.
-
-Three constraints, all of them real:
-
-- **PRF must be requested at credential creation.** A passkey registered before
-  this feature existed can never be used for PRF and cannot be upgraded — the
-  user has to register a new one.
-- **iOS and iPadOS cannot pass PRF to an external authenticator.** A security
-  key on an iPhone will not work; platform passkeys do.
-- **PRF needs iOS 18+, macOS 15+ or Chrome 132+.** Below that, enrolment fails
-  with age's own message saying so.
-
-Better Auth's passkey client strips `clientExtensionResults` before posting an
-assertion, and the ceremony here is run directly rather than through it, so the
-PRF output never reaches the server by either route.
+Adding a passkey needs the password, because on a device that caches a
+non-extractable `CryptoKey` opening the password wrap is the only way to get
+the identity as a string to seal. Deleting one deletes its wrap in the same
+batch (`/api/keys/passkey/[id]`).
 
 ## Import boundaries
 
@@ -270,7 +206,8 @@ PRF output never reaches the server by either route.
   lives in `crypto/` — the login page needs the KDF and must not pull in
   age-encryption, which brings ML-KEM with it for a feature this app never uses.
 - The server's entire involvement is storing and returning four opaque strings:
-  `recipient`, `type`, `params`, `blob`.
+  `recipient`, `type`, `params`, `blob`. It reads one field inside `params` — a
+  passkey wrap's public `credentialId` — to tie the wrap to its passkey row.
 
 ## What the forms do
 
@@ -331,51 +268,45 @@ already existed.
 `src/lib/crypto/keystore.ts` caches it in IndexedDB, and `session.svelte.ts`
 holds the one piece of state everything reads (`currentKeyring()`).
 
-Five ways a device ends up unlocked, in the order they are tried:
+**Signing in is what unlocks.** There is no unlock step and no unlock form. The
+login form derives the wrap key from the password as it signs in; the passkey
+ceremony gets its PRF output or user handle as it signs in; signup has the new
+identity in hand. Each leaves what it has in a module-level stash
+(`src/lib/crypto/stash.ts`), and a moment later `initialiseKeyring` opens the
+identity with it and caches it through the storage ladder below. The next load
+finds it cached and needs nothing.
 
-1. **Already cached.** The identity is in IndexedDB from a previous visit.
-2. **Just signed in.** The login or signup form derived the wrap key while it
-   had the password, and left it in a module-level stash
-   (`src/lib/crypto/stash.ts`) for the gate to pick up a moment later. This is
-   what makes signing in on a new device unlock with no second prompt. The
-   stash is keyed by email and cleared as it is read, so a second sign-in in the
-   same tab cannot inherit the first one's key.
-3. **A passkey.** When the account has a `webauthn-prf` wrap, the unlock screen
-   offers it above the password field. It ends in the same cache as every other
-   path, so one touch also re-persists the identity through the ladder below and
-   the next load is silent.
-4. **The unlock prompt.** A cold start: a new device, a passkey sign-in, or —
-   most often — the browser having evicted its storage. iOS drops IndexedDB
-   after about a week of not opening the app, so this is a screen a regular user
-   sees regularly, and it is designed as one rather than as an error.
-5. **No keys at all** (`absent`), which is a legacy or passkey-first account.
-   The messaging screens and `/settings/encryption` explain how to set them up
-   when that state becomes relevant.
+So a device ends up in one of two states:
 
-A wrong password is caught by the AES-GCM tag **on the device**, with no server
-round trip — so it is answered instantly and tells a watcher nothing.
+1. **It holds the identity** — cached from an earlier sign-in, or just opened
+   from the stash.
+2. **It does not.** Most often the browser has cleared its storage — Safari does
+   after a week of use without a visit — while the session cookie survived.
+   `EncryptionGate` then signs the device out and sends it to
+   `/login?redirectTo=…&reason=device`. That login page looks exactly like any
+   other: nothing about keys or messages. Signing in brings the identity back,
+   and the user lands where they were. `reason=device` only makes the storage
+   explanation below due afterwards.
 
-**Locking returns the keyring to `unknown`, not to `locked`**, because what the
-device can do next depends on what the account still has, and that is a question
-for `initialiseKeyring`. `EncryptionGate` re-asks it whenever the status goes
-back to `unknown`. Every screen that switches on the status has an explicit
-`unknown` branch that renders a placeholder and never content — see the last
-section of [docs/passkeys.md](passkeys.md) for what went wrong when it did not.
+Every screen is sent back, not only messaging: "signed in, except some
+features" is the half-state this replaced. A device whose cached identity no
+longer matches the public key the server serves — because a partner-assisted
+sign-in on another device replaced it — drops the stale copy and is sent back
+too.
 
-**Every screen that can be reached while locked renders the same component.**
-`UnlockPanel.svelte`, wired up by `MessageUnlock.svelte`, and what it offers is
-decided by the pure `unlockMode`. That is not tidiness: there used to be four
-copies, and two of them passed no passkey callback at all, so passkey unlock
-silently did not exist on the messaging screens. The four shapes it takes are
-described in [docs/passkeys.md](passkeys.md).
+**Signing out forgets the identity** on this device (`lock()`). It used to be
+left in IndexedDB, readable by whoever signed in next on the same browser
+profile. `lock()` leaves the keyring `signed-out` rather than `unknown`, so
+nothing starts working the state out again — and deciding to send the device
+to sign in — while the sign-out's own redirect is still in flight.
 
-`EncryptionGate` in the app shell decides which of these applies, once. It is
-deliberately not a wall: the guides and the partner screens need no keys, so a
-locked device gets a callout and everything else keeps working. The gate only
-speaks up once the user has actual message history, which is the point where a
-locked or absent key state can strand real data. Only the messaging screens
-and `/settings/encryption` render their own locked state, and the gate keeps
-quiet on those to avoid two identical unlock forms on one page.
+A sign-in that hands over a secret which opens nothing ends up
+`locked` with `signInFailed`, and is **not** sent round again. Every way in is
+created with a wrap, so that is a bug, and a redirect loop would hide it.
+
+Every screen that switches on the status renders a placeholder, never content,
+for anything but `unlocked` — see the last section of
+[docs/passkeys.md](passkeys.md) for what went wrong when one did not.
 
 ### The storage ladder
 
@@ -391,7 +322,7 @@ Whichever survives is the one this browser profile uses, decided once:
 
 **Why the second tier exists.** WebCrypto X25519 only shipped in Safari 18.4 /
 iOS 18.4. Before that a `CryptoKey` identity cannot be made at all, and the
-device was dropped straight to `memory` — an unlock prompt on every page load,
+device was dropped straight to `memory` — a password prompt on every page load,
 which is what an iPhone actually did. Nothing about _storing_ the identity ever
 needed X25519, though: age decrypts perfectly well from a string identity via
 `@noble/curves`, and only the `CryptoKey` form of it needs the algorithm. So the
@@ -413,92 +344,89 @@ identity is held as a non-extractable `CryptoKey` in the keyring, even on the
 sealed and memory tiers — the tier decides what reaches disk, not what a
 variable holds.
 
-`fallbackReason` records why a device is not on `crypto-key`, and
-`/settings/encryption` shows it when the device ends up on `memory`. It exists
+`fallbackReason` records why a device is not on `crypto-key`, and the Security
+page's "This device" block shows it when the device ends up on `memory` — where
+every page load loses the identity and signs the user out. It exists
 because one `catch` around the whole probe made "iOS asks for my password every
 time" indistinguishable from an unsupported curve, a refused database and a
 `DataCloneError` without attaching a remote inspector.
 
 ### Storage still gets evicted
 
-iOS drops IndexedDB after about a week of not opening the app, and any browser
-may evict under pressure. Asking `navigator.storage.persist()` helps where the
-browser agrees, which Safari generally does not unless the site is on the Home
-Screen — so path 3 stays a first-class screen, not an error.
+Safari deletes a site's storage after seven days of use without a visit to it,
+and any browser may evict under pressure. Two things reduce how often that
+costs a sign-in; neither can stop it, so signing in again is designed as the
+ordinary path it is, not an error.
 
-The request is never made unprompted. Chrome and Safari decide it silently, but
-Firefox shows a permission prompt, and the keystore used to fire it on its first
-durable write — the silent unlock straight after signing in, with nothing on
-screen to say why. Now (`src/lib/crypto/storage-persistence.svelte.ts`):
+**The Home Screen.** A web app opened from the iOS Home Screen is WebKit's one
+documented exemption from the seven-day rule, so on iPhone and iPad (in a
+browser tab, not already standalone) `HomeScreenHint` suggests "Add to Home
+Screen to stay signed in for longer", on the login page and in the app shell.
+The web cannot add itself, so it says how; `shouldOfferHomeScreen` in
+`src/lib/home-screen.ts` decides, and a dismissal is remembered per device. The
+manifest's `start_url` is `/home`, so the Home Screen app opens the app rather
+than whatever page it was added from.
 
-- **Only an explicit unlock makes the explanation due** — a password or passkey
-  unlock through `unlockWithPassword` / `unlockWithPasskey`. The stash unlock
-  after login or signup, and a load that finds the key already cached, do not.
-  An explicit unlock is the moment eviction has just cost the user something.
+**Asking the browser to keep it.** `navigator.storage.persist()` helps where the
+browser agrees — Chrome decides from engagement, Firefox asks the user. It is
+not asked for on the login page: Safari shows no prompt, grants it mainly to
+Home Screen apps, and does not document it as overriding the seven-day rule.
+
+The request is never made unprompted. Firefox shows a permission prompt, and
+the keystore used to fire it on its first durable write — the silent unlock
+straight after signing in, with nothing on screen to say why. Now
+(`src/lib/crypto/storage-persistence.svelte.ts`):
+
+- **Only a sign-in the browser forced makes the explanation due** — one that
+  arrived through `reason=device`, carried in the stash. An ordinary sign-in,
+  and a load that finds the key already cached, do not. That forced sign-in is
+  the moment eviction has just cost the user something.
 - **It is skipped** when the device is on the `memory` tier (nothing is stored to
   keep), when the Storage API is missing, when `persisted()` already says yes,
   or once this device has pressed OK (the `bound-up:storage-persistence-asked`
   localStorage key — per origin, because the permission is).
 - **`StoragePersistenceDialog`, in the app shell, explains; only its OK asks.**
-  `persist()` is called in the click handler before anything is awaited, because
-  Firefox prompts only while the click's user activation is live. Closing the
-  dialog any other way asks nothing and records nothing, so it comes back after
-  the next explicit unlock.
-- **It waits out "unlock, then set up a passkey".** `MessageUnlock` holds it shut
-  while the add-a-passkey dialogs are open, rather than stacking two modals.
-- **`/settings/encryption` can ask again** whenever the device is unlocked on a
+  Its copy is "Stay signed in on this device" — about staying signed in, which
+  is what the user experiences, never about keys. `persist()` is called in the
+  click handler before anything is awaited, because Firefox prompts only while
+  the click's user activation is live. Closing the dialog any other way asks
+  nothing and records nothing, so it comes back the next time.
+- **The Security page can ask again** whenever the device holds the key on a
   durable tier and `persisted()` says no — whether the dialog was dismissed or
   the browser refused an OK.
 
-## Changing and resetting the password
+## Changing the password, and losing it
 
-The settings split is now deliberate:
+Every account has message keys — signup creates them, and a signup whose keys
+fail to store is undone rather than left without — so there is one path for
+each of these, not one per kind of account.
 
-- `/settings/security` handles ordinary account-password changes and passkey
-  management — see [docs/passkeys.md](passkeys.md).
-- `/settings/encryption` handles message-key setup, unlock-method management,
-  and forgotten-password recovery for message history.
-
-`/settings/security` changes the password in one of two ways, depending on
-whether the account already has message keys.
-
-**Changing it** re-seals the same identity, so nothing already sent is lost. The
-order is chosen for crash-safety, and there is a test asserting it:
+**Changing the password** (Security) re-seals the same identity, so nothing
+already sent is lost. The order is chosen for crash-safety, and there is a test
+asserting it:
 
 1. Insert the **new** wrap. Both password wraps now exist.
 2. Change the credential.
 3. Only now retire the old wrap.
 
 Dying between 1 and 2 leaves two wraps of which the old password opens one;
-between 2 and 3, two of which the new password opens one. Unlock tries each in
+between 2 and 3, two of which the new password opens one. Sign-in tries each in
 turn, so neither loses the identity. If step 2 fails outright the new wrap is
-rolled back.
+rolled back. A change that arrives without a re-sealed wrap is refused, since it
+would leave the identity sealed to a password that no longer exists.
 
 The old password is checked **in the browser** first, by opening the existing
 wrap with it. A wrong one therefore fails before anything is sent.
 
-If the account has no message keys yet, `/settings/security` still changes the
-Better Auth credential without writing any wrap rows.
+**Losing the password alone loses nothing**, as long as a passkey is left: every
+passkey unlocks, so signing in with one brings the identity back.
 
-`/settings/encryption` still covers the message-specific paths. **Forgetting the
-password** is not recoverable, and the screen says so in as many words. What it
-offers instead: set a _new_ password, generate a _new_ identity, and ask each
-partner to re-encrypt the shared history to it — see
-[docs/messaging.md](messaging.md). That needs an authenticated session, which
-today means a passkey, so `clearPasswordCredential` nulls the stored credential
-and `setPassword` writes the new one. (`setPassword` throws
-`PASSWORD_ALREADY_SET` otherwise, and `changePassword` needs the old password,
-which is precisely what is missing.)
-
-**Setting up encrypted messages on an account with a password but no keys**
-verifies the password before sealing anything to it — via a no-op
-`changePassword`, which is the only way to ask Better Auth "is this the current
-password?". Sealing to a mistyped password would produce a key that looks fine
-and can never be opened.
-
-The last remaining unlock method cannot be removed. A recipient with no wraps is
-an identity nobody can open again, and the tempting recovery from it —
-generating a fresh key — silently orphans every message the user has received.
+**Losing every way in** — the password and every passkey — loses the identity
+for good. What remains is a partner-assisted sign-in, from the login page: a new
+password and a new identity, a partner who compares a code and re-encrypts the
+history the two of them share, and every old passkey and session removed. See
+[docs/account-recovery.md](account-recovery.md), including the gap it has until
+email verification exists.
 
 ## Trust on first use
 

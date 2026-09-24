@@ -17,7 +17,7 @@ function data(partnerTasks: PageData['partnerTasks'] = []): PageData {
 			timezone: 'Europe/London'
 		},
 		partners: [{ id: 'p1', name: 'Jun', image: null }],
-		userHasMessageHistory: false,
+		helpRequests: [],
 		selfTasks: {
 			tasks: [],
 			completions: [

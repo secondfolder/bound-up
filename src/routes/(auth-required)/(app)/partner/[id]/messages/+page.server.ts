@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getRecipientsForPartnership, getUserKeys } from '$lib/server/keys';
+import { getRecipientsForPartnership } from '$lib/server/keys';
 import { listBoard, listRestoreRequests, listTags, requireMembership } from '$lib/server/messaging';
 import type { PageServerLoad } from './$types';
 
@@ -19,13 +19,19 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	// So a send, or a realtime notification, can refresh just this board.
 	depends(`messages:board:${params.id}`);
 
-	const [threads, recipients, keys, restoreRequests, tags] = await Promise.all([
+	const [threads, recipients, restoreRequests, tags] = await Promise.all([
 		listBoard(locals.db, params.id, locals.user.id),
 		getRecipientsForPartnership(locals.db, params.id, locals.user.id),
-		getUserKeys(locals.db, locals.user.id),
 		listRestoreRequests(locals.db, params.id, locals.user.id),
 		listTags(locals.db, params.id, locals.user.id)
 	]);
+
+	// Every account has keys, so a partnership without both is broken data —
+	// 404 like the membership check rather than rendering a board that cannot
+	// send.
+	if (!recipients) {
+		error(404, 'Partner not found');
+	}
 
 	return {
 		partner: {
@@ -36,8 +42,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		tags: tags ?? [],
 		// Public keys. `mine` is included so a server that swapped it can be
 		// caught, not only a swapped partner key — see docs/encryption.md.
-		recipients: recipients ?? { mine: null, theirs: null },
-		historyWarningAcknowledged: keys?.historyWarningAcknowledged ?? false,
+		recipients,
 		restoreRequests
 	};
 };

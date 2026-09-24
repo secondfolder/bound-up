@@ -1,35 +1,33 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { currentKeyring, initialiseKeyring, resetKeyring } from '$lib/crypto/session.svelte';
-	import MessageUnlock from './MessageUnlock.svelte';
-	import PasskeyOffer from './PasskeyOffer.svelte';
+	import { page } from '$app/state';
+	import { authClient } from '$lib/auth-client';
+	import { currentKeyring, initialiseKeyring, lock, resetKeyring } from '$lib/crypto/session.svelte';
+	import { rememberSignInEmail } from '$lib/sign-in-again';
 	import StoragePersistenceDialog from './StoragePersistenceDialog.svelte';
 
 	/**
-	 * Works out whether this device can read the user's messages, once.
+	 * Makes sure this device holds the key to the user's messages, once.
 	 *
 	 * Mounted in the app shell rather than on the messaging pages, because the
-	 * answer is needed before the user gets there and because the prompt is
-	 * worth showing wherever they happen to be. It is deliberately **not**
-	 * blocking: the guides and the partner screens need no keys, so a locked
-	 * device is a callout and not a wall. The callouts are only shown once the
-	 * user has actual message history to lose or unlock.
+	 * answer is needed before the user gets there. There is no unlock screen:
+	 * signing in is what unlocks (see `session.svelte.ts`), so a device that
+	 * finds itself without the key — most often because the browser cleared its
+	 * storage — signs out and sends the user to sign in again. To them that is
+	 * just being asked to sign in, which is the one thing they already know how
+	 * to do; the login page says nothing about keys or messages.
 	 *
-	 * Only the messaging screens themselves refuse to render while locked.
+	 * Every screen, not only messaging, is sent back. The guides and partner
+	 * screens need no key, but "signed in, except for some features" is exactly
+	 * the half-state this replaced.
 	 */
-	let {
-		user = null,
-		userHasMessageHistory = false,
-		handledByPage = false
-	}: {
-		user?: { id: string; email: string } | null;
-		userHasMessageHistory?: boolean;
-		handledByPage?: boolean;
-	} = $props();
+	let { user = null }: { user?: { id: string; email: string } | null } = $props();
 	const keyring = $derived(currentKeyring());
 
 	let lastUserId: string | null = null;
+	let signingOut = false;
 
 	onMount(() => {
 		void refresh();
@@ -43,12 +41,19 @@
 			return;
 		}
 
-		// `unknown` means nobody has worked out where this device stands — the
-		// state `lock()` leaves behind. Re-asking here is what makes locking
-		// settle on the right panel without a reload; `initialiseKeyring` returns
-		// early unless the status is `unknown`, so this cannot loop.
+		// `unknown` means nobody has worked out where this device stands.
+		// `initialiseKeyring` returns early unless the status is `unknown`, so
+		// this cannot loop.
 		if (keyring.status === 'unknown') {
 			void refresh();
+			return;
+		}
+
+		// A sign-in that just handed over its secret and still did not unlock is
+		// a bug (`signInFailed`), and sending the user round again would hide it
+		// in a loop. It is logged by `initialiseKeyring` and left there.
+		if (keyring.status === 'locked' && !keyring.signInFailed && user) {
+			void signInAgain(user);
 		}
 	});
 
@@ -62,77 +67,39 @@
 		try {
 			await initialiseKeyring(current);
 		} catch (error) {
-			// A failed bundle fetch leaves the keyring 'unknown', which renders
-			// nothing — better than a scary banner for what is usually a dropped
-			// connection on a page that does not need keys anyway.
+			// A failed bundle fetch leaves the keyring 'unknown', which renders a
+			// placeholder on the screens that need keys — better than a scary
+			// banner for what is usually a dropped connection.
 			console.error('could not work out encryption state', error);
 		}
 	}
 
-	/**
-	 * Where the gate keeps quiet.
-	 *
-	 * The messaging screens render their own locked state, because there the
-	 * lock is the whole story rather than an aside. So does
-	 * `/settings/encryption` — offering a second unlock form beside that page's
-	 * own would put two identical buttons on one screen, which is confusing and
-	 * exactly the sort of duplicate accessible name AGENTS.md warns about.
-	 */
+	async function signInAgain(current: { id: string; email: string }) {
+		if (signingOut) {
+			return;
+		}
+		signingOut = true;
+		// Kept on the device, not put in the URL, so the address does not end up
+		// in access logs; the login page pre-fills it so a password manager or
+		// passkey autofill matches the right account.
+		rememberSignInEmail(current.email);
+		// `lock` leaves the keyring `signed-out`, which this gate does not react
+		// to — so nothing here starts working the state out again, and racing
+		// the navigation below with a second one, while the session goes.
+		await lock(current.id);
+		await authClient.signOut();
+
+		const back = `${page.url.pathname}${page.url.search}`;
+		const query = new URLSearchParams({ redirectTo: back, reason: 'device' });
+		// A runtime query string on a resolved route: the login load validates
+		// `redirectTo` with `safeRedirect`, and `reason` only ever changes what
+		// happens after the sign-in, never what the page shows.
+		// biome-ignore lint/plugin: see above — a resolved route plus a validated query.
+		await goto(`${resolve('/(public)/login')}?${query}`, { invalidateAll: true });
+		signingOut = false;
+	}
 </script>
 
-<!-- Not gated on `handledByPage`: both follow an unlock rather than replacing
-     a locked screen, so there is no duplicate form to avoid. -->
 {#if user}
-	<PasskeyOffer />
 	<StoragePersistenceDialog />
 {/if}
-
-<!-- Mounted whenever there is a user, with the callout passed in as chrome
-     rather than wrapped around it. Unlocking flips the keyring, and wrapping
-     would unmount the whole thing — dialogs included — half way through
-     "unlock, then set up a passkey". -->
-{#if user && userHasMessageHistory && !handledByPage}
-	<MessageUnlock {user}>
-		{#snippet chrome(panel)}
-			<wa-callout variant="warning" class="gate">
-				<wa-icon slot="icon" name="lock" variant="solid"></wa-icon>
-				<strong>Your messages are locked on this device</strong>
-				<p>Unlock them with your password, or carry on — everything else works without it.</p>
-				{@render panel()}
-			</wa-callout>
-		{/snippet}
-	</MessageUnlock>
-{/if}
-
-{#if user && userHasMessageHistory && keyring.status === 'absent' && !handledByPage}
-	<wa-callout variant="neutral" class="gate">
-		<wa-icon slot="icon" name="key" variant="solid"></wa-icon>
-		<strong>Private messages are not set up on this account</strong>
-		<p>
-			<a href={resolve('/(auth-required)/(app)/settings/encryption')}>Set up messaging</a> to send your
-			partner something only the two of you can read.
-		</p>
-	</wa-callout>
-{/if}
-
-<style>
-	.gate {
-		display: block;
-		/* Matches the 40rem column the settings pages use. Without it the
-		   callout ran the full width of a desktop window, which made a short
-		   unlock form look like a page-wide error banner. */
-		max-width: 40rem;
-		margin: var(--wa-space-m) auto;
-		width: calc(100% - 2 * var(--wa-space-m));
-
-		strong {
-			display: block;
-		}
-
-		p {
-			margin: 0.25rem 0 0.75rem;
-			color: var(--wa-color-text-quiet);
-			font-size: 0.875rem;
-		}
-	}
-</style>

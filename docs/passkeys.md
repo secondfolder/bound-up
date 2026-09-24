@@ -1,116 +1,114 @@
 # Passkeys
 
-A passkey in this app does two jobs. It signs you in, and — if its provider
-will co-operate — it unlocks your encrypted message history with a touch
-instead of your password. The second job is the interesting one, and it is not
-something every passkey can do.
+A passkey in this app does two jobs in one touch: it signs you in, and signing
+in with it unlocks your encrypted messages. Every passkey does both, whatever
+password manager holds it.
 
 The keys themselves, the wraps and what the encryption guarantees are in
 [docs/encryption.md](encryption.md). This document is about the credential: how
-one is created, how the app finds out what it can do, what it is called, and
-what each screen says when the answer is disappointing.
+one is created, what it carries, how signing in with it opens the identity, and
+what it is called.
+
+## Two secrets, one wrap each
+
+A passkey can hand the page one of two secrets, and whichever it can is what its
+wrap is sealed to. Both wraps are the same AES-GCM envelope as the password
+wrap, under a key derived with HKDF (`src/lib/crypto/passkey-wraps.ts`).
+
+- **PRF output — `passkey-prf`.** The WebAuthn PRF extension evaluated with a
+  fixed, app-wide salt: SHA-256 of `bound-up-prf-salt-v1`. The authenticator
+  computes it from a key it never releases, so this is the strong one, and it
+  is always preferred.
+- **The user handle — `passkey-handle`.** At registration, the browser replaces
+  the `user.id` Better Auth proposed with `0x01 ‖ 32 random bytes`. Every
+  discoverable passkey stores its user handle and returns it on every assertion,
+  whatever the provider — so this works where PRF does not. The prefix byte is a
+  format version: a handle without it is not a secret, and is never treated as
+  one.
+
+**Why a fixed salt.** The salt has to be in the sign-in request before the
+browser knows which passkey will answer, and passkey autofill (conditional
+mediation) requires an empty `allowCredentials`, which rules out
+`evalByCredential`. A salt per credential would therefore mean a second ceremony
+after signing in — which is exactly what the previous design, age's own
+`webauthn` recipient with a fresh salt per file, needed. PRF output is already
+unique to each credential, so sharing the salt costs nothing.
+
+**Why replacing `user.id` is safe.** Better Auth (1.7.5) generates a random
+`userID` for each registration, never stores it and never checks it: it finds a
+passkey by credential id and verifies the signature against the stored public
+key. `residentKey: 'required'` in `src/lib/server/auth.ts` makes every passkey
+discoverable, so every one stores a handle to return.
+
+**What the user-handle wrap gives up.** The handle is stored in the passkey
+provider's vault, like a strong random password would be. It is exported with
+the passkey if the user moves it to another manager (CXF), and a browser
+extension that wraps WebAuthn can see it. It never reaches this server. That is
+weaker than PRF — it is the reason a passkey never has both wraps, since two for
+one credential would be only as strong as the weaker — and it is the price of
+every passkey unlocking.
+
+**Neither secret reaches the server.** Better Auth's own client posts the
+assertion as the browser produced it, handle included, so the ceremonies in
+`src/lib/crypto/passkey-ceremony.ts` call the same endpoints through
+`authClient.$fetch` instead, with the same `@simplewebauthn/browser` helpers, and
+strip `clientExtensionResults` and `response.userHandle` before posting. An e2e
+test asserts on the posted bodies.
 
 ## Adding one
 
-`AddPasskeyFlow.svelte` owns the whole sequence, and both entry points use it —
-Security and Encrypted messages. It used to be two implementations of one job,
-and they drifted far enough apart that only one of them ever checked PRF.
+`AddPasskeyFlow.svelte`, on Security, owns the sequence:
 
-1. **The password, in a dialog.** Asked for two reasons at once, and the copy
-   says both.
-2. **Prove it, twice.** Locally, by opening the stored password wrap — a wrong
-   password fails its AES-GCM tag on the device, with no round trip, so it is
-   answered instantly and tells a watcher nothing. Then on the server, via
-   `POST /api/keys/verify-password`.
-3. **Register.** `authClient.passkey.addPasskey({ returnWebAuthnResponse: true })`.
-4. **Seal.** The identity is encrypted to the new credential, which is a real
-   PRF evaluation and the only honest test of whether it works.
-5. **Record.** `POST /api/keys/passkey-enrolled` stores the verdict and, if
-   there is one, the wrap.
-6. **Name it**, in a second dialog, pre-filled from the provider.
+1. **The password, in a dialog.** Opening the password wrap with it is the only
+   way to the identity as a string on a device that caches a non-extractable
+   `CryptoKey`, and sealing needs the string. It is also the password check: a
+   wrong one fails the AES-GCM tag on the device, instantly, without asking the
+   server. It is a check on the device, not a permission — the server lets any
+   signed-in session register a passkey.
+2. **Register** (`registerPasskey`): fetch Better Auth's options, replace
+   `user.id` with a fresh secret handle, ask for PRF, create the credential,
+   verify it with the server minus the extension results.
+3. **Pick the secret.** PRF output from creation if the provider returned it;
+   otherwise one more assertion, pinned to the new credential, to evaluate PRF
+   (the dialog says "Touch your passkey once more to finish"); otherwise the
+   handle. Any failure of that extra assertion — a dismissed prompt included —
+   falls back to the handle, which always works.
+4. **Store the wrap** (`POST /api/keys/passkey-enrolled`). The server refuses a
+   wrap that names any credential but the passkey's own, because that is what
+   signing in and deleting both match on. **If this fails, the passkey is
+   deleted again** — a passkey with no wrap would sign in and then have nothing
+   to open, and send the device round the sign-in-again loop for good.
+5. **Name it**, in a second dialog, pre-filled from the provider.
 
-### Why the password is asked for
+The order cannot change: opening the identity comes before registering, or a
+mistyped password would leave a stray passkey behind.
 
-**It is a re-authentication.** The new credential signs in on its own
-afterwards, so a session someone walked away from should not be enough to mint
-one. That check is on the server (invariant 14), not only in the browser.
+**Why "one more touch" is sometimes needed.** Many platforms cannot evaluate PRF
+while a credential is being created, only when it is used. The evaluation is a
+real assertion rather than a read of `prf.enabled` from the registration
+response, because providers disagree with themselves about that flag in both
+directions: Samsung Pass and KeePassXC say no at creation and then work;
+Microsoft Password Manager says yes and then refuses.
 
-**It is the only route to the identity.** Sealing needs the age secret as a
-_string_, and this device's cache holds a non-extractable `CryptoKey` that no
-API turns back into one. Opening a password wrap is the only way to get it —
-with the happy side effect that adding a way in requires proving you already
-have one.
+## Signing in, which is unlocking
 
-### Why the order cannot change
+`signInWithPasskey` asks for PRF with the fixed salt, including on the passkey
+autofill request the login page makes from its email field. It returns the
+credential id, the PRF output if any, and the handle secret if any; the login
+form stashes them, and `initialiseKeyring` opens the wrap that names that
+credential with whichever secret its type needs (`openPasskeyWrap`). One touch,
+and the user is signed in with their messages readable.
 
-Verify, then register, then seal. Registering first would leave a stray passkey
-behind every mistyped password — a credential the user did not mean to create,
-on a screen that had just told them they got something wrong.
+Deleting a passkey (Security, via `DELETE /api/keys/passkey/[id]` rather than
+Better Auth's own delete, which knows nothing about wraps) removes its wrap in
+the same batch.
 
-### A passkey-only account
-
-An account with no password credential is necessarily an account with no
-message keys, because `/settings/encryption` is the only way to get them and it
-sets a password on the way through. So that flow skips the prompt entirely,
-registers, and records the verdict from the registration flag alone.
-
-## Working out whether it can unlock messages
-
-**The registration flag is a hint, never the verdict.**
-`clientExtensionResults.prf.enabled` says what the provider claims at creation
-time, and providers disagree with themselves in both directions:
-
-- Samsung Pass and KeePassXC report `enabled: false` at creation and then return
-  PRF output perfectly well at assertion.
-- Microsoft Password Manager does the reverse — fine at creation, then
-  `NotAllowedError` every time it is used.
-
-So a `false` flag does not stop the flow. It only changes what the progress text
-says while a real seal is attempted anyway. `verdictFor` in
-`src/lib/crypto/passkey-enrolment.ts` turns the outcome into what gets stored:
-
-| Outcome                                              | Recorded      |
-| ---------------------------------------------------- | ------------- |
-| The seal worked                                      | `supported`   |
-| The credential answered, without PRF output          | `unsupported` |
-| The ceremony was dismissed, or failed some other way | **nothing**   |
-| No identity to seal, and the flag said `false`       | `unsupported` |
-| No identity to seal, and the flag said `true`        | **nothing**   |
-
-The two "nothing" rows are the point. A dismissed Face ID sheet is not evidence
-about the credential, and recording `unsupported` for it would brand a working
-passkey with a warning it could never shake off. Equally, a provider claiming
-`enabled` has not proved anything, so that is not written down as a promise
-either.
-
-**Absence of a row is a third state**, and it must never render as a warning.
-Every passkey registered before this check existed is in it.
-
-## The credential binding
-
-`wrapIdentityToPasskey` can pin the ceremony to one credential, via age's own
-`AGE-PLUGIN-FIDO2PRF-1…` identity string. Without it, `allowCredentials` is
-empty and the platform opens a chooser — which seconds after creating a passkey
-is a confusing second prompt, and which makes "which passkey does this wrap
-belong to" unanswerable, because the user may well pick a different one.
-
-`age-encryption` builds those strings in `createCredential()` and exports
-neither that encoder nor a way to get one for a credential Better Auth
-registered, so `encodeAgeCredentialIdentity` in `src/lib/crypto/passkey.ts`
-reproduces the encoding: bech32 over CTAP2-flavoured CBOR of version,
-credential id, rp id and transports.
-
-Depending on a private format is normally a bad idea. Two things make it safe
-here: `age-encryption` is pinned to an exact version precisely because
-`age.webauthn` is experimental, so the format cannot move without a deliberate
-bump; and `passkey.test.ts` holds a frozen vector _and_ round-trips the result
-through age's own decoder, so a bump that did change it fails in CI rather than
-on someone's phone.
-
-`params.ageIdentity` and `params.passkeyId` are both optional. Wraps written
-before this existed have neither and still open through the chooser, and wraps
-written by `PasskeyOffer` — which seals to whichever passkey the user picks —
-deliberately have neither.
+**Known open risk:** a provider that answered PRF at creation and then refuses
+it at sign-in would fail the sign-in outright. Microsoft Password Manager is
+reported to behave like that. Retrying without the extension would get the user
+in, but only by prompting again after what might have been a deliberate
+dismissal — the two are the same error by design. Not done yet; worth checking
+against the real provider.
 
 ## Naming, and the AAGUID
 
@@ -127,98 +125,29 @@ copy rather than an import because Better Auth exports `getAuthenticatorName`
 from its **server** entry, and pulling that whole plugin into the browser bundle
 to read a fourteen-entry object would be a poor trade.
 `passkey-providers.test.ts` imports the upstream map and asserts the two agree,
-so the copy cannot drift silently.
+so the copy cannot drift silently. The Security page reads the AAGUID from
+Better Auth's own `passkey` row.
 
 **Apple zeroes the AAGUID** under the default `attestation: "none"`, which is
 the flow this app uses. So the single most common passkey in existence resolves
 to no provider at all, and every caller has an answer for `null` — the name
-falls back to `navigator.platform`, and the copy that would have named a
-provider says "the password manager holding it" instead. Asking for attestation
-to get a real value would put a consent prompt in front of every registration
-to improve a default label, which is not a trade worth making.
+falls back to `navigator.platform`. Asking for attestation to get a real value
+would put a consent prompt in front of every registration to improve a default
+label, which is not a trade worth making.
 
-## Which providers can do this
+## What went away, and why
 
-Surveyed September 2026, and kept in `PRF_PROVIDERS` so the copy has one
-source. This table is **never** used to decide anything — the verdict for a real
-credential always comes from actually trying it. It is there so someone whose
-passkey just failed knows where to put the next one.
+There used to be a PRF _verdict_ per passkey (`passkey_details.prf_status`), a
+survey of which providers could do PRF, "Cannot unlock your messages" badges on
+Security, an unlock form with four modes, and an offer to seal an existing
+passkey after a password unlock. Every one of them existed because a passkey
+might not be able to unlock. Once every passkey could, there was nothing left
+for them to say, and they were removed rather than kept quiet.
 
-| Provider                          | PRF for third-party sites                                                          |
-| --------------------------------- | ---------------------------------------------------------------------------------- |
-| Apple Passwords / iCloud Keychain | Yes                                                                                |
-| Google Password Manager           | Yes, every GPM passkey                                                             |
-| Windows Hello                     | Yes, with the February 2026 Windows 11 update and Chrome/Edge 147+ or Firefox 148+ |
-| 1Password                         | Yes — extension, Android, iOS 18                                                   |
-| Proton Pass                       | Yes                                                                                |
-| Keeper                            | Yes                                                                                |
-| Enpass                            | Yes, despite its capability flags saying otherwise                                 |
-| Bitwarden                         | Platform-dependent — Linux with Firefox yes, iOS and Safari no                     |
-| KeePassXC                         | Usually refuses at creation, then works                                            |
-| Samsung Pass                      | Says no at creation, then works                                                    |
-| Microsoft Password Manager        | Accepts at creation, then refuses every unlock                                     |
-| Dashlane                          | No — uses PRF for its own vault, does not offer it to other sites                  |
-| NordPass                          | No                                                                                 |
+## One thing that is easy to break
 
-Three constraints that are nothing to do with the provider:
-
-- **PRF must be requested at credential creation.** A passkey registered before
-  this feature existed can never do PRF and cannot be upgraded.
-- **iOS and iPadOS cannot pass PRF to an external authenticator.** A security
-  key on an iPhone will not work; platform passkeys do.
-- **PRF needs iOS 18+, macOS 15+ or Chrome 132+.**
-
-## What each screen says
-
-**Security** lists every passkey with its provider, and a badge:
-
-- `unsupported` → "Cannot unlock your messages", the reason, and the provider
-  list. Persistent, so it is still answerable tomorrow rather than only in the
-  moment the passkey was created.
-- `supported` → "Unlocks your messages".
-- no verdict → nothing at all.
-
-**The unlock panel** (`UnlockPanel.svelte`) is the one unlock form, used by the
-app-shell callout, the messaging board, a thread, and Encrypted messages.
-Before it there were four, and two of them passed no passkey callback at all —
-so the screens a locked device is most likely to be found on were the ones with
-no passkey button. `unlockMode` in `src/lib/passkey-unlock.ts` is pure and
-decides which of four shapes it takes:
-
-| Mode                | When                                                       | What it shows                                                                                                    |
-| ------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `passkey-ready`     | a `webauthn-prf` wrap exists                               | the passkey button, and the password behind a **button** — someone who set up a passkey did so to stop typing it |
-| `passkeys-unusable` | passkeys exist and **every one** has been tried and failed | the explanation, naming the provider where it can, and the password field straight away                          |
-| `offer-setup`       | no wrap, and something might still work                    | the password field plus "set up a passkey"                                                                       |
-| `password-only`     | this browser has no WebAuthn                               | the password field alone                                                                                         |
-
-`passkeys-unusable` needs _every_ passkey to have failed. One unverdicted
-passkey drops it to `offer-setup`, because a passkey registered before the check
-existed might work perfectly well.
-
-**Why `offer-setup` does not offer passkey _unlock_.** With no wrap there is
-nothing to open, and with no passkey at all the platform opens a chooser with
-nothing in it and reports that as a plain `NotAllowedError` — the same error a
-dismissal gives, deliberately, so a page cannot learn which credentials exist.
-The button would appear to do nothing and could not explain itself. It offers to
-_create_ one instead, which needs the password first, because a locked device
-has no identity to seal.
-
-## Two things that are easy to break
-
-**The unlock panel must outlive the unlock.** Unlocking flips the keyring, and a
-caller that wraps `<MessageUnlock>` in its own `{#if locked}` unmounts it — and
-the add-a-passkey dialogs with it — while "unlock, then set up a passkey" is
-still half way through. So the chrome goes in through a snippet, and the
-messaging screens additionally hold the branch open via `onFlowOpen` while a
-ceremony is running.
-
-**`lock()` leaves the keyring at `unknown`, not `locked`**, because what the
-device can do next depends on what the account still has. `EncryptionGate`
-re-asks whenever the status goes back to `unknown`. Without that re-ask the
-status stayed `unknown` for the rest of the session, and two things broke:
-`/settings/encryption` showed no panel at all after "Lock on this device", and —
-worse — the messaging board fell through to rendering itself, every thread
-preview and every message showing "…" where the plaintext should be. Every
-screen that switches on the status therefore has an explicit `unknown` branch
-that renders a placeholder, never content.
+**A screen must never render message content without the key.** Every screen
+that switches on the keyring renders a placeholder for anything but `unlocked`.
+Falling through to the content was a real bug: the messaging board rendered
+every thread preview and every message as "…", which is ciphertext presented
+as if it were the text.

@@ -176,6 +176,63 @@ export async function logOut(page: Page) {
 	await page.waitForURL('/');
 }
 
+/**
+ * Signs in on a login page the browser is already on, without navigating to it.
+ *
+ * For the page the app itself sends a user to — `/login?redirectTo=…&reason=device`
+ * after a device loses its key — where `logIn`'s `goto('/login')` would throw
+ * away the query that is under test.
+ */
+export async function logInHere(page: Page, who: Account) {
+	await waitForEnhancedForm(page);
+	await fillWaInput(page, 'email', who.email);
+	await fillPassword(page, 'password', who.password);
+	await submitEnhancedForm(page, 'Login');
+	await page.waitForURL((url) => !url.pathname.startsWith('/login'));
+}
+
+/**
+ * Throws away this device's key cache without touching the session.
+ *
+ * What Safari does after a week without a visit, and the one way a signed-in
+ * device ends up without its key. The next page load sends the user to sign in
+ * again — which is what signing in, not an unlock form, is for now.
+ */
+export async function evictKeyStorage(page: Page) {
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve, reject) => {
+				const request = indexedDB.deleteDatabase('bound-up-keys');
+				request.onsuccess = () => resolve();
+				request.onerror = () => reject(request.error);
+				request.onblocked = () => resolve();
+			})
+	);
+}
+
+/**
+ * Whether this device holds the key, as the Security page reports it.
+ *
+ * The one place the UI says anything about it: "This device" shows a line
+ * once the key is cached, and a placeholder until then — so this waits for
+ * the placeholder to resolve one way or the other before answering.
+ */
+export async function deviceHoldsKey(page: Page): Promise<boolean> {
+	await page.goto('/settings/security');
+	const holds = page.getByText('This browser remembers you between visits.');
+	const memoryOnly = page.getByTestId('device-not-durable');
+	await holds.or(memoryOnly).first().waitFor();
+	return await holds.isVisible();
+}
+
+/** The app sent this device back to sign in, because it had lost its key. */
+export async function expectSentToSignIn(page: Page, from: string) {
+	await page.waitForURL(
+		(url) => url.pathname === '/login' && url.searchParams.get('reason') === 'device'
+	);
+	expect(new URL(page.url()).searchParams.get('redirectTo')).toBe(from);
+}
+
 /** Walks the add-a-partner flow and returns the invite URL it produced. */
 export async function createInvite(
 	page: Page,
@@ -249,12 +306,7 @@ export async function linkAccounts(inviter: Side, invitee: Side): Promise<void> 
 	await invitee.page.waitForURL(/\/partner\//);
 }
 
-/**
- * Opens a partner's board, clearing the one-time history warning if it shows.
- *
- * The warning blocks the board until acknowledged, deliberately, so every test
- * that wants the board has to get past it once per account.
- */
+/** Opens a partner's messages board, and waits until it can be written on. */
 export async function openBoard(page: Page, partnerName: string): Promise<void> {
 	// Scoped to the nav and matched loosely on purpose: the tab's accessible
 	// name is the partner's name TWICE ("Jun Jun"), because the avatar carries a
@@ -270,21 +322,9 @@ export async function openBoard(page: Page, partnerName: string): Promise<void> 
 	await page.getByRole('link', { name: 'Messages' }).click();
 	await page.waitForURL(/\/messages$/);
 
-	// Waits for the screen to settle on one or the other before deciding. The
-	// board shows a placeholder while the keyring resolves, and only then the
-	// warning — so an instant `isVisible()` check could land on the placeholder,
-	// skip the warning, and leave it blocking every later step. Serially it
-	// always resolved first; the parallel suite's load made it lose that race.
-	const warning = page.getByText(/Your password is the only key/);
-	const board = page.getByRole('button', { name: 'Write something' });
-	await expect(warning.or(board).first()).toBeVisible();
-	if (await warning.isVisible()) {
-		await page.getByRole('checkbox').check();
-		await clickWaButton(page, 'Start messaging');
-		// A wait rather than an assertion: whether this branch runs at all is
-		// the account's history, not something the calling test is checking.
-		await warning.waitFor({ state: 'hidden' });
-	}
+	// The board shows a placeholder until the key is in hand, and only then the
+	// button — so this waits for it rather than sampling.
+	await expect(page.getByRole('button', { name: 'Write something' })).toBeVisible();
 }
 
 /**

@@ -2,7 +2,6 @@
 	import { invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
 	import ThreadView from '$lib/components/ThreadView.svelte';
@@ -21,8 +20,6 @@
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
-	/** Keeps the unlock screen mounted while its passkey dialogs are open. */
-	let settingUpUnlock = $state(false);
 
 	/**
 	 * The same key check as the board, because a reply is a send too.
@@ -100,33 +97,14 @@
 			recipients={data.recipients}
 			{canSend}
 		/>
-	{:else if keyring.status === 'unknown'}
-		<!-- Never the thread while the keyring is unresolved: every message would
-		     render as "…". See the note on the board. -->
-		<div class="locked" aria-busy="true" data-testid="messages-settling">
-			<wa-spinner></wa-spinner>
-			<p>Checking your keys…</p>
-		</div>
-	{:else if keyring.status === 'locked' || settingUpUnlock}
-		<!-- `settingUpUnlock` keeps this branch on screen for a moment after the
-		     unlock succeeds: `MessageUnlock` owns the passkey dialogs, and
-		     unmounting it mid-ceremony would take them with it. -->
-		<MessageUnlock {user} onFlowOpen={(open) => { settingUpUnlock = open; }}>
-			{#snippet chrome(panel)}
-				<div class="locked">
-					<p>These messages are locked on this device.</p>
-					{@render panel()}
-				</div>
-			{/snippet}
-		</MessageUnlock>
 	{:else}
-		<ThreadView
-			thread={data.thread}
-			partnershipId={data.partner.id}
-			tags={data.tags}
-			recipients={data.recipients}
-			{canSend}
-		/>
+		<!-- Never the thread until the key is here: every message would render as
+		     "…". `locked` looks the same, because `EncryptionGate` is already
+		     sending the user to sign in again. See the note on the board. -->
+		<div class="settling" aria-busy="true" data-testid="messages-settling">
+			<wa-spinner></wa-spinner>
+			<p>Loading your messages…</p>
+		</div>
 	{/if}
 </div>
 
@@ -142,7 +120,7 @@
 		padding: var(--wa-space-s) var(--wa-space-m) 0;
 	}
 
-	.locked {
+	.settling {
 		max-width: 26rem;
 		margin: 0 auto;
 		padding: var(--wa-space-xl) var(--wa-space-l);

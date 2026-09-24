@@ -11,7 +11,7 @@ function data(claimCount: number): PageData {
 	return {
 		user: { id: 'u1', name: 'Ada', email: 'ada@example.com', image: null, timezone: 'UTC' },
 		partners: [{ id: 'p1', name: 'Jun', image: null }],
-		userHasMessageHistory: false,
+		helpRequests: [],
 		selfRewards: {
 			credits: 3,
 			rewards: [],

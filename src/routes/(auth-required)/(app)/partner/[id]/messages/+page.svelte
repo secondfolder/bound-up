@@ -2,8 +2,6 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import HistoryWarning from '$lib/components/HistoryWarning.svelte';
-	import MessageUnlock from '$lib/components/MessageUnlock.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import NewMessageDialog from '$lib/components/NewMessageDialog.svelte';
 	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
@@ -17,7 +15,7 @@
 		trustAllowsSending,
 		trustFor
 	} from '$lib/crypto/trust.svelte';
-	import { acknowledgeWarning, sendMessage } from '$lib/messaging/client';
+	import { sendMessage } from '$lib/messaging/client';
 	import { watchPartnership } from '$lib/messaging/live';
 	import type { PageData } from './$types';
 
@@ -25,9 +23,6 @@
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
-	const acknowledged = $derived(data.historyWarningAcknowledged);
-	/** Keeps the unlock screen mounted while its passkey dialogs are open. */
-	let settingUpUnlock = $state(false);
 
 	const trust = $derived(trustFor(data.partner.id));
 	const canSend = $derived(trustAllowsSending(trust));
@@ -35,11 +30,11 @@
 	/**
 	 * Checks the served keys against what this device pinned, and pins on first
 	 * sight. Runs on every load rather than once: `recipients` changes when
-	 * either partner resets their password, which is exactly the case that must
-	 * not be missed.
+	 * either partner gets back in with a partner's help, which replaces their
+	 * key — exactly the case that must not be missed.
 	 *
-	 * Gated on being unlocked only because there is nothing to send while
-	 * locked, so a warning about what to send to would be noise.
+	 * Gated on being unlocked only because nothing renders until then, so a
+	 * warning about what to send to would have nowhere to go.
 	 */
 	$effect(() => {
 		if (keyring.status !== 'unlocked') {
@@ -79,9 +74,7 @@
 
 	let composing = $state(false);
 
-	const targets = $derived(
-		[data.recipients.mine, data.recipients.theirs].filter((value): value is string => value !== null)
-	);
+	const targets = $derived([data.recipients.mine, data.recipients.theirs]);
 
 	async function send(
 		message: { text: string; files: File[] },
@@ -108,55 +101,24 @@
 		);
 		return null;
 	}
-
-	async function acknowledge() {
-		await acknowledgeWarning(data.partner.id);
-		await invalidate(`messages:board:${data.partner.id}`);
-	}
 </script>
 
 <svelte:head><title>{data.partner.name} — messages</title></svelte:head>
 
-{#if keyring.status === 'unknown'}
+{#if keyring.status !== 'unlocked'}
 	<!--
-		Never the board while the keyring is unresolved.
+		Never the board until the key is here.
 
-		Falling through to it was a real bug: after "Lock on this device" the
-		status goes back to `unknown`, and the board rendered every thread with
-		"…" for the preview and "…" for every message inside — ciphertext with
-		nothing to open it, presented as if it were the content. A locked device
-		has to say so, and until it knows, it says nothing.
+		Falling through to it was a real bug: with the keyring unresolved the
+		board rendered every thread with "…" for the preview and "…" for every
+		message inside — ciphertext with nothing to open it, presented as if it
+		were the content. `locked` gets the same placeholder: `EncryptionGate` is
+		already sending the user to sign in again, so there is nothing to show.
 	-->
 	<section class="notice" aria-busy="true" data-testid="messages-settling">
 		<wa-spinner></wa-spinner>
-		<p>Checking your keys…</p>
+		<p>Loading your messages…</p>
 	</section>
-{:else if keyring.status === 'absent'}
-	<section class="notice">
-		<h1>Set up encrypted messages</h1>
-		<p>This account has no message keys yet, so there is nothing to encrypt with.</p>
-		<wa-button variant="brand" href={resolve('/(auth-required)/(app)/settings/encryption')}>
-			Set up messaging
-		</wa-button>
-	</section>
-{:else if keyring.status === 'locked' || settingUpUnlock}
-	<!-- `settingUpUnlock` keeps this branch on screen for a moment after the
-	     unlock succeeds, because `MessageUnlock` owns the passkey dialogs and
-	     unmounting it mid-ceremony would take them with it. -->
-	<MessageUnlock {user} onFlowOpen={(open) => { settingUpUnlock = open; }}>
-		{#snippet chrome(panel)}
-			<section class="notice">
-				<h1>Unlock your messages</h1>
-				<p>
-					They are encrypted on this device. This happens on a new phone, after signing in with a
-					passkey, or when the browser has cleared its storage.
-				</p>
-				{@render panel()}
-			</section>
-		{/snippet}
-	</MessageUnlock>
-{:else if !acknowledged}
-	<HistoryWarning {acknowledge} />
 {:else}
 	<section class="page">
 		<NestedPageHeader
@@ -168,35 +130,23 @@
 
 		<div class="board">
 			<header>
-				<!--
-				The "they have not set up messaging" case lives in here too, rather
-				than beside it: `pinStateFor` already calls that `missing`, and two
-				components deciding when to mention the partner's key would drift.
-			-->
 				<PartnerKeyNotice
 					{trust}
 					partnerName={data.partner.name}
 					verify={() => markVerified(user.id, data.partner.id, data.recipients)}
 					accept={(which) => acceptKeyChange(user.id, data.partner.id, data.recipients, which)}
 				/>
-				<!--
-				`mine`, not the trust view's safety number: a restore's number must be
-				derived from the recipient snapshotted on the request, which is the
-				value the re-encryption actually seals to. See the comment in
-				RestoreRequests.svelte — using the served key here would defeat the
-				out-of-band check entirely.
-			-->
 				<RestoreRequests
 					requests={data.restoreRequests}
 					partnershipId={data.partner.id}
 					partnerName={data.partner.name}
-					mine={data.recipients.mine}
+					userId={user.id}
 				/>
 			</header>
 
 			<StickerBoard threads={data.threads} partnershipId={data.partner.id} />
 
-			{#if data.recipients.theirs !== null && canSend}
+			{#if canSend}
 				<div class="new">
 					<!-- "Write something" rather than "New message": /home already has
 					     a "new messages from …" link, and two controls must not share an
@@ -215,7 +165,7 @@
 				</div>
 			{/if}
 
-			{#if data.recipients.theirs !== null && canSend && composing}
+			{#if canSend && composing}
 				<NewMessageDialog
 					partnerName={data.partner.name}
 					partnershipId={data.partner.id}
@@ -243,11 +193,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-m);
-
-		h1 {
-			margin: 0;
-			font-size: 1.25rem;
-		}
 
 		p {
 			margin: 0;

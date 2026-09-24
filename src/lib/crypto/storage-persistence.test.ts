@@ -5,67 +5,44 @@ import type { KeyWrapParams } from '../encryption';
 import type { KeyWrapView } from '../types';
 import { resetX25519Probe } from './identity';
 import { resetKeyStore } from './keystore';
-import {
-	currentKeyring,
-	initialiseKeyring,
-	lock,
-	resetKeyring,
-	unlockWithPasskey,
-	unlockWithPassword
-} from './session.svelte';
+import { currentKeyring, initialiseKeyring, lock, resetKeyring } from './session.svelte';
 import { buildIdentitySubmission } from './setup';
 import { stashUnlock } from './stash';
 import {
 	acceptStorageExplanation,
 	dismissStorageExplanation,
-	holdStorageExplanation,
 	offerStorageExplanation,
 	resetStorageExplanation,
 	STORAGE_PERSISTENCE_ASKED_KEY,
 	storageExplanationVisible
 } from './storage-persistence.svelte';
 
-vi.mock('./passkey', async (importOriginal) => ({
-	...(await importOriginal<typeof import('./passkey')>()),
-	unwrapIdentityWithPasskey: vi.fn()
-}));
-
 /**
  * When the browser is asked to keep this origin's storage.
  *
  * The behaviour worth pinning down is that it is *never* asked unprompted:
- * not by the keystore's first write, not by the silent unlock after signing
- * in, and not by the dialog closing. Firefox turns each of those into a
- * permission prompt with no explanation in front of it.
+ * not by the keystore's first write, not by an ordinary sign-in, and not by
+ * the dialog closing. Firefox turns each of those into a permission prompt
+ * with no explanation in front of it. Only a sign-in the app forced — because
+ * the browser had cleared its storage — makes the explanation due.
  */
 
 const ada = { id: 'user-ada', email: 'ada@example.com' };
 const PASSWORD = 'correct horse battery staple';
 
-let identity: string;
 let recipient: string;
+let wrapKey: CryptoKey;
 let passwordWrap: KeyWrapView;
-
-const PASSKEY_WRAP = {
-	id: 'wrap-passkey',
-	type: 'webauthn-prf',
-	params: { type: 'webauthn-prf', version: 1, rpId: 'bound-up.test' },
-	blob: 'x'.repeat(40),
-	label: null,
-	lastUsedAt: null,
-	createdAt: new Date()
-} as KeyWrapView;
 
 beforeAll(async () => {
 	const built = await buildIdentitySubmission(ada.email, PASSWORD);
-	({ identity, recipient } = built);
+	({ recipient, wrapKey } = built);
 	passwordWrap = {
 		id: 'wrap-password',
 		type: 'password',
 		params: JSON.parse(built.wrapParams) as KeyWrapParams,
 		blob: built.wrapBlob,
 		label: null,
-		lastUsedAt: null,
 		createdAt: new Date()
 	} as KeyWrapView;
 });
@@ -89,31 +66,19 @@ function browser({ alreadyPersisted = false } = {}) {
 function bundleIs(wraps: KeyWrapView[]) {
 	vi.stubGlobal(
 		'fetch',
-		vi.fn(() =>
-			Promise.resolve(
-				Response.json({
-					recipient,
-					wraps,
-					passkeyCount: 0,
-					passkeysKnownUnusable: 0,
-					unusableProviderAaguid: null
-				})
-			)
-		)
+		vi.fn(() => Promise.resolve(Response.json({ recipient, wraps })))
 	);
 }
 
 /** The explanation is decided after an await on `persisted()`, so let it land. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-async function lockedDevice(wraps: KeyWrapView[] = [passwordWrap]) {
-	bundleIs(wraps);
+/** Signs in with the password, as the login form hands it over. */
+async function signIn(reason?: 'device') {
+	bundleIs([passwordWrap]);
+	stashUnlock({ kind: 'password', email: ada.email, wrapKey, ...(reason ? { reason } : {}) });
 	await initialiseKeyring(ada);
-	// A precondition rather than an assertion: every test here starts locked.
-	const { status } = currentKeyring();
-	if (status !== 'locked') {
-		throw new Error(`Expected a locked keyring to start from, got ${status}`);
-	}
+	await settle();
 }
 
 beforeEach(() => {
@@ -131,42 +96,17 @@ afterEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('which unlocks make the explanation due', () => {
-	it('a password unlock does, and asks the browser nothing yet', async () => {
-		await lockedDevice();
-		await unlockWithPassword(ada, PASSWORD);
-		await settle();
+describe('which sign-ins make the explanation due', () => {
+	it('one the app sent them back for does, and asks the browser nothing yet', async () => {
+		await signIn('device');
 
 		expect(currentKeyring().status).toBe('unlocked');
 		expect(storageExplanationVisible()).toBe(true);
 		expect(persist).not.toHaveBeenCalled();
 	});
 
-	it('a passkey unlock does', async () => {
-		const { unwrapIdentityWithPasskey } = await import('./passkey');
-		vi.mocked(unwrapIdentityWithPasskey).mockResolvedValue(identity);
-		await lockedDevice([PASSKEY_WRAP]);
-		await unlockWithPasskey(ada, PASSKEY_WRAP);
-		await settle();
-
-		expect(currentKeyring().status).toBe('unlocked');
-		expect(storageExplanationVisible()).toBe(true);
-		expect(persist).not.toHaveBeenCalled();
-	});
-
-	it('the silent unlock after signing in does not', async () => {
-		bundleIs([passwordWrap]);
-		stashUnlock({
-			email: ada.email,
-			wrapKey: await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
-				'encrypt',
-				'decrypt'
-			]),
-			identity,
-			recipient
-		});
-		await initialiseKeyring(ada);
-		await settle();
+	it('an ordinary sign-in does not', async () => {
+		await signIn();
 
 		expect(currentKeyring().status).toBe('unlocked');
 		expect(storageExplanationVisible()).toBe(false);
@@ -174,29 +114,16 @@ describe('which unlocks make the explanation due', () => {
 		expect(persist).not.toHaveBeenCalled();
 	});
 
-	it('a wrong password does not', async () => {
-		await lockedDevice();
-		await unlockWithPassword(ada, 'not the password');
-		await settle();
-
-		expect(currentKeyring().status).toBe('locked');
-		expect(storageExplanationVisible()).toBe(false);
-	});
-
-	it('an unlock held in memory only does not, since nothing is stored to keep', async () => {
+	it('one held in memory only does not, since nothing is stored to keep', async () => {
 		vi.stubGlobal('indexedDB', undefined);
-		await lockedDevice();
-		await unlockWithPassword(ada, PASSWORD);
-		await settle();
+		await signIn('device');
 
 		expect(currentKeyring()).toMatchObject({ status: 'unlocked', durable: false });
 		expect(storageExplanationVisible()).toBe(false);
 	});
 
-	it('locking closes it', async () => {
-		await lockedDevice();
-		await unlockWithPassword(ada, PASSWORD);
-		await settle();
+	it('signing out closes it', async () => {
+		await signIn('device');
 		await lock(ada.id);
 
 		expect(storageExplanationVisible()).toBe(false);
@@ -233,7 +160,7 @@ describe('when it is skipped', () => {
 		expect(storageExplanationVisible()).toBe(true);
 	});
 
-	it('when the device is locked while the offer is still deciding', async () => {
+	it('when the user signs out while the offer is still deciding', async () => {
 		const pending = offerStorageExplanation(true);
 		dismissStorageExplanation();
 		await pending;
@@ -251,7 +178,7 @@ describe('answering it', () => {
 		expect(storageExplanationVisible()).toBe(false);
 	});
 
-	it('dismissing asks nothing, remembers nothing, and it comes back next unlock', async () => {
+	it('dismissing asks nothing, remembers nothing, and it comes back next time', async () => {
 		await offerStorageExplanation(true);
 		dismissStorageExplanation();
 
@@ -261,19 +188,5 @@ describe('answering it', () => {
 
 		await offerStorageExplanation(true);
 		expect(storageExplanationVisible()).toBe(true);
-	});
-
-	it('stays shut while held, and opens when released', async () => {
-		await offerStorageExplanation(true);
-		const release = holdStorageExplanation();
-		expect(storageExplanationVisible()).toBe(false);
-
-		release();
-		release(); // idempotent — a second call must not unbalance the count
-		expect(storageExplanationVisible()).toBe(true);
-
-		const again = holdStorageExplanation();
-		expect(storageExplanationVisible()).toBe(false);
-		again();
 	});
 });

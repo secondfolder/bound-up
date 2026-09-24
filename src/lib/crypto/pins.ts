@@ -43,6 +43,35 @@ import { type KeyStore, keyStore, type PinRow } from './keystore';
  */
 export const OWN_KEY_PIN = 'self';
 
+/**
+ * Where a key this device has vouched for is remembered, per partnership.
+ *
+ * Helping a partner back in (docs/account-recovery.md) means comparing a code
+ * for their **new** key — the same assurance as comparing a safety number. But
+ * the server keeps serving their old key until they finish signing in, so
+ * pinning the new one straight away would make the old one look like a change
+ * and warn about exactly the thing the user just did. So the vouch is kept
+ * aside, and `evaluateTrust` accepts the new key as verified the moment the
+ * server serves it — and only that key.
+ *
+ * Per device, like every pin: another of the helper's devices never saw the
+ * code, so it still says the key changed.
+ */
+export function vouchPinId(partnershipId: string): string {
+	return `vouched:${partnershipId}`;
+}
+
+/** Remembers that this device compared the code for `recipient`. */
+export async function recordVouch(
+	store: KeyStore,
+	userId: string,
+	partnershipId: string,
+	recipient: string,
+	now: number = Date.now()
+): Promise<void> {
+	await writePin(store, userId, vouchPinId(partnershipId), recipient, { verified: true, now });
+}
+
 /** Pin rows are keyed by user *and* partnership, so one device can hold several accounts. */
 export function pinRowId(userId: string, partnershipId: string): string {
 	return `${userId}:${partnershipId}`;
@@ -155,20 +184,31 @@ export async function evaluateTrust(
 	store: KeyStore,
 	userId: string,
 	partnershipId: string,
-	served: { mine: string | null; theirs: string | null },
+	served: { mine: string; theirs: string },
 	now: number = Date.now()
 ): Promise<PartnershipTrust> {
 	const pins = await readPins(store, userId);
 
-	const partner = pinStateFor(pins.get(partnershipId), served.theirs);
+	let partner = pinStateFor(pins.get(partnershipId), served.theirs);
 	const own = pinStateFor(pins.get(OWN_KEY_PIN), served.mine);
+
+	// The key this device vouched for, now actually served: verified, with no
+	// warning in between. See `vouchPinId`.
+	const vouched = pins.get(vouchPinId(partnershipId));
+	if (vouched?.recipient === served.theirs && partner.kind !== 'verified') {
+		const record = await writePin(store, userId, partnershipId, served.theirs, {
+			verified: true,
+			now
+		});
+		partner = { kind: 'verified', verifiedAt: record.verifiedAt ?? now };
+	}
 
 	// Pin on first sight, both sides. Never re-pin: a mismatch is the signal
 	// this whole module exists to produce, and overwriting it would erase it.
-	if (partner.kind === 'new' && served.theirs) {
+	if (partner.kind === 'new') {
 		await writePin(store, userId, partnershipId, served.theirs, { now });
 	}
-	if (own.kind === 'new' && served.mine) {
+	if (own.kind === 'new') {
 		await writePin(store, userId, OWN_KEY_PIN, served.mine, { now });
 	}
 
@@ -179,7 +219,7 @@ export async function evaluateTrust(
 export async function deviceTrust(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string | null; theirs: string | null }
+	served: { mine: string; theirs: string }
 ): Promise<PartnershipTrust> {
 	return evaluateTrust(await keyStore(), userId, partnershipId, served);
 }

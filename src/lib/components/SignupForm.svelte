@@ -126,7 +126,7 @@
 
 				// The identity travels too, so the gate on the next screen can cache
 				// it without re-deriving anything.
-				stashUnlock({ email, wrapKey, identity, recipient });
+				stashUnlock({ kind: 'password', email, wrapKey, identity, recipient });
 			} catch (error) {
 				console.error(error);
 				cancel();

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, ne, or, sql } from 'drizzle-orm';
 import {
 	BOARD_LIMIT,
 	isThreadIcon,
@@ -22,6 +22,7 @@ import type {
 } from '../types';
 import type { Db } from './db';
 import {
+	accountRecoveryRequests,
 	historyRestoreRequests,
 	messageAttachments,
 	messageReactions,
@@ -34,18 +35,6 @@ import {
 } from './db/schema';
 import { attachmentKey, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
-
-/** Whether message-key settings are relevant for this user yet. */
-export async function userHasMessageHistory(db: Db, userId: string): Promise<boolean> {
-	const rows = await db
-		.select({ id: messageThreads.id })
-		.from(messageThreads)
-		.innerJoin(partnerships, eq(partnerships.id, messageThreads.partnershipId))
-		.where(or(eq(partnerships.inviterId, userId), eq(partnerships.inviteeId, userId)))
-		.limit(1);
-
-	return rows.length > 0;
-}
 
 /**
  * Every database access for messaging.
@@ -1032,63 +1021,50 @@ export async function clearReaction(
 // ── history restore ──────────────────────────────────────────────────────────
 
 /**
- * Opens a request for the partner to re-encrypt the shared history.
+ * Which restore requests are still live, as a SQL condition.
  *
- * Any earlier pending request from the same person is superseded, so a second
- * attempt does not leave the partner with two prompts and no way to tell which
- * recipient is current.
+ * A restore request belongs to a partner-assisted sign-in, and it is only
+ * worth acting on while that sign-in could still happen or already has:
+ * pending and in date, or approved, or completed. A request whose sign-in was
+ * superseded, declined or left to expire must disappear rather than invite a
+ * partner to re-encrypt the whole history to a key nobody will ever hold.
+ *
+ * Rows with no recovery request predate this and are treated as live, so
+ * nothing that was already on someone's board vanishes.
  */
-export async function requestHistoryRestore(
-	db: Db,
-	input: { partnershipId: string; requesterId: string; recipient: string },
-	now: Date = new Date()
-): Promise<{ ok: true; id: string } | { ok: false; reason: 'not-a-member' }> {
-	const membership = await requireMembership(db, input.partnershipId, input.requesterId);
-	if (!membership) {
-		return { ok: false, reason: 'not-a-member' };
-	}
-
-	const id = crypto.randomUUID();
-	await db.batch([
-		db
-			.update(historyRestoreRequests)
-			.set({ status: 'declined', resolvedAt: now })
-			.where(
-				and(
-					eq(historyRestoreRequests.partnershipId, input.partnershipId),
-					eq(historyRestoreRequests.requesterId, input.requesterId),
-					eq(historyRestoreRequests.status, 'pending')
-				)
-			),
-		db.insert(historyRestoreRequests).values({
-			id,
-			partnershipId: input.partnershipId,
-			requesterId: input.requesterId,
-			requestedRecipient: input.recipient
-		})
-	]);
-
-	return { ok: true, id };
+function restoreStillLive(now: Date) {
+	return or(
+		sql`${historyRestoreRequests.recoveryRequestId} is null`,
+		inArray(accountRecoveryRequests.status, ['approved', 'completed']),
+		and(eq(accountRecoveryRequests.status, 'pending'), gt(accountRecoveryRequests.expiresAt, now))
+	);
 }
 
 /** Any open restore request in this partnership, from either side. */
 export async function listRestoreRequests(
 	db: Db,
 	partnershipId: string,
-	viewerId: string
+	viewerId: string,
+	now: Date = new Date()
 ): Promise<RestoreRequestView[]> {
 	const rows = await db
 		.select({
 			id: historyRestoreRequests.id,
 			requesterId: historyRestoreRequests.requesterId,
 			requestedRecipient: historyRestoreRequests.requestedRecipient,
-			createdAt: historyRestoreRequests.createdAt
+			createdAt: historyRestoreRequests.createdAt,
+			recoveryStatus: accountRecoveryRequests.status
 		})
 		.from(historyRestoreRequests)
+		.leftJoin(
+			accountRecoveryRequests,
+			eq(accountRecoveryRequests.id, historyRestoreRequests.recoveryRequestId)
+		)
 		.where(
 			and(
 				eq(historyRestoreRequests.partnershipId, partnershipId),
-				eq(historyRestoreRequests.status, 'pending')
+				eq(historyRestoreRequests.status, 'pending'),
+				restoreStillLive(now)
 			)
 		)
 		.orderBy(desc(historyRestoreRequests.createdAt));
@@ -1097,8 +1073,41 @@ export async function listRestoreRequests(
 		id: row.id,
 		requestedRecipient: row.requestedRecipient,
 		createdAt: row.createdAt,
-		mine: row.requesterId === viewerId
+		mine: row.requesterId === viewerId,
+		signInApproved: row.recoveryStatus === 'approved' || row.recoveryStatus === 'completed'
 	}));
+}
+
+/**
+ * The partnerships in which someone has asked this viewer for help signing in.
+ *
+ * For the callout the app shell shows on every screen — a partner who cannot
+ * get into their account cannot message you to say so, so the request has to
+ * find you wherever you are. Ids only; the layout already has the names.
+ */
+export async function listHelpRequests(
+	db: Db,
+	viewerId: string,
+	now: Date = new Date()
+): Promise<string[]> {
+	const rows = await db
+		.selectDistinct({ partnershipId: historyRestoreRequests.partnershipId })
+		.from(historyRestoreRequests)
+		.innerJoin(partnerships, eq(partnerships.id, historyRestoreRequests.partnershipId))
+		.leftJoin(
+			accountRecoveryRequests,
+			eq(accountRecoveryRequests.id, historyRestoreRequests.recoveryRequestId)
+		)
+		.where(
+			and(
+				eq(historyRestoreRequests.status, 'pending'),
+				ne(historyRestoreRequests.requesterId, viewerId),
+				eq(partnerships.status, 'accepted'),
+				or(eq(partnerships.inviterId, viewerId), eq(partnerships.inviteeId, viewerId)),
+				restoreStillLive(now)
+			)
+		);
+	return rows.map((row) => row.partnershipId);
 }
 
 export type RestorePage = {
@@ -1210,21 +1219,31 @@ function parseRestoreCursor(
  */
 async function findRestorableRequest(
 	db: Db,
-	input: { partnershipId: string; requestId: string; actorId: string }
-): Promise<{ id: string; requesterId: string } | null> {
+	input: { partnershipId: string; requestId: string; actorId: string },
+	now: Date = new Date()
+): Promise<{ id: string; requesterId: string; recoveryRequestId: string | null } | null> {
 	const membership = await requireMembership(db, input.partnershipId, input.actorId);
 	if (!membership) {
 		return null;
 	}
 
 	const rows = await db
-		.select({ id: historyRestoreRequests.id, requesterId: historyRestoreRequests.requesterId })
+		.select({
+			id: historyRestoreRequests.id,
+			requesterId: historyRestoreRequests.requesterId,
+			recoveryRequestId: historyRestoreRequests.recoveryRequestId
+		})
 		.from(historyRestoreRequests)
+		.leftJoin(
+			accountRecoveryRequests,
+			eq(accountRecoveryRequests.id, historyRestoreRequests.recoveryRequestId)
+		)
 		.where(
 			and(
 				eq(historyRestoreRequests.id, input.requestId),
 				eq(historyRestoreRequests.partnershipId, input.partnershipId),
-				eq(historyRestoreRequests.status, 'pending')
+				eq(historyRestoreRequests.status, 'pending'),
+				restoreStillLive(now)
 			)
 		)
 		.limit(1);
@@ -1280,7 +1299,7 @@ export async function applyHistoryRestore(
 		return { ok: false, reason: 'not-a-member' };
 	}
 
-	const request = await findRestorableRequest(db, input);
+	const request = await findRestorableRequest(db, input, now);
 	if (!request) {
 		return { ok: false, reason: 'no-such-request' };
 	}
@@ -1340,12 +1359,36 @@ export async function applyHistoryRestore(
 		)
 	];
 
+	// The final page closes the request, and — if it is the first partnership to
+	// finish — approves the sign-in it belongs to. That approval is what lets
+	// the requester back into their account, so it happens only here, after
+	// this partner has compared the code and re-encrypted everything.
+	//
+	// KNOWN GAP (docs/account-recovery.md, "Not built yet"): nothing yet proves
+	// the requester controls the account's email address, so a partner who
+	// filed a request for someone else's email could approve it themselves and
+	// take over the account. Email verification must be added before this is
+	// relied on.
 	const closing = input.final
 		? [
 				db
 					.update(historyRestoreRequests)
 					.set({ status: 'completed', resolvedAt: now })
-					.where(eq(historyRestoreRequests.id, input.requestId))
+					.where(eq(historyRestoreRequests.id, input.requestId)),
+				...(request.recoveryRequestId
+					? [
+							db
+								.update(accountRecoveryRequests)
+								.set({ status: 'approved', approvedBy: input.actorId, resolvedAt: now })
+								.where(
+									and(
+										eq(accountRecoveryRequests.id, request.recoveryRequestId),
+										eq(accountRecoveryRequests.status, 'pending'),
+										gt(accountRecoveryRequests.expiresAt, now)
+									)
+								)
+						]
+					: [])
 			]
 		: [];
 

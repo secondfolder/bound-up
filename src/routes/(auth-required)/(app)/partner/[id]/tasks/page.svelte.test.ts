@@ -25,7 +25,7 @@ function data({
 			timezone: 'Europe/London'
 		},
 		partners: [{ id: 'p1', name: 'Jun', image: null }],
-		userHasMessageHistory: false,
+		helpRequests: [],
 		partner: {
 			id: 'p1',
 			name: 'Jun',

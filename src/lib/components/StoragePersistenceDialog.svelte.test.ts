@@ -11,7 +11,7 @@ import { defined } from '$lib/testing/defined';
 import { waSettled } from '$lib/testing/web-awesome';
 import StoragePersistenceDialog from './StoragePersistenceDialog.svelte';
 
-const TITLE = 'Keep your messages unlocked here';
+const TITLE = 'Stay signed in on this device';
 
 let persist: ReturnType<typeof vi.spyOn>;
 
@@ -36,7 +36,7 @@ async function renderDue() {
 }
 
 describe('StoragePersistenceDialog', () => {
-	it('says nothing until an unlock makes it due', () => {
+	it('says nothing until a forced sign-in makes it due', () => {
 		const { container } = render(StoragePersistenceDialog);
 		expect(container.querySelector('wa-dialog')).toBeNull();
 	});

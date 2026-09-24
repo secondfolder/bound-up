@@ -39,3 +39,19 @@ test('refuses to bounce a signed-in visitor off-site', async () => {
 	);
 	expect(result).toMatchObject({ type: 'redirect', location: '/home' });
 });
+
+/**
+ * `reason=device` is the app sending someone back because their browser lost
+ * its key. It is passed on so the storage explanation can follow the sign-in,
+ * and anything else is ignored rather than trusted.
+ */
+test('passes on the one reason it knows, and nothing else', async () => {
+	const sent = await runLoad(load(fakeEvent({ path: '/login?reason=device' })));
+	expect(sent.reason).toBe('device');
+
+	const ordinary = await runLoad(load(fakeEvent({ path: '/login' })));
+	expect(ordinary.reason).toBeNull();
+
+	const made = await runLoad(load(fakeEvent({ path: '/login?reason=%3Cscript%3E' })));
+	expect(made.reason).toBeNull();
+});

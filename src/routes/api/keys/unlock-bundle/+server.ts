@@ -3,12 +3,12 @@ import { getUnlockBundle } from '$lib/server/keys';
 import type { RequestHandler } from './$types';
 
 /**
- * Everything a cold device needs to unlock: the public recipient and the
- * sealed wraps. All opaque — the server cannot open any of it.
+ * Everything a device needs to open the identity after signing in: the public
+ * recipient and the sealed wraps. All opaque — the server cannot open any of it.
  *
  * Its own endpoint rather than fields on the app shell's layout load, because
  * in the layout it would add a D1 read and a few hundred bytes of ciphertext to
- * *every* page in the app for something needed once per lock.
+ * *every* page in the app for something needed once per sign-in.
  */
 export const GET: RequestHandler = async ({ locals }) => {
 	// Explicit, even though this sits under a directory that looks protected.
@@ -20,5 +20,11 @@ export const GET: RequestHandler = async ({ locals }) => {
 		error(401, 'Not signed in');
 	}
 
-	return json(await getUnlockBundle(locals.db, locals.user.id));
+	const bundle = await getUnlockBundle(locals.db, locals.user.id);
+	if (!bundle) {
+		// Every account is created with keys, so this is broken data rather than
+		// a state to render. Loud, so it is found rather than lived with.
+		error(409, 'This account has no message keys. It was created before they existed.');
+	}
+	return json(bundle);
 };

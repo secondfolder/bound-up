@@ -35,7 +35,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
-| `src/routes/(public)/`        | Anonymous-reachable routes. `+layout.svelte` here owns `SiteHeader`                          |
+| `src/routes/(public)/`        | Anonymous-reachable routes. No header: each page links onwards itself                        |
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
 | `.../(auth-required)/(app)/`  | The signed-in app shell: fixed-viewport layout plus the `AppNav` bottom bar                  |
 | `drizzle/`                    | Generated migrations + snapshots. **Committed.** Never hand-edit                             |
@@ -200,18 +200,18 @@ site it applies to; go read that comment before deciding to break one.
 10. **Passkeys are bound to a hostname.** One registered on `localhost` will not
     work on the tunnel host or in production. WebAuthn, not a bug.
 
-    Two more that cost a debugging round each, both in
-    [docs/passkeys.md](docs/passkeys.md):
+    Two more, both in [docs/passkeys.md](docs/passkeys.md):
 
     - **`clientExtensionResults.prf.enabled` is a hint, not a verdict.**
       Providers disagree with themselves in both directions — Samsung Pass and
       KeePassXC say no at creation and then work, Microsoft Password Manager
-      says yes and then fails every unlock. Whether a credential can unlock
-      messages is decided by attempting a real seal, never by reading the flag.
-    - **An absent PRF verdict is a third state.** `passkey_details.prf_status`
-      is NULL for every passkey registered before the check existed, and that
-      must render as silence. Showing it as a warning would flag working
-      passkeys on every existing account.
+      says yes and then refuses. Which wrap a new passkey gets is decided by a
+      real PRF evaluation, never by reading the flag.
+    - **A passkey's secrets never go to the server.** Its PRF output and its
+      user handle (which this app fills with a secret) open its wrap, so the
+      ceremonies in `crypto/passkey-ceremony.ts` strip both before posting to
+      Better Auth. Going back to Better Auth's own `signIn.passkey` /
+      `addPasskey` would post the user handle as-is.
 
 11. **Never pass `undefined` to a boolean attribute on a `wa-*` element.**
     `disabled={busy || undefined}` looks like the usual "omit the attribute"
@@ -293,26 +293,23 @@ site it applies to; go read that comment before deciding to break one.
 
 ## Conventions
 
-**There is one unlock form, and one add-a-passkey flow.** `UnlockPanel.svelte`
-(wired up by `MessageUnlock.svelte`) is rendered by the app-shell callout, the
-messaging board, a thread and `/settings/encryption`; `AddPasskeyFlow.svelte` is
-rendered by both Security and Encrypted messages. A second copy of either is
-drift, and it is not hypothetical — there used to be four unlock forms, of which
-two passed no passkey callback at all, so passkey unlock silently did not exist
-on the messaging screens. Two things about `MessageUnlock` are load-bearing:
+**There is no unlock form: signing in is what unlocks.** The password form and
+the passkey ceremony both leave what opens the message key in the stash, and
+the app shell caches it. A device that finds itself without the key —
+cleared storage, most often — is signed out by `EncryptionGate` and sent to an
+ordinary-looking `/login?redirectTo=…&reason=device`. Users never see
+encryption as a separate concept, so do not add a screen, a prompt or copy that
+asks them to "unlock" anything; there used to be four unlock forms, and the
+drift between them is part of why they went. See
+[docs/encryption.md](docs/encryption.md).
 
-- **Its chrome goes in through a snippet, not around it.** Unlocking flips the
-  keyring, so a caller that wraps it in its own `{#if locked}` unmounts it — and
-  the add-a-passkey dialogs with it — while "unlock, then set up a passkey" is
-  still half way through the ceremony.
-- **A screen that swaps itself out on unlock holds the branch open** via
-  `onFlowOpen`, for the same reason.
-
-**A keyring status of `unknown` renders a placeholder, never content.** `lock()`
-deliberately returns the keyring to `unknown`, and until `EncryptionGate`
-re-resolves it nothing knows whether the device is locked. Falling through to
-the content was a real bug: the messaging board rendered every thread preview
-and every message as "…", which is ciphertext presented as if it were the text.
+**A keyring that is not `unlocked` renders a placeholder, never content.**
+`unknown` (not worked out yet), `locked` (being sent to sign in) and
+`signed-out` all look the same. Falling through to the content was a real bug:
+the messaging board rendered every thread preview and every message as "…",
+which is ciphertext presented as if it were the text. And `signed-out` is not
+`unknown` on purpose: the gate re-resolves `unknown`, and doing that during a
+sign-out raced the sign-out's redirect with one of its own.
 
 **Auth state flows one way: server load → `page.data`.** Better Auth's cookies
 are httpOnly, there is no client-side auth store, and there must not be one.
@@ -460,11 +457,12 @@ promote its save button to a solid brand style. On `superForm(...)` screens,
 key that off the form's tainted and valid state rather than hand-rolled comparisons so
 the button follows the same definition of "unsaved changes" as the form logic.
 
-**Two shells, one per group.** `(public)` renders `SiteHeader` above a centred
-800px column; `(auth-required)/(app)` renders a `100svh` flex column whose
-`<main>` scrolls and whose `AppNav` bottom bar does not. The root
-`+layout.svelte` deliberately renders neither — stacking a top nav on top of the
-bottom nav is what moving `SiteHeader` out of it fixed. Each shell sets the
+**Two shells, one per group.** `(public)` renders a centred 800px column with
+no header — each of its pages links onwards from its own content;
+`(auth-required)/(app)` renders a `100svh` flex column whose `<main>` scrolls
+and whose `AppNav` bottom bar does not. The root `+layout.svelte` deliberately
+renders neither — a top nav stacked on the bottom nav defeated the point of
+it. Each shell sets the
 `body` rules it needs through `<svelte:head>`, so they are added and removed
 with the layout rather than fighting each other globally.
 
@@ -483,11 +481,11 @@ hydration. Route ids are identical on both sides.
 
 **CSS lives in the component's `<style>` block**, nested, no framework.
 
-**Two links must not share an accessible name.** The `(public)` header already
-has "Login" and "Sign up"; the invite page's own buttons are "Log in to accept"
-and "Create an account" for that reason. Duplicate names are a real problem for
-anyone navigating by link list, and they make a test locator ambiguous — which
-is how this one was noticed.
+**Two links on one page must not share an accessible name.** Duplicate names
+going to different places are a real problem for anyone navigating by link
+list, and they make a test locator ambiguous — which is how the rule was first
+noticed, back when a site header's "Login" and "Sign up" sat above pages with
+links of their own.
 
 **Comments explain _why_, not _what_.** This codebase's distinguishing habit is
 that every non-obvious decision carries a comment naming the failure it avoids —
@@ -614,7 +612,7 @@ lacks `ElementInternals` altogether.) That changes how to read them:
 - Testing-library's role queries do not look inside shadow roots, so a
   `wa-button`'s role is out of their reach; find it by element or class.
 - `userEvent` from `vitest/browser` types real, trusted keystrokes through
-  Playwright — what `UnlockPanel.svelte.test.ts` uses for the password box.
+  Playwright, for a component whose state depends on real typing.
 
 The test browser is sealed off. Every host but localhost resolves to a black
 hole (`--host-resolver-rules` in `vite.config.ts`), so an iframe never loads
@@ -681,10 +679,14 @@ Notes that cost a debugging round each:
   the same check.) Serially the page almost always won this race; four workers
   made it lose, in a different flow each run.
 - **Anything a test waits for has to be waited for, not sampled.** `openBoard`
-  used to check for the one-time history warning with an instant
-  `isVisible()`, which could land on the placeholder shown while the keyring
-  resolves, skip the warning, and leave it blocking the page. It now waits for
-  the warning or the board, whichever comes.
+  used to check for a one-time warning with an instant `isVisible()`, which
+  could land on the placeholder shown while the keyring resolves, skip the
+  warning, and leave it blocking the page. Wait on the thing itself, or on
+  either of two outcomes with `.or()`.
+- **A copied `storageState` is a device without its key.** It carries cookies
+  and localStorage, but not the non-extractable `CryptoKey` in IndexedDB — so
+  a context built from one is sent to sign in again on its first page.
+  `timezone.spec.ts` shows the shape.
 - **Waiting for the page to catch up is `settle(page)`, not a sleep.** Lexical
   learns where the caret went from `selectionchange`, which the browser
   dispatches as a task after the key press, so a loop that presses again
@@ -740,7 +742,8 @@ Four places, split on scope:
 | [docs/rewards.md](docs/rewards.md)                                                       | Self rewards and partnership rewards: credits, claims, control                |
 | [docs/tasks.md](docs/tasks.md)                                                           | Self tasks and partnership tasks: scheduling, credits, timezone ownership     |
 | [docs/encryption.md](docs/encryption.md)                                                 | Message keys: the client-side KDF, the wraps, what the guarantee is           |
-| [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: the password gate, PRF detection, provider naming, the unlock panel |
+| [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: PRF and user-handle wraps, sign-in that unlocks, provider naming    |
+| [docs/account-recovery.md](docs/account-recovery.md)                                     | Partner-assisted sign-in after losing every way in, and its known gap         |
 | [docs/halftone.md](docs/halftone.md)                                                     | The landing page's halftone overlay: the screen model and its fixtures        |
 | [docs/embeds.md](docs/embeds.md)                                                         | URL linkification and inline embeds: providers, privacy gate, reddit path     |
 | [docs/messaging.md](docs/messaging.md)                                                   | Encrypted partner messages: threads, the board, unread, restore               |

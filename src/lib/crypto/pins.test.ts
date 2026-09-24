@@ -6,6 +6,7 @@ import {
 	OWN_KEY_PIN,
 	pinRowId,
 	readPins,
+	recordVouch,
 	verifyPin,
 	writePin
 } from './pins';
@@ -142,14 +143,6 @@ describe('evaluateTrust', () => {
 		expect(trust.partner.kind).toBe('pinned');
 	});
 
-	it('treats a partner with no keys as missing rather than pinning null', async () => {
-		const store = fakeStore();
-		const trust = await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: null });
-
-		expect(trust.partner).toEqual({ kind: 'missing' });
-		expect((await readPins(store, ada)).has(partnership)).toBe(false);
-	});
-
 	it('keeps one account’s pins away from another on the same device', async () => {
 		const store = fakeStore();
 		await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey });
@@ -172,7 +165,7 @@ describe('verifyPin', () => {
 		const record = await verifyPin(store, ada, partnership, theirKey, 5000);
 		expect(record).toMatchObject({ pinnedAt: 1000, verifiedAt: 5000 });
 
-		const trust = await evaluateTrust(store, ada, partnership, { mine: null, theirs: theirKey });
+		const trust = await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey });
 		expect(trust.partner).toEqual({ kind: 'verified', verifiedAt: 5000 });
 	});
 
@@ -206,7 +199,52 @@ describe('acceptPin', () => {
 
 		// Carrying verification across a key change would defeat the point of
 		// having pinned anything, so the new key comes back merely `pinned`.
-		const trust = await evaluateTrust(store, ada, partnership, { mine: null, theirs: 'age1new' });
+		const trust = await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: 'age1new' });
 		expect(trust.partner).toEqual({ kind: 'pinned', pinnedAt: 9000 });
+	});
+});
+
+describe("vouching for a partner's new key", () => {
+	/**
+	 * Helping a partner back in: this device compared the code for their new
+	 * key, but the server serves the old one until they finish signing in.
+	 * Neither moment should warn about a change the user just made.
+	 */
+	it('stays quiet while the old key is still served', async () => {
+		const store = fakeStore();
+		await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey });
+		await recordVouch(store, ada, partnership, 'age1new');
+
+		const trust = await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey });
+		expect(trust.partner).toMatchObject({ kind: 'pinned' });
+	});
+
+	it('accepts the vouched key as verified when it arrives, with no change warning', async () => {
+		const store = fakeStore();
+		await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey });
+		await recordVouch(store, ada, partnership, 'age1new', 5000);
+
+		const trust = await evaluateTrust(
+			store,
+			ada,
+			partnership,
+			{ mine: myKey, theirs: 'age1new' },
+			6000
+		);
+		expect(trust.partner).toEqual({ kind: 'verified', verifiedAt: 6000 });
+		expect((await readPins(store, ada)).get(partnership)?.recipient).toBe('age1new');
+	});
+
+	/** The vouch is for one key; any other is still a change, and still warns. */
+	it('still warns about a key that is not the one vouched for', async () => {
+		const store = fakeStore();
+		await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey });
+		await recordVouch(store, ada, partnership, 'age1new');
+
+		const trust = await evaluateTrust(store, ada, partnership, {
+			mine: myKey,
+			theirs: 'age1attacker'
+		});
+		expect(trust.partner.kind).toBe('changed');
 	});
 });

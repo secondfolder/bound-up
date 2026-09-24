@@ -1,6 +1,8 @@
 {
 	"name": "Bound Up",
 	"short_name": "Bound Up",
+	"start_url": "/home",
+	"scope": "/",
 	"icons": [
 		{
 			"src": "web-app-manifest-192x192.png",

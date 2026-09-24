@@ -175,3 +175,29 @@ today. Do not wait for a literal zero.
   URL", and removing it would change what counts as a link.
 - The `richTextFieldSchema` sanitising behaviour, which is not about legacy
   content at all.
+
+## Partner-assisted sign-in without email verification
+
+Not code to delete, but a gap that is temporary on purpose: partner-assisted
+sign-in (docs/account-recovery.md) lets a partner's approval alone replace
+someone's password and keys. Until the requester also has to prove control of
+the account's email address, **a partner can take over the account by
+themselves** — file a request for the other person's email, approve it, and
+sign in.
+
+### Where it currently lives
+
+- the approval: the `closing` statements in `applyHistoryRestore`,
+  `src/lib/server/messaging.ts` (commented at the site)
+- the completion: `completeAccountRecovery` in `src/lib/server/recovery.ts`
+
+### What removes the need for it
+
+A mailer. With one, completion should require both a partner's approval and a
+link sent to the account's email address.
+
+### What should stay after the cleanup
+
+Everything else about the flow: the code compared out of band, the
+no-account-existence-oracle rule on the start endpoint, the hashed token, and
+wiping every passkey and session on completion.

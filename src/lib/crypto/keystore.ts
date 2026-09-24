@@ -29,8 +29,8 @@
  *   restricts IndexedDB outright. Hence the ladder, and `fallbackReason` so a
  *   support answer is a screenshot rather than a remote-inspector session.
  * - **Storage gets evicted.** iOS drops IndexedDB after about a week of
- *   inactivity, and any browser may evict under pressure. So the unlock prompt
- *   is a designed screen and not an error state.
+ *   inactivity, and any browser may evict under pressure. So signing in again
+ *   to get the key back is an ordinary path, not an error state.
  */
 
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb';
@@ -111,7 +111,7 @@ export type KeyStore = {
 	/**
 	 * Why this device is not on `crypto-key`, or null when it is.
 	 *
-	 * Shown on /settings/encryption. `keyStore()` used to swallow every failure
+	 * Shown on the Security page. `keyStore()` used to swallow every failure
 	 * into one `catch`, which made "iOS asks me for my password every time"
 	 * impossible to tell apart from an unsupported curve, a refused database and
 	 * a `DataCloneError` without a remote inspector.
@@ -193,10 +193,10 @@ interface KeyDb extends DBSchema {
 }
 
 function openDatabase(): Promise<IDBPDatabase<KeyDb>> {
-	// A version change held open by another tab must not hang the unlock screen
-	// forever, and `openDB` keeps waiting after `blocked` fires — so race it.
-	// The other tab closing is not handled: it is rare, it is one page load, and
-	// the fallback is a store that works and an unlock prompt.
+	// A version change held open by another tab must not hang the app forever,
+	// and `openDB` keeps waiting after `blocked` fires — so race it. The other
+	// tab closing is not handled: it is rare, it is one page load, and the
+	// fallback is a store that works in memory for this tab.
 	let onBlocked!: (error: Error) => void;
 	const blocked = new Promise<never>((_, reject) => {
 		onBlocked = reject;

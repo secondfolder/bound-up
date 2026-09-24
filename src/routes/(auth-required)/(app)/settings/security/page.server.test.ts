@@ -1,8 +1,7 @@
 import { APIError } from 'better-auth/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { currentPasswordWrapParams } from '$lib/crypto/setup';
-import { account, passkey } from '$lib/server/db/schema';
-import { recordPasskeyPrfStatus } from '$lib/server/keys';
+import { account } from '$lib/server/db/schema';
 import { FAKE_WRAP_BLOB } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
@@ -48,71 +47,35 @@ function loadEvent(passkeys: Record<string, unknown>[] = []) {
 	});
 }
 
-/** A real `passkey` row, which is what the PRF verdict's foreign key needs. */
-async function givePasskeyRow(id: string) {
-	await harness.db.insert(passkey).values({
-		id,
-		name: id,
-		publicKey: 'irrelevant',
-		userId: ada.id,
-		credentialID: `cred-${id}`,
-		counter: 0,
-		deviceType: 'singleDevice',
-		backedUp: false,
-		transports: 'internal',
-		createdAt: new Date()
-	});
-}
-
 describe('load', () => {
 	it('refuses an unsigned visitor', async () => {
 		const result = await runAndCatch(() => load(fakeEvent({ db: harness.db })));
 		expect(result).toMatchObject({ type: 'error', status: 401 });
 	});
 
-	it('returns passkeys, password state, and the unlock bundle', async () => {
+	it('returns passkeys and the unlock bundle', async () => {
 		await givePassword(ada.id);
 		const keys = await createTestUserKeys(harness.db, ada);
 
 		const data = await runLoad(load(loadEvent([{ id: 'pk-1', name: 'Laptop' }])));
 
-		expect(data.hasPassword).toBe(true);
 		expect(data.bundle.recipient).toBe(keys.recipient);
 		expect(data.passkeys).toMatchObject([{ id: 'pk-1', name: 'Laptop' }]);
 	});
 
-	/**
-	 * Three states, and the third is the one that is easy to get wrong: a passkey
-	 * nothing has ever tried is not a passkey that failed. Every passkey
-	 * registered before this check existed is in that state, and flagging them
-	 * would put a warning on every account that had one.
-	 */
-	it('reports a verdict only for a passkey that has actually been tried', async () => {
-		await givePasskeyRow('pk-good');
-		await givePasskeyRow('pk-bad');
-		await givePasskeyRow('pk-untried');
-		await recordPasskeyPrfStatus(harness.db, ada.id, {
-			passkeyId: 'pk-good',
-			prfStatus: 'supported'
-		});
-		await recordPasskeyPrfStatus(harness.db, ada.id, {
-			passkeyId: 'pk-bad',
-			prfStatus: 'unsupported'
-		});
-
-		const data = await runLoad(
-			load(loadEvent([{ id: 'pk-good' }, { id: 'pk-bad' }, { id: 'pk-untried' }]))
-		);
-
-		expect(data.passkeys.map((entry: { prfStatus?: string }) => entry.prfStatus)).toEqual([
-			'supported',
-			'unsupported',
-			undefined
-		]);
+	/** Every account is created with keys; one without them is broken data. */
+	it('refuses an account with no keys rather than rendering a half page', async () => {
+		const result = await runAndCatch(() => load(loadEvent()));
+		expect(result).toMatchObject({ type: 'error', status: 409 });
 	});
 
-	/** So the warning can name the manager rather than leaving the user to guess. */
+	/**
+	 * From the AAGUID on Better Auth's own `passkey` row — the app no longer
+	 * keeps a copy of it (the `passkey_details` table went with the PRF
+	 * verdicts it existed for).
+	 */
 	it('resolves the provider from the AAGUID Better Auth stored', async () => {
+		await createTestUserKeys(harness.db, ada);
 		const data = await runLoad(
 			load(
 				loadEvent([
@@ -124,7 +87,7 @@ describe('load', () => {
 			)
 		);
 
-		expect(data.passkeys[0].provider).toMatchObject({ name: 'Dashlane', prf: 'none' });
+		expect(data.passkeys[0].provider).toEqual({ name: 'Dashlane' });
 		expect(data.passkeys[1].provider).toBeNull();
 	});
 });
@@ -213,8 +176,12 @@ describe('changePassword', () => {
 		expect(changePassword.mock.calls[0][0].body.revokeOtherSessions).toBe(false);
 	});
 
-	it('still changes a password on an account with no message keys', async () => {
-		await givePassword(ada.id);
+	/**
+	 * Every account has keys, so a change without a re-sealed wrap would leave
+	 * the key sealed to a password that no longer exists.
+	 */
+	it('refuses a change that carries no re-sealed wrap', async () => {
+		await setUpAda();
 		const changePassword = vi.fn().mockResolvedValue({});
 
 		const result = await actions.changePassword(
@@ -229,8 +196,7 @@ describe('changePassword', () => {
 			})
 		);
 
-		expect(result).toMatchObject({ form: { valid: true } });
-		await expect(readWrapRows(harness.db, ada.id)).resolves.toHaveLength(0);
-		expect(changePassword).toHaveBeenCalledOnce();
+		expect(result).toMatchObject({ status: 400 });
+		expect(changePassword).not.toHaveBeenCalled();
 	});
 });

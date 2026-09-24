@@ -13,7 +13,14 @@
 import { pinBlocksSending } from '../encryption';
 import { safetyNumber } from './fingerprint';
 import { keyStore } from './keystore';
-import { acceptPin, deviceTrust, OWN_KEY_PIN, type PartnershipTrust, verifyPin } from './pins';
+import {
+	acceptPin,
+	deviceTrust,
+	OWN_KEY_PIN,
+	type PartnershipTrust,
+	recordVouch,
+	verifyPin
+} from './pins';
 
 /** What one partnership's trust looks like while it is being worked out. */
 export type TrustView =
@@ -29,7 +36,7 @@ export type TrustView =
 	 * instead.
 	 */
 	| { status: 'unavailable' }
-	| ({ status: 'known'; safetyNumber: string | null } & PartnershipTrust);
+	| ({ status: 'known'; safetyNumber: string } & PartnershipTrust);
 
 const views = $state<Record<string, TrustView>>({});
 
@@ -47,14 +54,11 @@ export function trustFor(partnershipId: string): TrustView {
 export async function refreshTrust(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string | null; theirs: string | null }
+	served: { mine: string; theirs: string }
 ): Promise<TrustView> {
 	try {
 		const trust = await deviceTrust(userId, partnershipId, served);
-		// Only computable with both halves — a partner who has not set up
-		// messaging has no number to compare, which `missing` already says.
-		const number =
-			served.mine && served.theirs ? await safetyNumber(served.mine, served.theirs) : null;
+		const number = await safetyNumber(served.mine, served.theirs);
 
 		const view: TrustView = { status: 'known', safetyNumber: number, ...trust };
 		views[partnershipId] = view;
@@ -88,11 +92,8 @@ export function trustAllowsSending(view: TrustView): boolean {
 export async function markVerified(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string | null; theirs: string | null }
+	served: { mine: string; theirs: string }
 ): Promise<void> {
-	if (!served.theirs) {
-		return;
-	}
 	await verifyPin(await keyStore(), userId, partnershipId, served.theirs);
 	await refreshTrust(userId, partnershipId, served);
 }
@@ -107,17 +108,34 @@ export async function markVerified(
 export async function acceptKeyChange(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string | null; theirs: string | null },
+	served: { mine: string; theirs: string },
 	which: 'partner' | 'own'
 ): Promise<void> {
 	const store = await keyStore();
-	if (which === 'partner' && served.theirs) {
+	if (which === 'partner') {
 		await acceptPin(store, userId, partnershipId, served.theirs);
 	}
-	if (which === 'own' && served.mine) {
+	if (which === 'own') {
 		await acceptPin(store, userId, OWN_KEY_PIN, served.mine);
 	}
 	await refreshTrust(userId, partnershipId, served);
+}
+
+/**
+ * "I just compared the code and helped them sign in."
+ *
+ * Remembers the partner's new key as vouched for, rather than pinning it: the
+ * server serves their old key until they finish signing in, and a pin on the
+ * new one would make that look like a change. When the new key does arrive it
+ * is accepted as verified, with no "key changed" warning about the thing the
+ * user just did. See `vouchPinId` in `pins.ts`.
+ */
+export async function trustRecoveredKey(
+	userId: string,
+	partnershipId: string,
+	recipient: string
+): Promise<void> {
+	await recordVouch(await keyStore(), userId, partnershipId, recipient);
 }
 
 /** Drops the cache — on sign-out, or a different account in the same tab. */

@@ -11,7 +11,7 @@ import { test } from './fixtures';
 test.describe('login/signup cross-links', () => {
 	test('login links to signup, and signup links back to login', async ({ page }) => {
 		await page.goto('/login');
-		await expect(page.getByRole('link', { name: 'New here? Create an account' })).toHaveAttribute(
+		await expect(page.getByRole('link', { name: 'Create an account' })).toHaveAttribute(
 			'href',
 			/\/signup$/
 		);
@@ -26,7 +26,7 @@ test.describe('login/signup cross-links', () => {
 		// An arbitrary off-site value would have been dropped by safeRedirect in
 		// the load, so use a real internal path: what an invite actually sends.
 		await page.goto('/login?redirectTo=%2Finvite%2Fsome-token');
-		const link = page.getByRole('link', { name: 'New here? Create an account' });
+		const link = page.getByRole('link', { name: 'Create an account' });
 		await expect(link).toHaveAttribute(
 			'href',
 			`/signup?redirectTo=${encodeURIComponent('/invite/some-token')}`
@@ -46,7 +46,7 @@ test.describe('login/signup cross-links', () => {
 		page
 	}) => {
 		await page.goto('/login?redirectTo=%2Finvite%2Fsome-token');
-		await page.getByRole('link', { name: 'New here? Create an account' }).click();
+		await page.getByRole('link', { name: 'Create an account' }).click();
 		await page.waitForURL(/\/signup\?redirectTo=/);
 
 		await page.getByRole('link', { name: 'Already have an account? Log in' }).click();

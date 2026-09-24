@@ -213,8 +213,19 @@ export default defineConfig(({ command, mode }) => {
 			 * made and no error anywhere — which showed up as the Playwright suite
 			 * failing about one run in three, always on whichever test followed the
 			 * first dynamic import. Listing them here moves the work to server start.
+			 *
+			 * `@simplewebauthn/browser` is imported statically, but it is also a
+			 * dependency of `@better-auth/passkey`, which Vite had already bundled on
+			 * its own terms; listing it keeps the direct import from being discovered
+			 * as a second, new dependency mid-run.
 			 */
-			include: ['age-encryption', '@js-temporal/polyfill', '@scure/base', 'html2canvas-pro']
+			include: [
+				'age-encryption',
+				'@js-temporal/polyfill',
+				'@scure/base',
+				'html2canvas-pro',
+				'@simplewebauthn/browser'
+			]
 		},
 
 		server: {

@@ -167,11 +167,6 @@ describe('pinStateFor', () => {
 		...over
 	});
 
-	it('is missing when they have no key yet', () => {
-		expect(pinStateFor(undefined, null)).toEqual({ kind: 'missing' });
-		expect(pinStateFor(pin(), null)).toEqual({ kind: 'missing' });
-	});
-
 	it('is new on first sight', () => {
 		expect(pinStateFor(undefined, 'age1theirs')).toEqual({ kind: 'new' });
 	});
@@ -204,8 +199,7 @@ describe('pinStateFor', () => {
 });
 
 describe('pinBlocksSending', () => {
-	it('blocks only when there is no key or the key changed', () => {
-		expect(pinBlocksSending({ kind: 'missing' })).toBe(true);
+	it('blocks only when the key changed', () => {
 		expect(
 			pinBlocksSending({
 				kind: 'changed',

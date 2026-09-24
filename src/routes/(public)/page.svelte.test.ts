@@ -29,8 +29,8 @@ describe('/+page.svelte', () => {
 		pageState.data.user = null;
 		render(Page);
 
-		// The big link is named "Sign up for Bound Up", deliberately not
-		// "Sign up", which the site header already uses.
+		// The big link is named "Sign up for Bound Up" — see the aria-label
+		// comment on the page.
 		expect(screen.getByRole('link', { name: 'Sign up for Bound Up' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
 		expect(screen.queryByRole('link', { name: 'Sign up' })).not.toBeInTheDocument();

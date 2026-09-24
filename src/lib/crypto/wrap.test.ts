@@ -50,8 +50,8 @@ describe('wrapIdentity / unwrapIdentity', () => {
 		expect(new Set(ivs).size).toBe(50);
 	});
 
-	// "Wrong password" is an ordinary outcome the unlock screen renders as a
-	// message, so it is a value and not an exception.
+	// "Wrong password" is an ordinary outcome a screen renders as a message, so
+	// it is a value and not an exception.
 	it('returns null for the wrong wrap key', async () => {
 		const blob = await wrapIdentity({
 			wrapKey: await aesKey(1),

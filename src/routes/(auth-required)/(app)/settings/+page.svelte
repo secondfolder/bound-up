@@ -2,14 +2,11 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import type { PageData } from './$types';
-
-	let { data }: { data: PageData } = $props();
+	import { lock } from '$lib/crypto/session.svelte';
 
 	// Server load data is the single source of truth for auth state — see the
 	// note in src/routes/+layout.svelte.
 	const user = $derived(page.data.user);
-	const hasMessageHistory = $derived(data.hasMessageHistory);
 </script>
 
 <section>
@@ -24,9 +21,11 @@
 					<span class="email">{user.email}</span>
 				</div>
 
-				<!-- Plain use:enhance is enough: its default behaviour already does goto +
-				     invalidateAll for a redirect result. -->
-				<form method="POST" action="/logout" use:enhance>
+				<!-- Forgets this device's copy of the message key before the session
+				     goes: signing out used to leave it in IndexedDB, readable by whoever
+				     signed in next on the same browser profile. Then enhance's default
+				     goto + invalidateAll for the redirect. -->
+				<form method="POST" action="/logout" use:enhance={() => lock(user.id)}>
 					<wa-button type="submit" appearance="outlined" variant="danger">Log out</wa-button>
 				</form>
 			</div>
@@ -52,14 +51,6 @@
 				<wa-icon name="chevron-right" variant="solid"></wa-icon>
 			</a>
 		</li>
-		{#if hasMessageHistory}
-			<li>
-				<a href={resolve('/(auth-required)/(app)/settings/encryption')}>
-					<span>Encrypted messages</span>
-					<wa-icon name="chevron-right" variant="solid"></wa-icon>
-				</a>
-			</li>
-		{/if}
 	</ul>
 </section>
 

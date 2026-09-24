@@ -11,25 +11,21 @@ import {
 	createTestPartnership,
 	createTestUser,
 	createTestUserKeys,
-	readUserKeysRow,
 	readWrapRows,
 	type TestUser
 } from '../testing/fixtures';
 import { passkey } from './db/schema';
 import {
-	acknowledgeHistoryWarning,
+	addPasskeyWrap,
 	addWrap,
 	deleteOtherPasswordWraps,
+	deletePasskeyWithWrap,
 	deleteWrap,
 	getRecipientsForPartnership,
 	getUnlockBundle,
-	getUserKeys,
+	getUserRecipient,
 	listWrapsForUser,
-	passkeyPrfStatusFor,
-	putUserKeys,
-	recordPasskeyPrfStatus,
-	replaceUserKeys,
-	touchWrap
+	putUserKeys
 } from './keys';
 
 let harness: TestDb;
@@ -51,10 +47,7 @@ describe('putUserKeys', () => {
 	it('writes the recipient and its first wrap together', async () => {
 		await putUserKeys(harness.db, ada.id, { recipient: ADA_RECIPIENT, wrap: passwordWrap() });
 
-		await expect(getUserKeys(harness.db, ada.id)).resolves.toEqual({
-			recipient: ADA_RECIPIENT,
-			historyWarningAcknowledged: false
-		});
+		await expect(getUserRecipient(harness.db, ada.id)).resolves.toBe(ADA_RECIPIENT);
 		await expect(readWrapRows(harness.db, ada.id)).resolves.toHaveLength(1);
 	});
 
@@ -83,21 +76,9 @@ describe('putUserKeys', () => {
 	});
 });
 
-describe('getUserKeys', () => {
-	it('is null before setup', async () => {
-		await expect(getUserKeys(harness.db, ada.id)).resolves.toBeNull();
-	});
-
-	it('reports the acknowledgement once it is given', async () => {
-		await createTestUserKeys(harness.db, ada);
-		await expect(getUserKeys(harness.db, ada.id)).resolves.toMatchObject({
-			historyWarningAcknowledged: false
-		});
-
-		await acknowledgeHistoryWarning(harness.db, ada.id);
-		await expect(getUserKeys(harness.db, ada.id)).resolves.toMatchObject({
-			historyWarningAcknowledged: true
-		});
+describe('getUserRecipient', () => {
+	it('is null for an account with no keys, which is broken data', async () => {
+		await expect(getUserRecipient(harness.db, ada.id)).resolves.toBeNull();
 	});
 });
 
@@ -120,172 +101,131 @@ describe('listWrapsForUser', () => {
 
 describe('getUnlockBundle', () => {
 	/**
+	 * Every account is created with keys, so an account without them is broken
+	 * data, and the endpoint turns this null into an error rather than a state.
+	 */
+	it('is null for an account with no keys', async () => {
+		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toBeNull();
+	});
+
+	/**
 	 * The state a malicious server could manufacture by deleting the wraps. The
 	 * dangerous response would be to generate a fresh identity, which would
-	 * permanently orphan every message the user had received — so the bundle has
-	 * to report "key present, no way in" distinguishably from "not set up".
+	 * permanently orphan every message the user had received — so the bundle
+	 * still reports the key it has, with no way in.
 	 */
-	it('reports a recipient with no wraps distinguishably from no keys at all', async () => {
-		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toEqual({
-			recipient: null,
-			historyWarningAcknowledged: false,
-			wraps: [],
-			passkeyCount: 0,
-			passkeysKnownUnusable: 0,
-			unusableProviderAaguid: null
-		});
-
+	it('still reports the recipient when every wrap is gone', async () => {
 		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT });
 		const [wrap] = await listWrapsForUser(harness.db, ada.id);
 		await deleteWrap(harness.db, wrap.id, ada.id);
 
 		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toEqual({
 			recipient: ADA_RECIPIENT,
-			historyWarningAcknowledged: false,
-			wraps: [],
-			passkeyCount: 0,
-			passkeysKnownUnusable: 0,
-			unusableProviderAaguid: null
-		});
-	});
-
-	/**
-	 * Whether there is a passkey at all, which is a different question from
-	 * whether the browser can do WebAuthn. Offering a passkey unlock to someone
-	 * who has registered none opens a chooser with nothing in it, and WebAuthn
-	 * reports that identically to a dismissed prompt — so the screens have to
-	 * know beforehand rather than explain afterwards.
-	 */
-	it('reports whether the account has a passkey to offer', async () => {
-		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT });
-		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
-			passkeyCount: 0
-		});
-
-		await harness.db.insert(passkey).values({
-			id: 'passkey-ada',
-			name: 'iPhone',
-			publicKey: 'irrelevant',
-			userId: ada.id,
-			credentialID: 'cred-ada',
-			counter: 0,
-			deviceType: 'singleDevice',
-			backedUp: false,
-			transports: 'internal',
-			createdAt: new Date()
-		});
-
-		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
-			passkeyCount: 1,
-			// Nothing has been tried yet, which is not the same as "cannot".
-			passkeysKnownUnusable: 0
-		});
-
-		// Someone else's passkey is not an offer for this account.
-		const someoneElse = await createTestUser(harness.db, { name: 'Jun' });
-		await expect(getUnlockBundle(harness.db, someoneElse.id)).resolves.toMatchObject({
-			passkeyCount: 0
+			wraps: []
 		});
 	});
 });
 
-describe('recordPasskeyPrfStatus', () => {
-	async function givePasskey(userId: string, id: string, aaguid: string | null = null) {
-		await harness.db.insert(passkey).values({
-			id,
-			name: 'A passkey',
-			publicKey: 'irrelevant',
-			userId,
-			credentialID: `cred-${id}`,
-			counter: 0,
-			deviceType: 'singleDevice',
-			backedUp: false,
-			transports: 'internal',
-			createdAt: new Date(),
-			aaguid
-		});
-	}
+async function givePasskey(userId: string, id: string) {
+	await harness.db.insert(passkey).values({
+		id,
+		name: 'A passkey',
+		publicKey: 'irrelevant',
+		userId,
+		credentialID: `cred-${id}`,
+		counter: 0,
+		deviceType: 'singleDevice',
+		backedUp: false,
+		transports: 'internal',
+		createdAt: new Date()
+	});
+}
 
-	it('records a verdict and surfaces it in the bundle', async () => {
-		await givePasskey(ada.id, 'passkey-ada', '531126d6-e717-415c-9320-3d9aa6981239');
+const passkeyWrap = (credentialId: string) =>
+	({
+		type: 'passkey-prf',
+		params: { type: 'passkey-prf', version: 1, credentialId, rpId: 'bound-up.test' },
+		blob: FAKE_WRAP_BLOB
+	}) as const;
+
+describe('addPasskeyWrap', () => {
+	it('stores the wrap for the user’s own passkey', async () => {
+		await createTestUserKeys(harness.db, ada);
+		await givePasskey(ada.id, 'pk-ada');
 
 		await expect(
-			recordPasskeyPrfStatus(harness.db, ada.id, {
-				passkeyId: 'passkey-ada',
-				prfStatus: 'unsupported'
-			})
+			addPasskeyWrap(harness.db, ada.id, { passkeyId: 'pk-ada', wrap: passkeyWrap('cred-pk-ada') })
 		).resolves.toBe(true);
+		const types = (await readWrapRows(harness.db, ada.id))
+			.map((wrap) => wrap.type)
+			.sort((a, b) => a.localeCompare(b));
+		expect(types).toEqual(['passkey-prf', 'password']);
+	});
 
-		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
-			passkeyCount: 1,
-			passkeysKnownUnusable: 1,
-			// Carried so the unlock screen can name the provider rather than
-			// leaving the user to guess which of their managers is at fault.
-			unusableProviderAaguid: '531126d6-e717-415c-9320-3d9aa6981239'
-		});
-
-		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(
-			new Map([['passkey-ada', 'unsupported']])
-		);
+	it('refuses someone else’s passkey', async () => {
+		await givePasskey(jun.id, 'pk-jun');
+		await expect(
+			addPasskeyWrap(harness.db, ada.id, { passkeyId: 'pk-jun', wrap: passkeyWrap('cred-pk-jun') })
+		).resolves.toBe(false);
+		await expect(readWrapRows(harness.db, ada.id)).resolves.toHaveLength(0);
 	});
 
 	/**
-	 * A provider that refused once can be retried and succeed — Samsung Pass and
-	 * KeePassXC both do — so pinning the first answer for ever would leave a
-	 * permanent warning on a passkey that now works.
+	 * Sign-in matches a wrap to its passkey by credential id, and so does
+	 * deletion. A wrap naming another credential could never be opened or
+	 * cleaned up.
 	 */
-	it('replaces an earlier verdict rather than failing on the second one', async () => {
-		await givePasskey(ada.id, 'passkey-ada');
-
-		await recordPasskeyPrfStatus(harness.db, ada.id, {
-			passkeyId: 'passkey-ada',
-			prfStatus: 'unsupported'
-		});
-		await recordPasskeyPrfStatus(harness.db, ada.id, {
-			passkeyId: 'passkey-ada',
-			prfStatus: 'supported'
-		});
-
-		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(
-			new Map([['passkey-ada', 'supported']])
-		);
-		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
-			passkeysKnownUnusable: 0
-		});
-	});
-
-	it("records nothing against someone else's passkey", async () => {
-		const someoneElse = await createTestUser(harness.db, { name: 'Jun' });
-		await givePasskey(someoneElse.id, 'passkey-jun');
-
+	it('refuses a wrap that names a different credential', async () => {
+		await givePasskey(ada.id, 'pk-ada');
 		await expect(
-			recordPasskeyPrfStatus(harness.db, ada.id, {
-				passkeyId: 'passkey-jun',
-				prfStatus: 'unsupported'
-			})
+			addPasskeyWrap(harness.db, ada.id, { passkeyId: 'pk-ada', wrap: passkeyWrap('cred-other') })
 		).resolves.toBe(false);
-
-		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(new Map());
-		await expect(getUnlockBundle(harness.db, someoneElse.id)).resolves.toMatchObject({
-			passkeysKnownUnusable: 0
-		});
 	});
 
-	/** Deleting a passkey must not leave a verdict counting against the account. */
-	it('goes away with the passkey it describes', async () => {
-		await givePasskey(ada.id, 'passkey-ada');
-		await recordPasskeyPrfStatus(harness.db, ada.id, {
-			passkeyId: 'passkey-ada',
-			prfStatus: 'unsupported'
+	it('refuses a password wrap', async () => {
+		await givePasskey(ada.id, 'pk-ada');
+		await expect(
+			addPasskeyWrap(harness.db, ada.id, { passkeyId: 'pk-ada', wrap: passwordWrap() })
+		).resolves.toBe(false);
+	});
+});
+
+describe('deletePasskeyWithWrap', () => {
+	it('removes the passkey and its wrap, and nothing else', async () => {
+		await createTestUserKeys(harness.db, ada);
+		await givePasskey(ada.id, 'pk-one');
+		await givePasskey(ada.id, 'pk-two');
+		await addPasskeyWrap(harness.db, ada.id, {
+			passkeyId: 'pk-one',
+			wrap: passkeyWrap('cred-pk-one')
+		});
+		await addPasskeyWrap(harness.db, ada.id, {
+			passkeyId: 'pk-two',
+			wrap: passkeyWrap('cred-pk-two')
 		});
 
-		await harness.db.delete(passkey).where(eq(passkey.id, 'passkey-ada'));
+		await expect(deletePasskeyWithWrap(harness.db, ada.id, 'pk-one')).resolves.toBe(true);
 
-		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(new Map());
-		await expect(getUnlockBundle(harness.db, ada.id)).resolves.toMatchObject({
-			passkeyCount: 0,
-			passkeysKnownUnusable: 0
-		});
+		const wraps = await listWrapsForUser(harness.db, ada.id);
+		expect(wraps.map((wrap) => wrap.type).sort((a, b) => a.localeCompare(b))).toEqual([
+			'passkey-prf',
+			'password'
+		]);
+		expect(
+			wraps.some(
+				(wrap) => wrap.params.type !== 'password' && wrap.params.credentialId === 'cred-pk-one'
+			)
+		).toBe(false);
+		const passkeys = await harness.db.select().from(passkey).where(eq(passkey.userId, ada.id));
+		expect(passkeys.map((row) => row.id)).toEqual(['pk-two']);
+	});
+
+	it('refuses someone else’s passkey', async () => {
+		await givePasskey(jun.id, 'pk-jun');
+		await expect(deletePasskeyWithWrap(harness.db, ada.id, 'pk-jun')).resolves.toBe(false);
+		await expect(
+			harness.db.select().from(passkey).where(eq(passkey.id, 'pk-jun'))
+		).resolves.toHaveLength(1);
 	});
 });
 
@@ -310,17 +250,12 @@ describe('addWrap + deleteOtherPasswordWraps', () => {
 
 	it('keeps non-password wraps, so a passkey survives a password change', async () => {
 		await createTestUserKeys(harness.db, ada);
-		await addWrap(harness.db, ada.id, {
-			type: 'webauthn-prf',
-			params: { type: 'webauthn-prf', version: 1, rpId: 'bound-up.test' },
-			blob: FAKE_WRAP_BLOB,
-			label: 'iPhone passkey'
-		});
+		await addWrap(harness.db, ada.id, { ...passkeyWrap('cred-ada'), label: 'iPhone passkey' });
 		const newId = await addWrap(harness.db, ada.id, passwordWrap('bmV3'));
 
 		await deleteOtherPasswordWraps(harness.db, ada.id, newId);
 		const types = (await readWrapRows(harness.db, ada.id)).map((w) => w.type).sort();
-		expect(types).toEqual(['password', 'webauthn-prf']);
+		expect(types).toEqual(['passkey-prf', 'password']);
 	});
 
 	it('does not touch another user’s wraps', async () => {
@@ -346,62 +281,6 @@ describe('deleteWrap', () => {
 	});
 });
 
-describe('touchWrap', () => {
-	it('records a successful unlock, scoped to the owner', async () => {
-		await createTestUserKeys(harness.db, ada);
-		const [wrap] = await listWrapsForUser(harness.db, ada.id);
-		expect(wrap.lastUsedAt).toBeNull();
-
-		await touchWrap(harness.db, wrap.id, jun.id);
-		expect((await listWrapsForUser(harness.db, ada.id))[0].lastUsedAt).toBeNull();
-
-		await touchWrap(harness.db, wrap.id, ada.id);
-		expect((await listWrapsForUser(harness.db, ada.id))[0].lastUsedAt).toBeInstanceOf(Date);
-	});
-});
-
-describe('replaceUserKeys', () => {
-	it('swaps the recipient and leaves exactly one new wrap', async () => {
-		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT, acknowledged: true });
-		await addWrap(harness.db, ada.id, passwordWrap('c3RhbGU'));
-
-		await replaceUserKeys(harness.db, ada.id, {
-			recipient: JUN_RECIPIENT,
-			wrap: passwordWrap('ZnJlc2g')
-		});
-
-		const row = await readUserKeysRow(harness.db, ada.id);
-		expect(row.recipient).toBe(JUN_RECIPIENT);
-		const wraps = await readWrapRows(harness.db, ada.id);
-		expect(wraps).toHaveLength(1);
-		expect(wraps[0].blob).toBe('ZnJlc2g');
-	});
-
-	// A new identity means new history to lose, so the warning is owed again.
-	it('clears the history-warning acknowledgement', async () => {
-		await createTestUserKeys(harness.db, ada, { acknowledged: true });
-		await replaceUserKeys(harness.db, ada.id, {
-			recipient: JUN_RECIPIENT,
-			wrap: passwordWrap()
-		});
-		await expect(getUserKeys(harness.db, ada.id)).resolves.toMatchObject({
-			historyWarningAcknowledged: false
-		});
-	});
-
-	it('leaves the other user alone', async () => {
-		await createTestUserKeys(harness.db, ada, { recipient: ADA_RECIPIENT });
-		const junKeys = await createTestUserKeys(harness.db, jun);
-		await replaceUserKeys(harness.db, ada.id, {
-			recipient: JUN_RECIPIENT,
-			wrap: passwordWrap()
-		});
-		await expect(getUserKeys(harness.db, jun.id)).resolves.toMatchObject({
-			recipient: junKeys.recipient
-		});
-	});
-});
-
 describe('getRecipientsForPartnership', () => {
 	it('resolves mine/theirs from each side of the same row', async () => {
 		const adaKeys = await createTestUserKeys(harness.db, ada);
@@ -421,22 +300,16 @@ describe('getRecipientsForPartnership', () => {
 	});
 
 	/**
-	 * LEFT joins on both sides. An inner join would make the whole partnership
-	 * vanish because one of the two had not set up messaging, which the UI would
-	 * render as "no such partner" rather than "they haven't set this up yet".
+	 * Every account has keys, so a partnership missing one is broken data, and
+	 * reads as "no such partner" rather than a board that cannot send.
 	 */
-	it('returns nulls rather than nothing when a key is missing', async () => {
-		const adaKeys = await createTestUserKeys(harness.db, ada);
+	it('is null when either key is missing', async () => {
+		await createTestUserKeys(harness.db, ada);
 		const partnership = await createTestPartnership(harness.db, ada, jun);
 
-		await expect(getRecipientsForPartnership(harness.db, partnership.id, ada.id)).resolves.toEqual({
-			mine: adaKeys.recipient,
-			theirs: null
-		});
-		await expect(getRecipientsForPartnership(harness.db, partnership.id, jun.id)).resolves.toEqual({
-			mine: null,
-			theirs: adaKeys.recipient
-		});
+		await expect(
+			getRecipientsForPartnership(harness.db, partnership.id, ada.id)
+		).resolves.toBeNull();
 	});
 
 	it('is null for someone who is not in the partnership', async () => {

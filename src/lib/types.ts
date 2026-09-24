@@ -173,56 +173,29 @@ export type KeyWrapView = {
 	params: KeyWrapParams;
 	blob: string;
 	label: string | null;
-	lastUsedAt: Date | null;
 	createdAt: Date;
 };
 
-/** What `EncryptionGate` fetches to unlock. Null recipient means "not set up". */
+/**
+ * What a device fetches to open the identity: the public key and every wrap.
+ *
+ * Every account has keys — signup creates them, and a partner-assisted sign-in
+ * replaces them — so there is no "not set up" state to carry.
+ */
 export type UnlockBundleView = {
-	recipient: string | null;
-	historyWarningAcknowledged: boolean;
+	recipient: string;
 	wraps: KeyWrapView[];
-	/**
-	 * How many passkeys the account has registered.
-	 *
-	 * Not the same question as "can this browser do WebAuthn". Offering to set
-	 * up a passkey unlock to someone who has never registered one opens a
-	 * chooser with nothing in it, and WebAuthn reports that as the same error as
-	 * a cancelled prompt — so the offer has to be withheld rather than
-	 * explained afterwards.
-	 */
-	passkeyCount: number;
-	/**
-	 * How many of those were tried against PRF and could not do it.
-	 *
-	 * Sent alongside the total rather than as a boolean, because the unlock
-	 * screen has to tell three cases apart: a passkey that works, passkeys that
-	 * are all known not to, and a passkey nothing has ever tried — which is any
-	 * passkey registered before this check existed, and might work fine. Only
-	 * the middle case gets the "your password manager cannot do this" message.
-	 */
-	passkeysKnownUnusable: number;
-	/**
-	 * The AAGUID of one passkey that was tried and failed, when it has one.
-	 *
-	 * So the unlock screen can say which password manager is at fault rather
-	 * than leaving the user to guess. Often null: Apple reports the anonymous
-	 * AAGUID under the default attestation, so the copy has to work without it.
-	 */
-	unusableProviderAaguid: string | null;
 };
 
 /**
  * The two public keys behind one partnership, for the safety number.
  *
- * Either may be null — a partner who has not set up messaging yet has no key,
- * and neither does a viewer who has not. Both are needed: pinning only theirs
- * would miss a server that swapped *yours*, which would make your partner
- * encrypt to a key you do not hold.
+ * Both are needed: pinning only theirs would miss a server that swapped
+ * *yours*, which would make your partner encrypt to a key you do not hold.
  */
 export type PartnerRecipientsView = {
-	mine: string | null;
-	theirs: string | null;
+	mine: string;
+	theirs: string;
 };
 
 /**
@@ -351,7 +324,8 @@ export type HomePartnerRewardsSectionView = {
 };
 
 /**
- * A partner asking to have the shared history re-encrypted to a new key.
+ * A partner asking to have the shared history re-encrypted to a new key, as
+ * part of a partner-assisted sign-in (see docs/account-recovery.md).
  *
  * `requestedRecipient` is the snapshot the partner must compare out of band
  * before confirming — see the table comment in schema/app.ts for why using the
@@ -363,6 +337,23 @@ export type RestoreRequestView = {
 	createdAt: Date;
 	/** True when the viewer is the one who lost their key. */
 	mine: boolean;
+	/**
+	 * True once another partner has already approved the sign-in, so this one
+	 * is only about bringing back this partnership's history. The copy differs:
+	 * the requester is already back in, and this partner should still check the
+	 * code with them rather than trust whoever approved.
+	 */
+	signInApproved: boolean;
+};
+
+/**
+ * A partner who cannot sign in and has asked the viewer for help, for the
+ * callout the app shell shows on every screen. Just enough to link to the
+ * board, where the code is compared and the request answered.
+ */
+export type HelpRequestView = {
+	partnershipId: string;
+	partnerName: string;
 };
 
 /**

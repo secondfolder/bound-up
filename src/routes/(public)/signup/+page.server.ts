@@ -1,10 +1,12 @@
 import { redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
+import { eq } from 'drizzle-orm';
 import { fail, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { parseKeyWrapParams } from '$lib/encryption';
 import { redirectTargetOrHome, safeRedirect } from '$lib/safe-redirect';
 import { signupFormSchema } from '$lib/schemas/signupForm';
+import { user } from '$lib/server/db/schema';
 import { putUserKeys } from '$lib/server/keys';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -65,11 +67,13 @@ export const actions: Actions = {
 			return setError(signupForm, '', 'Could not sign up');
 		}
 
-		// Deliberately after signUpEmail rather than inside it: the user id only
-		// exists once that returns. If this half fails the account still exists
-		// with no identity, which is the same state a passkey-first account would
-		// be in and which /settings/encryption already handles — a recoverable
-		// partial, not a corrupt one.
+		// After signUpEmail rather than inside it: the user id only exists once
+		// that returns. If this half fails, the account is undone rather than left
+		// without keys — every account is assumed to have them (sign-in is what
+		// unlocks, and there is no longer a screen that sets keys up later), so an
+		// account without them could sign in and never read a message. Deleting
+		// the user cascades to its credential and the session signUpEmail just
+		// made, so the cookie it set points at nothing.
 		try {
 			await putUserKeys(locals.db, userId, {
 				recipient,
@@ -77,6 +81,8 @@ export const actions: Actions = {
 			});
 		} catch (error) {
 			console.error('signup: could not store encryption keys', error);
+			await locals.db.delete(user).where(eq(user.id, userId));
+			return setError(signupForm, '', 'Could not sign up — please try again');
 		}
 
 		redirect(303, redirectTargetOrHome(url.searchParams.get('redirectTo')));

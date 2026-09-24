@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import AppNav from '$lib/components/AppNav.svelte';
 	import EncryptionGate from '$lib/components/EncryptionGate.svelte';
+	import HelpRequestCallout from '$lib/components/HelpRequestCallout.svelte';
+	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
 	import type { LayoutData } from './$types';
 
@@ -42,12 +44,19 @@
 		<!-- Inside <main> so it scrolls with the page: `position: fixed` against
 		     the viewport does not work in this shell, and a callout pinned over
 		     the content would cover it. -->
-		<EncryptionGate
-			user={data.user}
-			userHasMessageHistory={data.userHasMessageHistory}
-			handledByPage={(page.route.id?.includes('/partner/[id]/messages') ?? false) ||
-				(page.route.id?.endsWith('/settings/encryption') ?? false)}
+		<EncryptionGate user={data.user} />
+		<HelpRequestCallout
+			requests={data.helpRequests.filter(
+				// The board shows the full request; a second callout above it
+				// pointing at the page you are on would only be noise.
+				(request) =>
+					!(
+						page.route.id === '/(auth-required)/(app)/partner/[id]/messages' &&
+						page.params.id === request.partnershipId
+					)
+			)}
 		/>
+		<HomeScreenHint />
 		{@render children()}
 	</main>
 	<AppNav partners={data.partners} />

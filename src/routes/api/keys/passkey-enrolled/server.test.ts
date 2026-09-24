@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { passkey } from '$lib/server/db/schema';
-import { passkeyPrfStatusFor } from '$lib/server/keys';
-import { FAKE_WRAP_BLOB } from '$lib/testing/crypto';
+import { FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import {
@@ -13,7 +12,7 @@ import {
 import { POST } from './+server';
 
 /**
- * Recording what a passkey enrolment established.
+ * Storing the wrap a new passkey was sealed to.
  *
  * Named `server.test.ts` and not `+server.test.ts`: SvelteKit reserves the `+`
  * prefix and refuses to build a route file it does not recognise.
@@ -22,12 +21,8 @@ import { POST } from './+server';
 let harness: TestDb;
 let ada: TestUser;
 
-const PRF_PARAMS = JSON.stringify({
-	type: 'webauthn-prf',
-	version: 1,
-	rpId: 'bound-up.test',
-	passkeyId: 'pk-ada'
-});
+const wrapParams = (type: 'passkey-prf' | 'passkey-handle', credentialId = 'cred-pk-ada') =>
+	JSON.stringify({ type, version: 1, credentialId, rpId: 'bound-up.test' });
 
 async function givePasskey(userId: string, id: string) {
 	await harness.db.insert(passkey).values({
@@ -40,14 +35,14 @@ async function givePasskey(userId: string, id: string) {
 		deviceType: 'singleDevice',
 		backedUp: false,
 		transports: 'internal',
-		createdAt: new Date(),
-		aaguid: 'bada5566-a7aa-401f-bd96-45619a55120d'
+		createdAt: new Date()
 	});
 }
 
 beforeEach(async () => {
 	harness = await createTestDb();
 	ada = await createTestUser(harness.db, { name: 'Ada' });
+	await createTestUserKeys(harness.db, ada);
 	await givePasskey(ada.id, 'pk-ada');
 });
 
@@ -59,7 +54,12 @@ function post(json: unknown, user: TestUser | null = ada) {
 
 describe('POST /api/keys/passkey-enrolled', () => {
 	it('refuses an unsigned visitor', async () => {
-		const result = await runAndCatch(() => post({ passkeyId: 'pk-ada' }, null));
+		const result = await runAndCatch(() =>
+			post(
+				{ passkeyId: 'pk-ada', wrap: { params: wrapParams('passkey-prf'), blob: FAKE_WRAP_BLOB } },
+				null
+			)
+		);
 		expect(result).toMatchObject({ type: 'error', status: 401 });
 	});
 
@@ -68,77 +68,72 @@ describe('POST /api/keys/passkey-enrolled', () => {
 		expect(result).toMatchObject({ type: 'error', status: 400 });
 	});
 
-	it('rejects a verdict that is not one of the two', async () => {
-		const result = await runAndCatch(() => post({ passkeyId: 'pk-ada', prfStatus: 'maybe' }));
+	/** Every passkey is created with its wrap, so there is nothing to record without one. */
+	it('rejects a passkey with no wrap', async () => {
+		const result = await runAndCatch(() => post({ passkeyId: 'pk-ada' }));
 		expect(result).toMatchObject({ type: 'error', status: 400 });
 	});
 
-	it('records the verdict on its own', async () => {
-		await post({ passkeyId: 'pk-ada', prfStatus: 'unsupported' });
-
-		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(
-			new Map([['pk-ada', 'unsupported']])
-		);
-		// No wrap was sent, so none was written — a passkey that cannot do PRF
-		// still signs in, and that is the whole state being recorded.
-		await expect(readWrapRows(harness.db, ada.id)).resolves.toHaveLength(0);
-	});
-
-	it('records the verdict and the wrap together', async () => {
-		await createTestUserKeys(harness.db, ada);
-
+	it('stores a PRF wrap', async () => {
 		await post({
 			passkeyId: 'pk-ada',
-			prfStatus: 'supported',
-			wrap: { params: PRF_PARAMS, blob: FAKE_WRAP_BLOB, label: '1Password' }
+			wrap: { params: wrapParams('passkey-prf'), blob: FAKE_WRAP_BLOB }
 		});
-
-		await expect(passkeyPrfStatusFor(harness.db, ada.id)).resolves.toEqual(
-			new Map([['pk-ada', 'supported']])
-		);
 		const wraps = await readWrapRows(harness.db, ada.id);
-		expect(wraps.filter((wrap) => wrap.type === 'webauthn-prf')).toMatchObject([
-			{ label: '1Password', blob: FAKE_WRAP_BLOB }
-		]);
+		expect(wraps.map((wrap) => wrap.type).sort()).toEqual(['passkey-prf', 'password']);
 	});
 
-	/**
-	 * The two writes describe one event. A client that managed the first and not
-	 * the second would leave a passkey marked `supported` with nothing behind
-	 * it — which reads as "this unlocks your messages" and does not.
-	 */
-	it('refuses a wrap for an account with no identity to wrap', async () => {
+	it('stores a user-handle wrap', async () => {
+		await post({
+			passkeyId: 'pk-ada',
+			wrap: { params: wrapParams('passkey-handle'), blob: FAKE_WRAP_BLOB }
+		});
+		const wraps = await readWrapRows(harness.db, ada.id);
+		expect(wraps.map((wrap) => wrap.type).sort()).toEqual(['passkey-handle', 'password']);
+	});
+
+	it('refuses a password wrap, which is not what a passkey gets', async () => {
 		const result = await runAndCatch(() =>
 			post({
 				passkeyId: 'pk-ada',
-				prfStatus: 'supported',
-				wrap: { params: PRF_PARAMS, blob: FAKE_WRAP_BLOB }
+				wrap: { params: JSON.stringify(PASSWORD_WRAP_PARAMS), blob: FAKE_WRAP_BLOB }
 			})
 		);
-
-		expect(result).toMatchObject({ type: 'error', status: 409 });
+		expect(result).toMatchObject({ type: 'error', status: 400 });
 	});
 
-	it("records nothing against someone else's passkey", async () => {
+	it('refuses a wrap naming a credential other than the passkey’s own', async () => {
+		const result = await runAndCatch(() =>
+			post({
+				passkeyId: 'pk-ada',
+				wrap: { params: wrapParams('passkey-prf', 'cred-somebody-else'), blob: FAKE_WRAP_BLOB }
+			})
+		);
+		expect(result).toMatchObject({ type: 'error', status: 404 });
+	});
+
+	it("stores nothing against someone else's passkey", async () => {
 		const jun = await createTestUser(harness.db, { name: 'Jun' });
 		await givePasskey(jun.id, 'pk-jun');
 
-		const result = await runAndCatch(() => post({ passkeyId: 'pk-jun', prfStatus: 'unsupported' }));
-
-		expect(result).toMatchObject({ type: 'error', status: 404 });
-		await expect(passkeyPrfStatusFor(harness.db, jun.id)).resolves.toEqual(new Map());
-	});
-
-	it('rejects a wrap whose params are not a shape this version understands', async () => {
-		await createTestUserKeys(harness.db, ada);
-
 		const result = await runAndCatch(() =>
 			post({
-				passkeyId: 'pk-ada',
-				wrap: { params: JSON.stringify({ type: 'telepathy' }), blob: FAKE_WRAP_BLOB }
+				passkeyId: 'pk-jun',
+				wrap: { params: wrapParams('passkey-prf', 'cred-pk-jun'), blob: FAKE_WRAP_BLOB }
 			})
 		);
 
+		expect(result).toMatchObject({ type: 'error', status: 404 });
+		await expect(readWrapRows(harness.db, jun.id)).resolves.toHaveLength(0);
+	});
+
+	it('rejects a wrap whose params are not a shape this version understands', async () => {
+		const result = await runAndCatch(() =>
+			post({
+				passkeyId: 'pk-ada',
+				wrap: { params: JSON.stringify({ type: 'webauthn-prf', version: 1 }), blob: FAKE_WRAP_BLOB }
+			})
+		);
 		expect(result).toMatchObject({ type: 'error', status: 400 });
 	});
 });

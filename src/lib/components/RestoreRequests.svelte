@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
-	import { safetyNumber } from '$lib/crypto/fingerprint';
+	import { invalidate, invalidateAll } from '$app/navigation';
+	import { recoveryCode } from '$lib/crypto/fingerprint';
+	import { trustRecoveredKey } from '$lib/crypto/trust.svelte';
 	import {
 		declineHistoryRestore,
 		type RestoreProgress,
@@ -10,58 +11,58 @@
 	import SafetyNumber from './SafetyNumber.svelte';
 
 	/**
-	 * Open history-restore requests on a partner's board.
+	 * Partner-assisted sign-in, as the partners see it on the messages board.
 	 *
-	 * Two very different cases share this component because they are the two
-	 * ends of one thing:
+	 * Someone who lost every way into their account asked for help from the
+	 * login page (`/login/recover`). Their browser made a new key, and each of
+	 * their partners gets a request here to re-encrypt the shared history to it.
+	 * The first partner to finish is what lets them back in. See
+	 * docs/account-recovery.md.
 	 *
-	 * - **Mine** — I reset my password, so my old identity is gone and every
-	 *   existing message is unreadable to me. I am waiting for my partner.
-	 *   Nothing to do but be told that, and told what they will be asked.
-	 * - **Theirs** — my partner lost their key and is asking me to re-encrypt
-	 *   our shared history to their new one. This is the consequential one.
+	 * Two ends of the same thing share this component:
+	 *
+	 * - **Mine** — I am back in, and a partner has not yet brought back our older
+	 *   messages. Nothing to do but be told.
+	 * - **Theirs** — my partner is asking. This is the consequential one.
 	 *
 	 * The out-of-band comparison is **load-bearing, not a nicety**, and the copy
-	 * has to carry that weight. Without it a dishonest server could inject a
-	 * restore request carrying its own recipient and have the partner
-	 * re-encrypt the entire history straight to it — one confirmation, complete
-	 * compromise, no other step in the design that would catch it. So: the
-	 * number is shown before the button, the button says what it means, and
-	 * declining is offered as an equal option rather than buried.
+	 * has to carry that weight. Without it a dishonest server — or, until email
+	 * verification exists, anyone who knows the partner's email — could inject a
+	 * request carrying their own key and have this partner re-encrypt the whole
+	 * history straight to it, and let them into the account besides. So: the code
+	 * is shown before the button, the button says what it means, and declining is
+	 * offered as an equal option rather than buried.
 	 */
 	let {
 		requests,
 		partnershipId,
 		partnerName,
-		/** This user's own recipient, for computing the number. */
-		mine
+		userId
 	}: {
 		requests: RestoreRequestView[];
 		partnershipId: string;
 		partnerName: string;
-		mine: string | null;
+		/** The viewer, for pinning the key they are about to vouch for. */
+		userId: string;
 	} = $props();
 
 	/**
-	 * The number is derived from the recipient **snapshotted on the request**,
+	 * The code is derived from the recipient **snapshotted on the request**,
 	 * never from whatever `user_keys` currently says.
 	 *
 	 * This is the point of the whole screen. `applyHistoryRestore` seals to the
-	 * snapshot, so the number the user reads aloud has to describe the same
-	 * value — computing it from the served key would let a server show a
-	 * matching number and receive the history under a different one.
+	 * snapshot, so the code the partner compares has to describe the same value —
+	 * computing it from the served key would let a server show a matching code
+	 * and receive the history under a different one. The requester's page
+	 * computes the same code from the key their browser made.
 	 */
-	const numbers = $derived.by(async () => {
+	const codes = $derived.by(async () => {
 		// A plain object rather than a Map, and deliberately not a SvelteMap: this
 		// is a scratch lookup built fresh inside the derivation and never mutated
-		// afterwards, so there is nothing for reactivity to observe. Same call as
-		// the `masters` object in `session.svelte.ts`.
+		// afterwards, so there is nothing for reactivity to observe.
 		const entries: Record<string, string> = {};
-		if (!mine) {
-			return entries;
-		}
 		for (const request of requests) {
-			entries[request.id] = await safetyNumber(mine, request.requestedRecipient);
+			entries[request.id] = await recoveryCode(request.requestedRecipient);
 		}
 		return entries;
 	});
@@ -72,9 +73,9 @@
 	/** The confirm button's text: its own progress, or the question it asks. */
 	function restoreLabel(requestId: string): string {
 		if (busy?.id !== requestId) {
-			return 'The number matches — restore it';
+			return 'The code matches — help them';
 		}
-		return busy.progress ? `Restoring… ${busy.progress.done} done` : 'Restoring…';
+		return busy.progress ? `Working… ${busy.progress.done} done` : 'Working…';
 	}
 	let failure: string | null = $state(null);
 
@@ -93,12 +94,18 @@
 					}
 				}
 			);
-			if (!outcome.ok) {
+			if (outcome.ok) {
+				// They just compared the code, which vouches for the new key as much
+				// as comparing a safety number would.
+				await trustRecoveredKey(userId, partnershipId, request.requestedRecipient);
+			} else {
 				failure = outcome.message;
 			}
 		} finally {
 			busy = null;
-			await invalidate(`messages:board:${partnershipId}`);
+			// All, not only the board: the app shell's "asked for your help"
+			// callout is from the layout load, and should go with the request.
+			await invalidateAll();
 		}
 	}
 
@@ -112,42 +119,55 @@
 		} finally {
 			busy = null;
 			await invalidate(`messages:board:${partnershipId}`);
+			await invalidateAll();
 		}
 	}
 </script>
 
 {#each requests as request (request.id)}
 	{#if request.mine}
-		<wa-callout variant="warning" size="small">
-			<wa-icon slot="icon" name="key" variant="solid"></wa-icon>
-			<strong>Your old messages are locked</strong>
+		<wa-callout variant="neutral" size="small">
+			<wa-icon slot="icon" name="clock-rotate-left" variant="solid"></wa-icon>
+			<strong>Some older messages are still on their way</strong>
 			<p>
-				Your keys were replaced, so the messages here were encrypted to a key you no longer have.
-				{partnerName} can restore them — they will be asked to compare a safety number with you first,
-				so have that conversation somewhere other than this app.
+				{partnerName} needs to open Bound Up and confirm it is you before your older messages with them
+				come back.
 			</p>
 		</wa-callout>
 	{:else}
-		<wa-callout variant="warning">
-			<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
-			<strong>{partnerName} is asking for your shared history back</strong>
-			<p>
-				Their keys were replaced, so they can no longer read anything the two of you have sent. Your
-				device can re-encrypt it all to their new key.
-			</p>
+		<wa-callout variant="warning" data-testid="restore-request">
+			<wa-icon slot="icon" name="life-ring" variant="solid"></wa-icon>
+			{#if request.signInApproved}
+				<strong>{partnerName} needs your help to get your messages back</strong>
+				<p>
+					They lost every way into their account and have signed back in with another partner's help.
+					Your messages with them are still unreadable to them until you confirm it is really them.
+				</p>
+			{:else}
+				<strong>{partnerName} can't sign in and asked for your help</strong>
+				<p>
+					They lost every way into their account. Confirming lets them back in, and brings back the
+					messages the two of you have sent.
+				</p>
+			{/if}
 			<!--
-				Blunt on purpose. This is the one step that stands between a
-				dishonest server and the entire conversation, so it says what
-				confirming does and what a mismatch means.
+				Blunt on purpose. This is the one step that stands between someone
+				pretending to be them and both the account and the conversation.
 			-->
 			<p>
-				<strong>Check with them first.</strong> If this number does not match the one
-				{partnerName} reads back to you, someone else is asking — and confirming would hand them everything.
+				<strong>Check with them first.</strong> Ask {partnerName} to read you the code on their screen.
+				If it does not match this one, someone else is asking — and confirming would hand them
+				everything.
 			</p>
-			{#await numbers then resolved}
-				{const number = $derived(resolved[request.id])}
-				{#if number}
-					<SafetyNumber value={number} {partnerName} tone="warning" />
+			{#await codes then resolved}
+				{const code = $derived(resolved[request.id])}
+				{#if code}
+					<SafetyNumber
+						value={code}
+						{partnerName}
+						tone="warning"
+						instructions={`Compare this with the code on ${partnerName}'s screen, in person or over a call — not in this app.`}
+					/>
 				{/if}
 			{/await}
 

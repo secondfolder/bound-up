@@ -372,8 +372,3 @@ export async function fetchAttachment(
 	const blob = await decryptAttachment(await response.arrayBuffer(), info);
 	return { url: URL.createObjectURL(blob), blob };
 }
-
-/** Records the history-warning acknowledgement. */
-export async function acknowledgeWarning(partnershipId: string): Promise<void> {
-	await fetch(`/api/partnerships/${partnershipId}/ack-warning`, { method: 'POST' });
-}

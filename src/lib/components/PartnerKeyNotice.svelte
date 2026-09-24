@@ -12,8 +12,6 @@
 	 *
 	 * The states, and why each reads the way it does:
 	 *
-	 * - `missing` — they have not set up messaging. Not a warning; there is
-	 *   simply nobody to encrypt to yet.
 	 * - `new` — first sight on this device. Sending is allowed, because that is
 	 *   what trust-on-first-use means, but it says *when* it was first seen so
 	 *   "a moment ago" is not mistaken for "two years ago". Pins are per-device
@@ -67,17 +65,18 @@
 		<!--
 			Listed before the partner's, and worded differently, because it means
 			something worse: the server returned a different public key for the
-			user's own account than this device recorded. The innocent cause is a
-			password reset, which replaces the identity — so that is named, since
-			otherwise this reads as an accusation the user cannot act on.
+			user's own account than this device recorded. The innocent cause is
+			getting back in with a partner's help, which replaces the identity — so
+			that is named, since otherwise this reads as an accusation the user
+			cannot act on.
 		-->
 		<wa-callout variant="danger">
 			<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
 			<strong>Your own message key has changed</strong>
 			<p>
-				This device recorded a different key for your account. That is expected if you reset your
-				password — it replaces your keys. If you did not, do not send anything: someone may have
-				changed them for you.
+				This device recorded a different key for your account. That is expected if a partner helped
+				you sign back in — it replaces your keys. If that did not happen, do not send anything:
+				someone may have changed them for you.
 			</p>
 			<wa-button
 				size="s"
@@ -85,7 +84,7 @@
 				disabled={working}
 				onclick={() => run(() => accept('own'))}
 			>
-				I reset my password — use the new key
+				A partner helped me sign in — use the new key
 			</wa-button>
 		</wa-callout>
 	{:else if trust.partner.kind === 'changed'}
@@ -94,8 +93,8 @@
 			<strong>{partnerName}'s message key has changed</strong>
 			<p>
 				This device first saw a different key on {when(trust.partner.pinned.pinnedAt)}. That happens
-				when they reset their password — but it is also what it would look like if someone were
-				trying to read your messages.
+				when a partner helps them sign back in after losing every way in — but it is also what it
+				would look like if someone were trying to read your messages.
 			</p>
 			<!--
 				Said explicitly because "key changed" otherwise reads as "your history
@@ -105,9 +104,7 @@
 				Everything they have already sent you stays readable — you decrypt that with your own key,
 				not theirs. Only new messages are held back.
 			</p>
-			{#if trust.safetyNumber}
-				<SafetyNumber value={trust.safetyNumber} {partnerName} tone="warning" />
-			{/if}
+			<SafetyNumber value={trust.safetyNumber} {partnerName} tone="warning" />
 			<wa-button
 				size="s"
 				variant="danger"
@@ -116,10 +113,6 @@
 			>
 				I checked with {partnerName} — this is their new key
 			</wa-button>
-		</wa-callout>
-	{:else if trust.partner.kind === 'missing'}
-		<wa-callout variant="neutral" size="small">
-			{partnerName} hasn't set up encrypted messaging yet, so there is nobody to encrypt to. Nudge them.
 		</wa-callout>
 	{:else}
 		<div class="quiet">
@@ -137,7 +130,7 @@
 				</p>
 			{/if}
 
-			{#if trust.safetyNumber && trust.partner.kind !== 'verified'}
+			{#if trust.partner.kind !== 'verified'}
 				{#if showNumber}
 					<SafetyNumber value={trust.safetyNumber} {partnerName} />
 					<div class="actions">

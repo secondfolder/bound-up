@@ -14,7 +14,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (locals.user) {
 		redirect(303, redirectTo ?? '/home');
 	}
-	return { loginForm: await superValidate(zod4(loginFormSchema)), redirectTo };
+	// `reason=device` is the app sending someone back after their browser lost
+	// its key. It changes nothing on screen; the form passes it on so the
+	// storage explanation can follow the sign-in. Anything else is ignored.
+	const reason = url.searchParams.get('reason') === 'device' ? ('device' as const) : null;
+	return { loginForm: await superValidate(zod4(loginFormSchema)), redirectTo, reason };
 };
 
 export const actions: Actions = {

@@ -17,8 +17,8 @@
  * every composer already has: none of them is on screen while the device is
  * locked. The consequences are deliberate:
  *
- * - A draft survives "Lock on this device" and signing out, as ciphertext, and
- *   comes back on the next unlock.
+ * - A draft survives signing out, as ciphertext, and comes back on the next
+ *   sign-in.
  * - It is keyed by recipient as well as by scope, so two accounts on one
  *   browser never see — or overwrite — each other's drafts.
  * - An account with no message keys (`absent`) has nothing to seal to, so its

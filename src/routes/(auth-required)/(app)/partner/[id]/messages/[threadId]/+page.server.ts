@@ -49,6 +49,11 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		console.error('could not mark thread read', cause);
 	});
 
+	// Every account has keys, so a partnership without both is broken data.
+	if (!recipients) {
+		error(404, 'Partner not found');
+	}
+
 	return {
 		partner: {
 			id: membership.partnership.id,
@@ -56,6 +61,6 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		},
 		thread,
 		tags: tags ?? [],
-		recipients: recipients ?? { mine: null, theirs: null }
+		recipients
 	};
 };

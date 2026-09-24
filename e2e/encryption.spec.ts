@@ -1,16 +1,20 @@
 import { createClient } from '@libsql/client';
-import type { Cookie } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { test } from './fixtures';
 import {
+	type Account,
 	account,
 	autofillPassword,
 	autofillPasswordSilently,
 	autofillWaInput,
 	clickWaButton,
+	deviceHoldsKey,
+	evictKeyStorage,
+	expectSentToSignIn,
 	fillPassword,
 	fillWaInput,
 	logIn,
+	logInHere,
 	logOut,
 	signUp,
 	submitEnhancedForm,
@@ -132,15 +136,12 @@ test.describe('what signing up stores', () => {
 		const client = db();
 		try {
 			const keys = await client.execute({
-				sql: `select k.recipient, k.history_warning_ack_at
+				sql: `select k.recipient
 				      from user_keys k join user u on u.id = k.user_id where u.email = ?`,
 				args: [who.email]
 			});
 			expect(keys.rows).toHaveLength(1);
 			expect(String(keys.rows[0].recipient)).toMatch(/^age1[02-9ac-hj-np-z]{58}$/);
-			// The history warning has not been acknowledged yet — that happens on
-			// the messaging page, not at signup.
-			expect(keys.rows[0].history_warning_ack_at).toBeNull();
 
 			const wraps = await client.execute({
 				sql: `select w.type, w.params, w.blob
@@ -363,15 +364,13 @@ test.describe('password manager autofill', () => {
 	});
 });
 
-test.describe('getting your keys back', () => {
+test.describe('signing in is what unlocks', () => {
 	/**
 	 * The point of storing a copy on the server: a second device can catch up.
-	 *
 	 * Signing in derives the wrap key from the password that was just typed, so
-	 * this should happen with no extra prompt at all — the password has already
-	 * been given.
+	 * there is no second prompt of any kind.
 	 */
-	test('a new device unlocks straight away after signing in', async ({ browser }) => {
+	test('a new device holds the key straight after signing in', async ({ browser }) => {
 		const who = account('Bo');
 
 		const first = await browser.newContext();
@@ -386,86 +385,57 @@ test.describe('getting your keys back', () => {
 		try {
 			const page = await second.newPage();
 			await logIn(page, who);
-			await page.goto('/settings/encryption');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			expect(await deviceHoldsKey(page)).toBe(true);
 		} finally {
 			await second.close();
 		}
 	});
 
 	/**
-	 * The cold path, which is the one a real user hits most: still signed in,
-	 * but the browser has thrown away its storage. iOS does this after about a
-	 * week of not opening the app.
-	 *
-	 * Simulated by carrying the session cookie into a fresh context, which
-	 * leaves the session valid and the key cache empty — exactly the state
-	 * eviction produces.
+	 * The path a real user hits most: still signed in, but the browser has
+	 * thrown its storage away — Safari does after a week without a visit.
+	 * There is no unlock screen any more: the app signs the device out and asks
+	 * it to sign in, which is what brings the key back.
 	 */
-	test('a cleared browser asks for the password once, then unlocks', async ({ browser }) => {
+	test('a cleared browser is sent back to sign in, and signing in brings the key back', async ({
+		page
+	}) => {
 		const who = account('Cleo');
+		await signUp(page, who);
+		await page.waitForURL('**/home');
 
-		const first = await browser.newContext();
-		let cookies: Cookie[] = [];
-		try {
-			await signUp(await first.newPage(), who);
-			cookies = await first.cookies();
-		} finally {
-			await first.close();
-		}
+		await evictKeyStorage(page);
+		await page.goto('/home/guides');
+		await expectSentToSignIn(page, '/home/guides');
 
-		const evicted = await browser.newContext();
-		try {
-			await evicted.addCookies(cookies);
-			const page = await evicted.newPage();
-			await page.goto('/settings/encryption');
+		// An ordinary login page: nothing about keys, locks or messages.
+		await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+		await expect(page.getByText(/unlock|encrypt|your messages/i)).toHaveCount(0);
+		// And the email already filled in, so a password manager or passkey
+		// autofill matches the right account.
+		await expect(page.locator('wa-input[name="email"] input')).toHaveValue(who.email);
 
-			// Signed in, but locked — and said so as an ordinary state.
-			await expect(page.getByText(/Locked on this device/)).toBeVisible();
-
-			await fillPassword(page, 'unlockPassword', who.password);
-			await clickWaButton(page, 'Unlock messages');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-		} finally {
-			await evicted.close();
-		}
+		await logInHere(page, who);
+		await page.waitForURL('/home/guides');
+		expect(await deviceHoldsKey(page)).toBe(true);
 	});
 
 	/**
-	 * The bug the storage ladder exists for: unlock, close the tab, and be asked
-	 * again on the very next load.
+	 * The bug the storage ladder exists for: sign in, close the tab, and be
+	 * asked again on the very next load.
 	 *
 	 * `reload()` rather than a click, deliberately. A client-side navigation
-	 * keeps the module holding the unlocked identity alive, so it would pass
-	 * whether or not anything was ever written down.
+	 * keeps the module holding the identity alive, so it would pass whether or
+	 * not anything was ever written down.
 	 */
-	test('an unlock survives a full page load', async ({ browser }) => {
+	test('the key survives a full page load', async ({ page }) => {
 		const who = account('Efe');
+		await signUp(page, who);
+		expect(await deviceHoldsKey(page)).toBe(true);
 
-		const first = await browser.newContext();
-		let cookies: Cookie[] = [];
-		try {
-			await signUp(await first.newPage(), who);
-			cookies = await first.cookies();
-		} finally {
-			await first.close();
-		}
-
-		const evicted = await browser.newContext();
-		try {
-			await evicted.addCookies(cookies);
-			const page = await evicted.newPage();
-			await page.goto('/settings/encryption');
-			await fillPassword(page, 'unlockPassword', who.password);
-			await clickWaButton(page, 'Unlock messages');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-
-			await page.reload();
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-			await expect(page.getByText(/Locked on this device/)).toBeHidden();
-		} finally {
-			await evicted.close();
-		}
+		await page.reload();
+		await expect(page.getByText('This browser remembers you between visits.')).toBeVisible();
+		expect(new URL(page.url()).pathname).toBe('/settings/security');
 	});
 
 	/**
@@ -473,29 +443,26 @@ test.describe('getting your keys back', () => {
 	 * iPhone before iOS 18.4, and is what made this an iOS bug report.
 	 *
 	 * There is no way to store the identity as a `CryptoKey` on such a browser,
-	 * so the keystore seals the string under a device key instead. The unlock
-	 * has to survive anyway, and the warning about being asked every time has to
-	 * stay away — that is the whole difference between tier 2 and tier 3.
+	 * so the keystore seals the string under a device key instead. It has to
+	 * survive a reload anyway — otherwise that iPhone would be signed out on
+	 * every page load.
 	 *
 	 * The init script goes on the second context only: signup in the first one
 	 * still needs to generate a real identity.
 	 */
-	test('an unlock survives a full page load without WebCrypto X25519', async ({ browser }) => {
+	test('the key survives a full page load without WebCrypto X25519', async ({ browser }) => {
 		const who = account('Fen');
 
 		const first = await browser.newContext();
-		let cookies: Cookie[] = [];
 		try {
 			await signUp(await first.newPage(), who);
-			cookies = await first.cookies();
 		} finally {
 			await first.close();
 		}
 
-		const evicted = await browser.newContext();
+		const second = await browser.newContext();
 		try {
-			await evicted.addCookies(cookies);
-			await evicted.addInitScript(() => {
+			await second.addInitScript(() => {
 				// Init scripts run in every frame, including opaque-origin ones like
 				// `about:blank`, where there is no SubtleCrypto to stub at all.
 				if (!globalThis.crypto?.subtle) {
@@ -511,115 +478,56 @@ test.describe('getting your keys back', () => {
 				}) as typeof crypto.subtle.generateKey;
 			});
 
-			const page = await evicted.newPage();
-			await page.goto('/settings/encryption');
-			await fillPassword(page, 'unlockPassword', who.password);
-			await clickWaButton(page, 'Unlock messages');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-			await expect(page.getByText(/cannot store your key securely/)).toBeHidden();
+			const page = await second.newPage();
+			await logIn(page, who);
+			expect(await deviceHoldsKey(page)).toBe(true);
+			await expect(page.getByTestId('device-not-durable')).toHaveCount(0);
 
 			await page.reload();
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-			await expect(page.getByText(/Locked on this device/)).toBeHidden();
+			await expect(page.getByText('This browser remembers you between visits.')).toBeVisible();
+			expect(new URL(page.url()).pathname).toBe('/settings/security');
 		} finally {
-			await evicted.close();
-		}
-	});
-
-	// The unlock happens against the stored wrap on the device, so a wrong
-	// password is answered locally and instantly, with no request at all.
-	test('rejects a wrong password locally, without asking the server', async ({ browser }) => {
-		const who = account('Dov');
-
-		const first = await browser.newContext();
-		let cookies: Cookie[] = [];
-		try {
-			await signUp(await first.newPage(), who);
-			cookies = await first.cookies();
-		} finally {
-			await first.close();
-		}
-
-		const evicted = await browser.newContext();
-		try {
-			await evicted.addCookies(cookies);
-			const page = await evicted.newPage();
-			let posts = 0;
-			page.on('request', (request) => {
-				if (request.method() === 'POST') {
-					posts += 1;
-				}
-			});
-
-			await page.goto('/settings/encryption');
-			await expect(page.getByText(/Locked on this device/)).toBeVisible();
-
-			await fillPassword(page, 'unlockPassword', 'not-the-right-password');
-			await clickWaButton(page, 'Unlock messages');
-			await expect(page.getByText(/did not unlock your messages/)).toBeVisible();
-			expect(posts).toBe(0);
-		} finally {
-			await evicted.close();
+			await second.close();
 		}
 	});
 
 	/**
 	 * Changing a password re-seals the same identity, so nothing is lost. The
-	 * observable consequence: the new password unlocks a cleared browser and the
-	 * old one does not.
+	 * observable consequence: the new password signs in and brings the key back,
+	 * and the old one does not sign in at all.
 	 */
-	test('a changed password becomes the one that unlocks', async ({ browser }) => {
+	test('a changed password becomes the one that signs in', async ({ page }) => {
 		const who = account('Esme');
 		const newPassword = 'vocalist-hazy-radar-plunge';
 
-		const first = await browser.newContext();
-		let cookies: Cookie[] = [];
-		try {
-			const page = await first.newPage();
-			await signUp(page, who);
-			await page.goto('/settings/security');
-			await waitForEnhancedForm(page);
+		await signUp(page, who);
+		await page.goto('/settings/security');
+		await waitForEnhancedForm(page);
+		await fillPassword(page, 'oldPassword', who.password);
+		await fillPassword(page, 'newPassword', newPassword);
+		await fillPassword(page, 'newConfirm', newPassword);
+		await clickWaButton(page, 'Change password');
+		// The form clears itself once the action has come back.
+		await expect(page.locator('wa-input[data-field="oldPassword"] input')).toHaveValue('');
+		await logOut(page);
 
-			await fillPassword(page, 'oldPassword', who.password);
-			await fillPassword(page, 'newPassword', newPassword);
-			await fillPassword(page, 'newConfirm', newPassword);
-			await clickWaButton(page, 'Change password');
-			// The form clears itself once the action has come back.
-			await expect(page.locator('wa-input[data-field="oldPassword"] input')).toHaveValue('');
+		await page.goto('/login');
+		await waitForEnhancedForm(page);
+		await fillWaInput(page, 'email', who.email);
+		await fillPassword(page, 'password', who.password);
+		await submitEnhancedForm(page, 'Login');
+		await expect(page.getByText('Invalid email or password')).toBeVisible();
 
-			cookies = await first.cookies();
-		} finally {
-			await first.close();
-		}
-
-		const evicted = await browser.newContext();
-		try {
-			await evicted.addCookies(cookies);
-			const page = await evicted.newPage();
-			await page.goto('/settings/encryption');
-			await expect(page.getByText(/Locked on this device/)).toBeVisible();
-
-			await fillPassword(page, 'unlockPassword', who.password);
-			await clickWaButton(page, 'Unlock messages');
-			// What matters here is that the OLD password no longer unlocks.
-			await expect(page.getByText(/did not unlock your messages/)).toBeVisible();
-			await expect(page.getByText(/Locked on this device/)).toBeVisible();
-			await expect(page.getByText(/Your messages are unlocked here/)).toHaveCount(0);
-
-			await fillPassword(page, 'unlockPassword', newPassword);
-			await clickWaButton(page, 'Unlock messages');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-		} finally {
-			await evicted.close();
-		}
+		await logIn(page, { ...who, password: newPassword });
+		expect(await deviceHoldsKey(page)).toBe(true);
 	});
 });
 
 test.describe('asking the browser to keep the key', () => {
 	/**
 	 * `navigator.storage.persist()` is a permission prompt on Firefox, so it
-	 * must never fire on its own — not on signup's silent unlock, and not when
-	 * the explanation is dismissed. Chromium decides silently and may already
+	 * must never fire on its own — not on an ordinary sign-in, and not when the
+	 * explanation is dismissed. Chromium decides silently and may already
 	 * report the origin as persisted, which would skip the explanation
 	 * altogether, so both calls are stubbed: `persisted()` says no, and
 	 * `persist()` counts and refuses.
@@ -649,18 +557,19 @@ test.describe('asking the browser to keep the key', () => {
 		// By its heading: this alpha's `wa-dialog` gives the dialog no accessible
 		// name, so `getByRole('dialog', { name })` matches nothing.
 		page.getByRole('dialog').filter({
-			has: page.getByRole('heading', { name: 'Keep your messages unlocked here' })
+			has: page.getByRole('heading', { name: 'Stay signed in on this device' })
 		});
 
-	async function lockAndUnlock(page: import('@playwright/test').Page, password: string) {
-		await clickWaButton(page, 'Lock on this device');
-		await expect(page.getByText(/Locked on this device/)).toBeVisible();
-		await fillPassword(page, 'unlockPassword', password);
-		await clickWaButton(page, 'Unlock messages');
-		await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+	/** What eviction costs: the key goes, and the next page load signs in again. */
+	async function evictAndSignIn(page: import('@playwright/test').Page, who: Account) {
+		await evictKeyStorage(page);
+		await page.goto('/home');
+		await expectSentToSignIn(page, '/home');
+		await logInHere(page, who);
+		await page.waitForURL('/home');
 	}
 
-	test('explains after an explicit unlock, and asks only on OK', async ({ browser }) => {
+	test('explains after a sign-in the browser forced, and asks only on OK', async ({ browser }) => {
 		const who = account('Gus');
 		const context = await stubbedStorage(browser);
 		try {
@@ -668,14 +577,12 @@ test.describe('asking the browser to keep the key', () => {
 			await signUp(page, who);
 			await page.waitForURL('**/home');
 
-			// Signup unlocks silently: no explanation, and nothing asked.
-			await page.goto('/settings/encryption');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			// An ordinary sign-in: no explanation, and nothing asked.
+			expect(await deviceHoldsKey(page)).toBe(true);
 			await expect(explanation(page)).toBeHidden();
 			expect(await persistCalls(page)).toBe(0);
 
-			await lockAndUnlock(page, who.password);
-
+			await evictAndSignIn(page, who);
 			await expect(explanation(page)).toBeVisible();
 			expect(await persistCalls(page)).toBe(0);
 
@@ -683,41 +590,41 @@ test.describe('asking the browser to keep the key', () => {
 			await expect(explanation(page)).toBeHidden();
 			await expect.poll(() => persistCalls(page)).toBe(1);
 
-			// The browser said no, so settings offers to ask again.
+			// The browser said no, so Security offers to ask again.
+			// A full page load, so the init script's counter starts again from zero.
+			await page.goto('/settings/security');
 			await clickWaButton(page, 'Ask the browser to keep it');
-			await expect.poll(() => persistCalls(page)).toBe(2);
+			await expect.poll(() => persistCalls(page)).toBe(1);
 			await expect(page.getByText(/Your browser said no/)).toBeVisible();
 
-			// Once OK has been pressed on this device, an unlock does not explain again.
-			await lockAndUnlock(page, who.password);
+			// Once OK has been pressed on this device, it does not explain again.
+			await evictAndSignIn(page, who);
 			await expect(explanation(page)).toBeHidden();
 		} finally {
 			await context.close();
 		}
 	});
 
-	test('dismissing asks nothing, and the explanation comes back next unlock', async ({
-		browser
-	}) => {
+	test('dismissing asks nothing, and the explanation comes back next time', async ({ browser }) => {
 		const who = account('Hal');
 		const context = await stubbedStorage(browser);
 		try {
 			const page = await context.newPage();
 			await signUp(page, who);
 			await page.waitForURL('**/home');
-			await page.goto('/settings/encryption');
 
-			await lockAndUnlock(page, who.password);
+			await evictAndSignIn(page, who);
 			await expect(explanation(page)).toBeVisible();
 
 			await page.keyboard.press('Escape');
 			await expect(explanation(page)).toBeHidden();
 			expect(await persistCalls(page)).toBe(0);
 
-			// Settings is the way back meanwhile.
+			// Security is the way back meanwhile.
+			await page.goto('/settings/security');
 			await expect(page.getByRole('button', { name: 'Ask the browser to keep it' })).toBeVisible();
 
-			await lockAndUnlock(page, who.password);
+			await evictAndSignIn(page, who);
 			await expect(explanation(page)).toBeVisible();
 			expect(await persistCalls(page)).toBe(0);
 		} finally {

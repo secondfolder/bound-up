@@ -49,6 +49,17 @@ export type FakeEventOptions = {
 	// `never[]` parameters: every function is assignable to this, whatever it
 	// takes, which is what a bag of stubs for different endpoints needs.
 	authApi?: Record<string, (...args: never[]) => unknown>;
+	/**
+	 * A stand-in for `locals.auth.$context`, for the few routes that need Better
+	 * Auth's secret or its password hasher. Same rule as `authApi`: absent
+	 * unless the test says what it is.
+	 */
+	authContext?: { secret?: string; password?: { hash: (password: string) => Promise<string> } };
+	/**
+	 * What `getClientAddress()` returns. Absent, it throws — as it does on an
+	 * adapter that cannot tell, which the routes that call it must survive.
+	 */
+	clientAddress?: string;
 	/** `event.fetch`, for a route that calls out through it. Absent otherwise. */
 	fetch?: typeof fetch;
 	/**
@@ -106,8 +117,12 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 		});
 	}
 
-	if (options.authApi) {
-		locals.auth = { api: options.authApi };
+	if (options.authApi || options.authContext) {
+		locals.auth = {
+			api: options.authApi ?? {},
+			// biome-ignore lint/style/useNamingConvention: `$context` is Better Auth's own name for it.
+			...(options.authContext ? { $context: Promise.resolve(options.authContext) } : {})
+		};
 	} else {
 		// The partners routes call no Better Auth endpoint, so by default reaching
 		// for it should be an obvious failure rather than a confusing `undefined`.
@@ -135,6 +150,12 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 		// failing a route test over cache plumbing teaches nobody anything.
 		...(options.fetch ? { fetch: options.fetch } : {}),
 		...(options.parentData ? { parent: () => Promise.resolve(options.parentData) } : {}),
+		getClientAddress: () => {
+			if (options.clientAddress === undefined) {
+				throw new Error('fakeEvent was given no clientAddress');
+			}
+			return options.clientAddress;
+		},
 		depends: () => undefined
 	};
 	return event as unknown as Event;

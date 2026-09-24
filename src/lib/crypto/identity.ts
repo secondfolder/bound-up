@@ -35,7 +35,7 @@ export type NewIdentity = {
 };
 
 /** A fresh long-term identity. Called once per user, ever — or once more after
- *  a forgotten password, which starts a partner-assisted history restore. */
+ *  losing every way in, in a partner-assisted sign-in (docs/account-recovery.md). */
 export async function generateAgeIdentity(): Promise<NewIdentity> {
 	const age = await loadAge();
 	// generateIdentity() is documented as possibly returning a post-quantum

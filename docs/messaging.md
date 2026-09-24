@@ -47,7 +47,7 @@ full-page loading wall.
 | `message_tags`             | A reusable name and color scoped to one partnership.                                            |
 | `message_thread_tags`      | The many-to-many assignment between threads and tags.                                           |
 | `thread_reads`             | Per-user read state for one thread.                                                             |
-| `history_restore_requests` | A partner asking to have the history re-encrypted.                                              |
+| `history_restore_requests` | A partner asked, as part of a partner-assisted sign-in, to re-encrypt the shared history.      |
 
 Every foreign key cascades. Deleting a partnership takes its threads, messages,
 attachments rows, reactions and read state with it — but **not** the objects in
@@ -228,20 +228,33 @@ the client falls back to `embed.reddit.com` for the reddit post itself.
 
 ## Partner-assisted history restore
 
-A forgotten password loses the identity for good: the wrap is the only copy and
-the password is the only key to it. But both people can already decrypt every
-message in the partnership, so the _other_ one can re-encrypt it. The server
-cannot help, and does not need to.
+Losing every way into an account — the password and every passkey — loses the
+identity for good: the wraps are the only copies and those were the only keys
+to them. But both people can already decrypt every message in the partnership,
+so the _other_ one can re-encrypt it. The server cannot help, and does not need
+to.
 
-The flow, and the one security-critical part:
+This is the history half of a **partner-assisted sign-in**, which is how
+someone in that position gets back into their account at all; the sign-in half
+— starting from the login page, the code, completing — is in
+[docs/account-recovery.md](account-recovery.md). The flow, and the one
+security-critical part:
 
-1. The person who lost their key gets a new identity and publishes its recipient.
-2. They open a restore request carrying a **snapshot** of that recipient.
-3. Their partner is shown the request and must compare the safety number **out
-   of band** before confirming.
-4. On confirm, the partner's device pages through every message body, encrypted
+1. The person who lost everything makes a new identity from `/login/recover`,
+   and a restore request is opened in each of their partnerships carrying a
+   **snapshot** of its recipient.
+2. Each partner is shown the request — on every screen, not only the board —
+   and must compare the recovery code **out of band** before confirming.
+3. On confirm, the partner's device pages through every message body, encrypted
    metadata sidecar **and reaction** with its own identity, re-encrypts each to
-   both recipients, and uploads the replacements a page at a time.
+   both recipients, and uploads the replacements a page at a time. The final
+   page is what approves the sign-in, if no other partner got there first.
+4. The partner's device remembers the new key as vouched for, because comparing
+   the recovery code is the same assurance as comparing the safety number. It
+   is not pinned yet — the server serves the old key until the sign-in
+   completes, and a pin would make that look like a change — but the moment the
+   new key is served it is accepted as verified, with no "key changed" warning
+   (`recordVouch` in `crypto/pins.ts`).
 
 Reactions are included because they are encrypted too — a restore that skipped
 them would hand back a readable history dotted with tapbacks the owner cannot
@@ -267,10 +280,15 @@ The person who lost their key cannot read any of it, so a request from them is
 either a bug or a stolen session, and it 404s.
 
 Declining is a first-class answer, not tidiness: the out-of-band comparison is
-the load-bearing step, and someone who finds the number does _not_ match needs a
+the load-bearing step, and someone who finds the code does _not_ match needs a
 way to say so that leaves the requester informed rather than waiting for ever.
 
-Step 3 is load-bearing. Without the out-of-band check, a malicious server could
+A restore request lives only as long as its sign-in: one whose sign-in expired,
+was superseded by a newer request or was declined disappears from the board
+and refuses uploads, so nobody re-encrypts a whole history to a key that will
+never be used.
+
+Step 2 is load-bearing. Without the out-of-band check, a malicious server could
 inject a request carrying its own recipient and have the partner re-encrypt the
 entire history to it. The snapshot matters for the same reason: the
 re-encryption targets exactly the recipient that was compared, not whatever
@@ -282,7 +300,7 @@ Two honest caveats:
   verify that the new ciphertext says what the old one said — it cannot read
   either. This is not a new trust boundary, since the partner could always send
   whatever they liked, but it is worth knowing.
-- **If both partners lose their passwords, the history is gone.** So is the
+- **If both partners lose every way in, the history is gone.** So is the
   history of anyone with no partner. There is no other copy.
 
 ## Drafts
@@ -297,12 +315,12 @@ the message is sent or its text deleted. The code is `src/lib/messaging/drafts.t
   dialog (`new-thread:<partnershipId>`). Writing in one never touches another.
 - **Encrypted to the writer alone.** A draft is an age file encrypted to the
   account's own recipient (`DraftPayload` in `src/lib/crypto/messages.ts`).
-  Writing it needs only the public key; reading it needs the unlocked
-  identity, which every composer has because none renders while the device is
-  locked. The draft therefore survives "Lock on this device" and signing out,
-  as ciphertext. The storage key includes the recipient, so two accounts in
-  one browser never read or overwrite each other's drafts. An `absent`
-  account (no message keys) has nothing to seal to and keeps no draft.
+  Writing it needs only the public key; reading it needs the identity, which
+  every composer has because none renders until the key is on the device. The
+  draft therefore survives signing out, as ciphertext. The storage key
+  includes the recipient, so two accounts in one browser never read or
+  overwrite each other's drafts — and a draft sealed to a key that a
+  partner-assisted sign-in has since replaced is simply never looked up.
 - **The new-message dialog stores its tags with its text**, only while there
   is text. A draft whose text is emptied is removed, tags and all, so an
   emptied dialog that is closed and reopened comes back with neither. Tags on

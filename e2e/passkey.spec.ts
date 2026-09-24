@@ -1,31 +1,35 @@
-import type { Page } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { test } from './fixtures';
 import {
 	account,
 	clickWaButton,
+	deviceHoldsKey,
+	evictKeyStorage,
+	expectSentToSignIn,
 	fillPassword,
 	linkAccounts,
+	logOut,
 	newSide,
 	openBoard,
 	signUp,
+	waitForHydration,
 	writeThread
 } from './helpers';
 
 /**
- * Registering a passkey and unlocking messages with it, through real ceremonies.
+ * Passkeys, through real ceremonies: signing in with one is what unlocks.
  *
  * Everything below the browser is covered by unit tests, and they all run
  * against an authenticator this repo wrote — which is exactly why bugs reached
- * a phone: an offer that appeared to people with no passkey and then did
- * nothing visible, a password manager returning no PRF and the message blaming
- * the user's OS version, and a passkey that signed in fine and could not read a
- * single message with nothing anywhere saying so. None of those is reachable
- * without driving `navigator.credentials` for real.
+ * a phone before. What only this level can show is that a real WebAuthn
+ * assertion carries its secret into the page, opens the wrap, and never
+ * carries it to the server.
  *
- * Chromium's virtual authenticator can, through CDP: `hasPrf` makes it
- * evaluate the PRF extension, which Playwright's own cross-browser
- * `browserContext.credentials` API cannot do.
+ * Chromium's virtual authenticator, through CDP: `hasPrf` decides whether it
+ * evaluates the PRF extension, which is the whole difference between the two
+ * wraps a passkey can get. Playwright's own cross-browser
+ * `browserContext.credentials` API cannot do PRF.
  */
 
 type Authenticator = { forget: () => Promise<void> };
@@ -38,9 +42,8 @@ async function useAuthenticator(page: Page, options: { prf: boolean }): Promise<
 			protocol: 'ctap2',
 			ctap2Version: 'ctap2_1',
 			transport: 'internal',
-			// Discoverable, because an unlock ceremony on a wrap written before the
-			// credential binding existed passes no `allowCredentials` — it lets the
-			// platform offer what it has.
+			// Discoverable: every passkey this app makes is, because signing in
+			// passes no `allowCredentials` and the user handle carries a secret.
 			hasResidentKey: true,
 			hasUserVerification: true,
 			// PRF needs user verification, so the assertion has to carry it.
@@ -57,10 +60,8 @@ async function useAuthenticator(page: Page, options: { prf: boolean }): Promise<
 }
 
 /**
- * Registers a passkey the way a user now does: from Security, with a password.
- *
- * Returns once the naming dialog is up, so a caller can assert on what it says
- * about message unlock before dismissing it.
+ * Registers a passkey the way a user does: from Security, with a password.
+ * Returns once the naming dialog is up.
  */
 async function addPasskey(page: Page, password: string) {
 	await page.goto('/settings/security');
@@ -84,9 +85,8 @@ function namingDialog(page: Page) {
  * The dialog closes before the name is saved: `saveName()` hides it, then
  * renames the passkey, then calls `invalidateAll()`. A step that navigates
  * straight after the dialog closes can have that navigation superseded by the
- * invalidation — SvelteKit lets the newest of the two win — and stay on the
- * page it left, with the link it clicked focused and nothing else happening.
- * Waiting for the invalidation's own data request is what closes that window.
+ * invalidation and stay on the page it left. Waiting for the invalidation's
+ * own data request is what closes that window.
  */
 async function finishNaming(page: Page) {
 	const refreshed = page.waitForResponse((response) => response.url().includes('/__data.json'));
@@ -95,187 +95,188 @@ async function finishNaming(page: Page) {
 	await refreshed;
 }
 
+/** The wraps this account has, as the device fetches them. */
+async function wrapTypes(page: Page): Promise<string[]> {
+	return await page.evaluate(async () => {
+		const response = await fetch('/api/keys/unlock-bundle');
+		const bundle = (await response.json()) as { wraps: { type: string }[] };
+		return bundle.wraps.map((wrap) => wrap.type).sort((a, b) => a.localeCompare(b));
+	});
+}
+
 /**
- * Throws away the key cache without touching the session.
+ * Signs in by clicking "Sign in with a passkey" on the page already open.
  *
- * What iOS does after about a week, and the state most of these tests need:
- * signed in, and with no way to read a message until something unlocks.
+ * Passkey autofill also runs on the login page, and a virtual authenticator
+ * may answer it on its own before the click — so either way in counts, and the
+ * click is skipped if the page has already moved on.
  */
-async function evictKeyStorage(page: Page) {
-	await page.evaluate(
-		() =>
-			new Promise<void>((resolve, reject) => {
-				const request = indexedDB.deleteDatabase('bound-up-keys');
-				request.onsuccess = () => resolve();
-				request.onerror = () => reject(request.error);
-				request.onblocked = () => resolve();
-			})
-	);
-	await page.reload();
+async function signInWithPasskeyHere(page: Page) {
+	await waitForHydration(page);
+	if (new URL(page.url()).pathname === '/login') {
+		await clickWaButton(page, 'Sign in with a passkey').catch(() => undefined);
+	}
+	await page.waitForURL((url) => url.pathname !== '/login');
+}
+
+/** Every request body the two passkey ceremonies post to Better Auth. */
+function recordCeremonyBodies(page: Page): string[] {
+	const bodies: string[] = [];
+	page.on('request', (request: Request) => {
+		if (/\/passkey\/verify-(?<ceremony>registration|authentication)/.test(request.url())) {
+			bodies.push(request.postData() ?? '');
+		}
+	});
+	return bodies;
 }
 
 test.describe('adding a passkey', () => {
-	/**
-	 * The whole loop: register behind the password, get message unlock in the
-	 * same act, lose the storage, and get back in with no password at all.
-	 */
-	test('asks for the password, then seals the identity to the new passkey', async ({ page }) => {
-		const who = account('Isla');
+	test('asks for the password, then seals the key to the new passkey with PRF', async ({
+		page
+	}) => {
+		const who = account('Ines');
 		const authenticator = await useAuthenticator(page, { prf: true });
 		try {
 			await signUp(page, who);
 			await addPasskey(page, who.password);
-
-			// The seal already happened, so the dialog can say what the passkey can
-			// actually do rather than guess from a flag.
-			await expect(page.getByText('This passkey can also unlock your messages.')).toBeVisible();
+			await expect(page.getByText('You can sign in with this passkey now.')).toBeVisible();
 			await finishNaming(page);
 
-			await expect(page.getByText('You have no passkeys yet.')).toBeHidden();
-			await expect(page.getByTestId('passkey-unlocks')).toBeVisible();
-			await expect(page.getByTestId('passkey-no-unlock')).toHaveCount(0);
-
-			// One wrap for the password, one for the passkey — no second trip to
-			// /settings/encryption needed.
-			await page.goto('/settings/encryption');
-			await expect(page.locator('.wraps li')).toHaveCount(2);
-
-			// The part that matters: a cold device, and no password typed.
-			await evictKeyStorage(page);
-			await expect(page.getByText(/Locked on this device/)).toBeVisible();
-			await clickWaButton(page, 'Unlock with a passkey');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			expect(await wrapTypes(page)).toEqual(['passkey-prf', 'password']);
 		} finally {
 			await authenticator.forget();
 		}
 	});
 
 	/**
-	 * The password is a real gate, not decoration. Registering first and checking
-	 * afterwards would leave a stray credential behind every typo.
+	 * A provider that will not do PRF still gets a passkey that unlocks — the
+	 * secret goes in the user handle instead. No warning, because there is
+	 * nothing to warn about any more.
 	 */
+	test('falls back to the user handle when the provider has no PRF', async ({ page }) => {
+		const who = account('Jem');
+		const authenticator = await useAuthenticator(page, { prf: false });
+		try {
+			await signUp(page, who);
+			await addPasskey(page, who.password);
+			await finishNaming(page);
+
+			expect(await wrapTypes(page)).toEqual(['passkey-handle', 'password']);
+		} finally {
+			await authenticator.forget();
+		}
+	});
+
 	test('registers nothing when the password is wrong', async ({ page }) => {
-		const who = account('Mira');
+		const who = account('Kai');
 		const authenticator = await useAuthenticator(page, { prf: true });
 		try {
 			await signUp(page, who);
 			await page.goto('/settings/security');
 			await clickWaButton(page, 'Add a passkey');
-			await fillPassword(page, 'addPasskeyPassword', 'not-the-right-password');
+			await fillPassword(page, 'addPasskeyPassword', 'not-the-password');
 			await clickWaButton(page, 'Continue');
 
 			await expect(page.getByText('That password is not right')).toBeVisible();
-			// Still on the prompt, and nothing was created.
-			await expect(page.getByTestId('add-passkey-password')).toBeVisible();
-			await clickWaButton(page, 'Cancel');
-			await expect(page.getByText('You have no passkeys yet.')).toBeVisible();
+			await expect(namingDialog(page)).toHaveCount(0);
+			expect(await wrapTypes(page)).toEqual(['password']);
 		} finally {
 			await authenticator.forget();
 		}
 	});
 
-	/**
-	 * The passkey still works for signing in — that is the whole point of saying
-	 * something rather than refusing — but it cannot open a message, and both
-	 * the dialog and the list have to say so.
-	 */
-	test('warns, and keeps warning, when the passkey cannot do PRF', async ({ page }) => {
-		const who = account('Kit');
-		const authenticator = await useAuthenticator(page, { prf: false });
-		try {
-			await signUp(page, who);
-			await addPasskey(page, who.password);
-
-			await expect(page.getByText('This passkey cannot unlock your messages')).toBeVisible();
-			// age's own text names macOS 15 and Chrome 132, which reads as nonsense
-			// to someone already on macOS 15 whose password manager is at fault.
-			await expect(page.getByText(/macOS 15/)).toHaveCount(0);
-			// And it says where a passkey would work instead. Scoped to the dialog:
-			// the same list is already on the page behind it, beside the passkey.
-			const dialog = page.locator('wa-dialog');
-			await dialog.getByText('Which password managers can unlock messages').click();
-			await expect(dialog.getByText('Dashlane', { exact: false }).first()).toBeVisible();
-			await finishNaming(page);
-
-			// The warning persists beside the passkey, so it is still answerable
-			// tomorrow rather than only in the moment it was created.
-			await expect(page.getByTestId('passkey-no-unlock')).toBeVisible();
-			await expect(page.getByTestId('passkey-unlocks')).toHaveCount(0);
-
-			// Nothing was stored, so the password is still the only way in.
-			await page.goto('/settings/encryption');
-			await expect(page.locator('.wraps li')).toHaveCount(1);
-		} finally {
-			await authenticator.forget();
-		}
-	});
-
-	/**
-	 * The AAGUID only exists in a registration response, which is why the name is
-	 * chosen after the credential is made rather than before it.
-	 */
 	test('lets the passkey be named, and keeps the name', async ({ page }) => {
-		const who = account('Noor');
+		const who = account('Lux');
 		const authenticator = await useAuthenticator(page, { prf: true });
 		try {
 			await signUp(page, who);
 			await addPasskey(page, who.password);
-
 			await page.locator('wa-input[data-field="passkeyName"] input').fill('Work laptop');
 			await finishNaming(page);
 
+			await page.reload();
 			await expect(page.getByText('Work laptop')).toBeVisible();
-			// The wraps list follows the passkey's current name rather than the
-			// label frozen in when it was sealed.
-			await page.goto('/settings/encryption');
-			await expect(page.locator('.wraps li').getByText('Work laptop')).toBeVisible();
+		} finally {
+			await authenticator.forget();
+		}
+	});
+
+	/** Removing a passkey takes its wrap with it, so nothing stale is handed out. */
+	test('removing a passkey removes its wrap', async ({ page }) => {
+		const who = account('Mo');
+		const authenticator = await useAuthenticator(page, { prf: true });
+		try {
+			await signUp(page, who);
+			await addPasskey(page, who.password);
+			await finishNaming(page);
+			expect(await wrapTypes(page)).toEqual(['passkey-prf', 'password']);
+
+			await page.getByRole('button', { name: 'Remove' }).click();
+			await expect(page.getByText('You have no passkeys yet.')).toBeVisible();
+			expect(await wrapTypes(page)).toEqual(['password']);
 		} finally {
 			await authenticator.forget();
 		}
 	});
 });
 
-test.describe('the unlock panel', () => {
+test.describe('signing in with a passkey', () => {
+	for (const prf of [true, false]) {
+		test(`unlocks straight away ${prf ? 'with PRF' : 'through the user handle'}`, async ({
+			page
+		}) => {
+			const who = account(prf ? 'Nell' : 'Otto');
+			const authenticator = await useAuthenticator(page, { prf });
+			try {
+				await signUp(page, who);
+				await addPasskey(page, who.password);
+				await finishNaming(page);
+				await logOut(page);
+
+				await page.goto('/login');
+				await signInWithPasskeyHere(page);
+				// With nowhere else to go, the same default as a password sign-in.
+				await page.waitForURL('/home');
+				expect(await deviceHoldsKey(page)).toBe(true);
+			} finally {
+				await authenticator.forget();
+			}
+		});
+	}
+
 	/**
-	 * One component, four shapes. The messaging board used to build its own and
-	 * pass no passkey callback at all, so the screen a locked device is most
-	 * likely to be found on was the one screen with no passkey button.
+	 * The heart of the user-handle wrap's guarantee, and of PRF's: the secret a
+	 * ceremony hands the page is never posted to the server.
 	 */
-	test('offers the passkey first, with the password one click away', async ({ page }) => {
-		const who = account('Rae');
+	test('never sends the user handle or the PRF output to the server', async ({ page }) => {
+		const who = account('Pip');
 		const authenticator = await useAuthenticator(page, { prf: true });
+		const bodies = recordCeremonyBodies(page);
 		try {
 			await signUp(page, who);
 			await addPasskey(page, who.password);
 			await finishNaming(page);
+			await logOut(page);
+			await page.goto('/login');
+			await signInWithPasskeyHere(page);
 
-			await evictKeyStorage(page);
-			await page.goto('/settings/encryption');
-
-			const panel = page.locator('form[data-unlock-mode]');
-			await expect(panel).toHaveAttribute('data-unlock-mode', 'passkey-ready');
-			await expect(page.getByText('Unlock with a passkey')).toBeVisible();
-			// A button, not a field: someone who set up a passkey did so to stop
-			// typing their password.
-			await expect(page.locator('wa-input[data-field="unlockPassword"]')).toHaveCount(0);
-
-			await clickWaButton(page, 'Use your password instead');
-			await expect(page.locator('wa-input[data-field="unlockPassword"]')).toBeVisible();
-			await fillPassword(page, 'unlockPassword', who.password);
-			await clickWaButton(page, 'Unlock messages');
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
+			expect(bodies.length).toBeGreaterThanOrEqual(2);
+			for (const body of bodies) {
+				expect(body).not.toContain('userHandle');
+				expect(body).not.toContain('clientExtensionResults');
+				expect(body).not.toContain('"prf"');
+			}
 		} finally {
 			await authenticator.forget();
 		}
 	});
 
 	/**
-	 * The case the whole PRF check exists for. Asking for a password with no
-	 * explanation, from someone who deliberately set up a passkey, reads as the
-	 * app being broken.
+	 * A cleared browser is sent back to sign in, and a passkey is all it takes
+	 * to come back where the user was, with the key.
 	 */
-	test('explains itself when every passkey has failed', async ({ page }) => {
-		const who = account('Tomas');
+	test('brings a cleared browser back with one touch', async ({ page }) => {
+		const who = account('Quil');
 		const authenticator = await useAuthenticator(page, { prf: false });
 		try {
 			await signUp(page, who);
@@ -283,82 +284,41 @@ test.describe('the unlock panel', () => {
 			await finishNaming(page);
 
 			await evictKeyStorage(page);
-			await page.goto('/settings/encryption');
+			await page.goto('/home/guides');
+			await expectSentToSignIn(page, '/home/guides');
 
-			const panel = page.locator('form[data-unlock-mode]');
-			await expect(panel).toHaveAttribute('data-unlock-mode', 'passkeys-unusable');
-			await expect(page.getByText('Your passkey cannot unlock your messages')).toBeVisible();
-			// The password is shown straight away here, because it is the only way
-			// in — no extra click between the user and the thing that works.
-			await expect(page.locator('wa-input[data-field="unlockPassword"]')).toBeVisible();
-			// And no passkey button, which would open a chooser that cannot help.
-			await expect(page.getByText('Unlock with a passkey')).toHaveCount(0);
+			await signInWithPasskeyHere(page);
+			await page.waitForURL('/home/guides');
+			expect(await deviceHoldsKey(page)).toBe(true);
 		} finally {
 			await authenticator.forget();
 		}
 	});
 
-	/**
-	 * With nothing registered, offering "unlock with a passkey" opens a chooser
-	 * with nothing in it, and WebAuthn reports that exactly like a dismissal. So
-	 * the offer is to *create* one — which needs the password first, because a
-	 * locked device has no identity to seal.
-	 */
-	test('offers to create a passkey when the account has none', async ({ page }) => {
-		const who = account('Vesna');
-		const authenticator = await useAuthenticator(page, { prf: true });
-		try {
-			await signUp(page, who);
-			await evictKeyStorage(page);
-			await page.goto('/settings/encryption');
-
-			const panel = page.locator('form[data-unlock-mode]');
-			await expect(panel).toHaveAttribute('data-unlock-mode', 'offer-setup');
-			await expect(page.getByText('Unlock with a passkey')).toHaveCount(0);
-
-			await fillPassword(page, 'unlockPassword', who.password);
-			await clickWaButton(page, 'Unlock and set up a passkey');
-
-			// It unlocks first, then registers — a passkey sealed off a password
-			// that turned out to be wrong would open nothing and look like it had.
-			await expect(namingDialog(page)).toBeVisible({ timeout: 15_000 });
-			await expect(page.getByText('This passkey can also unlock your messages.')).toBeVisible();
-			await finishNaming(page);
-
-			await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-			await expect(page.locator('.wraps li')).toHaveCount(2);
-		} finally {
-			await authenticator.forget();
-		}
-	});
-
-	/**
-	 * The same component on the messaging screens, which is the point of
-	 * `MessageUnlock`. Asserted here rather than only in the component tests
-	 * because the drift
-	 * it replaced was invisible to every test that existed.
-	 */
-	test('is the same panel on the messages board', async ({ browser }) => {
+	/** The end-to-end point: a message written before is readable after. */
+	test('reads the history after a passkey sign-in', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		const authenticator = await useAuthenticator(ada.page, { prf: true });
+		const secret = 'written before the passkey sign-in';
 		try {
 			await signUp(ada.page, ada.who);
 			await signUp(jun.page, jun.who);
 			await linkAccounts(ada, jun);
 
+			await jun.page.goto('/home');
+			await openBoard(jun.page, ada.who.name);
+			await writeThread(jun.page, secret);
+			const threadPath = new URL(jun.page.url()).pathname;
+
 			await addPasskey(ada.page, ada.who.password);
 			await finishNaming(ada.page);
+			await logOut(ada.page);
+			await ada.page.goto('/login');
+			await signInWithPasskeyHere(ada.page);
 
-			// Before evicting, so the one-time history warning is out of the way and
-			// the locked screen is the only thing this asserts on.
-			await openBoard(ada.page, jun.who.name);
-			await evictKeyStorage(ada.page);
-
-			const panel = ada.page.locator('form[data-unlock-mode]');
-			await expect(panel).toHaveAttribute('data-unlock-mode', 'passkey-ready');
-			await clickWaButton(ada.page, 'Unlock with a passkey');
-			await expect(panel).toHaveCount(0);
+			await ada.page.goto(threadPath);
+			await expect(ada.page.getByText(secret)).toBeVisible();
 		} finally {
 			await authenticator.forget();
 			await ada.close();
@@ -367,71 +327,13 @@ test.describe('the unlock panel', () => {
 	});
 });
 
-test.describe('adding a passkey from encrypted messages', () => {
+test.describe('the messages screens without a key', () => {
 	/**
-	 * The same component as Security, reached from the other screen.
-	 *
-	 * That page used to carry its own inline password field posting to its own
-	 * action — a second implementation of one job, which is how the two drifted
-	 * far enough apart that only one of them ever checked PRF.
+	 * Never ciphertext presented as content: while the key is not here, the
+	 * board and the thread show a placeholder, and the app sends the user to
+	 * sign in.
 	 */
-	test('uses the same dialog, and seals message unlock', async ({ page }) => {
-		const who = account('Odile');
-		const authenticator = await useAuthenticator(page, { prf: true });
-		try {
-			await signUp(page, who);
-			await page.goto('/settings/encryption');
-			await expect(page.locator('.wraps li')).toHaveCount(1);
-
-			await clickWaButton(page, 'Add a passkey');
-			// A dialog, not a field on the page behind it.
-			await expect(page.getByTestId('add-passkey-password')).toBeVisible();
-			await fillPassword(page, 'addPasskeyPassword', who.password);
-			await clickWaButton(page, 'Continue');
-
-			await expect(namingDialog(page)).toBeVisible({ timeout: 15_000 });
-			await expect(page.getByText('This passkey can also unlock your messages.')).toBeVisible();
-			await finishNaming(page);
-
-			await expect(page.locator('.wraps li')).toHaveCount(2);
-			// Registered with Better Auth too, so it is a real sign-in credential
-			// and not just a wrap — the old encryption-page form could only seal
-			// to a passkey that already existed.
-			await page.goto('/settings/security');
-			await expect(page.getByTestId('passkey-unlocks')).toBeVisible();
-		} finally {
-			await authenticator.forget();
-		}
-	});
-});
-
-test.describe('locking on this device', () => {
-	/**
-	 * `lock()` returns the keyring to `unknown`, and nothing used to re-ask what
-	 * that meant — so the locked panel appeared only after a reload, and every
-	 * screen that switches on the status was stuck showing the wrong thing.
-	 */
-	test('shows the locked panel immediately, with no reload', async ({ page }) => {
-		const who = account('Wren');
-		await signUp(page, who);
-		await page.goto('/settings/encryption');
-		await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-
-		await clickWaButton(page, 'Lock on this device');
-
-		// Without navigating anywhere.
-		await expect(page.getByText(/Locked on this device/)).toBeVisible();
-		await expect(page.locator('form[data-unlock-mode]')).toBeVisible();
-	});
-
-	/**
-	 * The board rendered every thread with "…" for the preview and "…" for each
-	 * message inside — ciphertext with nothing to open it, shown as if it were
-	 * the content. A locked device has to say it is locked.
-	 */
-	test('sends the messages screens to the unlock form rather than showing ciphertext', async ({
-		browser
-	}) => {
+	test('send the user to sign in rather than showing ciphertext', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		const secret = 'the thing that must not be rendered as an ellipsis';
@@ -440,62 +342,18 @@ test.describe('locking on this device', () => {
 			await signUp(jun.page, jun.who);
 			await linkAccounts(ada, jun);
 
-			// `linkAccounts` leaves the inviter on the invite screen, which still
-			// says "waiting for them to accept" — its nav has no Messages link yet.
-			// A real navigation is what picks the acceptance up.
 			await ada.page.goto('/home');
 			await openBoard(ada.page, jun.who.name);
 			await writeThread(ada.page, secret);
-			await expect(ada.page.getByText(secret)).toBeVisible();
+			const threadPath = new URL(ada.page.url()).pathname;
 
-			const threadUrl = ada.page.url();
-			const boardUrl = threadUrl.replace(/\/[0-9a-f-]{36}$/, '');
-
-			// Lock from settings, then come back the way a user would.
-			await ada.page.goto('/settings/encryption');
-			await clickWaButton(ada.page, 'Lock on this device');
-			await expect(ada.page.getByText(/Locked on this device/)).toBeVisible();
-
-			// The board: the unlock form, not a grid of threads whose previews are
-			// all "…" because there is no key to open them with.
-			await ada.page.goto(boardUrl);
-			await expect(ada.page.getByRole('heading', { name: 'Unlock your messages' })).toBeVisible();
-			await expect(ada.page.locator('form[data-unlock-mode]')).toBeVisible();
+			await evictKeyStorage(ada.page);
+			await ada.page.goto(threadPath);
+			await expectSentToSignIn(ada.page, threadPath);
 			await expect(ada.page.getByText('…', { exact: true })).toHaveCount(0);
-
-			// And the thread itself, which showed "…" for every message.
-			await ada.page.goto(threadUrl);
-			await expect(ada.page.locator('form[data-unlock-mode]')).toBeVisible();
-			await expect(ada.page.getByText(secret)).toHaveCount(0);
-			await expect(ada.page.getByText('…', { exact: true })).toHaveCount(0);
-
-			// It opens again from right there, with the message readable.
-			await fillPassword(ada.page, 'unlockPassword', ada.who.password);
-			await clickWaButton(ada.page, 'Unlock messages');
-			await expect(ada.page.getByText(secret)).toBeVisible();
 		} finally {
 			await ada.close();
 			await jun.close();
 		}
-	});
-});
-
-test.describe('the free offer after an unlock', () => {
-	/**
-	 * `PasskeyOffer` is a different moment from `AddPasskeyFlow`: the identity is
-	 * still in memory as a string, so it needs no password at all. It still
-	 * requires a passkey to already exist, for the chooser reason above.
-	 */
-	test('is not offered to an account with no passkey', async ({ page }) => {
-		const who = account('Jonas');
-		await signUp(page, who);
-
-		await evictKeyStorage(page);
-		await page.goto('/settings/encryption');
-		await fillPassword(page, 'unlockPassword', who.password);
-		await clickWaButton(page, 'Unlock messages');
-
-		await expect(page.getByText(/Your messages are unlocked here/)).toBeVisible();
-		await expect(page.getByText('Unlock with a passkey next time?')).toBeHidden();
 	});
 });

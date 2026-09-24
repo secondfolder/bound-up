@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_CIPHERTEXT_BYTES, RESTORE_PAGE_SIZE } from '../messaging';
 import { createTestDb, type TestDb } from '../testing/db';
@@ -5,6 +6,7 @@ import {
 	createTestInvite,
 	createTestMessage,
 	createTestPartnership,
+	createTestRestoreRequest,
 	createTestThread,
 	createTestUser,
 	markMessageBodyLegacy,
@@ -15,6 +17,7 @@ import {
 	type TestUser
 } from '../testing/fixtures';
 import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '../testing/media';
+import { accountRecoveryRequests } from './db/schema';
 import { attachmentKey, partnershipMediaPrefix } from './media';
 import {
 	applyHistoryRestore,
@@ -24,13 +27,13 @@ import {
 	getPartnerMessagesWidget,
 	getThread,
 	listBoard,
+	listHelpRequests,
 	listHistoryForRestore,
 	listRestoreRequests,
 	listUnreadCounts,
 	markThreadOpened,
 	migrateMessageBodies,
 	purgePartnershipMedia,
-	requestHistoryRestore,
 	requireMembership,
 	requireMessageMembership,
 	requireThreadMembership,
@@ -38,6 +41,18 @@ import {
 	setReaction,
 	startThread
 } from './messaging';
+
+/**
+ * A restore request, as a partner-assisted sign-in opens one — see
+ * `server/recovery.ts`, which is the only thing that creates them now. Kept as
+ * a local wrapper so the restore tests read as they always did.
+ */
+async function requestHistoryRestore(
+	db: TestDb['db'],
+	input: { partnershipId: string; requesterId: string; recipient: string; expiresAt?: Date }
+) {
+	return { ok: true as const, ...(await createTestRestoreRequest(db, input)) };
+}
 
 let harness: TestDb;
 let store: TestMediaStore;
@@ -724,9 +739,6 @@ describe('history restore', () => {
 			recipient: 'age1newkey'
 		});
 		expect(request).toMatchObject({ ok: true });
-		if (!request.ok) {
-			return;
-		}
 
 		// Ada sees her own request; Jun sees it as someone else's to act on.
 		await expect(listRestoreRequests(harness.db, partnershipId, ada.id)).resolves.toMatchObject([
@@ -760,9 +772,6 @@ describe('history restore', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) {
-			return;
-		}
 
 		await expect(
 			applyHistoryRestore(harness.db, {
@@ -785,9 +794,6 @@ describe('history restore', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) {
-			return;
-		}
 
 		await applyHistoryRestore(harness.db, {
 			partnershipId,
@@ -801,31 +807,12 @@ describe('history restore', () => {
 		expect(rows[0].ciphertext).toBe('c2FmZQ');
 	});
 
-	it('supersedes an earlier pending request from the same person', async () => {
-		await requestHistoryRestore(harness.db, {
-			partnershipId,
-			requesterId: ada.id,
-			recipient: 'age1first'
-		});
-		await requestHistoryRestore(harness.db, {
-			partnershipId,
-			requesterId: ada.id,
-			recipient: 'age1second'
-		});
-		const open = await listRestoreRequests(harness.db, partnershipId, jun.id);
-		expect(open).toHaveLength(1);
-		expect(open[0].requestedRecipient).toBe('age1second');
-	});
-
 	it('lets the partner decline, and only the partner', async () => {
 		const request = await requestHistoryRestore(harness.db, {
 			partnershipId,
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) {
-			return;
-		}
 
 		await expect(
 			declineHistoryRestore(harness.db, {
@@ -844,17 +831,151 @@ describe('history restore', () => {
 		await expect(listRestoreRequests(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
 	});
 
-	it('refuses a request from a non-member', async () => {
-		const stranger = await createTestUser(harness.db);
+	/**
+	 * Finishing the re-encryption is what lets the requester back in. Only the
+	 * final page does it, and only while the sign-in is still open.
+	 */
+	it('approves the sign-in when the partner finishes, not before', async () => {
+		const { messageId } = await createTestThread(harness.db, partnershipId, jun);
+		const request = await requestHistoryRestore(harness.db, {
+			partnershipId,
+			requesterId: ada.id,
+			recipient: 'age1newkey'
+		});
+
+		await applyHistoryRestore(harness.db, {
+			partnershipId,
+			requestId: request.id,
+			actorId: jun.id,
+			messages: [{ id: messageId, ciphertext: 'bmV3' }],
+			final: false
+		});
+		await expect(readRecovery(request.recoveryRequestId)).resolves.toMatchObject({
+			status: 'pending',
+			approvedBy: null
+		});
+
+		await applyHistoryRestore(harness.db, {
+			partnershipId,
+			requestId: request.id,
+			actorId: jun.id,
+			messages: [],
+			final: true
+		});
+		await expect(readRecovery(request.recoveryRequestId)).resolves.toMatchObject({
+			status: 'approved',
+			approvedBy: jun.id
+		});
+	});
+
+	/**
+	 * A sign-in that expired or was superseded must take its restore request
+	 * with it — nobody should re-encrypt a whole history to a key that will
+	 * never be used.
+	 */
+	it('hides and refuses a request whose sign-in has expired', async () => {
+		const { messageId } = await createTestThread(harness.db, partnershipId, jun);
+		const request = await requestHistoryRestore(harness.db, {
+			partnershipId,
+			requesterId: ada.id,
+			recipient: 'age1newkey',
+			expiresAt: new Date(Date.now() - 1000)
+		});
+
+		await expect(listRestoreRequests(harness.db, partnershipId, jun.id)).resolves.toEqual([]);
 		await expect(
-			requestHistoryRestore(harness.db, {
+			applyHistoryRestore(harness.db, {
 				partnershipId,
-				requesterId: stranger.id,
-				recipient: 'age1x'
+				requestId: request.id,
+				actorId: jun.id,
+				messages: [{ id: messageId, ciphertext: 'bmV3' }],
+				final: true
 			})
-		).resolves.toEqual({ ok: false, reason: 'not-a-member' });
+		).resolves.toEqual({ ok: false, reason: 'no-such-request' });
+	});
+
+	/**
+	 * Once one partner has approved the sign-in, the others still have their own
+	 * histories to bring back — and the copy says the requester is back in.
+	 */
+	it('says when another partner already approved the sign-in', async () => {
+		const request = await requestHistoryRestore(harness.db, {
+			partnershipId,
+			requesterId: ada.id,
+			recipient: 'age1newkey'
+		});
+		await expect(listRestoreRequests(harness.db, partnershipId, jun.id)).resolves.toMatchObject([
+			{ signInApproved: false }
+		]);
+
+		await harness.db
+			.update(accountRecoveryRequests)
+			.set({ status: 'approved' })
+			.where(eq(accountRecoveryRequests.id, request.recoveryRequestId));
+		await expect(listRestoreRequests(harness.db, partnershipId, jun.id)).resolves.toMatchObject([
+			{ signInApproved: true }
+		]);
 	});
 });
+
+describe('listHelpRequests', () => {
+	it('names the partnerships where someone asked this viewer for help', async () => {
+		await requestHistoryRestore(harness.db, {
+			partnershipId,
+			requesterId: ada.id,
+			recipient: 'age1newkey'
+		});
+
+		await expect(listHelpRequests(harness.db, jun.id)).resolves.toEqual([partnershipId]);
+		// The requester is not asking themselves.
+		await expect(listHelpRequests(harness.db, ada.id)).resolves.toEqual([]);
+	});
+
+	it('forgets a request once it is answered or expired', async () => {
+		const answered = await requestHistoryRestore(harness.db, {
+			partnershipId,
+			requesterId: ada.id,
+			recipient: 'age1newkey'
+		});
+		await declineHistoryRestore(harness.db, {
+			partnershipId,
+			requestId: answered.id,
+			actorId: jun.id
+		});
+		await requestHistoryRestore(harness.db, {
+			partnershipId,
+			requesterId: ada.id,
+			recipient: 'age1old',
+			expiresAt: new Date(Date.now() - 1000)
+		});
+
+		await expect(listHelpRequests(harness.db, jun.id)).resolves.toEqual([]);
+	});
+
+	it('ignores other people’s partnerships', async () => {
+		const cas = await createTestUser(harness.db, { name: 'Cas' });
+		const other = await createTestPartnership(harness.db, ada, cas);
+		await requestHistoryRestore(harness.db, {
+			partnershipId: other.id,
+			requesterId: ada.id,
+			recipient: 'age1newkey'
+		});
+
+		await expect(listHelpRequests(harness.db, jun.id)).resolves.toEqual([]);
+		await expect(listHelpRequests(harness.db, cas.id)).resolves.toEqual([other.id]);
+	});
+});
+
+async function readRecovery(id: string) {
+	const [row] = await harness.db
+		.select({
+			status: accountRecoveryRequests.status,
+			approvedBy: accountRecoveryRequests.approvedBy
+		})
+		.from(accountRecoveryRequests)
+		.where(eq(accountRecoveryRequests.id, id));
+	return row;
+}
 
 describe('listHistoryForRestore', () => {
 	/** Raises a request from Ada and returns its id, for the tests below. */
@@ -864,9 +985,6 @@ describe('listHistoryForRestore', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) {
-			throw new Error('fixture could not open a request');
-		}
 		return request.id;
 	}
 
@@ -931,9 +1049,6 @@ describe('listHistoryForRestore', () => {
 			requesterId: ada.id,
 			recipient: 'age1elsewhere'
 		});
-		if (!elsewhere.ok) {
-			return;
-		}
 
 		// Jun is a member of `partnershipId` but the request lives in `other`.
 		await expect(
@@ -1035,9 +1150,6 @@ describe('applyHistoryRestore reactions', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!request.ok) {
-			return;
-		}
 
 		const page = await listHistoryForRestore(harness.db, {
 			partnershipId,
@@ -1086,9 +1198,6 @@ describe('applyHistoryRestore reactions', () => {
 			requesterId: ada.id,
 			recipient: 'age1x'
 		});
-		if (!theirRequest.ok) {
-			return;
-		}
 		const theirPage = await listHistoryForRestore(harness.db, {
 			partnershipId: other.id,
 			requestId: theirRequest.id,
@@ -1103,9 +1212,6 @@ describe('applyHistoryRestore reactions', () => {
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		if (!mine.ok) {
-			return;
-		}
 
 		await applyHistoryRestore(harness.db, {
 			partnershipId,
