@@ -1,6 +1,5 @@
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';
 import {
-	$createLinkNode,
 	$isAutoLinkNode,
 	$isLinkNode,
 	AutoLinkNode,
@@ -22,11 +21,13 @@ import {
 } from '@lexical/markdown';
 import { registerRichText } from '@lexical/rich-text';
 import {
-	$applyNodeReplacement,
 	$findMatchingParent,
 	$getRoot,
 	$getSelection,
+	$getSiblingCaret,
+	$insertNodeToNearestRootAtCaret,
 	$isElementNode,
+	$isLineBreakNode,
 	$isRangeSelection,
 	COMMAND_PRIORITY_NORMAL,
 	createEditor,
@@ -34,17 +35,18 @@ import {
 	FORMAT_TEXT_COMMAND,
 	type Klass,
 	type LexicalEditor,
-	type LexicalNode,
-	type NodeKey,
-	type SerializedLexicalNode,
-	type Spread
+	type LexicalNode
 } from 'lexical';
 import { find as findLinks } from 'linkifyjs';
 import { embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
 import { EDITOR_NODE_REPLACEMENTS } from '$lib/lexical/nodes';
+import { $createEmbedNode, $isEmbedNode, EmbedNode } from '$lib/lexical/nodes/embed';
 import { EMBED_OFFER_CLASS } from '$lib/lexical/nodes/shared/embed-offer';
-import type { RichTextDocument, RichTextInlineNode } from '$lib/richtext';
-import { registerWidgetSelection, WidgetNode } from '$lib/richtext-widgets';
+import { registerDecoratorBlockSelection } from '$lib/lexical/plugins/decorator-block-selection';
+import {
+	$markBlockContinuation,
+	registerMendSplitBlocks
+} from '$lib/lexical/transformers/mend-split-blocks';
 
 /**
  * The editor half of rich text: the node set, the typing shortcuts, and the
@@ -80,92 +82,6 @@ export const DOCUMENT_FEATURES: readonly RichTextFeature[] = [
 	'link',
 	'list'
 ];
-
-/* ── the embed node ────────────────────────────────────────────────────── */
-
-export type SerializedEmbedNode = Spread<{ url: string }, SerializedLexicalNode>;
-
-/**
- * A preview for one URL, inline in the document and block-level on screen.
- *
- * Its own node rather than a flag on the link that produced it, and that is
- * the whole design: because it is a real node, a writer who does not want the
- * embed removes it, and there is no opt-out flag to store anywhere. The chip
- * carries an explicit remove button, because a block that appeared on its own
- * needs a visible way out; selecting it and pressing backspace works too.
- *
- * A `WidgetNode`, which is this app's name for a decorator that is inline in
- * the model and a block on screen. Everything that makes one behave like an
- * object — selected as a unit, deleted in one keystroke, reachable with the
- * arrow keys, selected by a press — comes from `richtext-widgets.ts` and knows
- * nothing about embeds. The note there explains why the shape is forced.
- *
- * What is specific to an embed is only this: it holds a URL, it is drawn by
- * `ComposerEmbed`, and it sits at the start of the line its link is on. The
- * alternative, splitting the paragraph in two around a block node, leaves the
- * halves apart for good once the embed is removed.
- */
-export class EmbedNode extends WidgetNode<string> {
-	__url: string;
-
-	static getType(): string {
-		return 'embed';
-	}
-
-	static clone(node: EmbedNode): EmbedNode {
-		return new EmbedNode(node.__url, node.__key);
-	}
-
-	constructor(url: string, key?: NodeKey) {
-		super(key);
-		this.__url = url;
-	}
-
-	getUrl(): string {
-		return this.__url;
-	}
-
-	override getWidgetClass(): string {
-		return 'richtext-embed';
-	}
-
-	getWidgetLabel(): string {
-		return `Embedded preview of ${this.__url}`;
-	}
-
-	updateDOM(prevNode: EmbedNode): boolean {
-		// The label carries the URL, so a new URL needs a new element.
-		return prevNode.__url !== this.__url;
-	}
-
-	/**
-	 * The URL, which is all the composer needs to draw the embed.
-	 *
-	 * Lexical has no renderer of its own: it collects whatever `decorate()`
-	 * returns into a record keyed by node, hands that to every decorator
-	 * listener after each commit, and leaves the mounting to the host
-	 * framework. `RichTextEditor.svelte` is that host — see the note there.
-	 */
-	decorate(): string {
-		return this.__url;
-	}
-
-	static importJSON(serialised: SerializedEmbedNode): EmbedNode {
-		return $createEmbedNode(serialised.url).updateFromJSON(serialised);
-	}
-
-	exportJSON(): SerializedEmbedNode {
-		return { ...super.exportJSON(), url: this.__url };
-	}
-}
-
-export function $createEmbedNode(url: string): EmbedNode {
-	return $applyNodeReplacement(new EmbedNode(url));
-}
-
-export function $isEmbedNode(node: LexicalNode | null | undefined): node is EmbedNode {
-	return node instanceof EmbedNode;
-}
 
 /** Every node type the document may contain. A type absent here cannot exist. */
 export const RICH_TEXT_NODES: readonly Klass<LexicalNode>[] = [
@@ -277,70 +193,41 @@ function $insertEmbedBefore(link: AutoLinkNode | LinkNode): boolean {
 		return false;
 	}
 
+	// The head of the link's line, which is where the paragraph is cut. The
+	// embed lands between the halves, at the root, because that is the only
+	// place Lexical's own decorator handling reaches — see `nodes/decorator-block.ts`.
+	// `$insertNodeToNearestRootAtCaret` does the cut: it splits the ancestor
+	// chain from this position up to the root and inserts between the pieces,
+	// which is the same call the Lexical playground's video block goes through.
 	const lineStart = $lineStartFor(link);
-	// When the link *is* the start of its line the embed lands directly in
-	// front of it, which is the arrangement the auto-linker refuses — settle it
-	// first, and hang the embed off what that leaves behind.
-	const anchor = lineStart === link && $isAutoLinkNode(link) ? $settleLink(link) : lineStart;
-	anchor.insertBefore($createEmbedNode(url));
-	return true;
-}
-
-/**
- * Turn an auto-link into an ordinary link, so the auto-linker stops policing it.
- *
- * `@lexical/link` unwraps an `AutoLinkNode` whose previous sibling is not text
- * ending in a separator, a line break, or nothing at all — the rule that keeps
- * `foo` + `https://x` from being read as one link. An embed at the start of the
- * link's line is none of those, so the link would be silently turned back into
- * plain text: on load, on the next edit to it, and with no way back. Not a
- * hypothetical — loading a saved description did exactly that, and the plain
- * text is what got saved over the top.
- *
- * A `LinkNode` is skipped by every branch of that transform. What it costs is
- * the auto-link's one extra behaviour: editing the URL text afterwards no
- * longer retargets the link. That is arguably the better answer here anyway —
- * the embed beside it is pinned to the original URL, so a link that quietly
- * followed the text would disagree with the preview above it.
- */
-function $settleLink(link: AutoLinkNode): LinkNode {
-	const settled = $createLinkNode(link.getURL());
-	link.replace(settled, true);
-	return settled;
-}
-
-/**
- * The same settling, applied to a document on its way into the editor.
- *
- * Every path that puts an embed in front of a link has to do this, and loading
- * is one of them: a document hoisted from the older root-level shape arrives
- * with an auto-link directly after an embed, which the auto-linker would unwrap
- * on the very first commit — turning a link into plain text that then gets
- * saved. Documents written since carry `link` there already, so this is a
- * no-op for them.
- */
-export function settleLinksAfterEmbeds(doc: RichTextDocument): RichTextDocument {
-	let changed = false;
-	const children = doc.root.children.map((block) => {
-		if (block.type !== 'paragraph') {
-			return block;
-		}
-		const nodes = block.children.map((node, index) => {
-			if (node.type !== 'autolink' || block.children[index - 1]?.type !== 'embed') {
-				return node;
-			}
-			changed = true;
-			// `isUnlinked` is an auto-link's flag and means nothing on a link, so
-			// it goes rather than travelling along as dead state.
-			return {
-				type: 'link',
-				url: node.url,
-				children: node.children
-			} satisfies RichTextInlineNode;
-		});
-		return { ...block, children: nodes };
+	// Whether the cut leaves anything on the near side. When the link's line is
+	// the first of its paragraph there is nothing above it, and the halves must
+	// not be marked as belonging together — `$shouldSplit` keeps the empty half
+	// from being made at all, which is what stopped a blank row appearing above
+	// an embed at the top of a message.
+	const cutsTheBlock = lineStart.getPreviousSibling() !== null;
+	const embed = $createEmbedNode(url);
+	$insertNodeToNearestRootAtCaret(embed, $getSiblingCaret(lineStart, 'previous'), {
+		// biome-ignore lint/style/useNamingConvention: Lexical's own option name.
+		$shouldSplit: () => false
 	});
-	return changed ? { root: { type: 'root', children } } : doc;
+	// What the cut left on the far side, so that removing the embed later puts
+	// the block back together — see `$markWidgetContinuation`.
+	const tail = embed.getNextSibling();
+	if (cutsTheBlock && tail && $isElementNode(tail)) {
+		$markBlockContinuation(tail);
+		// The break that used to separate the two lines: the paragraph boundary
+		// separates them now, and a block whose last child is a line break gets a
+		// managed `<br>` from Lexical — an extra row the writer did not type.
+		const head = embed.getPreviousSibling();
+		if ($isElementNode(head)) {
+			const last = head.getLastChild();
+			if ($isLineBreakNode(last)) {
+				last.remove();
+			}
+		}
+	}
+	return true;
 }
 
 /**
@@ -580,6 +467,17 @@ export function registerEmbedOffers(editor: LexicalEditor): () => void {
  * the editor show something no reader ever would.
  */
 const EDITOR_THEME = {
+	/**
+	 * The caret Lexical draws beside a block it cannot put a text caret in.
+	 *
+	 * A decorator block has no line box either side of it to draw an ordinary
+	 * caret in — which is why the caret used to vanish there. Lexical's
+	 * answer is to insert an element of its own and hide the text caret while it
+	 * is up, but it only styles that element if the theme names a class for it:
+	 * without this the position is invisible again, which is the bug this whole
+	 * arrangement exists to fix. Styled in `RichTextEditor.svelte`.
+	 */
+	blockCursor: 'rt-block-cursor',
 	text: {
 		bold: 'rt-bold',
 		italic: 'rt-italic',
@@ -625,7 +523,8 @@ export function createRichTextEditor(options: {
 		// Everything the arrow keys, the pointer and the eye need for a node that
 		// is inline in the model and a block on screen. Above `registerRichText`
 		// in priority, which is why it is registered after it here.
-		registerWidgetSelection(editor),
+		registerDecoratorBlockSelection(editor),
+		registerMendSplitBlocks(editor),
 		registerHistory(editor, createEmptyHistoryState(), 300),
 		registerAutoLink(editor, {
 			matchers: [linkifyMatcher],

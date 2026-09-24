@@ -90,7 +90,7 @@ noise:
     linter. Suppress a plugin diagnostic with `// biome-ignore lint/plugin:`.
   - **Two Biome false positives have a shape worth knowing.** Its inference
     believes `RegExp.prototype.exec` never returns null, so a `const match =
-    …exec(x)` needs an explicit `: RegExpExecArray | null` annotation or the
+…exec(x)` needs an explicit `: RegExpExecArray | null` annotation or the
     null check is reported as unnecessary. And a switch over an indexed access
     into superforms' `Infer<>` overflows its stack and takes the whole run
     with it — `z.output<Schema>` is the same type and does not.
@@ -404,9 +404,13 @@ with no Lexical import at all, which is why a page that only displays
 descriptions ships none of the editor and the worker bundle contains none of
 it. Adding a Lexical import to `richtext.ts` silently undoes that for every
 such page. Everything that writes a document lives in `richtext-editor.ts`, and
-the caret rules for a node that is inline in the model but a block on screen —
-the URL embed is the only one so far — live in `richtext-widgets.ts`, which
-knows nothing about embeds. See [docs/rich-text.md](docs/rich-text.md).
+the editor-only Lexical pieces live under `src/lib/lexical/`: `nodes/` for node
+classes — `DecoratorBlockNode`, a port of `@lexical/react`'s, with `EmbedNode`
+on top of it — `transformers/` for node transforms, and `plugins/` for
+registrations. A decorator block is a **block at the root while it is being
+edited and an inline node in the stored document**;
+`src/lib/lexical/document-shape.ts` is the bridge, and that split is what gets
+the caret behaviour from Lexical rather than by hand. See [docs/rich-text.md](docs/rich-text.md).
 
 **Every rich-text length limit counts visible text**, via `documentToPlainText`
 — never the stored string, which is several times larger than the prose in it.
@@ -735,23 +739,23 @@ Four places, split on scope:
 
 ### Feature docs
 
-| Doc                                                                                      | Feature                                                                       |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [docs/partners.md](docs/partners.md)                                                     | Linking two accounts: invites, the control permission, the nav tabs           |
-| [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md) | What the app promises users: never losing their data, and privacy boundaries  |
-| [docs/rewards.md](docs/rewards.md)                                                       | Self rewards and partnership rewards: credits, claims, control                |
-| [docs/tasks.md](docs/tasks.md)                                                           | Self tasks and partnership tasks: scheduling, credits, timezone ownership     |
-| [docs/encryption.md](docs/encryption.md)                                                 | Message keys: the client-side KDF, the wraps, what the guarantee is           |
-| [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: PRF and user-handle wraps, sign-in that unlocks, provider naming    |
-| [docs/account-recovery.md](docs/account-recovery.md)                                     | Partner-assisted sign-in after losing every way in, and its known gap         |
-| [docs/halftone.md](docs/halftone.md)                                                     | The landing page's halftone overlay: the screen model and its fixtures        |
-| [docs/embeds.md](docs/embeds.md)                                                         | URL linkification and inline embeds: providers, privacy gate, reddit path     |
-| [docs/messaging.md](docs/messaging.md)                                                   | Encrypted partner messages: threads, the board, unread, restore               |
-| [docs/rich-text.md](docs/rich-text.md)                                                   | The rich-text document: Lexical serialisation, the editors, embed blocks      |
-| [docs/section-widgets.md](docs/section-widgets.md)                                       | The /home and /partner cards: the shell, the per-section bodies, the data     |
-| [docs/timezone.md](docs/timezone.md)                                                     | Account timezone storage, mismatch prompts, and device-local dismissal        |
-| [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text      |
-| [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin           |
+| Doc                                                                                      | Feature                                                                      |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [docs/partners.md](docs/partners.md)                                                     | Linking two accounts: invites, the control permission, the nav tabs          |
+| [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md) | What the app promises users: never losing their data, and privacy boundaries |
+| [docs/rewards.md](docs/rewards.md)                                                       | Self rewards and partnership rewards: credits, claims, control               |
+| [docs/tasks.md](docs/tasks.md)                                                           | Self tasks and partnership tasks: scheduling, credits, timezone ownership    |
+| [docs/encryption.md](docs/encryption.md)                                                 | Message keys: the client-side KDF, the wraps, what the guarantee is          |
+| [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: PRF and user-handle wraps, sign-in that unlocks, provider naming   |
+| [docs/account-recovery.md](docs/account-recovery.md)                                     | Partner-assisted sign-in after losing every way in, and its known gap        |
+| [docs/halftone.md](docs/halftone.md)                                                     | The landing page's halftone overlay: the screen model and its fixtures       |
+| [docs/embeds.md](docs/embeds.md)                                                         | URL linkification and inline embeds: providers, privacy gate, reddit path    |
+| [docs/messaging.md](docs/messaging.md)                                                   | Encrypted partner messages: threads, the board, unread, restore              |
+| [docs/rich-text.md](docs/rich-text.md)                                                   | The rich-text document: Lexical serialisation, the editors, embed blocks     |
+| [docs/section-widgets.md](docs/section-widgets.md)                                       | The /home and /partner cards: the shell, the per-section bodies, the data    |
+| [docs/timezone.md](docs/timezone.md)                                                     | Account timezone storage, mismatch prompts, and device-local dismissal       |
+| [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text     |
+| [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

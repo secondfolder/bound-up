@@ -979,7 +979,22 @@ test.describe('embeds', () => {
 						offset: selection?.anchorOffset ?? -1
 					};
 				});
-			const decorator = ada.page.locator('.richtext-editor .richtext-embed');
+			/**
+			 * The text of the line the caret is on.
+			 *
+			 * Which line rather than which point: stepping off a block lands on an
+			 * element point at the end of the block before it, which is the same
+			 * place on screen as the text point inside it and is what Lexical
+			 * leaves behind.
+			 */
+			const caretLine = () =>
+				ada.page.evaluate(() => {
+					const node = document.getSelection()?.anchorNode ?? null;
+					const element =
+						node?.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
+					return element?.closest('p, .decorator-block')?.textContent ?? null;
+				});
+			const decorator = ada.page.locator('.richtext-editor .embed-block');
 
 			/**
 			 * Walks the caret left until it reaches `goal`, or gives up.
@@ -1015,9 +1030,11 @@ test.describe('embeds', () => {
 			 *
 			 * The left arrow there used to hand the caret to the point in front of
 			 * the embed — a real position that nothing draws a caret for — and the
-			 * press after that sent it to the end of the message. Now the press
-			 * does nothing at all, which is what the left arrow does at the start
-			 * of any message, and the embed stays selected.
+			 * press after that sent it to the end of the message. Lexical's own
+			 * answer is a block cursor above it, which is a row the writer cannot
+			 * see and did not make. So the press does nothing at all, which is what
+			 * these keys do at the start of any message, and the embed stays
+			 * selected.
 			 */
 			await typeRichText(ada.page, 'hello https://vimeo.com/1 world');
 			await expect(ada.page.locator('.richtext-editor .composer-embed')).toHaveCount(1);
@@ -1026,11 +1043,20 @@ test.describe('embeds', () => {
 
 			await arrowLeft();
 			await expect(decorator).toHaveClass(/is-selected/);
+			await expect(surface).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+
+			// And there it stays, however many times it is pressed — including up,
+			// which is the direction this was reported in.
+			const blockCursor = ada.page.locator('.richtext-editor [data-lexical-cursor]');
 			for (let i = 0; i < 3; i += 1) {
 				await arrowLeft();
 				await expect(decorator).toHaveClass(/is-selected/);
-				await expect(surface).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+				await expect(blockCursor).toHaveCount(0);
 			}
+			await ada.page.keyboard.press('ArrowUp');
+			await settle(ada.page);
+			await expect(decorator).toHaveClass(/is-selected/);
+			await expect(blockCursor).toHaveCount(0);
 
 			await surface.click();
 			await ada.page.keyboard.press('ControlOrMeta+A');
@@ -1056,13 +1082,18 @@ test.describe('embeds', () => {
 
 			// The real embed, in the composer, on its own row between the first
 			// line and the line holding the link — not at the top of the message.
+			// In the editor that reads as a block of its own between the two halves
+			// of what was typed as one paragraph; stored, it goes back to an inline
+			// node at the head of the link's line. See `embed-blocks.ts`.
 			await expect(embed).toHaveCount(1);
 			await expect(embed.getByText('A stubbed vimeo clip')).toBeVisible();
-			await expect(
-				ada.page
-					.locator('.richtext-editor .richtext-embed')
-					.locator('xpath=preceding-sibling::*[1]')
-			).toHaveJSProperty('tagName', 'BR');
+			const decoratorBlock = ada.page.locator('.richtext-editor .embed-block');
+			await expect(decoratorBlock.locator('xpath=preceding-sibling::*[1]')).toHaveText(
+				'first line'
+			);
+			await expect(decoratorBlock.locator('xpath=following-sibling::*[1]')).toContainText(
+				'https://vimeo.com/1'
+			);
 
 			/**
 			 * Arrowing left off the head of the link's line, one stop at a time.
@@ -1092,7 +1123,7 @@ test.describe('embeds', () => {
 			// One more: the end of the line above, not the start of the message.
 			await arrowLeft();
 			await expect(decorator).not.toHaveClass(/is-selected/);
-			expect(await caretAt()).toEqual({ text: 'first line', offset: 'first line'.length });
+			expect(await caretLine()).toBe('first line');
 			await expect(surface).not.toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
 
 			// And back the way it came, press for press: right onto the embed, then
@@ -1102,7 +1133,7 @@ test.describe('embeds', () => {
 			await expect(decorator).toHaveClass(/is-selected/);
 			await arrowRight();
 			await expect(decorator).not.toHaveClass(/is-selected/);
-			expect(await caretAt()).toEqual(lineStart);
+			expect(await caretLine()).toContain('watch ');
 
 			/**
 			 * Up and down, which have the same hole to cross.
@@ -1127,14 +1158,14 @@ test.describe('embeds', () => {
 
 			await arrowUp();
 			await expect(decorator).not.toHaveClass(/is-selected/);
-			expect(await caretAt()).toEqual({ text: 'first line', offset: 'first line'.length });
+			expect(await caretLine()).toBe('first line');
 
 			// And down again, press for press.
 			await arrowDown();
 			await expect(decorator).toHaveClass(/is-selected/);
 			await arrowDown();
 			await expect(decorator).not.toHaveClass(/is-selected/);
-			expect((await caretAt()).text).toBe('watch ');
+			expect(await caretLine()).toContain('watch ');
 
 			/**
 			 * Except when the line the caret is in wraps.
@@ -1360,7 +1391,7 @@ test.describe('embeds', () => {
 			await ada.page.keyboard.type('0');
 			await ada.page.keyboard.press('End');
 			await expect(embed).toHaveCount(1);
-			await expect(ada.page.locator('.richtext-editor .richtext-embed')).toHaveAttribute(
+			await expect(ada.page.locator('.richtext-editor .embed-block')).toHaveAttribute(
 				'aria-label',
 				`Embedded preview of ${url}0`
 			);

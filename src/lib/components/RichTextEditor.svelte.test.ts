@@ -6,15 +6,14 @@ import {
 	// biome-ignore lint/suspicious/noDeprecatedImports: only the overload that takes a type argument is deprecated, and this calls the plain one.
 	$getNodeByKey as getNodeByKey,
 	$getRoot as getRoot,
-	$isElementNode as isElementNode,
 	type LexicalEditor,
 	$setSelection as setSelection
 } from 'lexical';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type CachedEmbedDetails, clearOembedCache } from '$lib/embeds';
+import { $isEmbedNode as isEmbedNode } from '$lib/lexical/nodes/embed';
 import { FORMAT_BOLD, FORMAT_ITALIC, FORMAT_STRIKETHROUGH } from '$lib/richtext';
-import { $isEmbedNode as isEmbedNode } from '$lib/richtext-editor';
 import { defined } from '$lib/testing/defined';
 import { waProp } from '$lib/testing/web-awesome';
 import RichTextEditorHarness from './RichTextEditorHarness.svelte';
@@ -242,7 +241,7 @@ const WITH_PLAYER = JSON.stringify({
 });
 
 function embedChips(container: HTMLElement): Element[] {
-	return [...container.querySelectorAll('.richtext-embed')];
+	return [...container.querySelectorAll('.embed-block')];
 }
 
 /**
@@ -423,15 +422,14 @@ describe('RichTextEditor, embeds', () => {
 		await tick();
 		const editor = editorOf(container);
 		const surface = container.querySelector('.surface');
-		const embed = container.querySelector('.surface .richtext-embed');
+		const embed = container.querySelector('.surface .embed-block');
 		expect(embed?.classList.contains('is-selected')).toBe(false);
 
 		const embedNode = () =>
 			editor.getEditorState().read(() => {
-				const paragraph = getRoot().getFirstChild();
-				const node = isElementNode(paragraph)
-					? paragraph.getChildren().find(isEmbedNode)
-					: undefined;
+				// A root child: the editor keeps embeds out of paragraphs, which is
+				// what gives them Lexical's own caret handling.
+				const node = getRoot().getChildren().find(isEmbedNode);
 				if (!node) {
 					throw new Error('expected an embed node');
 				}
@@ -449,7 +447,7 @@ describe('RichTextEditor, embeds', () => {
 		);
 		await tick();
 		expect(embed?.classList.contains('is-selected')).toBe(false);
-		expect(surface?.classList.contains('widget-selected')).toBe(false);
+		expect(surface?.classList.contains('block-selected')).toBe(false);
 
 		// On it: no caret anywhere, the node itself selected.
 		editor.update(
@@ -464,7 +462,7 @@ describe('RichTextEditor, embeds', () => {
 		expect(embed?.classList.contains('is-selected')).toBe(true);
 		// And no text caret is drawn while that is true, because there is no text
 		// position to draw — the browser would otherwise park one at the start.
-		expect(surface?.classList.contains('widget-selected')).toBe(true);
+		expect(surface?.classList.contains('block-selected')).toBe(true);
 
 		// And moving off it again clears both.
 		editor.update(
@@ -475,7 +473,7 @@ describe('RichTextEditor, embeds', () => {
 		);
 		await tick();
 		expect(embed?.classList.contains('is-selected')).toBe(false);
-		expect(surface?.classList.contains('widget-selected')).toBe(false);
+		expect(surface?.classList.contains('block-selected')).toBe(false);
 	});
 
 	/**
@@ -490,24 +488,23 @@ describe('RichTextEditor, embeds', () => {
 		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
 		await tick();
 		const editor = editorOf(container);
-		const embed = container.querySelector('.surface .richtext-embed');
+		const embed = container.querySelector('.surface .embed-block');
 		const surface = container.querySelector('.surface');
 
 		editor.update(
 			() => {
-				const block = getRoot().getFirstChild();
-				if (!isElementNode(block)) {
-					throw new Error('expected a paragraph');
-				}
-				// From the start of the text above it to the end of the link below.
-				block.select(0, block.getChildrenSize());
+				// From the start of the line above it to the end of the link below,
+				// which now spans blocks: the embed is a block of its own between
+				// the two halves of what the writer typed as one paragraph.
+				const root = getRoot();
+				root.select(0, root.getChildrenSize());
 			},
 			{ discrete: true }
 		);
 		await tick();
 		expect(embed?.classList.contains('is-selected')).toBe(true);
 		// The selection has a caret of its own, so nothing is hidden.
-		expect(surface?.classList.contains('widget-selected')).toBe(false);
+		expect(surface?.classList.contains('block-selected')).toBe(false);
 	});
 
 	/**
@@ -526,10 +523,8 @@ describe('RichTextEditor, embeds', () => {
 		await fireEvent.pointerDown(card, { clientX: 4, clientY: 4 });
 		await tick();
 
-		expect(container.querySelector('.richtext-embed')?.classList.contains('is-selected')).toBe(
-			true
-		);
-		expect(container.querySelector('.surface')?.classList.contains('widget-selected')).toBe(true);
+		expect(container.querySelector('.embed-block')?.classList.contains('is-selected')).toBe(true);
+		expect(container.querySelector('.surface')?.classList.contains('block-selected')).toBe(true);
 	});
 
 	/**
@@ -559,16 +554,12 @@ describe('RichTextEditor, embeds', () => {
 
 		await fireEvent.pointerDown(card, { clientX: 30, clientY: 30 });
 		await tick();
-		expect(container.querySelector('.richtext-embed')?.classList.contains('is-selected')).toBe(
-			false
-		);
+		expect(container.querySelector('.embed-block')?.classList.contains('is-selected')).toBe(false);
 
 		// And the card around it still selects, at a point outside the frame.
 		await fireEvent.pointerDown(card, { clientX: 4, clientY: 4 });
 		await tick();
-		expect(container.querySelector('.richtext-embed')?.classList.contains('is-selected')).toBe(
-			true
-		);
+		expect(container.querySelector('.embed-block')?.classList.contains('is-selected')).toBe(true);
 	});
 
 	/**
@@ -588,18 +579,50 @@ describe('RichTextEditor, embeds', () => {
 		const { container } = render(RichTextEditorHarness, { props: { initial: onlyEmbed } });
 		await tick();
 
-		expect(container.querySelector('.surface .richtext-embed')).not.toBeNull();
+		expect(container.querySelector('.surface .embed-block')).not.toBeNull();
 		expect(container.querySelector('.placeholder')).toBeNull();
 	});
 
-	/** Inside the paragraph, after the line break, not above the whole block. */
+	/**
+	 * The line above an embed is the writer's line, not two of them.
+	 *
+	 * The embed cuts its paragraph in two, and the break that used to separate
+	 * the lines is left at the end of the first half — where Lexical adds a
+	 * managed `<br>` after it, because a block ending in a line break is a
+	 * trailing Shift+Enter and deserves a visible empty row. Ours is not one:
+	 * the paragraph boundary separates the lines now. Reported as "why is there
+	 * an extra line".
+	 */
+	it('leaves no empty row between a line and the embed under it', async () => {
+		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
+		await tick();
+
+		const first = container.querySelector('.surface p');
+		const height = first?.getBoundingClientRect().height ?? 0;
+		const line = Number.parseFloat(getComputedStyle(first as Element).lineHeight);
+
+		expect(first?.textContent).toBe('look');
+		// One row, not two: a second would be the break the cut made redundant.
+		expect(Math.round(height / line)).toBe(1);
+		expect(first?.querySelector('br')).toBeNull();
+	});
+
+	/**
+	 * Above the *line* its link is on, not above the whole paragraph.
+	 *
+	 * In the editor that means the embed is a block of its own sitting between
+	 * the two halves of the paragraph it was inserted into: the line before it
+	 * on one side, its link's line on the other. Stored, the same embed is an
+	 * inline node at the head of that line — see `embed-blocks.ts`.
+	 */
 	it('keeps the embed on the line its link is on', async () => {
 		const { container } = render(RichTextEditorHarness, { props: { initial: WITH_EMBED } });
 		await tick();
 
-		const embed = container.querySelector('.surface .richtext-embed');
-		expect(embed?.closest('p')).not.toBeNull();
-		expect(embed?.previousElementSibling?.tagName).toBe('BR');
+		const embed = container.querySelector('.surface .embed-block');
+		expect(embed?.closest('p')).toBeNull();
+		expect(embed?.previousElementSibling?.textContent).toBe('look');
+		expect(embed?.nextElementSibling?.textContent).toContain('https://i.imgur.com/cat.jpg');
 	});
 
 	/**
@@ -662,7 +685,7 @@ describe('RichTextEditor, embeds', () => {
 		await tick();
 
 		expect(
-			[...container.querySelectorAll('.surface .richtext-embed')].map((node) =>
+			[...container.querySelectorAll('.surface .embed-block')].map((node) =>
 				node.getAttribute('aria-label')
 			)
 		).toEqual([

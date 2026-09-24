@@ -151,113 +151,98 @@ line in `index.ts`. Lexical transformers, when there are ones of our own, belong
 beside it in `src/lib/lexical/transformers/`, and anything shared between nodes
 and transformers in `src/lib/lexical/shared/`.
 
-## Widgets: objects in the text, not characters
+## Decorator blocks: objects in the text, not characters
 
-A **widget** is this app's name for a `DecoratorNode` that is _inline in the
-model and a block on screen_. It lives inside a paragraph, among the text, but
-takes a row to itself when it is drawn. The URL embed is the only one today; a
-poll, an uploaded image or a quoted message would be the same shape. Everything
-in `richtext-widgets.ts` keys off `WidgetNode`, not off embeds, so a new one
-gets the whole set of behaviours by extending it and supplying a class name, a
-label and a `decorate()`.
+A **decorator block** is a `DecoratorNode` that is an object rather than
+characters: the URL embed is the only one today, and a poll, an uploaded image
+or a quoted message would be the same shape. `DecoratorBlockNode` in
+`src/lib/lexical/nodes/decorator-block.ts` is the base — a port of
+`@lexical/react`'s, which is React-only because its `decorate()` returns JSX —
+so a new one is a subclass supplying a class name, a label and a `decorate()`,
+the way `EmbedNode` and the Lexical playground's video block are. Everything
+under `src/lib/lexical/` keys off that base, not off embeds.
 
-The shape is forced rather than chosen, and the reason is in the next section:
-a paragraph's line breaks are `LineBreakNode`s, so something that belongs to _a
-line_ has to live inside the paragraph that holds the line.
+**A block is at the root of the editor's document, and an inline node in the
+stored one.** That split is the point, and it is worth understanding
+before changing anything here.
 
-**Lexical's own decorator machinery is written for the other kind** — the
-block-level node that is a sibling of paragraphs. It steps on and off those
-with the arrow keys, moves the caret up and down past them, and draws a **block
-cursor** beside them: a real element parked next to the node, with the text
-caret hidden, precisely because there is no line box there to draw one in.
-Every one of those paths tests `!isInline()` first, so none of it reaches a
-widget, and `$needsBlockCursorBeside` never fires for one either. (Selecting a
-decorator on a click is not among them — Lexical leaves that to the decorator's
-own component, and the playground's React components do it with
-`useLexicalNodeSelection`.) `registerWidgetSelection`
-is what `registerRichText` would do if it knew about this kind, and it is
-registered in `createRichTextEditor` alongside it — above it in priority, so it
-gets each key first and hands back what is not its business.
+Stored, an embed sits _inline_, at the head of the line its URL is on. It has
+to: a paragraph's line breaks are `LineBreakNode`s — in the composer Enter
+sends, so a whole message is usually one paragraph full of them — and something
+that belongs to _a line_ cannot be a sibling of paragraphs. That is the shape
+the reader walks, and the section below describes it.
 
-What has to be dealt with is the caret. A widget's row holds no text position
-at all, and the model points immediately either side of it are drawn by nothing
-— there is no line box beside a block to put a caret in. Measured in Chromium,
-not assumed. Those points are perfectly good model positions, so Lexical parks
-the caret on them and the browser then draws it somewhere else entirely, or not
-at all. Reported three times over: as the caret warping to the end of the
-message, as the way back taking one press more than the way out, and as up from
-the line under an embed jumping to the line over it.
+In the editor, the same embed is a child of the root, with the paragraph cut in
+two around it. That is the shape **Lexical's own decorator handling is written
+for**: `RangeSelection.modify` reaches across a block boundary and converts to a
+node selection, `$tryDecoratorLineNavigation` moves the caret up and down past
+it (probing the browser first, so a wrapped line is not hijacked), and
+`$needsBlockCursorBeside` draws a **block cursor** either side — a real element,
+because there is no line box next to a block to put an ordinary caret in. Every
+one of those paths tests `!isInline()` and then looks for the node as a sibling
+of a top-level block, so none of it reaches a decorator that is inline, or one
+that merely lives inside a paragraph. Writing the equivalent by hand cost
+several hundred lines and three rounds of caret bugs — the caret vanishing
+beside an embed, the way back taking a press more than the way out, and up from
+the line below jumping over it.
 
-So, in each direction:
+`src/lib/lexical/document-shape.ts` is the bridge: `toEditorDocument` on the way
+in, `toStoredDocument` on the way out, both pure functions over the JSON, and
+exact inverses. Nothing between them sees the other side's shape. It is the same
+arrangement as the editor-only node subclasses beside it, one level up.
 
-- **Left and right, off a selected widget.** The nearest position that _is_
-  drawn: the end of the line above, an empty line (which has a line box of its
-  own), a widget stacked alongside — selected in turn — or the end of the block
-  next door. A widget that opens the document has none of those to its left, so
-  the press does nothing at all and the widget stays selected, which is what
-  the left arrow does at the start of any document. Letting the key through
-  instead is what put the caret on the undrawable point and, from there, at the
-  end of the message.
-- **Right, onto a widget.** Stepping onto its row selects it rather than
-  stopping in front of it, so the way back takes the same number of presses as
-  the way out — browsers disagree about whether that spot is a caret stop at
-  all. "About to step onto" allows for the positions in between that nothing
-  draws separately: the break that ends the line the caret is already on, whose
-  following position the browser draws at the end of that same line, and a
-  paragraph boundary when the next paragraph opens with a widget. Each is
-  crossed once, so a _second_ empty line still stops the way it should: it has
-  a row of its own to visit. Left needs no equivalent, because
-  `RangeSelection.modify` lands on a decorator and converts to a node selection
-  by itself.
-- **Up and down.** A line move over a widget's row lands on the row beyond, so
-  without this the widget cannot be reached from above or below at all. Both
-  keys select it when the row they are stepping onto is its own. Note that a
-  widget and whatever follows it are line-_mates_ in the model — an embed is
-  inserted at the head of its link's line, with no break between them — and
-  neighbours on screen only because the widget is a block; "the row above" is
-  read accordingly.
+### Cutting the block, and putting it back
 
-That reading is a model's, and **a model cannot see a wrapped line**: a long URL
-is several rows on screen and one line to Lexical, so taking the up press on the
-second row would jump the caret clean out of the line it is in. `Selection.modify`
-is the only thing that knows where the rows are, so it is asked where the move
-would land, the answer is put straight back, and the press is taken over only if
-it was leaving this line regardless. Lexical probes the same way for its own
-block decorators.
+Inserting an embed splits its paragraph, which Lexical does itself:
+`$insertNodeToNearestRootAtCaret` cuts the ancestor chain from a caret up to the
+root and drops the node between the halves. (The Lexical playground's video
+block goes through the same call, which is why inserting one there splits a
+paragraph too.) Two details are ours:
 
-A **press** on a widget selects it, because clicking a thing is how a pointer
-says which one it means; without it a click did nothing at all and the caret
-stayed where it was. The press is cancelled, so focus never moves and the caret
-is never dropped on the undrawable point beside the widget — the editor is
-focused by hand instead. Two exceptions, both inside the widget: anything
-interactive (the embed's remove button) keeps its own press, and a press over a
-frame belongs to the document inside it. The frame is found by geometry rather
-than from the event's target, because a widget's content is `pointer-events:
-none` all through — a click in the editor belongs to the editor, not to a video
-— so every press inside it lands on the widget element and the target says
-nothing about where.
+- **No empty halves.** `$shouldSplit: () => false` keeps the cut from making a
+  half with nothing in it, so an embed at the head of a paragraph does not leave
+  a blank row above itself.
+- **The far half is marked**, with node state, as the tail of the block the
+  decorator was cut out of (`src/lib/lexical/transformers/mend-split-blocks.ts`). Lexical has no notion of a block boundary that exists
+  because of something else, so the fact has to be carried. `$mendSplitBlocks`
+  reads it back: a marked block whose decorator has gone is joined to the one
+  before it. That runs as a transform on the root, which Lexical applies last on
+  any update that dirtied anything — its own source calls that "a sort of update
+  finalizer" — so it covers every way a block can disappear: the remove button,
+  Backspace on a selected one, typing over a selection containing it, a paste.
 
-Selection has to be **visible**, because none of it otherwise is. A widget that
-is the selection outlines itself and the surface hides its caret: there is no
-text position to draw, and Lexical clearing the DOM selection leaves the browser
-parking one at the very start of the field, which reads as the caret having
-jumped to the top of the message. A widget merely _inside_ a range selection is
-outlined too — it goes when the range is typed over, the same as the words
-either side of it — but the caret stays, because the range has one. A collapsed
-caret marks nothing at all, whatever it happens to be beside: marking the stop
-next to a widget made it look selected across two presses of the arrow key, only
-one of which meant it.
+The mark never reaches storage: the stored document has the embed inline, so
+there is no boundary to remember. The playground, for comparison, splits on
+insert and never rejoins — delete its video and the paragraph stays in two.
 
-The classes are `richtext-widget`, `is-selected` on the widget and
-`widget-selected` on the surface, all applied by the plugin and styled in
-`RichTextEditor.svelte`. `createDOM` returns a `<div>` inside the paragraph's
-`<p>`, which is invalid markup a parser would unnest — but nothing ever parses
-it. Lexical builds it and inserts it programmatically, and the editor's surface
-is server-rendered empty. The read-only renderer, whose markup _is_ parsed, uses
-a `span` for exactly this reason.
+### What is still ours
 
-`richtext-widgets.svelte.test.ts` drives all of the above through a widget that
-is not the embed, which is the point of it: rules written against the only
+- **A press selects the block.** Lexical does not select a decorator on a click
+  at any level; the playground does it per component, with
+  `useLexicalNodeSelection`. Here one listener does it for every block (`src/lib/lexical/plugins/decorator-block-selection.ts`). A press
+  over a frame is left alone, tested by geometry rather than by the event's
+  target, because a block's content is `pointer-events: none` all through — a
+  click in the editor belongs to the editor, not to a video — so every press
+  inside it lands on the block element. So is a press on anything interactive
+  inside the block, such as the embed's remove button.
+- **Saying so on screen.** A block that is the selection outlines itself, and
+  the surface hides its text caret: there is no text position then, and Lexical
+  clearing the DOM selection leaves the browser parking one at the top of the
+  field. A block merely _inside_ a range selection is outlined too — it goes
+  when the range is typed over, the same as the words either side of it — but
+  the caret stays, because the range has one. A collapsed caret marks nothing at
+  all, whatever it happens to be beside.
+- **Drawing the block cursor, and refusing it at the top.** Lexical parks a
+  caret of its own beside a block, because there is no line box there, and hides
+  the text caret while it is up — but it only styles that element if the theme
+  names a class, which `EDITOR_THEME` does. Without that the position is
+  invisible, which is the bug this whole arrangement exists to fix. Above a
+  block that _opens_ the document there is no such position to offer: up and
+  left do nothing at all there, the way they do at the start of any document.
+  Reported as "I can move up again even though there shouldn't be a line".
+
+`src/lib/lexical/decorator-blocks.svelte.test.ts` drives all of it through a
+block that is not the embed, which is the point of that file: rules written against the only
 instance of a thing have a way of quietly depending on it.
 
 ## Embeds are nodes, not link properties
@@ -274,7 +259,7 @@ the paragraph would be an embed at the top of the message, however far down the
 URL was.
 
 So the embed node is **inline in the document and block-level on screen** — a
-widget, in the sense the previous section gives the word. It sits immediately
+decorator block, in the sense the previous section gives the words. It sits immediately
 after the line break that precedes its link and takes a row of its own through
 `display: block`:
 
@@ -333,7 +318,7 @@ any keyboard-selectable decorator, inline or not; arrowing off it goes to the
 adjacent paragraph. The block cursor appears only when the selection genuinely
 lands at an element point beside the node — a click in the gap, or a decorator
 that opens or closes the document — and there it _draws_ a position that would
-otherwise be invisible, which is the same problem the widget rules solve by
+otherwise be invisible, which is the same problem the arrow rules solve by
 skipping it. Click-to-select is the decorator's own job there too:
 `BlockWithAlignableContents` registers `CLICK_COMMAND` and calls
 `useLexicalNodeSelection`.
@@ -403,25 +388,21 @@ Four things follow:
 `embedSpecFor` still runs at render rather than being stored, so _dropping_ a
 provider degrades an embed to its link instead of leaving a hole.
 
-### An embedded link stops being an auto-link
+### An embedded link used to stop being an auto-link
 
 `@lexical/link` unwraps an `AutoLinkNode` whose previous sibling is not text
 ending in a separator, a line break, or nothing at all — the rule that keeps
-`foo` and `https://x` from being read as one link. An embed at the start of the
-link's line is none of those, so the link was silently turned back into plain
-text: on load, on the next edit, and with no way back. For a description that
-meant the loss was then saved over the top.
+`foo` and `https://x` from being read as one link. While embeds were inline,
+the embed at the head of the link's line was none of those, so the link was
+silently turned back into plain text: on load, on the next edit, and with no way
+back. The fix was to convert such a link into an ordinary `LinkNode`, which cost
+the auto-link's one useful behaviour — editing the URL text no longer retargeted
+the link.
 
-So a link that gets an embed is converted to a plain `link` node, which every
-branch of that transform skips. `settleLinksAfterEmbeds` does the same to a
-document on its way into the editor, for the ones hoisted from the older
-root-level shape. The renderer draws `link` and `autolink` identically, so
-nothing downstream notices.
-
-What it costs is the auto-link's one extra behaviour: editing the URL text
-afterwards no longer retargets the link. That is arguably better here — the
-embed above it is pinned to the original URL, so a link that quietly followed
-the text would disagree with the preview.
+Both are gone. In the editor the embed is a block of its own, so the link is the
+first child of its paragraph and `previousNode === null` satisfies the rule.
+Stored documents written while the workaround existed still hold `link` nodes
+where they would now hold `autolink`; nothing reads them differently.
 
 ### The composer shows the real embed
 
@@ -439,11 +420,13 @@ preview of. It also counts as content: a composer holding one embed and no text
 is not empty, so the placeholder gets out of its way — an embed carries no text
 of its own, which is what made that worth saying out loud.
 
-The embed is a **widget** — see the section above — so everything about
+The embed is a **decorator block** — see the section above — so everything about
 selecting it, stepping on and off it with the arrow keys and pressing it comes
-from `richtext-widgets.ts` and is not embed knowledge at all. `EmbedNode`
-extends `WidgetNode` and adds only what is its own: it holds a URL, it is drawn
-by `ComposerEmbed`, and it sits at the head of its link's line.
+from the shared base and is not embed knowledge at all. `EmbedNode`
+extends `DecoratorBlockNode` and adds only what is its own: it holds a URL and it is
+drawn by `ComposerEmbed`. While it is being edited it is a block at the root,
+with the paragraph cut in two around it; stored, it goes back to an inline node
+at the head of its link's line.
 
 Lexical renders nothing for a `DecoratorNode` by itself: it collects whatever
 each one's `decorate()` returns into a record keyed by node, hands that record

@@ -14,7 +14,9 @@
 	} from 'lexical';
 	import { mount, unmount, untrack } from 'svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import { toEditorDocument, toStoredDocument } from '$lib/lexical/document-shape';
 	import { exportEditorDocument } from '$lib/lexical/nodes';
+	import { $isEmbedNode as isEmbedNode } from '$lib/lexical/nodes/embed';
 	import { ADD_EMBED_COMMAND } from '$lib/lexical/nodes/shared/embed-offer';
 	import { parseStoredRichText, richTextDocumentSchema } from '$lib/richtext';
 	import {
@@ -23,11 +25,9 @@
 		$embeddedUrls as embeddedUrls,
 		$insertEmbedForLink as insertEmbedForLink,
 		$insertEmbedForUrl as insertEmbedForUrl,
-		$isEmbedNode as isEmbedNode,
 		MESSAGE_FEATURES,
 		type RichTextEditorHandle,
 		type RichTextFeature,
-		settleLinksAfterEmbeds,
 		trackEmbedDismissals
 	} from '$lib/richtext-editor';
 	import ComposerEmbed from './ComposerEmbed.svelte';
@@ -103,7 +103,9 @@
 	let agreedValue: string | null = null;
 
 	function serialise(editor: LexicalEditor): string {
-		const full = exportEditorDocument(editor);
+		// The editor keeps embeds at the root; the stored document keeps them
+		// inline, where the reader expects them — see `embed-blocks.ts`.
+		const full = toStoredDocument(exportEditorDocument(editor));
 		/**
 		 * The stored form is the *validated* form — the same schema the server
 		 * applies to descriptions. It drops Lexical's default-valued noise
@@ -124,7 +126,7 @@
 	}
 
 	function load(editor: LexicalEditor, stored: string) {
-		const doc = settleLinksAfterEmbeds(parseStoredRichText(stored));
+		const doc = toEditorDocument(parseStoredRichText(stored));
 		if (doc.root.children.length === 0) {
 			// Lexical refuses a state whose root has no children ("the editor state
 			// is empty"), and an empty field is the commonest case there is — a
@@ -548,30 +550,54 @@
 		text-decoration: line-through;
 	}
 
-	/* Lexical's decorator element, holding one mounted widget component. A
-	   block, because what is inside it is one — an inline box wrapping a block
-	   child has no sensible geometry to outline. This and the two rules below
-	   are keyed on the shared widget class rather than on the embed's own, so a
-	   second kind of widget draws and behaves the same without touching this. */
-	.surface :global(.richtext-widget) {
+	/* Lexical's decorator element, holding one mounted component. Keyed on the
+	   shared decorator-block class rather than on the embed's own, so a second
+	   kind of block draws and behaves the same without touching this. */
+	.surface :global(.decorator-block) {
 		display: block;
 	}
 
-	/* While a widget is the selection there is no text position to draw. The
+	/* Lexical's own caret for the position beside a block, which has no line box
+	   to draw an ordinary one in. It parks an element there and hides the text
+	   caret; this is what makes it visible. A thin bar the height of a line, so
+	   it reads as a caret rather than as a selected gap. */
+	.surface :global(.rt-block-cursor) {
+		position: relative;
+		display: block;
+		pointer-events: none;
+	}
+
+	.surface :global(.rt-block-cursor::after) {
+		content: '';
+		position: absolute;
+		inset-block-start: -0.1em;
+		inline-size: 1px;
+		block-size: 1.2em;
+		background: currentcolor;
+		animation: rt-caret-blink 1.1s steps(2, start) infinite;
+	}
+
+	@keyframes rt-caret-blink {
+		to {
+			visibility: hidden;
+		}
+	}
+
+	/* While a block is the selection there is no text position to draw. The
 	   browser draws one anyway — Lexical clears the DOM selection and Chromium
 	   answers by parking a caret at the start of the field — and that reads as
 	   the caret having jumped to the top of the message. */
-	.surface:global(.widget-selected) {
+	.surface:global(.block-selected) {
 		caret-color: transparent;
 	}
 
-	/* Arrowing onto a widget selects it as a whole: the caret leaves the text
+	/* Arrowing onto a block selects it as a whole: the caret leaves the text
 	   and the next Backspace deletes the node. Both are correct and neither is
 	   visible, so the selection says so out loud — without it the caret looks
 	   lost and the delete looks like the editor eating something at random.
-	   Drawn around the widget's content rather than its element, which is a
+	   Drawn around the block's content rather than its element, which is a
 	   full-width block whatever is inside it. */
-	.surface :global(.richtext-widget.is-selected > *) {
+	.surface :global(.decorator-block.is-selected > *) {
 		outline: 2px solid var(--wa-color-brand-fill-loud, #2563eb);
 		outline-offset: 2px;
 		border-radius: 0.5rem;
