@@ -63,4 +63,11 @@ describe('HomeScreenHint', () => {
 		render(HomeScreenHint);
 		await vi.waitFor(() => expect(screen.getByTestId('home-screen-hint')).toBeInTheDocument());
 	});
+
+	it('shows the iOS share icon, named for assistive tech', async () => {
+		onIphone();
+		render(HomeScreenHint);
+		await vi.waitFor(() => expect(screen.getByRole('img', { name: 'Share' })).toBeInTheDocument());
+		expect(screen.getByText(/, then “Add to Home Screen”/)).toBeInTheDocument();
+	});
 });

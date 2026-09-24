@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { type CachedEmbedDetails, embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
 	import type { RichTextInlineNode } from '$lib/richtext';
+	import InlineButton from './InlineButton.svelte';
 	import MarkedText from './MarkedText.svelte';
 	import Self from './RichTextInline.svelte';
 	import UrlEmbed from './UrlEmbed.svelte';
@@ -96,18 +97,14 @@
 			rel="noopener noreferrer ugc"
 			><Self nodes={node.children} {embeds} {canReveal} {isRevealing} {onReveal} /></a
 		>{#if canReveal?.(node.url)}<!--
-				The spinner is swapped in by hand rather than through `loading`:
-				Svelte's SSR does not know to omit a false `loading`, and Lit reads
-				`loading="false"` as true. Same reason as UrlEmbed's refresh button.
-			--><wa-button
-				type="button"
+				Sits in the flow right after the link, with no whitespace between
+				them, so the margin is what separates the two.
+			--><InlineButton
 				class="reveal"
-				size="s"
-				appearance="outlined"
-				pill
+				--inline-button-margin="0.35em 0.1em"
 				disabled={isRevealing?.(node.url) ?? false}
-				onclick={() => onReveal?.(node.url)}
-				>{#if isRevealing?.(node.url)}<wa-spinner slot="end"></wa-spinner>{/if}Show</wa-button
+				loading={isRevealing?.(node.url) ?? false}
+				onclick={() => onReveal?.(node.url)}>Show</InlineButton
 			>{/if}{/if}{/each}
 
 <style>
@@ -115,34 +112,5 @@
 	   screen says block — that split is the point of the node. */
 	.embed-slot {
 		display: block;
-	}
-
-	/* Sits in the flow right after the link, so it reads as belonging to it.
-	   Sized in `em` and `lh` so it matches whatever text it is sitting in —
-	   a message bubble and a task description have different type scales. */
-	.reveal {
-		--wa-form-control-height: 1lh;
-		--wa-form-control-padding-inline: 0.7em;
-		font-size: 0.9em;
-		margin-inline: 0.35em 0.1em;
-		color: inherit;
-
-		wa-spinner {
-			font-size: 0.9em;
-			position: absolute;
-			left: 50%;
-			translate: -50%;
-			margin-inline-start: 0em;
-		}
-
-		/* Drawn in the text's own colour, so it reads the same in either side's
-		   bubble, rather than in the button's neutral palette. */
-		&::part(base) {
-			border-color: currentColor;
-			background: transparent;
-			color: inherit;
-			vertical-align: 0.75ex;
-			position: relative;
-		}
 	}
 </style>
