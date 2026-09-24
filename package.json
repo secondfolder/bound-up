@@ -33,9 +33,6 @@
 		],
 		"*.svelte": [
 			"node scripts/format-svelte.mjs"
-		],
-		"*.{js,mjs,cjs,ts,svelte}": [
-			"vitest related --run --passWithNoTests"
 		]
 	},
 	"devDependencies": {
