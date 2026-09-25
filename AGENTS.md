@@ -467,8 +467,8 @@ CSS. For buttons in particular:
   true until hydration corrects it. Swap the content by hand instead.
 
 **Save buttons start outlined and become solid only when there is something valid to save.**
-An idle save action is secondary, not a call to act. When a form becomes dirty, if the contents is valid then
-promote its save button to a solid brand style. On `superForm(...)` screens,
+An idle save/submit action is secondary, not a call to act. When a form becomes dirty, if the contents is valid then
+promote its save/submit button to a solid brand style (appearance = accent). On `superForm(...)` screens,
 key that off the form's tainted and valid state rather than hand-rolled comparisons so
 the button follows the same definition of "unsaved changes" as the form logic.
 

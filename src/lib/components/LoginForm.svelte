@@ -16,7 +16,7 @@
 	import type { PasskeySecrets } from '$lib/crypto/passkey-wraps';
 	import { type SignInReason, stashUnlock } from '$lib/crypto/stash';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
-	import type { LoginFormSchema } from '$lib/schemas/loginForm';
+	import { type LoginFormSchema, loginFormSchema } from '$lib/schemas/loginForm';
 	import { takeSignInEmail } from '$lib/sign-in-again';
 	import InputField from './InputField.svelte';
 	import PasswordField from './PasswordField.svelte';
@@ -140,7 +140,23 @@
 			}
 		}
 	});
-	const { errors } = superform;
+	const { errors, form: formValues } = superform;
+
+	/**
+	 * Whether there is something to sign in with, for the Login button's style:
+	 * outlined while there is not, solid once there is (the save-button
+	 * convention in AGENTS.md).
+	 *
+	 * Worked out by hand rather than from superforms' validity, because this
+	 * form has no `validators` (see above): `authSecret` is empty until submit,
+	 * and the password is never in `$form`. So it is the schema's own email rule
+	 * plus a password that is not empty. Style only — the button stays enabled,
+	 * so an email a password manager filled without an event Svelte sees (see
+	 * AGENTS.md) leaves it outlined rather than unusable.
+	 */
+	const canSignIn = $derived(
+		loginFormSchema.shape.email.safeParse($formValues.email).success && password.length > 0
+	);
 
 	let passkeyError: string | null = $state(null);
 
@@ -217,10 +233,10 @@
 		</p>
 	</noscript>
 
-	<!-- First, and styled as the Login button is: a passkey is the one-tap way
-	     in, and it unlocks messages in the same touch. `type="button"` so Enter
-	     in the password box still submits the password. -->
-	<wa-button type="button" variant="brand" appearance="outlined" onclick={signInWithPasskey}
+	<!-- First, and solid from the start: a passkey is the one-tap way in, needs
+	     nothing typed, and unlocks messages in the same touch. `type="button"`
+	     so Enter in the password box still submits the password. -->
+	<wa-button type="button" variant="brand" onclick={signInWithPasskey}
 		>Sign in with a passkey</wa-button
 	>
 	{#if passkeyError}<span class="invalid">{passkeyError}</span>{/if}
@@ -248,7 +264,7 @@
 	<wa-button
 		type="submit"
 		variant="brand"
-		appearance="outlined"
+		appearance={canSignIn ? 'accent' : 'outlined'}
 		disabled={!hydrated || deriving}>Login</wa-button
 	>
 	{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
