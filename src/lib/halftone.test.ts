@@ -138,11 +138,16 @@ describe('the halftone screen model', () => {
 		// checks the distribution, which a badly structured hash passes happily:
 		// the sine hash it replaced had the right histogram and visible vertical
 		// streaks. These assertions are about *arrangement*.
+		//
+		// The field straddles the origin because the grain is measured from
+		// the image centre, so half of every real image hashes negative
+		// coordinates.
 		const size = 192;
+		const half = size / 2;
 		const field = new Float64Array(size * size);
 		for (let y = 0; y < size; y += 1) {
 			for (let x = 0; x < size; x += 1) {
-				field[y * size + x] = halftoneNoiseDelta(x + 0.5, y + 0.5, 1);
+				field[y * size + x] = halftoneNoiseDelta(x + 0.5 - half, y + 0.5 - half, 1);
 			}
 		}
 		const mean = field.reduce((sum, value) => sum + value, 0) / field.length;
@@ -194,6 +199,32 @@ describe('the halftone screen model', () => {
 				spread / (standardDeviation / Math.sqrt(size)),
 				alongRow ? 'rows' : 'columns'
 			).toBeLessThan(1.5);
+		}
+
+		// And no symmetry about the origin. fract(-a) is 1 - fract(a), so a
+		// hash that leaned on it would mirror the grain either side of the
+		// page centre — invisible to every check above, obvious on screen.
+		const mirrorCorrelation = (mirrorX: boolean, mirrorY: boolean) => {
+			let sum = 0;
+			// Index size - 1 - x holds the coordinate -(x + 0.5 - half).
+			for (let y = 0; y < size; y += 1) {
+				for (let x = 0; x < size; x += 1) {
+					const mirrored =
+						field[(mirrorY ? size - 1 - y : y) * size + (mirrorX ? size - 1 - x : x)];
+					sum += (field[y * size + x] - mean) * (mirrored - mean);
+				}
+			}
+			return sum / field.length / variance;
+		};
+		for (const [mirrorX, mirrorY] of [
+			[true, false],
+			[false, true],
+			[true, true]
+		] as const) {
+			expect(
+				Math.abs(mirrorCorrelation(mirrorX, mirrorY)),
+				`mirror ${mirrorX ? 'x' : ''}${mirrorY ? 'y' : ''}`
+			).toBeLessThan(0.05);
 		}
 	});
 });

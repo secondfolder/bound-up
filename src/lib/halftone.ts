@@ -130,6 +130,24 @@ export function halftoneNoiseHash(x: number, y: number): number {
 	return fract(qx * qy * 97);
 }
 
+/**
+ * Where the grain is measured from: the middle of the image, rounded down to a
+ * whole pixel.
+ *
+ * The middle, because the landing page is laid out from its centre line: a
+ * grain anchored to a corner stays put under that corner while a resize moves
+ * everything else, so the content visibly slides over it. Measured from the
+ * centre, widening the window adds grain at both edges and what lies under
+ * the centred content stays where it is.
+ *
+ * Whole pixels, because a hash of a coordinate shifted by half a pixel is an
+ * entirely different field — rounding exactly would reshuffle all of the grain
+ * every time the width changed between odd and even.
+ */
+export function halftoneNoiseOrigin(width: number, height: number): { x: number; y: number } {
+	return { x: Math.floor(width / 2), y: Math.floor(height / 2) };
+}
+
 /** Offsets for the second tap; arbitrary, chosen to decorrelate the pair. */
 const NOISE_SECOND_TAP_OFFSET = { x: 137.17, y: 91.31 };
 
@@ -231,7 +249,13 @@ export function renderHalftoneGrayscalePixel(
 			options.centerY ?? image.height / 2
 		) - (options.drift ?? 0);
 	const value = renderHalftoneScreenValue(gray, coordAlong, options.cellSize, options.contrast);
-	return applyHalftoneNoise(value, x + 0.5, y + 0.5, options.noiseStrength);
+	const noiseOrigin = halftoneNoiseOrigin(image.width, image.height);
+	return applyHalftoneNoise(
+		value,
+		x + 0.5 - noiseOrigin.x,
+		y + 0.5 - noiseOrigin.y,
+		options.noiseStrength
+	);
 }
 
 export function renderHalftoneGrayscaleImage(
@@ -283,13 +307,15 @@ export function buildHalftoneFragmentShader(): string {
 	return `
 precision highp float;
 uniform sampler2D uImage;
-uniform vec2 uResolution;
+uniform vec2 uImageOrigin;
+uniform vec2 uImageSize;
 uniform vec2 uCenter;
 uniform int uPattern;
 uniform float uAngle;
 uniform float uContrast;
 uniform float uCellSize;
 uniform float uNoiseStrength;
+uniform vec2 uNoiseOrigin;
 uniform float uTime;
 uniform float uSpeed;
 
@@ -315,7 +341,12 @@ void main() {
 	}
 	coordAlong -= uTime * uSpeed;
 
-	vec2 uv = clamp(gl_FragCoord.xy / uResolution, 0.0, 1.0);
+	// The image may sit inside a larger canvas (see the overlay's bleed), in
+	// which case the clamp extends its edge pixels outwards; the screen and the
+	// grain need no such help, being functions of position alone. The origin
+	// is the image's bottom-left corner, so flipping y within the image is
+	// the same flip as before.
+	vec2 uv = clamp((gl_FragCoord.xy - uImageOrigin) / uImageSize, 0.0, 1.0);
 	uv.y = 1.0 - uv.y;
 	float gray = clamp(dot(texture2D(uImage, uv).rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
 
@@ -324,9 +355,12 @@ void main() {
 	float slope = min(tan(1.5707963 * clamp(uContrast, 0.0, 1.0)), 1000000.0);
 	float value = clamp(gray + slope * (screen - (1.0 - gray)), 0.0, 1.0);
 
+	// Measured from the image centre — see halftoneNoiseOrigin(). Measured
+	// bottom-up, like everything else here, which only mirrors the field.
+	vec2 grainCoord = gl_FragCoord.xy - uNoiseOrigin;
 	vec2 grain = vec2(
-		noiseHash(gl_FragCoord.xy),
-		noiseHash(gl_FragCoord.xy + vec2(${formatFloat(NOISE_SECOND_TAP_OFFSET.x)}, ${formatFloat(NOISE_SECOND_TAP_OFFSET.y)}))
+		noiseHash(grainCoord),
+		noiseHash(grainCoord + vec2(${formatFloat(NOISE_SECOND_TAP_OFFSET.x)}, ${formatFloat(NOISE_SECOND_TAP_OFFSET.y)}))
 	);
 	float grained = clamp(
 		value + (grain.x + grain.y - 1.0) * ${formatFloat(HALFTONE_NOISE_AMPLITUDE)} * uNoiseStrength,

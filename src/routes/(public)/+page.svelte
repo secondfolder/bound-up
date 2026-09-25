@@ -1,52 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { isSafari } from '$lib/browser-engine';
 	import HalftoneOverlay from '$lib/components/HalftoneOverlay.svelte';
 
 	// The root layout whitelists this — `locals.user` itself never crosses.
 	const user = $derived(page.data.user);
-	let ctaBlurStdDeviation = $state('0.45');
-	let ctaWobbleBaseFrequency = $state('0.0200');
-	let ctaWobbleScale = $state('40.00');
-	let ctaGrainScale = $state('6.00');
-
-	onMount(() => {
-		const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-		if (isSafari()) {
-			// Safari rasterizes this already-displaced SVG edge softer than
-			// Chromium/Firefox, so the same post-displacement blur reads as fuzz.
-			// Lower its cleanup blur there instead of changing the whole filter.
-			ctaBlurStdDeviation = '0';
-		}
-
-		if (prefersReducedMotion) {
-			return;
-		}
-
-		let animationFrame = 0;
-		const start = performance.now();
-		const tick = (now: number) => {
-			const seconds = (now - start) / 1000;
-			// Two slow waves keep the outline drifting rather than pulsing on one
-			// obvious beat, which reads more like a hand-cut edge breathing.
-			ctaWobbleBaseFrequency = (0.02 + Math.sin(seconds * 0.55) * 0.003).toFixed(4);
-			ctaWobbleScale = (
-				38 +
-				Math.sin(seconds * 0.8) * 4 +
-				Math.sin(seconds * 0.31 + 1.2) * 2
-			).toFixed(2);
-			ctaGrainScale = (6 + Math.sin(seconds * 1.05 + 0.4) * 1.1).toFixed(2);
-			animationFrame = requestAnimationFrame(tick);
-		};
-
-		animationFrame = requestAnimationFrame(tick);
-
-		return () => {
-			cancelAnimationFrame(animationFrame);
-		};
-	});
 </script>
 
 <svelte:head>
@@ -71,62 +29,6 @@
 	speed={0}
 />
 
-<!-- The raggedy edge on the big CTA, in two passes — one feTurbulence can
-     only be coarse-or-fine, never both:
-     1. low baseFrequency (long wavelength) + large scale: the outline
-        meanders in and out, the hand-cut silhouette;
-     2. high baseFrequency (tight wavelength) + small scale: the gritty
-        chewed-up texture along that outline, like the Muddy Tractor glyphs.
-     The second pass displaces the *result* of the first (its `in` is the
-     first map's output), so the effects add rather than fight. Inline SVG
-     defs rather than a filter file so it ships with the page and stays
-     tweakable here; aria-hidden + 0×0 because only the CSS
-     `filter: url(#…)` reference on .big ever points at it. -->
-<svg width="0" height="0" aria-hidden="true" focusable="false">
-	<defs>
-		<filter id="ragged-edge" x="-10%" y="-10%" width="120%" height="120%">
-			<feTurbulence
-				type="fractalNoise"
-				baseFrequency={ctaWobbleBaseFrequency}
-				numOctaves="2"
-				seed="61"
-				result="wobbleNoise"
-			/>
-			<!-- Explicit R/G channel selectors: feDisplacementMap defaults to the
-			     alpha channel, and turbulence alpha is flat 1. Using red + green
-			     is what actually turns the noise field into x/y motion. -->
-			<feDisplacementMap
-				in="SourceGraphic"
-				in2="wobbleNoise"
-				xChannelSelector="R"
-				yChannelSelector="G"
-				scale={ctaWobbleScale}
-				result="wobbled"
-			/>
-			<feTurbulence
-				type="fractalNoise"
-				baseFrequency="0.1"
-				numOctaves="3"
-				seed="3"
-				result="grainNoise"
-			/>
-			<feDisplacementMap
-				in="wobbled"
-				in2="grainNoise"
-				xChannelSelector="R"
-				yChannelSelector="G"
-				scale={ctaGrainScale}
-				result="ragged"
-			/>
-			<!-- The displacement gives the outline the right torn shape, but it
-			     quantises the edge onto hard pixel steps. A tiny blur after both
-			     passes acts like antialiasing: it softens the stair-steps without
-			     melting the overall silhouette back into a smooth pill. -->
-			<feGaussianBlur in="ragged" stdDeviation={ctaBlurStdDeviation} />
-		</filter>
-	</defs>
-</svg>
-
 <div class="landing">
 	<header>
 		<h1>Bound Up</h1>
@@ -134,13 +36,13 @@
 	</header>
 
 	<!-- Dead centre, above the overlay: the rings radiate from the centre of
-		     the captured document, and this stack is placed at 50%/50% of the
-		     same initial containing block so the button sits on the rings' origin.
-		     z-index 10000 beats the overlay canvas's 9999 — everything else on
+		     the captured <body>, and this stack is placed at 50%/50% of the same
+		     box (the overlay makes <body> positioned, so it is the containing
+		     block here too) so the button sits on the rings' origin.
+		     z-index 10000 beats the overlay's 9999 — everything else on
 		     the page stays under the effect, this one element floats on it.
-		     It is also excluded from the halftone capture: html2canvas sees the
-		     undeformed ::before pill more faithfully than the live SVG-filtered
-		     edge, which made the overlay pick up a faint static outline. -->
+		     It is also excluded from the halftone capture, so the button is not
+		     screened twice — once live and once as a static ghost under it. -->
 	<div class="cta" data-halftone-ignore="true">
 		{#if user}
 			<a class="big" href={resolve('/(auth-required)/(app)/home')}><span>Start</span></a>
@@ -289,7 +191,6 @@
 			border: #ffac00 2px solid;
 			background: #ffac004d;
 			box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
-			filter: url('#ragged-edge');
 		}
 
 		span {

@@ -223,7 +223,7 @@ export default defineConfig(({ command, mode }) => {
 				'age-encryption',
 				'@js-temporal/polyfill',
 				'@scure/base',
-				'html2canvas-pro',
+				'@zumer/snapdom',
 				'@simplewebauthn/browser'
 			]
 		},

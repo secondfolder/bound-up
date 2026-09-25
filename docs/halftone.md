@@ -7,7 +7,7 @@ back over itself with `mix-blend-mode: soft-light`.
 | Where                                       | What                                                                       |
 | ------------------------------------------- | -------------------------------------------------------------------------- |
 | `src/lib/halftone.ts`                       | The model: a CPU reference renderer plus the GLSL source generated from it |
-| `src/lib/components/HalftoneOverlay.svelte` | Capture, WebGL setup, the rAF loop, the fade-in                            |
+| `src/lib/components/HalftoneOverlay.svelte` | Capture, WebGL setup, on-demand drawing, the fade-in                       |
 | `src/lib/halftone.test.ts`                  | Regressions against the Affinity reference exports                         |
 | `src/lib/testing/halftone-fixtures/`        | Those exports, one directory per thing being calibrated                    |
 | `e2e/landing.spec.ts`                       | The only level that runs the real shader in a real browser                 |
@@ -16,6 +16,98 @@ The target is the **Halftone filter in Affinity by Canva**, in line-screen
 mode. The whole filter was reverse-engineered from the fixtures below and
 turned out to be four lines of arithmetic; the previous implementation was a
 hand-fitted pile of spline constants that matched nothing in particular.
+
+## Capture and drawing
+
+`HalftoneOverlay` captures `<body>` with SnapDOM, uploads the bitmap as a
+texture, and draws the shader into a canvas laid over the body.
+
+### The capture
+
+SnapDOM clones the live elements with their computed styles into an SVG
+`foreignObject` and has the browser paint it, caching fonts and resources
+between captures. Measured on this page in Firefox against a screenshot of the
+live page:
+
+| Library                           | Per capture | Mean difference from the live page |
+| --------------------------------- | ----------- | ---------------------------------- |
+| SnapDOM                           | 11–20 ms    | 0.00 levels, at every size tried   |
+| html2canvas-pro (the previous)    | 70–80 ms    | 0.13, a pixel or two off           |
+| modern-screenshot, reused context | ~160 ms     | 5.08, layout visibly wrong         |
+
+html2canvas re-implements CSS painting itself and, for every capture, builds a
+fresh iframe holding a copy of the whole document and its stylesheets — about
+60 of its 70 ms. Its API offers no way to keep that clone and only resize it.
+
+Four options matter:
+
+- **`excludeMode: 'remove'`.** The overlay's own clip and anything marked
+  `data-halftone-ignore` (the CTA) are excluded. SnapDOM's default leaves an
+  invisible spacer in each excluded element's place, and in this flex
+  `<body>` the spacers are laid out: they pushed the title down the page and
+  widened the bitmap, which is what once got SnapDOM rejected here as
+  inaccurate.
+- **`reconcile: true`.** Measures the clone against the live layout and pins
+  whatever diverges. Without it, text in an inline element (the subtitle) keeps
+  its natural width and could re-wrap, and SnapDOM says so with a console
+  warning — which the e2e fixture fails a run on. It costs nothing measurable
+  on this page.
+- **`clip` set to the body's own box.** Left to itself SnapDOM widens the
+  capture to take in content overflowing the body — on a 150 px window the
+  title overhangs a body the scrollbar has narrowed to 133 px — and a bitmap
+  wider than the clip, centred in it, put every glyph half the overhang to the
+  left. The overhang goes unscreened instead, since the clip that shows the
+  overlay stops at the body anyway.
+- **`dpr: 1`.** One bitmap pixel per CSS pixel, which is what `cellSize` is
+  measured in.
+
+The first capture waits for `document.fonts.ready`, since the fallback face's
+metrics move everything below the title, and a font that loads later
+(`document.fonts` `loadingdone`) recaptures.
+
+### Drawing
+
+**It draws on demand.** One draw per capture and one per prop change, and a
+frame loop only while `speed` is non-zero. The canvas is soft-light blended
+over the whole viewport, so a loop that redrew an unchanging frame kept
+Firefox's GPU process at 25–40% CPU on a page where nothing moves. The e2e
+suite counts draw calls to hold this.
+
+### Placement and resizing
+
+**The canvas is placed in CSS alone.** It sits in a clip that covers the body —
+the overlay sets `body { position: relative }` through `svelte:head` to be the
+clip's containing block — and a one-cell grid centres the canvas in the clip at
+its captured size (`place-items: unsafe center`, so an oversized canvas
+overflows both edges equally). It scrolls with the page on a viewport too short
+to hold it, and a resize moves the last frame in the same layout pass that
+moves the page, with no script in between.
+
+**A resize never blanks it and never stretches it.** Until the recapture
+lands, the last frame stays centred, so its screen, grain and centred content
+stay on the page's centre line. The canvas is drawn with a 240 px bleed past
+the capture on every side (`BLEED`), which the clip hides until the window
+grows into it. Past the capture there is nothing to screen, so the shader
+clamps its texture lookup and stretches the page's edge pixels outwards —
+right for this page, whose edges are background — while the screen and grain,
+being functions of position alone, simply continue. When the window shrinks
+the edges are cut off; the clip's `overflow: hidden` is also what stops an
+outgrown canvas holding the document open at its old size.
+
+**The soft-light blend is on the clip, not the canvas.** The clip's `z-index`
+makes it a stacking context, and a blend inside one reaches only that
+context's empty backdrop.
+
+**Recaptures run back to back.** A `ResizeObserver` on the body and the
+window's `resize` request one when the body's box changes. There is no
+throttle: one capture is in flight at a time, any request made meanwhile is
+folded into a single follow-up that starts the moment it lands, and a capture
+the page moved under is still shown before the next is taken. During a
+window-edge drag that is about 54 captures a second in Firefox, each drawn
+exactly once, for CPU that lasts only as long as the drag.
+
+Chromium's HTML-in-Canvas API (`drawElementImage`) would skip the capture
+entirely, but it is Chromium-only and behind an origin trial.
 
 ## The model
 
@@ -79,6 +171,16 @@ multiplication only, keeping every intermediate under 100 so float32 holds it
 exactly; it measures 52.15/255 with autocorrelation under 0.006 at every lag on
 both paths. `halftone.test.ts` asserts that whiteness directly, because a
 distribution check alone passes a structured hash.
+
+The grain is measured from the image centre, rounded down to a whole pixel
+(`halftoneNoiseOrigin()`), as the screen is. The landing page is laid out from
+its centre line, and a grain anchored to a corner stayed still while a resize
+slid the content over it; measured from the centre, widening the window adds
+grain at both edges. The rounding matters: hashing a coordinate shifted by
+half a pixel gives an unrelated field, so an exact centre would reshuffle all
+the grain whenever the width went between odd and even. Half of every image
+therefore hashes negative coordinates, which is why the whiteness test
+straddles the origin and also checks the grain is not mirrored about it.
 
 Strengths above 1 are allowed and just scale the deviation, but be aware they
 interact with the screen's clipping: once the grain is wide enough to push the
