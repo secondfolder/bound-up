@@ -33,6 +33,8 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
+| `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
+| `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
 | `src/routes/(public)/`        | Anonymous-reachable routes. No header: each page links onwards itself                        |
@@ -656,7 +658,7 @@ Notes that cost a debugging round each:
   errors (minus Chromium's "Failed to load resource" network log, which specs
   intentionally provoke, plus Lit's own dev-mode banner under `vite dev`, plus
   Chromium's WebGL "GPU stall due to ReadPixels" warning from the landing
-  page's halftone overlay) and
+  page's effects) and
   uncaught `pageerror`s. This is the only net for problems no assertion can
   see, like an invalid `pattern` attribute
   (Chromium compiles those with the `v` flag; Zod's `z.email()` regex is not
@@ -748,7 +750,7 @@ Four places, split on scope:
 | [docs/encryption.md](docs/encryption.md)                                                 | Message keys: the client-side KDF, the wraps, what the guarantee is          |
 | [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: PRF and user-handle wraps, sign-in that unlocks, provider naming   |
 | [docs/account-recovery.md](docs/account-recovery.md)                                     | Partner-assisted sign-in after losing every way in, and its known gap        |
-| [docs/halftone.md](docs/halftone.md)                                                     | The landing page's halftone overlay: the screen model and its fixtures       |
+| [docs/page-effects.md](docs/page-effects.md)                                             | The landing page's VFX-JS effects: the pipeline, halftone, grain, `mix()`    |
 | [docs/embeds.md](docs/embeds.md)                                                         | URL linkification and inline embeds: providers, privacy gate, reddit path    |
 | [docs/messaging.md](docs/messaging.md)                                                   | Encrypted partner messages: threads, the board, unread, restore              |
 | [docs/rich-text.md](docs/rich-text.md)                                                   | The rich-text document: Lexical serialisation, the editors, embed blocks     |

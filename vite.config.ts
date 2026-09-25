@@ -218,12 +218,19 @@ export default defineConfig(({ command, mode }) => {
 			 * dependency of `@better-auth/passkey`, which Vite had already bundled on
 			 * its own terms; listing it keeps the direct import from being discovered
 			 * as a second, new dependency mid-run.
+			 *
+			 * `@vfx-js/core` is the landing page's effects engine, reached only
+			 * from `VFXProvider`'s onMount for the same SSR reason as SnapDOM.
+			 * `@vfx-js/effects` is listed ahead of its first use so that
+			 * reaching for a library effect does not trigger the same reload.
 			 */
 			include: [
 				'age-encryption',
 				'@js-temporal/polyfill',
 				'@scure/base',
 				'@zumer/snapdom',
+				'@vfx-js/core',
+				'@vfx-js/effects',
 				'@simplewebauthn/browser'
 			]
 		},

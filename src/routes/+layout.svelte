@@ -41,10 +41,10 @@
 	:root {
 		--wa-color-text-danger: var(--wa-color-red-40);
 
-		/* safe area inset on iOS takes into account the corner radius of the screen 
-	        which in some situations is too aggressive and we only want the safe area 
+		/* safe area inset on iOS takes into account the corner radius of the screen
+	        which in some situations is too aggressive and we only want the safe area
 	        inset to include the home indicator bar so --safe-area-inset-bottom-min is
-	        provided for those situations. We use the ugly hack of 
+	        provided for those situations. We use the ugly hack of
 	        `@supports (-webkit-touch-callout: none)` to detect if the device is iOS */
 		--safe-area-inset-bottom-min-max-delta: 0px;
 		@supports (-webkit-touch-callout: none) {
@@ -55,6 +55,7 @@
 			0px,
 			calc(env(safe-area-inset-bottom, 0) - var(--safe-area-inset-bottom-min-max-delta))
 		);
+		--accent-color: #ffac00;
 	}
 
 	/**

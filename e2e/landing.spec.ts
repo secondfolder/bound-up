@@ -1,8 +1,10 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { test } from './fixtures';
 
 /**
- * The halftone overlay on the logged-out landing page.
+ * The landing page's effects: the page captured with SnapDOM
+ * (`VfxPageSnapshot`), screened by `HalftoneLinesEffect` and grained by
+ * `GrainEffect` through VFX-JS, and soft-lit back over the page.
  *
  * Tested at this level because the effect depends on SnapDOM capturing the
  * page with its real, served CSS, on WebGL, and on the browser compositing the
@@ -14,164 +16,303 @@ import { test } from './fixtures';
  * suite's pageerror watcher (see fixtures.ts) plus a pixels assertion can
  * tell a working overlay from a blank canvas.
  */
-test('the halftone overlay paints over the landing page', async ({ page }) => {
-	await page.goto('/');
 
-	const canvas = page.locator('canvas.halftone');
+type Region = { x: number; y: number; width: number; height: number };
 
-	// The canvas is only sized once SnapDOM has captured the page and
-	// the shader has drawn — width 0 means the effect never ran.
-	await expect
-		.poll(() => canvas.evaluate((el) => (el as HTMLCanvasElement).width), { timeout: 20_000 })
-		.toBeGreaterThan(0);
-
-	// Read the WebGL canvas back through a 2D canvas (a WebGL context cannot
-	// hand out getImageData itself) and check ink actually landed. The context
-	// is created with preserveDrawingBuffer for exactly this readback; without
-	// it the buffer is cleared after compositing and this reads blank.
-	const paintedFraction = await canvas.evaluate((el) => {
-		const canvasEl = el as HTMLCanvasElement;
+/**
+ * The effects canvas's pixels over `region` (viewport CSS px), read in the
+ * same frame as a fresh draw.
+ *
+ * VFX-JS creates its WebGL context without `preserveDrawingBuffer`, so the
+ * buffer is cleared once the frame is presented and a read at any other time
+ * sees transparent pixels. The provider redraws on scroll, in an animation
+ * frame callback; one registered after it runs later in the same frame, when
+ * the buffer still holds the draw. The canvas is one CSS px per pixel
+ * (`pixelRatio={1}` on the page) and tracks the viewport, offset by VFX's
+ * scroll padding, which its bounding box accounts for.
+ */
+function readEffects(page: Page, region: Region): Promise<number[]> {
+	return page.evaluate(async (box) => {
+		const canvas = document.querySelector<HTMLCanvasElement>('canvas.vfx-canvas');
+		if (!canvas) {
+			throw new Error('no effects canvas');
+		}
+		globalThis.dispatchEvent(new Event('scroll'));
+		await new Promise(requestAnimationFrame);
+		const rect = canvas.getBoundingClientRect();
 		const scratch = document.createElement('canvas');
-		scratch.width = canvasEl.width;
-		scratch.height = canvasEl.height;
+		scratch.width = box.width;
+		scratch.height = box.height;
 		const ctx = scratch.getContext('2d');
 		if (!ctx) {
-			throw new Error('no 2D context to read the overlay back through');
+			throw new Error('no 2D context to read the effects back through');
 		}
-		ctx.drawImage(canvasEl, 0, 0);
-		const { data } = ctx.getImageData(0, 0, scratch.width, scratch.height);
-		let painted = 0;
-		for (let i = 3; i < data.length; i += 4) {
-			if ((data.at(i) ?? 0) > 0) {
-				painted += 1;
-			}
-		}
-		return painted / (scratch.width * scratch.height);
-	});
+		ctx.drawImage(
+			canvas,
+			box.x - rect.left,
+			box.y - rect.top,
+			box.width,
+			box.height,
+			0,
+			0,
+			box.width,
+			box.height
+		);
+		return Array.from(ctx.getImageData(0, 0, box.width, box.height).data);
+	}, region);
+}
 
-	// The current calibration targets Affinity's blend-free line halftone, so
-	// the canvas is an opaque grayscale screen rather than a translucent ink
+/** Waits for the first capture to land and the effects canvas to fade in. */
+async function effectsShown(page: Page) {
+	await expect
+		.poll(
+			() => page.evaluate(() => document.querySelector<HTMLElement>('.vfx-layer')?.style.opacity),
+			{ timeout: 20_000 }
+		)
+		.toBe('1');
+}
+
+/**
+ * The value at (x, y), averaged along the screen's lines — 15° on the landing
+ * page — over ±12 px. The screen is constant along a line, so its profile
+ * survives, while the grain, independent from pixel to pixel, is averaged
+ * down five-fold. The grain runs at full strength over a halftone at 0.4, so
+ * without this the screen's extremes are lost in it.
+ */
+function alongLines(pixels: number[], width: number, x: number, y: number): number {
+	const [dx, dy] = [Math.cos((15 * Math.PI) / 180), -Math.sin((15 * Math.PI) / 180)];
+	let sum = 0;
+	for (let step = -12; step <= 12; step += 1) {
+		const [px, py] = [Math.round(x + step * dx), Math.round(y + step * dy)];
+		sum += pixels.at((py * width + px) * 4) ?? 0;
+	}
+	return sum / 25 / 255;
+}
+
+/**
+ * The red channel of `rgba` box-blurred over (2·radius + 1)² pixels, as RGBA
+ * again. Clamped at the edges.
+ */
+function boxBlur(rgba: number[], width: number, height: number, radius: number): number[] {
+	const out = new Array<number>(rgba.length).fill(255);
+	for (let y = 0; y < height; y += 1) {
+		for (let x = 0; x < width; x += 1) {
+			let [sum, count] = [0, 0];
+			for (let dy = -radius; dy <= radius; dy += 1) {
+				for (let dx = -radius; dx <= radius; dx += 1) {
+					const [px, py] = [x + dx, y + dy];
+					if (px >= 0 && px < width && py >= 0 && py < height) {
+						sum += rgba.at((py * width + px) * 4) ?? 0;
+						count += 1;
+					}
+				}
+			}
+			out[(y * width + x) * 4] = sum / count;
+		}
+	}
+	return out;
+}
+
+/** Pearson correlation of `a`'s red channel against `b`'s shifted by
+ * (dx, dy), over the pixels both cover. */
+function correlationAt(
+	a: number[],
+	b: number[],
+	width: number,
+	height: number,
+	dx: number,
+	dy: number
+): number {
+	let [n, sumA, sumB, sumAB, sumAA, sumBB] = [0, 0, 0, 0, 0, 0];
+	for (let y = 4; y < height - 4; y += 1) {
+		for (let x = 4; x < width - 4; x += 1) {
+			const va = a.at((y * width + x) * 4) ?? 0;
+			const vb = b.at(((y + dy) * width + x + dx) * 4) ?? 0;
+			[n, sumA, sumB] = [n + 1, sumA + va, sumB + vb];
+			[sumAB, sumAA, sumBB] = [sumAB + va * vb, sumAA + va * va, sumBB + vb * vb];
+		}
+	}
+	const covariance = sumAB / n - (sumA / n) * (sumB / n);
+	return covariance / Math.sqrt((sumAA / n - (sumA / n) ** 2) * (sumBB / n - (sumB / n) ** 2));
+}
+
+/** Waits for a capture of the body at the viewport's current size. */
+async function capturedAt(page: Page, width: number, height: number) {
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() => {
+					const source = document.querySelector<HTMLCanvasElement>('canvas.snapshot-source');
+					return source ? [source.width, source.height] : null;
+				}),
+			{ timeout: 20_000 }
+		)
+		.toEqual([width, height]);
+}
+
+test('the halftone screen and grain paint over the landing page', async ({ page }) => {
+	await page.setViewportSize({ width: 1000, height: 700 });
+	await page.goto('/');
+	await effectsShown(page);
+
+	const pixels = await readEffects(page, { x: 0, y: 0, width: 1000, height: 700 });
+
+	// The calibration targets Affinity's blend-free line halftone, so the
+	// canvas is an opaque grayscale screen rather than a translucent ink
 	// overlay. A render that paints under most pixels but leaves the frame
 	// non-opaque or coloured is the wrong algorithm, not a stylistic variant.
-	expect(paintedFraction).toBeGreaterThan(0.95);
+	let opaque = 0;
+	let channelDeltaSum = 0;
+	for (let index = 0; index < pixels.length; index += 4) {
+		const [red = 0, green = 0, blue = 0, alpha = 0] = pixels.slice(index, index + 4);
+		if (alpha >= 230) {
+			opaque += 1;
+		}
+		channelDeltaSum += Math.abs(red - green) + Math.abs(green - blue);
+	}
+	expect(opaque / (pixels.length / 4)).toBeGreaterThan(0.99);
+	expect(channelDeltaSum / (pixels.length / 4)).toBeLessThan(1);
 
-	const { opaqueFraction, meanChannelDelta, leftMin, leftMax, rightMin, rightMax } =
-		await canvas.evaluate((el) => {
-			const canvasEl = el as HTMLCanvasElement;
-			const scratch = document.createElement('canvas');
-			scratch.width = canvasEl.width;
-			scratch.height = canvasEl.height;
-			const ctx = scratch.getContext('2d');
-			if (!ctx) {
-				throw new Error('no 2D context to read the overlay back through');
-			}
-			ctx.drawImage(canvasEl, 0, 0);
-			const { data } = ctx.getImageData(0, 0, scratch.width, scratch.height);
-			let opaque = 0;
-			let total = 0;
-			let channelDeltaSum = 0;
-			for (let i = 3; i < data.length; i += 4) {
-				const [red = 0, green = 0, blue = 0, alpha = 0] = data.subarray(i - 3, i + 1);
-				if (alpha >= 230) {
-					opaque += 1;
-				}
-				channelDeltaSum += Math.abs(red - green) + Math.abs(green - blue);
-				total += 1;
-			}
-
-			const sampleColumn = (x: number) => {
-				let min = 255;
-				let max = 0;
-				for (let y = 0; y < scratch.height; y += 1) {
-					const v = data.at((y * scratch.width + x) * 4) ?? 0;
-					if (v < min) {
-						min = v;
-					}
-					if (v > max) {
-						max = v;
-					}
-				}
-				return { min: min / 255, max: max / 255 };
-			};
-
-			// Inside the page, not the bleed the canvas is drawn with past it.
-			const bleed = (scratch.width - window.innerWidth) / 2;
-			const left = sampleColumn(Math.floor(bleed + window.innerWidth * 0.05));
-			const right = sampleColumn(Math.floor(bleed + window.innerWidth * 0.95));
-			return {
-				opaqueFraction: opaque / total,
-				meanChannelDelta: channelDeltaSum / total,
-				leftMin: left.min,
-				leftMax: left.max,
-				rightMin: right.min,
-				rightMax: right.max
-			};
-		});
-	expect(opaqueFraction).toBeGreaterThan(0.99);
-	expect(meanChannelDelta).toBeLessThan(1);
+	// Columns down the part of the screen at full strength, above where the
+	// page starts fading it out (300px — see the landing page).
+	const sampleColumn = (x: number) => {
+		let [min, max] = [1, 0];
+		for (let y = 12; y < 288; y += 1) {
+			const value = alongLines(pixels, 1000, x, y);
+			[min, max] = [Math.min(min, value), Math.max(max, value)];
+		}
+		return { min, max };
+	};
+	const left = sampleColumn(50);
+	const right = sampleColumn(950);
 
 	// At a 15 degree line angle the bands still run near-horizontally, so
 	// vertical samples on both sides of the page's left-to-right gradient
 	// should oscillate strongly. The bounds come from the model in
-	// docs/halftone.md: at contrast 0.4 the slope is tan(36°) = 0.727, so a
+	// docs/page-effects.md: at contrast 0.4 the slope is tan(36°) = 0.727, so a
 	// tone t peaks at t·1.727 and troughs below zero for anything under 0.58.
 	// The background runs #943700 (tone 0.30) to #711500 (tone 0.18), which
 	// predicts crests near 0.52 on the left and 0.31 on the right, both on a
-	// black floor, plus up to 0.078 of grain. Asserting the shape rather than
+	// black floor. The page mixes that screen toward grey at 0.4, which maps
+	// 0..0.52 onto 0.30..0.51 and 0..0.31 onto 0.30..0.42, and the smoothed
+	// grain moves each by a few hundredths. Asserting the shape rather than
 	// the numbers keeps this honest through tuning.
-	expect(leftMin).toBeLessThan(0.05);
-	expect(leftMax).toBeGreaterThan(0.4);
-	expect(rightMin).toBeLessThan(0.05);
-	expect(rightMax).toBeGreaterThan(0.25);
-	expect(rightMax).toBeLessThan(0.5);
-	expect(leftMax).toBeGreaterThan(rightMax + 0.05);
+	expect(left.min).toBeLessThan(0.35);
+	expect(left.max).toBeGreaterThan(0.46);
+	expect(right.min).toBeLessThan(0.35);
+	expect(right.max).toBeGreaterThan(0.38);
+	expect(right.max).toBeLessThan(0.48);
+	expect(left.max).toBeGreaterThan(right.max + 0.03);
 });
 
 /**
- * The overlay draws on demand. It used to redraw every animation frame even
+ * The halftone fades out from 300px down the page; the grain runs the whole
+ * page. Past the fade the screen has gone to mid-grey, soft-light's identity,
+ * so what is left there is grain on grey — the page shows through untouched
+ * but for the grain.
+ *
+ * The page is lengthened for the test: at 1000 × 700 the fade ends at
+ * 300 + 0.35 × 700 = 545px, and the landing page is only as tall as the
+ * window.
+ */
+test('the halftone fades out down the page, and the grain carries on', async ({ page }) => {
+	await page.setViewportSize({ width: 1000, height: 700 });
+	await page.goto('/');
+	await page.addStyleTag({ content: 'html body { min-height: 1400px; }' });
+	await capturedAt(page, 1000, 1400);
+	await effectsShown(page);
+
+	const statsOf = (pixels: number[], width: number, height: number, x: number) => {
+		const smoothed: number[] = [];
+		for (let y = 12; y < height - 12; y += 1) {
+			smoothed.push(alongLines(pixels, width, x, y));
+		}
+		const values = pixels.filter((_, index) => index % 4 === 0).map((value) => value / 255);
+		const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+		const sd = Math.sqrt(
+			values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length
+		);
+		const smoothedMean = smoothed.reduce((sum, value) => sum + value, 0) / smoothed.length;
+		const screenSd = Math.sqrt(
+			smoothed.reduce((sum, value) => sum + (value - smoothedMean) ** 2, 0) / smoothed.length
+		);
+		return { mean, sd, values, screenSd };
+	};
+
+	// Well past the fade: the bottom of the page.
+	await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+	const scrollY = await page.evaluate(() => window.scrollY);
+	// Page y 555 onwards, which is off the top of the window once scrolled.
+	const top = Math.max(0, Math.ceil(545 + 10 - scrollY));
+	const below = statsOf(
+		await readEffects(page, { x: 300, y: top, width: 400, height: 698 - top }),
+		400,
+		698 - top,
+		200
+	);
+	// Grain at strength 1.3 on 0.5: triangular over ±0.204, sd 0.083.
+	expect(below.mean).toBeGreaterThan(0.47);
+	expect(below.mean).toBeLessThan(0.53);
+	expect(below.sd).toBeGreaterThan(0.06);
+	expect(below.sd).toBeLessThan(0.11);
+	expect(below.values.every((value) => value > 0.25 && value < 0.75)).toBe(true);
+	// No screen left: along the lines, only the averaged-down grain varies.
+	expect(below.screenSd).toBeLessThan(0.03);
+
+	// Above the fade, the screen is there.
+	await page.evaluate(() => window.scrollTo(0, 0));
+	const above = statsOf(
+		await readEffects(page, { x: 300, y: 0, width: 400, height: 290 }),
+		400,
+		290,
+		200
+	);
+	expect(above.screenSd).toBeGreaterThan(0.04);
+});
+
+/**
+ * The page draws on demand. It used to redraw every animation frame even
  * with the drift at 0, and since the canvas is soft-light blended over the
  * whole viewport that kept Firefox's GPU process near 40% CPU on a page where
  * nothing moves. Counting draw calls is the only way to see that from here —
  * the pixels are identical either way.
  */
-test('the halftone overlay stops drawing once the page is still', async ({ page }) => {
+test('the effects stop drawing once the page is still', async ({ page }) => {
 	await page.addInitScript(() => {
-		const counted = globalThis as unknown as { halftoneDraws: number };
-		counted.halftoneDraws = 0;
+		const counted = globalThis as unknown as { effectDraws: number };
+		counted.effectDraws = 0;
 		// A Proxy rather than a replacement function, so the call keeps the
 		// context it was made on without the wrapper having to touch `this`.
-		WebGLRenderingContext.prototype.drawArrays = new Proxy(
-			WebGLRenderingContext.prototype.drawArrays,
+		// WebGL2, which VFX-JS uses, and whose prototype does not inherit
+		// WebGL1's.
+		WebGL2RenderingContext.prototype.drawArrays = new Proxy(
+			WebGL2RenderingContext.prototype.drawArrays,
 			{
 				apply(target, context, args) {
-					counted.halftoneDraws += 1;
+					counted.effectDraws += 1;
 					return Reflect.apply(target, context, args);
 				}
 			}
 		);
 	});
 	await page.goto('/');
-
-	const canvas = page.locator('canvas.halftone');
-	await expect
-		.poll(() => canvas.evaluate((el) => (el as HTMLCanvasElement).width), { timeout: 20_000 })
-		.toBeGreaterThan(0);
+	await effectsShown(page);
 
 	// Draws made across the next 60 animation frames. A loop draws in every
 	// one, so it never reads 0; on-demand drawing reads 0 once any late
 	// recapture (a font arriving, say) has landed — hence poll, not sample.
 	const drawsOverSixtyFrames = () =>
 		page.evaluate(async () => {
-			const counted = globalThis as unknown as { halftoneDraws: number };
-			const before = counted.halftoneDraws;
+			const counted = globalThis as unknown as { effectDraws: number };
+			const before = counted.effectDraws;
 			for (let i = 0; i < 60; i += 1) {
 				await new Promise(requestAnimationFrame);
 			}
-			return counted.halftoneDraws - before;
+			return counted.effectDraws - before;
 		});
 	await expect.poll(drawsOverSixtyFrames, { timeout: 10_000 }).toBe(0);
 	expect(
-		await page.evaluate(() => (globalThis as unknown as { halftoneDraws: number }).halftoneDraws)
+		await page.evaluate(() => (globalThis as unknown as { effectDraws: number }).effectDraws)
 	).toBeGreaterThan(0);
 });
 
@@ -182,26 +323,32 @@ test('the halftone overlay stops drawing once the page is still', async ({ page 
  * body, which slid the screened subtitle visibly off the real one; before
  * that, the canvas was fixed and viewport-centred, which was off by half the
  * overflow.
+ *
+ * VFX-JS draws the effect wherever the snapshot's canvas is, so that canvas's
+ * box is where the effect lands.
  */
-test('the halftone overlay covers the body 1:1 on a short viewport, and follows a resize without blanking', async ({
+test('the page snapshot covers the body 1:1 on a short viewport, and follows a resize without blanking', async ({
 	page
 }) => {
-	await page.setViewportSize({ width: 900, height: 300 });
+	// Short enough that the page overflows it: the header plus the stacked
+	// CTA (the short-viewport rule) come to more than 200px.
+	await page.setViewportSize({ width: 900, height: 200 });
 	await page.goto('/');
-	const canvas = page.locator('canvas.halftone');
+	const canvas = page.locator('canvas.snapshot-source');
 
 	const geometry = () =>
 		page.evaluate(() => {
-			const el = document.querySelector<HTMLCanvasElement>('canvas.halftone');
+			const el = document.querySelector<HTMLCanvasElement>('canvas.snapshot-source');
 			if (!el) {
-				throw new Error('no overlay canvas');
+				throw new Error('no snapshot canvas');
 			}
 			const box = el.getBoundingClientRect();
 			const clip = el.parentElement?.getBoundingClientRect();
 			if (!clip) {
-				throw new Error('overlay canvas has no clip');
+				throw new Error('snapshot canvas has no clip');
 			}
 			const body = document.body.getBoundingClientRect();
+			const effects = document.querySelector<HTMLElement>('.vfx-layer');
 			return {
 				pixels: [el.width, el.height],
 				box: [box.left, box.top, box.width, box.height],
@@ -209,46 +356,42 @@ test('the halftone overlay covers the body 1:1 on a short viewport, and follows 
 				// Exact, as the clip is: it follows the body's own box. A bitmap
 				// is whole pixels, so the capture is this rounded one way or the
 				// other.
-				body: [body.left, body.top, body.width, body.height]
+				body: [body.left, body.top, body.width, body.height],
+				effectsOpacity: effects?.style.opacity
 			};
 		});
 
 	await expect
 		.poll(() => canvas.evaluate((el) => (el as HTMLCanvasElement).height), { timeout: 20_000 })
-		.toBeGreaterThan(300);
+		.toBeGreaterThan(200);
 	let { pixels, box, body } = await geometry();
-	// The canvas is the capture plus the same bleed on every side, centred on
-	// the body — in CSS, so a body of fractional height leaves the
-	// whole-pixel canvas a sub-pixel off centre, never more.
-	const bleed = Math.round((pixels[0] - body[2]) / 2);
-	expect(bleed).toBeGreaterThan(0);
+	// The canvas is the capture, centred on the body — in CSS, so a body of
+	// fractional height leaves the whole-pixel canvas a sub-pixel off centre,
+	// never more.
 	for (const [index, size] of pixels.entries()) {
-		expect(Math.abs(size - 2 * bleed - (body.at(index + 2) ?? 0)), `size ${index}`).toBeLessThan(1);
+		expect(Math.abs(size - (body.at(index + 2) ?? 0)), `size ${index}`).toBeLessThan(1);
 	}
-	const expected = [body[0] - bleed, body[1] - bleed, pixels[0], pixels[1]];
 	for (const [index, edge] of box.entries()) {
-		expect(Math.abs(edge - (expected.at(index) ?? 0)), `edge ${index}`).toBeLessThan(1);
+		expect(Math.abs(edge - (body.at(index) ?? 0)), `edge ${index}`).toBeLessThan(1);
 	}
 
-	// A drag, in steps: the overlay stays up throughout (it used to hide on
+	// A drag, in steps: the effects stay up throughout (they used to hide on
 	// every size change until the layout held still). The clip always covers
 	// the body, and the canvas inside it keeps a captured size, 1:1 — the last
 	// frame is centred until the next capture replaces it, never stretched.
+	await effectsShown(page);
 	for (const width of [860, 800, 740, 680, 620]) {
 		await page.setViewportSize({ width, height: 300 + (900 - width) });
-		await expect(canvas).toBeVisible();
+		expect((await geometry()).effectsOpacity).toBe('1');
 		await expect.poll(async () => (await geometry()).clip).toEqual((await geometry()).body);
 		({ pixels, box } = await geometry());
 		expect(box.slice(2)).toEqual(pixels);
 	}
 
 	await page.setViewportSize({ width: 600, height: 700 });
-	await expect
-		.poll(async () => (await geometry()).pixels)
-		.toEqual([600 + 2 * bleed, 700 + 2 * bleed]);
-	({ pixels, box, body } = await geometry());
+	await capturedAt(page, 600, 700);
+	({ body } = await geometry());
 	expect(body.slice(2)).toEqual([600, 700]);
-	await expect(canvas).toBeVisible();
 
 	// Narrow enough that the title overhangs the body. Left to itself SnapDOM
 	// widened the capture to take in the overhang, and a bitmap wider than the
@@ -261,7 +404,7 @@ test('the halftone overlay covers the body 1:1 on a short viewport, and follows 
 	await expect
 		.poll(async () => {
 			const current = await geometry();
-			return Math.abs(current.pixels[0] - 2 * bleed - (current.body.at(2) ?? 0));
+			return Math.abs((current.pixels.at(0) ?? 0) - (current.body.at(2) ?? 0));
 		})
 		.toBeLessThan(1);
 });
@@ -272,50 +415,27 @@ test('the halftone overlay covers the body 1:1 on a short viewport, and follows 
  * centred content alone. Anchored to a corner, the grain stayed still while
  * the content slid over it.
  *
- * Sampled below the header, where the capture is only the background: its
- * gradient is proportional to the width, so its colour at the centre is the
- * same at both widths, and so is the screen, which is centred too. The widths
- * differ by an even number of pixels so the centre moves by whole pixels.
+ * Sampled at 560px, past the end of the halftone's fade (545px at this
+ * height), where the effect is grain on neutral grey whatever the page
+ * beneath. The widths differ by an even number of pixels so the centre moves
+ * by whole pixels.
  */
-test('the halftone grain stays put under the centre of the page across a resize', async ({
-	page
-}) => {
-	const canvas = page.locator('canvas.halftone');
+test('the grain stays put under the centre of the page across a resize', async ({ page }) => {
 	const centreBlock = async (width: number) => {
 		await page.setViewportSize({ width, height: 700 });
-		// The capture has landed once the canvas is the new size plus its
-		// bleed, which is the same on both axes — so its width exceeds its
-		// height by exactly the viewport's difference.
-		await expect
-			.poll(
-				() =>
-					canvas.evaluate((el) => {
-						const canvasEl = el as HTMLCanvasElement;
-						return canvasEl.height > 0 ? canvasEl.width - canvasEl.height : null;
-					}),
-				{ timeout: 20_000 }
-			)
-			.toBe(width - 700);
-		return canvas.evaluate((el) => {
-			const canvasEl = el as HTMLCanvasElement;
-			const scratch = document.createElement('canvas');
-			scratch.width = canvasEl.width;
-			scratch.height = canvasEl.height;
-			const ctx = scratch.getContext('2d');
-			if (!ctx) {
-				throw new Error('no 2D context to read the overlay back through');
-			}
-			ctx.drawImage(canvasEl, 0, 0);
-			const size = 32;
-			const left = canvasEl.width / 2 - size / 2;
-			const bleed = (canvasEl.height - window.innerHeight) / 2;
-			return Array.from(
-				ctx.getImageData(left, bleed + 560, size, size).data.filter((_, i) => i % 4 === 0)
-			);
+		await capturedAt(page, width, 700);
+		const size = 32;
+		const pixels = await readEffects(page, {
+			x: width / 2 - size / 2,
+			y: 560,
+			width: size,
+			height: size
 		});
+		return pixels.filter((_, index) => index % 4 === 0);
 	};
 
 	await page.goto('/');
+	await effectsShown(page);
 	const narrow = await centreBlock(1000);
 	const wide = await centreBlock(1060);
 	const meanDifference =
@@ -328,16 +448,20 @@ test('the halftone grain stays put under the centre of the page across a resize'
 
 /**
  * The screened text lands on the real text, after a resize as well as on
- * load. Compared ink to ink: the bounding box of the title and subtitle's
- * glyphs in a screenshot of the live page, against the bounding box of their
- * screened glyphs in the overlay's own pixels. html2canvas, the previous
- * capture library, was a pixel or two out; mid-drag it could be twelve.
+ * load. Checked in two exact steps rather than by thresholding the effect,
+ * whose glyphs, at a 0.4 screen under full-strength grain, are too close to
+ * the background to pick out pixel by pixel:
+ *
+ * - The capture's glyphs against the live page's, ink box to ink box, to 2px.
+ *   This is the step that has drifted before: html2canvas, the previous
+ *   capture library, was a pixel or two out, and mid-drag it could be twelve.
+ * - The effect against the capture: of every shift up to 4px, the unshifted
+ *   one correlates best — VFX draws the effect exactly where the capture is.
  *
  * The widths straddle the title's `10vw` breakpoint, so the second one
  * reflows the header rather than only re-centring it.
  */
 test('the screened title and subtitle line up with the real ones', async ({ page }) => {
-	const canvas = page.locator('canvas.halftone');
 	// Glyph ink inside the header's box, in page coordinates.
 	const inkBox = (rgba: number[], width: number, isInk: (pixel: number[]) => boolean) => {
 		let [left, top, right, bottom] = [
@@ -362,19 +486,7 @@ test('the screened title and subtitle line up with the real ones', async ({ page
 
 	const compare = async (width: number) => {
 		await page.setViewportSize({ width, height: 700 });
-		await expect
-			.poll(() => canvas.evaluate((el) => (el as HTMLCanvasElement).height - 700), {
-				timeout: 20_000
-			})
-			.toBeGreaterThan(0);
-		await expect
-			.poll(() =>
-				canvas.evaluate((el) => {
-					const canvasEl = el as HTMLCanvasElement;
-					return canvasEl.width - canvasEl.height;
-				})
-			)
-			.toBe(width - 700);
+		await capturedAt(page, width, 700);
 
 		const header = await page.locator('.landing header').boundingBox();
 		if (!header) {
@@ -387,25 +499,28 @@ test('the screened title and subtitle line up with the real ones', async ({ page
 			height: Math.ceil(header.height)
 		};
 
-		// The overlay's pixels over the header, read from its own canvas: the
-		// capture sits `bleed` in from the canvas's top-left corner.
-		const screened = await canvas.evaluate((el, box) => {
-			const canvasEl = el as HTMLCanvasElement;
-			const bleed = (canvasEl.height - window.innerHeight) / 2;
+		const screened = await readEffects(page, region);
+		// The capture itself, from the snapshot's canvas, which covers the body
+		// from its top-left corner — the page's, with nothing scrolled.
+		const captured = await page.evaluate((box) => {
+			const source = document.querySelector<HTMLCanvasElement>('canvas.snapshot-source');
+			// Copied out rather than read through the snapshot's own context:
+			// reading that one repeatedly draws a Canvas2D performance warning,
+			// which the fixture fails the run on.
 			const scratch = document.createElement('canvas');
-			scratch.width = canvasEl.width;
-			scratch.height = canvasEl.height;
-			const ctx = scratch.getContext('2d');
-			if (!ctx) {
-				throw new Error('no 2D context to read the overlay back through');
+			scratch.width = box.width;
+			scratch.height = box.height;
+			const context = scratch.getContext('2d');
+			if (!(source && context)) {
+				throw new Error('no snapshot canvas to read the capture from');
 			}
-			ctx.drawImage(canvasEl, 0, 0);
-			return Array.from(ctx.getImageData(bleed + box.x, bleed + box.y, box.width, box.height).data);
+			context.drawImage(source, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
+			return Array.from(context.getImageData(0, 0, box.width, box.height).data);
 		}, region);
 
-		// The live page under the same box, with the overlay out of the way.
-		// Hiding it moves nothing, so it does not trigger a recapture.
-		await page.addStyleTag({ content: '.halftone-clip { visibility: hidden; }' });
+		// The live page under the same box, with the effects out of the way.
+		// Hiding the canvas moves nothing, so it does not trigger a recapture.
+		await page.addStyleTag({ content: '.vfx-canvas { visibility: hidden; }' });
 		const shot = await page.screenshot({ clip: region });
 		const live = await page.evaluate(async (png) => {
 			const image = new Image();
@@ -425,24 +540,68 @@ test('the screened title and subtitle line up with the real ones', async ({ page
 			document.head.lastElementChild?.remove();
 		});
 
-		// Live glyphs are the amber #ffac00 on a rust wash. Screened glyphs
-		// peak at white where the background's crests stop near 160 (see the
-		// first test's arithmetic), so a bright threshold keeps only glyphs.
+		// Glyphs are the amber #ffac00 on a rust wash, in the live page and in
+		// the capture alike, so one threshold finds both.
 		const liveInk = inkBox(
 			live,
 			region.width,
 			([r = 0, g = 0, b = 0]) => r > 200 && g > 130 && b < 90
 		);
-		const screenedInk = inkBox(screened, region.width, ([r = 0]) => r > 220);
+		const capturedInk = inkBox(
+			captured,
+			region.width,
+			([r = 0, g = 0, b = 0]) => r > 200 && g > 130 && b < 90
+		);
 		for (const [index, edge] of liveInk.entries()) {
 			expect(
-				Math.abs(edge - (screenedInk.at(index) ?? 0)),
-				`${width}px, edge ${index}`
+				Math.abs(edge - (capturedInk.at(index) ?? 0)),
+				`${width}px, capture edge ${index}`
 			).toBeLessThanOrEqual(2);
 		}
+
+		// And the effect lands exactly on the capture: of every shift up to 4px
+		// each way, the unshifted one correlates best. Blurred first, so the
+		// full-strength grain over a 0.4 screen averages out and what is left
+		// is the glyphs.
+		const effect = boxBlur(screened, region.width, region.height, 2);
+		const source = boxBlur(captured, region.width, region.height, 2);
+		let best = { dx: Number.NaN, dy: Number.NaN, score: Number.NEGATIVE_INFINITY };
+		for (let dy = -4; dy <= 4; dy += 1) {
+			for (let dx = -4; dx <= 4; dx += 1) {
+				const score = correlationAt(effect, source, region.width, region.height, dx, dy);
+				if (score > best.score) {
+					best = { dx, dy, score };
+				}
+			}
+		}
+		expect([best.dx, best.dy], `${width}px, effect offset from the capture`).toEqual([0, 0]);
 	};
 
 	await page.goto('/');
+	await effectsShown(page);
 	await compare(1200);
 	await compare(640);
+});
+
+/**
+ * Shrinking the window leaves no horizontal scrollbar. VFX-JS's canvas used
+ * to sit on <body>, where its scroll padding was sized from
+ * `body.scrollWidth` — which counted the canvas's own, pre-shrink width — so
+ * the canvas stayed wider than the window and the page scrolled sideways.
+ * It lives in the provider's clipped layer now.
+ */
+test('shrinking the window leaves no horizontal scroll', async ({ page }) => {
+	await page.setViewportSize({ width: 1200, height: 700 });
+	await page.goto('/');
+	await effectsShown(page);
+	for (const width of [1100, 1000, 900, 800]) {
+		await page.setViewportSize({ width, height: 700 });
+		await capturedAt(page, width, 700);
+		// A redraw at the new size, which is when VFX resizes its canvas.
+		await readEffects(page, { x: 0, y: 0, width: 1, height: 1 });
+		const overflow = await page.evaluate(
+			() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+		);
+		expect(overflow, `${width}px`).toBe(0);
+	}
 });

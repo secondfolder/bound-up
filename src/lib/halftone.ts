@@ -1,6 +1,15 @@
-const TRAILING_ZEROES = /\.0+$|(?<=\..*?)0+$/g;
-const TRAILING_POINT = /\.$/;
-const HAS_POINT_OR_EXPONENT = /[.eE]/;
+import { applyGrain, grainOrigin } from './grain';
+import { clamp01, formatGlslFloat, fract } from './shader-math';
+
+/**
+ * The halftone screen, calibrated against Affinity's Halftone filter: Rec.601
+ * luma, a triangle screen and a tangent contrast slope. On the page it runs as
+ * `HalftoneLinesEffect` (`$lib/effects`), the GPU half generated below; the
+ * CPU functions are the reference it is tested against. The grain is its own
+ * model, in `$lib/grain`. See docs/page-effects.md.
+ *
+ * Alias-free, so the reference tests run in plain node.
+ */
 export type HalftonePattern = 'circle' | 'line';
 
 export type NormalizedRgbaImage = {
@@ -16,37 +25,14 @@ export type HalftoneRenderOptions = {
 	contrast: number;
 	/** Distance between adjacent line centres (or rings), in pixels. */
 	cellSize: number;
-	/** 0..1, matching Affinity's 0..100 noise slider divided by 100. */
-	noiseStrength: number;
+	/** 0..1, matching Affinity's 0..100 noise slider divided by 100. Applied
+	 * after the screen, as `[HalftoneLinesEffect, GrainEffect]` does. */
+	grainStrength: number;
 	/** Pattern offset along the screen axis, in pixels. */
 	drift?: number;
 	centerX?: number;
 	centerY?: number;
 };
-
-export const HALFTONE_CAPTURE_IGNORE_SELECTOR = '[data-halftone-ignore="true"]';
-
-/**
- * Peak deviation of the grain at noise strength 1, in 0..1 units.
- *
- * Measured from `testing/halftone-fixtures/noise`: at strength 0.5 the
- * per-channel delta spans exactly ±20/255 with a standard deviation of
- * 8.12/255. A triangular distribution over ±20/255 has sd 20/255/sqrt(6) =
- * 8.16/255, which is why the grain is two hashes summed rather than one.
- */
-export const HALFTONE_NOISE_AMPLITUDE = 40 / 255;
-
-export function clamp01(value: number): number {
-	return Math.max(0, Math.min(1, value));
-}
-
-export function fract(value: number): number {
-	return value - Math.floor(value);
-}
-
-export function mix(start: number, end: number, amount: number): number {
-	return start + (end - start) * amount;
-}
 
 /**
  * Rec.601 luma on the sRGB values directly, with no linearisation.
@@ -107,78 +93,6 @@ export function renderHalftoneScreenValue(
 	return clamp01(gray + halftoneContrastSlope(contrast) * (screen - (1 - gray)));
 }
 
-/**
- * A uniform 0..1 value per pixel.
- *
- * Not the usual `fract(sin(dot(p, k)) * 43758.5453)`: that one is fine in
- * float64 but degrades on the GPU, where `sin` of a ~150000 radian argument
- * loses most of its mantissa. Measured in Chromium against the real WebGL
- * context, it produced grain with a standard deviation of 44/255 instead of
- * 52/255 and visible vertical streaking. This mixes by multiplication only —
- * every intermediate stays under 100, so float32 keeps it exact — and measures
- * 52.15/255 with autocorrelation under 0.006 at every lag, on both paths.
- */
-export function halftoneNoiseHash(x: number, y: number): number {
-	let qx = fract(x * 0.1031);
-	let qy = fract(y * 0.103);
-	let mixed = qx * (qy + 33.33) + qy * (qx + 33.33);
-	qx = fract(qx + mixed);
-	qy = fract(qy + mixed);
-	mixed = qx * (qy + 19.19) + qy * (qx + 19.19);
-	qx = fract(qx + mixed);
-	qy = fract(qy + mixed);
-	return fract(qx * qy * 97);
-}
-
-/**
- * Where the grain is measured from: the middle of the image, rounded down to a
- * whole pixel.
- *
- * The middle, because the landing page is laid out from its centre line: a
- * grain anchored to a corner stays put under that corner while a resize moves
- * everything else, so the content visibly slides over it. Measured from the
- * centre, widening the window adds grain at both edges and what lies under
- * the centred content stays where it is.
- *
- * Whole pixels, because a hash of a coordinate shifted by half a pixel is an
- * entirely different field — rounding exactly would reshuffle all of the grain
- * every time the width changed between odd and even.
- */
-export function halftoneNoiseOrigin(width: number, height: number): { x: number; y: number } {
-	return { x: Math.floor(width / 2), y: Math.floor(height / 2) };
-}
-
-/** Offsets for the second tap; arbitrary, chosen to decorrelate the pair. */
-const NOISE_SECOND_TAP_OFFSET = { x: 137.17, y: 91.31 };
-
-export function halftoneNoiseDelta(x: number, y: number, noiseStrength: number): number {
-	const first = halftoneNoiseHash(x, y);
-	const second = halftoneNoiseHash(x + NOISE_SECOND_TAP_OFFSET.x, y + NOISE_SECOND_TAP_OFFSET.y);
-	return (first + second - 1) * HALFTONE_NOISE_AMPLITUDE * noiseStrength;
-}
-
-export function applyHalftoneNoise(
-	value: number,
-	x: number,
-	y: number,
-	noiseStrength: number
-): number {
-	return clamp01(value + halftoneNoiseDelta(x, y, noiseStrength));
-}
-
-/** The grain is monochrome: one delta added to all three channels. */
-export function applyMonochromeNoiseRgb(
-	red: number,
-	green: number,
-	blue: number,
-	x: number,
-	y: number,
-	noiseStrength: number
-): [number, number, number] {
-	const delta = halftoneNoiseDelta(x, y, noiseStrength);
-	return [clamp01(red + delta), clamp01(green + delta), clamp01(blue + delta)];
-}
-
 export function softLightChannel(base: number, blend: number): number {
 	if (blend <= 0.5) {
 		return base - (1 - 2 * blend) * base * (1 - base);
@@ -230,6 +144,11 @@ export function halftoneCoordAlong(
  * Worth stating because it is the obvious thing to assume: an earlier version
  * averaged the source along the screen axis, and dropping that is most of what
  * took the 33.6 px / contrast-75 references from visibly wrong to 1.6/255 RMSE.
+ *
+ * The screen, then the grain: the same two steps, in the same order, as the
+ * `[HalftoneLinesEffect, GrainEffect]` chain on the page. The screen's value
+ * is clamped before the grain is added, so running them as two passes is the
+ * same arithmetic as the single shader this used to be.
  */
 export function renderHalftoneGrayscalePixel(
 	image: NormalizedRgbaImage,
@@ -249,13 +168,8 @@ export function renderHalftoneGrayscalePixel(
 			options.centerY ?? image.height / 2
 		) - (options.drift ?? 0);
 	const value = renderHalftoneScreenValue(gray, coordAlong, options.cellSize, options.contrast);
-	const noiseOrigin = halftoneNoiseOrigin(image.width, image.height);
-	return applyHalftoneNoise(
-		value,
-		x + 0.5 - noiseOrigin.x,
-		y + 0.5 - noiseOrigin.y,
-		options.noiseStrength
-	);
+	const origin = grainOrigin(image.width, image.height);
+	return applyGrain(value, x + 0.5 - origin.x, y + 0.5 - origin.y, options.grainStrength);
 }
 
 export function renderHalftoneGrayscaleImage(
@@ -293,80 +207,54 @@ export function renderSoftLightHalftoneImage(
 	return out;
 }
 
-function formatFloat(value: number): string {
-	const fixed = value.toFixed(7);
-	const trimmed = fixed.replace(TRAILING_ZEROES, '').replace(TRAILING_POINT, '');
-	return HAS_POINT_OR_EXPONENT.test(trimmed) ? trimmed : `${trimmed}.0`;
-}
-
 /**
- * The GPU half of the same model. Keep it in step with the functions above —
- * `halftone.test.ts` only exercises the CPU path.
+ * The GPU half of the screen, as a VFX-JS effect pass (GLSL 300 es, the
+ * default vertex shader's `uvContent` varying). Keep it in step with the
+ * functions above — `halftone.test.ts` covers the CPU path, and
+ * `HalftoneLinesEffect.svelte.test.ts` compares the two.
+ *
+ * Positions are element-local buffer pixels, snapped to pixel centres, taken
+ * from `uvContent` rather than `gl_FragCoord`: the final stage draws into a
+ * viewport offset somewhere inside VFX's shared canvas. `uvContent` runs past
+ * 0..1 in the bleed the effect draws around the element; the screen is a
+ * function of position alone and carries on there, and the texture read is
+ * clamped, which stretches the element's edge pixels outwards.
  */
-export function buildHalftoneFragmentShader(): string {
-	return `
+export function buildHalftoneLinesFragmentShader(): string {
+	return `#version 300 es
 precision highp float;
-uniform sampler2D uImage;
-uniform vec2 uImageOrigin;
-uniform vec2 uImageSize;
-uniform vec2 uCenter;
-uniform int uPattern;
-uniform float uAngle;
-uniform float uContrast;
-uniform float uCellSize;
-uniform float uNoiseStrength;
-uniform vec2 uNoiseOrigin;
-uniform float uTime;
-uniform float uSpeed;
-
-float noiseHash(vec2 p) {
-	vec2 q = fract(p * vec2(0.1031, 0.1030));
-	q += dot(q, q.yx + 33.33);
-	q = fract(q);
-	q += dot(q, q.yx + 19.19);
-	q = fract(q);
-	return fract(q.x * q.y * 97.0);
-}
+in vec2 uvContent;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec4 srcRectUv;
+uniform vec2 elementPixel;
+uniform int pattern;
+uniform float angle;
+uniform float contrast;
+uniform float cellSize;
+uniform float drift;
 
 void main() {
-	// gl_FragCoord.y runs up while the captured texture (and the reference
-	// renders) run down, so the screen axis is mirrored in y. The triangle is
-	// an even function, so mirroring the whole coordinate is free and only the
-	// sin term needs the sign flip.
+	vec2 pixel = floor(uvContent * elementPixel) + 0.5;
+	// y runs up here while the reference renders run down, so the screen
+	// axis is mirrored in y. The triangle is an even function, so mirroring
+	// the whole coordinate is free and only the sin term needs the sign flip.
+	vec2 fromCentre = pixel - elementPixel / 2.0;
 	float coordAlong;
-	if (uPattern == 0) {
-		coordAlong = length(gl_FragCoord.xy - uCenter);
+	if (pattern == 0) {
+		coordAlong = length(fromCentre);
 	} else {
-		coordAlong = dot(gl_FragCoord.xy - uCenter, vec2(-sin(uAngle), cos(uAngle)));
+		coordAlong = dot(fromCentre, vec2(-sin(angle), cos(angle)));
 	}
-	coordAlong -= uTime * uSpeed;
+	coordAlong -= drift;
 
-	// The image may sit inside a larger canvas (see the overlay's bleed), in
-	// which case the clamp extends its edge pixels outwards; the screen and the
-	// grain need no such help, being functions of position alone. The origin
-	// is the image's bottom-left corner, so flipping y within the image is
-	// the same flip as before.
-	vec2 uv = clamp((gl_FragCoord.xy - uImageOrigin) / uImageSize, 0.0, 1.0);
-	uv.y = 1.0 - uv.y;
-	float gray = clamp(dot(texture2D(uImage, uv).rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+	vec2 uv = srcRectUv.xy + clamp(uvContent, 0.0, 1.0) * srcRectUv.zw;
+	float gray = clamp(dot(texture(src, uv).rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
 
-	float phase = fract(coordAlong / uCellSize);
+	float phase = fract(coordAlong / cellSize);
 	float screen = phase < 0.5 ? phase * 2.0 : 2.0 - phase * 2.0;
-	float slope = min(tan(1.5707963 * clamp(uContrast, 0.0, 1.0)), 1000000.0);
+	float slope = min(tan(${formatGlslFloat(Math.PI / 2)} * clamp(contrast, 0.0, 1.0)), 1000000.0);
 	float value = clamp(gray + slope * (screen - (1.0 - gray)), 0.0, 1.0);
-
-	// Measured from the image centre — see halftoneNoiseOrigin(). Measured
-	// bottom-up, like everything else here, which only mirrors the field.
-	vec2 grainCoord = gl_FragCoord.xy - uNoiseOrigin;
-	vec2 grain = vec2(
-		noiseHash(grainCoord),
-		noiseHash(grainCoord + vec2(${formatFloat(NOISE_SECOND_TAP_OFFSET.x)}, ${formatFloat(NOISE_SECOND_TAP_OFFSET.y)}))
-	);
-	float grained = clamp(
-		value + (grain.x + grain.y - 1.0) * ${formatFloat(HALFTONE_NOISE_AMPLITUDE)} * uNoiseStrength,
-		0.0,
-		1.0
-	);
-	gl_FragColor = vec4(vec3(grained), 1.0);
+	outColor = vec4(vec3(value), 1.0);
 }`;
 }
