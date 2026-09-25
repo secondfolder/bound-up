@@ -220,7 +220,9 @@
 	<!-- First, and styled as the Login button is: a passkey is the one-tap way
 	     in, and it unlocks messages in the same touch. `type="button"` so Enter
 	     in the password box still submits the password. -->
-	<wa-button type="button" onclick={signInWithPasskey}>Sign in with a passkey</wa-button>
+	<wa-button type="button" variant="brand" appearance="outlined" onclick={signInWithPasskey}
+		>Sign in with a passkey</wa-button
+	>
 	{#if passkeyError}<span class="invalid">{passkeyError}</span>{/if}
 
 	<div class="divider">or</div>
@@ -243,7 +245,12 @@
 	     blank, which the Zod field rejects with a message naming the real cause. -->
 	<input type="hidden" name="authSecret" value="" />
 
-	<wa-button type="submit" disabled={!hydrated || deriving}>Login</wa-button>
+	<wa-button
+		type="submit"
+		variant="brand"
+		appearance="outlined"
+		disabled={!hydrated || deriving}>Login</wa-button
+	>
 	{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
 	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 

@@ -1281,19 +1281,37 @@ test.describe('embeds', () => {
 			/**
 			 * The card's frame is mixed from the text colour it inherits, not from
 			 * a fixed black — which is what keeps it visible on a sent message's
-			 * brand-blue bubble and on a received one in dark mode. Asserted on
-			 * the sent bubble, where the text is white in both themes, so a black
-			 * border would be unmistakable.
+			 * brand bubble (dark rust on amber) and on a received one (cream on
+			 * rust). Asserted as "the border is the text's colour", both resolved
+			 * to sRGB through a canvas, rather than against one literal colour:
+			 * it used to expect white, the text on the old brand-blue bubble, and
+			 * the palette moving (docs/theme.md) is not what this is about.
 			 */
-			const frame = await message.locator('.card-shell').evaluate((node) => ({
-				border: getComputedStyle(node).borderTopColor,
-				text: getComputedStyle(node).color
-			}));
-			expect(frame.text).toContain('255, 255, 255');
-			// Chromium serialises a `color-mix` result in `color(srgb …)` form, so
-			// both spellings of white are accepted; what matters is that it is the
-			// text's colour and not the fixed black it used to be.
-			expect(frame.border).toMatch(/srgb 1 1 1|255, 255, 255/);
+			const frame = await message.locator('.card-shell').evaluate((node) => {
+				const style = getComputedStyle(node);
+				// willReadFrequently, or Chromium logs a console hint about the two
+				// readbacks, which the fixture's diagnostics net fails the run on.
+				const context = document
+					.createElement('canvas')
+					.getContext('2d', { willReadFrequently: true });
+				if (!context) {
+					throw new Error('no 2d canvas context');
+				}
+				// The border is `color-mix(currentColor 18%, transparent)`, so only
+				// its colour is compared, not its alpha. getImageData hands back
+				// unpremultiplied channels, which at 18% alpha are only good to a
+				// few levels — hence the tolerance below.
+				const rgb = (color: string) => {
+					context.clearRect(0, 0, 1, 1);
+					context.fillStyle = color;
+					context.fillRect(0, 0, 1, 1);
+					return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+				};
+				return { text: rgb(style.color), border: rgb(style.borderTopColor) };
+			});
+			for (const [index, channel] of frame.border.entries()) {
+				expect(Math.abs(channel - (frame.text[index] ?? Number.NaN))).toBeLessThanOrEqual(8);
+			}
 
 			// Revealing is this reader's own view state and nothing more — the
 			// message itself is unchanged, so a reload starts over.

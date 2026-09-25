@@ -14,6 +14,10 @@
 		: resolve('/login');
 </script>
 
+<!-- In the landing page's display face, as every page title is (src/lib/theme.css):
+     without one, these were the only screens with nothing of it but the wash. -->
+<h1>Sign up</h1>
+
 <SignupForm data={data.signupForm} />
 
 <!-- Not plain "Log in": the (public) header already has a link by that name,
@@ -22,6 +26,12 @@
 <a class="cross-link" href={loginHref}>Already have an account? Log in</a>
 
 <style>
+	h1 {
+		text-align: center;
+		font-size: clamp(2.5rem, 12vw, 4rem);
+		margin: 1rem 0 1.5rem;
+	}
+
 	.cross-link {
 		display: block;
 		margin: 1rem auto 0;

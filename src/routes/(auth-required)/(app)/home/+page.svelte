@@ -49,9 +49,13 @@
 				margin: 0;
 			}
 
+			/* The landing page's subtitle, in the same amber as the title above
+			   it (the h1 takes it from src/lib/theme.css). This used to read
+			   --wa-color-text-secondary, which Web Awesome 3 does not define. */
 			.subtitle {
 				font-size: clamp(1rem, 5vw, 1.5rem);
-				color: var(--wa-color-text-secondary);
+				font-weight: 700;
+				color: var(--accent-color);
 			}
 		}
 

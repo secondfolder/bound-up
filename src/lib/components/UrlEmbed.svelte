@@ -1028,10 +1028,10 @@
 	 * The embed's chrome is drawn from `currentColor`, never from a fixed black.
 	 *
 	 * An embed inherits whatever it is sitting in: the page, a received message
-	 * (dark in dark mode), or a sent one (always on brand blue). A black border
+	 * (cream on dark rust), or a sent one (dark rust on amber). A black border
 	 * at 10% is invisible on two of those. Mixing the inherited text colour
-	 * means the frame follows the text it is next to, in both themes and on
-	 * both sides of a conversation, with no per-bubble overrides.
+	 * means the frame follows the text it is next to, on both sides of a
+	 * conversation, with no per-bubble overrides.
 	 */
 	.card-shell {
 		display: block;

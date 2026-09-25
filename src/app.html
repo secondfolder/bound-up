@@ -1,5 +1,9 @@
 <!doctype html>
-<html lang="en">
+<!-- Always dark: the whole app sits on the landing page's rust wash (see
+     src/lib/theme.css), so Web Awesome's light theme — white surfaces, dark
+     text — would put black text on dark rust. This used to follow
+     prefers-color-scheme through a script toggling the class. -->
+<html lang="en" class="wa-dark">
 	<head>
 		<meta charset="utf-8" />
 		<script>'use strict';
@@ -15,15 +19,7 @@
 		<link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
 		<meta name="apple-mobile-web-app-title" content="Bound Up" />
 		<link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
-		<script type="module">
-			const systemDark = globalThis.matchMedia('(prefers-color-scheme: dark)');
-			const applyDark = (event = systemDark) => {
-				const isDark = event.matches;
-				document.documentElement.classList.toggle('wa-dark', isDark);
-			};
-			systemDark.addEventListener('change', applyDark);
-			applyDark();
-		</script>
+		<meta name="theme-color" content="#711500" />
 		<!-- biome-ignore-start lint/nursery/noNonScalableViewport: zoom has been disabled since the first commit, with no reason recorded. It fails WCAG 1.4.4 (resize text); whether to allow it is a product call, not a lint fix. A range because a plain biome-ignore does not reach a diagnostic on an attribute. -->
 		<meta
 			name="viewport"

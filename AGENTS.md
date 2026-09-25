@@ -431,6 +431,15 @@ long-form ones still work but log a deprecation warning, which the e2e
 fixture fails a run on. Pinned to `3.0.0-alpha.11` — an alpha, so treat a
 version bump as a change that needs the app actually opened.
 
+**The app is always dark, and its palette is Web Awesome's tokens.**
+`src/lib/theme.css` carries the landing page's wash, texture, fonts and amber
+onto every page by setting `--wa-color-*` and friends in Web Awesome's last
+cascade layer, and `<html>` is `wa-dark` unconditionally. A component names a
+semantic token (`--wa-color-surface-default`, `--wa-color-text-quiet`), never
+a hex value, and a colour the palette lacks becomes a token there first. Page
+titles are `h1`s, which the theme sets in Muddy Tractor. See
+[docs/theme.md](docs/theme.md).
+
 **Prefer a `wa-*` component wherever an appropriate one exists** — a
 `wa-button` rather than a `<button>`, a `wa-dropdown` rather than a hand-built
 menu — and style it through its attributes and variables before reaching for
@@ -751,6 +760,7 @@ Four places, split on scope:
 | [docs/passkeys.md](docs/passkeys.md)                                                     | Passkeys: PRF and user-handle wraps, sign-in that unlocks, provider naming   |
 | [docs/account-recovery.md](docs/account-recovery.md)                                     | Partner-assisted sign-in after losing every way in, and its known gap        |
 | [docs/page-effects.md](docs/page-effects.md)                                             | The landing page's VFX-JS effects: the pipeline, halftone, grain, `mix()`    |
+| [docs/theme.md](docs/theme.md)                                                           | The app-wide look: palette tokens, always-dark, the CSS halftone and grain   |
 | [docs/embeds.md](docs/embeds.md)                                                         | URL linkification and inline embeds: providers, privacy gate, reddit path    |
 | [docs/messaging.md](docs/messaging.md)                                                   | Encrypted partner messages: threads, the board, unread, restore              |
 | [docs/rich-text.md](docs/rich-text.md)                                                   | The rich-text document: Lexical serialisation, the editors, embed blocks     |

@@ -8,6 +8,11 @@ line screen, then grain — and composited back over itself with
 (`@vfx-js/effects`: bloom, dither, scanline, chromatic aberration, vignette …)
 chains with ours.
 
+The rest of the app wears the same texture in plain CSS, under the content
+rather than over it — see [theme.md](theme.md). The landing page switches that
+off (`--page-texture: none`) so the two are not drawn together, and takes its
+wash and fonts from the same place.
+
 | Where                                 | What                                                                          |
 | ------------------------------------- | ----------------------------------------------------------------------------- |
 | `src/lib/vfx/`                        | The Svelte layer over VFX-JS: provider, context, attachment, page snapshot    |

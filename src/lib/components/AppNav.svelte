@@ -89,10 +89,10 @@
 			}
 
 			&[aria-current='page'] wa-avatar {
-				/* The blue label alone is easy to miss next to a photo, so the
+				/* The amber label alone is easy to miss next to a photo, so the
 				   active partner also gets a ring. */
 				outline: 2px solid currentColor;
-				outline-offset: 2px;
+				outline-offset: -2px;
 			}
 
 			span {

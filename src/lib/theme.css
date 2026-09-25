@@ -1,0 +1,221 @@
+/*
+ * The app's look: the landing page's rust wash, halftone and grain, and its
+ * type, carried onto every page. See docs/theme.md.
+ *
+ * Imported once, from the root layout, after Web Awesome's own stylesheet
+ * (src/lib/webawesome.ts). Web Awesome keeps everything in cascade layers, so
+ * the token overrides go in its last one, `wa-theme-overrides`, rather than
+ * unlayered: they win over its themes without also beating every `::part()`
+ * or per-component rule this app writes.
+ */
+
+@font-face {
+	font-family: 'Muddy Tractor';
+	src: url('/fonts/muddy-tractor.woff2') format('woff2');
+	font-display: swap;
+}
+
+/* Self-hosted rather than linked from Google Fonts, as Muddy Tractor is: no
+   request to a third party for every visitor, and a same-origin file the
+   landing page's snapshot can embed in its capture without a CORS round trip.
+   One variable file covers every weight; the latin subset is all the app's
+   copy needs. Source in static/fonts/rethink-sans-source.txt. */
+@font-face {
+	font-family: 'Rethink Sans';
+	src: url('/fonts/rethink-sans-latin.woff2') format('woff2');
+	font-weight: 400 800;
+	font-display: swap;
+}
+
+:root {
+	/* The landing page's two rust stops, and the amber its CTA is drawn in. */
+	--rust-light: #943700;
+	--rust-dark: #711500;
+	--accent-color: #ffac00;
+	--accent-tint: #ffcf7a;
+
+	--font-display: 'Muddy Tractor', var(--wa-font-family-body);
+
+	/* The wash every page sits on: rust left to right, darkening from 300px
+	   down to 800px. The stops are the landing page's, which is where the
+	   halftone band below starts and finishes fading, so the two line up. */
+	--page-wash:
+		linear-gradient(
+			to bottom,
+			transparent,
+			oklch(from var(--rust-light) calc(l * 0.7) c h) 300px,
+			oklch(from var(--rust-dark) calc(l * 0.6) c h) 800px
+		),
+		linear-gradient(to right, var(--rust-light) 10%, var(--rust-dark) 100%);
+}
+
+@layer wa-theme-overrides {
+	/* `:root` alone would lose to nothing here — a later layer beats `.wa-dark`
+	   in `wa-theme` whatever the specificity — but `.wa-dark` is listed too so
+	   a subtree someone marks dark again picks up these values, not the stock
+	   greys. */
+	:root,
+	.wa-dark {
+		/* Warm neutrals: Web Awesome's greys, re-hued toward the rust, so every
+		   derived fill and border (neutral buttons, input borders, dividers)
+		   reads as part of the same palette instead of cold blue-grey on
+		   orange. */
+		--wa-color-neutral-95: oklch(96% 0.015 65);
+		--wa-color-neutral-90: oklch(92% 0.025 62);
+		--wa-color-neutral-80: oklch(84% 0.035 58);
+		--wa-color-neutral-70: oklch(76% 0.045 54);
+		--wa-color-neutral-60: oklch(67% 0.05 50);
+		--wa-color-neutral-50: oklch(58% 0.055 46);
+		--wa-color-neutral-40: oklch(48% 0.06 43);
+		--wa-color-neutral-30: oklch(40% 0.065 40);
+		--wa-color-neutral-20: oklch(32% 0.065 38);
+		--wa-color-neutral-10: oklch(25% 0.06 37);
+		--wa-color-neutral-05: oklch(20% 0.05 36);
+
+		/* A filled neutral button is a raised rust slab with cream on it. Web
+		   Awesome's dark theme fills it with neutral-90, which on this palette
+		   is a pale cream block — the loudest thing on every screen, for the
+		   least important buttons on it. */
+		--wa-color-neutral-fill-loud: var(--wa-color-neutral-30);
+		--wa-color-neutral-on-loud: var(--wa-color-text-normal);
+
+		/* Brand is the CTA's amber, with 60 as its key. */
+		--wa-color-brand-95: #fff4e0;
+		--wa-color-brand-90: #ffe6b8;
+		--wa-color-brand-80: var(--accent-tint);
+		--wa-color-brand-70: #ffbd45;
+		--wa-color-brand-60: var(--accent-color);
+		--wa-color-brand-50: #e08e00;
+		--wa-color-brand-40: #b36d00;
+		--wa-color-brand-30: #8a5000;
+		--wa-color-brand-20: #613600;
+		--wa-color-brand-10: #3d2000;
+		--wa-color-brand-05: #2a1500;
+		--wa-color-brand: var(--accent-color);
+
+		/* Solid brand is amber with dark rust on it, as bright as the landing
+		   page's CTA. Web Awesome's dark theme puts white on brand-50, which on
+		   amber is illegible. */
+		--wa-color-brand-fill-quiet: color-mix(in oklab, var(--accent-color) 14%, transparent);
+		--wa-color-brand-fill-normal: color-mix(in oklab, var(--accent-color) 24%, transparent);
+		--wa-color-brand-fill-loud: var(--accent-color);
+		--wa-color-brand-border-quiet: color-mix(in oklab, var(--accent-color) 30%, transparent);
+		--wa-color-brand-border-normal: color-mix(in oklab, var(--accent-color) 60%, transparent);
+		--wa-color-brand-border-loud: var(--accent-color);
+		--wa-color-brand-on-quiet: var(--accent-color);
+		--wa-color-brand-on-normal: var(--accent-tint);
+		--wa-color-brand-on-loud: oklch(from var(--rust-dark) calc(l * 0.55) c h);
+
+		/* Opaque, and darker than the wash they sit on. Components paint these
+		   under things that have to hide what is behind them — a sticky footer's
+		   fade, a reaction pill over a bubble's edge — so a translucent surface
+		   would let content show through. */
+		--wa-color-surface-lowered: oklch(16% 0.045 36);
+		--wa-color-surface-default: oklch(21% 0.055 37);
+		--wa-color-surface-raised: oklch(26% 0.065 38);
+		--wa-color-surface-border: color-mix(in oklab, var(--accent-color) 28%, transparent);
+
+		--wa-color-text-normal: oklch(94% 0.035 78);
+		--wa-color-text-quiet: oklch(80% 0.06 62);
+		--wa-color-text-link: var(--accent-color);
+
+		/* The landing page's focus ring. */
+		--wa-color-focus: var(--accent-tint);
+
+		--wa-color-overlay-modal: color-mix(in oklab, oklch(12% 0.04 36) 70%, transparent);
+
+		--wa-font-family-body: 'Rethink Sans', ui-sans-serif, system-ui, sans-serif;
+		--wa-font-family-heading: var(--wa-font-family-body);
+		--wa-font-weight-heading: 700;
+
+		/* The CTA's corners are 0.2em: squarer than Web Awesome's default. */
+		--wa-border-radius-scale: 0.6;
+
+		/* A text colour, not Web Awesome's red-40, which is a light-theme value
+		   and all but invisible on rust. */
+		--wa-color-text-danger: var(--wa-color-red-70);
+	}
+}
+
+/*
+ * The page itself. On both html and body: the html one paints the overscroll
+ * area — without it dragging past the top reveals the default white — and the
+ * body one is what the landing page's snapshot captures, since it captures
+ * <body>, not the canvas.
+ */
+html,
+body {
+	background: var(--page-wash);
+}
+
+body {
+	/* The texture layers below are behind the content (z-index -1) but in
+	   front of the body's own background, which needs the body to be a
+	   stacking context — otherwise a negative z-index goes under the body's
+	   background too, and the texture is painted where nobody can see it. */
+	position: relative;
+	isolation: isolate;
+}
+
+/*
+ * The landing page's texture, in CSS: its halftone line screen fading out from
+ * 300px to 800px, and grain over the whole window.
+ *
+ * Not the landing page's VFX pipeline, which screens a snapshot of the page and
+ * holds that frame until the next capture — right for a page that sits still,
+ * wrong for one people type into, where the screen would lag the content. Here
+ * the texture is under the content rather than over it, so nothing has to be
+ * recaptured and nothing a person reads is screened.
+ *
+ * `--page-texture: none` switches both off. The landing page does, because its
+ * VFX pass already draws them; drawn twice, the grain doubled and the halftone
+ * showed through its own screen as a moiré.
+ */
+body::before,
+body::after {
+	content: '';
+	display: var(--page-texture, block);
+	pointer-events: none;
+	z-index: -1;
+	/* Soft-light, as the landing page's effects canvas is — 50% grey is its
+	   identity, so each layer only has to describe how far from grey it goes. */
+	mix-blend-mode: soft-light;
+}
+
+/* The halftone: angle 15° from horizontal, 8px cells, the landing page's
+   settings. A triangle from black to mid-grey approximates what its screen
+   does to a tone this dark. Opacity on a soft-lit layer is the same as the
+   landing page's mix toward grey (see "Per-effect opacity and fade" in
+   docs/page-effects.md); 0.35 rather than its 0.4 because this screen has no
+   clipped flats, and at 0.4 it measured noticeably harder than the real one. */
+body::before {
+	position: absolute;
+	inset: 0 0 auto;
+	height: 800px;
+	opacity: 0.35;
+	background: repeating-linear-gradient(195deg, #000 0, #6e6e6e 4px, #000 8px);
+	mask-image: linear-gradient(to bottom, #000 300px, transparent 800px);
+}
+
+/* The grain: SVG noise, desaturated and squeezed around 50% grey, measured
+   against a screenshot of the landing page to the same spread (about 6 levels
+   of standard deviation on the dark wash). `color-interpolation-filters` is
+   sRGB because the default, linearRGB, turns the noise's 0.5 midpoint into
+   about 0.73 on the way out — lighter than soft-light's neutral, so the grain
+   lifted the whole page by some 25 levels instead of only texturing it. Fixed
+   to the window, so a long public page keeps its grain all the way down, as
+   the landing page's does. */
+body::after {
+	position: fixed;
+	inset: 0;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncG type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncB type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncA type='table' tableValues='1 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Page titles in the landing page's display face. Only h1: Muddy Tractor is a
+   distressed poster face, and at section-heading sizes its texture turns to
+   noise. */
+:where(h1) {
+	font-family: var(--font-display);
+	font-weight: 400;
+	color: var(--accent-color);
+}

@@ -28,21 +28,12 @@
 </script>
 
 <svelte:head>
-	<!-- Page-scoped body rule, in the layout's idiom: each shell sets the body
-	     rules it needs through svelte:head so they mount and unmount with it.
-	     On both body and html — the html one is what paints the overscroll
-	     area, and without it dragging past the top reveals the default white. -->
+	<!-- The wash is the app-wide one (src/lib/theme.css). Only the CSS
+	     texture is switched off here: the effects below draw this page's
+	     halftone and grain, and the two drawn together doubled the grain. -->
 	<style>
-	html,
-	body {
-		background:
-			linear-gradient(
-				to bottom,
-				transparent,
-				oklch(from #943700 calc(l * 0.7) c h) 300px,
-				oklch(from #711500 calc(l * 0.6) c h) 800px
-			),
-			linear-gradient(to right, #943700 10%, #711500 100%);
+	:root {
+		--page-texture: none;
 	}
 </style>
 </svelte:head>
@@ -86,27 +77,11 @@
 </div>
 
 <style>
-	@font-face {
-		font-family: 'Muddy Tractor';
-		src: url('/fonts/muddy-tractor.woff2') format('woff2');
-		font-display: swap;
-	}
-
-	/* Self-hosted rather than linked from Google Fonts, as Muddy Tractor is:
-	   no request to a third party for every visitor, and a same-origin file
-	   the page snapshot can embed in its capture without a CORS round trip.
-	   One variable file covers every weight; the latin subset is all this
-	   page's copy needs. Source in static/fonts/rethink-sans-source.txt. */
-	@font-face {
-		font-family: 'Rethink Sans';
-		src: url('/fonts/rethink-sans-latin.woff2') format('woff2');
-		font-weight: 400 800;
-		font-display: swap;
-	}
+	/* Both faces are declared app-wide, in src/lib/theme.css. */
 
 	.landing {
 		/* Transparent: the wash behind the halftone overlay lives on the body
-		   (see the svelte:head style) so it fills the whole page, header
+		   (the app-wide one in src/lib/theme.css) so it fills the whole page, header
 		   included, not just this column. */
 		display: flex;
 		flex-direction: column;
@@ -121,7 +96,7 @@
 		text-align: center;
 
 		color: var(--accent-color);
-		font-family: 'Rethink Sans', var(--wa-font-family-body);
+		font-family: var(--wa-font-family-body);
 
 		header {
 			display: flex;
@@ -133,7 +108,7 @@
 			h1 {
 				/* Was a flat 5rem, which ran off both edges of a phone. The vw
 				   term keeps the desktop size and shrinks it to fit below that. */
-				font-family: 'Muddy Tractor', var(--wa-font-family-body);
+				font-family: var(--font-display);
 				font-size: clamp(2.5rem, 10vw, 7em);
 				margin: 0;
 				/* Never wraps, so the page capture cannot wrap it either. The

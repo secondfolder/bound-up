@@ -184,7 +184,9 @@
 	<input type="hidden" name="wrapBlob" value="" />
 	<input type="hidden" name="timezone" value="" />
 
-	<wa-button type="submit" disabled={!hydrated || working}>Sign Up</wa-button>
+	<wa-button type="submit" variant="brand" appearance="outlined" disabled={!hydrated || working}
+		>Sign Up</wa-button
+	>
 	{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
 	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 </form>

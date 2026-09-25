@@ -15,6 +15,10 @@
 		: resolve('/signup');
 </script>
 
+<!-- In the landing page's display face, as every page title is (src/lib/theme.css):
+     without one, these were the only screens with nothing of it but the wash. -->
+<h1>Log in</h1>
+
 <LoginForm data={data.loginForm} redirectTo={data.redirectTo} reason={data.reason} />
 
 <a class="cross-link" href={signupHref}>Create an account</a>
@@ -22,6 +26,12 @@
 <HomeScreenHint />
 
 <style>
+	h1 {
+		text-align: center;
+		font-size: clamp(2.5rem, 12vw, 4rem);
+		margin: 1rem 0 1.5rem;
+	}
+
 	.cross-link {
 		display: block;
 		margin: 1rem auto 0;

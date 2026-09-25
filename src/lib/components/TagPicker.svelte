@@ -379,7 +379,10 @@
 
 	.problem {
 		margin: 0;
-		color: var(--wa-color-danger-text, #a52a2a);
+		/* --wa-color-text-danger is the app's danger text colour (src/lib/theme.css).
+		   This used to read --wa-color-danger-text, which nothing defines, so it
+		   always fell back to a brown that all but vanishes on the rust wash. */
+		color: var(--wa-color-text-danger);
 		font-size: 0.8rem;
 	}
 </style>

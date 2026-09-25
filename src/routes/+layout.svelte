@@ -6,6 +6,9 @@
 	// src/lib/webawesome.ts, and invariant 16 in AGENTS.md for why that puts Lit
 	// in the server graph.
 	import '$lib/webawesome';
+	// After Web Awesome's stylesheet, which webawesome.ts imports: the app's
+	// palette, type and page texture, over its tokens. See docs/theme.md.
+	import '$lib/theme.css';
 
 	type Props = {
 		children?: Snippet;
@@ -39,8 +42,6 @@
 
 <style>
 	:root {
-		--wa-color-text-danger: var(--wa-color-red-40);
-
 		/* safe area inset on iOS takes into account the corner radius of the screen
 	        which in some situations is too aggressive and we only want the safe area
 	        inset to include the home indicator bar so --safe-area-inset-bottom-min is
@@ -55,7 +56,6 @@
 			0px,
 			calc(env(safe-area-inset-bottom, 0) - var(--safe-area-inset-bottom-min-max-delta))
 		);
-		--accent-color: #ffac00;
 	}
 
 	/**
@@ -77,5 +77,9 @@
 		--wa-color-on-loud: currentColor;
 		--wa-color-on-normal: currentColor;
 		--wa-color-on-quiet: currentColor;
+	}
+
+	:global(wa-card) {
+		box-shadow: none;
 	}
 </style>

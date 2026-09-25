@@ -111,6 +111,7 @@
 			li {
 				list-style-type: none;
 				border-bottom: 1px solid var(--wa-color-surface-border);
+				margin: 0;
 
 				a {
 					display: flex;

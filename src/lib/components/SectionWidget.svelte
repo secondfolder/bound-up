@@ -87,6 +87,9 @@
 		&.bodyless::part(body) {
 			display: none;
 		}
+		&.bodyless::part(header) {
+			border-block-end-width: 0;
+		}
 	}
 
 	h2 {
