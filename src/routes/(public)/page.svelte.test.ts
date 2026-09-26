@@ -36,11 +36,11 @@ describe('/+page.svelte', () => {
 		expect(screen.queryByRole('link', { name: 'Sign up' })).not.toBeInTheDocument();
 	});
 
-	it('logged in: the CTA becomes Start and points at the app', () => {
+	it('logged in: the CTA becomes Open and points at the app', () => {
 		pageState.data.user = { id: 'u-ada' };
 		render(Page);
 
-		expect(screen.getByRole('link', { name: 'Start' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Open' })).toBeInTheDocument();
 		expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument();
 	});
 });

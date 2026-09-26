@@ -24,13 +24,6 @@ export type MediaStore = {
 };
 
 /**
- * Object keys are `messages/<partnershipId>/<messageId>/<attachmentId>`.
- *
- * The prefix layout exists so that disconnecting can delete a partnership's
- * media in one call without enumerating rows. The key is still stored on the
- * row, so this layout can change without a migration.
- */
-/**
  * The three R2 methods this app uses, hand-declared.
  *
  * `@cloudflare/workers-types` is deliberately not imported, for the reason
@@ -53,17 +46,39 @@ export type MediaBucket = {
 	}) => Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
 };
 
+/**
+ * Which top-level prefix an object lives under: whether it self-destructs.
+ *
+ * The split exists for the bucket's lifecycle rule, which deletes anything
+ * under `expiring/` older than 31 days (see README, "Deploy setup"). No
+ * self-destructing file lives past 30, so everything that rule catches is
+ * either expired or an orphan — an object from a send that failed after its
+ * files were written but before its rows, which no row points at and the
+ * sweep therefore can never find. A lifecycle rule can only match a prefix, so
+ * permanent media has to live under a different one.
+ */
+export const MEDIA_LIFETIMES = ['expiring', 'permanent'] as const;
+export type MediaLifetime = (typeof MEDIA_LIFETIMES)[number];
+
+/**
+ * Object keys are `<lifetime>/<partnershipId>/<messageId>/<attachmentId>`.
+ *
+ * Partnership second so that disconnecting can delete a partnership's media
+ * one prefix per lifetime, without enumerating rows. The key is still stored
+ * on the row, so this layout can change without a migration.
+ */
 export function attachmentKey(
+	lifetime: MediaLifetime,
 	partnershipId: string,
 	messageId: string,
 	attachmentId: string
 ): string {
-	return `messages/${partnershipId}/${messageId}/${attachmentId}`;
+	return `${lifetime}/${partnershipId}/${messageId}/${attachmentId}`;
 }
 
-/** Everything belonging to one partnership, for `deletePrefix`. */
-export function partnershipMediaPrefix(partnershipId: string): string {
-	return `messages/${partnershipId}/`;
+/** One lifetime's worth of a partnership's media, for `deletePrefix`. */
+export function partnershipMediaPrefix(lifetime: MediaLifetime, partnershipId: string): string {
+	return `${lifetime}/${partnershipId}/`;
 }
 
 /**

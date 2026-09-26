@@ -43,7 +43,7 @@ describe('LoginForm', () => {
 		await waitFor(() => expect(waProp(login, 'appearance')).toBe('outlined'));
 
 		await userEvent.type(email, '.com');
-		await waitFor(() => expect(waProp(login, 'appearance')).toBe('filled'));
+		await waitFor(() => expect(waProp(login, 'appearance')).toBe('accent'));
 
 		await userEvent.clear(password);
 		await waitFor(() => expect(waProp(login, 'appearance')).toBe('outlined'));

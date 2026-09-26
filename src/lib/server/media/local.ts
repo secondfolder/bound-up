@@ -89,7 +89,7 @@ export function createLocalStore(root: string): MediaStore {
 		},
 
 		async deletePrefix(prefix) {
-			// Prefixes here are always `messages/<id>/`, i.e. a directory, so this
+			// Prefixes here are always `<lifetime>/<id>/`, i.e. a directory, so this
 			// counts the files it is about to remove and then drops the tree.
 			const directory = path.resolve(root, prefix.replace(TRAILING_SLASH, ''));
 			if (!directory.startsWith(path.resolve(root) + path.sep)) {

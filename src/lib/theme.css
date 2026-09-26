@@ -36,6 +36,12 @@
 
 	--font-display: 'Muddy Tractor', var(--wa-font-family-body);
 
+	/* A small label laid over a photo or video: the modal overlay's near-black,
+	   thinner, so it stays readable over a white image without blacking out a
+	   dark one. Paired with a backdrop blur wherever it is used, which is what
+	   carries the contrast over busy detail. Text on it is --wa-color-text-normal. */
+	--media-badge-fill: color-mix(in oklab, oklch(12% 0.04 36) 55%, transparent);
+
 	/* The wash every page sits on: rust left to right, darkening from 300px
 	   down to 800px. The stops are the landing page's, which is where the
 	   halftone band below starts and finishes fading, so the two line up. */

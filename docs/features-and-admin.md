@@ -5,7 +5,7 @@ account is given them. Nothing can be bought yet; for now an admin grants a
 feature from the admin page. When purchases arrive, buying a feature will write
 the same row a grant does, so nothing that checks access has to change.
 
-Guides are the first, and so far only, feature.
+There are two so far: guides and permanent media.
 
 ## The pieces
 
@@ -76,6 +76,28 @@ person has it. Sharing within a partnership would be a second check alongside
 `/home/guides` and `/home/guides/[id]` require `guides`. The `/home` Guides card
 shows only when the account holds it — see
 [section-widgets.md](section-widgets.md).
+
+### Permanent media
+
+All message media self-destructs, after 1 hour to 30 days (see
+[messaging.md](messaging.md#self-destructing-media)). `permanentMedia` lets an
+account send media that never does.
+
+This check is not `requireFeature` in a load or an action. Never-expiring media
+is one value of a field on a send, not a page, so the data layer checks it:
+`resolveMediaExpiry` in `src/lib/server/messaging.ts` calls `userHasFeature`
+when a send with files asks for `never`, before anything is written to the
+store. It refuses with `needs-permanent-media`, which the two send endpoints
+answer with a 403. Both endpoints go through it, as would any future writer.
+
+The message pages pass `hasFeature(data.features, 'permanentMedia')` down to the
+composer. For those accounts the menu shows a "Never" item and starts on it
+instead of on two weeks. That only affects what is shown.
+
+The choice is made **when the message is sent** and stored on each attachment
+(`expires_at` null). Revoking the feature later does not start a countdown on
+media already sent as permanent. Granting it does not rescue media that is
+already counting down.
 
 ## Admin
 

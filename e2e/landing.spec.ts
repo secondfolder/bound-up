@@ -136,18 +136,41 @@ function correlationAt(
 	return covariance / Math.sqrt((sumAA / n - (sumA / n) ** 2) * (sumBB / n - (sumB / n) ** 2));
 }
 
-/** Waits for a capture of the body at the viewport's current size. */
-async function capturedAt(page: Page, width: number, height: number) {
+/**
+ * Waits for a capture of the body at its current size, after a resize to
+ * `width`. The body's height is read rather than assumed: the landing page is
+ * taller than the window (its CTA's bottom margin is sized from the width), so
+ * it is not the viewport's height.
+ */
+async function capturedAt(page: Page, width: number) {
 	await expect
 		.poll(
 			() =>
-				page.evaluate(() => {
+				page.evaluate((expectedWidth) => {
 					const source = document.querySelector<HTMLCanvasElement>('canvas.snapshot-source');
-					return source ? [source.width, source.height] : null;
-				}),
+					if (!source) {
+						return false;
+					}
+					// A bitmap is whole pixels; the body can be fractional.
+					const body = document.body.getBoundingClientRect();
+					return source.width === expectedWidth && Math.abs(source.height - body.height) < 1;
+				}, width),
 			{ timeout: 20_000 }
 		)
-		.toEqual([width, height]);
+		.toBe(true);
+}
+
+/**
+ * Pins the page to a fixed, whole-pixel height, taller than the landing's
+ * content at any width a test uses.
+ *
+ * The landing page's own height follows the width (the CTA's bottom margin is
+ * in `vw`), and that moves two things a resize test means to hold still: the
+ * page centre the grain is anchored to, and — at a fractional height — the
+ * whole-pixel capture, which then sits half a pixel off the body's centre.
+ */
+async function pinPageHeight(page: Page) {
+	await page.addStyleTag({ content: 'html body { height: 1400px; min-height: 1400px; }' });
 }
 
 test('the halftone screen and grain paint over the landing page', async ({ page }) => {
@@ -211,15 +234,15 @@ test('the halftone screen and grain paint over the landing page', async ({ page 
  * so what is left there is grain on grey — the page shows through untouched
  * but for the grain.
  *
- * The page is lengthened for the test: at 1000 × 700 the fade ends at
- * 300 + 0.35 × 700 = 545px, and the landing page is only as tall as the
- * window.
+ * The page is lengthened to a fixed 1400px for the test: at 1000 × 700 the
+ * fade ends at 300 + 0.35 × 700 = 545px, and the landing page's own height
+ * depends on the width.
  */
 test('the halftone fades out down the page, and the grain carries on', async ({ page }) => {
 	await page.setViewportSize({ width: 1000, height: 700 });
 	await page.goto('/');
 	await page.addStyleTag({ content: 'html body { min-height: 1400px; }' });
-	await capturedAt(page, 1000, 1400);
+	await capturedAt(page, 1000);
 	await effectsShown(page);
 
 	const statsOf = (pixels: number[], width: number, height: number, x: number) => {
@@ -389,9 +412,7 @@ test('the page snapshot covers the body 1:1 on a short viewport, and follows a r
 	}
 
 	await page.setViewportSize({ width: 600, height: 700 });
-	await capturedAt(page, 600, 700);
-	({ body } = await geometry());
-	expect(body.slice(2)).toEqual([600, 700]);
+	await capturedAt(page, 600);
 
 	// Narrow enough that the title overhangs the body. Left to itself SnapDOM
 	// widened the capture to take in the overhang, and a bitmap wider than the
@@ -423,7 +444,7 @@ test('the page snapshot covers the body 1:1 on a short viewport, and follows a r
 test('the grain stays put under the centre of the page across a resize', async ({ page }) => {
 	const centreBlock = async (width: number) => {
 		await page.setViewportSize({ width, height: 700 });
-		await capturedAt(page, width, 700);
+		await capturedAt(page, width);
 		const size = 32;
 		const pixels = await readEffects(page, {
 			x: width / 2 - size / 2,
@@ -435,6 +456,7 @@ test('the grain stays put under the centre of the page across a resize', async (
 	};
 
 	await page.goto('/');
+	await pinPageHeight(page);
 	await effectsShown(page);
 	const narrow = await centreBlock(1000);
 	const wide = await centreBlock(1060);
@@ -486,7 +508,7 @@ test('the screened title and subtitle line up with the real ones', async ({ page
 
 	const compare = async (width: number) => {
 		await page.setViewportSize({ width, height: 700 });
-		await capturedAt(page, width, 700);
+		await capturedAt(page, width);
 
 		const header = await page.locator('.landing header').boundingBox();
 		if (!header) {
@@ -578,6 +600,7 @@ test('the screened title and subtitle line up with the real ones', async ({ page
 	};
 
 	await page.goto('/');
+	await pinPageHeight(page);
 	await effectsShown(page);
 	await compare(1200);
 	await compare(640);
@@ -596,7 +619,7 @@ test('shrinking the window leaves no horizontal scroll', async ({ page }) => {
 	await effectsShown(page);
 	for (const width of [1100, 1000, 900, 800]) {
 		await page.setViewportSize({ width, height: 700 });
-		await capturedAt(page, width, 700);
+		await capturedAt(page, width);
 		// A redraw at the new size, which is when VFX resizes its canvas.
 		await readEffects(page, { x: 0, y: 0, width: 1, height: 1 });
 		const overflow = await page.evaluate(

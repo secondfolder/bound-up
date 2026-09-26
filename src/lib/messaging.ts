@@ -155,6 +155,116 @@ export const MAX_VIDEO_BYTES = 15 * 1024 * 1024;
  */
 export const MAX_CIPHERTEXT_BYTES = 64 * 1024;
 
+// ── self-destructing media ───────────────────────────────────────────────────
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * How long an attachment may live, chosen by the sender per message. The
+ * server accepts any whole number of milliseconds in this range, not only the
+ * presets, so the presets can change without a server change.
+ *
+ * The ceiling is what bounds R2 storage: without it, media is kept for as long
+ * as the partnership exists. Media that never expires is a feature
+ * (`permanentMedia`), not a longer duration.
+ */
+export const MEDIA_TTL_MIN_MS = HOUR_MS;
+export const MEDIA_TTL_MAX_MS = 30 * DAY_MS;
+export const MEDIA_TTL_DEFAULT_MS = 14 * DAY_MS;
+
+/**
+ * How many messages' bodies a board tile is sent to work out whether its unseen
+ * media is images or videos. Bodies are up to 64 KB each, so this bounds what an
+ * unread tile can add to the board. Past it the tile says "media".
+ */
+export const UNSEEN_MEDIA_MESSAGE_LIMIT = 6;
+
+/** The value a send posts for media that never self-destructs. */
+export const MEDIA_TTL_NEVER = 'never';
+
+export type MediaTtl = number | typeof MEDIA_TTL_NEVER;
+
+export const MEDIA_TTL_PRESETS: readonly { label: string; ms: number }[] = [
+	{ label: '1 hour', ms: HOUR_MS },
+	{ label: '6 hours', ms: 6 * HOUR_MS },
+	{ label: '1 day', ms: DAY_MS },
+	{ label: '3 days', ms: 3 * DAY_MS },
+	{ label: '1 week', ms: 7 * DAY_MS },
+	{ label: '2 weeks', ms: 14 * DAY_MS },
+	{ label: '30 days', ms: 30 * DAY_MS }
+];
+
+const DIGITS = /^\d+$/;
+
+/**
+ * Reads the posted lifetime. Absent is the default; anything that is neither
+ * `never` nor a whole number in range is null, for the caller to refuse.
+ */
+export function parseMediaTtl(value: string | null | undefined): MediaTtl | null {
+	if (value === null || value === undefined || value === '') {
+		return MEDIA_TTL_DEFAULT_MS;
+	}
+	if (value === MEDIA_TTL_NEVER) {
+		return MEDIA_TTL_NEVER;
+	}
+	if (!DIGITS.test(value)) {
+		return null;
+	}
+	const ms = Number(value);
+	return ms >= MEDIA_TTL_MIN_MS && ms <= MEDIA_TTL_MAX_MS ? ms : null;
+}
+
+/**
+ * "3 days", "5 hours", "12 minutes": the largest whole unit, rounded up so a
+ * countdown never claims less time than is left. Under a minute is "a moment".
+ */
+export function formatTimeLeft(ms: number): string {
+	if (ms < MINUTE_MS) {
+		return 'a moment';
+	}
+	// Rounded up to whole minutes BEFORE the unit is chosen. Choosing it from
+	// the raw milliseconds made media sent for "1 hour" read "60 minutes" a
+	// second later — 59:59 is under an hour, so the unit fell to minutes, and
+	// then rounding up brought it back to sixty of them.
+	const minutes = Math.ceil(ms / MINUTE_MS - 1e-9);
+	const units: [number, string][] = [
+		[DAY_MS / MINUTE_MS, 'day'],
+		[HOUR_MS / MINUTE_MS, 'hour'],
+		[1, 'minute']
+	];
+	for (const [size, name] of units) {
+		if (minutes >= size) {
+			const count = Math.ceil(minutes / size);
+			return `${count} ${name}${count === 1 ? '' : 's'}`;
+		}
+	}
+	return 'a moment';
+}
+
+/**
+ * A board tile's "Image self-destructs in 3 days".
+ *
+ * `kinds` is one entry per unseen file, or null when they are not all known —
+ * a body that would not decrypt, or more messages than the tile was sent — in
+ * which case it says "Media" rather than guess.
+ */
+export function describeUnseenMedia(
+	kinds: readonly ('image' | 'video')[] | null,
+	timeLeft: string
+): string {
+	const [first] = kinds ?? [];
+	const same = kinds !== null && first !== undefined && kinds.every((kind) => kind === first);
+	if (!same) {
+		return `Media self-destructs in ${timeLeft}`;
+	}
+	const noun = first === 'image' ? 'Image' : 'Video';
+	return kinds.length === 1
+		? `${noun} self-destructs in ${timeLeft}`
+		: `${kinds.length} ${noun.toLowerCase()}s self-destruct in ${timeLeft}`;
+}
+
 /** A reaction is an emoji, so its ciphertext has no business being large. */
 export const MAX_REACTION_CIPHERTEXT_BYTES = 4 * 1024;
 

@@ -9,7 +9,11 @@
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"moduleResolution": "bundler"
+		"moduleResolution": "bundler",
+		// So vite.config.ts can import its local plugins with the `.ts` extension
+		// that Vite's native config loader (the planned default) requires. Safe
+		// because nothing here is emitted by tsc: `noEmit` comes from SvelteKit.
+		"allowImportingTsExtensions": true
 	},
 	"include": [
 		".svelte-kit/ambient.d.ts",
@@ -22,6 +26,7 @@
 		"src/**/*.ts",
 		"src/**/*.svelte",
 		"e2e/**/*.ts",
+		"vite-plugins/**/*.ts",
 		"vitest-setup-browser.ts",
 		"better-auth.config.ts",
 		"drizzle.config.ts",

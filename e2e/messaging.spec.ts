@@ -1,4 +1,6 @@
 import { Buffer } from 'node:buffer';
+import { randomUUID } from 'node:crypto';
+import { createClient } from '@libsql/client';
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { defined } from '../src/lib/testing/defined';
@@ -15,6 +17,26 @@ import {
 	typeRichText,
 	writeThread
 } from './helpers';
+import { E2E_DATABASE_URL } from './run-paths';
+
+/**
+ * A statement straight against the e2e database, for the state no UI can
+ * produce in a test's lifetime — an attachment's expiry an hour on, or a
+ * feature grant without going through an admin.
+ */
+async function sql(statement: string, args: (string | number)[]) {
+	const client = createClient({
+		url: E2E_DATABASE_URL,
+		// Other workers are writing through the dev server meanwhile; wait out a
+		// lock rather than fail with SQLITE_BUSY.
+		timeout: 5000
+	});
+	try {
+		return await client.execute({ sql: statement, args });
+	} finally {
+		client.close();
+	}
+}
 
 /**
  * Encrypted messages between two partners, over HTTP, in two real browsers.
@@ -635,6 +657,168 @@ test.describe('attachments', () => {
 			await ada.close();
 			await jun.close();
 			await cas.close();
+		}
+	});
+
+	/**
+	 * Self-destructing media, end to end: the sender's choice reaches the
+	 * server, the reader sees the countdown, and once the expiry has passed the
+	 * file is gone for good — replaced by the placeholder in the thread and on
+	 * the board, rather than an error.
+	 *
+	 * Waiting out even the shortest lifetime is not an option, so the expiry is
+	 * moved into the past in the database; that is the same state an hour's
+	 * wait would leave.
+	 */
+	test('media sent for an hour counts down, then self-destructs', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		// Routing turns off Jun's HTTP cache. The download is cacheable until its
+		// expiry, which is right for real time passing, but this test moves the
+		// expiry under a response the browser already holds — so without this the
+		// board tile would be served the cached file instead of asking again.
+		await jun.page.route('**/attachments/**', (route) => route.continue());
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await clickWaButton(ada.page, 'Write something');
+			// No choice to make until there is a file to make it for.
+			await expect(ada.page.getByRole('button', { name: /^Self-destructs after/ })).toHaveCount(0);
+			await ada.page
+				.locator('input[type="file"]')
+				.setInputFiles({ name: 'sunset.png', mimeType: 'image/png', buffer: Png });
+			await expect(ada.page.getByText('sunset.png')).toBeVisible();
+
+			await clickWaButton(ada.page, 'Self-destructs after 2 weeks');
+			await ada.page.getByRole('menuitem', { name: '1 hour', exact: true }).click();
+			await expect(
+				ada.page.getByRole('button', { name: 'Self-destructs after 1 hour' })
+			).toBeVisible();
+
+			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
+			await clickWaButton(ada.page, 'Send');
+			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+			await expect(ada.page.getByRole('img', { name: 'sunset.png' })).toBeVisible();
+			await expect(ada.page.getByText('in 1 hour', { exact: true })).toBeVisible();
+
+			// Jun reads it, with the countdown over it.
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
+			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+			await expect(jun.page.getByRole('img', { name: 'sunset.png' })).toBeVisible();
+			await expect(jun.page.getByText('in 1 hour', { exact: true })).toBeVisible();
+
+			// ── an hour later ──────────────────────────────────────────────────
+			const [, threadId] = defined(
+				/\/messages\/(?<threadId>[0-9a-f-]{36})$/.exec(jun.page.url()),
+				'the thread id in the URL'
+			);
+			const updated = await sql(
+				`update message_attachments set expires_at = ?
+				 where message_id in (select id from messages where thread_id = ?)
+				 returning id`,
+				[Date.now() - 60_000, defined(threadId, 'the thread id')]
+			);
+			// Counted from what came back: libsql reports no rowsAffected for a
+			// statement with `returning`.
+			expect(updated.rows).toHaveLength(1);
+
+			// In the thread: the placeholder, and no file and no countdown. The
+			// server says it has expired in the load, so nothing is downloaded.
+			await jun.page.reload();
+			const kaboom = jun.page.getByRole('img', { name: 'This media has self-destructed' });
+			await expect(kaboom).toBeVisible();
+			await expect(jun.page.getByText('Kaboom! This media has self-destructed.')).toBeVisible();
+			await expect(jun.page.getByRole('img', { name: 'sunset.png' })).toHaveCount(0);
+			await expect(jun.page.locator('.countdown')).toHaveCount(0);
+
+			// And the download itself is refused, as gone rather than missing.
+			const attachmentId = String(defined(updated.rows[0], 'the updated attachment').id);
+			const status = await jun.page.evaluate(async (id) => {
+				const [, , partnership] = globalThis.location.pathname.split('/');
+				return (await fetch(`/api/partnerships/${partnership}/attachments/${id}`)).status;
+			}, attachmentId);
+			expect(status).toBe(410);
+
+			// On the board the tile learns it from the download's 410, and shows
+			// the bomb in the photo's place.
+			await jun.page.getByRole('link', { name: 'Back to messages' }).click();
+			await jun.page.waitForURL(/\/messages$/);
+			await expect(
+				jun.page
+					.getByRole('list', { name: 'Already read' })
+					.getByRole('img', { name: 'This media has self-destructed' })
+			).toBeVisible();
+			await expect(jun.page.locator('ul[aria-label] img.thumb')).toHaveCount(0);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	/**
+	 * "Never" is the `permanentMedia` feature: offered only to an account that
+	 * holds it. The server refusing it from anyone else is covered by the
+	 * server tests; this is what each account is shown.
+	 */
+	test('only an account with permanent media is offered "Never"', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+			// Features are read from the database per request, so the grant
+			// applies from Ada's next page load without signing in again.
+			await sql(
+				`insert into user_features (id, user_id, feature, source)
+				 select ?, id, 'permanentMedia', 'grant' from user where email = ?`,
+				[randomUUID(), ada.who.email]
+			);
+
+			/** Opens the self-destruct menu with a file attached, and returns its trigger. */
+			const openPicker = async (page: Page, partner: string) => {
+				await page.goto('/home');
+				await openBoard(page, partner);
+				await clickWaButton(page, 'Write something');
+				await page
+					.locator('input[type="file"]')
+					.setInputFiles({ name: 'forever.png', mimeType: 'image/png', buffer: Png });
+				const triggerButton = page.getByRole('button', { name: /^Self-destructs after/ });
+				await expect(triggerButton).toBeVisible();
+				return triggerButton;
+			};
+			const item = (page: Page, name: string) => page.getByRole('menuitem', { name, exact: true });
+
+			// Jun: two weeks by default, and no "Never" among the choices.
+			const junTrigger = await openPicker(jun.page, 'Ada');
+			await expect(junTrigger).toHaveAccessibleName('Self-destructs after 2 weeks');
+			await clickWaButton(jun.page, 'Self-destructs after 2 weeks');
+			await expect(item(jun.page, '1 hour')).toBeVisible();
+			await expect(item(jun.page, 'Never')).toHaveCount(0);
+
+			// Ada: "Never" is on offer, and is where she starts.
+			const adaTrigger = await openPicker(ada.page, 'Jun');
+			await expect(adaTrigger).toHaveAccessibleName('Self-destructs after Never');
+			await clickWaButton(ada.page, 'Self-destructs after Never');
+			await expect(item(ada.page, 'Never')).toBeVisible();
+			await item(ada.page, 'Never').click();
+			await expect(adaTrigger).toHaveAccessibleName('Self-destructs after Never');
+			await clickWaButton(ada.page, 'Send');
+			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+			// Sent, and permanent: the photo with no countdown on it.
+			await expect(ada.page.getByRole('img', { name: 'forever.png' })).toBeVisible();
+			await expect(ada.page.locator('.countdown')).toHaveCount(0);
+		} finally {
+			await ada.close();
+			await jun.close();
 		}
 	});
 

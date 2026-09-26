@@ -755,17 +755,38 @@ export const messageAttachments = sqliteTable(
 		 * The object key, written before the DB rows and never derived from them
 		 * at read time.
 		 *
-		 * The layout is `messages/<partnershipId>/<messageId>/<id>` so that
-		 * disconnecting can delete a whole prefix, but storing the key means that
-		 * layout can change without a migration.
+		 * The layout is `<expiring|permanent>/<partnershipId>/<messageId>/<id>`
+		 * (see `MEDIA_LIFETIMES`), so the bucket's lifecycle rule can match the
+		 * self-destructing half and disconnecting can delete whole prefixes, but
+		 * storing the key means that layout can change without a migration.
 		 *
 		 * Nothing cascades from D1 into R2. Deleting a partnership removes these
-		 * rows and leaves the objects — see `purgePartnershipMedia`.
+		 * rows, so the disconnect action purges the partnership's prefixes itself.
 		 */
 		storageKey: text('storage_key').notNull(),
+		/**
+		 * When the object stops being served and becomes eligible for the sweep.
+		 * Null is permanent, which only the `permanentMedia` feature can ask for.
+		 *
+		 * Set by the server from the send time and the chosen lifetime, never by
+		 * the client, whose clock the server has no reason to trust. Checked on
+		 * every read, so expiry is exact even though the sweep that deletes the
+		 * object only runs every quarter hour — see `src/lib/server/media/expiry.ts`.
+		 */
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+		/**
+		 * When the sweep deleted the object. The row outlives the object on
+		 * purpose: it is a few bytes, and it is what lets the thread say the media
+		 * self-destructed rather than that it is missing.
+		 */
+		purgedAt: integer('purged_at', { mode: 'timestamp_ms' }),
 		...timestamps
 	},
-	(table) => [index('message_attachments_message_id_idx').on(table.messageId)]
+	(table) => [
+		index('message_attachments_message_id_idx').on(table.messageId),
+		// The sweep's query: unpurged rows whose expiry has passed.
+		index('message_attachments_expiry_idx').on(table.purgedAt, table.expiresAt)
+	]
 );
 
 /**

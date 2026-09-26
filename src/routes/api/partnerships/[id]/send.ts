@@ -1,5 +1,10 @@
 import { error } from '@sveltejs/kit';
-import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from '$lib/messaging';
+import {
+	MAX_ATTACHMENT_TOTAL_BYTES,
+	MAX_ATTACHMENTS_PER_MESSAGE,
+	type MediaTtl,
+	parseMediaTtl
+} from '$lib/messaging';
 import type { OutgoingAttachment, SendFailure } from '$lib/server/messaging';
 
 /**
@@ -23,6 +28,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export type ParsedSend = {
 	form: FormData;
 	attachments: OutgoingAttachment[];
+	/** How long the attachments live. Enforced by the data layer, which also checks the feature. */
+	mediaTtl: MediaTtl;
 };
 
 /**
@@ -81,8 +88,15 @@ export async function parseSend(request: Request): Promise<ParsedSend> {
 		error(413, 'Those files add up to more than 25 MB.');
 	}
 
+	const rawTtl = form.get('mediaTtlMs');
+	const mediaTtl = parseMediaTtl(typeof rawTtl === 'string' ? rawTtl : null);
+	if (mediaTtl === null) {
+		error(400, 'Media can self-destruct after between 1 hour and 30 days.');
+	}
+
 	return {
 		form,
+		mediaTtl,
 		// `.stream()` rather than `.arrayBuffer()`: formData has already buffered
 		// once, and streaming into the store avoids a second full copy.
 		attachments: files.map((file, index) => ({
@@ -104,7 +118,10 @@ export function sendFailureStatus(reason: SendFailure): number {
 		case 'bad-icon':
 		case 'no-such-tag':
 		case 'duplicate-attachment':
+		case 'bad-media-ttl':
 			return 400;
+		case 'needs-permanent-media':
+			return 403;
 		default:
 			return 413;
 	}

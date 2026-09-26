@@ -13,6 +13,10 @@ export const FEATURES = {
 	guides: {
 		name: 'Guides',
 		description: 'Edge guides: a counter that reveals instructions as it climbs.'
+	},
+	permanentMedia: {
+		name: 'Permanent media',
+		description: 'Send photos and videos in messages that never self-destruct.'
 	}
 } as const satisfies Record<string, { name: string; description: string }>;
 

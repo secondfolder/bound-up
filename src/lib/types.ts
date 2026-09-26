@@ -218,6 +218,31 @@ export type ThreadStickerView = {
 	previewCiphertext: string;
 	/** Cached derived metadata for the first message, encrypted like the body. */
 	previewMetadataCiphertext: string | null;
+	/**
+	 * Self-destructing media the viewer has not seen yet: files in their
+	 * partner's messages since they last read the thread. Null when there is
+	 * none, which includes every read thread.
+	 */
+	unseenMedia: UnseenMediaView | null;
+};
+
+/**
+ * What a board tile needs to say "Image self-destructs in 3 days".
+ *
+ * The server knows when each file expires but not whether it is an image or a
+ * video — that is inside the encrypted body — so it sends the bodies of the
+ * messages carrying the files and the browser decrypts them to find out.
+ */
+export type UnseenMediaView = {
+	/** The soonest expiry among the unseen files: the most urgent one. */
+	expiresAt: Date;
+	/** Each message with unseen files, and which of its attachments those are. */
+	messages: { ciphertext: string; attachmentIds: string[] }[];
+	/**
+	 * More messages carry unseen files than are listed here, so the browser
+	 * cannot know every kind and should say "media".
+	 */
+	truncated: boolean;
 };
 
 export type TagView = {
@@ -230,6 +255,13 @@ export type TagView = {
 export type AttachmentView = {
 	id: string;
 	byteSize: number;
+	/** When it self-destructs; null for permanent media. */
+	expiresAt: Date | null;
+	/**
+	 * Already self-destructed as of the load, so the browser does not ask for
+	 * it at all. Worked out by the server, whose clock decides expiry.
+	 */
+	expired: boolean;
 };
 
 export type ReactionView = {

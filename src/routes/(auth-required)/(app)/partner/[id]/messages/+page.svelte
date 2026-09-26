@@ -15,7 +15,8 @@
 		trustAllowsSending,
 		trustFor
 	} from '$lib/crypto/trust.svelte';
-	import { sendMessage } from '$lib/messaging/client';
+	import { hasFeature } from '$lib/features';
+	import { type ComposedMessage, sendMessage } from '$lib/messaging/client';
 	import { watchPartnership } from '$lib/messaging/live';
 	import type { PageData } from './$types';
 
@@ -76,10 +77,7 @@
 
 	const targets = $derived([data.recipients.mine, data.recipients.theirs]);
 
-	async function send(
-		message: { text: string; files: File[] },
-		tagIds: string[] = []
-	): Promise<string | null> {
+	async function send(message: ComposedMessage, tagIds: string[] = []): Promise<string | null> {
 		const outcome = await sendMessage(
 			{ kind: 'new-thread', partnershipId: data.partner.id, tagIds },
 			message,
@@ -171,6 +169,7 @@
 					partnershipId={data.partner.id}
 					tags={data.tags}
 					{send}
+					permanentMedia={hasFeature(data.features, 'permanentMedia')}
 					close={() => { composing = false; }}
 				/>
 			{/if}

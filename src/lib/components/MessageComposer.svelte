@@ -1,6 +1,13 @@
 <script lang="ts">
-	import { MAX_ATTACHMENTS_PER_MESSAGE } from '$lib/messaging';
-	import { checkComposed } from '$lib/messaging/client';
+	import type { WaSelectEvent } from '@awesome.me/webawesome/dist/events/select.js';
+	import {
+		MAX_ATTACHMENTS_PER_MESSAGE,
+		MEDIA_TTL_DEFAULT_MS,
+		MEDIA_TTL_NEVER,
+		MEDIA_TTL_PRESETS,
+		type MediaTtl
+	} from '$lib/messaging';
+	import { type ComposedMessage, checkComposed } from '$lib/messaging/client';
 	import { MESSAGE_FEATURES } from '$lib/richtext-editor';
 	import RichTextEditor from './RichTextEditor.svelte';
 
@@ -28,9 +35,10 @@
 		placeholder = 'Say something…',
 		submitLabel = 'Send',
 		initialText = '',
-		onTextChange
+		onTextChange,
+		permanentMedia = false
 	}: {
-		send: (message: { text: string; files: File[] }) => Promise<string | null>;
+		send: (message: ComposedMessage) => Promise<string | null>;
 		placeholder?: string;
 		submitLabel?: string;
 		/** A restored draft. Initial only, like the editor's own `value`. */
@@ -42,11 +50,34 @@
 		 * composer stays presentational and the caller decides where it goes.
 		 */
 		onTextChange?: ((text: string) => void) | undefined;
+		/**
+		 * Whether to offer "Never" among the self-destruct choices — the
+		 * `permanentMedia` feature. It only decides what is shown: the server
+		 * refuses a `never` from an account without the feature regardless.
+		 */
+		permanentMedia?: boolean;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
 	let text = $state(initialText);
 	let files: File[] = $state([]);
+	/**
+	 * An account that may send permanent media starts on "Never"; everyone
+	 * else on two weeks. Derived rather than copied into state, so a grant
+	 * that arrives with a refresh moves an untouched menu along with it.
+	 */
+	const defaultTtl = $derived<MediaTtl>(permanentMedia ? MEDIA_TTL_NEVER : MEDIA_TTL_DEFAULT_MS);
+	/**
+	 * What the sender picked, per send. Null means "the default", and it goes
+	 * back to null after each send so a short choice never sticks unnoticed.
+	 */
+	let chosenTtl = $state<MediaTtl | null>(null);
+	const mediaTtl = $derived(chosenTtl ?? defaultTtl);
+	const mediaTtlLabel = $derived(
+		mediaTtl === MEDIA_TTL_NEVER
+			? 'Never'
+			: (MEDIA_TTL_PRESETS.find((preset) => preset.ms === mediaTtl)?.label ?? '2 weeks')
+	);
 	let sending = $state(false);
 	let problem: string | null = $state(null);
 	let fileInput: HTMLInputElement | undefined = $state();
@@ -76,6 +107,14 @@
 		}
 	}
 
+	// `wa-select` rather than a click per item, so keyboard selection works too
+	// (see EdgeTask.svelte). The item's `value` is read as a property: Svelte
+	// sets it as one on an upgraded element, and Lit does not reflect it back.
+	function onTtlSelect(event: WaSelectEvent) {
+		const { value } = event.detail.item as Element & { value: string };
+		chosenTtl = value === MEDIA_TTL_NEVER ? MEDIA_TTL_NEVER : Number(value);
+	}
+
 	function remove(index: number) {
 		files = files.filter((_, at) => at !== index);
 		problem = checkComposed({ text, files })?.message ?? null;
@@ -102,13 +141,14 @@
 		sending = true;
 		problem = null;
 		try {
-			const failure = await send({ text, files });
+			const failure = await send({ text, files, mediaTtl });
 			if (failure) {
 				problem = failure;
 				return;
 			}
 			text = '';
 			files = [];
+			chosenTtl = null;
 			// The editor owns its document, so resetting the state is not enough.
 			editor?.setValue('');
 			// Said explicitly rather than left to the editor's change event: the
@@ -144,6 +184,25 @@
 				</li>
 			{/each}
 		</ul>
+
+		<!-- Only while there are files: text never self-destructs, so the choice
+		     means nothing without them. -->
+		<div class="ttl">
+			<wa-icon name="bomb" variant="solid"></wa-icon>
+			<span aria-hidden="true">Self-destructs after</span>
+			<wa-dropdown placement="top-start" onwa-select={onTtlSelect}>
+				<wa-button slot="trigger" size="s" appearance="outlined" with-caret>
+					<span class="wa-visually-hidden">Self-destructs after </span>{mediaTtlLabel}
+				</wa-button>
+				{#each MEDIA_TTL_PRESETS as preset (preset.ms)}
+					<wa-dropdown-item value={String(preset.ms)}>{preset.label}</wa-dropdown-item>
+				{/each}
+				{#if permanentMedia}
+					<wa-divider></wa-divider>
+					<wa-dropdown-item value={MEDIA_TTL_NEVER}>Never</wa-dropdown-item>
+				{/if}
+			</wa-dropdown>
+		</div>
 	{/if}
 
 	<div class="row">
@@ -256,6 +315,18 @@
 			clip-path: inset(50%);
 			inline-size: 1px;
 			block-size: 1px;
+		}
+	}
+
+	.ttl {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.8125rem;
+		color: var(--wa-color-text-quiet);
+
+		wa-button {
+			--wa-form-control-height: 1.75rem;
 		}
 	}
 

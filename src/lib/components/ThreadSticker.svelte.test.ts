@@ -30,13 +30,16 @@ const fetchAttachment =
 		) => Promise<{ url: string; blob: Blob }>
 	>();
 
-vi.mock('$lib/messaging/client', () => ({
-	openMessage,
-	openMessageMetadata,
-	fetchAttachment
-}));
+// The real error class, kept through the mock: the tile recognises a 410 with
+// `instanceof`, so the error a test rejects with must be the very class the
+// component imported.
+vi.mock('$lib/messaging/client', async (importOriginal) => {
+	const { MediaExpiredError } = await importOriginal<typeof import('$lib/messaging/client')>();
+	return { openMessage, openMessageMetadata, fetchAttachment, MediaExpiredError };
+});
 
 const { default: ThreadSticker } = await import('./ThreadSticker.svelte');
+const { MediaExpiredError } = await import('$lib/messaging/client');
 
 function thread(overrides: Partial<ThreadStickerView> = {}): ThreadStickerView {
 	return {
@@ -48,6 +51,7 @@ function thread(overrides: Partial<ThreadStickerView> = {}): ThreadStickerView {
 		messageCount: 2,
 		previewCiphertext: 'ciphertext',
 		previewMetadataCiphertext: null,
+		unseenMedia: null,
 		...overrides
 	};
 }
@@ -259,5 +263,160 @@ describe('ThreadSticker', () => {
 		});
 		expect(container.querySelector('.fan')).not.toBeNull();
 		expect(container.querySelector('.text-bubble')).not.toBeNull();
+	});
+
+	it('shows a self-destructed attachment as the bomb, beside a sibling that still renders', async () => {
+		openMessage.mockResolvedValue({
+			version: 1,
+			text: '',
+			attachments: [
+				{
+					id: 'a1',
+					key: 'AGE-SECRET-KEY-1TEST',
+					kind: 'image',
+					mimeType: 'image/png',
+					fileName: 'gone.png'
+				},
+				{
+					id: 'a2',
+					key: 'AGE-SECRET-KEY-1TEST2',
+					kind: 'image',
+					mimeType: 'image/png',
+					fileName: 'kept.png'
+				}
+			]
+		});
+		// The board has no attachment rows, so the download's 410 is how it
+		// learns a file has gone — and one gone file must not blank the other.
+		fetchAttachment.mockImplementation((_, info) =>
+			info.id === 'a1'
+				? Promise.reject(new MediaExpiredError())
+				: Promise.resolve({ url: 'blob:kept', blob: new Blob() })
+		);
+
+		const { container, findByRole } = render(ThreadSticker, {
+			props: {
+				thread: thread(),
+				partnershipId: 'p1',
+				position: 1,
+				total: 1
+			}
+		});
+
+		const bomb = await findByRole('img', { name: 'This media has self-destructed' });
+		// The compact version: no room on a tile for the caption.
+		expect(bomb).toHaveClass('compact');
+		expect(bomb.textContent).not.toContain('Kaboom');
+		expect(bomb.closest('.media-card')).not.toBeNull();
+		const images = container.querySelectorAll('.media-card img.thumb');
+		expect(images).toHaveLength(1);
+		expect(images[0]).toHaveAttribute('src', 'blob:kept');
+	});
+
+	describe('unseen self-destructing media', () => {
+		const Hour = 60 * 60 * 1000;
+		const unreadThread = (unseenMedia: ThreadStickerView['unseenMedia']) =>
+			thread({ unread: true, lastFullyReadAt: null, unseenMedia });
+		const payloadWith = (kinds: ('image' | 'video')[], ids: string[]) => ({
+			version: 1 as const,
+			text: '',
+			attachments: kinds.map((kind, index) => ({
+				id: ids[index] ?? `missing-${index}`,
+				key: 'k',
+				kind,
+				mimeType: kind === 'image' ? 'image/png' : 'video/mp4',
+				fileName: `f${index}`
+			}))
+		});
+		const renderTile = (unseenMedia: ThreadStickerView['unseenMedia']) =>
+			render(ThreadSticker, {
+				props: { thread: unreadThread(unseenMedia), partnershipId: 'p1', position: 1, total: 1 }
+			});
+
+		it('names the kind and the soonest expiry, even on a sealed tile', async () => {
+			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
+			const { container } = renderTile({
+				expiresAt: new Date(Date.now() + 3 * 24 * Hour),
+				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				truncated: false
+			});
+
+			await waitFor(() =>
+				expect(container.querySelector('.self-destructs')?.textContent?.trim()).toBe(
+					'Image self-destructs in 3 days'
+				)
+			);
+			expect(openMessage).toHaveBeenCalledWith('c1', 'secret');
+			// The link's label is what a screen reader hears; the line itself is hidden.
+			expect(container.querySelector('a')?.getAttribute('aria-label')).toContain(
+				'image self-destructs in 3 days'
+			);
+			// Still sealed: the warning does not open the envelope.
+			expect(waProp(container.querySelector('.preview-envelope wa-icon'), 'name')).toBe('envelope');
+		});
+
+		it('counts only the unseen files it was told about, across messages', async () => {
+			openMessage
+				.mockResolvedValueOnce(payloadWith(['video', 'image'], ['v1', 'seen']))
+				.mockResolvedValueOnce(payloadWith(['video'], ['v2']));
+			const { container } = renderTile({
+				expiresAt: new Date(Date.now() + 2 * Hour),
+				messages: [
+					{ ciphertext: 'c1', attachmentIds: ['v1'] },
+					{ ciphertext: 'c2', attachmentIds: ['v2'] }
+				],
+				truncated: false
+			});
+
+			await waitFor(() =>
+				expect(container.querySelector('.self-destructs')?.textContent?.trim()).toBe(
+					'2 videos self-destruct in 2 hours'
+				)
+			);
+		});
+
+		it('says media when the list was cut short or a body will not open', async () => {
+			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
+			const truncated = renderTile({
+				expiresAt: new Date(Date.now() + Hour),
+				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				truncated: true
+			});
+			await waitFor(() =>
+				expect(truncated.container.querySelector('.self-destructs')?.textContent?.trim()).toBe(
+					'Media self-destructs in 1 hour'
+				)
+			);
+			truncated.unmount();
+
+			openMessage.mockResolvedValue(null);
+			const unreadable = renderTile({
+				expiresAt: new Date(Date.now() + Hour),
+				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				truncated: false
+			});
+			await waitFor(() =>
+				expect(unreadable.container.querySelector('.self-destructs')?.textContent?.trim()).toBe(
+					'Media self-destructs in 1 hour'
+				)
+			);
+		});
+
+		it('says nothing without unseen media, and drops the line once it has expired', async () => {
+			const none = renderTile(null);
+			expect(none.container.querySelector('.self-destructs')).toBeNull();
+			none.unmount();
+
+			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
+			const { container } = renderTile({
+				expiresAt: new Date(Date.now() + 90 * 1000),
+				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				truncated: false
+			});
+			await waitFor(() => expect(container.querySelector('.self-destructs')).not.toBeNull());
+
+			await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+			expect(container.querySelector('.self-destructs')).toBeNull();
+		});
 	});
 });

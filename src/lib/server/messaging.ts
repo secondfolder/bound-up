@@ -6,8 +6,14 @@ import {
 	MAX_ATTACHMENTS_PER_MESSAGE,
 	MAX_CIPHERTEXT_BYTES,
 	MAX_REACTION_CIPHERTEXT_BYTES,
+	MEDIA_TTL_DEFAULT_MS,
+	MEDIA_TTL_MAX_MS,
+	MEDIA_TTL_MIN_MS,
+	MEDIA_TTL_NEVER,
+	type MediaTtl,
 	RESTORE_PAGE_SIZE,
-	type ThreadIcon
+	type ThreadIcon,
+	UNSEEN_MEDIA_MESSAGE_LIMIT
 } from '../messaging';
 import type { PartnershipView } from '../partnership';
 import type {
@@ -18,7 +24,8 @@ import type {
 	TagView,
 	ThreadStickerView,
 	ThreadView,
-	UnreadPartnerView
+	UnreadPartnerView,
+	UnseenMediaView
 } from '../types';
 import type { Db } from './db';
 import {
@@ -33,7 +40,8 @@ import {
 	partnerships,
 	threadReads
 } from './db/schema';
-import { attachmentKey, type MediaStore, partnershipMediaPrefix } from './media';
+import { userHasFeature } from './features';
+import { attachmentKey, MEDIA_LIFETIMES, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
 
 /**
@@ -198,7 +206,8 @@ export async function requireMessageMembership(
 export async function listBoard(
 	db: Db,
 	partnershipId: string,
-	viewerId: string
+	viewerId: string,
+	now: Date = new Date()
 ): Promise<ThreadStickerView[]> {
 	const unread = sql<number>`(
 		${messageThreads.lastMessageSenderId} <> ${viewerId}
@@ -261,6 +270,13 @@ export async function listBoard(
 		tagsByThread.set(tag.threadId, values);
 	}
 
+	const unseenMedia = await listUnseenMedia(
+		db,
+		rows.filter((row) => Boolean(row.unread)).map((row) => row.id),
+		viewerId,
+		now
+	);
+
 	return rows.map((row) => ({
 		id: row.id,
 		icon: row.icon,
@@ -272,8 +288,149 @@ export async function listBoard(
 		lastFullyReadAt: row.lastFullyReadAt ?? null,
 		messageCount: Number(row.messageCount),
 		previewCiphertext: row.previewCiphertext,
-		previewMetadataCiphertext: row.previewMetadataCiphertext ?? null
+		previewMetadataCiphertext: row.previewMetadataCiphertext ?? null,
+		unseenMedia: unseenMedia.get(row.id) ?? null
 	}));
+}
+
+/** Under D1's 100 bound parameters per statement, leaving room for the rest. */
+const IN_CHUNK = 90;
+
+function chunked<T>(values: T[]): T[][] {
+	const chunks: T[][] = [];
+	for (let at = 0; at < values.length; at += IN_CHUNK) {
+		chunks.push(values.slice(at, at + IN_CHUNK));
+	}
+	return chunks;
+}
+
+/**
+ * Self-destructing files the viewer has not seen yet, per thread.
+ *
+ * "Not seen" is the unread rule applied to single messages: sent by the
+ * partner, after the viewer's `last_read_message_at` (or at all, for a thread
+ * they have never opened). That is why only unread threads are asked about —
+ * a read thread cannot have any. Permanent and already-expired files are left
+ * out: neither is counting down.
+ *
+ * Two queries, not one: the attachment rows first, which are small, then the
+ * bodies of at most `UNSEEN_MEDIA_MESSAGE_LIMIT` messages per thread — the ones
+ * expiring soonest — so a thread full of unseen photos does not pull every one
+ * of its 64 KB bodies onto the board.
+ */
+async function listUnseenMedia(
+	db: Db,
+	threadIds: string[],
+	viewerId: string,
+	now: Date
+): Promise<Map<string, UnseenMediaView>> {
+	const result = new Map<string, UnseenMediaView>();
+	if (threadIds.length === 0) {
+		return result;
+	}
+
+	const attachmentRows = (
+		await Promise.all(
+			chunked(threadIds).map((chunk) =>
+				db
+					.select({
+						id: messageAttachments.id,
+						messageId: messageAttachments.messageId,
+						expiresAt: messageAttachments.expiresAt,
+						threadId: messages.threadId
+					})
+					.from(messageAttachments)
+					.innerJoin(messages, eq(messages.id, messageAttachments.messageId))
+					// In the ON for the same reason as `listBoard`: in the WHERE it would
+					// drop every thread the viewer has never opened.
+					.leftJoin(
+						threadReads,
+						and(eq(threadReads.threadId, messages.threadId), eq(threadReads.userId, viewerId))
+					)
+					.where(
+						and(
+							inArray(messages.threadId, chunk),
+							ne(messages.senderId, viewerId),
+							or(
+								sql`${threadReads.lastReadMessageAt} is null`,
+								gt(messages.createdAt, threadReads.lastReadMessageAt)
+							),
+							sql`${messageAttachments.purgedAt} is null`,
+							gt(messageAttachments.expiresAt, now)
+						)
+					)
+					.orderBy(asc(messageAttachments.expiresAt), asc(messageAttachments.id))
+			)
+		)
+	).flat();
+
+	// Rows arrive soonest-first, so the first seen per thread is its expiry and
+	// the first N messages seen are the ones worth decrypting.
+	const byThread = new Map<
+		string,
+		{
+			expiresAt: Date;
+			messageIds: string[];
+			attachments: Map<string, string[]>;
+			truncated: boolean;
+		}
+	>();
+	for (const row of attachmentRows) {
+		if (!row.expiresAt) {
+			continue;
+		}
+		let entry = byThread.get(row.threadId);
+		if (!entry) {
+			entry = {
+				expiresAt: row.expiresAt,
+				messageIds: [],
+				attachments: new Map(),
+				truncated: false
+			};
+			byThread.set(row.threadId, entry);
+		}
+		let ids = entry.attachments.get(row.messageId);
+		if (!ids) {
+			if (entry.messageIds.length >= UNSEEN_MEDIA_MESSAGE_LIMIT) {
+				entry.truncated = true;
+				continue;
+			}
+			ids = [];
+			entry.messageIds.push(row.messageId);
+			entry.attachments.set(row.messageId, ids);
+		}
+		ids.push(row.id);
+	}
+
+	const messageIds = [...byThread.values()].flatMap((entry) => entry.messageIds);
+	const bodies = new Map<string, string>();
+	const bodyRows = (
+		await Promise.all(
+			chunked(messageIds).map((chunk) =>
+				db
+					.select({ id: messages.id, ciphertext: messages.ciphertext })
+					.from(messages)
+					.where(inArray(messages.id, chunk))
+			)
+		)
+	).flat();
+	for (const row of bodyRows) {
+		bodies.set(row.id, row.ciphertext);
+	}
+
+	for (const [threadId, entry] of byThread) {
+		result.set(threadId, {
+			expiresAt: entry.expiresAt,
+			messages: entry.messageIds.flatMap((id) => {
+				const ciphertext = bodies.get(id);
+				return ciphertext === undefined
+					? []
+					: [{ ciphertext, attachmentIds: entry.attachments.get(id) ?? [] }];
+			}),
+			truncated: entry.truncated
+		});
+	}
+	return result;
 }
 
 /**
@@ -288,7 +445,8 @@ export async function getThread(
 	db: Db,
 	threadId: string,
 	icon: ThreadIcon,
-	viewerId: string
+	viewerId: string,
+	now: Date = new Date()
 ): Promise<ThreadView> {
 	const rows = await db
 		.select(messageColumns)
@@ -305,7 +463,9 @@ export async function getThread(
 					.select({
 						id: messageAttachments.id,
 						messageId: messageAttachments.messageId,
-						byteSize: messageAttachments.byteSize
+						byteSize: messageAttachments.byteSize,
+						expiresAt: messageAttachments.expiresAt,
+						purgedAt: messageAttachments.purgedAt
 					})
 					.from(messageAttachments)
 					.where(inArray(messageAttachments.messageId, ids))
@@ -355,7 +515,9 @@ export async function getThread(
 	for (const attachment of attachments) {
 		byMessage.get(attachment.messageId)?.attachments.push({
 			id: attachment.id,
-			byteSize: attachment.byteSize
+			byteSize: attachment.byteSize,
+			expiresAt: attachment.expiresAt,
+			expired: isAttachmentExpired(attachment, now)
 		});
 	}
 	for (const reaction of reactions) {
@@ -433,17 +595,38 @@ export async function listUnreadCounts(
 	});
 }
 
+export type AttachmentDownload =
+	| { expired: false; id: string; storageKey: string; byteSize: number; expiresAt: Date | null }
+	| { expired: true };
+
+/**
+ * Whether an attachment has self-destructed, as of `now`.
+ *
+ * The expiry is compared here, at read, rather than only trusted to the sweep
+ * having run: the sweep runs every quarter hour, and "self-destructs in 1
+ * hour" should not mean "in up to 1 hour 15".
+ */
+export function isAttachmentExpired(
+	row: { expiresAt: Date | null; purgedAt: Date | null },
+	now: Date
+): boolean {
+	return row.purgedAt !== null || (row.expiresAt !== null && row.expiresAt <= now);
+}
+
 /** The row the download endpoint needs, once membership is proven. */
 export async function getAttachmentForDownload(
 	db: Db,
 	partnershipId: string,
-	attachmentId: string
-): Promise<{ id: string; storageKey: string; byteSize: number } | null> {
+	attachmentId: string,
+	now: Date = new Date()
+): Promise<AttachmentDownload | null> {
 	const rows = await db
 		.select({
 			id: messageAttachments.id,
 			storageKey: messageAttachments.storageKey,
-			byteSize: messageAttachments.byteSize
+			byteSize: messageAttachments.byteSize,
+			expiresAt: messageAttachments.expiresAt,
+			purgedAt: messageAttachments.purgedAt
 		})
 		.from(messageAttachments)
 		.innerJoin(messages, eq(messages.id, messageAttachments.messageId))
@@ -456,7 +639,20 @@ export async function getAttachmentForDownload(
 		)
 		.limit(1);
 
-	return rows[0] ?? null;
+	const [row] = rows;
+	if (!row) {
+		return null;
+	}
+	if (isAttachmentExpired(row, now)) {
+		return { expired: true };
+	}
+	return {
+		expired: false,
+		id: row.id,
+		storageKey: row.storageKey,
+		byteSize: row.byteSize,
+		expiresAt: row.expiresAt
+	};
 }
 
 // ── writes ───────────────────────────────────────────────────────────────────
@@ -490,7 +686,9 @@ export type SendFailure =
 	| 'body-too-large'
 	| 'too-many-attachments'
 	| 'too-many-bytes'
-	| 'duplicate-attachment';
+	| 'duplicate-attachment'
+	| 'bad-media-ttl'
+	| 'needs-permanent-media';
 
 export type SendResult =
 	| { ok: true; threadId: string; messageId: string }
@@ -518,28 +716,82 @@ function checkPayload(ciphertext: string, attachments: OutgoingAttachment[]): Se
 }
 
 /**
+ * Turns the sender's chosen lifetime into the expiry every attachment of the
+ * send is stored with, or a refusal.
+ *
+ * Checked here rather than only in the endpoint, for the reason the icon is:
+ * a rule is only a rule if every writer applies it. Never-expiring media is
+ * the `permanentMedia` feature, and the check runs before a single object is
+ * written, so a refused send leaves nothing behind in the store.
+ *
+ * With no attachments there is nothing to expire, so the lifetime is not
+ * looked at at all — a stale `never` from a composer that had its files
+ * removed is not a reason to refuse the text.
+ */
+async function resolveMediaExpiry(
+	db: Db,
+	senderId: string,
+	attachments: OutgoingAttachment[],
+	mediaTtl: MediaTtl,
+	now: Date
+): Promise<{ ok: true; expiresAt: Date | null } | { ok: false; reason: SendFailure }> {
+	if (attachments.length === 0) {
+		return { ok: true, expiresAt: null };
+	}
+	if (mediaTtl === MEDIA_TTL_NEVER) {
+		return (await userHasFeature(db, senderId, 'permanentMedia'))
+			? { ok: true, expiresAt: null }
+			: { ok: false, reason: 'needs-permanent-media' };
+	}
+	if (!Number.isInteger(mediaTtl) || mediaTtl < MEDIA_TTL_MIN_MS || mediaTtl > MEDIA_TTL_MAX_MS) {
+		return { ok: false, reason: 'bad-media-ttl' };
+	}
+	return { ok: true, expiresAt: new Date(now.getTime() + mediaTtl) };
+}
+
+type AttachmentRow = {
+	id: string;
+	messageId: string;
+	byteSize: number;
+	storageKey: string;
+	expiresAt: Date | null;
+};
+
+/**
  * Writes the attachment objects, then returns the rows to insert.
  *
  * Objects go to the store BEFORE the database batch, deliberately. A crash
- * between the two then leaves an orphaned encrypted blob — unreadable, and
- * sweepable by prefix — rather than a row pointing at an object that does not
- * exist, which is a permanently broken message in someone's history.
+ * between the two then leaves an orphaned encrypted blob rather than a row
+ * pointing at an object that does not exist, which is a permanently broken
+ * message in someone's history. The orphan is unreachable (no row, so the
+ * download 404s) and unreadable (its key was only ever inside the body that
+ * was never stored). The bucket's lifecycle rule deletes it within 31 days if
+ * it self-destructs, and disconnecting deletes it by prefix if it does not —
+ * see `MEDIA_LIFETIMES`.
  */
+
 async function writeAttachments(
 	store: MediaStore,
 	partnershipId: string,
 	messageId: string,
-	attachments: OutgoingAttachment[]
-): Promise<{ id: string; messageId: string; byteSize: number; storageKey: string }[]> {
-	const rows: { id: string; messageId: string; byteSize: number; storageKey: string }[] = [];
+	attachments: OutgoingAttachment[],
+	expiresAt: Date | null
+): Promise<AttachmentRow[]> {
+	const rows: AttachmentRow[] = [];
 	for (const attachment of attachments) {
-		const storageKey = attachmentKey(partnershipId, messageId, attachment.id);
+		const storageKey = attachmentKey(
+			expiresAt === null ? 'permanent' : 'expiring',
+			partnershipId,
+			messageId,
+			attachment.id
+		);
 		await store.put(storageKey, attachment.body, attachment.byteSize);
 		rows.push({
 			id: attachment.id,
 			messageId,
 			byteSize: attachment.byteSize,
-			storageKey
+			storageKey,
+			expiresAt
 		});
 	}
 	return rows;
@@ -772,6 +1024,8 @@ export async function startThread(
 		ciphertext: string;
 		metadataCiphertext?: string;
 		attachments: OutgoingAttachment[];
+		/** Defaults to `MEDIA_TTL_DEFAULT_MS`. See `resolveMediaExpiry`. */
+		mediaTtl?: MediaTtl;
 		tagIds?: string[];
 	},
 	now: Date = new Date()
@@ -796,6 +1050,16 @@ export async function startThread(
 	if (!tags) {
 		return { ok: false, reason: 'no-such-tag' };
 	}
+	const expiry = await resolveMediaExpiry(
+		db,
+		input.senderId,
+		input.attachments,
+		input.mediaTtl ?? MEDIA_TTL_DEFAULT_MS,
+		now
+	);
+	if (!expiry.ok) {
+		return expiry;
+	}
 
 	const threadId = crypto.randomUUID();
 	const messageId = crypto.randomUUID();
@@ -803,7 +1067,8 @@ export async function startThread(
 		store,
 		input.partnershipId,
 		messageId,
-		input.attachments
+		input.attachments,
+		expiry.expiresAt
 	);
 
 	await db.batch([
@@ -843,6 +1108,8 @@ export async function sendMessage(
 		ciphertext: string;
 		metadataCiphertext?: string;
 		attachments: OutgoingAttachment[];
+		/** Defaults to `MEDIA_TTL_DEFAULT_MS`. See `resolveMediaExpiry`. */
+		mediaTtl?: MediaTtl;
 	},
 	now: Date = new Date()
 ): Promise<SendResult> {
@@ -861,13 +1128,24 @@ export async function sendMessage(
 	if (problem) {
 		return { ok: false, reason: problem };
 	}
+	const expiry = await resolveMediaExpiry(
+		db,
+		input.senderId,
+		input.attachments,
+		input.mediaTtl ?? MEDIA_TTL_DEFAULT_MS,
+		now
+	);
+	if (!expiry.ok) {
+		return expiry;
+	}
 
 	const messageId = crypto.randomUUID();
 	const attachmentRows = await writeAttachments(
 		store,
 		input.partnershipId,
 		messageId,
-		input.attachments
+		input.attachments,
+		expiry.expiresAt
 	);
 
 	await db.batch([
@@ -1510,12 +1788,16 @@ export async function declineHistoryRestore(
 // ── teardown ─────────────────────────────────────────────────────────────────
 
 /**
- * Deletes every stored object for a partnership.
+ * Deletes every stored object for a partnership, under both lifetimes.
  *
  * Nothing cascades from D1 into the object store, so this has to be called
  * when a partnership is disconnected. It deletes by prefix rather than by
  * enumerating rows, which means it still works after the rows have gone — the
- * escape hatch if it ever fails midway.
+ * escape hatch if it ever fails midway — and it takes the orphans of failed
+ * sends with it, which no row points at.
+ *
+ * Each prefix is attempted even if the other fails, so one bad call does not
+ * leave the rest behind.
  *
  * Failure is reported, not thrown: leaving an unreadable blob behind is a much
  * smaller problem than refusing to let someone disconnect, which
@@ -1525,14 +1807,16 @@ export async function purgePartnershipMedia(
 	store: MediaStore,
 	partnershipId: string
 ): Promise<{ deleted: number; failed: boolean }> {
-	try {
-		return {
-			deleted: await store.deletePrefix(partnershipMediaPrefix(partnershipId)),
-			failed: false
-		};
-	} catch {
-		return { deleted: 0, failed: true };
+	let deleted = 0;
+	let failed = false;
+	for (const lifetime of MEDIA_LIFETIMES) {
+		try {
+			deleted += await store.deletePrefix(partnershipMediaPrefix(lifetime, partnershipId));
+		} catch {
+			failed = true;
+		}
 	}
+	return { deleted, failed };
 }
 
 /**

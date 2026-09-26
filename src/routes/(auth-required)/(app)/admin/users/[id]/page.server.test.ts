@@ -40,7 +40,8 @@ describe('load', () => {
 		const data = await runLoad(load(fakeEvent({ db, user: admin, params: { id: ada.id } })));
 		expect(data.account).toMatchObject({ id: ada.id, name: 'Ada', isAdmin: false });
 		expect(data.account.features).toEqual([
-			expect.objectContaining({ key: 'guides', name: 'Guides', held: null })
+			expect.objectContaining({ key: 'guides', name: 'Guides', held: null }),
+			expect.objectContaining({ key: 'permanentMedia', name: 'Permanent media', held: null })
 		]);
 		expect(data.isSelf).toBe(false);
 	});

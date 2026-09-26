@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
 	import { unlockedIdentity } from '$lib/crypto/session.svelte';
+	import type { ComposedMessage } from '$lib/messaging/client';
 	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import type { TagView } from '$lib/types';
 	import MessageComposer from './MessageComposer.svelte';
@@ -11,13 +12,16 @@
 		partnershipId,
 		send,
 		close,
-		tags
+		tags,
+		/** Display only: offers "Never" in the composer. The server enforces it. */
+		permanentMedia = false
 	}: {
 		partnerName: string;
 		partnershipId: string;
-		send: (message: { text: string; files: File[] }, tagIds: string[]) => Promise<string | null>;
+		send: (message: ComposedMessage, tagIds: string[]) => Promise<string | null>;
 		close: () => void;
 		tags: TagView[];
+		permanentMedia?: boolean;
 	} = $props();
 
 	let selectedTagIds = $state<string[]>([]);
@@ -81,7 +85,7 @@
 		close();
 	}
 
-	async function sendWithTags(message: { text: string; files: File[] }) {
+	async function sendWithTags(message: ComposedMessage) {
 		// Held on to until the send has landed: a failed send keeps its draft.
 		const session = draft;
 		const failure = await send(message, selectedTagIds);
@@ -133,6 +137,7 @@
 	-->
 			<MessageComposer
 				send={sendWithTags}
+				{permanentMedia}
 				placeholder={`Message to ${partnerName}`}
 				initialText={draft.initial?.text ?? ''}
 				{onTextChange}

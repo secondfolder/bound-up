@@ -70,7 +70,11 @@
 				</div>
 			{/if}
 			{#each payload.attachments as info (info.id)}
-				<AttachmentPreview {info} {partnershipId} />
+				<AttachmentPreview
+					{info}
+					{partnershipId}
+					view={message.attachments.find((attachment) => attachment.id === info.id)}
+				/>
 			{/each}
 		{/if}
 

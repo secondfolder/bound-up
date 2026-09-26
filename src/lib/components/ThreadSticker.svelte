@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type {
 		MessageAttachmentInfo,
@@ -6,18 +7,26 @@
 		MessagePayload
 	} from '$lib/crypto/messages';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
-	import { fetchAttachment, openMessage, openMessageMetadata } from '$lib/messaging/client';
+	import { describeUnseenMedia, formatTimeLeft } from '$lib/messaging';
+	import {
+		fetchAttachment,
+		MediaExpiredError,
+		openMessage,
+		openMessageMetadata
+	} from '$lib/messaging/client';
 	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
 	import type { ThreadStickerView } from '$lib/types';
+	import SelfDestructedMedia from './SelfDestructedMedia.svelte';
 
 	type PreviewMedia = {
 		id: string;
 		kind: MessageAttachmentInfo['kind'];
-		url: string;
+		/** Null once it has self-destructed: the tile shows the bomb instead. */
+		url: string | null;
 	};
 
 	type FanCard =
-		| { id: string; kind: 'media'; mediaKind: MessageAttachmentInfo['kind']; url: string }
+		| { id: string; kind: 'media'; mediaKind: MessageAttachmentInfo['kind']; url: string | null }
 		| { id: 'text'; kind: 'text'; text: string };
 	const MAX_PREVIEW_ITEMS = 4;
 
@@ -53,6 +62,79 @@
 	let previewMetadata = $state<MessageMetadataPayload | null | undefined>(undefined);
 	let mediaPreviews: PreviewMedia[] = $state([]);
 	let mediaLoading = $state(false);
+
+	/**
+	 * The kinds of the viewer's unseen, self-destructing files: undefined while
+	 * the bodies decrypt, null when not all of them could be read (the tile
+	 * then says "media"). Decrypted here, even on a sealed tile, because the
+	 * server does not know whether a file is an image or a video.
+	 */
+	let unseenKinds = $state<MessageAttachmentInfo['kind'][] | null | undefined>(undefined);
+	// Primitives for the effects to depend on: `thread` is a fresh object on
+	// every `invalidate()`, and an effect that read `thread.unseenMedia` would
+	// decrypt again on every refresh of the board (AGENTS.md).
+	const unseenKey = $derived(
+		thread.unseenMedia?.messages.map((message) => message.attachmentIds.join(',')).join(';') ?? null
+	);
+	const unseenExpiresAt = $derived(thread.unseenMedia?.expiresAt.getTime() ?? null);
+	let now = $state(Date.now());
+
+	$effect(() => {
+		if (unseenExpiresAt === null) {
+			return;
+		}
+		// A minute is the countdown's smallest unit.
+		const timer = setInterval(() => {
+			now = Date.now();
+		}, 60_000);
+		return () => clearInterval(timer);
+	});
+
+	$effect(() => {
+		if (unseenKey === null || keyring.status !== 'unlocked') {
+			unseenKinds = undefined;
+			return;
+		}
+		const unseen = untrack(() => thread.unseenMedia);
+		if (!unseen) {
+			return;
+		}
+		const { identity } = keyring;
+		let cancelled = false;
+		void Promise.all(
+			unseen.messages.map(async (message) => {
+				const payload = await openMessage(message.ciphertext, identity);
+				if (!payload) {
+					return null;
+				}
+				const kinds = message.attachmentIds.map(
+					(id) => payload.attachments.find((info) => info.id === id)?.kind
+				);
+				return kinds.every((kind) => kind !== undefined) ? kinds : null;
+			})
+		)
+			.then((perMessage) => {
+				if (cancelled) {
+					return;
+				}
+				const known = perMessage.every((kinds) => kinds !== null);
+				unseenKinds = known && !unseen.truncated ? perMessage.flat() : null;
+			})
+			.catch(() => {
+				if (!cancelled) {
+					unseenKinds = null;
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	const unseenLine = $derived(
+		unseenKinds === undefined || unseenExpiresAt === null || now >= unseenExpiresAt
+			? null
+			: describeUnseenMedia(unseenKinds, formatTimeLeft(unseenExpiresAt - now))
+	);
 
 	$effect(() => {
 		if (sealed) {
@@ -115,19 +197,31 @@
 		mediaLoading = true;
 
 		void Promise.all(
-			attachments.map(async (info) => {
-				const result = await fetchAttachment(partnershipId, info);
-				return { id: info.id, kind: info.kind, url: result.url } satisfies PreviewMedia;
+			attachments.map(async (info): Promise<PreviewMedia> => {
+				// The board has no attachment rows to read an expiry from — its
+				// preview is only the first message's ciphertext — so a
+				// self-destructed file is learned from the download's 410. Caught
+				// per file so one expired file does not blank its siblings.
+				try {
+					const result = await fetchAttachment(partnershipId, info);
+					return { id: info.id, kind: info.kind, url: result.url };
+				} catch (error) {
+					if (error instanceof MediaExpiredError) {
+						return { id: info.id, kind: info.kind, url: null };
+					}
+					throw error;
+				}
 			})
 		)
 			.then((results) => {
+				const urls = results.flatMap((result) => (result.url ? [result.url] : []));
 				if (cancelled) {
-					for (const result of results) {
-						URL.revokeObjectURL(result.url);
+					for (const url of urls) {
+						URL.revokeObjectURL(url);
 					}
 					return;
 				}
-				current = results.map((result) => result.url);
+				current = urls;
 				mediaPreviews = results;
 				mediaLoading = false;
 			})
@@ -234,7 +328,8 @@
 	const label = $derived(
 		`${thread.unread ? 'Unread message' : 'Message'} ${position} of ${total}, ${when}` +
 			(opened ? `, ${opened}` : '') +
-			(thread.messageCount > 1 ? `, ${thread.messageCount} messages` : '')
+			(thread.messageCount > 1 ? `, ${thread.messageCount} messages` : '') +
+			(unseenLine ? `, ${unseenLine.toLowerCase()}` : '')
 	);
 	const previewValue = $derived(loadedPreview(preview));
 	const embedPreview = $derived(previewMetadata?.embeds[0] ?? null);
@@ -309,7 +404,9 @@
 									class="fan-card"
 									style={`--fan-offset: ${fanOffset(index, previewItemCount)}; --fan-tilt: ${fanTilt(index, previewItemCount)}deg; --fan-z: ${fanZ(index, previewItemCount)};`}
 								>
-									{#if card.kind === 'media' && card.mediaKind === 'video'}
+									{#if card.kind === 'media' && card.url === null}
+										<SelfDestructedMedia compact />
+									{:else if card.kind === 'media' && card.mediaKind === 'video'}
 										<video class="thumb" src={card.url} muted playsinline preload="metadata"
 										></video>
 									{:else if card.kind === 'media'}
@@ -323,6 +420,8 @@
 								<span class="pending" role="img" aria-label="Decrypting">···</span>
 							{/if}
 						</div>
+					{:else if mediaPreviews[0] && mediaPreviews[0].url === null}
+						<SelfDestructedMedia compact />
 					{:else if mediaPreviews[0]?.kind === 'video'}
 						<video class="thumb" src={mediaPreviews[0].url} muted playsinline preload="metadata"
 						></video>
@@ -338,6 +437,15 @@
 				<span>{when}</span>
 				{#if opened}<span>{opened}</span>{/if}
 			</div>
+
+			<!-- Hidden from assistive tech only because the link's own label
+			     already says it. -->
+			{#if unseenLine}
+				<p class="self-destructs" aria-hidden="true">
+					<wa-icon name="bomb" variant="solid"></wa-icon>
+					{unseenLine}
+				</p>
+			{/if}
 
 			{#if thread.tags?.length}
 				<ul class="tags" aria-label="Tags">
@@ -602,6 +710,22 @@
 			font-size: 0.68rem;
 			line-height: 1.3;
 			text-align: center;
+		}
+
+		.self-destructs {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.3rem;
+			margin: 0;
+			font-size: 0.68rem;
+			line-height: 1.3;
+			text-align: center;
+			color: var(--wa-color-brand-fill-loud);
+
+			wa-icon {
+				flex: none;
+			}
 		}
 
 		.tags {

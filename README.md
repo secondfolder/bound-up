@@ -42,6 +42,10 @@ npm run dev
 ```sh
 npx wrangler login
 npx wrangler d1 create bound-up        # paste database_id into wrangler.jsonc
+npx wrangler r2 bucket create bound-up-media
+# Deletes self-destructing media (and orphans from failed sends) that outlive the
+# 30-day maximum. Lives on the bucket, not in wrangler.jsonc. See docs/messaging.md.
+npx wrangler r2 bucket lifecycle add bound-up-media expire-self-destructing expiring/ --expire-days 31
 openssl rand -hex 32 | npx wrangler secret put BETTER_AUTH_SECRET
 npm run db:migrate:production
 npm run deploy
@@ -59,6 +63,11 @@ that. The one wrinkle is the `RealtimeRoom` Durable Object class, which has to b
 exported from the worker's own module — a module the adapter generates, so there
 is nowhere in the source tree to put the export. The `sveltekit-cloudflare-do`
 plugin in `vite.config.ts` appends it once the adapter has written the file.
+The cron handler that deletes self-destructed message media from R2 is attached
+to the same file the same way, by `vite-plugins/scheduled-handler.ts`; its
+schedule is `triggers.crons` in `wrangler.jsonc` and is applied by `deploy`. To
+run it by hand against `npm run preview`, start wrangler with
+`--test-scheduled` and request `/cdn-cgi/handler/scheduled`.
 
 Because wrangler needs no custom entry, Cloudflare's deploy-on-push works on its
 defaults — build command `npm run build`, deploy command `npx wrangler deploy`.

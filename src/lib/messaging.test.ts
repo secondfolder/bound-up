@@ -4,6 +4,7 @@ import {
 	type BoardThread,
 	compareBoardThreads,
 	DEFAULT_THREAD_ICON,
+	formatTimeLeft,
 	isThreadIcon,
 	isUnreadFor,
 	MAX_ATTACHMENT_TOTAL_BYTES,
@@ -225,5 +226,34 @@ describe('compareBoardThreads', () => {
 			.sort(compareBoardThreads)
 			.map((t) => t.id);
 		expect(twice).toEqual(once);
+	});
+});
+
+describe('formatTimeLeft', () => {
+	const Minute = 60 * 1000;
+	const Hour = 60 * Minute;
+	const Day = 24 * Hour;
+
+	it('names the largest whole unit, rounded up', () => {
+		expect(formatTimeLeft(3 * Day)).toBe('3 days');
+		expect(formatTimeLeft(2 * Day + 1)).toBe('3 days');
+		expect(formatTimeLeft(5 * Hour)).toBe('5 hours');
+		expect(formatTimeLeft(12 * Minute)).toBe('12 minutes');
+		expect(formatTimeLeft(Minute)).toBe('1 minute');
+	});
+
+	// Media sent for "1 hour" is a second or two under it by the time anyone
+	// reads the countdown. It read "60 minutes" until the rounding moved ahead
+	// of the choice of unit.
+	it('rounds up before choosing the unit, so just under an hour is "1 hour"', () => {
+		expect(formatTimeLeft(Hour - 1000)).toBe('1 hour');
+		expect(formatTimeLeft(Day - 1000)).toBe('1 day');
+		expect(formatTimeLeft(Hour - Minute - 1)).toBe('59 minutes');
+	});
+
+	it('calls anything under a minute "a moment"', () => {
+		expect(formatTimeLeft(59 * 1000)).toBe('a moment');
+		expect(formatTimeLeft(0)).toBe('a moment');
+		expect(formatTimeLeft(-5 * Minute)).toBe('a moment');
 	});
 });

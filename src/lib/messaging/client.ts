@@ -24,7 +24,8 @@ import {
 	MAX_ATTACHMENT_TOTAL_BYTES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
 	MAX_BODY_CHARS,
-	MAX_VIDEO_BYTES
+	MAX_VIDEO_BYTES,
+	type MediaTtl
 } from '$lib/messaging';
 import {
 	documentEmbedUrls,
@@ -36,6 +37,11 @@ import {
 export type ComposedMessage = {
 	text: string;
 	files: File[];
+	/**
+	 * How long the files live. Omitted means the server's default of two weeks;
+	 * `never` needs the `permanentMedia` feature, which the server checks.
+	 */
+	mediaTtl?: MediaTtl;
 };
 
 /** A refusal the composer can render, worked out before anything is sent. */
@@ -142,6 +148,9 @@ async function buildBody(message: ComposedMessage, recipients: string[]): Promis
 		text,
 		attachments
 	};
+	if (message.files.length > 0 && message.mediaTtl !== undefined) {
+		body.set('mediaTtlMs', String(message.mediaTtl));
+	}
 	body.set('ciphertext', await encryptPayload(payload, recipients));
 	const metadata = await metadataPromise.catch(() => null);
 	if (metadata) {
@@ -226,6 +235,9 @@ async function describeFailure(response: Response): Promise<string> {
 	}
 	if (response.status === 401) {
 		return 'You have been signed out';
+	}
+	if (response.status === 403) {
+		return 'Your account cannot send media that never self-destructs';
 	}
 	// SvelteKit's `error()` bodies are JSON with a `message`.
 	const body = (await response.json().catch(() => null)) as { message?: string } | null;
@@ -354,6 +366,18 @@ async function writeMessageMetadataEntry(
 }
 
 /**
+ * The server's 410 for an attachment that has self-destructed. Its own class so
+ * a preview can show the self-destructed placeholder rather than "Could not
+ * open this file", which would read as a fault.
+ */
+export class MediaExpiredError extends Error {
+	constructor() {
+		super('This media has self-destructed');
+		this.name = 'MediaExpiredError';
+	}
+}
+
+/**
  * Downloads and decrypts one attachment into an object URL.
  *
  * The caller owns the URL and must revoke it — `AttachmentPreview` does that on
@@ -366,6 +390,9 @@ export async function fetchAttachment(
 	info: MessageAttachmentInfo
 ): Promise<{ url: string; blob: Blob }> {
 	const response = await fetch(`/api/partnerships/${partnershipId}/attachments/${info.id}`);
+	if (response.status === 410) {
+		throw new MediaExpiredError();
+	}
 	if (!response.ok) {
 		throw new Error(`Could not download attachment (${response.status})`);
 	}

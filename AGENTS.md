@@ -42,6 +42,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
 | `.../(auth-required)/(app)/`  | The signed-in app shell: fixed-viewport layout plus the `AppNav` bottom bar                  |
 | `drizzle/`                    | Generated migrations + snapshots. **Committed.** Never hand-edit                             |
+| `vite-plugins/`               | Local Vite plugins, run in Node at build time. Tests beside them run in the node project     |
 
 ## The verification loop
 
@@ -98,7 +99,8 @@ noise:
     into superforms' `Infer<>` overflows its stack and takes the whole run
     with it — `z.output<Schema>` is the same type and does not.
 - `npm run check`: **0 errors, 0 warnings.** All TypeScript files across the
-  workspace (root configs, `vitest-setup-browser.ts`, `e2e/**/*.ts`) are
+  workspace (root configs, `vitest-setup-browser.ts`, `e2e/**/*.ts`,
+  `vite-plugins/**/*.ts`) are
   included in `tsconfig.json`, so command-line checks catch every error visible
   in VS Code. Two
   suppressions keep it clean. Both are ones svelte-check and the vite dev
@@ -293,6 +295,18 @@ site it applies to; go read that comment before deciding to break one.
     `production`, which broke `esm-env` and sent the worker down the dev
     database path. `npm run preview` plus a real page load is still the
     only check that exercises this path.
+
+17. **`src/lib/server/scheduled.ts` is a third alias-free zone**, and so is
+    everything it imports (`db/`, `media/expiry.ts`, `media/r2.ts`). It is the
+    cron handler that sweeps self-destructed media out of R2. The adapter has no
+    hook for a `scheduled` export any more than for a Durable Object, so
+    `vite-plugins/scheduled-handler.ts` attaches it to the generated worker
+    after the build by assigning to the adapter's `worker_default`, and
+    wrangler's esbuild bundles it from there. The plugin **fails the build** if
+    that binding disappears: a worker that silently never sweeps shows up only
+    on the storage bill. The schedule is `triggers.crons` in `wrangler.jsonc`.
+    Expiry itself does not depend on the sweep, because every read checks
+    `expires_at`. See [docs/messaging.md](docs/messaging.md#self-destructing-media).
 
 ## Conventions
 
@@ -492,7 +506,7 @@ with the layout rather than fighting each other globally.
 
 **`/` is the landing page for everyone; `/home` is the signed-in app.** `/`
 does not bounce a session holder any more: its centred CTA says "Sign up"
-(with a "Log in" link under it) when logged out and "Start" → `/home` when
+(with a "Log in" link under it) when logged out and "Open" → `/home` when
 logged in. Every post-auth redirect still points at `/home`. The guides live
 under it (`/home/guides`, `/home/guides/[id]`), behind the auth guard — the
 public surface is only `/`, `/login` and `/signup`.

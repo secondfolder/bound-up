@@ -82,11 +82,21 @@
 		}
 	],
 	"preview_urls": true,
+	// Every quarter hour, the sweep in src/lib/server/scheduled.ts deletes
+	// self-destructed media from R2. This only bounds how long we pay for an
+	// expired file: expiry itself is exact, because every read checks
+	// `expires_at` itself. The handler is attached to the generated worker by
+	// vite-plugins/scheduled-handler.ts. Cron triggers are on the Free plan.
+	"triggers": {
+		"crons": ["*/15 * * * *"]
+	},
 	"r2_buckets": [
 		{
 			"binding": "MEDIA",
 			// Encrypted message attachments. Create it with
-			// `npx wrangler r2 bucket create bound-up-media`.
+			// `npx wrangler r2 bucket create bound-up-media`, then give it the
+			// lifecycle rule in README's deploy steps: it deletes everything under
+			// `expiring/` after 31 days, and cannot be declared in this file.
 			// `npm run dev` never reads this: with no platform there is no R2
 			// binding at all, and src/lib/server/media/dev.ts writes to
 			// ./local-media instead.

@@ -6,6 +6,7 @@
 	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
 	import {
 		buildReaction,
+		type ComposedMessage,
 		fillMissingMessageMetadata,
 		openMessage,
 		openMessageMetadata,
@@ -35,13 +36,16 @@
 		 * reads as a bug. Passed in rather than derived here so the board and
 		 * the thread cannot disagree about it.
 		 */
-		canSend = true
+		canSend = true,
+		/** Display only: offers "Never" in the composer. The server enforces it. */
+		permanentMedia = false
 	}: {
 		thread: ThreadView;
 		partnershipId: string;
 		tags?: TagView[];
 		recipients: PartnerRecipientsView;
 		canSend?: boolean;
+		permanentMedia?: boolean;
 	} = $props();
 
 	const keyring = $derived(currentKeyring());
@@ -168,7 +172,7 @@
 		return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
 	}
 
-	async function send(message: { text: string; files: File[] }): Promise<string | null> {
+	async function send(message: ComposedMessage): Promise<string | null> {
 		const outcome = await sendMessage(
 			{ kind: 'reply', partnershipId, threadId: thread.id },
 			message,
@@ -279,6 +283,7 @@
 				{#await draftFor(threadId) then draft}
 					<MessageComposer
 						{send}
+						{permanentMedia}
 						placeholder="Reply…"
 						initialText={draft.initial?.text ?? ''}
 						onTextChange={(text) => draft.save({ text, tagIds: [] })}

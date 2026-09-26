@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db';
+import { partnershipMediaPrefix } from '$lib/server/media';
 import { findPendingInviteByToken } from '$lib/server/partnerships';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
@@ -11,7 +12,15 @@ import {
 	readPartnershipRow,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { createTestMediaStore, type TestMediaStore } from '$lib/testing/media';
 import { actions, load } from './+page.server';
+
+// Under vitest the real factory would pick the local-directory store and touch
+// the disk; the in-memory one also lets a test see what was purged.
+const media = vi.hoisted(() => ({ store: undefined as TestMediaStore | undefined }));
+vi.mock('$lib/server/media/dev', () => ({
+	createMediaStore: () => Promise.resolve(media.store)
+}));
 
 let harness: TestDb;
 let db: Db;
@@ -25,6 +34,7 @@ beforeEach(async () => {
 	ada = await createTestUser(db, { name: 'Ada' });
 	jun = await createTestUser(db, { name: 'Jun' });
 	stranger = await createTestUser(db, { name: 'Stranger' });
+	media.store = createTestMediaStore();
 });
 
 afterEach(() => harness.close());
@@ -204,6 +214,46 @@ describe('the disconnect action', () => {
 		expect(await readPartnershipRow(db, id)).toBeUndefined();
 	});
 
+	// Nothing cascades from D1 into the store, so without this every file ever
+	// sent in the partnership stayed in R2, billed, for good.
+	it('deletes the partnership’s media and nobody else’s', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const other = await createTestPartnership(db, ada, stranger);
+		const store = media.store as TestMediaStore;
+		const bytes = new Uint8Array([1]);
+		for (const key of ['m1/a1', 'm2/a2']) {
+			await store.put(
+				`${partnershipMediaPrefix('expiring', id)}${key}`,
+				new Blob([bytes]).stream(),
+				1
+			);
+		}
+		await store.put(
+			`${partnershipMediaPrefix('expiring', other.id)}m3/a3`,
+			new Blob([bytes]).stream(),
+			1
+		);
+
+		await runAndCatch(() => run('disconnect', at(id, jun)));
+
+		expect([...store.objects.keys()]).toEqual([
+			`${partnershipMediaPrefix('expiring', other.id)}m3/a3`
+		]);
+	});
+
+	it('still disconnects when the media purge fails', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const store = media.store as TestMediaStore;
+		store.deletePrefix = () => Promise.reject(new Error('R2 is having a day'));
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+		const result = await runAndCatch(() => run('disconnect', at(id, jun)));
+
+		expect(result).toMatchObject({ type: 'redirect', status: 303 });
+		expect(await readPartnershipRow(db, id)).toBeUndefined();
+		expect(logged).toHaveBeenCalledOnce();
+	});
+
 	it('lets the inviter cancel a pending invite', async () => {
 		const invite = await createTestInvite(db, ada);
 		await runAndCatch(() => run('disconnect', at(invite.id, ada)));
@@ -216,6 +266,20 @@ describe('the disconnect action', () => {
 
 		expect(result).toMatchObject({ type: 'error', status: 404 });
 		expect(await readPartnershipRow(db, id)).toBeDefined();
+	});
+
+	it('purges nothing for a stranger', async () => {
+		const { id } = await createTestPartnership(db, ada, jun);
+		const store = media.store as TestMediaStore;
+		await store.put(
+			`${partnershipMediaPrefix('expiring', id)}m1/a1`,
+			new Blob([new Uint8Array([1])]).stream(),
+			1
+		);
+
+		await runAndCatch(() => run('disconnect', at(id, stranger)));
+
+		expect(store.objects.size).toBe(1);
 	});
 
 	it('refuses to run without a session', async () => {

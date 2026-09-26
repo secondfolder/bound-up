@@ -1,7 +1,16 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_CIPHERTEXT_BYTES, RESTORE_PAGE_SIZE } from '../messaging';
+import {
+	MAX_ATTACHMENT_TOTAL_BYTES,
+	MAX_CIPHERTEXT_BYTES,
+	MEDIA_TTL_DEFAULT_MS,
+	MEDIA_TTL_MAX_MS,
+	MEDIA_TTL_MIN_MS,
+	RESTORE_PAGE_SIZE,
+	UNSEEN_MEDIA_MESSAGE_LIMIT
+} from '../messaging';
 import { createTestDb, type TestDb } from '../testing/db';
+import { defined } from '../testing/defined';
 import {
 	createTestInvite,
 	createTestMessage,
@@ -17,7 +26,8 @@ import {
 	type TestUser
 } from '../testing/fixtures';
 import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '../testing/media';
-import { accountRecoveryRequests } from './db/schema';
+import { accountRecoveryRequests, messageAttachments } from './db/schema';
+import { grantFeature } from './features';
 import { attachmentKey, partnershipMediaPrefix } from './media';
 import {
 	applyHistoryRestore,
@@ -255,7 +265,9 @@ describe('startThread', () => {
 		const rows = await readAttachmentRows(harness.db, result.messageId);
 		expect(rows).toHaveLength(1);
 		expect(rows[0].byteSize).toBe(4);
-		expect(rows[0].storageKey).toBe(attachmentKey(partnershipId, result.messageId, rows[0].id));
+		expect(rows[0].storageKey).toBe(
+			attachmentKey('expiring', partnershipId, result.messageId, rows[0].id)
+		);
 		expect(store.objects.get(rows[0].storageKey)).toEqual(bytes);
 	});
 
@@ -690,6 +702,286 @@ describe('getAttachmentForDownload', () => {
 	});
 });
 
+describe('self-destructing media', () => {
+	const sentAt = at(1_000_000_000_000);
+	const Hour = 60 * 60 * 1000;
+
+	async function sendWith(
+		mediaTtl: Parameters<typeof startThread>[2]['mediaTtl'],
+		files = [outgoingAttachment(new Uint8Array([1])), outgoingAttachment(new Uint8Array([2]))]
+	) {
+		return await startThread(
+			harness.db,
+			store,
+			{
+				partnershipId,
+				senderId: ada.id,
+				icon: 'envelope',
+				ciphertext: 'eA',
+				attachments: files,
+				mediaTtl
+			},
+			sentAt
+		);
+	}
+
+	async function sentRows(result: Awaited<ReturnType<typeof sendWith>>) {
+		if (!result.ok) {
+			throw new Error(`expected a send, got ${result.reason}`);
+		}
+		return await readAttachmentRows(harness.db, result.messageId);
+	}
+
+	it('expires two weeks after sending when no lifetime is given', async () => {
+		const rows = await sentRows(await sendWith(undefined));
+		expect(rows.map((row) => row.expiresAt?.getTime())).toEqual([
+			sentAt.getTime() + MEDIA_TTL_DEFAULT_MS,
+			sentAt.getTime() + MEDIA_TTL_DEFAULT_MS
+		]);
+	});
+
+	it('stamps every attachment of a reply with the chosen lifetime, from the server clock', async () => {
+		const thread = await createTestThread(harness.db, partnershipId, jun);
+		const result = await sendMessage(
+			harness.db,
+			store,
+			{
+				partnershipId,
+				threadId: thread.threadId,
+				senderId: ada.id,
+				ciphertext: 'eA',
+				attachments: [outgoingAttachment(new Uint8Array([3]))],
+				mediaTtl: MEDIA_TTL_MIN_MS
+			},
+			sentAt
+		);
+		const rows = await sentRows(result);
+		expect(rows[0]?.expiresAt).toEqual(at(sentAt.getTime() + Hour));
+		expect(rows[0]?.purgedAt).toBeNull();
+	});
+
+	it('refuses a lifetime outside an hour to thirty days, writing nothing', async () => {
+		for (const ttl of [MEDIA_TTL_MIN_MS - 1, MEDIA_TTL_MAX_MS + 1, Hour + 0.5]) {
+			await expect(sendWith(ttl)).resolves.toEqual({ ok: false, reason: 'bad-media-ttl' });
+		}
+		expect(store.objects.size).toBe(0);
+		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+	});
+
+	it('refuses never-expiring media without the feature, before writing any object', async () => {
+		await expect(sendWith('never')).resolves.toEqual({
+			ok: false,
+			reason: 'needs-permanent-media'
+		});
+		expect(store.objects.size).toBe(0);
+		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+	});
+
+	it('stores never-expiring media for an account holding the feature', async () => {
+		await grantFeature(harness.db, {
+			userId: ada.id,
+			feature: 'permanentMedia',
+			grantedByUserId: jun.id
+		});
+		const rows = await sentRows(await sendWith('never'));
+		expect(rows.map((row) => row.expiresAt)).toEqual([null, null]);
+	});
+
+	// The bucket's lifecycle rule deletes everything under `expiring/` after 31
+	// days, so permanent media must never be written there.
+	it('files media under a prefix for its lifetime', async () => {
+		await grantFeature(harness.db, {
+			userId: ada.id,
+			feature: 'permanentMedia',
+			grantedByUserId: jun.id
+		});
+		const permanent = await sentRows(await sendWith('never'));
+		const expiring = await sentRows(await sendWith(MEDIA_TTL_MIN_MS));
+
+		for (const row of permanent) {
+			expect(row.storageKey.startsWith(partnershipMediaPrefix('permanent', partnershipId))).toBe(
+				true
+			);
+		}
+		for (const row of expiring) {
+			expect(row.storageKey.startsWith(partnershipMediaPrefix('expiring', partnershipId))).toBe(
+				true
+			);
+		}
+	});
+
+	// A composer whose files were removed can still be holding `never`; the
+	// text has nothing to expire and must not be refused for it.
+	it('ignores the lifetime of a send with no attachments', async () => {
+		await expect(sendWith('never', [])).resolves.toMatchObject({ ok: true });
+		await expect(sendWith(1, [])).resolves.toMatchObject({ ok: true });
+	});
+
+	it('refuses to serve media once it has expired, whether or not the sweep has run', async () => {
+		const [row] = await sentRows(await sendWith(MEDIA_TTL_MIN_MS));
+		const { id } = defined(row, 'the attachment row');
+		const expiry = sentAt.getTime() + Hour;
+
+		await expect(
+			getAttachmentForDownload(harness.db, partnershipId, id, at(expiry - 1))
+		).resolves.toMatchObject({ expired: false, id, expiresAt: at(expiry) });
+		await expect(
+			getAttachmentForDownload(harness.db, partnershipId, id, at(expiry))
+		).resolves.toEqual({ expired: true });
+	});
+
+	it('treats a purged attachment as expired even with a later expiry', async () => {
+		const [row] = await sentRows(await sendWith(MEDIA_TTL_MAX_MS));
+		const { id } = defined(row, 'the attachment row');
+		await harness.db
+			.update(messageAttachments)
+			.set({ purgedAt: sentAt })
+			.where(eq(messageAttachments.id, id));
+
+		await expect(getAttachmentForDownload(harness.db, partnershipId, id, sentAt)).resolves.toEqual({
+			expired: true
+		});
+	});
+
+	it('never expires permanent media', async () => {
+		await grantFeature(harness.db, {
+			userId: ada.id,
+			feature: 'permanentMedia',
+			grantedByUserId: jun.id
+		});
+		const [row] = await sentRows(await sendWith('never'));
+		const { id } = defined(row, 'the attachment row');
+		await expect(
+			getAttachmentForDownload(harness.db, partnershipId, id, at(8_000_000_000_000))
+		).resolves.toMatchObject({ expired: false, expiresAt: null });
+	});
+
+	it('tells the thread which attachments have expired', async () => {
+		const result = await sendWith(MEDIA_TTL_MIN_MS);
+		if (!result.ok) {
+			throw new Error('expected a send');
+		}
+		const before = await getThread(harness.db, result.threadId, 'envelope', jun.id, sentAt);
+		expect(before.messages[0]?.attachments).toEqual([
+			expect.objectContaining({ expired: false, expiresAt: at(sentAt.getTime() + Hour) }),
+			expect.objectContaining({ expired: false })
+		]);
+
+		const after = await getThread(
+			harness.db,
+			result.threadId,
+			'envelope',
+			jun.id,
+			at(sentAt.getTime() + Hour)
+		);
+		expect(after.messages[0]?.attachments.map((attachment) => attachment.expired)).toEqual([
+			true,
+			true
+		]);
+	});
+});
+
+describe('listBoard: unseen self-destructing media', () => {
+	const Hour = 60 * 60 * 1000;
+	const t0 = at(1_000_000_000_000);
+
+	async function sendFrom(
+		sender: TestUser,
+		threadId: string | null,
+		mediaTtl: number | 'never',
+		ciphertext: string,
+		files: number,
+		when: Date
+	) {
+		const attachments = Array.from({ length: files }, () =>
+			outgoingAttachment(new Uint8Array([1]))
+		);
+		const result = threadId
+			? await sendMessage(
+					harness.db,
+					store,
+					{ partnershipId, threadId, senderId: sender.id, ciphertext, attachments, mediaTtl },
+					when
+				)
+			: await startThread(
+					harness.db,
+					store,
+					{
+						partnershipId,
+						senderId: sender.id,
+						icon: 'envelope',
+						ciphertext,
+						attachments,
+						mediaTtl
+					},
+					when
+				);
+		if (!result.ok) {
+			throw new Error(`expected a send, got ${result.reason}`);
+		}
+		return result;
+	}
+
+	const boardFor = async (viewer: TestUser, now: Date) => {
+		const [tile] = await listBoard(harness.db, partnershipId, viewer.id, now);
+		return defined(tile, 'the board tile');
+	};
+
+	it('gives the recipient the soonest expiry and the bodies carrying the files', async () => {
+		const first = await sendFrom(ada, null, 3 * Hour, 'body-1', 2, t0);
+		await sendFrom(ada, first.threadId, Hour, 'body-2', 1, at(t0.getTime() + 1000));
+
+		const tile = await boardFor(jun, at(t0.getTime() + 2000));
+		expect(tile.unseenMedia?.expiresAt).toEqual(at(t0.getTime() + 1000 + Hour));
+		expect(tile.unseenMedia?.messages.map((message) => message.ciphertext)).toEqual([
+			'body-2',
+			'body-1'
+		]);
+		expect(tile.unseenMedia?.messages.map((message) => message.attachmentIds.length)).toEqual([
+			1, 2
+		]);
+		expect(tile.unseenMedia?.truncated).toBe(false);
+	});
+
+	it('is nothing for the sender, who has seen their own files', async () => {
+		await sendFrom(ada, null, Hour, 'eA', 1, t0);
+		expect((await boardFor(ada, t0)).unseenMedia).toBeNull();
+	});
+
+	it('forgets files the recipient has read past, and counts only newer ones', async () => {
+		const first = await sendFrom(ada, null, Hour, 'old', 1, t0);
+		await markThreadOpened(harness.db, first.threadId, jun.id, at(t0.getTime() + 1000));
+		expect((await boardFor(jun, at(t0.getTime() + 1000))).unseenMedia).toBeNull();
+
+		await sendFrom(ada, first.threadId, 2 * Hour, 'new', 1, at(t0.getTime() + 2000));
+		const tile = await boardFor(jun, at(t0.getTime() + 3000));
+		expect(tile.unseenMedia?.messages.map((message) => message.ciphertext)).toEqual(['new']);
+	});
+
+	it('leaves out media that has expired or never will', async () => {
+		await grantFeature(harness.db, {
+			userId: ada.id,
+			feature: 'permanentMedia',
+			grantedByUserId: jun.id
+		});
+		const first = await sendFrom(ada, null, 'never', 'forever', 1, t0);
+		expect((await boardFor(jun, t0)).unseenMedia).toBeNull();
+
+		await sendFrom(ada, first.threadId, Hour, 'short', 1, t0);
+		expect((await boardFor(jun, at(t0.getTime() + Hour))).unseenMedia).toBeNull();
+	});
+
+	it('sends a bounded number of bodies and says so when it stops', async () => {
+		const first = await sendFrom(ada, null, Hour, 'b0', 1, t0);
+		for (let index = 1; index <= UNSEEN_MEDIA_MESSAGE_LIMIT; index += 1) {
+			await sendFrom(ada, first.threadId, Hour + index, `b${index}`, 1, at(t0.getTime() + index));
+		}
+		const tile = await boardFor(jun, at(t0.getTime() + 100));
+		expect(tile.unseenMedia?.messages).toHaveLength(UNSEEN_MEDIA_MESSAGE_LIMIT);
+		expect(tile.unseenMedia?.truncated).toBe(true);
+	});
+});
+
 describe('purgePartnershipMedia', () => {
 	it('removes only that partnership’s objects', async () => {
 		const cas = await createTestUser(harness.db, { name: 'Cas' });
@@ -710,8 +1002,56 @@ describe('purgePartnershipMedia', () => {
 			failed: false
 		});
 		expect(
-			[...store.objects.keys()].every((k) => k.startsWith(partnershipMediaPrefix(other.id)))
+			[...store.objects.keys()].every((k) =>
+				k.startsWith(partnershipMediaPrefix('expiring', other.id))
+			)
 		).toBe(true);
+	});
+
+	it('removes permanent media as well as self-destructing media', async () => {
+		await grantFeature(harness.db, {
+			userId: ada.id,
+			feature: 'permanentMedia',
+			grantedByUserId: jun.id
+		});
+		for (const mediaTtl of ['never', MEDIA_TTL_MIN_MS] as const) {
+			await startThread(harness.db, store, {
+				partnershipId,
+				senderId: ada.id,
+				icon: 'envelope',
+				ciphertext: 'eA',
+				attachments: [outgoingAttachment(new Uint8Array([1]))],
+				mediaTtl
+			});
+		}
+
+		await expect(purgePartnershipMedia(store, partnershipId)).resolves.toEqual({
+			deleted: 2,
+			failed: false
+		});
+		expect(store.objects.size).toBe(0);
+	});
+
+	// One prefix failing must not leave the other behind.
+	it('still tries the second lifetime when the first fails', async () => {
+		const attempted: string[] = [];
+		const flaky = {
+			...store,
+			deletePrefix: (prefix: string) => {
+				attempted.push(prefix);
+				return attempted.length === 1
+					? Promise.reject(new Error('R2 is having a day'))
+					: Promise.resolve(3);
+			}
+		};
+		await expect(purgePartnershipMedia(flaky, partnershipId)).resolves.toEqual({
+			deleted: 3,
+			failed: true
+		});
+		expect(attempted).toEqual([
+			partnershipMediaPrefix('expiring', partnershipId),
+			partnershipMediaPrefix('permanent', partnershipId)
+		]);
 	});
 
 	// Disconnecting must never be blocked — docs/partners.md is explicit.

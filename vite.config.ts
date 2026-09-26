@@ -7,6 +7,7 @@ import { playwright } from '@vitest/browser-playwright';
 import cloudflareDoExporter from 'sveltekit-cloudflare-do';
 import { loadEnv } from 'vite';
 import { defineConfig, type Plugin } from 'vitest/config';
+import { scheduledHandler } from './vite-plugins/scheduled-handler.ts';
 
 const host: string | undefined = process.env.HOST;
 const port: number = Number(process.env.PORT) || 58_769;
@@ -134,6 +135,12 @@ export default defineConfig(({ command, mode }) => {
 			cloudflareDoExporter({
 				durableObjects: ['src/lib/server/realtime/durable-object.ts']
 			}),
+			/**
+			 * Attaches the cron handler (`triggers.crons` in wrangler.jsonc) to the
+			 * same generated worker, for the same reason as the plugin above. See the
+			 * plugin file for why it fails the build rather than skipping.
+			 */
+			scheduledHandler({ handler: 'src/lib/server/scheduled.ts' }),
 			getCloudflarePlugin({ command, env })
 		],
 
@@ -191,7 +198,7 @@ export default defineConfig(({ command, mode }) => {
 					test: {
 						name: 'server',
 						environment: 'node',
-						include: ['src/**/*.{test,spec}.{js,ts}'],
+						include: ['src/**/*.{test,spec}.{js,ts}', 'vite-plugins/**/*.{test,spec}.ts'],
 						exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
 					}
 				}

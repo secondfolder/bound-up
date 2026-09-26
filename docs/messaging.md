@@ -42,7 +42,7 @@ full-page loading wall.
 | -------------------------- | ----------------------------------------------------------------------------------------------- |
 | `message_threads`          | One exchange. Its sticker `icon`, plus two denormalised columns.                                |
 | `messages`                 | One message. The body ciphertext, its format flag, plus an optional encrypted metadata sidecar. |
-| `message_attachments`      | An encrypted file in the object store. Size and key only.                                       |
+| `message_attachments`      | An encrypted file in the object store. Size, key, and when it self-destructs.                   |
 | `message_reactions`        | One tapback per user per message. Encrypted.                                                    |
 | `message_tags`             | A reusable name and color scoped to one partnership.                                            |
 | `message_thread_tags`      | The many-to-many assignment between threads and tags.                                           |
@@ -51,7 +51,8 @@ full-page loading wall.
 
 Every foreign key cascades. Deleting a partnership takes its threads, messages,
 attachments rows, reactions and read state with it — but **not** the objects in
-the media store, which nothing cascades into. See "Media" below.
+the media store, which nothing cascades into. The disconnect action purges them
+itself; see "Attachments and media" below.
 
 ### Three decisions worth the argument
 
@@ -171,9 +172,123 @@ an orphaned encrypted blob — unreadable, and sweepable by prefix — rather th
 row pointing at an object that does not exist, which would be a permanently
 broken message in someone's history.
 
-Keys are `messages/<partnershipId>/<messageId>/<attachmentId>`, so disconnecting
-can delete a partnership's media by prefix without enumerating rows. The key is
-still stored on the row, so the layout can change without a migration.
+Keys are `<lifetime>/<partnershipId>/<messageId>/<attachmentId>`, where the
+lifetime is `expiring` or `permanent` (`MEDIA_LIFETIMES` in
+`src/lib/server/media/index.ts`). Disconnecting deletes a partnership's media
+one prefix per lifetime, without enumerating rows. The key is still stored on
+the row, so the layout can change without a migration.
+
+**The lifetime prefix exists for the bucket's lifecycle rule**, which deletes
+anything under `expiring/` older than 31 days (set up in the README's deploy
+steps; it cannot be declared in `wrangler.jsonc`). No self-destructing file
+lives past 30 days, so anything the rule catches is either expired or an
+**orphan**: an object from a send that died after writing its files but before
+its rows. No row points at an orphan, so the sweep can never find it. That is
+what the rule is for, and it also backs up the sweep: if the cron job breaks,
+nothing under `expiring/` is stored for more than 31 days anyway. A lifecycle
+rule can only match a prefix, which is why permanent media lives under a
+different one.
+
+An orphan is never visible to anyone. With no row, the download endpoint 404s.
+Its key existed only inside a message body that was never stored, so it is
+unreadable even to the server. It only costs storage, and the sender's retry
+uploads fresh copies under new ids.
+
+**Disconnecting purges the partnership's media.** The `disconnect` action in
+`settings/partners/[id]` calls `purgePartnershipMedia` after the partnership row
+is deleted: the delete is what proves membership, and the purge works by prefix,
+so it does not need the rows. A failed purge is logged, not thrown, because
+leaving a partnership must never wait on storage (docs/partners.md).
+
+### Self-destructing media
+
+Every attachment self-destructs. The sender picks how long it lives for each
+message: a "Self-destructs after" menu appears in the composer once a file is
+attached. It offers presets from **1 hour** to **30 days**, defaults to
+**2 weeks** (or **Never** for an account with `permanentMedia`), and goes back
+to the default after every send. The countdown starts
+**when the message is sent**, not when it is first opened, so how long a file is
+stored is known the moment it arrives. When it runs out, only the media goes. The
+message text stays, and each file becomes a bomb that says "Kaboom! This media
+has self-destructed." (`SelfDestructedMedia.svelte`).
+
+The constants and the parser are in `src/lib/messaging.ts`: `MEDIA_TTL_MIN_MS`,
+`MEDIA_TTL_MAX_MS`, `MEDIA_TTL_DEFAULT_MS`, `MEDIA_TTL_PRESETS` and
+`parseMediaTtl`.
+
+- **The server works out the expiry.** The client posts a lifetime, `mediaTtlMs`,
+  alongside the files. The server accepts any whole number of milliseconds in
+  range, not only the presets, so the presets can change without a server
+  change. It stamps `expires_at = send time + lifetime` on every attachment of
+  the send. No expiry is computed from the client's clock.
+- **Never-expiring media is a feature.** Posting `never` requires the
+  `permanentMedia` feature (docs/features-and-admin.md). The composer shows a
+  "Never" item only to accounts that hold it. `resolveMediaExpiry` in
+  `server/messaging.ts` is what enforces it, **before any object is written**,
+  and it refuses the send as `needs-permanent-media`, which is a 403. Permanent
+  media has `expires_at = null`. A send with no files ignores the lifetime
+  entirely: a stale `never` is not a reason to refuse text.
+- **Expiry is checked on every read.** `isAttachmentExpired` compares
+  `expires_at`, and `purged_at`, with the server's clock. The download endpoint
+  answers **410 Gone** once media has expired, even if its object is still in
+  the store, and `getThread` marks each `AttachmentView` `expired` so the browser
+  does not ask at all. The board has no attachment rows (its preview is only the
+  first message's ciphertext), so its tiles find out from the 410.
+  `fetchAttachment` turns a 410 into a `MediaExpiredError`, which is what makes
+  the difference between the bomb and "Could not open this file". A thread left
+  open also re-checks the countdown every 30 seconds, so a file expiring on
+  screen turns into the bomb without a reload.
+- **The countdown sits on the media itself.** A small pill in the image's
+  bottom-left corner reads "[bomb] in 3 days"; on a video it goes in the
+  top-left, because the native controls own the bottom edge. The bomb's
+  accessible name is "Self-destructs", so a screen reader hears the whole
+  sentence. The pill is a translucent near-black (`--media-badge-fill` in
+  `theme.css`) behind a backdrop blur. That keeps it readable over a white
+  photo without blacking out a dark one, and it ignores taps.
+- **Unread tiles warn about unseen media.** A board tile says "Image
+  self-destructs in 3 days", "2 videos self-destruct in…", or "Media…" for a
+  mix. This covers files in the partner's messages since the viewer last read
+  the thread, the same rule as unread, applied to each message. Permanent and
+  already-expired files are left out. With several files, the tile shows the
+  **soonest** expiry. The server knows the expiries but not the kinds, so
+  `listBoard` also sends the bodies of the messages carrying those files, at
+  most `UNSEEN_MEDIA_MESSAGE_LIMIT` per thread, soonest-expiring first.
+  `ThreadSticker` decrypts them to name the kind. If the list was cut short, or
+  a body would not decrypt, the tile says "Media" rather than guess. This works
+  on sealed tiles too: the envelope still hides the content, but the warning
+  is exactly what a sealed tile needs.
+- **Browser caching ends with the media.** Self-destructing media is served
+  with `private, max-age=<seconds left>`. Only permanent media keeps
+  `immutable`.
+- **A cron sweep deletes the objects.** Every 15 minutes (`triggers.crons` in
+  wrangler.jsonc), `sweepExpiredMedia` in `src/lib/server/media/expiry.ts` finds
+  rows where `purged_at IS NULL AND expires_at <= now`, using
+  `message_attachments_expiry_idx`. It deletes their objects and sets
+  `purged_at`. This is what stops the storage bill; it is not what makes media
+  disappear, because the read check does that on time. The object is deleted
+  before the row is marked, so a run that dies in between retries the same keys
+  next time instead of leaving a row marked purged over an object nobody will
+  delete. Batches are 1000 keys, which is R2's delete limit. Row updates are
+  chunked under D1's 100 bound parameters per statement.
+- **The row outlives the object.** It is a few bytes, and it is what lets the
+  thread say the media self-destructed rather than that it is missing.
+- **The decision is made when the message is sent.** Revoking `permanentMedia`
+  does not start a countdown on media already sent as permanent, and granting it
+  does not rescue media that is already counting down.
+
+The cron handler, `src/lib/server/scheduled.ts`, is attached to the worker that
+the adapter generates. It is added after the build by
+`vite-plugins/scheduled-handler.ts`, for the same reason the Durable Object
+export is (see "Exporting the class from a generated worker" below). The plugin
+fails the build if the adapter's output ever stops having the `worker_default`
+it assigns to, rather than shipping a worker that silently never sweeps.
+`scheduled.ts` and everything it imports are therefore alias-free.
+
+`vite dev` has no cron. Expiry still behaves correctly there, because it is
+checked on read, but nothing deletes the files in `./local-media`. To exercise
+the real sweep, run `npm run preview` and request
+`/cdn-cgi/handler/scheduled` (wrangler serves that path when started with
+`--test-scheduled`).
 
 ## Links and embeds
 
@@ -358,6 +473,8 @@ plainly, because the framing of this feature invites the assumption that it does
 - The names and colors of the tags used by threads.
 - How many attachments each message has, and **each one's exact byte size** — so
   approximate media sizes.
+- How long the sender chose for each message's media to last, and whether it was
+  sent as permanent. The server has to know this in order to delete the media.
 - When each side opened each thread, and when they last read it.
 - Which of the sixteen stored icons a thread has, even though the current UI no
   longer surfaces that choice directly.
@@ -378,7 +495,7 @@ reaction, and anything that would let it read or forge any of them.
 | `.../tags/[tagId]`                  | `PATCH`: rename or recolor a tag.                                           |
 | `.../threads/[threadId]/tags`       | `PUT`: replace the thread's tag assignments.                                |
 | `.../messages/[messageId]/reaction` | `PUT` / `DELETE`.                                                           |
-| `.../attachments/[attachmentId]`    | `GET`, streams ciphertext.                                                  |
+| `.../attachments/[attachmentId]`    | `GET`, streams ciphertext. `410` once the media has self-destructed.        |
 | `.../ack-warning`                   | `POST`, the one-time warning acknowledgement.                               |
 | `.../restore`                       | `GET` a page, `POST` re-encrypted rows, `DELETE`.                           |
 | `.../events`                        | `GET`, the SSE feed. Metadata only.                                         |
@@ -534,6 +651,11 @@ The honest boundary:
   Playwright at `wrangler dev` would close both gaps and is not done.
 - **Video** is accepted and capped, but has had no real exercise beyond a unit
   test of the encryption; only a small PNG is covered end to end.
+- **Orphaned permanent media stays until disconnect.** The lifecycle rule only
+  covers `expiring/`, so an orphan under `permanent/` (a failed send by an
+  account with `permanentMedia`) is removed only when the partnership is
+  disconnected. It is unreachable and unreadable, so the cost is storage alone:
+  at most 25 MB per failed send.
 
 ## The body is a rich-text document
 

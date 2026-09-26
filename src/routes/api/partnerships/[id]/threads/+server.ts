@@ -28,7 +28,7 @@ export const POST: RequestHandler = async (event) => {
 		error(404, 'Not found');
 	}
 
-	const { form, attachments } = await parseSend(request);
+	const { form, attachments, mediaTtl } = await parseSend(request);
 	const parsed = newThreadSchema.safeParse({
 		icon: form.get('icon'),
 		ciphertext: form.get('ciphertext'),
@@ -59,6 +59,7 @@ export const POST: RequestHandler = async (event) => {
 		ciphertext: parsed.data.ciphertext,
 		metadataCiphertext: parsed.data.metadataCiphertext,
 		attachments,
+		mediaTtl,
 		tagIds
 	});
 

@@ -4,6 +4,8 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import { inviteUrl } from '$lib/invite-url';
 import { answerFromControl, controlFromAnswer, isInviteUsable } from '$lib/partnership';
 import { partnerEditFormSchema } from '$lib/schemas/partnerForm';
+import { createMediaStore } from '$lib/server/media/dev';
+import { purgePartnershipMedia } from '$lib/server/messaging';
 import {
 	deletePartnership,
 	getPartnershipForUser,
@@ -125,7 +127,7 @@ export const actions: Actions = {
 	 * Not gated on `control` on purpose — a user who handed control to their
 	 * partner must still be able to get out. See `deletePartnership`.
 	 */
-	disconnect: async ({ locals, params }) => {
+	disconnect: async ({ locals, params, platform }) => {
 		if (!locals.user) {
 			error(401, 'Not signed in');
 		}
@@ -133,6 +135,17 @@ export const actions: Actions = {
 		const removed = await deletePartnership(locals.db, params.id, locals.user.id);
 		if (!removed) {
 			error(404, 'Partner not found');
+		}
+
+		// After the delete, not before: the delete is what proves membership, so
+		// nobody can purge a partnership's media without being in it. Nothing
+		// cascades from D1 into the store, and without this every file ever sent
+		// stayed in R2, billed, for good. The purge works by prefix, so the rows
+		// being gone does not matter, and it reports failure rather than throwing
+		// — leaving never waits on storage.
+		const purge = await purgePartnershipMedia(await createMediaStore({ platform }), params.id);
+		if (purge.failed) {
+			console.error(`could not purge media for partnership ${params.id}`);
 		}
 
 		redirect(303, '/settings/partners');

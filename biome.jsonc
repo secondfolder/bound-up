@@ -265,6 +265,7 @@
 				"vitest-setup-browser.ts",
 				"e2e/**",
 				"scripts/**",
+				"vite-plugins/**",
 				"src/lib/server/db/**",
 				// The attachment store `npm run dev` writes to disk; dead code in
 				// the worker bundle.

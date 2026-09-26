@@ -13,6 +13,7 @@
 		trustAllowsSending,
 		trustFor
 	} from '$lib/crypto/trust.svelte';
+	import { hasFeature } from '$lib/features';
 	import { watchPartnership } from '$lib/messaging/live';
 	import type { PageData } from './$types';
 
@@ -96,6 +97,7 @@
 			tags={data.tags}
 			recipients={data.recipients}
 			{canSend}
+			permanentMedia={hasFeature(data.features, 'permanentMedia')}
 		/>
 	{:else}
 		<!-- Never the thread until the key is here: every message would render as
