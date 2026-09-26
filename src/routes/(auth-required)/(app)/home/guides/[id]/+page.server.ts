@@ -1,7 +1,15 @@
 import { error } from '@sveltejs/kit';
+import { requireFeature } from '$lib/server/features';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, locals: { db } }) => {
+export const load: PageServerLoad = async ({ params, locals: { db, user } }) => {
+	if (!user) {
+		error(401, 'Not signed in');
+	}
+	// Before the lookup, so an account without guides cannot tell a real guide
+	// id from a made-up one by the 404.
+	await requireFeature(db, user.id, 'guides');
+
 	const guide = await db.query.guides.findFirst({
 		where: (guides, { eq }) => eq(guides.id, params.id),
 		columns: { id: true, title: true },

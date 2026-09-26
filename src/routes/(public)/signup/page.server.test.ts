@@ -8,7 +8,14 @@ import { actions, load } from './+page.server';
 
 // See the note in the login test: this covers only the invite round-trip.
 
-const user = { id: 'u1', name: 'Ada', email: 'ada@example.test', image: null, timezone: 'UTC' };
+const user = {
+	id: 'u1',
+	name: 'Ada',
+	email: 'ada@example.test',
+	image: null,
+	timezone: 'UTC',
+	role: 'user'
+};
 let harness: TestDb;
 
 beforeEach(async () => {

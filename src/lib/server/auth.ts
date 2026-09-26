@@ -4,6 +4,8 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 // pulls in getMigrations and the Kysely adapter, which we never use and which
 // would otherwise be bundled into the worker. The core is identical.
 import { betterAuth } from 'better-auth/minimal';
+import { admin } from 'better-auth/plugins/admin';
+import { defaultAc, userAc } from 'better-auth/plugins/admin/access';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { getRequestEvent } from '$app/server';
 import { AUTH_SECRET_LENGTH } from '../encryption';
@@ -37,6 +39,31 @@ type PasskeyExtensions = NonNullable<
  * If the library ever adds `prf`, this cast becomes a no-op and still compiles.
  */
 const PRF_REGISTRATION_EXTENSIONS = { prf: {} } as PasskeyExtensions;
+
+/**
+ * The admin role, narrowed from the plugin's default to what the admin pages
+ * actually use: finding an account and making or unmaking an admin.
+ *
+ * The plugin's own `admin` role can do far more, over `/api/auth/admin/*`,
+ * whether or not any screen here calls it. What is left out, and why:
+ *
+ * - `impersonate` would hand an admin a session inside someone's partner
+ *   data — tasks, rewards, who they are linked to — which is the privacy
+ *   boundary docs/user-commitments-and-product-goals.md draws.
+ * - `create` and `set-password` make a credential the browser never derived,
+ *   so there is no password wrap for it and the account's message key can
+ *   never be opened again (docs/encryption.md). It would look like a working
+ *   account and be a broken one.
+ * - `set-email`, `update`, `delete` and `ban` have no screen and no use yet.
+ *   Grant one when something needs it, not before.
+ *
+ * Granting a feature is not in here at all: `user_features` is an app table,
+ * written by our own admin actions behind `requireAdmin`.
+ */
+const adminRole = defaultAc.newRole({
+	user: ['list', 'get', 'set-role'],
+	session: ['list', 'revoke']
+});
 
 export type AuthRequestConfig = {
 	/** `platform.env.BETTER_AUTH_SECRET` in production, `.env` in dev. */
@@ -145,6 +172,13 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 				 */
 				registration: { extensions: PRF_REGISTRATION_EXTENSIONS }
 			}),
+			// Adds `user.role`. There is no hook here making the first account an
+			// admin: a trigger in the migrations does that, so it holds however
+			// the row is inserted — see drizzle/*_promote_first_user_to_admin.sql
+			// and docs/features-and-admin.md.
+			// No `ac`: the plugin only reads it on the client, for a client-side
+			// permission check this app does not use; the server checks `roles`.
+			admin({ roles: { admin: adminRole, user: userAc } }),
 			// Must be last — Better Auth warns if the cookie plugin is not.
 			sveltekitCookies(getRequestEvent)
 		]

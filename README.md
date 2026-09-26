@@ -104,6 +104,13 @@ npm run db:migrate:production   # production
 
 Never run `drizzle-kit push` — see the comment in `drizzle.config.ts`.
 
+### The first admin
+
+The first account created in a database is made an admin by a trigger in the
+migrations, and every later admin is made from that account's Settings → Admin
+page. On a fresh deployment, sign up straight after the first deploy. See
+[docs/features-and-admin.md](docs/features-and-admin.md).
+
 ## Gotchas
 
 - **Nothing under `src/lib/server/db/` may import `$lib`, `$env` or `$app`.**

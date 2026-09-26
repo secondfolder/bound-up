@@ -38,6 +38,8 @@ function data(timezone: string | null): PageData {
 		},
 		partners: [],
 		helpRequests: [],
+		features: [],
+		isAdmin: false,
 		// The cards are exercised on their own and through the load; here they
 		// only need to be present, because the page renders them unconditionally
 		// and a missing prop would fail for the wrong reason.

@@ -12,6 +12,8 @@ function data(claimCount: number): PageData {
 		user: { id: 'u1', name: 'Ada', email: 'ada@example.com', image: null, timezone: 'UTC' },
 		partners: [{ id: 'p1', name: 'Jun', image: null }],
 		helpRequests: [],
+		features: [],
+		isAdmin: false,
 		selfRewards: {
 			credits: 3,
 			rewards: [],

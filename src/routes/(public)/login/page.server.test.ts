@@ -8,7 +8,14 @@ import { load } from './+page.server';
  * end to end by the Playwright suite.
  */
 
-const user = { id: 'u1', name: 'Ada', email: 'ada@example.test', image: null, timezone: 'UTC' };
+const user = {
+	id: 'u1',
+	name: 'Ada',
+	email: 'ada@example.test',
+	image: null,
+	timezone: 'UTC',
+	role: 'user'
+};
 
 test('offers a validated redirectTo to the page', async () => {
 	const data = await runLoad(load(fakeEvent({ path: '/login?redirectTo=%2Finvite%2Fabc' })));

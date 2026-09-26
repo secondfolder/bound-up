@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../../encryption';
+import type { FeatureKey, FeatureSource } from '../../../features';
 import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
@@ -955,3 +956,46 @@ export type AccountRecoveryRequest = typeof accountRecoveryRequests.$inferSelect
 export type NewAccountRecoveryRequest = typeof accountRecoveryRequests.$inferInsert;
 export type HistoryRestoreRequest = typeof historyRestoreRequests.$inferSelect;
 export type NewHistoryRestoreRequest = typeof historyRestoreRequests.$inferInsert;
+
+/**
+ * The features an account holds. No row, no feature — see
+ * docs/features-and-admin.md.
+ *
+ * One row per (user, feature), which is also the shape a purchase will need:
+ * buying a feature will insert the same row with `source = 'purchase'`, so the
+ * access check never has to learn where access came from. Revoking deletes the
+ * row rather than flagging it, so "holds it" is simply "a row exists".
+ *
+ * `feature` is a plain string in the database. A key later removed from
+ * `FEATURES` can leave rows behind, which `listUserFeatures` filters out rather
+ * than trusting the `$type`.
+ */
+export const userFeatures = sqliteTable(
+	'user_features',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		feature: text('feature').$type<FeatureKey>().notNull(),
+		source: text('source').$type<FeatureSource>().notNull(),
+		/**
+		 * The admin who granted it, for the audit trail. Null for a purchase, and
+		 * after that admin's account is deleted — the grant outlives them.
+		 */
+		grantedByUserId: text('granted_by_user_id').references(() => user.id, {
+			onDelete: 'set null'
+		}),
+		...timestamps
+	},
+	(table) => [
+		// Makes a repeated grant a no-op, and doubles as the index for the only
+		// read path: "this user's features".
+		uniqueIndex('user_features_user_feature_idx').on(table.userId, table.feature)
+	]
+);
+
+export type UserFeature = typeof userFeatures.$inferSelect;
+export type NewUserFeature = typeof userFeatures.$inferInsert;

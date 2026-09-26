@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { FeatureKey } from '$lib/features';
 import type { Db } from '$lib/server/db';
+import { guides } from '$lib/server/db/schema';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
@@ -32,9 +34,10 @@ afterEach(() => harness.close());
 
 function at(
 	user: TestUser | null,
-	partners = [] as { id: string; name: string; image: string | null }[]
+	partners = [] as { id: string; name: string; image: string | null }[],
+	features = [] as FeatureKey[]
 ) {
-	return fakeEvent({ db, user, path: '/home', parentData: { partners } });
+	return fakeEvent({ db, user, path: '/home', parentData: { partners, features } });
 }
 
 describe('load', () => {
@@ -114,10 +117,41 @@ describe('load', () => {
 		]);
 	});
 
+	describe('the guides card', () => {
+		beforeEach(async () => {
+			// Explicit times: the card's order is createdAt then id, and ids are
+			// UUIDs, so rows inserted in the same millisecond would sort at random.
+			await db.insert(guides).values(
+				['First', 'Second', 'Third', 'Fourth'].map((title, index) => ({
+					title,
+					createdAt: new Date(Date.UTC(2026, 0, index + 1))
+				}))
+			);
+		});
+
+		it('is absent for an account without the guides feature', async () => {
+			const data = await runLoad(load(at(ada)));
+			expect(data.guides).toBeNull();
+		});
+
+		it('previews the first guides, and counts them all, for an account that has it', async () => {
+			const data = await runLoad(load(at(ada, [], ['guides'])));
+			expect(data.guides).toEqual({
+				guides: [
+					{ id: expect.any(String), title: 'First' },
+					{ id: expect.any(String), title: 'Second' },
+					{ id: expect.any(String), title: 'Third' }
+				],
+				total: 4
+			});
+		});
+	});
+
 	it('degrades to an empty home feed without a session', async () => {
 		const data = await runLoad(load(at(null)));
 		expect(data).toEqual({
 			unread: [],
+			guides: null,
 			tasks: { viewerActs: true, ready: [], readyCount: 0, waitingCount: 0, activeCount: 0 },
 			rewards: {
 				viewerActs: true,

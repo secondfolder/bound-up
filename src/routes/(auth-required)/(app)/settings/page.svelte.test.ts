@@ -4,7 +4,8 @@ import { render, screen } from '@testing-library/svelte';
 
 const pageState = {
 	data: {
-		user: { id: 'u1', name: 'Ada', email: 'ada@example.com', image: null, timezone: 'UTC' }
+		user: { id: 'u1', name: 'Ada', email: 'ada@example.com', image: null, timezone: 'UTC' },
+		isAdmin: false
 	}
 };
 
@@ -52,6 +53,23 @@ describe('/settings/+page.svelte', () => {
 			'href',
 			'/(auth-required)/(app)/settings/partners'
 		);
+	});
+
+	it('links to the admin pages only for an admin', () => {
+		const { unmount } = renderPage();
+		expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+		unmount();
+
+		pageState.data.isAdmin = true;
+		try {
+			renderPage();
+			expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute(
+				'href',
+				'/(auth-required)/(app)/admin'
+			);
+		} finally {
+			pageState.data.isAdmin = false;
+		}
 	});
 
 	/**

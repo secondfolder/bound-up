@@ -12,6 +12,8 @@ function data(claimCount: number, claimable = true): PageData {
 		user: { id: 'u1', name: 'Ada', email: 'ada@example.com', image: null, timezone: 'UTC' },
 		partners: [{ id: 'p1', name: 'Jun', image: null }],
 		helpRequests: [],
+		features: [],
+		isAdmin: false,
 		partner: { id: 'p1', name: 'Jun', canManageRewards: true, canClaimRewards: claimable },
 		counterpartUserId: 'u2',
 		viewerCredits: 4,

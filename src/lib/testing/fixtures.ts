@@ -81,6 +81,8 @@ export type TestUser = {
 	email: string;
 	image: string | null;
 	timezone: string;
+	/** Better Auth's admin plugin role. `'admin'` or `'user'`. */
+	role: string;
 };
 
 export async function createTestUser(db: Db, overrides: Partial<TestUser> = {}): Promise<TestUser> {
@@ -90,7 +92,8 @@ export async function createTestUser(db: Db, overrides: Partial<TestUser> = {}):
 		name: overrides.name ?? `Test User ${counter}`,
 		email: overrides.email ?? `user-${counter}@example.test`,
 		image: overrides.image ?? null,
-		timezone: overrides.timezone ?? 'UTC'
+		timezone: overrides.timezone ?? 'UTC',
+		role: overrides.role ?? 'user'
 	};
 
 	await db.insert(user).values({
@@ -103,6 +106,10 @@ export async function createTestUser(db: Db, overrides: Partial<TestUser> = {}):
 		createdAt: new Date(),
 		updatedAt: new Date()
 	});
+	// Written after the insert, not with it: the migrations' first-account
+	// trigger makes whichever fixture user is inserted first an admin, and a
+	// test's roles should be what it asked for, not an accident of order.
+	await db.update(user).set({ role: row.role }).where(eq(user.id, row.id));
 
 	return row;
 }

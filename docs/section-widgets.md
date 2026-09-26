@@ -12,7 +12,7 @@ One shell, one component per destination.
 
 ```
 SectionWidget            the card: wa-card, header, optional header link, body
-├─ GuidesWidget          first few guide titles — not rendered for now
+├─ GuidesWidget          first few guide titles — only with the guides feature
 ├─ TasksWidget           tasks ready to complete now
 ├─ RewardsWidget         credit balance + rewards claimable now
 ├─ PartnerMessagesWidget unread / total threads for one partnership
@@ -23,16 +23,17 @@ SectionWidget            the card: wa-card, header, optional header link, body
 nothing about card chrome. `WidgetItems` renders the title-plus-note list that
 Guides, Tasks and Rewards all want, so that list exists once.
 
-| Page            | Cards                                          |
-| --------------- | ---------------------------------------------- |
-| `/home`         | Messages (conditional), Tasks, Rewards         |
-| `/partner/[id]` | Messages, Tasks, Rewards                       |
+| Page            | Cards                                                        |
+| --------------- | ------------------------------------------------------------ |
+| `/home`         | Messages (conditional), Guides (conditional), Tasks, Rewards |
+| `/partner/[id]` | Messages, Tasks, Rewards                                     |
 
-The Guides card is **hidden from `/home` for now**: guides need more work before
-they are advertised. `GuidesWidget` and `GuidesWidgetView` are kept for when it
-returns, but the `/home` load no longer queries guides — D1 charges for rows
-read by a card nobody sees — so bringing it back means restoring that query as
-well as the markup. `/home/guides` itself still works; nothing links to it.
+The Guides card shows **only to an account that holds the `guides` feature**
+(see [features-and-admin.md](features-and-admin.md)). The `/home` load reads
+`features` from the app shell layout and skips the guides query entirely
+otherwise — D1 charges for rows read by a card nobody sees — returning
+`guides: null`. That layout list only decides what is shown; `/home/guides`
+refuses an account without the feature by itself.
 
 Every `/home` card shows self **and** partner data wherever both exist — see
 below.
@@ -163,7 +164,7 @@ only what the preview shows:
 | --------------------------- | ----------------------------------------------------- | --------------------- |
 | `TasksWidgetView`           | `getHomeTasksWidget`, `getPartnershipTasksWidget`     | `server/tasks.ts`     |
 | `RewardsWidgetView`         | `getHomeRewardsWidget`, `getPartnershipRewardsWidget` | `server/rewards.ts`   |
-| `GuidesWidgetView`          | nothing while the card is hidden                      | —                     |
+| `GuidesWidgetView`          | `loadGuidesCard`, only with the guides feature        | the `/home` load      |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
 
 These deliberately do **not** reuse `getSelfTasksSection`, `getSelfRewardsSection`

@@ -26,6 +26,8 @@ function data({
 		},
 		partners: [{ id: 'p1', name: 'Jun', image: null }],
 		helpRequests: [],
+		features: [],
+		isAdmin: false,
 		partner: {
 			id: 'p1',
 			name: 'Jun',

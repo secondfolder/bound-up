@@ -120,6 +120,20 @@
       "when": 1790214852968,
       "tag": "0016_account_recovery_and_passkey_wraps",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1790392657838,
+      "tag": "0017_add_admin_and_user_features",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1790392663894,
+      "tag": "0018_promote_first_user_to_admin",
+      "breakpoints": true
     }
   ]
 }

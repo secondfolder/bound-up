@@ -51,6 +51,15 @@
 				<wa-icon name="chevron-right" variant="solid"></wa-icon>
 			</a>
 		</li>
+		<!-- Display only: the admin pages check the role again on the server. -->
+		{#if page.data.isAdmin}
+			<li>
+				<a href={resolve('/(auth-required)/(app)/admin')}>
+					<span>Admin</span>
+					<wa-icon name="chevron-right" variant="solid"></wa-icon>
+				</a>
+			</li>
+		{/if}
 	</ul>
 </section>
 

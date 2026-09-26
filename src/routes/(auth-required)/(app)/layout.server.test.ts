@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import type { Db } from '$lib/server/db';
+import { grantFeature } from '$lib/server/features';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
@@ -46,4 +47,22 @@ test('leaves a pending invite out of the nav', async () => {
 test('degrades to an empty nav rather than throwing without a session', async () => {
 	const { partners } = await runLoad(load(fakeEvent({ db, user: null })));
 	expect(partners).toEqual([]);
+});
+
+test('lists the features the viewer holds, and only theirs', async () => {
+	await grantFeature(db, { userId: ada.id, feature: 'guides', grantedByUserId: jun.id });
+	expect((await runLoad(load(fakeEvent({ db, user: ada })))).features).toEqual(['guides']);
+	expect((await runLoad(load(fakeEvent({ db, user: jun })))).features).toEqual([]);
+});
+
+test('says whether the viewer is an admin', async () => {
+	const admin = await createTestUser(db, { role: 'admin' });
+	expect((await runLoad(load(fakeEvent({ db, user: admin })))).isAdmin).toBe(true);
+	expect((await runLoad(load(fakeEvent({ db, user: ada })))).isAdmin).toBe(false);
+});
+
+test('gives no features and no admin without a session', async () => {
+	const data = await runLoad(load(fakeEvent({ db, user: null })));
+	expect(data.features).toEqual([]);
+	expect(data.isAdmin).toBe(false);
 });

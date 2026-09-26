@@ -1,12 +1,20 @@
+import { hasFeature } from '$lib/features';
+import type { Db } from '$lib/server/db';
+import { guides } from '$lib/server/db/schema';
 import { listUnreadCounts } from '$lib/server/messaging';
 import { getHomeRewardsWidget } from '$lib/server/rewards';
 import { getHomeTasksWidget } from '$lib/server/tasks';
+import type { GuidesWidgetView } from '$lib/types';
 import type { PageServerLoad } from './$types';
+
+/** Rows the guides card previews before it falls back to "and N more". */
+const GUIDES_PREVIEW_LIMIT = 3;
 
 /** Every card in its empty state, for the session-less degrade path below. */
 function emptyPage() {
 	return {
 		unread: [],
+		guides: null as GuidesWidgetView | null,
 		tasks: { viewerActs: true, ready: [], readyCount: 0, waitingCount: 0, activeCount: 0 },
 		rewards: {
 			viewerActs: true,
@@ -29,7 +37,7 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	// nav, so take it from there rather than reading `partnerships` a second
 	// time. It also carries the per-viewer name, which is resolved in exactly
 	// one place (invariant 12).
-	const { partners } = await parent();
+	const { partners, features } = await parent();
 
 	depends('messages:unread');
 	// The same keys the /home/tasks and /home/rewards loads use, so completing a
@@ -37,12 +45,12 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	depends('tasks:home');
 	depends('rewards:home');
 
-	// No guides query: the guides card is hidden until the feature is ready to
-	// advertise, and D1 charges for rows read by a card nobody sees. When it
-	// comes back, preview the first few in /home/guides' order (createdAt, then
-	// id), limited in SQL, with the total counted separately.
-	const [unread, tasks, rewards] = await Promise.all([
+	const [unread, guidesCard, tasks, rewards] = await Promise.all([
 		listUnreadCounts(locals.db, locals.user.id, partners),
+		// Only for an account that holds guides: D1 charges for rows read by a
+		// card nobody sees. This decides what is shown, which is all the layout's
+		// `features` may be used for; /home/guides checks for itself.
+		hasFeature(features, 'guides') ? loadGuidesCard(locals.db) : null,
 		// Both take the layout's partner list: the cards mirror /home/tasks and
 		// /home/rewards, which show your own things AND each partner's.
 		getHomeTasksWidget(locals.db, locals.user.id, partners),
@@ -51,7 +59,24 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 
 	return {
 		unread,
+		guides: guidesCard,
 		tasks,
 		rewards
 	};
 };
+
+async function loadGuidesCard(db: Db): Promise<GuidesWidgetView> {
+	const [rows, total] = await Promise.all([
+		// Same ordering as /home/guides, so the card previews the top of the list
+		// the link goes to rather than an unrelated three. Limited in SQL, with
+		// the total counted separately, because D1 charges for rows read and the
+		// card never shows more than GUIDES_PREVIEW_LIMIT of them.
+		db.query.guides.findMany({
+			columns: { id: true, title: true },
+			orderBy: (guide, { asc }) => [asc(guide.createdAt), asc(guide.id)],
+			limit: GUIDES_PREVIEW_LIMIT
+		}),
+		db.$count(guides)
+	]);
+	return { guides: rows, total };
+}

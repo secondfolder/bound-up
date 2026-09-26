@@ -18,6 +18,8 @@ function data(partnerTasks: PageData['partnerTasks'] = []): PageData {
 		},
 		partners: [{ id: 'p1', name: 'Jun', image: null }],
 		helpRequests: [],
+		features: [],
+		isAdmin: false,
 		selfTasks: {
 			tasks: [],
 			completions: [

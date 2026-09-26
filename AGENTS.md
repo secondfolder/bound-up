@@ -32,6 +32,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/types.ts`            | Types both server and components need. Alias-free so the schema can import it                |
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
+| `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
@@ -318,6 +319,14 @@ are httpOnly, there is no client-side auth store, and there must not be one.
 `src/lib/auth-client.ts` exists only for the passkey ceremonies, which have to
 run in the browser. After a client-side ceremony, `invalidateAll()` before
 navigating.
+
+**A feature is enforced with `requireFeature`, in every load and action that
+serves it.** Features (`src/lib/features.ts`) are off until an account holds
+one. The app shell's `page.data.features` and `page.data.isAdmin` decide what
+to *show* and nothing else: loads run in parallel and actions run before any
+load, so a check that only lives in a layout gates nothing. Admin pages call
+`requireAdmin` in every load and action for the same reason. See
+[docs/features-and-admin.md](docs/features-and-admin.md).
 
 **Never return `locals.user` wholesale from a load.** It is the full DB row and
 load data is serialised into the HTML of every page. Whitelist fields, as
@@ -768,6 +777,7 @@ Four places, split on scope:
 | [docs/timezone.md](docs/timezone.md)                                                     | Account timezone storage, mismatch prompts, and device-local dismissal       |
 | [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text     |
 | [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |
+| [docs/features-and-admin.md](docs/features-and-admin.md)                                 | Per-account features, the admin role, the first-account admin, `/admin`      |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

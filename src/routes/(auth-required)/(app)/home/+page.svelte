@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import GuidesWidget from '$lib/components/GuidesWidget.svelte';
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
 	import TasksWidget from '$lib/components/TasksWidget.svelte';
 	import UnreadMessagesWidget from '$lib/components/UnreadMessagesWidget.svelte';
@@ -19,10 +20,11 @@
 		     have opened the app, and it should not be below the fold on a short
 		     phone. Renders nothing when there is nothing waiting. -->
 		<UnreadMessagesWidget unread={data.unread} />
-		<!-- No GuidesWidget for now: guides need more work before they are
-		     advertised. /home/guides still works for anyone who has the link;
-		     restoring the card means putting it back here and its query back in
-		     the load. -->
+		<!-- Only for an account that holds the guides feature: the load returns
+		     null otherwise, and /home/guides would refuse them anyway. -->
+		{#if data.guides}
+			<GuidesWidget guides={data.guides} href={resolve('/(auth-required)/(app)/home/guides')} />
+		{/if}
 		<TasksWidget tasks={data.tasks} href={resolve('/(auth-required)/(app)/home/tasks')} />
 		<RewardsWidget rewards={data.rewards} href={resolve('/(auth-required)/(app)/home/rewards')} />
 	</div>
