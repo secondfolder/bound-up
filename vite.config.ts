@@ -7,6 +7,7 @@ import { playwright } from '@vitest/browser-playwright';
 import cloudflareDoExporter from 'sveltekit-cloudflare-do';
 import { loadEnv } from 'vite';
 import { defineConfig, type Plugin } from 'vitest/config';
+import { buildTarget } from './vite-plugins/build-target.ts';
 import { scheduledHandler } from './vite-plugins/scheduled-handler.ts';
 
 const host: string | undefined = process.env.HOST;
@@ -108,7 +109,19 @@ const getCloudflarePlugin = ({
 
 export default defineConfig(({ command, mode }) => {
 	const env = loadEnv(mode, process.cwd(), '');
+	const selfHosted = buildTarget() === 'node';
 	return {
+		/**
+		 * `__SELF_HOSTED__` is the Node build's counterpart to `dev`: a build-time
+		 * constant, so `if (dev || __SELF_HOSTED__)` in the three backend
+		 * factories is dead code in the Workers bundle, and libsql and `node:fs`
+		 * never reach it. False in `vite dev` and vitest, where `dev` already
+		 * decides. See docs/self-hosting.md.
+		 */
+		define: {
+			// biome-ignore lint/style/useNamingConvention: a `define` key is the literal identifier it replaces in the source, and the dunder spelling is what marks it as a build-time constant rather than a variable.
+			__SELF_HOSTED__: JSON.stringify(selfHosted)
+		},
 		plugins: [
 			sveltekit(),
 			removeBareDevalueImport(),
@@ -132,15 +145,20 @@ export default defineConfig(({ command, mode }) => {
 			 *
 			 * `apply: 'build'` inside the plugin keeps it out of `vite dev` and vitest.
 			 */
-			cloudflareDoExporter({
-				durableObjects: ['src/lib/server/realtime/durable-object.ts']
-			}),
+			//
+			// Both this and the next plugin rewrite the Cloudflare adapter's
+			// output, so the Node build leaves them out: `scheduledHandler` fails
+			// the build when that output is missing, which is the point of it.
+			!selfHosted &&
+				cloudflareDoExporter({
+					durableObjects: ['src/lib/server/realtime/durable-object.ts']
+				}),
 			/**
 			 * Attaches the cron handler (`triggers.crons` in wrangler.jsonc) to the
 			 * same generated worker, for the same reason as the plugin above. See the
 			 * plugin file for why it fails the build rather than skipping.
 			 */
-			scheduledHandler({ handler: 'src/lib/server/scheduled.ts' }),
+			!selfHosted && scheduledHandler({ handler: 'src/lib/server/scheduled.ts' }),
 			getCloudflarePlugin({ command, env })
 		],
 

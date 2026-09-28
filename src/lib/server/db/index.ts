@@ -11,16 +11,17 @@ import * as tables from './schema';
  *
  * This module must stay free of `$lib` / `$env` / `$app` imports so it can also
  * be loaded by drizzle-kit and by the seed script, both of which run outside
- * Vite. The dev/prod driver switch lives in `./dev.ts` for that reason.
+ * Vite. The dev/prod driver switch lives in `./backend.ts` for that reason.
  */
 export function createD1Db(d1: AnyD1Database) {
 	return drizzle(d1, { schema });
 }
 
 /**
- * The app's database type is deliberately the *production* one. The dev libsql
- * client is cast to it, so all application code is typed against exactly what
- * runs in production and cannot accidentally rely on a dev-only capability.
+ * The app's database type is deliberately the D1 one. The local libsql client
+ * (dev and the self-hosted build) is cast to it, so all application code is
+ * typed against what runs on Workers and cannot accidentally rely on a
+ * capability D1 lacks.
  */
 export type Db = ReturnType<typeof createD1Db>;
 

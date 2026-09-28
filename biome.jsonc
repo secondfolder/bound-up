@@ -28,7 +28,10 @@
 		"lineWidth": 100
 	},
 	"javascript": {
-		"formatter": { "quoteStyle": "single", "trailingCommas": "none" }
+		"formatter": { "quoteStyle": "single", "trailingCommas": "none" },
+		// Replaced at build time by `define` in vite.config.ts and declared in
+		// src/app.d.ts; Biome reads neither. See docs/self-hosting.md.
+		"globals": ["__SELF_HOSTED__"]
 	},
 	"css": { "formatter": { "quoteStyle": "single" } },
 	"html": {
@@ -294,7 +297,7 @@
 		},
 		{
 			// Tool configs are loaded by their tool, which requires a default export.
-			"includes": ["*.config.ts", "*.config.js"],
+			"includes": ["*.config.ts", "*.config.js", "*.config.mjs"],
 			"linter": { "rules": { "style": { "noDefaultExport": "off" } } }
 		},
 		{

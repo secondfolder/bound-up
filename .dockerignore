@@ -1,0 +1,27 @@
+# Rebuilt inside the image, and the host's may be the wrong platform.
+node_modules
+.svelte-kit
+build
+.wrangler
+
+# Local state and secrets: never baked into an image.
+local.db
+local.db-*
+local-media
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+
+# Not needed to build or run the server.
+.git
+.github
+.husky
+.agents
+test-results
+playwright-report
+e2e
+docs
+*.md
+Dockerfile
+docker-compose.yml

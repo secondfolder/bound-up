@@ -1,6 +1,6 @@
-import { createClient } from '@libsql/client';
 import type { Browser, BrowserContextOptions, Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { sql } from './db';
 import { test } from './fixtures';
 import {
 	type Account,
@@ -13,28 +13,10 @@ import {
 	signUp,
 	waitForEnhancedForm
 } from './helpers';
-import { E2E_DATABASE_URL } from './run-paths';
-
-function db() {
-	return createClient({
-		url: E2E_DATABASE_URL,
-		// Other workers are writing through the dev server meanwhile; wait out a
-		// lock rather than fail with SQLITE_BUSY.
-		timeout: 5000
-	});
-}
 
 async function readTimezone(email: string): Promise<string> {
-	const client = db();
-	try {
-		const result = await client.execute({
-			sql: 'select timezone from user where email = ?',
-			args: [email]
-		});
-		return String(result.rows[0]?.timezone ?? '');
-	} finally {
-		client.close();
-	}
+	const result = await sql('select timezone from user where email = ?', [email]);
+	return String(result.rows[0]?.timezone ?? '');
 }
 
 function newDevice(browser: Browser, timezoneId: string) {

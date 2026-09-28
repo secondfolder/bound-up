@@ -18,7 +18,9 @@ import {
  *
  * Runs against `vite dev` on a port and a SQLite file of its own, both derived
  * from the checkout path (see `e2e/run-paths.ts`), so a local `local.db` is
- * never touched and runs in separate worktrees never touch each other.
+ * never touched and runs in separate worktrees never touch each other. With
+ * `E2E_IMAGE` set it runs against that Docker image on the same port and file
+ * instead — see `e2e/server.mjs`.
  */
 
 export default defineConfig({
@@ -57,6 +59,10 @@ export default defineConfig({
 		stdout: 'pipe',
 		stderr: 'pipe',
 		timeout: 120_000,
+		// So that `e2e/server.mjs` gets to `docker stop` the container in image
+		// mode, rather than being killed and leaving it running. Harmless for
+		// `vite dev`, which it forwards the signal to.
+		gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
 		env: {
 			E2E_PORT: String(E2E_PORT),
 			E2E_RUN_DIR,
@@ -71,7 +77,10 @@ export default defineConfig({
 			BETTER_AUTH_SECRET: 'e2e-secret-not-used-anywhere-else',
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.
-			VITE_DEV_ORIGIN: E2E_BASE_URL
+			VITE_DEV_ORIGIN: E2E_BASE_URL,
+			// Set to a Docker image to run the suite against it instead of
+			// `vite dev` (`npm run test:e2e:image`; CI does this for every build).
+			...(process.env.E2E_IMAGE ? { E2E_IMAGE: process.env.E2E_IMAGE } : {})
 		}
 	}
 });

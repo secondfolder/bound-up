@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { setThreadTags } from '$lib/server/messaging';
-import { createNotifier } from '$lib/server/realtime/dev';
+import { createNotifier } from '$lib/server/realtime/backend';
 import type { RequestHandler } from './$types';
 
 export const PUT: RequestHandler = async ({ locals, params, request, platform }) => {

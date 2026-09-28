@@ -6,8 +6,9 @@ import type { AnyD1Database } from 'drizzle-orm/d1';
  *
  * `event.platform` is populated only when running on Workers (`wrangler dev` or
  * deployed) — `svelte.config.js` strips the adapter's `emulate` hook, so in
- * `vite dev` there is no platform at all and the libsql path in `./dev.ts` is
- * used instead.
+ * `vite dev` there is no platform at all and the libsql path in `./backend.ts` is
+ * used instead. The self-hosted Node build has no platform either, and takes the
+ * same libsql path.
  */
 export function requireD1(platform: App.Platform | undefined): AnyD1Database {
 	if (!platform?.env?.DB) {

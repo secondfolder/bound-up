@@ -8,7 +8,7 @@ import { type Db, schema } from '../server/db';
  * A throwaway database for a single test.
  *
  * libsql, not better-sqlite3, for the same reason dev uses it (see
- * `src/lib/server/db/dev.ts`): its async signatures and `batch()` match
+ * `src/lib/server/db/backend.ts`): its async signatures and `batch()` match
  * `DrizzleD1Database`, so a test cannot pass against a capability D1 does not
  * have. The result is cast to `Db` for exactly that reason too — application
  * code under test is typed against production.

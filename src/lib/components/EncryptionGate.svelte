@@ -33,6 +33,22 @@
 		void refresh();
 	});
 
+	// Published on <html> for the e2e helpers, as the root layout publishes
+	// `data-hydrated`. `unlocked` is only set once the identity has been
+	// cached (`keyring = await cache(…)` in session.svelte.ts), so it is the
+	// moment a full page load stops being able to lose the key a sign-in just
+	// handed over. A helper that navigated before it sent the device back to
+	// sign in, intermittently, and only against the production build, whose
+	// redirect is fast enough to win the race. See waitForKeyring in
+	// e2e/helpers.ts. Removed with the shell, so a stale value from a previous
+	// session is never read.
+	$effect(() => {
+		document.documentElement.dataset.keyring = keyring.status;
+		return () => {
+			delete document.documentElement.dataset.keyring;
+		};
+	});
+
 	$effect(() => {
 		// A different account in the same tab must not inherit the previous one's
 		// keyring — it would fail to unwrap, but it would fail confusingly.

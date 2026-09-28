@@ -1,7 +1,9 @@
-import adapter from '@sveltejs/adapter-cloudflare';
+import cloudflareAdapter from '@sveltejs/adapter-cloudflare';
+import nodeAdapter from '@sveltejs/adapter-node';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import { buildTarget } from './vite-plugins/build-target.ts';
 
-const cloudflare = adapter();
+const cloudflare = cloudflareAdapter();
 
 /**
  * Custom elements verified to upgrade to a real interactive control: a
@@ -65,7 +67,12 @@ const config = {
 		//
 		// `vite build` still uses the full adapter. Run `npm run preview`
 		// (real wrangler dev) to exercise the platform path before deploying.
-		adapter: { ...cloudflare, emulate: undefined }
+		//
+		// `BUILD_TARGET=node` (`npm run build:node`, what the Dockerfile runs)
+		// builds the self-hosted server instead. It has no platform either, and
+		// `__SELF_HOSTED__` sends it down the same local backends as `vite dev`.
+		// See docs/self-hosting.md.
+		adapter: buildTarget() === 'node' ? nodeAdapter() : { ...cloudflare, emulate: undefined }
 	}
 };
 

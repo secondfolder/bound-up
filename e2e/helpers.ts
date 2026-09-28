@@ -142,6 +142,32 @@ export function account(name: string): Account {
 	return { name, email: uniqueEmail(name.toLowerCase()), password: 'correct-horse-battery' };
 }
 
+/** The routes outside the app shell, where `EncryptionGate` never runs. */
+const PUBLIC_PATH = /^\/(?:$|signup|login|logout|invite|roadmap)(?:\/|$)/;
+
+/**
+ * After a sign-in or sign-up, waits until the key it handed over is cached.
+ *
+ * Signing in leaves what opens the key in an in-memory stash, and the app
+ * shell caches the key from it a moment after landing. A full page load in
+ * between — `page.goto`, as the next step of most specs is — throws the stash
+ * away before it is used, and the device is sent back to sign in
+ * (`/login?reason=device`). Against `vite dev` the landing page is slow enough
+ * that this almost never happened; against the production build in the Docker
+ * image it did, in a different spec each run. Waits on the keyring the gate
+ * publishes (see EncryptionGate.svelte), which is `unlocked` only once the key
+ * is cached — `deviceHoldsKey` would navigate, and so lose the same race.
+ *
+ * Only inside the app shell: a sign-up that lands back on an invite has no
+ * gate, and keeps the stash until the shell first loads.
+ */
+async function waitForKeyring(page: Page) {
+	if (PUBLIC_PATH.test(new URL(page.url()).pathname)) {
+		return;
+	}
+	await page.locator('html[data-keyring="unlocked"]').waitFor({ state: 'attached' });
+}
+
 export async function signUp(page: Page, who: Account, from = '/signup') {
 	await page.goto(from);
 	// Before the first fill, not just before the submit — see the note on
@@ -156,6 +182,7 @@ export async function signUp(page: Page, who: Account, from = '/signup') {
 	// signing up lands on /home normally and back on the invite when one is
 	// being accepted. Without this the next step races the session cookie.
 	await page.waitForURL((url) => !url.pathname.startsWith('/signup'));
+	await waitForKeyring(page);
 }
 
 export async function logIn(page: Page, who: Account, from = '/login') {
@@ -166,6 +193,7 @@ export async function logIn(page: Page, who: Account, from = '/login') {
 	await submitEnhancedForm(page, 'Login');
 	// See the note in signUp: the destination depends on `redirectTo`.
 	await page.waitForURL((url) => !url.pathname.startsWith('/login'));
+	await waitForKeyring(page);
 }
 
 export async function logOut(page: Page) {
@@ -189,6 +217,7 @@ export async function logInHere(page: Page, who: Account) {
 	await fillPassword(page, 'password', who.password);
 	await submitEnhancedForm(page, 'Login');
 	await page.waitForURL((url) => !url.pathname.startsWith('/login'));
+	await waitForKeyring(page);
 }
 
 /**

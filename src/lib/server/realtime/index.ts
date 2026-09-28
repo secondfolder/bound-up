@@ -2,7 +2,7 @@
  * Telling the other device that something changed.
  *
  * An interface with two implementations, for the same reason
- * `src/lib/server/db/dev.ts` and `server/media/index.ts` have one each:
+ * `src/lib/server/db/backend.ts` and `server/media/index.ts` have one each:
  * `svelte.config.js` strips the Cloudflare adapter's `emulate` hook, so
  * `vite dev` has no `event.platform` and therefore no Durable Object binding at
  * all. Production gets a Durable Object; dev gets a module-level `Map`, which

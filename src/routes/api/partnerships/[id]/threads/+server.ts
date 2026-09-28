@@ -1,8 +1,8 @@
 import { error, json } from '@sveltejs/kit';
 import { newThreadSchema } from '$lib/schemas/messageForm';
-import { createMediaStore } from '$lib/server/media/dev';
+import { createMediaStore } from '$lib/server/media/backend';
 import { requireMembership, startThread } from '$lib/server/messaging';
-import { createNotifier } from '$lib/server/realtime/dev';
+import { createNotifier } from '$lib/server/realtime/backend';
 import { parseSend, sendFailureStatus } from '../send';
 import type { RequestHandler } from './$types';
 

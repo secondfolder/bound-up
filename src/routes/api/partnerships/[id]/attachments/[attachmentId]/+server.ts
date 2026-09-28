@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { createMediaStore } from '$lib/server/media/dev';
+import { createMediaStore } from '$lib/server/media/backend';
 import { getAttachmentForDownload, requireMembership } from '$lib/server/messaging';
 import type { RequestHandler } from './$types';
 

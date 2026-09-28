@@ -1,12 +1,12 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { attachmentKey, type MediaStore, partnershipMediaPrefix } from './index';
-import { createLocalStore } from './local';
+import { createLocalStore, type LocalMediaStore } from './local';
 
 let root: string;
-let store: MediaStore;
+let store: LocalMediaStore;
 
 const stream = (bytes: Uint8Array) =>
 	new Blob([bytes as BlobPart]).stream() as ReadableStream<Uint8Array>;
@@ -33,6 +33,28 @@ describe('createLocalStore', () => {
 		await expect(read(await store.get(key))).resolves.toEqual(bytes);
 	});
 
+	// Streamed rather than buffered, so a body arrives in pieces; the file has
+	// to be every piece, in order.
+	it('round-trips a body that arrives in many chunks', async () => {
+		const key = attachmentKey('permanent', 'p1', 'm1', 'a1');
+		const chunks = Array.from({ length: 50 }, (_, i) => new Uint8Array(1000).fill(i));
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				for (const chunk of chunks) {
+					controller.enqueue(chunk);
+				}
+				controller.close();
+			}
+		});
+		await store.put(key, body, 50_000);
+		const result = await store.get(key);
+		expect(result?.byteSize).toBe(50_000);
+		const bytes = await read(result);
+		expect(bytes.length).toBe(50_000);
+		expect(bytes[0]).toBe(0);
+		expect(bytes[49_999]).toBe(49);
+	});
+
 	it('is null for something that was never written', async () => {
 		await expect(store.get(attachmentKey('expiring', 'p1', 'm1', 'nope'))).resolves.toBeNull();
 	});
@@ -43,6 +65,28 @@ describe('createLocalStore', () => {
 		await expect(
 			store.put(attachmentKey('expiring', 'p1', 'm1', 'a1'), stream(new Uint8Array(3)), 4)
 		).rejects.toThrow(/Declared 4 bytes but received 3/);
+	});
+
+	// A failed upload must leave nothing behind: not the target, which a reader
+	// would serve as a truncated attachment, and not the temp file either.
+	it('leaves no file at all after a short or an overlong body', async () => {
+		const key = attachmentKey('expiring', 'p1', 'm1', 'a1');
+		await expect(store.put(key, stream(new Uint8Array(3)), 4)).rejects.toThrow();
+		await expect(store.put(key, stream(new Uint8Array(5)), 4)).rejects.toThrow(/Declared 4/);
+		await expect(store.get(key)).resolves.toBeNull();
+		await expect(readdir(path.join(root, 'expiring', 'p1', 'm1'))).resolves.toEqual([]);
+	});
+
+	it('leaves no file behind when the body itself fails midway', async () => {
+		const key = attachmentKey('expiring', 'p1', 'm1', 'a1');
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(new Uint8Array([1, 2]));
+				controller.error(new Error('connection dropped'));
+			}
+		});
+		await expect(store.put(key, body, 4)).rejects.toThrow(/connection dropped/);
+		await expect(readdir(path.join(root, 'expiring', 'p1', 'm1'))).resolves.toEqual([]);
 	});
 
 	it('deletes by key, and tolerates deleting what is not there', async () => {
@@ -95,6 +139,31 @@ describe('createLocalStore', () => {
 		} finally {
 			await rm(outside, { force: true });
 		}
+	});
+
+	// Stands in for the R2 lifecycle rule on `expiring/`, so it must take only
+	// what is old enough and only under the prefix it was given.
+	it('deletes files older than the cutoff under a prefix, and nothing else', async () => {
+		const old = attachmentKey('expiring', 'p1', 'm1', 'old');
+		const fresh = attachmentKey('expiring', 'p1', 'm1', 'fresh');
+		const kept = attachmentKey('permanent', 'p1', 'm1', 'old');
+		for (const key of [old, fresh, kept]) {
+			await store.put(key, stream(new Uint8Array([1])), 1);
+		}
+		const longAgo = new Date('2020-01-01T00:00:00Z');
+		await utimes(path.join(root, old), longAgo, longAgo);
+		await utimes(path.join(root, kept), longAgo, longAgo);
+
+		await expect(
+			store.deleteOlderThan('expiring/', new Date('2021-01-01T00:00:00Z'))
+		).resolves.toBe(1);
+		await expect(store.get(old)).resolves.toBeNull();
+		await expect(store.get(fresh)).resolves.not.toBeNull();
+		await expect(store.get(kept)).resolves.not.toBeNull();
+	});
+
+	it('finds nothing to age out under a prefix that does not exist yet', async () => {
+		await expect(store.deleteOlderThan('expiring/', new Date())).resolves.toBe(0);
 	});
 
 	it('refuses an empty or oddly-shaped key', async () => {

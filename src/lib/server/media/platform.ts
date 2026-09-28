@@ -7,7 +7,8 @@ import type { MediaBucket } from './index';
  * `event.platform` is populated only when running on Workers (`wrangler dev` or
  * deployed) — `svelte.config.js` strips the adapter's `emulate` hook, so in
  * `vite dev` there is no platform at all and the local-directory path in
- * `./dev.ts` is used instead. Same shape as `db/platform.ts`.
+ * `./backend.ts` is used instead, as it is in the self-hosted Node build. Same
+ * shape as `db/platform.ts`.
  */
 export function requireR2(platform: App.Platform | undefined): MediaBucket {
 	if (!platform?.env?.MEDIA) {

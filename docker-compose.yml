@@ -1,0 +1,26 @@
+# A self-hosted Bound Up. See docs/self-hosting.md.
+#
+#   BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d
+#
+# Keep the secret: changing it signs everyone out. The first account to sign
+# up becomes the admin.
+services:
+  bound-up:
+    image: ghcr.io/secondfolder/bound-up:latest
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET, e.g. with openssl rand -hex 32}
+      # The address people type into their browser. Required behind a TLS
+      # proxy: without it the server believes it is on plain http, and form
+      # posts, sign-in and passkeys all fail its origin checks. Passkeys also
+      # need https unless this is localhost.
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+    volumes:
+      - bound-up-db:/data/db
+      - bound-up-media:/data/media
+
+volumes:
+  bound-up-db:
+  bound-up-media:

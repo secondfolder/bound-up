@@ -35,3 +35,9 @@ export const E2E_MEDIA_DIR = join(E2E_RUN_DIR, 'media');
  */
 export const E2E_LOCK_PATH = join(tmpdir(), `bound-up-e2e-${KEY}.sock`);
 export const E2E_DATABASE_URL = `file:${join(E2E_RUN_DIR, 'e2e.db')}`;
+/**
+ * The container, and the prefix of its two volumes, when the suite runs
+ * against a Docker image (`E2E_IMAGE`). Per checkout like everything else, so
+ * the next run finds and replaces what a killed one left behind.
+ */
+export const E2E_CONTAINER = `bound-up-e2e-${E2E_PORT}`;

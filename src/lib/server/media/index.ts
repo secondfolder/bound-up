@@ -2,10 +2,11 @@
  * Where encrypted attachments live.
  *
  * An interface with two real implementations, for the reason
- * `src/lib/server/db/dev.ts` gives about the database: `svelte.config.js`
+ * `src/lib/server/db/backend.ts` gives about the database: `svelte.config.js`
  * strips the Cloudflare adapter's `emulate` hook, so `vite dev` has no
- * `event.platform` at all and therefore no R2 binding. Production gets R2; dev
- * gets a local directory. See `dev.ts` for the switch.
+ * `event.platform` at all and therefore no R2 binding. Workers gets R2; dev and
+ * the self-hosted Node build get a local directory. See `backend.ts` for the
+ * switch.
  *
  * Only the four operations messaging actually needs, so the two are genuinely
  * interchangeable and neither can leak a capability the other lacks — the same

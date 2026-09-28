@@ -1,9 +1,8 @@
-import { createClient } from '@libsql/client';
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { sql } from './db';
 import { test } from './fixtures';
 import { type Account, account, clickWaButton, logIn, logOut, newSide, signUp } from './helpers';
-import { E2E_DATABASE_URL } from './run-paths';
 
 /**
  * Sets an account's role straight in the database, then signs it in afresh.
@@ -16,15 +15,7 @@ import { E2E_DATABASE_URL } from './run-paths';
  * would keep the old one until then.
  */
 async function becomeRole(page: Page, who: Account, role: 'admin' | 'user') {
-	const client = createClient({ url: E2E_DATABASE_URL, timeout: 5000 });
-	try {
-		await client.execute({
-			sql: 'update user set role = ? where email = ?',
-			args: [role, who.email]
-		});
-	} finally {
-		client.close();
-	}
+	await sql('update user set role = ? where email = ?', [role, who.email]);
 	await logOut(page);
 	await logIn(page, who);
 }

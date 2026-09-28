@@ -1,5 +1,5 @@
-import { createClient } from '@libsql/client';
 import { expect } from '@playwright/test';
+import { sql } from './db';
 import { test } from './fixtures';
 import {
 	type Account,
@@ -20,7 +20,6 @@ import {
 	submitEnhancedForm,
 	waitForEnhancedForm
 } from './helpers';
-import { E2E_DATABASE_URL } from './run-paths';
 
 /**
  * The client-side key derivation, over HTTP, in a real browser.
@@ -31,16 +30,6 @@ import { E2E_DATABASE_URL } from './run-paths';
  * tests; the wiring between superforms, the form action and Better Auth is
  * only real here.
  */
-
-/** The database the Playwright web server rebuilt for this run. */
-function db() {
-	return createClient({
-		url: E2E_DATABASE_URL,
-		// Other workers are writing through the dev server meanwhile; wait out a
-		// lock rather than fail with SQLITE_BUSY.
-		timeout: 5000
-	});
-}
 
 test.describe('the password never leaves the browser', () => {
 	/**
@@ -133,45 +122,40 @@ test.describe('what signing up stores', () => {
 		await signUp(page, who);
 		await page.waitForURL('**/home');
 
-		const client = db();
-		try {
-			const keys = await client.execute({
-				sql: `select k.recipient
-				      from user_keys k join user u on u.id = k.user_id where u.email = ?`,
-				args: [who.email]
-			});
-			expect(keys.rows).toHaveLength(1);
-			expect(String(keys.rows[0].recipient)).toMatch(/^age1[02-9ac-hj-np-z]{58}$/);
+		const keys = await sql(
+			`select k.recipient
+			      from user_keys k join user u on u.id = k.user_id where u.email = ?`,
+			[who.email]
+		);
+		expect(keys.rows).toHaveLength(1);
+		expect(String(keys.rows[0].recipient)).toMatch(/^age1[02-9ac-hj-np-z]{58}$/);
 
-			const wraps = await client.execute({
-				sql: `select w.type, w.params, w.blob
-				      from user_key_wraps w join user u on u.id = w.user_id where u.email = ?`,
-				args: [who.email]
-			});
-			expect(wraps.rows).toHaveLength(1);
-			expect(wraps.rows[0].type).toBe('password');
-			expect(JSON.parse(String(wraps.rows[0].params))).toMatchObject({
-				type: 'password',
-				kdf: 'PBKDF2-SHA256'
-			});
-			// Opaque, and — the point — not the password.
-			expect(String(wraps.rows[0].blob)).toMatch(/^[A-Za-z0-9_-]+$/);
-			expect(String(wraps.rows[0].blob)).not.toContain(who.password);
+		const wraps = await sql(
+			`select w.type, w.params, w.blob
+			      from user_key_wraps w join user u on u.id = w.user_id where u.email = ?`,
+			[who.email]
+		);
+		expect(wraps.rows).toHaveLength(1);
+		expect(wraps.rows[0].type).toBe('password');
+		expect(JSON.parse(String(wraps.rows[0].params))).toMatchObject({
+			type: 'password',
+			kdf: 'PBKDF2-SHA256'
+		});
+		// Opaque, and — the point — not the password.
+		expect(String(wraps.rows[0].blob)).toMatch(/^[A-Za-z0-9_-]+$/);
+		expect(String(wraps.rows[0].blob)).not.toContain(who.password);
 
-			// Better Auth's stored credential is a scrypt hash of the auth secret,
-			// so it must not be the auth secret itself and must not be the password.
-			const creds = await client.execute({
-				sql: `select a.password from account a join user u on u.id = a.user_id
-				      where u.email = ? and a.provider_id = 'credential'`,
-				args: [who.email]
-			});
-			expect(creds.rows).toHaveLength(1);
-			expect(String(creds.rows[0].password)).not.toContain(who.password);
-			// scrypt output is `salt:hash`, both hex.
-			expect(String(creds.rows[0].password)).toMatch(/^[0-9a-f]+:[0-9a-f]+$/);
-		} finally {
-			client.close();
-		}
+		// Better Auth's stored credential is a scrypt hash of the auth secret,
+		// so it must not be the auth secret itself and must not be the password.
+		const creds = await sql(
+			`select a.password from account a join user u on u.id = a.user_id
+			      where u.email = ? and a.provider_id = 'credential'`,
+			[who.email]
+		);
+		expect(creds.rows).toHaveLength(1);
+		expect(String(creds.rows[0].password)).not.toContain(who.password);
+		// scrypt output is `salt:hash`, both hex.
+		expect(String(creds.rows[0].password)).toMatch(/^[0-9a-f]+:[0-9a-f]+$/);
 	});
 });
 

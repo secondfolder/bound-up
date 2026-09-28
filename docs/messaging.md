@@ -397,6 +397,11 @@ fails the build if the adapter's output ever stops having the `worker_default`
 it assigns to, rather than shipping a worker that silently never sweeps.
 `scheduled.ts` and everything it imports are therefore alias-free.
 
+The self-hosted Docker build has no cron trigger either; it runs the same
+`sweepExpiredMedia` every 15 minutes from SvelteKit's `init` hook, and deletes
+anything under `expiring/` older than 31 days in the same pass, in place of the
+lifecycle rule. See [self-hosting.md](self-hosting.md).
+
 `vite dev` has no cron. Expiry still behaves correctly there, because it is
 checked on read, but nothing deletes the files in `./local-media`. To exercise
 the real sweep, run `npm run preview` and request
@@ -662,9 +667,10 @@ client code path used only in development — and the Playwright suite would the
 never exercise the real one. An SSE stream is a plain streaming `Response` and
 behaves identically in dev and on Workers.
 
-The dev/prod switch mirrors `db/dev.ts` and `media/dev.ts`: a Durable Object in
-production, a module-level `Map` under `vite dev`, which is genuinely correct
-there because dev is one process.
+The backend switch mirrors `db/backend.ts` and `media/backend.ts`: a Durable
+Object on Workers, a module-level `Map` under `vite dev` and in the self-hosted
+Docker build, which is genuinely correct there because each is one process —
+and is why a self-hosted instance supports one replica only.
 
 ### Hanging up when hidden is a billing necessity
 

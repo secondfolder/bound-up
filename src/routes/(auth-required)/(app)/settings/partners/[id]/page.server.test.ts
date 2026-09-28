@@ -18,7 +18,7 @@ import { actions, load } from './+page.server';
 // Under vitest the real factory would pick the local-directory store and touch
 // the disk; the in-memory one also lets a test see what was purged.
 const media = vi.hoisted(() => ({ store: undefined as TestMediaStore | undefined }));
-vi.mock('$lib/server/media/dev', () => ({
+vi.mock('$lib/server/media/backend', () => ({
 	createMediaStore: () => Promise.resolve(media.store)
 }));
 

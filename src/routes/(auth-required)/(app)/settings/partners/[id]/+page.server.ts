@@ -4,7 +4,7 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import { inviteUrl } from '$lib/invite-url';
 import { answerFromControl, controlFromAnswer, isInviteUsable } from '$lib/partnership';
 import { partnerEditFormSchema } from '$lib/schemas/partnerForm';
-import { createMediaStore } from '$lib/server/media/dev';
+import { createMediaStore } from '$lib/server/media/backend';
 import { purgePartnershipMedia } from '$lib/server/messaging';
 import {
 	deletePartnership,

@@ -16,7 +16,7 @@ import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '$
 import { GET } from './+server';
 
 const media = vi.hoisted(() => ({ store: undefined as TestMediaStore | undefined }));
-vi.mock('$lib/server/media/dev', () => ({
+vi.mock('$lib/server/media/backend', () => ({
 	createMediaStore: () => Promise.resolve(media.store)
 }));
 

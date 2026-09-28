@@ -951,7 +951,8 @@
 					"id": "self-hosting",
 					"title": "Self-hosting",
 					"summary": "Run your own copy of Bound Up.",
-					"status": "exploring",
+					"status": "shipped",
+					"shippedOn": "2026-09-28",
 					"icon": "server"
 				},
 				{

@@ -1,7 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { reactionSchema } from '$lib/schemas/messageForm';
 import { clearReaction, setReaction } from '$lib/server/messaging';
-import { createNotifier } from '$lib/server/realtime/dev';
+import { createNotifier } from '$lib/server/realtime/backend';
 import type { RequestHandler } from './$types';
 
 /** Sets or replaces the viewer's tapback. One per person per message. */

@@ -10,6 +10,13 @@ import type { RealtimeNamespace } from '$lib/server/realtime/binding';
 declare global {
 	var litIssuedWarnings: Set<string> | undefined;
 
+	/**
+	 * True only in the self-hosted Node build (`npm run build:node`). Replaced
+	 * at build time by `define` in vite.config.ts, so a branch on it is dead
+	 * code in the Workers bundle. See docs/self-hosting.md.
+	 */
+	const __SELF_HOSTED__: boolean;
+
 	namespace App {
 		// interface Error {}
 		interface Locals {

@@ -1,10 +1,12 @@
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
-import { createClient } from '@libsql/client';
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { defined } from '../src/lib/testing/defined';
 import { withExif } from '../src/lib/testing/exif';
+// `sql` sets the state no UI can produce in a test's lifetime — an
+// attachment's expiry an hour on, or a feature grant without an admin.
+import { sql } from './db';
 import { test } from './fixtures';
 import {
 	clickWaButton,
@@ -18,26 +20,6 @@ import {
 	typeRichText,
 	writeThread
 } from './helpers';
-import { E2E_DATABASE_URL } from './run-paths';
-
-/**
- * A statement straight against the e2e database, for the state no UI can
- * produce in a test's lifetime — an attachment's expiry an hour on, or a
- * feature grant without going through an admin.
- */
-async function sql(statement: string, args: (string | number)[]) {
-	const client = createClient({
-		url: E2E_DATABASE_URL,
-		// Other workers are writing through the dev server meanwhile; wait out a
-		// lock rather than fail with SQLITE_BUSY.
-		timeout: 5000
-	});
-	try {
-		return await client.execute({ sql: statement, args });
-	} finally {
-		client.close();
-	}
-}
 
 /**
  * Encrypted messages between two partners, over HTTP, in two real browsers.

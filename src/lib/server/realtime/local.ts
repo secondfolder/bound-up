@@ -13,11 +13,14 @@ import {
  * Correct rather than a stub, which is the point — `npm run dev` and the
  * Playwright suite exercise the same client code, the same endpoint and the
  * same SSE framing as production, and only the fan-out differs. Kept
- * module-level because `vite dev` is a single Node process, so every request
- * genuinely shares this table.
+ * module-level because `vite dev` and the self-hosted server are each a
+ * single Node process, so every request genuinely shares this table. That is
+ * also why a self-hosted instance supports one replica only: a second process
+ * would have a table of its own and never hear the first one's publishes.
  *
- * `dev.ts` reaches this only behind `if (dev)`, which is a build-time constant,
- * so the whole file is dead-code-eliminated from the worker bundle.
+ * `backend.ts` reaches this only behind `if (dev || __SELF_HOSTED__)`, both
+ * build-time constants, so the whole file is dead-code-eliminated from the
+ * worker bundle.
  */
 
 const encoder = new TextEncoder();

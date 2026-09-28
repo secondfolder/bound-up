@@ -10,11 +10,12 @@ will break if you guess, and what "done" means.
 ## What this is
 
 Bound Up (formerly Edgeucator) is a small SvelteKit 2 / Svelte 5 app on Cloudflare
-Workers. A
+Workers, also published as a self-hostable Docker image (see
+[docs/self-hosting.md](docs/self-hosting.md)). A
 _guide_ has ordered _edge tasks_; an edge task renders a counter and reveals prose as the
 count crosses thresholds. Accounts are email/password + passkeys via Better
-Auth. Data is Drizzle over Cloudflare D1 (production) and a local SQLite file
-(dev).
+Auth. Data is Drizzle over Cloudflare D1 (Workers) and a local SQLite file
+(dev and self-hosted).
 
 Guides, edge tasks, and `src/lib/server/db/seed-data.ts` are explicit adult content.
 That is the point of the app, not a mistake. Treat that prose as data: do not
@@ -39,6 +40,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
 | `src/lib/media/`              | Browser-only media transcoding. See [docs/messaging.md](docs/messaging.md#transcoding)       |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
+| `src/lib/server/self-hosted/` | What only the Docker build runs: the media sweep. See [docs/self-hosting.md](docs/self-hosting.md) |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
 | `src/routes/(public)/`        | Anonymous-reachable routes. No header: each page links onwards itself                        |
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
@@ -55,6 +57,7 @@ npm run check    # svelte-check
 npm run lint     # biome ci + the Svelte <script>/<style> format check
 npm test         # everything: vitest (node + browser projects), then playwright
 npm run test:e2e # playwright alone, real browser against vite dev
+npm run test:e2e:image # playwright against a fresh Docker build, as CI runs it
 npm run format   # fixes everything `lint` complains about that is mechanical
 ```
 
@@ -63,7 +66,16 @@ npm run format   # fixes everything `lint` complains about that is mechanical
 lint-staged (`biome check --write`, the Svelte block formatter, then
 `vitest related --run` on the tests that import them — config lives in
 `package.json`). It is a fast partial gate, not the loop: it does not run the
-e2e suite, and a commit passing it is not "done".
+e2e suite, and a commit passing it is not "done". A `commit-msg` hook runs
+commitlint as well: release versions are computed from conventional commit
+messages (see [docs/self-hosting.md](docs/self-hosting.md#versioning-and-publishing)),
+so a malformed one is refused rather than silently left out of a release.
+
+CI (`.github/workflows/ci.yml`) runs `lint`, `check` and vitest, then builds
+the Docker image and runs the Playwright suite against it — not against
+`vite dev` — and publishes only if all of that passed. A change that works under
+`vite dev` but not in the Node build fails there; `npm run test:e2e:image`
+reproduces it locally.
 
 Honest baseline as of this writing — `lint`, `check`, `test` and `test:e2e` are
 all clean. It was not always so; both suppression conventions below exist
@@ -168,26 +180,30 @@ site it applies to; go read that comment before deciding to break one.
 
 1. **Nothing under `src/lib/server/db/` may import `$lib`, `$env`, `$app`, or
    `cloudflare:workers`.** drizzle-kit and the seed script load those files
-   outside Vite, where the aliases do not resolve. `db/dev.ts` is the single
+   outside Vite, where the aliases do not resolve. `db/backend.ts` is the single
    exception and is imported only from the SvelteKit side. `src/lib/types.ts` is
    alias-free for the same reason.
 
 2. **No module-level `db` or `auth` singleton.** A D1 binding exists only inside
    a request. Both are built per request in `hooks.server.ts` and read from
-   `event.locals`. The one cache — `devDb` in `db/dev.ts` — is inside a
-   `if (dev)` branch that is dead-code-eliminated from the worker bundle.
+   `event.locals`. The one cache — `localDb` in `db/backend.ts` — is reached
+   only behind `if (dev || __SELF_HOSTED__)`, both build-time constants, so it
+   is dead-code-eliminated from the worker bundle. The local backends (dev and
+   the Docker build) are one process over one file, where a cache is correct.
 
 3. **`db.transaction()` fails on D1.** It works in dev and will pass every local
    check. Use `db.batch()`. The dev driver is libsql (not better-sqlite3)
    specifically so `batch()` exists and the async signatures match.
 
 4. **`event.platform` means "running on Workers".** `svelte.config.js` strips the
-   adapter's `emulate` hook, so `vite dev` has no platform at all. Reach for
+   adapter's `emulate` hook, so `vite dev` has no platform at all, and the
+   self-hosted Node build has none either. Reach for
    `platform.env` only behind `requireD1()` or a `?? privateEnv.X` fallback, and
    never during prerender — `hooks.server.ts` bails on `building` first.
 
-5. **`Db` is typed as the D1 client.** The dev libsql client is cast to it, so
-   application code cannot accidentally depend on a dev-only capability. Do not
+5. **`Db` is typed as the D1 client.** The local libsql client (dev and
+   self-hosted) is cast to it, so application code cannot accidentally depend
+   on a capability D1 lacks. Do not
    widen this type to make something compile.
 
 6. **Never run `drizzle-kit push`.** Generate a migration, read the SQL, commit
@@ -608,7 +624,7 @@ const data = await runLoad(load(fakeEvent({ db, user: ada }))); // $lib/testing/
 ```
 
 - `createTestDb()` applies the committed `drizzle/*.sql` to a `:memory:` libsql
-  database. libsql, not better-sqlite3, for the reason `db/dev.ts` gives — the
+  database. libsql, not better-sqlite3, for the reason `db/backend.ts` gives — the
   async signatures and `batch()` match D1, so a test cannot pass against a
   capability production does not have. Foreign keys are on, as they are on D1.
 - Fixtures insert `user` rows directly rather than booting Better Auth, which
@@ -683,6 +699,14 @@ not in a `globalSetup`: Playwright starts the web server first, and deleting
 the file underneath it leaves every write failing with
 `SQLITE_READONLY_DBMOVED`.
 
+With `E2E_IMAGE` set (`npm run test:e2e:image`, and CI) the same command runs
+that Docker image instead, on fresh named volumes. **A spec that reads or
+writes the database goes through `sql()` from `e2e/db.ts`**, never a
+`createClient` of its own: against an image it runs the statement inside the
+container, because a SQLite file opened from both the host and a Docker
+Desktop VM corrupts writes on macOS. See
+[docs/self-hosting.md](docs/self-hosting.md#how-the-image-is-tested).
+
 The port, the database and the media directory are derived from the checkout
 path (`e2e/run-paths.ts`), so separate worktrees run the suite at the same time
 without touching each other. A second run in the **same** checkout is refused
@@ -728,6 +752,14 @@ Notes that cost a debugging round each:
   (`waitForEnhancedForm`, on a per-form `data-ready`, is the older version of
   the same check.) Serially the page almost always won this race; four workers
   made it lose, in a different flow each run.
+- **Signing in is not finished when the URL changes.** The key a sign-in hands
+  over sits in an in-memory stash until the app shell caches it, and a
+  `page.goto` in between throws it away and sends the device back to
+  `/login?reason=device`. `signUp`, `logIn` and `logInHere` therefore wait for
+  `html[data-keyring="unlocked"]` (published by `EncryptionGate`) whenever they
+  land inside the shell; a new sign-in helper needs the same. It surfaced only
+  against the Docker image, whose production build redirects fast enough to
+  lose the race.
 - **Anything a test waits for has to be waited for, not sampled.** `openBoard`
   used to check for a one-time warning with an instant `isVisible()`, which
   could land on the placeholder shown while the keyring resolves, skip the
@@ -804,6 +836,7 @@ Four places, split on scope:
 | [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text     |
 | [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |
 | [docs/features-and-admin.md](docs/features-and-admin.md)                                 | Per-account features, the admin role, the first-account admin, `/admin`      |
+| [docs/self-hosting.md](docs/self-hosting.md)                                             | The Docker build: backends, volumes, the sweep, CI, versioning and releases  |
 | [docs/roadmap.md](docs/roadmap.md)                                                       | The public /roadmap tree and landing teaser: the JSON, its rules, the drawer |
 
 **Keeping these current is part of the change, not a follow-up to it.**
@@ -871,6 +904,15 @@ Unless the user explicilty indicates otherwise the plan or major change should i
 
 ## Traps
 
+- **The self-hosted build needs `ORIGIN` behind a proxy, and a
+  `BODY_SIZE_LIMIT` above the attachment cap.** Without `ORIGIN`, adapter-node
+  sees `http://` and the internal host, so form posts fail SvelteKit's CSRF
+  check and passkeys bind to the wrong name. adapter-node's default body limit
+  is 512 KB; the Dockerfile raises it, and `self-hosted/dockerfile.test.ts`
+  fails if `MAX_REQUEST_BYTES` ever outgrows it.
+- **A build-time constant for a new backend branch is `dev || __SELF_HOSTED__`,
+  not `!event.platform`.** A runtime check would keep libsql and `node:fs` in
+  the worker bundle, where they cannot load.
 - `local.db`, `.env`, and `.dev.vars` are gitignored; `drizzle/` is not. Do not
   commit the first three or gitignore the last.
 - `.env` (vite dev) and `.dev.vars` (wrangler dev) are **separate files**.

@@ -1,22 +1,43 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { mkdir, open, readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { assertStorageKey, type MediaStore } from './index';
 
 const TRAILING_SLASH = /\/$/;
 
 /**
- * The development store: encrypted attachments in a local directory.
+ * The local store, plus the one thing only it needs: R2 expires the
+ * `expiring/` prefix with a bucket lifecycle rule, and a directory has no such
+ * thing, so the self-hosted sweep calls `deleteOlderThan` instead. See
+ * `self-hosted/sweep.ts`.
+ */
+export type LocalMediaStore = MediaStore & {
+	/**
+	 * Removes every file under `prefix` last modified before `cutoff`, and
+	 * returns how many went. Leftover `.tmp-` files from an interrupted upload
+	 * are files like any other, so they go too.
+	 */
+	deleteOlderThan: (prefix: string, cutoff: Date) => Promise<number>;
+};
+
+/**
+ * Encrypted attachments in a local directory: `vite dev`, and the self-hosted
+ * server, where the directory is a Docker volume.
  *
  * Exists so that `npm run dev` needs no Cloudflare account and no R2 bucket,
- * exactly as `db/dev.ts` does for the database. It is imported only from inside
- * a `if (dev)` branch, so `node:fs` is dead-code-eliminated from the worker
- * bundle.
+ * exactly as `db/backend.ts` does for the database. It is imported only from
+ * inside a `if (dev || __SELF_HOSTED__)` branch, so `node:fs` is
+ * dead-code-eliminated from the worker bundle.
  *
- * Buffered rather than streamed. That is a real difference from the R2
- * implementation, and it is acceptable only because this path is dev-only and
- * capped at 25 MB a message — it would not be acceptable in production.
+ * Streamed in both directions. It used to buffer each upload whole, which was
+ * tolerable only while this was dev-only; self-hosted, a 25 MB message times
+ * a few concurrent senders is real memory. A write goes to a temp file beside
+ * the target and is renamed into place once its length checks out, so a
+ * reader never sees half an attachment and a failed upload leaves nothing.
  */
-export function createLocalStore(root: string): MediaStore {
+export function createLocalStore(root: string): LocalMediaStore {
 	/**
 	 * Turns a key into a path under `root`.
 	 *
@@ -37,42 +58,73 @@ export function createLocalStore(root: string): MediaStore {
 		return full;
 	}
 
-	async function collect(body: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-		const chunks: Uint8Array[] = [];
-		const reader = body.getReader();
-		for (;;) {
-			const { done, value } = await reader.read();
-			if (done) {
-				break;
+	/** A prefix is always `<lifetime>/` or `<lifetime>/<id>/`, i.e. a directory. */
+	function resolvePrefix(prefix: string): string {
+		const directory = path.resolve(root, prefix.replace(TRAILING_SLASH, ''));
+		if (!directory.startsWith(path.resolve(root) + path.sep)) {
+			throw new Error(`Refusing a prefix that escapes the media root: ${prefix}`);
+		}
+		return directory;
+	}
+
+	/** Every file under a directory, or none if it does not exist. */
+	async function filesUnder(directory: string): Promise<string[]> {
+		try {
+			const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+			return entries
+				.filter((entry) => entry.isFile())
+				.map((entry) => path.join(entry.parentPath, entry.name));
+		} catch (error) {
+			if ((error as { code?: string }).code === 'ENOENT') {
+				return [];
 			}
-			chunks.push(value);
+			throw error;
 		}
-		const out = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
-		let at = 0;
-		for (const chunk of chunks) {
-			out.set(chunk, at);
-			at += chunk.length;
-		}
-		return out;
 	}
 
 	return {
 		async put(key, body, byteSize) {
 			const full = resolve(key);
 			await mkdir(path.dirname(full), { recursive: true });
-			const bytes = await collect(body);
-			if (bytes.length !== byteSize) {
-				throw new Error(`Declared ${byteSize} bytes but received ${bytes.length}`);
+			const temp = `${full}.tmp-${randomUUID()}`;
+			const file = await open(temp, 'wx');
+			let received = 0;
+			try {
+				const reader = body.getReader();
+				for (;;) {
+					const { done, value } = await reader.read();
+					if (done) {
+						break;
+					}
+					received += value.length;
+					// Stop reading as soon as it is over: nothing past the declared
+					// size is worth writing to disk.
+					if (received > byteSize) {
+						await reader.cancel();
+						break;
+					}
+					await file.write(value);
+				}
+			} catch (error) {
+				await file.close();
+				await rm(temp, { force: true });
+				throw error;
 			}
-			await writeFile(full, bytes);
+			await file.close();
+			if (received !== byteSize) {
+				await rm(temp, { force: true });
+				throw new Error(`Declared ${byteSize} bytes but received ${received}`);
+			}
+			await rename(temp, full);
 		},
 
 		async get(key) {
+			const full = resolve(key);
 			try {
-				const bytes = await readFile(resolve(key));
+				const { size } = await stat(full);
 				return {
-					body: new Blob([bytes as BlobPart]).stream() as ReadableStream<Uint8Array>,
-					byteSize: bytes.byteLength
+					body: Readable.toWeb(createReadStream(full)) as ReadableStream<Uint8Array>,
+					byteSize: size
 				};
 			} catch (error) {
 				if ((error as { code?: string }).code === 'ENOENT') {
@@ -89,26 +141,22 @@ export function createLocalStore(root: string): MediaStore {
 		},
 
 		async deletePrefix(prefix) {
-			// Prefixes here are always `<lifetime>/<id>/`, i.e. a directory, so this
-			// counts the files it is about to remove and then drops the tree.
-			const directory = path.resolve(root, prefix.replace(TRAILING_SLASH, ''));
-			if (!directory.startsWith(path.resolve(root) + path.sep)) {
-				throw new Error(`Refusing a prefix that escapes the media root: ${prefix}`);
-			}
-			let deleted = 0;
-			try {
-				for (const entry of await readdir(directory, { recursive: true, withFileTypes: true })) {
-					if (entry.isFile()) {
-						deleted += 1;
-					}
-				}
-			} catch (error) {
-				if ((error as { code?: string }).code === 'ENOENT') {
-					return 0;
-				}
-				throw error;
-			}
+			// Counts the files it is about to remove and then drops the tree.
+			const directory = resolvePrefix(prefix);
+			const deleted = (await filesUnder(directory)).length;
 			await rm(directory, { recursive: true, force: true });
+			return deleted;
+		},
+
+		async deleteOlderThan(prefix, cutoff) {
+			let deleted = 0;
+			for (const file of await filesUnder(resolvePrefix(prefix))) {
+				const { mtime } = await stat(file);
+				if (mtime < cutoff) {
+					await rm(file, { force: true });
+					deleted += 1;
+				}
+			}
 			return deleted;
 		}
 	};
