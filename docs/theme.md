@@ -12,6 +12,7 @@ WebGL (see [page-effects.md](page-effects.md)); everywhere else it is CSS.
 | `src/app.html`                     | `class="wa-dark"` on `<html>`, and the browser `theme-color`          |
 | `src/routes/(public)/+page.svelte` | Sets `--page-texture: none`, since its effects draw the texture       |
 | `e2e/theme.spec.ts`                | The cascade on real pages: dark class, texture on and off, title face |
+| `scripts/generate-favicons.ts`     | The icons in `static/`, drawn from this theme; `npm run favicons`     |
 
 ## Always dark
 
@@ -87,6 +88,29 @@ needs recapturing and never screens anything a person reads.
 **`--page-texture: none` switches both off.** The landing page sets it,
 because its effects draw the halftone and grain already; drawn twice, the
 grain doubled and the halftone showed a moiré against its own screen.
+
+## The icons
+
+The favicons, the Apple touch icon and the manifest's icons are a "B" in the
+title face on the wash, under the landing page's halftone and grain.
+`npm run favicons` draws them all into `static/`; rerun it after changing the
+wash, the title face or colour, or the landing page's effect parameters.
+
+- **Drawn from the source, not a copy of it.** Chromium renders an `h1` over
+  `theme.css`, so the letter and wash are the theme's own, and the filter is
+  the CPU reference model in `src/lib/halftone.ts` and `src/lib/grain.ts`
+  that the page's shaders are generated from. Only the effect parameters are
+  copied, from the landing page, so they have to be kept in step by hand.
+- **Every size is its own render.** The screen is a line pattern, and a large
+  icon scaled down to 16 px averages it into a flat tint. Each icon is a
+  64 CSS px tile of the page, drawn at that icon's device scale factor. That
+  puts eight lines across every size.
+- **The manifest icons have a smaller letter.** They are `maskable`, and a
+  platform may crop one to a circle 80% of its width, so the whole letter has
+  to fit inside that circle.
+- **There is no SVG favicon.** The old one was a PNG wrapped in SVG, and the
+  browser picked it over the size-specific PNGs. That scaled one bitmap to
+  every size, which is the problem the per-size renders avoid.
 
 ## Adding to it
 

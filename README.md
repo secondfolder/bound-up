@@ -202,3 +202,4 @@ other is half a script, is in
 | `db:studio`                                                   | Drizzle Studio against `./local.db`                           |
 | `auth:schema` / `auth:secret`                                 | Regenerate the Better Auth tables / generate a secret         |
 | `cf-typegen`                                                  | Regenerate Cloudflare binding types (not currently committed) |
+| `favicons`                                                    | Regenerate every icon in `static/` from the theme and effects |

@@ -25,7 +25,8 @@
 		"db:studio": "drizzle-kit studio",
 		"auth:schema": "better-auth generate --config ./better-auth.config.ts --output src/lib/server/db/schema/auth.ts --yes",
 		"auth:secret": "better-auth secret",
-		"cf-typegen": "wrangler types ./src/worker-env.d.ts --include-runtime=false"
+		"cf-typegen": "wrangler types ./src/worker-env.d.ts --include-runtime=false",
+		"favicons": "tsx scripts/generate-favicons.ts"
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,ts,svelte,css,html,json,jsonc}": [

@@ -27,6 +27,7 @@
 		"src/**/*.svelte",
 		"e2e/**/*.ts",
 		"vite-plugins/**/*.ts",
+		"scripts/**/*.ts",
 		"vitest-setup-browser.ts",
 		"better-auth.config.ts",
 		"drizzle.config.ts",
