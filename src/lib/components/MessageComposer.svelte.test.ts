@@ -1,6 +1,7 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import type { TranscodeOptions } from '$lib/media/transcode';
+import { NO_SENSITIVE_METADATA, type SensitiveMetadata } from '$lib/media-metadata';
 import type { TranscodedQuality } from '$lib/media-quality';
 import { MEDIA_TTL_DEFAULT_MS, MEDIA_TTL_NEVER } from '$lib/messaging';
 import type { ComposedMessage } from '$lib/messaging/client';
@@ -45,11 +46,30 @@ vi.mock('$lib/media/transcode', () => ({
 		})
 }));
 
+/**
+ * What each picked file's metadata says, by file name; anything unlisted has
+ * none. The real reader is covered in `src/lib/media/metadata.svelte.test.ts`.
+ */
+const metadata = vi.hoisted(() => new Map<string, SensitiveMetadata>());
+
+vi.mock('$lib/media/metadata', () => ({
+	readSensitiveMetadata: (file: File) =>
+		Promise.resolve(metadata.get(file.name) ?? NO_SENSITIVE_METADATA)
+}));
+
+const PHONE_PHOTO: SensitiveMetadata = {
+	location: true,
+	device: 'Apple iPhone 15 Pro',
+	takenAt: null,
+	owner: null
+};
+
 const HOUR = 60 * 60 * 1000;
 const MB = 1024 * 1024;
 
 function mount(props: { permanentMedia?: boolean; highQualityMedia?: boolean } = {}) {
 	jobs.length = 0;
+	metadata.clear();
 	const send = vi.fn<(message: ComposedMessage) => Promise<string | null>>(async () => null);
 	const result = render(MessageComposer, { props: { send, ...props } });
 	return { send, ...result };
@@ -304,7 +324,11 @@ describe('MessageComposer quality button', () => {
 		await attachAndSettle(container, 'sunset.png');
 		const button = defined(qualityButton(row(container)), 'the quality button');
 		expect(visibleText(button)).toBe('HD');
-		expect(button.textContent).toContain('Quality of sunset.png:');
+		// Read in full by a screen reader, so the words must not run together.
+		expect(button.textContent?.replace(/\s+/g, ' ').trim()).toBe('Quality of sunset.png: HD');
+		expect(ttlTrigger(row(container)).textContent?.replace(/\s+/g, ' ').trim()).toBe(
+			'sunset.png self-destructs after 2 weeks'
+		);
 		expect((await job()).quality).toBe('high');
 
 		button.click();
@@ -356,18 +380,54 @@ describe('MessageComposer quality button', () => {
 	});
 
 	// Compressing is also what strips EXIF, which nobody would guess.
-	it('says that Original keeps location data, and only while a file is Original', async () => {
+	it('names what the metadata shares, beside the button, while the file is Original', async () => {
 		const { container } = mount({ highQualityMedia: true });
-		await attachAndSettle(container);
-		expect(container.querySelector('.hint')).toBeNull();
+		metadata.set('IMG_0001.jpg', PHONE_PHOTO);
+		await attachAndSettle(container, 'IMG_0001.jpg', { type: 'image/jpeg' });
+		(await job()).finish();
+		const warning = () => row(container).querySelector('.metadata-warning');
+		// Compressed: none of it goes, so nothing to say.
+		await waitFor(() => expect(row(container).querySelector('.busy')).toBeNull());
+		expect(warning()).toBeNull();
 
 		const button = defined(qualityButton(row(container)), 'the quality button');
 		button.click();
 		await waitFor(() =>
-			expect(container.querySelector('.hint')?.textContent).toMatch(/location data/)
+			expect(visibleText(defined(warning(), 'the warning') as HTMLElement)).toBe(
+				'Shares where it was taken and the device (Apple iPhone 15 Pro)'
+			)
 		);
+		expect(warning()?.querySelector('wa-icon[name="triangle-exclamation"]')).not.toBeNull();
+		// Straight after the quality button, in the same row.
+		expect(button.nextElementSibling).toBe(warning());
+		expect(warning()?.textContent).toContain('IMG_0001.jpg:');
+
 		button.click();
-		await waitFor(() => expect(container.querySelector('.hint')).toBeNull());
+		await waitFor(() => expect(warning()).toBeNull());
+	});
+
+	it('says nothing for an Original whose metadata gives nothing away', async () => {
+		const { container } = mount({ highQualityMedia: true });
+		await attachAndSettle(container, 'plain.jpg', { type: 'image/jpeg' });
+		defined(qualityButton(row(container)), 'the quality button').click();
+		await waitFor(() =>
+			expect(visibleText(qualityButton(row(container)) as HTMLElement)).toBe('Original')
+		);
+		// Give the metadata read its turn before deciding it said nothing.
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(row(container).querySelector('.metadata-warning')).toBeNull();
+	});
+
+	// A GIF is never compressed, so it takes its metadata along at any quality.
+	it('warns for a file sent as picked at SD too', async () => {
+		const { container } = mount();
+		metadata.set('party.gif', PHONE_PHOTO);
+		await attachAndSettle(container, 'party.gif', { type: 'image/gif' });
+		await waitFor(() =>
+			expect(row(container).querySelector('.metadata-warning')?.textContent).toContain(
+				'where it was taken'
+			)
+		);
 	});
 });
 

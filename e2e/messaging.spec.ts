@@ -4,6 +4,7 @@ import { createClient } from '@libsql/client';
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { defined } from '../src/lib/testing/defined';
+import { withExif } from '../src/lib/testing/exif';
 import { test } from './fixtures';
 import {
 	clickWaButton,
@@ -850,6 +851,36 @@ test.describe('attachments', () => {
 		return Buffer.from(base64, 'base64');
 	}
 
+	/**
+	 * A small JPEG carrying what a phone writes into every photo: where, on
+	 * what, and when. Drawn in the page, with the EXIF added here.
+	 */
+	async function phonePhoto(page: Page): Promise<Buffer> {
+		const base64 = await page.evaluate(async () => {
+			const canvas = new OffscreenCanvas(64, 48);
+			const context = canvas.getContext('2d');
+			if (!context) {
+				throw new Error('no 2D context');
+			}
+			context.fillStyle = '#f60';
+			context.fillRect(0, 0, 64, 48);
+			const bytes = new Uint8Array(
+				await (await canvas.convertToBlob({ type: 'image/jpeg' })).arrayBuffer()
+			);
+			let binary = '';
+			for (const byte of bytes) {
+				binary += String.fromCharCode(byte);
+			}
+			return btoa(binary);
+		});
+		const tagged = await withExif(new Blob([Buffer.from(base64, 'base64')]), {
+			make: 'Apple',
+			model: 'iPhone 15 Pro',
+			gps: { latitude: -37.8136, longitude: 144.9631 }
+		});
+		return Buffer.from(await tagged.arrayBuffer());
+	}
+
 	/** The decrypted image Jun sees, by name, once it has actually decoded. */
 	async function receivedImage(page: Page, name: string) {
 		const image = page.getByRole('img', { name });
@@ -928,7 +959,18 @@ test.describe('attachments', () => {
 			await expect(quality).toHaveAccessibleName('Quality of photo.png: HD');
 			await clickWaButton(ada.page, 'Quality of photo.png: HD');
 			await expect(quality).toHaveAccessibleName('Quality of photo.png: Original');
-			await expect(ada.page.getByText(/including any location data/)).toBeVisible();
+			// A drawn PNG gives nothing away, so there is nothing to warn about...
+			await expect(ada.page.locator('.metadata-warning')).toHaveCount(0);
+			// ...but a phone's photo, sent as it is, says where and on what.
+			await ada.page.locator('input[type="file"]').setInputFiles({
+				name: 'IMG_0002.jpg',
+				mimeType: 'image/jpeg',
+				buffer: await phonePhoto(ada.page)
+			});
+			await clickWaButton(ada.page, 'Quality of IMG_0002.jpg: HD');
+			await expect(ada.page.locator('.metadata-warning')).toHaveText(
+				'IMG_0002.jpg: Shares where it was taken and the device (Apple iPhone 15 Pro)'
+			);
 			await clickWaButton(ada.page, 'Send');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
 

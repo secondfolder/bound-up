@@ -243,6 +243,8 @@ export default defineConfig(({ command, mode }) => {
 				'@vfx-js/effects',
 				'@simplewebauthn/browser',
 				'mediabunny',
+				// Reads a picked photo's EXIF, for the composer's metadata warning.
+				'exifr',
 				// The one dependency of the excluded AVIF encoder, listed so that
 				// the first photo sent does not discover it mid-run either.
 				'@jsquash/avif > wasm-feature-detect'

@@ -221,8 +221,8 @@ pure rules are in `src/lib/media-quality.ts`. The encoders are in
   button says **SD**, **HD** or **Original** (the Low, High and Original tiers
   above) and a click cycles to the next. It is shown only to an account with
   `highQualityMedia`, where a new file starts on **HD**. Everyone else's files
-  are always SD, with no button. While any file is on Original, a line under the
-  rows says originals go exactly as picked, including any location data.
+  are always SD, with no button. A file that will go with sensitive metadata
+  gets a warning after the button (see "Compressing strips metadata" below).
 - **Compressing starts when a file is picked, not when Send is pressed.**
   `PendingAttachment` (`src/lib/messaging/pending-attachment.svelte.ts`) starts
   the job the moment the file is added and shows its progress over the
@@ -256,11 +256,29 @@ pure rules are in `src/lib/media-quality.ts`. The encoders are in
 - **Left alone at every tier:** GIFs, since decoding keeps only the first frame
   and so loses the animation, and SVGs. A re-encode that came out no smaller
   than an original the web already displays is also discarded, and the
-  original is sent instead. A HEIC stays converted even when the AVIF is
-  larger, because converting it was about being viewable, not about size.
-- **Compressing strips metadata.** Re-encoding carries no EXIF over, GPS
-  included, and video tags are dropped on purpose. Original keeps both, which
-  is why the composer says so.
+  original is sent instead — unless the original carries location or other
+  sensitive metadata (below), when the larger re-encode goes, since someone who
+  left a file on SD expects none of that to go with it. A HEIC stays converted
+  even when the AVIF is larger, because converting it was about being
+  viewable, not about size.
+- **Compressing strips metadata; a file sent as picked keeps it, and says
+  what.** Re-encoding carries no EXIF over, GPS included, and video tags are
+  dropped on purpose. A file that goes as picked keeps all of it: Original, but
+  also a GIF or a photo this browser could not decode, at any quality. For
+  those, the composer shows a warning icon after the quality button with what
+  the file would give away, specifically: "Shares where it was taken, the
+  device (Apple iPhone 15 Pro) and the date (1 Sept 2026)". It shows nothing
+  for a file whose metadata gives nothing away, so the warning is not noise.
+  - The metadata is read once, when the file is picked
+    (`src/lib/media/metadata.ts`): photos with exifr (EXIF, GPS and IPTC from
+    JPEG, HEIC, AVIF, PNG and TIFF), videos with mediabunny's container tags.
+    What counts and how it is worded is pure, in `src/lib/media-metadata.ts`.
+  - Location is GPS or an IPTC place name in a photo. In a video it is Apple's
+    `com.apple.quicktime.location.ISO6709`, the `©xyz` box most Android phones
+    write, 3GPP's `loci`, or any tag naming a location or GPS. Then the device's
+    make and model, when it was taken, and an owner or author name.
+  - A file whose metadata cannot be read is treated as having none. That is
+    the one gap: a format neither reader understands goes without a warning.
 - **Sizes are checked on what will be sent.** The composer measures each file
   once its final form is known: at once for one that goes as picked, and when
   compressing finishes for the rest. So a 40 MB clip is not refused on its way

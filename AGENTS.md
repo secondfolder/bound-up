@@ -247,7 +247,8 @@ site it applies to; go read that comment before deciding to break one.
     the worker bundle, so never import it statically from anything the server
     renders. Its pure half — tiers, resize maths,
     pass-through rules, the byte budget — is `src/lib/media-quality.ts`,
-    alias-free because the server shares `attachmentBudget`.
+    alias-free because the server shares `attachmentBudget`; what counts as
+    sensitive metadata, and how it is worded, is `src/lib/media-metadata.ts`.
 
 14. **A permission is enforced on the server, never by a disabled input.** The
     read-only accept screen still posts every field (they are hidden inputs, so

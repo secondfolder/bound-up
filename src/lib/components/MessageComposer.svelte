@@ -110,8 +110,6 @@
 		return `Compressing ${files}… (${Math.round(fraction * 100)}%)`;
 	});
 
-	const anyOriginal = $derived(attachments.some((attachment) => attachment.quality === 'original'));
-
 	onDestroy(() => {
 		for (const attachment of attachments) {
 			attachment.dispose();
@@ -284,8 +282,10 @@
 					>
 						<wa-button slot="trigger" size="s" appearance="outlined" with-caret disabled={sending}>
 							<wa-icon slot="start" name="bomb" variant="solid"></wa-icon>
-							<span class="wa-visually-hidden">{attachment.name} self-destructs after </span
-							>{ttlLabel(attachment.mediaTtl)}
+							<!-- Spaces between the spans, never inside the hidden one: Svelte trims
+							     whitespace at the end of an element, and the name ran together. -->
+							<span class="wa-visually-hidden">{attachment.name} self-destructs after</span>
+							{ttlLabel(attachment.mediaTtl)}
 						</wa-button>
 						{#each MEDIA_TTL_PRESETS as preset (preset.ms)}
 							<wa-dropdown-item value={String(preset.ms)}>{preset.label}</wa-dropdown-item>
@@ -307,20 +307,28 @@
 							disabled={sending}
 							onclick={() => attachment.setQuality(nextQuality(attachment.quality))}
 						>
-							<span class="wa-visually-hidden">Quality of {attachment.name}: </span>{MEDIA_QUALITY_LABELS[
-								attachment.quality
-							]}
+							<span class="wa-visually-hidden">Quality of {attachment.name}:</span>
+							{MEDIA_QUALITY_LABELS[attachment.quality]}
 						</wa-button>
+					{/if}
+
+					{#if attachment.metadataWarning}
+						<!-- Only for a file going as picked, and only when its metadata
+						     actually says something: compressing leaves all of it behind,
+						     which nobody would guess, and a warning on every Original
+						     whether or not it applied would soon be read as noise. -->
+						<span class="metadata-warning">
+							<wa-icon name="triangle-exclamation" variant="solid"></wa-icon>
+							<!-- As in the trigger above: the space between the spans. -->
+							<span
+								><span class="wa-visually-hidden">{attachment.name}:</span>
+								{attachment.metadataWarning}</span
+							>
+						</span>
 					{/if}
 				</li>
 			{/each}
 		</ul>
-
-		{#if anyOriginal}
-			<!-- Said because it is the one thing Original does that nobody would
-			     guess: compressing is also what strips a photo's EXIF. -->
-			<p class="hint">Originals are sent exactly as picked, including any location data.</p>
-		{/if}
 	{/if}
 
 	{#if sending && attachments.length > 0}
@@ -440,7 +448,6 @@
 		}
 	}
 
-	.hint,
 	.progress {
 		margin: 0;
 		font-size: 0.8125rem;
@@ -457,9 +464,25 @@
 
 		li {
 			display: flex;
+			flex-wrap: wrap;
 			align-items: center;
 			gap: 0.5rem;
 			font-size: 0.8125rem;
+		}
+
+		/* Takes the rest of the row, and wraps under the controls when the row is
+		   too narrow for it rather than squeezing them. */
+		.metadata-warning {
+			flex: 1 1 12rem;
+			display: flex;
+			align-items: center;
+			gap: 0.375rem;
+			line-height: 1.3;
+
+			wa-icon {
+				flex: none;
+				color: var(--wa-color-warning-fill-loud, var(--wa-color-yellow-50));
+			}
 		}
 
 		/* Row-sized rather than form-control-sized, so a file list stays compact. */

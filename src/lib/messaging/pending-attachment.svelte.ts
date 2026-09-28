@@ -15,6 +15,7 @@
  */
 
 import { browser } from '$app/environment';
+import { describeSensitiveMetadata } from '$lib/media-metadata';
 import { type MediaQuality, transcodeKind } from '$lib/media-quality';
 import type { MediaTtl } from '$lib/messaging';
 
@@ -44,6 +45,13 @@ export class PendingAttachment {
 	prepared: File | null = $state(null);
 	/** How far the current quality's compression has got, 0–1; null when not compressing. */
 	progress: number | null = $state(null);
+	/**
+	 * What the original's metadata gives away — "Shares where it was taken, the
+	 * device (…)" — or null if nothing, or not read yet. Read once, when the
+	 * file is picked; it only matters while the file would go as picked, which
+	 * `metadataWarning` works out.
+	 */
+	sensitiveMetadata: string | null = $state(null);
 
 	readonly #jobs = new Map<MediaQuality, Job>();
 
@@ -53,6 +61,23 @@ export class PendingAttachment {
 		this.previewUrl = URL.createObjectURL(original);
 		this.mediaTtl = options.mediaTtl;
 		this.setQuality(options.quality);
+		if (browser) {
+			void import('$lib/media/metadata')
+				.then(({ readSensitiveMetadata }) => readSensitiveMetadata(original))
+				.then((metadata) => {
+					this.sensitiveMetadata = describeSensitiveMetadata(metadata);
+				});
+		}
+	}
+
+	/**
+	 * The warning to show beside the file: only when what will be sent is the
+	 * original itself. That is Original, but also a GIF, or a HEIC this browser
+	 * could not decode, at any quality — compressing is what leaves metadata
+	 * behind, so a file that is not compressed takes all of it along.
+	 */
+	get metadataWarning(): string | null {
+		return this.prepared === this.original ? this.sensitiveMetadata : null;
 	}
 
 	get name(): string {

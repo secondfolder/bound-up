@@ -9,6 +9,7 @@
  * that never attaches media. See docs/messaging.md#transcoding.
  */
 
+import { hasSensitiveMetadata } from '../media-metadata';
 import {
 	keepOriginal,
 	TRANSCODE_SETTINGS,
@@ -17,6 +18,7 @@ import {
 	withExtension
 } from '../media-quality';
 import type { ImageJob, ImageResult } from './image.worker';
+import { readSensitiveMetadata } from './metadata';
 
 export type TranscodeOptions = {
 	/** How far through this file, 0–1. Images report only the end. */
@@ -24,6 +26,20 @@ export type TranscodeOptions = {
 	/** Gives up on the file: removed from the composer, or its quality changed. */
 	signal?: AbortSignal;
 };
+
+/**
+ * `keepOriginal`, plus the one thing it cannot know: whether the original
+ * carries where it was taken, or anything else about who took it. Such a file
+ * keeps its re-encode even when that came out larger, because someone who left
+ * a photo on SD has every reason to expect none of that is going with it.
+ * Read only when size alone would keep the original, which is rarely.
+ */
+async function sendOriginal(file: File, encodedSize: number): Promise<boolean> {
+	if (!keepOriginal(file, encodedSize)) {
+		return false;
+	}
+	return !hasSensitiveMetadata(await readSensitiveMetadata(file));
+}
 
 function encodeImage(job: ImageJob, signal: AbortSignal | undefined): Promise<ImageResult> {
 	// A worker per image, closed when it answers: a long-lived worker would
@@ -54,7 +70,7 @@ async function transcodeImage(
 		}
 		return file;
 	}
-	if (keepOriginal(file, result.buffer.byteLength)) {
+	if (await sendOriginal(file, result.buffer.byteLength)) {
 		return file;
 	}
 	return new File([result.buffer], withExtension(file.name, 'avif'), {
@@ -81,7 +97,7 @@ async function transcodeVideoFile(
 		console.warn('could not compress a video; sending it as picked', error);
 		return file;
 	}
-	if (!encoded || keepOriginal(file, encoded.blob.size)) {
+	if (!encoded || (await sendOriginal(file, encoded.blob.size))) {
 		return file;
 	}
 	return new File([encoded.blob], withExtension(file.name, encoded.extension), {

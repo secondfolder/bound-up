@@ -162,7 +162,9 @@ export function transcodeKind(mimeType: string, quality: MediaQuality): Transcod
  * Whether to send the original rather than the re-encode: only when the
  * re-encode came out no smaller and the original already displays everywhere.
  * A HEIC stays converted even when it grew, since the point of converting it
- * was that most browsers cannot show it at all.
+ * was that most browsers cannot show it at all. The transcoder also keeps the
+ * re-encode of a file with location or other sensitive metadata, which this
+ * pure rule cannot see — see `sendOriginal` in `src/lib/media/transcode.ts`.
  */
 export function keepOriginal(original: { size: number; type: string }, encodedSize: number) {
 	return encodedSize >= original.size && WEB_DISPLAYABLE.has(original.type);
