@@ -5,7 +5,7 @@ account is given them. Nothing can be bought yet; for now an admin grants a
 feature from the admin page. When purchases arrive, buying a feature will write
 the same row a grant does, so nothing that checks access has to change.
 
-There are two so far: guides and permanent media.
+There are three so far: guides, permanent media, and higher quality uploads.
 
 ## The pieces
 
@@ -85,19 +85,42 @@ account send media that never does.
 
 This check is not `requireFeature` in a load or an action. Never-expiring media
 is one value of a field on a send, not a page, so the data layer checks it:
-`resolveMediaExpiry` in `src/lib/server/messaging.ts` calls `userHasFeature`
-when a send with files asks for `never`, before anything is written to the
-store. It refuses with `needs-permanent-media`, which the two send endpoints
+`resolveMedia` in `src/lib/server/messaging.ts` reads the sender's features
+once for any send with files and refuses a `never` without this one, before
+anything is written to the store. It refuses with `needs-permanent-media`, which the two send endpoints
 answer with a 403. Both endpoints go through it, as would any future writer.
 
 The message pages pass `hasFeature(data.features, 'permanentMedia')` down to the
-composer. For those accounts the menu shows a "Never" item and starts on it
-instead of on two weeks. That only affects what is shown.
+composer. For those accounts each file's self-destruct menu shows a "Never"
+item and starts on it instead of on two weeks. That only affects what is shown.
 
 The choice is made **when the message is sent** and stored on each attachment
 (`expires_at` null). Revoking the feature later does not start a countdown on
 media already sent as permanent. Granting it does not rescue media that is
 already counting down.
+
+### Higher quality uploads
+
+Message media is compressed in the sender's browser before it is encrypted.
+Without this feature every file goes at SD. `highQualityMedia` adds a button to
+each attachment row in the composer that cycles SD → HD → Original, and a new
+file starts on HD (see [messaging.md](messaging.md#transcoding)).
+
+Quality itself cannot be enforced. The server holds only ciphertext and cannot
+tell an SD photo from an Original one. What it can see is bytes, so that is
+what the feature buys on the server. `resolveMedia` in
+`src/lib/server/messaging.ts` holds an account without it to
+`MAX_LOW_QUALITY_TOTAL_BYTES` (10 MB) per message, and holders get the full
+25 MB. It refuses with `needs-high-quality-media`, which the send endpoints
+answer with a 413 carrying that reason, so the client can name the limit. The
+same feature read also serves the `permanentMedia` check.
+
+The message pages pass `hasFeature(data.features, 'highQualityMedia')` to the
+composer, and it only decides what is shown: without it there is no button,
+and every file compresses to SD. The server budget is what backs that up.
+
+Like every feature, it belongs to the account that holds it. A partner with
+the feature does not raise the other side's budget.
 
 ## Admin
 

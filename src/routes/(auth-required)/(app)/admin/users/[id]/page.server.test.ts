@@ -41,7 +41,12 @@ describe('load', () => {
 		expect(data.account).toMatchObject({ id: ada.id, name: 'Ada', isAdmin: false });
 		expect(data.account.features).toEqual([
 			expect.objectContaining({ key: 'guides', name: 'Guides', held: null }),
-			expect.objectContaining({ key: 'permanentMedia', name: 'Permanent media', held: null })
+			expect.objectContaining({ key: 'permanentMedia', name: 'Permanent media', held: null }),
+			expect.objectContaining({
+				key: 'highQualityMedia',
+				name: 'Higher quality uploads',
+				held: null
+			})
 		]);
 		expect(data.isSelf).toBe(false);
 	});

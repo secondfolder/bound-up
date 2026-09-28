@@ -46,9 +46,8 @@ async function send(mediaTtl: number | 'never', files = 1): Promise<string> {
 			icon: 'envelope',
 			ciphertext: 'eA',
 			attachments: Array.from({ length: files }, (_, index) =>
-				outgoingAttachment(new Uint8Array([index]))
-			),
-			mediaTtl
+				outgoingAttachment(new Uint8Array([index]), mediaTtl)
+			)
 		},
 		sentAt
 	);

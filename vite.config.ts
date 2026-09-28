@@ -230,6 +230,9 @@ export default defineConfig(({ command, mode }) => {
 			 * from `VFXProvider`'s onMount for the same SSR reason as SnapDOM.
 			 * `@vfx-js/effects` is listed ahead of its first use so that
 			 * reaching for a library effect does not trigger the same reload.
+			 *
+			 * `mediabunny` is the video transcoder, reached only through
+			 * `await import()` when a message with a video is sent.
 			 */
 			include: [
 				'age-encryption',
@@ -238,8 +241,31 @@ export default defineConfig(({ command, mode }) => {
 				'@zumer/snapdom',
 				'@vfx-js/core',
 				'@vfx-js/effects',
-				'@simplewebauthn/browser'
-			]
+				'@simplewebauthn/browser',
+				'mediabunny',
+				// The one dependency of the excluded AVIF encoder, listed so that
+				// the first photo sent does not discover it mid-run either.
+				'@jsquash/avif > wasm-feature-detect'
+			],
+			/**
+			 * The AVIF encoder is the one dependency that must NOT be pre-bundled.
+			 * Its emscripten glue finds its `.wasm` with
+			 * `new URL('avif_enc.wasm', import.meta.url)`, and pre-bundling moves
+			 * the glue into `.vite/deps` without the file beside it, so the fetch
+			 * 404s. Served from `node_modules` as-is, the URL resolves. It is only
+			 * imported from the image worker, which Vite does not scan anyway.
+			 */
+			exclude: ['@jsquash/avif']
+		},
+
+		/**
+		 * ES-module workers, not the default IIFE: the AVIF encoder chooses its
+		 * threaded or single-threaded build with a dynamic `import()`, and an
+		 * IIFE worker cannot be code-split. Every browser that can run the
+		 * encoder runs module workers.
+		 */
+		worker: {
+			format: 'es'
 		},
 
 		server: {

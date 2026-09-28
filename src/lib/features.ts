@@ -17,6 +17,11 @@ export const FEATURES = {
 	permanentMedia: {
 		name: 'Permanent media',
 		description: 'Send photos and videos in messages that never self-destruct.'
+	},
+	highQualityMedia: {
+		name: 'Higher quality uploads',
+		description:
+			'Send photos and videos at high or original quality, rather than always compressed to low.'
 	}
 } as const satisfies Record<string, { name: string; description: string }>;
 

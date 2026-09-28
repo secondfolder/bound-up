@@ -44,8 +44,7 @@ async function sendOne(mediaTtl: number | 'never'): Promise<string> {
 		senderId: ada.id,
 		icon: 'envelope',
 		ciphertext: 'eA',
-		attachments: [outgoingAttachment(new Uint8Array([7, 7]))],
-		mediaTtl
+		attachments: [outgoingAttachment(new Uint8Array([7, 7]), mediaTtl)]
 	});
 	if (!result.ok) {
 		throw new Error(`expected a send, got ${result.reason}`);

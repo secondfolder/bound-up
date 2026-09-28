@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import {
 	MAX_ATTACHMENT_TOTAL_BYTES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
+	MEDIA_TTL_DEFAULT_MS,
 	type MediaTtl,
 	parseMediaTtl
 } from '$lib/messaging';
@@ -27,9 +28,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export type ParsedSend = {
 	form: FormData;
+	/** Each with its own lifetime, which the data layer enforces along with the feature. */
 	attachments: OutgoingAttachment[];
-	/** How long the attachments live. Enforced by the data layer, which also checks the feature. */
-	mediaTtl: MediaTtl;
 };
 
 /**
@@ -88,21 +88,33 @@ export async function parseSend(request: Request): Promise<ParsedSend> {
 		error(413, 'Those files add up to more than 25 MB.');
 	}
 
-	const rawTtl = form.get('mediaTtlMs');
-	const mediaTtl = parseMediaTtl(typeof rawTtl === 'string' ? rawTtl : null);
-	if (mediaTtl === null) {
-		error(400, 'Media can self-destruct after between 1 hour and 30 days.');
+	/**
+	 * One lifetime per file, in the same order, like `fileIds` — or none at
+	 * all, which is the two-week default for every file. Anything in between
+	 * cannot be paired up and is refused rather than guessed at.
+	 */
+	const rawTtls = form.getAll('mediaTtlMs').map(String);
+	if (rawTtls.length > 0 && rawTtls.length !== files.length) {
+		error(400, 'Each file needs exactly one lifetime, or none.');
+	}
+	const mediaTtls: MediaTtl[] = [];
+	for (const index of files.keys()) {
+		const mediaTtl = parseMediaTtl(rawTtls[index]);
+		if (mediaTtl === null) {
+			error(400, 'Media can self-destruct after between 1 hour and 30 days.');
+		}
+		mediaTtls.push(mediaTtl);
 	}
 
 	return {
 		form,
-		mediaTtl,
 		// `.stream()` rather than `.arrayBuffer()`: formData has already buffered
 		// once, and streaming into the store avoids a second full copy.
 		attachments: files.map((file, index) => ({
 			id: ids[index],
 			body: file.stream(),
-			byteSize: file.size
+			byteSize: file.size,
+			mediaTtl: mediaTtls[index] ?? MEDIA_TTL_DEFAULT_MS
 		}))
 	};
 }
@@ -122,6 +134,11 @@ export function sendFailureStatus(reason: SendFailure): number {
 			return 400;
 		case 'needs-permanent-media':
 			return 403;
+		// 413, not 403: it is a size the account may not send, and a client
+		// that compressed to low quality as it should never meets it. The
+		// reason travels as the body's message so the client can name the limit.
+		case 'needs-high-quality-media':
+			return 413;
 		default:
 			return 413;
 	}

@@ -36,6 +36,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
+| `src/lib/media/`              | Browser-only media transcoding. See [docs/messaging.md](docs/messaging.md#transcoding)       |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
 | `src/routes/(public)/`        | Anonymous-reachable routes. No header: each page links onwards itself                        |
@@ -238,6 +239,15 @@ site it applies to; go read that comment before deciding to break one.
     half — types, constants, normalisation, the safety-number formatting — lives
     in `src/lib/encryption.ts`, which is alias-free so the Drizzle schema can
     import its types. See [docs/encryption.md](docs/encryption.md).
+
+    **`src/lib/media/**` is browser-only on the same terms**: it drives a Web
+    Worker, WebCodecs and a 3.5 MB wasm encoder. It is reached only through
+    `await import()` behind a `browser` check in
+    `messaging/pending-attachment.svelte.ts`, which is what keeps it out of
+    the worker bundle, so never import it statically from anything the server
+    renders. Its pure half — tiers, resize maths,
+    pass-through rules, the byte budget — is `src/lib/media-quality.ts`,
+    alias-free because the server shares `attachmentBudget`.
 
 14. **A permission is enforced on the server, never by a disabled input.** The
     read-only accept screen still posts every field (they are hidden inputs, so

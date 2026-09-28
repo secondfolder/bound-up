@@ -98,6 +98,7 @@
 			recipients={data.recipients}
 			{canSend}
 			permanentMedia={hasFeature(data.features, 'permanentMedia')}
+			highQualityMedia={hasFeature(data.features, 'highQualityMedia')}
 		/>
 	{:else}
 		<!-- Never the thread until the key is here: every message would render as

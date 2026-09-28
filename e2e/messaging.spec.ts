@@ -458,8 +458,8 @@ test.describe('attachments', () => {
 			await ada.page
 				.locator('input[type="file"]')
 				.setInputFiles({ name: 'sunset.png', mimeType: 'image/png', buffer: Png });
-			// The chip confirms the composer took it before the send.
-			await expect(ada.page.getByText('sunset.png')).toBeVisible();
+			// The thumbnail confirms the composer took it before the send.
+			await expect(ada.page.getByRole('img', { name: 'sunset.png', exact: true })).toBeVisible();
 
 			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
 			await clickWaButton(ada.page, 'Send');
@@ -528,8 +528,8 @@ test.describe('attachments', () => {
 				{ name: 'five.png', mimeType: 'image/png', buffer: Png }
 			]);
 
-			await expect(ada.page.getByText('one.png')).toBeVisible();
-			await expect(ada.page.getByText('two.png')).toBeVisible();
+			await expect(ada.page.getByRole('img', { name: 'one.png', exact: true })).toBeVisible();
+			await expect(ada.page.getByRole('img', { name: 'two.png', exact: true })).toBeVisible();
 			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
 			await clickWaButton(ada.page, 'Send');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -688,22 +688,22 @@ test.describe('attachments', () => {
 			await openBoard(ada.page, 'Jun');
 			await clickWaButton(ada.page, 'Write something');
 			// No choice to make until there is a file to make it for.
-			await expect(ada.page.getByRole('button', { name: /^Self-destructs after/ })).toHaveCount(0);
+			await expect(ada.page.getByRole('button', { name: /self-destructs after/i })).toHaveCount(0);
 			await ada.page
 				.locator('input[type="file"]')
 				.setInputFiles({ name: 'sunset.png', mimeType: 'image/png', buffer: Png });
-			await expect(ada.page.getByText('sunset.png')).toBeVisible();
+			await expect(ada.page.getByRole('img', { name: 'sunset.png', exact: true })).toBeVisible();
 
-			await clickWaButton(ada.page, 'Self-destructs after 2 weeks');
+			await clickWaButton(ada.page, 'sunset.png self-destructs after 2 weeks');
 			await ada.page.getByRole('menuitem', { name: '1 hour', exact: true }).click();
 			await expect(
-				ada.page.getByRole('button', { name: 'Self-destructs after 1 hour' })
+				ada.page.getByRole('button', { name: 'sunset.png self-destructs after 1 hour' })
 			).toBeVisible();
 
 			await expect(ada.page.getByRole('button', { name: 'Send' })).toBeEnabled();
 			await clickWaButton(ada.page, 'Send');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
-			await expect(ada.page.getByRole('img', { name: 'sunset.png' })).toBeVisible();
+			await expect(ada.page.getByRole('img', { name: 'sunset.png', exact: true })).toBeVisible();
 			await expect(ada.page.getByText('in 1 hour', { exact: true })).toBeVisible();
 
 			// Jun reads it, with the countdown over it.
@@ -791,7 +791,7 @@ test.describe('attachments', () => {
 				await page
 					.locator('input[type="file"]')
 					.setInputFiles({ name: 'forever.png', mimeType: 'image/png', buffer: Png });
-				const triggerButton = page.getByRole('button', { name: /^Self-destructs after/ });
+				const triggerButton = page.getByRole('button', { name: /self-destructs after/i });
 				await expect(triggerButton).toBeVisible();
 				return triggerButton;
 			};
@@ -799,23 +799,148 @@ test.describe('attachments', () => {
 
 			// Jun: two weeks by default, and no "Never" among the choices.
 			const junTrigger = await openPicker(jun.page, 'Ada');
-			await expect(junTrigger).toHaveAccessibleName('Self-destructs after 2 weeks');
-			await clickWaButton(jun.page, 'Self-destructs after 2 weeks');
+			await expect(junTrigger).toHaveAccessibleName('forever.png self-destructs after 2 weeks');
+			await clickWaButton(jun.page, 'forever.png self-destructs after 2 weeks');
 			await expect(item(jun.page, '1 hour')).toBeVisible();
 			await expect(item(jun.page, 'Never')).toHaveCount(0);
 
 			// Ada: "Never" is on offer, and is where she starts.
 			const adaTrigger = await openPicker(ada.page, 'Jun');
-			await expect(adaTrigger).toHaveAccessibleName('Self-destructs after Never');
-			await clickWaButton(ada.page, 'Self-destructs after Never');
+			await expect(adaTrigger).toHaveAccessibleName('forever.png self-destructs after Never');
+			await clickWaButton(ada.page, 'forever.png self-destructs after Never');
 			await expect(item(ada.page, 'Never')).toBeVisible();
 			await item(ada.page, 'Never').click();
-			await expect(adaTrigger).toHaveAccessibleName('Self-destructs after Never');
+			await expect(adaTrigger).toHaveAccessibleName('forever.png self-destructs after Never');
 			await clickWaButton(ada.page, 'Send');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
 			// Sent, and permanent: the photo with no countdown on it.
 			await expect(ada.page.getByRole('img', { name: 'forever.png' })).toBeVisible();
 			await expect(ada.page.locator('.countdown')).toHaveCount(0);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	/**
+	 * A photo big enough that compressing it pays, drawn in the page rather
+	 * than checked in. The 1×1 `Png` above is sent as picked at every quality,
+	 * because its AVIF would be larger than it is.
+	 */
+	async function photo(page: Page): Promise<Buffer> {
+		const base64 = await page.evaluate(async () => {
+			const canvas = new OffscreenCanvas(2400, 1800);
+			const context = canvas.getContext('2d');
+			if (!context) {
+				throw new Error('no 2D context');
+			}
+			const gradient = context.createLinearGradient(0, 0, 2400, 1800);
+			gradient.addColorStop(0, '#f60');
+			gradient.addColorStop(1, '#06f');
+			context.fillStyle = gradient;
+			context.fillRect(0, 0, 2400, 1800);
+			const blob = await canvas.convertToBlob({ type: 'image/png' });
+			const bytes = new Uint8Array(await blob.arrayBuffer());
+			let binary = '';
+			for (const byte of bytes) {
+				binary += String.fromCharCode(byte);
+			}
+			return btoa(binary);
+		});
+		return Buffer.from(base64, 'base64');
+	}
+
+	/** The decrypted image Jun sees, by name, once it has actually decoded. */
+	async function receivedImage(page: Page, name: string) {
+		const image = page.getByRole('img', { name });
+		await expect(image).toBeVisible();
+		await expect
+			.poll(() => image.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+			.toBeGreaterThan(0);
+		return image;
+	}
+
+	test('a photo is compressed to a low-quality AVIF, with no choice offered', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await clickWaButton(ada.page, 'Write something');
+			await ada.page
+				.locator('input[type="file"]')
+				.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: await photo(ada.page) });
+			await expect(ada.page.getByRole('img', { name: 'photo.png', exact: true })).toBeVisible();
+			// Without the feature there is nothing to choose.
+			await expect(ada.page.getByRole('button', { name: /^Quality/ })).toHaveCount(0);
+			await clickWaButton(ada.page, 'Send');
+			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
+			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+			// Renamed with its new type, and scaled to the low tier's 1600 px.
+			const image = await receivedImage(jun.page, 'photo.avif');
+			await expect
+				.poll(() => image.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+				.toBe(1600);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	/**
+	 * Higher quality uploads: a choice of tier, starting on High, offered only
+	 * to an account holding the feature. The server's byte budget for everyone
+	 * else is covered by the server tests.
+	 */
+	test('an account with higher quality uploads can send the original', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+			await sql(
+				`insert into user_features (id, user_id, feature, source)
+				 select ?, id, 'highQualityMedia', 'grant' from user where email = ?`,
+				[randomUUID(), ada.who.email]
+			);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await clickWaButton(ada.page, 'Write something');
+			await ada.page
+				.locator('input[type="file"]')
+				.setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: await photo(ada.page) });
+			// One button per file that cycles SD → HD → Original, starting on HD.
+			const quality = ada.page.getByRole('button', { name: /^Quality of photo\.png/ });
+			await expect(quality).toHaveAccessibleName('Quality of photo.png: HD');
+			await clickWaButton(ada.page, 'Quality of photo.png: HD');
+			await expect(quality).toHaveAccessibleName('Quality of photo.png: Original');
+			await expect(ada.page.getByText(/including any location data/)).toBeVisible();
+			await clickWaButton(ada.page, 'Send');
+			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
+			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+			// Untouched: the same name, and every pixel.
+			const image = await receivedImage(jun.page, 'photo.png');
+			await expect
+				.poll(() => image.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+				.toBe(2400);
 		} finally {
 			await ada.close();
 			await jun.close();

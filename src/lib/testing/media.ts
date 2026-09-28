@@ -1,4 +1,6 @@
+import { MEDIA_TTL_DEFAULT_MS, type MediaTtl } from '../messaging';
 import { assertStorageKey, type MediaStore } from '../server/media';
+import type { OutgoingAttachment } from '../server/messaging';
 
 /**
  * An in-memory `MediaStore` for server tests.
@@ -93,7 +95,7 @@ export function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
 }
 
 /**
- * An `OutgoingAttachment` with an id already chosen.
+ * An `OutgoingAttachment` with an id already chosen, living `mediaTtl`.
  *
  * Ids come from the client in production — the decryption keys live inside the
  * encrypted body, so they have to exist before it is sealed — so a test fixture
@@ -101,7 +103,7 @@ export function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
  */
 export function outgoingAttachment(
 	bytes: Uint8Array,
-	id: string = crypto.randomUUID()
-): { id: string; body: ReadableStream<Uint8Array>; byteSize: number } {
-	return { id, body: streamOf(bytes), byteSize: bytes.length };
+	mediaTtl: MediaTtl = MEDIA_TTL_DEFAULT_MS
+): OutgoingAttachment {
+	return { id: crypto.randomUUID(), body: streamOf(bytes), byteSize: bytes.length, mediaTtl };
 }

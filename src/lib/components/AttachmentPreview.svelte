@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { MessageAttachmentInfo } from '$lib/crypto/messages';
+	import { canDisplayAvif, canPlayVideo } from '$lib/media/support';
 	import { formatTimeLeft } from '$lib/messaging';
 	import { fetchAttachment, MediaExpiredError } from '$lib/messaging/client';
 	import type { AttachmentView } from '$lib/types';
@@ -33,6 +34,14 @@
 	let failed = $state(false);
 	/** A 410 from the server: it expired between the load and the download. */
 	let gone = $state(false);
+	/**
+	 * This browser cannot show the file. Asked before downloading where the
+	 * type allows — an AVIF, or a video whose type names its codecs — so an
+	 * out-of-date browser is told to update rather than made to fetch and
+	 * decrypt something it will only draw as a broken box. Anything else is
+	 * found out by the element's own `error` event, once it tries.
+	 */
+	let unsupported = $state(false);
 
 	let now = $state(Date.now());
 
@@ -71,6 +80,16 @@
 
 		void (async () => {
 			try {
+				const viewable =
+					info.kind === 'video'
+						? canPlayVideo(info.mimeType)
+						: info.mimeType !== 'image/avif' || (await canDisplayAvif());
+				if (!viewable) {
+					if (!cancelled) {
+						unsupported = true;
+					}
+					return;
+				}
 				const result = await fetchAttachment(partnershipId, info);
 				if (cancelled) {
 					// Revoked immediately: the component went away mid-download, and
@@ -105,6 +124,12 @@
 
 {#if expired}
 	<SelfDestructedMedia />
+{:else if unsupported}
+	<wa-callout variant="warning" size="s" class="unsupported">
+		<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
+		{info.kind === 'video' ? 'This video can’t be played' : 'This photo can’t be shown'} in this
+		browser. Updating your browser should fix it.
+	</wa-callout>
 {:else if failed}
 	<p class="failed">Could not open this file.</p>
 {:else if !url}
@@ -117,14 +142,36 @@
 	     (Since this is a user uploaded video we don't have captions for it although at somepoint in the future we'd like
 	     to offer on-device auto-captioning)
 	-->
+	<!-- `preload="auto"`, not "metadata". `url` is a blob of a file already
+	     downloaded and decrypted in full, so holding back costs nothing to undo —
+	     and with "metadata", Firefox suspends loading and then, for some files,
+	     never resumes: Play shows "playing" and sits at 0:00 until the timeline is
+	     clicked. Measured on a 3-second, silent 768×768 clip, in its original
+	     H.264 MP4 and its VP9 re-encode alike: stuck every time with
+	     "metadata", playing every time with "auto". -->
 	<div class="media video">
 		<!-- biome-ignore lint/a11y/useMediaCaption: as above — an uploaded video has no caption track to offer. -->
-		<video src={url} controls playsinline preload="metadata"></video>
+		<video
+			src={url}
+			controls
+			playsinline
+			preload="auto"
+			onerror={() => {
+				unsupported = true;
+			}}
+		></video>
 		{@render countdown()}
 	</div>
 {:else}
 	<div class="media">
-		<img src={url} alt={info.fileName} />
+		<!-- biome-ignore lint/a11y/noNoninteractiveElementInteractions: `error` is the image failing to decode, not a user interaction. -->
+		<img
+			src={url}
+			alt={info.fileName}
+			onerror={() => {
+				unsupported = true;
+			}}
+		/>
 		{@render countdown()}
 	</div>
 {/if}
@@ -195,6 +242,10 @@
 	   top-left corner instead of covering the play button and scrubber. */
 	.video .countdown {
 		inset-block: 0.375rem auto;
+	}
+
+	.unsupported {
+		font-size: 0.8125rem;
 	}
 
 	.failed {

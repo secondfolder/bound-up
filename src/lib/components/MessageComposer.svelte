@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { WaSelectEvent } from '@awesome.me/webawesome/dist/events/select.js';
+	import { onDestroy } from 'svelte';
+	import { defaultQuality, MEDIA_QUALITY_LABELS, nextQuality } from '$lib/media-quality';
 	import {
 		MAX_ATTACHMENTS_PER_MESSAGE,
 		MEDIA_TTL_DEFAULT_MS,
@@ -7,7 +9,8 @@
 		MEDIA_TTL_PRESETS,
 		type MediaTtl
 	} from '$lib/messaging';
-	import { type ComposedMessage, checkComposed } from '$lib/messaging/client';
+	import { type ComposedMessage, checkSizes, checkText } from '$lib/messaging/client';
+	import { PendingAttachment } from '$lib/messaging/pending-attachment.svelte';
 	import { MESSAGE_FEATURES } from '$lib/richtext-editor';
 	import RichTextEditor from './RichTextEditor.svelte';
 
@@ -36,7 +39,8 @@
 		submitLabel = 'Send',
 		initialText = '',
 		onTextChange,
-		permanentMedia = false
+		permanentMedia = false,
+		highQualityMedia = false
 	}: {
 		send: (message: ComposedMessage) => Promise<string | null>;
 		placeholder?: string;
@@ -56,68 +60,115 @@
 		 * refuses a `never` from an account without the feature regardless.
 		 */
 		permanentMedia?: boolean;
+		/**
+		 * Whether each file gets an SD / HD / Original button — the
+		 * `highQualityMedia` feature. Without it every file is SD and there is
+		 * nothing to choose. It only decides what is shown: the server holds an
+		 * account without the feature to the SD byte budget regardless.
+		 */
+		highQualityMedia?: boolean;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
 	let text = $state(initialText);
-	let files: File[] = $state([]);
 	/**
-	 * An account that may send permanent media starts on "Never"; everyone
-	 * else on two weeks. Derived rather than copied into state, so a grant
-	 * that arrives with a refresh moves an untouched menu along with it.
+	 * The picked files, each already compressing at its own quality — see
+	 * `PendingAttachment`. Quality and lifetime are per file, and a new file
+	 * starts on the defaults, so a choice made for one never sticks to the next.
 	 */
-	const defaultTtl = $derived<MediaTtl>(permanentMedia ? MEDIA_TTL_NEVER : MEDIA_TTL_DEFAULT_MS);
-	/**
-	 * What the sender picked, per send. Null means "the default", and it goes
-	 * back to null after each send so a short choice never sticks unnoticed.
-	 */
-	let chosenTtl = $state<MediaTtl | null>(null);
-	const mediaTtl = $derived(chosenTtl ?? defaultTtl);
-	const mediaTtlLabel = $derived(
-		mediaTtl === MEDIA_TTL_NEVER
-			? 'Never'
-			: (MEDIA_TTL_PRESETS.find((preset) => preset.ms === mediaTtl)?.label ?? '2 weeks')
-	);
+	let attachments: PendingAttachment[] = $state([]);
 	let sending = $state(false);
-	let problem: string | null = $state(null);
+	/** A refusal from the last attempt to send, or from the text check it ran. */
+	let refusal: string | null = $state(null);
 	let fileInput: HTMLInputElement | undefined = $state();
 	let editor: ReturnType<typeof RichTextEditor> | undefined = $state();
 
-	const nothingToSend = $derived(
-		files.length === 0 && checkComposed({ text, files })?.kind === 'empty'
+	/**
+	 * Measured live as each file finishes compressing: only a file whose final
+	 * form is known can be measured, so a 40 MB clip is not refused on its way
+	 * to becoming 6 MB. A file sent as picked is known at once.
+	 */
+	const sizeProblem = $derived(
+		checkSizes(
+			attachments.flatMap((attachment) => (attachment.prepared ? [attachment.prepared] : [])),
+			highQualityMedia
+		)?.message ?? null
 	);
+	const problem = $derived(refusal ?? sizeProblem);
+
+	const nothingToSend = $derived(checkText(text, attachments.length)?.kind === 'empty');
+
+	/** The files still compressing, and how far they have got between them. */
+	const pending = $derived(attachments.filter((attachment) => attachment.prepared === null));
+	const pendingLabel = $derived.by(() => {
+		if (pending.length === 0) {
+			return 'Sending…';
+		}
+		const fraction =
+			pending.reduce((sum, attachment) => sum + (attachment.progress ?? 0), 0) / pending.length;
+		const files = pending.length === 1 ? '1 file' : `${pending.length} files`;
+		return `Compressing ${files}… (${Math.round(fraction * 100)}%)`;
+	});
+
+	const anyOriginal = $derived(attachments.some((attachment) => attachment.quality === 'original'));
+
+	onDestroy(() => {
+		for (const attachment of attachments) {
+			attachment.dispose();
+		}
+	});
 
 	function onChange(next: string) {
 		text = next;
 		onTextChange?.(next);
-		if (problem) {
-			problem = checkComposed({ text, files })?.message ?? null;
+		if (refusal) {
+			refusal = checkText(text, attachments.length)?.message ?? null;
 		}
 	}
 
 	function onPick(event: Event) {
 		const picked = [...((event.target as HTMLInputElement).files ?? [])];
+		const room = MAX_ATTACHMENTS_PER_MESSAGE - attachments.length;
 		// Appended rather than replaced, so picking twice adds rather than
-		// discards — the file input reports only its own last selection.
-		files = [...files, ...picked].slice(0, MAX_ATTACHMENTS_PER_MESSAGE);
-		problem = checkComposed({ text, files })?.message ?? null;
+		// discards — the file input reports only its own last selection. Each
+		// starts compressing here, the moment it is picked.
+		attachments = [
+			...attachments,
+			...picked.slice(0, Math.max(0, room)).map(
+				(file) =>
+					new PendingAttachment(file, {
+						quality: defaultQuality(highQualityMedia),
+						// "Never" for an account that may send permanent media, two
+						// weeks for everyone else.
+						mediaTtl: permanentMedia ? MEDIA_TTL_NEVER : MEDIA_TTL_DEFAULT_MS
+					})
+			)
+		];
+		refusal = null;
 		// Cleared so re-picking the same file fires `change` again.
 		if (fileInput) {
 			fileInput.value = '';
 		}
 	}
 
+	function ttlLabel(mediaTtl: MediaTtl): string {
+		return mediaTtl === MEDIA_TTL_NEVER
+			? 'Never'
+			: (MEDIA_TTL_PRESETS.find((preset) => preset.ms === mediaTtl)?.label ?? '2 weeks');
+	}
+
 	// `wa-select` rather than a click per item, so keyboard selection works too
 	// (see EdgeTask.svelte). The item's `value` is read as a property: Svelte
 	// sets it as one on an upgraded element, and Lit does not reflect it back.
-	function onTtlSelect(event: WaSelectEvent) {
+	function onTtlSelect(attachment: PendingAttachment, event: WaSelectEvent) {
 		const { value } = event.detail.item as Element & { value: string };
-		chosenTtl = value === MEDIA_TTL_NEVER ? MEDIA_TTL_NEVER : Number(value);
+		attachment.mediaTtl = value === MEDIA_TTL_NEVER ? MEDIA_TTL_NEVER : Number(value);
 	}
 
-	function remove(index: number) {
-		files = files.filter((_, at) => at !== index);
-		problem = checkComposed({ text, files })?.message ?? null;
+	function remove(attachment: PendingAttachment) {
+		attachment.dispose();
+		attachments = attachments.filter((other) => other !== attachment);
+		refusal = null;
 	}
 
 	/**
@@ -132,23 +183,47 @@
 			return;
 		}
 
-		const local = checkComposed({ text, files });
+		const local = checkText(text, attachments.length);
 		if (local) {
-			problem = local.message;
+			refusal = local.message;
+			return;
+		}
+		if (sizeProblem) {
 			return;
 		}
 
 		sending = true;
-		problem = null;
+		refusal = null;
 		try {
-			const failure = await send({ text, files, mediaTtl });
+			// Usually already done: compressing started when each file was picked.
+			// Anything still going is waited for here, with its progress showing.
+			const sent = [...attachments];
+			let files: File[];
+			try {
+				files = await Promise.all(sent.map((attachment) => attachment.ready()));
+			} catch {
+				// Only an abort rejects, and only `dispose` aborts the job a file is
+				// waiting on: the composer went away mid-send. Nothing is left to
+				// send it from.
+				return;
+			}
+			const failure = await send({
+				text,
+				attachments: sent.map((attachment, index) => ({
+					file: files[index] ?? attachment.original,
+					mediaTtl: attachment.mediaTtl
+				})),
+				highQualityMedia
+			});
 			if (failure) {
-				problem = failure;
+				refusal = failure;
 				return;
 			}
 			text = '';
-			files = [];
-			chosenTtl = null;
+			for (const attachment of sent) {
+				attachment.dispose();
+			}
+			attachments = attachments.filter((attachment) => !sent.includes(attachment));
 			// The editor owns its document, so resetting the state is not enough.
 			editor?.setValue('');
 			// Said explicitly rather than left to the editor's change event: the
@@ -159,12 +234,6 @@
 			sending = false;
 		}
 	}
-
-	function sizeOf(bytes: number): string {
-		return bytes < 1024 * 1024
-			? `${Math.max(1, Math.round(bytes / 1024))} KB`
-			: `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-	}
 </script>
 
 <div class="composer">
@@ -172,37 +241,90 @@
 		<wa-callout variant="danger" size="small">{problem}</wa-callout>
 	{/if}
 
-	{#if files.length > 0}
-		<ul class="files">
-			{#each files as file, index (`${file.name}-${index}`)}
+	{#if attachments.length > 0}
+		<ul class="attachments">
+			{#each attachments as attachment (attachment.id)}
 				<li>
-					<span class="name">{file.name}</span>
-					<span class="size">{sizeOf(file.size)}</span>
-					<wa-button type="button" size="s" appearance="plain" pill onclick={() => remove(index)}>
-						<wa-icon name="xmark" variant="solid" label={`Remove ${file.name}`}></wa-icon>
+					<wa-button
+						type="button"
+						size="s"
+						appearance="plain"
+						pill
+						disabled={sending}
+						onclick={() => remove(attachment)}
+					>
+						<wa-icon name="trash-can" variant="solid" label={`Remove ${attachment.name}`}
+						></wa-icon>
 					</wa-button>
+
+					<span class="thumb">
+						{#if attachment.kind === 'video'}
+							<!-- `#t=0.1` so Safari draws a first frame instead of nothing. -->
+							<video
+								src={`${attachment.previewUrl}#t=0.1`}
+								muted
+								playsinline
+								preload="metadata"
+								aria-label={attachment.name}
+							></video>
+						{:else}
+							<img src={attachment.previewUrl} alt={attachment.name} />
+						{/if}
+						{#if attachment.progress !== null}
+							<!-- Over the thumbnail, so it is plain the work has already started. -->
+							<span class="busy" aria-hidden="true">
+								{Math.round(attachment.progress * 100)}%
+							</span>
+						{/if}
+					</span>
+
+					<wa-dropdown
+						placement="top-start"
+						onwa-select={(event: WaSelectEvent) => onTtlSelect(attachment, event)}
+					>
+						<wa-button slot="trigger" size="s" appearance="outlined" with-caret disabled={sending}>
+							<wa-icon slot="start" name="bomb" variant="solid"></wa-icon>
+							<span class="wa-visually-hidden">{attachment.name} self-destructs after </span
+							>{ttlLabel(attachment.mediaTtl)}
+						</wa-button>
+						{#each MEDIA_TTL_PRESETS as preset (preset.ms)}
+							<wa-dropdown-item value={String(preset.ms)}>{preset.label}</wa-dropdown-item>
+						{/each}
+						{#if permanentMedia}
+							<wa-divider></wa-divider>
+							<wa-dropdown-item value={MEDIA_TTL_NEVER}>Never</wa-dropdown-item>
+						{/if}
+					</wa-dropdown>
+
+					{#if highQualityMedia}
+						<!-- A plain button that cycles, not a toggle: it has three states, and
+						     `aria-pressed` has two. Its name says which file and which tier. -->
+						<wa-button
+							type="button"
+							size="s"
+							appearance="outlined"
+							class="quality"
+							disabled={sending}
+							onclick={() => attachment.setQuality(nextQuality(attachment.quality))}
+						>
+							<span class="wa-visually-hidden">Quality of {attachment.name}: </span>{MEDIA_QUALITY_LABELS[
+								attachment.quality
+							]}
+						</wa-button>
+					{/if}
 				</li>
 			{/each}
 		</ul>
 
-		<!-- Only while there are files: text never self-destructs, so the choice
-		     means nothing without them. -->
-		<div class="ttl">
-			<wa-icon name="bomb" variant="solid"></wa-icon>
-			<span aria-hidden="true">Self-destructs after</span>
-			<wa-dropdown placement="top-start" onwa-select={onTtlSelect}>
-				<wa-button slot="trigger" size="s" appearance="outlined" with-caret>
-					<span class="wa-visually-hidden">Self-destructs after </span>{mediaTtlLabel}
-				</wa-button>
-				{#each MEDIA_TTL_PRESETS as preset (preset.ms)}
-					<wa-dropdown-item value={String(preset.ms)}>{preset.label}</wa-dropdown-item>
-				{/each}
-				{#if permanentMedia}
-					<wa-divider></wa-divider>
-					<wa-dropdown-item value={MEDIA_TTL_NEVER}>Never</wa-dropdown-item>
-				{/if}
-			</wa-dropdown>
-		</div>
+		{#if anyOriginal}
+			<!-- Said because it is the one thing Original does that nobody would
+			     guess: compressing is also what strips a photo's EXIF. -->
+			<p class="hint">Originals are sent exactly as picked, including any location data.</p>
+		{/if}
+	{/if}
+
+	{#if sending && attachments.length > 0}
+		<p class="progress" aria-live="polite">{pendingLabel}</p>
 	{/if}
 
 	<div class="row">
@@ -318,48 +440,64 @@
 		}
 	}
 
-	.ttl {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+	.hint,
+	.progress {
+		margin: 0;
 		font-size: 0.8125rem;
 		color: var(--wa-color-text-quiet);
-
-		wa-button {
-			--wa-form-control-height: 1.75rem;
-		}
 	}
 
-	.files {
+	.attachments {
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.375rem;
 
 		li {
 			display: flex;
 			align-items: center;
 			gap: 0.5rem;
 			font-size: 0.8125rem;
+		}
 
-			.name {
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-			}
+		/* Row-sized rather than form-control-sized, so a file list stays compact. */
+		wa-button {
+			--wa-form-control-height: 1.75rem;
+		}
 
-			.size {
-				color: var(--wa-color-text-quiet);
-				margin-inline-start: auto;
-			}
+		wa-button[pill] {
+			color: var(--wa-color-text-quiet);
+		}
+	}
 
-			/* Row-sized rather than form-control-sized, so a file list stays compact. */
-			wa-button {
-				--wa-form-control-height: 1.75rem;
-				color: var(--wa-color-text-quiet);
-			}
+	.thumb {
+		position: relative;
+		flex: none;
+		inline-size: 2.75rem;
+		block-size: 2.75rem;
+		overflow: hidden;
+		border-radius: var(--wa-border-radius-s, 0.25rem);
+		background: var(--wa-color-surface-lowered);
+
+		img,
+		video {
+			display: block;
+			inline-size: 100%;
+			block-size: 100%;
+			object-fit: cover;
+		}
+
+		.busy {
+			position: absolute;
+			inset: 0;
+			display: grid;
+			place-items: center;
+			background: var(--media-badge-fill);
+			color: var(--wa-color-text-normal);
+			font-size: 0.6875rem;
+			font-variant-numeric: tabular-nums;
 		}
 	}
 </style>

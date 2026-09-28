@@ -134,6 +134,17 @@ export type RestoreRequestStatus = 'pending' | 'completed' | 'declined';
  */
 export const MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024;
 
+/**
+ * The attachment budget for an account without `highQualityMedia`.
+ *
+ * The server cannot see what quality a file was sent at — it only ever holds
+ * ciphertext — so bytes are the one part of the feature it can enforce. Low
+ * quality output fits comfortably: a 1600 px AVIF is a few hundred KB, and the
+ * low video bitrate (`src/lib/media-quality.ts`) puts about a minute of video
+ * under it. See docs/messaging.md#transcoding.
+ */
+export const MAX_LOW_QUALITY_TOTAL_BYTES = 10 * 1024 * 1024;
+
 /** Per message, so one enormous file cannot be split past the total either. */
 export const MAX_ATTACHMENTS_PER_MESSAGE = 6;
 

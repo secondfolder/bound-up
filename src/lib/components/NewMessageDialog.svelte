@@ -14,7 +14,9 @@
 		close,
 		tags,
 		/** Display only: offers "Never" in the composer. The server enforces it. */
-		permanentMedia = false
+		permanentMedia = false,
+		/** Display only: offers a choice of quality. The server enforces a byte budget. */
+		highQualityMedia = false
 	}: {
 		partnerName: string;
 		partnershipId: string;
@@ -22,6 +24,7 @@
 		close: () => void;
 		tags: TagView[];
 		permanentMedia?: boolean;
+		highQualityMedia?: boolean;
 	} = $props();
 
 	let selectedTagIds = $state<string[]>([]);
@@ -138,6 +141,7 @@
 			<MessageComposer
 				send={sendWithTags}
 				{permanentMedia}
+				{highQualityMedia}
 				placeholder={`Message to ${partnerName}`}
 				initialText={draft.initial?.text ?? ''}
 				{onTextChange}

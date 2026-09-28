@@ -200,13 +200,104 @@ is deleted: the delete is what proves membership, and the purge works by prefix,
 so it does not need the rows. A failed purge is logged, not thrown, because
 leaving a partnership must never wait on storage (docs/partners.md).
 
+### Transcoding
+
+Media is compressed **in the sender's browser, before it is encrypted**. The
+server only ever sees ciphertext, so there is nowhere else this could happen.
+It exists to save R2 storage and bandwidth, and the recipient's wait: a file
+downloads in full before it shows, because age ciphertext is not seekable. It
+also makes photos from any camera viewable in any browser. The tiers and the
+pure rules are in `src/lib/media-quality.ts`. The encoders are in
+`src/lib/media/`, which is browser-only in the same way `src/lib/crypto/` is.
+
+| Tier     | Photo                              | Video                                                    |
+| -------- | ---------------------------------- | -------------------------------------------------------- |
+| Low      | AVIF, long edge ≤ 1600 px, q 50    | short edge ≤ 720 px; VP9 0.8 Mbps or H.264 1.2 Mbps      |
+| High     | AVIF, long edge ≤ 3200 px, q 70    | short edge ≤ 1080 px; VP9 2.5 Mbps or H.264 4 Mbps       |
+| Original | the file as picked, byte for byte  | the file as picked, byte for byte                        |
+
+- **The composer.** Each picked file is a row: a bin to remove it, a
+  thumbnail, its own self-destruct menu, and the quality button. The quality
+  button says **SD**, **HD** or **Original** (the Low, High and Original tiers
+  above) and a click cycles to the next. It is shown only to an account with
+  `highQualityMedia`, where a new file starts on **HD**. Everyone else's files
+  are always SD, with no button. While any file is on Original, a line under the
+  rows says originals go exactly as picked, including any location data.
+- **Compressing starts when a file is picked, not when Send is pressed.**
+  `PendingAttachment` (`src/lib/messaging/pending-attachment.svelte.ts`) starts
+  the job the moment the file is added and shows its progress over the
+  thumbnail, so by the time the sender has written their message the file is
+  usually ready. It keeps a job per quality, so cycling back to a tier that has
+  finished is instant. It abandons an unfinished job the sender has cycled
+  away from, or removed the file during, because an encode nobody will send
+  only drains a phone's battery. Send waits for anything still going, and says
+  "Compressing 1 file… (40%)" while it does.
+- **One file at a time.** `transcodeFile` runs jobs through a single queue in
+  the order they were picked, because a phone decoding two 4K videos at once
+  runs out of memory. An abandoned job leaves the queue without holding up the
+  next.
+- **Photos → AVIF**, in a Web Worker (`image.worker.ts`) so the encode doesn't
+  freeze the composer. The browser decodes the photo itself, with the EXIF
+  orientation applied, and `createImageBitmap` does the resizing. The wasm
+  build of libavif (`@jsquash/avif`) does the encoding, single-threaded,
+  because the threaded build needs COOP/COEP headers this app does not send.
+- **Video → VP9 + Opus in WebM**, through WebCodecs by way of mediabunny
+  (`video.ts`). VP9 is roughly a third smaller than H.264 for the same picture
+  and plays in every current browser, Safari included from iOS 17.4. A sender
+  whose browser cannot encode VP9 gets **H.264 + AAC (or Opus) in MP4**
+  instead. AV1 is not used, because Safari only decodes it on recent hardware.
+  The stored `mimeType` carries the codecs (`video/webm; codecs="vp09…,opus"`),
+  so a reader can ask its own browser whether it will play before downloading.
+- **Native decode only.** A file the sender's browser cannot decode, such as a
+  HEIC outside Safari, is sent as picked. So is a video with no available
+  encoder, or one whose sound the conversion would have had to drop.
+  `transcodeFile` never fails a send because it could not compress a file.
+  The size checks that follow decide whether that file can go.
+- **Left alone at every tier:** GIFs, since decoding keeps only the first frame
+  and so loses the animation, and SVGs. A re-encode that came out no smaller
+  than an original the web already displays is also discarded, and the
+  original is sent instead. A HEIC stays converted even when the AVIF is
+  larger, because converting it was about being viewable, not about size.
+- **Compressing strips metadata.** Re-encoding carries no EXIF over, GPS
+  included, and video tags are dropped on purpose. Original keeps both, which
+  is why the composer says so.
+- **Sizes are checked on what will be sent.** The composer measures each file
+  once its final form is known: at once for one that goes as picked, and when
+  compressing finishes for the rest. So a 40 MB clip is not refused on its way
+  to becoming 6 MB, and a clip that is still too big after compressing is
+  refused as soon as that is known. `sendMessage` checks the finished files
+  again (`checkComposed`).
+- **The byte budget is the server's half.** The server cannot see quality, so
+  it enforces bytes. `resolveMedia` holds an account without
+  `highQualityMedia` to `MAX_LOW_QUALITY_TOTAL_BYTES` (10 MB) per message and
+  refuses more as `needs-high-quality-media`, a 413. Holders keep the full
+  25 MB. The same `listUserFeatures` read serves this and the `never` check, so
+  a send with media costs one feature query and a text-only send costs none.
+  Low's bitrates are sized so about a minute of video fits under 10 MB, which
+  `media-quality.test.ts` asserts.
+- **Nothing reaches the Worker.** Both encoders are imported with
+  `await import()` behind a `browser` check in `PendingAttachment`, which is
+  dead code in the server build. So neither the ~3.5 MB wasm nor mediabunny
+  counts against the Workers bundle limit, and a page that never sends media
+  never fetches them. The Worker's own work per send is unchanged: count
+  bytes, write blobs.
+- **A browser that cannot show the result says so.** `AttachmentPreview` asks
+  `canDisplayAvif()` / `canPlayVideo()` (`src/lib/media/support.ts`) before
+  downloading. If the answer is no, it shows "This photo can't be shown in this
+  browser. Updating your browser should fix it." instead of fetching something
+  it would only draw as a broken box. The element's own `error` event triggers
+  the same warning for anything the type could not predict, such as a HEIC
+  sent as picked. Board tiles show a plain placeholder instead.
+
 ### Self-destructing media
 
-Every attachment self-destructs. The sender picks how long it lives for each
-message: a "Self-destructs after" menu appears in the composer once a file is
-attached. It offers presets from **1 hour** to **30 days**, defaults to
-**2 weeks** (or **Never** for an account with `permanentMedia`), and goes back
-to the default after every send. The countdown starts
+Every attachment self-destructs. The sender picks how long it lives **for each
+file**: every attachment row in the composer has its own self-destruct menu
+(a bomb and "2 weeks"), so one message can hold a photo that lasts an hour
+beside one that lasts a month. It offers presets from **1 hour** to
+**30 days**, and a newly picked file starts on **2 weeks** (or **Never** for an
+account with `permanentMedia`), so a short choice made for one file never
+sticks to the next. The countdown starts
 **when the message is sent**, not when it is first opened, so how long a file is
 stored is known the moment it arrives. When it runs out, only the media goes. The
 message text stays, and each file becomes a bomb that says "Kaboom! This media
@@ -216,16 +307,20 @@ The constants and the parser are in `src/lib/messaging.ts`: `MEDIA_TTL_MIN_MS`,
 `MEDIA_TTL_MAX_MS`, `MEDIA_TTL_DEFAULT_MS`, `MEDIA_TTL_PRESETS` and
 `parseMediaTtl`.
 
-- **The server works out the expiry.** The client posts a lifetime, `mediaTtlMs`,
-  alongside the files. The server accepts any whole number of milliseconds in
-  range, not only the presets, so the presets can change without a server
-  change. It stamps `expires_at = send time + lifetime` on every attachment of
-  the send. No expiry is computed from the client's clock.
+- **The server works out the expiry.** The client posts one lifetime per file,
+  `mediaTtlMs`, in the same order as the files and their `fileIds`; posting
+  none at all means two weeks for every file, and any other count is a 400.
+  The server accepts any whole number of milliseconds in range, not only the
+  presets, so the presets can change without a server change. It stamps
+  `expires_at = send time + lifetime` on each attachment, and files it under
+  `expiring/` or `permanent/` accordingly. No expiry is computed from the
+  client's clock.
 - **Never-expiring media is a feature.** Posting `never` requires the
   `permanentMedia` feature (docs/features-and-admin.md). The composer shows a
-  "Never" item only to accounts that hold it. `resolveMediaExpiry` in
+  "Never" item only to accounts that hold it. `resolveMedia` in
   `server/messaging.ts` is what enforces it, **before any object is written**,
-  and it refuses the send as `needs-permanent-media`, which is a 403. Permanent
+  and it refuses the whole send as `needs-permanent-media`, a 403, if any one
+  file asks for it. Permanent
   media has `expires_at = null`. A send with no files ignores the lifetime
   entirely: a stale `never` is not a reason to refuse text.
 - **Expiry is checked on every read.** `isAttachmentExpired` compares
@@ -472,7 +567,9 @@ plainly, because the framing of this feature invites the assumption that it does
 - Which side sent each message.
 - The names and colors of the tags used by threads.
 - How many attachments each message has, and **each one's exact byte size** — so
-  approximate media sizes.
+  approximate media sizes. After transcoding that size says more about the
+  quality tier than about the original, since an SD photo is always about the
+  same size whatever camera took it.
 - How long the sender chose for each message's media to last, and whether it was
   sent as permanent. The server has to know this in order to delete the media.
 - When each side opened each thread, and when they last read it.
@@ -649,8 +746,10 @@ The honest boundary:
   because a page cannot currently be loaded on the built worker at all — see the
   known bug at the end of AGENTS.md, which predates this work. Pointing
   Playwright at `wrangler dev` would close both gaps and is not done.
-- **Video** is accepted and capped, but has had no real exercise beyond a unit
-  test of the encryption; only a small PNG is covered end to end.
+- **Video is transcoded in unit tests, not end to end.** The browser project
+  re-encodes a generated clip through the real VP9 path, but the Playwright
+  suite only sends photos. A long phone video on a real phone, where the
+  encode takes the longest, has been checked by hand at most.
 - **Orphaned permanent media stays until disconnect.** The lifecycle rule only
   covers `expiring/`, so an orphan under `permanent/` (a failed send by an
   account with `permanentMedia`) is removed only when the partnership is

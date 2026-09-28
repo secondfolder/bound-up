@@ -23,6 +23,14 @@ class MediaExpiredError extends Error {}
 
 vi.mock('$lib/messaging/client', () => ({ fetchAttachment, MediaExpiredError }));
 
+/** What this browser can show, as the tests want it. Real Chromium says yes to both. */
+const support = vi.hoisted(() => ({ avif: true, video: true }));
+
+vi.mock('$lib/media/support', () => ({
+	canDisplayAvif: () => Promise.resolve(support.avif),
+	canPlayVideo: () => support.video
+}));
+
 const { default: AttachmentPreview } = await import('./AttachmentPreview.svelte');
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -43,6 +51,8 @@ const placeholderName = 'This media has self-destructed';
 
 beforeEach(() => {
 	fetchAttachment.mockReset();
+	support.avif = true;
+	support.video = true;
 });
 
 afterEach(() => {
@@ -154,5 +164,82 @@ describe('AttachmentPreview', () => {
 			expect(queryByRole('img', { name: placeholderName })).not.toBeNull();
 		});
 		expect(queryByRole('img', { name: 'sunset.png' })).toBeNull();
+	});
+});
+
+describe('AttachmentPreview video', () => {
+	// With "metadata", Firefox suspends loading and some videos then sit at 0:00
+	// when Play is pressed — see the comment at the element. The test browser is
+	// Chromium, which does not have the bug, so what can be pinned here is the
+	// attribute.
+	it('asks the browser to load the whole video, which is already in memory', async () => {
+		fetchAttachment.mockResolvedValue({ url: 'blob:clip', blob: new Blob() });
+		const { container } = render(AttachmentPreview, {
+			props: {
+				info: { ...info, kind: 'video', mimeType: 'video/mp4', fileName: 'clip.mp4' },
+				partnershipId: 'p1',
+				view: view()
+			}
+		});
+		const video = await waitFor(() => defined(container.querySelector('video'), 'the video'));
+		expect(video.getAttribute('preload')).toBe('auto');
+	});
+});
+
+describe('AttachmentPreview in a browser that cannot show the file', () => {
+	const avif: MessageAttachmentInfo = { ...info, mimeType: 'image/avif', fileName: 'sunset.avif' };
+	const webm: MessageAttachmentInfo = {
+		...info,
+		kind: 'video',
+		mimeType: 'video/webm; codecs="vp09.00.10.08,opus"',
+		fileName: 'clip.webm'
+	};
+
+	it('says to update the browser for an AVIF it cannot show, without downloading it', async () => {
+		support.avif = false;
+		const { findByText } = render(AttachmentPreview, {
+			props: { info: avif, partnershipId: 'p1', view: view() }
+		});
+
+		expect(await findByText(/This photo can’t be shown in this browser/)).toBeInTheDocument();
+		expect(await findByText(/Updating your browser should fix it/)).toBeInTheDocument();
+		expect(fetchAttachment).not.toHaveBeenCalled();
+	});
+
+	it('says the same for a video it cannot play', async () => {
+		support.video = false;
+		const { findByText } = render(AttachmentPreview, {
+			props: { info: webm, partnershipId: 'p1', view: view() }
+		});
+
+		expect(await findByText(/This video can’t be played in this browser/)).toBeInTheDocument();
+		expect(fetchAttachment).not.toHaveBeenCalled();
+	});
+
+	it('shows an AVIF normally where the browser can', async () => {
+		fetchAttachment.mockResolvedValue({ url: 'blob:avif', blob: new Blob() });
+		const { container } = render(AttachmentPreview, {
+			props: { info: avif, partnershipId: 'p1', view: view() }
+		});
+		await waitFor(() => expect(container.querySelector('img')).not.toBeNull());
+		expect(fetchAttachment).toHaveBeenCalledTimes(1);
+	});
+
+	// A HEIC sent as picked by an iPhone, say, which the type could not warn
+	// about in advance.
+	it('turns an image that fails to decode into the same warning', async () => {
+		fetchAttachment.mockResolvedValue({ url: 'blob:heic', blob: new Blob() });
+		const { container, findByText } = render(AttachmentPreview, {
+			props: {
+				info: { ...info, mimeType: 'image/heic', fileName: 'IMG_1.HEIC' },
+				partnershipId: 'p1',
+				view: view()
+			}
+		});
+		const image = await waitFor(() => defined(container.querySelector('img'), 'the image'));
+		image.dispatchEvent(new Event('error'));
+
+		expect(await findByText(/This photo can’t be shown in this browser/)).toBeInTheDocument();
+		expect(container.querySelector('img')).toBeNull();
 	});
 });

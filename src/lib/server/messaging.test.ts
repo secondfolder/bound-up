@@ -3,9 +3,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
 	MAX_ATTACHMENT_TOTAL_BYTES,
 	MAX_CIPHERTEXT_BYTES,
+	MAX_LOW_QUALITY_TOTAL_BYTES,
 	MEDIA_TTL_DEFAULT_MS,
 	MEDIA_TTL_MAX_MS,
 	MEDIA_TTL_MIN_MS,
+	MEDIA_TTL_NEVER,
+	type MediaTtl,
 	RESTORE_PAGE_SIZE,
 	UNSEEN_MEDIA_MESSAGE_LIMIT
 } from '../messaging';
@@ -707,8 +710,11 @@ describe('self-destructing media', () => {
 	const Hour = 60 * 60 * 1000;
 
 	async function sendWith(
-		mediaTtl: Parameters<typeof startThread>[2]['mediaTtl'],
-		files = [outgoingAttachment(new Uint8Array([1])), outgoingAttachment(new Uint8Array([2]))]
+		mediaTtl: MediaTtl | undefined,
+		files = [
+			outgoingAttachment(new Uint8Array([1]), mediaTtl),
+			outgoingAttachment(new Uint8Array([2]), mediaTtl)
+		]
 	) {
 		return await startThread(
 			harness.db,
@@ -718,8 +724,7 @@ describe('self-destructing media', () => {
 				senderId: ada.id,
 				icon: 'envelope',
 				ciphertext: 'eA',
-				attachments: files,
-				mediaTtl
+				attachments: files
 			},
 			sentAt
 		);
@@ -750,14 +755,45 @@ describe('self-destructing media', () => {
 				threadId: thread.threadId,
 				senderId: ada.id,
 				ciphertext: 'eA',
-				attachments: [outgoingAttachment(new Uint8Array([3]))],
-				mediaTtl: MEDIA_TTL_MIN_MS
+				attachments: [outgoingAttachment(new Uint8Array([3]), MEDIA_TTL_MIN_MS)]
 			},
 			sentAt
 		);
 		const rows = await sentRows(result);
 		expect(rows[0]?.expiresAt).toEqual(at(sentAt.getTime() + Hour));
 		expect(rows[0]?.purgedAt).toBeNull();
+	});
+
+	// The composer has a self-destruct menu on every attachment.
+	it('stamps each attachment with its own lifetime, and files each under its own prefix', async () => {
+		await grantFeature(harness.db, {
+			userId: ada.id,
+			feature: 'permanentMedia',
+			grantedByUserId: jun.id
+		});
+		const rows = await sentRows(
+			await sendWith(undefined, [
+				outgoingAttachment(new Uint8Array([1]), MEDIA_TTL_MIN_MS),
+				outgoingAttachment(new Uint8Array([2]), MEDIA_TTL_NEVER),
+				outgoingAttachment(new Uint8Array([3]), MEDIA_TTL_MAX_MS)
+			])
+		);
+		expect(rows.map((row) => row.expiresAt?.getTime() ?? null).sort()).toEqual(
+			[sentAt.getTime() + MEDIA_TTL_MIN_MS, sentAt.getTime() + MEDIA_TTL_MAX_MS, null].sort()
+		);
+		for (const row of rows) {
+			expect(row.storageKey.startsWith(row.expiresAt ? 'expiring/' : 'permanent/')).toBe(true);
+		}
+	});
+
+	it('refuses the whole send when any one file asks for never without the feature', async () => {
+		await expect(
+			sendWith(undefined, [
+				outgoingAttachment(new Uint8Array([1]), MEDIA_TTL_MIN_MS),
+				outgoingAttachment(new Uint8Array([2]), MEDIA_TTL_NEVER)
+			])
+		).resolves.toEqual({ ok: false, reason: 'needs-permanent-media' });
+		expect(store.objects.size).toBe(0);
 	});
 
 	it('refuses a lifetime outside an hour to thirty days, writing nothing', async () => {
@@ -881,6 +917,85 @@ describe('self-destructing media', () => {
 	});
 });
 
+describe('the higher quality uploads byte budget', () => {
+	const Megabyte = 1024 * 1024;
+
+	/** Two files, so the budget is shown to be on the total rather than per file. */
+	function filesOf(totalBytes: number) {
+		const half = Math.ceil(totalBytes / 2);
+		return [
+			outgoingAttachment(new Uint8Array(half)),
+			outgoingAttachment(new Uint8Array(totalBytes - half))
+		];
+	}
+
+	async function startWith(attachments: ReturnType<typeof filesOf>) {
+		return await startThread(harness.db, store, {
+			partnershipId,
+			senderId: ada.id,
+			icon: 'envelope',
+			ciphertext: 'eA',
+			attachments
+		});
+	}
+
+	it('refuses more than the low-quality budget without the feature, writing nothing', async () => {
+		await expect(startWith(filesOf(MAX_LOW_QUALITY_TOTAL_BYTES + 1))).resolves.toEqual({
+			ok: false,
+			reason: 'needs-high-quality-media'
+		});
+		expect(store.objects.size).toBe(0);
+		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+	});
+
+	it('refuses it on a reply too', async () => {
+		const thread = await createTestThread(harness.db, partnershipId, jun);
+		await expect(
+			sendMessage(harness.db, store, {
+				partnershipId,
+				threadId: thread.threadId,
+				senderId: ada.id,
+				ciphertext: 'eA',
+				attachments: filesOf(MAX_LOW_QUALITY_TOTAL_BYTES + 1)
+			})
+		).resolves.toEqual({ ok: false, reason: 'needs-high-quality-media' });
+		expect(store.objects.size).toBe(0);
+	});
+
+	it('accepts exactly the low-quality budget without the feature', async () => {
+		await expect(startWith(filesOf(MAX_LOW_QUALITY_TOTAL_BYTES))).resolves.toMatchObject({
+			ok: true
+		});
+	});
+
+	it('accepts up to the full budget for an account holding the feature', async () => {
+		await grantFeature(harness.db, {
+			userId: ada.id,
+			feature: 'highQualityMedia',
+			grantedByUserId: jun.id
+		});
+		await expect(startWith(filesOf(20 * Megabyte))).resolves.toMatchObject({ ok: true });
+		// The account-wide cap still holds over the feature.
+		await expect(startWith(filesOf(MAX_ATTACHMENT_TOTAL_BYTES + 1))).resolves.toEqual({
+			ok: false,
+			reason: 'too-many-bytes'
+		});
+	});
+
+	// Belongs to the partner who holds it, like every feature.
+	it('does not follow from the partner holding the feature', async () => {
+		await grantFeature(harness.db, {
+			userId: jun.id,
+			feature: 'highQualityMedia',
+			grantedByUserId: jun.id
+		});
+		await expect(startWith(filesOf(MAX_LOW_QUALITY_TOTAL_BYTES + 1))).resolves.toEqual({
+			ok: false,
+			reason: 'needs-high-quality-media'
+		});
+	});
+});
+
 describe('listBoard: unseen self-destructing media', () => {
 	const Hour = 60 * 60 * 1000;
 	const t0 = at(1_000_000_000_000);
@@ -894,13 +1009,13 @@ describe('listBoard: unseen self-destructing media', () => {
 		when: Date
 	) {
 		const attachments = Array.from({ length: files }, () =>
-			outgoingAttachment(new Uint8Array([1]))
+			outgoingAttachment(new Uint8Array([1]), mediaTtl)
 		);
 		const result = threadId
 			? await sendMessage(
 					harness.db,
 					store,
-					{ partnershipId, threadId, senderId: sender.id, ciphertext, attachments, mediaTtl },
+					{ partnershipId, threadId, senderId: sender.id, ciphertext, attachments },
 					when
 				)
 			: await startThread(
@@ -911,8 +1026,7 @@ describe('listBoard: unseen self-destructing media', () => {
 						senderId: sender.id,
 						icon: 'envelope',
 						ciphertext,
-						attachments,
-						mediaTtl
+						attachments
 					},
 					when
 				);
@@ -1020,8 +1134,7 @@ describe('purgePartnershipMedia', () => {
 				senderId: ada.id,
 				icon: 'envelope',
 				ciphertext: 'eA',
-				attachments: [outgoingAttachment(new Uint8Array([1]))],
-				mediaTtl
+				attachments: [outgoingAttachment(new Uint8Array([1]), mediaTtl)]
 			});
 		}
 

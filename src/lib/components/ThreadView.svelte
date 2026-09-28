@@ -38,7 +38,9 @@
 		 */
 		canSend = true,
 		/** Display only: offers "Never" in the composer. The server enforces it. */
-		permanentMedia = false
+		permanentMedia = false,
+		/** Display only: offers a choice of quality. The server enforces a byte budget. */
+		highQualityMedia = false
 	}: {
 		thread: ThreadView;
 		partnershipId: string;
@@ -46,6 +48,7 @@
 		recipients: PartnerRecipientsView;
 		canSend?: boolean;
 		permanentMedia?: boolean;
+		highQualityMedia?: boolean;
 	} = $props();
 
 	const keyring = $derived(currentKeyring());
@@ -284,6 +287,7 @@
 					<MessageComposer
 						{send}
 						{permanentMedia}
+						{highQualityMedia}
 						placeholder="Reply…"
 						initialText={draft.initial?.text ?? ''}
 						onTextChange={(text) => draft.save({ text, tagIds: [] })}

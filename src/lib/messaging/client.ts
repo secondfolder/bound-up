@@ -19,9 +19,9 @@ import {
 	type ReactionPayload
 } from '$lib/crypto/messages';
 import { fetchEmbedMetadata } from '$lib/embeds';
+import { attachmentBudget } from '$lib/media-quality';
 import {
 	DEFAULT_THREAD_ICON,
-	MAX_ATTACHMENT_TOTAL_BYTES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
 	MAX_BODY_CHARS,
 	MAX_VIDEO_BYTES,
@@ -34,14 +34,25 @@ import {
 	parseStoredRichText
 } from '$lib/richtext';
 
+/** One file as it is about to be encrypted: already compressed, if it was going to be. */
+export type ComposedAttachment = {
+	file: File;
+	/**
+	 * How long this file lives. `never` needs the `permanentMedia` feature,
+	 * which the server checks.
+	 */
+	mediaTtl: MediaTtl;
+};
+
 export type ComposedMessage = {
 	text: string;
-	files: File[];
+	attachments: ComposedAttachment[];
 	/**
-	 * How long the files live. Omitted means the server's default of two weeks;
-	 * `never` needs the `permanentMedia` feature, which the server checks.
+	 * Whether the sender's account holds `highQualityMedia`, which decides how
+	 * many bytes the message may carry. Only that: the server applies its own
+	 * byte budget regardless.
 	 */
-	mediaTtl?: MediaTtl;
+	highQualityMedia?: boolean;
 };
 
 /** A refusal the composer can render, worked out before anything is sent. */
@@ -58,6 +69,21 @@ export type ComposeProblem = {
  * see the note in `src/lib/schemas/messageForm.ts`.
  */
 export function checkComposed(message: ComposedMessage): ComposeProblem | null {
+	return (
+		checkText(message.text, message.attachments.length) ??
+		checkSizes(
+			message.attachments.map((attachment) => attachment.file),
+			message.highQualityMedia ?? false
+		)
+	);
+}
+
+/**
+ * The checks that need only the text and how many files there are — which the
+ * composer can run while its files are still compressing and their sizes are
+ * not known yet.
+ */
+export function checkText(text: string, attachmentCount: number): ComposeProblem | null {
 	/**
 	 * Emptiness and length are both measured on the *visible text*, never on the
 	 * stored string. The stored string is a Lexical document — JSON several
@@ -65,8 +91,8 @@ export function checkComposed(message: ComposedMessage): ComposeProblem | null {
 	 * empty editor full and cut people off after a few hundred typed
 	 * characters.
 	 */
-	const document = parseStoredRichText(message.text);
-	if (isRichTextDocumentEmpty(document) && message.files.length === 0) {
+	const document = parseStoredRichText(text);
+	if (isRichTextDocumentEmpty(document) && attachmentCount === 0) {
 		return { kind: 'empty', message: 'Write something first' };
 	}
 	if (documentToPlainText(document).length > MAX_BODY_CHARS) {
@@ -78,13 +104,18 @@ export function checkComposed(message: ComposedMessage): ComposeProblem | null {
 			message: `That message is over the ${MAX_BODY_CHARS.toLocaleString()} character limit`
 		};
 	}
-	if (message.files.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+	if (attachmentCount > MAX_ATTACHMENTS_PER_MESSAGE) {
 		return {
 			kind: 'too-many',
 			message: `At most ${MAX_ATTACHMENTS_PER_MESSAGE} files in one message`
 		};
 	}
-	const oversizedVideo = message.files.find(
+	return null;
+}
+
+/** The byte limits, on the files exactly as they are about to be encrypted. */
+export function checkSizes(files: File[], highQualityMedia: boolean): ComposeProblem | null {
+	const oversizedVideo = files.find(
 		(file) => file.type.startsWith('video/') && file.size > MAX_VIDEO_BYTES
 	);
 	if (oversizedVideo) {
@@ -93,11 +124,12 @@ export function checkComposed(message: ComposedMessage): ComposeProblem | null {
 			message: `Videos have to be under ${Math.round(MAX_VIDEO_BYTES / 1024 / 1024)} MB — they are downloaded in full before they play`
 		};
 	}
-	const total = message.files.reduce((sum, file) => sum + file.size, 0);
-	if (total > MAX_ATTACHMENT_TOTAL_BYTES) {
+	const budget = attachmentBudget(highQualityMedia);
+	const total = files.reduce((sum, file) => sum + file.size, 0);
+	if (total > budget) {
 		return {
 			kind: 'too-big',
-			message: `Those files add up to more than ${Math.round(MAX_ATTACHMENT_TOTAL_BYTES / 1024 / 1024)} MB`
+			message: `Those files add up to more than ${Math.round(budget / 1024 / 1024)} MB`
 		};
 	}
 	return null;
@@ -127,7 +159,7 @@ async function buildBody(message: ComposedMessage, recipients: string[]): Promis
 	const { text } = message;
 	const metadataPromise = resolveMessageMetadata(text);
 
-	for (const file of message.files) {
+	for (const { file, mediaTtl } of message.attachments) {
 		const sealed = await encryptAttachment(file);
 		const id = crypto.randomUUID();
 		attachments.push({
@@ -141,6 +173,7 @@ async function buildBody(message: ComposedMessage, recipients: string[]): Promis
 		body.append('files', new Blob([await new Response(sealed.body).arrayBuffer()]), file.name);
 		// Appended in lockstep with the file above; order is what pairs them.
 		body.append('fileIds', id);
+		body.append('mediaTtlMs', String(mediaTtl));
 	}
 
 	const payload: MessagePayload = {
@@ -148,9 +181,6 @@ async function buildBody(message: ComposedMessage, recipients: string[]): Promis
 		text,
 		attachments
 	};
-	if (message.files.length > 0 && message.mediaTtl !== undefined) {
-		body.set('mediaTtlMs', String(message.mediaTtl));
-	}
 	body.set('ciphertext', await encryptPayload(payload, recipients));
 	const metadata = await metadataPromise.catch(() => null);
 	if (metadata) {
@@ -227,8 +257,13 @@ export async function sendMessage(
 }
 
 async function describeFailure(response: Response): Promise<string> {
+	// SvelteKit's `error()` bodies are JSON with a `message`; the send
+	// endpoints put the data layer's refusal reason there.
+	const body = (await response.json().catch(() => null)) as { message?: string } | null;
 	if (response.status === 413) {
-		return 'That is too large to send';
+		return body?.message === 'needs-high-quality-media'
+			? `Those files add up to more than ${Math.round(attachmentBudget(false) / 1024 / 1024)} MB`
+			: 'That is too large to send';
 	}
 	if (response.status === 404) {
 		return 'That conversation is no longer there';
@@ -239,8 +274,6 @@ async function describeFailure(response: Response): Promise<string> {
 	if (response.status === 403) {
 		return 'Your account cannot send media that never self-destructs';
 	}
-	// SvelteKit's `error()` bodies are JSON with a `message`.
-	const body = (await response.json().catch(() => null)) as { message?: string } | null;
 	return body?.message ?? 'Could not send that';
 }
 

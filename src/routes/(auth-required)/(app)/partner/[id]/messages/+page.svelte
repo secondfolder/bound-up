@@ -170,6 +170,7 @@
 					tags={data.tags}
 					{send}
 					permanentMedia={hasFeature(data.features, 'permanentMedia')}
+					highQualityMedia={hasFeature(data.features, 'highQualityMedia')}
 					close={() => { composing = false; }}
 				/>
 			{/if}

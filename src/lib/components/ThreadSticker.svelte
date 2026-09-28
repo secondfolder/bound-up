@@ -7,6 +7,7 @@
 		MessagePayload
 	} from '$lib/crypto/messages';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
+	import { canDisplayAvif, canPlayVideo } from '$lib/media/support';
 	import { describeUnseenMedia, formatTimeLeft } from '$lib/messaging';
 	import {
 		fetchAttachment,
@@ -23,10 +24,23 @@
 		kind: MessageAttachmentInfo['kind'];
 		/** Null once it has self-destructed: the tile shows the bomb instead. */
 		url: string | null;
+		/**
+		 * False when this browser cannot show it (see `AttachmentPreview`), found
+		 * out before the download where the type allows and from the element's
+		 * `error` event otherwise. The tile is a plain placeholder rather than a
+		 * broken image; the thread itself says to update the browser.
+		 */
+		viewable: boolean;
 	};
 
 	type FanCard =
-		| { id: string; kind: 'media'; mediaKind: MessageAttachmentInfo['kind']; url: string | null }
+		| {
+				id: string;
+				kind: 'media';
+				mediaKind: MessageAttachmentInfo['kind'];
+				url: string | null;
+				viewable: boolean;
+		  }
 		| { id: 'text'; kind: 'text'; text: string };
 	const MAX_PREVIEW_ITEMS = 4;
 
@@ -202,12 +216,19 @@
 				// preview is only the first message's ciphertext — so a
 				// self-destructed file is learned from the download's 410. Caught
 				// per file so one expired file does not blank its siblings.
+				const viewable =
+					info.kind === 'video'
+						? canPlayVideo(info.mimeType)
+						: info.mimeType !== 'image/avif' || (await canDisplayAvif());
+				if (!viewable) {
+					return { id: info.id, kind: info.kind, url: null, viewable };
+				}
 				try {
 					const result = await fetchAttachment(partnershipId, info);
-					return { id: info.id, kind: info.kind, url: result.url };
+					return { id: info.id, kind: info.kind, url: result.url, viewable };
 				} catch (error) {
 					if (error instanceof MediaExpiredError) {
-						return { id: info.id, kind: info.kind, url: null };
+						return { id: info.id, kind: info.kind, url: null, viewable };
 					}
 					throw error;
 				}
@@ -350,10 +371,24 @@
 	const showFan = $derived(previewItemCount > 1);
 	const fanCards = $derived([
 		...mediaPreviews.map(
-			(media) => ({ id: media.id, kind: 'media', mediaKind: media.kind, url: media.url }) as const
+			(media) =>
+				({
+					id: media.id,
+					kind: 'media',
+					mediaKind: media.kind,
+					url: media.url,
+					viewable: media.viewable
+				}) as const
 		),
 		...(textPreview ? ([{ id: 'text', kind: 'text', text: textPreview }] as const) : [])
 	] satisfies FanCard[]);
+
+	/** A tile whose element failed to draw what it was given. */
+	function markUnviewable(id: string) {
+		mediaPreviews = mediaPreviews.map((media) =>
+			media.id === id ? { ...media, viewable: false } : media
+		);
+	}
 </script>
 
 <li>
@@ -404,13 +439,8 @@
 									class="fan-card"
 									style={`--fan-offset: ${fanOffset(index, previewItemCount)}; --fan-tilt: ${fanTilt(index, previewItemCount)}deg; --fan-z: ${fanZ(index, previewItemCount)};`}
 								>
-									{#if card.kind === 'media' && card.url === null}
-										<SelfDestructedMedia compact />
-									{:else if card.kind === 'media' && card.mediaKind === 'video'}
-										<video class="thumb" src={card.url} muted playsinline preload="metadata"
-										></video>
-									{:else if card.kind === 'media'}
-										<img class="thumb" src={card.url} alt="" />
+									{#if card.kind === 'media'}
+										{@render thumb(card.id, card.mediaKind, card.url, card.viewable)}
 									{:else}
 										<p class="text">{card.text}</p>
 									{/if}
@@ -420,13 +450,13 @@
 								<span class="pending" role="img" aria-label="Decrypting">···</span>
 							{/if}
 						</div>
-					{:else if mediaPreviews[0] && mediaPreviews[0].url === null}
-						<SelfDestructedMedia compact />
-					{:else if mediaPreviews[0]?.kind === 'video'}
-						<video class="thumb" src={mediaPreviews[0].url} muted playsinline preload="metadata"
-						></video>
 					{:else if mediaPreviews[0]}
-						<img class="thumb" src={mediaPreviews[0].url} alt="" />
+						{@render thumb(
+							mediaPreviews[0].id,
+							mediaPreviews[0].kind,
+							mediaPreviews[0].url,
+							mediaPreviews[0].viewable
+						)}
 					{:else}
 						<div class="single-card text-bubble"><p class="text">{previewText(preview)}</p></div>
 					{/if}
@@ -461,6 +491,33 @@
 		</div>
 	</a>
 </li>
+
+{#snippet thumb(
+	id: string,
+	kind: MessageAttachmentInfo['kind'],
+	url: string | null,
+	viewable: boolean
+)}
+	{#if !viewable}
+		<span class="thumb unviewable-media" role="img" aria-label="Media this browser can’t show">
+			<wa-icon name={kind === 'video' ? 'film' : 'image'} variant="solid"></wa-icon>
+		</span>
+	{:else if url === null}
+		<SelfDestructedMedia compact />
+	{:else if kind === 'video'}
+		<video
+			class="thumb"
+			src={url}
+			muted
+			playsinline
+			preload="metadata"
+			onerror={() => markUnviewable(id)}
+		></video>
+	{:else}
+		<!-- biome-ignore lint/a11y/noNoninteractiveElementInteractions: `error` is the image failing to decode, not a user interaction. -->
+		<img class="thumb" src={url} alt="" onerror={() => markUnviewable(id)} />
+	{/if}
+{/snippet}
 
 <style>
 	li {
@@ -640,6 +697,12 @@
 			inline-size: 100%;
 			block-size: 100%;
 			object-fit: cover;
+		}
+
+		.unviewable-media {
+			display: grid;
+			place-items: center;
+			color: var(--wa-color-text-quiet);
 		}
 
 		.pending,

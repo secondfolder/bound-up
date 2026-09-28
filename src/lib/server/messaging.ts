@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, ne, or, sql } from 'drizzle-orm';
+import { attachmentBudget } from '../media-quality';
 import {
 	BOARD_LIMIT,
 	isThreadIcon,
@@ -6,7 +7,6 @@ import {
 	MAX_ATTACHMENTS_PER_MESSAGE,
 	MAX_CIPHERTEXT_BYTES,
 	MAX_REACTION_CIPHERTEXT_BYTES,
-	MEDIA_TTL_DEFAULT_MS,
 	MEDIA_TTL_MAX_MS,
 	MEDIA_TTL_MIN_MS,
 	MEDIA_TTL_NEVER,
@@ -40,7 +40,7 @@ import {
 	partnerships,
 	threadReads
 } from './db/schema';
-import { userHasFeature } from './features';
+import { listUserFeatures } from './features';
 import { attachmentKey, MEDIA_LIFETIMES, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
 
@@ -676,6 +676,12 @@ export type OutgoingAttachment = {
 	/** Already-encrypted bytes. The server never sees a filename or a mime type. */
 	body: ReadableStream<Uint8Array>;
 	byteSize: number;
+	/**
+	 * How long this file lives, chosen by the sender per file: the composer has
+	 * a self-destruct menu on every attachment, so one message can hold a photo
+	 * that lasts an hour beside one that lasts a month. See `resolveMedia`.
+	 */
+	mediaTtl: MediaTtl;
 };
 
 export type SendFailure =
@@ -688,7 +694,8 @@ export type SendFailure =
 	| 'too-many-bytes'
 	| 'duplicate-attachment'
 	| 'bad-media-ttl'
-	| 'needs-permanent-media';
+	| 'needs-permanent-media'
+	| 'needs-high-quality-media';
 
 export type SendResult =
 	| { ok: true; threadId: string; messageId: string }
@@ -716,37 +723,54 @@ function checkPayload(ciphertext: string, attachments: OutgoingAttachment[]): Se
 }
 
 /**
- * Turns the sender's chosen lifetime into the expiry every attachment of the
- * send is stored with, or a refusal.
+ * The checks on a send's media that depend on the sender's features — each
+ * file's lifetime and the message's size — resolved to the expiry each
+ * attachment is stored with, in the same order, or a refusal.
  *
  * Checked here rather than only in the endpoint, for the reason the icon is:
- * a rule is only a rule if every writer applies it. Never-expiring media is
- * the `permanentMedia` feature, and the check runs before a single object is
- * written, so a refused send leaves nothing behind in the store.
+ * a rule is only a rule if every writer applies it. Both run before a single
+ * object is written, so a refused send leaves nothing behind in the store.
  *
- * With no attachments there is nothing to expire, so the lifetime is not
- * looked at at all — a stale `never` from a composer that had its files
- * removed is not a reason to refuse the text.
+ * One feature read serves both, rather than a `userHasFeature` apiece: D1
+ * bills per query, and this is on every send with media. A send with no
+ * attachments has nothing to expire or measure, and costs no read at all.
  */
-async function resolveMediaExpiry(
+async function resolveMedia(
 	db: Db,
 	senderId: string,
 	attachments: OutgoingAttachment[],
-	mediaTtl: MediaTtl,
 	now: Date
-): Promise<{ ok: true; expiresAt: Date | null } | { ok: false; reason: SendFailure }> {
+): Promise<{ ok: true; expiries: (Date | null)[] } | { ok: false; reason: SendFailure }> {
 	if (attachments.length === 0) {
-		return { ok: true, expiresAt: null };
+		return { ok: true, expiries: [] };
 	}
-	if (mediaTtl === MEDIA_TTL_NEVER) {
-		return (await userHasFeature(db, senderId, 'permanentMedia'))
-			? { ok: true, expiresAt: null }
-			: { ok: false, reason: 'needs-permanent-media' };
+	const features = await listUserFeatures(db, senderId);
+
+	/**
+	 * Quality itself is invisible here — the server holds only ciphertext — so
+	 * bytes are the part of `highQualityMedia` that can be enforced. The
+	 * account-wide cap in `checkPayload` still applies to everyone.
+	 */
+	const total = attachments.reduce((sum, attachment) => sum + attachment.byteSize, 0);
+	if (total > attachmentBudget(features.includes('highQualityMedia'))) {
+		return { ok: false, reason: 'needs-high-quality-media' };
 	}
-	if (!Number.isInteger(mediaTtl) || mediaTtl < MEDIA_TTL_MIN_MS || mediaTtl > MEDIA_TTL_MAX_MS) {
-		return { ok: false, reason: 'bad-media-ttl' };
+
+	const expiries: (Date | null)[] = [];
+	for (const { mediaTtl } of attachments) {
+		if (mediaTtl === MEDIA_TTL_NEVER) {
+			if (!features.includes('permanentMedia')) {
+				return { ok: false, reason: 'needs-permanent-media' };
+			}
+			expiries.push(null);
+			continue;
+		}
+		if (!Number.isInteger(mediaTtl) || mediaTtl < MEDIA_TTL_MIN_MS || mediaTtl > MEDIA_TTL_MAX_MS) {
+			return { ok: false, reason: 'bad-media-ttl' };
+		}
+		expiries.push(new Date(now.getTime() + mediaTtl));
 	}
-	return { ok: true, expiresAt: new Date(now.getTime() + mediaTtl) };
+	return { ok: true, expiries };
 }
 
 type AttachmentRow = {
@@ -775,10 +799,12 @@ async function writeAttachments(
 	partnershipId: string,
 	messageId: string,
 	attachments: OutgoingAttachment[],
-	expiresAt: Date | null
+	/** One per attachment, in the same order: `resolveMedia`'s answer. */
+	expiries: (Date | null)[]
 ): Promise<AttachmentRow[]> {
 	const rows: AttachmentRow[] = [];
-	for (const attachment of attachments) {
+	for (const [index, attachment] of attachments.entries()) {
+		const expiresAt = expiries[index] ?? null;
 		const storageKey = attachmentKey(
 			expiresAt === null ? 'permanent' : 'expiring',
 			partnershipId,
@@ -1024,8 +1050,6 @@ export async function startThread(
 		ciphertext: string;
 		metadataCiphertext?: string;
 		attachments: OutgoingAttachment[];
-		/** Defaults to `MEDIA_TTL_DEFAULT_MS`. See `resolveMediaExpiry`. */
-		mediaTtl?: MediaTtl;
 		tagIds?: string[];
 	},
 	now: Date = new Date()
@@ -1050,13 +1074,7 @@ export async function startThread(
 	if (!tags) {
 		return { ok: false, reason: 'no-such-tag' };
 	}
-	const expiry = await resolveMediaExpiry(
-		db,
-		input.senderId,
-		input.attachments,
-		input.mediaTtl ?? MEDIA_TTL_DEFAULT_MS,
-		now
-	);
+	const expiry = await resolveMedia(db, input.senderId, input.attachments, now);
 	if (!expiry.ok) {
 		return expiry;
 	}
@@ -1068,7 +1086,7 @@ export async function startThread(
 		input.partnershipId,
 		messageId,
 		input.attachments,
-		expiry.expiresAt
+		expiry.expiries
 	);
 
 	await db.batch([
@@ -1108,8 +1126,6 @@ export async function sendMessage(
 		ciphertext: string;
 		metadataCiphertext?: string;
 		attachments: OutgoingAttachment[];
-		/** Defaults to `MEDIA_TTL_DEFAULT_MS`. See `resolveMediaExpiry`. */
-		mediaTtl?: MediaTtl;
 	},
 	now: Date = new Date()
 ): Promise<SendResult> {
@@ -1128,13 +1144,7 @@ export async function sendMessage(
 	if (problem) {
 		return { ok: false, reason: problem };
 	}
-	const expiry = await resolveMediaExpiry(
-		db,
-		input.senderId,
-		input.attachments,
-		input.mediaTtl ?? MEDIA_TTL_DEFAULT_MS,
-		now
-	);
+	const expiry = await resolveMedia(db, input.senderId, input.attachments, now);
 	if (!expiry.ok) {
 		return expiry;
 	}
@@ -1145,7 +1155,7 @@ export async function sendMessage(
 		input.partnershipId,
 		messageId,
 		input.attachments,
-		expiry.expiresAt
+		expiry.expiries
 	);
 
 	await db.batch([
