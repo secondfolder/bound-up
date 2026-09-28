@@ -42,6 +42,11 @@
 	   carries the contrast over busy detail. Text on it is --wa-color-text-normal. */
 	--media-badge-fill: color-mix(in oklab, oklch(12% 0.04 36) 55%, transparent);
 
+	/* The flat colour the wash settles on from 800px down, which is behind
+	   most of any long page. Something drawn in a solid colour that has to
+	   read as translucent mixes toward this (the roadmap's dimmed lines). */
+	--page-wash-floor: oklch(from var(--rust-dark) calc(l * 0.6) c h);
+
 	/* The wash every page sits on: rust left to right, darkening from 300px
 	   down to 800px. The stops are the landing page's, which is where the
 	   halftone band below starts and finishes fading, so the two line up. */
@@ -50,7 +55,7 @@
 			to bottom,
 			transparent,
 			oklch(from var(--rust-light) calc(l * 0.7) c h) 300px,
-			oklch(from var(--rust-dark) calc(l * 0.6) c h) 800px
+			var(--page-wash-floor) 800px
 		),
 		linear-gradient(to right, var(--rust-light) 10%, var(--rust-dark) 100%);
 }

@@ -1,0 +1,974 @@
+{
+	"branches": [
+		{
+			"id": "sessions",
+			"title": "Sessions",
+			"summary": "Things to do right now, alone or with a partner.",
+			"icon": "hourglass-half",
+			"items": [
+				{
+					"id": "edging",
+					"title": "Edging",
+					"summary": "Edging sessions, from freestyle with a timer to fully guided.",
+					"status": "in-progress",
+					"icon": "fire",
+					"featured": true,
+					"children": [
+						{
+							"id": "freeplay",
+							"title": "Freeplay",
+							"summary": "Edge your own way with a timer, logging edges and other events as they happen.",
+							"status": "planned"
+						},
+						{
+							"id": "guided-sessions",
+							"title": "Guided sessions",
+							"summary": "Step-by-step guides that reveal what to do next as you go.",
+							"status": "in-progress",
+							"notes": [
+								"Tasks that count edges, ruins and orgasms",
+								"Guides a partner writes and shares with you"
+							]
+						},
+						{
+							"id": "generated-guides",
+							"title": "Auto-generated guides",
+							"summary": "A fresh guide built for you each time, from what your notebook says you like.",
+							"status": "planned",
+							"dependsOn": ["kink-list", "toy-collection", "stats-deck"],
+							"notes": [
+								"Uses your kink list, the toys you own and your stats deck",
+								"Override any of it for one session, like only (or no) anal tonight",
+								"Decide up front whether cumming is allowed"
+							]
+						},
+						{
+							"id": "remix-guides",
+							"title": "Remix guides",
+							"summary": "Duplicate any guide and make it your own.",
+							"status": "planned"
+						},
+						{
+							"id": "guide-scripting",
+							"title": "Advanced scripting",
+							"summary": "Branching, randomised guides for people who want to write something elaborate.",
+							"status": "exploring"
+						},
+						{
+							"id": "timed-edging",
+							"title": "Timed edging",
+							"summary": "Hold the edge against a progress bar until time's up.",
+							"status": "planned"
+						},
+						{
+							"id": "beg-out-loud",
+							"title": "Beg out loud to cum",
+							"summary": "Say the words out loud and have them recognised, on your device.",
+							"status": "planned"
+						},
+						{
+							"id": "more-task-types",
+							"title": "More task types",
+							"summary": "New kinds of steps for guides, well beyond counting edges.",
+							"status": "planned",
+							"notes": [
+								"Write out lines",
+								"Wear a toy, like nipple clamps, for a set time",
+								"Curate a board of porn",
+								"Post to a burner social media account",
+								"Spin a wheel or roll dice for a random task, or a random twist on one"
+							]
+						},
+						{
+							"id": "mercy-button",
+							"title": "Mercy button",
+							"summary": "Skip a task you can't face, optionally earning a punishment for it.",
+							"status": "planned"
+						},
+						{
+							"id": "oops-button",
+							"title": "\"Oops, I came\" button",
+							"summary": "Own up to an accident, and take the consequences then and there or later.",
+							"status": "planned",
+							"notes": [
+								"An instant consequence, like no more cumming this session",
+								"Or a proper punishment added to your list"
+							]
+						}
+					]
+				},
+				{
+					"id": "chastity",
+					"title": "Chastity",
+					"summary": "Track time locked up, guided or on your own terms.",
+					"status": "planned",
+					"icon": "lock",
+					"featured": true,
+					"children": [
+						{
+							"id": "chastity-guided",
+							"title": "Guided and unguided",
+							"summary": "Follow a plan for your lock-up or just keep count.",
+							"status": "planned"
+						},
+						{
+							"id": "chastity-timers",
+							"title": "Count down and count up",
+							"summary": "A release date to wait for, or a tally of how long it's been.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "scene-sessions",
+					"title": "Play and scene sessions",
+					"summary": "Plan and run a scene together, then look back on it.",
+					"status": "planned",
+					"icon": "masks-theater"
+				},
+				{
+					"id": "focus-sessions",
+					"title": "Focus sessions",
+					"summary": "Stay on task for a set time, with your dynamic keeping you honest.",
+					"status": "exploring",
+					"icon": "bullseye"
+				},
+				{
+					"id": "generated-roleplay",
+					"title": "Generated roleplay",
+					"summary": "Roleplay scenarios written for you, from your preferences.",
+					"status": "exploring",
+					"icon": "comments"
+				},
+				{
+					"id": "hypnosis",
+					"title": "Hypnosis",
+					"summary": "Hypno sessions, if we can make them safe to use.",
+					"status": "exploring",
+					"icon": "eye",
+					"notes": ["Safety comes first, so this needs careful thought before it's built"]
+				},
+				{
+					"id": "loggable-events",
+					"title": "Loggable events",
+					"summary": "Log edges, orgasms and more, inside a session or out of one.",
+					"status": "planned",
+					"icon": "bolt",
+					"notes": ["A quick-log button that's always close to hand"]
+				},
+				{
+					"id": "session-points",
+					"title": "Sessions earn points",
+					"summary": "Completing a session earns points to spend on rewards.",
+					"status": "planned",
+					"icon": "coins",
+					"dependsOn": ["self-partner-rewards"]
+				},
+				{
+					"id": "session-indicator",
+					"title": "Session in progress indicator",
+					"summary": "A running session peeks out of the bottom bar, wherever you are in the app.",
+					"status": "planned",
+					"icon": "circle-play"
+				}
+			]
+		},
+		{
+			"id": "notebook",
+			"title": "Notebook",
+			"summary": "Everything about you and your dynamic, in one place.",
+			"icon": "book",
+			"items": [
+				{
+					"id": "kink-list",
+					"title": "Kink list",
+					"summary": "What you're into, what you're curious about and your hard limits.",
+					"status": "planned",
+					"icon": "list-ul",
+					"featured": true,
+					"dependsOn": ["expand-encryption"],
+					"children": [
+						{
+							"id": "kink-list-categories",
+							"title": "Categories",
+							"summary": "Kinks grouped so a long list stays easy to work through.",
+							"status": "planned"
+						},
+						{
+							"id": "kink-list-detail",
+							"title": "Choose your level of detail",
+							"summary": "Answer broadly, or drill right down.",
+							"status": "planned"
+						},
+						{
+							"id": "kink-list-filters",
+							"title": "Tag filters",
+							"summary": "Filter by tags, like whether something is degrading.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "toy-collection",
+					"title": "Toy collection",
+					"summary": "Keep track of the toys you own.",
+					"status": "planned",
+					"icon": "box-open"
+				},
+				{
+					"id": "stats-deck",
+					"title": "Stats deck",
+					"summary": "Your vital statistics, the kinky kind.",
+					"status": "planned",
+					"icon": "id-card",
+					"children": [
+						{
+							"id": "stats-body",
+							"title": "Body details",
+							"summary": "Genital type and the finer details, down to curvature and pubic hair.",
+							"status": "planned"
+						},
+						{
+							"id": "stats-measurements",
+							"title": "Measurements",
+							"summary": "Body measurements, kept for when they matter.",
+							"status": "planned"
+						},
+						{
+							"id": "stats-markings",
+							"title": "Markings and tattoos",
+							"summary": "Registration, branding, identifying marks and tattoo placements.",
+							"status": "planned"
+						},
+						{
+							"id": "stats-trigger-words",
+							"title": "Trigger words",
+							"summary": "The words that work on you.",
+							"status": "planned"
+						},
+						{
+							"id": "stats-deep-throat",
+							"title": "Deep-throat stats",
+							"summary": "How much you can take, and for how long.",
+							"status": "planned"
+						},
+						{
+							"id": "stats-sti-checks",
+							"title": "STI checks",
+							"summary": "When you were last tested.",
+							"status": "planned"
+						},
+						{
+							"id": "stats-partner-answers",
+							"title": "Answers for your partner",
+							"summary": "Your partner's version of your deck starts from yours, and you can copy their answers back.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "report-card",
+					"title": "Obedience report card",
+					"summary": "Training targets, progress and a grade to live up to.",
+					"status": "planned",
+					"icon": "graduation-cap",
+					"children": [
+						{
+							"id": "report-card-positions",
+							"title": "Positions to master",
+							"summary": "Kneeling, presenting and the rest, ticked off as you master them.",
+							"status": "planned"
+						},
+						{
+							"id": "report-card-study-areas",
+							"title": "Study areas",
+							"summary": "Training organised into subjects.",
+							"status": "planned"
+						},
+						{
+							"id": "report-card-grades",
+							"title": "Grades",
+							"summary": "A grade worked out from your progress.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "contract-rules",
+					"title": "Contract and rules",
+					"summary": "Write down what you've agreed to, and the rules you live by.",
+					"status": "planned",
+					"icon": "file-signature"
+				},
+				{
+					"id": "journal-notes",
+					"title": "Journal and notes",
+					"summary": "Somewhere to write things down, as often as you like.",
+					"status": "planned",
+					"icon": "feather",
+					"children": [
+						{
+							"id": "journal",
+							"title": "Journal",
+							"summary": "Dated entries about how things are going.",
+							"status": "planned"
+						},
+						{
+							"id": "fantasies",
+							"title": "Fantasies",
+							"summary": "The things you daydream about.",
+							"status": "planned"
+						},
+						{
+							"id": "bucket-list",
+							"title": "Bucket list",
+							"summary": "Ideas you want to try some day.",
+							"status": "planned"
+						},
+						{
+							"id": "free-notes",
+							"title": "Free text notes",
+							"summary": "Anything that doesn't fit anywhere else.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "sticker-book",
+					"title": "Sticker book",
+					"summary": "Collect stickers you've earned or been given.",
+					"status": "planned",
+					"icon": "note-sticky"
+				},
+				{
+					"id": "kink-quizzes",
+					"title": "Kink quizzes",
+					"summary": "Quizzes to find out more about what you're into.",
+					"status": "planned",
+					"icon": "circle-question"
+				},
+				{
+					"id": "activity-log",
+					"title": "Activity log",
+					"summary": "A record of what you've done, and when.",
+					"status": "planned",
+					"icon": "clock-rotate-left"
+				},
+				{
+					"id": "wish-list",
+					"title": "Wish list",
+					"summary": "A wish list for findom.",
+					"status": "planned",
+					"icon": "sack-dollar"
+				},
+				{
+					"id": "notebook-organisation",
+					"title": "Organisation",
+					"summary": "Arrange your notebook the way that makes sense to you.",
+					"status": "planned",
+					"icon": "folder-tree",
+					"children": [
+						{
+							"id": "notebook-folders",
+							"title": "Folders or tags",
+							"summary": "Group pages together.",
+							"status": "planned"
+						},
+						{
+							"id": "notebook-rename",
+							"title": "Rename pages",
+							"summary": "Call each page whatever you like.",
+							"status": "planned"
+						},
+						{
+							"id": "notebook-icons",
+							"title": "Page icons",
+							"summary": "Pick an icon for each page.",
+							"status": "planned"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "tasks",
+			"title": "Tasks",
+			"summary": "Things to get done, set by yourself or your partner.",
+			"icon": "list-check",
+			"items": [
+				{
+					"id": "self-partner-tasks",
+					"title": "Self and partner tasks",
+					"summary": "Tasks for yourself or between partners, on a schedule, earning credits.",
+					"status": "shipped",
+					"shippedOn": "2026-09-14",
+					"icon": "list-check"
+				},
+				{
+					"id": "task-proof",
+					"title": "Photo and video proof",
+					"summary": "Prove a task is done with a photo or video.",
+					"status": "planned",
+					"icon": "camera"
+				},
+				{
+					"id": "suggest-tasks",
+					"title": "Suggest tasks",
+					"summary": "The sub can suggest tasks for their partner to approve.",
+					"status": "planned",
+					"icon": "hand"
+				},
+				{
+					"id": "task-styling",
+					"title": "Nicer task cards",
+					"summary": "Tasks that look as good as they feel to finish.",
+					"status": "planned",
+					"icon": "wand-magic-sparkles"
+				},
+				{
+					"id": "punishments",
+					"title": "Punishments",
+					"summary": "A list of punishments owed, and a way to show they've been served.",
+					"status": "planned",
+					"icon": "gavel",
+					"children": [
+						{
+							"id": "punishment-proof",
+							"title": "Proof of punishment",
+							"summary": "Prove a punishment was carried out.",
+							"status": "planned"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "rewards",
+			"title": "Rewards",
+			"summary": "Treats to earn and to spend credits on.",
+			"icon": "gift",
+			"items": [
+				{
+					"id": "self-partner-rewards",
+					"title": "Self and partner rewards",
+					"summary": "Rewards to claim with the credits you earn.",
+					"status": "shipped",
+					"shippedOn": "2026-09-13",
+					"icon": "gift"
+				},
+				{
+					"id": "request-rewards",
+					"title": "Request rewards",
+					"summary": "The sub can ask for new rewards to be added.",
+					"status": "planned",
+					"icon": "hand-holding-heart"
+				},
+				{
+					"id": "sticker-rewards",
+					"title": "Stickers as rewards",
+					"summary": "Give a sticker for the sticker book as a reward.",
+					"status": "planned",
+					"icon": "star",
+					"dependsOn": ["sticker-book"]
+				},
+				{
+					"id": "secret-rewards",
+					"title": "Secret rewards",
+					"summary": "Rewards that stay hidden until you've earned them.",
+					"status": "planned",
+					"icon": "user-secret"
+				},
+				{
+					"id": "reward-shop",
+					"title": "Reward shop",
+					"summary": "Browse rewards like a shop.",
+					"status": "exploring",
+					"icon": "store"
+				}
+			]
+		},
+		{
+			"id": "partners",
+			"title": "Partners",
+			"summary": "Link up with a partner and keep in touch.",
+			"icon": "user-group",
+			"items": [
+				{
+					"id": "partner-linking",
+					"title": "Partner linking",
+					"summary": "Invite a partner and decide which of you is in control.",
+					"status": "shipped",
+					"shippedOn": "2026-09-07",
+					"icon": "link"
+				},
+				{
+					"id": "messages",
+					"title": "Messages",
+					"summary": "Private conversations with your partner, organised into threads.",
+					"status": "shipped",
+					"shippedOn": "2026-09-07",
+					"icon": "message",
+					"children": [
+						{
+							"id": "message-tags",
+							"title": "Tags",
+							"summary": "Tag threads to keep conversations organised.",
+							"status": "shipped",
+							"shippedOn": "2026-09-14"
+						},
+						{
+							"id": "message-encryption",
+							"title": "End-to-end encryption",
+							"summary": "Only you and your partner can ever read your messages.",
+							"status": "shipped",
+							"shippedOn": "2026-09-07"
+						},
+						{
+							"id": "message-rich-text",
+							"title": "Rich text",
+							"summary": "Bold, italics, lists and more in your messages.",
+							"status": "shipped",
+							"shippedOn": "2026-09-19"
+						},
+						{
+							"id": "message-embeds",
+							"title": "Link previews",
+							"summary": "Paste a link and see what it is, right in the conversation.",
+							"status": "shipped",
+							"shippedOn": "2026-09-16"
+						},
+						{
+							"id": "message-drafts",
+							"title": "Saved drafts",
+							"summary": "Whatever you were typing is still there when you come back.",
+							"status": "shipped",
+							"shippedOn": "2026-09-22"
+						},
+						{
+							"id": "self-destructing-media",
+							"title": "Self-destructing media",
+							"summary": "Photos and videos that disappear after they've been seen.",
+							"status": "shipped",
+							"shippedOn": "2026-09-26"
+						},
+						{
+							"id": "voice-messages",
+							"title": "Voice messages",
+							"summary": "Say it instead of typing it.",
+							"status": "planned",
+							"icon": "microphone",
+							"featured": true
+						},
+						{
+							"id": "voice-captions",
+							"title": "Captions",
+							"summary": "Voice messages transcribed on your device, for accessibility.",
+							"status": "planned",
+							"dependsOn": ["voice-messages"]
+						},
+						{
+							"id": "message-points",
+							"title": "Send points and rewards",
+							"summary": "Send your partner points or a reward in a message.",
+							"status": "planned"
+						},
+						{
+							"id": "message-stickers",
+							"title": "Stickers",
+							"summary": "Send stickers, and add the ones you're sent to your own sticker book.",
+							"status": "planned",
+							"dependsOn": ["sticker-book"]
+						}
+					]
+				},
+				{
+					"id": "ping-partner",
+					"title": "Ping your partner",
+					"summary": "A little poke to get their attention.",
+					"status": "planned",
+					"icon": "hand-point-right"
+				},
+				{
+					"id": "vacation-mode",
+					"title": "Vacation mode",
+					"summary": "Pause the dynamic while one of you is away.",
+					"status": "planned",
+					"icon": "umbrella-beach"
+				},
+				{
+					"id": "compare-kink-lists",
+					"title": "Compare kink lists",
+					"summary": "See where your interests overlap.",
+					"status": "planned",
+					"icon": "code-compare",
+					"dependsOn": ["kink-list"],
+					"children": [
+						{
+							"id": "per-partner-kink-list",
+							"title": "Kink list per partner",
+							"summary": "Adjust your answers for each partner.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "session-notifications",
+					"title": "Session notifications",
+					"summary": "Let your partner know automatically when you start a session.",
+					"status": "planned",
+					"icon": "bell",
+					"dependsOn": ["push-notifications"]
+				},
+				{
+					"id": "shared-session-history",
+					"title": "Shared session history",
+					"summary": "Let your partner see the sessions you've done on your own.",
+					"status": "planned",
+					"icon": "clock-rotate-left"
+				}
+			]
+		},
+		{
+			"id": "ideas",
+			"title": "Ideas generator",
+			"summary": "Inspiration for when you're stuck for something to do.",
+			"icon": "lightbulb",
+			"items": [
+				{
+					"id": "body-writing",
+					"title": "Body writing",
+					"summary": "Ideas for what to write, and where.",
+					"status": "planned",
+					"icon": "pen-nib"
+				},
+				{
+					"id": "social-phrases",
+					"title": "Social media phrases",
+					"summary": "Things to post, for when that's part of the fun.",
+					"status": "planned",
+					"icon": "hashtag"
+				},
+				{
+					"id": "task-suggestions",
+					"title": "Task suggestions",
+					"summary": "A kinky task, whenever you want one.",
+					"status": "planned",
+					"icon": "dice"
+				}
+			]
+		},
+		{
+			"id": "customisation",
+			"title": "Customisation",
+			"summary": "Make the app your own.",
+			"icon": "palette",
+			"items": [
+				{
+					"id": "new-look",
+					"title": "The new look",
+					"summary": "One dark, textured theme across the whole app.",
+					"status": "shipped",
+					"shippedOn": "2026-09-25",
+					"icon": "brush"
+				},
+				{
+					"id": "home-widgets",
+					"title": "Home screen cards",
+					"summary": "Tasks, rewards and messages at a glance on your home screen.",
+					"status": "shipped",
+					"shippedOn": "2026-09-21",
+					"icon": "table-cells-large"
+				},
+				{
+					"id": "add-to-home-screen",
+					"title": "Add to home screen",
+					"summary": "A hint showing how to install the app on your phone.",
+					"status": "shipped",
+					"shippedOn": "2026-09-24",
+					"icon": "mobile-screen-button"
+				},
+				{
+					"id": "themes",
+					"title": "Themes",
+					"summary": "Dress the whole app up to suit your dynamic.",
+					"status": "planned",
+					"icon": "swatchbook",
+					"featured": true,
+					"children": [
+						{
+							"id": "theme-slut-uni",
+							"title": "Slut Training Uni",
+							"summary": "Coursework, but filthier.",
+							"status": "planned"
+						},
+						{
+							"id": "theme-sissy-uni",
+							"title": "Sissy Training Uni",
+							"summary": "Pretty in pink, with homework.",
+							"status": "planned"
+						},
+						{
+							"id": "theme-bimbo",
+							"title": "Bimbo",
+							"summary": "Glossy, pink and not thinking too hard.",
+							"status": "planned"
+						},
+						{
+							"id": "theme-hypno",
+							"title": "Hypno",
+							"summary": "Spirals and soft focus.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "partner-colours",
+					"title": "Partner colours",
+					"summary": "Give each partner a colour of their own.",
+					"status": "planned",
+					"icon": "droplet"
+				},
+				{
+					"id": "home-sections",
+					"title": "Home screen sections",
+					"summary": "Choose what your home screen and partner page show.",
+					"status": "planned",
+					"icon": "grip",
+					"children": [
+						{
+							"id": "sections-reorder",
+							"title": "Reorder and collapse",
+							"summary": "Put the sections in the order you want, and fold away the rest.",
+							"status": "planned"
+						},
+						{
+							"id": "sections-pinned-photo",
+							"title": "Pinned photo",
+							"summary": "Pin a photo to the top.",
+							"status": "planned"
+						},
+						{
+							"id": "sections-stats",
+							"title": "Stats",
+							"summary": "Stats for yourself, your partner or both of you.",
+							"status": "planned"
+						}
+					]
+				},
+				{
+					"id": "reward-currency",
+					"title": "Your own reward currency",
+					"summary": "Good boy points? Pick a name and a symbol, or make up your own.",
+					"status": "planned",
+					"icon": "coins"
+				},
+				{
+					"id": "avatars",
+					"title": "Avatars",
+					"summary": "Upload a picture for your profile.",
+					"status": "planned",
+					"icon": "circle-user"
+				},
+				{
+					"id": "discreet-mode",
+					"title": "Discreet mode",
+					"summary": "A custom app icon and an incognito mode, for when someone's looking over your shoulder.",
+					"status": "planned",
+					"icon": "mask"
+				}
+			]
+		},
+		{
+			"id": "privacy",
+			"title": "Privacy and data",
+			"summary": "Your data stays yours.",
+			"icon": "shield-halved",
+			"items": [
+				{
+					"id": "passkeys",
+					"title": "Passkeys",
+					"summary": "Sign in with Face ID, a fingerprint or your password manager.",
+					"status": "shipped",
+					"shippedOn": "2026-09-21",
+					"icon": "fingerprint"
+				},
+				{
+					"id": "timezones",
+					"title": "Time zones",
+					"summary": "Tasks happen at the right time, wherever you and your partner are.",
+					"status": "shipped",
+					"shippedOn": "2026-09-14",
+					"icon": "earth-oceania"
+				},
+				{
+					"id": "expand-encryption",
+					"title": "End-to-end encryption everywhere",
+					"summary": "The protection your messages have, extended to the rest of what you store.",
+					"status": "planned",
+					"icon": "user-lock",
+					"dependsOn": ["message-encryption"]
+				},
+				{
+					"id": "clearer-disconnect",
+					"title": "Clearer disconnecting",
+					"summary": "Know exactly what happens when you unlink from a partner, with the option to delete what you shared.",
+					"status": "planned",
+					"icon": "link-slash"
+				},
+				{
+					"id": "email-verification",
+					"title": "Email verification",
+					"summary": "Confirm your email address is really yours.",
+					"status": "planned",
+					"icon": "envelope-circle-check"
+				},
+				{
+					"id": "change-email",
+					"title": "Change your email",
+					"summary": "Move your account to a new email address.",
+					"status": "planned",
+					"icon": "envelope",
+					"dependsOn": ["email-verification"]
+				},
+				{
+					"id": "data-export",
+					"title": "Export your data",
+					"summary": "Download a copy of everything.",
+					"status": "planned",
+					"icon": "file-export"
+				},
+				{
+					"id": "sharing",
+					"title": "Share pages",
+					"summary": "Share a notebook page, or a dashboard you've put together, with a link.",
+					"status": "planned",
+					"icon": "share-nodes"
+				}
+			]
+		},
+		{
+			"id": "integrations",
+			"title": "Integrations",
+			"summary": "Working together with other apps.",
+			"icon": "plug",
+			"items": [
+				{
+					"id": "edgr",
+					"title": "edgr.app",
+					"summary": "Bring edgr.app into your sessions.",
+					"status": "exploring",
+					"icon": "plug-circle-bolt"
+				},
+				{
+					"id": "deep-throat-trainer",
+					"title": "Deep-throat trainer",
+					"summary": "Hook up a deep-throat trainer and track your progress.",
+					"status": "exploring",
+					"icon": "chart-line"
+				}
+			]
+		},
+		{
+			"id": "community",
+			"title": "Community",
+			"summary": "Share what you've made with everyone else.",
+			"icon": "globe",
+			"items": [
+				{
+					"id": "community-guides",
+					"title": "Shared guides",
+					"summary": "Publish your guides, and play other people's.",
+					"status": "planned",
+					"icon": "book-open",
+					"dependsOn": ["guided-sessions"]
+				},
+				{
+					"id": "community-task-ideas",
+					"title": "Shared task ideas",
+					"summary": "Trade task ideas with other people.",
+					"status": "planned",
+					"icon": "lightbulb"
+				},
+				{
+					"id": "community-voting",
+					"title": "Voting",
+					"summary": "Upvote the best of what's shared.",
+					"status": "planned",
+					"icon": "thumbs-up"
+				}
+			]
+		},
+		{
+			"id": "platform",
+			"title": "Around the app",
+			"summary": "Getting started, and getting Bound Up onto more devices.",
+			"icon": "mobile-screen",
+			"items": [
+				{
+					"id": "push-notifications",
+					"title": "Push notifications",
+					"summary": "Hear about new messages and tasks without opening the app.",
+					"status": "planned",
+					"icon": "bell",
+					"featured": true
+				},
+				{
+					"id": "ios-app",
+					"title": "iOS app",
+					"summary": "Bound Up from the App Store.",
+					"status": "planned",
+					"icon": "mobile-screen-button"
+				},
+				{
+					"id": "android-app",
+					"title": "Android app",
+					"summary": "Bound Up from the Play Store.",
+					"status": "planned",
+					"icon": "mobile"
+				},
+				{
+					"id": "ios-share-shortcut",
+					"title": "iOS share shortcut",
+					"summary": "Send photos and videos to Bound Up straight from the share sheet.",
+					"status": "planned",
+					"icon": "arrow-up-from-bracket"
+				},
+				{
+					"id": "onboarding",
+					"title": "Onboarding",
+					"summary": "A short tour when you first sign up.",
+					"status": "planned",
+					"icon": "route"
+				},
+				{
+					"id": "demo-mode",
+					"title": "Demo mode",
+					"summary": "Try everything with example data, then hop back to your real account.",
+					"status": "planned",
+					"icon": "flask"
+				},
+				{
+					"id": "self-hosting",
+					"title": "Self-hosting",
+					"summary": "Run your own copy of Bound Up.",
+					"status": "exploring",
+					"icon": "server"
+				},
+				{
+					"id": "feature-comparison",
+					"title": "Feature comparison",
+					"summary": "How Bound Up compares with other apps.",
+					"status": "planned",
+					"icon": "table-list"
+				},
+				{
+					"id": "roadmap-feedback",
+					"title": "Roadmap voting and suggestions",
+					"summary": "Vote on what gets built next, and suggest things we haven't thought of.",
+					"status": "planned",
+					"icon": "square-poll-vertical"
+				}
+			]
+		}
+	]
+}

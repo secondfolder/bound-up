@@ -132,6 +132,15 @@ Four options matter:
   this flex `<body>` the spacers are laid out: they pushed the title down the
   page and widened the bitmap, which is what once got SnapDOM rejected here as
   inaccurate.
+
+  The price of removing is that **anything after an excluded element sits
+  higher in the clone than on the page**, by that element's height. The
+  roadmap teaser under the CTA is the case in point: screened, it left a ghost
+  of itself behind the "Sign up" button. So it is excluded too — it stays under
+  the canvas, so the grain still covers it, but it is not screened, and being
+  last on the page nothing after it can shift. Anything added below the CTA
+  needs the same treatment, or the CTA needs a stand-in of its own height in
+  the clone.
 - **`reconcile: true`.** Measures the clone against the live layout and pins
   whatever diverges. Without it, text in an inline element (the subtitle) keeps
   its natural width and could re-wrap, and SnapDOM says so with a console

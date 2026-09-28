@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import RoadmapHighlights from '$lib/components/roadmap/RoadmapHighlights.svelte';
 	import { GrainEffect } from '$lib/effects/grain-effect.svelte';
 	import { HalftoneLinesEffect } from '$lib/effects/halftone-lines-effect.svelte';
 	import { mix, SOFT_LIGHT_NEUTRAL } from '$lib/effects/mix.svelte';
@@ -74,6 +75,19 @@
 			<a class="small" href={resolve('/(public)/login')}>Log in</a>
 		{/if}
 	</div>
+
+	<!-- Left out of the page capture, like the CTA, but still under the effects
+	     canvas (which has pointer-events: none, so its links take clicks) —
+	     the grain carries on over it. It has to be left out because the
+	     capture drops the CTA from its clone altogether (`excludeMode:
+	     'remove'`, see VfxPageSnapshot), so everything after the CTA sits a
+	     CTA's height higher in the clone than on the page: screened, this
+	     section left a ghost of itself up behind the "Sign up" button. Being
+	     last, nothing after it can shift, and the halftone has all but faded
+	     out by this depth anyway. -->
+	<div class="roadmap-highlights" data-vfx-capture-ignore="true">
+		<RoadmapHighlights />
+	</div>
 </div>
 
 <style>
@@ -146,7 +160,11 @@
 		align-items: center;
 		gap: 0.75rem;
 		margin-block-start: 4em;
-		margin-block-end: 50vw;
+		/* Was 50vw, when the CTA was the last thing on the page and the margin
+		   only gave the halftone's fade room to play out. The roadmap section
+		   under it does that now, and a half-screen gap would leave it looking
+		   like the page had ended. */
+		margin-block-end: 6rem;
 		font-weight: 700;
 	}
 

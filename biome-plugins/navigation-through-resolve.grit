@@ -5,9 +5,12 @@
 // Svelte markup, so an `href` is checked in review rather than here.
 language js
 
+// The two-argument shapes come first: tried after `goto($target)`, a call with
+// options matched that instead, with `$target` spanning both arguments — so
+// `goto(resolve(…), { replaceState: true })` was reported as unresolved.
 or {
-	`goto($target)`,
 	`goto($target, $_)`,
+	`goto($target)`,
 	`pushState($target, $_)`,
 	`replaceState($target, $_)`
 } where {

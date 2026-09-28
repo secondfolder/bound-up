@@ -43,4 +43,14 @@ describe('/+page.svelte', () => {
 		expect(screen.getByRole('link', { name: 'Open' })).toBeInTheDocument();
 		expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument();
 	});
+
+	it('shows the roadmap teaser, linking to the full roadmap', () => {
+		pageState.data.user = null;
+		render(Page);
+		expect(screen.getByRole('heading', { level: 2, name: 'Coming Up' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'See the full roadmap' })).toHaveAttribute(
+			'href',
+			'/(public)/roadmap'
+		);
+	});
 });

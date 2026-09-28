@@ -86,6 +86,11 @@ in template expressions. It cannot check an `href` attribute: Biome's plugins
 do not match markup yet, so **an `href` built without `resolve()` is caught in
 review, not by the linter.**
 
+Its patterns are order-sensitive: the two-argument shapes (`goto(x, opts)`)
+are listed before `goto(x)`, because tried the other way round a call with
+options matched the one-argument pattern with `$target` spanning both
+arguments, and `goto(resolve(…), { replaceState: true })` was reported.
+
 A plugin diagnostic is suppressed as `// biome-ignore lint/plugin: <reason>`.
 
 ## Markdown

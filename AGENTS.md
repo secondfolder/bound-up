@@ -33,6 +33,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
 | `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
+| `src/lib/roadmap/`            | The public roadmap's JSON and its validating loader. Alias-free. See [docs/roadmap.md](docs/roadmap.md) |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
@@ -520,7 +521,7 @@ does not bounce a session holder any more: its centred CTA says "Sign up"
 (with a "Log in" link under it) when logged out and "Open" → `/home` when
 logged in. Every post-auth redirect still points at `/home`. The guides live
 under it (`/home/guides`, `/home/guides/[id]`), behind the auth guard — the
-public surface is only `/`, `/login` and `/signup`.
+public surface is `/`, `/login`, `/signup` and `/roadmap`.
 
 **Active nav state compares `page.route.id`, never a pathname.** During SSR
 `resolve()` returns a path relative to the page being rendered (`./home` on
@@ -803,6 +804,7 @@ Four places, split on scope:
 | [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text     |
 | [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |
 | [docs/features-and-admin.md](docs/features-and-admin.md)                                 | Per-account features, the admin role, the first-account admin, `/admin`      |
+| [docs/roadmap.md](docs/roadmap.md)                                                       | The public /roadmap tree and landing teaser: the JSON, its rules, the drawer |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 
@@ -863,6 +865,9 @@ Unless the user explicilty indicates otherwise the plan or major change should i
       placing it's existing contents into a new section dedicated to that subfeature.
 - [ ] DB migration files should always be created with `drizzle-kit` rather than manually written and they should be
       given a meaningful name. E.g. `drizzle-kit generate --name add_rewards`.
+- [ ] If the feature (or part of it) is on the roadmap, update its entry in `src/lib/roadmap/roadmap.json`: set
+      `status` (and `shippedOn`, dropping `featured`, once it ships), or add a twig for the part that landed. See
+      [docs/roadmap.md](docs/roadmap.md#keeping-it-current).
 
 ## Traps
 

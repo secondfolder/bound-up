@@ -43,6 +43,11 @@ theme without being unlayered, where it would also beat every component's own
   `--wa-color-surface-default` under things that must hide what is behind them
   (a sticky footer's fade, a reaction pill over a bubble), so a translucent
   surface would let content show through.
+- **`--page-wash-floor`** is the flat colour the wash settles on from 800px
+  down, behind most of any long page. Something drawn solid that has to read
+  as translucent mixes toward it: the roadmap's dimmed connectors, which
+  cannot be translucent because they overlap (see
+  [roadmap.md](roadmap.md)).
 - **`--wa-color-text-danger`** is defined here as a light red: Web Awesome
   has no token by that name, and the old value, red-40, vanished on rust.
 - `h1` is Muddy Tractor in amber. Only `h1`: at section-heading sizes the
