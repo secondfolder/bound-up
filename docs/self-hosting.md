@@ -201,6 +201,16 @@ directory, to be inspected.
    GitHub Release written. A push that fails therefore leaves no tag behind,
    and a rerun starts clean.
 
+The preset behind the notes generator is pinned on purpose.
+`conventional-changelog-conventionalcommits` is a direct devDependency because
+`@semantic-release/release-notes-generator` loads it from the project root, and
+it is held at `^9`: preset v10 needs `conventional-changelog-writer` v9, while
+semantic-release 25 — the latest stable — pins writer v8, and the mismatch
+throws "Missing helper" in the release job after everything else has passed.
+`src/lib/server/self-hosted/release-notes.test.ts` renders a commit through the
+same preset-plus-writer pairing, so a bad bump fails on the PR instead. Bump
+the preset to v10 only together with a semantic-release that ships writer v9.
+
 The version rules:
 
 - `feat:` → minor

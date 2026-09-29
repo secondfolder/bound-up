@@ -187,10 +187,10 @@ describe('RoadmapTree', () => {
 
 		it('dims a line that leads only to hidden items, and a branch with nothing shown', () => {
 			const { container, colours } = renderHiding('in-progress', 'planned', 'exploring');
-			// Kink list and every twig under it are planned.
-			const kinkList = nodeOf(container, 'kink-list');
-			expect(lineColour(kinkList, '::before')).toBe(colours.lineDim);
-			expect(lineColour(kinkList, '::after')).toBe(colours.lineDim);
+			// Chastity and both of its twigs are planned.
+			const chastity = nodeOf(container, 'chastity');
+			expect(lineColour(chastity, '::before')).toBe(colours.lineDim);
+			expect(lineColour(chastity, '::after')).toBe(colours.lineDim);
 
 			// Sessions has nothing shipped, so nothing in it is shown.
 			const sessions = defined(container.querySelector('[id="sessions"]'), 'the Sessions head');
