@@ -13,7 +13,7 @@
  * `MessagePayload`.
  */
 
-import type { CachedEmbedDetails } from '../embeds';
+import { type CachedEmbedDetails, withSafeUrls } from '../embeds';
 import { MAX_BODY_CHARS } from '../messaging';
 import { loadAge } from './identity';
 
@@ -139,7 +139,16 @@ export async function decryptMessageMetadata(
 	ciphertext: string,
 	identity: CryptoKey | string
 ): Promise<MessageMetadataPayload | null> {
-	return await decryptPayload<MessageMetadataPayload>(ciphertext, identity);
+	const payload = await decryptPayload<MessageMetadataPayload>(ciphertext, identity);
+	if (!payload) {
+		return null;
+	}
+	// Every reader of a sidecar comes through here, and the sender wrote it, so
+	// this is where its URLs are checked. See `withSafeUrls`.
+	return {
+		...payload,
+		embeds: Array.isArray(payload.embeds) ? payload.embeds.map(withSafeUrls) : []
+	};
 }
 
 /** Trims and bounds what the composer collected, before it is encrypted. */

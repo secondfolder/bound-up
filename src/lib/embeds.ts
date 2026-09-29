@@ -101,6 +101,36 @@ export function isSafeHttpUrl(href: string): boolean {
 	}
 }
 
+/** A URL field of `CachedEmbedDetails`, which ends up in an href or a src. */
+const CACHED_URL_FIELDS = [
+	'thumbnailUrl',
+	'canonicalUrl',
+	'imageUrl',
+	'iframeSrc',
+	'faviconUrl'
+] as const satisfies readonly (keyof CachedEmbedDetails)[];
+
+/**
+ * `details` with every URL field that fails `isSafeHttpUrl` dropped to null.
+ *
+ * Needed for details decrypted from a message's metadata sidecar: the sender's
+ * client wrote them, not this app's server, so the checks the server-side
+ * builder makes never ran. An unchecked `iframeSrc` of `javascript:…` would run
+ * on this origin, since the embed frame's sandbox allows scripts and
+ * same-origin. A field dropped here renders as though the provider never sent
+ * it.
+ */
+export function withSafeUrls(details: CachedEmbedDetails): CachedEmbedDetails {
+	const safe = { ...details };
+	for (const field of CACHED_URL_FIELDS) {
+		const value = safe[field];
+		if (value !== null && !(typeof value === 'string' && isSafeHttpUrl(value))) {
+			safe[field] = null;
+		}
+	}
+	return safe;
+}
+
 /** `redgifs.com/watch/<id>` (and `/ifr/<id>`) → the documented player iframe. */
 function redgifsSpec(url: URL): EmbedSpec | null {
 	const match: RegExpExecArray | null = REDGIFS_PATH.exec(url.pathname);

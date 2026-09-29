@@ -20,6 +20,20 @@ describe('safeRedirect', () => {
 		expect(safeRedirect('/\\evil.example/steal')).toBeNull();
 	});
 
+	it('rejects a path the browser would read as protocol-relative', () => {
+		// The URL parser strips tabs and newlines before it reads a Location,
+		// so each of these becomes `//evil.example`.
+		expect(safeRedirect('/\t/evil.example/steal')).toBeNull();
+		expect(safeRedirect('/\n/evil.example/steal')).toBeNull();
+		expect(safeRedirect('/\r/evil.example/steal')).toBeNull();
+		expect(safeRedirect(decodeURIComponent('%2F%09%2Fevil.example'))).toBeNull();
+	});
+
+	it('rejects any other control character', () => {
+		expect(safeRedirect('/home\u0000')).toBeNull();
+		expect(safeRedirect('/home\u007f')).toBeNull();
+	});
+
 	it('rejects a bare relative path', () => {
 		expect(safeRedirect('home')).toBeNull();
 		expect(safeRedirect('../home')).toBeNull();
