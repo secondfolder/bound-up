@@ -8,7 +8,11 @@ import { render, screen } from '@testing-library/svelte';
  * are mocked (the AppNav test's shape) so the test is about what the landing
  * decides, not about SvelteKit.
  */
-const pageState = { data: { user: null as { id: string } | null } };
+const pageState = {
+	data: { user: null as { id: string } | null },
+	// ShareMeta resolves its image against it.
+	url: new URL('http://localhost/')
+};
 
 vi.mock('$app/state', () => ({
 	get page() {

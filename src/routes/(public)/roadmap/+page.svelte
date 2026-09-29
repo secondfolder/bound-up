@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import RoadmapDetails from '$lib/components/roadmap/RoadmapDetails.svelte';
 	import RoadmapTree from '$lib/components/roadmap/RoadmapTree.svelte';
+	import ShareMeta from '$lib/components/ShareMeta.svelte';
 	import { findItem, ROADMAP_STATUSES, roadmap, STATUS_LABELS, statusCounts } from '$lib/roadmap';
 
 	const user = $derived(page.data.user);
@@ -62,11 +63,11 @@
 
 <svelte:head>
 	<title>Roadmap · Bound Up</title>
-	<meta
-		name="description"
-		content="What Bound Up has shipped, what's being built and what's planned next."
-	/>
 </svelte:head>
+<ShareMeta
+	title="Bound Up roadmap"
+	description="What Bound Up has shipped, what's being built and what's planned next."
+/>
 
 <div class="roadmap">
 	<nav class="onwards">

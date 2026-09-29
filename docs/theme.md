@@ -12,7 +12,7 @@ WebGL (see [page-effects.md](page-effects.md)); everywhere else it is CSS.
 | `src/app.html`                     | `class="wa-dark"` on `<html>`, and the browser `theme-color`          |
 | `src/routes/(public)/+page.svelte` | Sets `--page-texture: none`, since its effects draw the texture       |
 | `e2e/theme.spec.ts`                | The cascade on real pages: dark class, texture on and off, title face |
-| `scripts/generate-favicons.ts`     | The icons in `static/`, drawn from this theme; `npm run favicons`     |
+| `scripts/generate-brand-images.ts` | The icons and share card in `static/`; `npm run brand-images`         |
 
 ## Always dark
 
@@ -98,8 +98,9 @@ grain doubled and the halftone showed a moiré against its own screen.
 
 The favicons, the Apple touch icon and the manifest's icons are a "B" in the
 title face on the wash, under the landing page's halftone and grain.
-`npm run favicons` draws them all into `static/`; rerun it after changing the
-wash, the title face or colour, or the landing page's effect parameters.
+`npm run brand-images` draws them all into `static/`, along with the share
+card below; rerun it after changing the wash, the title face or colour, the
+landing page's copy, or its effect parameters.
 
 - **Drawn from the source, not a copy of it.** Chromium renders an `h1` over
   `theme.css`, so the letter and wash are the theme's own, and the filter is
@@ -116,6 +117,29 @@ wash, the title face or colour, or the landing page's effect parameters.
 - **There is no SVG favicon.** The old one was a PNG wrapped in SVG, and the
   browser picked it over the size-specific PNGs. That scaled one bitmap to
   every size, which is the problem the per-size renders avoid.
+
+## The share card
+
+`static/og-image.jpg` is the image a link preview shows — a pasted invite
+link, above all. It is the top 1200 × 630 px of the landing page as a desktop
+browser draws it: the title and subtitle on the wash, through the same
+halftone (with its fade from 300 px down) and grain, at one pixel per CSS px,
+which is what the effects are calibrated in. The copy is duplicated from the
+landing page in the script, so a change to one is a change to both.
+
+It is a JPEG because grain is noise, which PNG cannot compress: the PNG was
+several times the size for no visible difference, and some previewers give up
+on large images.
+
+`src/lib/components/ShareMeta.svelte` emits the Open Graph and Twitter tags
+that point at it. A page people are expected to paste into a chat — the
+landing page, `/roadmap`, `/invite/[token]` — renders it with its own title
+and description. It is per page rather than in a layout on purpose: a page's
+tags would otherwise sit beside the layout's, and previewers disagree on which
+duplicate wins. The image URL is made absolute from the request's own origin,
+which is one more reason the self-hosted build needs `ORIGIN` behind a proxy.
+`e2e/share-previews.spec.ts` reads the pages with JavaScript off, as a
+previewer does.
 
 ## Adding to it
 

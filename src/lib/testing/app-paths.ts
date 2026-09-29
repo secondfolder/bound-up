@@ -15,6 +15,10 @@
 export const base = '';
 export const assets = '';
 
+export function asset(file: string): string {
+	return file;
+}
+
 export function resolve(id: string, params?: Record<string, string>): string {
 	return params ? id.replace(/\[(?<key>\w+)\]/g, (_, key: string) => params[key] ?? '') : id;
 }

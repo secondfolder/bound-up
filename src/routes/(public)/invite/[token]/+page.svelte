@@ -1,10 +1,33 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import PartnerAcceptForm from '$lib/components/PartnerAcceptForm.svelte';
+	import ShareMeta from '$lib/components/ShareMeta.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	// What a link preview says. Whoever fetches the preview is signed out, so
+	// in practice it is either the invalid state or the invite itself — and the
+	// inviter's chosen name is already on the page for anyone holding the link,
+	// so the preview shows nothing the page does not.
+	const share = $derived(
+		data.inviterName === null
+			? {
+					title: "This invite link doesn't work",
+					description: 'It may have expired, already been used, or been cancelled.'
+				}
+			: {
+					title: `${data.inviterName} wants to add you as a partner`,
+					description:
+						"Open the link to see what they're proposing on Bound Up. You can still say no."
+				}
+	);
 </script>
+
+<svelte:head>
+	<title>{share.title} · Bound Up</title>
+</svelte:head>
+<ShareMeta {...share} />
 
 <section>
 	{#if data.state === 'invalid'}

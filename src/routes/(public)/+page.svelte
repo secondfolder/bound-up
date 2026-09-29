@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import RoadmapHighlights from '$lib/components/roadmap/RoadmapHighlights.svelte';
+	import ShareMeta from '$lib/components/ShareMeta.svelte';
 	import { GrainEffect } from '$lib/effects/grain-effect.svelte';
 	import { HalftoneLinesEffect } from '$lib/effects/halftone-lines-effect.svelte';
 	import { mix, SOFT_LIGHT_NEUTRAL } from '$lib/effects/mix.svelte';
@@ -29,6 +30,7 @@
 </script>
 
 <svelte:head>
+	<title>Bound Up</title>
 	<!-- The wash is the app-wide one (src/lib/theme.css). Only the CSS
 	     texture is switched off here: the effects below draw this page's
 	     halftone and grain, and the two drawn together doubled the grain. -->
@@ -38,6 +40,10 @@
 	}
 </style>
 </svelte:head>
+<ShareMeta
+	title="Bound Up"
+	description="Explore your kinks and manage your dynamics. Either with a partner or solo."
+/>
 
 <svelte:window />
 

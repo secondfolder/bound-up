@@ -151,6 +151,13 @@ explicitly decided to share on partner surfaces.
   the inviter had already sent.
 - **Only ever sent to the inviter**, and only while it is live. The token is
   never included in the page data of anyone who could not already use it.
+- **Its preview names the inviter.** A chat app that unfurls the link fetches
+  it signed out, and the Open Graph title is "{name} wants to add you as a
+  partner" (`ShareMeta.svelte`; the card is in
+  [docs/theme.md](theme.md#the-share-card)). That is the name the inviter
+  chose for themselves on this invite, which the page already shows to anyone
+  holding the link, so the preview reveals nothing the link does not. A dead
+  link previews as "This invite link doesn't work" and names nobody.
 
 Two accepts racing on the same link cannot both win: the token is matched again
 inside the `UPDATE`'s `WHERE`, so the first clears it and the second matches no

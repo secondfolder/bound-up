@@ -28,7 +28,7 @@
 		"auth:schema": "better-auth generate --config ./better-auth.config.ts --output src/lib/server/db/schema/auth.ts --yes",
 		"auth:secret": "better-auth secret",
 		"cf-typegen": "wrangler types ./src/worker-env.d.ts --include-runtime=false",
-		"favicons": "tsx scripts/generate-favicons.ts"
+		"brand-images": "tsx scripts/generate-brand-images.ts"
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,ts,svelte,css,html,json,jsonc}": [
