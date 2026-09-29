@@ -1020,3 +1020,29 @@ export const userFeatures = sqliteTable(
 
 export type UserFeature = typeof userFeatures.$inferSelect;
 export type NewUserFeature = typeof userFeatures.$inferInsert;
+
+/**
+ * Counters for the sign-in and sign-up rate limit (`server/rate-limit.ts`).
+ *
+ * In the database rather than in memory because on Workers every isolate would
+ * otherwise keep counts of its own, and a guesser spread across them would
+ * never meet the limit. One row per rule and client address, rewritten in
+ * place by a single upsert, so a burst of concurrent attempts cannot all read
+ * a count below the limit.
+ *
+ * The key is an HMAC of the rule and the address, keyed with the auth secret,
+ * for the reason `account_recovery_requests.ip_hash` is: an address is
+ * guessable, so a plain hash of one would be reversible. Rows are pruned by the
+ * media sweep once their window has closed.
+ */
+export const authRateLimits = sqliteTable(
+	'auth_rate_limits',
+	{
+		key: text('key').primaryKey(),
+		count: integer('count').notNull(),
+		windowEnd: integer('window_end', { mode: 'timestamp_ms' }).notNull()
+	},
+	(table) => [index('auth_rate_limits_window_end_idx').on(table.windowEnd)]
+);
+
+export type AuthRateLimit = typeof authRateLimits.$inferSelect;

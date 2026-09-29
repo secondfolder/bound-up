@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest';
-import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
-import { load } from './+page.server';
+import { expect, test, vi } from 'vitest';
+import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
+import { actions, load } from './+page.server';
 
 /**
  * Only the redirectTo plumbing is covered here — it is what carries an invite
@@ -61,4 +61,46 @@ test('passes on the one reason it knows, and nothing else', async () => {
 
 	const made = await runLoad(load(fakeEvent({ path: '/login?reason=%3Cscript%3E' })));
 	expect(made.reason).toBeNull();
+});
+
+/**
+ * The action calls Better Auth directly, not through its HTTP endpoints, so
+ * nothing but this check limits password guessing through the form.
+ */
+const credentials = { email: 'ada@example.test', authSecret: 'a'.repeat(43) };
+
+test('refuses a sign-in over the rate limit without asking Better Auth', async () => {
+	const signInEmail = vi.fn();
+	const authRateLimit = vi.fn(() => Promise.resolve({ allowed: false, retryAfterSeconds: 42 }));
+	const result = await runAction(
+		actions,
+		'default',
+		fakeEvent({
+			path: '/login',
+			formData: credentials,
+			authApi: { signInEmail },
+			authRateLimit
+		})
+	);
+	expect(authRateLimit).toHaveBeenCalledWith('sign-in');
+	expect(signInEmail).not.toHaveBeenCalled();
+	expect(result).toMatchObject({
+		status: 429,
+		data: { form: { errors: { _errors: ['Too many attempts. Try again in 42 seconds.'] } } }
+	});
+});
+
+test('counts every sign-in attempt, and lets one under the limit through', async () => {
+	const signInEmail = vi.fn(() => Promise.resolve({}));
+	const authRateLimit = vi.fn(() => Promise.resolve({ allowed: true as const }));
+	const result = await runAndCatch(() =>
+		runAction(
+			actions,
+			'default',
+			fakeEvent({ path: '/login', formData: credentials, authApi: { signInEmail }, authRateLimit })
+		)
+	);
+	expect(authRateLimit).toHaveBeenCalledWith('sign-in');
+	expect(signInEmail).toHaveBeenCalledOnce();
+	expect(result).toMatchObject({ type: 'redirect', location: '/home' });
 });

@@ -252,7 +252,8 @@ AGENTS.md invariant 14. It is not: that invariant is about a **permission**
 being enforced by a disabled input, which is still forbidden. This is a
 **policy** that has structurally moved into the browser, and cannot move back
 without giving up the property this whole document is about. The compensating
-server-side control is rate limiting on `/sign-in/email`.
+server-side control is rate limiting on signing in and changing a password, per
+client address — see [rate-limiting.md](rate-limiting.md).
 
 ### JavaScript was already required
 

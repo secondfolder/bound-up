@@ -17,6 +17,11 @@ services:
       # posts, sign-in and passkeys all fail its origin checks. Passkeys also
       # need https unless this is localhost.
       ORIGIN: ${ORIGIN:-http://localhost:3000}
+      # Behind a reverse proxy, uncomment so sign-in is rate limited per client
+      # rather than per proxy. XFF_DEPTH is how many proxies are in front.
+      # See docs/rate-limiting.md.
+      # ADDRESS_HEADER: X-Forwarded-For
+      # XFF_DEPTH: 1
     volumes:
       - bound-up-db:/data/db
       - bound-up-media:/data/media

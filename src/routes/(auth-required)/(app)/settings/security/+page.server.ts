@@ -6,6 +6,7 @@ import { parseKeyWrapParams } from '$lib/encryption';
 import { providerForAaguid } from '$lib/passkey-providers';
 import { changePasswordSchema } from '$lib/schemas/encryptionForms';
 import { addWrap, deleteOtherPasswordWraps, deleteWrap, getUnlockBundle } from '$lib/server/keys';
+import { rateLimitMessage } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, request }) => {
@@ -55,6 +56,13 @@ export const actions: Actions = {
 		const form = await superValidate(request, zod4(changePasswordSchema));
 		if (!form.valid) {
 			return fail(400, { form });
+		}
+
+		// Checking the current password is a password guess like any other, and
+		// a stolen session could make them here without the sign-in limit.
+		const limited = await locals.authRateLimit('change-password');
+		if (!limited.allowed) {
+			return setError(form, '', rateLimitMessage(limited.retryAfterSeconds), { status: 429 });
 		}
 
 		const params = parseKeyWrapParams(form.data.wrapParams);

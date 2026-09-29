@@ -1,4 +1,5 @@
 import type { Db } from '../server/db';
+import { type AuthRateLimiter, unlimited } from '../server/rate-limit';
 import type { TestUser } from './fixtures';
 
 /**
@@ -60,6 +61,12 @@ export type FakeEventOptions = {
 	 * adapter that cannot tell, which the routes that call it must survive.
 	 */
 	clientAddress?: string;
+	/**
+	 * `locals.authRateLimit`. Unlike the rest, present by default — and allowing
+	 * everything — because the limit is orthogonal to what nearly every test of
+	 * a sign-in form is about. A test of the limit passes one that refuses.
+	 */
+	authRateLimit?: AuthRateLimiter;
 	/** `event.fetch`, for a route that calls out through it. Absent otherwise. */
 	fetch?: typeof fetch;
 	/**
@@ -103,7 +110,8 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 
 	const locals: Record<string, unknown> = {
 		user: options.user ?? null,
-		session: null
+		session: null,
+		authRateLimit: options.authRateLimit ?? unlimited
 	};
 	if (options.db) {
 		locals.db = options.db;

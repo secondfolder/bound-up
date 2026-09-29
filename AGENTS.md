@@ -325,7 +325,8 @@ site it applies to; go read that comment before deciding to break one.
     only check that exercises this path.
 
 17. **`src/lib/server/scheduled.ts` is a third alias-free zone**, and so is
-    everything it imports (`db/`, `media/expiry.ts`, `media/r2.ts`). It is the
+    everything it imports (`db/`, `media/expiry.ts`, `media/r2.ts`,
+    `rate-limit.ts`, `keyed-hash.ts`). It is the
     cron handler that sweeps self-destructed media out of R2. The adapter has no
     hook for a `scheduled` export any more than for a Durable Object, so
     `vite-plugins/scheduled-handler.ts` attaches it to the generated worker
@@ -446,6 +447,12 @@ fixes them (`requireD1`, the secret check in `hooks.server.ts`). Match that.
 **Auth failures must not leak which factor was wrong.** Login maps 401 to a
 single "Invalid email or password" for both unknown email and bad password, and
 the login schema deliberately omits the `.min(8)` the signup schema has.
+
+**Anything that checks a password or creates an account calls
+`locals.authRateLimit` first.** Better Auth's own limiter is off: it only runs
+in its HTTP router, which a form action calling `locals.auth.api.*` never goes
+through. The hook limits the `/api/auth` endpoints; a form action has to limit
+itself. See [docs/rate-limiting.md](docs/rate-limiting.md).
 
 **Queries select columns explicitly.** Use `columns: { … }` and `with: { … }`
 rather than selecting whole rows; D1 charges for rows read and response size.
@@ -837,6 +844,7 @@ Four places, split on scope:
 | [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |
 | [docs/features-and-admin.md](docs/features-and-admin.md)                                 | Per-account features, the admin role, the first-account admin, `/admin`      |
 | [docs/self-hosting.md](docs/self-hosting.md)                                             | The Docker build: backends, volumes, the sweep, CI, versioning and releases  |
+| [docs/rate-limiting.md](docs/rate-limiting.md)                                           | The sign-in, sign-up and change-password limits, and why not Better Auth's   |
 | [docs/roadmap.md](docs/roadmap.md)                                                       | The public /roadmap tree and landing teaser: the JSON, its rules, the drawer |
 
 **Keeping these current is part of the change, not a follow-up to it.**

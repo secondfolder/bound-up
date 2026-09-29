@@ -133,7 +133,8 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 			//
 			// The real strength policy is client-side and structurally
 			// unenforceable here. That is a consequence of the design, not an
-			// oversight; rate limiting is the compensating server-side control.
+			// oversight; rate limiting (`server/rate-limit.ts`) is the
+			// compensating server-side control.
 			minPasswordLength: AUTH_SECRET_LENGTH,
 			maxPasswordLength: AUTH_SECRET_LENGTH
 		},
@@ -142,6 +143,14 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 		// cookie read instead of two D1 queries. Cost: revocation lags by up to
 		// `maxAge` seconds.
 		session: { cookieCache: { enabled: true, maxAge: 60 } },
+		// Off, because the app limits these itself (`server/rate-limit.ts`).
+		// Better Auth's limiter only runs in its HTTP router, which the /login,
+		// /signup and change-password form actions never go through; it
+		// defaults to on only when NODE_ENV is 'production', which Workers does
+		// not set; and it counts in memory, which on Workers is per isolate.
+		// Left on, it also logged that it could not find the client's address,
+		// because nothing here tells it where to look.
+		rateLimit: { enabled: false },
 		telemetry: { enabled: false },
 		plugins: [
 			// `origin` is deliberately left unset so the plugin uses the real

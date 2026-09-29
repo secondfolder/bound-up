@@ -161,23 +161,31 @@
 	let passkeyError: string | null = $state(null);
 
 	async function afterPasskeySignIn(secrets: PasskeySecrets) {
+		// The password path gets `redirectTo` back from the action's 303; the
+		// passkey ceremony never touches the server action, so it has to apply
+		// the same destination itself or an invite would be dropped here — and
+		// the same default, `/home`, rather than the landing page.
+		//
+		// Read before `invalidateAll()`, not after. Re-running the login load
+		// with a session redirects away from this page, which unmounts this
+		// component, and a prop read after that is its default: `null`. That
+		// sent every passkey sign-in to /home, dropping an invite or the page a
+		// cleared browser was sent back from — and only a test that waited for
+		// the sign-in to finish, rather than sampling the URL on its way past,
+		// could see it.
+		const destination = redirectTo ?? resolve('/(auth-required)/(app)/home');
 		// Signing in with a passkey unlocks too: the same ceremony returned the
 		// secret that opens this passkey's wrap. See `passkey-ceremony.ts`.
 		stashUnlock({ kind: 'passkey', ...secrets, ...(reason ? { reason } : {}) });
 		// The ceremony set the session cookie client-side, so server load data is
 		// now stale — refetch before navigating.
 		await invalidateAll();
-		// The password path gets `redirectTo` back from the action's 303; the
-		// passkey ceremony never touches the server action, so it has to apply
-		// the same destination itself or an invite would be dropped here — and
-		// the same default, `/home`, rather than the landing page.
-		//
 		// The navigation-through-resolve plugin wants a resolve() call, but this
 		// is a runtime path from a query string, not a known route id — there is
 		// nothing to resolve against. It is safe because the server ran it
 		// through `safeRedirect` in the load before it ever reached this prop.
 		// biome-ignore lint/plugin: see above — a validated runtime path, not a route id.
-		await goto(redirectTo ?? resolve('/(auth-required)/(app)/home'), { invalidateAll: true });
+		await goto(destination, { invalidateAll: true });
 	}
 
 	async function signInWithPasskey() {

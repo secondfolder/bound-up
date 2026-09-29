@@ -4,6 +4,7 @@ import { fail, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { redirectTargetOrHome, safeRedirect } from '$lib/safe-redirect';
 import { loginFormSchema } from '$lib/schemas/loginForm';
+import { rateLimitMessage } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -31,6 +32,15 @@ export const actions: Actions = {
 		// Deliberately not replaced.
 		if (!loginForm.valid) {
 			return fail(400, { loginForm });
+		}
+
+		// Here as well as in the hook: this action calls Better Auth directly,
+		// which bypasses its HTTP endpoints — and any limit that only guarded
+		// those. Per client address, never per email, so a refusal says nothing
+		// about whether the account exists.
+		const limited = await locals.authRateLimit('sign-in');
+		if (!limited.allowed) {
+			return setError(loginForm, '', rateLimitMessage(limited.retryAfterSeconds), { status: 429 });
 		}
 
 		try {

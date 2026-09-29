@@ -1,6 +1,7 @@
 import { createD1Db } from './db';
 import { sweepExpiredMedia } from './media/expiry';
 import { createR2Store } from './media/r2';
+import { pruneRateLimits } from './rate-limit';
 
 /**
  * The worker's cron handler: `triggers.crons` in wrangler.jsonc.
@@ -23,11 +24,15 @@ export function scheduled(
 	env: Pick<App.Platform['env'], 'DB' | 'MEDIA'>,
 	ctx: { waitUntil: (promise: Promise<unknown>) => void }
 ): void {
+	const db = createD1Db(env.DB);
 	ctx.waitUntil(
-		sweepExpiredMedia(createD1Db(env.DB), createR2Store(env.MEDIA)).then((purged) => {
+		sweepExpiredMedia(db, createR2Store(env.MEDIA)).then((purged) => {
 			if (purged > 0) {
 				console.info(`self-destructed ${purged} attachment(s)`);
 			}
 		})
 	);
+	// Housekeeping on the same schedule: sign-in rate-limit counters whose
+	// window has closed (`rate-limit.ts`).
+	ctx.waitUntil(pruneRateLimits(db));
 }

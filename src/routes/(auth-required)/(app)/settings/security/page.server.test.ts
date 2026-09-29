@@ -199,4 +199,34 @@ describe('changePassword', () => {
 		expect(result).toMatchObject({ status: 400 });
 		expect(changePassword).not.toHaveBeenCalled();
 	});
+
+	// Checking the current password is a guess like a sign-in is, and a stolen
+	// session could otherwise make them here unlimited.
+	it('refuses a change over the rate limit before touching the wraps', async () => {
+		await setUpAda();
+		const changePassword = vi.fn().mockResolvedValue({});
+		const authRateLimit = vi.fn(() => Promise.resolve({ allowed: false, retryAfterSeconds: 5 }));
+
+		const result = await actions.changePassword(
+			fakeEvent({
+				db: harness.db,
+				user: ada,
+				authApi: { changePassword },
+				authRateLimit,
+				formData: {
+					currentAuthSecret: SECRET_A,
+					newAuthSecret: SECRET_B,
+					wrapParams: PARAMS,
+					wrapBlob: 'bmV3LXdyYXAtYmxvYi10aGF0LWlzLWxvbmctZW5vdWdo'
+				}
+			})
+		);
+
+		expect(authRateLimit).toHaveBeenCalledWith('change-password');
+		expect(changePassword).not.toHaveBeenCalled();
+		expect(result).toMatchObject({ status: 429 });
+		const remaining = await readWrapRows(harness.db, ada.id);
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0].blob).toBe(FAKE_WRAP_BLOB);
+	});
 });

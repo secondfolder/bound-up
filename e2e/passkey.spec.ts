@@ -14,6 +14,7 @@ import {
 	openBoard,
 	signUp,
 	waitForHydration,
+	waitForKeyring,
 	writeThread
 } from './helpers';
 
@@ -117,6 +118,10 @@ async function signInWithPasskeyHere(page: Page) {
 		await clickWaButton(page, 'Sign in with a passkey').catch(() => undefined);
 	}
 	await page.waitForURL((url) => url.pathname !== '/login');
+	// The ceremony leaves the key in the in-memory stash, like a password sign-in;
+	// the next full page load must not come before the shell has cached it. See
+	// waitForKeyring.
+	await waitForKeyring(page);
 }
 
 /** Every request body the two passkey ceremonies post to Better Auth. */

@@ -27,6 +27,9 @@ media. The first account to sign up becomes the admin, as on Workers (see
 | `MEDIA_DIR`          | `/data/media`               | Encrypted attachments                                          |
 | `PORT`               | `3000`                      | Where the server listens inside the container                  |
 | `BODY_SIZE_LIMIT`    | `32M`                       | adapter-node's request cap. Must stay above the attachment cap |
+| `ADDRESS_HEADER`     | none                        | Behind a proxy: where it puts the client's address             |
+| `XFF_DEPTH`          | none                        | With `X-Forwarded-For`: how many proxies are in front          |
+| `AUTH_RATE_LIMIT`    | on                          | `off` disables the sign-in rate limit                          |
 
 `/data/db` and `/data/media` are the two volumes. Back up both together: a
 database row without its file shows as missing media, and a file without its
@@ -41,6 +44,13 @@ see [passkeys.md](passkeys.md)). `PROTOCOL_HEADER=x-forwarded-proto` and
 `HOST_HEADER=x-forwarded-host` are the alternative when one container answers
 to several names. Passkeys and the Web Crypto API need a secure context, so
 anything but `localhost` needs HTTPS in front.
+
+**Behind a proxy, also set `ADDRESS_HEADER`** (usually `X-Forwarded-For`, with
+`XFF_DEPTH` set to the number of proxies). Signing in is rate limited per
+client address, and without it every client looks like the proxy, so they all
+share one allowance. Directly exposed, leave it unset: the connection's own
+address is used, and a client cannot pick its own by sending the header. See
+[rate-limiting.md](rate-limiting.md#self-hosted-the-clients-address).
 
 **One replica only.** The live message feed fans out through an in-process
 `Map` (below), so a second container would never hear the first one's
@@ -148,13 +158,16 @@ database. `drizzle-kit push` is still never used.
 Before anything is published, CI runs the image through three checks.
 
 - **`scripts/docker-smoke.sh`** starts it on fresh named volumes, checks every
-  migration was applied, writes a marker row and a marker file, then replaces
+  migration was applied, checks over HTTP that a sixth sign-in in a minute is
+  refused as too many (and that Better Auth never logged that it could not tell
+  clients apart), writes a marker row and a marker file, then replaces
   the container with a new one on the same volumes. The new one must be
   healthy, must not re-apply migrations, and must still have both markers.
 - **The whole Playwright suite runs against it.** With `E2E_IMAGE` set,
   `e2e/server.mjs` runs the image instead of `vite dev`, on the same
   per-checkout port, with two fresh named volumes mounted where a self-hoster's
-  go. `npm run test:e2e:image` does this locally (it builds `bound-up:local`
+  go, and `AUTH_RATE_LIMIT=off` — every test signs up from the same address,
+  which is why the smoke test checks the limit instead. `npm run test:e2e:image` does this locally (it builds `bound-up:local`
   first).
 - **The specs that touch the database go through the container.** `e2e/db.ts`
   is their one `sql()` helper. Against `vite dev` it opens the run's SQLite

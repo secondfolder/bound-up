@@ -97,7 +97,9 @@ BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d
 ```
 
 `docker-compose.yml` is the example to start from. Set `ORIGIN` to the URL
-people will use (it is required behind an HTTPS proxy), keep the secret, and
+people will use (it is required behind an HTTPS proxy), and behind a proxy
+also `ADDRESS_HEADER`, so sign-in is rate limited per client rather than per
+proxy ([docs/rate-limiting.md](docs/rate-limiting.md)). Keep the secret, and
 sign up straight away: the first account is the admin. Run one replica only.
 How the build differs from the Workers one, what runs in place of D1, R2, the
 Durable Object and the cron job, and how releases are versioned and tested are

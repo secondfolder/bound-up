@@ -8,6 +8,7 @@ import { redirectTargetOrHome, safeRedirect } from '$lib/safe-redirect';
 import { signupFormSchema } from '$lib/schemas/signupForm';
 import { user } from '$lib/server/db/schema';
 import { putUserKeys } from '$lib/server/keys';
+import { rateLimitMessage } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -27,6 +28,15 @@ export const actions: Actions = {
 		// no safer to log)
 		if (!signupForm.valid) {
 			return fail(400, { signupForm });
+		}
+
+		// See the login action: this bypasses Better Auth's HTTP endpoints, so
+		// it is limited here rather than there.
+		const limited = await locals.authRateLimit('sign-up');
+		if (!limited.allowed) {
+			return setError(signupForm, '', rateLimitMessage(limited.retryAfterSeconds), {
+				status: 429
+			});
 		}
 
 		const { name, email, timezone, authSecret, recipient, wrapParams, wrapBlob } = signupForm.data;

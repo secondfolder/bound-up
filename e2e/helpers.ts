@@ -160,8 +160,11 @@ const PUBLIC_PATH = /^\/(?:$|signup|login|logout|invite|roadmap)(?:\/|$)/;
  *
  * Only inside the app shell: a sign-up that lands back on an invite has no
  * gate, and keeps the stash until the shell first loads.
+ *
+ * Exported for sign-in helpers that live in a spec — the passkey ceremony in
+ * passkey.spec.ts had the same race, and failed in CI the same way.
  */
-async function waitForKeyring(page: Page) {
+export async function waitForKeyring(page: Page) {
 	if (PUBLIC_PATH.test(new URL(page.url()).pathname)) {
 		return;
 	}

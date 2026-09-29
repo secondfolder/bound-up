@@ -12,6 +12,7 @@ import {
 	userKeys,
 	userKeyWraps
 } from './db/schema';
+import { hex, keyedHash } from './keyed-hash';
 
 /**
  * Partner-assisted sign-in: getting back into an account after losing every
@@ -43,33 +44,9 @@ export const MAX_REQUESTS_PER_EMAIL = 3;
 /** Per address per hour. Higher, because people share addresses. */
 export const MAX_REQUESTS_PER_IP = 10;
 
-const encoder = new TextEncoder();
-
-function hex(bytes: ArrayBuffer): string {
-	return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * A keyed hash, for the email and IP columns.
- *
- * Keyed with the auth secret rather than plain SHA-256: an IPv4 address and a
- * typical email are guessable, so an unkeyed hash of either is reversible by
- * anyone holding the table. Keyed, a leaked table says nothing on its own.
- */
-async function keyedHash(secret: string, purpose: string, value: string): Promise<string> {
-	const key = await crypto.subtle.importKey(
-		'raw',
-		encoder.encode(secret),
-		{ name: 'HMAC', hash: 'SHA-256' },
-		false,
-		['sign']
-	);
-	return hex(await crypto.subtle.sign('HMAC', key, encoder.encode(`${purpose}|${value}`)));
-}
-
 /** The token is random, so a plain digest is enough to make the column useless. */
 async function tokenHash(token: string): Promise<string> {
-	return hex(await crypto.subtle.digest('SHA-256', encoder.encode(token)));
+	return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
 }
 
 export type StartRecoveryResult =

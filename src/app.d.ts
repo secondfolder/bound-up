@@ -5,6 +5,7 @@ import type { AnyD1Database } from 'drizzle-orm/d1';
 import type { Auth, Session, User } from '$lib/server/auth';
 import type { Db } from '$lib/server/db';
 import type { MediaBucket } from '$lib/server/media';
+import type { AuthRateLimiter } from '$lib/server/rate-limit';
 import type { RealtimeNamespace } from '$lib/server/realtime/binding';
 
 declare global {
@@ -26,6 +27,13 @@ declare global {
 			auth: Auth;
 			session: Session | null;
 			user: User | null;
+			/**
+			 * One attempt against a sign-in, sign-up or change-password bucket,
+			 * for this request's client. Form actions call it before Better Auth;
+			 * the hook calls it for the `/api/auth` equivalents. See
+			 * `$lib/server/rate-limit`.
+			 */
+			authRateLimit: AuthRateLimiter;
 		}
 		// interface PageData {}
 		// interface PageState {}
@@ -39,6 +47,8 @@ declare global {
 			env: {
 				DB: AnyD1Database;
 				BETTER_AUTH_SECRET: string;
+				/** `off` disables the sign-in rate limit. Unset in production. */
+				AUTH_RATE_LIMIT?: string;
 				/**
 				 * The R2 bucket holding encrypted attachments.
 				 *

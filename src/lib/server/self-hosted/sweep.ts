@@ -1,6 +1,7 @@
 import type { Db } from '../db';
 import { sweepExpiredMedia } from '../media/expiry';
 import type { LocalMediaStore } from '../media/local';
+import { pruneRateLimits } from '../rate-limit';
 
 /**
  * The self-hosted server's stand-in for two things Cloudflare does for the
@@ -22,7 +23,7 @@ export const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
  */
 export const EXPIRING_LIFECYCLE_MS = 31 * 24 * 60 * 60 * 1000;
 
-/** One pass: the expiry sweep, then the lifecycle backstop. */
+/** One pass: the expiry sweep, the lifecycle backstop, and closed rate-limit counters. */
 export async function runMediaSweep(
 	db: Db,
 	store: LocalMediaStore,
@@ -33,6 +34,8 @@ export async function runMediaSweep(
 		'expiring/',
 		new Date(now.getTime() - EXPIRING_LIFECYCLE_MS)
 	);
+	// Rides along with the sweep, as it does with the cron trigger on Workers.
+	await pruneRateLimits(db, now);
 	return { purged, agedOut };
 }
 

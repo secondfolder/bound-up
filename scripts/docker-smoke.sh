@@ -61,6 +61,33 @@ if [ "$migrations" != "$expected" ]; then
 	echo "Expected $expected migrations applied, found $migrations" >&2
 	exit 1
 fi
+# The sign-in rate limit, over real HTTP, from one client address: wrong
+# credentials are refused as such until the limit, then refused as too many.
+# (The Playwright suite runs with the limit off; see e2e/server.mjs.)
+sign_in() {
+	curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:$port/api/auth/sign-in/email" \
+		-H 'content-type: application/json' -H "origin: http://localhost:$port" \
+		--data "{\"email\":\"nobody@example.test\",\"password\":\"$(printf 'a%.0s' $(seq 1 43))\"}"
+}
+for attempt in 1 2 3 4 5; do
+	status=$(sign_in)
+	if [ "$status" != 401 ]; then
+		echo "Sign-in attempt $attempt answered $status, expected 401" >&2
+		exit 1
+	fi
+done
+status=$(sign_in)
+if [ "$status" != 429 ]; then
+	echo "The sixth sign-in attempt in a minute answered $status, expected 429" >&2
+	exit 1
+fi
+# Better Auth logs this when its own limiter cannot tell clients apart, which
+# is the situation the app's limiter exists to avoid; it must not appear.
+if docker logs "$name" 2>&1 | grep -q 'could not determine a client IP'; then
+	echo 'Better Auth could not determine the client address' >&2
+	exit 1
+fi
+
 # A marker that only survives if /data/db really is the volume.
 query "insert into verification (id, identifier, value, expires_at, created_at, updated_at) values ('smoke', 'smoke', 'smoke', 0, 0, 0) returning id" >/dev/null
 docker exec "$name" sh -c 'echo smoke > "$MEDIA_DIR/smoke"'
@@ -81,4 +108,4 @@ if [ "$(docker exec "$name" sh -c 'cat "$MEDIA_DIR/smoke"')" != smoke ]; then
 	echo 'The media directory did not survive the restart' >&2
 	exit 1
 fi
-echo "OK: healthy, $migrations migrations applied once, database and media persisted"
+echo "OK: healthy, sign-in rate limited, $migrations migrations applied once, database and media persisted"

@@ -117,4 +117,34 @@ describe('default action', () => {
 		expect(result).toMatchObject({ status: 400 });
 		expect(signUpEmail).not.toHaveBeenCalled();
 	});
+
+	// Better Auth's HTTP endpoint is limited in the hook; this action never
+	// goes through it.
+	it('refuses a sign-up over the rate limit without creating anything', async () => {
+		const signUpEmail = vi.fn();
+		const authRateLimit = vi.fn(() => Promise.resolve({ allowed: false, retryAfterSeconds: 90 }));
+
+		const result = await actions.default(
+			fakeEvent({
+				db: harness.db,
+				path: '/signup',
+				formData: {
+					name: 'Ada',
+					email: 'ada@example.test',
+					timezone: 'Europe/London',
+					authSecret: 'A'.repeat(43),
+					recipient: ADA_RECIPIENT,
+					wrapParams: JSON.stringify(PASSWORD_WRAP_PARAMS),
+					wrapBlob: FAKE_WRAP_BLOB
+				},
+				authApi: { signUpEmail },
+				authRateLimit
+			})
+		);
+
+		expect(authRateLimit).toHaveBeenCalledWith('sign-up');
+		expect(signUpEmail).not.toHaveBeenCalled();
+		expect(result).toMatchObject({ status: 429 });
+		expect(JSON.stringify(result)).toContain('Try again in 2 minutes');
+	});
 });
