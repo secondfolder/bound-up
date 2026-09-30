@@ -57,7 +57,7 @@
 
 <div class="landing">
 	<header>
-		<h1>Bound Up</h1>
+		<h1>Bound Up <span class="beta">beta</span></h1>
 		<div class="subtitle">
 			Explore your kinks and manage your dynamics. Either with a partner or solo.
 		</div>
@@ -138,6 +138,29 @@
 				   a second line, and the screened title sat as a two-line ghost
 				   under the real one. */
 				white-space: nowrap;
+				/* Anchors the beta tag. */
+				position: relative;
+
+				/* Absolutely positioned so it takes no width: the header centres
+				   the h1 by its box, and an inline tag would pull "Bound Up" off
+				   centre by its own width. Sized in em of the h1, so it follows
+				   the clamp down to a phone. */
+				.beta {
+					position: absolute;
+					top: 0.1em;
+					left: 100%;
+					margin-left: -0.8em;
+					padding: 0.15em 0.4em;
+					font-family: var(--wa-font-family-body);
+					font-size: 0.18em;
+					font-weight: 700;
+					letter-spacing: 0.08em;
+					line-height: 1;
+					text-transform: uppercase;
+					border: 2px solid var(--accent-color);
+					border-radius: 0.3em;
+					rotate: 8deg;
+				}
 			}
 			.subtitle {
 				font-size: clamp(1.25rem, 4vw, 2rem);
