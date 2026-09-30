@@ -179,8 +179,8 @@ one prefix per lifetime, without enumerating rows. The key is still stored on
 the row, so the layout can change without a migration.
 
 **The lifetime prefix exists for the bucket's lifecycle rule**, which deletes
-anything under `expiring/` older than 31 days (set up in the README's deploy
-steps; it cannot be declared in `wrangler.jsonc`). No self-destructing file
+anything under `expiring/` older than 31 days (set up in the deploy steps of
+[development.md](development.md); it cannot be declared in `wrangler.jsonc`). No self-destructing file
 lives past 30 days, so anything the rule catches is either expired or an
 **orphan**: an object from a send that died after writing its files but before
 its rows. No row points at an orphan, so the sweep can never find it. That is

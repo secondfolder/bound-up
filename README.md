@@ -1,235 +1,104 @@
+<p align="center">
+  <a href="https://boundup.secondfolder.com/">
+    <img src="static/og-image.jpg" alt="Bound Up: explore your kinks and manage your dynamics, either with a partner or solo." width="720">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://boundup.secondfolder.com/"><strong>Open Bound Up</strong></a>
+  ·
+  <a href="https://boundup.secondfolder.com/roadmap">Roadmap</a>
+  ·
+  <a href="#run-your-own">Self-host</a>
+  ·
+  <a href="docs/development.md">Develop</a>
+</p>
+
 # Bound Up
 
-SvelteKit 2 + Svelte 5 on Cloudflare Workers, with Drizzle ORM over Cloudflare D1
-and Better Auth (email/password + passkeys).
+**Explore your kinks and manage your dynamics. Either with a partner or solo.**
 
-## Features
+Bound Up is a private web app for kink and power-exchange dynamics. You can set
+tasks and earn rewards, run guided edging sessions, and keep in touch with a
+partner through messages only the two of you can read. Use it alone, or link
+up with a partner and decide between you which of you is in control.
 
-- Guides made of ordered edge tasks.
-- Self rewards and partnership rewards with shared-control permissions.
-- Self tasks and partnership tasks that award reward credits on completion.
-- Encrypted partner messaging with per-device key handling.
-- Partner-aware timezone handling, including tasks whose dates stay relative to
-  one partner's timezone even if that person later changes their timezone.
 
-> **Breaking change — accounts created before the end-to-end encryption work
-> must be recreated.** Passwords are now turned into a key in the browser and
-> only a derived value is sent to the server, so a credential stored under the
-> old scheme can no longer be matched. There is no migration and cannot be a
-> clean one: any "try the old way first" path would have to post the plaintext
-> password again, and deciding which way to try would mean asking the server
-> about an email before signing in — an account-existence oracle. Run
-> `npm run db:reset` locally; on a deployed instance, recreate the accounts.
-> Nothing is lost, because no messages exist yet. See
-> [docs/encryption.md](docs/encryption.md).
+## Get started
 
-## First-time setup
+Go to **[boundup.secondfolder.com](https://boundup.secondfolder.com/)** and
+sign up. It runs in the browser on your phone or computer, and there is nothing
+to download. On a phone you can add it to your home screen so it opens like an
+app.
 
-Local development needs **no Cloudflare account** — it runs against a plain
-SQLite file.
+If you would rather keep everything on your own server, you can
+[run your own copy](#run-your-own).
 
-```sh
-npm install
-cp .env.example .env
-npm run auth:secret          # paste the value into BETTER_AUTH_SECRET in .env
-npm run db:migrate           # create the tables in ./local.db
-npm run db:seed              # insert the dev guide + edge task
-npm run dev
-```
+## What you can do
 
-## Deploy setup (only when you actually deploy)
+- **Tasks.** Set things to get done, for yourself or between you and your
+  partner, one-off or on a schedule. Completing a task earns credits.
+- **Rewards.** Make a list of treats and spend your credits on them. In a
+  partnership, whoever is in control decides what is on offer.
+- **Partners.** Invite someone with a link. Once you are linked, they get their
+  own tab in the app, with their tasks, rewards and messages.
+- **Messages.** Private conversations with your partner, organised into tagged
+  threads. You can use formatting, link previews, and photos and videos that
+  disappear after they have been seen. Anything you are halfway through typing
+  is still there when you come back.
+- **Guided sessions** _(early access)_. Step-by-step edging guides that count
+  along with you and reveal what comes next as you go.
+- **Time zones that follow you.** A task happens at the right time for the
+  person it is set for, even if one of you travels or moves.
 
-```sh
-npx wrangler login
-npx wrangler d1 create bound-up        # paste database_id into wrangler.jsonc
-npx wrangler r2 bucket create bound-up-media
-# Deletes self-destructing media (and orphans from failed sends) that outlive the
-# 30-day maximum. Lives on the bucket, not in wrangler.jsonc. See docs/messaging.md.
-npx wrangler r2 bucket lifecycle add bound-up-media expire-self-destructing expiring/ --expire-days 31
-openssl rand -hex 32 | npx wrangler secret put BETTER_AUTH_SECRET
-npm run db:migrate:production
-npm run deploy
-```
+Plenty more is on the way, including chastity tracking, a kink list, and
+logging edges and orgasms. The **[roadmap](https://boundup.secondfolder.com/roadmap)**
+shows what is being built, what is planned and what is still an idea.
 
-Run `npm run preview` before every deploy — it is the only local step that
-exercises the real Workers runtime (`nodejs_compat`, the assets binding,
-`platform.env`, the R2 bucket, the Durable Object, the real bundle), and
-therefore the only one that can catch the dev/production divergences described
-below.
+## Private by design
 
-Both it and `deploy` run wrangler with no entry argument: `main` in
-`wrangler.jsonc` is the worker the adapter generates, and wrangler is happy with
-that. The one wrinkle is the `RealtimeRoom` Durable Object class, which has to be
-exported from the worker's own module — a module the adapter generates, so there
-is nowhere in the source tree to put the export. The `sveltekit-cloudflare-do`
-plugin in `vite.config.ts` appends it once the adapter has written the file.
-The cron handler that deletes self-destructed message media from R2 is attached
-to the same file the same way, by `vite-plugins/scheduled-handler.ts`; its
-schedule is `triggers.crons` in `wrangler.jsonc` and is applied by `deploy`. To
-run it by hand against `npm run preview`, start wrangler with
-`--test-scheduled` and request `/cdn-cgi/handler/scheduled`.
+- **Only you and your partner can read your messages.** They are encrypted on
+  your device before they are sent. The server stores only the scrambled
+  version and has no way to unscramble it.
+- **Your password never leaves your device.** Your browser turns it into a
+  key, and only a value derived from that key is sent to sign you in.
+- **Passkeys.** Sign in with Face ID, a fingerprint or your password manager
+  instead of a password.
+- **Nothing to set up.** Signing in is all it takes. There are no extra keys,
+  codes or passphrases to manage.
 
-Because wrangler needs no custom entry, Cloudflare's deploy-on-push works on its
-defaults — build command `npm run build`, deploy command `npx wrangler deploy`.
+Since nobody else can read your messages, nobody can reset your password for
+you by email either. If you lose every way into your account, a linked partner
+can vouch for you and help you back in, and your messages with them come back
+too.
 
-> **Why `overrides` in package.json:** `sveltekit-cloudflare-do@0.2.1` ships a
-> self-referential `"sveltekit-cloudflare-do": "link:"` dependency — a pnpm
-> workspace artefact that was published by mistake — and npm refuses it outright
-> with `EUNSUPPORTEDPROTOCOL`. The override redirects that nested self-dependency
-> back at the top-level spec, which is the only way the package installs under
-> npm. Delete it if the package ever ships a fixed release.
+The details, including exactly what the server can and cannot see, are in
+[docs/encryption.md](docs/encryption.md).
 
-> **Known issue:** the built worker currently 500s on every page —
-> `ReferenceError: HTMLElement is not defined`, because the root layout imports
-> Web Awesome's Lit components into the server graph. It predates the messaging
-> work and no test catches it, because the Playwright suite runs against
-> `vite dev`. The diagnosis and two rejected fixes are recorded at the end of
-> [AGENTS.md](AGENTS.md).
+## Run your own
 
-## Self-hosting with Docker
-
-Every release is also published as a Docker image, which runs without a
-Cloudflare account: a SQLite file and a directory of encrypted attachments,
-each on a Docker volume.
+Every release is published as a Docker image, so you can run Bound Up on your
+own server with no other services needed:
 
 ```sh
 BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d
 ```
 
-`docker-compose.yml` is the example to start from. Set `ORIGIN` to the URL
-people will use (it is required behind an HTTPS proxy), and behind a proxy
-also `ADDRESS_HEADER`, so sign-in is rate limited per client rather than per
-proxy ([docs/rate-limiting.md](docs/rate-limiting.md)). Keep the secret, and
-sign up straight away: the first account is the admin. Run one replica only.
-How the build differs from the Workers one, what runs in place of D1, R2, the
-Durable Object and the cron job, and how releases are versioned and tested are
-in [docs/self-hosting.md](docs/self-hosting.md).
+Start from [`docker-compose.yml`](docker-compose.yml), then sign up straight
+away: the first account on a new server becomes its admin. Keep the secret
+somewhere safe, because changing it signs everyone out. If the server sits
+behind a reverse proxy, set `ORIGIN` to the address people will use.
 
-## How the database works
+[docs/self-hosting.md](docs/self-hosting.md) covers the settings, backups,
+and how releases are versioned.
 
-|                             | Driver                 | Applier                         |
-| --------------------------- | ---------------------- | ------------------------------- |
-| `npm run dev`, seed, studio | libsql → `./local.db`  | `npm run db:migrate`            |
-| `npm run preview`           | D1 (wrangler-emulated) | `npm run db:migrate:preview`    |
-| production                  | D1                     | `npm run db:migrate:production` |
-| Docker image                | libsql → `/data/db`    | the entrypoint, on every start  |
+## Contributing
 
-- Schema: `src/lib/server/db/schema/app.ts` (hand-written) and `schema/auth.ts`
-  (generated by `npm run auth:schema` — regenerate rather than hand-edit).
-- Migrations live in `drizzle/` and **are committed**. One migration set feeds all
-  three databases; each keeps its own ledger table, so there is no double-apply.
-- The Drizzle client and the Better Auth instance are built **per request** in
-  `src/hooks.server.ts` and exposed as `event.locals.db` / `event.locals.auth`.
-  There is no module-level singleton: a D1 binding only exists inside a request.
+Bug reports and ideas are welcome in
+[GitHub issues](https://github.com/secondfolder/bound-up/issues). Check the
+[roadmap](https://boundup.secondfolder.com/roadmap) first, since your idea may
+already be on it.
 
-### Changing the schema
-
-```sh
-npm run auth:schema     # only if Better Auth's own tables need regenerating
-npm run db:generate     # writes drizzle/000N_*.sql — READ IT
-npm run db:migrate      # local
-npm run db:migrate:production   # production
-```
-
-Never run `drizzle-kit push` — see the comment in `drizzle.config.ts`.
-
-### The first admin
-
-The first account created in a database is made an admin by a trigger in the
-migrations, and every later admin is made from that account's Settings → Admin
-page. On a fresh deployment, sign up straight after the first deploy. See
-[docs/features-and-admin.md](docs/features-and-admin.md).
-
-## Gotchas
-
-- **Nothing under `src/lib/server/db/` may import `$lib`, `$env` or `$app`.**
-  drizzle-kit and the seed script load those files outside Vite, where SvelteKit's
-  aliases do not resolve. The one exception is `db/backend.ts`, which is imported only
-  by the SvelteKit side.
-- **`db.transaction()` works locally but fails on D1.** Drizzle's D1 driver emits
-  raw `begin`/`commit`; D1 is auto-commit and offers `batch()` instead. Use
-  `batch()`. (Better Auth is unaffected — its adapter runs writes sequentially.)
-- **Secrets come from three places**: `platform.env` on Workers (wrangler
-  secrets), `.env` in dev (there is no `platform` in dev — `svelte.config.js`
-  strips the adapter's `emulate` hook so `vite dev` needs no workerd), and the
-  container's environment when self-hosted.
-- **Passkeys are bound to a hostname.** One registered on `localhost` will not work
-  on a tunnel host or in production, and vice versa. That is WebAuthn, not a bug.
-- **Logging in and signing up need JavaScript, and always did.** Every text
-  field is a `<wa-input>` custom element whose real `<input>` only exists once
-  Web Awesome upgrades it, so with scripting off there are no usable inputs on
-  those pages at all. The client-side key derivation did not change that; it
-  just added a `<noscript>` block that explains it.
-- **The password is also the encryption key.** It is stretched in the browser
-  (PBKDF2-SHA256, 650k iterations) into an auth secret that goes to the server
-  and a wrap key that never leaves the device. Two consequences worth knowing
-  before you touch either: changing the email-normalisation rule or any KDF
-  parameter locks every existing account out of its own message history, and
-  there is a frozen test vector in `src/lib/crypto/kdf.test.ts` whose job is to
-  fail loudly if you do. See [docs/encryption.md](docs/encryption.md).
-- **Partner task dates are timezone-relative, not fixed to one stored offset.**
-  The tasks feature stores local wall-clock values plus which partner they are
-  relative to, so changing an account timezone later changes how that task is
-  interpreted. See [docs/tasks.md](docs/tasks.md) and [docs/timezone.md](docs/timezone.md).
-- `npm run db:reset` uses `rm -f` and is not Windows-portable.
-
-## Tests
-
-```sh
-npx playwright install chromium   # once — both suites use it
-npm test                          # everything: vitest, then the Playwright suite
-npm run test:unit                 # vitest alone, in watch mode
-npm run test:e2e                  # the Playwright suite alone
-npm run test:e2e:image            # the Playwright suite against a fresh Docker build
-```
-
-The server tests build a SQLite database in memory from the committed
-migrations. The component tests run in headless Chromium (Vitest's browser
-mode), sealed off from the network. The Playwright suite starts its own
-`vite dev` against a throwaway database under the OS temp directory, on a port
-derived from the checkout's path, so it never touches your `local.db` or
-`npm run dev`, and two worktrees can run it at once. A second run in the same
-checkout is refused until the first finishes. The app fetches its icons from
-Font Awesome's CDN, so the Playwright suite expects a network connection.
-`AGENTS.md` has the details of how each level is meant to be used.
-
-### Pre-commit
-
-`git commit` runs [husky](https://typicode.github.io/husky/) +
-[lint-staged](https://github.com/lint-staged/lint-staged): svelte-check over the
-whole project first, then over the staged files — [Biome](https://biomejs.dev)
-formats them and fixes what it can, `scripts/format-svelte.mjs` formats the
-`<script>` and `<style>` blocks of any staged component, and `vitest related`
-runs the unit tests whose files import the staged ones (see the `lint-staged`
-entry in `package.json`). Anything a task rewrites is re-staged automatically.
-It is not a substitute for the full loop in `AGENTS.md` — the e2e suite is too
-slow for a hook and runs in CI (`.github/workflows/ci.yml`, against the Docker
-image) or by hand.
-
-A `commit-msg` hook runs [commitlint](https://commitlint.js.org) too: release
-versions are computed from conventional commit messages, so a `feat:` spelled
-`feat;` would otherwise be left out of one. See
-[docs/self-hosting.md](docs/self-hosting.md#versioning-and-publishing).
-
-How the linter and formatter are set up, and why one is a Biome config and the
-other is half a script, is in
-[docs/linting-and-formatting.md](docs/linting-and-formatting.md).
-
-## Scripts
-
-| Script                                                        | What it does                                                  |
-| ------------------------------------------------------------- | ------------------------------------------------------------- |
-| `dev` / `build`.                                              | Vite dev server / production build                            |
-| `build:node`                                                  | The self-hosted Node server, as the Dockerfile builds it      |
-| `preview`                                                     | Build, migrate the emulated D1, then run the real worker      |
-| `deploy`                                                      | Build and deploy to Cloudflare                                |
-| `check` / `lint` / `format` / `test`                          | svelte-check / Biome check / Biome write / all tests          |
-| `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against `vite dev`          |
-| `test:e2e:image`                                              | Build the Docker image, then Playwright against it            |
-| `db:generate`                                                 | Generate a migration from the schema                          |
-| `db:migrate` / `db:migrate:preview` / `db:migrate:production` | Apply migrations to local.db / emulated D1 / production       |
-| `db:seed` / `db:reset`                                        | Seed dev data / wipe local.db and re-seed                     |
-| `db:studio`                                                   | Drizzle Studio against `./local.db`                           |
-| `auth:schema` / `auth:secret`                                 | Regenerate the Better Auth tables / generate a secret         |
-| `cf-typegen`                                                  | Regenerate Cloudflare binding types (not currently committed) |
-| `favicons`                                                    | Regenerate every icon in `static/` from the theme and effects |
+To work on the code, start with [docs/development.md](docs/development.md) for
+setup, tests and deployment, then [AGENTS.md](AGENTS.md) for the conventions
+every change follows. Each feature has its own write-up in [docs/](docs/).

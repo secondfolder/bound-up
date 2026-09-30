@@ -1,7 +1,7 @@
 # Database
 
 This document covers the repo's database workflow beyond the short command list
-in `README.md`.
+in [development.md](development.md).
 
 ## Migrations
 

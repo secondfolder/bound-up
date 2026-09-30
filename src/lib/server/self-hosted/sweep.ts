@@ -7,7 +7,7 @@ import { pruneRateLimits } from '../rate-limit';
  * The self-hosted server's stand-in for two things Cloudflare does for the
  * Workers build: the `*\/15 * * * *` cron trigger that runs
  * `sweepExpiredMedia` (`scheduled.ts`), and the R2 lifecycle rule that expires
- * anything under `expiring/` after 31 days (README, "Deploy setup").
+ * anything under `expiring/` after 31 days (docs/development.md, "Deploy setup").
  *
  * Started once from the `init` hook in `hooks.server.ts`. Relative imports
  * only, like `scheduled.ts`, so it stays reachable from either build.

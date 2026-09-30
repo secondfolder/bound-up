@@ -51,8 +51,8 @@ export type MediaBucket = {
  * Which top-level prefix an object lives under: whether it self-destructs.
  *
  * The split exists for the bucket's lifecycle rule, which deletes anything
- * under `expiring/` older than 31 days (see README, "Deploy setup"). No
- * self-destructing file lives past 30, so everything that rule catches is
+ * under `expiring/` older than 31 days (see docs/development.md, "Deploy
+ * setup"). No self-destructing file lives past 30, so everything that rule catches is
  * either expired or an orphan — an object from a send that failed after its
  * files were written but before its rows, which no row points at and the
  * sweep therefore can never find. A lifecycle rule can only match a prefix, so

@@ -2,9 +2,11 @@
 
 Conventions and invariants for this repo. Read this before changing anything.
 
-`README.md` is the human-facing setup guide — first-time setup, deploy, the
-three-database story, the full script table. It is not repeated here. This file
-covers what an agent needs that the README does not say: where things live, what
+`README.md` is the front page for people who want to use the app: what it is,
+how to reach it, how to self-host it. The human-facing developer guide —
+first-time setup, deploy, the three-database story, the full script table — is
+[docs/development.md](docs/development.md), and is not repeated here. This
+file covers what an agent needs that neither says: where things live, what
 will break if you guess, and what "done" means.
 
 ## What this is
@@ -290,7 +292,7 @@ site it applies to; go read that comment before deciding to break one.
       custom entry: plain `wrangler dev` / `wrangler deploy` are correct, which
       is what lets Cloudflare's deploy-on-push run on its default commands.
       (The `overrides` block in package.json exists only because that package
-      publishes a broken `link:` self-dependency that npm rejects — see README.)
+      publishes a broken `link:` self-dependency that npm rejects — see docs/development.md.)
     - **Durable Object class lifecycle is `exports`, and is not a database
       migration.** `d1_databases[0].migrations_dir` is SQL applied by
       `npm run db:migrate:preview`; the top-level `exports` map declares that the
@@ -813,7 +815,10 @@ Notes that cost a debugging round each:
 
 Four places, split on scope:
 
-- **`README.md`** — how a human sets up, runs, migrates, and deploys.
+- **`README.md`** — what the app is and how to use or self-host it, for
+  people who are not developers. Keep developer detail out of it.
+- **`docs/development.md`** — how a human sets up, runs, migrates, tests and
+  deploys from source.
 - **`AGENTS.md`** — repo-wide conventions and invariants.
 - **`docs/<feature>.md`** — how one feature actually works: its data model, its
   rules, and the decisions a reader would otherwise have to reconstruct from
@@ -843,6 +848,7 @@ Four places, split on scope:
 | [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill and legacy rich text     |
 | [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |
 | [docs/features-and-admin.md](docs/features-and-admin.md)                                 | Per-account features, the admin role, the first-account admin, `/admin`      |
+| [docs/development.md](docs/development.md)                                               | Working from source: setup, deploy, the databases, tests, the script table   |
 | [docs/self-hosting.md](docs/self-hosting.md)                                             | The Docker build: backends, volumes, the sweep, CI, versioning and releases  |
 | [docs/rate-limiting.md](docs/rate-limiting.md)                                           | The sign-in, sign-up and change-password limits, and why not Better Auth's   |
 | [docs/roadmap.md](docs/roadmap.md)                                                       | The public /roadmap tree and landing teaser: the JSON, its rules, the drawer |
