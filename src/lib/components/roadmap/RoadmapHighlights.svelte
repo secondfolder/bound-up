@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { featuredUpcoming, formatShippedOn, recentlyShipped, STATUS_LABELS } from '$lib/roadmap';
+	import { featuredUpcoming, STATUS_LABELS } from '$lib/roadmap';
 
 	const roadmapHref = resolve('/(public)/roadmap');
 	const upcoming = featuredUpcoming(6);
-	const recent = recentlyShipped(4);
 </script>
 
-<!-- The landing page's taste of the roadmap. Every link goes to the item's own
-     node on /roadmap, which opens its details. No two links share a name:
-     "Coming up" is only unshipped items and "Recently added" only shipped
-     ones, and $lib/roadmap refuses duplicate titles. -->
+<!-- The landing page's taste of what is coming. Every link goes to the item's
+     own node on /roadmap, which opens its details. What has already shipped
+     is RoadmapRecent, under the landing page's feature overview. -->
 <section class="highlights" aria-labelledby="roadmap-highlights">
 	<h2 id="roadmap-highlights">Coming Up</h2>
 	<ul class="upcoming">
@@ -21,20 +19,6 @@
 					<span class="title">{item.title}</span>
 					<span class="status">{STATUS_LABELS[item.status]}</span>
 				</a>
-			</li>
-		{/each}
-	</ul>
-
-	<h3>Recently added</h3>
-	<ul class="recent">
-		{#each recent as { item, parent } (item.id)}
-			<li>
-				<wa-icon name="check" variant="solid" aria-hidden="true"></wa-icon>
-				<!-- On one line: whitespace inside the link would be underlined. -->
-				<a href="{roadmapHref}#{item.id}">{#if parent}<span class="parent">{parent.title}:</span>&nbsp;{/if}{item.title}</a>
-				{#if item.shippedOn}
-					<span class="date">{formatShippedOn(item.shippedOn)}</span>
-				{/if}
 			</li>
 		{/each}
 	</ul>
@@ -63,14 +47,6 @@
 			font-family: var(--font-display);
 			font-size: clamp(2rem, 8vw, 3rem);
 			color: var(--accent-color);
-		}
-
-		h3 {
-			margin: 0.75rem 0 0;
-			font-size: var(--wa-font-size-s);
-			text-transform: uppercase;
-			letter-spacing: 0.08em;
-			color: var(--wa-color-text-normal);
 		}
 
 		ul {
@@ -183,44 +159,6 @@
 		&:focus-visible {
 			outline: 2px solid var(--accent-tint);
 			outline-offset: 3px;
-		}
-	}
-
-	.recent {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-
-		li {
-			display: flex;
-			flex-wrap: wrap;
-			justify-content: center;
-			align-items: baseline;
-			column-gap: 0.45rem;
-		}
-
-		wa-icon {
-			color: var(--accent-color);
-			align-self: center;
-		}
-
-		a {
-			color: var(--wa-color-text-normal);
-			font-weight: 700;
-
-			&:hover {
-				color: var(--accent-tint);
-			}
-		}
-
-		.parent {
-			font-weight: 400;
-			color: var(--wa-color-text-quiet);
-		}
-
-		.date {
-			font-size: var(--wa-font-size-s);
-			color: var(--wa-color-text-quiet);
 		}
 	}
 </style>

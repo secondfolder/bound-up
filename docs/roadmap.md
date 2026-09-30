@@ -208,17 +208,23 @@ straight back.
 ## The landing page teaser
 
 [RoadmapHighlights.svelte](../src/lib/components/roadmap/RoadmapHighlights.svelte)
-shows the first six `featuredUpcoming()` items as tiles, the four newest
-`recentlyShipped()`, and "See the full roadmap". It is excluded from the
-landing page's effects capture, for the reason given in
-[page-effects.md](page-effects.md).
+is the "Coming Up" section: the first six `featuredUpcoming()` items as tiles,
+and "See the full roadmap".
+[RoadmapRecent.svelte](../src/lib/components/roadmap/RoadmapRecent.svelte) is
+"Recently added", the four newest `recentlyShipped()`. It sits apart, under
+the landing page's feature overview
+([LandingFeatures.svelte](../src/lib/components/landing/LandingFeatures.svelte)),
+because what has shipped belongs with what the app does rather than with what
+is coming. Both are excluded from the landing page's effects capture, for the
+reason given in [page-effects.md](page-effects.md).
 
 ## Tests
 
 - **Data:** [roadmap.test.ts](../src/lib/roadmap/roadmap.test.ts) checks that
   the real file passes, has one broken tree per rule, and covers the
   selectors.
-- **Components:** `RoadmapTree` and `RoadmapHighlights` have browser tests.
+- **Components:** `RoadmapTree`, `RoadmapHighlights` and `RoadmapRecent` have
+  browser tests.
   The page test, `src/routes/(public)/roadmap/page.svelte.test.ts`, covers the
   fragment-driven drawer and the legend.
 - **End to end:** [e2e/roadmap.spec.ts](../e2e/roadmap.spec.ts) covers:

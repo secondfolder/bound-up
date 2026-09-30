@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import LandingFeatures from '$lib/components/landing/LandingFeatures.svelte';
 	import RoadmapHighlights from '$lib/components/roadmap/RoadmapHighlights.svelte';
 	import ShareMeta from '$lib/components/ShareMeta.svelte';
 	import { GrainEffect } from '$lib/effects/grain-effect.svelte';
@@ -82,16 +83,18 @@
 		{/if}
 	</div>
 
-	<!-- Left out of the page capture, like the CTA, but still under the effects
-	     canvas (which has pointer-events: none, so its links take clicks) —
-	     the grain carries on over it. It has to be left out because the
-	     capture drops the CTA from its clone altogether (`excludeMode:
-	     'remove'`, see VfxPageSnapshot), so everything after the CTA sits a
-	     CTA's height higher in the clone than on the page: screened, this
-	     section left a ghost of itself up behind the "Sign up" button. Being
-	     last, nothing after it can shift, and the halftone has all but faded
-	     out by this depth anyway. -->
-	<div class="roadmap-highlights" data-vfx-capture-ignore="true">
+	<!-- Everything after the CTA is left out of the page capture, like the CTA
+	     itself, but stays under the effects canvas (which has pointer-events:
+	     none, so its links take clicks) — the grain carries on over it. It has
+	     to be left out because the capture drops the CTA from its clone
+	     altogether (`excludeMode: 'remove'`, see VfxPageSnapshot), so
+	     everything after the CTA sits a CTA's height higher in the clone than
+	     on the page: screened, the roadmap section left a ghost of itself up
+	     behind the "Sign up" button. One wrapper rather than an attribute per
+	     section, so a section added here later cannot forget it. The halftone
+	     has all but faded out by this depth anyway. -->
+	<div class="below-cta" data-vfx-capture-ignore="true">
+		<LandingFeatures />
 		<RoadmapHighlights />
 	</div>
 </div>

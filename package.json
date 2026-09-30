@@ -18,6 +18,7 @@
 		"test": "vitest run && playwright test",
 		"test:e2e": "playwright test",
 		"test:e2e:image": "docker build -t bound-up:local . && E2E_IMAGE=bound-up:local playwright test",
+		"screenshots:landing": "playwright test --config playwright.screenshots.config.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate:dev": "drizzle-kit migrate",
 		"db:migrate:preview": "wrangler d1 migrations apply DB --local",

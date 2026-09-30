@@ -48,6 +48,14 @@ describe('/+page.svelte', () => {
 		expect(screen.queryByRole('link', { name: 'Log in' })).not.toBeInTheDocument();
 	});
 
+	it('shows the feature overview, then the roadmap teaser', () => {
+		pageState.data.user = null;
+		render(Page);
+		const features = screen.getByRole('heading', { level: 2, name: 'Features' });
+		const comingUp = screen.getByRole('heading', { level: 2, name: 'Coming Up' });
+		expect(features.compareDocumentPosition(comingUp)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+	});
+
 	it('shows the roadmap teaser, linking to the full roadmap', () => {
 		pageState.data.user = null;
 		render(Page);

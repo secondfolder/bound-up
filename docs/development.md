@@ -144,6 +144,12 @@ npm run test:e2e                  # the Playwright suite alone
 npm run test:e2e:image            # the Playwright suite against a fresh Docker build
 ```
 
+The landing page's feature screenshots in `static/landing/` are real screens,
+staged through the UI by `e2e/landing-screenshots.capture.ts`. Retake them with
+`npm run screenshots:landing` when one of those screens changes; it runs
+against the same throwaway server as the Playwright suite, which never picks up
+`*.capture.ts` files, so `npm test` leaves the committed images alone.
+
 The server tests build a SQLite database in memory from the committed
 migrations. The component tests run in headless Chromium (Vitest's browser
 mode), sealed off from the network. The Playwright suite starts its own
@@ -187,6 +193,7 @@ other is half a script, is in
 | `check` / `lint` / `format` / `test`                          | svelte-check / Biome check / Biome write / all tests          |
 | `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against `vite dev`          |
 | `test:e2e:image`                                              | Build the Docker image, then Playwright against it            |
+| `screenshots:landing`                                         | Retake the landing page's feature screenshots (`static/landing/`) |
 | `db:generate`                                                 | Generate a migration from the schema                          |
 | `db:migrate:dev` / `db:migrate:preview` / `db:migrate:production` | Apply migrations to local.db / emulated D1 / production |
 | `db:seed` / `db:reset`                                        | Seed dev data / wipe local.db and re-seed                     |

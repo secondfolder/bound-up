@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { type Browser, expect, type Locator, type Page } from '@playwright/test';
+import {
+	type Browser,
+	type BrowserContextOptions,
+	expect,
+	type Locator,
+	type Page
+} from '@playwright/test';
 
 /**
  * Shared steps for the invite flows.
@@ -320,8 +326,15 @@ export type Side = { page: Page; who: Account; close: () => Promise<void> };
  * `navigator.clipboard.writeText`, and without it Chromium leaves that promise
  * pending rather than rejecting, which stalls the page waiting to navigate.
  */
-export async function newSide(browser: Browser, name: string): Promise<Side> {
-	const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+export async function newSide(
+	browser: Browser,
+	name: string,
+	options: BrowserContextOptions = {}
+): Promise<Side> {
+	const context = await browser.newContext({
+		...options,
+		permissions: ['clipboard-read', 'clipboard-write']
+	});
 	const page = await context.newPage();
 	return { page, who: account(name), close: () => context.close() };
 }

@@ -17,13 +17,12 @@ describe('RoadmapHighlights', () => {
 		}
 	});
 
-	it('lists the most recently shipped items, with when', () => {
+	it('leaves what has shipped to RoadmapRecent', () => {
 		render(RoadmapHighlights);
+		expect(screen.queryByRole('heading', { name: 'Recently added' })).not.toBeInTheDocument();
 		for (const { item } of recentlyShipped(4)) {
-			const link = screen.getByRole('link', { name: new RegExp(`${item.title}$`) });
-			expect(link).toHaveAttribute('href', `/(public)/roadmap#${item.id}`);
+			expect(screen.queryByRole('link', { name: new RegExp(`${item.title}$`) })).toBeNull();
 		}
-		expect(screen.getAllByText('September 2026').length).toBeGreaterThan(0);
 	});
 
 	it('links to the full roadmap', () => {
