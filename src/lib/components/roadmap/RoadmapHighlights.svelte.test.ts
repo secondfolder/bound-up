@@ -33,7 +33,7 @@ describe('RoadmapHighlights', () => {
 		);
 	});
 
-	it('lays the tiles out evenly, with a short last row centred', () => {
+	it('lays the tiles out evenly and centred, three to a row at most', () => {
 		const { container } = render(RoadmapHighlights);
 		const list = defined(container.querySelector('.upcoming'), 'the tile list');
 		const tiles = [...container.querySelectorAll('.upcoming > li')].map((li) =>
@@ -49,16 +49,19 @@ describe('RoadmapHighlights', () => {
 
 		const rows = Map.groupBy(tiles, (tile) => Math.round(tile.top));
 		const rowList = [...rows.values()];
-		// The frame is wide enough for a full row and a short one.
+		// The frame is wide enough for the widest layout, which is three.
 		expect(rowList.length).toBeGreaterThan(1);
-		expect(rowList.at(-1)?.length).toBeLessThan(rowList[0].length);
+		expect(rowList[0]).toHaveLength(3);
+		for (const row of rowList) {
+			expect(row.length).toBeLessThanOrEqual(3);
+		}
 
 		const listBox = list.getBoundingClientRect();
 		for (const [index, row] of rowList.entries()) {
 			for (let i = 1; i < row.length; i += 1) {
 				expect(row[i].left - row[i - 1].right).toBeCloseTo(gap, 1);
 			}
-			// Centred, full rows and the short one alike.
+			// Centred, full rows and a short last one alike.
 			const first = defined(row[0], 'a tile');
 			const last = defined(row.at(-1), 'a tile');
 			expect(first.left - listBox.left).toBeCloseTo(listBox.right - last.right, 1);

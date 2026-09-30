@@ -56,7 +56,7 @@
 		}
 
 		/* Web Awesome's native styles indent every `li` by 1.125em, which made
-		   each tile 18px wider than its column: three fitted where four should,
+		   each tile 18px wider than its column: two fitted where three should,
 		   and one where two should on a phone. */
 		li {
 			margin: 0;
@@ -86,6 +86,8 @@
 	 * exactly one column wide so every full row lines up with the others.
 	 */
 	.upcoming {
+		/* Three at most, however wide the section, so the six featured
+		   items sit in two even rows. */
 		--columns: 2;
 		--gap: 0.75rem;
 
@@ -104,12 +106,6 @@
 	@container (min-width: 28rem) {
 		.upcoming {
 			--columns: 3;
-		}
-	}
-
-	@container (min-width: 36rem) {
-		.upcoming {
-			--columns: 4;
 		}
 	}
 
