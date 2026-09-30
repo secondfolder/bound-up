@@ -1,13 +1,13 @@
 <p align="center">
-  <a href="https://boundup.secondfolder.com/">
+  <a href="https://boundup.lewd.toys/">
     <img src="static/og-image.jpg" alt="Bound Up: explore your kinks and manage your dynamics, either with a partner or solo." width="720">
   </a>
 </p>
 
 <p align="center">
-  <a href="https://boundup.secondfolder.com/"><strong>Open Bound Up</strong></a>
+  <a href="https://boundup.lewd.toys/"><strong>Open Bound Up</strong></a>
   ·
-  <a href="https://boundup.secondfolder.com/roadmap">Roadmap</a>
+  <a href="https://boundup.lewd.toys/roadmap">Roadmap</a>
   ·
   <a href="#run-your-own">Self-host</a>
   ·
@@ -26,7 +26,7 @@ up with a partner and decide between you which of you is in control.
 
 ## Get started
 
-Go to **[boundup.secondfolder.com](https://boundup.secondfolder.com/)** and
+Go to **[boundup.lewd.toys](https://boundup.lewd.toys/)** and
 sign up. It runs in the browser on your phone or computer, and there is nothing
 to download. On a phone you can add it to your home screen so it opens like an
 app.
@@ -52,7 +52,7 @@ If you would rather keep everything on your own server, you can
   person it is set for, even if one of you travels or moves.
 
 Plenty more is on the way, including chastity tracking, a kink list, and
-logging edges and orgasms. The **[roadmap](https://boundup.secondfolder.com/roadmap)**
+logging edges and orgasms. The **[roadmap](https://boundup.lewd.toys/roadmap)**
 shows what is being built, what is planned and what is still an idea.
 
 ## Private by design
@@ -96,7 +96,7 @@ and how releases are versioned.
 
 Bug reports and ideas are welcome in
 [GitHub issues](https://github.com/secondfolder/bound-up/issues). Check the
-[roadmap](https://boundup.secondfolder.com/roadmap) first, since your idea may
+[roadmap](https://boundup.lewd.toys/roadmap) first, since your idea may
 already be on it.
 
 To work on the code, start with [docs/development.md](docs/development.md) for
