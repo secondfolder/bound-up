@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { NETWORK_FAILURE, tryFetch } from '$lib/request-failure.svelte';
 	import type { TagView } from '$lib/types';
 
 	let {
@@ -69,13 +70,13 @@
 		if (!newName.trim()) {
 			return;
 		}
-		const response = await fetch(`/api/partnerships/${partnershipId}/tags`, {
+		const response = await tryFetch(`/api/partnerships/${partnershipId}/tags`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ name: newName, color: newColor })
 		});
-		if (!response.ok) {
-			problem = 'Could not add that tag';
+		if (!response?.ok) {
+			problem = response ? 'Could not add that tag' : NETWORK_FAILURE;
 			return;
 		}
 		const tag = (await response.json()) as TagView;
@@ -99,13 +100,13 @@
 		if (!editingTagId) {
 			return;
 		}
-		const response = await fetch(`/api/partnerships/${partnershipId}/tags/${editingTagId}`, {
+		const response = await tryFetch(`/api/partnerships/${partnershipId}/tags/${editingTagId}`, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ name: draftName, color: draftColor })
 		});
-		if (!response.ok) {
-			problem = 'Could not save that tag';
+		if (!response?.ok) {
+			problem = response ? 'Could not save that tag' : NETWORK_FAILURE;
 			return;
 		}
 		const updated = (await response.json()) as TagView;
@@ -127,14 +128,16 @@
 	async function save() {
 		if (threadId) {
 			saving = true;
-			const response = await fetch(`/api/partnerships/${partnershipId}/threads/${threadId}/tags`, {
+			// `tryFetch`, so a dropped connection cannot throw past `saving = false`
+			// and leave the picker stuck saving.
+			const response = await tryFetch(`/api/partnerships/${partnershipId}/threads/${threadId}/tags`, {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ tagIds: selectedIds })
 			});
 			saving = false;
-			if (!response.ok) {
-				problem = 'Could not update tags';
+			if (!response?.ok) {
+				problem = response ? 'Could not update tags' : NETWORK_FAILURE;
 				return;
 			}
 		}

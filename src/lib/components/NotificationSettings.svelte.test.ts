@@ -38,7 +38,7 @@ beforeEach(() => {
 	client.storedPushDeviceId.mockReturnValue(null);
 	client.resyncPush.mockResolvedValue(null);
 	client.enablePush.mockResolvedValue('d-phone');
-	client.disablePush.mockResolvedValue(undefined);
+	client.disablePush.mockResolvedValue(true);
 });
 
 afterEach(() => {

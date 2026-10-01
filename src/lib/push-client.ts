@@ -1,6 +1,7 @@
 import { dev } from '$app/environment';
 import { shouldOfferHomeScreen } from '$lib/home-screen';
 import { deviceLabel, PUSH_DEVICE_ID_KEY } from '$lib/notifications';
+import { tryFetch } from '$lib/request-failure.svelte';
 
 /**
  * Turning push notifications on and off for this browser.
@@ -156,19 +157,25 @@ export async function resyncPush(): Promise<string | null> {
  * Called before signing out, too: a notification names a partner on the lock
  * screen, and that should stop with the session. It never throws, so a
  * network hiccup cannot block a sign-out; the server also deletes a device the
- * moment a push service reports it gone.
+ * moment a push service reports it gone, which an unsubscribed browser now is.
+ *
+ * Resolves false when the server could not be told, so the settings screen can
+ * say so. Sign-out ignores it: the session is going either way.
  */
-export async function disablePush(): Promise<void> {
+export async function disablePush(): Promise<boolean> {
 	const id = storedPushDeviceId();
 	storePushDeviceId(null);
 	try {
 		const existing = await navigator.serviceWorker?.getRegistration();
 		const subscription = await existing?.pushManager.getSubscription();
 		await subscription?.unsubscribe();
-		if (id) {
-			await fetch(`/api/push/subscriptions/${id}`, { method: 'DELETE' });
-		}
-	} catch (error) {
-		console.warn('could not fully turn off notifications', error);
+	} catch {
+		// The browser refused to unsubscribe. The server row still goes below.
 	}
+	if (!id) {
+		return true;
+	}
+	const response = await tryFetch(`/api/push/subscriptions/${id}`, { method: 'DELETE' });
+	// A 404 means it was already gone, which is the outcome wanted.
+	return response?.ok === true || response?.status === 404;
 }

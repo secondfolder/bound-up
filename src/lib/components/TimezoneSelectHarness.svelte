@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { type Infer, type SuperValidated, superForm } from 'sveltekit-superforms';
+	import type { Infer, SuperValidated } from 'sveltekit-superforms';
 	import type { AccountFormSchema } from '$lib/schemas/accountForm';
+	import { superForm } from '$lib/superform';
 	import TimezoneSelect from './TimezoneSelect.svelte';
 
 	let {

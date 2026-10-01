@@ -37,6 +37,7 @@ import {
 	encryptPayload
 } from '../crypto/messages';
 import { unlockedIdentity } from '../crypto/session.svelte';
+import { tryFetch } from '../request-failure.svelte';
 
 type RestorePage = {
 	messages: { id: string; ciphertext: string; metadataCiphertext?: string | null }[];
@@ -177,10 +178,10 @@ export async function declineHistoryRestore(
 	partnershipId: string,
 	requestId: string
 ): Promise<boolean> {
-	const response = await fetch(`/api/partnerships/${partnershipId}/restore`, {
+	const response = await tryFetch(`/api/partnerships/${partnershipId}/restore`, {
 		method: 'DELETE',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ requestId })
 	});
-	return response.ok;
+	return response?.ok === true;
 }

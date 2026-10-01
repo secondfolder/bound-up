@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { type Infer, type SuperValidated, superForm } from 'sveltekit-superforms';
+	import type { Infer, SuperValidated } from 'sveltekit-superforms';
 	import type { PartnerAcceptFormSchema } from '$lib/schemas/partnerForm';
+	import { superForm } from '$lib/superform';
 	import PartnerFields from './PartnerFields.svelte';
 
 	/**

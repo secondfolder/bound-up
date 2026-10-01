@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -7,6 +6,7 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import TaskForm from '$lib/components/TaskForm.svelte';
 	import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
+	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

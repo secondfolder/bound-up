@@ -15,6 +15,7 @@
 		sendMessage
 	} from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
+	import { reportRequestFailure, tryFetch } from '$lib/request-failure.svelte';
 	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
 	import { migrateLegacyMessages } from '$lib/richtext-legacy-migrate';
 	import { scrollIntoViewWithin } from '$lib/scroll-parent';
@@ -190,7 +191,7 @@
 
 	async function react(message: MessageView, emoji: string) {
 		const ciphertext = await buildReaction(emoji, targets);
-		const response = await fetch(
+		const response = await tryFetch(
 			`/api/partnerships/${partnershipId}/messages/${message.id}/reaction`,
 			{
 				method: 'PUT',
@@ -198,19 +199,23 @@
 				body: JSON.stringify({ ciphertext })
 			}
 		);
-		if (response.ok) {
-			await invalidate(`messages:thread:${thread.id}`);
+		if (!response?.ok) {
+			reportRequestFailure(response);
+			return;
 		}
+		await invalidate(`messages:thread:${thread.id}`);
 	}
 
 	async function clearReaction(message: MessageView) {
-		const response = await fetch(
+		const response = await tryFetch(
 			`/api/partnerships/${partnershipId}/messages/${message.id}/reaction`,
 			{ method: 'DELETE' }
 		);
-		if (response.ok) {
-			await invalidate(`messages:thread:${thread.id}`);
+		if (!response?.ok) {
+			reportRequestFailure(response);
+			return;
 		}
+		await invalidate(`messages:thread:${thread.id}`);
 	}
 
 	/**
@@ -244,9 +249,13 @@
 		}
 		const current = metadata[message.id] ?? null;
 		const next = await refreshMessageMetadata(partnershipId, message.id, href, current, targets);
-		if (next) {
-			metadata[message.id] = next;
+		if (!next) {
+			// Pressed and waited on, unlike the backfill above, which is
+			// opportunistic and simply tries again on the next view.
+			reportRequestFailure(null, "Couldn't refresh this preview. Please try again.");
+			return;
 		}
+		metadata[message.id] = next;
 	}
 </script>
 

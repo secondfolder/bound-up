@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

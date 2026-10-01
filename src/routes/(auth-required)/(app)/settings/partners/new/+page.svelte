@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerFields from '$lib/components/PartnerFields.svelte';
 	import { shareInviteLink } from '$lib/share';
+	import { superForm } from '$lib/superform';
 	import type { InviteCreated } from './+page.server';
 	import type { PageData } from './$types';
 

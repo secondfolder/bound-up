@@ -48,6 +48,12 @@ The exceptions are, roughly:
   schema barrel, the `--wa-*` custom properties that come from Web Awesome's
   stylesheet at runtime, Lexical's bitmask formats.
 
+The same override also carries the one rule that is configured rather than
+switched off: `noRestrictedImports` refuses `superForm` from
+`sveltekit-superforms`, so every form goes through `$lib/superform` and shows
+a failed submit (see [request-failures.md](request-failures.md)). The wrapper
+is the only file allowed the import, with a `biome-ignore` saying so.
+
 Per-site suppressions are `biome-ignore` comments with a real reason. A
 diagnostic reported against an **attribute** rather than an element (the iframe
 sandbox in `UrlEmbed.svelte`, the viewport meta in `app.html`) is not reachable

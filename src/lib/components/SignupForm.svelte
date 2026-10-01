@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import { superForm } from 'sveltekit-superforms';
 	import { generateAgeIdentity } from '$lib/crypto/identity';
 	import {
 		deriveAuthSecret,
@@ -15,6 +14,7 @@
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
 	import type { SignupFormSchema } from '$lib/schemas/signupForm';
+	import { superForm } from '$lib/superform';
 	import { currentTimeZoneOrUtc } from '$lib/timezone';
 	import InputField from './InputField.svelte';
 	import PasswordField from './PasswordField.svelte';

@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { lock } from '$lib/crypto/session.svelte';
 	import { disablePush } from '$lib/push-client';
+	import { reportRequestFailure } from '$lib/request-failure.svelte';
 
 	// Server load data is the single source of truth for auth state — see the
 	// note in src/routes/+layout.svelte.
@@ -34,6 +35,13 @@
 					use:enhance={async () => {
 						await disablePush();
 						await lock(user.id);
+						return async ({ result, update }) => {
+							if (result.type === 'error') {
+								reportRequestFailure(result);
+								return;
+							}
+							await update();
+						};
 					}}
 				>
 					<wa-button type="submit" appearance="outlined" variant="danger">Log out</wa-button>

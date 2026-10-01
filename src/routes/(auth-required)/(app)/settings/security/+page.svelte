@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { superForm } from 'sveltekit-superforms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -11,6 +10,8 @@
 	import { WEBCRYPTO_UNAVAILABLE, webCryptoAvailable } from '$lib/crypto/kdf';
 	import { buildPasswordChange } from '$lib/crypto/setup';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
+	import { NETWORK_FAILURE, tryFetch } from '$lib/request-failure.svelte';
+	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -53,11 +54,11 @@
 	 * and would leave this one in every bundle.
 	 */
 	async function remove(id: string) {
-		const response = await fetch(`/api/keys/passkey/${encodeURIComponent(id)}`, {
+		const response = await tryFetch(`/api/keys/passkey/${encodeURIComponent(id)}`, {
 			method: 'DELETE'
 		});
-		if (!response.ok) {
-			message = 'Could not remove passkey';
+		if (!response?.ok) {
+			message = response ? 'Could not remove passkey' : NETWORK_FAILURE;
 			return;
 		}
 		await invalidateAll();

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import { superForm } from 'sveltekit-superforms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
@@ -18,6 +17,7 @@
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import { type LoginFormSchema, loginFormSchema } from '$lib/schemas/loginForm';
 	import { takeSignInEmail } from '$lib/sign-in-again';
+	import { superForm } from '$lib/superform';
 	import InputField from './InputField.svelte';
 	import PasswordField from './PasswordField.svelte';
 

@@ -393,7 +393,10 @@ load data is serialised into the HTML of every page. Whitelist fields, as
   `locals.auth.api.*` inside `try`, maps `APIError` to `setError`, and
   `redirect(303, …)` on success.
 - The component takes the `SuperValidated` object as a prop and builds its own
-  `superForm`. Fields go through `InputField.svelte`.
+  `superForm`, **imported from `$lib/superform`**, whose `onError` shows a
+  failed submit; the library's own rethrows it into the console and the page
+  says nothing. Biome refuses the direct import. Fields go through
+  `InputField.svelte`.
 - **An `$effect` that reads the `data` prop re-runs on every `invalidate()`.**
   `data` is reassigned each time a load re-runs, so the effect's dependency is
   the whole prop rather than the field you read from it. For an effect that sets
@@ -437,6 +440,15 @@ load data is serialised into the HTML of every page. Whitelist fields, as
   are in `e2e/encryption.spec.ts` under "password manager autofill", and
   `e2e/helpers.ts` documents the measurement. Any future field whose Svelte
   state is load-bearing needs the same treatment.
+
+**Every request the browser sends shows feedback if it fails.** Expected
+failures (validation, a wrong password, a rate limit) are answered inline by
+the code that knows what they mean; unexpected ones (a 5xx, no connection, a
+timeout) go to the app-wide notice through `reportRequestFailure`. Use
+`tryFetch` from `$lib/request-failure.svelte` rather than a bare `fetch`
+whose result is acted on, so the failure `fetch` *throws* for cannot be
+forgotten. Only background work nobody is waiting on may fail silently. See
+[docs/request-failures.md](docs/request-failures.md).
 
 **Never lose something a user typed.** Every message composer keeps an
 encrypted draft on the device until it is sent or emptied, and a new place
@@ -861,6 +873,7 @@ Four places, split on scope:
 | [docs/rate-limiting.md](docs/rate-limiting.md)                                           | The sign-in, sign-up and change-password limits, and why not Better Auth's   |
 | [docs/roadmap.md](docs/roadmap.md)                                                       | The public /roadmap tree and landing teaser: the JSON, its rules, the drawer |
 | [docs/notifications.md](docs/notifications.md)                                           | Web Push: iOS rules, what a notification may say, devices, the Free plan fit |
+| [docs/request-failures.md](docs/request-failures.md)                                     | Feedback for failed requests: inline vs the app-wide notice, the safety net  |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

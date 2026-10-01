@@ -27,6 +27,7 @@ import {
 	MAX_VIDEO_BYTES,
 	type MediaTtl
 } from '$lib/messaging';
+import { NETWORK_FAILURE, SERVER_FAILURE, tryFetch } from '$lib/request-failure.svelte';
 import {
 	documentEmbedUrls,
 	documentToPlainText,
@@ -243,7 +244,11 @@ export async function sendMessage(
 		body.set('tagIds', JSON.stringify(target.tagIds ?? []));
 	}
 
-	const response = await fetch(endpointFor(target), { method: 'POST', body });
+	const response = await tryFetch(endpointFor(target), { method: 'POST', body });
+	if (!response) {
+		// Shown in the composer, with what was typed still in it.
+		return { ok: false, message: NETWORK_FAILURE };
+	}
 	if (!response.ok) {
 		return { ok: false, message: await describeFailure(response) };
 	}
@@ -273,6 +278,10 @@ async function describeFailure(response: Response): Promise<string> {
 	}
 	if (response.status === 403) {
 		return 'Your account cannot send media that never self-destructs';
+	}
+	// A 5xx body says "Internal Error" at best, which tells nobody anything.
+	if (response.status >= 500) {
+		return SERVER_FAILURE;
 	}
 	return body?.message ?? 'Could not send that';
 }

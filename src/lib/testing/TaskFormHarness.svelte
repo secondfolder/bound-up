@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import { superForm } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import TaskForm from '$lib/components/TaskForm.svelte';
 	import { type TaskEditorFormSchema, taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
+	import { superForm } from '$lib/superform';
 
 	type TimeZoneContext = {
 		viewerUserId: string;

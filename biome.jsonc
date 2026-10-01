@@ -125,6 +125,22 @@
 						"noSecrets": "off"
 					},
 					"style": {
+						// Not an exception: configuration, which a group set to a severity
+						// cannot carry either. superforms' own `superForm` rethrows a
+						// failed submit, so the failure never reaches the page; every form
+						// goes through `$lib/superform`, which shows it. See
+						// docs/request-failures.md.
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"sveltekit-superforms": {
+										"importNames": ["superForm"],
+										"message": "Import superForm from $lib/superform, which shows a failed submit instead of only logging it."
+									}
+								}
+							}
+						},
 						// Would outlaw `a ? b : c` everywhere, including Svelte markup where
 						// an expression is the only thing allowed.
 						"noTernary": "off",

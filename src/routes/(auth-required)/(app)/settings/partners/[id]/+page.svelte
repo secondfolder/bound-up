@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerFields from '$lib/components/PartnerFields.svelte';
 	import { initialsFor } from '$lib/initials';
+	import { reportRequestFailure } from '$lib/request-failure.svelte';
 	import { shareInviteLink } from '$lib/share';
+	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -90,6 +91,10 @@
 									await share(result.data.url);
 								} else if (result.type === 'failure') {
 									rotateError = String(result.data?.rotateError ?? 'Could not renew the link.');
+								} else if (result.type === 'error') {
+									// Shown on this page rather than swapping it for the error page.
+									reportRequestFailure(result);
+									return;
 								}
 								// Refresh the load data so the input above shows the new link.
 								await update({ reset: false });
@@ -142,7 +147,13 @@
 					if (!confirm(`Disconnect from ${partnership.partnerName}? This cannot be undone.`)) {
 						cancel();
 					}
-					return async ({ update }) => update();
+					return async ({ result, update }) => {
+						if (result.type === 'error') {
+							reportRequestFailure(result);
+							return;
+						}
+						await update();
+					};
 				}}
 			>
 				<wa-button type="submit" appearance="outlined" variant="danger">

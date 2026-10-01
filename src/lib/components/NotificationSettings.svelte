@@ -8,6 +8,7 @@
 		resyncPush,
 		storedPushDeviceId
 	} from '$lib/push-client';
+	import { NETWORK_FAILURE, tryFetch } from '$lib/request-failure.svelte';
 
 	/**
 	 * Push notification settings: this device's switch, and every device's
@@ -89,7 +90,9 @@
 	async function turnOff() {
 		busy = true;
 		message = null;
-		await disablePush();
+		if (!(await disablePush())) {
+			message = 'This browser has stopped, but the server could not be told. Remove it below.';
+		}
 		thisDeviceId = null;
 		await onchange();
 		busy = false;
@@ -97,13 +100,13 @@
 
 	async function update(id: string, changes: Partial<Omit<Device, 'id' | 'label'>>) {
 		message = null;
-		const response = await fetch(`/api/push/subscriptions/${encodeURIComponent(id)}`, {
+		const response = await tryFetch(`/api/push/subscriptions/${encodeURIComponent(id)}`, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(changes)
 		});
-		if (!response.ok) {
-			message = 'Could not save that change. Please try again.';
+		if (!response?.ok) {
+			message = response ? 'Could not save that change. Please try again.' : NETWORK_FAILURE;
 		}
 		await onchange();
 	}
@@ -114,11 +117,11 @@
 			return;
 		}
 		message = null;
-		const response = await fetch(`/api/push/subscriptions/${encodeURIComponent(id)}`, {
+		const response = await tryFetch(`/api/push/subscriptions/${encodeURIComponent(id)}`, {
 			method: 'DELETE'
 		});
-		if (!response.ok) {
-			message = 'Could not remove that device. Please try again.';
+		if (!response?.ok) {
+			message = response ? 'Could not remove that device. Please try again.' : NETWORK_FAILURE;
 		}
 		await onchange();
 	}
