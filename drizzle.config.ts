@@ -1,11 +1,12 @@
 import { defineConfig } from 'drizzle-kit';
 
 /**
- * Migrations are GENERATED here and applied to three separate databases:
+ * Migrations are GENERATED here and applied to four separate databases:
  *
- *   ./local.db          `npm run db:migrate:dev`          (drizzle-kit, dev)
- *   emulated D1         `npm run db:migrate:preview`      (wrangler, dev)
- *   production D1       `npm run db:migrate:production`   (wrangler, production)
+ *   ./local.db          `npm run db:migrate:dev`             (drizzle-kit, dev)
+ *   emulated D1         `npm run db:migrate:local-preview`   (wrangler, dev)
+ *   Worker Previews D1  `npm run db:migrate:remote-preview`  (wrangler, branch previews)
+ *   production D1       `npm run db:migrate:production`      (wrangler, production)
  *
  * Each database keeps exactly one ledger table, so there is no double-apply
  * hazard — but do NOT run `drizzle-kit push`: it needs a Cloudflare API token

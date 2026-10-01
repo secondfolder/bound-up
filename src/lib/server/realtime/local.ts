@@ -4,7 +4,8 @@ import {
 	SSE_HEADERS,
 	SSE_KEEPALIVE,
 	SSE_KEEPALIVE_MS,
-	SSE_PREAMBLE
+	SSE_PREAMBLE,
+	type Watcher
 } from './index';
 
 /**
@@ -25,21 +26,21 @@ import {
 
 const encoder = new TextEncoder();
 
-/** partnershipId → the open streams watching it. */
-const rooms = new Map<string, Set<ReadableStreamDefaultController<Uint8Array>>>();
+/** partnershipId → the open streams watching it, and whose they are. */
+const rooms = new Map<string, Map<ReadableStreamDefaultController<Uint8Array>, Watcher>>();
 
 export function createLocalNotifier(): Notifier {
 	return {
 		publish(partnershipId, event) {
 			const room = rooms.get(partnershipId);
 			if (!room) {
-				return Promise.resolve();
+				return Promise.resolve([]);
 			}
 
 			const frame = encoder.encode(encodeSseEvent(event));
 			// A copy, because a failed enqueue removes the controller from the set
 			// we would otherwise be iterating.
-			for (const controller of [...room]) {
+			for (const controller of [...room.keys()]) {
 				try {
 					controller.enqueue(frame);
 				} catch {
@@ -51,10 +52,10 @@ export function createLocalNotifier(): Notifier {
 			if (room.size === 0) {
 				rooms.delete(partnershipId);
 			}
-			return Promise.resolve();
+			return Promise.resolve([...room.values()]);
 		},
 
-		stream(partnershipId) {
+		stream(partnershipId, watcher) {
 			let own: ReadableStreamDefaultController<Uint8Array> | undefined;
 			let keepalive: ReturnType<typeof setInterval> | undefined;
 
@@ -75,9 +76,9 @@ export function createLocalNotifier(): Notifier {
 			const body = new ReadableStream<Uint8Array>({
 				start(controller) {
 					own = controller;
-					const room = rooms.get(partnershipId) ?? new Set();
+					const room = rooms.get(partnershipId) ?? new Map();
 					rooms.set(partnershipId, room);
-					room.add(controller);
+					room.set(controller, watcher);
 
 					controller.enqueue(encoder.encode(SSE_PREAMBLE));
 					keepalive = setInterval(() => {
@@ -103,4 +104,4 @@ export function localRoomSize(partnershipId: string): number {
 	return rooms.get(partnershipId)?.size ?? 0;
 }
 
-export type { RealtimeEvent } from './index';
+export type { RealtimeEvent, Watcher } from './index';

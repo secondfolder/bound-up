@@ -11,8 +11,18 @@ tested, and how it is versioned and published.
 ## Running it
 
 ```sh
-BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d
+docker run --rm --entrypoint node ghcr.io/secondfolder/bound-up \
+  scripts/secrets.mjs print --subject mailto:you@example.com > .env
+docker compose up -d
 ```
+
+The first command runs `scripts/secrets.mjs` from the image itself, so it needs
+nothing installed but Docker, and writes `BETTER_AUTH_SECRET` and the push
+notification keys to `.env`. Compose reads a `.env` beside the compose file for
+the `${…}` in it. Run it once: a second run would replace both, signing
+everyone out and stopping every device's notifications. To add a missing one
+later, append the line it needs rather than regenerating the file. The script
+itself is described in [development.md](development.md#secrets).
 
 `docker-compose.yml` at the repo root is a working example: the image from
 `ghcr.io/secondfolder/bound-up`, a volume for the database and a volume for
@@ -30,6 +40,9 @@ media. The first account to sign up becomes the admin, as on Workers (see
 | `ADDRESS_HEADER`     | none                        | Behind a proxy: where it puts the client's address             |
 | `XFF_DEPTH`          | none                        | With `X-Forwarded-For`: how many proxies are in front          |
 | `AUTH_RATE_LIMIT`    | on                          | `off` disables the sign-in rate limit                          |
+| `VAPID_PUBLIC_KEY`   | none — push is off          | Push notifications. `secrets.mjs print` makes the pair         |
+| `VAPID_PRIVATE_KEY`  | none — push is off          | Keep the pair: replacing it stops every subscription           |
+| `VAPID_SUBJECT`      | none — push is off          | A `mailto:` or `https:` URL push services can contact          |
 
 `/data/db` and `/data/media` are the two volumes. Back up both together: a
 database row without its file shows as missing media, and a file without its

@@ -1233,9 +1233,9 @@ export type ReactionResult =
 	 * `threadId` is returned so the caller can publish a realtime event without
 	 * a second lookup — `requireMessageMembership` has already resolved it, so
 	 * not returning it would mean re-reading the row to name the thread that
-	 * just changed.
+	 * just changed. `partnership` likewise, for the push notification.
 	 */
-	| { ok: true; threadId: string }
+	| { ok: true; threadId: string; partnership: PartnershipView }
 	| { ok: false; reason: 'not-a-member' | 'own-message' | 'too-large' };
 
 /**
@@ -1277,7 +1277,7 @@ export async function setReaction(
 			set: { ciphertext: input.ciphertext, updatedAt: new Date() }
 		});
 
-	return { ok: true, threadId: membership.threadId };
+	return { ok: true, threadId: membership.threadId, partnership: membership.partnership };
 }
 
 export async function clearReaction(
@@ -1303,7 +1303,7 @@ export async function clearReaction(
 			)
 		);
 
-	return { ok: true, threadId: membership.threadId };
+	return { ok: true, threadId: membership.threadId, partnership: membership.partnership };
 }
 
 // ── history restore ──────────────────────────────────────────────────────────

@@ -43,6 +43,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/media/`              | Browser-only media transcoding. See [docs/messaging.md](docs/messaging.md#transcoding)       |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `src/lib/server/self-hosted/` | What only the Docker build runs: the media sweep. See [docs/self-hosting.md](docs/self-hosting.md) |
+| `src/service-worker.ts`       | Shows push notifications, and nothing else: no `fetch` handler, no cache. See [docs/notifications.md](docs/notifications.md) |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
 | `src/routes/(public)/`        | Anonymous-reachable routes. No header: each page links onwards itself                        |
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
@@ -295,20 +296,27 @@ site it applies to; go read that comment before deciding to break one.
       publishes a broken `link:` self-dependency that npm rejects — see docs/development.md.)
     - **Durable Object class lifecycle is `exports`, and is not a database
       migration.** `d1_databases[0].migrations_dir` is SQL applied by
-      `npm run db:migrate:preview`; the top-level `exports` map declares that the
-      class exists and which storage backend its namespace gets, carries no
-      schema, and is applied by wrangler itself on deploy. It replaces the
+      `npm run db:migrate:local-preview` and friends; the top-level `exports`
+      map declares that the class exists and which storage backend its
+      namespace gets, carries no schema, and is applied by wrangler itself on
+      deploy. It replaces the
       legacy tagged `migrations` array, is mutually exclusive with it, and the
       move is one-way — once deployed with `exports`, a deploy cannot go back.
       Renames and deletions are tombstone entries (`"state": "renamed"` and so
       on) rather than new tags. `"storage": "sqlite"` because SQLite-backed
       Durable Objects are the only kind on the Workers Free plan, and because
       storage backends are immutable once provisioned.
-    - **Lifecycle changes only apply through `wrangler deploy`.**
-      `wrangler versions upload` — what Cloudflare runs for non-production
-      branches — cannot apply them, and preview URLs are not generated for
-      Workers with a Durable Object at all. Non-production branch builds are
-      therefore close to useless for this Worker.
+    - **Lifecycle changes only apply through `wrangler deploy`.** A Worker
+      Preview — what Cloudflare now builds for non-production branches, with
+      `wrangler preview` — gets a Durable Object namespace of its own, but a
+      new or renamed class still has to reach production before it can be
+      relied on anywhere.
+    - **The `previews` block in `wrangler.jsonc` inherits nothing.** Every
+      binding has to be repeated in it (`DB`, `MEDIA` and `REALTIME`, each
+      pointing at preview resources), and secrets live on the Preview base
+      config instead (`npm run secrets -- remote-preview`). A binding
+      added at the top level and not there is simply absent in previews. See
+      docs/development.md.
 
 16. **Web Awesome's Lit dependencies must resolve to their `node/` builds in
     the wrangler bundle.** `src/routes/+layout.svelte` statically imports the
@@ -852,6 +860,7 @@ Four places, split on scope:
 | [docs/self-hosting.md](docs/self-hosting.md)                                             | The Docker build: backends, volumes, the sweep, CI, versioning and releases  |
 | [docs/rate-limiting.md](docs/rate-limiting.md)                                           | The sign-in, sign-up and change-password limits, and why not Better Auth's   |
 | [docs/roadmap.md](docs/roadmap.md)                                                       | The public /roadmap tree and landing teaser: the JSON, its rules, the drawer |
+| [docs/notifications.md](docs/notifications.md)                                           | Web Push: iOS rules, what a notification may say, devices, the Free plan fit |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

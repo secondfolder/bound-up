@@ -17,8 +17,7 @@ SQLite file.
 
 ```sh
 npm install
-cp .env.example .env
-npm run auth:secret          # paste the value into BETTER_AUTH_SECRET in .env
+npm run secrets -- dev       # creates .env, fills BETTER_AUTH_SECRET and the push keys
 npm run db:migrate:dev       # create the tables in ./local.db
 npm run db:seed              # insert the dev guide + edge task
 npm run dev
@@ -33,7 +32,7 @@ npx wrangler r2 bucket create bound-up-media
 # Deletes self-destructing media (and orphans from failed sends) that outlive the
 # 30-day maximum. Lives on the bucket, not in wrangler.jsonc. See docs/messaging.md.
 npx wrangler r2 bucket lifecycle add bound-up-media expire-self-destructing expiring/ --expire-days 31
-openssl rand -hex 32 | npx wrangler secret put BETTER_AUTH_SECRET
+npm run secrets -- production --subject mailto:you@example.com
 npm run db:migrate:production
 npm run deploy
 ```
@@ -66,14 +65,67 @@ defaults — build command `npm run build`, deploy command `npx wrangler deploy`
 > back at the top-level spec, which is the only way the package installs under
 > npm. Delete it if the package ever ships a fixed release.
 
+## Secrets
+
+`npm run secrets -- <target>` generates `BETTER_AUTH_SECRET` and the VAPID push
+key pair, and stores them where that environment reads them:
+
+| Target           | Where                                          | Read by                        |
+| ---------------- | ---------------------------------------------- | ------------------------------ |
+| `dev`            | `.env` (created from `.env.example`)           | `npm run dev`                  |
+| `local-preview`  | `.dev.vars` (created from `.dev.vars.example`) | `npm run preview`              |
+| `production`     | wrangler secrets                               | the deployed Worker            |
+| `remote-preview` | the Preview base config                        | every branch preview           |
+| `print`          | stdout                                         | you: a self-hosted `.env`, say |
+
+**It only fills what is missing**, so it is safe to run again. A secret that is
+already set is kept unless `--rotate BETTER_AUTH_SECRET` or `--rotate VAPID`
+names it, because replacing either is never harmless: a new auth secret signs
+every account out, and a new VAPID pair stops notifications on every device
+until each turns them on again. For a remote target it learns what is set from
+`wrangler … secret list`, which returns names only.
+
+`VAPID_SUBJECT` is not random: it is the contact address sent to push
+services. Pass `--subject mailto:you@example.com`, or the script asks for it.
+The local targets default to a placeholder. `--dry-run` shows what would be
+set without setting it.
+
+## Branch previews
+
+Cloudflare builds every non-production branch as a **Worker Preview**
+(`wrangler preview`), on a URL of its own. Previews read the `previews` block
+in `wrangler.jsonc`, which **inherits nothing from the top level**:
+
+- `DB` and `MEDIA` point at `bound-up-preview` and `bound-up-media-preview`,
+  shared by every preview and kept apart from production's data.
+- `REALTIME` is declared again. Each preview gets its own Durable Object
+  namespace automatically, but without the binding `env.REALTIME` is absent.
+- No cron trigger: Cron Triggers only run against production, so previews
+  never run the media sweep.
+
+One-time setup, and again whenever a migration lands:
+
+```sh
+npm run db:migrate:remote-preview  # --remote --preview: the D1 entry's preview_database_id
+# Secrets live on the Preview base config, shared by all previews. This
+# generates values of their own, never production's.
+npm run secrets -- remote-preview --subject mailto:you@example.com
+# The same expiry rule production's bucket has, since no sweep runs here.
+npx wrangler r2 bucket lifecycle add bound-up-media-preview expire-self-destructing expiring/ --expire-days 31
+```
+
+Add a binding at the top level and it is missing in previews until it is
+added to `previews` too.
+
 ## How the database works
 
-|                             | Driver                 | Applier                         |
-| --------------------------- | ---------------------- | ------------------------------- |
-| `npm run dev`, seed, studio | libsql → `./local.db`  | `npm run db:migrate:dev`        |
-| `npm run preview`           | D1 (wrangler-emulated) | `npm run db:migrate:preview`    |
-| production                  | D1                     | `npm run db:migrate:production` |
-| Docker image                | libsql → `/data/db`    | the entrypoint, on every start  |
+|                             | Driver                     | Applier                             |
+| --------------------------- | -------------------------- | ----------------------------------- |
+| `npm run dev`, seed, studio | libsql → `./local.db`      | `npm run db:migrate:dev`            |
+| `npm run preview`           | D1 (wrangler-emulated)     | `npm run db:migrate:local-preview`  |
+| Worker Previews (branches)  | D1 → `bound-up-preview`    | `npm run db:migrate:remote-preview` |
+| production                  | D1                         | `npm run db:migrate:production`     |
+| Docker image                | libsql → `/data/db`        | the entrypoint, on every start      |
 
 - Schema: `src/lib/server/db/schema/app.ts` (hand-written) and `schema/auth.ts`
   (generated by `npm run auth:schema` — regenerate rather than hand-edit).
@@ -195,8 +247,10 @@ other is half a script, is in
 | `test:e2e:image`                                              | Build the Docker image, then Playwright against it            |
 | `screenshots:landing`                                         | Retake the landing page's feature screenshots (`static/landing/`) |
 | `db:generate`                                                 | Generate a migration from the schema                          |
-| `db:migrate:dev` / `db:migrate:preview` / `db:migrate:production` | Apply migrations to local.db / emulated D1 / production |
+| `db:migrate:dev` / `db:migrate:production`                    | Apply migrations to local.db / production D1                  |
+| `db:migrate:local-preview` / `db:migrate:remote-preview`      | Apply migrations to the emulated D1 / the Worker Previews' D1 |
 | `db:seed` / `db:reset`                                        | Seed dev data / wipe local.db and re-seed                     |
 | `db:studio`                                                   | Drizzle Studio against `./local.db`                           |
-| `auth:schema` / `auth:secret`                                 | Regenerate the Better Auth tables / generate a secret         |
+| `auth:schema`                                                 | Regenerate the Better Auth tables                             |
+| `secrets -- <target>`                                         | Generate missing secrets into one environment (see Secrets)   |
 | `cf-typegen`                                                  | Regenerate Cloudflare binding types (not currently committed) |

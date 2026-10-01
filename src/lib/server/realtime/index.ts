@@ -16,6 +16,12 @@
  * a partnership id. If a future event ever wants to carry a body, that is the
  * moment to stop and reconsider, not a small extension.
  *
+ * The one thing a room does know about its listeners is *who* they are — a
+ * user id, and the push device they are on if they have one — and only so that
+ * `publish` can say who is watching. A device with the board open is already
+ * being told; sending it a push notification as well would be noise. See
+ * docs/notifications.md.
+ *
  * **SSE, not WebSocket**, and the reason is decisive rather than aesthetic:
  * `vite dev` cannot serve a WebSocket upgrade from a `+server.ts` at all, so a
  * socket would need a second client code path used only in development — and
@@ -37,17 +43,32 @@ export type RealtimeEvent = {
 	threadId?: string;
 };
 
+/**
+ * One open stream's listener.
+ *
+ * `userId` is set by the events endpoint from the session, never from the
+ * request, so a member cannot claim to be the other one. `deviceId` is the
+ * listener's own push subscription id, if it has one, as the browser reports
+ * it; at worst a wrong one means a push that should have been skipped is sent.
+ */
+export type Watcher = {
+	userId: string;
+	deviceId: string | null;
+};
+
 export type Notifier = {
 	/**
-	 * Announces a change to everyone currently watching a partnership.
+	 * Announces a change to everyone currently watching a partnership, and
+	 * returns who that was.
 	 *
 	 * Must never throw. A realtime failure has to be invisible: the write it
 	 * follows has already committed, and turning that into a 500 would make the
-	 * client retry a send that actually succeeded.
+	 * client retry a send that actually succeeded. A failure reports nobody
+	 * watching, which errs towards sending a push rather than losing one.
 	 */
-	publish: (partnershipId: string, event: RealtimeEvent) => Promise<void>;
+	publish: (partnershipId: string, event: RealtimeEvent) => Promise<Watcher[]>;
 	/** A long-lived SSE `Response` for one partnership. */
-	stream: (partnershipId: string) => Promise<Response>;
+	stream: (partnershipId: string, watcher: Watcher) => Promise<Response>;
 };
 
 /**

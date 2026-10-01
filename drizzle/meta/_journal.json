@@ -148,6 +148,13 @@
       "when": 1790643517046,
       "tag": "0020_add_auth_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1790846021309,
+      "tag": "0021_add_push_subscriptions",
+      "breakpoints": true
     }
   ]
 }

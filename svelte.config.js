@@ -72,7 +72,12 @@ const config = {
 		// builds the self-hosted server instead. It has no platform either, and
 		// `__SELF_HOSTED__` sends it down the same local backends as `vite dev`.
 		// See docs/self-hosting.md.
-		adapter: buildTarget() === 'node' ? nodeAdapter() : { ...cloudflare, emulate: undefined }
+		adapter: buildTarget() === 'node' ? nodeAdapter() : { ...cloudflare, emulate: undefined },
+		// `src/service-worker.ts` exists only to show push notifications, so it is
+		// registered by the notification settings when someone turns them on
+		// (`$lib/push-client.ts`), not on every page load for everyone. A worker
+		// nobody asked for is one more thing between every visitor and the page.
+		serviceWorker: { register: false }
 	}
 };
 

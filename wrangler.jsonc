@@ -115,9 +115,9 @@
 	},
 	// Durable Object *class* lifecycle — NOTHING to do with
 	// `d1_databases[0].migrations_dir` below, despite that field's name. That one
-	// is SQL applied by `npm run db:migrate:preview`; this one declares that the class
-	// exists and which storage backend its namespace gets, carries no schema, and
-	// is applied by wrangler itself on deploy. No db script touches it.
+	// is SQL applied by the `db:migrate:*` scripts; this one declares that the
+	// class exists and which storage backend its namespace gets, carries no
+	// schema, and is applied by wrangler itself on deploy. No db script touches it.
 	//
 	// This is the declarative replacement for the legacy tagged `migrations`
 	// array (`{ "tag": "v1", "new_sqlite_classes": [...] }`). The two are
@@ -146,9 +146,57 @@
 			// Only needed for `npm run preview` and `npm run deploy` —
 			// `npm run dev` uses ./local.db and never reads this file.
 			"database_id": "eb783b31-d64c-4582-b386-d43c3d59ac67",
+			// The database Worker Previews share — the same id as
+			// `previews.d1_databases` below, which is what previews actually bind.
+			// Here only so `npm run db:migrate:remote-preview` (`--remote --preview`)
+			// can find it: d1 commands read this entry and never the `previews`
+			// block. Wrangler also keys `npm run preview`'s local database by it.
+			"preview_database_id": "5ded7bd1-7d9f-4a19-9d4b-4a891de5bbd8",
 			// drizzle-kit's `out`. Applied with `wrangler d1 migrations apply`;
 			// the local ./local.db is applied with `drizzle-kit migrate` instead.
 			"migrations_dir": "drizzle"
 		}
-	]
+	],
+	// Worker Previews: what Cloudflare's builds for non-production branches
+	// deploy with (`wrangler preview`), which refuses to run without this block.
+	// NOTHING is inherited from the top level, so every binding the app reads
+	// has to be repeated here, or it is simply absent and the code behind it
+	// throws. Secrets are not set here either: they live on the Preview base
+	// config (`npm run secrets -- remote-preview` fills it), and without
+	// BETTER_AUTH_SECRET every request fails. See docs/development.md.
+	"previews": {
+		// One database for every preview, kept apart from production's. Its
+		// migrations are applied by `npm run db:migrate:remote-preview`, through
+		// `preview_database_id` above — keep the two ids the same.
+		"d1_databases": [
+			{
+				"binding": "DB",
+				"database_name": "bound-up-preview",
+				"database_id": "5ded7bd1-7d9f-4a19-9d4b-4a891de5bbd8"
+			}
+		],
+		// Likewise one bucket for every preview. It needs the same `expiring/`
+		// lifecycle rule as production's, because the sweep below does not run
+		// for previews.
+		"r2_buckets": [
+			{
+				"binding": "MEDIA",
+				"bucket_name": "bound-up-media-preview"
+			}
+		],
+		// Unlike D1 and R2, each preview gets a namespace of its own
+		// automatically. The binding still has to be declared, or
+		// `env.REALTIME` does not exist and the live message feed throws.
+		"durable_objects": {
+			"bindings": [
+				{
+					"name": "REALTIME",
+					"class_name": "RealtimeRoom"
+				}
+			]
+		}
+		// No `triggers`: Cron Triggers only ever run against production, so the
+		// media sweep never runs for a preview. Expiry is still exact, because
+		// every read checks `expires_at`; the lifecycle rule bounds storage.
+	}
 }

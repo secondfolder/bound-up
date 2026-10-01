@@ -32,9 +32,10 @@ function fail(message) {
 // 500. Refusing to start is the clearer failure for a container.
 if (!process.env.BETTER_AUTH_SECRET) {
 	fail(
-		'BETTER_AUTH_SECRET is not set. Generate one with `openssl rand -hex 32` and ' +
-			'pass it with `-e BETTER_AUTH_SECRET=…` (or `environment:` in docker-compose.yml). ' +
-			'Keep it: changing it signs everyone out.'
+		'BETTER_AUTH_SECRET is not set. Generate it, with the push notification keys, by ' +
+			'running `docker run --rm --entrypoint node <this image> scripts/secrets.mjs print ' +
+			'--subject mailto:you@example.com > .env` beside docker-compose.yml, or pass one ' +
+			'with `-e BETTER_AUTH_SECRET=…`. Keep it: changing it signs everyone out.'
 	);
 }
 

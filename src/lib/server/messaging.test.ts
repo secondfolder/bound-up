@@ -606,10 +606,11 @@ describe('setReaction / clearReaction', () => {
 		});
 
 		// `threadId` comes back so the endpoint can publish a realtime event
-		// without a second lookup — see the note on `ReactionResult`.
+		// without a second lookup, and the partnership for the push notification
+		// — see the note on `ReactionResult`.
 		await expect(
 			clearReaction(harness.db, { partnershipId, messageId: reply.messageId, viewerId: ada.id })
-		).resolves.toEqual({ ok: true, threadId });
+		).resolves.toMatchObject({ ok: true, threadId, partnership: { id: partnershipId } });
 		const thread = await getThread(harness.db, threadId, 'envelope', ada.id);
 		expect(thread.messages[1].reactions).toEqual([]);
 	});

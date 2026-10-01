@@ -2,10 +2,16 @@
 # `npm run preview` (wrangler dev reads .dev.vars, not .env).
 # Everyday `npm run dev` does not need this file.
 #
-#   cp .dev.vars.example .dev.vars
+#   npm run secrets -- local-preview   # creates .dev.vars and fills the secrets
 #
-# Production values are set with:  npx wrangler secret put BETTER_AUTH_SECRET
+# Production's are wrangler secrets, set with `npm run secrets -- production`.
 BETTER_AUTH_SECRET=""
+
+# Web Push (notifications). Optional: without all three, the notifications
+# settings say they are not set up here and nothing is sent.
+VAPID_PUBLIC_KEY=""
+VAPID_PRIVATE_KEY=""
+VAPID_SUBJECT=""
 
 # Sets the Cloudflare tunnel to use for `npm run preview`.
 CF_TUNNEL_NAME=""

@@ -1,5 +1,5 @@
 import type { RealtimeNamespace } from './binding';
-import type { Notifier } from './index';
+import type { Notifier, Watcher } from './index';
 
 /**
  * The production notifier: a Durable Object per partnership.
@@ -23,11 +23,13 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 	return {
 		async publish(partnershipId, event) {
 			try {
-				await room(partnershipId).fetch(`${ROOM_ORIGIN}/publish`, {
+				const response = await room(partnershipId).fetch(`${ROOM_ORIGIN}/publish`, {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify(event)
 				});
+				const { watching } = (await response.json()) as { watching: Watcher[] };
+				return watching;
 			} catch (error) {
 				// Swallowed on purpose, and this is the whole reason `publish` is
 				// declared as never throwing: the write this follows has already
@@ -35,14 +37,20 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 				// client retry a send that actually succeeded, and the worst case
 				// here is that the other device notices on its next navigation.
 				console.error('could not publish a realtime event', error);
+				return [];
 			}
 		},
 
-		async stream(partnershipId) {
+		async stream(partnershipId, watcher) {
 			// The object's streaming Response is returned straight through. No
 			// buffering step: reading it here would hold the whole stream in the
 			// worker and defeat the point.
-			return await room(partnershipId).fetch(`${ROOM_ORIGIN}/subscribe`);
+			const url = new URL(`${ROOM_ORIGIN}/subscribe`);
+			url.searchParams.set('user', watcher.userId);
+			if (watcher.deviceId) {
+				url.searchParams.set('device', watcher.deviceId);
+			}
+			return await room(partnershipId).fetch(url.toString());
 		}
 	};
 }

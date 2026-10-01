@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { lock } from '$lib/crypto/session.svelte';
+	import { disablePush } from '$lib/push-client';
 
 	// Server load data is the single source of truth for auth state — see the
 	// note in src/routes/+layout.svelte.
@@ -23,9 +24,18 @@
 
 				<!-- Forgets this device's copy of the message key before the session
 				     goes: signing out used to leave it in IndexedDB, readable by whoever
-				     signed in next on the same browser profile. Then enhance's default
-				     goto + invalidateAll for the redirect. -->
-				<form method="POST" action="/logout" use:enhance={() => lock(user.id)}>
+				     signed in next on the same browser profile. Stops its push
+				     notifications too, while the session can still say which device
+				     to drop, since they name a partner on the lock screen. Then
+				     enhance's default goto + invalidateAll for the redirect. -->
+				<form
+					method="POST"
+					action="/logout"
+					use:enhance={async () => {
+						await disablePush();
+						await lock(user.id);
+					}}
+				>
 					<wa-button type="submit" appearance="outlined" variant="danger">Log out</wa-button>
 				</form>
 			</div>
@@ -48,6 +58,12 @@
 		<li>
 			<a href={resolve('/(auth-required)/(app)/settings/partners')}>
 				<span>Partners</span>
+				<wa-icon name="chevron-right" variant="solid"></wa-icon>
+			</a>
+		</li>
+		<li>
+			<a href={resolve('/(auth-required)/(app)/settings/notifications')}>
+				<span>Notifications</span>
 				<wa-icon name="chevron-right" variant="solid"></wa-icon>
 			</a>
 		</li>

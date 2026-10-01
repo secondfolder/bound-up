@@ -75,6 +75,14 @@ export default defineConfig({
 			// hooks.server.ts throws without this rather than letting Better Auth
 			// fall back to its hard-coded default.
 			BETTER_AUTH_SECRET: 'e2e-secret-not-used-anywhere-else',
+			// A key pair for this suite only, so the notification settings have
+			// something to subscribe with. Nothing is ever pushed with it: the specs
+			// fake the browser's PushManager and send no message to a subscribed
+			// device, so the server never calls a real push service.
+			VAPID_PUBLIC_KEY:
+				'BKTAQZYEZVpAT8IakACU85Y4RXzpvWbqsTI6lvLuAr_1wPRiV6EftpzbBa7NuMdxbSk87DJWSMmDjlPxSd4Etf0',
+			VAPID_PRIVATE_KEY: 'QX3e-wqGMS2973OcACY5PsLlFsMLbwj1rZE1x5NsHSI',
+			VAPID_SUBJECT: 'mailto:e2e@example.test',
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.
 			VITE_DEV_ORIGIN: E2E_BASE_URL,

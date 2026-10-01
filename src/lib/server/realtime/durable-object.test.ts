@@ -29,8 +29,8 @@ function room() {
 	return new RealtimeRoom();
 }
 
-async function subscribe(instance: RealtimeRoom) {
-	const response = await instance.fetch(new Request(`${ORIGIN}/subscribe`));
+async function subscribe(instance: RealtimeRoom, query = 'user=u-1') {
+	const response = await instance.fetch(new Request(`${ORIGIN}/subscribe?${query}`));
 	const contentType = response.headers.get('content-type');
 	if (contentType !== 'text/event-stream') {
 		throw new Error(`Expected an event stream, got ${contentType}`);
@@ -68,7 +68,7 @@ describe('RealtimeRoom', () => {
 		const b = await subscribe(instance);
 
 		const response = await publish(instance, { kind: 'message', threadId: 't-7' });
-		expect(response.status).toBe(204);
+		expect(response.status).toBe(200);
 
 		for (const reader of [a, b]) {
 			expect(decoder.decode((await reader.read()).value)).toBe(
@@ -83,7 +83,8 @@ describe('RealtimeRoom', () => {
 	it('accepts a publish with nobody listening', async () => {
 		vi.useFakeTimers();
 		const instance = room();
-		expect((await publish(instance, { kind: 'thread' })).status).toBe(204);
+		const response = await publish(instance, { kind: 'thread' });
+		expect(await response.json()).toEqual({ watching: [] });
 	});
 
 	/**
@@ -104,10 +105,24 @@ describe('RealtimeRoom', () => {
 		// The publish must still succeed, and must still reach the live one. A
 		// broadcast that threw on the dead writer would take the whole fan-out
 		// with it, so this is the assertion that matters.
-		expect((await publish(instance, { kind: 'reaction' })).status).toBe(204);
+		expect((await publish(instance, { kind: 'reaction' })).status).toBe(200);
 		expect(decoder.decode((await staying.read()).value)).toBe(encodeSseEvent({ kind: 'reaction' }));
 
 		await staying.cancel();
+	});
+
+	/** The Durable Object half of what `local.test.ts` checks for the dev notifier. */
+	it('reports who is watching after the broadcast, without anyone who hung up', async () => {
+		vi.useFakeTimers();
+		const instance = room();
+		const ada = await subscribe(instance, 'user=ada&device=d-ada');
+		const bo = await subscribe(instance, 'user=bo');
+		await bo.cancel();
+
+		const response = await publish(instance, { kind: 'message', threadId: 't-1' });
+		expect(await response.json()).toEqual({ watching: [{ userId: 'ada', deviceId: 'd-ada' }] });
+
+		await ada.cancel();
 	});
 
 	it('sends a keepalive so an idle stream is not reaped by a proxy', async () => {

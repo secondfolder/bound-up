@@ -5,7 +5,8 @@ import {
 	SSE_KEEPALIVE,
 	SSE_KEEPALIVE_MS,
 	SSE_PREAMBLE,
-	SSE_QUEUE_LIMIT
+	SSE_QUEUE_LIMIT,
+	type Watcher
 } from './index';
 
 /**
@@ -25,9 +26,9 @@ import {
  * including the component test project. The classic style needs no types at all.
  *
  * The object holds **no storage** and never sees message content — see the note
- * on `RealtimeEvent`. Everything it knows is which sockets are open, which is
- * why it can be discarded and recreated at any time with no consequence beyond
- * clients reconnecting.
+ * on `RealtimeEvent`. Everything it knows is which sockets are open and whose
+ * they are, which is why it can be discarded and recreated at any time with no
+ * consequence beyond clients reconnecting.
  */
 
 const encoder = new TextEncoder();
@@ -40,7 +41,7 @@ export class RealtimeRoom {
 	 * what Workers gives back for a streaming `Response`, and a failed `write`
 	 * is how a hung-up client announces itself.
 	 */
-	readonly #writers = new Set<WritableStreamDefaultWriter<Uint8Array>>();
+	readonly #writers = new Map<WritableStreamDefaultWriter<Uint8Array>, Watcher>();
 
 	// No constructor. The runtime passes `(state, env)`, and this object
 	// deliberately keeps neither: it has no storage and no bindings of its own,
@@ -52,7 +53,9 @@ export class RealtimeRoom {
 		if (url.pathname === '/publish') {
 			const event = (await request.json()) as RealtimeEvent;
 			this.#broadcast(event);
-			return new Response(null, { status: 204 });
+			// Who is watching *after* the broadcast, so a client it just dropped for
+			// not reading is not counted as having been told.
+			return Response.json({ watching: [...this.#writers.values()] });
 		}
 
 		if (url.pathname === '/subscribe') {
@@ -83,14 +86,18 @@ export class RealtimeRoom {
 	#broadcast(event: RealtimeEvent): void {
 		const frame = encoder.encode(encodeSseEvent(event));
 		// Copied first: `#drop` mutates the set we would otherwise be iterating.
-		for (const writer of [...this.#writers]) {
+		for (const writer of [...this.#writers.keys()]) {
 			// A full queue means this client has stopped reading — asleep, offline,
 			// or behind a proxy that buffers. Disconnect it rather than growing a
 			// queue for it: it will reconnect when it can, and reconnecting
 			// refetches unconditionally (see `live.ts`), so nothing is lost by
 			// hanging up on it. Without this, a client that never reads is an
 			// unbounded queue inside a 128 MB object.
-			if (writer.desiredSize !== null && writer.desiredSize <= 0) {
+			//
+			// `null` is an errored stream: the client has hung up and its write
+			// would only fail. Dropped now rather than when that rejection lands,
+			// so the watcher list `/publish` returns does not count it as told.
+			if (writer.desiredSize === null || writer.desiredSize <= 0) {
 				this.#drop(writer);
 				continue;
 			}
@@ -110,7 +117,13 @@ export class RealtimeRoom {
 			{ highWaterMark: SSE_QUEUE_LIMIT }
 		);
 		const writer = writable.getWriter();
-		this.#writers.add(writer);
+		const url = new URL(request.url);
+		this.#writers.set(writer, {
+			// Always present: `remote.ts` is the only caller, and it takes the user
+			// from the session.
+			userId: url.searchParams.get('user') ?? '',
+			deviceId: url.searchParams.get('device')
+		});
 
 		// Fired when the client hangs up — which the browser side does on purpose
 		// every time the page is hidden, so this is the common case rather than an

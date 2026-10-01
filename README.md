@@ -81,13 +81,20 @@ Every release is published as a Docker image, so you can run Bound Up on your
 own server with no other services needed:
 
 ```sh
-BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d
+docker run --rm --entrypoint node ghcr.io/secondfolder/bound-up \
+  scripts/secrets.mjs print --subject mailto:you@example.com > .env
+docker compose up -d
 ```
 
-Start from [`docker-compose.yml`](docker-compose.yml), then sign up straight
-away: the first account on a new server becomes its admin. Keep the secret
-somewhere safe, because changing it signs everyone out. If the server sits
-behind a reverse proxy, set `ORIGIN` to the address people will use.
+The first command writes the server's secrets to a `.env` file, which
+`docker compose` reads from then on. Use your own email address: it is passed
+to Apple and Google so they can reach you about the server's push
+notifications. Then, starting from [`docker-compose.yml`](docker-compose.yml),
+sign up straight away: the first account on a new server becomes its admin.
+
+Keep `.env` safe and back it up. Losing or replacing it signs everyone out and
+switches off notifications on every phone. If the server sits behind a
+reverse proxy, set `ORIGIN` to the address people will use.
 
 [docs/self-hosting.md](docs/self-hosting.md) covers the settings, backups,
 and how releases are versioned.

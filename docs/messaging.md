@@ -658,8 +658,14 @@ So a live update takes exactly the same authorised path as a navigation.
 **Events carry metadata only, and that is a rule rather than a convention.** An
 event is `{ kind, threadId }` — never a sender, never a byte of content. The
 Durable Object therefore never handles message content, holds no storage, and
-knows nothing but a partnership id. A future event wanting to carry a body is a
-reason to stop and reconsider, not a small extension.
+knows nothing but a partnership id and who is listening. A future event wanting
+to carry a body is a reason to stop and reconsider, not a small extension.
+
+**Who is listening** is the one thing a room knows about its streams: the
+viewer's user id, from the session, and their push device id, if the browser
+has one. `publish` returns that list, so a push notification is not also sent
+to a device already showing the change. See
+[notifications.md](notifications.md#not-telling-a-device-what-it-is-showing).
 
 **SSE, not WebSocket**, for a decisive reason: `vite dev` cannot serve a
 WebSocket upgrade from a `+server.ts` at all, so a socket would need a second
@@ -724,8 +730,9 @@ are all correct.
 
 `wrangler.jsonc` also gains a top-level `exports` map, which has **nothing** to
 do with `d1_databases[0].migrations_dir` beside it: that one is SQL applied by
-`npm run db:migrate:preview`, this one is Durable Object class lifecycle. It carries
-no schema — the class stores nothing — and wrangler applies it on deploy.
+the `db:migrate:*` scripts, this one is Durable Object class lifecycle. It
+carries no schema — the class stores nothing — and wrangler applies it on
+deploy.
 
 ```jsonc
 "exports": {
@@ -746,9 +753,11 @@ storage backends are immutable once provisioned, so changing it later means
 deleting the namespace and its data. This class stores nothing either way.
 
 One deployment consequence: Durable Object lifecycle changes apply only through
-`wrangler deploy`. `wrangler versions upload`, which Cloudflare runs for
-non-production branches, cannot apply them — so the namespace has to be created
-by a production-branch deploy.
+`wrangler deploy`, so the namespace has to be created by a production-branch
+deploy. A Worker Preview of another branch then gets an isolated namespace of
+its own, as long as the `previews` block in `wrangler.jsonc` declares the
+`REALTIME` binding; without it, `env.REALTIME` is absent and the live feed
+throws.
 
 ## Not built yet
 

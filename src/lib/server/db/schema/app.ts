@@ -1046,3 +1046,53 @@ export const authRateLimits = sqliteTable(
 );
 
 export type AuthRateLimit = typeof authRateLimits.$inferSelect;
+
+/**
+ * One device that has agreed to receive push notifications.
+ *
+ * A row per browser subscription rather than per user, because preferences are
+ * per device too: someone may want reactions on their phone but not their
+ * laptop. See docs/notifications.md.
+ *
+ * `endpoint` is the push service URL the browser handed out, and it is a
+ * capability — anyone holding it, with the keys beside it, can make that device
+ * show a notification. It is never put in load data; a screen names a device by
+ * `id` and `label`.
+ *
+ * `p256dh` and `auth` are the subscription's public key and auth secret, which
+ * RFC 8291 encrypts each payload to. Neither opens anything of the user's: the
+ * push service only ever sees ciphertext, and the payload never contains a byte
+ * of message content anyway.
+ */
+export const pushSubscriptions = sqliteTable(
+	'push_subscriptions',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		endpoint: text('endpoint').notNull(),
+		p256dh: text('p256dh').notNull(),
+		auth: text('auth').notNull(),
+		/** A rough device name from the user agent, so settings can list them. */
+		label: text('label').notNull(),
+		notifyMessages: integer('notify_messages', { mode: 'boolean' }).notNull().default(true),
+		notifyReactions: integer('notify_reactions', { mode: 'boolean' }).notNull().default(true),
+		/** When a push service last accepted a message for this device. */
+		lastSuccessAt: integer('last_success_at', { mode: 'timestamp_ms' }),
+		...timestamps
+	},
+	(table) => [
+		// A browser re-subscribing hands back the same endpoint, and the upsert in
+		// `savePushSubscription` keys on it so that is an update, not a duplicate
+		// that would show every notification twice.
+		uniqueIndex('push_subscriptions_endpoint_unq').on(table.endpoint),
+		// The send path: "every device of this user".
+		index('push_subscriptions_user_idx').on(table.userId)
+	]
+);
+
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscriptionRow = typeof pushSubscriptions.$inferInsert;

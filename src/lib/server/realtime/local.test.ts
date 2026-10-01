@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defined } from '$lib/testing/defined';
-import { encodeSseEvent, SSE_PREAMBLE } from './index';
+import { encodeSseEvent, SSE_PREAMBLE, type Watcher } from './index';
 import { createLocalNotifier, localRoomSize } from './local';
 
 /**
@@ -19,8 +19,12 @@ import { createLocalNotifier, localRoomSize } from './local';
 const decoder = new TextDecoder();
 
 /** Subscribes and returns a reader plus a way to let go of it. */
-async function subscribe(notifier: ReturnType<typeof createLocalNotifier>, id: string) {
-	const response = await notifier.stream(id);
+async function subscribe(
+	notifier: ReturnType<typeof createLocalNotifier>,
+	id: string,
+	watcher: Watcher = { userId: 'u-1', deviceId: null }
+) {
+	const response = await notifier.stream(id, watcher);
 	const contentType = response.headers.get('content-type');
 	if (contentType !== 'text/event-stream') {
 		throw new Error(`Expected an event stream, got ${contentType}`);
@@ -96,7 +100,7 @@ describe('the local notifier', () => {
 
 		await two.release();
 		// The room itself goes, not just its members — otherwise a long-lived dev
-		// server accumulates an empty Set per partnership ever opened.
+		// server accumulates an empty Map per partnership ever opened.
 		expect(localRoomSize('p-hangup')).toBe(0);
 	});
 
@@ -106,6 +110,28 @@ describe('the local notifier', () => {
 	 */
 	it('is a no-op when nobody is listening', async () => {
 		const notifier = createLocalNotifier();
-		await expect(notifier.publish('p-empty', { kind: 'reaction' })).resolves.toBeUndefined();
+		await expect(notifier.publish('p-empty', { kind: 'reaction' })).resolves.toEqual([]);
+	});
+
+	/**
+	 * What lets a push be skipped for a device that already has the board open
+	 * — see `watchingDevices` in `$lib/server/push`. Gone listeners must not be
+	 * reported, or a device that hung up would never be pushed to.
+	 */
+	it('reports who is watching, and stops reporting a listener once it hangs up', async () => {
+		const notifier = createLocalNotifier();
+		const ada = await subscribe(notifier, 'p-watchers', { userId: 'ada', deviceId: 'd-ada' });
+		const bo = await subscribe(notifier, 'p-watchers', { userId: 'bo', deviceId: null });
+
+		expect(await notifier.publish('p-watchers', { kind: 'thread' })).toEqual([
+			{ userId: 'ada', deviceId: 'd-ada' },
+			{ userId: 'bo', deviceId: null }
+		]);
+
+		await ada.release();
+		expect(await notifier.publish('p-watchers', { kind: 'thread' })).toEqual([
+			{ userId: 'bo', deviceId: null }
+		]);
+		await bo.release();
 	});
 });

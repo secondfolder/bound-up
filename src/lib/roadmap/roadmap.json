@@ -824,9 +824,24 @@
 					"id": "push-notifications",
 					"title": "Push notifications",
 					"summary": "Hear about new messages and tasks without opening the app.",
-					"status": "planned",
+					"status": "in-progress",
 					"icon": "bell",
-					"featured": true
+					"featured": true,
+					"children": [
+						{
+							"id": "message-notifications",
+							"title": "Message notifications",
+							"summary": "Get a notification when your partner sends you a message or reacts to yours.",
+							"status": "shipped",
+							"shippedOn": "2026-10-01"
+						},
+						{
+							"id": "task-notifications",
+							"title": "Task reminders",
+							"summary": "A nudge when a task is due.",
+							"status": "planned"
+						}
+					]
 				},
 				{
 					"id": "ios-app",

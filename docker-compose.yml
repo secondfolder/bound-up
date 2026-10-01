@@ -1,9 +1,12 @@
 # A self-hosted Bound Up. See docs/self-hosting.md.
 #
-#   BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d
+#   docker run --rm --entrypoint node ghcr.io/secondfolder/bound-up \
+#     scripts/secrets.mjs print --subject mailto:you@example.com > .env
+#   docker compose up -d
 #
-# Keep the secret: changing it signs everyone out. The first account to sign
-# up becomes the admin.
+# The first command writes the secrets to .env, which compose reads for the
+# ${…} below. Keep .env: replacing it signs everyone out and stops every
+# device's push notifications. The first account to sign up becomes the admin.
 services:
   bound-up:
     image: ghcr.io/secondfolder/bound-up:latest
@@ -11,7 +14,7 @@ services:
     ports:
       - '3000:3000'
     environment:
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET, e.g. with openssl rand -hex 32}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env, see the top of this file}
       # The address people type into their browser. Required behind a TLS
       # proxy: without it the server believes it is on plain http, and form
       # posts, sign-in and passkeys all fail its origin checks. Passkeys also
@@ -22,6 +25,11 @@ services:
       # See docs/rate-limiting.md.
       # ADDRESS_HEADER: X-Forwarded-For
       # XFF_DEPTH: 1
+      # Push notifications, from .env. Optional: left empty, notifications are
+      # simply off. See docs/notifications.md.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     volumes:
       - bound-up-db:/data/db
       - bound-up-media:/data/media

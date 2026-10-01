@@ -53,9 +53,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (!secret) {
 		throw new Error(
 			'BETTER_AUTH_SECRET is not set. In development put it in .env ' +
-				'(generate one with `npm run auth:secret`); in production set it with ' +
-				'`npx wrangler secret put BETTER_AUTH_SECRET`; self-hosted, pass it to the ' +
-				'container with `-e BETTER_AUTH_SECRET=$(openssl rand -hex 32)`.'
+				'(`npm run secrets -- dev` fills it in); on Workers run ' +
+				'`npm run secrets -- production`, or `-- remote-preview` for branch ' +
+				'previews; self-hosted, put it in the .env beside docker-compose.yml ' +
+				'(docs/self-hosting.md shows the one command that writes it).'
 		);
 	}
 

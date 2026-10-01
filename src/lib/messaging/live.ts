@@ -37,6 +37,8 @@
  * no amount of reconnecting fixes.
  */
 
+import { storedPushDeviceId } from '$lib/push-client';
+
 /** Matches the server's `RealtimeEvent`. Metadata only, by design. */
 export type LiveEvent = {
 	kind: 'thread' | 'message' | 'reaction' | 'restore';
@@ -75,7 +77,10 @@ export function watchPartnership(options: LiveOptions): () => void {
 	}
 
 	const { partnershipId, onChange } = options;
-	const url = `/api/partnerships/${partnershipId}/events`;
+	// Which push device is watching, so the server can skip pushing to the
+	// screen that is already showing the change. See docs/notifications.md.
+	const device = storedPushDeviceId();
+	const url = `/api/partnerships/${partnershipId}/events${device ? `?device=${encodeURIComponent(device)}` : ''}`;
 
 	let source: EventSource | null = null;
 	let retry: ReturnType<typeof setTimeout> | undefined;

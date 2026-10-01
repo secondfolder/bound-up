@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { replySchema } from '$lib/schemas/messageForm';
 import { createMediaStore } from '$lib/server/media/backend';
 import { requireThreadMembership, sendMessage } from '$lib/server/messaging';
+import { notifyPartner } from '$lib/server/push';
 import { createNotifier } from '$lib/server/realtime/backend';
 import { parseSend, sendFailureStatus } from '../../../send';
 import type { RequestHandler } from './$types';
@@ -16,7 +17,13 @@ export const POST: RequestHandler = async (event) => {
 	// The thread id from the URL is re-joined against this partnership rather
 	// than trusted. Without that, anyone in *any* partnership could post into
 	// any thread by supplying their own partnership id.
-	if (!(await requireThreadMembership(locals.db, params.id, params.threadId, locals.user.id))) {
+	const membership = await requireThreadMembership(
+		locals.db,
+		params.id,
+		params.threadId,
+		locals.user.id
+	);
+	if (!membership) {
 		error(404, 'Not found');
 	}
 
@@ -44,7 +51,16 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const notifier = await createNotifier({ platform });
-	await notifier.publish(params.id, { kind: 'message', threadId: params.threadId });
+	const watching = await notifier.publish(params.id, {
+		kind: 'message',
+		threadId: params.threadId
+	});
+	notifyPartner(event, {
+		partnership: membership.partnership,
+		kind: 'message',
+		threadId: params.threadId,
+		watching
+	});
 
 	return json({ messageId: result.messageId }, { status: 201 });
 };

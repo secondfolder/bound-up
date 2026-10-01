@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { newThreadSchema } from '$lib/schemas/messageForm';
 import { createMediaStore } from '$lib/server/media/backend';
 import { requireMembership, startThread } from '$lib/server/messaging';
+import { notifyPartner } from '$lib/server/push';
 import { createNotifier } from '$lib/server/realtime/backend';
 import { parseSend, sendFailureStatus } from '../send';
 import type { RequestHandler } from './$types';
@@ -24,7 +25,8 @@ export const POST: RequestHandler = async (event) => {
 
 	// Membership before the body is read, so a stranger cannot make the server
 	// buffer 25 MB for them.
-	if (!(await requireMembership(locals.db, params.id, locals.user.id))) {
+	const membership = await requireMembership(locals.db, params.id, locals.user.id);
+	if (!membership) {
 		error(404, 'Not found');
 	}
 
@@ -70,7 +72,13 @@ export const POST: RequestHandler = async (event) => {
 	// own errors, because the message is already stored and a fan-out problem
 	// must not turn into a retryable 500 for a send that worked.
 	const notifier = await createNotifier({ platform });
-	await notifier.publish(params.id, { kind: 'thread', threadId: result.threadId });
+	const watching = await notifier.publish(params.id, { kind: 'thread', threadId: result.threadId });
+	notifyPartner(event, {
+		partnership: membership.partnership,
+		kind: 'thread',
+		threadId: result.threadId,
+		watching
+	});
 
 	return json({ threadId: result.threadId, messageId: result.messageId }, { status: 201 });
 };

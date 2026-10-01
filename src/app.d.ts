@@ -38,8 +38,8 @@ declare global {
 		// interface PageData {}
 		// interface PageState {}
 		interface Platform {
-			// Only `env` is declared: nothing in this app uses platform.ctx /
-			// caches / cf. `AnyD1Database` comes from drizzle rather than
+			// Only `env` and `ctx.waitUntil` are declared: nothing in this app
+			// uses caches / cf. `AnyD1Database` comes from drizzle rather than
 			// @cloudflare/workers-types on purpose — that package exposes its
 			// types as ambient globals, and pulling them in would overwrite the
 			// DOM's Request/Response/fetch/Cache for the whole project,
@@ -65,6 +65,21 @@ declare global {
 				 * ambient-globals reason as the two above.
 				 */
 				REALTIME: RealtimeNamespace;
+				/**
+				 * Web Push. All three or none: without them push is off rather
+				 * than an error. See `$lib/server/push` and docs/notifications.md.
+				 */
+				VAPID_PUBLIC_KEY?: string;
+				VAPID_PRIVATE_KEY?: string;
+				VAPID_SUBJECT?: string;
+			};
+			/**
+			 * Optional because the self-hosted and dev servers have no platform
+			 * at all; on Workers it is always present.
+			 */
+			ctx?: {
+				/** Keeps the invocation alive for work finished after the response. */
+				waitUntil: (promise: Promise<unknown>) => void;
 			};
 		}
 	}

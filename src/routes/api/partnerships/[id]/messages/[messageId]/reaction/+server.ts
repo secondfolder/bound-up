@@ -1,11 +1,13 @@
 import { error, json } from '@sveltejs/kit';
 import { reactionSchema } from '$lib/schemas/messageForm';
 import { clearReaction, setReaction } from '$lib/server/messaging';
+import { notifyPartner } from '$lib/server/push';
 import { createNotifier } from '$lib/server/realtime/backend';
 import type { RequestHandler } from './$types';
 
 /** Sets or replaces the viewer's tapback. One per person per message. */
-export const PUT: RequestHandler = async ({ locals, params, request, platform }) => {
+export const PUT: RequestHandler = async (event) => {
+	const { locals, params, request, platform } = event;
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
@@ -30,7 +32,18 @@ export const PUT: RequestHandler = async ({ locals, params, request, platform })
 	}
 
 	const notifier = await createNotifier({ platform });
-	await notifier.publish(params.id, { kind: 'reaction', threadId: result.threadId });
+	const watching = await notifier.publish(params.id, {
+		kind: 'reaction',
+		threadId: result.threadId
+	});
+	// Always the other member's message: `setReaction` refuses your own. And
+	// only here, never on DELETE — taking a reaction back is not news.
+	notifyPartner(event, {
+		partnership: result.partnership,
+		kind: 'reaction',
+		threadId: result.threadId,
+		watching
+	});
 
 	return json({ ok: true });
 };

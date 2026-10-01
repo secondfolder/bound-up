@@ -139,6 +139,12 @@ async function serveImage(image) {
 			`${name}-media:/data/media`,
 			'--env',
 			'BETTER_AUTH_SECRET',
+			'--env',
+			'VAPID_PUBLIC_KEY',
+			'--env',
+			'VAPID_PRIVATE_KEY',
+			'--env',
+			'VAPID_SUBJECT',
 			// Every test signs up from the same address, many times a minute; the
 			// sign-in limit would refuse most of them. `vite dev` has it off for
 			// the same reason. scripts/docker-smoke.sh checks the limit instead.

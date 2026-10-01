@@ -47,6 +47,10 @@ COPY --from=build /app/build ./build
 COPY drizzle ./drizzle
 COPY package.json ./
 COPY scripts/docker-entrypoint.mjs ./scripts/docker-entrypoint.mjs
+# Not run by the server. Shipped so a self-hoster can generate the secrets from
+# the image itself, with nothing installed but Docker (see docs/self-hosting.md):
+#   docker run --rm --entrypoint node <image> scripts/secrets.mjs print … > .env
+COPY scripts/secrets.mjs ./scripts/secrets.mjs
 # Made here and owned by `node`, so a named volume mounted over them starts out
 # writable by the unprivileged user the server runs as.
 RUN mkdir -p /data/db /data/media && chown -R node:node /data
