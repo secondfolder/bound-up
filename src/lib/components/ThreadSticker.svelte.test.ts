@@ -419,4 +419,52 @@ describe('ThreadSticker', () => {
 			expect(container.querySelector('.self-destructs')).toBeNull();
 		});
 	});
+
+	/** The thread a push notification's tap was about. See the board's `?thread=`. */
+	describe('highlighted', () => {
+		// Real timers: the fade is a real CSS animation, and `waitFor` polls on
+		// timers the file's fake ones would freeze.
+		beforeEach(() => {
+			vi.useRealTimers();
+			openMessage.mockResolvedValue({ version: 1, text: 'hello', attachments: [] });
+		});
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('scrolls into view, rings the card, and says when the fade is over', async () => {
+			const scrollIntoView = vi
+				.spyOn(HTMLElement.prototype, 'scrollIntoView')
+				.mockImplementation(() => undefined);
+			const onHighlightEnd = vi.fn();
+			const { container } = render(ThreadSticker, {
+				props: {
+					thread: thread({ unread: true, lastFullyReadAt: null }),
+					partnershipId: 'p1',
+					position: 1,
+					total: 1,
+					highlighted: true,
+					onHighlightEnd
+				}
+			});
+
+			const card = container.querySelector('.card') as HTMLElement;
+			expect(card.hasAttribute('data-highlighted')).toBe(true);
+			await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+
+			// The real end of the CSS fade, rather than waiting four seconds for it.
+			const [animation] = card.getAnimations();
+			animation?.finish();
+			await waitFor(() => expect(onHighlightEnd).toHaveBeenCalledOnce());
+		});
+
+		it('leaves an ordinary tile alone', () => {
+			const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+			const { container } = render(ThreadSticker, {
+				props: { thread: thread(), partnershipId: 'p1', position: 1, total: 1 }
+			});
+			expect(container.querySelector('[data-highlighted]')).toBeNull();
+			expect(scrollIntoView).not.toHaveBeenCalled();
+		});
+	});
 });

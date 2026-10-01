@@ -68,8 +68,16 @@ the copy stays at "New message from Sam" and "Sam reacted to your message".
   replies to a phone that was off arrives as one notification, and a newer one
   replaces an older one on screen. A reaction gets neither, so it can never
   replace a message notification nobody has read yet.
-- A tap opens the thread. The service worker refuses to navigate off the app's
-  own origin whatever a payload says.
+- A tap opens the board at `?thread=<id>`, and the board's load decides at
+  tap time rather than at send time. A thread the recipient has opened before
+  redirects straight to its own page. One they have never opened stays on the
+  board, scrolled into view and ringed, the ring fading after about four
+  seconds. It is seen first as its sealed envelope, as every new thread is,
+  and opening it is still the recipient's own tap. Deciding at tap time means
+  a thread opened on another device in the meantime goes straight through.
+  The query is then dropped from the URL, so a reload does not highlight it
+  again. The service worker refuses to navigate off the app's own origin
+  whatever a payload says.
 - `TTL` is a day: long enough for a phone off overnight, short enough that a
   week away does not end in a pile of stale banners.
 

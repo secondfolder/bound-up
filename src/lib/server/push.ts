@@ -341,8 +341,13 @@ export function notifyPartner(
 	// Absolute, because a tap can open it from outside any page. The app has no
 	// `paths.base`, and `resolve()` can return a path relative to the page being
 	// rendered, which is meaningless to a notification.
+	//
+	// The board with `?thread=`, not the thread itself: the board's load sends a
+	// thread the recipient has already opened straight on to it, and shows one
+	// they never have highlighted on the board instead. Decided at tap time,
+	// which a URL fixed now could not be.
 	const url = new URL(
-		`/partner/${input.partnership.id}/messages/${input.threadId}`,
+		`/partner/${input.partnership.id}/messages?thread=${encodeURIComponent(input.threadId)}`,
 		event.url.origin
 	).href;
 	inBackground(

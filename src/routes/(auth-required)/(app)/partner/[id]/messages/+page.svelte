@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto, invalidate } from '$app/navigation';
+	import { afterNavigate, goto, invalidate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
@@ -73,6 +73,35 @@
 	});
 	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 
+	/**
+	 * The thread a push notification's tap was about, if it has never been
+	 * opened — the load sends an opened one straight to its own page.
+	 *
+	 * Captured once, not derived: a realtime refresh re-runs the load without
+	 * `?thread=` (it is dropped from the URL below), and deriving would cut the
+	 * fade short. Forgotten when the sticker's fade ends.
+	 */
+	// svelte-ignore state_referenced_locally
+	let highlightThreadId = $state(data.highlightThreadId);
+
+	// So a reload, or coming Back to the board, does not highlight it again.
+	//
+	// Deferred a microtask, because on a full page load (which a tap on a
+	// notification is) SvelteKit runs `afterNavigate` callbacks and only then
+	// marks its router started, and `replaceState` throws in dev until it is.
+	// `onMount` is earlier still. The rest of that startup is synchronous, so
+	// one microtask is enough.
+	afterNavigate(({ to }) => {
+		if (to?.url.searchParams.has('thread')) {
+			queueMicrotask(() => {
+				replaceState(
+					resolve('/(auth-required)/(app)/partner/[id]/messages', { id: partnershipId }),
+					{}
+				);
+			});
+		}
+	});
+
 	let composing = $state(false);
 
 	const targets = $derived([data.recipients.mine, data.recipients.theirs]);
@@ -142,7 +171,14 @@
 				/>
 			</header>
 
-			<StickerBoard threads={data.threads} partnershipId={data.partner.id} />
+			<StickerBoard
+				threads={data.threads}
+				partnershipId={data.partner.id}
+				{highlightThreadId}
+				onHighlightEnd={() => {
+					highlightThreadId = null;
+				}}
+			/>
 
 			{#if canSend}
 				<div class="new">

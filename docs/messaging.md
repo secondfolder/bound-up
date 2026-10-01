@@ -607,6 +607,7 @@ reaction, and anything that would let it read or forge any of them.
 | Route                               | What                                                                        |
 | ----------------------------------- | --------------------------------------------------------------------------- |
 | `/partner/[id]/messages`            | The board. The unopened-envelope state SSRs; previews decrypt after unlock. |
+| `/partner/[id]/messages?thread=…`   | Where a notification tap lands: a never-opened thread highlighted, else on. |
 | `/partner/[id]/messages/[threadId]` | One thread. Its load also records the open.                                 |
 | `/home`                             | A link per partner with something waiting.                                  |
 | `api/partnerships/[id]/threads`     | `POST` multipart: a thread and its first message.                           |

@@ -1,9 +1,10 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { neverOpened } from '$lib/messaging';
 import { getRecipientsForPartnership } from '$lib/server/keys';
 import { listBoard, listRestoreRequests, listTags, requireMembership } from '$lib/server/messaging';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, params, depends }) => {
+export const load: PageServerLoad = async ({ locals, params, depends, url }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
@@ -26,6 +27,20 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		listTags(locals.db, params.id, locals.user.id)
 	]);
 
+	// `?thread=` is where a push notification's tap lands (see
+	// `notifyPartner`). Decided here, at tap time, not when the push was sent:
+	// a thread opened since, on another device say, goes straight to the
+	// thread. One never opened stays on the board, highlighted, so it is first
+	// seen as its sealed envelope like every other new thread. Read off the
+	// board rather than queried, so "never opened" means exactly what makes a
+	// tile sealed. A thread not on this board (deleted, or not theirs) is ignored.
+	const requested = url.searchParams.get('thread');
+	const tapped = requested ? threads.find((thread) => thread.id === requested) : undefined;
+	if (tapped && !neverOpened(tapped)) {
+		redirect(303, `/partner/${params.id}/messages/${tapped.id}`);
+	}
+	const highlightThreadId = tapped ? tapped.id : null;
+
 	// Every account has keys, so a partnership without both is broken data —
 	// 404 like the membership check rather than rendering a board that cannot
 	// send.
@@ -43,6 +58,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		// Public keys. `mine` is included so a server that swapped it can be
 		// caught, not only a swapped partner key — see docs/encryption.md.
 		recipients,
-		restoreRequests
+		restoreRequests,
+		highlightThreadId
 	};
 };

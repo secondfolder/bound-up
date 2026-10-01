@@ -8,7 +8,7 @@
 	} from '$lib/crypto/messages';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
 	import { canDisplayAvif, canPlayVideo } from '$lib/media/support';
-	import { describeUnseenMedia, formatTimeLeft } from '$lib/messaging';
+	import { describeUnseenMedia, formatTimeLeft, neverOpened } from '$lib/messaging';
 	import {
 		fetchAttachment,
 		MediaExpiredError,
@@ -56,13 +56,34 @@
 		partnershipId,
 		/** 1-based, for the accessible name. Two stickers can share a timestamp. */
 		position,
-		total
+		total,
+		highlighted = false,
+		onHighlightEnd
 	}: {
 		thread: ThreadStickerView;
 		partnershipId: string;
 		position: number;
 		total: number;
+		/**
+		 * Drawn attention to once, as the thread a push notification was about:
+		 * scrolled into view, ringed, and faded out by the `highlight` animation.
+		 */
+		highlighted?: boolean;
+		/** When that fade has finished, so the board can forget the highlight. */
+		onHighlightEnd?: (() => void) | undefined;
 	} = $props();
+
+	let link: HTMLAnchorElement | undefined = $state(undefined);
+
+	$effect(() => {
+		if (!(highlighted && link)) {
+			return;
+		}
+		// The shell's <main> is what scrolls, and `scrollIntoView` finds it
+		// itself. Instant for anyone who asked the system for less motion.
+		const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		link.scrollIntoView({ block: 'center', behavior: reduce ? 'instant' : 'smooth' });
+	});
 
 	const href = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/messages/[threadId]', {
@@ -71,7 +92,7 @@
 		})
 	);
 	const keyring = $derived(currentKeyring());
-	const sealed = $derived(thread.unread && thread.lastFullyReadAt === null);
+	const sealed = $derived(thread.unread && neverOpened(thread));
 	let preview: MessagePayload | null | undefined = $state(undefined);
 	let previewMetadata = $state<MessageMetadataPayload | null | undefined>(undefined);
 	let mediaPreviews: PreviewMedia[] = $state([]);
@@ -392,8 +413,19 @@
 </script>
 
 <li>
-	<a {href} class:unread={thread.unread} class:sealed aria-label={label}>
-		<div class="card">
+	<a {href} bind:this={link} class:unread={thread.unread} class:sealed aria-label={label}>
+		<!-- `animationend` rather than a timer, so the board forgets the highlight
+		     exactly when it has faded, whatever the duration in the CSS says. -->
+		<div
+			class="card"
+			class:highlighted
+			data-highlighted={highlighted ? '' : undefined}
+			onanimationend={(event) => {
+				if (event.animationName.endsWith('highlight-fade')) {
+					onHighlightEnd?.();
+				}
+			}}
+		>
 			{#if sealed}
 				<div class="preview preview-envelope" aria-hidden="true">
 					<wa-icon name="envelope" variant="solid" canvas="square"></wa-icon>
@@ -520,6 +552,19 @@
 {/snippet}
 
 <style>
+	@keyframes highlight-fade {
+		0%,
+		40% {
+			outline: 0.2rem solid var(--wa-color-brand-fill-loud);
+			outline-offset: 0.15rem;
+		}
+
+		100% {
+			outline: 0.2rem solid transparent;
+			outline-offset: 0.15rem;
+		}
+	}
+
 	li {
 		position: relative;
 	}
@@ -554,6 +599,17 @@
 				transform: translateY(-0.125rem);
 				box-shadow: 0 0.8rem 1.6rem rgb(0 0 0 / 12%);
 			}
+		}
+
+		/*
+		 * The thread a notification was about: a ring in the brand colour that
+		 * holds long enough to be found, then fades. An outline rather than a
+		 * box-shadow, so it does not fight the card's own shadow or its hover lift.
+		 * A fade is a change of colour, not movement, so it stays under
+		 * `prefers-reduced-motion`.
+		 */
+		.card.highlighted {
+			animation: highlight-fade 4s ease-in forwards;
 		}
 
 		.preview {

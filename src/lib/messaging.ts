@@ -340,6 +340,19 @@ export function isUnreadFor(thread: ThreadUnreadInput, viewerId: string): boolea
 
 // ── board ordering ───────────────────────────────────────────────────────────
 
+/**
+ * Whether the viewer has never opened a thread.
+ *
+ * `lastFullyReadAt` comes from the viewer's `thread_reads` row, which is
+ * written the first time they open it (and for the sender, when they send), and
+ * it is never null once written. So null means no row: never opened. One
+ * definition for the sealed envelope on the board and for where a push
+ * notification's tap lands.
+ */
+export function neverOpened(thread: { lastFullyReadAt: Date | null }): boolean {
+	return thread.lastFullyReadAt === null;
+}
+
 export type BoardThread = {
 	id: string;
 	unread: boolean;

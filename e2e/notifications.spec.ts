@@ -2,7 +2,17 @@ import type { Browser } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, clickWaButton, logOut, signUp, waitForHydration } from './helpers';
+import {
+	account,
+	clickWaButton,
+	linkAccounts,
+	logOut,
+	newSide,
+	openBoard,
+	signUp,
+	waitForHydration,
+	writeThread
+} from './helpers';
 
 /**
  * Turning push notifications on and off, through the real settings screen,
@@ -153,6 +163,58 @@ test.describe('push notification settings', () => {
 			await expect(page.getByRole('button', { name: 'Turn on notifications' })).toHaveCount(0);
 		} finally {
 			await device.close();
+		}
+	});
+});
+
+/**
+ * Where a notification's tap lands: the board with `?thread=`. A thread never
+ * opened stays on the board with its tile highlighted; one already opened goes
+ * straight to it. Driven by visiting the URL `notifyPartner` builds, since the
+ * suite cannot tap a real notification.
+ */
+test.describe('tapping a message notification', () => {
+	test('highlights a never-opened thread on the board, and opens one already read', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await writeThread(ada.page, 'look what I found');
+			// Annotated for Biome, which believes `exec` never returns null.
+			const match: RegExpExecArray | null =
+				/\/partner\/(?<partnership>[0-9a-f-]{36})\/messages\/(?<thread>[0-9a-f-]{36})$/.exec(
+					new URL(ada.page.url()).pathname
+				);
+			const { partnership, thread } = match?.groups ?? {};
+			const tapped = `/partner/${partnership}/messages?thread=${thread}`;
+
+			// Never opened: the board, with the tile ringed and the query gone so a
+			// reload does not highlight it again.
+			await jun.page.goto(tapped);
+			const highlighted = jun.page.locator('[data-highlighted]');
+			await expect(highlighted).toHaveCount(1);
+			await expect(jun.page).toHaveURL(`/partner/${partnership}/messages`);
+			// Then it fades and goes, which takes about four seconds.
+			await expect(highlighted).toHaveCount(0, { timeout: 10_000 });
+
+			// Open it, and the same tap now goes straight to the thread.
+			// By href: the tile's accessible name is its timestamp and position.
+			await jun.page.locator(`a[href$="${thread}"]`).click();
+			await jun.page.waitForURL(`/partner/${partnership}/messages/${thread}`);
+			await expect(jun.page.getByText('look what I found')).toBeVisible();
+
+			await jun.page.goto(tapped);
+			await expect(jun.page).toHaveURL(`/partner/${partnership}/messages/${thread}`);
+		} finally {
+			await ada.close();
+			await jun.close();
 		}
 	});
 });

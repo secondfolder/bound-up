@@ -16,10 +16,15 @@
 	 */
 	let {
 		threads,
-		partnershipId
+		partnershipId,
+		highlightThreadId = null,
+		onHighlightEnd
 	}: {
 		threads: ThreadStickerView[];
 		partnershipId: string;
+		/** A thread to draw attention to once. See `ThreadSticker`'s `highlighted`. */
+		highlightThreadId?: string | null;
+		onHighlightEnd?: (() => void) | undefined;
 	} = $props();
 
 	const unread = $derived(threads.filter((thread) => thread.unread));
@@ -32,7 +37,14 @@
 	{#if unread.length > 0}
 		<ul aria-label="Unread">
 			{#each unread as thread, index (thread.id)}
-				<ThreadSticker {thread} {partnershipId} position={index + 1} total={unread.length} />
+				<ThreadSticker
+					{thread}
+					{partnershipId}
+					position={index + 1}
+					total={unread.length}
+					highlighted={thread.id === highlightThreadId}
+					{onHighlightEnd}
+				/>
 			{/each}
 		</ul>
 	{/if}
@@ -48,7 +60,14 @@
 	{#if read.length > 0}
 		<ul aria-label="Already read">
 			{#each read as thread, index (thread.id)}
-				<ThreadSticker {thread} {partnershipId} position={index + 1} total={read.length} />
+				<ThreadSticker
+					{thread}
+					{partnershipId}
+					position={index + 1}
+					total={read.length}
+					highlighted={thread.id === highlightThreadId}
+					{onHighlightEnd}
+				/>
 			{/each}
 		</ul>
 	{/if}

@@ -257,7 +257,8 @@ describe('notifyPartner', () => {
 		expect(payload).toMatchObject({
 			notification: {
 				title: 'New message from Ace',
-				navigate: `https://app.test/partner/${id}/messages/t-1`
+				// The board, which sends an opened thread on and highlights a new one.
+				navigate: `https://app.test/partner/${id}/messages?thread=t-1`
 			}
 		});
 	});
