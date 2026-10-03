@@ -158,6 +158,50 @@ export async function deletePushDevice(db: Db, userId: string, id: string): Prom
 	return rows.length > 0;
 }
 
+/** Whose a browser's subscription is, as far as the signed-in account goes. */
+export type PushOwnership =
+	| { status: 'yours'; id: string }
+	/** It was another account's, and has just been deleted. */
+	| { status: 'released' }
+	/** No account has it. */
+	| { status: 'unknown' };
+
+/**
+ * Settles whose a browser's subscription is, for whoever is signed in on it.
+ *
+ * A browser that changes hands without the settings screen's sign-out — the
+ * session ending, `/logout`, or simply signing in as somebody else — keeps
+ * its subscription, which still belongs to the previous account. Left alone,
+ * the previous person's notifications go on naming their partner on a screen
+ * somebody else is now using. So the app shell asks on every full load, and a
+ * device that is not the signed-in account's is deleted on the spot.
+ *
+ * Presenting the endpoint is what authorises that, whoever owns the row: the
+ * endpoint is a capability only the browser holding the subscription has.
+ *
+ * Never handed over to the new account. The browser's permission was given by
+ * the previous person, not them, so they turn notifications on themselves.
+ */
+export async function checkPushOwnership(
+	db: Db,
+	userId: string,
+	endpoint: string
+): Promise<PushOwnership> {
+	const [row] = await db
+		.select({ id: pushSubscriptions.id, userId: pushSubscriptions.userId })
+		.from(pushSubscriptions)
+		.where(eq(pushSubscriptions.endpoint, endpoint))
+		.limit(1);
+	if (!row) {
+		return { status: 'unknown' };
+	}
+	if (row.userId === userId) {
+		return { status: 'yours', id: row.id };
+	}
+	await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, row.id));
+	return { status: 'released' };
+}
+
 // ── sending ──────────────────────────────────────────────────────────────────
 
 const categoryColumn = {
@@ -204,7 +248,6 @@ export async function sendPush(
 		const devices = await db
 			.select({
 				id: pushSubscriptions.id,
-				label: pushSubscriptions.label,
 				endpoint: pushSubscriptions.endpoint,
 				p256dh: pushSubscriptions.p256dh,
 				auth: pushSubscriptions.auth
@@ -219,28 +262,7 @@ export async function sendPush(
 
 		const skip = new Set(input.skipDeviceIds);
 		const targets = devices.filter((device) => !skip.has(device.id));
-		// TEMPORARY, while iPhone delivery is diagnosed: what happened to each
-		// device, as one line per push. See docs/temporary-code.md.
-		const trace = new Map<string, string>(
-			devices.map((device) => [
-				device.id,
-				skip.has(device.id) ? 'skipped (watching)' : 'not attempted'
-			])
-		);
-		const logTrace = () =>
-			console.info(
-				`push ${input.kind}: ${
-					devices.length === 0
-						? 'no devices want it'
-						: devices
-								.map(
-									(device) => `${device.label} [${device.id.slice(0, 8)}] ${trace.get(device.id)}`
-								)
-								.join('; ')
-				}`
-			);
 		if (targets.length === 0) {
-			logTrace();
 			return outcome;
 		}
 
@@ -269,7 +291,6 @@ export async function sendPush(
 						keys
 					);
 					const response = await fetchImpl(device.endpoint, request);
-					trace.set(device.id, `push service answered ${response.status}`);
 					if (response.status === 404 || response.status === 410) {
 						gone.push(device.id);
 					} else if (response.ok) {
@@ -281,7 +302,6 @@ export async function sendPush(
 						outcome.failed += 1;
 					}
 				} catch (error) {
-					trace.set(device.id, 'threw before an answer');
 					console.error('could not send a push notification', error);
 					outcome.failed += 1;
 				}
@@ -300,7 +320,6 @@ export async function sendPush(
 		}
 		outcome.removed = gone.length;
 		outcome.sent = delivered.length;
-		logTrace();
 	} catch (error) {
 		console.error('could not send push notifications', error);
 	}

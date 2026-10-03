@@ -15,6 +15,7 @@ import type { Db } from './db';
 import { pushSubscriptions } from './db/schema';
 import { requireMembership } from './messaging';
 import {
+	checkPushOwnership,
 	deletePushDevice,
 	listPushDevices,
 	notifyPartner,
@@ -130,6 +131,39 @@ describe('devices', () => {
 		expect((await listPushDevices(db, ada.id))[0]?.notifyReactions).toBe(false);
 		expect(await deletePushDevice(db, ada.id, id)).toBe(true);
 		expect(await listPushDevices(db, ada.id)).toEqual([]);
+	});
+});
+
+/**
+ * A browser that changes hands without the settings screen's sign-out keeps
+ * the previous account's subscription. Found on a Mac whose Firefox, signed in
+ * as one account, was still being sent the other account's notifications.
+ */
+describe('checkPushOwnership', () => {
+	it('confirms a subscription that is the signed-in account’s', async () => {
+		const { id, browser } = await subscribe(ada);
+		expect(await checkPushOwnership(db, ada.id, browser.endpoint)).toEqual({
+			status: 'yours',
+			id
+		});
+		expect(await listPushDevices(db, ada.id)).toHaveLength(1);
+	});
+
+	it('deletes one that is another account’s, and gives it to nobody', async () => {
+		const { browser } = await subscribe(ada);
+		const kept = await subscribe(ada);
+
+		expect(await checkPushOwnership(db, bo.id, browser.endpoint)).toEqual({ status: 'released' });
+
+		// Only that browser's row: Ada's other devices still hear from her partner.
+		expect((await listPushDevices(db, ada.id)).map((device) => device.id)).toEqual([kept.id]);
+		// Never handed over: Bo did not ask for notifications.
+		expect(await listPushDevices(db, bo.id)).toEqual([]);
+	});
+
+	it('reports one no account has', async () => {
+		const browser = await createTestBrowserSubscription();
+		expect(await checkPushOwnership(db, ada.id, browser.endpoint)).toEqual({ status: 'unknown' });
 	});
 });
 

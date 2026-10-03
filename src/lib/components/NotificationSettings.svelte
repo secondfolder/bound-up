@@ -51,9 +51,9 @@
 	onMount(() => {
 		support = pushSupport();
 		thisDeviceId = storedPushDeviceId();
-		// A browser can be subscribed while the server has forgotten it, or the
-		// other way round (another account used it, storage was cleared). Re-
-		// registering is an idempotent upsert, so it simply puts them back in step.
+		// The browser's subscription and the server's rows can disagree: storage
+		// cleared, or another account subscribed this browser. `resyncPush` asks
+		// whose it is, and lets go of somebody else's rather than taking it over.
 		if (support === 'available' && vapidPublicKey) {
 			void resyncPush()
 				.then(async (id) => {

@@ -9,11 +9,13 @@ import { isKnownPushService } from '$lib/notifications';
  * `pushManager.subscribe()` runs in the browser, so it is posted by hand, the
  * way message sends are.
  */
+const endpointSchema = z
+	.string()
+	.max(1024, 'Malformed push endpoint')
+	.refine(isKnownPushService, 'Not a push service this server sends to');
+
 export const pushSubscribeSchema = z.object({
-	endpoint: z
-		.string()
-		.max(1024, 'Malformed push endpoint')
-		.refine(isKnownPushService, 'Not a push service this server sends to'),
+	endpoint: endpointSchema,
 	keys: z.object({
 		// A base64url P-256 point (65 bytes → 87 characters) and a 16-byte
 		// secret (22). The ceilings only stop a junk row; the exact check is the
@@ -40,3 +42,6 @@ export const pushDeviceUpdateSchema = z
 	})
 	.partial()
 	.refine((changes) => Object.keys(changes).length > 0, 'Nothing to change');
+
+/** Asking whose this browser's subscription is. See `checkPushOwnership`. */
+export const pushOwnershipSchema = z.object({ endpoint: endpointSchema });

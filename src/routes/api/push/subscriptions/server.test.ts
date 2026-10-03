@@ -6,6 +6,7 @@ import { createTestUser, type TestUser } from '$lib/testing/fixtures';
 import { createTestBrowserSubscription, createTestVapid } from '$lib/testing/push';
 import { POST } from './+server';
 import { DELETE, PATCH } from './[id]/+server';
+import { POST as CHECK } from './check/+server';
 
 /**
  * The device endpoints. `$env/dynamic/private` stands in for the server's
@@ -130,5 +131,38 @@ describe('/api/push/subscriptions/[id]', () => {
 		const response = await DELETE(fakeEvent({ db: harness.db, user: ada, params: { id } }));
 		expect(response.status).toBe(200);
 		expect(await listPushDevices(harness.db, ada.id)).toEqual([]);
+	});
+});
+
+describe('POST /api/push/subscriptions/check', () => {
+	async function check(user: TestUser | null, json: unknown) {
+		return await CHECK(fakeEvent({ db: harness.db, user, json }));
+	}
+
+	it('refuses an unsigned visitor', async () => {
+		const result = await runAndCatch(() => check(null, { endpoint: 'x' }));
+		expect(result).toMatchObject({ type: 'error', status: 401 });
+	});
+
+	it.each([null, {}, { endpoint: 'https://example.com/not-a-push-service' }])(
+		'refuses something that is not a push endpoint: %j',
+		async (json) => {
+			const result = await runAndCatch(() => check(ada, json));
+			expect(result).toMatchObject({ type: 'error', status: 400 });
+		}
+	);
+
+	it('says whose the browser is, and lets go of another account’s', async () => {
+		const subscription = await body();
+		const created = await POST(fakeEvent({ db: harness.db, user: ada, json: subscription }));
+		const { id } = (await created.json()) as { id: string };
+
+		const mine = await check(ada, { endpoint: subscription.endpoint });
+		expect(await mine.json()).toEqual({ status: 'yours', id });
+
+		const theirs = await check(bo, { endpoint: subscription.endpoint });
+		expect(await theirs.json()).toEqual({ status: 'released' });
+		expect(await listPushDevices(harness.db, ada.id)).toEqual([]);
+		expect(await listPushDevices(harness.db, bo.id)).toEqual([]);
 	});
 });

@@ -48,12 +48,6 @@ export const GET: RequestHandler = async ({ locals, params, platform, url }) => 
 	if (!(streamId && idSchema.safeParse(streamId).success)) {
 		error(400, 'A live feed needs a `stream` id: reload the page to get one');
 	}
-	// TEMPORARY, while iPhone delivery is diagnosed: whether this stream will
-	// count as a device watching. Cloudflare's logs redact the query string, so
-	// the request line cannot say. See docs/temporary-code.md.
-	console.info(
-		`live feed opened: device ${deviceId?.slice(0, 8) ?? (device === null ? 'none' : 'invalid')}`
-	);
 	const notifier = await createNotifier({ platform });
 	return notifier.stream(params.id, { userId: locals.user.id, deviceId, streamId });
 };

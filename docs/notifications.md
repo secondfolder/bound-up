@@ -129,6 +129,25 @@ a reasonable thing to want.
   a lock screen nobody is signed in behind. A device sent to sign in again by
   `EncryptionGate` keeps its subscription: that is the same person on the same
   device, and they would only be surprised to find notifications switched off.
+- **A browser that changes hands lets go of the previous account.** Only that
+  sign-out button can unsubscribe, because only it runs in the browser. A
+  session that expires, `/logout`, or simply signing in as somebody else leaves
+  the subscription where it was, still the previous account's. So on every
+  full load the app shell sends this browser's endpoint to
+  `POST /api/push/subscriptions/check`, and the server answers whose it is. If
+  it is another account's, the server deletes that row and the browser
+  unsubscribes. Holding the endpoint is what authorises deleting a row that is
+  not yours, since only the browser with the subscription has it. If it is the
+  signed-in account's, the stored device id is refreshed. A device sent to sign
+  in again by `EncryptionGate` comes back to its own row, so nothing changes
+  for it.
+- **A device is never handed to a new account.** The check releases a
+  subscription but never registers it for whoever signed in. Browser permission
+  was given by the previous person, so the new one turns notifications on with
+  a tap like anyone else. The settings screen used to re-register on every
+  visit, which quietly moved a previous person's device to whoever opened it.
+  This was found on a Mac whose Firefox, signed in as one account, was being
+  sent the other account's notifications.
 
 ## Not telling a device what it is showing
 
@@ -199,9 +218,9 @@ the page.
 | ---------------------------------------------------- | --------------------------------------------------------------- |
 | `src/lib/notifications.ts`                           | Pure: payload, copy, topic, device label, the push-service list |
 | `src/lib/server/push.ts`                             | Devices, `sendPush`, `notifyPartner`, VAPID config              |
-| `src/lib/push-client.ts`                             | Browser only: support detection, enable, disable, resync        |
+| `src/lib/push-client.ts`                             | Browser only: support detection, enable, disable, ownership check |
 | `src/service-worker.ts`                              | Shows a push and opens the thread on tap                        |
-| `src/routes/api/push/subscriptions/`                 | `POST` subscribe; `[id]` `PATCH` categories and `DELETE`        |
+| `src/routes/api/push/subscriptions/`                 | `POST` subscribe; `[id]` `PATCH` categories and `DELETE`; `check` |
 | `src/routes/(auth-required)/(app)/settings/notifications/` | The settings screen, around `NotificationSettings.svelte` |
 
 The send and reaction endpoints call `notifyPartner` straight after
@@ -236,7 +255,10 @@ The Zod schemas are in `src/lib/schemas/pushSubscription.ts`.
   page. Headless Chromium reports notifications as denied whatever the context
   is granted, and a real subscription would register with Google. The suite
   never sends a message to a subscribed account, so the server never calls a
-  real push service.
+  real push service. It also covers a browser changing hands: one account
+  subscribes, the session is cleared without the settings sign-out, another
+  signs up, and the first account's device is gone without the second
+  getting it.
 - **Not covered by any automated test: delivery on a real iPhone.** That needs
   `npm run preview` or a deploy with real keys, the app added to the Home
   Screen, and a second account sending a message while the phone is locked.

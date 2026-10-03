@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import AppNav from '$lib/components/AppNav.svelte';
 	import EncryptionGate from '$lib/components/EncryptionGate.svelte';
@@ -7,9 +7,23 @@
 	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
 	import NotificationsHint from '$lib/components/NotificationsHint.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
+	import { resyncPush } from '$lib/push-client';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
+
+	// A browser that changed hands without the settings screen's sign-out still
+	// has the previous account's subscription, and would go on showing their
+	// notifications. Checked once per full load, here rather than on sign-in,
+	// because a session can end and another begin with nothing of ours running
+	// in between. See docs/notifications.md.
+	onMount(() => {
+		if (data.pushAvailable) {
+			void resyncPush().catch(() => {
+				// Background work nobody is waiting on: the next full load asks again.
+			});
+		}
+	});
 
 	const showTimezoneWarning = $derived.by(() => {
 		const routeId = page.route.id;

@@ -148,11 +148,26 @@ export async function enablePush(vapidPublicKey: string): Promise<string | null>
 }
 
 /**
- * Re-registers an existing subscription, if there is one.
+ * Puts this browser's subscription back in step with the signed-in account.
  *
- * For when this browser is subscribed but the server has lost the device or
- * the browser has lost its id — after another account used it, say. The
- * upsert on the endpoint makes this safe to call on every visit to settings.
+ * A browser can change hands without the settings screen's sign-out — the
+ * session ending, `/logout`, or signing in as somebody else — and its
+ * subscription still belongs to the previous account. So this asks the server
+ * whose it is, on every full load of the app shell:
+ *
+ * - **yours:** the stored id is refreshed, in case storage lost it.
+ * - **released:** it was somebody else's; the server has deleted their row,
+ *   and this unsubscribes, so nothing addressed to them arrives here again.
+ * - **unknown:** no account has it (pruned past the device cap, say). The
+ *   stored id is dropped and the subscription kept, so turning notifications
+ *   back on reuses it.
+ *
+ * It never registers the subscription for whoever is signed in. That used to
+ * be its job, and it meant opening the settings screen on a browser somebody
+ * else had subscribed quietly moved their notifications to you. The
+ * permission was theirs to give, so turning on is always a tap.
+ *
+ * Returns this device's id when it is the signed-in account's, else null.
  */
 export async function resyncPush(): Promise<string | null> {
 	if (pushSupport() !== 'available' || Notification.permission !== 'granted') {
@@ -164,7 +179,28 @@ export async function resyncPush(): Promise<string | null> {
 		storePushDeviceId(null);
 		return null;
 	}
-	return await register(subscription);
+
+	const response = await fetch('/api/push/subscriptions/check', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ endpoint: subscription.endpoint })
+	});
+	if (!response.ok) {
+		throw new Error(`Could not check this device's notifications (${response.status})`);
+	}
+	const ownership = (await response.json()) as
+		| { status: 'yours'; id: string }
+		| { status: 'released' | 'unknown' };
+
+	if (ownership.status === 'yours') {
+		storePushDeviceId(ownership.id);
+		return ownership.id;
+	}
+	storePushDeviceId(null);
+	if (ownership.status === 'released') {
+		await subscription.unsubscribe().catch(() => false);
+	}
+	return null;
 }
 
 /**

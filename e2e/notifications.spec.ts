@@ -148,6 +148,39 @@ test.describe('push notification settings', () => {
 		}
 	});
 
+	/**
+	 * The other way a browser changes hands: the session ends without the
+	 * settings screen's sign-out — it expires, or `/logout` — and somebody else
+	 * signs in. Found on a Mac whose Firefox, signed in as one account, was
+	 * still being sent the other account's notifications.
+	 */
+	test('lets go of the previous account’s device when somebody else signs in', async ({
+		browser
+	}) => {
+		const device = await pushCapableDevice(browser);
+		const first = account('Quinn');
+		const second = account('Rui');
+		try {
+			const { page } = device;
+			await signUp(page, first);
+			await openNotificationSettings(page);
+			await clickWaButton(page, 'Turn on notifications');
+			await expect.poll(() => deviceRows(first.email)).toHaveLength(1);
+
+			// The session goes with nothing of ours running: no `disablePush`.
+			await page.context().clearCookies();
+			await signUp(page, second);
+
+			// Released by the app shell on its first load, and given to nobody.
+			await expect.poll(() => deviceRows(first.email)).toHaveLength(0);
+			expect(await deviceRows(second.email)).toHaveLength(0);
+			await openNotificationSettings(page);
+			await expect(page.getByRole('button', { name: 'Turn on notifications' })).toBeVisible();
+		} finally {
+			await device.close();
+		}
+	});
+
 	test('tells an iPhone in a browser tab to add the app to the Home Screen first', async ({
 		browser
 	}) => {
