@@ -27,12 +27,6 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 
 	depends(`messages:thread:${params.threadId}`);
 
-	const [thread, recipients, tags] = await Promise.all([
-		getThread(locals.db, params.threadId, membership.icon, locals.user.id),
-		getRecipientsForPartnership(locals.db, params.id, locals.user.id),
-		listTags(locals.db, params.id, locals.user.id)
-	]);
-
 	/**
 	 * A load that writes, which is unusual enough to justify.
 	 *
@@ -40,14 +34,24 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	 * hang an action on, and doing it from a client `fetch` after hydration
 	 * would lose the read for anyone who taps in and straight back out again.
 	 *
-	 * Deliberately not awaited before the response: the mark is not something
-	 * the page renders, and making the user wait on a write to see their own
-	 * messages would be the wrong trade. A failure means the thread stays
-	 * unread, which is recoverable by opening it again.
+	 * Awaited, alongside the reads so it costs no extra round trip. It used to
+	 * be left running after the response, so as not to make anyone wait on a
+	 * write, and that lost reads: Workers may cancel work a request does not
+	 * wait for, and going straight back to the board could load it before the
+	 * write landed. Either way a thread just read showed as unread. Locally the
+	 * Node server always let it finish, so only the deployed app showed it.
+	 *
+	 * A failure is logged rather than failing the page: the thread stays
+	 * unread, which opening it again fixes.
 	 */
-	void markThreadOpened(locals.db, params.threadId, locals.user.id).catch((cause) => {
-		console.error('could not mark thread read', cause);
-	});
+	const [thread, recipients, tags] = await Promise.all([
+		getThread(locals.db, params.threadId, membership.icon, locals.user.id),
+		getRecipientsForPartnership(locals.db, params.id, locals.user.id),
+		listTags(locals.db, params.id, locals.user.id),
+		markThreadOpened(locals.db, params.threadId, locals.user.id).catch((cause: unknown) => {
+			console.error('could not mark thread read', cause);
+		})
+	]);
 
 	// Every account has keys, so a partnership without both is broken data.
 	if (!recipients) {
