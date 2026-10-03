@@ -151,6 +151,13 @@ export class RealtimeRoom {
 	}
 
 	#drop(writer: WritableStreamDefaultWriter<Uint8Array>): void {
+		const watcher = this.#writers.get(writer);
+		if (watcher) {
+			// TEMPORARY, while iPhone delivery is diagnosed: when a device stops
+			// counting as watching, to compare with when it was hidden. See
+			// docs/temporary-code.md.
+			console.info(`live feed dropped: device ${watcher.deviceId?.slice(0, 8) ?? 'none'}`);
+		}
 		this.#writers.delete(writer);
 		// The close can itself throw if the stream is already gone, which is
 		// exactly the case that got us here.

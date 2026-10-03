@@ -39,9 +39,13 @@ export const GET: RequestHandler = async ({ locals, params, platform, url }) => 
 	// query, so a member cannot pass themselves off as the other one; the device
 	// id is only ever compared against that user's own subscriptions.
 	const device = url.searchParams.get('device');
+	const deviceId = deviceIdSchema.safeParse(device).success ? device : null;
+	// TEMPORARY, while iPhone delivery is diagnosed: whether this stream will
+	// count as a device watching. Cloudflare's logs redact the query string, so
+	// the request line cannot say. See docs/temporary-code.md.
+	console.info(
+		`live feed opened: device ${deviceId?.slice(0, 8) ?? (device === null ? 'none' : 'invalid')}`
+	);
 	const notifier = await createNotifier({ platform });
-	return notifier.stream(params.id, {
-		userId: locals.user.id,
-		deviceId: deviceIdSchema.safeParse(device).success ? device : null
-	});
+	return notifier.stream(params.id, { userId: locals.user.id, deviceId });
 };

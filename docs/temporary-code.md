@@ -201,3 +201,22 @@ link sent to the account's email address.
 Everything else about the flow: the code compared out of band, the
 no-account-existence-oracle rule on the start endpoint, the hashed token, and
 wiping every passkey and session on completion.
+
+## Push delivery diagnostics
+
+Some pushes to an iPhone were neither delivered nor reported as failing, and
+Cloudflare's logs redact the query string that says which device a live feed
+belongs to. Three `console.info` lines, each marked `TEMPORARY` at its site,
+say what the logs otherwise cannot:
+
+- `src/lib/server/push.ts`, `sendPush`: one `push <kind>: …` line per push,
+  naming each of the recipient's devices (label and the first eight characters
+  of its id) and what happened to it — skipped as watching, or the push
+  service's status.
+- `src/routes/api/partnerships/[id]/events/+server.ts`: `live feed opened`,
+  with the device id prefix, `none` or `invalid`.
+- `src/lib/server/realtime/durable-object.ts`, `#drop`: `live feed dropped`,
+  when a device stops counting as watching.
+
+Remove all three once the cause is found and fixed. What should stay is
+whatever fix comes out of it, with a test; none of these lines is a feature.

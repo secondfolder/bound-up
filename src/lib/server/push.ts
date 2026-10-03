@@ -204,6 +204,7 @@ export async function sendPush(
 		const devices = await db
 			.select({
 				id: pushSubscriptions.id,
+				label: pushSubscriptions.label,
 				endpoint: pushSubscriptions.endpoint,
 				p256dh: pushSubscriptions.p256dh,
 				auth: pushSubscriptions.auth
@@ -218,7 +219,28 @@ export async function sendPush(
 
 		const skip = new Set(input.skipDeviceIds);
 		const targets = devices.filter((device) => !skip.has(device.id));
+		// TEMPORARY, while iPhone delivery is diagnosed: what happened to each
+		// device, as one line per push. See docs/temporary-code.md.
+		const trace = new Map<string, string>(
+			devices.map((device) => [
+				device.id,
+				skip.has(device.id) ? 'skipped (watching)' : 'not attempted'
+			])
+		);
+		const logTrace = () =>
+			console.info(
+				`push ${input.kind}: ${
+					devices.length === 0
+						? 'no devices want it'
+						: devices
+								.map(
+									(device) => `${device.label} [${device.id.slice(0, 8)}] ${trace.get(device.id)}`
+								)
+								.join('; ')
+				}`
+			);
 		if (targets.length === 0) {
+			logTrace();
 			return outcome;
 		}
 
@@ -247,6 +269,7 @@ export async function sendPush(
 						keys
 					);
 					const response = await fetchImpl(device.endpoint, request);
+					trace.set(device.id, `push service answered ${response.status}`);
 					if (response.status === 404 || response.status === 410) {
 						gone.push(device.id);
 					} else if (response.ok) {
@@ -258,6 +281,7 @@ export async function sendPush(
 						outcome.failed += 1;
 					}
 				} catch (error) {
+					trace.set(device.id, 'threw before an answer');
 					console.error('could not send a push notification', error);
 					outcome.failed += 1;
 				}
@@ -276,6 +300,7 @@ export async function sendPush(
 		}
 		outcome.removed = gone.length;
 		outcome.sent = delivered.length;
+		logTrace();
 	} catch (error) {
 		console.error('could not send push notifications', error);
 	}
