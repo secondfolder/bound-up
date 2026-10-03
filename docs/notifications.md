@@ -38,6 +38,24 @@ is the version Apple accepts: 1.x sent the draft `aesgcm` encoding. The usual
   to the Home Screen and opened from there. In a Safari tab there is not even a
   `PushManager`, so the settings screen checks for that first and explains how
   to add the app, reusing `shouldOfferHomeScreen` from `home-screen.ts`.
+- **Suggested once the app is installed.** Adding it to the Home Screen is
+  what makes push possible on an iPhone, so the app shell then shows
+  `NotificationsHint`: "Get notified about new messages", linking to
+  Notifications settings. It is the follow-on to `HomeScreenHint`, and the two
+  never show together, since one is for a browser tab and the other for the
+  Home Screen app. It shows only when push can work and the person has not
+  decided yet (`shouldSuggestPush` in `push-client.ts`):
+  - the page is running standalone,
+  - this server has push keys (`pushAvailable` in the shell's load),
+  - the browser supports push,
+  - the permission is still at "ask",
+  - and this device has no subscription.
+
+  So someone who said no, or turned notifications off, is not asked again. It
+  is a link rather than a switch, because the permission prompt has to come
+  from the settings screen's own button. It is hidden on that screen, and
+  dismissing it is remembered per device, through the same
+  `DismissibleHint` base as the Home Screen hint.
 - **Permission needs a tap.** `enablePush` calls `Notification.requestPermission()`
   before any other `await`, because Safari only prompts inside a user gesture.
 - **No silent push.** WebKit revokes a subscription whose push does not show a

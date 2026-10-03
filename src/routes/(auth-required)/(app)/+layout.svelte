@@ -5,6 +5,7 @@
 	import EncryptionGate from '$lib/components/EncryptionGate.svelte';
 	import HelpRequestCallout from '$lib/components/HelpRequestCallout.svelte';
 	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
+	import NotificationsHint from '$lib/components/NotificationsHint.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
 	import type { LayoutData } from './$types';
 
@@ -57,6 +58,11 @@
 			)}
 		/>
 		<HomeScreenHint />
+		<!-- Never on the screen it links to. The two hints never show together:
+		     one is for a browser tab, the other for the Home Screen app. -->
+		{#if data.pushAvailable && page.route.id !== '/(auth-required)/(app)/settings/notifications'}
+			<NotificationsHint />
+		{/if}
 		{@render children()}
 	</main>
 	<AppNav partners={data.partners} />

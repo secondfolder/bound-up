@@ -3,10 +3,11 @@ import { isAdmin } from '$lib/server/admin';
 import { listUserFeatures } from '$lib/server/features';
 import { listHelpRequests } from '$lib/server/messaging';
 import { listPartnersForNav } from '$lib/server/partnerships';
+import { readVapidConfig } from '$lib/server/push';
 import type { HelpRequestView } from '$lib/types';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, platform }) => {
 	// Loaded in the layout rather than per page because the bottom nav renders
 	// one tab per partner on every screen in this group. The group's own guard
 	// has already run by the time a layout load does, so `locals.user` is set —
@@ -17,7 +18,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			partners: [],
 			helpRequests: [] as HelpRequestView[],
 			features: [] as FeatureKey[],
-			isAdmin: false
+			isAdmin: false,
+			pushAvailable: false
 		};
 	}
 
@@ -46,6 +48,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		features,
 		// A boolean rather than the role, so page data carries only the answer
 		// the UI needs. The admin pages check the role again on the server.
-		isAdmin: isAdmin(locals.user)
+		isAdmin: isAdmin(locals.user),
+		// Whether this server has push keys at all, so the shell only suggests
+		// turning on notifications where they can work. Env, not a query.
+		pushAvailable: readVapidConfig(platform) !== null
 	};
 };

@@ -189,6 +189,9 @@ export function deviceLabel(userAgent: string, maxTouchPoints = 0): string {
  */
 export const PUSH_DEVICE_ID_KEY = 'bound-up:push-device-id';
 
+/** Remembered per device once dismissed, like the Home Screen hint's. */
+export const NOTIFICATIONS_HINT_DISMISSED_KEY = 'bound-up:notifications-hint-dismissed';
+
 /**
  * Push services this server will send to.
  *

@@ -14,6 +14,7 @@ function data(claimCount: number, claimable = true): PageData {
 		helpRequests: [],
 		features: [],
 		isAdmin: false,
+		pushAvailable: false,
 		partner: { id: 'p1', name: 'Jun', canManageRewards: true, canClaimRewards: claimable },
 		counterpartUserId: 'u2',
 		viewerCredits: 4,

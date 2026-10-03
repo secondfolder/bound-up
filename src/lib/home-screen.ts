@@ -37,3 +37,17 @@ export function shouldOfferHomeScreen(input: {
 
 /** Remembered per device once dismissed. A convenience, so losing it is harmless. */
 export const HOME_SCREEN_HINT_DISMISSED_KEY = 'bound-up:home-screen-hint-dismissed';
+
+/**
+ * Whether this page is running as the Home Screen app rather than in a tab.
+ *
+ * Unlike the rest of this file it reads the browser, so it is for `onMount`
+ * and event handlers only. `navigator.standalone` is iOS's own flag; the media
+ * query is everyone else's, and iOS answers it too.
+ */
+export function isStandalone(): boolean {
+	return (
+		(navigator as Navigator & { standalone?: boolean }).standalone === true ||
+		matchMedia('(display-mode: standalone)').matches
+	);
+}

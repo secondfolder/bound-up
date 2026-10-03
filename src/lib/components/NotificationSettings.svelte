@@ -9,6 +9,7 @@
 		storedPushDeviceId
 	} from '$lib/push-client';
 	import { NETWORK_FAILURE, tryFetch } from '$lib/request-failure.svelte';
+	import ShareGlyph from './ShareGlyph.svelte';
 
 	/**
 	 * Push notification settings: this device's switch, and every device's
@@ -141,23 +142,9 @@
 	{:else if support === 'needs-install'}
 		<wa-callout variant="neutral" data-testid="push-needs-install">
 			<strong>Add Bound Up to your Home Screen first</strong>
-			<!-- The same share glyph as HomeScreenHint, for the same reason: the
-			     button it means has no text under it. -->
 			<p>
-				Your iPhone or iPad only shows notifications from apps on the Home Screen. Tap <svg
-					class="share"
-					role="img"
-					aria-label="Share"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					><path
-						d="M9 9H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-2M12 2.5V15M8.5 6 12 2.5 15.5 6"
-					/></svg
-				>, then “Add to Home Screen”, and open Bound Up from there.
+				Your iPhone or iPad only shows notifications from apps on the Home Screen. Tap <ShareGlyph
+				/>, then “Add to Home Screen”, and open Bound Up from there.
 			</p>
 		</wa-callout>
 	{:else if support === 'unsupported'}
@@ -221,12 +208,6 @@
 		wa-callout p {
 			margin-top: 0.25rem;
 			color: var(--wa-color-text-quiet);
-		}
-
-		.share {
-			width: 1.15em;
-			height: 1.15em;
-			vertical-align: -0.2em;
 		}
 
 		.devices {

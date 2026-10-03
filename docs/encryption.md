@@ -366,7 +366,9 @@ Screen to stay signed in for longer", on the login page and in the app shell.
 The web cannot add itself, so it says how, drawing Safari's share icon rather
 than naming it. (A Web Share API button was tried: the sheet a page opens has
 no "Add to Home Screen".) `shouldOfferHomeScreen` in
-`src/lib/home-screen.ts` decides, and a dismissal is remembered per device. The
+`src/lib/home-screen.ts` decides, and a dismissal is remembered per device by
+`DismissibleHint`, which `NotificationsHint` shares (see
+[notifications.md](notifications.md#ios)). The
 manifest's `start_url` is `/home`, so the Home Screen app opens the app rather
 than whatever page it was added from.
 

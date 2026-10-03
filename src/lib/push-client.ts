@@ -1,5 +1,5 @@
 import { dev } from '$app/environment';
-import { shouldOfferHomeScreen } from '$lib/home-screen';
+import { isStandalone, shouldOfferHomeScreen } from '$lib/home-screen';
 import { deviceLabel, PUSH_DEVICE_ID_KEY } from '$lib/notifications';
 import { tryFetch } from '$lib/request-failure.svelte';
 
@@ -24,14 +24,11 @@ import { tryFetch } from '$lib/request-failure.svelte';
 export type PushSupport = 'unsupported' | 'needs-install' | 'denied' | 'available';
 
 export function pushSupport(): PushSupport {
-	const standalone =
-		(navigator as Navigator & { standalone?: boolean }).standalone === true ||
-		matchMedia('(display-mode: standalone)').matches;
 	if (
 		shouldOfferHomeScreen({
 			userAgent: navigator.userAgent,
 			maxTouchPoints: navigator.maxTouchPoints,
-			standalone
+			standalone: isStandalone()
 		})
 	) {
 		return 'needs-install';
@@ -45,6 +42,25 @@ export function pushSupport(): PushSupport {
 		return 'denied';
 	}
 	return 'available';
+}
+
+/**
+ * Whether to suggest turning notifications on: the Home Screen app, where push
+ * works, and a person who has not decided yet.
+ *
+ * Not decided means the permission is still at "ask" and this device has no
+ * subscription. Someone who said no, or who turned notifications off on the
+ * settings screen, has decided, and is not asked again. Only in the Home Screen
+ * app, because that is the one place iOS offers push at all; a browser tab on
+ * an iPhone gets `HomeScreenHint` instead.
+ */
+export function shouldSuggestPush(): boolean {
+	return (
+		isStandalone() &&
+		pushSupport() === 'available' &&
+		Notification.permission === 'default' &&
+		storedPushDeviceId() === null
+	);
 }
 
 /** The id the server knows this browser by, if it is subscribed. */

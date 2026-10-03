@@ -28,6 +28,7 @@ function data({
 		helpRequests: [],
 		features: [],
 		isAdmin: false,
+		pushAvailable: false,
 		partner: {
 			id: 'p1',
 			name: 'Jun',
