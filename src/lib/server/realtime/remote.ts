@@ -42,15 +42,19 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 		},
 
 		async stream(partnershipId, watcher) {
-			// The object's streaming Response is returned straight through. No
-			// buffering step: reading it here would hold the whole stream in the
-			// worker and defeat the point.
 			const url = new URL(`${ROOM_ORIGIN}/subscribe`);
 			url.searchParams.set('user', watcher.userId);
 			if (watcher.deviceId) {
 				url.searchParams.set('device', watcher.deviceId);
 			}
-			return await room(partnershipId).fetch(url.toString());
+			const response = await room(partnershipId).fetch(url.toString());
+			// Rewrapped, because a stub's Response has immutable headers, and
+			// SvelteKit appends `Set-Cookie` to whatever an endpoint returns whenever
+			// the request set a cookie — a Better Auth session refresh, say. Returned
+			// as-is, that threw "Can't modify immutable headers" and the feed 500'd.
+			// The body is passed through rather than read, so it still streams:
+			// buffering it here would hold the whole stream in the worker.
+			return new Response(response.body, response);
 		}
 	};
 }
