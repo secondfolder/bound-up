@@ -44,6 +44,7 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 		async stream(partnershipId, watcher) {
 			const url = new URL(`${ROOM_ORIGIN}/subscribe`);
 			url.searchParams.set('user', watcher.userId);
+			url.searchParams.set('stream', watcher.streamId);
 			if (watcher.deviceId) {
 				url.searchParams.set('device', watcher.deviceId);
 			}
@@ -55,6 +56,20 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 			// The body is passed through rather than read, so it still streams:
 			// buffering it here would hold the whole stream in the worker.
 			return new Response(response.body, response);
+		},
+
+		async presence(partnershipId, presence) {
+			try {
+				await room(partnershipId).fetch(`${ROOM_ORIGIN}/presence`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify(presence)
+				});
+			} catch (error) {
+				// Swallowed like a failed publish: a lost renewal is covered by the
+				// next one, and a lost goodbye by the lease running out.
+				console.error('could not update realtime presence', error);
+			}
 		}
 	};
 }

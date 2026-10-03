@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defined } from '../../testing/defined';
 import { RealtimeRoom } from './durable-object';
-import { encodeSseEvent, SSE_KEEPALIVE, SSE_KEEPALIVE_MS, SSE_PREAMBLE } from './index';
+import {
+	encodeSseEvent,
+	PRESENCE_TTL_MS,
+	type Presence,
+	SSE_KEEPALIVE,
+	SSE_KEEPALIVE_MS,
+	SSE_PREAMBLE
+} from './index';
 
 /**
  * The Durable Object class, exercised directly.
@@ -29,7 +36,7 @@ function room() {
 	return new RealtimeRoom();
 }
 
-async function subscribe(instance: RealtimeRoom, query = 'user=u-1') {
+async function subscribe(instance: RealtimeRoom, query = 'user=u-1&stream=s-1') {
 	const response = await instance.fetch(new Request(`${ORIGIN}/subscribe?${query}`));
 	const contentType = response.headers.get('content-type');
 	if (contentType !== 'text/event-stream') {
@@ -115,12 +122,14 @@ describe('RealtimeRoom', () => {
 	it('reports who is watching after the broadcast, without anyone who hung up', async () => {
 		vi.useFakeTimers();
 		const instance = room();
-		const ada = await subscribe(instance, 'user=ada&device=d-ada');
-		const bo = await subscribe(instance, 'user=bo');
+		const ada = await subscribe(instance, 'user=ada&device=d-ada&stream=s-ada');
+		const bo = await subscribe(instance, 'user=bo&stream=s-bo');
 		await bo.cancel();
 
 		const response = await publish(instance, { kind: 'message', threadId: 't-1' });
-		expect(await response.json()).toEqual({ watching: [{ userId: 'ada', deviceId: 'd-ada' }] });
+		expect(await response.json()).toEqual({
+			watching: [{ userId: 'ada', deviceId: 'd-ada', streamId: 's-ada' }]
+		});
 
 		await ada.cancel();
 	});
@@ -134,6 +143,115 @@ describe('RealtimeRoom', () => {
 
 		expect(decoder.decode((await reader.read()).value)).toBe(SSE_KEEPALIVE);
 		await reader.cancel();
+	});
+
+	/**
+	 * Why streams are leases at all: on Workers, a browser closing its
+	 * `EventSource` was never seen to reach the room, so a phone that had left
+	 * the board went on being reported as watching and was never pushed to.
+	 * These cover the page's goodbye, the lease running out without one, and a
+	 * renewed lease surviving. See `PRESENCE_TTL_MS`.
+	 */
+	describe('presence', () => {
+		const phone = 'user=ada&device=d-phone&stream=s-phone';
+
+		function presence(instance: RealtimeRoom, body: Presence) {
+			return instance.fetch(
+				new Request(`${ORIGIN}/presence`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify(body)
+				})
+			);
+		}
+
+		async function watching(instance: RealtimeRoom) {
+			const response = await publish(instance, { kind: 'thread' });
+			return ((await response.json()) as { watching: unknown[] }).watching;
+		}
+
+		it('stops reporting a stream once its page says goodbye, and closes it', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const reader = await subscribe(instance, phone);
+
+			const response = await presence(instance, {
+				userId: 'ada',
+				streamId: 's-phone',
+				present: false
+			});
+			expect(response.status).toBe(204);
+
+			expect(await watching(instance)).toEqual([]);
+			// Closed rather than just forgotten, so the room stops paying to hold it.
+			expect((await reader.read()).done).toBe(true);
+		});
+
+		it('ignores a goodbye naming somebody else’s stream', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const reader = await subscribe(instance, phone);
+
+			await presence(instance, { userId: 'bo', streamId: 's-phone', present: false });
+
+			expect(await watching(instance)).toEqual([
+				{ userId: 'ada', deviceId: 'd-phone', streamId: 's-phone' }
+			]);
+			await reader.cancel();
+		});
+
+		it('stops reporting a stream whose page stopped renewing it', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const reader = await subscribe(instance, phone);
+			// Read as they come, so the keepalives are not what ends it.
+			void (async () => {
+				while (!(await reader.read()).done) {
+					// Draining.
+				}
+			})();
+
+			await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS + 1);
+
+			expect(await watching(instance)).toEqual([]);
+		});
+
+		it('closes a lapsed stream on its own, without waiting for a publish', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const reader = await subscribe(instance, phone);
+			const ended = (async () => {
+				while (!(await reader.read()).done) {
+					// Draining until the room closes it.
+				}
+				return 'closed';
+			})();
+
+			await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS + SSE_KEEPALIVE_MS + 1);
+
+			await expect(ended).resolves.toBe('closed');
+		});
+
+		it('keeps a stream whose page keeps renewing it', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const reader = await subscribe(instance, phone);
+			void (async () => {
+				while (!(await reader.read()).done) {
+					// Draining.
+				}
+			})();
+
+			for (let elapsed = 0; elapsed < PRESENCE_TTL_MS * 3; elapsed += SSE_KEEPALIVE_MS) {
+				await vi.advanceTimersByTimeAsync(SSE_KEEPALIVE_MS);
+				await presence(instance, { userId: 'ada', streamId: 's-phone', present: true });
+			}
+
+			expect(await watching(instance)).toEqual([
+				{ userId: 'ada', deviceId: 'd-phone', streamId: 's-phone' }
+			]);
+			await reader.cancel();
+		});
 	});
 
 	it('404s an unknown path rather than throwing', async () => {

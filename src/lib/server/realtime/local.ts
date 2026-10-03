@@ -1,5 +1,6 @@
 import {
 	encodeSseEvent,
+	isExpired,
 	type Notifier,
 	SSE_HEADERS,
 	SSE_KEEPALIVE,
@@ -26,12 +27,32 @@ import {
 
 const encoder = new TextEncoder();
 
-/** partnershipId → the open streams watching it, and whose they are. */
-const rooms = new Map<string, Map<ReadableStreamDefaultController<Uint8Array>, Watcher>>();
+/** One open stream: whose it is, when its page last spoke, and how to end it. */
+type Entry = { watcher: Watcher; lastSeen: number; close: () => void };
+
+/** partnershipId → the open streams watching it. */
+const rooms = new Map<string, Map<ReadableStreamDefaultController<Uint8Array>, Entry>>();
+
+/**
+ * Ends every stream in a room whose lease has run out — see `PRESENCE_TTL_MS`.
+ *
+ * Node does tell a stream when its client goes (`cancel` below), unlike
+ * Workers, but the lease applies here too so that both backends behave the
+ * same, and so the Playwright suite exercises the rule production relies on.
+ */
+function closeExpired(partnershipId: string): void {
+	const now = Date.now();
+	for (const entry of [...(rooms.get(partnershipId)?.values() ?? [])]) {
+		if (isExpired(entry.lastSeen, now)) {
+			entry.close();
+		}
+	}
+}
 
 export function createLocalNotifier(): Notifier {
 	return {
 		publish(partnershipId, event) {
+			closeExpired(partnershipId);
 			const room = rooms.get(partnershipId);
 			if (!room) {
 				return Promise.resolve([]);
@@ -40,19 +61,16 @@ export function createLocalNotifier(): Notifier {
 			const frame = encoder.encode(encodeSseEvent(event));
 			// A copy, because a failed enqueue removes the controller from the set
 			// we would otherwise be iterating.
-			for (const controller of [...room.keys()]) {
+			for (const [controller, entry] of [...room]) {
 				try {
 					controller.enqueue(frame);
 				} catch {
 					// The client has gone. Nothing to report — a closed stream is the
 					// normal end of every subscription, not an error.
-					room.delete(controller);
+					entry.close();
 				}
 			}
-			if (room.size === 0) {
-				rooms.delete(partnershipId);
-			}
-			return Promise.resolve([...room.values()]);
+			return Promise.resolve([...room.values()].map((entry) => entry.watcher));
 		},
 
 		stream(partnershipId, watcher) {
@@ -78,10 +96,26 @@ export function createLocalNotifier(): Notifier {
 					own = controller;
 					const room = rooms.get(partnershipId) ?? new Map();
 					rooms.set(partnershipId, room);
-					room.set(controller, watcher);
+					room.set(controller, {
+						watcher,
+						lastSeen: Date.now(),
+						close: () => {
+							drop();
+							try {
+								controller.close();
+							} catch {
+								// Already closed or errored: the client went first.
+							}
+						}
+					});
 
 					controller.enqueue(encoder.encode(SSE_PREAMBLE));
 					keepalive = setInterval(() => {
+						const entry = rooms.get(partnershipId)?.get(controller);
+						if (entry && isExpired(entry.lastSeen, Date.now())) {
+							entry.close();
+							return;
+						}
 						try {
 							controller.enqueue(encoder.encode(SSE_KEEPALIVE));
 						} catch {
@@ -95,6 +129,22 @@ export function createLocalNotifier(): Notifier {
 			});
 
 			return Promise.resolve(new Response(body, { headers: SSE_HEADERS }));
+		},
+
+		presence(partnershipId, { userId, streamId, present }) {
+			// Matched on the user as well as the stream: the user comes from the
+			// session, so naming somebody else's stream does nothing.
+			for (const entry of [...(rooms.get(partnershipId)?.values() ?? [])]) {
+				if (entry.watcher.userId !== userId || entry.watcher.streamId !== streamId) {
+					continue;
+				}
+				if (present) {
+					entry.lastSeen = Date.now();
+				} else {
+					entry.close();
+				}
+			}
+			return Promise.resolve();
 		}
 	};
 }

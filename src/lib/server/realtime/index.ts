@@ -50,10 +50,25 @@ export type RealtimeEvent = {
  * request, so a member cannot claim to be the other one. `deviceId` is the
  * listener's own push subscription id, if it has one, as the browser reports
  * it; at worst a wrong one means a push that should have been skipped is sent.
+ * `streamId` is random per connection, chosen by the browser, so a presence
+ * update names exactly one stream — see `PRESENCE_TTL_MS`.
  */
 export type Watcher = {
 	userId: string;
 	deviceId: string | null;
+	streamId: string;
+};
+
+/**
+ * A browser saying one of its streams is still on screen, or has gone.
+ *
+ * Matched on both fields: the user comes from the session, so a member can only
+ * ever touch their own streams, whatever stream id they name.
+ */
+export type Presence = {
+	userId: string;
+	streamId: string;
+	present: boolean;
 };
 
 export type Notifier = {
@@ -69,6 +84,13 @@ export type Notifier = {
 	publish: (partnershipId: string, event: RealtimeEvent) => Promise<Watcher[]>;
 	/** A long-lived SSE `Response` for one partnership. */
 	stream: (partnershipId: string, watcher: Watcher) => Promise<Response>;
+	/**
+	 * Refreshes a stream's lease, or closes it when its page has gone.
+	 *
+	 * Never throws, like `publish`, and for a kindred reason: it is fire and
+	 * forget from a beacon, and the lease expiring is the fallback anyway.
+	 */
+	presence: (partnershipId: string, presence: Presence) => Promise<void>;
 };
 
 /**
@@ -122,3 +144,27 @@ export const SSE_QUEUE_LIMIT = 16;
  * request, and it is holding one regardless of whether it writes.
  */
 export const SSE_KEEPALIVE_MS = 25_000;
+
+/**
+ * How long a stream counts as open without hearing from its page.
+ *
+ * **A browser hanging up does not reach the room.** On Workers neither the
+ * request's abort signal nor a failing write tells the Durable Object that a
+ * client went away — measured on the preview, a phone that had left the board
+ * was still listed as watching minutes later, so every push to it was
+ * skipped. So a stream is a lease rather than a connection: the page renews it
+ * every `PRESENCE_INTERVAL_MS` (in `live.ts`) while it is on screen, says when
+ * it leaves, and a stream not heard from within this long is closed and no
+ * longer reported as watching.
+ *
+ * A little over two intervals, so one late or lost renewal does not cost a
+ * live page its stream. This is also the longest a message can go unpushed
+ * to a device that vanished without saying so — a phone locked before its
+ * goodbye got out, say. See docs/notifications.md.
+ */
+export const PRESENCE_TTL_MS = 60_000;
+
+/** Whether a stream last heard from at `lastSeen` has outlived its lease. */
+export function isExpired(lastSeen: number, now: number): boolean {
+	return now - lastSeen > PRESENCE_TTL_MS;
+}

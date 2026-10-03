@@ -211,9 +211,9 @@ describe('watchingDevices', () => {
 		expect(
 			watchingDevices(
 				[
-					{ userId: 'bo', deviceId: 'bo-phone' },
-					{ userId: 'bo', deviceId: null },
-					{ userId: 'ada', deviceId: 'bo-laptop' }
+					{ userId: 'bo', deviceId: 'bo-phone', streamId: 's-1' },
+					{ userId: 'bo', deviceId: null, streamId: 's-2' },
+					{ userId: 'ada', deviceId: 'bo-laptop', streamId: 's-3' }
 				],
 				'bo'
 			)

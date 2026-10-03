@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defined } from '$lib/testing/defined';
 import type { RealtimeNamespace } from './binding';
 import { createDurableObjectNotifier } from './remote';
@@ -9,6 +9,10 @@ import { createDurableObjectNotifier } from './remote';
  * The object itself is covered by `durable-object.test.ts`; this is about what
  * the worker does with the object's Response before SvelteKit gets it.
  */
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 /** A namespace whose one room answers every request with `respond()`. */
 function fakeNamespace(respond: (url: string) => Promise<Response>) {
@@ -36,7 +40,8 @@ describe('createDurableObjectNotifier().stream', () => {
 		);
 		const response = await createDurableObjectNotifier(namespace).stream('p-1', {
 			userId: 'u-1',
-			deviceId: null
+			deviceId: null,
+			streamId: 's-1'
 		});
 
 		expect(() => response.headers.append('set-cookie', 'session=x')).not.toThrow();
@@ -45,16 +50,43 @@ describe('createDurableObjectNotifier().stream', () => {
 		expect(body).toBe(':ok\n\n');
 	});
 
-	it('names the user and device to the room', async () => {
+	it('names the user, device and stream to the room', async () => {
 		const { namespace, requested } = fakeNamespace(async () => new Response(''));
 		await createDurableObjectNotifier(namespace).stream('p-1', {
 			userId: 'u-1',
-			deviceId: 'd-1'
+			deviceId: 'd-1',
+			streamId: 's-1'
 		});
 
 		const url = new URL(defined(requested[0], 'the subscribe request'));
 		expect(url.pathname).toBe('/subscribe');
 		expect(url.searchParams.get('user')).toBe('u-1');
 		expect(url.searchParams.get('device')).toBe('d-1');
+		expect(url.searchParams.get('stream')).toBe('s-1');
+	});
+});
+
+describe('createDurableObjectNotifier().presence', () => {
+	it('passes the update on to the room', async () => {
+		const { namespace, requested } = fakeNamespace(async () => new Response(null, { status: 204 }));
+		await createDurableObjectNotifier(namespace).presence('p-1', {
+			userId: 'u-1',
+			streamId: 's-1',
+			present: false
+		});
+		expect(new URL(defined(requested[0], 'the presence request')).pathname).toBe('/presence');
+	});
+
+	/** A lost renewal is covered by the next, and a lost goodbye by the lease. */
+	it('never throws', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const { namespace } = fakeNamespace(() => Promise.reject(new Error('room unavailable')));
+		await expect(
+			createDurableObjectNotifier(namespace).presence('p-1', {
+				userId: 'u-1',
+				streamId: 's-1',
+				present: true
+			})
+		).resolves.toBeUndefined();
 	});
 });

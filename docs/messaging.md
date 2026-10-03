@@ -620,6 +620,7 @@ reaction, and anything that would let it read or forge any of them.
 | `.../ack-warning`                   | `POST`, the one-time warning acknowledgement.                               |
 | `.../restore`                       | `GET` a page, `POST` re-encrypted rows, `DELETE`.                           |
 | `.../events`                        | `GET`, the SSE feed. Metadata only.                                         |
+| `.../events/presence`               | `POST`, a stream's lease renewal or goodbye. See [A stream is a lease](#a-stream-is-a-lease). |
 
 **`src/routes/api/` sits outside both route groups deliberately.** A group guard
 is a layout `+layout.server.ts`, and layout loads never run for a `+server.ts`
@@ -688,10 +689,49 @@ permanently-open stream is roughly 10,800 GB-s a day: about **83% of the free
 plan's 13,000 GB-s daily allowance, for a single partnership idling in a
 background tab.**
 
-So the client closes the stream on `visibilitychange`. The step that makes that
-_safe_ is the reconnect: on becoming visible it refetches once,
-unconditionally, before any event arrives. Anything that happened while hung up
-was never delivered and never will be. **Do not remove one without the other.**
+So the client closes the stream on `visibilitychange`, and says goodbye as it
+does (see the next section), because closing alone does not end the object's
+request. The step that makes hanging up _safe_ is the reconnect: on becoming
+visible it refetches once, unconditionally, before any event arrives. Anything
+that happened while hung up was never delivered and never will be. **Do not
+remove one without the other.**
+
+### A stream is a lease
+
+**On Workers, a browser closing its `EventSource` does not reach the Durable
+Object.** Neither the request's abort signal nor a failing write tells the room
+the client went. On the preview, a phone that had left the board was still
+listed as watching it minutes later. A listed device is not sent push
+notifications, so it got none.
+
+So the room does not rely on noticing. Each connection is a lease:
+
+- **The page names its stream.** Every `EventSource` carries a random `stream`
+  id, chosen fresh per connection; the events endpoint refuses one without.
+- **It renews while open,** every 25 seconds, by beacon to
+  `POST .../events/presence` with `{ stream, present: true }`.
+- **It says goodbye as it closes,** on teardown or when hidden, with
+  `present: false`. A beacon, because the goodbye is sent as the page goes away,
+  which a `fetch` may not survive. The room closes that stream at once.
+- **A stream not heard from for `PRESENCE_TTL_MS` (60 s) is closed** and no
+  longer reported as watching: on its next keepalive, or at the next publish,
+  whichever is first. That covers a goodbye that never got out, such as a phone
+  locked before it could send one, and it is also what stops a dead stream
+  keeping the object billed.
+
+The id is per connection rather than per device so that a goodbye names one
+stream exactly. Leaving the board for a thread closes one stream and opens
+another; whichever of the goodbye and the new stream reaches the room first,
+the new one survives. It is also why a second tab on the same device keeps its
+own feed. Presence is matched on the session's user as well as the stream id,
+so naming somebody else's stream does nothing, and the endpoint checks
+membership, so it cannot make a room exist for an arbitrary id.
+
+The cost is one Worker request and one Durable Object request every 25
+seconds per page that is actually on screen, plus one D1 read for the
+membership check. Nothing is sent while hidden. The local notifier keeps the
+same lease, although Node does notice a hang-up, so that both backends behave
+the same and the Playwright suite exercises the rule production relies on.
 
 The same reasoning covers a client that stops reading without hanging up
 (asleep, or behind a proxy that buffers `text/event-stream`): once its queue

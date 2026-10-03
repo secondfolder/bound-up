@@ -1,5 +1,7 @@
 import {
 	encodeSseEvent,
+	isExpired,
+	type Presence,
 	type RealtimeEvent,
 	SSE_HEADERS,
 	SSE_KEEPALIVE,
@@ -35,13 +37,18 @@ const encoder = new TextEncoder();
 
 export class RealtimeRoom {
 	/**
-	 * The open streams.
+	 * The open streams, whose they are, and when their page was last heard from.
 	 *
 	 * Writers rather than controllers because a `TransformStream`'s writer is
-	 * what Workers gives back for a streaming `Response`, and a failed `write`
-	 * is how a hung-up client announces itself.
+	 * what Workers gives back for a streaming `Response`. A failed `write` would
+	 * be how a hung-up client announces itself, if the runtime ever told us —
+	 * in practice it does not, which is what `lastSeen` is for. See
+	 * `PRESENCE_TTL_MS`.
 	 */
-	readonly #writers = new Map<WritableStreamDefaultWriter<Uint8Array>, Watcher>();
+	readonly #writers = new Map<
+		WritableStreamDefaultWriter<Uint8Array>,
+		{ watcher: Watcher; lastSeen: number }
+	>();
 
 	// No constructor. The runtime passes `(state, env)`, and this object
 	// deliberately keeps neither: it has no storage and no bindings of its own,
@@ -52,18 +59,28 @@ export class RealtimeRoom {
 
 		if (url.pathname === '/publish') {
 			const event = (await request.json()) as RealtimeEvent;
+			// Expired leases go first, so a page that left without saying so is
+			// neither sent this nor reported as watching.
+			this.#dropExpired();
 			this.#broadcast(event);
 			// Who is watching *after* the broadcast, so a client it just dropped for
 			// not reading is not counted as having been told.
-			return Response.json({ watching: [...this.#writers.values()] });
+			return Response.json({
+				watching: [...this.#writers.values()].map((entry) => entry.watcher)
+			});
 		}
 
 		if (url.pathname === '/subscribe') {
 			return this.#subscribe(request);
 		}
 
+		if (url.pathname === '/presence') {
+			this.#presence((await request.json()) as Presence);
+			return new Response(null, { status: 204 });
+		}
+
 		// Unreachable through the app — `remote.ts` is the only caller and it only
-		// ever asks for these two paths. A 404 rather than a throw so a mistake
+		// ever asks for these three paths. A 404 rather than a throw so a mistake
 		// shows up as a bad response instead of an exception in the logs.
 		return new Response('Not found', { status: 404 });
 	}
@@ -119,15 +136,22 @@ export class RealtimeRoom {
 		const writer = writable.getWriter();
 		const url = new URL(request.url);
 		this.#writers.set(writer, {
-			// Always present: `remote.ts` is the only caller, and it takes the user
-			// from the session.
-			userId: url.searchParams.get('user') ?? '',
-			deviceId: url.searchParams.get('device')
+			watcher: {
+				// Always present: `remote.ts` is the only caller, it takes the user
+				// from the session, and the events endpoint refuses a stream without
+				// an id.
+				userId: url.searchParams.get('user') ?? '',
+				deviceId: url.searchParams.get('device'),
+				streamId: url.searchParams.get('stream') ?? ''
+			},
+			// Opening is the first sign of life; the page renews it from there.
+			lastSeen: Date.now()
 		});
 
-		// Fired when the client hangs up — which the browser side does on purpose
-		// every time the page is hidden, so this is the common case rather than an
-		// edge one. Without it the writer would linger until the next publish.
+		// Meant to fire when the client hangs up, but on Workers it was not seen
+		// to: a stream the page had closed stayed listed for minutes. Kept because
+		// it costs nothing where it does fire; the page's own goodbye and the
+		// lease are what actually end a stream. See `PRESENCE_TTL_MS`.
 		request.signal?.addEventListener('abort', () => this.#drop(writer));
 
 		// Not awaited: `fetch` has to return the Response now, and the preamble is
@@ -137,7 +161,14 @@ export class RealtimeRoom {
 				await writer.write(encoder.encode(SSE_PREAMBLE));
 				while (this.#writers.has(writer)) {
 					await sleep(SSE_KEEPALIVE_MS);
-					if (!this.#writers.has(writer)) {
+					const entry = this.#writers.get(writer);
+					if (!entry) {
+						break;
+					}
+					// Also what ends a stream nobody is reading any more, rather than
+					// leaving the room billed for holding it open indefinitely.
+					if (isExpired(entry.lastSeen, Date.now())) {
+						this.#drop(writer);
 						break;
 					}
 					await writer.write(encoder.encode(SSE_KEEPALIVE));
@@ -150,8 +181,36 @@ export class RealtimeRoom {
 		return new Response(readable, { headers: SSE_HEADERS });
 	}
 
+	/**
+	 * Renews a stream's lease, or closes it when its page says it has gone.
+	 *
+	 * Matched on the user as well as the stream id: the user comes from the
+	 * session, so naming somebody else's stream does nothing.
+	 */
+	#presence({ userId, streamId, present }: Presence): void {
+		for (const [writer, entry] of [...this.#writers]) {
+			if (entry.watcher.userId !== userId || entry.watcher.streamId !== streamId) {
+				continue;
+			}
+			if (present) {
+				entry.lastSeen = Date.now();
+			} else {
+				this.#drop(writer);
+			}
+		}
+	}
+
+	#dropExpired(): void {
+		const now = Date.now();
+		for (const [writer, entry] of [...this.#writers]) {
+			if (isExpired(entry.lastSeen, now)) {
+				this.#drop(writer);
+			}
+		}
+	}
+
 	#drop(writer: WritableStreamDefaultWriter<Uint8Array>): void {
-		const watcher = this.#writers.get(writer);
+		const watcher = this.#writers.get(writer)?.watcher;
 		if (watcher) {
 			// TEMPORARY, while iPhone delivery is diagnosed: when a device stops
 			// counting as watching, to compare with when it was hidden. See

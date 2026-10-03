@@ -147,9 +147,18 @@ noise. The realtime room knows who is listening, so it answers the question:
 
 It is per device on purpose: a board open on a laptop says nothing about
 whether its owner is looking at their phone, so the phone is still told.
-Because the feed hangs up whenever the page is hidden, "has a stream open"
-amounts to "is on screen". If the stored id is lost, the only cost is one
-redundant notification.
+If the stored id is lost, the only cost is one redundant notification.
+
+**"Has a stream open" only means "is on screen" because streams are leases.**
+The feed hangs up whenever the page is hidden or left, but on Workers that
+hang-up never reaches the room. So the page also says goodbye by beacon, and a
+stream it stops renewing is dropped after 60 seconds (see
+[messaging.md](messaging.md#a-stream-is-a-lease)). Before that, a phone that
+tapped a notification, landed on the board and then went to its home screen
+stayed listed as watching. Every later message skipped it, with nothing
+logged. The 60 seconds is now the worst case: a device that vanishes without
+saying goodbye, a phone locked mid-thread say, can miss pushes for up to that
+long.
 
 ## Configuration
 
@@ -216,6 +225,12 @@ The Zod schemas are in `src/lib/schemas/pushSubscription.ts`.
   wire.
 - `NotificationSettings.svelte.test.ts` covers each browser state with
   `$lib/push-client` mocked.
+- Whether a device counts as watching is covered at each layer: the lease
+  rules per backend in `server/realtime/{durable-object,local}.test.ts`, the
+  presence endpoint in `api/partnerships/[id]/events/server.test.ts`, and the
+  page's renewals and goodbye in `messaging/live.test.ts`. None of them can
+  show that Workers never tells the room about a hang-up, which is why the
+  lease exists at all; that was found on a deployed preview.
 - `e2e/notifications.spec.ts` drives the real screen, service worker and
   endpoints, with `PushManager` and the notification permission faked in the
   page. Headless Chromium reports notifications as denied whatever the context

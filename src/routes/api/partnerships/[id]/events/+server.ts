@@ -4,7 +4,7 @@ import { requireMembership } from '$lib/server/messaging';
 import { createNotifier } from '$lib/server/realtime/backend';
 import type { RequestHandler } from './$types';
 
-const deviceIdSchema = z.string().uuid();
+const idSchema = z.string().uuid();
 
 /**
  * The live feed for one partnership.
@@ -39,7 +39,15 @@ export const GET: RequestHandler = async ({ locals, params, platform, url }) => 
 	// query, so a member cannot pass themselves off as the other one; the device
 	// id is only ever compared against that user's own subscriptions.
 	const device = url.searchParams.get('device');
-	const deviceId = deviceIdSchema.safeParse(device).success ? device : null;
+	const deviceId = idSchema.safeParse(device).success ? device : null;
+
+	// Which stream this is, so the page can renew its lease and say goodbye to
+	// exactly this one — see `presence/+server.ts`. Required: a stream with no id
+	// could never be renewed, and would be closed when its lease ran out.
+	const streamId = url.searchParams.get('stream');
+	if (!(streamId && idSchema.safeParse(streamId).success)) {
+		error(400, 'A live feed needs a `stream` id: reload the page to get one');
+	}
 	// TEMPORARY, while iPhone delivery is diagnosed: whether this stream will
 	// count as a device watching. Cloudflare's logs redact the query string, so
 	// the request line cannot say. See docs/temporary-code.md.
@@ -47,5 +55,5 @@ export const GET: RequestHandler = async ({ locals, params, platform, url }) => 
 		`live feed opened: device ${deviceId?.slice(0, 8) ?? (device === null ? 'none' : 'invalid')}`
 	);
 	const notifier = await createNotifier({ platform });
-	return notifier.stream(params.id, { userId: locals.user.id, deviceId });
+	return notifier.stream(params.id, { userId: locals.user.id, deviceId, streamId });
 };

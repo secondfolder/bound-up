@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defined } from '$lib/testing/defined';
-import { encodeSseEvent, SSE_PREAMBLE, type Watcher } from './index';
+import { encodeSseEvent, PRESENCE_TTL_MS, SSE_PREAMBLE, type Watcher } from './index';
 import { createLocalNotifier, localRoomSize } from './local';
 
 /**
@@ -22,7 +22,7 @@ const decoder = new TextDecoder();
 async function subscribe(
 	notifier: ReturnType<typeof createLocalNotifier>,
 	id: string,
-	watcher: Watcher = { userId: 'u-1', deviceId: null }
+	watcher: Watcher = { userId: 'u-1', deviceId: null, streamId: crypto.randomUUID() }
 ) {
 	const response = await notifier.stream(id, watcher);
 	const contentType = response.headers.get('content-type');
@@ -120,18 +120,79 @@ describe('the local notifier', () => {
 	 */
 	it('reports who is watching, and stops reporting a listener once it hangs up', async () => {
 		const notifier = createLocalNotifier();
-		const ada = await subscribe(notifier, 'p-watchers', { userId: 'ada', deviceId: 'd-ada' });
-		const bo = await subscribe(notifier, 'p-watchers', { userId: 'bo', deviceId: null });
+		const adaWatcher = { userId: 'ada', deviceId: 'd-ada', streamId: 's-ada' };
+		const boWatcher = { userId: 'bo', deviceId: null, streamId: 's-bo' };
+		const ada = await subscribe(notifier, 'p-watchers', adaWatcher);
+		const bo = await subscribe(notifier, 'p-watchers', boWatcher);
 
 		expect(await notifier.publish('p-watchers', { kind: 'thread' })).toEqual([
-			{ userId: 'ada', deviceId: 'd-ada' },
-			{ userId: 'bo', deviceId: null }
+			adaWatcher,
+			boWatcher
 		]);
 
 		await ada.release();
-		expect(await notifier.publish('p-watchers', { kind: 'thread' })).toEqual([
-			{ userId: 'bo', deviceId: null }
-		]);
+		expect(await notifier.publish('p-watchers', { kind: 'thread' })).toEqual([boWatcher]);
 		await bo.release();
+	});
+});
+
+/**
+ * Each stream is a lease its page renews, because on Workers a browser hanging
+ * up never reaches the room — see `PRESENCE_TTL_MS`. The local notifier keeps
+ * the same rule, so the Playwright suite runs against what production relies
+ * on. Fake timers, because the lease is measured in tens of seconds.
+ */
+describe('the local notifier: presence', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	const phone = { userId: 'ada', deviceId: 'd-phone', streamId: 's-phone' };
+
+	it('stops reporting a stream once its page says goodbye, and closes it', async () => {
+		const notifier = createLocalNotifier();
+		const side = await subscribe(notifier, 'p-goodbye', phone);
+
+		await notifier.presence('p-goodbye', { userId: 'ada', streamId: 's-phone', present: false });
+
+		expect(await notifier.publish('p-goodbye', { kind: 'thread' })).toEqual([]);
+		// Closed rather than just forgotten, so the stream is not held open.
+		expect((await side.reader.read()).done).toBe(true);
+	});
+
+	it('ignores a goodbye naming somebody else’s stream', async () => {
+		const notifier = createLocalNotifier();
+		const side = await subscribe(notifier, 'p-not-yours', phone);
+
+		await notifier.presence('p-not-yours', { userId: 'bo', streamId: 's-phone', present: false });
+
+		expect(await notifier.publish('p-not-yours', { kind: 'thread' })).toEqual([phone]);
+		await side.release();
+	});
+
+	it('closes a stream whose page stopped renewing it, without a goodbye', async () => {
+		vi.useFakeTimers();
+		const notifier = createLocalNotifier();
+		const side = await subscribe(notifier, 'p-lapsed', phone);
+
+		await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS + 1);
+
+		expect(await notifier.publish('p-lapsed', { kind: 'thread' })).toEqual([]);
+		expect(localRoomSize('p-lapsed')).toBe(0);
+		await side.release();
+	});
+
+	it('keeps a stream whose page keeps renewing it', async () => {
+		vi.useFakeTimers();
+		const notifier = createLocalNotifier();
+		const side = await subscribe(notifier, 'p-renewed', phone);
+
+		for (let elapsed = 0; elapsed < PRESENCE_TTL_MS * 3; elapsed += 25_000) {
+			await vi.advanceTimersByTimeAsync(25_000);
+			await notifier.presence('p-renewed', { userId: 'ada', streamId: 's-phone', present: true });
+		}
+
+		expect(await notifier.publish('p-renewed', { kind: 'thread' })).toEqual([phone]);
+		await side.release();
 	});
 });

@@ -35,6 +35,21 @@
  * for the real case of an intermediary which buffers `text/event-stream`
  * indefinitely — the connection looks healthy and simply never delivers, which
  * no amount of reconnecting fixes.
+ *
+ * ## Presence: the stream is a lease
+ *
+ * The server cannot see this page hang up. On Workers, closing the
+ * `EventSource` never reaches the Durable Object, so a phone that had left the
+ * board stayed listed as watching it — and a device listed as watching is not
+ * sent push notifications (docs/notifications.md). So every connection carries
+ * a random `stream` id, renews its lease every `PRESENCE_INTERVAL_MS` while it
+ * is open, and says goodbye as it closes, by beacon so the goodbye survives the
+ * page going away. A stream the server stops hearing from is closed once
+ * `PRESENCE_TTL_MS` (in `server/realtime/index.ts`) runs out, which covers a
+ * goodbye that never got out.
+ *
+ * Each renewal is a request to the worker and on to the Durable Object, made
+ * only while the page is on screen — the same visibility gate as the stream.
  */
 
 import { storedPushDeviceId } from '$lib/push-client';
@@ -49,6 +64,15 @@ const MAX_BACKOFF_MS = 30_000;
 /** After this many consecutive failures, stop trusting SSE and poll instead. */
 const FALLBACK_AFTER_FAILURES = 4;
 const POLL_INTERVAL_MS = 20_000;
+/**
+ * How often an open stream renews its lease.
+ *
+ * Must stay comfortably under the server's `PRESENCE_TTL_MS` (60 s), which is
+ * set to outlast two of these so that one lost renewal does not close a stream
+ * that is still on screen. Matches the server's keepalive, for no deeper reason
+ * than that 25 s is already the cadence this feature runs at.
+ */
+const PRESENCE_INTERVAL_MS = 25_000;
 
 export type LiveOptions = {
 	partnershipId: string;
@@ -80,13 +104,28 @@ export function watchPartnership(options: LiveOptions): () => void {
 	// Which push device is watching, so the server can skip pushing to the
 	// screen that is already showing the change. See docs/notifications.md.
 	const device = storedPushDeviceId();
-	const url = `/api/partnerships/${partnershipId}/events${device ? `?device=${encodeURIComponent(device)}` : ''}`;
+	const presenceUrl = `/api/partnerships/${partnershipId}/events/presence`;
 
 	let source: EventSource | null = null;
+	/** The open stream's id, for its renewals and its goodbye. */
+	let streamId: string | null = null;
 	let retry: ReturnType<typeof setTimeout> | undefined;
 	let poll: ReturnType<typeof setInterval> | undefined;
+	let renew: ReturnType<typeof setInterval> | undefined;
 	let failures = 0;
 	let stopped = false;
+
+	/**
+	 * Tells the server this stream is still on screen, or has gone.
+	 *
+	 * A beacon rather than `tryFetch`: the goodbye is sent as the page goes away,
+	 * which only a beacon is built to survive, and nobody is waiting on either
+	 * kind — a lost one is covered by the next renewal or by the lease running
+	 * out, so failing silently is right here.
+	 */
+	function sendPresence(stream: string, present: boolean) {
+		navigator.sendBeacon(presenceUrl, JSON.stringify({ stream, present }));
+	}
 
 	function clearTimers() {
 		if (retry) {
@@ -101,8 +140,16 @@ export function watchPartnership(options: LiveOptions): () => void {
 
 	function disconnect() {
 		clearTimers();
+		if (renew) {
+			clearInterval(renew);
+			renew = undefined;
+		}
+		if (source && streamId) {
+			sendPresence(streamId, false);
+		}
 		source?.close();
 		source = null;
+		streamId = null;
 	}
 
 	function startPolling() {
@@ -126,7 +173,14 @@ export function watchPartnership(options: LiveOptions): () => void {
 			return;
 		}
 
-		source = new EventSource(url);
+		const stream = crypto.randomUUID();
+		streamId = stream;
+		const query = new URLSearchParams({ stream });
+		if (device) {
+			query.set('device', device);
+		}
+		source = new EventSource(`/api/partnerships/${partnershipId}/events?${query}`);
+		renew = setInterval(() => sendPresence(stream, true), PRESENCE_INTERVAL_MS);
 
 		source.onmessage = (message) => {
 			// Reset here rather than in `onopen`: an intermediary can accept the
