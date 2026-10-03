@@ -168,6 +168,11 @@ It is per device on purpose: a board open on a laptop says nothing about
 whether its owner is looking at their phone, so the phone is still told.
 If the stored id is lost, the only cost is one redundant notification.
 
+What a watching device gets instead is in-page: its board rings the new
+thread's sticker, and a thread page shows a toast for a message in another
+thread. Both are described in
+[messaging.md](messaging.md#notices-while-watching).
+
 **"Has a stream open" only means "is on screen" because streams are leases.**
 The feed hangs up whenever the page is hidden or left, but on Workers that
 hang-up never reaches the room. So the page also says goodbye by beacon, and a

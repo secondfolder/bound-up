@@ -2,6 +2,7 @@
 	import { invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import MessageToasts from '$lib/components/MessageToasts.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import PartnerKeyNotice from '$lib/components/PartnerKeyNotice.svelte';
 	import ThreadView from '$lib/components/ThreadView.svelte';
@@ -52,6 +53,9 @@
 	 * the `data` prop, which `invalidate()` reassigns — see the longer note on
 	 * the board, and the assertion in `e2e/messaging.spec.ts` that counts
 	 * `EventSource` constructions.
+	 *
+	 * A new message in another thread is not ignored, though: it becomes a
+	 * toast, in place of the push this device is not sent while it watches.
 	 */
 	const partnershipId = $derived(data.partner.id);
 	const threadId = $derived(data.thread.id);
@@ -62,12 +66,48 @@
 			partnershipId: partnership,
 			onChange: (event) => {
 				if (event?.threadId && event.threadId !== thread) {
+					if (event.kind === 'thread' || event.kind === 'message') {
+						void toastIfNews(partnership, event.threadId);
+					}
 					return;
 				}
 				void invalidate(`messages:thread:${thread}`);
 			}
 		});
 	});
+
+	let toasts = $state<MessageToasts>();
+
+	// A notice for the thread now open is stale: it is on screen.
+	$effect(() => {
+		toasts?.dismiss(threadId);
+	});
+
+	/**
+	 * Shows a toast for another thread's new message, if it is the partner's.
+	 *
+	 * The event cannot say who wrote it, so the server is asked whether that
+	 * thread is now unread for this viewer — which a message they sent
+	 * themselves, from another device, never makes it. A plain `fetch` rather
+	 * than `tryFetch`: nobody is waiting on this, and a failure costs only a
+	 * toast, which is not worth an error notice.
+	 */
+	async function toastIfNews(partnership: string, otherThreadId: string) {
+		try {
+			const response = await fetch(
+				`/api/partnerships/${partnership}/threads/${otherThreadId}/unread`
+			);
+			if (!response.ok) {
+				return;
+			}
+			const { unread } = (await response.json()) as { unread: boolean };
+			if (unread) {
+				toasts?.show(otherThreadId);
+			}
+		} catch {
+			// Offline or similar. The board shows it as unread either way.
+		}
+	}
 	const backHref = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/messages', { id: data.partner.id })
 	);
@@ -77,6 +117,7 @@
 
 <div class="page">
 	<NestedPageHeader {backHref} backLabel="Back to messages" backText={data.partner.name} />
+	<MessageToasts bind:this={toasts} partnershipId={data.partner.id} partnerName={data.partner.name} />
 
 	{#if keyring.status === 'unlocked'}
 		{#if !canSend}

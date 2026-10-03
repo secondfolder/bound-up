@@ -25,6 +25,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, platform 
 		error(400, 'Invalid tag');
 	}
 	const notifier = await createNotifier({ platform });
-	await notifier.publish(params.id, { kind: 'thread', threadId: '' });
+	// Board-level: a renamed or recoloured tag can be on any thread.
+	await notifier.publish(params.id, { kind: 'tags' });
 	return json(result.tag);
 };

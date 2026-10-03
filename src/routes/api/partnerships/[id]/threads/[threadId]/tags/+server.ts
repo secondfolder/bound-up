@@ -20,6 +20,6 @@ export const PUT: RequestHandler = async ({ locals, params, request, platform })
 		error(404, 'Not found');
 	}
 	const notifier = await createNotifier({ platform });
-	await notifier.publish(params.id, { kind: 'thread', threadId: params.threadId });
+	await notifier.publish(params.id, { kind: 'tags', threadId: params.threadId });
 	return json({ ok: true });
 };

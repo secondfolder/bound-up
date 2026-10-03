@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { afterNavigate, goto, invalidate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -16,6 +17,7 @@
 		trustFor
 	} from '$lib/crypto/trust.svelte';
 	import { hasFeature } from '$lib/features';
+	import { newlyArrived } from '$lib/messaging';
 	import { type ComposedMessage, sendMessage } from '$lib/messaging/client';
 	import { watchPartnership } from '$lib/messaging/live';
 	import type { PageData } from './$types';
@@ -62,20 +64,31 @@
 	 * a fresh billed request to the Durable Object. A derived primitive stops
 	 * propagating when its value is unchanged, so the effect stays put.
 	 * `e2e/messaging.spec.ts` counts `EventSource` constructions to hold this.
+	 *
+	 * A partner's message arriving here rings its sticker, the same ring a
+	 * notification's tap gives, in place of the push this device is not sent
+	 * while it watches. Which thread is worked out by comparing the board either
+	 * side of the reload (`newlyArrived`), because the event cannot say.
 	 */
 	const partnershipId = $derived(data.partner.id);
 	$effect(() => {
 		const id = partnershipId;
 		return watchPartnership({
 			partnershipId: id,
-			onChange: () => void invalidate(`messages:board:${id}`)
+			onChange: () => {
+				const before = data.threads;
+				void invalidate(`messages:board:${id}`).then(() =>
+					highlight(newlyArrived(before, data.threads))
+				);
+			}
 		});
 	});
 	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 
 	/**
 	 * The thread a push notification's tap was about, if it has never been
-	 * opened — the load sends an opened one straight to its own page.
+	 * opened — the load sends an opened one straight to its own page — or,
+	 * later, the one a partner's message has just arrived in.
 	 *
 	 * Captured once, not derived: a realtime refresh re-runs the load without
 	 * `?thread=` (it is dropped from the URL below), and deriving would cut the
@@ -83,6 +96,21 @@
 	 */
 	// svelte-ignore state_referenced_locally
 	let highlightThreadId = $state(data.highlightThreadId);
+
+	/** Rings a sticker, starting the fade again if it is already ringing. */
+	async function highlight(threadId: string | null) {
+		if (!threadId) {
+			return;
+		}
+		if (highlightThreadId === threadId) {
+			// Off for a frame, so the class comes back and the animation restarts:
+			// removing and re-adding it within one frame restarts nothing.
+			highlightThreadId = null;
+			await tick();
+			await new Promise((frame) => requestAnimationFrame(frame));
+		}
+		highlightThreadId = threadId;
+	}
 
 	// So a reload, or coming Back to the board, does not highlight it again.
 	//

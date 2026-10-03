@@ -3,6 +3,7 @@ import { attachmentBudget } from '../media-quality';
 import {
 	BOARD_LIMIT,
 	isThreadIcon,
+	isUnreadFor,
 	MAX_ATTACHMENT_TOTAL_BYTES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
 	MAX_CIPHERTEXT_BYTES,
@@ -157,6 +158,38 @@ export async function requireThreadMembership(
 		return null;
 	}
 	return { ...membership, threadId: row.id, icon: row.icon };
+}
+
+/**
+ * Whether one thread is unread for the viewer, by the one definition of unread
+ * (`isUnreadFor`).
+ *
+ * For a thread page deciding whether a live event about another thread is
+ * worth a toast. Events never say who sent anything, by design, and this is
+ * what answers it instead: unread means the newest message is not the
+ * viewer's own and they have not read up to it. So a message the viewer sent
+ * from another device never toasts.
+ *
+ * The thread must already be proven to be in the viewer's partnership —
+ * `requireThreadMembership` — which is why this takes no partnership id.
+ */
+export async function isThreadUnread(db: Db, threadId: string, viewerId: string): Promise<boolean> {
+	const [row] = await db
+		.select({
+			lastMessageAt: messageThreads.lastMessageAt,
+			lastMessageSenderId: messageThreads.lastMessageSenderId,
+			lastReadMessageAt: threadReads.lastReadMessageAt
+		})
+		.from(messageThreads)
+		// The user predicate in the ON, as in `listBoard`, so a thread the viewer
+		// never opened still has a row.
+		.leftJoin(
+			threadReads,
+			and(eq(threadReads.threadId, messageThreads.id), eq(threadReads.userId, viewerId))
+		)
+		.where(eq(messageThreads.id, threadId))
+		.limit(1);
+	return row ? isUnreadFor(row, viewerId) : false;
 }
 
 /** As above, for a message. Same re-join, same reason. */

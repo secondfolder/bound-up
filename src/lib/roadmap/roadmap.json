@@ -836,6 +836,13 @@
 							"shippedOn": "2026-10-01"
 						},
 						{
+							"id": "in-app-message-notices",
+							"title": "In-app message notices",
+							"summary": "While you're in your messages, a new one rings its thread on the board, or pops up a notice when you're reading a different thread.",
+							"status": "shipped",
+							"shippedOn": "2026-10-03"
+						},
+						{
 							"id": "task-notifications",
 							"title": "Task reminders",
 							"summary": "A nudge when a task is due.",

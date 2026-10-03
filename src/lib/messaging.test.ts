@@ -9,6 +9,7 @@ import {
 	isUnreadFor,
 	MAX_ATTACHMENT_TOTAL_BYTES,
 	MAX_VIDEO_BYTES,
+	newlyArrived,
 	THREAD_ICONS
 } from './messaging';
 
@@ -255,5 +256,49 @@ describe('formatTimeLeft', () => {
 		expect(formatTimeLeft(59 * 1000)).toBe('a moment');
 		expect(formatTimeLeft(0)).toBe('a moment');
 		expect(formatTimeLeft(-5 * Minute)).toBe('a moment');
+	});
+});
+
+/**
+ * Which sticker the board rings when a live refresh brings a message. Live
+ * events cannot say who sent anything, so this leans on `unread`, which the
+ * viewer's own messages never set.
+ */
+describe('newlyArrived', () => {
+	const thread = (id: string, unread: boolean, ms: number) => ({
+		id,
+		unread,
+		lastMessageAt: at(ms)
+	});
+
+	it('finds a thread that appeared unread', () => {
+		expect(
+			newlyArrived([thread('a', false, 1)], [thread('a', false, 1), thread('b', true, 2)])
+		).toBe('b');
+	});
+
+	it('finds a read thread that a reply made unread', () => {
+		expect(newlyArrived([thread('a', false, 1)], [thread('a', true, 2)])).toBe('a');
+	});
+
+	it('finds a second message in a thread that was already waiting', () => {
+		expect(newlyArrived([thread('a', true, 1)], [thread('a', true, 2)])).toBe('a');
+	});
+
+	it('ignores the viewer’s own message, which leaves the thread read', () => {
+		expect(
+			newlyArrived([thread('a', false, 1)], [thread('a', false, 2), thread('b', false, 3)])
+		).toBe(null);
+	});
+
+	/** A tag change, a reaction: the board reloads, and nothing new was written. */
+	it('ignores an unread thread that did not change', () => {
+		expect(newlyArrived([thread('a', true, 1)], [thread('a', true, 1)])).toBe(null);
+	});
+
+	it('picks the newest when several arrived at once', () => {
+		expect(
+			newlyArrived([], [thread('a', true, 1), thread('b', true, 3), thread('c', true, 2)])
+		).toBe('b');
 	});
 });

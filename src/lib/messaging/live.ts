@@ -56,7 +56,7 @@ import { storedPushDeviceId } from '$lib/push-client';
 
 /** Matches the server's `RealtimeEvent`. Metadata only, by design. */
 export type LiveEvent = {
-	kind: 'thread' | 'message' | 'reaction' | 'restore';
+	kind: 'thread' | 'message' | 'reaction' | 'tags' | 'restore';
 	threadId?: string;
 };
 

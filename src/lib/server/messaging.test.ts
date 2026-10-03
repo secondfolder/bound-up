@@ -39,6 +39,7 @@ import {
 	getAttachmentForDownload,
 	getPartnerMessagesWidget,
 	getThread,
+	isThreadUnread,
 	listBoard,
 	listHelpRequests,
 	listHistoryForRestore,
@@ -1812,5 +1813,33 @@ describe('getPartnerMessagesWidget', () => {
 			unreadThreads: 0,
 			newestAt: null
 		});
+	});
+});
+
+/**
+ * What a thread page asks before toasting another thread's new message. The
+ * live event cannot say who wrote it; this can.
+ */
+describe('isThreadUnread', () => {
+	it('is true for the partner’s new thread, and false for the sender', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, jun);
+		expect(await isThreadUnread(harness.db, threadId, ada.id)).toBe(true);
+		expect(await isThreadUnread(harness.db, threadId, jun.id)).toBe(false);
+	});
+
+	it('is false once read, and true again after the partner replies', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, jun, { at: at(1000) });
+		await markThreadOpened(harness.db, threadId, ada.id, at(2000));
+		expect(await isThreadUnread(harness.db, threadId, ada.id)).toBe(false);
+
+		await createTestMessage(harness.db, partnershipId, threadId, jun, { at: at(3000) });
+		expect(await isThreadUnread(harness.db, threadId, ada.id)).toBe(true);
+	});
+
+	/** A message sent from the viewer's other device must never toast. */
+	it('is false when the viewer wrote the newest message', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, jun, { at: at(1000) });
+		await createTestMessage(harness.db, partnershipId, threadId, ada, { at: at(2000) });
+		expect(await isThreadUnread(harness.db, threadId, ada.id)).toBe(false);
 	});
 });

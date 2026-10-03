@@ -615,6 +615,7 @@ reaction, and anything that would let it read or forge any of them.
 | `api/partnerships/[id]/tags`        | `GET` / `POST`: list or create partnership-scoped tags.                     |
 | `.../tags/[tagId]`                  | `PATCH`: rename or recolor a tag.                                           |
 | `.../threads/[threadId]/tags`       | `PUT`: replace the thread's tag assignments.                                |
+| `.../threads/[threadId]/unread`     | `GET`: whether the thread is unread for the viewer. For the in-app toast.   |
 | `.../messages/[messageId]/reaction` | `PUT` / `DELETE`.                                                           |
 | `.../attachments/[attachmentId]`    | `GET`, streams ciphertext. `410` once the media has self-destructed.        |
 | `.../ack-warning`                   | `POST`, the one-time warning acknowledgement.                               |
@@ -745,6 +746,39 @@ proxy that accepts the connection and then delivers nothing would otherwise
 never look like a failure. After several consecutive failures the client falls
 back to slow polling while visible, which is the honest answer to an
 intermediary that buffers the stream for ever.
+
+### Notices while watching
+
+A device with the board or a thread open is sent no push notification (see
+[notifications.md](notifications.md#not-telling-a-device-what-it-is-showing)),
+so the page tells the viewer itself:
+
+- **On the board, a partner's message rings its sticker.** It is the same ring
+  a notification's tap gives, fading after about four seconds. After each live
+  reload the board compares itself before and after (`newlyArrived` in
+  `src/lib/messaging.ts`). A thread counts when it is unread afterwards and
+  either was not, or has a newer message than before. If several arrived
+  together, the newest rings.
+- **In a thread, a new message in another thread is a toast**
+  (`MessageToasts.svelte`, a `wa-toast`) reading "New message from Sam". Its
+  link is the URL a notification's tap opens, `?thread=` on the board, so the
+  board's load makes the same decision: straight to a thread opened before, or
+  the board with a never-opened one ringed. One toast shows at a time and the
+  newest replaces the last, since two would be same-named links to different
+  places. A message in the thread already open is a live update, not a toast.
+  A reaction is not a toast either.
+
+**Who wrote it is decided by `unread`, because events cannot say.** An event
+names a kind and a thread and never a sender. "Unread for me" already means the
+newest message is not mine, so a message the viewer sent from another device
+never rings or toasts. The board has the whole board either side of its reload
+to compare. A thread page has only its own thread, so for an event about
+another thread it asks `GET .../threads/[threadId]/unread`.
+
+**`thread` and `message` events mean a message was written, and nothing else
+uses them.** A tag change publishes `tags`. Before, it borrowed `thread`, and a
+thread page would have asked about every retag. A new event kind that is not a
+written message must not reuse either of those two.
 
 ### Exporting the class from a generated worker
 

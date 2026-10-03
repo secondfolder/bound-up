@@ -36,9 +36,14 @@
  * change and invalidate the narrower key; `threadId` is absent for anything
  * board-level. Both are unguessable-by-design UUIDs already known to whoever
  * is allowed to receive them.
+ *
+ * `thread` and `message` mean a message was written — a new thread, a reply —
+ * and nothing else does: a tag change is `tags`. A thread page relies on
+ * that to decide whether another thread is worth a toast, so a kind that is
+ * not a new message must not borrow either of them.
  */
 export type RealtimeEvent = {
-	kind: 'thread' | 'message' | 'reaction' | 'restore';
+	kind: 'thread' | 'message' | 'reaction' | 'tags' | 'restore';
 	/** Absent when the change is board-level rather than inside one thread. */
 	threadId?: string;
 };

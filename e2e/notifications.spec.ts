@@ -9,6 +9,7 @@ import {
 	logOut,
 	newSide,
 	openBoard,
+	reply,
 	signUp,
 	waitForHydration,
 	writeThread
@@ -245,6 +246,93 @@ test.describe('tapping a message notification', () => {
 
 			await jun.page.goto(tapped);
 			await expect(jun.page).toHaveURL(`/partner/${partnership}/messages/${thread}`);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+});
+
+/**
+ * What a device that is watching gets instead of a push, since the server
+ * sends none to a device with the board or a thread open: on the board, the
+ * new thread's sticker is ringed; in another thread, a toast whose tap lands
+ * where a notification's would.
+ */
+test.describe('in-app notices while watching', () => {
+	/** The thread id at the end of a thread page's URL. */
+	function threadIdOf(url: string): string {
+		return url.split('/').at(-1) ?? '';
+	}
+
+	test('rings a partner’s new thread on an open board', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+
+			await writeThread(jun.page, 'look up');
+
+			const highlighted = ada.page.locator('[data-highlighted]');
+			await expect(highlighted).toHaveCount(1, { timeout: 20_000 });
+			await expect(highlighted).toHaveCount(0, { timeout: 10_000 });
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	test('toasts another thread’s new message, and the tap lands like a notification’s', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			await writeThread(jun.page, 'first thread');
+			const first = threadIdOf(jun.page.url());
+			const firstUrl = new URL(jun.page.url()).pathname;
+
+			// Ada reads the first thread, and stays in it.
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await ada.page.locator(`a[href$="${first}"]`).click();
+			await expect(ada.page.getByText('first thread')).toBeVisible();
+
+			// A reply in the thread she is reading is a live update, not a toast.
+			await reply(jun.page, 'in the same thread');
+			await expect(ada.page.getByText('in the same thread')).toBeVisible({ timeout: 20_000 });
+			await expect(ada.page.getByTestId('message-toast')).toHaveCount(0);
+
+			// A new thread elsewhere: a toast, and its tap rings the never-opened one.
+			await openBoard(jun.page, 'Ada');
+			await writeThread(jun.page, 'second thread');
+			const second = threadIdOf(jun.page.url());
+			const toast = ada.page.getByTestId('message-toast');
+			await expect(toast).toHaveText('New message from Jun', { timeout: 20_000 });
+			await toast.click();
+			await expect(ada.page).toHaveURL(/\/messages$/);
+			await expect(ada.page.locator('[data-highlighted]')).toHaveCount(1);
+
+			// Opened before: the tap goes straight to the thread.
+			await ada.page.locator(`a[href$="${second}"]`).click();
+			await expect(ada.page.getByText('second thread')).toBeVisible();
+			await jun.page.goto(firstUrl);
+			await reply(jun.page, 'back to the first');
+			await expect(toast).toBeVisible({ timeout: 20_000 });
+			await toast.click();
+			await expect(ada.page).toHaveURL(firstUrl);
+			await expect(ada.page.getByText('back to the first')).toBeVisible();
 		} finally {
 			await ada.close();
 			await jun.close();

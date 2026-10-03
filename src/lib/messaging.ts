@@ -338,6 +338,42 @@ export function isUnreadFor(thread: ThreadUnreadInput, viewerId: string): boolea
 	return thread.lastMessageAt.getTime() > thread.lastReadMessageAt.getTime();
 }
 
+/**
+ * The thread a live refresh brought a new message to, if any, for the board
+ * to highlight.
+ *
+ * `before` and `after` are the board either side of an `invalidate()`. A
+ * thread counts when it is unread afterwards and either was not, was not on
+ * the board at all, or has a newer message than it had — a second message in
+ * a thread already waiting is still news. Leaning on `unread` is what keeps
+ * this to the partner's messages: the viewer's own, sent from another device,
+ * never make a thread unread for them. Live events cannot say who sent
+ * anything, by design, so this is the only place that can tell.
+ *
+ * Several at once, from a burst while the stream was down, highlight the
+ * newest: the board only rings one sticker at a time.
+ */
+export function newlyArrived(
+	before: readonly ArrivalInput[],
+	after: readonly ArrivalInput[]
+): string | null {
+	const previous = new Map(before.map((thread) => [thread.id, thread]));
+	let newest: ArrivalInput | null = null;
+	for (const thread of after) {
+		if (!thread.unread) {
+			continue;
+		}
+		const was = previous.get(thread.id);
+		const isNews = !was?.unread || thread.lastMessageAt.getTime() > was.lastMessageAt.getTime();
+		if (isNews && (!newest || thread.lastMessageAt.getTime() > newest.lastMessageAt.getTime())) {
+			newest = thread;
+		}
+	}
+	return newest?.id ?? null;
+}
+
+export type ArrivalInput = { id: string; unread: boolean; lastMessageAt: Date };
+
 // ── board ordering ───────────────────────────────────────────────────────────
 
 /**
