@@ -242,9 +242,11 @@ site it applies to; go read that comment before deciding to break one.
 11. **Never pass `undefined` to a boolean attribute on a `wa-*` element.**
     `disabled={busy || undefined}` looks like the usual "omit the attribute"
     idiom, but once Web Awesome upgrades the element Svelte assigns to the
-    `disabled` _property_, and this alpha coerces `undefined` to true — leaving
-    the control permanently disabled. Write `disabled={busy}`. This silently
-    broke the "Add a passkey" button until the Playwright suite caught it.
+    `disabled` _property_, and Web Awesome coerced `undefined` to true — leaving
+    the control permanently disabled. That was seen on `3.0.0-alpha.11` and
+    has not been re-checked since; the rule stands either way. Write
+    `disabled={busy}`. This silently broke the "Add a passkey" button until
+    the Playwright suite caught it.
 
 12. **Never read `partnerships.inviter_name` / `invitee_name` directly.** Which
     of the two is "theirs" flips with who is looking, and getting it backwards
@@ -497,7 +499,7 @@ the caret behaviour from Lexical rather than by hand. See [docs/rich-text.md](do
 **Every rich-text length limit counts visible text**, via `documentToPlainText`
 — never the stored string, which is several times larger than the prose in it.
 
-**UI is Web Awesome 3 alpha, installed from npm and cherry-picked in
+**UI is Web Awesome 3, installed from npm and cherry-picked in
 `src/lib/webawesome.ts`.** The root layout imports that list, and so do the
 component tests, so the two cannot drift. Each component is imported there by
 hand rather than autoloaded, so an element the list does not name renders as an
@@ -508,8 +510,10 @@ are custom elements (`wa-button`, `wa-input`, …) with no TypeScript definition
 which is why Svelte's a11y warnings fire on them. Style with `--wa-*` custom
 properties and `::part()`. Sizes are the short spellings (`size="s"`): the
 long-form ones still work but log a deprecation warning, which the e2e
-fixture fails a run on. Pinned to `3.0.0-alpha.11` — an alpha, so treat a
-version bump as a change that needs the app actually opened.
+fixture fails a run on. Version `^3.12.0` in `package.json` (3.12.0
+installed as of writing). It began on `3.0.0-alpha.11`; every component
+registered here is now marked stable. Still treat a version bump as a change
+that needs the app actually opened.
 
 **The app is always dark, and its palette is Web Awesome's tokens.**
 `src/lib/theme.css` carries the landing page's wash, texture, fonts and amber
