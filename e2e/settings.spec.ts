@@ -31,6 +31,17 @@ test.describe('settings information architecture', () => {
 		await expect(page.locator('.account').getByRole('button', { name: 'Log out' })).toBeVisible();
 	});
 
+	// Worked out at build time from the git history under `vite dev`, and from
+	// the image's APP_VERSION against Docker — either way a real version, not
+	// package.json's placeholder.
+	test('shows the version the app is running', async ({ page }) => {
+		await signUp(page, account('Vic'));
+
+		await page.goto('/settings');
+		await expect(page.getByText(/^Version \d+\.\d+\.\d+/)).toBeVisible();
+		await expect(page.getByText('set-on-publish')).toHaveCount(0);
+	});
+
 	test('uses nested sub-pages for account and security', async ({ page }) => {
 		const who = account('Nia');
 		await signUp(page, who);

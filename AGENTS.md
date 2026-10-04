@@ -878,6 +878,7 @@ Four places, split on scope:
 | [docs/roadmap.md](docs/roadmap.md)                                                       | The public /roadmap tree and landing teaser: the JSON, its rules, the drawer |
 | [docs/notifications.md](docs/notifications.md)                                           | Web Push: iOS rules, what a notification may say, devices, the Free plan fit |
 | [docs/request-failures.md](docs/request-failures.md)                                     | Feedback for failed requests: inline vs the app-wide notice, the safety net  |
+| [docs/versions-and-updates.md](docs/versions-and-updates.md)                             | The build's version from git history, and how an open app picks up a deploy  |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

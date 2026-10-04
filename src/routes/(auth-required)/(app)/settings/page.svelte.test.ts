@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
+import type { PageData } from './$types';
 
 const pageState = {
 	data: {
@@ -20,7 +21,7 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 const { default: Page } = await import('./+page.svelte');
 
 function renderPage() {
-	return render(Page);
+	return render(Page, { data: { appVersion: '1.2.3' } as PageData });
 }
 
 describe('/settings/+page.svelte', () => {
@@ -79,5 +80,11 @@ describe('/settings/+page.svelte', () => {
 	it('has no encrypted-messages settings', () => {
 		renderPage();
 		expect(screen.queryByRole('link', { name: 'Encrypted messages' })).not.toBeInTheDocument();
+	});
+
+	it('shows the version the app is running at the bottom', () => {
+		const { container } = renderPage();
+		const version = screen.getByText('Version 1.2.3');
+		expect(container.querySelector('section')?.lastElementChild).toBe(version);
 	});
 });

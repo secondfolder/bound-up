@@ -7,10 +7,14 @@ import { playwright } from '@vitest/browser-playwright';
 import cloudflareDoExporter from 'sveltekit-cloudflare-do';
 import { loadEnv } from 'vite';
 import { defineConfig, type Plugin } from 'vitest/config';
+import { appVersion } from './vite-plugins/app-version.ts';
 import { buildTarget } from './vite-plugins/build-target.ts';
 import { scheduledHandler } from './vite-plugins/scheduled-handler.ts';
 
 const host: string | undefined = process.env.HOST;
+// Top level rather than inside the config function: an async one loses the
+// contextual typing `defineConfig` gives the returned object.
+const version = await appVersion();
 const port: number = Number(process.env.PORT) || 58_769;
 
 /**
@@ -120,7 +124,14 @@ export default defineConfig(({ command, mode }) => {
 		 */
 		define: {
 			// biome-ignore lint/style/useNamingConvention: a `define` key is the literal identifier it replaces in the source, and the dunder spelling is what marks it as a build-time constant rather than a variable.
-			__SELF_HOSTED__: JSON.stringify(selfHosted)
+			__SELF_HOSTED__: JSON.stringify(selfHosted),
+			/**
+			 * The release version this build is, worked out the way semantic-release
+			 * works it out (see vite-plugins/app-version.ts), and baked into the
+			 * build rather than committed: package.json keeps its placeholder.
+			 */
+			// biome-ignore lint/style/useNamingConvention: as for `__SELF_HOSTED__` above.
+			__APP_VERSION__: JSON.stringify(version)
 		},
 		plugins: [
 			sveltekit(),

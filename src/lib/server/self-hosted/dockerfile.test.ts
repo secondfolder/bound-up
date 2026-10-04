@@ -23,4 +23,19 @@ describe('Dockerfile', () => {
 		expect(match, 'the Dockerfile sets BODY_SIZE_LIMIT').not.toBeNull();
 		expect(parseSize(match?.groups?.size ?? '')).toBeGreaterThanOrEqual(MAX_REQUEST_BYTES);
 	});
+
+	// The image's version reaches the app only through this variable (see
+	// src/lib/server/app-version.ts), and the VERSION arg has to stay in the last
+	// layer so the released image is the one CI tested.
+	it('hands the release version to the app at runtime, from the last layer', () => {
+		const dockerfile = readFileSync('Dockerfile', 'utf8');
+		const lastStage = dockerfile.slice(dockerfile.lastIndexOf('\nFROM '));
+		const tail = lastStage.slice(lastStage.indexOf('ARG VERSION'));
+		expect(lastStage, 'the VERSION arg is in the runtime stage').toContain('ARG VERSION');
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: a Dockerfile variable, matched as text.
+		expect(tail).toContain('ENV APP_VERSION="${VERSION}"');
+		expect(tail, 'nothing but metadata follows the VERSION arg').not.toMatch(
+			/^(?:RUN|COPY|ADD)\b/m
+		);
+	});
 });

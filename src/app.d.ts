@@ -18,6 +18,13 @@ declare global {
 	 */
 	const __SELF_HOSTED__: boolean;
 
+	/**
+	 * The release version, computed at build time from the git history by
+	 * `vite-plugins/app-version.ts`. Read through `$lib/server/app-version`,
+	 * which lets the Docker image's runtime `APP_VERSION` take precedence.
+	 */
+	const __APP_VERSION__: string;
+
 	namespace App {
 		// interface Error {}
 		interface Locals {

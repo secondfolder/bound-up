@@ -146,8 +146,9 @@ were strengthened for production:
    `/api/health`, which answers 200 while `select 1` succeeds and 503 when it
    does not.
 
-The version label is set in the last layer, so every layer above it is
-identical between the image CI tests and the one it publishes.
+The version label and `APP_VERSION`, which the app reads to show its version,
+are set in the last layer, so every layer above them is identical between the
+image CI tests and the one it publishes.
 
 `BODY_SIZE_LIMIT` deserves its note. adapter-node refuses bodies over 512 KB
 by default, which is every message with a photo. The routes enforce the real
@@ -239,8 +240,11 @@ release is 0.1.0 rather than a version computed from years of pre-release
 commits.
 
 Nothing is committed back to the repository: the version lives in the tag, the
-GitHub Release and the image's `org.opencontainers.image.version` label.
-`package.json`'s `version` is a placeholder.
+GitHub Release, the image's `org.opencontainers.image.version` label and its
+`APP_VERSION` variable, which the settings page shows.
+`package.json`'s `version` is a placeholder. Builds that semantic-release does
+not make (Cloudflare's, `vite dev`) work the same version out from the git
+history; see [versions-and-updates.md](versions-and-updates.md).
 
 Because the version depends on the commit messages, they are checked: the
 husky `commit-msg` hook runs commitlint (`commitlint.config.js`,

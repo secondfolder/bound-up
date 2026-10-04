@@ -30,8 +30,9 @@
 	"javascript": {
 		"formatter": { "quoteStyle": "single", "trailingCommas": "none" },
 		// Replaced at build time by `define` in vite.config.ts and declared in
-		// src/app.d.ts; Biome reads neither. See docs/self-hosting.md.
-		"globals": ["__SELF_HOSTED__"]
+		// src/app.d.ts; Biome reads neither. See docs/self-hosting.md and
+		// docs/versions-and-updates.md.
+		"globals": ["__SELF_HOSTED__", "__APP_VERSION__"]
 	},
 	"css": { "formatter": { "quoteStyle": "single" } },
 	"html": {

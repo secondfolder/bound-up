@@ -1,7 +1,7 @@
 {
 	"name": "bound-up",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.0.0-set-on-publish",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -48,6 +48,7 @@
 		"@commitlint/cli": "^21.2.3",
 		"@commitlint/config-conventional": "^21.2.3",
 		"@playwright/test": "^1.63.0",
+		"@semantic-release/commit-analyzer": "^13.0.1",
 		"@semantic-release/exec": "^7.1.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
 		"@sveltejs/adapter-node": "^5.5.7",

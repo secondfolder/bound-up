@@ -77,7 +77,17 @@ const config = {
 		// registered by the notification settings when someone turns them on
 		// (`$lib/push-client.ts`), not on every page load for everyone. A worker
 		// nobody asked for is one more thing between every visitor and the page.
-		serviceWorker: { register: false }
+		serviceWorker: { register: false },
+		// A home-screen web app on iOS is resumed rather than relaunched, often
+		// days later, and has no reload button: without this it would keep
+		// running the build it was opened on indefinitely. Polling sets
+		// `updated.current`, which turns the next link click into a full page
+		// load and shows `UpdateAvailableNotice`. Timers barely run while iOS
+		// has the app suspended, so that component also checks on resume.
+		// `name` stays SvelteKit's default, the build time, rather than the
+		// release version: a `chore:` commit is deployed without a new version
+		// and still needs picking up.
+		version: { pollInterval: 5 * 60 * 1000 }
 	}
 };
 

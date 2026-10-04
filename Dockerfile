@@ -62,8 +62,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 ENTRYPOINT ["node", "scripts/docker-entrypoint.mjs"]
 
 # Last, so that every layer above is identical between the image CI tests and
-# the one it releases — only these labels differ.
+# the one it releases — only these labels and APP_VERSION differ. The app
+# shows APP_VERSION on its settings page (src/lib/server/app-version.ts): the
+# build stage has no .git to work a version out from, and must not take one
+# from here without giving up that identity.
 ARG VERSION=0.0.0-dev
+ENV APP_VERSION="${VERSION}"
 LABEL org.opencontainers.image.title="Bound Up" \
 	org.opencontainers.image.source="https://github.com/secondfolder/bound-up" \
 	org.opencontainers.image.version="${VERSION}"

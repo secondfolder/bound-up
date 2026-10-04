@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
 	import RequestFailureNotice from '$lib/components/RequestFailureNotice.svelte';
+	import UpdateAvailableNotice from '$lib/components/UpdateAvailableNotice.svelte';
 
 	// Registers every Web Awesome element the app uses. Statically imported from
 	// the root layout so hydration never waits on fetching them — see
@@ -44,6 +45,8 @@
 <!-- Every page, both shells: a request can fail anywhere. See
      $lib/request-failure.svelte.ts. -->
 <RequestFailureNotice />
+<!-- Every page too: a home-screen app can sit on an old build anywhere. -->
+<UpdateAvailableNotice />
 
 <style>
 	:root {

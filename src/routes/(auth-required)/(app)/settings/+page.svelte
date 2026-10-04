@@ -5,6 +5,9 @@
 	import { lock } from '$lib/crypto/session.svelte';
 	import { disablePush } from '$lib/push-client';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 
 	// Server load data is the single source of truth for auth state — see the
 	// note in src/routes/+layout.svelte.
@@ -85,6 +88,8 @@
 			</li>
 		{/if}
 	</ul>
+
+	<p class="version">Version {data.appVersion}</p>
 </section>
 
 <style>
@@ -156,6 +161,13 @@
 					color: inherit;
 				}
 			}
+		}
+
+		.version {
+			margin: var(--wa-space-xl) 0 0;
+			text-align: center;
+			font-size: var(--wa-font-size-s);
+			color: var(--wa-color-text-quiet);
 		}
 	}
 </style>
