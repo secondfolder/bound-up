@@ -26,8 +26,18 @@ tested and tagged it. So the build does semantic-release's sums itself:
 
 Because it is the same analyzer with the same config, the two cannot
 disagree. A commit that releases nothing (`chore:`, `docs:`) shows the
-version it was deployed on top of. A branch preview shows what its branch
-would release if it were merged as it is.
+version it was deployed on top of.
+
+A build from any branch semantic-release does not release from (its
+`branches` in `release.config.mjs`, so anything but `main`) adds the commit
+as semver build metadata, for example `1.2.0+3f2a9c1`. The number is what the
+branch would release if it were merged as it is. A branch is never tagged,
+though, so after its first `feat:` every later commit gives the same number,
+and without the hash a reload onto a new preview deploy would look like
+nothing had changed. Cloudflare's build checks out a detached HEAD, so the
+branch comes from its `WORKERS_CI_BRANCH` variable. A detached HEAD with no
+branch name gets the hash too, because an unknown branch is not known to be a
+release.
 
 The edge cases:
 

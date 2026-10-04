@@ -96,6 +96,36 @@ describe('appVersion', () => {
 		expect(await version()).toBe('1.0.0');
 	});
 
+	it('marks a build from a branch that is never released with its commit', async () => {
+		commit('feat: first');
+		git('tag', 'v1.0.0');
+		git('checkout', '--quiet', '-b', 'feature');
+		commit('feat: one');
+		const first = await version();
+		commit('fix: two');
+		const second = await version();
+
+		expect(first).toMatch(/^1\.1\.0\+[0-9a-f]{7,}$/);
+		expect(second).toMatch(/^1\.1\.0\+[0-9a-f]{7,}$/);
+		expect(second, 'two commits on the branch can be told apart').not.toBe(first);
+	});
+
+	it('marks a detached HEAD, whose branch is unknown', async () => {
+		commit('feat: first');
+		git('tag', 'v1.0.0');
+		git('checkout', '--quiet', '--detach');
+		expect(await version()).toMatch(/^1\.0\.0\+[0-9a-f]{7,}$/);
+	});
+
+	it("goes by Cloudflare's WORKERS_CI_BRANCH, since its build is detached", async () => {
+		commit('feat: first');
+		git('tag', 'v1.0.0');
+		git('checkout', '--quiet', '--detach');
+		const env = (branch: string) => ({ WORKERS_CI_BRANCH: branch });
+		expect(await appVersion({ cwd: repo, env: env('main') })).toBe('1.0.0');
+		expect(await appVersion({ cwd: repo, env: env('preview') })).toMatch(/^1\.0\.0\+/);
+	});
+
 	it('takes APP_VERSION from the environment over the history', async () => {
 		commit('feat: first');
 		git('tag', 'v1.0.0');

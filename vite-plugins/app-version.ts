@@ -17,6 +17,12 @@ import releaseConfig from '../release.config.mjs';
  * and all. A commit that releases nothing (`chore:`, `docs:`) shows the version
  * it was deployed on top of, which is what it is.
  *
+ * A build from any other branch than the ones semantic-release releases from
+ * (a Worker Preview, a local feature branch) also carries its commit as semver
+ * build metadata: `1.2.0+3f2a9c1`. Such a branch is never tagged, so after its
+ * first `feat:` every later commit comes out as the same number, and a reload
+ * onto a new deploy would look like it had changed nothing.
+ *
  * `APP_VERSION` in the environment wins, for a build that already knows its
  * version. The Docker build has no `.git` to read (it is in .dockerignore), so
  * it comes out as `FALLBACK_VERSION` here and the image sets `APP_VERSION` at
@@ -36,7 +42,7 @@ export async function appVersion({
 		return env.APP_VERSION;
 	}
 	try {
-		return await versionFromHistory(cwd);
+		return await versionFromHistory(cwd, env);
 	} catch (error) {
 		// A warning rather than a failed build: a wrong version on the settings
 		// page is not worth refusing to deploy over, and a source tree without
@@ -61,7 +67,10 @@ type Version = [major: number, minor: number, patch: number];
 /** A plain release; a prerelease suffix does not match. */
 const RELEASE_VERSION = /^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)$/;
 
-async function versionFromHistory(cwd: string): Promise<string> {
+async function versionFromHistory(
+	cwd: string,
+	env: Record<string, string | undefined>
+): Promise<string> {
 	const git = (...args: string[]) =>
 		execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
@@ -83,10 +92,22 @@ async function versionFromHistory(cwd: string): Promise<string> {
 		logger: { log: () => undefined }
 	});
 
-	if (!last) {
-		return releaseType ? FIRST_RELEASE : FALLBACK_VERSION;
+	let version = FALLBACK_VERSION;
+	if (last) {
+		version = format(releaseType ? bump(last.version, releaseType) : last.version);
+	} else if (releaseType) {
+		version = FIRST_RELEASE;
 	}
-	return format(releaseType ? bump(last.version, releaseType) : last.version);
+
+	// Cloudflare's build checks out a detached HEAD and names the branch in
+	// WORKERS_CI_BRANCH instead. A detached HEAD with no such variable is
+	// `HEAD` here, which no release branch is called, so it is marked too: an
+	// unknown branch is not known to be a release.
+	const branch = env.WORKERS_CI_BRANCH ?? git('rev-parse', '--abbrev-ref', 'HEAD');
+	if (releaseConfig.branches.includes(branch)) {
+		return version;
+	}
+	return `${version}+${git('rev-parse', '--short', 'HEAD')}`;
 }
 
 /** `v${version}` → `v*`, so a change of `tagFormat` is followed here too. */
