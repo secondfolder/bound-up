@@ -10,6 +10,7 @@ import {
 	MAX_ATTACHMENT_TOTAL_BYTES,
 	MAX_VIDEO_BYTES,
 	newlyArrived,
+	seenMessageId,
 	THREAD_ICONS
 } from './messaging';
 
@@ -140,6 +141,37 @@ describe('isUnreadFor', () => {
 		};
 		expect(isUnreadFor(thread, me)).toBe(true);
 		expect(isUnreadFor(thread, them)).toBe(false);
+	});
+});
+
+describe('seenMessageId', () => {
+	const mine = (id: string, ms: number) => ({ id, mine: true, createdAt: at(ms) });
+	const theirs = (id: string, ms: number) => ({ id, mine: false, createdAt: at(ms) });
+
+	it('is nothing when the partner has never opened the thread', () => {
+		expect(seenMessageId([mine('a', 100)], null)).toBeNull();
+	});
+
+	it('is my newest message they have read', () => {
+		expect(seenMessageId([mine('a', 100), mine('b', 200)], at(200))).toBe('b');
+	});
+
+	// The boundary that keeps "seen" in step with "unread": their read mark is
+	// set to exactly the newest message's time.
+	it('counts a message sent at the read mark as seen', () => {
+		expect(seenMessageId([mine('a', 100)], at(100))).toBe('a');
+	});
+
+	it('stays on the last one they read when I have sent more since', () => {
+		expect(seenMessageId([mine('a', 100), mine('b', 200), mine('c', 300)], at(200))).toBe('b');
+	});
+
+	it('is nothing when the newest message they read is their own', () => {
+		expect(seenMessageId([mine('a', 100), theirs('b', 200), mine('c', 300)], at(250))).toBeNull();
+	});
+
+	it('is nothing before they have read anything in it', () => {
+		expect(seenMessageId([mine('a', 100)], at(50))).toBeNull();
 	});
 });
 

@@ -338,6 +338,34 @@ export function isUnreadFor(thread: ThreadUnreadInput, viewerId: string): boolea
 	return thread.lastMessageAt.getTime() > thread.lastReadMessageAt.getTime();
 }
 
+// ── read receipts ────────────────────────────────────────────────────────────
+
+/**
+ * Which of the viewer's messages carries the "seen" avatar, if any.
+ *
+ * The partner's read mark is their `thread_reads.last_read_message_at`, the same
+ * value `isUnreadFor` reads from the other side, so "seen" and "unread" can
+ * never disagree: a message is seen exactly when it is no longer unread for
+ * the partner. Inclusive (`<=`) for the reason `isUnreadFor` is `>`.
+ *
+ * The receipt goes under the newest message the partner has read, and only if
+ * that message is the viewer's. If it is the partner's own, they have replied
+ * since, which says more than an avatar would, so there is none.
+ *
+ * `messages` must be in thread order, as `getThread` returns them.
+ */
+export function seenMessageId(
+	messages: readonly { id: string; mine: boolean; createdAt: Date }[],
+	partnerReadAt: Date | null
+): string | null {
+	if (partnerReadAt === null) {
+		return null;
+	}
+	const readAt = partnerReadAt.getTime();
+	const newestRead = messages.findLast((message) => message.createdAt.getTime() <= readAt);
+	return newestRead?.mine ? newestRead.id : null;
+}
+
 /**
  * The thread a live refresh brought a new message to, if any, for the board
  * to highlight.

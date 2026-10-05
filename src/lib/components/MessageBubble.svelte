@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
+	import { initialsFor } from '$lib/initials';
 	import type { MessageView } from '$lib/types';
 	import AttachmentPreview from './AttachmentPreview.svelte';
 	import ReactionPicker from './ReactionPicker.svelte';
@@ -27,7 +28,8 @@
 		when,
 		reactions,
 		onReact,
-		onClearReaction
+		onClearReaction,
+		seenBy = null
 	}: {
 		message: MessageView;
 		payload: MessagePayload | null | undefined;
@@ -40,6 +42,11 @@
 		reactions: { emoji: string; mine: boolean }[];
 		onReact: (emoji: string) => Promise<void>;
 		onClearReaction: () => Promise<void>;
+		/**
+		 * The partner, when this is the newest of the viewer's messages they
+		 * have seen: the read receipt. Null on every other message.
+		 */
+		seenBy?: { name: string; image: string | null } | null;
 	} = $props();
 
 	const mine = $derived(message.mine);
@@ -100,6 +107,18 @@
 			/>
 		{/if}
 	</div>
+
+	{#if seenBy}
+		<!-- Inside the message's <li> rather than after it, so it is announced
+		     with the message it belongs to. `image` is left off when null, as in
+		     AppNav: an empty one would render a broken image. -->
+		<wa-avatar
+			class="seen"
+			image={seenBy.image ?? undefined}
+			initials={initialsFor(seenBy.name)}
+			label="Seen by {seenBy.name}"
+		></wa-avatar>
+	{/if}
 </li>
 
 <style>
@@ -213,6 +232,30 @@
 			font-size: 0.6875rem;
 			color: var(--wa-color-text-quiet);
 			min-block-size: 1.25rem;
+		}
+
+		/* Small enough to read as a mark rather than a message of its own. It
+		   only ever sits under the viewer's messages, so `.mine`'s flex-end puts
+		   it in the corner, the way a messenger's seen-avatar does. */
+		.seen {
+			--size: 1rem;
+			font-size: 0.5rem;
+			animation: seen-in 200ms ease-out;
+		}
+	}
+
+	/* The receipt moves down the thread as the partner reads, and fading it in
+	   where it lands makes the move noticeable without being loud. */
+	@keyframes seen-in {
+		from {
+			opacity: 0;
+			transform: translateY(-0.25rem);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		li .seen {
+			animation: none;
 		}
 	}
 </style>

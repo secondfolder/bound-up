@@ -294,6 +294,12 @@ export type ThreadView = {
 	icon: ThreadIcon;
 	tags?: TagView[];
 	messages: MessageView[];
+	/**
+	 * The viewer's own message the partner has most recently seen, for the read
+	 * receipt, or null when there is none to show. See `seenMessageId` in
+	 * `src/lib/messaging.ts`.
+	 */
+	seenMessageId: string | null;
 };
 
 /** One row on /home: a partner with something waiting. */

@@ -69,13 +69,20 @@
 	 * notification's tap gives, in place of the push this device is not sent
 	 * while it watches. Which thread is worked out by comparing the board either
 	 * side of the reload (`newlyArrived`), because the event cannot say.
+	 *
+	 * A `read` event is skipped: it is for a thread page's read receipt, which
+	 * the board does not show, and reloading for it would cost a board load
+	 * every time either partner opens a thread.
 	 */
 	const partnershipId = $derived(data.partner.id);
 	$effect(() => {
 		const id = partnershipId;
 		return watchPartnership({
 			partnershipId: id,
-			onChange: () => {
+			onChange: (event) => {
+				if (event?.kind === 'read') {
+					return;
+				}
 				const before = data.threads;
 				void invalidate(`messages:board:${id}`).then(() =>
 					highlight(newlyArrived(before, data.threads))

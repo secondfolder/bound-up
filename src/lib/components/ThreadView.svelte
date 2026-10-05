@@ -27,6 +27,8 @@
 	let {
 		thread,
 		partnershipId,
+		/** For the read receipt's avatar. */
+		partner,
 		tags = [],
 		recipients,
 		/**
@@ -45,6 +47,7 @@
 	}: {
 		thread: ThreadView;
 		partnershipId: string;
+		partner: { name: string; image: string | null };
 		tags?: TagView[];
 		recipients: PartnerRecipientsView;
 		canSend?: boolean;
@@ -276,6 +279,7 @@
 				reactions={reactions[message.id] ?? []}
 				onReact={(emoji) => react(message, emoji)}
 				onClearReaction={() => clearReaction(message)}
+				seenBy={message.id === thread.seenMessageId ? partner : null}
 			/>
 		{/each}
 	</ul>

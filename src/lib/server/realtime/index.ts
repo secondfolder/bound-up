@@ -41,9 +41,12 @@
  * and nothing else does: a tag change is `tags`. A thread page relies on
  * that to decide whether another thread is worth a toast, so a kind that is
  * not a new message must not borrow either of them.
+ *
+ * `read` means a member's read mark in a thread moved, so the other one's read
+ * receipt may have. Only a thread page shows receipts, so the board ignores it.
  */
 export type RealtimeEvent = {
-	kind: 'thread' | 'message' | 'reaction' | 'tags' | 'restore';
+	kind: 'thread' | 'message' | 'reaction' | 'tags' | 'restore' | 'read';
 	/** Absent when the change is board-level rather than inside one thread. */
 	threadId?: string;
 };

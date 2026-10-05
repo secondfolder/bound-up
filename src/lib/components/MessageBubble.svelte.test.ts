@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
 import { defined } from '$lib/testing/defined';
 import { pending } from '$lib/testing/pending';
-import { isWaIconRequest } from '$lib/testing/web-awesome';
+import { isWaIconRequest, waProp } from '$lib/testing/web-awesome';
 import type { MessageView } from '$lib/types';
 import MessageBubble from './MessageBubble.svelte';
 
@@ -341,6 +341,28 @@ describe('MessageBubble', () => {
 			props: { ...props, message: message({ mine: true }), payload: null, metadata: undefined }
 		});
 		expect(mine.container.querySelector('li.mine')).not.toBeNull();
+	});
+
+	it('shows the read receipt only when told who has seen it', () => {
+		const unseen = render(MessageBubble, {
+			props: { ...props, message: message({ mine: true }), payload: null, metadata: undefined }
+		});
+		expect(unseen.container.querySelector('wa-avatar.seen')).toBeNull();
+		unseen.unmount();
+
+		const { container } = render(MessageBubble, {
+			props: {
+				...props,
+				message: message({ mine: true }),
+				payload: null,
+				metadata: undefined,
+				seenBy: { name: 'Sam Lee', image: null }
+			}
+		});
+		const avatar = container.querySelector('li wa-avatar.seen');
+		expect(avatar).not.toBeNull();
+		expect(waProp(avatar, 'label')).toBe('Seen by Sam Lee');
+		expect(waProp(avatar, 'initials')).toBe('SL');
 	});
 
 	/**

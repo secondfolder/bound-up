@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { attachmentBudget } from '../media-quality';
 import {
 	BOARD_LIMIT,
@@ -13,6 +13,7 @@ import {
 	MEDIA_TTL_NEVER,
 	type MediaTtl,
 	RESTORE_PAGE_SIZE,
+	seenMessageId,
 	type ThreadIcon,
 	UNSEEN_MEDIA_MESSAGE_LIMIT
 } from '../messaging';
@@ -467,9 +468,9 @@ async function listUnseenMedia(
 }
 
 /**
- * One thread with its messages, attachment metadata and reactions.
+ * One thread with its messages, attachment metadata, reactions and read receipt.
  *
- * Three queries, never N+1: attachments and reactions are fetched for the whole
+ * Never N+1: attachments and reactions are fetched for the whole
  * message set with `inArray`. The Free plan allows 50 D1 queries per Worker
  * invocation, so a per-message fetch would break production while passing
  * locally, where the limit is not enforced.
@@ -490,7 +491,7 @@ export async function getThread(
 		.orderBy(asc(messages.createdAt), asc(messages.id));
 
 	const ids = rows.map((row) => row.id);
-	const [attachments, reactions, tags] = await Promise.all([
+	const [attachments, reactions, tags, partnerReads] = await Promise.all([
 		ids.length > 0
 			? db
 					.select({
@@ -519,30 +520,41 @@ export async function getThread(
 			.from(messageThreadTags)
 			.innerJoin(messageTags, eq(messageTags.id, messageThreadTags.tagId))
 			.where(eq(messageThreadTags.threadId, threadId))
-			.orderBy(asc(messageTags.createdAt), asc(messageTags.id))
+			.orderBy(asc(messageTags.createdAt), asc(messageTags.id)),
+		// The partner's read mark, for the read receipt. "Not the viewer" is
+		// "the partner" because only the partnership's two members can ever
+		// open the thread, which `requireThreadMembership` has already proven
+		// the viewer is one of.
+		db
+			.select({ lastReadMessageAt: threadReads.lastReadMessageAt })
+			.from(threadReads)
+			.where(and(eq(threadReads.threadId, threadId), ne(threadReads.userId, viewerId)))
+			.limit(1)
 	]);
 
 	const byMessage = new Map<string, MessageView>();
+	const messageViews = rows.map((row) => {
+		const message: MessageView = {
+			id: row.id,
+			// Resolved here so no component sees a user id, which keeps the
+			// "never return locals.user wholesale" posture intact.
+			mine: row.senderId === viewerId,
+			ciphertext: row.ciphertext,
+			bodyFormat: row.bodyFormat,
+			metadataCiphertext: row.metadataCiphertext ?? null,
+			createdAt: row.createdAt,
+			attachments: [],
+			reactions: []
+		};
+		byMessage.set(row.id, message);
+		return message;
+	});
 	const view: ThreadView = {
 		id: threadId,
 		icon,
 		tags: tags.map((tag) => ({ id: tag.id, name: tag.name, color: tag.color })),
-		messages: rows.map((row) => {
-			const message: MessageView = {
-				id: row.id,
-				// Resolved here so no component sees a user id, which keeps the
-				// "never return locals.user wholesale" posture intact.
-				mine: row.senderId === viewerId,
-				ciphertext: row.ciphertext,
-				bodyFormat: row.bodyFormat,
-				metadataCiphertext: row.metadataCiphertext ?? null,
-				createdAt: row.createdAt,
-				attachments: [],
-				reactions: []
-			};
-			byMessage.set(row.id, message);
-			return message;
-		})
+		messages: messageViews,
+		seenMessageId: seenMessageId(messageViews, partnerReads[0]?.lastReadMessageAt ?? null)
 	};
 
 	for (const attachment of attachments) {
@@ -1212,22 +1224,29 @@ export async function sendMessage(
 }
 
 /**
- * Records that the viewer read the thread up to its current latest message.
+ * Records that the viewer read the thread up to its current latest message,
+ * and says whether that moved their read mark.
  *
  * `lastReadMessageAt` is set to the thread's CURRENT `last_message_at`, read
  * inside the same call — not to `now`. Using `now` would mark a message that
  * arrived in the same second as already read, and it would be silent.
  *
- * `lastFullyReadAt` is only advanced when the latest message changes from unread
- * to read. Reopening a thread with no new messages must not reshuffle the
- * board's read section.
+ * The row is only written when the mark moves forward, which is also the only
+ * time `lastFullyReadAt` may advance: reopening a thread with no new messages
+ * must not reshuffle the board's read section.
+ *
+ * The return value is what decides whether the partner is told (a `read`
+ * event, for their read receipt). It must be false for a reopen, because a
+ * thread page reloads on every event about its thread, including `read`: two
+ * people with the same thread open would otherwise tell each other about the
+ * reload the last event caused, for ever.
  */
 export async function markThreadOpened(
 	db: Db,
 	threadId: string,
 	viewerId: string,
 	now: Date = new Date()
-): Promise<void> {
+): Promise<boolean> {
 	const rows = await db
 		.select({ lastMessageAt: messageThreads.lastMessageAt })
 		.from(messageThreads)
@@ -1236,10 +1255,12 @@ export async function markThreadOpened(
 
 	const [row] = rows;
 	if (!row) {
-		return;
+		return false;
 	}
 
-	await db
+	// `returning` yields a row for an insert or an update and none when
+	// `setWhere` skips the update, which is exactly "the mark moved".
+	const written = await db
 		.insert(threadReads)
 		.values({
 			threadId,
@@ -1249,16 +1270,11 @@ export async function markThreadOpened(
 		})
 		.onConflictDoUpdate({
 			target: [threadReads.threadId, threadReads.userId],
-			set: {
-				lastFullyReadAt: sql`case
-					when ${threadReads.lastReadMessageAt} is null
-					  or ${threadReads.lastReadMessageAt} < ${row.lastMessageAt}
-					then ${now}
-					else ${threadReads.lastFullyReadAt}
-				end`,
-				lastReadMessageAt: row.lastMessageAt
-			}
-		});
+			set: { lastFullyReadAt: now, lastReadMessageAt: row.lastMessageAt },
+			setWhere: lt(threadReads.lastReadMessageAt, row.lastMessageAt)
+		})
+		.returning({ id: threadReads.id });
+	return written.length > 0;
 }
 
 export type ReactionResult =

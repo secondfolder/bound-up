@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createNotifier } from '$lib/server/realtime/backend';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
+	createTestMessage,
 	createTestPartnership,
 	createTestThread,
 	createTestUser,
@@ -20,7 +22,7 @@ vi.mock('$lib/server/messaging', async (importOriginal) => {
 		...actual,
 		markThreadOpened: async (...args: Parameters<typeof actual.markThreadOpened>) => {
 			await new Promise((done) => setTimeout(done, 50));
-			await actual.markThreadOpened(...args);
+			return actual.markThreadOpened(...args);
 		}
 	};
 });
@@ -77,5 +79,46 @@ describe('/partner/[id]/messages/[threadId]', () => {
 		);
 		const threads: { id: string; unread: boolean }[] = board.threads;
 		expect(threads.find((thread) => thread.id === threadId)?.unread).toBe(false);
+	});
+
+	/**
+	 * Opening a thread tells a partner watching it that their read receipt
+	 * moved, and a reopen with nothing new does not: this load re-runs on every
+	 * event about its thread, so publishing each time would have two open
+	 * pages answering each other for ever.
+	 */
+	it('publishes a read event only when the read mark moves', async () => {
+		const notifier = await createNotifier({});
+		const publish = vi.spyOn(notifier, 'publish');
+		// Explicit times, so the reply is newer even inside one millisecond.
+		const { threadId } = await createTestThread(harness.db, partnershipId, ada, {
+			at: new Date(1000)
+		});
+		const open = () =>
+			runLoad(
+				load(
+					fakeEvent({
+						db: harness.db,
+						user: bo,
+						params: { id: partnershipId, threadId },
+						path: `/partner/${partnershipId}/messages/${threadId}`
+					})
+				)
+			);
+
+		try {
+			await open();
+			expect(publish).toHaveBeenCalledExactlyOnceWith(partnershipId, { kind: 'read', threadId });
+
+			publish.mockClear();
+			await open();
+			expect(publish).not.toHaveBeenCalled();
+
+			await createTestMessage(harness.db, partnershipId, threadId, ada, { at: new Date(2000) });
+			await open();
+			expect(publish).toHaveBeenCalledExactlyOnceWith(partnershipId, { kind: 'read', threadId });
+		} finally {
+			publish.mockRestore();
+		}
 	});
 });

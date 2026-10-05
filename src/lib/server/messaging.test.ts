@@ -497,7 +497,22 @@ describe('markThreadOpened', () => {
 	});
 
 	it('does nothing for a thread that is not there', async () => {
-		await expect(markThreadOpened(harness.db, 'nope', ada.id)).resolves.toBeUndefined();
+		await expect(markThreadOpened(harness.db, 'nope', ada.id)).resolves.toBe(false);
+	});
+
+	/**
+	 * The return value decides whether the partner is sent a `read` event, and
+	 * a thread page reloads on that event, which opens the thread again. So a
+	 * reopen with nothing new must say false, or two open pages would ping
+	 * each other for ever.
+	 */
+	it('says whether the read mark moved', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, jun, { at: at(1000) });
+		await expect(markThreadOpened(harness.db, threadId, ada.id, at(2000))).resolves.toBe(true);
+		await expect(markThreadOpened(harness.db, threadId, ada.id, at(3000))).resolves.toBe(false);
+
+		await createTestMessage(harness.db, partnershipId, threadId, jun, { at: at(3500) });
+		await expect(markThreadOpened(harness.db, threadId, ada.id, at(4000))).resolves.toBe(true);
 	});
 });
 
@@ -550,6 +565,50 @@ describe('getThread', () => {
 	it('is empty rather than failing for a thread with no messages', async () => {
 		const thread = await getThread(harness.db, 'nope', 'envelope', ada.id);
 		expect(thread.messages).toEqual([]);
+		expect(thread.seenMessageId).toBeNull();
+	});
+
+	describe('read receipt', () => {
+		// Sending writes the sender's own read row, which must not be taken for
+		// the partner's.
+		it('is nothing until the partner opens the thread', async () => {
+			const { threadId } = await createTestThread(harness.db, partnershipId, ada, { at: at(1000) });
+			const thread = await getThread(harness.db, threadId, 'envelope', ada.id);
+			expect(thread.seenMessageId).toBeNull();
+		});
+
+		it('marks my message once the partner has opened it, and only for me', async () => {
+			const { threadId, messageId } = await createTestThread(harness.db, partnershipId, ada, {
+				at: at(1000)
+			});
+			await markThreadOpened(harness.db, threadId, jun.id, at(1500));
+
+			const forAda = await getThread(harness.db, threadId, 'envelope', ada.id);
+			expect(forAda.seenMessageId).toBe(messageId);
+			// Jun has read Ada's message, but Ada reading Jun's is a different
+			// question, and the newest message Ada read is her own.
+			const forJun = await getThread(harness.db, threadId, 'envelope', jun.id);
+			expect(forJun.seenMessageId).toBeNull();
+		});
+
+		it('stays on the last one seen when I send another', async () => {
+			const { threadId, messageId } = await createTestThread(harness.db, partnershipId, ada, {
+				at: at(1000)
+			});
+			await markThreadOpened(harness.db, threadId, jun.id, at(1500));
+			await createTestMessage(harness.db, partnershipId, threadId, ada, { at: at(2000) });
+
+			const thread = await getThread(harness.db, threadId, 'envelope', ada.id);
+			expect(thread.seenMessageId).toBe(messageId);
+		});
+
+		it('goes once the partner has replied', async () => {
+			const { threadId } = await createTestThread(harness.db, partnershipId, ada, { at: at(1000) });
+			await createTestMessage(harness.db, partnershipId, threadId, jun, { at: at(2000) });
+
+			const thread = await getThread(harness.db, threadId, 'envelope', ada.id);
+			expect(thread.seenMessageId).toBeNull();
+		});
 	});
 });
 

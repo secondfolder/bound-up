@@ -6,9 +6,10 @@ import {
 	markThreadOpened,
 	requireThreadMembership
 } from '$lib/server/messaging';
+import { createNotifier } from '$lib/server/realtime/backend';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, params, depends }) => {
+export const load: PageServerLoad = async ({ locals, params, depends, platform }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
@@ -44,14 +45,25 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	 * A failure is logged rather than failing the page: the thread stays
 	 * unread, which opening it again fixes.
 	 */
-	const [thread, recipients, tags] = await Promise.all([
+	const [thread, recipients, tags, readMoved] = await Promise.all([
 		getThread(locals.db, params.threadId, membership.icon, locals.user.id),
 		getRecipientsForPartnership(locals.db, params.id, locals.user.id),
 		listTags(locals.db, params.id, locals.user.id),
 		markThreadOpened(locals.db, params.threadId, locals.user.id).catch((cause: unknown) => {
 			console.error('could not mark thread read', cause);
+			return false;
 		})
 	]);
+
+	// Tells a partner with this thread open that their read receipt moved.
+	// Only when it did: this load re-runs on every event about the thread,
+	// `read` included, so publishing on every open would have two open pages
+	// answering each other for ever. Awaited for the same reason the write is;
+	// `publish` never throws.
+	if (readMoved) {
+		const notifier = await createNotifier({ platform });
+		await notifier.publish(params.id, { kind: 'read', threadId: params.threadId });
+	}
 
 	// Every account has keys, so a partnership without both is broken data.
 	if (!recipients) {
@@ -61,7 +73,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	return {
 		partner: {
 			id: membership.partnership.id,
-			name: membership.partnership.partnerName
+			name: membership.partnership.partnerName,
+			// For the read receipt's avatar.
+			image: membership.partnership.counterpart?.image ?? null
 		},
 		thread,
 		tags: tags ?? [],

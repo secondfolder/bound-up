@@ -413,7 +413,20 @@
 </script>
 
 <li>
-	<a {href} bind:this={link} class:unread={thread.unread} class:sealed aria-label={label}>
+	<!-- No data preload, which app.html turns on for every link on hover: the
+	     thread page's load is what marks a thread read, so preloading it marked
+	     a thread read — and showed the partner a read receipt — for a pointer
+	     passing over its sticker, or a finger scrolling past one. The code still
+	     preloads, since that runs no load. -->
+	<a
+		{href}
+		bind:this={link}
+		class:unread={thread.unread}
+		class:sealed
+		aria-label={label}
+		data-sveltekit-preload-data="off"
+		data-sveltekit-preload-code="hover"
+	>
 		<!-- `animationend` rather than a timer, so the board forgets the highlight
 		     exactly when it has faded, whatever the duration in the CSS says. -->
 		<div

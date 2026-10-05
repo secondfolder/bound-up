@@ -226,6 +226,62 @@ test.describe('the board', () => {
 		}
 	});
 
+	/**
+	 * Opening a thread is what reads it, and the thread page's load is what
+	 * records that, so a sticker must never preload it: app.html preloads
+	 * every link's data on hover, and that once marked a thread read — and
+	 * showed the partner a read receipt — for a pointer passing over it.
+	 *
+	 * Proving a request did not happen needs a window it would have happened
+	 * in. Hovering the back link afterwards gives one: its data does preload,
+	 * and SvelteKit preloads in hover order, so by the time that request is
+	 * out the sticker's would have been too.
+	 */
+	test('hovering a sticker does not read the thread', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await writeThread(ada.page, 'just looking');
+
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			const threadData: string[] = [];
+			jun.page.on('request', (request) => {
+				if (/\/messages\/[0-9a-f-]{36}\/__data\.json/.test(request.url())) {
+					threadData.push(request.url());
+				}
+			});
+
+			const sticker = jun.page
+				.getByRole('list', { name: 'Unread' })
+				.getByRole('link', { name: /^Unread message/ });
+			await sticker.hover();
+			const control = jun.page.waitForRequest(/\/partner\/[0-9a-f-]{36}\/__data\.json/);
+			await jun.page.getByRole('link', { name: 'Back to partner' }).hover();
+			await control;
+			expect(threadData).toEqual([]);
+
+			// Still unread for Jun, and no receipt for Ada.
+			await jun.page.reload();
+			await expect(
+				jun.page.getByRole('list', { name: 'Unread' }).getByRole('listitem')
+			).toHaveCount(1);
+			await ada.page.reload();
+			await expect(ada.page.getByText('just looking')).toBeVisible();
+			await expect(ada.page.getByRole('img', { name: 'Seen by Jun' })).toHaveCount(0);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
 	test('keeps board tiles aligned in a plain grid and opens the composer only on tap', async ({
 		browser
 	}) => {
@@ -375,6 +431,51 @@ test.describe('live updates', () => {
 				() => (globalThis as unknown as { streamCount?: number }).streamCount ?? 0
 			);
 			expect(streamsAfter).toBe(streamsBefore);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	/**
+	 * The read receipt follows the partner's reading live, both when they open
+	 * the thread and when a reply reaches a thread they already have open —
+	 * the second is their page reloading for the reply, marking it read, and
+	 * telling Ada, with nobody touching anything.
+	 */
+	test('the read receipt moves as the partner reads, with no reload', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await writeThread(ada.page, 'thinking about you');
+			const message = (text: string) => ada.page.locator('ul.messages > li', { hasText: text });
+			const seen = ada.page.getByRole('img', { name: 'Seen by Jun' });
+			await expect(message('thinking about you')).toBeVisible();
+			await expect(seen).toHaveCount(0);
+
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
+			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+
+			await expect(
+				message('thinking about you').getByRole('img', { name: 'Seen by Jun' })
+			).toBeVisible({ timeout: 20_000 });
+
+			// Jun is still on the thread, so the reply is read as it arrives and
+			// the receipt moves down to it. One receipt, never two.
+			await reply(ada.page, 'are you there');
+			await expect(message('are you there').getByRole('img', { name: 'Seen by Jun' })).toBeVisible({
+				timeout: 20_000
+			});
+			await expect(seen).toHaveCount(1);
 		} finally {
 			await ada.close();
 			await jun.close();

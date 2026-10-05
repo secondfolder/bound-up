@@ -125,6 +125,61 @@ as `isUnreadFor` in `src/lib/messaging.ts` for anything that needs it in
 JavaScript. They have to agree, or `/home` and the board would disagree about
 what is waiting for you.
 
+## Read receipts
+
+Inside a thread, the partner's avatar sits small under the newest of the
+viewer's messages that the partner has seen. Like a messenger's seen-avatar, it
+moves down the thread as they read, and there is only ever one.
+
+"Seen" is the unread rule run from the other side, and uses the same column:
+
+```
+seen(M, by P)  ⟺  M.created_at <= P's thread_reads.last_read_message_at
+```
+
+so a message is seen exactly when it stopped being unread for the partner, and
+the two can never disagree. No new table, no migration, and no per-message read
+rows: `getThread` reads one extra row, the partner's `thread_reads`, picked as
+"the read row that is not the viewer's" — sound because only the partnership's
+two members can open the thread. `seenMessageId` in `src/lib/messaging.ts`
+picks the message.
+
+**Only ever under the viewer's own message.** The receipt goes under the newest
+message the partner has read, and if that one is the partner's own there is
+none: they have replied since, which says more than an avatar would. A thread
+the partner has never opened has none either.
+
+**What it says is "opened the thread since this arrived"**, not "looked at this
+bubble". Opening a thread marks it read up to its newest message, the same as
+it does for unread, so a long thread scrolled no further than its top still
+counts as seen. That is the same promise the board's unread state makes.
+
+**So nothing may run the thread page's load except opening the thread.**
+`app.html` preloads every link's data on hover, which for a sticker meant a
+pointer passing over it, or a finger scrolling past it, read the thread and
+showed the partner a receipt. A sticker's link turns data preloading off
+(`data-sveltekit-preload-data="off"`), and an e2e test hovers one to hold that.
+A new link straight to a thread page needs the same.
+
+**It moves live.** When opening a thread moves someone's read mark,
+`markThreadOpened` says so, and the thread page's load publishes a `read`
+event. The other member's thread page reloads on it, as it does for any event
+about the thread it shows, and the board ignores it, since it shows no
+receipts. A thread page left open on a thread marks each reply read as it
+arrives, because the reply's `message` event reloads the page and the reload
+is an open — so the sender watches the avatar move onto their reply.
+
+**Only a read mark that moved publishes**, and that is load-bearing rather
+than a saving. A thread page reloads on `read`, and reloading is opening: if
+every open published, two people with the same thread open would answer each
+other's reloads for ever. `markThreadOpened` writes only when the mark moves
+forward (`setWhere`) and reports whether a row came back, with a server test
+on both halves.
+
+There is no setting to turn receipts off. The server has always known when each
+side read each thread (see [What the server still knows](#what-the-server-still-knows));
+this shows it to the partner, who is the one person it is about.
+
 ## Board order
 
 Unread first, newest at the top. Then a divider. Then the read ones, by the day
@@ -595,7 +650,8 @@ plainly, because the framing of this feature invites the assumption that it does
   same size whatever camera took it.
 - How long the sender chose for each message's media to last, and whether it was
   sent as permanent. The server has to know this in order to delete the media.
-- When each side opened each thread, and when they last read it.
+- When each side opened each thread, and when they last read it. The partner
+  sees the second too, as the read receipt.
 - Which of the sixteen stored icons a thread has, even though the current UI no
   longer surfaces that choice directly.
 
@@ -608,7 +664,7 @@ reaction, and anything that would let it read or forge any of them.
 | ----------------------------------- | --------------------------------------------------------------------------- |
 | `/partner/[id]/messages`            | The board. The unopened-envelope state SSRs; previews decrypt after unlock. |
 | `/partner/[id]/messages?thread=…`   | Where a notification tap lands: a never-opened thread highlighted, else on. |
-| `/partner/[id]/messages/[threadId]` | One thread. Its load also records the open.                                 |
+| `/partner/[id]/messages/[threadId]` | One thread. Its load also records the open, and publishes `read` if it moved. |
 | `/home`                             | A link per partner with something waiting.                                  |
 | `api/partnerships/[id]/threads`     | `POST` multipart: a thread and its first message.                           |
 | `.../threads/[threadId]/messages`   | `POST` multipart: a reply.                                                  |
@@ -776,9 +832,10 @@ to compare. A thread page has only its own thread, so for an event about
 another thread it asks `GET .../threads/[threadId]/unread`.
 
 **`thread` and `message` events mean a message was written, and nothing else
-uses them.** A tag change publishes `tags`. Before, it borrowed `thread`, and a
-thread page would have asked about every retag. A new event kind that is not a
-written message must not reuse either of those two.
+uses them.** A tag change publishes `tags`, and a read mark moving publishes
+`read` (see [Read receipts](#read-receipts)). Before, tags borrowed `thread`,
+and a thread page would have asked about every retag. A new event kind that is
+not a written message must not reuse either of those two.
 
 ### Exporting the class from a generated worker
 

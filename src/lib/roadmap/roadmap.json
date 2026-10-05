@@ -468,6 +468,13 @@
 							"shippedOn": "2026-09-26"
 						},
 						{
+							"id": "message-read-receipts",
+							"title": "Read receipts",
+							"summary": "See when your partner has read what you sent.",
+							"status": "shipped",
+							"shippedOn": "2026-10-06"
+						},
+						{
 							"id": "voice-messages",
 							"title": "Voice messages",
 							"summary": "Say it instead of typing it.",
