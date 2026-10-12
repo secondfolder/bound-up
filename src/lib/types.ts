@@ -1,5 +1,6 @@
 import type { KeyWrapParams, KeyWrapType } from './encryption';
 import type { MessageBodyFormat, ThreadIcon } from './messaging';
+import type { Intensity, Role, Vibe } from './playroom/iq-test/settings';
 
 /**
  * Shared types that BOTH server code and Svelte components need.
@@ -480,4 +481,33 @@ export type PartnerMessagesWidgetView = {
 	unreadThreads: number;
 	totalThreads: number;
 	newestAt: Date | null;
+};
+
+/**
+ * One past IQ test, as the history list and the /home card show it.
+ *
+ * The same shape whether it came from the account (a row of
+ * `iq_test_results`) or from this device's own history, so the list does not
+ * care which.
+ */
+export type IqTestResultView = {
+	id: string;
+	role: Role;
+	intensity: Intensity;
+	vibe: Vibe | null;
+	iq: number;
+	correct: number;
+	attempted: number;
+	skipped: number;
+	/** Whether its results humiliated, and wore the vibe's look: see `iq_test_results`. */
+	humiliating: boolean;
+	themedLook: boolean;
+	soberIq: number | null;
+	targetIq: number | null;
+	createdAt: Date;
+	/**
+	 * Device history only: the signed link a signed-out result is shared by
+	 * (see `iq-test-share.ts`). An account's results are shared by their id.
+	 */
+	shareToken?: string;
 };

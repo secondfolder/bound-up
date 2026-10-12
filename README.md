@@ -48,6 +48,9 @@ If you would rather keep everything on your own server, you can
   is still there when you come back.
 - **Guided sessions** _(early access)_. Step-by-step edging guides that count
   along with you and reveal what comes next as you go.
+- **Playroom.** Toys and games, starting with a bimbo IQ test that is built for
+  subs to fail and doms to win. It has a link of its own, so anyone can take it
+  without an account.
 - **Time zones that follow you.** A task happens at the right time for the
   person it is set for, even if one of you travels or moves.
 

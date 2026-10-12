@@ -5,7 +5,8 @@ account is given them. Nothing can be bought yet; for now an admin grants a
 feature from the admin page. When purchases arrive, buying a feature will write
 the same row a grant does, so nothing that checks access has to change.
 
-There are three so far: guides, permanent media, and higher quality uploads.
+There are four so far: guides, permanent media, higher quality uploads, and
+the IQ test answer button.
 
 ## The pieces
 
@@ -121,6 +122,18 @@ and every file compresses to SD. The server budget is what backs that up.
 
 Like every feature, it belongs to the account that holds it. A partner with
 the feature does not raise the other side's budget.
+
+### IQ test answer button
+
+A testing aid for the Playroom's IQ test (see
+[playroom.md](playroom.md#testing-aid)). `iqTestAnswerButton` adds a "Correct
+answer" button above each question that answers it correctly, so a run can be
+tapped through to a result quickly.
+
+The test page's load reads it with `userHasFeature`, and that only decides what
+is shown. There is nothing else to enforce: the test is marked in the browser,
+the server stores whatever score it is sent, and nothing depends on that score
+being honest.
 
 ## Admin
 

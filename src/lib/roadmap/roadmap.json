@@ -307,6 +307,30 @@
 			]
 		},
 		{
+			"id": "playroom",
+			"title": "Playroom",
+			"summary": "Toys and games to play with, alone or together.",
+			"icon": "dice",
+			"items": [
+				{
+					"id": "bimbo-iq-test",
+					"title": "Bimbo IQ test",
+					"summary": "An IQ test built for subs to fail and doms to win, from strictly official to flashing porn.",
+					"status": "shipped",
+					"shippedOn": "2026-10-10",
+					"icon": "brain",
+					"notes": [
+						"Works without an account, at its own link",
+						"Keeps your past results",
+						"Plays a Bambi hypno in the bambi vibe, picked at random or chosen by search and trigger",
+						"Plays hypno music videos for every vibe, among the porn",
+						"Every result gets a link to share, signed in or not",
+						"Learns which questions you struggle with, and asks more of them"
+					]
+				}
+			]
+		},
+		{
 			"id": "tasks",
 			"title": "Tasks",
 			"summary": "Things to get done, set by yourself or your partner.",

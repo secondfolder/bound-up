@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import GuidesWidget from '$lib/components/GuidesWidget.svelte';
+	import PlayroomWidget from '$lib/components/PlayroomWidget.svelte';
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
 	import TasksWidget from '$lib/components/TasksWidget.svelte';
 	import UnreadMessagesWidget from '$lib/components/UnreadMessagesWidget.svelte';
@@ -27,6 +28,7 @@
 		{/if}
 		<TasksWidget tasks={data.tasks} href={resolve('/(auth-required)/(app)/home/tasks')} />
 		<RewardsWidget rewards={data.rewards} href={resolve('/(auth-required)/(app)/home/rewards')} />
+		<PlayroomWidget latestIq={data.latestIq} href={resolve('/(auth-required)/(app)/playroom')} />
 	</div>
 </div>
 

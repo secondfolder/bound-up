@@ -16,17 +16,18 @@ SectionWidget            the card: wa-card, header, optional header link, body
 ├─ TasksWidget           tasks ready to complete now
 ├─ RewardsWidget         credit balance + rewards claimable now
 ├─ PartnerMessagesWidget unread / total threads for one partnership
-└─ UnreadMessagesWidget  one row per partner with unread — /home only
+├─ UnreadMessagesWidget  one row per partner with unread — /home only
+└─ PlayroomWidget        the last IQ test score — /home only
 ```
 
 `SectionWidget` knows nothing about tasks, rewards or messages. The widgets know
 nothing about card chrome. `WidgetItems` renders the title-plus-note list that
 Guides, Tasks and Rewards all want, so that list exists once.
 
-| Page            | Cards                                                        |
-| --------------- | ------------------------------------------------------------ |
-| `/home`         | Messages (conditional), Guides (conditional), Tasks, Rewards |
-| `/partner/[id]` | Messages, Tasks, Rewards                                     |
+| Page            | Cards                                                                  |
+| --------------- | ---------------------------------------------------------------------- |
+| `/home`         | Messages (conditional), Guides (conditional), Tasks, Rewards, Playroom |
+| `/partner/[id]` | Messages, Tasks, Rewards                                               |
 
 The Guides card shows **only to an account that holds the `guides` feature**
 (see [features-and-admin.md](features-and-admin.md)). The `/home` load reads
@@ -117,6 +118,7 @@ What counts as "something to say" is per widget:
 | Rewards            | a non-zero balance or a claimable row                |
 | Guides             | there is at least one guide                          |
 | Messages (partner) | there is at least one thread                         |
+| Playroom           | an IQ test result has been saved to the account      |
 
 Two of those are deliberately **not** treated as empty states, because they say
 something an absent body does not:
@@ -166,6 +168,7 @@ only what the preview shows:
 | `RewardsWidgetView`         | `getHomeRewardsWidget`, `getPartnershipRewardsWidget` | `server/rewards.ts`   |
 | `GuidesWidgetView`          | `loadGuidesCard`, only with the guides feature        | the `/home` load      |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
+| `IqTestResultView`          | `latestIqTestResult` (one row)                        | `server/iq-test.ts`   |
 
 These deliberately do **not** reuse `getSelfTasksSection`, `getSelfRewardsSection`
 or the `get*Page` loaders. Those also read every completion and every claim ever

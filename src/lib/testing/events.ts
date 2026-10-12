@@ -67,6 +67,12 @@ export type FakeEventOptions = {
 	 * a sign-in form is about. A test of the limit passes one that refuses.
 	 */
 	authRateLimit?: AuthRateLimiter;
+	/**
+	 * The request's cookies, by name, for a route that reads `event.cookies`.
+	 * Absent unless given, and reaching for it then fails loudly; only `get` is
+	 * provided, because nothing under test sets one server-side.
+	 */
+	cookies?: Record<string, string>;
 	/** `event.fetch`, for a route that calls out through it. Absent otherwise. */
 	fetch?: typeof fetch;
 	/**
@@ -166,6 +172,19 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 		},
 		depends: () => undefined
 	};
+	if (options.cookies) {
+		const jar = options.cookies;
+		Object.assign(event, { cookies: { get: (name: string) => jar[name] } });
+	} else {
+		Object.defineProperty(event, 'cookies', {
+			enumerable: true,
+			get(): never {
+				throw new Error(
+					'fakeEvent was given no cookies — pass `cookies` for a route that reads them'
+				);
+			}
+		});
+	}
 	return event as unknown as Event;
 }
 

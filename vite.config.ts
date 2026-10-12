@@ -305,7 +305,8 @@ export default defineConfig(({ command, mode }) => {
 			// Overridable so the Playwright suite can run against localhost: with the
 			// tunnel host baked in, a page served from 127.0.0.1 asks the tunnel for
 			// its modules and never hydrates.
-			origin: process.env.VITE_DEV_ORIGIN
+			origin: process.env.VITE_DEV_ORIGIN,
+			allowedHosts: true
 		}
 	};
 });

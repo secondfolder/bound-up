@@ -4,6 +4,7 @@ import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../..
 import type { FeatureKey, FeatureSource } from '../../../features';
 import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
+import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
 import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
 import { user } from './auth';
 
@@ -1096,3 +1097,54 @@ export const pushSubscriptions = sqliteTable(
 
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type NewPushSubscriptionRow = typeof pushSubscriptions.$inferInsert;
+
+/**
+ * One finished sitting of the Playroom's IQ test, kept for its taker's history.
+ *
+ * Plaintext like tasks and rewards: a score and the settings it was taken
+ * under, which is what the history shows. The score is reported by the
+ * browser, which ran the test; nothing re-marks it, because nothing depends on
+ * it being honest. `seed` is kept for the record, though it no longer deals
+ * a run again on its own: past the first round, which questions came up
+ * depended on the answers, and those are not stored.
+ * See docs/playroom.md.
+ */
+export const iqTestResults = sqliteTable(
+	'iq_test_results',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		ownerId: text('owner_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		role: text('role').$type<Role>().notNull(),
+		/** The slider's level, 0–4: a number, so levels compare. */
+		intensity: integer('intensity').$type<Intensity>().notNull(),
+		/** Null for a clinical run, which has no vibe whatever was picked. */
+		vibe: text('vibe').$type<Vibe>(),
+		iq: integer('iq').notNull(),
+		correct: integer('correct').notNull(),
+		attempted: integer('attempted').notNull(),
+		/** Of those attempted, how many were skipped. The results tease about them. */
+		skipped: integer('skipped').notNull().default(0),
+		/**
+		 * The two settings the results screen depends on, as they were in
+		 * effect: whether it humiliated, and whether it wore the vibe's look.
+		 * The rest only shaped the run itself.
+		 */
+		humiliating: integer('humiliating', { mode: 'boolean' }).notNull().default(true),
+		themedLook: integer('themed_look', { mode: 'boolean' }).notNull().default(true),
+		soberIq: integer('sober_iq'),
+		targetIq: integer('target_iq'),
+		seed: integer('seed').notNull(),
+		...timestamps
+	},
+	(table) => [
+		// The history list and the /home card: "this user's, newest first".
+		index('iq_test_results_owner_created_idx').on(table.ownerId, table.createdAt)
+	]
+);
+
+export type IqTestResult = typeof iqTestResults.$inferSelect;
+export type NewIqTestResult = typeof iqTestResults.$inferInsert;

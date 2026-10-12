@@ -37,6 +37,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
 | `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
 | `src/lib/roadmap/`            | The public roadmap's JSON and its validating loader. Alias-free. See [docs/roadmap.md](docs/roadmap.md) |
+| `src/lib/playroom/`           | The Playroom's tool registry and the IQ test's engine: questions, rigging, copy. See [docs/playroom.md](docs/playroom.md) |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
@@ -46,6 +47,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/service-worker.ts`       | Shows push notifications, and nothing else: no `fetch` handler, no cache. See [docs/notifications.md](docs/notifications.md) |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
 | `src/routes/(public)/`        | Anonymous-reachable routes. No header: each page links onwards itself                        |
+| `src/routes/(standalone)/`    | Public pages that should not look like Bound Up at all (the Playroom's tools). No shell      |
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
 | `.../(auth-required)/(app)/`  | The signed-in app shell: fixed-viewport layout plus the `AppNav` bottom bar                  |
 | `drizzle/`                    | Generated migrations + snapshots. **Committed.** Never hand-edit                             |
@@ -556,10 +558,14 @@ promote its save/submit button to a solid brand style (appearance = accent). On 
 key that off the form's tainted and valid state rather than hand-rolled comparisons so
 the button follows the same definition of "unsaved changes" as the form logic.
 
-**Two shells, one per group.** `(public)` renders a centred 800px column with
+**Three shells, one per group.** `(public)` renders a centred 800px column with
 no header — each of its pages links onwards from its own content;
 `(auth-required)/(app)` renders a `100svh` flex column whose `<main>` scrolls
-and whose `AppNav` bottom bar does not. The root `+layout.svelte` deliberately
+and whose `AppNav` bottom bar does not; `(standalone)` renders nothing but
+switches the page texture off, for public tools that should not look like the
+app. `theme.css` still loads there, so such a page re-themes a wrapper of its
+own — and must not give it the `wa-dark` class, which `theme.css` repaints in
+the app's colours (see [docs/playroom.md](docs/playroom.md#undoing-the-apps-theme)). The root `+layout.svelte` deliberately
 renders neither — a top nav stacked on the bottom nav defeated the point of
 it. Each shell sets the
 `body` rules it needs through `<svelte:head>`, so they are added and removed
@@ -570,7 +576,8 @@ does not bounce a session holder any more: its centred CTA says "Sign up"
 (with a "Log in" link under it) when logged out and "Open" → `/home` when
 logged in. Every post-auth redirect still points at `/home`. The guides live
 under it (`/home/guides`, `/home/guides/[id]`), behind the auth guard — the
-public surface is `/`, `/login`, `/signup` and `/roadmap`.
+public surface is `/`, `/login`, `/signup`, `/roadmap` and the Playroom's
+standalone tools (`/playroom/iq-test`). `/playroom` itself is signed-in.
 
 **Active nav state compares `page.route.id`, never a pathname.** During SSR
 `resolve()` returns a path relative to the page being rendered (`./home` on
@@ -757,7 +764,9 @@ Notes that cost a debugging round each:
   fixture wraps `browser` so every page — including contexts the specs create
   by hand — fails the run on browser-engine diagnostics: console warnings and
   errors (minus Chromium's "Failed to load resource" network log, which specs
-  intentionally provoke, plus Lit's own dev-mode banner under `vite dev`, plus
+  intentionally provoke, plus Lit's own dev-mode banner under `vite dev`, plus `wa-slider`'s own Lit
+  "scheduled an update after an update completed" dev warning, which a bare
+  slider logs on its first render, plus
   Chromium's WebGL "GPU stall due to ReadPixels" warning from the landing
   page's effects) and
   uncaught `pageerror`s. This is the only net for problems no assertion can
@@ -879,6 +888,7 @@ Four places, split on scope:
 | [docs/notifications.md](docs/notifications.md)                                           | Web Push: iOS rules, what a notification may say, devices, the Free plan fit |
 | [docs/request-failures.md](docs/request-failures.md)                                     | Feedback for failed requests: inline vs the app-wide notice, the safety net  |
 | [docs/versions-and-updates.md](docs/versions-and-updates.md)                             | The build's version from git history, and how an open app picks up a deploy  |
+| [docs/playroom.md](docs/playroom.md)                                                     | The Playroom, the standalone shell, and the IQ test: rigging, questions, media |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

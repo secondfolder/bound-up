@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FeatureKey } from '$lib/features';
 import type { Db } from '$lib/server/db';
-import { guides } from '$lib/server/db/schema';
+import { guides, iqTestResults } from '$lib/server/db/schema';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
@@ -159,7 +159,29 @@ describe('load', () => {
 				claimable: [],
 				claimableCount: 0,
 				activeCount: 0
-			}
+			},
+			latestIq: null
 		});
+	});
+
+	it("gives the Playroom card the user's newest IQ result, and only theirs", async () => {
+		expect((await runLoad(load(at(ada)))).latestIq).toBeNull();
+
+		const result = {
+			role: 'sub' as const,
+			intensity: 0 as const,
+			vibe: null,
+			correct: 4,
+			attempted: 12,
+			soberIq: null,
+			targetIq: null,
+			seed: 1
+		};
+		await db.insert(iqTestResults).values([
+			{ ...result, ownerId: ada.id, iq: 90, createdAt: new Date('2026-10-01T10:00:00Z') },
+			{ ...result, ownerId: ada.id, iq: 70, createdAt: new Date('2026-10-02T10:00:00Z') },
+			{ ...result, ownerId: jun.id, iq: 130, createdAt: new Date('2026-10-03T10:00:00Z') }
+		]);
+		expect((await runLoad(load(at(ada)))).latestIq?.iq).toBe(70);
 	});
 });

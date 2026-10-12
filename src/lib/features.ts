@@ -22,6 +22,11 @@ export const FEATURES = {
 		name: 'Higher quality uploads',
 		description:
 			'Send photos and videos at high or original quality, rather than always compressed to low.'
+	},
+	iqTestAnswerButton: {
+		name: 'IQ test answer button',
+		description:
+			'A "Correct answer" button in the Playroom IQ test that answers each question correctly, for testing.'
 	}
 } as const satisfies Record<string, { name: string; description: string }>;
 

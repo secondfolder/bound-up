@@ -46,6 +46,11 @@ describe('load', () => {
 				key: 'highQualityMedia',
 				name: 'Higher quality uploads',
 				held: null
+			}),
+			expect.objectContaining({
+				key: 'iqTestAnswerButton',
+				name: 'IQ test answer button',
+				held: null
 			})
 		]);
 		expect(data.isSelf).toBe(false);

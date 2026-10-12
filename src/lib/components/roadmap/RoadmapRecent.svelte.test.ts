@@ -18,6 +18,8 @@ describe('RoadmapRecent', () => {
 			const link = screen.getByRole('link', { name: new RegExp(`${item.title}$`) });
 			expect(link).toHaveAttribute('href', `/(public)/roadmap#${item.id}`);
 		}
-		expect(screen.getAllByText('September 2026').length).toBeGreaterThan(0);
+		// Any month: naming one here failed the first time something shipped in
+		// the next month.
+		expect(screen.getAllByText(/^[A-Z][a-z]+ \d{4}$/).length).toBeGreaterThan(0);
 	});
 });

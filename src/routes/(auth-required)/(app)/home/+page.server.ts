@@ -1,10 +1,11 @@
 import { hasFeature } from '$lib/features';
 import type { Db } from '$lib/server/db';
 import { guides } from '$lib/server/db/schema';
+import { latestIqTestResult } from '$lib/server/iq-test';
 import { listUnreadCounts } from '$lib/server/messaging';
 import { getHomeRewardsWidget } from '$lib/server/rewards';
 import { getHomeTasksWidget } from '$lib/server/tasks';
-import type { GuidesWidgetView } from '$lib/types';
+import type { GuidesWidgetView, IqTestResultView } from '$lib/types';
 import type { PageServerLoad } from './$types';
 
 /** Rows the guides card previews before it falls back to "and N more". */
@@ -22,7 +23,8 @@ function emptyPage() {
 			claimable: [],
 			claimableCount: 0,
 			activeCount: 0
-		}
+		},
+		latestIq: null as IqTestResultView | null
 	};
 }
 
@@ -45,7 +47,7 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	depends('tasks:home');
 	depends('rewards:home');
 
-	const [unread, guidesCard, tasks, rewards] = await Promise.all([
+	const [unread, guidesCard, tasks, rewards, latestIq] = await Promise.all([
 		listUnreadCounts(locals.db, locals.user.id, partners),
 		// Only for an account that holds guides: D1 charges for rows read by a
 		// card nobody sees. This decides what is shown, which is all the layout's
@@ -54,14 +56,17 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 		// Both take the layout's partner list: the cards mirror /home/tasks and
 		// /home/rewards, which show your own things AND each partner's.
 		getHomeTasksWidget(locals.db, locals.user.id, partners),
-		getHomeRewardsWidget(locals.db, locals.user.id, partners)
+		getHomeRewardsWidget(locals.db, locals.user.id, partners),
+		// One row, for the Playroom card's "Last IQ test" line.
+		latestIqTestResult(locals.db, locals.user.id)
 	]);
 
 	return {
 		unread,
 		guides: guidesCard,
 		tasks,
-		rewards
+		rewards,
+		latestIq
 	};
 };
 

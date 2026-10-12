@@ -24,7 +24,7 @@ import { type Browser, test as base, type Page } from '@playwright/test';
  * last test has been checked (a context closed lazily, a late `pageerror`) is
  * still reported, at worker teardown, rather than silently dropped.
  *
- * Two deliberate exclusions:
+ * Deliberate exclusions:
  *
  * - "Failed to load resource" is Chromium's network log, not script output.
  *   Several specs intentionally provoke 401/404 responses, and those belong to
@@ -32,6 +32,12 @@ import { type Browser, test as base, type Page } from '@playwright/test';
  * - Lit logs a dev-mode banner under `vite dev`, which is the server Playwright
  *   runs against. That is environment noise rather than an app regression, so
  *   the watcher ignores it instead of making every e2e run fail by design.
+ * - Lit's dev build warns that `wa-slider` "scheduled an update after an
+ *   update completed". Web Awesome's slider does that to itself on its first
+ *   render — a bare `<wa-slider>` with no properties set triggers it, measured
+ *   in isolation — so no code here can avoid it, and the production build
+ *   (what the image run tests) does not log it. Only that element's message
+ *   is ignored: the same warning from any other element is still a failure.
  * - Chromium logs a WebGL performance warning when the landing page's halftone
  *   overlay reads back its canvas. That readback is deliberate — the overlay's
  *   own e2e assertion depends on it — and the warning is browser noise rather
@@ -48,6 +54,7 @@ import { type Browser, test as base, type Page } from '@playwright/test';
 const IGNORED = [
 	/^Failed to load resource/,
 	/^Lit is in dev mode\. Not recommended for production!/,
+	/^Element wa-slider scheduled an update \(generally because a property was set\) after an update completed/,
 	/^\[\.WebGL-[^\]]+\]GL Driver Message \(OpenGL, Performance, GL_CLOSE_PATH_NV, High\): GPU stall due to ReadPixels/
 ];
 const FAILING_CONSOLE_TYPES = new Set(['warning', 'error']);
