@@ -13,23 +13,30 @@ import type { Vibe } from './settings';
  * which is what is read here. Measured, not documented, so it is checked
  * field by field and anything that does not fit is dropped.
  *
- * **The file is derived where it can be.** A search result carries no
- * `videoUrl`, only its HLS master playlist. For a video uploaded since the
- * site's rebuild, that sits beside the MP4 at `videos/<file>.mp4/master.m3u8`,
- * and taking the playlist's name off gives the MP4. An older one keeps its
- * playlist in a folder named for its old id, which says nothing about the
- * file's name; for those `mediaUrl` is empty, and the server reads the file
- * from the video's own page when one is picked (`parseVideoPage`).
+ * **The file is read from the video's own page, always.** A search result
+ * carries no `videoUrl`, only its HLS master playlist. For a video uploaded
+ * since the site's rebuild that playlist sits in a folder named like an MP4
+ * (`videos/<name>.mp4/master.m3u8`), and taking the playlist's name off once
+ * looked like it gave the file. It does not, reliably: the folder keeps the
+ * name the video was *uploaded* under, and a renamed or re-encoded video's
+ * file is called something else. Measured on 2026-10-13, 4 of 29 such guesses
+ * were 403s. An older video's playlist is in an old id's folder, which says
+ * nothing about the file at all. So `mediaUrl` is empty from a search, and
+ * the server reads the file off the video's page when one is picked
+ * (`parseVideoPage`), once per video and cached (see `playroom-pmv.ts`).
  *
- * Either way the bucket serves the MP4 with range requests and no referrer
- * check, but with no CORS header: the page cannot route it through Web Audio,
- * and HLS (which needs `fetch`) is out for the same reason.
+ * **Not HLS either.** The bucket sends no CORS header on its playlists or
+ * segments, and an HLS player in JavaScript (hls.js, video.js) fetches both,
+ * so it would be refused everywhere but Safari, which plays the MP4 anyway.
+ *
+ * The bucket serves the MP4 with range requests and no referrer check, but,
+ * as with HLS, no CORS header: the page cannot route it through Web Audio.
  */
 
 const ORIGIN = 'https://pmvhaven.com';
 const BUCKET = 'https://pmvhavencloud.s3.eu-west-par.io.cloud.ovh.net/';
-/** A master playlist beside its MP4, from which the MP4 can be read off. */
-const MASTER_BESIDE_FILE =
+/** A master playlist in a folder named for the upload, which is not always the file's name. */
+const MASTER_IN_UPLOAD_FOLDER =
 	/^https:\/\/pmvhavencloud\.s3\.eu-west-par\.io\.cloud\.ovh\.net\/videos\/[^/?#]+\.mp4\/master\.m3u8$/;
 /** A master playlist in an old id's folder: the video is real, its file name unknown. */
 const MASTER_IN_FOLDER =
@@ -134,9 +141,11 @@ export function parseSearchPage(html: string): HypnoFile[] {
 		const id = read.string(raw._id);
 		const master = read.string(raw.hlsMasterPlaylistUrl);
 		const title = read.string(raw.title);
-		const beside = master !== null && MASTER_BESIDE_FILE.test(master);
-		const inFolder = master !== null && MASTER_IN_FOLDER.test(master);
-		if (!(id && ID.test(id) && (beside || inFolder) && title) || seen.has(id)) {
+		// The playlist is only a check that the video is hosted on the bucket:
+		// its path does not name the file (see the header).
+		const hosted =
+			master !== null && (MASTER_IN_UPLOAD_FOLDER.test(master) || MASTER_IN_FOLDER.test(master));
+		if (!(id && ID.test(id) && hosted && title) || seen.has(id)) {
 			continue;
 		}
 		seen.add(id);
@@ -152,8 +161,8 @@ export function parseSearchPage(html: string): HypnoFile[] {
 			triggers: read.strings(raw.tags).slice(0, 12),
 			description: (read.string(raw.description) ?? '').trim().slice(0, DESCRIPTION_LIMIT),
 			warnings: read.flag(raw.seizureWarning) ? ['Flashing images'] : [],
-			// Empty when it has to be read from the video's own page.
-			mediaUrl: beside && master ? master.slice(0, -'/master.m3u8'.length) : '',
+			// Read from the video's own page when it is picked.
+			mediaUrl: '',
 			plays: read.number(raw.views) ?? 0
 		});
 	}

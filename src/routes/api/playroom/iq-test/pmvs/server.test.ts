@@ -42,6 +42,33 @@ describe('GET /api/playroom/iq-test/pmvs', () => {
 		expect(response.headers.get('cache-control')).toBe('no-store');
 	});
 
+	it("plays the page's file, not one guessed from a playlist folder named like an MP4", async () => {
+		// As measured: the folder keeps the name the video was uploaded under, and
+		// nothing is at that path; the page names the real file.
+		const uploaded = `${BUCKET}/videos/Gooner_Anthem_upscaled.mp4`;
+		const renamed = `${BUCKET}/videos/Someone_-_Gooner_Anthem_zucea9lb.mp4`;
+		const search = `<script id="__NUXT_DATA__">${JSON.stringify([
+			{ _id: 1, title: 2, hlsMasterPlaylistUrl: 3 },
+			id(2),
+			'Gooner Anthem',
+			`${uploaded}/master.m3u8`
+		])}</script>`;
+		const video = `<script id="__NUXT_DATA__">${JSON.stringify([{ _id: 1, videoUrl: 2 }, id(2), renamed])}</script>`;
+		const fetchFn = vi.fn(
+			async (input: RequestInfo | URL) =>
+				new Response(String(input).includes('/video/') ? video : search)
+		);
+		const response = await GET(
+			fakeEvent({
+				user: null,
+				path: '/api/playroom/iq-test/pmvs?vibe=gooner&random=1',
+				fetch: fetchFn
+			})
+		);
+		const body = (await response.json()) as { files: { mediaUrl: string }[] };
+		expect(body.files).toEqual([expect.objectContaining({ mediaUrl: renamed })]);
+	});
+
 	it('refuses an unknown vibe, so it cannot be pointed at anything else', async () => {
 		const fetchFn = pmvhaven();
 		const outcome = await runAndCatch(() =>

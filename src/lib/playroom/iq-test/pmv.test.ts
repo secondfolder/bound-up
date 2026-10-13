@@ -46,7 +46,10 @@ const video = (n: number, overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('parseSearchPage', () => {
-	it('reads each result, deriving the MP4 from a playlist beside it', () => {
+	// Even beside a playlist named `<x>.mp4/`, the file is left to be looked up:
+	// the folder keeps the upload's original name, which is not always the
+	// file's (see the header of pmv.ts).
+	it('reads each result, leaving its file to be looked up', () => {
 		const [file] = parseSearchPage(page([video(1, { hasVoiceOver: true, seizureWarning: true })]));
 		expect(file).toEqual({
 			source: 'pmvhaven',
@@ -59,7 +62,7 @@ describe('parseSearchPage', () => {
 			triggers: ['goon', 'hypno'],
 			description: '',
 			warnings: ['Flashing images'],
-			mediaUrl: `${BUCKET}/videos/someone_-_Video_1.mp4`,
+			mediaUrl: '',
 			plays: 10
 		});
 	});

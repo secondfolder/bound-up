@@ -770,12 +770,16 @@ fast cuts, music, often a voice-over. Read off the site and measured on
   Bambi and bimbo hypno for bambi, sissy hypno led by DeepSlutPuppy for
   feminisation, chastity and tease-and-denial for denial, and so on. Each
   gave a page of on-theme results.
-- **The file.** A result has no file URL, only its HLS playlist. For a video
-  uploaded since the site's rebuild the playlist sits beside the MP4, which
-  is read off it. An older one's playlist is in an old id's folder, so its
-  file is read from the video's own page (allowed too) when it is picked —
-  once per video per isolate, and only for a video already in the index, so
-  nothing a visitor sends picks a page to fetch.
+- **The file.** A result has no file URL, only its HLS playlist, so the file
+  is read from the video's own page (allowed too) when it is picked: once per
+  video per isolate, kept a month by the relay, and only for a video already
+  in the index, so nothing a visitor sends picks a page to fetch. A newer
+  video's playlist sits in a folder named like an MP4, but that is the name it
+  was uploaded under, not always its file's: guessing the file from it gave a
+  403 for 4 of 29 videos measured on 2026-10-13, so it is not guessed.
+- **Not HLS.** The playlists and segments send no CORS header either, and a
+  JavaScript HLS player (hls.js, video.js) has to fetch them, so it would be
+  refused everywhere but Safari, which plays the MP4 anyway.
 - **No CORS.** The bucket serves MP4s with range requests and no referrer
   check, but no CORS header. So a video plays in a plain element without
   `crossorigin` (asking for CORS would refuse it), outside Web Audio, and its
