@@ -71,7 +71,7 @@ describe('SetupDialog', () => {
 	it('is open as soon as it renders, with the disclaimer', async () => {
 		const { container } = await renderDialog();
 		expect(waProp(container.querySelector('wa-dialog'), 'open')).toBe(true);
-		expect(container).toHaveTextContent('kink toy for consenting adults');
+		expect(container).toHaveTextContent('agreed to play');
 	});
 
 	it('is the window’s full height whatever it holds, so the slider never moves', async () => {

@@ -92,7 +92,7 @@
 	attribute, which Lit reads as true.
 -->
 <wa-dialog
-	label="Before you start"
+	label="Disclaimer: This is a kink toy for consenting adults"
 	{open}
 	class="setup"
 	class:closable
@@ -101,11 +101,6 @@
 	onwa-after-hide={afterHide}
 >
 	<div class="disclaimer">
-		<p>
-			<strong>This is a kink toy for consenting adults.</strong> It is not a real IQ test and its
-			scores mean nothing. It is built to humiliate the people who want humiliating, and to flatter the
-			people doing the humiliating — on purpose.
-		</p>
 		<p>
 			Don't take it seriously, and don't use it on anyone who hasn't agreed to play. If you're under
 			18, close this page.

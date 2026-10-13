@@ -45,7 +45,7 @@ function dialog(page: Page) {
 /** Start as a sub from the setup dialog, skip enough for a score, and finish. */
 async function takeTest(page: Page) {
 	await waitForHydration(page);
-	await expect(dialog(page)).toContainText('kink toy for consenting adults');
+	await expect(dialog(page)).toContainText('agreed to play');
 	await dialog(page).getByRole('button', { name: SUB }).click();
 
 	for (let i = 1; i <= MIN_FOR_SCORE; i += 1) {
@@ -530,7 +530,7 @@ test.describe('IQ test', () => {
 	}) => {
 		await page.goto('/playroom/iq-test');
 		await waitForHydration(page);
-		await expect(dialog(page)).toContainText('kink toy for consenting adults');
+		await expect(dialog(page)).toContainText('agreed to play');
 		// No role chosen yet on this device, so there is no closing it without one.
 		await expect(dialog(page).locator('[part~="close-button"]')).toBeHidden();
 		await page.keyboard.press('Escape');
@@ -541,7 +541,7 @@ test.describe('IQ test', () => {
 		// A reload in the same session goes straight to the page, from the
 		// server's first render on — not a dialog that flashes up and closes.
 		const html = await (await page.request.get('/playroom/iq-test')).text();
-		expect(html).not.toContain('kink toy for consenting adults');
+		expect(html).not.toContain('agreed to play');
 		await page.reload();
 		await waitForHydration(page);
 		await expect(dialog(page)).toHaveCount(0);
@@ -549,7 +549,7 @@ test.describe('IQ test', () => {
 
 		// With a role chosen once, the dialog can be closed without one.
 		await page.getByRole('button', { name: 'Start over', exact: true }).click();
-		await expect(dialog(page)).toContainText('kink toy for consenting adults');
+		await expect(dialog(page)).toContainText('agreed to play');
 		await page.keyboard.press('Escape');
 		await expect(dialog(page)).toHaveCount(0);
 		await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
@@ -562,7 +562,7 @@ test.describe('IQ test', () => {
 		try {
 			const again = await fresh.newPage();
 			await again.goto('/playroom/iq-test');
-			await expect(dialog(again)).toContainText('kink toy for consenting adults');
+			await expect(dialog(again)).toContainText('agreed to play');
 		} finally {
 			await fresh.close();
 		}
@@ -1086,7 +1086,7 @@ test.describe('IQ test', () => {
 		await expect(page.getByText('Question 2 of 36')).toBeVisible();
 
 		await page.getByRole('button', { name: 'Start over', exact: true }).click();
-		await expect(dialog(page)).toContainText('kink toy for consenting adults');
+		await expect(dialog(page)).toContainText('agreed to play');
 		// A fresh run, not the one that was left.
 		await dialog(page).getByRole('button', { name: SUB }).click();
 		await expect(page.getByText('Question 1 of 36')).toBeVisible();
@@ -1244,6 +1244,6 @@ test.describe('IQ test', () => {
 
 		await page.getByRole('link', { name: /Bimbo IQ test/ }).click();
 		await page.waitForURL('**/playroom/iq-test');
-		await expect(dialog(page)).toContainText('kink toy for consenting adults');
+		await expect(dialog(page)).toContainText('agreed to play');
 	});
 });
