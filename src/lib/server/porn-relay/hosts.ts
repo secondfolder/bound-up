@@ -9,6 +9,13 @@
  */
 export const RELAYED_HOSTS: readonly string[] = ['pmvhaven.com'];
 
+/**
+ * How long, in seconds, the relay may keep a successful response. Set by the
+ * caller, because only the caller knows how fast its pages change; a request
+ * without it is never cached.
+ */
+export const MAX_AGE_HEADER = 'x-relay-max-age';
+
 /** An https URL on one of `RELAYED_HOSTS`, with no credentials or port. */
 export function isRelayable(target: string): boolean {
 	let url: URL;

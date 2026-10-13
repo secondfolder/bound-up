@@ -7,8 +7,18 @@ import {
 	pmvSearchUrl
 } from '$lib/playroom/iq-test/pmv';
 import type { Vibe } from '$lib/playroom/iq-test/settings';
+import { MAX_AGE_HEADER } from '$lib/server/porn-relay/hosts';
 
 const USER_AGENT = 'BoundUp/1.0 (playroom hypno)';
+
+/**
+ * How long the relay, on Workers, may keep a page for every isolate (see
+ * `$lib/server/porn-relay`). A search page as long as an index lives; a video
+ * page for a month, since its file does not change once uploaded. Ignored
+ * where there is no relay.
+ */
+const SEARCH_MAX_AGE_S = 6 * 60 * 60;
+const VIDEO_MAX_AGE_S = 30 * 24 * 60 * 60;
 
 /** How long a vibe's index is served before PMVHaven is asked again. */
 export const PMV_TTL_MS = 6 * 60 * 60 * 1000;
@@ -75,10 +85,21 @@ async function buildIndex(vibe: Vibe, fetchFn: typeof fetch): Promise<HypnoFile[
 async function fetchSearch(fetchFn: typeof fetch, query: string): Promise<HypnoFile[]> {
 	try {
 		const response = await fetchFn(pmvSearchUrl(query), {
-			headers: { 'user-agent': USER_AGENT, accept: 'text/html' }
+			headers: {
+				'user-agent': USER_AGENT,
+				accept: 'text/html',
+				[MAX_AGE_HEADER]: String(SEARCH_MAX_AGE_S)
+			}
 		});
-		return response.ok ? parseSearchPage(await response.text()) : [];
-	} catch {
+		if (!response.ok) {
+			// Logged: an empty index looks exactly like a quiet PMVHaven otherwise,
+			// which is how a 451 for every visitor in Australia went unnoticed.
+			console.error(`PMVHaven search "${query}" answered ${response.status}`);
+			return [];
+		}
+		return parseSearchPage(await response.text());
+	} catch (error) {
+		console.error(`PMVHaven search "${query}" failed`, error);
 		return [];
 	}
 }
@@ -102,7 +123,11 @@ export async function withMedia(file: HypnoFile, fetchFn: typeof fetch): Promise
 	}
 	try {
 		const response = await fetchFn(pmvPageUrl(file.uuid), {
-			headers: { 'user-agent': USER_AGENT, accept: 'text/html' }
+			headers: {
+				'user-agent': USER_AGENT,
+				accept: 'text/html',
+				[MAX_AGE_HEADER]: String(VIDEO_MAX_AGE_S)
+			}
 		});
 		const url = response.ok ? parseVideoPage(await response.text(), file.uuid) : null;
 		if (!url) {

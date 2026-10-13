@@ -801,23 +801,37 @@ searches it or picks at random, in the same shape as `/hypnos`; its
 #### The porn relay
 
 [`porn-relay/`](../src/lib/server/porn-relay/) is a Durable Object,
-`PornRelay`, made once in Western Europe (`locationHint: 'weur'`). A Durable
-Object runs where it was made, and its subrequests leave from there, so a page
-fetched through it is fetched from Europe whoever asked. `relayedFetch()`
-returns a `fetch` that sends URLs on a relayed host through it and anything
-else straight out; the PMVHaven endpoints pass it to `pmvIndex` and
-`withMedia` in place of the request's own.
+`PornRelay`. A Durable Object runs where it was first made, and its
+subrequests leave from there, so a page fetched through it is fetched from
+there whoever asked. `relayedFetch()` returns a `fetch` that sends URLs on a
+relayed host through it and anything else straight out; the PMVHaven
+endpoints pass it to `pmvIndex` and `withMedia` in place of the request's own.
 
+- **Several regions, tried in turn.** A location hint names a region, not a
+  country. Measured on 2026-10-13, the first `weur` object landed in France,
+  which PMVHaven refuses too, while fresh objects in every other region but
+  `oc` (Australia) and `afr` (also France) got through. So `RELAY_LOCATIONS`
+  is a list, one object per region named after it, and a `451` moves on to the
+  next. An isolate remembers the one that answered, so it pays for a refusal
+  at most once.
+- **A cache every isolate shares.** The object keeps each `200` it fetched in
+  its own SQLite storage for as long as the caller's `x-relay-max-age` says:
+  six hours for a search page (an index's lifetime), a month for a video page,
+  whose file never changes. Without the header nothing is kept, and a failure
+  never is. Each isolate still keeps its own index in front of it, so the
+  relay is asked only when an isolate is cold; the cache is what makes a cold
+  isolate cheap. Expired rows are swept on every write.
 - **Only for sites that need it.** `RELAYED_HOSTS` in `hosts.ts` lists them,
   by exact hostname (only `pmvhaven.com` today). Every relayed request is a
-  billed Durable Object request and a trip to Europe, so a site that serves
+  billed Durable Object request and a trip abroad, so a site that serves
   everyone stays off the list.
 - **Not an open proxy.** The object passes on only a GET to an https URL on a
   listed host, with only `user-agent` and `accept`, and follows no redirects.
   Anything else is a 403 and no request. The callers build every URL from
   fixed searches and ids already in their index, so this is the second fence.
-- **The status comes back whole**, so a refusal still reads as one, and the
-  index keeps its last good copy rather than caching it.
+- **A refusal is logged.** `playroom-pmv.ts` logs a search that fails, status
+  included: an empty index otherwise looks exactly like a quiet PMVHaven,
+  which is how the 451 went unnoticed.
 - **Workers only.** `vite dev` and the self-hosted build fetch directly from
   wherever they run, so a server in Australia is refused there too.
 
