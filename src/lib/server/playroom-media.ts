@@ -112,16 +112,15 @@ async function fetchSource(
 			}
 			return response.ok ? parseFeed(await response.text()) : null;
 		}
-		const token = await tokenFor(fetchFn, now);
-		if (token === null) {
-			return null;
+		let response = await searchRedgifs(source.tag, fetchFn, now);
+		if (response?.status === 401) {
+			// Expired, revoked, or fetched from another address: a token is bound
+			// to the address that asked for it ("WrongSender"), and the tunnel
+			// fallback changes that address mid-isolate. Asked again at once, on
+			// the route the host is now on, so this request is not wasted.
+			response = await searchRedgifs(source.tag, fetchFn, now);
 		}
-		const response = await fetchFn(redgifsSearchUrl(source.tag), {
-			headers: { 'user-agent': USER_AGENT, authorization: `Bearer ${token}` }
-		});
-		if (response.status === 401) {
-			// Expired early or revoked: the next request asks for a new one.
-			redgifsToken = null;
+		if (response === null || response.status === 401) {
 			return null;
 		}
 		if (!checkRateLimit('redgifs', response, now)) {
@@ -145,6 +144,29 @@ function checkRateLimit(host: Host, response: Response, now: number): boolean {
 		now + (Number.isFinite(reset) && reset > 0 ? reset * 1000 : RATE_LIMIT_FALLBACK_MS)
 	);
 	return false;
+}
+
+/**
+ * One Redgifs search with the shared token, null without one. A 401 drops
+ * the token it used, unless another search has already replaced it, so the
+ * next call asks for a new one rather than every parallel search doing so.
+ */
+async function searchRedgifs(
+	tag: string,
+	fetchFn: typeof fetch,
+	now: number
+): Promise<Response | null> {
+	const token = await tokenFor(fetchFn, now);
+	if (token === null) {
+		return null;
+	}
+	const response = await fetchFn(redgifsSearchUrl(tag), {
+		headers: { 'user-agent': USER_AGENT, authorization: `Bearer ${token}` }
+	});
+	if (response.status === 401 && redgifsToken?.value === token) {
+		redgifsToken = null;
+	}
+	return response;
 }
 
 let tokenRequest: Promise<string | null> | null = null;

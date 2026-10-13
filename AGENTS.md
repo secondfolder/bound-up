@@ -318,8 +318,9 @@ site it applies to; go read that comment before deciding to break one.
       new or renamed class still has to reach production before it can be
       relied on anywhere.
     - **The `previews` block in `wrangler.jsonc` inherits nothing.** Every
-      binding has to be repeated in it (`DB`, `MEDIA`, `REALTIME` and
-      `PORN_RELAY`, each pointing at preview resources), and secrets live on the Preview base
+      binding has to be repeated in it (`DB`, `MEDIA`, `REALTIME`,
+      `PORN_RELAY` and the `TUNNEL_*` VPC services, each pointing at preview
+      resources where it has any), and secrets live on the Preview base
       config instead (`npm run secrets -- remote-preview`). A binding
       added at the top level and not there is simply absent in previews. See
       docs/development.md.

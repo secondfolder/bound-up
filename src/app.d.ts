@@ -6,6 +6,7 @@ import type { Auth, Session, User } from '$lib/server/auth';
 import type { Db } from '$lib/server/db';
 import type { MediaBucket } from '$lib/server/media';
 import type { PornRelayNamespace } from '$lib/server/porn-relay/binding';
+import type { TunnelService } from '$lib/server/porn-relay/tunnel';
 import type { AuthRateLimiter } from '$lib/server/rate-limit';
 import type { RealtimeNamespace } from '$lib/server/realtime/binding';
 
@@ -78,6 +79,14 @@ declare global {
 				 * country from Europe instead. See `$lib/server/porn-relay`.
 				 */
 				PORN_RELAY: PornRelayNamespace;
+				/**
+				 * Workers VPC services through the tunnel to darcy, one per host,
+				 * for when a host refuses every Cloudflare address. Optional: without
+				 * one, that host simply has no fallback. See
+				 * `$lib/server/porn-relay/tunnel`.
+				 */
+				TUNNEL_REDGIFS?: TunnelService;
+				TUNNEL_PMVHAVEN?: TunnelService;
 				/**
 				 * Web Push. All three or none: without them push is off rather
 				 * than an error. See `$lib/server/push` and docs/notifications.md.

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { hasMedia, isVibe } from '$lib/playroom/iq-test/media';
 import { mediaFor } from '$lib/server/playroom-media';
+import { withTunnelFallback } from '$lib/server/porn-relay/tunnel';
 import type { RequestHandler } from './$types';
 
 /**
@@ -16,12 +17,14 @@ import type { RequestHandler } from './$types';
  * only the lookups come through here — Redgifs' search needs a token, and
  * reddit's feeds send no CORS headers.
  */
-export const GET: RequestHandler = async ({ url, fetch }) => {
+export const GET: RequestHandler = async ({ url, fetch, platform }) => {
 	const vibe = url.searchParams.get('vibe');
 	if (!isVibe(vibe)) {
 		return json({ error: 'unknown vibe' }, { status: 400 });
 	}
-	const feed = await mediaFor(vibe, fetch);
+	// Redgifs rate-limits the address every Worker shares, so on Workers a
+	// refusal is retried through the tunnel (see porn-relay/tunnel.ts).
+	const feed = await mediaFor(vibe, withTunnelFallback(platform, fetch));
 	return json(feed, {
 		// Public data, the same for everyone: let the browser and any shared
 		// cache hold it as long as the server-side cache would. An empty feed is

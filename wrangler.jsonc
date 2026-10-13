@@ -139,6 +139,15 @@
 	// a billing decision rather than a technical one. It is also permanent:
 	// storage backends are immutable once provisioned, so changing it later means
 	// deleting the namespace.
+	// Workers VPC services: the tunnel to darcy, a machine of our own, one
+	// service per host. The fallback for a host that refuses every Cloudflare
+	// address — Redgifs rate-limits the one address every Worker reaches it
+	// from. Made with `npx wrangler vpc service create`; see
+	// src/lib/server/porn-relay/tunnel.ts.
+	"vpc_services": [
+		{ "binding": "TUNNEL_REDGIFS", "service_id": "01a134a3-cd88-75b2-885d-9d17d2cae67b" },
+		{ "binding": "TUNNEL_PMVHAVEN", "service_id": "01a134b5-3426-7b81-9183-d70cbc370bc3" }
+	],
 	"exports": {
 		"RealtimeRoom": {
 			"type": "durable-object",
@@ -209,7 +218,13 @@
 					"class_name": "PornRelay"
 				}
 			]
-		}
+		},
+		// The same services as the top level: they are only a way out, with no
+		// data of their own to keep apart.
+		"vpc_services": [
+			{ "binding": "TUNNEL_REDGIFS", "service_id": "01a134a3-cd88-75b2-885d-9d17d2cae67b" },
+			{ "binding": "TUNNEL_PMVHAVEN", "service_id": "01a134b5-3426-7b81-9183-d70cbc370bc3" }
+		]
 		// No `triggers`: Cron Triggers only ever run against production, so the
 		// media sweep never runs for a preview. Expiry is still exact, because
 		// every read checks `expires_at`; the lifecycle rule bounds storage.

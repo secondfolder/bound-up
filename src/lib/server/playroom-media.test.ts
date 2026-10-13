@@ -162,6 +162,23 @@ describe('mediaFor', () => {
 		expect(urls(fetchFn)).toContain(REDGIFS_TOKEN_URL);
 	});
 
+	it('asks for a new token at once when a search refuses the one it had', async () => {
+		// As when the tunnel takes over mid-isolate: a token is bound to the
+		// address that fetched it, so the first search after the switch is a 401.
+		let refusals = 1;
+		const fetchFn = fakeFetch({
+			redgifs: () => {
+				if (refusals > 0) {
+					refusals -= 1;
+					return new Response('', { status: 401 });
+				}
+				return Response.json({ gifs: [] });
+			}
+		});
+		await mediaFor('gooner', asFetch(fetchFn), 0);
+		expect(urls(fetchFn).filter((url) => url === REDGIFS_TOKEN_URL)).toHaveLength(2);
+	});
+
 	it('answers an empty feed, never an error, when nothing can answer', async () => {
 		const failing = vi.fn(() => Promise.resolve(new Response('', { status: 503 })));
 		await expect(mediaFor('degradation', failing as unknown as typeof fetch, 0)).resolves.toEqual({

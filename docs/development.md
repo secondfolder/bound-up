@@ -101,6 +101,9 @@ in `wrangler.jsonc`, which **inherits nothing from the top level**:
 - `REALTIME` and `PORN_RELAY` are declared again. Each preview gets its own
   Durable Object namespaces automatically, but without the bindings
   `env.REALTIME` and `env.PORN_RELAY` are absent.
+- `TUNNEL_REDGIFS` and `TUNNEL_PMVHAVEN`, the Workers VPC services through the
+  tunnel to darcy, are declared again with the same service ids. Without them
+  the Playroom's Redgifs pictures have no fallback (see docs/playroom.md).
 - No cron trigger: Cron Triggers only run against production, so previews
   never run the media sweep.
 

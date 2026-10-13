@@ -459,7 +459,19 @@ a tag or a subreddit is named.
   measured. When reddit was the only source, whichever vibe asked first got
   the minute's request, and denial, feminisation and degradation showed
   nothing. Every vibe now has Redgifs tags with thousands of results each, and
-  the API showed no rate limit in use.
+  the API showed no rate limit in use — from a home connection.
+- **From Workers, Redgifs is nearly always a 429.** Redgifs is itself behind
+  Cloudflare, so every Worker and Durable Object reaches it from one shared
+  address, `2a06:98c0:3600::103`, and its search limit is keyed to that
+  address, which every other Worker on the internet spends too. Measured
+  2026-10-13 from the Worker and from relays in six regions: all refused, with
+  delays of 20 to 50 minutes. On Workers a refusal is therefore retried
+  through [the tunnel](#the-tunnel-fallback). Its search sends CORS only for
+  `www.redgifs.com`, so the browser cannot ask it instead.
+- **A token is bound to the address that fetched it.** One fetched from
+  anywhere else is a `401 WrongSender`. A 401 drops the token and the search
+  is tried once more with a new one at once, which is what keeps a switch to
+  the tunnel from costing a request's pictures.
 - **`tags=`, not `search_text=`.** The search API accepts `search_text` and
   ignores it, answering every query with the same front page.
 - **What is kept.** Redgifs answers give an id (for the player) and a poster
@@ -838,6 +850,34 @@ endpoints pass it to `pmvIndex` and `withMedia` in place of the request's own.
   which is how the 451 went unnoticed.
 - **Workers only.** `vite dev` and the self-hosted build fetch directly from
   wherever they run, so a server in Australia is refused there too.
+
+#### The tunnel fallback
+
+[`porn-relay/tunnel.ts`](../src/lib/server/porn-relay/tunnel.ts) is the last
+way out: a Cloudflare Tunnel to darcy, a machine of our own, reached through a
+Workers VPC service per host (`TUNNEL_REDGIFS`, `TUNNEL_PMVHAVEN` in
+`wrangler.jsonc`). A request through it leaves from darcy's own address, which
+is what Redgifs answers when it refuses Cloudflare's shared one.
+
+- **A fallback, not the route.** darcy is one machine that can be off, and
+  everything through it spends its allowance. A request goes the usual way
+  first (straight out for Redgifs, through the relay for PMVHaven), and only a
+  403, 429 or 451, or a thrown fetch, sends it through the tunnel.
+- **Sticky for 30 minutes.** A host that fell back stays on the tunnel for
+  that long, per isolate, because a Redgifs token only works from the address
+  that fetched it: token and searches must share a route. If the tunnel fails
+  while holding a host, the host goes back to the usual route.
+- **Down is not broken.** With darcy off, a request answers as it would have
+  without the tunnel: the usual route's refusal, which the caches above
+  already handle.
+- **A host needs a service of its own.** `npx wrangler vpc service create
+  <name> --type http --tunnel-id <darcy's tunnel id> --hostname <host>
+  --https-port 443`, then a `vpc_services` entry, top level and `previews`
+  both, and a line in `TUNNELLED_HOSTS`. Note the tunnel's id is not its
+  connector's: `cloudflared` on darcy logs both, and only the tunnel's is
+  accepted.
+- **Workers only**, like the relay: dev and the self-hosted build send from
+  their own address and need none of it.
 
 **Among the porn.**
 [`HypnoVideo`](../src/lib/components/iq-test/HypnoVideo.svelte) is shown as
