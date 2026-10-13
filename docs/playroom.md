@@ -785,12 +785,41 @@ fast cuts, music, often a voice-over. Read off the site and measured on
   having a voice-over, three to one: talking is what makes it a hypno.
 - **No content filter.** PMVHaven flags gay, trans and extreme content; none of
   it is filtered out.
+- **Refuses Australia.** PMVHaven answers a request from an Australian
+  address with `451 Not available in Australia`. A Worker's subrequests leave
+  from the data centre that took the visitor's request, so for every visitor
+  in Australia the index came back empty. On Workers its pages are therefore
+  fetched through the [porn relay](#the-porn-relay); the MP4s themselves are
+  not, since the browser loads those straight from the bucket.
 
 [`playroom-pmv.ts`](../src/lib/server/playroom-pmv.ts) caches each vibe's
 index per isolate for six hours, like bambicloud's.
 [`/api/playroom/iq-test/pmvs?vibe=`](../src/routes/api/playroom/iq-test/pmvs/+server.ts)
 searches it or picks at random, in the same shape as `/hypnos`; its
 "triggers" are PMVHaven's tags, and it has no categories.
+
+#### The porn relay
+
+[`porn-relay/`](../src/lib/server/porn-relay/) is a Durable Object,
+`PornRelay`, made once in Western Europe (`locationHint: 'weur'`). A Durable
+Object runs where it was made, and its subrequests leave from there, so a page
+fetched through it is fetched from Europe whoever asked. `relayedFetch()`
+returns a `fetch` that sends URLs on a relayed host through it and anything
+else straight out; the PMVHaven endpoints pass it to `pmvIndex` and
+`withMedia` in place of the request's own.
+
+- **Only for sites that need it.** `RELAYED_HOSTS` in `hosts.ts` lists them,
+  by exact hostname (only `pmvhaven.com` today). Every relayed request is a
+  billed Durable Object request and a trip to Europe, so a site that serves
+  everyone stays off the list.
+- **Not an open proxy.** The object passes on only a GET to an https URL on a
+  listed host, with only `user-agent` and `accept`, and follows no redirects.
+  Anything else is a 403 and no request. The callers build every URL from
+  fixed searches and ids already in their index, so this is the second fence.
+- **The status comes back whole**, so a refusal still reads as one, and the
+  index keeps its last good copy rather than caching it.
+- **Workers only.** `vite dev` and the self-hosted build fetch directly from
+  wherever they run, so a server in Australia is refused there too.
 
 **Among the porn.**
 [`HypnoVideo`](../src/lib/components/iq-test/HypnoVideo.svelte) is shown as

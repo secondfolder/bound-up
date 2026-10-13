@@ -5,6 +5,7 @@ import type { AnyD1Database } from 'drizzle-orm/d1';
 import type { Auth, Session, User } from '$lib/server/auth';
 import type { Db } from '$lib/server/db';
 import type { MediaBucket } from '$lib/server/media';
+import type { PornRelayNamespace } from '$lib/server/porn-relay/binding';
 import type { AuthRateLimiter } from '$lib/server/rate-limit';
 import type { RealtimeNamespace } from '$lib/server/realtime/binding';
 
@@ -72,6 +73,11 @@ declare global {
 				 * ambient-globals reason as the two above.
 				 */
 				REALTIME: RealtimeNamespace;
+				/**
+				 * The Durable Object that fetches sites refusing the visitor's
+				 * country from Europe instead. See `$lib/server/porn-relay`.
+				 */
+				PORN_RELAY: PornRelayNamespace;
 				/**
 				 * Web Push. All three or none: without them push is off rather
 				 * than an error. See `$lib/server/push` and docs/notifications.md.

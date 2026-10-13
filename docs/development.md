@@ -98,8 +98,9 @@ in `wrangler.jsonc`, which **inherits nothing from the top level**:
 
 - `DB` and `MEDIA` point at `bound-up-preview` and `bound-up-media-preview`,
   shared by every preview and kept apart from production's data.
-- `REALTIME` is declared again. Each preview gets its own Durable Object
-  namespace automatically, but without the binding `env.REALTIME` is absent.
+- `REALTIME` and `PORN_RELAY` are declared again. Each preview gets its own
+  Durable Object namespaces automatically, but without the bindings
+  `env.REALTIME` and `env.PORN_RELAY` are absent.
 - No cron trigger: Cron Triggers only run against production, so previews
   never run the media sweep.
 

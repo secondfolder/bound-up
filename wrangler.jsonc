@@ -110,6 +110,13 @@
 				// One object per partnership, holding only the open SSE connections
 				// watching it. No storage, and it never sees message content.
 				"class_name": "RealtimeRoom"
+			},
+			{
+				"name": "PORN_RELAY",
+				// One object, made in Western Europe, that fetches pages from
+				// sites refusing Australia (PMVHaven answers 451). No storage.
+				// See src/lib/server/porn-relay/durable-object.ts.
+				"class_name": "PornRelay"
 			}
 		]
 	},
@@ -134,6 +141,10 @@
 	// deleting the namespace.
 	"exports": {
 		"RealtimeRoom": {
+			"type": "durable-object",
+			"storage": "sqlite"
+		},
+		"PornRelay": {
 			"type": "durable-object",
 			"storage": "sqlite"
 		}
@@ -192,6 +203,10 @@
 				{
 					"name": "REALTIME",
 					"class_name": "RealtimeRoom"
+				},
+				{
+					"name": "PORN_RELAY",
+					"class_name": "PornRelay"
 				}
 			]
 		}

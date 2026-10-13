@@ -280,9 +280,11 @@ site it applies to; go read that comment before deciding to break one.
     row and ignores them. Same for the edit action, which re-checks `control`
     against the database rather than trusting that the form was hidden.
 
-15. **`src/lib/server/realtime/durable-object.ts` is a second alias-free zone.**
-    It is bundled by wrangler's esbuild, which resolves neither `$lib` nor any of
-    SvelteKit's aliases, so every import in it must be relative. Two traps live
+15. **Durable Object files are a second alias-free zone**:
+    `src/lib/server/realtime/durable-object.ts`,
+    `src/lib/server/porn-relay/durable-object.ts`, and what they import.
+    They are bundled by wrangler's esbuild, which resolves neither `$lib` nor any of
+    SvelteKit's aliases, so every import in them must be relative. Two traps live
     here:
 
     - **A Durable Object class must be exported from the worker's own entry
@@ -316,8 +318,8 @@ site it applies to; go read that comment before deciding to break one.
       new or renamed class still has to reach production before it can be
       relied on anywhere.
     - **The `previews` block in `wrangler.jsonc` inherits nothing.** Every
-      binding has to be repeated in it (`DB`, `MEDIA` and `REALTIME`, each
-      pointing at preview resources), and secrets live on the Preview base
+      binding has to be repeated in it (`DB`, `MEDIA`, `REALTIME` and
+      `PORN_RELAY`, each pointing at preview resources), and secrets live on the Preview base
       config instead (`npm run secrets -- remote-preview`). A binding
       added at the top level and not there is simply absent in previews. See
       docs/development.md.

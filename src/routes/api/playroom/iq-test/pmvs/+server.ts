@@ -3,6 +3,7 @@ import { filterHypnos, type HypnoFile, triggerCounts } from '$lib/playroom/iq-te
 import { isVibe } from '$lib/playroom/iq-test/media';
 import { pickPmv } from '$lib/playroom/iq-test/pmv';
 import { pmvIndex, withMedia } from '$lib/server/playroom-pmv';
+import { relayedFetch } from '$lib/server/porn-relay';
 import type { RequestHandler } from './$types';
 
 /** The most results one search returns. */
@@ -22,7 +23,9 @@ const RANDOM_ATTEMPTS = 3;
  *
  * `GET ?vibe=&q=&trigger=&maxMinutes=&random=1&exclude=&limit=`
  */
-export const GET: RequestHandler = async ({ url, fetch }) => {
+export const GET: RequestHandler = async ({ url, fetch: eventFetch, platform }) => {
+	// Through the relay on Workers: PMVHaven refuses Australia (see porn-relay).
+	const fetch = relayedFetch(platform, eventFetch);
 	const params = url.searchParams;
 	const vibe = params.get('vibe');
 	if (!isVibe(vibe)) {

@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { isVibe } from '$lib/playroom/iq-test/media';
 import { pmvIndex, withMedia } from '$lib/server/playroom-pmv';
+import { relayedFetch } from '$lib/server/porn-relay';
 import type { RequestHandler } from './$types';
 
 /**
@@ -12,7 +13,9 @@ import type { RequestHandler } from './$types';
  *
  * `GET /api/playroom/iq-test/pmvs/<id>?vibe=`
  */
-export const GET: RequestHandler = async ({ params, url, fetch }) => {
+export const GET: RequestHandler = async ({ params, url, fetch: eventFetch, platform }) => {
+	// Through the relay on Workers, as in `../+server.ts`.
+	const fetch = relayedFetch(platform, eventFetch);
 	const vibe = url.searchParams.get('vibe');
 	if (!isVibe(vibe)) {
 		error(400, 'Unknown vibe');

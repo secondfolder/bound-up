@@ -137,7 +137,7 @@ export default defineConfig(({ command, mode }) => {
 			sveltekit(),
 			removeBareDevalueImport(),
 			/**
-			 * Appends `export { RealtimeRoom }` to the worker the Cloudflare adapter
+			 * Appends `export { RealtimeRoom, PornRelay }` to the worker the Cloudflare adapter
 			 * generates.
 			 *
 			 * A Durable Object class has to be exported from the worker's own entry
@@ -162,7 +162,10 @@ export default defineConfig(({ command, mode }) => {
 			// the build when that output is missing, which is the point of it.
 			!selfHosted &&
 				cloudflareDoExporter({
-					durableObjects: ['src/lib/server/realtime/durable-object.ts']
+					durableObjects: [
+						'src/lib/server/realtime/durable-object.ts',
+						'src/lib/server/porn-relay/durable-object.ts'
+					]
 				}),
 			/**
 			 * Attaches the cron handler (`triggers.crons` in wrangler.jsonc) to the
