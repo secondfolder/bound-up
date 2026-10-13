@@ -818,7 +818,22 @@ test.describe('IQ test', () => {
 	test('packs the porn tight at 4, and fills the room under the question with it', async ({
 		page
 	}) => {
+		// Seed 1 deals a letter series first, which leaves room under it. A
+		// random seed sometimes dealt a grid of shapes tall enough to leave none,
+		// so no strip fitted and the fill check below failed now and then.
+		// `newSeed()` is the page's only one-number draw.
+		await page.addInitScript(() => {
+			const draw = crypto.getRandomValues.bind(crypto);
+			crypto.getRandomValues = (array) => {
+				if (array instanceof Uint32Array && array.length === 1) {
+					array[0] = 1;
+					return array;
+				}
+				return draw(array);
+			};
+		});
 		await startWithPorn(page, 4, { width: 1600, height: 1100 });
+		await expect(page.getByText('Which letter comes next?')).toBeVisible();
 		await expect.poll(() => bandGap(page)).toBe(8);
 		// Every column whole, a gap from the window's edge: none run off it,
 		// which the scrollbar (counted in the window's width, not the page's)
