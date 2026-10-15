@@ -81,7 +81,9 @@ The details, including exactly what the server can and cannot see, are in
 ## Run your own
 
 Every release is published as a Docker image, so you can run Bound Up on your
-own server with no other services needed:
+own server. The one other thing it needs is a way to send email, because new
+accounts confirm their address before they can sign in: either your own mail
+server, or a free [Resend](https://resend.com) account.
 
 ```sh
 docker run --rm --entrypoint node ghcr.io/secondfolder/bound-up \
@@ -92,8 +94,10 @@ docker compose up -d
 The first command writes the server's secrets to a `.env` file, which
 `docker compose` reads from then on. Use your own email address: it is passed
 to Apple and Google so they can reach you about the server's push
-notifications. Then, starting from [`docker-compose.yml`](docker-compose.yml),
-sign up straight away: the first account on a new server becomes its admin.
+notifications. Before starting it, add the email settings to `.env` —
+[docs/self-hosting.md](docs/self-hosting.md#running-it) shows the three lines.
+Then, starting from [`docker-compose.yml`](docker-compose.yml), sign up
+straight away: the first account on a new server becomes its admin.
 
 Keep `.env` safe and back it up. Losing or replacing it signs everyone out and
 switches off notifications on every phone. If the server sits behind a

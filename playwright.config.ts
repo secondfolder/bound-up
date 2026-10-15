@@ -3,6 +3,7 @@ import {
 	E2E_BASE_URL,
 	E2E_DATABASE_URL,
 	E2E_LOCK_PATH,
+	E2E_MAIL_DIR,
 	E2E_MEDIA_DIR,
 	E2E_PORT,
 	E2E_RUN_DIR
@@ -75,6 +76,16 @@ export default defineConfig({
 			// hooks.server.ts throws without this rather than letting Better Auth
 			// fall back to its hard-coded default.
 			BETTER_AUTH_SECRET: 'e2e-secret-not-used-anywhere-else',
+			// Required like the secret. Nothing is sent: the outbox writes each
+			// email to a file, and `e2e/mail.ts` reads the links back out of it.
+			// The image gets a path of its own instead (`e2e/server.mjs`).
+			MAIL_FROM: 'Bound Up <e2e@example.test>',
+			MAIL_OUTBOX_DIR: E2E_MAIL_DIR,
+			// Blanked, so a real transport in a developer's .env — which `vite dev`
+			// also reads — cannot make two transports set at once, or send real
+			// email to example.test. An empty value counts as unset.
+			RESEND_API_KEY: '',
+			SMTP_URL: '',
 			// A key pair for this suite only, so the notification settings have
 			// something to subscribe with. Nothing is ever pushed with it: the specs
 			// fake the browser's PushManager and send no message to a subscribed

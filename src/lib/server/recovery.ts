@@ -24,16 +24,18 @@ import { hex, keyedHash } from './keyed-hash';
  * 1. `startAccountRecovery` — unauthenticated. Stores the requester's new
  *    public key and password wrap, opens a restore request in each of their
  *    partnerships, and hands back a token.
- * 2. A partner compares a code and re-encrypts their shared history; the final
- *    page of that approves the sign-in (`applyHistoryRestore` in
- *    `messaging.ts`).
- * 3. `completeAccountRecovery` — authorised by the token. Swaps in the new
- *    keys and password, and wipes every other way into the account.
+ * 2. Two things, in either order. A partner compares a code and re-encrypts
+ *    their shared history, the final page of which approves the sign-in
+ *    (`applyHistoryRestore` in `messaging.ts`). And the requester follows the
+ *    link emailed to the account's address (`confirmRecoveryEmail`).
+ * 3. `completeAccountRecovery` — authorised by the token, and only once both
+ *    of the above have happened. Swaps in the new keys and password, and wipes
+ *    every other way into the account.
  *
- * KNOWN GAP, on purpose and written down: nothing here proves the requester
- * controls the account's email address. Until email verification exists, a
- * partner can file a request for someone else's email, approve it themselves,
- * and sign in as them. See "Not built yet" in docs/account-recovery.md.
+ * Both halves are required because each alone is someone else's say-so: a
+ * partner could file a request for your email and approve it themselves, and
+ * someone who got into your inbox should not be able to replace your keys
+ * either. See docs/account-recovery.md.
  */
 
 /** How long a request stays open. Long enough for a partner to be reached. */
@@ -50,7 +52,17 @@ async function tokenHash(token: string): Promise<string> {
 }
 
 export type StartRecoveryResult =
-	| { ok: true; token: string }
+	| {
+			ok: true;
+			/** Goes back to the requester's page. The only part a caller may answer with. */
+			token: string;
+			/**
+			 * What to email, and where: the link that proves the requester holds
+			 * the account's address. NULL for an email with no account, which is
+			 * sent nothing — so this must never reach the response.
+			 */
+			confirmation: { email: string; token: string } | null;
+	  }
 	| { ok: false; reason: 'rate-limited' };
 
 /**
@@ -60,7 +72,9 @@ export type StartRecoveryResult =
  * account", or "that account has no partner", would turn this unauthenticated
  * endpoint into a way to check whether someone uses the app — so an unknown
  * email still gets a row (with no user), still counts towards the rate limit,
- * and still gets a token back. It is simply never approved.
+ * and still gets a token back. It is simply never approved. The one thing that
+ * differs, `confirmation`, goes to the account's own inbox, never to the
+ * caller.
  */
 export async function startAccountRecovery(
 	db: Db,
@@ -122,6 +136,7 @@ export async function startAccountRecovery(
 		: [];
 
 	const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+	const emailToken = account ? toBase64Url(crypto.getRandomValues(new Uint8Array(32))) : null;
 	const id = crypto.randomUUID();
 
 	// A new request replaces an older pending one, so a partner is never shown
@@ -163,6 +178,7 @@ export async function startAccountRecovery(
 			emailHash,
 			ipHash,
 			tokenHash: await tokenHash(token),
+			emailTokenHash: emailToken ? await tokenHash(emailToken) : null,
 			recipient: input.recipient,
 			wrapParams: input.wrap.params,
 			wrapBlob: input.wrap.blob,
@@ -183,11 +199,25 @@ export async function startAccountRecovery(
 			: [])
 	]);
 
-	return { ok: true, token };
+	return {
+		ok: true,
+		token,
+		confirmation: emailToken ? { email: normaliseEmail(input.email), token: emailToken } : null
+	};
 }
 
-/** What the waiting requester's page is told. */
+/** Where a request stands, as the waiting requester's page is told it. */
 export type RecoveryStatus = 'pending' | 'approved' | 'declined' | 'expired' | 'completed';
+
+export type RecoveryProgress = {
+	status: RecoveryStatus;
+	/**
+	 * Whether the emailed link has been confirmed. Separate from `status`
+	 * because the two halves happen in either order, and the page shows both.
+	 * Always false for an email with no account, like a link nobody opened.
+	 */
+	emailConfirmed: boolean;
+};
 
 async function findByToken(db: Db, token: string) {
 	const [row] = await db
@@ -196,6 +226,7 @@ async function findByToken(db: Db, token: string) {
 			userId: accountRecoveryRequests.userId,
 			status: accountRecoveryRequests.status,
 			expiresAt: accountRecoveryRequests.expiresAt,
+			emailConfirmedAt: accountRecoveryRequests.emailConfirmedAt,
 			recipient: accountRecoveryRequests.recipient,
 			wrapParams: accountRecoveryRequests.wrapParams,
 			wrapBlob: accountRecoveryRequests.wrapBlob
@@ -218,8 +249,17 @@ export async function recoveryStatus(
 	db: Db,
 	token: string,
 	now: Date = new Date()
-): Promise<RecoveryStatus> {
+): Promise<RecoveryProgress> {
 	const row = await findByToken(db, token);
+	const emailConfirmed = Boolean(row?.emailConfirmedAt);
+	return { status: await statusOf(db, row, now), emailConfirmed };
+}
+
+async function statusOf(
+	db: Db,
+	row: Awaited<ReturnType<typeof findByToken>>,
+	now: Date
+): Promise<RecoveryStatus> {
 	if (!row || row.status === 'superseded') {
 		return 'expired';
 	}
@@ -240,13 +280,44 @@ export async function recoveryStatus(
 	return 'pending';
 }
 
+/**
+ * The emailed half: marks a request's address as confirmed by the person who
+ * opened the link sent to it.
+ *
+ * Only from a POST — the confirm page's button — never from loading the link,
+ * because mail scanners fetch links to look at them, and one doing so must not
+ * be able to vouch for anybody. Works while the request is open (pending, or
+ * already approved by a partner), and is harmless to repeat. Anything else —
+ * an unknown token, an expired, superseded, declined or finished request —
+ * is the one answer, `invalid`.
+ */
+export async function confirmRecoveryEmail(
+	db: Db,
+	emailToken: string,
+	now: Date = new Date()
+): Promise<'confirmed' | 'invalid'> {
+	const confirmed = await db
+		.update(accountRecoveryRequests)
+		.set({ emailConfirmedAt: now })
+		.where(
+			and(
+				eq(accountRecoveryRequests.emailTokenHash, await tokenHash(emailToken)),
+				inArray(accountRecoveryRequests.status, ['pending', 'approved']),
+				gt(accountRecoveryRequests.expiresAt, now)
+			)
+		)
+		.returning({ id: accountRecoveryRequests.id });
+	return confirmed.length > 0 ? 'confirmed' : 'invalid';
+}
+
 export type CompleteRecoveryResult =
 	| { ok: true; userId: string }
-	| { ok: false; reason: 'not-approved' | 'expired' };
+	| { ok: false; reason: 'not-approved' | 'email-unconfirmed' | 'expired' };
 
 /**
- * Finishes an approved request: the requester's new keys and password become
- * the account's, and every other way in is removed.
+ * Finishes a request a partner approved and the account's email confirmed: the
+ * requester's new keys and password become the account's, and every other way
+ * in is removed.
  *
  * `passwordHash` is Better Auth's own hash of the new `authSecret`, computed by
  * the caller — the secret arrives only now, so no login credential ever sat in
@@ -261,6 +332,10 @@ export type CompleteRecoveryResult =
  * - **Every passkey** — none can open the new identity, and one left behind
  *   would sign in to a device that could never get its key.
  * - **Every session** — whoever holds the lost devices is signed out.
+ *
+ * And it marks the address verified: the emailed link just proved it, and an
+ * account that somehow never confirmed could not otherwise sign in with the
+ * new password.
  */
 export async function completeAccountRecovery(
 	db: Db,
@@ -273,6 +348,11 @@ export async function completeAccountRecovery(
 	}
 	if (row.status !== 'approved') {
 		return { ok: false, reason: 'not-approved' };
+	}
+	// The other half. Without it a partner's approval alone would be enough,
+	// and a partner could file a request for your email and approve it.
+	if (!row.emailConfirmedAt) {
+		return { ok: false, reason: 'email-unconfirmed' };
 	}
 	const { userId } = row;
 
@@ -288,6 +368,7 @@ export async function completeAccountRecovery(
 		db.delete(passkey).where(eq(passkey.userId, userId)),
 		setPasswordHashStatement(db, userId, input.passwordHash),
 		db.delete(session).where(eq(session.userId, userId)),
+		db.update(user).set({ emailVerified: true }).where(eq(user.id, userId)),
 		db
 			.update(accountRecoveryRequests)
 			.set({ status: 'completed', resolvedAt: now })

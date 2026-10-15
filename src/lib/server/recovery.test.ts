@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from '../testing/crypto';
 import { createTestDb, type TestDb } from '../testing/db';
+import { defined } from '../testing/defined';
 import {
 	createTestInvite,
 	createTestPartnership,
@@ -17,11 +18,13 @@ import {
 	accountRecoveryRequests,
 	historyRestoreRequests,
 	passkey,
-	session
+	session,
+	user
 } from './db/schema';
 import { applyHistoryRestore, declineHistoryRestore, listRestoreRequests } from './messaging';
 import {
 	completeAccountRecovery,
+	confirmRecoveryEmail,
 	MAX_REQUESTS_PER_EMAIL,
 	MAX_REQUESTS_PER_IP,
 	RECOVERY_TTL_MS,
@@ -68,12 +71,26 @@ function start(email: string, options: { ip?: string; now?: Date } = {}) {
 	);
 }
 
-async function startOk(email = ada.email, options: { ip?: string; now?: Date } = {}) {
+async function startWithConfirmation(email = ada.email, options: { ip?: string; now?: Date } = {}) {
 	const result = await start(email, options);
 	if (!result.ok) {
 		throw new Error('expected the request to start');
 	}
-	return result.token;
+	return { token: result.token, emailToken: result.confirmation?.token ?? null };
+}
+
+async function startOk(email = ada.email, options: { ip?: string; now?: Date } = {}) {
+	return (await startWithConfirmation(email, options)).token;
+}
+
+/** Starts a request for Ada and follows the link emailed to her. */
+async function startAndConfirmEmail() {
+	const { token, emailToken } = await startWithConfirmation();
+	const confirmed = await confirmRecoveryEmail(harness.db, defined(emailToken, 'the email token'));
+	if (confirmed !== 'confirmed') {
+		throw new Error('expected the emailed link to confirm');
+	}
+	return token;
 }
 
 /** Jun re-encrypts everything and finishes, which is what approves the sign-in. */
@@ -102,9 +119,16 @@ describe('starting a request', () => {
 		]);
 
 		for (const answer of answers) {
-			expect(Object.keys(answer).sort()).toEqual(['ok', 'token']);
+			expect(Object.keys(answer).sort()).toEqual(['confirmation', 'ok', 'token']);
 			expect(answer).toMatchObject({ ok: true, token: expect.stringMatching(/^[\w-]{43}$/) });
 		}
+		// What differs goes to the account's own inbox, never to the caller: the
+		// route answers with `token` alone.
+		expect(answers.map((answer) => answer.ok && answer.confirmation?.email)).toEqual([
+			ada.email,
+			loner.email,
+			undefined
+		]);
 	});
 
 	it('keeps neither the token nor the email in the clear', async () => {
@@ -113,6 +137,8 @@ describe('starting a request', () => {
 
 		expect(row.tokenHash).not.toBe(token);
 		expect(row.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+		expect(row.emailTokenHash).toMatch(/^[0-9a-f]{64}$/);
+		expect(row.emailTokenHash).not.toBe(row.tokenHash);
 		expect(JSON.stringify(row)).not.toContain(ada.email);
 		expect(JSON.stringify(row)).not.toContain('203.0.113.9');
 		expect(row).toMatchObject({ userId: ada.id, recipient: NEW_RECIPIENT, status: 'pending' });
@@ -139,7 +165,7 @@ describe('starting a request', () => {
 		await startOk();
 
 		await expect(listRestoreRequests(harness.db, partnershipId, jun.id)).resolves.toHaveLength(1);
-		await expect(recoveryStatus(harness.db, first)).resolves.toBe('expired');
+		await expect(recoveryStatus(harness.db, first)).resolves.toMatchObject({ status: 'expired' });
 	});
 
 	/** An unknown email reaches the limit at exactly the same rate. */
@@ -172,10 +198,10 @@ describe('starting a request', () => {
 describe('where a request stands', () => {
 	it('is pending until a partner finishes, then approved', async () => {
 		const token = await startOk();
-		await expect(recoveryStatus(harness.db, token)).resolves.toBe('pending');
+		await expect(recoveryStatus(harness.db, token)).resolves.toMatchObject({ status: 'pending' });
 
 		await approveAsJun();
-		await expect(recoveryStatus(harness.db, token)).resolves.toBe('approved');
+		await expect(recoveryStatus(harness.db, token)).resolves.toMatchObject({ status: 'approved' });
 	});
 
 	it('is declined once every partner said the code did not match', async () => {
@@ -187,23 +213,27 @@ describe('where a request stands', () => {
 			actorId: jun.id
 		});
 
-		await expect(recoveryStatus(harness.db, token)).resolves.toBe('declined');
+		await expect(recoveryStatus(harness.db, token)).resolves.toMatchObject({ status: 'declined' });
 	});
 
 	it('expires', async () => {
 		const token = await startOk();
 		const later = new Date(Date.now() + RECOVERY_TTL_MS + 1000);
-		await expect(recoveryStatus(harness.db, token, later)).resolves.toBe('expired');
+		await expect(recoveryStatus(harness.db, token, later)).resolves.toMatchObject({
+			status: 'expired'
+		});
 	});
 
 	it('says nothing about a token it does not know', async () => {
-		await expect(recoveryStatus(harness.db, 'x'.repeat(43))).resolves.toBe('expired');
+		await expect(recoveryStatus(harness.db, 'x'.repeat(43))).resolves.toMatchObject({
+			status: 'expired'
+		});
 	});
 
 	/** For an unknown email there is nobody to answer, and it looks like waiting. */
 	it('stays pending for an email with no account', async () => {
 		const token = await startOk('nobody@example.test');
-		await expect(recoveryStatus(harness.db, token)).resolves.toBe('pending');
+		await expect(recoveryStatus(harness.db, token)).resolves.toMatchObject({ status: 'pending' });
 	});
 
 	/** Only the other member can approve — the requester cannot vouch for themselves. */
@@ -220,7 +250,7 @@ describe('where a request stands', () => {
 				final: true
 			});
 		}
-		await expect(recoveryStatus(harness.db, token)).resolves.toBe('pending');
+		await expect(recoveryStatus(harness.db, token)).resolves.toMatchObject({ status: 'pending' });
 	});
 });
 
@@ -257,14 +287,49 @@ describe('completing a request', () => {
 		});
 	});
 
-	it('refuses before a partner has approved', async () => {
-		const token = await startOk();
+	it('refuses before a partner has approved, even with the email confirmed', async () => {
+		const token = await startAndConfirmEmail();
 		await expect(
 			completeAccountRecovery(harness.db, { token, passwordHash: 'new-hash' })
 		).resolves.toEqual({ ok: false, reason: 'not-approved' });
 		await expect(readUserKeysRow(harness.db, ada.id)).resolves.not.toMatchObject({
 			recipient: NEW_RECIPIENT
 		});
+	});
+
+	/**
+	 * The takeover a partner alone could otherwise do: file a request for
+	 * someone else's email from their own browser, and approve it themselves.
+	 */
+	it("refuses a partner's approval alone, without the emailed link", async () => {
+		const token = await startOk();
+		await approveAsJun();
+		await expect(
+			completeAccountRecovery(harness.db, { token, passwordHash: 'new-hash' })
+		).resolves.toEqual({ ok: false, reason: 'email-unconfirmed' });
+		await expect(readUserKeysRow(harness.db, ada.id)).resolves.not.toMatchObject({
+			recipient: NEW_RECIPIENT
+		});
+		await expect(
+			harness.db.select().from(session).where(eq(session.userId, ada.id))
+		).resolves.toHaveLength(1);
+	});
+
+	it('finishes whichever order the two halves happen in', async () => {
+		const { token, emailToken } = await startWithConfirmation();
+		await approveAsJun();
+		await expect(recoveryStatus(harness.db, token)).resolves.toEqual({
+			status: 'approved',
+			emailConfirmed: false
+		});
+		await confirmRecoveryEmail(harness.db, defined(emailToken, 'the email token'));
+		await expect(recoveryStatus(harness.db, token)).resolves.toEqual({
+			status: 'approved',
+			emailConfirmed: true
+		});
+		await expect(
+			completeAccountRecovery(harness.db, { token, passwordHash: 'new-hash' })
+		).resolves.toEqual({ ok: true, userId: ada.id });
 	});
 
 	it('refuses a token it does not know', async () => {
@@ -280,7 +345,8 @@ describe('completing a request', () => {
 	 */
 	it('swaps in the new keys and password, and removes every other way in', async () => {
 		await createTestThread(harness.db, partnershipId, jun);
-		const token = await startOk();
+		await harness.db.update(user).set({ emailVerified: false }).where(eq(user.id, ada.id));
+		const token = await startAndConfirmEmail();
 		await approveAsJun();
 
 		await expect(
@@ -306,16 +372,22 @@ describe('completing a request', () => {
 		await expect(
 			harness.db.select().from(session).where(eq(session.userId, ada.id))
 		).resolves.toHaveLength(0);
+		// The emailed link proved the address, so the new password can sign in.
+		const [verified] = await harness.db
+			.select({ emailVerified: user.emailVerified })
+			.from(user)
+			.where(eq(user.id, ada.id));
+		expect(verified?.emailVerified).toBe(true);
 
 		// Done, and cannot be done twice.
-		await expect(recoveryStatus(harness.db, token)).resolves.toBe('completed');
+		await expect(recoveryStatus(harness.db, token)).resolves.toMatchObject({ status: 'completed' });
 		await expect(
 			completeAccountRecovery(harness.db, { token, passwordHash: 'again' })
 		).resolves.toEqual({ ok: false, reason: 'not-approved' });
 	});
 
 	it('leaves the partner who helped untouched', async () => {
-		const token = await startOk();
+		const token = await startAndConfirmEmail();
 		await approveAsJun();
 		const before = await readUserKeysRow(harness.db, jun.id);
 
@@ -325,5 +397,56 @@ describe('completing a request', () => {
 			recipient: before.recipient
 		});
 		await expect(readWrapRows(harness.db, jun.id)).resolves.toHaveLength(1);
+	});
+});
+
+describe('confirming the emailed link', () => {
+	it('is only sent for an account that exists', async () => {
+		const { emailToken } = await startWithConfirmation('nobody@example.test');
+		expect(emailToken).toBeNull();
+		const [row] = await harness.db
+			.select({ emailTokenHash: accountRecoveryRequests.emailTokenHash })
+			.from(accountRecoveryRequests);
+		expect(row?.emailTokenHash).toBeNull();
+	});
+
+	it('marks the request, and is harmless to repeat', async () => {
+		const { token, emailToken } = await startWithConfirmation();
+		const link = defined(emailToken, 'the email token');
+		await expect(confirmRecoveryEmail(harness.db, link)).resolves.toBe('confirmed');
+		await expect(confirmRecoveryEmail(harness.db, link)).resolves.toBe('confirmed');
+		await expect(recoveryStatus(harness.db, token)).resolves.toEqual({
+			status: 'pending',
+			emailConfirmed: true
+		});
+	});
+
+	it('is not the request token, nor the other way round', async () => {
+		const { token, emailToken } = await startWithConfirmation();
+		await expect(confirmRecoveryEmail(harness.db, token)).resolves.toBe('invalid');
+		await expect(
+			recoveryStatus(harness.db, defined(emailToken, 'the email token'))
+		).resolves.toMatchObject({
+			status: 'expired'
+		});
+	});
+
+	it('refuses an unknown, expired or superseded link', async () => {
+		await expect(confirmRecoveryEmail(harness.db, 'z'.repeat(43))).resolves.toBe('invalid');
+
+		const { emailToken: expired } = await startWithConfirmation();
+		const later = new Date(Date.now() + RECOVERY_TTL_MS + 1000);
+		await expect(confirmRecoveryEmail(harness.db, defined(expired, 'first'), later)).resolves.toBe(
+			'invalid'
+		);
+
+		// A newer request replaces the first, and with it the first link.
+		const { emailToken: newer } = await startWithConfirmation(ada.email, { ip: '203.0.113.50' });
+		await expect(confirmRecoveryEmail(harness.db, defined(expired, 'first'))).resolves.toBe(
+			'invalid'
+		);
+		await expect(confirmRecoveryEmail(harness.db, defined(newer, 'second'))).resolves.toBe(
+			'confirmed'
+		);
 	});
 });

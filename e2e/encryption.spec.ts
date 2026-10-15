@@ -13,6 +13,7 @@ import {
 	expectSentToSignIn,
 	fillPassword,
 	fillWaInput,
+	finishSignUp,
 	logIn,
 	logInHere,
 	logOut,
@@ -309,7 +310,8 @@ test.describe('password manager autofill', () => {
 		await expect(page.locator('wa-input[data-field="password"] ~ .strength')).toBeVisible();
 
 		await submitEnhancedForm(page, 'Sign Up');
-		await page.waitForURL('**/home');
+		await finishSignUp(page, who);
+		await expect(page).toHaveURL(/\/home$/);
 		await expect(page.getByText(/at least 12 characters/)).toBeHidden();
 	});
 
@@ -344,6 +346,7 @@ test.describe('password manager autofill', () => {
 		await autofillPasswordSilently(page, 'passwordConfirm', who.password);
 
 		await submitEnhancedForm(page, 'Sign Up');
+		await finishSignUp(page, who);
 		await expect(page).toHaveURL(/\/home$/);
 	});
 });

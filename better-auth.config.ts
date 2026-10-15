@@ -23,5 +23,8 @@ export const auth = createAuth(throwawayDb as unknown as Db, {
 	secret: 'cli-only-placeholder-secret-0123456789abcdef',
 	origin: 'http://localhost:5173',
 	rpID: 'localhost',
-	host: 'localhost:5173'
+	host: 'localhost:5173',
+	// The CLI only reads `auth.options`; nothing is ever sent or counted.
+	sendMail: () => undefined,
+	emailRateLimit: () => Promise.resolve({ allowed: true })
 });

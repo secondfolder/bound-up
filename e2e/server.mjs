@@ -145,6 +145,13 @@ async function serveImage(image) {
 			'VAPID_PRIVATE_KEY',
 			'--env',
 			'VAPID_SUBJECT',
+			'--env',
+			'MAIL_FROM',
+			// `E2E_CONTAINER_MAIL_DIR` in run-paths.ts, which `e2e/mail.ts` reads
+			// through `docker exec`; the host path in MAIL_OUTBOX_DIR means nothing
+			// inside the container.
+			'--env',
+			'MAIL_OUTBOX_DIR=/tmp/mail-outbox',
 			// Every test signs up from the same address, many times a minute; the
 			// sign-in limit would refuse most of them. `vite dev` has it off for
 			// the same reason. scripts/docker-smoke.sh checks the limit instead.

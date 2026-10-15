@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 // `better-auth/minimal` rather than `better-auth`: the full entry's `init`
 // pulls in getMigrations and the Kysely adapter, which we never use and which
 // would otherwise be bundled into the worker. The core is identical.
+import { createAuthMiddleware } from 'better-auth/api';
 import { betterAuth } from 'better-auth/minimal';
 import { admin } from 'better-auth/plugins/admin';
 import { defaultAc, userAc } from 'better-auth/plugins/admin/access';
@@ -10,6 +11,9 @@ import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { getRequestEvent } from '$app/server';
 import { AUTH_SECRET_LENGTH } from '../encryption';
 import { type Db, schema } from './db';
+import type { MailMessage } from './mail';
+import { existingAccountEmail, verificationEmail } from './mail/templates';
+import type { EmailRateLimiter } from './rate-limit';
 
 /**
  * The type `@better-auth/passkey` accepts for WebAuthn extensions, derived from
@@ -78,7 +82,29 @@ export type AuthRequestConfig = {
 	rpID: string;
 	/** `event.url.host` — used to also trust the https form of this host. */
 	host: string;
+	/**
+	 * Hands an email to the mailer without waiting for it — `sendInBackground`
+	 * from `./mail`, bound to this request. Never throws, which is what keeps
+	 * `/send-verification-email` from answering differently for an address
+	 * with an account (see `emailVerification` below).
+	 *
+	 * `onlyIf`, when given, runs in the background too and the message is
+	 * dropped if it resolves false — which is how the per-address limit is
+	 * applied without the response waiting on it.
+	 */
+	sendMail: (message: MailMessage, what: string, onlyIf?: () => Promise<boolean>) => void;
+	/**
+	 * `locals.emailRateLimit`: one email to an address, counted against
+	 * `VERIFICATION_EMAIL_PER_ADDRESS`. Applied here, where Better Auth sends,
+	 * rather than in the forms that ask it to — the per-client limits on those
+	 * forms are all that `/api/auth/send-verification-email` and a repeated
+	 * sign-up would otherwise meet.
+	 */
+	emailRateLimit: EmailRateLimiter;
 };
+
+/** How long a verification link works. A day: long enough to find the email tomorrow. */
+export const VERIFICATION_LINK_TTL_SECONDS = 24 * 60 * 60;
 
 /**
  * Builds a Better Auth instance for one request.
@@ -89,6 +115,26 @@ export type AuthRequestConfig = {
  * no per-environment configuration.
  */
 export function createAuth(db: Db, config: AuthRequestConfig) {
+	/**
+	 * The Better Auth endpoint this request is running, recorded by the
+	 * `before` hook below — which Better Auth runs for `auth.api.*` calls from
+	 * the form actions as well as for its HTTP routes. The instance is built per
+	 * request, so this is per request too.
+	 *
+	 * Read by `sendVerificationEmail`, the one callback several endpoints share,
+	 * because Better Auth does not say which of them called it.
+	 */
+	let endpoint: string | undefined;
+
+	/**
+	 * Sends an email that anyone could have asked for — a sign-up or a resend
+	 * names any address it likes — only while that address is under its limit.
+	 * Counting happens in the background with the send, so a refusal takes no
+	 * longer than a success and says nothing about the account.
+	 */
+	const sendLimited = (message: MailMessage, what: string) =>
+		config.sendMail(message, what, async () => (await config.emailRateLimit(message.to)).allowed);
+
 	return betterAuth({
 		appName: 'Bound Up',
 		// Passed explicitly: Better Auth's own env lookup reads
@@ -117,8 +163,25 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 		},
 		emailAndPassword: {
 			enabled: true,
-			autoSignIn: true,
-			requireEmailVerification: false,
+			// An account cannot sign in until its address is confirmed. That is
+			// what lets partner-assisted sign-in and, later, changing an email
+			// lean on the address actually being the account holder's. See
+			// docs/email.md.
+			requireEmailVerification: true,
+			// Off, and implied off by the line above anyway: signing up ends at
+			// "check your email", not in a session. Better Auth also answers a
+			// sign-up for an address that already has an account exactly as it
+			// answers a new one once either is set, which is what stops the
+			// sign-up form telling a stranger who has an account here.
+			autoSignIn: false,
+			// The one person who needs telling about that duplicate is the
+			// address's owner, so they hear it by email rather than the
+			// stranger hearing it on the page.
+			// Limited per address, since the sign-up form can name anyone's.
+			onExistingUserSignUp: ({ user }) => {
+				sendLimited(existingAccountEmail(user.email, `${config.origin}/login`), 'existing account');
+				return Promise.resolve();
+			},
 			// NOT a password policy. The browser posts a 43-character base64url
 			// HKDF output in the `password` field and the real password never
 			// leaves the device (see src/lib/crypto/kdf.ts and
@@ -138,6 +201,41 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 			minPasswordLength: AUTH_SECRET_LENGTH,
 			maxPasswordLength: AUTH_SECRET_LENGTH
 		},
+		emailVerification: {
+			sendOnSignUp: true,
+			// An unverified account signing in with the right password gets a
+			// fresh link, so an expired or lost one is never a dead end. Better
+			// Auth checks the password first, so nobody else can trigger it.
+			sendOnSignIn: true,
+			// Off on purpose. The link may be opened in another browser or on
+			// another device, and a session made there without the password has
+			// no key: EncryptionGate would bounce it straight to
+			// /login?reason=device. Instead the link lands on the login page
+			// saying the address is confirmed, and signing in — which is what
+			// unlocks, as everywhere else — finishes the job.
+			autoSignInAfterVerification: false,
+			expiresIn: VERIFICATION_LINK_TTL_SECONDS,
+			// Never awaits the provider. `/send-verification-email` awaits this
+			// for an unverified account and skips it otherwise, so a send that
+			// took longer, or threw, would tell an unauthenticated caller which
+			// addresses have accounts — Better Auth's 500ms floor only hides a
+			// fast provider.
+			//
+			// Limited per address unless it came from signing in. Sign-in only
+			// sends once the password has checked out, so it cannot be pointed at
+			// a stranger's inbox, and it is already limited per client. Leaving it
+			// out of the address's count is what keeps the owner able to get a
+			// link when someone else has used that count up from the resend form.
+			sendVerificationEmail: ({ user, url }) => {
+				const message = verificationEmail(user.email, url);
+				if (endpoint === '/sign-in/email') {
+					config.sendMail(message, 'verification');
+				} else {
+					sendLimited(message, 'verification');
+				}
+				return Promise.resolve();
+			}
+		},
 		// NOT enabled by default once a database is configured, so opt in
 		// explicitly: this turns the per-request session lookup into a signed
 		// cookie read instead of two D1 queries. Cost: revocation lags by up to
@@ -152,6 +250,12 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 		// because nothing here tells it where to look.
 		rateLimit: { enabled: false },
 		telemetry: { enabled: false },
+		hooks: {
+			before: createAuthMiddleware((ctx) => {
+				endpoint = ctx.path;
+				return Promise.resolve();
+			})
+		},
 		plugins: [
 			// `origin` is deliberately left unset so the plugin uses the real
 			// browser Origin header as `expectedOrigin` — which is what the

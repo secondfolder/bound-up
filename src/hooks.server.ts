@@ -6,26 +6,64 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { createAuth } from '$lib/server/auth';
 import type { Db } from '$lib/server/db';
 import { createDb, getLocalDb } from '$lib/server/db/backend';
+import { createMailer, type Mailer, sendInBackground } from '$lib/server/mail';
+import { readMailConfig } from '$lib/server/mail/config';
 import { getLocalMediaStore } from '$lib/server/media/backend';
 import {
 	type AuthRateLimiter,
 	authRateLimiter,
 	bucketForAuthPath,
+	emailRateLimiter,
+	onceEach,
 	rateLimitMessage,
-	unlimited
+	unlimited,
+	unlimitedEmail
 } from '$lib/server/rate-limit';
 
 const AUTH_PATH_PREFIX = '/api/auth';
 
 /**
+ * The mailer, built the first time something is sent rather than on every
+ * request.
+ *
+ * Built eagerly, a missing `MAIL_FROM` made every page a 500 — the landing
+ * page and the roadmap included — and every request parsed the mail settings
+ * for nothing. Built here, inside `send`, a bad setting rejects that send, and
+ * `sendInBackground` logs it with the fix `readMailConfig` names. It must not
+ * throw where the request can see it instead: only some addresses are sent
+ * mail (an unconfirmed account, an account being recovered), so a send that
+ * failed the response would tell a stranger which addresses have accounts.
+ * The self-hosted server still checks the settings once at start-up (`init`).
+ */
+function lazyMailer(platform: App.Platform | undefined): Mailer {
+	let built: Mailer | undefined;
+	return {
+		send(message) {
+			try {
+				built ??= createMailer(readMailConfig(platform));
+			} catch (error) {
+				return Promise.reject(error);
+			}
+			return built.send(message);
+		}
+	};
+}
+
+/**
  * Runs once when the server starts. Only the self-hosted Node build does
- * anything here: it has no cron trigger, so it starts the media sweep that
- * `scheduled.ts` is on Workers. `__SELF_HOSTED__` is a build-time constant, so
+ * anything here: it checks the mail settings, and, having no cron trigger,
+ * starts the media sweep that `scheduled.ts` is on Workers. `__SELF_HOSTED__` is a build-time constant, so
  * this is empty in the worker bundle and never runs under `vite dev`, which
  * keeps its behaviour as it was. See docs/self-hosting.md.
  */
 export const init: ServerInit = async () => {
 	if (__SELF_HOSTED__ && !building) {
+		// Read once up front so a server with no way to send email refuses to
+		// start, with the fix in the message, rather than answering every
+		// request with it. Workers has no environment to read here (its
+		// `platform.env` exists only inside a request), so there the check in
+		// `handle` is the one that fires.
+		readMailConfig(undefined);
 		const { runMediaSweep, startMediaSweep } = await import('$lib/server/self-hosted/sweep');
 		const db = await getLocalDb();
 		const store = await getLocalMediaStore();
@@ -60,16 +98,25 @@ export const handle: Handle = async ({ event, resolve }) => {
 		);
 	}
 
+	const mailer = lazyMailer(event.platform);
+	const limitsOff = rateLimitsOff(event);
+	const emailRateLimit = limitsOff ? unlimitedEmail : onceEach(emailRateLimiter(db, secret));
+
 	const auth = createAuth(db, {
 		secret,
 		origin: event.url.origin,
 		rpID: event.url.hostname,
-		host: event.url.host
+		host: event.url.host,
+		sendMail: (message, what, onlyIf) =>
+			sendInBackground(event.platform, mailer, message, what, onlyIf),
+		emailRateLimit
 	});
 
 	event.locals.db = db;
 	event.locals.auth = auth;
-	event.locals.authRateLimit = rateLimiterFor(event, db, secret);
+	event.locals.mailer = mailer;
+	event.locals.authRateLimit = limitsOff ? unlimited : rateLimiterFor(event, db, secret);
+	event.locals.emailRateLimit = emailRateLimit;
 	event.locals.session = null;
 	event.locals.user = null;
 
@@ -107,12 +154,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 };
 
 /**
- * The sign-in rate limit for this request's client, or none.
+ * Whether the auth rate limits are off for this deployment.
  *
  * Off under `vite dev`, where every request comes from localhost and the e2e
  * suite signs up hundreds of accounts a minute, and wherever `AUTH_RATE_LIMIT`
  * is `off` — the Playwright suite against the Docker image, which is the same
  * situation, or an operator limiting at their proxy instead.
+ */
+function rateLimitsOff(event: RequestEvent): boolean {
+	const setting = event.platform?.env?.AUTH_RATE_LIMIT ?? privateEnv.AUTH_RATE_LIMIT;
+	return dev || setting === 'off';
+}
+
+/**
+ * The sign-in rate limit for this request's client.
  *
  * The client is SvelteKit's `getClientAddress()`: `cf-connecting-ip` on
  * Workers, and on adapter-node the socket's peer unless `ADDRESS_HEADER` names
@@ -120,10 +175,6 @@ export const handle: Handle = async ({ event, resolve }) => {
  * cannot say at all shares one bucket rather than going unlimited.
  */
 function rateLimiterFor(event: RequestEvent, db: Db, secret: string): AuthRateLimiter {
-	const setting = event.platform?.env?.AUTH_RATE_LIMIT ?? privateEnv.AUTH_RATE_LIMIT;
-	if (dev || setting === 'off') {
-		return unlimited;
-	}
 	let address = 'unknown';
 	try {
 		address = event.getClientAddress();

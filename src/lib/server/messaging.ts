@@ -1701,11 +1701,11 @@ export async function applyHistoryRestore(
 	// the requester back into their account, so it happens only here, after
 	// this partner has compared the code and re-encrypted everything.
 	//
-	// KNOWN GAP (docs/account-recovery.md, "Not built yet"): nothing yet proves
-	// the requester controls the account's email address, so a partner who
-	// filed a request for someone else's email could approve it themselves and
-	// take over the account. Email verification must be added before this is
-	// relied on.
+	// Approval is half of what completing needs, not all of it: the requester
+	// must also confirm a link sent to the account's address
+	// (`completeAccountRecovery` in recovery.ts). That is what stops a partner
+	// who filed a request for someone else's email from approving it and
+	// taking the account over. See docs/account-recovery.md.
 	const closing = input.final
 		? [
 				db

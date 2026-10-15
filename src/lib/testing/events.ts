@@ -1,5 +1,11 @@
 import type { Db } from '../server/db';
-import { type AuthRateLimiter, unlimited } from '../server/rate-limit';
+import type { Mailer } from '../server/mail';
+import {
+	type AuthRateLimiter,
+	type EmailRateLimiter,
+	unlimited,
+	unlimitedEmail
+} from '../server/rate-limit';
 import type { TestUser } from './fixtures';
 
 /**
@@ -67,12 +73,21 @@ export type FakeEventOptions = {
 	 * a sign-in form is about. A test of the limit passes one that refuses.
 	 */
 	authRateLimit?: AuthRateLimiter;
+	/** `locals.emailRateLimit`, likewise present and allowing everything by default. */
+	emailRateLimit?: EmailRateLimiter;
 	/**
-	 * The request's cookies, by name, for a route that reads `event.cookies`.
-	 * Absent unless given, and reaching for it then fails loudly; only `get` is
-	 * provided, because nothing under test sets one server-side.
+	 * The request's cookies, by name, for a route that uses `event.cookies`.
+	 * Absent unless given, and reaching for it then fails loudly. `get` reads
+	 * this object and `set` writes into it, so a test can pass `{}` and then
+	 * look at what the route set — its options are not kept.
 	 */
 	cookies?: Record<string, string>;
+	/**
+	 * `locals.mailer`, for a route that sends email — `capturingMailer()` from
+	 * `$lib/testing/mail` records what it was given. Absent, reaching for it
+	 * fails loudly.
+	 */
+	mailer?: Mailer;
 	/** `event.fetch`, for a route that calls out through it. Absent otherwise. */
 	fetch?: typeof fetch;
 	/**
@@ -117,7 +132,8 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 	const locals: Record<string, unknown> = {
 		user: options.user ?? null,
 		session: null,
-		authRateLimit: options.authRateLimit ?? unlimited
+		authRateLimit: options.authRateLimit ?? unlimited,
+		emailRateLimit: options.emailRateLimit ?? unlimitedEmail
 	};
 	if (options.db) {
 		locals.db = options.db;
@@ -127,6 +143,20 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 			configurable: true,
 			get(): never {
 				throw new Error('fakeEvent was given no db — pass `db` for a route that queries');
+			}
+		});
+	}
+
+	if (options.mailer) {
+		locals.mailer = options.mailer;
+	} else {
+		Object.defineProperty(locals, 'mailer', {
+			enumerable: true,
+			configurable: true,
+			get(): never {
+				throw new Error(
+					'fakeEvent was given no mailer — pass `mailer` for a route that sends email'
+				);
 			}
 		});
 	}
@@ -174,7 +204,14 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 	};
 	if (options.cookies) {
 		const jar = options.cookies;
-		Object.assign(event, { cookies: { get: (name: string) => jar[name] } });
+		Object.assign(event, {
+			cookies: {
+				get: (name: string) => jar[name],
+				set: (name: string, value: string) => {
+					jar[name] = value;
+				}
+			}
+		});
 	} else {
 		Object.defineProperty(event, 'cookies', {
 			enumerable: true,

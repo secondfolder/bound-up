@@ -18,8 +18,9 @@
 	 * For someone who has lost every way in — no password, no passkey. Their
 	 * old key is lost with those, so this makes a new one and a new password, and
 	 * asks their partner to vouch for them. The partner compares the code shown
-	 * here, re-encrypts the history the two of them share to the new key, and
-	 * that lets this page finish. See docs/account-recovery.md.
+	 * here and re-encrypts the history the two of them share to the new key;
+	 * and the person here opens a link emailed to the account's address. Both
+	 * together let this page finish. See docs/account-recovery.md.
 	 *
 	 * Everything is held in this page's memory — the token that authorises the
 	 * request, the new key, and the value the new password derives to — and
@@ -30,7 +31,13 @@
 	type Stage =
 		| { kind: 'form' }
 		| { kind: 'working' }
-		| { kind: 'waiting'; code: string }
+		| {
+				kind: 'waiting';
+				code: string;
+				email: string;
+				partnerApproved: boolean;
+				emailConfirmed: boolean;
+		  }
 		| { kind: 'finishing' }
 		| { kind: 'ended'; message: string };
 	let stage: Stage = $state({ kind: 'form' });
@@ -118,7 +125,13 @@
 			};
 			password = '';
 			confirm = '';
-			stage = { kind: 'waiting', code: await recoveryCode(built.recipient) };
+			stage = {
+				kind: 'waiting',
+				code: await recoveryCode(built.recipient),
+				email,
+				partnerApproved: false,
+				emailConfirmed: false
+			};
 			poll = setInterval(() => void check(), 4000);
 		} catch (error) {
 			console.error(error);
@@ -127,22 +140,51 @@
 		}
 	}
 
+	/**
+	 * Whether a status check is still out. The poll fires every four seconds
+	 * whether or not the last one answered, so on a slow connection two could
+	 * both see approval and both call `finish()` — the second getting a 410 and
+	 * reporting failure while the first was signing in.
+	 */
+	let checking = false;
+
 	async function check() {
-		if (!pending || stage.kind !== 'waiting') {
+		const asked = pending;
+		if (checking || !asked || stage.kind !== 'waiting') {
 			return;
 		}
+		checking = true;
+		try {
+			await checkStatus(asked);
+		} finally {
+			checking = false;
+		}
+	}
+
+	async function checkStatus(asked: NonNullable<typeof pending>) {
 		const response = await fetch('/api/account-recovery/status', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ token: pending.token })
+			body: JSON.stringify({ token: asked.token })
 		}).catch(() => null);
 		if (!response?.ok) {
 			return;
 		}
-		const { status } = (await response.json()) as { status: string };
-		if (status === 'approved') {
+		const { status, emailConfirmed } = (await response.json()) as {
+			status: string;
+			emailConfirmed: boolean;
+		};
+		// The page may have moved on while this was out — ended, or started
+		// again with a new request — and an answer about the old one must not
+		// be spread into the new stage.
+		if (pending !== asked || stage.kind !== 'waiting') {
+			return;
+		}
+		if (status === 'approved' && emailConfirmed) {
 			clearInterval(poll);
 			await finish();
+		} else if (status === 'pending' || status === 'approved') {
+			stage = { ...stage, partnerApproved: status === 'approved', emailConfirmed };
 		} else if (status === 'declined') {
 			end('Your partner said the code did not match, so nothing changed. You can try again.');
 		} else if (status === 'expired' || status === 'completed') {
@@ -243,11 +285,26 @@
 		<SafetyNumber
 			value={stage.code}
 			partnerName="your partner"
-			instructions="Read this to your partner in person or over a call — not in this app. When it matches theirs and they confirm, you will be signed in here."
+			instructions="Read this to your partner in person or over a call — not in this app. When it matches theirs and they confirm, and you have opened the email below, you will be signed in here."
 		/>
-		<p class="quiet" role="status">Waiting for your partner… Keep this page open.</p>
+		<!-- Both halves, in whichever order they happen. The email line reads the
+		     same for an address with no account, which is never sent anything:
+		     this page must not say whether the account exists. -->
+		<ul class="steps" role="status">
+			<li data-done={stage.partnerApproved}>
+				{stage.partnerApproved ? 'Your partner confirmed it is you.' : 'Waiting for your partner…'}
+			</li>
+			<li data-done={stage.emailConfirmed}>
+				{#if stage.emailConfirmed}
+					Your email is confirmed.
+				{:else}
+					We've emailed a link to <strong>{stage.email}</strong>. Open it and confirm it's you.
+				{/if}
+			</li>
+		</ul>
+		<p class="quiet">Keep this page open.</p>
 	{:else if stage.kind === 'finishing'}
-		<p role="status">Your partner confirmed it is you. Signing you in…</p>
+		<p role="status">That's everything confirmed. Signing you in…</p>
 	{:else}
 		<p role="status">{stage.message}</p>
 		<wa-button
@@ -294,6 +351,18 @@
 
 		.invalid {
 			color: var(--wa-color-text-danger);
+		}
+
+		.steps {
+			margin: 0;
+			padding-left: 1.25rem;
+			display: flex;
+			flex-direction: column;
+			gap: var(--wa-space-xs);
+
+			li[data-done='true'] {
+				color: var(--wa-color-text-quiet);
+			}
 		}
 
 		.back {

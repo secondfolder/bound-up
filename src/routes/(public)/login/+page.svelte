@@ -19,6 +19,21 @@
      without one, these were the only screens with nothing of it but the wash. -->
 <h1>Log in</h1>
 
+<!-- Where a verification link lands. An old or broken link needs no resend
+     button here: signing in to an unconfirmed account sends a fresh one. -->
+{#if data.verification === 'verified'}
+	<wa-callout variant="success" size="s" class="notice" data-testid="verification-notice">
+		<wa-icon slot="icon" name="envelope-circle-check" variant="solid"></wa-icon>
+		Your email is confirmed. Log in to continue.
+	</wa-callout>
+{:else if data.verification}
+	<wa-callout variant="warning" size="s" class="notice" data-testid="verification-notice">
+		<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
+		{data.verification === 'expired' ? 'That link has expired.' : "That link didn't work."}
+		Log in and we'll email you a new one.
+	</wa-callout>
+{/if}
+
 <LoginForm data={data.loginForm} redirectTo={data.redirectTo} reason={data.reason} />
 
 <a class="cross-link" href={signupHref}>Create an account</a>
@@ -30,6 +45,10 @@
 		text-align: center;
 		font-size: clamp(2.5rem, 12vw, 4rem);
 		margin: 1rem 0 1.5rem;
+	}
+
+	.notice {
+		margin-bottom: 1rem;
 	}
 
 	.cross-link {

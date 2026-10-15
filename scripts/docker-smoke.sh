@@ -26,6 +26,8 @@ start() {
 		-v "$db_volume:/data/db" -v "$media_volume:/data/media" \
 		-e BETTER_AUTH_SECRET="smoke-test-secret-$(date +%s)-padding-to-32-chars" \
 		-e ORIGIN="http://localhost:$port" \
+		-e MAIL_FROM="Bound Up <smoke@example.test>" \
+		-e MAIL_OUTBOX_DIR=/tmp/mail-outbox \
 		"$image" >/dev/null
 }
 
@@ -51,6 +53,21 @@ query() {
 		console.log(Object.values(result.rows[0])[0]);
 	"
 }
+
+# Email is required: without it the server must refuse to start, and say what
+# to set, rather than come up and fail every sign-up.
+echo "Starting $image without email settings, which it must refuse"
+if docker run --rm -e BETTER_AUTH_SECRET="smoke-test-secret-padding-to-32-chars" \
+	"$image" >"/tmp/$name-nomail.log" 2>&1; then
+	echo 'The server started without MAIL_FROM' >&2
+	exit 1
+fi
+if ! grep -q 'MAIL_FROM is not set' "/tmp/$name-nomail.log"; then
+	echo 'The server failed without email settings, but not by naming them. Its log:' >&2
+	cat "/tmp/$name-nomail.log" >&2
+	exit 1
+fi
+rm -f "/tmp/$name-nomail.log"
 
 echo "Starting $image on fresh volumes"
 start
@@ -108,4 +125,4 @@ if [ "$(docker exec "$name" sh -c 'cat "$MEDIA_DIR/smoke"')" != smoke ]; then
 	echo 'The media directory did not survive the restart' >&2
 	exit 1
 fi
-echo "OK: healthy, sign-in rate limited, $migrations migrations applied once, database and media persisted"
+echo "OK: refused to start without email, healthy, sign-in rate limited, $migrations migrations applied once, database and media persisted"

@@ -9,7 +9,6 @@
 		WEBCRYPTO_UNAVAILABLE,
 		webCryptoAvailable
 	} from '$lib/crypto/kdf';
-	import { stashUnlock } from '$lib/crypto/stash';
 	import { wrapIdentity } from '$lib/crypto/wrap';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
@@ -124,9 +123,9 @@
 					})
 				);
 
-				// The identity travels too, so the gate on the next screen can cache
-				// it without re-deriving anything.
-				stashUnlock({ kind: 'password', email, wrapKey, identity, recipient });
+				// Nothing is stashed for the next screen, unlike signing in: signing
+				// up makes no session, because the address has to be confirmed
+				// first. The first sign-in after that derives everything again.
 			} catch (error) {
 				console.error(error);
 				cancel();

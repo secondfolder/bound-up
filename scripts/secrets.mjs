@@ -11,8 +11,15 @@
  *
  * Options:
  *   --subject <mailto:…|https:…>   VAPID_SUBJECT, if it is not set already
+ *   --mail-from <"Name <a@b>">     MAIL_FROM, if it is not set already
+ *   --resend-key <re_…>            RESEND_API_KEY, if no mail transport is set
  *   --rotate <BETTER_AUTH_SECRET|VAPID>   regenerate one even though it is set
  *   --dry-run                      say what would be set, and set nothing
+ *
+ * Email (docs/email.md) is required, and its credentials cannot be generated:
+ * `dev` points it at a local outbox directory instead, and the Workers targets
+ * ask for a Resend key and sender (or take them from the options above).
+ * `print` leaves them to the self-hoster, who may prefer SMTP.
  *
  * **Only what is missing is generated.** A secret that is already set is left
  * alone unless `--rotate` names it, because replacing one is never harmless:
@@ -53,7 +60,25 @@ const TARGETS = {
 };
 
 /** Every secret this script owns. Anything else in a file is not its business. */
-const MANAGED = ['BETTER_AUTH_SECRET', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT'];
+const MANAGED = [
+	'BETTER_AUTH_SECRET',
+	'VAPID_PUBLIC_KEY',
+	'VAPID_PRIVATE_KEY',
+	'VAPID_SUBJECT',
+	'MAIL_FROM',
+	'RESEND_API_KEY',
+	'MAIL_OUTBOX_DIR'
+];
+
+/** Any one of these is a mail transport; the app refuses more than one. */
+const MAIL_TRANSPORTS = ['RESEND_API_KEY', 'SMTP_URL', 'MAIL_OUTBOX_DIR'];
+
+/**
+ * `npm run dev` writes email to files here rather than sending it, so nobody
+ * needs a provider to click their own sign-up link. Gitignored.
+ */
+const LOCAL_OUTBOX = './.mail-outbox';
+const LOCAL_MAIL_FROM = 'Bound Up <dev@localhost>';
 
 /** Local targets push to real push services too, so a placeholder subject is fine there. */
 const LOCAL_SUBJECT = 'mailto:dev@example.com';
@@ -69,6 +94,8 @@ const { values: options, positionals } = parseArgs({
 	allowPositionals: true,
 	options: {
 		subject: { type: 'string' },
+		'mail-from': { type: 'string' },
+		'resend-key': { type: 'string' },
 		rotate: { type: 'string', multiple: true, default: [] },
 		'dry-run': { type: 'boolean', default: false },
 		help: { type: 'boolean', short: 'h', default: false }
@@ -78,7 +105,8 @@ const { values: options, positionals } = parseArgs({
 const [targetName] = positionals;
 if (options.help || !targetName || !Object.hasOwn(TARGETS, targetName)) {
 	say('usage: npm run secrets -- <dev|local-preview|production|remote-preview|print>');
-	say('       [--subject mailto:you@example.com] [--rotate BETTER_AUTH_SECRET|VAPID] [--dry-run]');
+	say('       [--subject mailto:you@example.com] [--mail-from "Bound Up <hi@example.com>"]');
+	say('       [--resend-key re_…] [--rotate BETTER_AUTH_SECRET|VAPID] [--dry-run]');
 	process.exit(options.help ? 0 : 1);
 }
 const target = TARGETS[targetName];
@@ -146,6 +174,17 @@ async function vapidPair() {
 	return { VAPID_PUBLIC_KEY: Buffer.from(raw).toString('base64url'), VAPID_PRIVATE_KEY: d };
 }
 
+/** Asks on the terminal, or fails naming the option that would have answered. */
+async function ask(question, option) {
+	if (!process.stdin.isTTY) {
+		fail(`${question.split(' ')[0]} is not set. Pass ${option}`);
+	}
+	const prompt = createInterface({ input: process.stdin, output: process.stderr });
+	const answer = (await prompt.question(`${question}: `)).trim();
+	prompt.close();
+	return answer;
+}
+
 async function vapidSubject() {
 	if (options.subject) {
 		return options.subject;
@@ -153,17 +192,12 @@ async function vapidSubject() {
 	if (target.file) {
 		return LOCAL_SUBJECT;
 	}
-	if (!process.stdin.isTTY) {
-		fail('VAPID_SUBJECT is not set. Pass --subject mailto:you@example.com');
-	}
 	// Asked rather than guessed: it is sent to every push service, so it should
 	// be an address someone actually reads.
-	const prompt = createInterface({ input: process.stdin, output: process.stderr });
-	const answer = (
-		await prompt.question('VAPID_SUBJECT (a mailto: or https: URL push services can contact): ')
-	).trim();
-	prompt.close();
-	return answer;
+	return await ask(
+		'VAPID_SUBJECT (a mailto: or https: URL push services can contact)',
+		'--subject mailto:you@example.com'
+	);
 }
 
 const existing = existingNames();
@@ -192,6 +226,38 @@ if (missing('VAPID_SUBJECT') || (rotate.has('VAPID') && options.subject)) {
 		fail(`VAPID_SUBJECT must start with mailto: or https:, got "${subject}"`);
 	}
 	generated.VAPID_SUBJECT = subject;
+}
+
+// Email. Only `dev` can use the outbox: `local-preview` runs the real Workers
+// runtime, which can write no files, so it needs Resend like production does.
+// `print` is for a self-hoster, who chooses their own transport.
+if ((targetName !== 'print' || options['mail-from']) && missing('MAIL_FROM')) {
+	generated.MAIL_FROM =
+		options['mail-from'] ??
+		(targetName === 'dev'
+			? LOCAL_MAIL_FROM
+			: await ask(
+					'MAIL_FROM (the sender, e.g. "Bound Up <hello@your-domain>", on a domain Resend has verified)',
+					'--mail-from "Bound Up <hello@your-domain>"'
+				));
+}
+if (MAIL_TRANSPORTS.every(missing)) {
+	if (options['resend-key']) {
+		generated.RESEND_API_KEY = options['resend-key'];
+	} else if (targetName === 'dev') {
+		generated.MAIL_OUTBOX_DIR = LOCAL_OUTBOX;
+	} else if (targetName !== 'print') {
+		generated.RESEND_API_KEY = await ask(
+			'RESEND_API_KEY (from resend.com, allowed to send from MAIL_FROM)',
+			'--resend-key re_…'
+		);
+	}
+}
+if (targetName === 'print' && !generated.MAIL_FROM) {
+	say(
+		'Also set MAIL_FROM and one of RESEND_API_KEY or SMTP_URL: the server will not start ' +
+			'without email. See docs/self-hosting.md.'
+	);
 }
 
 // ── storing ──────────────────────────────────────────────────────────────────

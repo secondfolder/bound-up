@@ -7,6 +7,8 @@ import {
 	bucketForAuthPath,
 	clientBucket,
 	consumeRateLimit,
+	emailRateLimiter,
+	onceEach,
 	pruneRateLimits,
 	rateLimitMessage
 } from './rate-limit';
@@ -104,6 +106,22 @@ describe('authRateLimiter', () => {
 	});
 });
 
+describe('onceEach', () => {
+	/**
+	 * The check-email action counts an address, then Better Auth's send counts
+	 * it again in the same request; at one a minute, a second count would
+	 * refuse the email the action had just allowed.
+	 */
+	it('counts an address once per request, however it is spelled', async () => {
+		const limit = onceEach(emailRateLimiter(harness.db, SECRET));
+		expect(await limit('Ada@Example.test')).toEqual({ allowed: true });
+		expect(await limit('ada@example.test ')).toEqual({ allowed: true });
+
+		const nextRequest = onceEach(emailRateLimiter(harness.db, SECRET));
+		expect(await nextRequest('ada@example.test')).toMatchObject({ allowed: false });
+	});
+});
+
 describe('clientBucket', () => {
 	it('keeps an IPv4 address as it is', () => {
 		expect(clientBucket('203.0.113.7')).toBe('203.0.113.7');
@@ -130,6 +148,7 @@ describe('bucketForAuthPath', () => {
 		expect(bucketForAuthPath('/sign-in/email')).toBe('sign-in');
 		expect(bucketForAuthPath('/sign-up/email')).toBe('sign-up');
 		expect(bucketForAuthPath('/change-password')).toBe('change-password');
+		expect(bucketForAuthPath('/send-verification-email')).toBe('verification-email');
 		expect(bucketForAuthPath('/get-session')).toBeNull();
 		expect(bucketForAuthPath('/passkey/verify-authentication')).toBeNull();
 	});

@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_REQUESTS_PER_EMAIL } from '$lib/server/recovery';
 import { ADA_RECIPIENT, FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
+import { createTestUser } from '$lib/testing/fixtures';
+import { capturingMailer, linkIn } from '$lib/testing/mail';
 import { POST as start } from './+server';
 import { POST as complete } from './complete/+server';
 import { POST as status } from './status/+server';
@@ -72,6 +75,50 @@ describe('POST /api/account-recovery', () => {
 		expect(result).toMatchObject({ type: 'error', status: 429 });
 	});
 
+	/**
+	 * The emailed half of the sign-in. Sent to the account's own address, and
+	 * the answer to the caller is the same `{ token }` as for an unknown email.
+	 */
+	it('emails an existing account a confirm link, and answers as for anyone', async () => {
+		const ada = await createTestUser(harness.db, { name: 'Ada' });
+		const { mailer, sent } = capturingMailer();
+		const response = await start(
+			fakeEvent({
+				db: harness.db,
+				json: { ...validStart, email: ada.email.toUpperCase() },
+				authContext,
+				clientAddress: '203.0.113.9',
+				mailer
+			})
+		);
+		const body = await response.json();
+		expect(Object.keys(body)).toEqual(['token']);
+
+		expect(sent).toHaveLength(1);
+		expect(sent[0]?.to).toBe(ada.email);
+		const link = linkIn(defined(sent[0], 'the confirm email'));
+		expect(link.pathname).toBe('/login/recover/confirm');
+		// In the fragment, which no browser sends to the server, and never the
+		// requester's own token.
+		expect(link.search).toBe('');
+		expect(link.hash).toMatch(/^#token=[\w-]{43}$/);
+		expect(link.hash).not.toContain(body.token);
+	});
+
+	it('emails nobody for an address with no account', async () => {
+		const { mailer, sent } = capturingMailer();
+		await start(
+			fakeEvent({
+				db: harness.db,
+				json: validStart,
+				authContext,
+				clientAddress: '203.0.113.9',
+				mailer
+			})
+		);
+		expect(sent).toEqual([]);
+	});
+
 	it('still works where the client address is unknown', async () => {
 		const response = await start(fakeEvent({ db: harness.db, json: validStart, authContext }));
 		expect(response.status).toBe(200);
@@ -82,7 +129,7 @@ describe('POST /api/account-recovery/status', () => {
 	it('reads a pending request', async () => {
 		const { token } = await (await post(start, validStart)).json();
 		const response = await post(status, { token });
-		await expect(response.json()).resolves.toEqual({ status: 'pending' });
+		await expect(response.json()).resolves.toEqual({ status: 'pending', emailConfirmed: false });
 	});
 
 	it('refuses a malformed token', async () => {

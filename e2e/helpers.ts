@@ -6,6 +6,7 @@ import {
 	type Locator,
 	type Page
 } from '@playwright/test';
+import { linkIn, waitForMailTo } from './mail';
 
 /**
  * Shared steps for the invite flows.
@@ -177,6 +178,15 @@ export async function waitForKeyring(page: Page) {
 	await page.locator('html[data-keyring="unlocked"]').waitFor({ state: 'attached' });
 }
 
+/**
+ * Signs up, confirms the address from the email that sends, and signs in.
+ *
+ * All three, because signing up alone no longer signs anyone in: an account
+ * cannot until its address is confirmed (docs/email.md). The link is read out
+ * of the server's outbox (`e2e/mail.ts`) and followed as a person would, and
+ * it carries `redirectTo` through, so a sign-up started from an invite still
+ * lands back on it.
+ */
 export async function signUp(page: Page, who: Account, from = '/signup') {
 	await page.goto(from);
 	// Before the first fill, not just before the submit — see the note on
@@ -187,11 +197,23 @@ export async function signUp(page: Page, who: Account, from = '/signup') {
 	await fillPassword(page, 'password', who.password);
 	await fillPassword(page, 'passwordConfirm', who.password);
 	await submitEnhancedForm(page, 'Sign Up');
-	// Waits for the form to be left behind rather than for a fixed destination:
-	// signing up lands on /home normally and back on the invite when one is
-	// being accepted. Without this the next step races the session cookie.
-	await page.waitForURL((url) => !url.pathname.startsWith('/signup'));
-	await waitForKeyring(page);
+	await finishSignUp(page, who);
+}
+
+/**
+ * The half of `signUp` after the form is submitted: waits for the check-email
+ * page, follows the link from the email, and signs in where it lands.
+ *
+ * Exported for specs that fill the sign-up form their own way, such as the
+ * autofill tests in encryption.spec.ts.
+ */
+export async function finishSignUp(page: Page, who: Account) {
+	await page.waitForURL((url) => url.pathname === '/signup/check-email');
+	const mail = await waitForMailTo(who.email);
+	await page.goto(linkIn(mail));
+	await page.waitForURL((url) => url.pathname === '/login' && url.searchParams.has('verified'));
+	await expect(page.getByTestId('verification-notice')).toContainText('Your email is confirmed');
+	await logInHere(page, who);
 }
 
 export async function logIn(page: Page, who: Account, from = '/login') {

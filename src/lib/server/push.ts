@@ -9,6 +9,7 @@ import {
 	type PushKind
 } from '$lib/notifications';
 import type { PartnershipView } from '$lib/partnership';
+import { inBackground } from './background';
 import type { Db } from './db';
 import { pushSubscriptions } from './db/schema';
 import type { Watcher } from './realtime';
@@ -339,19 +340,6 @@ export function watchingDevices(watching: readonly Watcher[], recipientId: strin
 	return watching.flatMap((watcher) =>
 		watcher.userId === recipientId && watcher.deviceId ? [watcher.deviceId] : []
 	);
-}
-
-/**
- * Lets a push finish after the response has gone.
- *
- * On Workers that is `ctx.waitUntil`, which keeps the invocation alive for up
- * to 30 seconds without holding the sender's request open on a round trip to
- * Apple. The Node builds have no such limit: the promise simply runs.
- * `sendPush` never rejects, so a floating promise here cannot become an
- * unhandled rejection.
- */
-export function inBackground(platform: App.Platform | undefined, task: Promise<unknown>): void {
-	platform?.ctx?.waitUntil(task);
 }
 
 /**

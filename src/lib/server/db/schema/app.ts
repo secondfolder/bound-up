@@ -880,9 +880,14 @@ export const threadReads = sqliteTable(
  * - `recipient` / `wrap_*` — the requester's new public key and their new
  *   password wrap, both opaque. Note what is absent: the new `authSecret`
  *   arrives only at completion, so no login credential ever waits in here.
+ * - `email_token_hash` — SHA-256 of a second random token, the one emailed to
+ *   the account's address. Following that link sets `email_confirmed_at`.
+ *   NULL for an unknown email, which is never sent anything.
  *
  * `status` moves pending → approved (a partner finished re-encrypting) →
- * completed (the requester signed in), or to declined / superseded. Expiry is
+ * completed (the requester signed in), or to declined / superseded. Completing
+ * needs `email_confirmed_at` as well as `approved`: a partner alone cannot
+ * sign in as someone else (docs/account-recovery.md). Expiry is
  * `expires_at`, read at use rather than written by a job.
  */
 export const accountRecoveryRequests = sqliteTable(
@@ -902,6 +907,9 @@ export const accountRecoveryRequests = sqliteTable(
 		status: text('status').$type<AccountRecoveryStatus>().notNull().default('pending'),
 		/** The partner whose re-encryption approved it. */
 		approvedBy: text('approved_by').references(() => user.id, { onDelete: 'set null' }),
+		emailTokenHash: text('email_token_hash').unique(),
+		/** When the link sent to the account's address was followed and confirmed. */
+		emailConfirmedAt: integer('email_confirmed_at', { mode: 'timestamp_ms' }),
 		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
 		resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
 		...timestamps

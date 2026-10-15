@@ -13,6 +13,12 @@ VAPID_PUBLIC_KEY=""
 VAPID_PRIVATE_KEY=""
 VAPID_SUBJECT=""
 
+# Email (docs/email.md). Required. This is the real Workers runtime, which
+# cannot write files or open SMTP connections, so only Resend works here:
+# `npm run secrets -- local-preview` asks for both.
+MAIL_FROM=""
+RESEND_API_KEY=""
+
 # Sets the Cloudflare tunnel to use for `npm run preview`.
 CF_TUNNEL_NAME=""
 # If true the Cloudflare will be used automatically when runnning `npm run preview`.

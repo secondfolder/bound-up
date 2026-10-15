@@ -24,6 +24,24 @@ everyone out and stopping every device's notifications. To add a missing one
 later, append the line it needs rather than regenerating the file. The script
 itself is described in [development.md](development.md#secrets).
 
+**Then add email to `.env` before starting.** Accounts confirm their address
+before they can sign in, so the server will not start without a way to send
+the link (see [email.md](email.md)). It needs a sender and exactly one
+transport:
+
+```sh
+MAIL_FROM="Bound Up <hello@bound.example.com>"
+# Either an API key from resend.com, allowed to send from that address…
+RESEND_API_KEY="re_…"
+# …or any SMTP server, as a URL (smtps:// for TLS on connect, smtp:// for STARTTLS)
+SMTP_URL="smtps://user:password@mail.example.com:465"
+```
+
+**Upgrading from a version before email verification:** add those lines before
+pulling the new image, or it will exit at startup saying which are missing.
+Existing accounts are marked verified by a migration, so nobody already signed
+up is asked to confirm anything.
+
 `docker-compose.yml` at the repo root is a working example: the image from
 `ghcr.io/secondfolder/bound-up`, a volume for the database and a volume for
 media. The first account to sign up becomes the admin, as on Workers (see
@@ -43,6 +61,9 @@ media. The first account to sign up becomes the admin, as on Workers (see
 | `VAPID_PUBLIC_KEY`   | none — push is off          | Push notifications. `secrets.mjs print` makes the pair         |
 | `VAPID_PRIVATE_KEY`  | none — push is off          | Keep the pair: replacing it stops every subscription           |
 | `VAPID_SUBJECT`      | none — push is off          | A `mailto:` or `https:` URL push services can contact          |
+| `MAIL_FROM`          | none — the server exits     | The sender of every email, e.g. `Bound Up <hi@example.com>`    |
+| `RESEND_API_KEY`     | none                        | Send through Resend. Exactly one of this and `SMTP_URL`        |
+| `SMTP_URL`           | none                        | Send through an SMTP server: `smtps://user:pass@host:465`      |
 
 `/data/db` and `/data/media` are the two volumes. Back up both together: a
 database row without its file shows as missing media, and a file without its
@@ -102,6 +123,7 @@ global through `javascript.globals` in `biome.jsonc`; TypeScript through
 | cron trigger → `scheduled.ts` | `startMediaSweep` from the `init` hook                | `src/hooks.server.ts`             |
 | R2 lifecycle rule on `expiring/` | `deleteOlderThan` in the same sweep               | `src/lib/server/self-hosted/sweep.ts` |
 | `wrangler secret`             | the container's environment                           | `src/hooks.server.ts`             |
+| Resend over `fetch`           | Resend, or SMTP through nodemailer (`mail/local.ts`)  | `src/lib/server/mail/config.ts`   |
 | `wrangler d1 migrations apply` | the entrypoint, on every start                       | `scripts/docker-entrypoint.mjs`   |
 
 These are the same local backends `vite dev` has always used, so everything
@@ -171,7 +193,9 @@ database. `drizzle-kit push` is still never used.
 
 Before anything is published, CI runs the image through three checks.
 
-- **`scripts/docker-smoke.sh`** starts it on fresh named volumes, checks every
+- **`scripts/docker-smoke.sh`** first starts it with no email settings and
+  checks it exits saying `MAIL_FROM is not set`. Then it starts it on fresh
+  named volumes, checks every
   migration was applied, checks over HTTP that a sixth sign-in in a minute is
   refused as too many (and that Better Auth never logged that it could not tell
   clients apart), writes a marker row and a marker file, then replaces
@@ -181,7 +205,9 @@ Before anything is published, CI runs the image through three checks.
   `e2e/server.mjs` runs the image instead of `vite dev`, on the same
   per-checkout port, with two fresh named volumes mounted where a self-hoster's
   go, and `AUTH_RATE_LIMIT=off` — every test signs up from the same address,
-  which is why the smoke test checks the limit instead. `npm run test:e2e:image` does this locally (it builds `bound-up:local`
+  which is why the smoke test checks the limit instead. Email goes to an
+  outbox directory under `/tmp` inside the container, which `e2e/mail.ts`
+  reads through `docker exec` the same way `e2e/db.ts` reaches the database. `npm run test:e2e:image` does this locally (it builds `bound-up:local`
   first).
 - **The specs that touch the database go through the container.** `e2e/db.ts`
   is their one `sql()` helper. Against `vite dev` it opens the run's SQLite

@@ -29,6 +29,18 @@ export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 export const E2E_RUN_DIR = join(tmpdir(), `bound-up-e2e-${KEY}`);
 export const E2E_MEDIA_DIR = join(E2E_RUN_DIR, 'media');
 /**
+ * Where the server writes the email it would have sent (`MAIL_OUTBOX_DIR`),
+ * for `e2e/mail.ts` to read the links back out. Inside the run directory, so
+ * every run starts with an empty one.
+ */
+export const E2E_MAIL_DIR = join(E2E_RUN_DIR, 'mail');
+/**
+ * The same, inside the container when the suite runs against an image. Under
+ * `/tmp`, which the unprivileged user the image runs as can write to, rather
+ * than on a volume: nothing needs it once the run is over.
+ */
+export const E2E_CONTAINER_MAIL_DIR = '/tmp/mail-outbox';
+/**
  * Beside the run directory rather than inside it, because the run directory is
  * deleted once the lock is held. Kept short: a Unix socket path is capped at
  * 104 bytes on macOS, and `tmpdir()` there is already about 50.

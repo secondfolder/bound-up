@@ -43,6 +43,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
 | `src/lib/media/`              | Browser-only media transcoding. See [docs/messaging.md](docs/messaging.md#transcoding)       |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
+| `src/lib/server/mail/`        | The mailer: Resend, SMTP or an outbox, and every email's copy. See [docs/email.md](docs/email.md) |
 | `src/lib/server/self-hosted/` | What only the Docker build runs: the media sweep. See [docs/self-hosting.md](docs/self-hosting.md) |
 | `src/service-worker.ts`       | Shows push notifications, and nothing else: no `fetch` handler, no cache. See [docs/notifications.md](docs/notifications.md) |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
@@ -463,6 +464,14 @@ people write needs the same treatment. The commitment, and how it sits beside
 privacy (drafts are sealed to the writer's own key, never stored in the clear),
 is in [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md).
 
+**Email is sent in the background and never awaited.** Hand a message to
+`sendInBackground` from `$lib/server/mail` (Better Auth gets the same through
+`sendMail` in `createAuth`). A send that a response waited on, or that could
+throw into it, would let response time or an error say whether an address has
+an account — the sign-up, resend and recovery forms all promise it does not.
+Copy goes in `mail/templates.ts` and says nothing about what the app is for.
+See [docs/email.md](docs/email.md).
+
 **Never log a form object.** It no longer contains a plaintext password —
 the browser posts a derived value instead (see
 [docs/encryption.md](docs/encryption.md)) — but it does contain `authSecret`,
@@ -844,6 +853,13 @@ Notes that cost a debugging round each:
   'focus')" as it upgrades, and the symptom was a send button that never
   enabled — nowhere near the cause. Worth checking `page.on('pageerror')` early
   when a component seems inert.
+- **`signUp` goes through the email.** An account cannot sign in until its
+  address is confirmed, so the helper submits the form, reads the link out of
+  the server's outbox (`e2e/mail.ts`), follows it and signs in. A spec that
+  fills the sign-up form itself calls `finishSignUp` afterwards; one that
+  wants an email reads it with `waitForMailTo`, which polls, because the
+  server sends after its response. Against an image the outbox is inside the
+  container and is read through `docker exec`, like `sql()`.
 - Each test that needs two people drives two browser contexts, so the two
   accounts hold genuinely separate cookies.
 
@@ -892,6 +908,7 @@ Four places, split on scope:
 | [docs/request-failures.md](docs/request-failures.md)                                     | Feedback for failed requests: inline vs the app-wide notice, the safety net  |
 | [docs/versions-and-updates.md](docs/versions-and-updates.md)                             | The build's version from git history, and how an open app picks up a deploy  |
 | [docs/playroom.md](docs/playroom.md)                                                     | The Playroom, the standalone shell, and the IQ test: rigging, questions, media |
+| [docs/email.md](docs/email.md)                                                           | Email verification, the mailer and its transports, what an email may say     |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

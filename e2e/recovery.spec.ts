@@ -11,6 +11,7 @@ import {
 	waitForHydration,
 	writeThread
 } from './helpers';
+import { linkIn, mailsTo, waitForMailTo } from './mail';
 
 /**
  * Partner-assisted sign-in, from both ends, with the real key exchange.
@@ -43,6 +44,7 @@ test.describe('partner-assisted sign-in', () => {
 			const threadPath = new URL(jun.page.url()).pathname;
 
 			// ── Ada, on the new device ─────────────────────────────────────────
+			const mailsBefore = (await mailsTo(ada.who.email)).length;
 			const requester = await fresh.newPage();
 			await requester.goto('/login');
 			await waitForHydration(requester);
@@ -73,6 +75,25 @@ test.describe('partner-assisted sign-in', () => {
 			// No "key changed" warning about the change Jun just vouched for — not
 			// even while the server still serves Ada's old key.
 			await expect(jun.page.getByText(/message key has changed/)).toHaveCount(0);
+
+			// ── Jun's approval alone is not enough ─────────────────────────────
+			// Otherwise a partner could file a request for someone else's email
+			// and approve it themselves. The requester page waits for the other
+			// half: the link emailed to Ada's address.
+			await expect(requester.getByText('Your partner confirmed it is you.')).toBeVisible({
+				timeout: 15_000
+			});
+			expect(new URL(requester.url()).pathname).toBe('/login/recover');
+
+			// ── Ada opens the email, wherever she reads it ─────────────────────
+			const confirmMail = await waitForMailTo(ada.who.email, mailsBefore + 1);
+			expect(confirmMail.subject).toMatch(/signing back in/);
+			const inbox = await fresh.newPage();
+			await inbox.goto(linkIn(confirmMail));
+			await waitForHydration(inbox);
+			await clickWaButton(inbox, 'Yes, this is me');
+			await expect(inbox.getByText(/that's confirmed/)).toBeVisible();
+			await inbox.close();
 
 			// ── Ada is let in, with the history readable ───────────────────────
 			await requester.waitForURL('/home', { timeout: 20_000 });
@@ -141,5 +162,60 @@ test.describe('partner-assisted sign-in', () => {
 
 		await expect(page.locator('.safety .number')).toBeVisible({ timeout: 15_000 });
 		await expect(page.getByText(/Waiting for your partner/)).toBeVisible();
+		// Says it emailed a link, as it does for a real account, though nothing
+		// was sent.
+		await expect(page.getByText(/We've emailed a link to nobody@example.test/)).toBeVisible();
+		expect(await mailsTo('nobody@example.test')).toEqual([]);
+	});
+
+	/**
+	 * Mail scanners open links to look at them. Opening the confirm link must
+	 * not be what confirms it, or a scanner could vouch for a takeover.
+	 */
+	test('opening the emailed link confirms nothing until the button is pressed', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		const fresh = await browser.newContext();
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+			const mailsBefore = (await mailsTo(ada.who.email)).length;
+
+			const requester = await fresh.newPage();
+			await requester.goto('/login/recover');
+			await waitForHydration(requester);
+			await requester.locator('wa-input[data-field="recoverEmail"] input').fill(ada.who.email);
+			await fillPassword(requester, 'newPassword', 'vocalist-hazy-radar-plunge');
+			await fillPassword(requester, 'confirmPassword', 'vocalist-hazy-radar-plunge');
+			await clickWaButton(requester, 'Ask my partner');
+			await expect(requester.locator('.safety .number')).toBeVisible({ timeout: 15_000 });
+
+			const link = linkIn(await waitForMailTo(ada.who.email, mailsBefore + 1));
+			const scanner = await fresh.newPage();
+			await scanner.goto(link);
+			await waitForHydration(scanner);
+			await expect(scanner.getByText('Is this you?')).toBeVisible();
+			await scanner.close();
+
+			// Jun approves; the request still cannot finish.
+			await jun.page.goto('/home');
+			await jun.page.getByRole('link', { name: `Help ${ada.who.name} sign in` }).click();
+			await clickWaButton(jun.page, 'The code matches — help them');
+			await expect(requester.getByText('Your partner confirmed it is you.')).toBeVisible({
+				timeout: 15_000
+			});
+			await expect(requester.getByText(/We've emailed a link/)).toBeVisible();
+			expect(new URL(requester.url()).pathname).toBe('/login/recover');
+			// And Ada's old session is untouched.
+			await ada.page.goto('/home');
+			expect(new URL(ada.page.url()).pathname).toBe('/home');
+		} finally {
+			await fresh.close();
+			await ada.close();
+			await jun.close();
+		}
 	});
 });

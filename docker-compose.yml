@@ -5,8 +5,11 @@
 #   docker compose up -d
 #
 # The first command writes the secrets to .env, which compose reads for the
-# ${…} below. Keep .env: replacing it signs everyone out and stops every
-# device's push notifications. The first account to sign up becomes the admin.
+# ${…} below. Then add MAIL_FROM and either RESEND_API_KEY or SMTP_URL to it:
+# accounts confirm their email before they can sign in, so the server will
+# not start without a way to send it. Keep .env: replacing it signs everyone
+# out and stops every device's push notifications. The first account to sign
+# up becomes the admin.
 services:
   bound-up:
     image: ghcr.io/secondfolder/bound-up:latest
@@ -30,6 +33,12 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # Email, from .env. Required: MAIL_FROM, and exactly one of the two
+      # transports — an API key from resend.com, or any SMTP server as a URL
+      # (smtps://user:password@mail.example.com:465). See docs/email.md.
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env, see the top of this file}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SMTP_URL: ${SMTP_URL:-}
     volumes:
       - bound-up-db:/data/db
       - bound-up-media:/data/media

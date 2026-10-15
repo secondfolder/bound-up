@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
 import { fail, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
+import { verificationNotice, verifiedCallback } from '$lib/email-verification';
 import { redirectTargetOrHome, safeRedirect } from '$lib/safe-redirect';
 import { loginFormSchema } from '$lib/schemas/loginForm';
 import { rateLimitMessage } from '$lib/server/rate-limit';
@@ -19,7 +20,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// its key. It changes nothing on screen; the form passes it on so the
 	// storage explanation can follow the sign-in. Anything else is ignored.
 	const reason = url.searchParams.get('reason') === 'device' ? ('device' as const) : null;
-	return { loginForm: await superValidate(zod4(loginFormSchema)), redirectTo, reason };
+	// Where a verification link lands, as Better Auth redirected it: confirmed,
+	// or a link that no longer works. See `$lib/email-verification`.
+	const verification = verificationNotice(url.searchParams);
+	return {
+		loginForm: await superValidate(zod4(loginFormSchema)),
+		redirectTo,
+		reason,
+		verification
+	};
 };
 
 export const actions: Actions = {
@@ -51,8 +60,15 @@ export const actions: Actions = {
 			// `authSecret` goes in as the password. Better Auth hashes whatever it
 			// is given with scrypt and a fresh per-user salt, which is what stops a
 			// stolen database from being a login verifier — see docs/encryption.md.
+			//
+			// `callbackURL` is only used if the address is not yet confirmed: it
+			// is where the fresh link Better Auth then sends comes back to.
 			await locals.auth.api.signInEmail({
-				body: { email: loginForm.data.email, password: loginForm.data.authSecret },
+				body: {
+					email: loginForm.data.email,
+					password: loginForm.data.authSecret,
+					callbackURL: verifiedCallback(url.searchParams.get('redirectTo'))
+				},
 				headers: request.headers
 			});
 		} catch (error) {
@@ -64,6 +80,18 @@ export const actions: Actions = {
 				// indistinguishable rather than only reported identically.
 				if (error.statusCode === 401) {
 					return setError(loginForm, '', 'Invalid email or password');
+				}
+				// Only reachable with the right password — Better Auth checks it
+				// first — so saying the address is unconfirmed tells nobody but its
+				// owner anything. A new link has already been sent
+				// (`sendOnSignIn`), so an old or lost one is never a dead end.
+				if (error.body?.code === 'EMAIL_NOT_VERIFIED') {
+					return setError(
+						loginForm,
+						'',
+						"Confirm your email address first. We've just sent you a new link — open it, then sign in.",
+						{ status: 403 }
+					);
 				}
 				return setError(loginForm, '', error.body?.message ?? 'Could not login');
 			}

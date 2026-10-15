@@ -766,7 +766,8 @@
 					"id": "email-verification",
 					"title": "Email verification",
 					"summary": "Confirm your email address is really yours.",
-					"status": "planned",
+					"status": "shipped",
+					"shippedOn": "2026-10-15",
 					"icon": "envelope-circle-check"
 				},
 				{

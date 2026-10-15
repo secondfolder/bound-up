@@ -4,10 +4,11 @@
 import type { AnyD1Database } from 'drizzle-orm/d1';
 import type { Auth, Session, User } from '$lib/server/auth';
 import type { Db } from '$lib/server/db';
+import type { Mailer } from '$lib/server/mail';
 import type { MediaBucket } from '$lib/server/media';
 import type { PornRelayNamespace } from '$lib/server/porn-relay/binding';
 import type { TunnelService } from '$lib/server/porn-relay/tunnel';
-import type { AuthRateLimiter } from '$lib/server/rate-limit';
+import type { AuthRateLimiter, EmailRateLimiter } from '$lib/server/rate-limit';
 import type { RealtimeNamespace } from '$lib/server/realtime/binding';
 
 declare global {
@@ -37,12 +38,26 @@ declare global {
 			session: Session | null;
 			user: User | null;
 			/**
-			 * One attempt against a sign-in, sign-up or change-password bucket,
-			 * for this request's client. Form actions call it before Better Auth;
-			 * the hook calls it for the `/api/auth` equivalents. See
-			 * `$lib/server/rate-limit`.
+			 * One attempt against a sign-in, sign-up, change-password or
+			 * verification-email bucket, for this request's client. Form actions
+			 * call it before Better Auth; the hook calls it for the `/api/auth`
+			 * equivalents. See `$lib/server/rate-limit`.
 			 */
 			authRateLimit: AuthRateLimiter;
+			/**
+			 * One verification email to an address, counted per address rather
+			 * than per client, and off wherever `authRateLimit` is. Better Auth's
+			 * sends are held to it (`sendLimited` in `$lib/server/auth`), and the
+			 * check-email page's resend is refused by it. Counts each address
+			 * once per request (`onceEach`). See `$lib/server/rate-limit`.
+			 */
+			emailRateLimit: EmailRateLimiter;
+			/**
+			 * This server's mailer, built on its first send (`lazyMailer` in
+			 * hooks.server.ts). Send through `sendInBackground` so no response
+			 * waits on the provider. See `$lib/server/mail` and docs/email.md.
+			 */
+			mailer: Mailer;
 		}
 		// interface PageData {}
 		// interface PageState {}
@@ -94,6 +109,15 @@ declare global {
 				VAPID_PUBLIC_KEY?: string;
 				VAPID_PRIVATE_KEY?: string;
 				VAPID_SUBJECT?: string;
+				/**
+				 * Email. `MAIL_FROM` and one transport are required: the server
+				 * refuses to start without them. On Workers the transport can only
+				 * be `RESEND_API_KEY`. See `$lib/server/mail` and docs/email.md.
+				 */
+				MAIL_FROM?: string;
+				RESEND_API_KEY?: string;
+				SMTP_URL?: string;
+				MAIL_OUTBOX_DIR?: string;
 			};
 			/**
 			 * Optional because the self-hosted and dev servers have no platform

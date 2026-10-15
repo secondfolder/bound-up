@@ -29,3 +29,12 @@ export const startRecoverySchema = z.object({
 export const recoveryStatusSchema = z.object({ token: tokenField });
 
 export const completeRecoverySchema = z.object({ token: tokenField, authSecret: authSecretField });
+
+/**
+ * The confirm page's form: the token from the link emailed to the account's
+ * address. A form action rather than JSON, unlike the three above, because
+ * this page holds nothing in memory that a 303 could lose.
+ */
+export const confirmRecoveryEmailSchema = z.object({ token: tokenField });
+
+export type ConfirmRecoveryEmailSchema = typeof confirmRecoveryEmailSchema;

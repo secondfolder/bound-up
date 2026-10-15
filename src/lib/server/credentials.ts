@@ -19,8 +19,10 @@ const CREDENTIAL_PROVIDER = 'credential';
  * For a partner-assisted sign-in, and nothing else: the user has lost their
  * password, so `changePassword` (which needs the old one) cannot help, and
  * `setPassword` refuses an account that already has one. There is no
- * reset-by-email flow in this app — no mailer, so `requestPasswordReset` has
- * no handler to call.
+ * reset-by-email flow in this app, and `sendResetPassword` is deliberately not
+ * configured, so `requestPasswordReset` has no handler to call: an emailed
+ * reset could set a password but never bring back the key it opened
+ * (docs/account-recovery.md).
  *
  * `hash` must come from Better Auth's own `password.hash`, so sign-in can
  * verify it exactly as it verifies any other credential. Returned as a query

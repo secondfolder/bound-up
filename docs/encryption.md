@@ -429,9 +429,9 @@ passkey unlocks, so signing in with one brings the identity back.
 **Losing every way in** — the password and every passkey — loses the identity
 for good. What remains is a partner-assisted sign-in, from the login page: a new
 password and a new identity, a partner who compares a code and re-encrypts the
-history the two of them share, and every old passkey and session removed. See
-[docs/account-recovery.md](account-recovery.md), including the gap it has until
-email verification exists.
+history the two of them share, a link emailed to the account's address, and
+every old passkey and session removed. See
+[docs/account-recovery.md](account-recovery.md).
 
 ## Trust on first use
 

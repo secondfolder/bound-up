@@ -4,7 +4,8 @@ import { completeAccountRecovery } from '$lib/server/recovery';
 import type { RequestHandler } from './$types';
 
 /**
- * Finishes an approved partner-assisted sign-in, and sets the new password.
+ * Finishes a partner-assisted sign-in once a partner has approved it and the
+ * link emailed to the account has been confirmed, and sets the new password.
  *
  * The `authSecret` for the new password arrives only here, and is hashed with
  * Better Auth's own password hasher so sign-in verifies it like any other. The
@@ -23,6 +24,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		passwordHash: await context.password.hash(parsed.data.authSecret)
 	});
 	if (!result.ok) {
+		if (result.reason === 'email-unconfirmed') {
+			error(409, 'Confirm the link we emailed you first.');
+		}
 		error(result.reason === 'not-approved' ? 409 : 410, 'That request is no longer open.');
 	}
 	return json({ ok: true });

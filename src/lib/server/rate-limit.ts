@@ -1,10 +1,13 @@
 import { lte, sql } from 'drizzle-orm';
+import { RESEND_COOLDOWN_SECONDS } from '../email-verification';
+import { normaliseEmail } from '../encryption';
 import type { Db } from './db';
 import { authRateLimits } from './db/schema';
 import { keyedHash } from './keyed-hash';
 
 /**
- * The rate limit on signing in, signing up and changing a password.
+ * The rate limit on signing in, signing up, changing a password and asking
+ * for another verification email.
  *
  * The app's own rather than Better Auth's, which it replaces (`rateLimit` in
  * `auth.ts` is off). Better Auth's limiter runs only in its HTTP router, so it
@@ -46,10 +49,72 @@ export const AUTH_RATE_LIMITS = {
 	'change-password': [
 		{ max: 5, windowSeconds: 60 },
 		{ max: 20, windowSeconds: 60 * 60 }
+	],
+	// Asking for another verification link. Not a guess at anything, but each
+	// one is an email sent to an address the caller names, so it is kept low
+	// enough that the form cannot be turned on somebody's inbox. The email
+	// itself is also limited per address (`locals.emailRateLimit`), where Better
+	// Auth sends it — see `sendLimited` in auth.ts.
+	'verification-email': [
+		{ max: 3, windowSeconds: 60 },
+		{ max: 10, windowSeconds: 60 * 60 }
 	]
 } as const satisfies Record<string, readonly RateLimitRule[]>;
 
 export type AuthRateLimitBucket = keyof typeof AUTH_RATE_LIMITS;
+
+/**
+ * Verification links one address can be sent, whichever clients ask: one a
+ * minute, which is the countdown the check-email page shows, and four an hour
+ * — the sign-up's own and three more. Per address because the per-client
+ * bucket alone would let many clients fill one inbox.
+ */
+export const VERIFICATION_EMAIL_PER_ADDRESS = [
+	{ max: 1, windowSeconds: RESEND_COOLDOWN_SECONDS },
+	{ max: 4, windowSeconds: 60 * 60 }
+] as const satisfies readonly RateLimitRule[];
+
+/**
+ * What `locals.emailRateLimit` is: one verification email to `address`,
+ * counted against `VERIFICATION_EMAIL_PER_ADDRESS`. Off wherever
+ * `authRateLimit` is.
+ */
+export type EmailRateLimiter = (address: string) => Promise<RateLimitResult>;
+
+export const unlimitedEmail: EmailRateLimiter = () => Promise.resolve({ allowed: true });
+
+/**
+ * Counts each address once, however often it is asked about, for the life of
+ * the limiter — one request, as `hooks.server.ts` builds it.
+ *
+ * The check-email action counts an address so it can show the countdown, and
+ * then asks Better Auth to send, whose callback counts it again before
+ * sending. Counted twice, the one-a-minute rule would refuse the very email
+ * the action had just allowed. Every caller gets the first answer.
+ */
+export function onceEach(limiter: EmailRateLimiter): EmailRateLimiter {
+	const answers = new Map<string, Promise<RateLimitResult>>();
+	return (address) => {
+		const key = normaliseEmail(address);
+		let answer = answers.get(key);
+		if (!answer) {
+			answer = limiter(address);
+			answers.set(key, answer);
+		}
+		return answer;
+	};
+}
+
+/** Builds `locals.emailRateLimit`. Addresses are counted as Better Auth stores them. */
+export function emailRateLimiter(db: Db, secret: string): EmailRateLimiter {
+	return (address) =>
+		consumeRateLimit(
+			db,
+			secret,
+			`verification-email|address|${normaliseEmail(address)}`,
+			VERIFICATION_EMAIL_PER_ADDRESS
+		);
+}
 
 export type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 
@@ -72,6 +137,9 @@ export function bucketForAuthPath(path: string): AuthRateLimitBucket | null {
 	}
 	if (path === '/change-password') {
 		return 'change-password';
+	}
+	if (path === '/send-verification-email') {
+		return 'verification-email';
 	}
 	return null;
 }

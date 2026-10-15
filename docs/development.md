@@ -68,7 +68,8 @@ defaults — build command `npm run build`, deploy command `npx wrangler deploy`
 ## Secrets
 
 `npm run secrets -- <target>` generates `BETTER_AUTH_SECRET` and the VAPID push
-key pair, and stores them where that environment reads them:
+key pair, fills in the email settings, and stores them where that environment
+reads them:
 
 | Target           | Where                                          | Read by                        |
 | ---------------- | ---------------------------------------------- | ------------------------------ |
@@ -89,6 +90,23 @@ until each turns them on again. For a remote target it learns what is set from
 services. Pass `--subject mailto:you@example.com`, or the script asks for it.
 The local targets default to a placeholder. `--dry-run` shows what would be
 set without setting it.
+
+**Email is required** ([email.md](email.md)): without `MAIL_FROM` and exactly
+one transport the Docker image will not start, and elsewhere every email fails
+to send, logging what to set — so nobody can finish signing up.
+
+- `dev` sets `MAIL_OUTBOX_DIR=./.mail-outbox`, so nothing is sent: each email
+  is a JSON file there, and the newest holds your sign-up link. To send for
+  real instead, put `RESEND_API_KEY` (or `SMTP_URL`) in `.env` and remove
+  `MAIL_OUTBOX_DIR`.
+- `local-preview`, `production` and `remote-preview` run on Workers, which can
+  only use Resend. They ask for `MAIL_FROM` and `RESEND_API_KEY`, or take
+  `--mail-from "Bound Up <hello@your-domain>"` and `--resend-key re_…`. The
+  sender's domain must be verified in Resend.
+- `print` leaves both to you, since a self-hoster may prefer SMTP.
+
+**Set production's before deploying a build that needs them**, or every
+request fails with the message naming what is missing.
 
 ## Branch previews
 

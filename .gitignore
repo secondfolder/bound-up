@@ -40,5 +40,8 @@ local.db-wal
 # Encrypted attachments written by `npm run dev` (R2 stands in for this in production)
 local-media/
 
+# Email `npm run dev` would have sent, one JSON file each (docs/email.md)
+.mail-outbox/
+
 # Miscellaneous
 .local

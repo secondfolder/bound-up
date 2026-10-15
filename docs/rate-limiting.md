@@ -6,9 +6,11 @@ password never reaches the server (the browser posts a key derived from it —
 see [encryption.md](encryption.md)), so the server cannot judge a password's
 strength, only how often someone is trying one.
 
-Partner-assisted recovery has limits of its own, per email and per address,
-described in [account-recovery.md](account-recovery.md). Nothing else
-is limited.
+Asking for another email-verification link is limited too, per client and
+per address, because each one is an email sent to an address the caller
+chose. Partner-assisted recovery has limits of its own, per email and per
+address, described in [account-recovery.md](account-recovery.md). Nothing
+else is limited.
 
 ## Why the app does it, not Better Auth
 
@@ -34,24 +36,49 @@ Better Auth has a rate limiter, and it is switched off (`rateLimit` in
 
 `src/lib/server/rate-limit.ts`.
 
-- **Buckets.** `sign-in`, `sign-up` and `change-password`, each with two
-  fixed-window rules (`AUTH_RATE_LIMITS`): a short one against a burst, and an
-  hour against the steady guesser the short one alone lets through.
+- **Buckets.** `sign-in`, `sign-up`, `change-password` and
+  `verification-email`, each with two fixed-window rules (`AUTH_RATE_LIMITS`):
+  a short one against a burst, and an hour against the steady guesser the
+  short one alone lets through.
 
-  | Bucket            | Per minute | Per hour |
-  | ----------------- | ---------- | -------- |
-  | `sign-in`         | 5          | 30       |
-  | `sign-up`         | 3          | 10       |
-  | `change-password` | 5          | 20       |
+  | Bucket               | Per minute | Per hour |
+  | -------------------- | ---------- | -------- |
+  | `sign-in`            | 5          | 30       |
+  | `sign-up`            | 3          | 10       |
+  | `change-password`    | 5          | 20       |
+  | `verification-email` | 3          | 10       |
+
+  `verification-email` has more limits, per **address** rather than per
+  client (`VERIFICATION_EMAIL_PER_ADDRESS`): one link a minute and four an
+  hour to one address, whichever clients ask. The per-client rules alone would
+  let many clients fill one inbox. `locals.emailRateLimit` counts them, built
+  in the hook beside `authRateLimit` and off wherever it is.
+
+  It is applied **where Better Auth sends**, not in the forms that ask it to
+  (`sendLimited` in `auth.ts`): a form-only limit was bypassed by
+  `/api/auth/send-verification-email` and by signing up again with a taken
+  address, which emails its owner. So the sign-up link, a resend and the
+  "someone tried to sign up" notice all count, checked in the background with
+  the send so a refusal takes no longer than a success. The check-email
+  action also checks it up front, to show the wait; the hook's limiter counts
+  each address once per request (`onceEach`), so that and the send are one
+  count, not two. All of it counts whether or not the address has an account.
+
+  The link sent by **signing in** to an unconfirmed account is left out. It
+  goes only to someone who has just given the right password, and the
+  `sign-in` bucket already limits that per client; counting it would let a
+  stranger who had used up an address's links from the resend form lock its
+  owner out of getting one for an hour.
 
   Every attempt counts, successful or not. Counting only failures would need a
   second write after Better Auth answers, and a real person signs in once. The
   numbers leave room for a household behind one address.
 - **Where it is checked.** `hooks.server.ts` builds `locals.authRateLimit` for
-  each request. The three form actions call it before Better Auth and answer
+  each request. The four form actions call it before Better Auth and answer
   a refusal with a form error and a 429 ("Too many attempts. Try again in 42
   seconds."). The hook calls it too, for the equivalent Better Auth endpoints
-  (`/api/auth/sign-in/*`, `/api/auth/sign-up/*`, `/api/auth/change-password`),
+  (`/api/auth/sign-in/*`, `/api/auth/sign-up/*`, `/api/auth/change-password`,
+  `/api/auth/send-verification-email`),
   answering with a 429 in Better Auth's error shape and a `Retry-After`. The
   form and its endpoint share a bucket, so alternating between them buys
   nothing. Passkey sign-in is not limited: an assertion cannot be guessed.

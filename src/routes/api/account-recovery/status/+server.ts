@@ -15,5 +15,5 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!parsed.success) {
 		error(400, 'Malformed request');
 	}
-	return json({ status: await recoveryStatus(locals.db, parsed.data.token) });
+	return json(await recoveryStatus(locals.db, parsed.data.token));
 };
