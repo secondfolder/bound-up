@@ -12,6 +12,7 @@ import type {
 	DaydreamCharacter,
 	DaydreamScene,
 	DaydreamStance,
+	SceneDials,
 	ScenePart,
 	StoryDials
 } from '../daydream';
@@ -23,6 +24,7 @@ import {
 	parseFill,
 	parseName,
 	parseParts,
+	parseSceneDials,
 	parseSurpriseScene,
 	type SuggestedPart,
 	type SuggestTarget
@@ -59,6 +61,7 @@ export async function suggestChips(input: {
 	draft: Record<string, string>;
 	parts?: PartsDraft;
 	dials?: CharacterDials;
+	sceneDials?: SceneDials;
 	context: SuggestContext;
 }): Promise<Answer<string[]>> {
 	const answer = await ask({ task: 'chips', ...withParts(input) });
@@ -69,14 +72,22 @@ export async function suggestChips(input: {
 	return chips.length > 0 ? { ok: true, value: chips } : { ok: false, error: NOTHING };
 }
 
-/** What "Fill in the rest" came back with: text for empty fields, and a scene's parts when it had none. */
-export type Filled = { fields: Partial<Record<string, string>>; parts: SuggestedPart[] };
+/**
+ * What "Fill in the rest" came back with: text for empty fields, and for a
+ * scene its parts when it had none and its heat and kink where they were unset.
+ */
+export type Filled = {
+	fields: Partial<Record<string, string>>;
+	parts: SuggestedPart[];
+	sceneDials: SceneDials;
+};
 
 export async function suggestFill(input: {
 	target: SuggestTarget;
 	draft: Record<string, string>;
 	parts?: PartsDraft;
 	dials?: CharacterDials;
+	sceneDials?: SceneDials;
 	context: SuggestContext;
 }): Promise<Answer<Filled>> {
 	const answer = await ask({ task: 'fill', ...withParts(input) });
@@ -85,8 +96,10 @@ export async function suggestFill(input: {
 	}
 	const fields = parseFill(input.target, answer.value);
 	const parts = input.target === 'scene' ? parseParts(answer.value) : [];
+	const sceneDials =
+		input.target === 'scene' ? parseSceneDials(answer.value) : { heat: null, kink: null };
 	return Object.keys(fields).length > 0 || parts.length > 0
-		? { ok: true, value: { fields, parts } }
+		? { ok: true, value: { fields, parts, sceneDials } }
 		: { ok: false, error: NOTHING };
 }
 
@@ -122,10 +135,18 @@ export async function suggestName(input: {
 	return name ? { ok: true, value: name } : { ok: false, error: NOTHING };
 }
 
+/** A whole scene, made up. `sceneDials` are any heat and kink already chosen, for it to fit. */
 export async function surpriseScene(
-	context: SuggestContext
+	context: SuggestContext,
+	sceneDials?: SceneDials
 ): Promise<Answer<Omit<DaydreamScene, 'parts'> & { parts: SuggestedPart[] }>> {
-	const answer = await ask({ task: 'surprise-scene', target: 'scene', draft: {}, context });
+	const answer = await ask({
+		task: 'surprise-scene',
+		target: 'scene',
+		draft: {},
+		...(sceneDials ? { sceneDials } : {}),
+		context
+	});
 	if (!answer.ok) {
 		return answer;
 	}

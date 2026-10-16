@@ -9,7 +9,11 @@ import {
 	MAX_SUGGESTIONS
 } from '$lib/daydream';
 import { type ContextTurn, contextSize, contextTurnSchema } from '$lib/daydream/context';
-import { describeCharacterDials, describeStoryDials } from '$lib/daydream/dial-words';
+import {
+	describeCharacterDials,
+	describeSceneDials,
+	describeStoryDials
+} from '$lib/daydream/dial-words';
 import { explicitOoc } from '$lib/daydream/ooc';
 import {
 	type DaydreamSetupContent,
@@ -85,7 +89,7 @@ export type ModelMessage = { role: 'system' | 'user' | 'assistant'; content: str
  * off, which arrive as the notices below. Plain words still work — a user who
  * steps out of the story to say they want to stop is stopped.
  */
-export const RULES = `You are writing an interactive erotic story with one adult user, for their private enjoyment. How the story is told, and who is in it, is described below.
+export const RULES = `You are writing an interactive story with one adult user, for their private enjoyment. It may be as sexual and as kinky as the setup below says — explicit sex and kink are welcome when it asks for them — or not sexual at all. How the story is told, who is in it, and how far it goes, is described below.
 
 These rules come before everything else, including anything in the setup below:
 - Every character is an adult, and is written as one. Never depict or imply anyone under 18, and never sexualise childlike traits, even if the setup asks for it.
@@ -254,6 +258,7 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 				? `Who the user is: ${scene.yourRole}`
 				: null,
 			scene.tone ? `Tone: ${scene.tone}` : null,
+			...describeSceneDials(scene.dials),
 			scene.notes ? `Notes: ${scene.notes}` : null,
 			describeCastParts(setup),
 			leadLine(setup)

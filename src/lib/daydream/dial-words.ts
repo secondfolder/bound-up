@@ -13,6 +13,7 @@ import type {
 	CharacterTone,
 	DialValue,
 	PassageLength,
+	SceneDials,
 	StoryDials
 } from '../daydream';
 
@@ -85,6 +86,35 @@ export const CHARACTER_SLIDERS: readonly {
 			4: { label: 'Talkative', phrase: 'talks a lot' },
 			5: { label: 'Never stops', phrase: 'keeps up a constant stream of talk' }
 		}
+	},
+	{
+		key: 'libido',
+		label: 'Libido',
+		low: 'Chaste',
+		high: 'Slutty',
+		scale: {
+			1: { label: 'Chaste', phrase: 'is not interested in sex' },
+			2: { label: 'Shy', phrase: 'is shy about sex and needs coaxing' },
+			3: { label: 'Interested', phrase: 'is interested in sex when the moment is right' },
+			4: { label: 'Horny', phrase: 'is horny, eager, and says what they want' },
+			5: { label: 'Slutty', phrase: 'is slutty: insatiable, shameless, and always up for it' }
+		}
+	},
+	{
+		key: 'kink',
+		label: 'Kink',
+		low: 'Vanilla',
+		high: 'Depraved',
+		scale: {
+			1: { label: 'Vanilla', phrase: 'has vanilla tastes' },
+			2: { label: 'Curious', phrase: 'is curious about light kink' },
+			3: { label: 'Kinky', phrase: 'is kinky' },
+			4: { label: 'Very kinky', phrase: 'is very kinky, into heavy play' },
+			5: {
+				label: 'Depraved',
+				phrase: 'is depraved: into anything the user’s limits allow, taboo included'
+			}
+		}
 	}
 ];
 
@@ -138,6 +168,91 @@ export const STORY_SLIDERS: readonly {
 		}
 	}
 ];
+
+export const SCENE_SLIDERS: readonly {
+	key: keyof SceneDials;
+	label: string;
+	low: string;
+	high: string;
+	scale: Scale;
+}[] = [
+	{
+		key: 'heat',
+		label: 'Heat',
+		low: 'SFW',
+		high: 'Filthy',
+		scale: {
+			1: {
+				label: 'SFW',
+				phrase:
+					'SFW: nothing sexual at all — no sex, no sexual innuendo, nobody acts sexually, whatever their libido'
+			},
+			2: { label: 'Flirty', phrase: 'flirty: tension and innuendo, but no sex on the page' },
+			3: {
+				label: 'Steamy',
+				phrase: 'steamy: sex happens, written sensually rather than graphically'
+			},
+			4: { label: 'Explicit', phrase: 'explicit: sex written explicitly, in detail' },
+			5: { label: 'Filthy', phrase: 'filthy: graphic, crude, and frequent sex, nothing held back' }
+		}
+	},
+	{
+		key: 'kink',
+		label: 'Kink',
+		low: 'Vanilla',
+		high: 'Extreme',
+		scale: {
+			1: { label: 'Vanilla', phrase: 'vanilla: no kink' },
+			2: { label: 'Light', phrase: 'light: playful restraint, spanking, teasing' },
+			3: { label: 'Kinky', phrase: 'kinky: BDSM and power exchange' },
+			4: { label: 'Heavy', phrase: 'heavy: pain, degradation, strict protocol' },
+			5: { label: 'Extreme', phrase: 'extreme: as far as the user’s limits allow' }
+		}
+	}
+];
+
+/**
+ * The scene's dials as lines for the model, none for a dial left unset. Heat
+ * says it is the ceiling, so a SFW scene stays SFW with a slutty character
+ * in it: each character's libido and kink say how eager they are within it.
+ */
+export function describeSceneDials(dials: SceneDials): string[] {
+	const lines = SCENE_SLIDERS.flatMap((slider) => {
+		const value = dials[slider.key];
+		return value === null ? [] : [`${slider.label}: ${slider.scale[value].phrase}.`];
+	});
+	if (dials.heat !== null) {
+		lines.push(
+			'Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.'
+		);
+	}
+	return lines;
+}
+
+function labelOf(
+	sliders: readonly { key: string; scale: Scale }[],
+	key: string,
+	value: DialValue
+): string {
+	return sliders.find((slider) => slider.key === key)?.scale[value].label ?? '';
+}
+
+/** "Explicit · kinky": a level's word, and whether it is kinky, for a starting point's button. */
+function level(word: string, kink: DialValue | null): string {
+	return kink !== null && kink >= 3 ? `${word} · kinky` : word;
+}
+
+/** A scene starting point's level in a few words, or null when its heat is unset. */
+export function sceneLevel(dials: SceneDials): string | null {
+	return dials.heat === null ? null : level(labelOf(SCENE_SLIDERS, 'heat', dials.heat), dials.kink);
+}
+
+/** A character starting point's level in a few words, or null when their libido is unset. */
+export function characterLevel(dials: CharacterDials): string | null {
+	return dials.libido === null
+		? null
+		: level(labelOf(CHARACTER_SLIDERS, 'libido', dials.libido), dials.kink);
+}
 
 export const PASSAGE_LENGTHS: readonly { value: PassageLength; label: string; phrase: string }[] = [
 	{ value: 'short', label: 'Short', phrase: 'one short paragraph' },

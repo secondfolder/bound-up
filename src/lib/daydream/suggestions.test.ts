@@ -6,6 +6,7 @@ import {
 	parseFill,
 	parseName,
 	parseParts,
+	parseSceneDials,
 	parseSurpriseScene
 } from './suggestions';
 
@@ -66,15 +67,35 @@ describe('parseSurpriseScene', () => {
 			yourRole: '',
 			tone: 'tense',
 			notes: '',
-			parts: []
+			parts: [],
+			dials: { heat: null, kink: null }
 		});
 		expect(parseSurpriseScene({ title: 'T' })).toBeNull();
+	});
+
+	it('keeps a heat and kink it rated, and leaves out what is not a dial', () => {
+		expect(parseSurpriseScene({ title: 'T', premise: 'P', heat: 5, kink: 2 })?.dials).toEqual({
+			heat: 5,
+			kink: 2
+		});
+		expect(parseSurpriseScene({ title: 'T', premise: 'P', heat: 9, kink: 2.5 })?.dials).toEqual({
+			heat: null,
+			kink: null
+		});
 	});
 
 	it('keeps the parts it came with', () => {
 		expect(
 			parseSurpriseScene({ title: 'T', premise: 'P', parts: [{ name: 'the host' }] })?.parts
 		).toEqual([{ name: 'the host', description: '' }]);
+	});
+});
+
+describe('parseSceneDials', () => {
+	it('takes whole numbers from 1 to 5, and nothing else', () => {
+		expect(parseSceneDials({ heat: 1, kink: 5 })).toEqual({ heat: 1, kink: 5 });
+		expect(parseSceneDials({ heat: 0, kink: '3' })).toEqual({ heat: null, kink: null });
+		expect(parseSceneDials(null)).toEqual({ heat: null, kink: null });
 	});
 });
 

@@ -101,7 +101,9 @@ noise:
   `skills-lock.json`, `drizzle/`, `static/`, the seed prose and the frozen
   `docs/historical-plans/` are excluded in `files.includes` — the skills
   because `skills-lock.json` pins them, the plans because formatting would
-  silently rewrite frozen records. Keep new files formatted; keep those
+  silently rewrite frozen records. So is `.claude/`, with `!!` so Biome does
+  not even scan it: an agent's worktree in there is a whole checkout with a
+  `biome.jsonc` of its own, and a second root config stops Biome running. Keep new files formatted; keep those
   ignored.
   - **Biome does not format Markdown**, so `*.md` is hand-wrapped: match the
     width of the file you are editing rather than reflowing it.

@@ -163,6 +163,10 @@ export type CharacterDials = {
 	edge: DialValue | null;
 	/** Terse ↔ chatty. */
 	talk: DialValue | null;
+	/** Chaste ↔ slutty: how much they want sex, and how openly. */
+	libido: DialValue | null;
+	/** Vanilla ↔ depraved. */
+	kink: DialValue | null;
 };
 
 export const UNSET_CHARACTER_DIALS: CharacterDials = {
@@ -170,7 +174,9 @@ export const UNSET_CHARACTER_DIALS: CharacterDials = {
 	control: null,
 	strictness: null,
 	edge: null,
-	talk: null
+	talk: null,
+	libido: null,
+	kink: null
 };
 
 /**
@@ -237,6 +243,21 @@ export type ScenePart = {
 	description: string;
 };
 
+/**
+ * How sexual and how kinky a scene is. Each is optional, like a character's
+ * dials: unset says nothing, and the model follows the scene's words. Heat is
+ * the ceiling for everyone in it — at its lowest the story is not sexual at
+ * all, whatever a character's libido — which is how a daydream is made SFW.
+ */
+export type SceneDials = {
+	/** SFW ↔ filthy. */
+	heat: DialValue | null;
+	/** Vanilla ↔ extreme. */
+	kink: DialValue | null;
+};
+
+export const UNSET_SCENE_DIALS: SceneDials = { heat: null, kink: null };
+
 export type DaydreamScene = {
 	title: string;
 	/** Where it happens. */
@@ -250,6 +271,7 @@ export type DaydreamScene = {
 	notes: string;
 	/** The parts it has for characters. Optional: a scene with none is cast freely. */
 	parts: ScenePart[];
+	dials: SceneDials;
 };
 
 export const SCENE_TEXT_FIELDS = [
@@ -272,7 +294,8 @@ export const EMPTY_SCENE: DaydreamScene = {
 	yourRole: '',
 	tone: '',
 	notes: '',
-	parts: []
+	parts: [],
+	dials: UNSET_SCENE_DIALS
 };
 
 // ── a daydream's setup ───────────────────────────────────────────────────────

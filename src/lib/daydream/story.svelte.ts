@@ -19,7 +19,13 @@
  */
 
 import { SvelteMap } from 'svelte/reactivity';
-import type { DaydreamSetup, DaydreamTurnRole, DialValue, StoryDials } from '../daydream';
+import type {
+	DaydreamSetup,
+	DaydreamTurnRole,
+	DialValue,
+	SceneDials,
+	StoryDials
+} from '../daydream';
 import { reportRequestFailure } from '../request-failure.svelte';
 import type {
 	DaydreamMarkContent,
@@ -617,6 +623,16 @@ export class DaydreamStory {
 	async setDials(dials: StoryDials): Promise<string | null> {
 		const { setup } = this;
 		return setup ? await this.saveSetup({ ...setup, dials }) : NOT_READY;
+	}
+
+	/**
+	 * The scene's heat and kink, turned up or down mid-story. Only this
+	 * daydream's copy of the scene changes, never the library's: like any
+	 * edit to a setup, it applies from the next passage on.
+	 */
+	async setSceneDials(dials: SceneDials): Promise<string | null> {
+		const { setup } = this;
+		return setup ? await this.saveSetup({ ...setup, scene: { ...setup.scene, dials } }) : NOT_READY;
 	}
 
 	/** This visit's request for a name, once made: once is enough, whatever came of it. */

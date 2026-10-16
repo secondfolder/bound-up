@@ -45,8 +45,12 @@ const characterDials = z.object({
 	control: dial.nullable(),
 	strictness: dial.nullable(),
 	edge: dial.nullable(),
-	talk: dial.nullable()
+	talk: dial.nullable(),
+	libido: dial.nullable(),
+	kink: dial.nullable()
 });
+
+const sceneDials = z.object({ heat: dial.nullable(), kink: dial.nullable() });
 
 const characterFields = {
 	name: required(DAYDREAM_LIMITS.characterName, 'them a name'),
@@ -72,7 +76,8 @@ const sceneFields = {
 	yourRole: optional(DAYDREAM_LIMITS.yourRole),
 	tone: optional(DAYDREAM_LIMITS.tone),
 	notes: optional(DAYDREAM_LIMITS.sceneNotes),
-	parts: z.array(partFields).max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} parts`)
+	parts: z.array(partFields).max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} parts`),
+	dials: sceneDials
 };
 
 /** Who a character is in this daydream. Edited in the character dialog's "In this story". */

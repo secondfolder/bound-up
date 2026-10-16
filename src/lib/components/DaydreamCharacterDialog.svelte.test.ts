@@ -170,6 +170,34 @@ describe('DaydreamCharacterDialog', () => {
 		expect(chip(baseElement, 'patient')).toBeDefined();
 	});
 
+	it('keeps a starting point’s libido and kink, says them on it, and clears them', async () => {
+		const onsaved = vi.fn();
+		const { baseElement } = render(DaydreamCharacterDialog, {
+			props: { context, suggestionsOn: false, onsaved, onclose: () => undefined }
+		});
+		await waSettled(baseElement);
+		const sadist = button(baseElement, 'The sadist');
+		expect(sadist?.querySelector('.level')?.textContent?.trim()).toBe('Horny · kinky');
+		expect(button(baseElement, 'The old friend')?.querySelector('.level')?.textContent).toBe(
+			'Chaste'
+		);
+
+		sadist?.click();
+		await waitFor(() => expect(button(baseElement, 'Clear libido')).toBeDefined());
+		await waSettled(baseElement);
+		button(baseElement, 'Clear libido')?.click();
+		await waitFor(() => expect(button(baseElement, 'Clear libido')).toBeUndefined());
+
+		baseElement.querySelector<HTMLInputElement>('.save-to-library input')?.click();
+		await waSettled(baseElement);
+		button(baseElement, 'Add character')?.click();
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		expect(onsaved.mock.calls[0]?.[0]).toMatchObject({
+			name: 'Corin',
+			dials: { libido: null, kink: 5, edge: 5 }
+		});
+	});
+
 	describe('more detail', () => {
 		it('starts closed for a character described only up front', async () => {
 			const { baseElement } = render(DaydreamCharacterDialog, {

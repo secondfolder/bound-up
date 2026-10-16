@@ -18,6 +18,8 @@
 //   one stub and every one of them opens the same way;
 // - a 500, once, for a turn containing `[fail]`, so a spec can see a failure
 //   and then "Try again" succeed.
+// A scene with its heat set says so after each passage, as "(Heat: SFW.)", so a
+// spec can see which level the prompt carried; one without says nothing extra.
 // Every passage offers two directions ("Slower", "Surprise me") and two
 // suggestions, and proposes a roll for a turn containing `[roll]`.
 //
@@ -64,6 +66,12 @@ const ROLL = {
 	]
 };
 
+/** "(Heat: SFW.)" for a scene whose heat is set (`describeSceneDials`), or nothing. */
+function heatNote(system) {
+	const level = system.match(/^Heat: (?<level>[^:]+):/m)?.groups?.level;
+	return level ? ` (Heat: ${level}.)` : '';
+}
+
 function withMeta(passage, meta) {
 	return `${passage}\n\n<meta>\n${JSON.stringify(meta)}\n</meta>`;
 }
@@ -71,6 +79,7 @@ function withMeta(passage, meta) {
 function replyFor(messages) {
 	const system = messages.find((message) => message.role === 'system')?.content ?? '';
 	const name = characterName(system);
+	const heat = heatNote(system);
 	const users = messages.filter((message) => message.role === 'user');
 	const last = users.at(-1)?.content ?? '';
 	if (system.includes('# The scene is stopped')) {
@@ -89,7 +98,10 @@ function replyFor(messages) {
 		...(last.includes('[roll]') ? { roll: ROLL } : {})
 	};
 	if (users.length === 1 && last.startsWith('(Begin the story')) {
-		return withMeta(`${name} looks up as you come in.\n\nThe door clicks shut behind you.`, meta);
+		return withMeta(
+			`${name} looks up as you come in.${heat}\n\nThe door clicks shut behind you.`,
+			meta
+		);
 	}
 	const conversation = JSON.stringify(messages);
 	const take = (takes.get(conversation) ?? 0) + 1;
@@ -98,7 +110,7 @@ function replyFor(messages) {
 	if (last.includes('(Rewrite the passage')) {
 		return withMeta(`${name} rewrites it.${takeNote}`, meta);
 	}
-	return withMeta(`${name} heard: "${last}"${takeNote}`, meta);
+	return withMeta(`${name} heard: "${last}"${takeNote}${heat}`, meta);
 }
 
 /** A setup suggestion's answer, as OpenRouter wraps a non-streamed completion. */

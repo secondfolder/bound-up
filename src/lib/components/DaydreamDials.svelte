@@ -1,6 +1,7 @@
 <script lang="ts">
-	import type { DialValue, PassageLength, StoryDials } from '$lib/daydream';
-	import { PASSAGE_LENGTHS, STORY_SLIDERS } from '$lib/daydream/dial-words';
+	import type { DialValue, PassageLength, SceneDials, StoryDials } from '$lib/daydream';
+	import { PASSAGE_LENGTHS, SCENE_SLIDERS, STORY_SLIDERS } from '$lib/daydream/dial-words';
+	import DaydreamOptionalSlider from './DaydreamOptionalSlider.svelte';
 
 	/**
 	 * The story's sticky dials: intensity, pace and how long each passage is.
@@ -15,10 +16,19 @@
 	 */
 	let {
 		value,
-		onchange
+		onchange,
+		scene,
+		onscenechange
 	}: {
 		value: StoryDials;
 		onchange: (dials: StoryDials) => void;
+		/**
+		 * The scene's heat and kink, shown above the rest when given: in the
+		 * story's popover, so they can be turned up or down mid-story. The
+		 * setup form leaves them out, as its scene dialog sets them.
+		 */
+		scene?: SceneDials;
+		onscenechange?: (dials: SceneDials) => void;
 	} = $props();
 
 	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
@@ -47,6 +57,19 @@
 </script>
 
 <div class="dials">
+	{#if scene && onscenechange}
+		{#each SCENE_SLIDERS as entry (entry.key)}
+			<DaydreamOptionalSlider
+				label={entry.label}
+				low={entry.low}
+				high={entry.high}
+				scale={entry.scale}
+				value={scene[entry.key]}
+				onchange={(level) => onscenechange({ ...scene, [entry.key]: level })}
+			/>
+		{/each}
+	{/if}
+
 	{#each STORY_SLIDERS as entry (entry.key)}
 		<div class="dial">
 			<wa-slider

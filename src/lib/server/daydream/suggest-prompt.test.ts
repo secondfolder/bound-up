@@ -86,10 +86,78 @@ describe('buildSuggestMessages', () => {
 		const ask =
 			buildSuggestMessages({
 				...base,
-				dials: { tone: 'teasing', control: null, strictness: null, edge: 5, talk: null }
+				dials: {
+					tone: 'teasing',
+					control: null,
+					strictness: null,
+					edge: 5,
+					talk: null,
+					libido: null,
+					kink: null
+				}
 			}).messages.at(-1)?.content ?? '';
 		expect(ask).toContain('playful and teasing');
 		expect(ask).toContain('is cruel');
+	});
+});
+
+describe('buildSuggestMessages, heat and kink', () => {
+	const scene = {
+		task: 'fill' as const,
+		target: 'scene' as const,
+		draft: { title: 'Late', premise: 'A meeting.' },
+		context: { characters: [], limits: '' }
+	};
+
+	it('matches the level set, and suggests nothing sexual for a SFW scene', () => {
+		expect(SUGGEST_RULES).not.toContain('erotic story');
+		expect(SUGGEST_RULES).toContain('suggest nothing sexual for a scene set to SFW');
+		const ask =
+			buildSuggestMessages({ ...scene, sceneDials: { heat: 1, kink: 4 } }).messages.at(-1)
+				?.content ?? '';
+		expect(ask).toContain('Heat: SFW');
+		expect(ask).toContain('Kink: heavy');
+	});
+
+	it('asks the model to rate only the dials left unset', () => {
+		const ask =
+			buildSuggestMessages({ ...scene, sceneDials: { heat: 3, kink: null } }).messages.at(-1)
+				?.content ?? '';
+		expect(ask).toContain('"kink": 1-5');
+		expect(ask).not.toContain('"heat": 1-5');
+
+		const surprise =
+			buildSuggestMessages({ ...scene, task: 'surprise-scene', draft: {} }).messages.at(-1)
+				?.content ?? '';
+		expect(surprise).toContain('"heat": 1-5');
+		expect(surprise).toContain('"kink": 1-5');
+	});
+
+	it('says a character’s libido and kink in words', () => {
+		const ask =
+			buildSuggestMessages({
+				...base,
+				dials: {
+					tone: null,
+					control: null,
+					strictness: null,
+					edge: null,
+					talk: null,
+					libido: 5,
+					kink: 1
+				}
+			}).messages.at(-1)?.content ?? '';
+		expect(ask).toContain('is slutty');
+		expect(ask).toContain('has vanilla tastes');
+	});
+
+	it('holds the dials to 1 to 5', () => {
+		expect(
+			suggestRequestSchema.safeParse({ ...scene, sceneDials: { heat: 6, kink: null } }).success
+		).toBe(false);
+		expect(
+			suggestRequestSchema.safeParse({ ...scene, sceneDials: { heat: 5, kink: null } }).success
+		).toBe(true);
 	});
 });
 

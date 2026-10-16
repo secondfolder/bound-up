@@ -6,15 +6,18 @@
 	import {
 		DAYDREAM_LIMITS,
 		type DaydreamSceneCopy,
+		type DialValue,
 		EMPTY_SCENE,
 		MAX_DAYDREAM_CHARACTERS,
 		SCENE_PRIMARY_FIELDS,
 		SCENE_TEXT_FIELDS,
+		type SceneDials,
 		type ScenePart,
 		type SceneTextField
 	} from '$lib/daydream';
 	import { SCENE_CHIPS, SCENE_FIELD_LABELS, SCENE_TEMPLATES } from '$lib/daydream/catalog';
 	import { saveLibraryItem } from '$lib/daydream/client';
+	import { SCENE_SLIDERS, sceneLevel } from '$lib/daydream/dial-words';
 	import {
 		type SuggestContext,
 		suggestChips,
@@ -26,6 +29,7 @@
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
+	import DaydreamOptionalSlider from './DaydreamOptionalSlider.svelte';
 	import { startOpen } from './details';
 
 	/**
@@ -36,9 +40,11 @@
 	 * first — from the characters, the limits and the dials — and it opens
 	 * here to read, change, or try again before it is used.
 	 *
-	 * Up front: the title, what is going on, and the parts it has for
-	 * characters, which is what a daydream casts them into. The rest is under
-	 * "More detail", which starts open when any of it is filled.
+	 * Up front: the title, what is going on, how sexual and how kinky it is,
+	 * and the parts it has for characters, which is what a daydream casts
+	 * them into. Heat and kink are up front because they decide what kind of
+	 * story it is — SFW or filthy — more than any other field. The rest is
+	 * under "More detail", which starts open when any of it is filled.
 	 *
 	 * An SPA superform saving through `api/daydreams/scenes`, for the reason
 	 * the character dialog gives.
@@ -79,6 +85,7 @@
 				tone: existing.tone,
 				notes: existing.notes,
 				parts: existing.parts.map((part) => ({ ...part })),
+				dials: { ...existing.dials },
 				saveToLibrary: inLibrary
 			}
 		: { ...EMPTY_SCENE, saveToLibrary: true };
@@ -101,6 +108,16 @@
 		}
 	}
 
+	/** The dials the user has set, with the model's ideas only where they left one unset. */
+	const keepSetDials = (suggested: SceneDials): SceneDials => ({
+		heat: $form.dials.heat ?? suggested.heat,
+		kink: $form.dials.kink ?? suggested.kink
+	});
+
+	function setDial(key: keyof SceneDials, level: DialValue | null) {
+		$form.dials = { ...$form.dials, [key]: level };
+	}
+
 	/** Parts from a template or the model, with ids of their own. */
 	const withIds = (parts: readonly SuggestedPart[]): ScenePart[] =>
 		parts.map((part) => ({ ...part, id: crypto.randomUUID() }));
@@ -114,6 +131,8 @@
 		// character that had just been added.
 		applyAction: false,
 		invalidateAll: false,
+		// The heat and kink dials are a nested object, which superforms only allows as JSON.
+		dataType: 'json',
 		resetForm: false,
 		validators: zod4Client(daydreamSceneFormSchema),
 		async onUpdate({ form: submitted }) {
@@ -217,10 +236,15 @@
 	async function makeOneUp() {
 		thinking = true;
 		problem = null;
-		const answer = await surpriseScene(context);
+		const answer = await surpriseScene(context, $form.dials);
 		thinking = false;
 		if (answer.ok) {
-			$form = { ...$form, ...answer.value, parts: withIds(answer.value.parts) };
+			$form = {
+				...$form,
+				...answer.value,
+				parts: withIds(answer.value.parts),
+				dials: keepSetDials(answer.value.dials)
+			};
 			revealDetail();
 		} else {
 			problem = answer.error;
@@ -236,7 +260,13 @@
 	async function fillTheRest() {
 		thinking = true;
 		problem = null;
-		const answer = await suggestFill({ target: 'scene', draft, parts: namedParts(), context });
+		const answer = await suggestFill({
+			target: 'scene',
+			draft,
+			parts: namedParts(),
+			sceneDials: $form.dials,
+			context
+		});
 		thinking = false;
 		if (!answer.ok) {
 			problem = answer.error;
@@ -253,6 +283,7 @@
 		if (next.parts.length === 0) {
 			next.parts = withIds(answer.value.parts);
 		}
+		next.dials = keepSetDials(answer.value.sceneDials);
 		$form = next;
 		revealDetail();
 	}
@@ -264,7 +295,15 @@
 			.map(({ name, description }) => ({ name, description }));
 
 	function moreIdeas(field: SceneTextField) {
-		return () => suggestChips({ target: 'scene', field, draft, parts: namedParts(), context });
+		return () =>
+			suggestChips({
+				target: 'scene',
+				field,
+				draft,
+				parts: namedParts(),
+				sceneDials: $form.dials,
+				context
+			});
 	}
 
 	function labelFor(): string {
@@ -323,8 +362,10 @@
 				<p class="hint">Start from one of these, or from nothing.</p>
 				<div class="template-list">
 					{#each SCENE_TEMPLATES as template (template.id)}
+						{const level = $derived(sceneLevel(template.scene.dials))}
 						<wa-button size="s" appearance="outlined" onclick={() => useTemplate(template.id)}>
 							{template.label}
+							{#if level}<span class="level">{level}</span>{/if}
 						</wa-button>
 					{/each}
 				</div>
@@ -343,6 +384,21 @@
 		{#each SCENE_PRIMARY_FIELDS as field (field)}
 			{@render textField(field)}
 		{/each}
+
+		<fieldset class="heat">
+			<legend>Heat and kink</legend>
+			<p class="hint">How sexual and how kinky it is, from SFW to filthy. Optional: left unset, the story follows what you wrote.</p>
+			{#each SCENE_SLIDERS as entry (entry.key)}
+				<DaydreamOptionalSlider
+					label={entry.label}
+					low={entry.low}
+					high={entry.high}
+					scale={entry.scale}
+					value={$form.dials[entry.key]}
+					onchange={(level) => setDial(entry.key, level)}
+				/>
+			{/each}
+		</fieldset>
 
 		<fieldset class="parts">
 			<legend>Parts for characters</legend>
@@ -450,6 +506,33 @@
 
 	.fill {
 		align-self: flex-start;
+	}
+
+	/* How sexual and how kinky a starting point is, said on it, so nobody
+	   picks one blind. */
+	.level {
+		margin-inline-start: 0.4em;
+		font-size: 0.75rem;
+		color: var(--wa-color-text-quiet);
+	}
+
+	.heat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin: 0;
+		border: 0;
+		padding: 0;
+
+		legend {
+			padding: 0;
+			margin-block-end: 0.25rem;
+			font-weight: 600;
+		}
+
+		.hint {
+			margin: 0;
+		}
 	}
 
 	.parts {

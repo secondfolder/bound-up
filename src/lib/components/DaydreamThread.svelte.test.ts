@@ -442,6 +442,27 @@ describe('DaydreamThread', () => {
 		await waitFor(() => expect(saved(0)?.content).toEqual({ type: 'safety', signal: 'yellow' }));
 	});
 
+	it('turns the scene’s heat up mid-story, in this daydream’s copy of the scene', async () => {
+		client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		// The label is a property Svelte set on the upgraded element (AGENTS.md).
+		await waitFor(() => expect(waByProp(container, 'wa-slider', 'label', 'Heat')).toHaveLength(1));
+		await waSettled(container);
+		const heat = waByProp(container, 'wa-slider', 'label', 'Heat')[0] as HTMLElement & {
+			value: number;
+		};
+		heat.value = 4;
+		heat.dispatchEvent(new Event('change'));
+		await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
+		expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({
+			scene: { title: SETUP.scene.title, dials: { heat: 4, kink: null } },
+			dials: SETUP.dials
+		});
+	});
+
 	it('rolls the die a passage proposed, and records the result', async () => {
 		const roll = {
 			prompt: 'Roll to hold still',

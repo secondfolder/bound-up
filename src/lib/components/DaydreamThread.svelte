@@ -267,6 +267,10 @@
 						onchange={async (dials) => {
 							dialsProblem = await story.setDials(dials);
 						}}
+						scene={setup.scene.dials}
+						onscenechange={async (dials) => {
+							dialsProblem = await story.setSceneDials(dials);
+						}}
 					/>
 					{#if dialsProblem}<p class="invalid" role="alert">{dialsProblem}</p>{/if}
 				</div>

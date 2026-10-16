@@ -155,13 +155,15 @@ The character and scene dialogs (`DaydreamCharacterDialog.svelte`,
 `DaydreamSceneDialog.svelte`) are guided rather than blank:
 
 - **Starting points** (`CHARACTER_TEMPLATES`, `SCENE_TEMPLATES` in
-  `daydream/catalog.ts`). A scene template comes with its parts, which get
-  fresh ids each time one is used.
-- **Character dials**: a tone (warm, teasing, cold, clinical) and four
-  sliders — control, strictness, edge, talk — each of which can be left
-  unset. The words for each value are in `daydream/dial-words.ts`, shared by
-  the sliders and the prompt, so the screen and the model read the same
-  thing.
+  `daydream/catalog.ts`), from SFW to filthy and extreme, in that order, each
+  saying its level on its button (below). A scene template comes with its
+  parts, which get fresh ids each time one is used.
+- **Character dials**: a tone (warm, teasing, cold, clinical) and six
+  sliders — control, strictness, edge, talk, libido, kink — each of which can
+  be left unset. The words for each value are in `daydream/dial-words.ts`,
+  shared by the sliders and the prompt, so the screen and the model read the
+  same thing.
+- **Scene dials**: heat and kink, up front in the scene dialog (below).
 - **Chips under every field**: phrases that toggle in the field's text
   (`toggleChip`), leaving whatever else was written exactly as it was. The
   casting's two fields have their own (`CASTING_CHIPS`).
@@ -171,6 +173,36 @@ The character and scene dialogs (`DaydreamCharacterDialog.svelte`,
   and notes — is under "More detail", which starts open when any of it is
   filled, and opens when a template, Fill in the rest or Surprise me writes
   into it, so what changed is in view.
+
+### How sexual, and how kinky
+
+Daydreams are for SFW stories and filthy ones alike, and nothing pretends
+otherwise: the prompt does not call every story erotic, and it does not shy
+away when one is.
+
+- **A scene has heat** (SFW → Flirty → Steamy → Explicit → Filthy) **and
+  kink** (Vanilla → Light → Kinky → Heavy → Extreme). They are saved with a
+  library scene, set by its starting point, and shown above the other
+  dials in the story's Dials popover, so they can be turned up or down
+  mid-story. That changes the daydream's copy of the scene only, never the
+  library's.
+- **A character has libido** (Chaste → Shy → Interested → Horny → Slutty)
+  **and kink** (Vanilla → Curious → Kinky → Very kinky → Depraved).
+- **Heat is the ceiling.** At SFW nobody acts sexually, whatever their
+  libido: a character's libido and kink say how eager they are within the
+  scene's heat, never past it (`describeSceneDials`). The user's limits
+  outrank all of it, as they outrank everything.
+- **Unset says nothing.** With no heat set, the prompt is silent on it and the
+  model follows the words, as with every other dial. Setting heat to SFW is
+  how a story is made strictly SFW.
+- **The starting points say their level** (`sceneLevel`, `characterLevel`):
+  "SFW", "Explicit · kinky". Nobody has to guess what they are picking, and
+  the range is plain to see, from the lighthouse mystery to the dungeon.
+- **Suggestions match it.** The suggest prompt is given the dials, so chips
+  for a SFW scene stay SFW, and Fill in the rest and Surprise me rate a
+  scene's heat and kink where the user left them unset — never over ones
+  they set (`parseSceneDials` reads the answer leniently, dropping anything
+  that is not 1 to 5).
 
 **The free text is the truth.** Every field is plain text the user can
 rewrite, chips only edit it, and where a description and the dials
@@ -463,11 +495,13 @@ budget.
 
 `src/lib/server/daydream/prompt.ts` builds what the model reads: the
 server's `RULES` first, then the setup (`describeSetup`: how it is told,
-each character with their dials in words, the scene, the limits, the
-dials), then how to read the user's turns, then either the reply format or,
+each character with their dials in words, the scene with its heat and kink,
+the limits, the dials), then how to read the user's turns, then either the reply format or,
 for a stopped scene, the check-in. The rules are never sent by a browser, so
 a page cannot drop them, and they say they come before anything in the
-setup, which is where a user would try to talk a model out of them:
+setup, which is where a user would try to talk a model out of them. They
+open by saying the story may be as sexual and as kinky as the setup says, or
+not sexual at all, rather than calling every story erotic:
 
 - every character is an adult, and nothing underage is depicted, implied or
   sexualised;
@@ -576,6 +610,9 @@ Noted so they are not lost; none is in the code.
   every way into their account loses their daydreams and library with it.
 - **Edited setups apply forward.** Changing the setup, the dials or a limit
   changes the next passage, not what has already been written.
+- **Heat and kink turned mid-story are this daydream's.** The scene in the
+  library keeps its own, and the setup page does not show the copy as
+  changed, since its library revision has not moved.
 - **A stopped passage is kept as it stood**, mid-sentence (Stop writing, not
   Stop the scene). Writing it again is one press away.
 - **A very long story loads its newest 2,000 turns' shape.** Older turns are
@@ -587,8 +624,10 @@ Noted so they are not lost; none is in the code.
   scene's parts),
   `daydream/tree.test.ts`, `reply-format.test.ts`, `dice.test.ts`,
   `chips.test.ts`, `quotes.test.ts`, `ooc.test.ts`, `suggestions.test.ts`,
+  `dial-words.test.ts`, `catalog.test.ts` (every starting point is a valid
+  record, they run SFW to extreme in order, every chip is one phrase),
   `context.test.ts`, `server/daydream/prompt.test.ts` (the rules always come
-  first; a stopped story gets a check-in in any mode),
+  first; a stopped story gets a check-in in any mode; heat is the ceiling),
   `suggest-prompt.test.ts`, `config.test.ts`, the sealed fixtures, and the
   tree backfill in `server/db/migrations.test.ts`.
 - Server: `server/daydreams.test.ts` (the tree, marks, libraries, ownership),
@@ -598,6 +637,7 @@ Noted so they are not lost; none is in the code.
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts),
   `DaydreamSetupFormAdd.svelte.test.ts`,
   `DaydreamCharacterDialog.svelte.test.ts` (the two halves),
-  `DaydreamSceneDialog.svelte.test.ts` (the parts editor).
-- End to end: `e2e/daydreams.spec.ts`, against `e2e/model-stub.mjs`, a
-  stand-in OpenRouter that `e2e/server.mjs` starts beside the app.
+  `DaydreamSceneDialog.svelte.test.ts` (the parts editor, heat and kink).
+- End to end: `e2e/daydreams.spec.ts` and `e2e/daydream-heat.spec.ts`,
+  against `e2e/model-stub.mjs`, a stand-in OpenRouter that `e2e/server.mjs`
+  starts beside the app.

@@ -25,7 +25,7 @@
 		CHARACTER_TEMPLATES
 	} from '$lib/daydream/catalog';
 	import { saveLibraryItem } from '$lib/daydream/client';
-	import { CHARACTER_SLIDERS, CHARACTER_TONES } from '$lib/daydream/dial-words';
+	import { CHARACTER_SLIDERS, CHARACTER_TONES, characterLevel } from '$lib/daydream/dial-words';
 	import { type SuggestContext, suggestChips, suggestFill } from '$lib/daydream/suggest';
 	import {
 		type DaydreamCharacterFormValues,
@@ -34,6 +34,7 @@
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
+	import DaydreamOptionalSlider from './DaydreamOptionalSlider.svelte';
 	import { startOpen } from './details';
 
 	/** What the dialog needs to edit a character's casting: given only when opened from a daydream. */
@@ -66,7 +67,8 @@
 	 *
 	 * Guided rather than a blank form: starting points to begin from, dials
 	 * for the broad strokes (a tone, and how much they take charge, how
-	 * strict, how cruel, how much they talk), and chips under every field. The
+	 * strict, how cruel, how much they talk, how much they want sex and how
+	 * kinky they are), and chips under every field. The
 	 * free text is the truth, and the model is told so where the dials and the
 	 * description disagree.
 	 *
@@ -240,17 +242,6 @@
 		$form.dials = { ...$form.dials, [key]: level };
 	}
 
-	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
-	function slider(key: Exclude<keyof CharacterDials, 'tone'>) {
-		const scale = CHARACTER_SLIDERS.find((entry) => entry.key === key)?.scale;
-		return (node: WaSlider) => {
-			node.valueFormatter = (level) => scale?.[level as DialValue]?.label ?? String(level);
-			const update = () => setDial(key, Math.round(node.value) as DialValue);
-			node.addEventListener('change', update);
-			return () => node.removeEventListener('change', update);
-		};
-	}
-
 	let filling = $state(false);
 	async function fillTheRest() {
 		filling = true;
@@ -356,8 +347,10 @@
 				<p class="hint">Start from one of these, or from nothing.</p>
 				<div class="template-list">
 					{#each CHARACTER_TEMPLATES as template (template.id)}
+						{const level = $derived(characterLevel(template.character.dials))}
 						<wa-button size="s" appearance="outlined" onclick={() => useTemplate(template.id)}>
 							{template.label}
+							{#if level}<span class="level">{level}</span>{/if}
 						</wa-button>
 					{/each}
 				</div>
@@ -445,21 +438,14 @@
 						{/each}
 					</fieldset>
 					{#each CHARACTER_SLIDERS as entry (entry.key)}
-						{const level = $derived($form.dials[entry.key])}
-						<div class="dial" class:unset={level === null}>
-							<wa-slider {@attach slider(entry.key)} label={entry.label} min={1} max={5} step={1} value={level ?? 3}>
-								<span slot="reference">{entry.low}</span>
-								<span slot="reference">{entry.high}</span>
-							</wa-slider>
-							<div class="reading">
-								<span>{level === null ? 'Not set' : entry.scale[level].label}</span>
-								{#if level !== null}
-									<wa-button size="s" appearance="plain" onclick={() => setDial(entry.key, null)}>
-										Clear {entry.label.toLowerCase()}
-									</wa-button>
-								{/if}
-							</div>
-						</div>
+						<DaydreamOptionalSlider
+							label={entry.label}
+							low={entry.low}
+							high={entry.high}
+							scale={entry.scale}
+							value={$form.dials[entry.key]}
+							onchange={(level) => setDial(entry.key, level)}
+						/>
 					{/each}
 				</fieldset>
 
@@ -596,19 +582,12 @@
 		}
 	}
 
-	.dial {
-		.reading {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			font-size: 0.8125rem;
-			color: var(--wa-color-text-quiet);
-		}
-
-		/* An unset dial says nothing about the character, so it reads as off. */
-		&.unset wa-slider {
-			opacity: 0.55;
-		}
+	/* How sexual and how kinky a starting point is, said on it, so nobody
+	   picks one blind. Quiet, beside the name it qualifies. */
+	.level {
+		margin-inline-start: 0.4em;
+		font-size: 0.75rem;
+		color: var(--wa-color-text-quiet);
 	}
 
 	.fill {

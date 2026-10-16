@@ -147,7 +147,8 @@ describe('DaydreamSceneDialog', () => {
 			ok: true,
 			value: {
 				fields: { setting: 'A hotel bar.' },
-				parts: [{ name: 'the stranger', description: '' }]
+				parts: [{ name: 'the stranger', description: '' }],
+				sceneDials: { heat: null, kink: null }
 			}
 		});
 		const { baseElement } = renderDialog({
@@ -161,5 +162,59 @@ describe('DaydreamSceneDialog', () => {
 			'the stranger'
 		);
 		expect(moreDetail(baseElement).open).toBe(true);
+	});
+
+	it('says each starting point’s level on it, from SFW up', async () => {
+		const { baseElement } = renderDialog();
+		await waSettled(baseElement);
+		const levels = [...baseElement.querySelectorAll('.template-list .level')].map((level) =>
+			level.textContent?.trim()
+		);
+		expect(levels[0]).toBe('SFW');
+		expect(levels.at(-1)).toBe('Filthy · kinky');
+	});
+
+	it('keeps a template’s heat and kink, which can be cleared', async () => {
+		const onsaved = vi.fn();
+		const { baseElement } = renderDialog({ onsaved });
+		await waSettled(baseElement);
+		button(baseElement, 'The dungeon')?.click();
+		await waitFor(() => expect(button(baseElement, 'Clear heat')).toBeDefined());
+		await waSettled(baseElement);
+		button(baseElement, 'Clear kink')?.click();
+		await waitFor(() => expect(button(baseElement, 'Clear kink')).toBeUndefined());
+
+		const save = defined(
+			baseElement.querySelector<HTMLInputElement>('.save-to-library input'),
+			'the library box'
+		);
+		save.click();
+		await waSettled(baseElement);
+		button(baseElement, 'Use this scene')?.click();
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		expect(onsaved.mock.calls[0]?.[0]).toMatchObject({ dials: { heat: 5, kink: null } });
+	});
+
+	it('takes the model’s heat and kink only where they were unset', async () => {
+		suggest.suggestFill.mockResolvedValue({
+			ok: true,
+			value: { fields: { setting: 'A hotel bar.' }, parts: [], sceneDials: { heat: 4, kink: 5 } }
+		});
+		const onsaved = vi.fn();
+		const { baseElement } = renderDialog({
+			scene: testScene({ title: 'Late', premise: 'A meeting.', dials: { heat: null, kink: 2 } }),
+			suggestionsOn: true,
+			onsaved
+		});
+		await waSettled(baseElement);
+		button(baseElement, 'Fill in the rest')?.click();
+		await waitFor(() => expect(button(baseElement, 'Clear heat')).toBeDefined());
+		expect(suggest.suggestFill.mock.calls[0]?.[0]).toMatchObject({
+			sceneDials: { heat: null, kink: 2 }
+		});
+		await waSettled(baseElement);
+		button(baseElement, 'Save changes')?.click();
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		expect(onsaved.mock.calls[0]?.[0]).toMatchObject({ dials: { heat: 4, kink: 2 } });
 	});
 });

@@ -134,7 +134,9 @@
 							"control": null,
 							"strictness": null,
 							"edge": null,
-							"talk": null
+							"talk": null,
+							"libido": null,
+							"kink": null
 						},
 						"sourceId": null,
 						"sourceRevision": null,
@@ -154,7 +156,11 @@
 					"notes": "",
 					"sourceId": null,
 					"sourceRevision": null,
-					"parts": []
+					"parts": [],
+					"dials": {
+						"heat": null,
+						"kink": null
+					}
 				},
 				"lead": "character",
 				"limits": "Nothing public.",
@@ -179,7 +185,7 @@
 			"kind": "daydream-setup",
 			"version": 2,
 			"recordId": "00000000-0000-4000-8000-0000000000d3",
-			"ciphertext": "sb1.tncWlVTEPlt8kY4JK_6ogI9rlaiXQofu6y1DS0AoRsH6tHRdJsmfde3nKeMrDP-3o2vi4iPlxloYmGjJJlBI60v1pkK3zwajOYxQcTQj8kBfdjad7nPJytpjjnxNzUSFO4nsixiRfi4n1yOvK7a_zkyHcdrvRCRuTMJgInr6n_HafUwp4F2_T0Q7Uhs_v8ilaXg0Wz90KiJmpg9s7xBryknS7D4bo1SXTbPWK-ghWKFZGpb80EY-wJo_K-nLCJEFa6p9J7q1pY9UktpqHDVnC3a8QhPACLjzjuoFM5Tmej5rK_JnHOwSdCFKK0FkOVOCA0WiX3MbfdKBFgRkHitLWrDjFzgS8HHNaxOXKH7I_YMQSCu0vTd1NNGIIrImPC6FjKj6G-Sj6weOavtNA4e-QBI5UZvoJFeD5yWNvQLIon-Ynet31neHUdY1UUTM71bFviIpbeXIjWU6X9KY8iZExJ_FgII1lCXoHVjdchoesFHhvrUCoeSLJcRCa-sI3DxVY4G1q9VTkCshdWcB-dy3sDoER2pO5cyrbK2Tg1Q2q5hHtrPEMi6e1RBvKog5RiWsjhbsC2Bz7rLMtMNz8EwU2c0vQ0innb1mAnWHSbSfuv-oLc3-1o1uJQyWQvAycdOb_HbieIa0Z2izfu0U0L1PT3unz_11sdWk0cjbhMytD3fdOHfIVugukWS5lK2azKxtryhMYgjjnc8MgpeOn_hS0jUeB-vnGrbUbJa-3NXmyfhrvFg53PJKexv-jaJkKY6gZXly0tHSV1s-5O-1aBfBswoO2JRMoglphQgb8aAqSbFkNd_x92RMjVR-C5I8ELUXhEFA5oV-Uf99rCGy10Jm65M20E1rHocmMLnEiZqeeFYVC7OmBJeAJgLbgNxgi5ykcXJ84aVl0DpQCeaOzyE23G19R6o_IRVQo7xWmsj8-NW4gtQP-kZiOifwww6swIZpK6vWc16UID7pr05YrlvOQKJJfFD0o9WnVk61kFs7IA_yS_4ifX2AauUmUgwcXoWkOS6x14YDjcTXvri449fYqlaVChQxuPBVxe7uIHUBBWc_cE8w0K8Y_6JJ1SNCpl9HTlxnnnsrGm47SKeD4ZlSNmppVBaNK8K1w9MCwMpX1ryNFGuYcqlPzhEL9TIgk5XmNNlHFMDN4tODuqyaCRHCgO7XvAx0PANXo0g19Zhv849npRIhyJmOveLPy6PDsnvYqXQfzTPGYkAgEu8MpmDm_aXZeDc4l3lb5HtKc31yTg5DNu1uIh-jzTdfMyTocBQIc_1S2S9jaGruhc-Tl-xI5GKSU_jbpcj07RKvtJOd7YwXL_33BIALfIAZKTHzp0ZPqunM4Kb46fIi7pr88SaVLyKj9eL3pQqWsHiCHDVELa9qv1bNZPmTSgr-4zm8RFzPqLa3oar5Es9wg10IFgDuy2bqeqHl2xIfXAiEeCTtXkb2VuUizOzPMoSB0BN_iQgT-1N_9QBwb9wIDfF2SzyDoU4if4KvFOVIxvrJbb4Uru7B8cAicIPeF7xHlyacLuTY15GNBZq1FwMrCuKiH410yJJGGrOAXBvi6pssim1q_5xBN4rSb5svpIkXKNB9iVgXgXUhD2RFXq99_UmeDqC2uqlqHwHIAkJvgrmqyFy12YE1dj-PoYnrZL7mFS_A5HWnVhmF5pAm1cZIPhNXY1TlSw5x5ugLcKYMo2MCm6QPWwgfy_pumwvX_LJfEgOV9WuhwXjJQznpQie6yP9m4BS7faUKYfIJFHdmewp_NR22ZkVRf_YCjmO0xB7OkYnI_GuQ9QWXzB4JiJ7CfikDQIUsEw",
+			"ciphertext": "sb1.Wtjab5rM6ZegpEL-U-K4-IzyxX-oVuILr28IvML5YUAr_SUsHJ9anN-DP9F9gKLS4MYUKp1cOTFtx1EbrUF0N6BXR0icpAFqt5yV6nHk9XCh7mXbvHEmdcgADbKCduus12fLwAa2qC_ThkXWygLQkB173EGeDbB953CjwHXK4zpznSJSLleosQqOXl9tkKdNPYvcCQqfk2mmDvreZcnBC81izzmDf3WF9_Q-cDJZw-8s_XnLC2Lesn4yJyfHN62uE_VUIsPrqo2Fp3SLAbn6ZINxLf5ckPV9K9ujDdOkLbGKGrXM7Aw26RSSGhV2iiV1ebpppUWCWnqsFLFzhMEw__c21gz2TjBk3BcnOqH9rppHB7uVmid2yRdMR3DAqw_5FNvB2Z0ljbY_vzk15r9bRvJi6iutbTNsScUEovIKPAX2Fp0Iu-PrKQhxsE1i2sTbrrzNMVuJNKl-2QDEVZPco6AXdhcuHft48eUiJnMq2Fa3ekWOWen7TnjLlpW3-J5rQ0fPkEoxywxfob7rgeZCqZsTzJEXMnJfIOWvclU6NUXDYZf6RIx1PYPtCMTCicmPP9IObwAewfZx8WBMSYdqJY2_EM2Ois_a7r_raWnDE3vYs1FRtLsjN0rtsMWFkeI0zD7Fu4tbsrK3gHFq3RXysETjVox5ihJ0YE3NGPfPxHSW4Qr5HI9Hk5DxA_I93e73cw5xEMGgR0stytK4gU0M1RxHGfgnxuenGNk_hBjmzZgRUHsBMTY2FSgPydD-oNhD08yUM1KL3GfSLKc0qLG8btQCl8vDROn7W8kVCC4OKER8UyN6JgU6dfbDyXBueGAoQM4xDgqW0z_hq6Z822O0SN0xGfNRSPIftE3BoRRQEcE6iZUp0Jk8rE1Hpr083SJuTbs2V792HB63LPdVCCRhz-f00beyPSJHcNyrdj8xNcZ6HiTyZo0K1OF-lku5QPTfkqAtswkEI5cVkn2dDJq1wkjI5kEIQ2JtrKLRx1Z8_XCshSbEWzkz7a3U9mBWUi0ooL1QacvQ2QD5NuDdgFReYi9MdB7Z4SWPbyrvtUURY9SwTUd4SeVAGLIsEFqkP-6wyZkbONWIsGOkdAWj358kEv6tYoanEMyQFhtu8RCbshmF7kWru0oWG63nxvzAgIvOrl4Gn1nUytYpQwokFz0Cv1CIvW6I9LjIW_pUE7HuPhwHlwpP_HJhqJYhbF1QnoKiGey7DWM_SGQ8JwUx-UQtjyHKkxJKm4H7ewq1MreBNmQka5KeX0n0_oU11VaVHztHclk8oUvU99zs1R28saqOiDyF2XtLRSrNsLPnJg63S59AHvOy6M4Y_gaivDZrDBMpiWpNMFbPIe88CUra8IU7rJRovIMuR-cE5WQVWmowkoLBVYYn-mK1H9FF8oDy7s647vUcHNiMToNifdJ_gtCSCmekXBILMyejBbFwL8kGfu81DlEJSwTZ3W3UEvYbT1P6a697v-YYAP5-CmUgAwmBTsmdt1q-RWBqovUeV3YrplO9T6S8RV3ECh9VpgU33J-pwiOQxf6TZjfx1TeiApUgQsDRS4jRBwnNMNpFCE4IAq8qrAUHm6KoKVe2rBT6CgSZOcf6FLCeNwhfj8e16ilAX02kL2JuloZu-9sZA4Dmh_GMni8X3H0M5uqoMr9QTEb42zGuZPfVFiwxEAe5UsMezT2SzKtmVbmLbbrNQcL7AkhWERdM9ECg8WP7UXz6_jsUkf7kcelXrkcLq22imRID78JRp9gb_oCIS4WYNJU60kZTh-sKjazKpXpfH8AQGAEcQZzCewpWWDOGARq5qVVIRSqggyitoVKrcVPFgc5rtbsbgi0kRjjnBg1yiBsTKQIwK9qcgS2r3GzsFXqRQcPe9Gd2QMENZ_M3A04dmZ3xopdFSNVXeBg_",
 			"expected": {
 				"title": "",
 				"voice": {
@@ -201,7 +207,9 @@
 							"control": 5,
 							"strictness": 4,
 							"edge": null,
-							"talk": 2
+							"talk": 2,
+							"libido": 4,
+							"kink": 3
 						},
 						"sourceId": "00000000-0000-4000-8000-0000000000d6",
 						"sourceRevision": 2,
@@ -224,7 +232,9 @@
 							"control": null,
 							"strictness": null,
 							"edge": null,
-							"talk": null
+							"talk": null,
+							"libido": 4,
+							"kink": 3
 						},
 						"sourceId": null,
 						"sourceRevision": null,
@@ -255,7 +265,11 @@
 						}
 					],
 					"sourceId": null,
-					"sourceRevision": null
+					"sourceRevision": null,
+					"dials": {
+						"heat": 4,
+						"kink": null
+					}
 				},
 				"lead": "shared",
 				"limits": "Nothing public.",
@@ -338,7 +352,7 @@
 			"kind": "daydream-character",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d6",
-			"ciphertext": "sb1.gKMxvEzVR4UpTjfd0zRO-bRXi19ePY2cKUrHicxKcHhwf17HDFUF9DiUZLrjLAFQKWE-CDn-gXreYRNFjDA3I1E15oVSIOBhgS_RvOosNw-it2XMZXR3xuGhjzyCF4088a4Jk_4Kpg_Hvy7NY1BWTpkyiNtnpOqGdlrHx65VlDEgOO-ZGEeXRI-ufNCDW1ygvGIufGhHLG-NhMpfWuuvQ_lWWy3ARAeHs98fPRC9-xGdQJZNJZFAhKzWtPFHSaktWwrcLtffIb05fTnSpd0chxO0qa5cXCiO0hpP3UB-34INxZBm0lyLygmiqg48yapE0V60I-gqqStrotLDP2U0oJYBrR3IgIx9i60ZVE5f0WjmTYP0X0vb3svAuiL5uDMqxYzHOdX3Tbtd0sI",
+			"ciphertext": "sb1.6LkF9dtJkwQakKMtDzFJ2K1gO9c-bUFvSjNNlMVgKwtHjV53oFDBaXWcjFo6wYNgLQ0csyETm4mIXCLtNGK8ql62wnySALMM0N788ZcpsSL4pSp9Bf13bbBQuak5i3nKex6zm51dQw5uSQ7kOImnZvxLP6uykuDHaBTqow_5KaepPuxbgIbpoFTZR9M2nbdQ-l0RePyx-nWZZsAcqyDGtnqgUmGawNJWbgc_SXbue9c1ZbOVAV5tN_Hmc1_Xb2aW7GjumhlJkwXbUua6n_SBUhZ-ZUmavkwEaMxNB3TR2XC1rIRrlOUjjSLKvWbQFybF3fmA1q3FvlCKIZDuTNaIJwNta9FnwjotZzLtS_7Lqf4UlZdrGGt_UW3rHhLyHCdUrhda_gWnTJ054RtUV6G4ePzz8UfnvSDCe4iwzq2H6Q",
 			"expected": {
 				"name": "Mara",
 				"archetype": "The exacting mentor",
@@ -352,7 +366,9 @@
 					"control": 5,
 					"strictness": 4,
 					"edge": null,
-					"talk": 2
+					"talk": 2,
+					"libido": 4,
+					"kink": 3
 				}
 			}
 		},
@@ -360,7 +376,7 @@
 			"kind": "daydream-scene",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d7",
-			"ciphertext": "sb1.R7GVFSE_7IYgG3ioJ1E22YvenKy7bGNOrTVbUUqUuyW-RQMWPzfjOaakCWb_oTW3_hWRO5QP_5230XSBEWMOt52FwEs1_y2YCORAF3YrNS3PuyJJ7ftRgowCW_P7c-lOSDVXJwAApiwFvgQJUXr1jjRvV15TZXXnoIMch6dXBhwhHJmxWn94Dk58wMNJM_wxKPnAFv8YfG8Z7SrUEZwlc2YJcN4PTxWJMuduspClzXixZjJUh1hOjpQnLqdEKDp4JPyV8Hb1-NXHmJna76hNwHqeKp-edUfu9qPrV1y4O54RVAj1mXXnYzk2k0-noYvl2uPyiJ29MbK2Z5c_d-9EomV_NSGE5YCTw2W62qabkx4-HGsN_c1s_UHM-8DVYedchAXT19Tz8AwWAcPKKguhCh3_53i-lGb9AS5sff4EnZ405_MHnq0T1r7S6O-YyPUgCJZ8BMVwZFuEmgO_DEhKqVV-oIlYlUBT2-fBnzG4pZaxTMXe0MGF3Th0pA6mPg",
+			"ciphertext": "sb1.oG1XC1qMQ18hzjXh9F6uRvojgWTCvx6eUKBmAl1NJH8cKVyxhx93rM1J5RhCMOlaFGFBNHAlaXMegCAe8QQxJZDfnImR_P479W6kvnSygJgmnIObBJ4BRFdRpDQgN_eKN2He7bk3rVmrb7kOtqfXsJ4sENa2VmpHlKLN4uk1X9sfFKHmv9cQQ9YOD2wXT77ST0uDnGK5fRVj76l2mw_wWItakmYstm3SCbco-j57dzkT0Dx2zP0_vk1NXH1Ss5e9j0COp6RTaLOMLEUhy--VkUuw2OHXZeWZqaALL-gawiYR1hy6A2WISVZQOJmxTJP5cfcaDw5aCDW2hoq7Ym68EWQYb-_sceCuRpNu7AmrtxfSjiBbr2h0kSyYUyxObPMnVuS6jy6JQS4_0tCiYpNevbUP28w91AhP6Jqfn33ngkr3nmtChZJPUPcNZ1i4gSxAOWLZosXfPcsLLATqwZYJq6ckBU-trEKfJL4AZ-VDHLhFrd1CQSvokZmFnN4_yNZ9EImQCqbYIOdmoF0lArNA6JORH8fLh0ITbl_wfR4",
 			"expected": {
 				"title": "Frozen evening",
 				"setting": "An empty office.",
@@ -379,7 +395,11 @@
 						"name": "the observer",
 						"description": ""
 					}
-				]
+				],
+				"dials": {
+					"heat": 4,
+					"kink": null
+				}
 			}
 		}
 	]

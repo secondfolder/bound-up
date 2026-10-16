@@ -14,7 +14,11 @@
 			// Frozen historical plans: formatting would silently rewrite frozen records.
 			"!docs/historical-plans",
 			// Served verbatim: favicons and the web manifest are assets, not source.
-			"!static"
+			"!static",
+			// Claude Code's own: settings, and agents' git worktrees, each a whole
+			// checkout with a biome.jsonc of its own. `!!` keeps them out of the
+			// scan too, or Biome refuses to run on finding a second root config.
+			"!!.claude"
 		]
 	},
 	// A rule Biome has no built-in for: see the file for what it checks.

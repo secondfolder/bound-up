@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DaydreamNarrator, DaydreamStance } from '$lib/daydream';
+import { type DaydreamNarrator, type DaydreamStance, UNSET_CHARACTER_DIALS } from '$lib/daydream';
 import type { ContextTurn } from '$lib/daydream/context';
 import { daydreamSetupKind } from '$lib/sealed-kinds/daydreams';
 import { testCharacter, testDaydreamSetup, testScene } from '$lib/testing/daydream-setup';
@@ -38,6 +38,12 @@ describe('buildMessages', () => {
 		expect(first?.role).toBe('system');
 		expect(first?.content.startsWith(RULES)).toBe(true);
 		expect(first?.content.indexOf('# The characters')).toBeGreaterThan(RULES.length);
+	});
+
+	it('does not call every story erotic, but welcomes explicit sex and kink when asked for', () => {
+		expect(RULES).not.toContain('erotic story');
+		expect(RULES).toContain('explicit sex and kink are welcome');
+		expect(RULES).toContain('or not sexual at all');
 	});
 
 	it('keeps the rules whatever the setup says', () => {
@@ -181,7 +187,15 @@ describe('describeSetup', () => {
 					testCharacter({
 						name: 'Mara',
 						archetype: 'strict mentor',
-						dials: { tone: 'cold', control: 5, strictness: null, edge: null, talk: 1 }
+						dials: {
+							tone: 'cold',
+							control: 5,
+							strictness: null,
+							edge: null,
+							talk: 1,
+							libido: null,
+							kink: null
+						}
 					}),
 					testCharacter({ name: 'Jun' })
 				]
@@ -237,6 +251,33 @@ describe('describeSetup', () => {
 
 	it('still says the limits are absolute when none were written', () => {
 		expect(describeSetup(setup)).toContain('None stated beyond the rules above.');
+	});
+
+	it('says how sexual and how kinky the scene is, with heat as the ceiling', () => {
+		const sfw = describeSetup(
+			testDaydreamSetup({
+				characters: [testCharacter({ dials: { ...UNSET_CHARACTER_DIALS, libido: 5, kink: 5 } })],
+				scene: testScene({ dials: { heat: 1, kink: null } })
+			})
+		);
+		expect(sfw).toContain('Heat: SFW: nothing sexual at all');
+		expect(sfw).toContain('Heat is the ceiling for everyone in the story');
+		// The character's own dials are still said, for within that ceiling.
+		expect(sfw).toContain('is slutty');
+		expect(sfw).toContain('is depraved');
+		expect(sfw).not.toContain('Kink:');
+
+		const filthy = describeSetup(
+			testDaydreamSetup({ scene: testScene({ dials: { heat: 5, kink: 5 } }) })
+		);
+		expect(filthy).toContain('Heat: filthy');
+		expect(filthy).toContain('Kink: extreme');
+	});
+
+	it('says nothing of heat or kink when neither is set, leaving it to the words', () => {
+		const content = describeSetup(setup);
+		expect(content).not.toContain('Heat');
+		expect(content).not.toContain('Kink');
 	});
 
 	it('includes the story dials', () => {

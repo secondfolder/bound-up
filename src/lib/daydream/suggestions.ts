@@ -17,8 +17,10 @@ import {
 	type CharacterTextField,
 	DAYDREAM_LIMITS,
 	type DaydreamScene,
+	type DialValue,
 	MAX_DAYDREAM_CHARACTERS,
 	SCENE_TEXT_FIELDS,
+	type SceneDials,
 	type SceneTextField
 } from '../daydream';
 import { unfence } from './reply-format';
@@ -159,6 +161,26 @@ export function parseParts(value: unknown): SuggestedPart[] {
 	return parts.slice(0, MAX_DAYDREAM_CHARACTERS);
 }
 
+/** A dial from an answer: a whole number 1 to 5, or null for anything else. */
+function dialOf(value: unknown): DialValue | null {
+	return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5
+		? (value as DialValue)
+		: null;
+}
+
+/**
+ * A scene's heat and kink from an answer. Lenient, like the rest: a missing or
+ * out-of-range value is unset rather than the answer failing, since the
+ * dials are optional anyway.
+ */
+export function parseSceneDials(value: unknown): SceneDials {
+	if (!value || typeof value !== 'object') {
+		return { heat: null, kink: null };
+	}
+	const answer = value as Record<string, unknown>;
+	return { heat: dialOf(answer.heat), kink: dialOf(answer.kink) };
+}
+
 /** A whole scene from "Surprise me", or null when it lacks the two fields a scene must have. */
 export function parseSurpriseScene(
 	value: unknown
@@ -174,7 +196,8 @@ export function parseSurpriseScene(
 		yourRole: fields.yourRole ?? '',
 		tone: fields.tone ?? '',
 		notes: fields.notes ?? '',
-		parts: parseParts(value)
+		parts: parseParts(value),
+		dials: parseSceneDials(value)
 	};
 }
 

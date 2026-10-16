@@ -4,7 +4,8 @@ import {
 	type DaydreamSetup,
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
-	UNSET_CHARACTER_DIALS
+	UNSET_CHARACTER_DIALS,
+	UNSET_SCENE_DIALS
 } from '../daydream';
 
 /**
@@ -42,6 +43,7 @@ export function testScene(overrides: Partial<DaydreamSceneCopy> = {}): DaydreamS
 		tone: '',
 		notes: '',
 		parts: [],
+		dials: UNSET_SCENE_DIALS,
 		...overrides
 	};
 }

@@ -21,6 +21,7 @@ import {
 	MAX_DIRECTIONS,
 	MAX_SUGGESTIONS,
 	UNSET_CHARACTER_DIALS,
+	UNSET_SCENE_DIALS,
 	voiceProblem
 } from '../daydream';
 import { coversEveryFace, MAX_SIDES, MIN_SIDES } from '../daydream/dice';
@@ -39,8 +40,12 @@ const characterDialsSchema = z.object({
 	control: dial.nullable(),
 	strictness: dial.nullable(),
 	edge: dial.nullable(),
-	talk: dial.nullable()
+	talk: dial.nullable(),
+	libido: dial.nullable(),
+	kink: dial.nullable()
 });
+
+const sceneDialsSchema = z.object({ heat: dial.nullable(), kink: dial.nullable() });
 
 const characterShape = {
 	name: required(DAYDREAM_LIMITS.characterName),
@@ -72,7 +77,8 @@ const sceneShape = {
 		.refine(
 			(parts) => new Set(parts.map((part) => part.id)).size === parts.length,
 			'Duplicate part'
-		)
+		),
+	dials: sceneDialsSchema
 };
 
 /** Who a character is in one daydream (`DaydreamCasting`). Only ever in a setup, never the library. */
@@ -194,7 +200,8 @@ export const daydreamSetupKind = defineSealedKind({
 					yourRole: '',
 					tone: value.tone,
 					notes: '',
-					parts: []
+					parts: [],
+					dials: UNSET_SCENE_DIALS
 				},
 				lead: value.lead,
 				limits: value.limits,
