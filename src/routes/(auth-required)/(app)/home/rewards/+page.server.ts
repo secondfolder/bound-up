@@ -2,27 +2,20 @@ import { error, fail } from '@sveltejs/kit';
 import {
 	partnerRewardClaimSchema,
 	rewardClaimSchema,
-	rewardCreditsSchema,
-	rewardUpdateSchema
+	rewardCreditsSchema
 } from '$lib/schemas/rewardForm';
 import {
 	claimPartnershipReward,
 	claimSelfReward,
 	getSelfRewardsSection,
 	listHomePartnerRewardSections,
-	setSelfRewardCredits,
-	updateSelfReward
+	setSelfRewardCredits
 } from '$lib/server/rewards';
 import type { Actions, PageServerLoad } from './$types';
 
 function stringField(formData: FormData, key: string): string | undefined {
 	const value = formData.get(key);
 	return typeof value === 'string' ? value : undefined;
-}
-
-function nullableStringField(formData: FormData, key: string): string | null {
-	const value = formData.get(key);
-	return typeof value === 'string' ? value : null;
 }
 
 function numberField(formData: FormData, key: string): string | undefined {
@@ -60,35 +53,6 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 };
 
 export const actions: Actions = {
-	selfUpdateReward: async ({ locals, request }) => {
-		if (!locals.user) {
-			error(401, 'Not signed in');
-		}
-
-		const formData = await request.formData();
-		const parsed = rewardUpdateSchema.safeParse({
-			rewardId: stringField(formData, 'rewardId'),
-			title: stringField(formData, 'title'),
-			description: nullableStringField(formData, 'description'),
-			cost: numberField(formData, 'cost'),
-			active: formData.get('active') === 'on'
-		});
-		if (!parsed.success) {
-			const flat = parsed.error.flatten();
-			return fail(400, {
-				action: 'selfUpdateReward',
-				error: firstError(flat.fieldErrors, flat.formErrors)
-			});
-		}
-
-		const { rewardId, ...input } = parsed.data;
-		const updated = await updateSelfReward(locals.db, locals.user.id, rewardId, input);
-		if (!updated) {
-			error(404, 'Reward not found');
-		}
-		return { action: 'selfUpdateReward', message: 'Reward saved.' };
-	},
-
 	selfSetCredits: async ({ locals, request }) => {
 		if (!locals.user) {
 			error(401, 'Not signed in');

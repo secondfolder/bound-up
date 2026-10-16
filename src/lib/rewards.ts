@@ -1,11 +1,14 @@
 import { canEditPartnership, type PartnershipRecord, roleOf } from './partnership';
 
-/** The editable fields on a reward in either scope. */
+/**
+ * The editable fields on a reward in either scope: the cost and whether it is
+ * active, which the server checks claims against, and the title and
+ * description sealed in the scope's vault (`rewardKind`).
+ */
 export type RewardInput = {
-	title: string;
-	description: string | null;
 	cost: number;
 	active: boolean;
+	content: { vaultId: string; ciphertext: string; payloadVersion: number };
 };
 
 export type PartnershipRewardRecord = Pick<

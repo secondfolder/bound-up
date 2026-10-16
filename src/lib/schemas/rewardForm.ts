@@ -1,14 +1,6 @@
 import { z } from 'zod';
-import { richTextFieldSchema } from '$lib/schemas/richTextField';
-
-const titleSchema = z
-	.string()
-	.trim()
-	.min(1, 'Please enter a reward title')
-	.max(80, 'Please keep this to 80 characters or fewer');
-
-/** Rich text: the 500 is characters of prose, not bytes of document. */
-const descriptionSchema = richTextFieldSchema(500);
+import { SEALED_PATTERN } from '$lib/sealed';
+import { isClientId } from '$lib/vault';
 
 const creditsSchema = z.coerce
 	.number()
@@ -19,11 +11,24 @@ const rewardIdSchema = z.string().uuid('Malformed reward id');
 
 const userIdSchema = z.string().trim().min(1, 'Malformed user id');
 
-export const rewardFormSchema = z.object({
-	title: titleSchema,
-	description: descriptionSchema,
+/**
+ * What a reward form actually posts: the cost and whether it is active, which
+ * the server checks claims against, and the title and description sealed into
+ * the scope's vault in place of the text fields (`sealRewardSubmission` in
+ * `sealed-forms.ts`). See docs/rewards.md.
+ */
+export const rewardSealedSubmitSchema = z.object({
+	recordId: z.string().refine(isClientId, 'Malformed id'),
+	vaultId: z.string().refine(isClientId, 'Malformed id'),
+	ciphertext: z
+		.string()
+		.min(1)
+		.max(64 * 1024)
+		.regex(SEALED_PATTERN),
+	payloadVersion: z.coerce.number().int().positive(),
 	cost: creditsSchema,
-	active: z.boolean()
+	active: z.boolean(),
+	expectedRevision: z.coerce.number().int().min(0).optional()
 });
 
 export const rewardClaimSchema = z.object({ rewardId: rewardIdSchema });
@@ -37,8 +42,4 @@ export const rewardCreditsSchema = z.object({
 	credits: creditsSchema
 });
 
-export const rewardUpdateSchema = rewardFormSchema.extend({ rewardId: rewardIdSchema });
-
-export type RewardFormSchema = typeof rewardFormSchema;
 export type RewardCreditsSchema = typeof rewardCreditsSchema;
-export type RewardUpdateSchema = typeof rewardUpdateSchema;

@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { assertNever } from './assert-never';
-import type { TaskEditorFormSchema } from './schemas/taskEditorForm';
+import type { TaskEditorFormSchema, TaskSealedSubmit } from './schemas/taskEditorForm';
 import type { TaskInput } from './tasks';
 import type {
 	PartnershipTaskView,
@@ -16,6 +16,19 @@ import type {
 export type TaskEditorFormValues = z.output<TaskEditorFormSchema>;
 
 type TaskEditableView = SelfTaskView | PartnershipTaskView;
+
+/** The schedule fields, which the editor and the sealed submit share. */
+type ScheduleValues = Omit<
+	TaskEditorFormValues,
+	'title' | 'description' | 'completionMessagesText'
+>;
+
+/** A task's content as the editor collects it. */
+export type TaskContentInput = {
+	title: string;
+	description: string | null;
+	completionMessages: string[];
+};
 
 const LINE_BREAK = /\r?\n/;
 
@@ -135,7 +148,7 @@ export function taskEditorFormValuesFromTask(task: TaskEditableView): TaskEditor
 	return values;
 }
 
-function scheduleFromValues(values: TaskEditorFormValues): TaskSchedule {
+function scheduleFromValues(values: ScheduleValues): TaskSchedule {
 	switch (values.scheduleMode) {
 		case 'one-off':
 			return { mode: 'one-off' };
@@ -172,7 +185,7 @@ function scheduleFromValues(values: TaskEditorFormValues): TaskSchedule {
 	}
 }
 
-function scheduleEndFromValues(values: TaskEditorFormValues): TaskScheduleEnd {
+function scheduleEndFromValues(values: ScheduleValues): TaskScheduleEnd {
 	switch (values.scheduledEndKind) {
 		case 'until':
 			return { kind: 'until', untilLocal: values.scheduledUntilLocal };
@@ -185,7 +198,7 @@ function scheduleEndFromValues(values: TaskEditorFormValues): TaskScheduleEnd {
 	}
 }
 
-function monthlyPatternFromValues(values: TaskEditorFormValues): TaskMonthlyPattern | undefined {
+function monthlyPatternFromValues(values: ScheduleValues): TaskMonthlyPattern | undefined {
 	if (values.scheduledFrequency !== 'month') {
 		return undefined;
 	}
@@ -199,14 +212,27 @@ function monthlyPatternFromValues(values: TaskEditorFormValues): TaskMonthlyPatt
 	return { kind: 'day-of-month', day: Number(values.scheduledDayOfMonth) };
 }
 
-export function taskInputFromEditorForm(values: TaskEditorFormValues): TaskInput {
+/** The content as typed, ready to seal (`taskKind`). */
+export function taskContentFromEditorForm(values: TaskEditorFormValues): TaskContentInput {
 	return {
 		title: values.title.trim(),
 		description: values.description.trim() === '' ? null : values.description.trim(),
+		completionMessages: parseCompletionMessages(values.completionMessagesText)
+	};
+}
+
+/** What the server stores of a submitted task: the settings, and the sealed content. */
+export function taskInputFromSealedSubmit(values: TaskSealedSubmit): TaskInput {
+	return {
 		active: values.active,
 		creditsAwarded: Number(values.creditsAwarded),
-		completionMessages: parseCompletionMessages(values.completionMessagesText),
 		timezoneOwnerUserId: values.timezoneOwnerUserId,
-		schedule: scheduleFromValues(values)
+		schedule: scheduleFromValues(values),
+		content: {
+			vaultId: values.vaultId,
+			ciphertext: values.ciphertext,
+			payloadVersion: values.payloadVersion,
+			completionMessageCount: values.completionMessageCount
+		}
 	};
 }

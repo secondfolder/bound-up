@@ -77,7 +77,7 @@ cannot be cut at a character offset without corrupting it.
 | `src/lib/components/ComposerEmbed.svelte`         | One embed inside the editor: the real `UrlEmbed` plus its remove button.                       |
 | `src/lib/components/RichTextEditor.svelte`        | The editor, in both moods.                                                                     |
 | `src/lib/components/FloatingFormatToolbar.svelte` | The selection toolbar, for descriptions only.                                                  |
-| `src/lib/schemas/richTextField.ts`                | The form field: validates, sanitises, limits.                                                  |
+| `src/lib/sealed-kinds/tasks.ts`                   | `richDescription`: validates, sanitises and limits a description, on write and on every read.  |
 
 The split in the first two rows is load-bearing. A Lexical import in
 `richtext.ts` puts the whole editor back on every page that shows a
@@ -488,15 +488,20 @@ sanitised `{@html}` in the app is inside `UrlEmbed`, and only ever sees
 DOMPurify-cleaned oEmbed markup. This is why the renderer walks the document
 itself instead of using `@lexical/html`, which returns an HTML string.
 
-**Descriptions are validated server-side.** They arrive as client-supplied
-JSON, so `richTextFieldSchema` parses them and **stores its own output**. That
-is the sanitisation step: Lexical deliberately preserves unrecognised node
-state (a node's `$` key) verbatim so other plugins' data survives a round trip,
-which would otherwise make a description column an unbounded arbitrary-data
-channel. Invariant 14, the same reasoning as re-checking the thread icon.
+**Descriptions are validated by whoever opens them.** A task's or reward's
+description is sealed in a vault with the rest of its content
+([docs/tasks.md](tasks.md#what-the-server-can-see)), so the server never sees
+it and cannot check it. `richDescription` in `sealed-kinds/tasks.ts` does
+instead: the writer's device runs it before sealing, and **every reader runs it
+again on what it opens** and uses its output. That is the sanitisation step:
+Lexical deliberately preserves unrecognised node state (a node's `$` key)
+verbatim so other plugins' data survives a round trip, so a partner's device —
+or a tampered one — could otherwise hand a reader arbitrary data inside a
+description. The 500-character limit is checked the same way, on the visible
+text.
 
-Message bodies need no such check — the server holds only ciphertext, and a
-sender could always put anything in their own message.
+Message bodies need no such check — a sender could always put anything in
+their own message, and the reader parses the document where it is drawn.
 
 **URLs are checked twice**: `isSafeHttpUrl` on the way in, and again at render
 before an `href` reaches the DOM.

@@ -2,10 +2,16 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RichText from '$lib/components/RichText.svelte';
+	import { openedClaim, shownTitle } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const backHref = $derived(resolve('/(auth-required)/(app)/home/rewards'));
+
+	/** Each row with its content opened, or a placeholder while it opens (`sealed-views.svelte.ts`). */
+	const rows = $derived(
+		data.selfRewards.claims.map((claim) => ({ claim, content: openedClaim(claim) }))
+	);
 </script>
 
 <section class="page">
@@ -24,12 +30,12 @@
 				<p class="empty">Nothing claimed yet.</p>
 			{:else}
 				<ul class="history-list">
-					{#each data.selfRewards.claims as claim (claim.id)}
+					{#each rows as { claim, content } (claim.id)}
 						<li>
-							<strong>{claim.rewardTitle}</strong>
+							<strong>{shownTitle(content)}</strong>
 							<span>{claim.rewardCost} credits</span>
-							{#if claim.rewardDescription}
-								<div class="description"><RichText text={claim.rewardDescription} /></div>
+							{#if content?.description}
+								<div class="description"><RichText text={content.description} /></div>
 							{/if}
 						</li>
 					{/each}

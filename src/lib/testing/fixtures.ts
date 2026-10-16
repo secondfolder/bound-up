@@ -3,7 +3,6 @@ import { generateAgeIdentity } from '../crypto/identity';
 import type { ThreadIcon } from '../messaging';
 import type { ControlAnswer } from '../partnership';
 import { controlFromAnswer } from '../partnership';
-import type { RewardInput } from '../rewards';
 import type { Db } from '../server/db';
 import {
 	accountRecoveryRequests,
@@ -41,7 +40,7 @@ import {
 	setSelfRewardCredits
 } from '../server/rewards';
 import { createPartnershipTask, createSelfTask } from '../server/tasks';
-import type { TaskInput } from '../tasks';
+import type { TaskSettings } from '../tasks';
 import type { TaskSchedule } from '../types';
 import { FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from './crypto';
 import { createTestMediaStore } from './media';
@@ -250,18 +249,34 @@ export async function readWrapRows(db: Db, userId: string) {
 	return await db.select().from(userKeyWraps).where(eq(userKeyWraps.userId, userId));
 }
 
+/**
+ * What a fixture task or reward is made from: the plain settings, and a
+ * stand-in for the sealed content. The server never reads the content, so a
+ * test names the ciphertext it expects to get back rather than a title.
+ */
+export type TestRewardInput = { cost?: number; active?: boolean; ciphertext?: string };
+
+export type TestTaskInput = Partial<TaskSettings> & {
+	ciphertext?: string;
+	completionMessageCount?: number;
+};
+
 export async function createTestSelfReward(
 	db: Db,
 	owner: TestUser,
-	input: Partial<RewardInput> = {}
-): Promise<{ id: string }> {
-	const id = await createSelfReward(db, owner.id, {
-		title: input.title ?? 'Reward',
-		description: input.description ?? 'Reward description',
+	input: TestRewardInput = {}
+): Promise<{ id: string; ciphertext: string }> {
+	const id = crypto.randomUUID();
+	const ciphertext = input.ciphertext ?? fakeSealed('reward');
+	const result = await createSelfReward(db, owner.id, id, {
 		cost: input.cost ?? 3,
-		active: input.active ?? true
+		active: input.active ?? true,
+		content: { vaultId: await ensureTestSelfVault(db, owner.id), ciphertext, payloadVersion: 1 }
 	});
-	return { id };
+	if (!result.ok) {
+		throw new Error(`fixture could not create self reward: ${result.reason}`);
+	}
+	return { id, ciphertext };
 }
 
 export async function setTestSelfRewardCredits(
@@ -309,18 +324,23 @@ export async function createTestPartnershipReward(
 	db: Db,
 	partnershipId: string,
 	owner: TestUser,
-	input: Partial<RewardInput> = {}
-): Promise<{ id: string }> {
-	const result = await createPartnershipReward(db, partnershipId, owner.id, {
-		title: input.title ?? 'Partner reward',
-		description: input.description ?? 'Partner reward description',
+	input: TestRewardInput = {}
+): Promise<{ id: string; ciphertext: string }> {
+	const id = crypto.randomUUID();
+	const ciphertext = input.ciphertext ?? fakeSealed('reward');
+	const result = await createPartnershipReward(db, partnershipId, owner.id, id, {
 		cost: input.cost ?? 2,
-		active: input.active ?? true
+		active: input.active ?? true,
+		content: {
+			vaultId: await ensureTestPartnershipVault(db, partnershipId),
+			ciphertext,
+			payloadVersion: 1
+		}
 	});
 	if (!result.ok) {
 		throw new Error(`fixture could not create partnership reward: ${result.reason}`);
 	}
-	return { id: result.id };
+	return { id, ciphertext };
 }
 
 export async function setTestPartnershipRewardCredits(
@@ -398,39 +418,52 @@ function defaultTaskSchedule(): TaskSchedule {
 export async function createTestSelfTask(
 	db: Db,
 	owner: TestUser,
-	input: Partial<TaskInput> = {}
-): Promise<{ id: string }> {
-	const id = await createSelfTask(db, owner.id, owner.timezone, {
-		title: input.title ?? 'Self task',
-		description: input.description ?? 'Self task description',
+	input: TestTaskInput = {}
+): Promise<{ id: string; ciphertext: string }> {
+	const id = crypto.randomUUID();
+	const ciphertext = input.ciphertext ?? fakeSealed('task');
+	const result = await createSelfTask(db, owner.id, owner.timezone, id, {
 		active: input.active ?? true,
 		creditsAwarded: input.creditsAwarded ?? 2,
-		completionMessages: input.completionMessages ?? ['Nice work'],
 		schedule: input.schedule ?? defaultTaskSchedule(),
-		timezoneOwnerUserId: input.timezoneOwnerUserId ?? owner.id
+		timezoneOwnerUserId: input.timezoneOwnerUserId ?? owner.id,
+		content: {
+			vaultId: await ensureTestSelfVault(db, owner.id),
+			ciphertext,
+			payloadVersion: 1,
+			completionMessageCount: input.completionMessageCount ?? 1
+		}
 	});
-	return { id };
+	if (!result.ok) {
+		throw new Error(`fixture could not create self task: ${result.reason}`);
+	}
+	return { id, ciphertext };
 }
 
 export async function createTestPartnershipTask(
 	db: Db,
 	partnershipId: string,
 	viewer: TestUser,
-	input: Partial<TaskInput> = {}
-): Promise<{ id: string }> {
-	const result = await createPartnershipTask(db, partnershipId, viewer.id, viewer.timezone, {
-		title: input.title ?? 'Partner task',
-		description: input.description ?? 'Partner task description',
+	input: TestTaskInput = {}
+): Promise<{ id: string; ciphertext: string }> {
+	const id = crypto.randomUUID();
+	const ciphertext = input.ciphertext ?? fakeSealed('task');
+	const result = await createPartnershipTask(db, partnershipId, viewer.id, viewer.timezone, id, {
 		active: input.active ?? true,
 		creditsAwarded: input.creditsAwarded ?? 2,
-		completionMessages: input.completionMessages ?? ['Nicely done'],
 		schedule: input.schedule ?? defaultTaskSchedule(),
-		timezoneOwnerUserId: input.timezoneOwnerUserId ?? viewer.id
+		timezoneOwnerUserId: input.timezoneOwnerUserId ?? viewer.id,
+		content: {
+			vaultId: await ensureTestPartnershipVault(db, partnershipId),
+			ciphertext,
+			payloadVersion: 1,
+			completionMessageCount: input.completionMessageCount ?? 1
+		}
 	});
 	if (!result.ok) {
 		throw new Error(`fixture could not create partnership task: ${result.reason}`);
 	}
-	return { id: result.id };
+	return { id, ciphertext };
 }
 
 export async function readSelfTaskRow(db: Db, id: string) {
@@ -491,6 +524,23 @@ export async function ensureTestPartnershipVault(db: Db, partnershipId: string):
 	await db
 		.insert(vaults)
 		.values({ id, kind: 'partnership', partnershipId, keyCheck: 'K'.repeat(43) });
+	return id;
+}
+
+/** The user's own vault, made if they have none, as `ensureTestPartnershipVault`. */
+export async function ensureTestSelfVault(db: Db, userId: string): Promise<string> {
+	const [existing] = await db
+		.select({ id: vaults.id })
+		.from(vaults)
+		.where(eq(vaults.ownerUserId, userId))
+		.limit(1);
+	if (existing) {
+		return existing.id;
+	}
+	const id = crypto.randomUUID();
+	await db
+		.insert(vaults)
+		.values({ id, kind: 'self', ownerUserId: userId, keyCheck: 'K'.repeat(43) });
 	return id;
 }
 

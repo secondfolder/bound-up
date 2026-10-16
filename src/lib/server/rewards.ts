@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { canClaimFromPartnership, type RewardInput } from '../rewards';
+import { rewardKind } from '../sealed-kinds/tasks';
 import type {
 	HomePartnerRewardsSectionView,
 	PartnershipRewardClaimView,
@@ -22,11 +23,22 @@ import {
 	selfRewards
 } from './db/schema';
 import { getPartnershipForUser } from './partnerships';
+import {
+	partnershipVaultIdFor,
+	sealedIsAcceptable,
+	sealedRef,
+	selfVaultIdFor,
+	snapshotRef
+} from './sealed-content';
 
 const selfRewardColumns = {
 	id: selfRewards.id,
 	title: selfRewards.title,
 	description: selfRewards.description,
+	ciphertext: selfRewards.ciphertext,
+	vaultId: selfRewards.vaultId,
+	payloadVersion: selfRewards.payloadVersion,
+	revision: selfRewards.revision,
 	cost: selfRewards.cost,
 	active: selfRewards.active,
 	createdAt: selfRewards.createdAt,
@@ -39,6 +51,10 @@ const partnershipRewardColumns = {
 	createdByUserId: partnershipRewards.createdByUserId,
 	title: partnershipRewards.title,
 	description: partnershipRewards.description,
+	ciphertext: partnershipRewards.ciphertext,
+	vaultId: partnershipRewards.vaultId,
+	payloadVersion: partnershipRewards.payloadVersion,
+	revision: partnershipRewards.revision,
 	cost: partnershipRewards.cost,
 	active: partnershipRewards.active,
 	createdAt: partnershipRewards.createdAt,
@@ -50,6 +66,10 @@ const rewardHistoryColumns = {
 	rewardTitle: selfRewardClaims.rewardTitle,
 	rewardDescription: selfRewardClaims.rewardDescription,
 	rewardCost: selfRewardClaims.rewardCost,
+	snapshotCiphertext: selfRewardClaims.snapshotCiphertext,
+	snapshotVaultId: selfRewardClaims.snapshotVaultId,
+	snapshotVersion: selfRewardClaims.snapshotVersion,
+	snapshotRecordId: selfRewardClaims.snapshotRecordId,
 	createdAt: selfRewardClaims.createdAt
 } as const;
 
@@ -60,13 +80,21 @@ const partnershipRewardHistoryColumns = {
 	rewardTitle: partnershipRewardClaims.rewardTitle,
 	rewardDescription: partnershipRewardClaims.rewardDescription,
 	rewardCost: partnershipRewardClaims.rewardCost,
+	snapshotCiphertext: partnershipRewardClaims.snapshotCiphertext,
+	snapshotVaultId: partnershipRewardClaims.snapshotVaultId,
+	snapshotVersion: partnershipRewardClaims.snapshotVersion,
+	snapshotRecordId: partnershipRewardClaims.snapshotRecordId,
 	createdAt: partnershipRewardClaims.createdAt
 } as const;
 
 type SelfRewardRow = {
 	id: string;
-	title: string;
+	title: string | null;
 	description: string | null;
+	ciphertext: string | null;
+	vaultId: string | null;
+	payloadVersion: number | null;
+	revision: number;
 	cost: number;
 	active: boolean;
 	createdAt: Date;
@@ -75,9 +103,13 @@ type SelfRewardRow = {
 
 type SelfRewardHistoryRow = {
 	id: string;
-	rewardTitle: string;
+	rewardTitle: string | null;
 	rewardDescription: string | null;
 	rewardCost: number;
+	snapshotCiphertext: string | null;
+	snapshotVaultId: string | null;
+	snapshotVersion: number | null;
+	snapshotRecordId: string | null;
 	createdAt: Date;
 };
 
@@ -85,8 +117,12 @@ type PartnershipRewardRow = {
 	id: string;
 	partnershipId: string;
 	createdByUserId: string;
-	title: string;
+	title: string | null;
 	description: string | null;
+	ciphertext: string | null;
+	vaultId: string | null;
+	payloadVersion: number | null;
+	revision: number;
 	cost: number;
 	active: boolean;
 	createdAt: Date;
@@ -111,6 +147,58 @@ export type PartnershipRewardsPageView = {
 };
 
 type RewardResult<TReason extends string> = { ok: true } | { ok: false; reason: TReason };
+
+/** Why the server refused the sealed half of a reward write. */
+/**
+ * Why a sealed write was refused. `id-taken`: the browser chooses a new
+ * record's id (it is part of what the content is sealed to), so a create can
+ * name one that exists — a retried post whose first attempt landed, most
+ * likely. Refused rather than left to fail as a primary-key error.
+ */
+type ContentRefusal = 'bad-content' | 'wrong-vault' | 'id-taken';
+
+/** As `taskContentProblem` in tasks.ts, for the reward kind. */
+function rewardContentProblem(
+	content: RewardInput['content'],
+	vaultId: string | null
+): ContentRefusal | null {
+	if (!sealedIsAcceptable(rewardKind, content.ciphertext, content.payloadVersion)) {
+		return 'bad-content';
+	}
+	return content.vaultId === vaultId ? null : 'wrong-vault';
+}
+
+/** The columns a sealed reward write sets. The plaintext goes once the content is sealed. */
+function sealedRewardColumns(content: RewardInput['content'], revision: number) {
+	return {
+		ciphertext: content.ciphertext,
+		vaultId: content.vaultId,
+		payloadVersion: content.payloadVersion,
+		revision,
+		title: null,
+		description: null
+	};
+}
+
+/**
+ * What a claim records of the reward: its sealed record copied as it is — the
+ * claimant need not be its author and cannot re-seal it — or, for a reward
+ * still in plaintext, a plaintext snapshot as before sealing.
+ */
+function claimSnapshot(reward: SelfRewardRow | PartnershipRewardRow) {
+	const sealed = sealedRef(reward.id, reward);
+	if (sealed) {
+		return {
+			snapshotCiphertext: sealed.ciphertext,
+			snapshotVaultId: sealed.vaultId,
+			snapshotVersion: sealed.payloadVersion,
+			snapshotRecordId: sealed.recordId,
+			rewardTitle: null,
+			rewardDescription: null
+		};
+	}
+	return { rewardTitle: reward.title ?? '', rewardDescription: reward.description };
+}
 type CreateRewardResult<TReason extends string> =
 	| { ok: true; id: string }
 	| { ok: false; reason: TReason };
@@ -152,8 +240,10 @@ async function readPartnershipCredits(
 function toSelfRewardView(row: SelfRewardRow, credits: number): SelfRewardView {
 	return {
 		id: row.id,
-		title: row.title,
+		title: row.title ?? '',
 		description: row.description,
+		sealed: sealedRef(row.id, row),
+		revision: row.revision,
 		cost: row.cost,
 		active: row.active,
 		canClaim: row.active && credits >= row.cost,
@@ -165,10 +255,11 @@ function toSelfRewardView(row: SelfRewardRow, credits: number): SelfRewardView {
 function toHistoryView(row: SelfRewardHistoryRow): RewardHistoryView {
 	return {
 		id: row.id,
-		rewardTitle: row.rewardTitle,
+		rewardTitle: row.rewardTitle ?? '',
 		rewardDescription: row.rewardDescription,
 		rewardCost: row.rewardCost,
-		createdAt: row.createdAt
+		createdAt: row.createdAt,
+		sealed: snapshotRef(row)
 	};
 }
 
@@ -181,8 +272,10 @@ function toPartnershipRewardView(
 	const createdByMe = row.createdByUserId === viewerId;
 	return {
 		id: row.id,
-		title: row.title,
+		title: row.title ?? '',
 		description: row.description,
+		sealed: sealedRef(row.id, row),
+		revision: row.revision,
 		cost: row.cost,
 		active: row.active,
 		createdByMe,
@@ -252,41 +345,69 @@ export async function getSelfRewardForUser(
 	return toSelfRewardView(row, await readSelfCredits(db, userId));
 }
 
+/** Creates a self reward, its content sealed in the owner's own vault. `rewardId` comes from the browser. */
 export async function createSelfReward(
-	db: Db,
-	userId: string,
-	input: RewardInput
-): Promise<string> {
-	const [row] = await db
-		.insert(selfRewards)
-		.values({
-			ownerId: userId,
-			title: input.title,
-			description: input.description,
-			cost: input.cost,
-			active: input.active
-		})
-		.returning({ id: selfRewards.id });
-	return row.id;
-}
-
-export async function updateSelfReward(
 	db: Db,
 	userId: string,
 	rewardId: string,
 	input: RewardInput
-): Promise<boolean> {
-	const rows = await db
-		.update(selfRewards)
-		.set({
-			title: input.title,
-			description: input.description,
+): Promise<CreateRewardResult<ContentRefusal>> {
+	const problem = rewardContentProblem(input.content, await selfVaultIdFor(db, userId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const inserted = await db
+		.insert(selfRewards)
+		.values({
+			id: rewardId,
+			ownerId: userId,
+			...sealedRewardColumns(input.content, 0),
 			cost: input.cost,
 			active: input.active
 		})
-		.where(and(eq(selfRewards.id, rewardId), eq(selfRewards.ownerId, userId)))
+		.onConflictDoNothing()
 		.returning({ id: selfRewards.id });
-	return rows.length > 0;
+	if (inserted.length === 0) {
+		return { ok: false, reason: 'id-taken' };
+	}
+	return { ok: true, id: rewardId };
+}
+
+/** Compare-and-swap on `revision`, as `updateSelfTask`. */
+export async function updateSelfReward(
+	db: Db,
+	userId: string,
+	rewardId: string,
+	input: RewardInput & { expectedRevision: number }
+): Promise<RewardResult<'not-found' | 'conflict' | ContentRefusal>> {
+	const problem = rewardContentProblem(input.content, await selfVaultIdFor(db, userId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const rows = await db
+		.update(selfRewards)
+		.set({
+			...sealedRewardColumns(input.content, input.expectedRevision + 1),
+			cost: input.cost,
+			active: input.active
+		})
+		.where(
+			and(
+				eq(selfRewards.id, rewardId),
+				eq(selfRewards.ownerId, userId),
+				eq(selfRewards.revision, input.expectedRevision)
+			)
+		)
+		.returning({ id: selfRewards.id });
+	if (rows.length > 0) {
+		return { ok: true };
+	}
+	const [exists] = await db
+		.select({ id: selfRewards.id })
+		.from(selfRewards)
+		.where(and(eq(selfRewards.id, rewardId), eq(selfRewards.ownerId, userId)))
+		.limit(1);
+	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
 }
 
 export async function setSelfRewardCredits(db: Db, userId: string, credits: number): Promise<void> {
@@ -328,8 +449,7 @@ export async function claimSelfReward(
 		db.insert(selfRewardClaims).values({
 			ownerId: userId,
 			rewardId: reward.id,
-			rewardTitle: reward.title,
-			rewardDescription: reward.description,
+			...claimSnapshot(reward),
 			rewardCost: reward.cost,
 			createdAt: now,
 			updatedAt: now
@@ -391,11 +511,7 @@ export async function getPartnershipRewardsPage(
 			toPartnershipRewardView(row, userId, viewerCredits, membership.canClaim)
 		),
 		claims: claims.map((row) => ({
-			id: row.id,
-			rewardTitle: row.rewardTitle,
-			rewardDescription: row.rewardDescription,
-			rewardCost: row.rewardCost,
-			createdAt: row.createdAt,
+			...toHistoryView(row),
 			mine: row.claimedByUserId === userId,
 			createdByMe: row.createdByUserId === userId
 		}))
@@ -447,8 +563,9 @@ export async function createPartnershipReward(
 	db: Db,
 	partnershipId: string,
 	userId: string,
+	rewardId: string,
 	input: RewardInput
-): Promise<CreateRewardResult<'not-a-member' | 'forbidden'>> {
+): Promise<CreateRewardResult<'not-a-member' | 'forbidden' | ContentRefusal>> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
 	if (!membership) {
 		return { ok: false, reason: 'not-a-member' };
@@ -456,20 +573,31 @@ export async function createPartnershipReward(
 	if (!membership.canManage) {
 		return { ok: false, reason: 'forbidden' };
 	}
+	const problem = rewardContentProblem(
+		input.content,
+		await partnershipVaultIdFor(db, partnershipId)
+	);
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 
-	const [row] = await db
+	const inserted = await db
 		.insert(partnershipRewards)
 		.values({
+			id: rewardId,
 			partnershipId,
 			createdByUserId: userId,
-			title: input.title,
-			description: input.description,
+			...sealedRewardColumns(input.content, 0),
 			cost: input.cost,
 			active: input.active
 		})
+		.onConflictDoNothing()
 		.returning({ id: partnershipRewards.id });
+	if (inserted.length === 0) {
+		return { ok: false, reason: 'id-taken' };
+	}
 
-	return { ok: true, id: row.id };
+	return { ok: true, id: rewardId };
 }
 
 export async function updatePartnershipReward(
@@ -477,8 +605,8 @@ export async function updatePartnershipReward(
 	partnershipId: string,
 	userId: string,
 	rewardId: string,
-	input: RewardInput
-): Promise<RewardResult<'not-a-member' | 'forbidden' | 'not-found'>> {
+	input: RewardInput & { expectedRevision: number }
+): Promise<RewardResult<'not-a-member' | 'forbidden' | 'not-found' | 'conflict' | ContentRefusal>> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
 	if (!membership) {
 		return { ok: false, reason: 'not-a-member' };
@@ -486,23 +614,40 @@ export async function updatePartnershipReward(
 	if (!membership.canManage) {
 		return { ok: false, reason: 'forbidden' };
 	}
+	const problem = rewardContentProblem(
+		input.content,
+		await partnershipVaultIdFor(db, partnershipId)
+	);
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 
 	const rows = await db
 		.update(partnershipRewards)
 		.set({
-			title: input.title,
-			description: input.description,
+			...sealedRewardColumns(input.content, input.expectedRevision + 1),
 			cost: input.cost,
 			active: input.active
 		})
 		.where(
-			and(eq(partnershipRewards.id, rewardId), eq(partnershipRewards.partnershipId, partnershipId))
+			and(
+				eq(partnershipRewards.id, rewardId),
+				eq(partnershipRewards.partnershipId, partnershipId),
+				eq(partnershipRewards.revision, input.expectedRevision)
+			)
 		)
 		.returning({ id: partnershipRewards.id });
-	if (rows.length === 0) {
-		return { ok: false, reason: 'not-found' };
+	if (rows.length > 0) {
+		return { ok: true };
 	}
-	return { ok: true };
+	const [exists] = await db
+		.select({ id: partnershipRewards.id })
+		.from(partnershipRewards)
+		.where(
+			and(eq(partnershipRewards.id, rewardId), eq(partnershipRewards.partnershipId, partnershipId))
+		)
+		.limit(1);
+	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
 }
 
 export async function setPartnershipRewardCredits(
@@ -590,8 +735,7 @@ export async function claimPartnershipReward(
 			rewardId: reward.id,
 			claimedByUserId: input.userId,
 			createdByUserId: reward.createdByUserId,
-			rewardTitle: reward.title,
-			rewardDescription: reward.description,
+			...claimSnapshot(reward),
 			rewardCost: reward.cost,
 			createdAt: now,
 			updatedAt: now
@@ -704,7 +848,10 @@ const WIDGET_PREVIEW_LIMIT = 3;
 
 type RewardWidgetRow = {
 	id: string;
-	title: string;
+	title: string | null;
+	ciphertext: string | null;
+	vaultId: string | null;
+	payloadVersion: number | null;
 	cost: number;
 	/** Whose section this came from on /home/rewards. Null for your own. */
 	context?: string | null;
@@ -733,7 +880,9 @@ function toRewardsWidgetView(
 		claimable: viewerActs
 			? claimable.slice(0, WIDGET_PREVIEW_LIMIT).map((row) => ({
 					id: row.id,
-					title: row.title,
+					title: row.title ?? '',
+					kind: 'reward' as const,
+					sealed: sealedRef(row.id, row),
 					note: `${row.cost}`,
 					context: row.context ?? null
 				}))
@@ -773,7 +922,14 @@ export async function getHomeRewardsWidget(
 		[
 			readSelfCredits(db, userId),
 			db
-				.select({ id: selfRewards.id, title: selfRewards.title, cost: selfRewards.cost })
+				.select({
+					id: selfRewards.id,
+					title: selfRewards.title,
+					ciphertext: selfRewards.ciphertext,
+					vaultId: selfRewards.vaultId,
+					payloadVersion: selfRewards.payloadVersion,
+					cost: selfRewards.cost
+				})
 				.from(selfRewards)
 				.where(and(eq(selfRewards.ownerId, userId), eq(selfRewards.active, true))),
 			// `in ()` is a syntax error in SQLite, and a fresh account has no partners.
@@ -811,6 +967,9 @@ export async function getHomeRewardsWidget(
 							partnershipId: partnershipRewards.partnershipId,
 							createdByUserId: partnershipRewards.createdByUserId,
 							title: partnershipRewards.title,
+							ciphertext: partnershipRewards.ciphertext,
+							vaultId: partnershipRewards.vaultId,
+							payloadVersion: partnershipRewards.payloadVersion,
 							cost: partnershipRewards.cost
 						})
 						.from(partnershipRewards)
@@ -846,6 +1005,9 @@ export async function getHomeRewardsWidget(
 			{
 				id: row.id,
 				title: row.title,
+				ciphertext: row.ciphertext,
+				vaultId: row.vaultId,
+				payloadVersion: row.payloadVersion,
 				cost: row.cost,
 				context: name,
 				credits: creditsByPartnership.get(row.partnershipId) ?? 0
@@ -898,6 +1060,9 @@ export async function getPartnershipRewardsWidget(
 				id: partnershipRewards.id,
 				createdByUserId: partnershipRewards.createdByUserId,
 				title: partnershipRewards.title,
+				ciphertext: partnershipRewards.ciphertext,
+				vaultId: partnershipRewards.vaultId,
+				payloadVersion: partnershipRewards.payloadVersion,
 				cost: partnershipRewards.cost
 			})
 			.from(partnershipRewards)

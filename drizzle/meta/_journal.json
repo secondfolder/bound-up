@@ -197,6 +197,20 @@
       "when": 1792127543148,
       "tag": "0027_add_vault_escrows",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1792128534398,
+      "tag": "0028_add_sealed_task_and_reward_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1792128548688,
+      "tag": "0029_make_task_and_reward_plaintext_nullable",
+      "breakpoints": true
     }
   ]
 }

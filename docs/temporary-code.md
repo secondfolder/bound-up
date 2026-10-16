@@ -69,16 +69,17 @@ left to read and all of this can be deleted in a single commit.
 
 ### Why the client does the converting
 
-For descriptions it need not: the server holds those in plaintext and a batch
-script would finish immediately. For **messages it is the only option that
-exists.** Bodies are E2E encrypted, so the server cannot read them, cannot
-convert them, and never will be able to. The only place a message body can be
-converted is a browser holding the key.
+Because it is the only option that exists. Message bodies, and now task and
+reward descriptions, are E2E encrypted, so the server cannot read them, cannot
+convert them, and never will be able to. The only place one can be converted
+is a browser holding the key.
 
-Message bodies are converted as they move into the partnership vault (see
-[Messages in the original scheme](#messages-in-the-original-scheme) below),
-which decrypts every one anyway, so they have no conversion path of their own
-any more.
+Neither has a conversion path of its own any more. Message bodies are
+converted as they move into the partnership vault (see
+[Messages in the original scheme](#messages-in-the-original-scheme) below), and
+descriptions as their task or reward is sealed (see
+[Tasks and rewards in plaintext](#tasks-and-rewards-in-plaintext)); both
+decrypt or read every one anyway.
 
 ### Current temporary code
 
@@ -93,9 +94,6 @@ Whole files, deleted outright:
 
 - `src/lib/richtext-legacy.ts` — plain text → document, including the
   linkifyjs call and the embed insertion
-- `src/lib/richtext-legacy-migrate.ts` — convert and write back descriptions
-- `src/lib/server/richtext-legacy.ts` — the permission-checked description writes
-- `src/routes/api/legacy-descriptions/+server.ts` — description endpoint
 
 Edits inside files that stay:
 
@@ -103,9 +101,8 @@ Edits inside files that stay:
 - `MESSAGE_BODY_FORMATS` / `isMessageBodyFormat` in `src/lib/messaging.ts`
 - `messages.body_format` in the schema, and where `sealLegacyMessages` and the
   two send paths set it
-- the migration triggers in `RewardList.svelte` and `ManagedTaskList.svelte`
-- the legacy branch in `src/lib/schemas/richTextField.ts`
-- the `asDocument` conversion in `src/lib/messaging/vault-migration.ts`
+- the `asDocument` conversions in `src/lib/messaging/vault-migration.ts` and
+  `src/lib/content-sealing.ts`
 - the `LEGACY-RICHTEXT`-marked `describe` blocks in `richtext.test.ts` and
   `RichText.svelte.test.ts`
 
@@ -130,13 +127,11 @@ client is still holding an unsynced draft:
 -- Messages still in the old form.
 select count(*) from messages where body_format = 'plain';
 
--- Descriptions still in the old form: a document always starts `{"root"`.
-select
-  (select count(*) from self_rewards        where description is not null and description not like '{"root"%') +
-  (select count(*) from partnership_rewards where description is not null and description not like '{"root"%') +
-  (select count(*) from self_tasks          where description is not null and description not like '{"root"%') +
-  (select count(*) from partnership_tasks   where description is not null and description not like '{"root"%');
 ```
+
+Descriptions have no count of their own: a legacy one can only still exist in
+a task or reward that has not been sealed yet, so the count under
+[Tasks and rewards in plaintext](#tasks-and-rewards-in-plaintext) covers them.
 
 **The caveat that will bite.** A message encrypted to keys neither partner
 still has can never be migrated _by anyone_, because nobody can read it. Those rows
@@ -161,8 +156,8 @@ today. Do not wait for a literal zero.
 - **`linkifyjs` stays a dependency.** It leaves the read path, but the editor
   still uses it as the auto-link matcher — it is the one answer to "is this a
   URL", and removing it would change what counts as a link.
-- The `richTextFieldSchema` sanitising behaviour, which is not about legacy
-  content at all.
+- The `richDescription` sanitising in `src/lib/sealed-kinds/tasks.ts`, which
+  is not about legacy content at all.
 
 ## Messages in the original scheme
 
@@ -219,3 +214,60 @@ partners lost. Those render as unreadable either way.
 - The sealed kinds, the vault, and the restore that wraps it.
 - `decryptPayload` and `encryptPayload`, which drafts use.
 
+## Tasks and rewards in plaintext
+
+Tasks, rewards, completions and claims are sealed in a vault
+([docs/tasks.md](tasks.md#what-the-server-can-see)). Rows written before that
+keep their text in plaintext columns until a device seals them: once vaults
+are open, `content-sealing.ts` asks `/api/sealing/[scope]` for the scope's
+unsealed rows, seals each into the scope's vault, and posts them back, and the
+server clears the plaintext in the same write. Any member can seal a
+partnership's rows; only the owner, their own. A completion or claim is sealed
+to its own id, as the task or reward it recorded, with the one message it was
+given at index 0.
+
+### Current temporary code
+
+- `src/lib/content-sealing.ts`, and the `sealOpenScopes()` call in
+  `EncryptionGate.svelte`
+- `src/lib/server/content-sealing.ts`, `src/lib/schemas/sealing.ts` and
+  `src/routes/api/sealing/[scope]/+server.ts`, with their tests
+- the plaintext branches of the openers in `src/lib/sealed-views.svelte.ts`
+  (a view with `sealed: null`), and the plaintext fields on the task, reward,
+  completion, claim and widget views in `src/lib/types.ts`
+- the plaintext columns themselves: `title`, `description` and
+  `completion_messages` on the task tables; `task_title`, `task_description`
+  and `completion_message` on the completion tables; `title` and
+  `description` on the reward tables; `reward_title` and `reward_description`
+  on the claim tables. All nullable since migration 0029.
+
+A row whose old content does not fit the kind — a title over 80 characters,
+say, from before a limit — is skipped rather than sealed, and stays in
+plaintext.
+
+### What removes the need for it
+
+```sql
+select
+  (select count(*) from self_tasks where ciphertext is null) +
+  (select count(*) from partnership_tasks where ciphertext is null) +
+  (select count(*) from self_task_completions where snapshot_ciphertext is null) +
+  (select count(*) from partnership_task_completions where snapshot_ciphertext is null) +
+  (select count(*) from self_rewards where ciphertext is null) +
+  (select count(*) from partnership_rewards where ciphertext is null) +
+  (select count(*) from self_reward_claims where snapshot_ciphertext is null) +
+  (select count(*) from partnership_reward_claims where snapshot_ciphertext is null);
+```
+
+reaching zero in production. Unlike messages, nothing here is unreadable to
+everyone — it is plaintext — so a residue means accounts that have not
+signed in since, or rows that did not fit. Decide what to do with those
+before dropping the columns; dropping them deletes that text.
+
+### What to remove
+
+1. Everything in the list above.
+2. Drop the plaintext columns, and make `ciphertext`, `vault_id` and
+   `payload_version` (and the `snapshot_*` columns on completions and claims)
+   `NOT NULL`, with a generated migration.
+3. Re-run the full verification loop, including `npm run test:e2e`.

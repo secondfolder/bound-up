@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { taskKind } from '../sealed-kinds/tasks';
 import {
 	initialNextEligibleAt,
 	nextEligibleAtAfterCompletion,
@@ -8,6 +9,7 @@ import {
 	canCompleteFromPartnership,
 	canViewPartnershipTask,
 	isTaskCompletableAt,
+	type SealedTaskContent,
 	type TaskInput
 } from '../tasks';
 import type {
@@ -33,6 +35,13 @@ import {
 	selfTasks
 } from './db/schema';
 import { getPartnershipForUser } from './partnerships';
+import {
+	partnershipVaultIdFor,
+	sealedIsAcceptable,
+	sealedRef,
+	selfVaultIdFor,
+	snapshotRef
+} from './sealed-content';
 
 const selfTaskColumns = {
 	id: selfTasks.id,
@@ -42,6 +51,11 @@ const selfTaskColumns = {
 	active: selfTasks.active,
 	creditsAwarded: selfTasks.creditsAwarded,
 	completionMessages: selfTasks.completionMessages,
+	ciphertext: selfTasks.ciphertext,
+	vaultId: selfTasks.vaultId,
+	payloadVersion: selfTasks.payloadVersion,
+	revision: selfTasks.revision,
+	completionMessageCount: selfTasks.completionMessageCount,
 	schedule: selfTasks.schedule,
 	timezoneOwnerUserId: selfTasks.timezoneOwnerUserId,
 	lastCompletedAt: selfTasks.lastCompletedAt,
@@ -61,6 +75,11 @@ const partnershipTaskColumns = {
 	active: partnershipTasks.active,
 	creditsAwarded: partnershipTasks.creditsAwarded,
 	completionMessages: partnershipTasks.completionMessages,
+	ciphertext: partnershipTasks.ciphertext,
+	vaultId: partnershipTasks.vaultId,
+	payloadVersion: partnershipTasks.payloadVersion,
+	revision: partnershipTasks.revision,
+	completionMessageCount: partnershipTasks.completionMessageCount,
 	schedule: partnershipTasks.schedule,
 	lastCompletedAt: partnershipTasks.lastCompletedAt,
 	completedCount: partnershipTasks.completedCount,
@@ -75,6 +94,11 @@ const selfTaskCompletionColumns = {
 	taskDescription: selfTaskCompletions.taskDescription,
 	creditsAwarded: selfTaskCompletions.creditsAwarded,
 	completionMessage: selfTaskCompletions.completionMessage,
+	completionMessageIndex: selfTaskCompletions.completionMessageIndex,
+	snapshotCiphertext: selfTaskCompletions.snapshotCiphertext,
+	snapshotVaultId: selfTaskCompletions.snapshotVaultId,
+	snapshotVersion: selfTaskCompletions.snapshotVersion,
+	snapshotRecordId: selfTaskCompletions.snapshotRecordId,
 	createdAt: selfTaskCompletions.createdAt
 } as const;
 
@@ -86,17 +110,27 @@ const partnershipTaskCompletionColumns = {
 	taskDescription: partnershipTaskCompletions.taskDescription,
 	creditsAwarded: partnershipTaskCompletions.creditsAwarded,
 	completionMessage: partnershipTaskCompletions.completionMessage,
+	completionMessageIndex: partnershipTaskCompletions.completionMessageIndex,
+	snapshotCiphertext: partnershipTaskCompletions.snapshotCiphertext,
+	snapshotVaultId: partnershipTaskCompletions.snapshotVaultId,
+	snapshotVersion: partnershipTaskCompletions.snapshotVersion,
+	snapshotRecordId: partnershipTaskCompletions.snapshotRecordId,
 	createdAt: partnershipTaskCompletions.createdAt
 } as const;
 
 type SelfTaskRow = {
 	id: string;
 	ownerId: string;
-	title: string;
+	title: string | null;
 	description: string | null;
 	active: boolean;
 	creditsAwarded: number;
-	completionMessages: string[];
+	completionMessages: string[] | null;
+	ciphertext: string | null;
+	vaultId: string | null;
+	payloadVersion: number | null;
+	revision: number;
+	completionMessageCount: number;
 	schedule: TaskSchedule;
 	timezoneOwnerUserId: string;
 	lastCompletedAt: Date | null;
@@ -111,11 +145,16 @@ type PartnershipTaskRow = {
 	partnershipId: string;
 	createdByUserId: string;
 	timezoneOwnerUserId: string;
-	title: string;
+	title: string | null;
 	description: string | null;
 	active: boolean;
 	creditsAwarded: number;
-	completionMessages: string[];
+	completionMessages: string[] | null;
+	ciphertext: string | null;
+	vaultId: string | null;
+	payloadVersion: number | null;
+	revision: number;
+	completionMessageCount: number;
 	schedule: TaskSchedule;
 	lastCompletedAt: Date | null;
 	completedCount: number;
@@ -124,9 +163,21 @@ type PartnershipTaskRow = {
 	updatedAt: Date;
 };
 
-type SelfTaskCompletionRow = TaskCompletionView;
+type SelfTaskCompletionRow = {
+	id: string;
+	taskTitle: string | null;
+	taskDescription: string | null;
+	creditsAwarded: number;
+	completionMessage: string | null;
+	completionMessageIndex: number | null;
+	snapshotCiphertext: string | null;
+	snapshotVaultId: string | null;
+	snapshotVersion: number | null;
+	snapshotRecordId: string | null;
+	createdAt: Date;
+};
 
-type PartnershipTaskCompletionRow = TaskCompletionView & {
+type PartnershipTaskCompletionRow = SelfTaskCompletionRow & {
 	completedByUserId: string;
 	createdByUserId: string;
 };
@@ -155,6 +206,52 @@ export type PartnershipTasksPageView = {
 };
 
 type TaskResult<TReason extends string> = { ok: true } | { ok: false; reason: TReason };
+
+/** Why the server refused the sealed half of a task write. */
+/**
+ * Why a sealed write was refused. `id-taken`: the browser chooses a new
+ * record's id (it is part of what the content is sealed to), so a create can
+ * name one that exists — a retried post whose first attempt landed, most
+ * likely. Refused rather than left to fail as a primary-key error.
+ */
+type ContentRefusal = 'bad-content' | 'wrong-vault' | 'id-taken';
+
+/**
+ * Whether a task's sealed content is one the server will store: a sealed
+ * record of the task kind, under the vault this task belongs in, with a
+ * completion-message count it could have. The content itself it cannot see.
+ */
+function taskContentProblem(
+	content: SealedTaskContent,
+	vaultId: string | null
+): ContentRefusal | null {
+	if (
+		!(
+			sealedIsAcceptable(taskKind, content.ciphertext, content.payloadVersion) &&
+			Number.isInteger(content.completionMessageCount)
+		) ||
+		content.completionMessageCount < 0 ||
+		content.completionMessageCount > 20
+	) {
+		return 'bad-content';
+	}
+	return content.vaultId === vaultId ? null : 'wrong-vault';
+}
+
+/** The columns a sealed write sets, and `revision` moved on so a stale writer loses. */
+function sealedTaskColumns(content: SealedTaskContent, revision: number) {
+	return {
+		ciphertext: content.ciphertext,
+		vaultId: content.vaultId,
+		payloadVersion: content.payloadVersion,
+		completionMessageCount: content.completionMessageCount,
+		revision,
+		// Never both: once the content is sealed, the plaintext goes.
+		title: null,
+		description: null,
+		completionMessages: null
+	};
+}
 type CreateTaskResult<TReason extends string> =
 	| { ok: true; id: string }
 	| { ok: false; reason: TReason };
@@ -194,11 +291,13 @@ function toTimeZoneNote(
 function toTaskCompletionView(row: SelfTaskCompletionRow): TaskCompletionView {
 	return {
 		id: row.id,
-		taskTitle: row.taskTitle,
+		taskTitle: row.taskTitle ?? '',
 		taskDescription: row.taskDescription,
 		creditsAwarded: row.creditsAwarded,
 		completionMessage: row.completionMessage,
-		createdAt: row.createdAt
+		createdAt: row.createdAt,
+		sealed: snapshotRef(row),
+		completionMessageIndex: row.completionMessageIndex
 	};
 }
 
@@ -229,11 +328,13 @@ function toSelfTaskView(row: SelfTaskRow, viewerTimezone: string): SelfTaskView 
 		(row.schedule.mode === 'one-off' ? null : scheduleReferenceDate(row.schedule, viewerTimezone));
 	return {
 		id: row.id,
-		title: row.title,
+		title: row.title ?? '',
 		description: row.description,
 		active: row.active,
 		creditsAwarded: row.creditsAwarded,
-		completionMessages: row.completionMessages,
+		completionMessages: row.completionMessages ?? [],
+		sealed: sealedRef(row.id, row),
+		revision: row.revision,
 		schedule: row.schedule,
 		timezoneOwnerUserId: row.timezoneOwnerUserId,
 		lastCompletedAt: row.lastCompletedAt,
@@ -262,11 +363,13 @@ function toPartnershipTaskView(
 	const createdByMe = row.createdByUserId === membership.viewerId;
 	return {
 		id: row.id,
-		title: row.title,
+		title: row.title ?? '',
 		description: row.description,
 		active: row.active,
 		creditsAwarded: row.creditsAwarded,
-		completionMessages: row.completionMessages,
+		completionMessages: row.completionMessages ?? [],
+		sealed: sealedRef(row.id, row),
+		revision: row.revision,
 		schedule: row.schedule,
 		timezoneOwnerUserId: row.timezoneOwnerUserId,
 		lastCompletedAt: row.lastCompletedAt,
@@ -346,12 +449,39 @@ async function recentPartnershipTaskCompletionTimes(
 	return rows.map((row) => row.createdAt);
 }
 
-function chooseCompletionMessage(messages: string[]): string | null {
-	if (messages.length === 0) {
-		return null;
+/** One of `count` completion messages, at random, or null when there are none. */
+function chooseCompletionIndex(count: number): number | null {
+	return count > 0 ? Math.floor(Math.random() * count) : null;
+}
+
+/**
+ * What a completion records of the task, as it is now.
+ *
+ * A sealed task's record is copied as it is — the person completing need not
+ * be its author and cannot re-seal it — with which of its messages was picked.
+ * A task still in plaintext is snapshotted in plaintext, as before sealing.
+ */
+function completionSnapshot(task: SelfTaskRow | PartnershipTaskRow) {
+	const sealed = sealedRef(task.id, task);
+	if (sealed) {
+		return {
+			snapshotCiphertext: sealed.ciphertext,
+			snapshotVaultId: sealed.vaultId,
+			snapshotVersion: sealed.payloadVersion,
+			snapshotRecordId: sealed.recordId,
+			completionMessageIndex: chooseCompletionIndex(task.completionMessageCount),
+			taskTitle: null,
+			taskDescription: null,
+			completionMessage: null
+		};
 	}
-	const index = Math.floor(Math.random() * messages.length);
-	return messages[index] ?? null;
+	const messages = task.completionMessages ?? [];
+	const index = chooseCompletionIndex(messages.length);
+	return {
+		taskTitle: task.title ?? '',
+		taskDescription: task.description,
+		completionMessage: index === null ? null : (messages[index] ?? null)
+	};
 }
 
 function toPartnershipTaskCompletionView(
@@ -359,12 +489,7 @@ function toPartnershipTaskCompletionView(
 	viewerId: string
 ): PartnershipTaskCompletionView {
 	return {
-		id: row.id,
-		taskTitle: row.taskTitle,
-		taskDescription: row.taskDescription,
-		creditsAwarded: row.creditsAwarded,
-		completionMessage: row.completionMessage,
-		createdAt: row.createdAt,
+		...toTaskCompletionView(row),
 		mine: row.completedByUserId === viewerId,
 		createdByMe: row.createdByUserId === viewerId
 	};
@@ -415,30 +540,43 @@ export async function getSelfTasksSection(
 	};
 }
 
+/**
+ * Creates a self task, its content sealed in the owner's own vault.
+ *
+ * `taskId` is chosen by the browser, because the content is sealed to it.
+ */
 export async function createSelfTask(
 	db: Db,
 	userId: string,
 	ownerTimeZone: string,
+	taskId: string,
 	input: TaskInput
-): Promise<string> {
+): Promise<CreateTaskResult<ContentRefusal>> {
+	const problem = taskContentProblem(input.content, await selfVaultIdFor(db, userId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 	const now = new Date();
-	const [row] = await db
+	const inserted = await db
 		.insert(selfTasks)
 		.values({
+			id: taskId,
 			ownerId: userId,
-			title: input.title,
-			description: input.description,
+			...sealedTaskColumns(input.content, 0),
 			active: input.active,
 			creditsAwarded: input.creditsAwarded,
-			completionMessages: input.completionMessages,
 			schedule: input.schedule,
 			timezoneOwnerUserId: userId,
 			nextEligibleAt: initialNextEligibleAt(input.schedule, ownerTimeZone, now),
 			createdAt: now,
 			updatedAt: now
 		})
+		.onConflictDoNothing()
 		.returning({ id: selfTasks.id });
-	return row.id;
+	if (inserted.length === 0) {
+		return { ok: false, reason: 'id-taken' };
+	}
+	return { ok: true, id: taskId };
 }
 
 export async function getSelfTaskForUser(
@@ -459,30 +597,54 @@ export async function getSelfTaskForUser(
 	return toSelfTaskView(row, viewerTimezone);
 }
 
+/**
+ * Replaces a self task's settings and sealed content.
+ *
+ * Compare-and-swap on `revision`: the write goes through only if the task is
+ * still at the revision the editor opened. Anything else — another device's
+ * edit, a background upgrade — makes this `conflict`, and the editor reloads
+ * rather than overwriting what changed.
+ */
 export async function updateSelfTask(
 	db: Db,
 	userId: string,
 	ownerTimeZone: string,
 	taskId: string,
-	input: TaskInput
-): Promise<boolean> {
+	input: TaskInput & { expectedRevision: number }
+): Promise<TaskResult<'not-found' | 'conflict' | ContentRefusal>> {
+	const problem = taskContentProblem(input.content, await selfVaultIdFor(db, userId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 	const nextEligibleAt = initialNextEligibleAt(input.schedule, ownerTimeZone);
 	const rows = await db
 		.update(selfTasks)
 		.set({
-			title: input.title,
-			description: input.description,
+			...sealedTaskColumns(input.content, input.expectedRevision + 1),
 			active: input.active,
 			creditsAwarded: input.creditsAwarded,
-			completionMessages: input.completionMessages,
 			schedule: input.schedule,
 			timezoneOwnerUserId: userId,
 			nextEligibleAt,
 			updatedAt: new Date()
 		})
-		.where(and(eq(selfTasks.id, taskId), eq(selfTasks.ownerId, userId)))
+		.where(
+			and(
+				eq(selfTasks.id, taskId),
+				eq(selfTasks.ownerId, userId),
+				eq(selfTasks.revision, input.expectedRevision)
+			)
+		)
 		.returning({ id: selfTasks.id });
-	return rows.length > 0;
+	if (rows.length > 0) {
+		return { ok: true };
+	}
+	const [exists] = await db
+		.select({ id: selfTasks.id })
+		.from(selfTasks)
+		.where(and(eq(selfTasks.id, taskId), eq(selfTasks.ownerId, userId)))
+		.limit(1);
+	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
 }
 
 export async function getPartnershipTasksPage(
@@ -555,8 +717,9 @@ export async function createPartnershipTask(
 	partnershipId: string,
 	userId: string,
 	viewerTimezone: string,
+	taskId: string,
 	input: TaskInput
-): Promise<CreateTaskResult<'not-a-member' | 'forbidden' | 'bad-timezone-owner'>> {
+): Promise<CreateTaskResult<'not-a-member' | 'forbidden' | 'bad-timezone-owner' | ContentRefusal>> {
 	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
 	if (!membership) {
 		return { ok: false, reason: 'not-a-member' };
@@ -570,31 +733,38 @@ export async function createPartnershipTask(
 	) {
 		return { ok: false, reason: 'bad-timezone-owner' };
 	}
+	const problem = taskContentProblem(input.content, await partnershipVaultIdFor(db, partnershipId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 	const ownerTimeZone =
 		input.timezoneOwnerUserId === membership.viewerId
 			? membership.viewerTimezone
 			: membership.counterpartTimezone;
 	const now = new Date();
 
-	const [row] = await db
+	const inserted = await db
 		.insert(partnershipTasks)
 		.values({
+			id: taskId,
 			partnershipId,
 			createdByUserId: userId,
 			timezoneOwnerUserId: input.timezoneOwnerUserId,
-			title: input.title,
-			description: input.description,
+			...sealedTaskColumns(input.content, 0),
 			active: input.active,
 			creditsAwarded: input.creditsAwarded,
-			completionMessages: input.completionMessages,
 			schedule: input.schedule,
 			nextEligibleAt: initialNextEligibleAt(input.schedule, ownerTimeZone, now),
 			createdAt: now,
 			updatedAt: now
 		})
+		.onConflictDoNothing()
 		.returning({ id: partnershipTasks.id });
+	if (inserted.length === 0) {
+		return { ok: false, reason: 'id-taken' };
+	}
 
-	return { ok: true, id: row.id };
+	return { ok: true, id: taskId };
 }
 
 export async function getPartnershipTaskForUser(
@@ -648,8 +818,12 @@ export async function updatePartnershipTask(
 	userId: string,
 	viewerTimezone: string,
 	taskId: string,
-	input: TaskInput
-): Promise<TaskResult<'not-a-member' | 'forbidden' | 'not-found' | 'bad-timezone-owner'>> {
+	input: TaskInput & { expectedRevision: number }
+): Promise<
+	TaskResult<
+		'not-a-member' | 'forbidden' | 'not-found' | 'bad-timezone-owner' | 'conflict' | ContentRefusal
+	>
+> {
 	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
 	if (!membership) {
 		return { ok: false, reason: 'not-a-member' };
@@ -680,24 +854,33 @@ export async function updatePartnershipTask(
 	if (existing.createdByUserId !== userId) {
 		return { ok: false, reason: 'forbidden' };
 	}
+	const problem = taskContentProblem(input.content, await partnershipVaultIdFor(db, partnershipId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
 
+	// Compare-and-swap on `revision`, as `updateSelfTask`.
 	const rows = await db
 		.update(partnershipTasks)
 		.set({
 			timezoneOwnerUserId: input.timezoneOwnerUserId,
-			title: input.title,
-			description: input.description,
+			...sealedTaskColumns(input.content, input.expectedRevision + 1),
 			active: input.active,
 			creditsAwarded: input.creditsAwarded,
-			completionMessages: input.completionMessages,
 			schedule: input.schedule,
 			nextEligibleAt: initialNextEligibleAt(input.schedule, ownerTimeZone),
 			updatedAt: new Date()
 		})
-		.where(and(eq(partnershipTasks.id, taskId), eq(partnershipTasks.partnershipId, partnershipId)))
+		.where(
+			and(
+				eq(partnershipTasks.id, taskId),
+				eq(partnershipTasks.partnershipId, partnershipId),
+				eq(partnershipTasks.revision, input.expectedRevision)
+			)
+		)
 		.returning({ id: partnershipTasks.id });
 	if (rows.length === 0) {
-		return { ok: false, reason: 'not-found' };
+		return { ok: false, reason: 'conflict' };
 	}
 	return { ok: true };
 }
@@ -740,7 +923,6 @@ export async function completeSelfTask(
 		now,
 		recentCompletions
 	);
-	const completionMessage = chooseCompletionMessage(task.completionMessages);
 	const nextCredits = (await readSelfRewardCredits(db, userId)) + task.creditsAwarded;
 	const nextActive = task.schedule.mode === 'one-off' ? false : task.active;
 
@@ -748,10 +930,8 @@ export async function completeSelfTask(
 		db.insert(selfTaskCompletions).values({
 			ownerId: userId,
 			taskId: task.id,
-			taskTitle: task.title,
-			taskDescription: task.description,
+			...completionSnapshot(task),
 			creditsAwarded: task.creditsAwarded,
-			completionMessage,
 			createdAt: now,
 			updatedAt: now
 		}),
@@ -839,7 +1019,6 @@ export async function completePartnershipTask(
 		now,
 		recentCompletions
 	);
-	const completionMessage = chooseCompletionMessage(task.completionMessages);
 	const nextCredits =
 		(await readPartnershipRewardCredits(db, input.partnershipId, input.userId)) +
 		task.creditsAwarded;
@@ -851,10 +1030,8 @@ export async function completePartnershipTask(
 			taskId: task.id,
 			completedByUserId: input.userId,
 			createdByUserId: task.createdByUserId,
-			taskTitle: task.title,
-			taskDescription: task.description,
+			...completionSnapshot(task),
 			creditsAwarded: task.creditsAwarded,
-			completionMessage,
 			createdAt: now,
 			updatedAt: now
 		}),
@@ -983,7 +1160,10 @@ const WIDGET_PREVIEW_LIMIT = 3;
 
 type TaskWidgetRow = {
 	id: string;
-	title: string;
+	title: string | null;
+	ciphertext: string | null;
+	vaultId: string | null;
+	payloadVersion: number | null;
 	active: boolean;
 	creditsAwarded: number;
 	nextEligibleAt: Date | null;
@@ -1001,7 +1181,9 @@ function toTasksWidgetView(rows: TaskWidgetRow[], viewerActs: boolean, now: Date
 		ready: viewerActs
 			? ready.slice(0, WIDGET_PREVIEW_LIMIT).map((row) => ({
 					id: row.id,
-					title: row.title,
+					title: row.title ?? '',
+					kind: 'task' as const,
+					sealed: sealedRef(row.id, row),
 					note: row.creditsAwarded > 0 ? `+${row.creditsAwarded}` : null,
 					context: row.context ?? null
 				}))
@@ -1042,6 +1224,9 @@ export async function getHomeTasksWidget(
 			.select({
 				id: selfTasks.id,
 				title: selfTasks.title,
+				ciphertext: selfTasks.ciphertext,
+				vaultId: selfTasks.vaultId,
+				payloadVersion: selfTasks.payloadVersion,
 				active: selfTasks.active,
 				creditsAwarded: selfTasks.creditsAwarded,
 				nextEligibleAt: selfTasks.nextEligibleAt
@@ -1069,6 +1254,9 @@ export async function getHomeTasksWidget(
 						partnershipId: partnershipTasks.partnershipId,
 						createdByUserId: partnershipTasks.createdByUserId,
 						title: partnershipTasks.title,
+						ciphertext: partnershipTasks.ciphertext,
+						vaultId: partnershipTasks.vaultId,
+						payloadVersion: partnershipTasks.payloadVersion,
 						active: partnershipTasks.active,
 						creditsAwarded: partnershipTasks.creditsAwarded,
 						nextEligibleAt: partnershipTasks.nextEligibleAt
@@ -1136,6 +1324,9 @@ export async function getPartnershipTasksWidget(
 			partnershipId: partnershipTasks.partnershipId,
 			createdByUserId: partnershipTasks.createdByUserId,
 			title: partnershipTasks.title,
+			ciphertext: partnershipTasks.ciphertext,
+			vaultId: partnershipTasks.vaultId,
+			payloadVersion: partnershipTasks.payloadVersion,
 			active: partnershipTasks.active,
 			creditsAwarded: partnershipTasks.creditsAwarded,
 			nextEligibleAt: partnershipTasks.nextEligibleAt

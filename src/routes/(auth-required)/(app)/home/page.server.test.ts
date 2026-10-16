@@ -56,8 +56,8 @@ describe('load', () => {
 	});
 
 	it('previews the tasks that are ready to do right now', async () => {
-		await createTestSelfTask(db, ada, { title: 'Morning stretches', creditsAwarded: 2 });
-		await createTestSelfTask(db, ada, { title: 'Shelved for later', active: false });
+		const stretches = await createTestSelfTask(db, ada, { creditsAwarded: 2 });
+		await createTestSelfTask(db, ada, { active: false });
 
 		const data = await runLoad(load(at(ada)));
 		expect(data.tasks.viewerActs).toBe(true);
@@ -65,19 +65,36 @@ describe('load', () => {
 		// tasks and showed one would be worse than no card.
 		expect(data.tasks.activeCount).toBe(1);
 		expect(data.tasks.ready).toEqual([
-			{ id: expect.any(String), title: 'Morning stretches', note: '+2', context: null }
+			{
+				id: stretches.id,
+				title: '',
+				kind: 'task',
+				sealed: expect.objectContaining({
+					recordId: stretches.id,
+					ciphertext: stretches.ciphertext
+				}),
+				note: '+2',
+				context: null
+			}
 		]);
 	});
 
 	it('previews only the rewards the balance actually covers', async () => {
 		await setTestSelfRewardCredits(db, ada, 5);
-		await createTestSelfReward(db, ada, { title: 'Long bath', cost: 5 });
-		await createTestSelfReward(db, ada, { title: 'Weekend away', cost: 50 });
+		const bath = await createTestSelfReward(db, ada, { cost: 5 });
+		await createTestSelfReward(db, ada, { cost: 50 });
 
 		const data = await runLoad(load(at(ada)));
 		expect(data.rewards.balances).toEqual([{ id: 'self', label: null, credits: 5 }]);
 		expect(data.rewards.claimable).toEqual([
-			{ id: expect.any(String), title: 'Long bath', note: '5', context: null }
+			{
+				id: bath.id,
+				title: '',
+				kind: 'reward',
+				sealed: expect.objectContaining({ recordId: bath.id, ciphertext: bath.ciphertext }),
+				note: '5',
+				context: null
+			}
 		]);
 		// The unaffordable one is simply absent: the card never names a reward
 		// the balance does not cover.
@@ -94,21 +111,21 @@ describe('load', () => {
 	it('carries partner tasks and rewards into the cards, not just your own', async () => {
 		// Jun controls, so what Jun sets up is Ada's to do and to claim.
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		await createTestSelfTask(db, ada, { title: 'Ada’s own task' });
-		await createTestPartnershipTask(db, id, jun, { title: 'Jun’s task for Ada' });
-		await createTestPartnershipReward(db, id, jun, { title: 'Jun’s reward', cost: 1 });
+		const own = await createTestSelfTask(db, ada);
+		const junsTask = await createTestPartnershipTask(db, id, jun);
+		const junsReward = await createTestPartnershipReward(db, id, jun, { cost: 1 });
 		await setTestPartnershipRewardCredits(db, id, jun, ada, 1);
 
 		const data = await runLoad(load(at(ada, [{ id, name: 'Jun', image: null }])));
 
 		expect(data.tasks.ready).toEqual(
 			expect.arrayContaining([
-				expect.objectContaining({ title: 'Ada’s own task', context: null }),
-				expect.objectContaining({ title: 'Jun’s task for Ada', context: 'Jun' })
+				expect.objectContaining({ id: own.id, context: null }),
+				expect.objectContaining({ id: junsTask.id, context: 'Jun' })
 			])
 		);
 		expect(data.rewards.claimable).toEqual([
-			expect.objectContaining({ title: 'Jun’s reward', context: 'Jun' })
+			expect.objectContaining({ id: junsReward.id, context: 'Jun' })
 		]);
 		// Both balances, separately — partnership credits do not buy self rewards.
 		expect(data.rewards.balances).toEqual([

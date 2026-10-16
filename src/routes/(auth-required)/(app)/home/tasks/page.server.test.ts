@@ -41,19 +41,26 @@ const run = (name: string, event: never) => runAction(actions, name, event);
 describe('load', () => {
 	it('returns self tasks and partner sections', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		await createTestSelfTask(db, ada, { title: 'Self task' });
-		await createTestPartnershipTask(db, id, jun, {
-			title: 'Partner task',
-			timezoneOwnerUserId: jun.id
-		});
+		const own = await createTestSelfTask(db, ada);
+		const theirs = await createTestPartnershipTask(db, id, jun, { timezoneOwnerUserId: jun.id });
 
 		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
-		expect(data.selfTasks.tasks).toContainEqual(expect.objectContaining({ title: 'Self task' }));
+		expect(data.selfTasks.tasks).toContainEqual(
+			expect.objectContaining({
+				id: own.id,
+				sealed: expect.objectContaining({ ciphertext: own.ciphertext })
+			})
+		);
 		expect(data.partnerTasks).toContainEqual(
 			expect.objectContaining({
 				partnershipId: id,
 				name: 'Jun',
-				tasks: [expect.objectContaining({ title: 'Partner task' })]
+				tasks: [
+					expect.objectContaining({
+						id: theirs.id,
+						sealed: expect.objectContaining({ ciphertext: theirs.ciphertext })
+					})
+				]
 			})
 		);
 	});
@@ -68,7 +75,7 @@ describe('load', () => {
 
 describe('actions', () => {
 	it('completes a self task from the tasks hub', async () => {
-		const task = await createTestSelfTask(db, ada, { title: 'Nap', creditsAwarded: 2 });
+		const task = await createTestSelfTask(db, ada, { creditsAwarded: 2 });
 
 		const result = await run('selfCompleteTask', at(ada, { taskId: task.id }));
 		expect(result).toMatchObject({ message: 'Task completed.' });
@@ -78,7 +85,7 @@ describe('actions', () => {
 
 	it('completes a partner task from the home tasks hub', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		const task = await createTestPartnershipTask(db, id, jun, { title: 'Tea', creditsAwarded: 3 });
+		const task = await createTestPartnershipTask(db, id, jun, { creditsAwarded: 3 });
 
 		const result = await run(
 			'partnerCompleteTask',

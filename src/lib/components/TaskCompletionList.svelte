@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RichText from '$lib/components/RichText.svelte';
+	import { openedCompletion, openedPart, shownText } from '$lib/sealed-views.svelte';
 	import type { PartnershipTaskCompletionView, TaskCompletionView } from '$lib/types';
 
 	type CompletionView = TaskCompletionView | PartnershipTaskCompletionView;
@@ -23,25 +24,30 @@
 	): completion is PartnershipTaskCompletionView {
 		return 'mine' in completion;
 	}
+
+	/** Each row with its content opened, or a placeholder while it opens (`sealed-views.svelte.ts`). */
+	const rows = $derived(
+		completions.map((completion) => ({ completion, opened: openedCompletion(completion) }))
+	);
 </script>
 
 {#if completions.length === 0}
 	<p class="empty">{emptyMessage}</p>
 {:else}
 	<div class="list">
-		{#each completions as completion (completion.id)}
+		{#each rows as { completion, opened } (completion.id)}
 			<article class="card">
 				<div class="header-row">
-					<h3>{completion.taskTitle}</h3>
+					<h3>{shownText(openedPart(opened, (value) => value.taskTitle))}</h3>
 					<p class="credits">
 						+{completion.creditsAwarded} credit{completion.creditsAwarded === 1 ? '' : 's'}
 					</p>
 				</div>
-				{#if completion.taskDescription}
-					<div class="description"><RichText text={completion.taskDescription} /></div>
+				{#if opened?.taskDescription}
+					<div class="description"><RichText text={opened.taskDescription} /></div>
 				{/if}
-				{#if completion.completionMessage}
-					<p class="message">{completion.completionMessage}</p>
+				{#if opened?.completionMessage}
+					<p class="message">{opened.completionMessage}</p>
 				{/if}
 				<div class="meta">
 					<p class="muted">{formatDateTime(completion.createdAt)}</p>

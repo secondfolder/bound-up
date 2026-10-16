@@ -67,6 +67,33 @@ export function selfVault(): OpenVault | null | undefined {
 	return state.status === 'ready' ? state.self : null;
 }
 
+/**
+ * The vault a record names, in the same three states as `partnershipVault`.
+ * What a reader wants: a record carries its vault's id, and the scope it
+ * belongs to follows from that rather than from the page it is shown on.
+ */
+export function vaultById(vaultId: string): OpenVault | null | undefined {
+	if (state.status === 'idle' || state.status === 'loading') {
+		return undefined;
+	}
+	if (state.status === 'failed') {
+		return null;
+	}
+	if (state.self?.id === vaultId) {
+		return state.self;
+	}
+	return Object.values(state.partnerships).find((vault) => vault.id === vaultId) ?? null;
+}
+
+/**
+ * The vaults once they are worked out, for a write that cannot proceed
+ * without one — a form submitted while the page is still opening them. Does
+ * not start anything: before `initialiseVaults` has run it answers at once.
+ */
+export async function vaultsSettled(): Promise<VaultsState> {
+	return running === null ? state : await running;
+}
+
 /** A request that never got an answer: offline, or cut short by a navigation. */
 class VaultNetworkError extends Error {}
 

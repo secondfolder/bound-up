@@ -6,6 +6,10 @@ import {
 	createTestInvite,
 	createTestPartnership,
 	createTestUser,
+	ensureTestPartnershipVault,
+	ensureTestSelfVault,
+	fakeSealed,
+	readPartnershipRewardRow,
 	readPartnershipRewardRows,
 	type TestUser
 } from '$lib/testing/fixtures';
@@ -55,27 +59,79 @@ describe('load', () => {
 	});
 });
 
+/** A reward form as the browser posts it: the settings, and the content sealed. */
+async function sealedPost(partnershipId: string, overrides: Record<string, string> = {}) {
+	return {
+		recordId: crypto.randomUUID(),
+		vaultId: await ensureTestPartnershipVault(db, partnershipId),
+		ciphertext: fakeSealed('reward'),
+		payloadVersion: '1',
+		cost: '3',
+		active: 'on',
+		...overrides
+	};
+}
+
 describe('actions', () => {
-	it('creates a reward and redirects back to the rewards page', async () => {
+	it('creates a reward from the sealed post and redirects back to the rewards page', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
-		const result = await runAndCatch(() =>
-			actions.default?.(
-				at(id, ada, {
-					title: 'Movie night',
-					description: 'Pick a film',
-					cost: '3',
-					active: 'on'
-				})
-			)
-		);
+		const post = await sealedPost(id);
+		const result = await runAndCatch(() => actions.default?.(at(id, ada, post)));
 
 		expect(result).toMatchObject({
 			type: 'redirect',
 			status: 303,
 			location: `/partner/${id}/rewards`
 		});
-		await expect(readPartnershipRewardRows(db, id)).resolves.toContainEqual(
-			expect.objectContaining({ title: 'Movie night', createdByUserId: ada.id })
-		);
+		await expect(readPartnershipRewardRow(db, post.recordId)).resolves.toMatchObject({
+			partnershipId: id,
+			createdByUserId: ada.id,
+			ciphertext: post.ciphertext,
+			vaultId: post.vaultId,
+			revision: 0,
+			cost: 3
+		});
+	});
+
+	it('does not store a title the post still carries', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+		const post = await sealedPost(id, { title: 'Movie night', description: 'Pick a film' });
+		await runAndCatch(() => actions.default?.(at(id, ada, post)));
+
+		await expect(readPartnershipRewardRow(db, post.recordId)).resolves.toMatchObject({
+			title: null,
+			description: null,
+			ciphertext: post.ciphertext
+		});
+	});
+
+	it("refuses content sealed in another partnership's vault", async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+		const other = await createTestPartnership(db, ada, stranger, { control: 'me' });
+		const post = await sealedPost(id, {
+			vaultId: await ensureTestPartnershipVault(db, other.id)
+		});
+
+		const result = await runAndCatch(() => actions.default?.(at(id, ada, post)));
+		expect(result).toMatchObject({ type: 'ok', value: { status: 409 } });
+		await expect(readPartnershipRewardRows(db, id)).resolves.toEqual([]);
+	});
+
+	it("refuses content sealed in the user's own vault", async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+		const post = await sealedPost(id, { vaultId: await ensureTestSelfVault(db, ada.id) });
+
+		const result = await runAndCatch(() => actions.default?.(at(id, ada, post)));
+		expect(result).toMatchObject({ type: 'ok', value: { status: 409 } });
+		await expect(readPartnershipRewardRows(db, id)).resolves.toEqual([]);
+	});
+
+	it('refuses the non-controlling side', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+		const post = await sealedPost(id);
+
+		const result = await runAndCatch(() => actions.default?.(at(id, jun, post)));
+		expect(result).toMatchObject({ type: 'ok', value: { status: 403 } });
+		await expect(readPartnershipRewardRows(db, id)).resolves.toEqual([]);
 	});
 });

@@ -30,6 +30,8 @@ function data(partnerTasks: PageData['partnerTasks'] = []): PageData {
 					taskDescription: null,
 					creditsAwarded: 2,
 					completionMessage: 'Done',
+					sealed: null,
+					completionMessageIndex: null,
 					createdAt: new Date()
 				}
 			]

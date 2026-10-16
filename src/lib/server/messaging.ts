@@ -18,7 +18,6 @@ import {
 	UNSEEN_MEDIA_MESSAGE_LIMIT
 } from '../messaging';
 import type { PartnershipView } from '../partnership';
-import { isKnownVersion, SEALED_PATTERN, type SealedKind } from '../sealed';
 import {
 	messageBodyKind,
 	messageMetadataKind,
@@ -49,12 +48,12 @@ import {
 	partnerships,
 	threadReads,
 	vaultEscrowRelays,
-	vaults,
 	vaultWraps
 } from './db/schema';
 import { listUserFeatures } from './features';
 import { attachmentKey, MEDIA_LIFETIMES, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
+import { partnershipVaultIdFor, sealedIsAcceptable } from './sealed-content';
 import { escrowForRequester } from './vaults';
 
 /**
@@ -800,34 +799,6 @@ export type SendResult =
 	| { ok: true; threadId: string; messageId: string }
 	| { ok: false; reason: SendFailure };
 
-/**
- * Whether a sealed ciphertext is one the server will store for `kind`: the
- * format, the kind's cap, and a version this build knows. The content is the
- * one thing it cannot check, and does not try to.
- */
-function sealedIsAcceptable(
-	kind: SealedKind<unknown>,
-	ciphertext: string,
-	version: number
-): boolean {
-	return (
-		ciphertext.length > 0 &&
-		ciphertext.length <= kind.maxCiphertextLength &&
-		SEALED_PATTERN.test(ciphertext) &&
-		isKnownVersion(kind, version)
-	);
-}
-
-/** The partnership's vault, or null while it has none — a device makes it on its next load. */
-export async function partnershipVaultId(db: Db, partnershipId: string): Promise<string | null> {
-	const [row] = await db
-		.select({ id: vaults.id })
-		.from(vaults)
-		.where(eq(vaults.partnershipId, partnershipId))
-		.limit(1);
-	return row?.id ?? null;
-}
-
 /** What a send carries besides its attachments: the sealed body and its sidecar. */
 export type SealedMessageInput = {
 	/** Chosen by the browser, because the body is sealed to it. */
@@ -864,7 +835,7 @@ async function checkSealedMessage(
 	) {
 		return 'bad-body';
 	}
-	if ((await partnershipVaultId(db, partnershipId)) !== input.vaultId) {
+	if ((await partnershipVaultIdFor(db, partnershipId)) !== input.vaultId) {
 		return 'wrong-vault';
 	}
 	const [taken] = await db
@@ -1466,7 +1437,7 @@ export async function setReaction(
 	if (!sealedIsAcceptable(messageReactionKind, input.ciphertext, input.payloadVersion)) {
 		return { ok: false, reason: 'too-large' };
 	}
-	if ((await partnershipVaultId(db, input.partnershipId)) !== input.vaultId) {
+	if ((await partnershipVaultIdFor(db, input.partnershipId)) !== input.vaultId) {
 		return { ok: false, reason: 'wrong-vault' };
 	}
 
@@ -1740,7 +1711,7 @@ export async function sealLegacyMessages(
 	if (!membership) {
 		return { ok: false, reason: 'not-a-member' };
 	}
-	if ((await partnershipVaultId(db, input.partnershipId)) !== input.vaultId) {
+	if ((await partnershipVaultIdFor(db, input.partnershipId)) !== input.vaultId) {
 		return { ok: false, reason: 'invalid' };
 	}
 	const acceptable =
@@ -1936,7 +1907,7 @@ export async function restoreVaultAccess(
 	if (!request) {
 		return { ok: false, reason: 'no-such-request' };
 	}
-	const vaultId = await partnershipVaultId(db, input.partnershipId);
+	const vaultId = await partnershipVaultIdFor(db, input.partnershipId);
 	if (!vaultId) {
 		return { ok: false, reason: 'no-vault' };
 	}

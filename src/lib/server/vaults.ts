@@ -14,6 +14,7 @@ import {
 	vaultWraps
 } from './db/schema';
 import { keyedHash } from './keyed-hash';
+import { selfVaultIdFor } from './sealed-content';
 
 /**
  * Every database access for vaults. See docs/encryption.md, "Vaults".
@@ -401,15 +402,6 @@ export async function escrowShare(secret: string, escrowId: string): Promise<str
 	return await keyedHash(secret, ESCROW_SHARE_PURPOSE, escrowId);
 }
 
-async function selfVaultId(db: Db, userId: string): Promise<string | null> {
-	const [row] = await db
-		.select({ id: vaults.id })
-		.from(vaults)
-		.where(eq(vaults.ownerUserId, userId))
-		.limit(1);
-	return row?.id ?? null;
-}
-
 /**
  * The share for an escrow the user is about to make.
  *
@@ -424,7 +416,7 @@ export async function issueEscrowShare(
 	userId: string,
 	escrowId: string
 ): Promise<string | null> {
-	if (!(await selfVaultId(db, userId))) {
+	if (!(await selfVaultIdFor(db, userId))) {
 		return null;
 	}
 	const [taken] = await db
@@ -445,7 +437,7 @@ export async function putEscrow(
 	userId: string,
 	input: { id: string; partnershipId: string; ciphertext: string }
 ): Promise<boolean> {
-	const vaultId = await selfVaultId(db, userId);
+	const vaultId = await selfVaultIdFor(db, userId);
 	if (!vaultId) {
 		return false;
 	}
@@ -480,7 +472,7 @@ export async function putEscrow(
  * escrows are made again, under new ids and so new shares.
  */
 export async function deleteEscrows(db: Db, userId: string): Promise<void> {
-	const vaultId = await selfVaultId(db, userId);
+	const vaultId = await selfVaultIdFor(db, userId);
 	if (vaultId) {
 		await db.delete(vaultEscrows).where(eq(vaultEscrows.vaultId, vaultId));
 	}
@@ -531,7 +523,7 @@ export async function releaseEscrow(
 	now: Date = new Date()
 ): Promise<EscrowRelease[]> {
 	const recovery = await releasableRecovery(db, userId, now);
-	const vaultId = await selfVaultId(db, userId);
+	const vaultId = await selfVaultIdFor(db, userId);
 	if (!(recovery && vaultId)) {
 		return [];
 	}
@@ -561,7 +553,7 @@ export async function deleteLostSelfVault(
 	userId: string,
 	now: Date = new Date()
 ): Promise<boolean> {
-	const vaultId = await selfVaultId(db, userId);
+	const vaultId = await selfVaultIdFor(db, userId);
 	if (!vaultId) {
 		return false;
 	}
@@ -604,7 +596,7 @@ export async function escrowForRequester(
 	db: Db,
 	input: { requesterId: string; partnershipId: string }
 ): Promise<{ id: string; ciphertext: string } | null> {
-	const vaultId = await selfVaultId(db, input.requesterId);
+	const vaultId = await selfVaultIdFor(db, input.requesterId);
 	if (!vaultId) {
 		return null;
 	}

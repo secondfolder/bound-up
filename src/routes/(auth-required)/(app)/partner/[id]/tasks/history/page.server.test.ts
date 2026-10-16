@@ -32,9 +32,8 @@ describe('load', () => {
 	it('returns the partnership task completion history for a member', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		const task = await createTestPartnershipTask(db, id, jun, {
-			title: 'Snack',
 			creditsAwarded: 2,
-			completionMessages: ['Done']
+			completionMessageCount: 1
 		});
 		await completePartnershipTask(db, {
 			partnershipId: id,
@@ -45,7 +44,13 @@ describe('load', () => {
 
 		const data = await runLoad(load(at(id, ada)));
 		expect(data.completions).toContainEqual(
-			expect.objectContaining({ taskTitle: 'Snack', mine: true, createdByMe: false })
+			expect.objectContaining({
+				mine: true,
+				createdByMe: false,
+				// The task's sealed record as it was, and which of its one message was picked.
+				sealed: expect.objectContaining({ recordId: task.id, ciphertext: task.ciphertext }),
+				completionMessageIndex: 0
+			})
 		);
 	});
 });

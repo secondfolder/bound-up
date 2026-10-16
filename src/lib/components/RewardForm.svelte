@@ -1,6 +1,11 @@
 <script lang="ts">
+	import type { SubmitFunction } from '@sveltejs/kit';
+	import { enhance } from '$app/forms';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import { reportRequestFailure } from '$lib/request-failure.svelte';
 	import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
+	import { replaceWithSealed, type SealScope, sealForSubmit } from '$lib/sealed-forms';
+	import { rewardKind } from '$lib/sealed-kinds/tasks';
 
 	type RewardFormValues = {
 		title: string;
@@ -11,23 +16,74 @@
 
 	let {
 		values,
-		submitLabel
+		submitLabel,
+		sealScope,
+		reward = null
 	}: {
 		values: RewardFormValues;
 		submitLabel: string;
+		sealScope: SealScope;
+		/** The reward being edited; null to create one. */
+		reward?: { id: string; revision: number } | null;
 	} = $props();
 
+	let problem = $state<string | null>(null);
+	/** As on `SealedTaskEditor`: kept across attempts, so a retry cannot create the reward twice. */
+	let newId: string | null = null;
+
 	/**
-	 * This form posts natively rather than through superforms, so the editor's
-	 * document is carried by a hidden input and the action reads the same field
-	 * name it always did.
+	 * Seals the title and description before the form leaves the page, and
+	 * posts the sealed record in their place (`sealed-forms.ts`). Not
+	 * superforms: this form has always posted natively, and the only thing the
+	 * action sends back now is a message.
+	 */
+	const sealOnSubmit: SubmitFunction = async ({ formData, cancel }) => {
+		problem = null;
+		const title = formData.get('title');
+		newId ??= crypto.randomUUID();
+		const outcome = await sealForSubmit(rewardKind, {
+			scope: sealScope,
+			recordId: reward?.id ?? newId,
+			payload: { title: typeof title === 'string' ? title : '', description },
+			describe: (field) =>
+				field === 'description'
+					? 'Please keep the description to 500 characters or fewer'
+					: 'Please enter a reward title of 80 characters or fewer'
+		});
+		if (!outcome.ok) {
+			({ error: problem } = outcome);
+			cancel();
+			return;
+		}
+		replaceWithSealed(formData, ['title', 'description'], {
+			...outcome.fields,
+			...(reward ? { expectedRevision: String(reward.revision) } : {})
+		});
+		return async ({ result, update }) => {
+			if (result.type === 'failure') {
+				problem =
+					typeof result.data?.error === 'string'
+						? result.data.error
+						: 'That reward could not be saved. Reload and try again.';
+			} else if (result.type === 'error') {
+				reportRequestFailure(result.error);
+			} else {
+				await update();
+			}
+		};
+	};
+
+	/**
+	 * The editor's document, which `sealOnSubmit` seals with the title. Still
+	 * carried by a hidden input too, so the form's fields are all in one place
+	 * when it is read; that input is removed from what is posted.
 	 */
 	// svelte-ignore state_referenced_locally
 	let description = $state(values.description);
 
 	/*
 	 * The native fields are seeded with `defaultValue` / `defaultChecked`, not
-	 * `value` / `checked`, because this form posts natively: the server's values
+	 * `value` / `checked`, because nothing here holds them in state: the server's values
 	 * are where the fields start, not something to hold them to.
 	 *
 	 * `value={…}` lost what the user typed. Svelte does not write an input's
@@ -42,7 +98,8 @@
 	 */
 </script>
 
-<form method="POST" class="panel reward-form add-form">
+<form method="POST" class="panel reward-form add-form" use:enhance={sealOnSubmit}>
+	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
 	<label>
 		<span>Title</span>
 		<input name="title" maxlength="80" required defaultValue={values.title} />
@@ -120,6 +177,10 @@
 	.richtext-field:focus-within {
 		outline: 2px solid var(--wa-color-brand-fill-loud, currentColor);
 		outline-offset: -1px;
+	}
+
+	.invalid {
+		color: var(--wa-color-text-danger);
 	}
 
 	.checkbox {

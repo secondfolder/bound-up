@@ -38,7 +38,7 @@ const run = (name: string, event: never) => runAction(actions, name, event);
 describe('load', () => {
 	it('returns the partner rewards page view for a member', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		await createTestPartnershipReward(db, id, jun, { title: 'Treat', cost: 2 });
+		const reward = await createTestPartnershipReward(db, id, jun, { cost: 2 });
 
 		const data = await runLoad(load(at(id, ada)));
 		expect(data).toMatchObject({
@@ -50,7 +50,11 @@ describe('load', () => {
 			}
 		});
 		expect(data.rewards).toContainEqual(
-			expect.objectContaining({ title: 'Treat', createdByMe: false })
+			expect.objectContaining({
+				id: reward.id,
+				createdByMe: false,
+				sealed: expect.objectContaining({ ciphertext: reward.ciphertext })
+			})
 		);
 	});
 
@@ -85,7 +89,7 @@ describe('actions', () => {
 
 	it('lets the claimant side claim a partner reward', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		const reward = await createTestPartnershipReward(db, id, jun, { title: 'Snack', cost: 2 });
+		const reward = await createTestPartnershipReward(db, id, jun, { cost: 2 });
 		await run('setCredits', at(id, jun, { targetUserId: ada.id, credits: '4' }));
 
 		const result = await run('claimReward', at(id, ada, { rewardId: reward.id }));
@@ -100,7 +104,7 @@ describe('actions', () => {
 
 	it('blocks claiming your own shared-control reward', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
-		const reward = await createTestPartnershipReward(db, id, ada, { title: 'Own reward', cost: 2 });
+		const reward = await createTestPartnershipReward(db, id, ada, { cost: 2 });
 
 		const result = await run('claimReward', at(id, ada, { rewardId: reward.id }));
 		expect(result.status).toBe(403);

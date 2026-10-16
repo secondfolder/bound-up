@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { openedWidgetTitle, shownText } from '$lib/sealed-views.svelte';
 	import type { WidgetItemView } from '$lib/types';
 
 	/**
@@ -26,7 +27,8 @@
 		{#each items as item (item.id)}
 			<li>
 				<span class="title">
-					{item.title}
+					<!-- Opened here, in the browser: the server never had the title. -->
+					{shownText(openedWidgetTitle(item))}
 					{#if item.context}
 						<!-- Which section this row came from on the page the header links
 						     to. /home merges your things with every partner's, and two

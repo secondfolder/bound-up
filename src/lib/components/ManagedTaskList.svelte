@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import RichText from '$lib/components/RichText.svelte';
 	import TimeZoneDisplay from '$lib/components/TimeZoneDisplay.svelte';
-	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
-	import { migrateLegacyDescriptions } from '$lib/richtext-legacy-migrate';
+	import { openedTask, shownTitle } from '$lib/sealed-views.svelte';
 	import { describeTaskSchedule } from '$lib/task-schedule';
 	import type { PartnershipTaskView, SelfTaskView } from '$lib/types';
 
@@ -64,34 +62,20 @@
 		return !task.canComplete;
 	}
 
-	/**
-	 * LEGACY-RICHTEXT — quietly convert any pre-rich-text descriptions the
-	 * viewer is allowed to edit. `editHref` being set is the client-side proxy
-	 * for "can edit"; the server re-checks it properly. Read untracked so this
-	 * does not re-run on every unrelated update.
-	 */
-	$effect(() => {
-		if (!editHref) {
-			return;
-		}
-		void migrateLegacyDescriptions({
-			kind: completePartnershipId ? 'partnership-task' : 'self-task',
-			partnershipId: completePartnershipId,
-			items: untrack(() => tasks.map((task) => ({ id: task.id, description: task.description })))
-		});
-	});
+	/** Each row with its content opened, or a placeholder while it opens (`sealed-views.svelte.ts`). */
+	const rows = $derived(tasks.map((task) => ({ task, content: openedTask(task) })));
 </script>
 
 {#if tasks.length === 0}
 	<p class="empty">{emptyMessage}</p>
 {:else}
 	<div class="list">
-		{#each tasks as task (task.id)}
+		{#each rows as { task, content } (task.id)}
 			<article class="card">
 				<div class="content-column">
 					<div class="header-row">
 						<div>
-							<h3>{task.title}</h3>
+							<h3>{shownTitle(content)}</h3>
 							<p class="schedule">{describeTaskSchedule(task.schedule)}</p>
 							{#if task.timeZoneNote}
 								<TimeZoneDisplay
@@ -109,8 +93,8 @@
 						{/if}
 					</div>
 
-					{#if task.description}
-						<div class="description"><RichText text={task.description} /></div>
+					{#if content?.description}
+						<div class="description"><RichText text={content.description} /></div>
 					{/if}
 
 					<div class="meta">

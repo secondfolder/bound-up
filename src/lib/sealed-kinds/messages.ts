@@ -3,7 +3,7 @@
  * metadata sidecar, and a reaction. See `../sealed.ts` for what a kind is and
  * the rules every version follows.
  *
- * Alias-free: the server reads the size caps and known versions from here.
+ * The server reads the size caps and known versions from here.
  */
 
 import { z } from 'zod';

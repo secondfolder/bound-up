@@ -15,6 +15,8 @@ function task(overrides: Partial<SelfTaskView> = {}): SelfTaskView {
 		active: true,
 		creditsAwarded: 3,
 		completionMessages: [],
+		sealed: null,
+		revision: 0,
 		schedule: { mode: 'one-off' },
 		timezoneOwnerUserId: 'u1',
 		lastCompletedAt: null,
@@ -38,6 +40,8 @@ function partnershipTask(overrides: Partial<PartnershipTaskView> = {}): Partners
 		active: true,
 		creditsAwarded: 3,
 		completionMessages: [],
+		sealed: null,
+		revision: 0,
 		schedule: { mode: 'one-off' },
 		timezoneOwnerUserId: 'u2',
 		lastCompletedAt: null,
@@ -60,6 +64,33 @@ describe('ManagedTaskList', () => {
 			emptyMessage: 'No tasks'
 		});
 
+		expect(screen.getByText('+3 credits')).toBeInTheDocument();
+	});
+
+	it('shows the plaintext title of a task written before sealing', () => {
+		render(ManagedTaskList, { tasks: [task()], emptyMessage: 'No tasks' });
+
+		expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Stretch');
+	});
+
+	it('shows a placeholder for a sealed task no vault has opened, never the empty title', () => {
+		render(ManagedTaskList, {
+			tasks: [
+				task({
+					title: '',
+					sealed: {
+						recordId: 'task-1',
+						vaultId: 'vault-1',
+						ciphertext: 'sb1.sealed',
+						payloadVersion: 1
+					}
+				})
+			],
+			emptyMessage: 'No tasks'
+		});
+
+		expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('…');
+		// The settings are plaintext, so they show whether or not the content opens.
 		expect(screen.getByText('+3 credits')).toBeInTheDocument();
 	});
 

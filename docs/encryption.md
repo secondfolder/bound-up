@@ -1,15 +1,18 @@
 # Encryption keys
 
-Private messages between partners are encrypted in the browser, and the server
-stores only ciphertext. This document covers the keys: where they come from,
+Private messages between partners, and the content of tasks and rewards, are
+encrypted in the browser, and the server stores only ciphertext. This document covers the keys: where they come from,
 where they are kept, and what the guarantee actually is. The messaging feature
 itself is [docs/messaging.md](messaging.md).
 
 Beside each user's identity sit **vaults**: one key per user and one per
 partnership, which a user's data is sealed under as **sealed records**. Both
-are described below. Messages are sealed in their partnership's vault; moving
-the other kinds of user data onto them is in progress, and until a kind has
-moved, it is stored as it was.
+are described below. Messages are sealed in their partnership's vault; tasks,
+rewards, and their completions and claims in the owner's or the partnership's
+vault ([docs/tasks.md](tasks.md#what-the-server-can-see),
+[docs/rewards.md](rewards.md#what-the-server-can-see)). Moving the remaining
+kinds of user data onto vaults is in progress, and until a kind has moved, it
+is stored as it was.
 
 Two narrow exceptions exist for embeds. First, when a URL is typed into the
 composer, when a new message is sent, or when an embed with no cached preview

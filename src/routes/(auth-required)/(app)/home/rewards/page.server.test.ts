@@ -9,12 +9,10 @@ import {
 	createTestUser,
 	readPartnershipRewardClaimRows,
 	readSelfRewardCreditRow,
-	readSelfRewardRow,
 	setTestPartnershipRewardCredits,
 	setTestSelfRewardCredits,
 	type TestUser
 } from '$lib/testing/fixtures';
-import type { SelfRewardView } from '$lib/types';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;
@@ -44,21 +42,31 @@ const run = (name: string, event: never) => runAction(actions, name, event);
 describe('load', () => {
 	it('returns self rewards and partner sections', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		await createTestSelfReward(db, ada, { title: 'Self treat', cost: 1 });
+		const own = await createTestSelfReward(db, ada, { cost: 1 });
 		await setTestSelfRewardCredits(db, ada, 3);
-		await createTestPartnershipReward(db, id, jun, { title: 'Partner treat', cost: 2 });
+		const theirs = await createTestPartnershipReward(db, id, jun, { cost: 2 });
 		await setTestPartnershipRewardCredits(db, id, jun, ada, 4);
 
 		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
 		expect(data.selfRewards).toMatchObject({ credits: 3 });
 		expect(data.selfRewards.rewards).toContainEqual(
-			expect.objectContaining({ title: 'Self treat', canClaim: true })
+			expect.objectContaining({
+				id: own.id,
+				canClaim: true,
+				sealed: expect.objectContaining({ recordId: own.id, ciphertext: own.ciphertext })
+			})
 		);
 		expect(data.partnerRewards).toContainEqual(
 			expect.objectContaining({
 				partnershipId: id,
 				name: 'Jun',
-				rewards: [expect.objectContaining({ title: 'Partner treat', canClaim: true })]
+				rewards: [
+					expect.objectContaining({
+						id: theirs.id,
+						canClaim: true,
+						sealed: expect.objectContaining({ ciphertext: theirs.ciphertext })
+					})
+				]
 			})
 		);
 	});
@@ -73,7 +81,7 @@ describe('load', () => {
 
 	it('omits a controller-only partnership from the claimable partner sections', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
-		await createTestPartnershipReward(db, id, ada, { title: 'Tea', cost: 2 });
+		await createTestPartnershipReward(db, id, ada, { cost: 2 });
 
 		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
 		expect(data.partnerRewards).toEqual([]);
@@ -88,35 +96,8 @@ describe('load', () => {
 });
 
 describe('actions', () => {
-	it('updates a self reward from the rewards hub', async () => {
-		await createTestSelfReward(db, ada, { title: 'Bath', description: 'Long soak', cost: 2 });
-		const section = await runLoad(load(at(ada)));
-		const reward = section.selfRewards.rewards.find(
-			(entry: SelfRewardView) => entry.title === 'Bath'
-		);
-		if (!reward) {
-			throw new Error('reward not created');
-		}
-
-		await run(
-			'selfUpdateReward',
-			at(ada, {
-				rewardId: reward.id,
-				title: 'Bath time',
-				description: 'Hot bath',
-				cost: '3',
-				active: 'on'
-			})
-		);
-
-		await expect(readSelfRewardRow(db, reward.id)).resolves.toMatchObject({
-			title: 'Bath time',
-			cost: 3
-		});
-	});
-
 	it('claims a self reward and deducts credits', async () => {
-		const reward = await createTestSelfReward(db, ada, { title: 'Nap', cost: 2 });
+		const reward = await createTestSelfReward(db, ada, { cost: 2 });
 		await setTestSelfRewardCredits(db, ada, 5);
 
 		const result = await run('selfClaimReward', at(ada, { rewardId: reward.id }));
@@ -126,7 +107,7 @@ describe('actions', () => {
 
 	it('claims a partner reward from the rewards hub', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		const reward = await createTestPartnershipReward(db, id, jun, { title: 'Tea', cost: 2 });
+		const reward = await createTestPartnershipReward(db, id, jun, { cost: 2 });
 		await setTestPartnershipRewardCredits(db, id, jun, ada, 4);
 
 		const result = await run(

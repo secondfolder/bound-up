@@ -75,6 +75,28 @@ export type TaskTimeZoneNoteView = {
 	showCurrentTime: boolean;
 };
 
+/**
+ * A sealed record a device can open: which record it is sealed as, under
+ * which vault, and at what payload version. See docs/encryption.md, "Sealed
+ * records". Null on a view means the row is still plaintext, written before
+ * sealing, until a device seals it.
+ */
+export type SealedRefView = {
+	recordId: string;
+	vaultId: string;
+	ciphertext: string;
+	payloadVersion: number;
+};
+
+/**
+ * A completed task, as history.
+ *
+ * `sealed` is the task as it was, copied when it was completed, and
+ * `completionMessageIndex` which of its messages was picked. Null `sealed` is
+ * a completion recorded before sealing, whose `taskTitle`, `taskDescription`
+ * and `completionMessage` are still plaintext; for a sealed one they are empty
+ * until a device opens it (`openedCompletion` in `sealed-views.svelte.ts`).
+ */
 export type TaskCompletionView = {
 	id: string;
 	taskTitle: string;
@@ -82,6 +104,8 @@ export type TaskCompletionView = {
 	creditsAwarded: number;
 	completionMessage: string | null;
 	createdAt: Date;
+	sealed: SealedRefView | null;
+	completionMessageIndex: number | null;
 };
 
 export type PartnershipTaskCompletionView = TaskCompletionView & {
@@ -89,6 +113,12 @@ export type PartnershipTaskCompletionView = TaskCompletionView & {
 	createdByMe: boolean;
 };
 
+/**
+ * `title`, `description` and `completionMessages` are plaintext only on a task
+ * written before sealing; on a sealed one (`sealed`) they are empty until a
+ * device opens it (`openedTask` in `sealed-views.svelte.ts`). `revision` is
+ * what an edit is compare-and-swap against.
+ */
 export type SelfTaskView = {
 	id: string;
 	title: string;
@@ -96,6 +126,8 @@ export type SelfTaskView = {
 	active: boolean;
 	creditsAwarded: number;
 	completionMessages: string[];
+	sealed: SealedRefView | null;
+	revision: number;
 	schedule: TaskSchedule;
 	timezoneOwnerUserId: string;
 	lastCompletedAt: Date | null;
@@ -107,6 +139,7 @@ export type SelfTaskView = {
 	timeZoneNote: TaskTimeZoneNoteView | null;
 };
 
+/** As `SelfTaskView`, sealed in the partnership's vault. */
 export type PartnershipTaskView = {
 	id: string;
 	title: string;
@@ -114,6 +147,8 @@ export type PartnershipTaskView = {
 	active: boolean;
 	creditsAwarded: number;
 	completionMessages: string[];
+	sealed: SealedRefView | null;
+	revision: number;
 	schedule: TaskSchedule;
 	timezoneOwnerUserId: string;
 	lastCompletedAt: Date | null;
@@ -372,18 +407,23 @@ export type UnreadPartnerView = {
 	newestAt: Date;
 };
 
+/** A claimed reward, as history. `sealed` as on `TaskCompletionView`. */
 export type RewardHistoryView = {
 	id: string;
 	rewardTitle: string;
 	rewardDescription: string | null;
 	rewardCost: number;
 	createdAt: Date;
+	sealed: SealedRefView | null;
 };
 
+/** `title` and `description` as on `SelfTaskView`. */
 export type SelfRewardView = {
 	id: string;
 	title: string;
 	description: string | null;
+	sealed: SealedRefView | null;
+	revision: number;
 	cost: number;
 	active: boolean;
 	canClaim: boolean;
@@ -395,6 +435,8 @@ export type PartnershipRewardView = {
 	id: string;
 	title: string;
 	description: string | null;
+	sealed: SealedRefView | null;
+	revision: number;
 	cost: number;
 	active: boolean;
 	createdByMe: boolean;
@@ -464,7 +506,14 @@ export type HelpRequestView = {
  */
 export type WidgetItemView = {
 	id: string;
+	/**
+	 * Plaintext only for an item written before sealing; for a sealed one it is
+	 * empty until a device opens `sealed` (`openedWidgetItem`).
+	 */
 	title: string;
+	/** Which kind `sealed` opens as. A guide is never sealed: guides are the app's, not a user's. */
+	kind: 'task' | 'reward' | 'guide';
+	sealed: SealedRefView | null;
 	/** A credit award, a cost — rendered as a pill, or omitted when null. */
 	note: string | null;
 	/**

@@ -32,6 +32,41 @@ const timestamps = {
 		.$onUpdate(() => new Date())
 };
 
+/**
+ * The columns of a row whose content is a sealed record (docs/encryption.md,
+ * "Sealed records"): the ciphertext, the vault it is sealed under, the payload
+ * version, and a revision that every write bumps, so an edit or a background
+ * upgrade can be compare-and-swap and never overwrite a newer write. Ciphertext
+ * and vault are NULL on a row written before sealing, which still carries its
+ * content in the plaintext columns until a device seals it.
+ */
+function sealedContent() {
+	return {
+		ciphertext: text('ciphertext'),
+		vaultId: text('vault_id').references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version'),
+		revision: integer('revision').notNull().default(0)
+	};
+}
+
+/**
+ * A copy of a sealed record, taken when a task is completed or a reward
+ * claimed, so the history says what it said at the time. The copy is the
+ * ciphertext itself — the person completing or claiming need not be its
+ * author, and cannot re-seal what they did not write — so it stays bound to
+ * the record it was sealed as: `snapshot_record_id`.
+ */
+function sealedSnapshot() {
+	return {
+		snapshotCiphertext: text('snapshot_ciphertext'),
+		snapshotVaultId: text('snapshot_vault_id').references(() => vaults.id, {
+			onDelete: 'cascade'
+		}),
+		snapshotVersion: integer('snapshot_version'),
+		snapshotRecordId: text('snapshot_record_id')
+	};
+}
+
 export const guides = sqliteTable('guides', {
 	// Text ids to match Better Auth's own tables, so any future foreign key
 	// between app data and `user.id` is type-consistent. `crypto.randomUUID` is
@@ -168,10 +203,12 @@ export const selfRewards = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		title: text('title').notNull(),
+		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
+		title: text('title'),
 		description: text('description'),
 		cost: integer('cost').notNull(),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
+		...sealedContent(),
 		...timestamps
 	},
 	(table) => [
@@ -216,9 +253,11 @@ export const selfRewardClaims = sqliteTable(
 		rewardId: text('reward_id')
 			.notNull()
 			.references(() => selfRewards.id, { onDelete: 'cascade' }),
-		rewardTitle: text('reward_title').notNull(),
+		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
+		rewardTitle: text('reward_title'),
 		rewardDescription: text('reward_description'),
 		rewardCost: integer('reward_cost').notNull(),
+		...sealedSnapshot(),
 		...timestamps
 	},
 	(table) => [
@@ -245,10 +284,12 @@ export const partnershipRewards = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		title: text('title').notNull(),
+		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
+		title: text('title'),
 		description: text('description'),
 		cost: integer('cost').notNull(),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
+		...sealedContent(),
 		...timestamps
 	},
 	(table) => [
@@ -308,9 +349,11 @@ export const partnershipRewardClaims = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		rewardTitle: text('reward_title').notNull(),
+		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
+		rewardTitle: text('reward_title'),
 		rewardDescription: text('reward_description'),
 		rewardCost: integer('reward_cost').notNull(),
+		...sealedSnapshot(),
 		...timestamps
 	},
 	(table) => [
@@ -340,11 +383,19 @@ export const selfTasks = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		title: text('title').notNull(),
+		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
+		title: text('title'),
 		description: text('description'),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		creditsAwarded: integer('credits_awarded').notNull().default(0),
-		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>().notNull(),
+		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>(),
+		/**
+		 * How many completion messages the sealed content holds. Plaintext so the
+		 * server can still pick one at random on completion — an index, which the
+		 * reader looks up after opening the snapshot.
+		 */
+		completionMessageCount: integer('completion_message_count').notNull().default(0),
+		...sealedContent(),
 		schedule: text('schedule', { mode: 'json' }).$type<TaskSchedule>().notNull(),
 		timezoneOwnerUserId: text('timezone_owner_user_id')
 			.notNull()
@@ -379,10 +430,14 @@ export const selfTaskCompletions = sqliteTable(
 		taskId: text('task_id')
 			.notNull()
 			.references(() => selfTasks.id, { onDelete: 'cascade' }),
-		taskTitle: text('task_title').notNull(),
+		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
+		taskTitle: text('task_title'),
 		taskDescription: text('task_description'),
 		creditsAwarded: integer('credits_awarded').notNull(),
 		completionMessage: text('completion_message'),
+		/** Which of the snapshot's completion messages was picked, or NULL for none. */
+		completionMessageIndex: integer('completion_message_index'),
+		...sealedSnapshot(),
 		...timestamps
 	},
 	(table) => [
@@ -414,11 +469,19 @@ export const partnershipTasks = sqliteTable(
 		timezoneOwnerUserId: text('timezone_owner_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		title: text('title').notNull(),
+		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
+		title: text('title'),
 		description: text('description'),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		creditsAwarded: integer('credits_awarded').notNull().default(0),
-		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>().notNull(),
+		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>(),
+		/**
+		 * How many completion messages the sealed content holds. Plaintext so the
+		 * server can still pick one at random on completion — an index, which the
+		 * reader looks up after opening the snapshot.
+		 */
+		completionMessageCount: integer('completion_message_count').notNull().default(0),
+		...sealedContent(),
 		schedule: text('schedule', { mode: 'json' }).$type<TaskSchedule>().notNull(),
 		lastCompletedAt: integer('last_completed_at', { mode: 'timestamp_ms' }),
 		completedCount: integer('completed_count').notNull().default(0),
@@ -461,10 +524,14 @@ export const partnershipTaskCompletions = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		taskTitle: text('task_title').notNull(),
+		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
+		taskTitle: text('task_title'),
 		taskDescription: text('task_description'),
 		creditsAwarded: integer('credits_awarded').notNull(),
 		completionMessage: text('completion_message'),
+		/** Which of the snapshot's completion messages was picked, or NULL for none. */
+		completionMessageIndex: integer('completion_message_index'),
+		...sealedSnapshot(),
 		...timestamps
 	},
 	(table) => [

@@ -74,13 +74,21 @@ test('shows each side their own view of the same link', async () => {
  */
 test('gives the side that completes a task a preview of it', async () => {
 	const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
-	await createTestPartnershipTask(db, id, ada, { title: 'Kneel at eight', creditsAwarded: 3 });
+	const task = await createTestPartnershipTask(db, id, ada, { creditsAwarded: 3 });
 
 	const junsView = await runLoad(load(at(id, jun)));
 	expect(junsView.tasks).toMatchObject({
 		viewerActs: true,
 		readyCount: 1,
-		ready: [{ title: 'Kneel at eight', note: '+3' }]
+		// Sealed, so the title is the browser's to open.
+		ready: [
+			{
+				title: '',
+				kind: 'task',
+				note: '+3',
+				sealed: { recordId: task.id, ciphertext: task.ciphertext }
+			}
+		]
 	});
 
 	const adasView = await runLoad(load(at(id, ada)));
@@ -89,8 +97,8 @@ test('gives the side that completes a task a preview of it', async () => {
 
 test('gives the side that claims a reward its balance, and the other side a count', async () => {
 	const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
-	await createTestPartnershipReward(db, id, ada, { title: 'An hour off', cost: 4 });
-	await createTestPartnershipReward(db, id, ada, { title: 'A whole day off', cost: 40 });
+	const hourOff = await createTestPartnershipReward(db, id, ada, { cost: 4 });
+	await createTestPartnershipReward(db, id, ada, { cost: 40 });
 	await setTestPartnershipRewardCredits(db, id, ada, jun, 4);
 
 	const junsView = await runLoad(load(at(id, jun)));
@@ -99,7 +107,13 @@ test('gives the side that claims a reward its balance, and the other side a coun
 		// page that has several and has to tell them apart.
 		balances: [{ label: null, credits: 4 }],
 		viewerActs: true,
-		claimable: [{ title: 'An hour off', note: '4' }],
+		claimable: [
+			{
+				kind: 'reward',
+				note: '4',
+				sealed: { recordId: hourOff.id, ciphertext: hourOff.ciphertext }
+			}
+		],
 		activeCount: 2
 	});
 

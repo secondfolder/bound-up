@@ -1,21 +1,11 @@
 <script lang="ts">
-	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import TaskForm from '$lib/components/TaskForm.svelte';
-	import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
-	import { superForm } from '$lib/superform';
+	import SealedTaskEditor from '$lib/components/SealedTaskEditor.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const backHref = $derived(resolve('/(auth-required)/(app)/home/tasks'));
-	// svelte-ignore state_referenced_locally
-	// Captures the load's initial task form on purpose: `superForm` owns the
-	// live state afterwards and failed submissions should stay populated.
-	const superform = superForm(data.taskForm, {
-		resetForm: false,
-		validators: zod4Client(taskEditorFormSchema)
-	});
 </script>
 
 <section class="page">
@@ -28,7 +18,7 @@
 	/>
 
 	<div class="content">
-		<TaskForm {superform} submitLabel="Add task" />
+		<SealedTaskEditor taskForm={data.taskForm} sealScope={{ kind: 'self' }} submitLabel="Add task" />
 	</div>
 </section>
 

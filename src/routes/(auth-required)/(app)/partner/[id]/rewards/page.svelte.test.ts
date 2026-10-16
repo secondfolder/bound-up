@@ -28,6 +28,8 @@ function data(claimCount: number, claimable = true): PageData {
 				active: true,
 				createdByMe: false,
 				canClaim: claimable,
+				sealed: null,
+				revision: 0,
 				createdAt: new Date(),
 				updatedAt: new Date()
 			}
@@ -39,6 +41,7 @@ function data(claimCount: number, claimable = true): PageData {
 			rewardCost: 2,
 			mine: false,
 			createdByMe: false,
+			sealed: null,
 			createdAt: new Date()
 		}))
 	};

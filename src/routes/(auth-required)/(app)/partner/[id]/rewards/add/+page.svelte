@@ -2,10 +2,10 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardForm from '$lib/components/RewardForm.svelte';
-	import type { ActionData, PageData } from './$types';
+	import type { PageData } from './$types';
 
-	let { data, form }: { data: PageData; form?: ActionData } = $props();
-	const values = $derived(form?.values ?? { title: '', description: '', cost: '', active: true });
+	let { data }: { data: PageData } = $props();
+	const values = { title: '', description: '', cost: '', active: true };
 	const backHref = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/rewards', { id: data.partner.id })
 	);
@@ -21,9 +21,7 @@
 	/>
 
 	<div class="content">
-		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
-
-		<RewardForm {values} submitLabel="Add reward" />
+		<RewardForm {values} sealScope={{ kind: 'partnership', partnershipId: data.partner.id }} submitLabel="Add reward" />
 	</div>
 </section>
 
@@ -41,9 +39,5 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-	}
-
-	.invalid {
-		color: var(--wa-color-text-danger);
 	}
 </style>

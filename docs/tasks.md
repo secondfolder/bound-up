@@ -162,6 +162,57 @@ frozen to the old offset.
 - One-off tasks show no timezone note, because they have no task-local date or
   datetime to explain.
 
+## What the server can see
+
+A task's **content** — its title, description and completion messages — is
+end-to-end encrypted. It is one sealed record (kind `task`, in
+`src/lib/sealed-kinds/tasks.ts`) in the scope's vault: the owner's own vault
+for a self task, the partnership's for a partnership task. See
+[docs/encryption.md](encryption.md#sealed-records) for vaults and the record
+format.
+
+The server sees everything it acts on, and nothing else:
+
+| Plaintext (the server needs it)                                   | Sealed                                |
+| ----------------------------------------------------------------- | ------------------------------------- |
+| `active`, `credits_awarded`, `schedule`, `timezone_owner_user_id` | `title`                               |
+| `completion_message_count`                                        | `description` (rich text)             |
+| who created it, timestamps, eligibility                           | `completionMessages` (up to 20)       |
+| `vault_id`, `payload_version`, `revision`                         |                                       |
+
+**Completion messages are picked by index.** The server cannot read the
+messages, so it is told how many there are (`completion_message_count`) and
+picks a random index on completion; the device showing the completion reads
+that entry out of the snapshot.
+
+**What moved into the browser.** The checks on the content — a title of 1–80
+characters, at most 20 completion messages, a description of at most 500
+visible characters — run in the browser before sealing, and again on every
+read (`taskKind` validates whatever comes out of a vault, so a malformed or
+tampered record reads as "can't be shown" rather than as whatever it says).
+The server checks only what it can: the ciphertext's shape and size, a known
+`payload_version`, the vault belonging to the task's scope, and every
+permission. Permissions never moved: who may create, edit or complete a task
+is decided from the stored rows exactly as before.
+
+**Forms.** The editor (`SealedTaskEditor.svelte`) is superforms as usual, but
+its `onSubmit` validates, seals the three text fields, and posts the sealed
+record (`recordId`, `vaultId`, `ciphertext`, `payloadVersion`,
+`completionMessageCount`) in their place (`sealed-forms.ts`). A new task's id
+is chosen by the browser, because the id is part of what the content is
+sealed to. The action answers with a message rather than a superform, since
+there are no text fields to send back.
+
+**Edits are compare-and-swap.** Every sealed write bumps `revision`, and an
+edit names the revision it opened. If the other partner saved in between, the
+edit is refused with "changed somewhere else" rather than overwriting their
+change unseen — the server cannot merge what it cannot read.
+
+**Reading** goes through `openedTask` / `openedCompletion` in
+`src/lib/sealed-views.svelte.ts`: a placeholder while the vault opens, the
+content once it has, and "can't be shown" for a record that will not open on
+this device. Nothing is rendered on the server.
+
 ## Data model
 
 The current schema uses four task tables:
@@ -173,25 +224,32 @@ The current schema uses four task tables:
 
 Important fields on the live task rows:
 
-- `title`, `description`, `active`
-- `credits_awarded`
-- `completion_messages`
+- `ciphertext`, `vault_id`, `payload_version`, `revision` — the sealed content
+- `completion_message_count`
+- `active`, `credits_awarded`
 - `schedule`
 - `timezone_owner_user_id`
 - `last_completed_at`
 - `completed_count`
 - `next_eligible_at`
+- `title`, `description`, `completion_messages` — plaintext, set only on rows
+  written before sealing and cleared when a device seals them (see
+  [docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext))
 
 Completion rows snapshot:
 
-- the title and description as completed
+- the task's sealed record as it was when completed — a copy of its
+  ciphertext, which still opens as a task (`snapshot_*` columns; it stays
+  sealed to the task's id, `snapshot_record_id`)
+- `completion_message_index`, which of the snapshot's messages was given
 - the credit award amount
-- the specific completion message shown
 - who created the task for partnership rows
 - who completed it for partnership rows
 
 The snapshot exists for the same reason as rewards history: visible history must
-stay truthful even if the live task is edited later.
+stay truthful even if the live task is edited later. Copying the ciphertext is
+what lets the server take a snapshot it cannot read, and either partner's
+completion can trigger it.
 
 ## Route surface
 

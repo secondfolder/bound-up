@@ -27,11 +27,18 @@ const at = (user: TestUser | null) => fakeEvent({ db, user, path: '/home/rewards
 
 describe('load', () => {
 	it('returns the self reward claim history', async () => {
-		const reward = await createTestSelfReward(db, ada, { title: 'Nap', cost: 2 });
+		const reward = await createTestSelfReward(db, ada, { cost: 2 });
 		await setTestSelfRewardCredits(db, ada, 4);
 		await claimTestSelfReward(db, ada, reward.id);
 
 		const data = await runLoad(load(at(ada)));
-		expect(data.selfRewards.claims).toContainEqual(expect.objectContaining({ rewardTitle: 'Nap' }));
+		// The claim keeps a copy of the reward's sealed record, bound to the reward.
+		expect(data.selfRewards.claims).toContainEqual(
+			expect.objectContaining({
+				rewardTitle: '',
+				rewardCost: 2,
+				sealed: expect.objectContaining({ recordId: reward.id, ciphertext: reward.ciphertext })
+			})
+		);
 	});
 });

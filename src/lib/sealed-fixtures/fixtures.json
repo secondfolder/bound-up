@@ -52,6 +52,27 @@
 			"expected": {
 				"emoji": "🔥"
 			}
+		},
+		{
+			"kind": "task",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000b1",
+			"ciphertext": "sb1.nz5Q25tz_KtvHNyUTiPZEBHjTdFuRWg8KB8mTm5zuQzKdNTMSfCPu05znslh4Ve0BNlXAR0P72eI772kQRGZDm1ymxZFYLd6mLd7zG2gj1N3-vp4CM6yIvOo6TtSMQ76tW1V9ehEng71nR75rCMOrWsHa15YmbIPOMAJGnKYoRsXOYv4fi2c8S5NMPlBBepQp-fptGCLwsqDIA1r3GDZKJ4ZOTixuNawRxTwEBIUGDCEq6IS_fH4C7_t5RpBRXiakbDFj3oupiqkII31m0eTmOoZGIQtM5r6GeOieKnw9426LL13uw5LYSChsfYZ7QM6RSKmbZcspO1idaHHqghiWZ1c",
+			"expected": {
+				"title": "Kneel at eight",
+				"description": "{\"root\":{\"type\":\"root\",\"children\":[{\"type\":\"paragraph\",\"children\":[{\"type\":\"text\",\"text\":\"frozen\",\"format\":0}]}]}}",
+				"completionMessages": ["Good.", "Again tomorrow."]
+			}
+		},
+		{
+			"kind": "reward",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000b2",
+			"ciphertext": "sb1.65G0ZYbivMlf_mdqDPodyZB57iQOdBaHky8dGxb-nSsj6Kn3QEZf9Q2V7iHEBzlULAtjMENhiGR9W6nsNGfKNXDdT4YpsQ",
+			"expected": {
+				"title": "A long bath",
+				"description": null
+			}
 		}
 	]
 }

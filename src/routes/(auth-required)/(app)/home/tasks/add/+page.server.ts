@@ -1,9 +1,10 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
+import { malformedSealed, readSealedTask, sealedRefusal } from '$lib/server/sealed-submit';
 import { createSelfTask } from '$lib/server/tasks';
-import { taskEditorFormValuesForCreate, taskInputFromEditorForm } from '$lib/task-editor-form';
+import { taskEditorFormValuesForCreate, taskInputFromSealedSubmit } from '$lib/task-editor-form';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -26,17 +27,21 @@ export const actions: Actions = {
 			error(401, 'Not signed in');
 		}
 
-		const taskForm = await superValidate(request, zod4(taskEditorFormSchema));
-		if (!taskForm.valid) {
-			return fail(400, { taskForm });
+		// The content arrives sealed; see `taskSealedSubmitSchema`.
+		const submitted = await readSealedTask(request);
+		if (!submitted) {
+			return malformedSealed('task');
 		}
-
-		await createSelfTask(
+		const result = await createSelfTask(
 			locals.db,
 			locals.user.id,
 			locals.user.timezone,
-			taskInputFromEditorForm(taskForm.data)
+			submitted.recordId,
+			taskInputFromSealedSubmit(submitted)
 		);
+		if (!result.ok) {
+			return sealedRefusal(result.reason, 'task');
+		}
 		redirect(303, '/home/tasks');
 	}
 };

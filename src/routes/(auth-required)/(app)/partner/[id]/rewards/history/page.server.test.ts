@@ -32,13 +32,17 @@ const at = (id: string, user: TestUser | null) =>
 describe('load', () => {
 	it('returns the reward claim history for a member', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		const reward = await createTestPartnershipReward(db, id, jun, { title: 'Snack', cost: 2 });
+		const reward = await createTestPartnershipReward(db, id, jun, { cost: 2 });
 		await setTestPartnershipRewardCredits(db, id, jun, ada, 4);
 		await claimTestPartnershipReward(db, id, ada, reward.id);
 
 		const data = await runLoad(load(at(id, ada)));
 		expect(data.claims).toContainEqual(
-			expect.objectContaining({ rewardTitle: 'Snack', mine: true, createdByMe: false })
+			expect.objectContaining({
+				mine: true,
+				createdByMe: false,
+				sealed: expect.objectContaining({ recordId: reward.id, ciphertext: reward.ciphertext })
+			})
 		);
 	});
 });

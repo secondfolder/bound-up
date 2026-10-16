@@ -32,7 +32,16 @@ describe('TasksWidget', () => {
 		render(TasksWidget, {
 			href: '/home/tasks',
 			tasks: tasks({
-				ready: [{ id: 't1', title: 'Morning stretches', note: '+2', context: null }],
+				ready: [
+					{
+						id: 't1',
+						title: 'Morning stretches',
+						kind: 'task',
+						sealed: null,
+						note: '+2',
+						context: null
+					}
+				],
 				readyCount: 4,
 				activeCount: 4
 			})
@@ -41,6 +50,35 @@ describe('TasksWidget', () => {
 		expect(screen.getByText('Morning stretches')).toBeInTheDocument();
 		expect(screen.getByText('+2')).toBeInTheDocument();
 		expect(screen.getByText('and 3 more ready')).toBeInTheDocument();
+	});
+
+	it('shows a placeholder, not an empty title, for a sealed row no vault has opened', () => {
+		render(TasksWidget, {
+			href: '/home/tasks',
+			tasks: tasks({
+				ready: [
+					{
+						id: 't1',
+						// The server never has a sealed task's title.
+						title: '',
+						kind: 'task',
+						sealed: {
+							recordId: 't1',
+							vaultId: 'v1',
+							ciphertext: 'sb1.sealed',
+							payloadVersion: 1
+						},
+						note: '+2',
+						context: null
+					}
+				],
+				readyCount: 1,
+				activeCount: 1
+			})
+		});
+
+		expect(screen.getByRole('listitem')).toHaveTextContent('…');
+		expect(screen.getByText('+2')).toBeInTheDocument();
 	});
 
 	it('says what is waiting when nothing is ready, rather than that nothing is', () => {
@@ -82,7 +120,9 @@ describe('RewardsWidget', () => {
 			href: '/home/rewards',
 			rewards: rewards({
 				balances: [{ id: 'self', label: null, credits: 12 }],
-				claimable: [{ id: 'r1', title: 'Long bath', note: '5', context: null }],
+				claimable: [
+					{ id: 'r1', title: 'Long bath', kind: 'reward', sealed: null, note: '5', context: null }
+				],
 				claimableCount: 3,
 				activeCount: 5
 			})

@@ -151,9 +151,20 @@ list, so `TasksWidgetView` and `RewardsWidgetView` both carry `viewerActs`:
   Only what can be acted on now: never a count of what cannot.
 - **false** — a count of what that person has set up, and no titles.
 
-The titles are withheld **on the server**, not hidden in the component. Load
+The rows are withheld **on the server**, not hidden in the component. Load
 data is serialised into the page HTML, so a component-level `{#if}` would ship
 them anyway.
+
+### Titles are opened in the browser
+
+Task and reward titles are sealed ([tasks.md](tasks.md#what-the-server-can-see)),
+so the server cannot put them in a row. Each `WidgetItemView` carries the
+record's sealed reference instead (`sealed`, and `kind` to say which kind it
+opens as), and `WidgetItems` opens it with `openedWidgetTitle` from
+`sealed-views.svelte.ts`: "…" until the vault is open, the title after. A row
+written before sealing still has a plaintext `title`, shown straight away.
+Guides are the app's own content, never sealed, and their rows have
+`kind: 'guide'` and no `sealed`.
 
 `viewerActs` is always true on `/home`, where there is only one side.
 

@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import RichText from '$lib/components/RichText.svelte';
-	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
-	import { migrateLegacyDescriptions } from '$lib/richtext-legacy-migrate';
+	import { openedReward, shownTitle } from '$lib/sealed-views.svelte';
 	import type { PartnershipRewardView, SelfRewardView } from '$lib/types';
 
 	type RewardView = SelfRewardView | PartnershipRewardView;
@@ -28,49 +26,33 @@
 		return 'createdByMe' in reward ? reward.createdByMe : false;
 	}
 
-	/**
-	 * LEGACY-RICHTEXT — quietly convert any pre-rich-text descriptions the
-	 * viewer is allowed to edit. `editHref` being set is the client-side proxy
-	 * for "can edit"; the server re-checks it properly. Read untracked so this
-	 * does not re-run on every unrelated update.
-	 */
-	$effect(() => {
-		if (!editHref) {
-			return;
-		}
-		void migrateLegacyDescriptions({
-			kind: claimPartnershipId ? 'partnership-reward' : 'self-reward',
-			partnershipId: claimPartnershipId,
-			items: untrack(() =>
-				rewards.map((reward) => ({ id: reward.id, description: reward.description }))
-			)
-		});
-	});
+	/** Each row with its content opened, or a placeholder while it opens (`sealed-views.svelte.ts`). */
+	const rows = $derived(rewards.map((reward) => ({ reward, content: openedReward(reward) })));
 </script>
 
 {#if rewards.length === 0}
 	<p class="empty">{emptyMessage}</p>
 {:else}
 	<ul class="reward-list">
-		{#each rewards as reward (reward.id)}
+		{#each rows as { reward, content } (reward.id)}
 			<li class:inactive={!reward.active}>
 				<div class="reward-head">
 					<div>
-						<h3>{reward.title}</h3>
+						<h3>{shownTitle(content)}</h3>
 						<p>{reward.cost} credits</p>
 					</div>
 					<div class="reward-meta">
 						{#if editHref}
 							<a class="icon-link" href={editHref(reward.id)}>
 								<wa-icon name="pen-to-square" variant="solid"></wa-icon>
-								<span class="wa-visually-hidden">Edit {reward.title}</span>
+								<span class="wa-visually-hidden">Edit {shownTitle(content)}</span>
 							</a>
 						{/if}
 					</div>
 				</div>
 
-				{#if reward.description}<div class="description">
-						<RichText text={reward.description} />
+				{#if content?.description}<div class="description">
+						<RichText text={content.description} />
 					</div>{/if}
 
 				{#if showClaimUi && !rewardCreatedByMe(reward)}

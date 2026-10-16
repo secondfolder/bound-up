@@ -36,10 +36,7 @@ const run = (name: string, event: never) => runAction(actions, name, event);
 describe('load', () => {
 	it('returns the partner tasks page view for a member', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		await createTestPartnershipTask(db, id, jun, {
-			title: 'Treat task',
-			timezoneOwnerUserId: jun.id
-		});
+		const task = await createTestPartnershipTask(db, id, jun, { timezoneOwnerUserId: jun.id });
 
 		const data = await runLoad(load(at(id, ada)));
 		expect(data).toMatchObject({
@@ -51,7 +48,12 @@ describe('load', () => {
 			}
 		});
 		expect(data.tasks).toContainEqual(
-			expect.objectContaining({ title: 'Treat task', createdByMe: false })
+			expect.objectContaining({
+				id: task.id,
+				createdByMe: false,
+				revision: 0,
+				sealed: expect.objectContaining({ recordId: task.id, ciphertext: task.ciphertext })
+			})
 		);
 	});
 
@@ -71,10 +73,7 @@ describe('load', () => {
 describe('actions', () => {
 	it('lets the completing side complete a partner task', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		const task = await createTestPartnershipTask(db, id, jun, {
-			title: 'Snack',
-			creditsAwarded: 2
-		});
+		const task = await createTestPartnershipTask(db, id, jun, { creditsAwarded: 2 });
 
 		const result = await run('completeTask', at(id, ada, { taskId: task.id }));
 		expect(result).toMatchObject({ message: 'Task completed.' });
@@ -85,7 +84,7 @@ describe('actions', () => {
 
 	it('blocks completing your own shared-control task', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
-		const task = await createTestPartnershipTask(db, id, ada, { title: 'Own task' });
+		const task = await createTestPartnershipTask(db, id, ada);
 
 		const result = await run('completeTask', at(id, ada, { taskId: task.id }));
 		expect(result.status).toBe(403);

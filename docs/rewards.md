@@ -25,8 +25,8 @@ Each user has:
 - A claim history showing what they redeemed and what it cost at the time.
 
 Claiming a self reward deducts credits and inserts a history row in the same
-`db.batch()`. The reward title, description and cost are copied onto the claim
-row so the history stays truthful if the reward is edited later.
+`db.batch()`. The reward's sealed content and its cost are copied onto the
+claim row so the history stays truthful if the reward is edited later.
 
 Inactive rewards stay visible for management but cannot be claimed.
 
@@ -85,7 +85,7 @@ Partnership reward credits are stored per `(partnership_id, user_id)`.
 - Claiming deducts from the claimant's balance and writes a claim history row
   in the same `db.batch()`.
 
-As with self rewards, claim rows snapshot the reward title, description and
+As with self rewards, claim rows snapshot the reward's sealed content and its
 cost so history does not rewrite when a reward changes later.
 
 ## Screens
@@ -117,6 +117,32 @@ The home rewards page's partner sections are intentionally claim-focused rather
 than a second management UI. Editing partnership rewards stays on the partner
 rewards screen, and creating rewards or reviewing claim history happens on the
 dedicated nested pages reached from buttons there.
+
+## What the server can see
+
+A reward's **title and description** are end-to-end encrypted, the same way
+as a task's ([docs/tasks.md](tasks.md#what-the-server-can-see) has the full
+account): one sealed record of kind `reward` (`src/lib/sealed-kinds/tasks.ts`)
+in the owner's vault for a self reward, or the partnership's vault for a
+partnership reward. The server sees what it acts on — the cost, whether the
+reward is active, who authored it, credits and claims — and checks only the
+sealed record's envelope and every permission.
+
+- **The form** (`RewardForm.svelte`, SvelteKit's `enhance` rather than
+  superforms, as it was before) seals the title and description on submit
+  and posts the sealed record in their place (`sealed-forms.ts`). The title
+  and description limits run in the browser and on every read.
+- **Edits are compare-and-swap** on `revision`, so a partner's newer edit is
+  never overwritten unseen.
+- **A claim** copies the reward's ciphertext as it stood (`snapshot_*`
+  columns). The copy still opens as a reward, sealed to the reward's id, so
+  either partner's claim can take the snapshot without reading it.
+- **Reading** goes through `openedReward` / `openedClaim` in
+  `src/lib/sealed-views.svelte.ts`.
+
+Rewards written before sealing keep `title` and `description` in plaintext
+until a device seals them in the background; see
+[docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext).
 
 ## Data model
 

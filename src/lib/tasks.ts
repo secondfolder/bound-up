@@ -1,15 +1,29 @@
 import { canEditPartnership, type PartnershipRecord, roleOf } from './partnership';
 import type { TaskSchedule } from './types';
 
-export type TaskInput = {
-	title: string;
-	description: string | null;
+/** What the server can see of a task: everything it schedules, credits and checks. */
+export type TaskSettings = {
 	active: boolean;
 	creditsAwarded: number;
-	completionMessages: string[];
 	schedule: TaskSchedule;
 	timezoneOwnerUserId: string;
 };
+
+/**
+ * The rest of a task — title, description and completion messages — sealed
+ * in the scope's vault (`taskKind` in `sealed-kinds/tasks.ts`). The server
+ * stores it and checks only its envelope; `completionMessageCount` is the
+ * one thing about the content it is told, so it can still pick a message at
+ * random on completion.
+ */
+export type SealedTaskContent = {
+	vaultId: string;
+	ciphertext: string;
+	payloadVersion: number;
+	completionMessageCount: number;
+};
+
+export type TaskInput = TaskSettings & { content: SealedTaskContent };
 
 export type PartnershipTaskRecord = Pick<
 	PartnershipRecord,

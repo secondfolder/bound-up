@@ -23,15 +23,18 @@ const at = (user: TestUser | null) => fakeEvent({ db, user, path: '/home/tasks/h
 describe('load', () => {
 	it('returns the self task completion history', async () => {
 		const task = await createTestSelfTask(db, ada, {
-			title: 'Nap',
 			creditsAwarded: 2,
-			completionMessages: ['Done']
+			completionMessageCount: 1
 		});
 		await completeSelfTask(db, ada.id, ada.timezone, task.id);
 
 		const data = await runLoad(load(at(ada)));
 		expect(data.selfTasks.completions).toContainEqual(
-			expect.objectContaining({ taskTitle: 'Nap', creditsAwarded: 2 })
+			expect.objectContaining({
+				creditsAwarded: 2,
+				sealed: expect.objectContaining({ recordId: task.id, ciphertext: task.ciphertext }),
+				completionMessageIndex: 0
+			})
 		);
 	});
 });

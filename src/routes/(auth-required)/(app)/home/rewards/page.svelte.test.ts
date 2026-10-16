@@ -23,6 +23,7 @@ function data(claimCount: number): PageData {
 				rewardTitle: 'Bath',
 				rewardDescription: null,
 				rewardCost: 2,
+				sealed: null,
 				createdAt: new Date()
 			}))
 		},

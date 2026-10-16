@@ -2,17 +2,29 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardForm from '$lib/components/RewardForm.svelte';
-	import type { ActionData, PageData } from './$types';
+	import { openedReward } from '$lib/sealed-views.svelte';
+	import type { PageData } from './$types';
 
-	let { data, form }: { data: PageData; form?: ActionData } = $props();
-	const values = $derived(
-		form?.values ?? {
-			title: data.reward.title,
-			description: data.reward.description ?? '',
-			cost: String(data.reward.cost),
-			active: data.reward.active
-		}
+	let { data }: { data: PageData } = $props();
+	const opened = $derived(openedReward(data.reward));
+	/**
+	 * The fields' starting values, taken once the reward is opened. Held rather
+	 * than derived for the reason `RewardForm` gives: its fields start from
+	 * these and are not held to them.
+	 */
+	let values = $state<{ title: string; description: string; cost: string; active: boolean } | null>(
+		null
 	);
+	$effect(() => {
+		if (values === null && opened) {
+			values = {
+				title: opened.title,
+				description: opened.description ?? '',
+				cost: String(data.reward.cost),
+				active: data.reward.active
+			};
+		}
+	});
 	const backHref = $derived(resolve('/(auth-required)/(app)/home/rewards'));
 </script>
 
@@ -26,8 +38,18 @@
 	/>
 
 	<div class="content">
-		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
-		<RewardForm {values} submitLabel="Save reward" />
+		{#if values}
+			<RewardForm
+				{values}
+				sealScope={{ kind: 'self' }}
+				reward={{ id: data.reward.id, revision: data.reward.revision }}
+				submitLabel="Save reward"
+			/>
+		{:else if opened === null}
+			<p class="quiet">This reward can't be shown on this device right now.</p>
+		{:else}
+			<p class="quiet">…</p>
+		{/if}
 	</div>
 </section>
 
@@ -47,7 +69,7 @@
 		gap: 1rem;
 	}
 
-	.invalid {
-		color: var(--wa-color-text-danger);
+	.quiet {
+		color: var(--wa-color-text-quiet);
 	}
 </style>

@@ -8,7 +8,14 @@
 	const items = $derived(
 		// Guides are shared content, not per-account and not per-partnership, so
 		// there is no scope to attribute a row to.
-		guides.guides.map((guide) => ({ id: guide.id, title: guide.title, note: null, context: null }))
+		guides.guides.map((guide) => ({
+			id: guide.id,
+			title: guide.title,
+			kind: 'guide' as const,
+			sealed: null,
+			note: null,
+			context: null
+		}))
 	);
 	const hidden = $derived(Math.max(0, guides.total - guides.guides.length));
 </script>

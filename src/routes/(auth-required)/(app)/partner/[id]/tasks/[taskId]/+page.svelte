@@ -1,32 +1,28 @@
 <script lang="ts">
-	import { zod4Client } from 'sveltekit-superforms/adapters';
-	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import TaskForm from '$lib/components/TaskForm.svelte';
-	import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
-	import { superForm } from '$lib/superform';
+	import SealedTaskEditor from '$lib/components/SealedTaskEditor.svelte';
+	import type { TaskContent } from '$lib/sealed-kinds/tasks';
+	import { openedTask } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const backHref = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/tasks', { id: data.partner.id })
 	);
-	// svelte-ignore state_referenced_locally
-	// Captures the load's initial task form on purpose: `superForm` owns the
-	// live state afterwards and failed submissions should stay populated.
-	const superform = superForm(data.taskForm, {
-		resetForm: false,
-		validators: zod4Client(taskEditorFormSchema),
-		async onUpdated({ form }) {
-			if (!form.valid) {
-				return;
-			}
-			await invalidateAll();
+	const opened = $derived(openedTask(data.task));
+	/**
+	 * The content as first opened, held so the editor is mounted once: a save
+	 * re-runs the load, and the new ciphertext reads as "still opening" for a
+	 * moment, which would otherwise unmount the form and lose its state.
+	 */
+	let content = $state<TaskContent | null | undefined>(undefined);
+	$effect(() => {
+		if (content === undefined && opened !== undefined) {
+			content = opened;
 		}
 	});
-	const { message } = superform;
 	const timeZoneContext = $derived(
 		page.data.user
 			? {
@@ -50,8 +46,19 @@
 	/>
 
 	<div class="content">
-		{#if $message}<p class="status">{$message}</p>{/if}
-		<TaskForm {superform} submitLabel="Save task" {timeZoneContext} />
+		{#if content === undefined}
+			<p class="quiet">…</p>
+		{:else if content === null}
+			<p class="quiet">This task can't be shown on this device right now.</p>
+		{:else}
+			<SealedTaskEditor
+				taskForm={data.taskForm}
+				sealScope={{ kind: 'partnership', partnershipId: data.partner.id }}
+				task={{ id: data.task.id, revision: data.task.revision, content }}
+				submitLabel="Save task"
+				{timeZoneContext}
+			/>
+		{/if}
 	</div>
 </section>
 
@@ -71,7 +78,7 @@
 		gap: 1rem;
 	}
 
-	.status {
-		color: var(--wa-color-text-success);
+	.quiet {
+		color: var(--wa-color-text-quiet);
 	}
 </style>
