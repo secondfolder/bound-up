@@ -300,10 +300,17 @@ would otherwise send every take of every passage on every visit.
 - **`‹ 2/3 ›`** under any turn with others beside it (`DaydreamSiblings`).
   Moving to one shows the branch through it where it was last left
   (`latestLeafUnder`), not its first turn.
-- **The branch map** (`DaydreamBranchMap.svelte`): an outline where a run of
-  turns reads as a line and forks are nested lists, the branch being read
-  and the bookmarks marked. Picking a turn moves to the branch through it;
-  **carry on from here** makes that turn the place to continue from.
+- **The branch map** (`DaydreamBranchMap.svelte`), drawn with the generic
+  [Tree](tree.md). Its trunk is the story's **longest path**: at each fork
+  the child with the most generations under it carries the line on, a tie
+  going to the child on the branch being read and then to the newest. Every
+  other way the story went grows off the turn it forked from, straight after
+  it, and is itself drawn along its own longest path. The branch being read
+  is filled in, the turn being read ringed, and bookmarks carry an icon.
+  Picking a turn moves to the branch through it; **carry on from here** makes
+  that turn the place to continue from. A side branch folds to its first
+  turn and a trunk turn folds the forks off it; the turn being read is never
+  folded away.
 - **Carry on from here** in a passage's menu, likewise.
 
 ## Moving the story on
@@ -637,7 +644,9 @@ Noted so they are not lost; none is in the code.
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts),
   `DaydreamSetupFormAdd.svelte.test.ts`,
   `DaydreamCharacterDialog.svelte.test.ts` (the two halves),
-  `DaydreamSceneDialog.svelte.test.ts` (the parts editor, heat and kink).
+  `DaydreamSceneDialog.svelte.test.ts` (the parts editor, heat and kink),
+  `DaydreamBranchMap.svelte.test.ts` (the longest-path trunk, jumping,
+  folding).
 - End to end: `e2e/daydreams.spec.ts` and `e2e/daydream-heat.spec.ts`,
   against `e2e/model-stub.mjs`, a stand-in OpenRouter that `e2e/server.mjs`
   starts beside the app.
