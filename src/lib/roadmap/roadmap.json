@@ -135,10 +135,38 @@
 				},
 				{
 					"id": "generated-roleplay",
-					"title": "Generated roleplay",
-					"summary": "Roleplay scenarios written for you, from your preferences.",
-					"status": "exploring",
-					"icon": "comments"
+					"title": "Daydreams",
+					"summary": "Play out a scene with a character you make up, who writes back as you go.",
+					"status": "in-progress",
+					"icon": "cloud-moon",
+					"notes": [
+						"Set up the character, the scenario, who leads and your limits",
+						"The scene opens on its own, then you take turns",
+						"A safeword stops the scene, always"
+					],
+					"children": [
+						{
+							"id": "daydreams-kink-list",
+							"title": "Daydreams from your kink list",
+							"summary": "Scenes that start from what you're into, and stay clear of your hard limits.",
+							"status": "planned",
+							"dependsOn": ["kink-list"]
+						},
+						{
+							"id": "daydreams-tasks-points",
+							"title": "Characters set tasks and give points",
+							"summary": "A character can set you tasks during a scene, and award points for them.",
+							"status": "exploring",
+							"dependsOn": ["self-partner-rewards"]
+						},
+						{
+							"id": "daydreams-partners",
+							"title": "Daydreams your partner can see or shape",
+							"summary": "Share a daydream with your partner, or let them set one up for you.",
+							"status": "exploring",
+							"dependsOn": ["partner-linking"]
+						}
+					]
 				},
 				{
 					"id": "hypnosis",

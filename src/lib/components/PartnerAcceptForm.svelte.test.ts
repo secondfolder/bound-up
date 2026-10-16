@@ -1,4 +1,5 @@
 import { describe, expect, it, test } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { type SuperValidated, superValidate } from 'sveltekit-superforms';
@@ -223,4 +224,32 @@ test('the form posts back to the invite URL it was served from', async () => {
 	// No `action`: the default action on the current URL is what carries the
 	// token, which lives in the path.
 	expect(form?.hasAttribute('action')).toBe(false);
+});
+
+/**
+ * A regression test. The partner schema once trimmed each field, and once the
+ * form is valid superforms writes the schema's parsed value back after each
+ * change, so every space was deleted a moment after it was typed: "Mistress
+ * Jane" came out "MistressJane". The same schema backs the new-partner and
+ * edit forms. It only shows with typing paced like a person's, hence the wait
+ * between keys; this form starts valid, with the inviter's names filled in.
+ */
+describe('typing a name', () => {
+	it.each(['partnerName', 'yourName', 'partnerRole', 'yourRole'])(
+		'keeps the spaces typed into %s',
+		async (name) => {
+			const { container } = render(PartnerAcceptForm, await props());
+			await waSettled(container);
+			const input = waInput(container, name).shadowRoot?.querySelector('input');
+			if (!input) {
+				throw new Error(`no input inside ${name}`);
+			}
+			await userEvent.clear(input);
+			for (const key of 'Mistress Jane') {
+				await userEvent.type(input, key === ' ' ? '{Space}' : key);
+				await new Promise((resolve) => setTimeout(resolve, 30));
+			}
+			expect(input.value).toBe('Mistress Jane');
+		}
+	);
 });

@@ -7,6 +7,8 @@ import {
 	bucketForAuthPath,
 	clientBucket,
 	consumeRateLimit,
+	DAYDREAM_REPLY_LIMITS,
+	daydreamRateLimiter,
 	emailRateLimiter,
 	onceEach,
 	pruneRateLimits,
@@ -103,6 +105,23 @@ describe('authRateLimiter', () => {
 		await expect(authRateLimiter(harness.db, SECRET, '203.0.113.8')('sign-in')).resolves.toEqual({
 			allowed: true
 		});
+	});
+});
+
+describe('daydreamRateLimiter', () => {
+	it("counts each account's replies on their own, and refuses past the burst limit", async () => {
+		const limit = daydreamRateLimiter(harness.db, SECRET);
+		const [burst] = DAYDREAM_REPLY_LIMITS;
+		for (let reply = 0; reply < burst.max; reply += 1) {
+			await expect(limit('ada')).resolves.toEqual({ allowed: true });
+		}
+		await expect(limit('ada')).resolves.toMatchObject({ allowed: false });
+		// Another account is untouched by Ada's spending.
+		await expect(limit('jun')).resolves.toEqual({ allowed: true });
+	});
+
+	it('keeps a day window as well as the burst one', () => {
+		expect(DAYDREAM_REPLY_LIMITS.some((entry) => entry.windowSeconds === 24 * 60 * 60)).toBe(true);
 	});
 });
 

@@ -25,8 +25,9 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, unlinkSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 
-const { E2E_PORT, E2E_RUN_DIR, E2E_MEDIA_DIR, E2E_LOCK_PATH, E2E_IMAGE } = process.env;
-if (!(E2E_PORT && E2E_RUN_DIR && E2E_MEDIA_DIR && E2E_LOCK_PATH)) {
+const { E2E_PORT, E2E_MODEL_PORT, E2E_RUN_DIR, E2E_MEDIA_DIR, E2E_LOCK_PATH, E2E_IMAGE } =
+	process.env;
+if (!(E2E_PORT && E2E_MODEL_PORT && E2E_RUN_DIR && E2E_MEDIA_DIR && E2E_LOCK_PATH)) {
 	console.error('e2e/server.mjs is started by playwright.config.ts, which sets its environment.');
 	process.exit(2);
 }
@@ -86,6 +87,16 @@ process.on('exit', () => lock.close());
 // there to inspect.
 rmSync(E2E_RUN_DIR, { recursive: true, force: true });
 mkdirSync(E2E_MEDIA_DIR, { recursive: true });
+
+// The stand-in model provider for the Daydreams specs (`e2e/model-stub.mjs`).
+// Inside the lock, like the database: its port is per checkout too. A
+// container reaches it through the host's gateway address rather than
+// loopback, so in image mode it listens on every interface.
+const modelStub = spawn('node', ['e2e/model-stub.mjs'], {
+	stdio: 'inherit',
+	env: { ...process.env, E2E_MODEL_HOST: E2E_IMAGE ? '0.0.0.0' : '127.0.0.1' }
+});
+process.on('exit', () => modelStub.kill());
 
 if (E2E_IMAGE) {
 	await serveImage(E2E_IMAGE);
@@ -147,6 +158,16 @@ async function serveImage(image) {
 			'VAPID_SUBJECT',
 			'--env',
 			'MAIL_FROM',
+			// Daydreams, against the stub on the host. `host-gateway` makes the
+			// name resolve on Linux as well, where Docker does not add it itself.
+			'--add-host',
+			'host.docker.internal:host-gateway',
+			'--env',
+			'OPENROUTER_API_KEY',
+			'--env',
+			'DAYDREAM_MODEL',
+			'--env',
+			`OPENROUTER_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/v1`,
 			// `E2E_CONTAINER_MAIL_DIR` in run-paths.ts, which `e2e/mail.ts` reads
 			// through `docker exec`; the host path in MAIL_OUTBOX_DIR means nothing
 			// inside the container.

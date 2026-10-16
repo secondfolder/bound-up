@@ -39,6 +39,11 @@ services:
       MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env, see the top of this file}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       SMTP_URL: ${SMTP_URL:-}
+      # Daydreams, from .env. Optional: left empty, the feature is off. An
+      # OpenRouter key, and optionally the model to use. Each reply costs
+      # money on that key. See docs/daydreams.md.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DAYDREAM_MODEL: ${DAYDREAM_MODEL:-}
     volumes:
       - bound-up-db:/data/db
       - bound-up-media:/data/media

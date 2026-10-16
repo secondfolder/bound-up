@@ -1,5 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import type { DaydreamTurnRole } from '../../../daydream';
 import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../../encryption';
 import type { FeatureKey, FeatureSource } from '../../../features';
 import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
@@ -1444,3 +1445,89 @@ export const iqTestResults = sqliteTable(
 
 export type IqTestResult = typeof iqTestResults.$inferSelect;
 export type NewIqTestResult = typeof iqTestResults.$inferInsert;
+
+/**
+ * A daydream: a roleplay with a made-up character, set up by its owner and
+ * written turn by turn with a language model. See docs/daydreams.md.
+ *
+ * Everything the user wrote is sealed in their own vault, and these columns
+ * are NOT NULL, unlike `sealedContent()`'s: there were never plaintext
+ * daydreams to carry. The id is chosen by the browser, because it is part of
+ * what the setup is sealed to.
+ */
+export const daydreams = sqliteTable(
+	'daydreams',
+	{
+		id: text('id').primaryKey(),
+		ownerId: text('owner_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		/** The setup: title, character, scenario, limits. */
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		/** Bumped by every write, so an edit is compare-and-swap. */
+		revision: integer('revision').notNull().default(0),
+		/** What the list sorts by: the newest conversation first. Null before the opening. */
+		lastTurnAt: integer('last_turn_at', { mode: 'timestamp_ms' }),
+		...timestamps
+	},
+	(table) => [
+		// The list and the /home card: "this user's, most recently played first".
+		index('daydreams_owner_last_turn_idx').on(table.ownerId, table.lastTurnAt)
+	]
+);
+
+/**
+ * One turn of a daydream: something the user said, or the character's reply.
+ *
+ * `role` is the one plaintext fact about a turn, because the server acts on
+ * it: only the newest character turn may be replaced (a retried reply).
+ * `position` orders the conversation and is unique per daydream, so two
+ * devices appending at once cannot both take the same place.
+ */
+export const daydreamTurns = sqliteTable(
+	'daydream_turns',
+	{
+		id: text('id').primaryKey(),
+		daydreamId: text('daydream_id')
+			.notNull()
+			.references(() => daydreams.id, { onDelete: 'cascade' }),
+		role: text('role').$type<DaydreamTurnRole>().notNull(),
+		position: integer('position').notNull(),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		revision: integer('revision').notNull().default(0),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('daydream_turns_daydream_position_idx').on(table.daydreamId, table.position)
+	]
+);
+
+/**
+ * A user's Daydreams settings. For now only whether they have been told, and
+ * accepted, that what they write in a daydream goes to a model provider.
+ *
+ * A table of its own rather than a column on `user`, whose schema file is
+ * generated (`schema/auth.ts`).
+ */
+export const daydreamPreferences = sqliteTable('daydream_preferences', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	disclosureAcceptedAt: integer('disclosure_accepted_at', { mode: 'timestamp_ms' }),
+	...timestamps
+});
+
+export type Daydream = typeof daydreams.$inferSelect;
+export type NewDaydream = typeof daydreams.$inferInsert;
+export type DaydreamTurn = typeof daydreamTurns.$inferSelect;
+export type NewDaydreamTurn = typeof daydreamTurns.$inferInsert;
+export type DaydreamPreferences = typeof daydreamPreferences.$inferSelect;
+export type NewDaydreamPreferences = typeof daydreamPreferences.$inferInsert;

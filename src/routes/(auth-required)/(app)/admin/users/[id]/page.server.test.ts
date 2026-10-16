@@ -47,6 +47,7 @@ describe('load', () => {
 				name: 'Higher quality uploads',
 				held: null
 			}),
+			expect.objectContaining({ key: 'daydreams', name: 'Daydreams', held: null }),
 			expect.objectContaining({
 				key: 'iqTestAnswerButton',
 				name: 'IQ test answer button',

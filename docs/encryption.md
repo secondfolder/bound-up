@@ -11,7 +11,8 @@ are described below. Messages, message tags' names and the partnership's own nam
 their partnership's vault;
 tasks, rewards, and their completions and claims in the owner's or the
 partnership's vault ([docs/tasks.md](tasks.md#what-the-server-can-see),
-[docs/rewards.md](rewards.md#what-the-server-can-see)). Moving the remaining
+[docs/rewards.md](rewards.md#what-the-server-can-see)); a daydream's setup and
+every turn of it in the owner's own vault ([docs/daydreams.md](daydreams.md)). Moving the remaining
 kinds of user data onto vaults is in progress, and until a kind has moved, it
 is stored as it was.
 
@@ -25,6 +26,15 @@ on thread open. The server still does not store message plaintext, but it can
 transiently receive those URLs because some providers do not expose a
 browser-callable metadata API, and those lookups are not logged. The full
 behaviour lives in [docs/embeds.md](embeds.md).
+
+A third, wider exception is Daydreams. Their replies are written by a hosted
+language model, so while a daydream is being played the browser sends its
+setup and recent turns as plaintext to `/api/daydreams/[id]/reply`, which
+forwards them to OpenRouter and a model provider. The server neither stores
+nor logs them, and what is saved is sealed like everything else, but the words
+do leave the device in the clear, and the user accepts that before their first
+daydream. [docs/daydreams.md](daydreams.md#what-the-server-sees) states the
+boundary exactly.
 
 ## What this does and does not promise
 

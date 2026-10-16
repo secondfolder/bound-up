@@ -5,6 +5,7 @@ import { guides, iqTestResults } from '$lib/server/db/schema';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
+	createTestDaydream,
 	createTestPartnership,
 	createTestPartnershipReward,
 	createTestPartnershipTask,
@@ -132,6 +133,23 @@ describe('load', () => {
 		]);
 	});
 
+	describe('the daydreams card', () => {
+		it('is absent for an account without the daydreams feature', async () => {
+			await createTestDaydream(db, ada.id);
+			expect((await runLoad(load(at(ada)))).daydreams).toBeNull();
+		});
+
+		it("previews the account's own daydreams, and counts them all", async () => {
+			for (let index = 0; index < 4; index += 1) {
+				await createTestDaydream(db, ada.id);
+			}
+			await createTestDaydream(db, jun.id);
+			const data = await runLoad(load(at(ada, [], ['daydreams'])));
+			expect(data.daydreams?.daydreams).toHaveLength(3);
+			expect(data.daydreams?.total).toBe(4);
+		});
+	});
+
 	describe('the guides card', () => {
 		beforeEach(async () => {
 			// Explicit times: the card's order is createdAt then id, and ids are
@@ -167,6 +185,7 @@ describe('load', () => {
 		expect(data).toEqual({
 			unread: [],
 			guides: null,
+			daydreams: null,
 			tasks: { viewerActs: true, ready: [], readyCount: 0, waitingCount: 0, activeCount: 0 },
 			rewards: {
 				viewerActs: true,

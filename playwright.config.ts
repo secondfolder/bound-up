@@ -5,6 +5,7 @@ import {
 	E2E_LOCK_PATH,
 	E2E_MAIL_DIR,
 	E2E_MEDIA_DIR,
+	E2E_MODEL_PORT,
 	E2E_PORT,
 	E2E_RUN_DIR
 } from './e2e/run-paths';
@@ -66,6 +67,7 @@ export default defineConfig({
 		gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
 		env: {
 			E2E_PORT: String(E2E_PORT),
+			E2E_MODEL_PORT: String(E2E_MODEL_PORT),
 			E2E_RUN_DIR,
 			E2E_MEDIA_DIR,
 			E2E_LOCK_PATH,
@@ -94,6 +96,13 @@ export default defineConfig({
 				'BKTAQZYEZVpAT8IakACU85Y4RXzpvWbqsTI6lvLuAr_1wPRiV6EftpzbBa7NuMdxbSk87DJWSMmDjlPxSd4Etf0',
 			VAPID_PRIVATE_KEY: 'QX3e-wqGMS2973OcACY5PsLlFsMLbwj1rZE1x5NsHSI',
 			VAPID_SUBJECT: 'mailto:e2e@example.test',
+			// Daydreams, against the stand-in provider `e2e/server.mjs` starts
+			// (`e2e/model-stub.mjs`), which checks for exactly this key. Set here so
+			// a real key in a developer's .env is never used — or billed — by a
+			// run. The image is pointed at the stub through the Docker host instead.
+			OPENROUTER_API_KEY: 'e2e-openrouter-key',
+			OPENROUTER_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/v1`,
+			DAYDREAM_MODEL: 'e2e/stub',
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.
 			VITE_DEV_ORIGIN: E2E_BASE_URL,

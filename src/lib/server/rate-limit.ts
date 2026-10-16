@@ -243,6 +243,32 @@ export function authRateLimiter(db: Db, secret: string, clientAddress: string): 
 	return (bucket) => consumeRateLimit(db, secret, `${bucket}|${client}`, AUTH_RATE_LIMITS[bucket]);
 }
 
+/**
+ * Replies a Daydreams account can ask for: a burst limit, and a day's worth.
+ *
+ * Unlike the limits above this one is about cost rather than guessing — every
+ * reply is a paid call to a model provider — so it is counted per account,
+ * not per address, and it is on everywhere, `vite dev` and
+ * `AUTH_RATE_LIMIT=off` included. A real scene is a reply every half minute or
+ * so; twenty a minute is a script, and three hundred a day is a long evening.
+ */
+export const DAYDREAM_REPLY_LIMITS = [
+	{ max: 20, windowSeconds: 60 },
+	{ max: 300, windowSeconds: 24 * 60 * 60 }
+] as const satisfies readonly RateLimitRule[];
+
+/** What `locals.daydreamRateLimit` is: one reply, for this account. */
+export type DaydreamRateLimiter = (userId: string) => Promise<RateLimitResult>;
+
+/** Builds `locals.daydreamRateLimit`. */
+export function daydreamRateLimiter(db: Db, secret: string): DaydreamRateLimiter {
+	return (userId) =>
+		consumeRateLimit(db, secret, `daydream-reply|user|${userId}`, DAYDREAM_REPLY_LIMITS);
+}
+
+/** For tests of everything but the limit. */
+export const unlimitedDaydreams: DaydreamRateLimiter = () => Promise.resolve({ allowed: true });
+
 /** The message a form shows when refused. Says how long, and nothing about why. */
 export function rateLimitMessage(retryAfterSeconds: number): string {
 	const minutes = Math.ceil(retryAfterSeconds / 60);
@@ -256,7 +282,8 @@ export function rateLimitMessage(retryAfterSeconds: number): string {
 /**
  * Deletes counters whose window has closed. Run with the media sweep —
  * `scheduled.ts` on Workers, `self-hosted/sweep.ts` in the Docker image — so
- * the table holds only the last hour's clients.
+ * the table holds only counters still inside their window: the last hour's
+ * clients, and the last day's Daydreams replies.
  */
 export async function pruneRateLimits(db: Db, now: Date = new Date()): Promise<number> {
 	const deleted = await db

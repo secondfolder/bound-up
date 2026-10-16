@@ -1,3 +1,4 @@
+import type { DaydreamTurnRole } from './daydream';
 import type { KeyWrapParams, KeyWrapType } from './encryption';
 import type { ThreadIcon } from './messaging';
 import type { PartnerNamesSource } from './partnership';
@@ -524,7 +525,7 @@ export type WidgetItemView = {
 	 */
 	title: string;
 	/** Which kind `sealed` opens as. A guide is never sealed: guides are the app's, not a user's. */
-	kind: 'task' | 'reward' | 'guide';
+	kind: 'task' | 'reward' | 'guide' | 'daydream';
 	sealed: SealedRefView | null;
 	/** A credit award, a cost — rendered as a pill, or omitted when null. */
 	note: string | null;
@@ -592,6 +593,37 @@ export type RewardsWidgetView = {
 export type GuidesWidgetView = {
 	guides: GuideView[];
 	total: number;
+};
+
+/** A daydream as the list shows it: its sealed setup (for the title) and when it was last played. */
+export type DaydreamListItemView = {
+	id: string;
+	setup: SealedRefView;
+	lastTurnAt: Date | null;
+	createdAt: Date;
+};
+
+/** What the /home Daydreams card previews: the most recently played, and how many there are. */
+export type DaydreamsWidgetView = {
+	daydreams: DaydreamListItemView[];
+	total: number;
+};
+
+/** One turn of a daydream. Its text is sealed; who wrote it is not. */
+export type DaydreamTurnView = {
+	id: string;
+	role: DaydreamTurnRole;
+	position: number;
+	revision: number;
+	sealed: SealedRefView;
+};
+
+/** A daydream as its own page shows it: the setup and the whole conversation, oldest first. */
+export type DaydreamView = {
+	id: string;
+	revision: number;
+	setup: SealedRefView;
+	turns: DaydreamTurnView[];
 };
 
 /**

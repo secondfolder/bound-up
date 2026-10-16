@@ -225,6 +225,13 @@
       "when": 1792132323009,
       "tag": "0031_add_sealed_partnership_names",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1792143811452,
+      "tag": "0032_add_daydreams",
+      "breakpoints": true
     }
   ]
 }

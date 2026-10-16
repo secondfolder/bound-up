@@ -2,8 +2,10 @@ import type { Db } from '../server/db';
 import type { Mailer } from '../server/mail';
 import {
 	type AuthRateLimiter,
+	type DaydreamRateLimiter,
 	type EmailRateLimiter,
 	unlimited,
+	unlimitedDaydreams,
 	unlimitedEmail
 } from '../server/rate-limit';
 import type { TestUser } from './fixtures';
@@ -75,6 +77,13 @@ export type FakeEventOptions = {
 	authRateLimit?: AuthRateLimiter;
 	/** `locals.emailRateLimit`, likewise present and allowing everything by default. */
 	emailRateLimit?: EmailRateLimiter;
+	/** `locals.daydreamRateLimit`, likewise present and allowing everything by default. */
+	daydreamRateLimit?: DaydreamRateLimiter;
+	/**
+	 * The method of a `json` request. POST unless given: most `+server.ts`
+	 * routes are POSTs, and a test of a PUT or PATCH says so.
+	 */
+	method?: string;
 	/**
 	 * The request's cookies, by name, for a route that uses `event.cookies`.
 	 * Absent unless given, and reaching for it then fails loudly. `get` reads
@@ -115,7 +124,7 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 	let request: Request;
 	if ('json' in options) {
 		request = new Request(url, {
-			method: 'POST',
+			method: options.method ?? 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: options.json === undefined ? 'not json' : JSON.stringify(options.json)
 		});
@@ -133,7 +142,8 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 		user: options.user ?? null,
 		session: null,
 		authRateLimit: options.authRateLimit ?? unlimited,
-		emailRateLimit: options.emailRateLimit ?? unlimitedEmail
+		emailRateLimit: options.emailRateLimit ?? unlimitedEmail,
+		daydreamRateLimit: options.daydreamRateLimit ?? unlimitedDaydreams
 	};
 	if (options.db) {
 		locals.db = options.db;

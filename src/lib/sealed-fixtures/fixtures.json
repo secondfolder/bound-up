@@ -107,6 +107,31 @@
 				"inviteeRole": "sub",
 				"inviterRecipient": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
 			}
+		},
+		{
+			"kind": "daydream-setup",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000d1",
+			"ciphertext": "sb1.NlqqbuwnU9r0s4SE1MTAMmwKC9PFsjZHYL137gwUOED9Vd1D1QwCerDKc6FNcvTWhL6SeDIpQOO5dR-X3C-oCNy7DZAyPo8d1_KFNYVjb9r1MA02eD74LMrU9-tn-fV3P7h66uu0MxX33QNoGMgTLzMcMhuQM0EDA0GmnVkM_QeJqPZ9FkQeweTZkoO45tZ2mYtG9yx2YdygGIAiPGTdnJYJi5k0TErYGkrysglPlQ6yMWXI41g2Ku6dZvA9nvaOlmLCNJ3y7ha1Yv_lFIOxQ790xCwiVorgwpb6F9OoyzcEeILgLJnmUkhiBdz4H31RqnkK124",
+			"expected": {
+				"title": "Frozen evening",
+				"characterName": "Mara",
+				"persona": "Calm, exacting, amused.",
+				"lead": "character",
+				"scenario": "A late meeting that runs over.",
+				"tone": "slow-burn",
+				"limits": "Nothing public.",
+				"safeword": "pineapple"
+			}
+		},
+		{
+			"kind": "daydream-turn",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000d2",
+			"ciphertext": "sb1.kofN1Q2NWHr5q_1uvaoFW0NVdneTBrL1iL-GMiYFIkL0rwpMT0nklZ7EvLq8FRskwAyQfHk9A7s9YuuTAlZa",
+			"expected": {
+				"text": "Frozen.\n\nStill frozen."
+			}
 		}
 	]
 }

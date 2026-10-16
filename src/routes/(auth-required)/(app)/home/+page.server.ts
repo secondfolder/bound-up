@@ -1,21 +1,26 @@
 import { hasFeature } from '$lib/features';
+import { getDaydreamsWidget } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
 import { guides } from '$lib/server/db/schema';
 import { latestIqTestResult } from '$lib/server/iq-test';
 import { listUnreadCounts } from '$lib/server/messaging';
 import { getHomeRewardsWidget } from '$lib/server/rewards';
 import { getHomeTasksWidget } from '$lib/server/tasks';
-import type { GuidesWidgetView, IqTestResultView } from '$lib/types';
+import type { DaydreamsWidgetView, GuidesWidgetView, IqTestResultView } from '$lib/types';
 import type { PageServerLoad } from './$types';
 
 /** Rows the guides card previews before it falls back to "and N more". */
 const GUIDES_PREVIEW_LIMIT = 3;
+
+/** Likewise for the Daydreams card. */
+const DAYDREAMS_PREVIEW_LIMIT = 3;
 
 /** Every card in its empty state, for the session-less degrade path below. */
 function emptyPage() {
 	return {
 		unread: [],
 		guides: null as GuidesWidgetView | null,
+		daydreams: null as DaydreamsWidgetView | null,
 		tasks: { viewerActs: true, ready: [], readyCount: 0, waitingCount: 0, activeCount: 0 },
 		rewards: {
 			viewerActs: true,
@@ -47,12 +52,16 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	depends('tasks:home');
 	depends('rewards:home');
 
-	const [unread, guidesCard, tasks, rewards, latestIq] = await Promise.all([
+	const [unread, guidesCard, daydreamsCard, tasks, rewards, latestIq] = await Promise.all([
 		listUnreadCounts(locals.db, locals.user.id, partners),
 		// Only for an account that holds guides: D1 charges for rows read by a
 		// card nobody sees. This decides what is shown, which is all the layout's
 		// `features` may be used for; /home/guides checks for itself.
 		hasFeature(features, 'guides') ? loadGuidesCard(locals.db) : null,
+		// The same for Daydreams; /daydreams checks for itself.
+		hasFeature(features, 'daydreams')
+			? getDaydreamsWidget(locals.db, locals.user.id, DAYDREAMS_PREVIEW_LIMIT)
+			: null,
 		// Both take the layout's partner list: the cards mirror /home/tasks and
 		// /home/rewards, which show your own things AND each partner's.
 		getHomeTasksWidget(locals.db, locals.user.id, partners),
@@ -64,6 +73,7 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	return {
 		unread,
 		guides: guidesCard,
+		daydreams: daydreamsCard,
 		tasks,
 		rewards,
 		latestIq

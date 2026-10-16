@@ -657,6 +657,8 @@ the message is sent or its text deleted. The code is `src/lib/messaging/drafts.t
 - **One draft per composer.** Each thread's reply box has its own
   (`thread:<threadId>`), and so does each partnership's "Write something"
   dialog (`new-thread:<partnershipId>`). Writing in one never touches another.
+  Daydreams' composer keeps its drafts the same way, under
+  `daydream:<daydreamId>` ([docs/daydreams.md](daydreams.md)).
 - **Encrypted to the writer alone.** A draft is an age file encrypted to the
   account's own recipient (`DraftPayload` in `src/lib/crypto/messages.ts`).
   Writing it needs only the public key; reading it needs the identity, which

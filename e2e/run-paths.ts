@@ -26,6 +26,12 @@ const KEY = createHash('sha1').update(process.cwd()).digest().readUInt16BE(0) % 
 
 export const E2E_PORT = 20_000 + KEY;
 export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
+/**
+ * The stand-in model provider the Daydreams specs talk to (`e2e/model-stub.mjs`).
+ * Half the range away from `E2E_PORT`, so it stays in the same 20000–39999
+ * band and away from this checkout's own server.
+ */
+export const E2E_MODEL_PORT = 20_000 + ((KEY + 10_000) % 20_000);
 export const E2E_RUN_DIR = join(tmpdir(), `bound-up-e2e-${KEY}`);
 export const E2E_MEDIA_DIR = join(E2E_RUN_DIR, 'media');
 /**

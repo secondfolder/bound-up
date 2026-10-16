@@ -8,7 +8,11 @@ import type { Mailer } from '$lib/server/mail';
 import type { MediaBucket } from '$lib/server/media';
 import type { PornRelayNamespace } from '$lib/server/porn-relay/binding';
 import type { TunnelService } from '$lib/server/porn-relay/tunnel';
-import type { AuthRateLimiter, EmailRateLimiter } from '$lib/server/rate-limit';
+import type {
+	AuthRateLimiter,
+	DaydreamRateLimiter,
+	EmailRateLimiter
+} from '$lib/server/rate-limit';
 import type { RealtimeNamespace } from '$lib/server/realtime/binding';
 
 declare global {
@@ -52,6 +56,12 @@ declare global {
 			 * once per request (`onceEach`). See `$lib/server/rate-limit`.
 			 */
 			emailRateLimit: EmailRateLimiter;
+			/**
+			 * One Daydreams reply for an account, against
+			 * `DAYDREAM_REPLY_LIMITS`. On everywhere, because it limits what
+			 * the server spends on a model provider. See `$lib/server/rate-limit`.
+			 */
+			daydreamRateLimit: DaydreamRateLimiter;
 			/**
 			 * This server's mailer, built on its first send (`lazyMailer` in
 			 * hooks.server.ts). Send through `sendInBackground` so no response
@@ -118,6 +128,14 @@ declare global {
 				RESEND_API_KEY?: string;
 				SMTP_URL?: string;
 				MAIL_OUTBOX_DIR?: string;
+				/**
+				 * Daydreams. Without the key the feature is off on this server
+				 * rather than an error; the other two have defaults. See
+				 * `$lib/server/daydream/config` and docs/daydreams.md.
+				 */
+				OPENROUTER_API_KEY?: string;
+				DAYDREAM_MODEL?: string;
+				OPENROUTER_BASE_URL?: string;
 			};
 			/**
 			 * Optional because the self-hosted and dev servers have no platform

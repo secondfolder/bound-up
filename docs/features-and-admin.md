@@ -123,6 +123,20 @@ and every file compresses to SD. The server budget is what backs that up.
 Like every feature, it belongs to the account that holds it. A partner with
 the feature does not raise the other side's budget.
 
+### Daydreams
+
+`daydreams` turns on Daydreams: roleplay with a made-up character whose
+replies are written by a hosted language model (see
+[daydreams.md](daydreams.md)). Every load, action and endpoint under
+`/daydreams` and `/api/daydreams` calls `requireFeature` itself, and the
+`/home` load reads the Daydreams card only for an account that holds it.
+
+It is a grant rather than on for everyone for two reasons that are not about
+testing: every reply is paid for on the server's OpenRouter key, and using it
+sends what the user writes to a model provider, which nothing else in the app
+does. A server with no `OPENROUTER_API_KEY` has no Daydreams whatever is
+granted; the pages say so.
+
 ### IQ test answer button
 
 A testing aid for the Playroom's IQ test (see

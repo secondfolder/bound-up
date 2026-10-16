@@ -9,8 +9,9 @@ strength, only how often someone is trying one.
 Asking for another email-verification link is limited too, per client and
 per address, because each one is an email sent to an address the caller
 chose. Partner-assisted recovery has limits of its own, per email and per
-address, described in [account-recovery.md](account-recovery.md). Nothing
-else is limited.
+address, described in [account-recovery.md](account-recovery.md). Daydreams'
+replies are limited per account, for cost rather than guessing (see
+[below](#daydreams-replies)). Nothing else is limited.
 
 ## Why the app does it, not Better Auth
 
@@ -100,7 +101,8 @@ Better Auth has a rate limiter, and it is switched off (`rateLimit` in
   Nothing else about the client is kept.
 - **Pruning.** Rows whose window has closed are deleted by the scheduled sweep:
   `scheduled.ts` on Workers, `self-hosted/sweep.ts` in the Docker image. The
-  table holds about an hour of clients at most.
+  table holds about an hour of clients at most, and a day of Daydreams
+  counters.
 
 ## Where it is off
 
@@ -111,6 +113,22 @@ Better Auth has a rate limiter, and it is switched off (`rateLimit` in
   for the same reason as dev; an operator limiting at their own proxy may too.
   `scripts/docker-smoke.sh` checks the limit against the image instead: five
   wrong sign-ins are refused as wrong, and the sixth as too many.
+
+## Daydreams replies
+
+Every Daydreams reply is a paid call to a model provider, on the server's
+OpenRouter key, so `/api/daydreams/[id]/reply` counts them per **account**
+(`DAYDREAM_REPLY_LIMITS`, through `locals.daydreamRateLimit`): 20 a minute and
+300 a day. The same table and the same upsert as the auth buckets, under a
+scope of its own (`daydream-reply|user|<id>`).
+
+Unlike the auth limits it is on everywhere, `vite dev` and
+`AUTH_RATE_LIMIT=off` included. Those exist because many accounts share one
+address in dev and in the e2e suite; this counts accounts, which that does not
+affect, and an unlimited dev server would still be spending real money. A
+refused reply answers 429 with `Retry-After` and the usual "Try again in …"
+wording, which the page shows beside the conversation. A malformed request is
+refused before it is counted. See [daydreams.md](daydreams.md#cost).
 
 ## Self-hosted: the client's address
 

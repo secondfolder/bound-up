@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import DaydreamsWidget from '$lib/components/DaydreamsWidget.svelte';
 	import GuidesWidget from '$lib/components/GuidesWidget.svelte';
 	import PlayroomWidget from '$lib/components/PlayroomWidget.svelte';
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
@@ -25,6 +26,13 @@
 		     null otherwise, and /home/guides would refuse them anyway. -->
 		{#if data.guides}
 			<GuidesWidget guides={data.guides} href={resolve('/(auth-required)/(app)/home/guides')} />
+		{/if}
+		<!-- Likewise only for an account that holds the daydreams feature. -->
+		{#if data.daydreams}
+			<DaydreamsWidget
+				daydreams={data.daydreams}
+				href={resolve('/(auth-required)/(app)/daydreams')}
+			/>
 		{/if}
 		<TasksWidget tasks={data.tasks} href={resolve('/(auth-required)/(app)/home/tasks')} />
 		<RewardsWidget rewards={data.rewards} href={resolve('/(auth-required)/(app)/home/rewards')} />

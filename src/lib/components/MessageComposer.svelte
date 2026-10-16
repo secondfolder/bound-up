@@ -40,7 +40,8 @@
 		initialText = '',
 		onTextChange,
 		permanentMedia = false,
-		highQualityMedia = false
+		highQualityMedia = false,
+		allowAttachments = true
 	}: {
 		send: (message: ComposedMessage) => Promise<string | null>;
 		placeholder?: string;
@@ -67,6 +68,11 @@
 		 * account without the feature to the SD byte budget regardless.
 		 */
 		highQualityMedia?: boolean;
+		/**
+		 * Whether the attach button is there at all. A daydream has no use for
+		 * files: its turns are text the model reads.
+		 */
+		allowAttachments?: boolean;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -236,7 +242,7 @@
 
 <div class="composer">
 	{#if problem}
-		<wa-callout variant="danger" size="small">{problem}</wa-callout>
+		<wa-callout variant="danger" size="s">{problem}</wa-callout>
 	{/if}
 
 	{#if attachments.length > 0}
@@ -346,7 +352,7 @@
 			No autofocus, deliberately: the composer appears on a tap, so the user is
 			already looking at it.
 		-->
-		<div class="field">
+		<div class="field" class:no-attach={!allowAttachments}>
 			<RichTextEditor
 				bind:this={editor}
 				value={initialText}
@@ -358,16 +364,18 @@
 				editorClass="composer-input"
 			/>
 
-			<label class="attach" aria-label="Attach a photo or video">
-				<wa-icon name="image" variant="solid"></wa-icon>
-				<input
-					bind:this={fileInput}
-					type="file"
-					accept="image/*, video/*"
-					multiple
-					onchange={onPick}
-				/>
-			</label>
+			{#if allowAttachments}
+				<label class="attach" aria-label="Attach a photo or video">
+					<wa-icon name="image" variant="solid"></wa-icon>
+					<input
+						bind:this={fileInput}
+						type="file"
+						accept="image/*, video/*"
+						multiple
+						onchange={onPick}
+					/>
+				</label>
+			{/if}
 		</div>
 
 		<!-- disabled={...}, never `... || undefined` — invariant 11. -->
@@ -412,6 +420,11 @@
 			border: 1px solid var(--wa-color-surface-border);
 			border-radius: 1rem;
 			background: var(--wa-color-surface-lowered, transparent);
+		}
+
+		/* No button inside the box, so no room kept for one. */
+		&.no-attach :global(.composer-input) {
+			padding-inline-end: 0.75rem;
 		}
 
 		:global(.composer-input:focus-within) {

@@ -43,6 +43,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
 | `src/lib/media/`              | Browser-only media transcoding. See [docs/messaging.md](docs/messaging.md#transcoding)       |
+| `src/lib/daydream/`           | Daydreams' browser half: the reply stream, context trimming, the calls. See [docs/daydreams.md](docs/daydreams.md) |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `src/lib/server/mail/`        | The mailer: Resend, SMTP or an outbox, and every email's copy. See [docs/email.md](docs/email.md) |
 | `src/lib/server/self-hosted/` | What only the Docker build runs: the media sweep. See [docs/self-hosting.md](docs/self-hosting.md) |
@@ -926,6 +927,7 @@ Four places, split on scope:
 | [docs/versions-and-updates.md](docs/versions-and-updates.md)                             | The build's version from git history, and how an open app picks up a deploy  |
 | [docs/playroom.md](docs/playroom.md)                                                     | The Playroom, the standalone shell, and the IQ test: rigging, questions, media |
 | [docs/email.md](docs/email.md)                                                           | Email verification, the mailer and its transports, what an email may say     |
+| [docs/daydreams.md](docs/daydreams.md)                                                   | Roleplay with a generated character: the flow, what the server sees, cost    |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

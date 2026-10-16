@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { partnershipNamesKind } from '$lib/sealed-kinds/partnerships';
 import { partnerInviteFormSchema } from './partnerForm';
 
 const valid = {
@@ -14,9 +15,18 @@ describe('partnerInviteFormSchema', () => {
 		expect(partnerInviteFormSchema.parse(valid)).toEqual(valid);
 	});
 
-	it('trims the names', () => {
-		const parsed = partnerInviteFormSchema.parse({ ...valid, partnerName: '  Ada  ' });
-		expect(parsed.partnerName).toBe('Ada');
+	it('leaves names as typed, for the sealed kind to trim', () => {
+		// Trimming in the form schema deleted each space as it was typed, because
+		// superforms writes the parsed value back into the form (see the schema).
+		const parsed = partnerInviteFormSchema.parse({ ...valid, partnerName: 'Mistress ' });
+		expect(parsed.partnerName).toBe('Mistress ');
+		const sealed = partnershipNamesKind.latest.parse({
+			inviterName: '  Ada  ',
+			inviteeName: 'Jun',
+			inviterRole: ' trainer ',
+			inviteeRole: null
+		});
+		expect(sealed).toMatchObject({ inviterName: 'Ada', inviterRole: 'trainer' });
 	});
 
 	it('rejects a name that is only whitespace', () => {

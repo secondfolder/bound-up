@@ -64,6 +64,8 @@ media. The first account to sign up becomes the admin, as on Workers (see
 | `MAIL_FROM`          | none — the server exits     | The sender of every email, e.g. `Bound Up <hi@example.com>`    |
 | `RESEND_API_KEY`     | none                        | Send through Resend. Exactly one of this and `SMTP_URL`        |
 | `SMTP_URL`           | none                        | Send through an SMTP server: `smtps://user:pass@host:465`      |
+| `OPENROUTER_API_KEY` | none — Daydreams are off    | Daydreams' replies. Each one is paid for on this key           |
+| `DAYDREAM_MODEL`     | an adult-fiction model      | The OpenRouter model id that writes Daydreams' replies         |
 
 `/data/db` and `/data/media` are the two volumes. Back up both together: a
 database row without its file shows as missing media, and a file without its

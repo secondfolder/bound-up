@@ -23,6 +23,11 @@ export const FEATURES = {
 		description:
 			'Send photos and videos at high or original quality, rather than always compressed to low.'
 	},
+	daydreams: {
+		name: 'Daydreams',
+		description:
+			'Roleplay with a made-up character, whose replies are written by a hosted language model.'
+	},
 	iqTestAnswerButton: {
 		name: 'IQ test answer button',
 		description:

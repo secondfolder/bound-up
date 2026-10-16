@@ -19,6 +19,10 @@ VAPID_SUBJECT=""
 MAIL_FROM=""
 RESEND_API_KEY=""
 
+# Daydreams (docs/daydreams.md). Optional: without a key the feature is off.
+OPENROUTER_API_KEY=""
+DAYDREAM_MODEL=""
+
 # Sets the Cloudflare tunnel to use for `npm run preview`.
 CF_TUNNEL_NAME=""
 # If true the Cloudflare will be used automatically when runnning `npm run preview`.

@@ -13,21 +13,28 @@ import { isClientId } from '$lib/vault';
 /** "Who's in control?" is always asked from the answerer's own side. */
 export const controlAnswerSchema = z.enum(['me', 'them', 'mix']);
 
+/*
+ * No `.trim()` in these, deliberately. superforms' client-side validation
+ * writes the schema's *parsed* value back into the form after each change once
+ * the form is valid, so a trim here deleted every space the moment it was
+ * typed: "Mistress Jane" could only be entered as "MistressJane". The sealed
+ * kinds (`sealed-kinds/partnerships.ts`) trim instead, as the names are
+ * sealed, which is the only place they are stored; these only check.
+ */
 const nameSchema = z
 	.string()
-	.trim()
-	.min(1, 'Please enter a name')
 	// Nav tabs and avatars render this; unbounded input would break the layout
 	// long before it broke the database.
-	.max(60, 'Please keep this to 60 characters or fewer');
+	.max(60, 'Please keep this to 60 characters or fewer')
+	.refine((value) => value.trim() !== '', 'Please enter a name');
 
 const roleSchema = z
 	.string()
-	.trim()
 	.max(40, 'Please keep this to 40 characters or fewer')
 	// An empty box means "no role", not an empty string — normalising here
-	// keeps the column NULL rather than '' for the same intent.
-	.transform((value) => (value === '' ? null : value))
+	// keeps the column NULL rather than '' for the same intent. A box of only
+	// spaces is empty too: the sealed kind would trim it to '' and refuse it.
+	.transform((value) => (value.trim() === '' ? null : value))
 	.nullable()
 	.default(null);
 

@@ -19,6 +19,12 @@
 import { vaultById } from './crypto/vaults.svelte';
 import type { SealedKind } from './sealed';
 import { sealedReader } from './sealed-cache.svelte';
+import {
+	type DaydreamSetupContent,
+	type DaydreamTurnContent,
+	daydreamSetupKind,
+	daydreamTurnKind
+} from './sealed-kinds/daydreams';
 import { tagKind } from './sealed-kinds/tags';
 import { type RewardContent, rewardKind, type TaskContent, taskKind } from './sealed-kinds/tasks';
 import type {
@@ -108,9 +114,24 @@ export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
 	if (!item.sealed) {
 		return item.title;
 	}
-	const content =
-		item.kind === 'task' ? open(taskKind, item.sealed) : open(rewardKind, item.sealed);
-	return openedPart(content, (value) => value.title);
+	switch (item.kind) {
+		case 'task':
+			return openedPart(open(taskKind, item.sealed), (value) => value.title);
+		case 'daydream':
+			return openedPart(open(daydreamSetupKind, item.sealed), (value) => value.title);
+		default:
+			return openedPart(open(rewardKind, item.sealed), (value) => value.title);
+	}
+}
+
+/** A daydream's setup: its title, character, scenario and limits. Always sealed. */
+export function openedDaydreamSetup(ref: SealedRefView): Opened<DaydreamSetupContent> {
+	return open(daydreamSetupKind, ref);
+}
+
+/** One turn of a daydream's conversation. Always sealed. */
+export function openedDaydreamTurn(ref: SealedRefView): Opened<DaydreamTurnContent> {
+	return open(daydreamTurnKind, ref);
 }
 
 /** A message tag's name. */

@@ -13,6 +13,7 @@ One shell, one component per destination.
 ```
 SectionWidget            the card: wa-card, header, optional header link, body
 ├─ GuidesWidget          first few guide titles — only with the guides feature
+├─ DaydreamsWidget       the most recently played daydreams — only with that feature
 ├─ TasksWidget           tasks ready to complete now
 ├─ RewardsWidget         credit balance + rewards claimable now
 ├─ PartnerMessagesWidget unread / total threads for one partnership
@@ -24,17 +25,20 @@ SectionWidget            the card: wa-card, header, optional header link, body
 nothing about card chrome. `WidgetItems` renders the title-plus-note list that
 Guides, Tasks and Rewards all want, so that list exists once.
 
-| Page            | Cards                                                                  |
-| --------------- | ---------------------------------------------------------------------- |
-| `/home`         | Messages (conditional), Guides (conditional), Tasks, Rewards, Playroom |
-| `/partner/[id]` | Messages, Tasks, Rewards                                               |
+| Page            | Cards                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `/home`         | Messages (conditional), Guides (conditional), Daydreams (conditional), Tasks, Rewards, Playroom |
+| `/partner/[id]` | Messages, Tasks, Rewards                                                                        |
 
 The Guides card shows **only to an account that holds the `guides` feature**
 (see [features-and-admin.md](features-and-admin.md)). The `/home` load reads
 `features` from the app shell layout and skips the guides query entirely
 otherwise — D1 charges for rows read by a card nobody sees — returning
 `guides: null`. That layout list only decides what is shown; `/home/guides`
-refuses an account without the feature by itself.
+refuses an account without the feature by itself. The Daydreams card works
+the same way with the `daydreams` feature, returning `daydreams: null`
+without it; its titles are sealed, so `WidgetItems` opens them in the browser
+like a task's.
 
 Every `/home` card shows self **and** partner data wherever both exist — see
 below.
@@ -117,6 +121,7 @@ What counts as "something to say" is per widget:
 | Tasks              | something is ready, or a waiting/hidden count exists |
 | Rewards            | a non-zero balance or a claimable row                |
 | Guides             | there is at least one guide                          |
+| Daydreams          | there is at least one daydream                       |
 | Messages (partner) | there is at least one thread                         |
 | Playroom           | an IQ test result has been saved to the account      |
 
@@ -178,6 +183,7 @@ only what the preview shows:
 | `TasksWidgetView`           | `getHomeTasksWidget`, `getPartnershipTasksWidget`     | `server/tasks.ts`     |
 | `RewardsWidgetView`         | `getHomeRewardsWidget`, `getPartnershipRewardsWidget` | `server/rewards.ts`   |
 | `GuidesWidgetView`          | `loadGuidesCard`, only with the guides feature        | the `/home` load      |
+| `DaydreamsWidgetView`       | `getDaydreamsWidget`, only with the daydreams feature | `server/daydreams.ts` |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
 | `IqTestResultView`          | `latestIqTestResult` (one row)                        | `server/iq-test.ts`   |
 

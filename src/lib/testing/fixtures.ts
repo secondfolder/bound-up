@@ -3,9 +3,12 @@ import { generateAgeIdentity } from '../crypto/identity';
 import type { ThreadIcon } from '../messaging';
 import type { ControlAnswer } from '../partnership';
 import { controlFromAnswer } from '../partnership';
+import { appendTurn, createDaydream } from '../server/daydreams';
 import type { Db } from '../server/db';
 import {
 	accountRecoveryRequests,
+	daydreams,
+	daydreamTurns,
 	historyRestoreRequests,
 	messageAttachments,
 	messages,
@@ -27,6 +30,7 @@ import {
 	userKeyWraps,
 	vaults
 } from '../server/db/schema';
+import { grantFeature } from '../server/features';
 import { putUserKeys } from '../server/keys';
 import type { MediaStore } from '../server/media';
 import { type OutgoingAttachment, sendMessage, startThread } from '../server/messaging';
@@ -734,4 +738,59 @@ export async function makeMessageLegacy(
 			bodyFormat: options.plain ? 'plain' : 'lexical'
 		})
 		.where(eq(messages.id, messageId));
+}
+
+// ── daydreams ────────────────────────────────────────────────────────────────
+
+/** Gives a user the Daydreams feature, granted by themselves, which nothing reads. */
+export async function grantTestDaydreams(db: Db, userId: string): Promise<void> {
+	await grantFeature(db, { userId, feature: 'daydreams', grantedByUserId: userId });
+}
+
+/**
+ * A daydream with a stand-in sealed setup, and these turns, through the same
+ * functions the endpoints use. Returns the daydream's id and its turns' ids.
+ */
+export async function createTestDaydream(
+	db: Db,
+	ownerId: string,
+	turns: readonly ('user' | 'character')[] = []
+): Promise<{ id: string; turnIds: string[] }> {
+	const vaultId = await ensureTestSelfVault(db, ownerId);
+	const id = crypto.randomUUID();
+	const created = await createDaydream(db, ownerId, id, {
+		vaultId,
+		ciphertext: fakeSealed('setup'),
+		payloadVersion: 1
+	});
+	if (!created.ok) {
+		throw new Error(`createTestDaydream: ${created.reason}`);
+	}
+	const turnIds: string[] = [];
+	for (const role of turns) {
+		const turnId = crypto.randomUUID();
+		const appended = await appendTurn(
+			db,
+			ownerId,
+			id,
+			{ id: turnId, role, content: { vaultId, ciphertext: fakeSealed('turn'), payloadVersion: 1 } },
+			nextFixtureTime()
+		);
+		if (!appended.ok) {
+			throw new Error(`createTestDaydream: ${appended.reason}`);
+		}
+		turnIds.push(turnId);
+	}
+	return { id, turnIds };
+}
+
+export async function readDaydreamRow(db: Db, id: string) {
+	return await db.query.daydreams.findFirst({ where: eq(daydreams.id, id) });
+}
+
+export async function readDaydreamTurnRows(db: Db, daydreamId: string) {
+	return await db.query.daydreamTurns.findMany({
+		where: eq(daydreamTurns.daydreamId, daydreamId),
+		orderBy: (turn, { asc }) => [asc(turn.position), asc(turn.id)]
+	});
 }

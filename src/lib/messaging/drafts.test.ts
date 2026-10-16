@@ -101,6 +101,22 @@ describe('openDraft', () => {
 		});
 	});
 
+	it("keeps a daydream's draft apart from a thread's, even under the same id", async () => {
+		const ada = await owner();
+		const storage = memoryStorage();
+		const daydream: DraftScope = { kind: 'daydream', daydreamId: 'thread-a' };
+
+		const thread = await openDraft(threadA, ada, storage);
+		const scene = await openDraft(daydream, ada, storage);
+		thread.save({ text: 'to my partner', tagIds: [] });
+		scene.save({ text: 'to the character', tagIds: [] });
+		await Promise.all([thread.settled(), scene.settled()]);
+
+		expect(draftStorageKey(ada, daydream)).not.toBe(draftStorageKey(ada, threadA));
+		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe('to my partner');
+		expect((await openDraft(daydream, ada, storage)).initial?.text).toBe('to the character');
+	});
+
 	it('keeps two accounts on one browser apart', async () => {
 		const ada = await owner();
 		const jun = await owner();

@@ -31,6 +31,7 @@
  * storage to spare a re-pick is the wrong trade.
  */
 
+import { assertNever } from '$lib/assert-never';
 import { type DraftPayload, decryptPayload, encryptPayload } from '$lib/crypto/messages';
 import { isRichTextDocumentEmpty, parseStoredRichText } from '$lib/richtext';
 
@@ -38,7 +39,9 @@ import { isRichTextDocumentEmpty, parseStoredRichText } from '$lib/richtext';
 export type DraftScope =
 	| { kind: 'thread'; threadId: string }
 	/** The "Write something" dialog — one per partnership, not per open. */
-	| { kind: 'new-thread'; partnershipId: string };
+	| { kind: 'new-thread'; partnershipId: string }
+	/** What the user is writing in a daydream: one per daydream. */
+	| { kind: 'daydream'; daydreamId: string };
 
 export type Draft = { text: string; tagIds: string[] };
 
@@ -67,8 +70,20 @@ export type DraftSession = {
 const PREFIX = 'bound-up:draft:v1';
 
 export function draftStorageKey(owner: Pick<DraftOwner, 'recipient'>, scope: DraftScope): string {
-	const id = scope.kind === 'thread' ? scope.threadId : scope.partnershipId;
-	return `${PREFIX}:${owner.recipient}:${scope.kind}:${id}`;
+	return `${PREFIX}:${owner.recipient}:${scope.kind}:${scopeId(scope)}`;
+}
+
+function scopeId(scope: DraftScope): string {
+	switch (scope.kind) {
+		case 'thread':
+			return scope.threadId;
+		case 'new-thread':
+			return scope.partnershipId;
+		case 'daydream':
+			return scope.daydreamId;
+		default:
+			return assertNever(scope, 'draft scope');
+	}
 }
 
 /** Empty by the same measure the Send button uses: nothing a reader would see. */

@@ -105,6 +105,12 @@ to send, logging what to set — so nobody can finish signing up.
   sender's domain must be verified in Resend.
 - `print` leaves both to you, since a self-hoster may prefer SMTP.
 
+Daydreams ([daydreams.md](daydreams.md)) need an OpenRouter key, which is
+never asked for: each reply costs money on it. Pass `--openrouter-key sk-or-…`
+to any target to set `OPENROUTER_API_KEY`; without it Daydreams are simply
+off. The Playwright suite never uses a real key: it runs its own stand-in
+provider (`e2e/model-stub.mjs`).
+
 **Set production's before deploying a build that needs them**, or every
 request fails with the message naming what is missing.
 
