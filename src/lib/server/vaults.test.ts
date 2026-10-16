@@ -5,12 +5,31 @@ import { defined } from '../testing/defined';
 import {
 	createTestInvite,
 	createTestPartnership,
+	createTestRestoreRequest,
 	createTestUser,
 	createTestUserKeys,
 	type TestUser
 } from '../testing/fixtures';
-import { partnerships, userKeys, vaults, vaultWraps } from './db/schema';
-import { createVault, listVaultsForUser, putVaultWrap } from './vaults';
+import {
+	accountRecoveryRequests,
+	partnerships,
+	userKeys,
+	vaultEscrowRelays,
+	vaultEscrows,
+	vaults,
+	vaultWraps
+} from './db/schema';
+import { restoreVaultAccess } from './messaging';
+import {
+	createVault,
+	deleteLostSelfVault,
+	escrowShare,
+	issueEscrowShare,
+	listVaultsForUser,
+	putEscrow,
+	putVaultWrap,
+	releaseEscrow
+} from './vaults';
 
 /**
  * The server never opens a wrap, so these use stand-in ciphertexts: what is
@@ -116,7 +135,8 @@ describe('createVault', () => {
 			kind: 'self',
 			partnershipId: null,
 			keyCheck: KEY_CHECK,
-			wrap: { ciphertext: WRAP, forRecipient: adaKey }
+			wrap: { ciphertext: WRAP, forRecipient: adaKey },
+			escrowPartnershipIds: []
 		});
 	});
 
@@ -301,5 +321,180 @@ describe('putVaultWrap', () => {
 				forRecipient: junKey
 			})
 		).toEqual({ ok: false, reason: 'not-found' });
+	});
+});
+
+describe('escrow', () => {
+	const Secret = 'escrow-test-secret';
+	let partnershipId: string;
+
+	beforeEach(async () => {
+		partnershipId = (await createTestPartnership(harness.db, ada, jun)).id;
+		await selfVault(ada, adaKey);
+		await partnershipVault(ada, partnershipId);
+	});
+
+	/** What a partner-assisted sign-in leaves: a completed, email-confirmed recovery. */
+	async function completedRecovery() {
+		const request = await createTestRestoreRequest(harness.db, {
+			partnershipId,
+			requesterId: ada.id,
+			recipient: junKey
+		});
+		await harness.db
+			.update(accountRecoveryRequests)
+			.set({ status: 'approved', approvedBy: jun.id })
+			.where(eq(accountRecoveryRequests.id, request.recoveryRequestId));
+		return request;
+	}
+
+	async function finish(
+		recoveryRequestId: string,
+		options: { emailConfirmed?: boolean; resolvedAt?: Date } = {}
+	) {
+		await harness.db
+			.update(accountRecoveryRequests)
+			.set({
+				status: 'completed',
+				emailConfirmedAt: options.emailConfirmed === false ? null : new Date(),
+				resolvedAt: options.resolvedAt ?? new Date()
+			})
+			.where(eq(accountRecoveryRequests.id, recoveryRequestId));
+	}
+
+	it('hands out the share only for an escrow that does not exist yet', async () => {
+		const escrowId = id(30);
+		expect(await issueEscrowShare(harness.db, Secret, ada.id, escrowId)).toBe(
+			await escrowShare(Secret, escrowId)
+		);
+		await putEscrow(harness.db, ada.id, { id: escrowId, partnershipId, ciphertext: WRAP });
+		// A stolen session plus a willing partner must not be enough.
+		expect(await issueEscrowShare(harness.db, Secret, ada.id, escrowId)).toBeNull();
+		// And nobody without an own vault gets one at all.
+		expect(await issueEscrowShare(harness.db, Secret, stranger.id, id(31))).toBeNull();
+	});
+
+	it('is held only with a partner the user really has, one per partner', async () => {
+		expect(
+			await putEscrow(harness.db, stranger.id, { id: id(30), partnershipId, ciphertext: WRAP })
+		).toBe(false);
+		await putEscrow(harness.db, ada.id, { id: id(30), partnershipId, ciphertext: WRAP });
+		await putEscrow(harness.db, ada.id, { id: id(32), partnershipId, ciphertext: OTHER_WRAP });
+		const rows = await harness.db.select({ id: vaultEscrows.id }).from(vaultEscrows);
+		expect(rows).toEqual([{ id: id(32) }]);
+		const listing = defined(await listVaultsForUser(harness.db, ada.id), 'listing');
+		expect(listing.self?.escrowPartnershipIds).toEqual([partnershipId]);
+	});
+
+	describe('release', () => {
+		/** Ada's escrow with Jun, and Jun's relay of it, as a restore leaves them. */
+		async function relayed() {
+			await putEscrow(harness.db, ada.id, { id: id(30), partnershipId, ciphertext: WRAP });
+			const request = await completedRecovery();
+			const restored = await restoreVaultAccess(harness.db, {
+				partnershipId,
+				requestId: request.id,
+				actorId: jun.id,
+				vaultWrap: WRAP,
+				escrowRelay: { escrowId: id(30), ciphertext: 'cmVsYXk=' }
+			});
+			if (!restored.ok) {
+				throw new Error(`fixture could not relay: ${restored.reason}`);
+			}
+			return request;
+		}
+
+		it('gives the account the relay and the share, once the sign-in completed by email', async () => {
+			const request = await relayed();
+			// Approved, not completed: nothing yet.
+			expect(await releaseEscrow(harness.db, Secret, ada.id)).toEqual([]);
+
+			await finish(request.recoveryRequestId);
+			expect(await releaseEscrow(harness.db, Secret, ada.id)).toEqual([
+				{
+					escrowId: id(30),
+					vaultId: id(1),
+					ciphertext: 'cmVsYXk=',
+					share: await escrowShare(Secret, id(30))
+				}
+			]);
+			// To the account itself only: the partner who relayed gets nothing.
+			expect(await releaseEscrow(harness.db, Secret, jun.id)).toEqual([]);
+		});
+
+		it('gives nothing for a sign-in that skipped the email, or long ago', async () => {
+			const request = await relayed();
+			await finish(request.recoveryRequestId, { emailConfirmed: false });
+			expect(await releaseEscrow(harness.db, Secret, ada.id)).toEqual([]);
+
+			await finish(request.recoveryRequestId, {
+				resolvedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+			});
+			expect(await releaseEscrow(harness.db, Secret, ada.id)).toEqual([]);
+		});
+
+		it('takes a relay only for the requester’s escrow with this partner', async () => {
+			const cas = await createTestUser(harness.db, { name: 'Cas' });
+			const casKey = (await createTestUserKeys(harness.db, cas)).recipient;
+			const other = await createTestPartnership(harness.db, ada, cas);
+			await createVault(harness.db, ada.id, {
+				kind: 'partnership',
+				id: id(40),
+				partnershipId: other.id,
+				keyCheck: KEY_CHECK,
+				wraps: [
+					{ userId: ada.id, ciphertext: WRAP, forRecipient: adaKey },
+					{ userId: cas.id, ciphertext: WRAP, forRecipient: casKey }
+				]
+			});
+			await putEscrow(harness.db, ada.id, {
+				id: id(41),
+				partnershipId: other.id,
+				ciphertext: WRAP
+			});
+			const request = await completedRecovery();
+			// Jun cannot pass on the escrow Cas holds.
+			await expect(
+				restoreVaultAccess(harness.db, {
+					partnershipId,
+					requestId: request.id,
+					actorId: jun.id,
+					vaultWrap: WRAP,
+					escrowRelay: { escrowId: id(41), ciphertext: 'cmVsYXk=' }
+				})
+			).resolves.toEqual({ ok: false, reason: 'no-such-escrow' });
+			expect(await harness.db.select().from(vaultEscrowRelays)).toEqual([]);
+		});
+	});
+
+	describe('replacing an own vault that is lost', () => {
+		async function loseAdasKey() {
+			const { recipient } = await createTestUserKeys(harness.db, await createTestUser(harness.db));
+			await harness.db.update(userKeys).set({ recipient }).where(eq(userKeys.userId, ada.id));
+		}
+
+		it('is refused while the account still holds a wrap that opens it', async () => {
+			await expect(deleteLostSelfVault(harness.db, ada.id)).resolves.toBe(false);
+		});
+
+		it('is allowed when nothing held it in escrow', async () => {
+			await loseAdasKey();
+			await expect(deleteLostSelfVault(harness.db, ada.id)).resolves.toBe(true);
+			const rows = await harness.db.select().from(vaults).where(eq(vaults.ownerUserId, ada.id));
+			expect(rows).toEqual([]);
+		});
+
+		it('waits while an escrow could still bring it back, and not after', async () => {
+			await putEscrow(harness.db, ada.id, { id: id(30), partnershipId, ciphertext: WRAP });
+			const request = await completedRecovery();
+			await finish(request.recoveryRequestId);
+			await loseAdasKey();
+			await expect(deleteLostSelfVault(harness.db, ada.id)).resolves.toBe(false);
+
+			await finish(request.recoveryRequestId, {
+				resolvedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+			});
+			await expect(deleteLostSelfVault(harness.db, ada.id)).resolves.toBe(true);
+		});
 	});
 });

@@ -116,7 +116,13 @@ export const sealedMigrationSchema = z.object({
  */
 export const restoreApplySchema = z.object({
 	requestId: z.string().uuid('Malformed request id'),
-	vaultWrap: z.string().min(1).max(MAX_VAULT_WRAP_LENGTH).regex(VAULT_WRAP_PATTERN)
+	vaultWrap: z.string().min(1).max(MAX_VAULT_WRAP_LENGTH).regex(VAULT_WRAP_PATTERN),
+	escrowRelay: z
+		.object({
+			escrowId: clientIdSchema,
+			ciphertext: z.string().min(1).max(MAX_VAULT_WRAP_LENGTH).regex(VAULT_WRAP_PATTERN)
+		})
+		.optional()
 });
 
 export const restoreDeclineSchema = z.object({

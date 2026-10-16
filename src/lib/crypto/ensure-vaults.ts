@@ -26,6 +26,7 @@
  */
 
 import type { VaultListingView, VaultWrapView } from '../types';
+import { decryptBytes, encryptBytesTo, openUnderShare, sealUnderShare } from './escrow';
 import {
 	deriveVaultKeys,
 	generateVaultKey,
@@ -72,6 +73,18 @@ export type EnsureVaultsDeps = {
 	) => Promise<boolean>;
 	/** For a vault this device should be able to open and cannot: logged, not thrown. */
 	report: (message: string) => void;
+	/** The user's own vault held in escrow by their partners. See `escrow.ts`. */
+	escrow: {
+		/** The server's share for a new escrow id. */
+		issueShare: (escrowId: string) => Promise<string>;
+		put: (escrow: { id: string; partnershipId: string; ciphertext: string }) => Promise<void>;
+		/** After a partner-assisted sign-in: the relays partners passed on, with the server's share of each. */
+		release: () => Promise<{ escrowId: string; ciphertext: string; share: string }[]>;
+		/** Replaces nothing: drops every escrow, so they are made again under new shares. */
+		deleteAll: () => Promise<void>;
+		/** Deletes an own vault nothing can bring back. False while something still might. */
+		deleteLostSelfVault: () => Promise<boolean>;
+	};
 	newId?: () => string;
 };
 
@@ -124,8 +137,16 @@ async function pass(
 
 	let lostRace = false;
 	const opened: OpenedVaults = { self: null, partnerships: {} };
+	/**
+	 * The own vault's raw key, when this pass made or recovered it, for making
+	 * escrows below without opening the wrap again. Zeroed at the end.
+	 */
+	let selfRaw: Uint8Array<ArrayBuffer> | null = null;
+	/** Partnerships already holding the own vault in escrow. */
+	let escrowed = new Set(listing.self?.escrowPartnershipIds ?? []);
 
 	// ── the self vault ──
+	let createSelf = !listing.self;
 	if (listing.self) {
 		if (usable(listing.self.wrap, identity.recipient)) {
 			opened.self = await openVaultWrap({
@@ -136,10 +157,24 @@ async function pass(
 			if (!opened.self) {
 				deps.report('the self vault has a wrap for this key that does not open');
 			}
+		} else {
+			// No wrap for this key: a partner-assisted sign-in replaced it. The
+			// escrow is the only way back (`recoverSelfVault`); when nothing can
+			// ever bring the vault back, it is replaced with a new one.
+			const recovered = await recoverSelfVault(deps, listing.self);
+			if (recovered) {
+				opened.self = await vaultFromKey(recovered, listing.self);
+				selfRaw = recovered;
+				// Every share of the old escrows has now been released, so they
+				// are made again below, under new ids and so new shares.
+				await deps.escrow.deleteAll();
+				escrowed = new Set();
+			} else if (mayCreate && (await deps.escrow.deleteLostSelfVault())) {
+				createSelf = true;
+			}
 		}
-		// A wrap for an old key: only the escrow can bring this back, and that is
-		// the account-recovery flow's job, not this one's.
-	} else if (mayCreate) {
+	}
+	if (createSelf && mayCreate) {
 		const raw = generateVaultKey();
 		const { keyCheck } = await deriveVaultKeys(raw);
 		const id = newId();
@@ -157,11 +192,30 @@ async function pass(
 		});
 		if (result === 'created') {
 			opened.self = await vaultFromKey(raw, { id, kind: 'self', partnershipId: null });
+			selfRaw = raw;
+			escrowed = new Set();
 		} else {
 			lostRace = true;
+			raw.fill(0);
 		}
-		raw.fill(0);
 	}
+
+	/** The own vault's raw key, opened from its wrap if this pass did not already hold it. */
+	const ownRaw = async (): Promise<Uint8Array<ArrayBuffer> | null> => {
+		if (selfRaw) {
+			return selfRaw;
+		}
+		const { self } = listing;
+		if (!(self && usable(self.wrap, identity.recipient))) {
+			return null;
+		}
+		selfRaw = await unwrapVaultKey({
+			ciphertext: self.wrap.ciphertext,
+			identity: identity.identity,
+			vault: self
+		});
+		return selfRaw;
+	};
 
 	// ── partnership vaults ──
 	for (const entry of listing.partnerships) {
@@ -171,6 +225,23 @@ async function pass(
 			theirs: recipients.theirs,
 			vaultCheck: entry.vault?.keyCheck ?? null
 		});
+
+		// The own vault, held in escrow with this partner — handing them half of
+		// it, so it waits on the trust check like anything else for them.
+		if (allowed && opened.self && !escrowed.has(partnershipId)) {
+			const raw = await ownRaw();
+			if (raw) {
+				const escrowId = newId();
+				const share = await deps.escrow.issueShare(escrowId);
+				const inner = await sealUnderShare({ raw, share, vault: opened.self });
+				await deps.escrow.put({
+					id: escrowId,
+					partnershipId,
+					ciphertext: await encryptBytesTo(inner, recipients.theirs)
+				});
+				escrowed.add(partnershipId);
+			}
+		}
 
 		if (entry.vault) {
 			const { vault } = entry;
@@ -245,5 +316,35 @@ async function pass(
 		raw.fill(0);
 	}
 
+	selfRaw?.fill(0);
 	return { opened, lostRace };
+}
+
+/**
+ * The own vault's key, from a relay a partner passed on during a
+ * partner-assisted sign-in and the server's share of its escrow — written
+ * back as a wrap for the key this device holds now. Null when no relay opens.
+ */
+async function recoverSelfVault(
+	deps: EnsureVaultsDeps,
+	self: { id: string; keyCheck: string }
+): Promise<Uint8Array<ArrayBuffer> | null> {
+	for (const relay of await deps.escrow.release()) {
+		const inner = await decryptBytes(relay.ciphertext, deps.identity.identity);
+		if (!inner) {
+			continue;
+		}
+		const raw = await openUnderShare({ inner, share: relay.share, vault: self });
+		if (!raw) {
+			deps.report('an escrow relay for the own vault did not open');
+			continue;
+		}
+		await deps.putWrap(self.id, {
+			userId: deps.userId,
+			ciphertext: await wrapVaultKey({ vaultId: self.id, raw, recipient: deps.identity.recipient }),
+			forRecipient: deps.identity.recipient
+		});
+		return raw;
+	}
+	return null;
 }

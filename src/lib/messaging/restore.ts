@@ -16,6 +16,11 @@
  *    recipients on every one.
  * 2. **The vault is wrapped for the requested key** and posted, which closes
  *    the request and approves the sign-in.
+ * 3. **The requester's own vault**, if they held it in escrow with this
+ *    partner, has this partner's half passed on with it: their layer opened,
+ *    and the inside — still sealed under the server's share — re-encrypted to
+ *    the requested key. The server releases its share to the account only once
+ *    the sign-in completes. See docs/encryption.md, "Escrow".
  *
  * Two things about this are deliberate and worth not undoing:
  *
@@ -30,6 +35,7 @@
  *   comparison would have been for nothing.
  */
 
+import { decryptBytes, encryptBytesTo } from '../crypto/escrow';
 import { unlockedIdentity } from '../crypto/session.svelte';
 import { writeGrantFor } from '../crypto/trust.svelte';
 import { partnershipVault, wrapPartnershipVaultFor } from '../crypto/vaults.svelte';
@@ -66,10 +72,11 @@ export async function runHistoryRestore(
 		if (!vaultWrap) {
 			return { ok: false, message: 'This device cannot open what you share. Try another device.' };
 		}
+		const escrowRelay = await relayEscrow(partnershipId, request, unlocked.identity);
 		const response = await fetch(`/api/partnerships/${partnershipId}/restore`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ requestId: request.id, vaultWrap })
+			body: JSON.stringify({ requestId: request.id, vaultWrap, escrowRelay })
 		});
 		if (!response.ok) {
 			throw new Error(`Could not save the restore (${response.status})`);
@@ -82,6 +89,38 @@ export async function runHistoryRestore(
 			message: 'Something went wrong part-way through. Anything already done is saved.'
 		};
 	}
+}
+
+/**
+ * This partner's half of the requester's own-vault escrow, passed on to the
+ * requested key — or undefined when they hold none, or it will not open here.
+ * The inside stays sealed under the server's share throughout.
+ */
+async function relayEscrow(
+	partnershipId: string,
+	request: { id: string; requestedRecipient: string },
+	identity: CryptoKey | string
+): Promise<{ escrowId: string; ciphertext: string } | undefined> {
+	const response = await fetch(
+		`/api/partnerships/${partnershipId}/restore?${new URLSearchParams({ requestId: request.id })}`
+	);
+	if (!response.ok) {
+		throw new Error(`Could not read the escrow (${response.status})`);
+	}
+	const { escrow } = (await response.json()) as {
+		escrow: { id: string; ciphertext: string } | null;
+	};
+	if (!escrow) {
+		return undefined;
+	}
+	const inner = await decryptBytes(escrow.ciphertext, identity);
+	if (!inner) {
+		return undefined;
+	}
+	return {
+		escrowId: escrow.id,
+		ciphertext: await encryptBytesTo(inner, request.requestedRecipient)
+	};
 }
 
 /** Says no, so the requester is told rather than left waiting. */

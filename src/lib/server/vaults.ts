@@ -1,9 +1,19 @@
-import { and, eq, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { CreateVaultInput, VaultWrapInput } from '../schemas/vault';
 import type { VaultListingView, VaultWrapView } from '../types';
+import { ESCROW_RELEASE_WINDOW_MS, ESCROW_SHARE_PURPOSE } from '../vault';
 import type { Db } from './db';
-import { partnerships, userKeys, vaults, vaultWraps } from './db/schema';
+import {
+	accountRecoveryRequests,
+	partnerships,
+	userKeys,
+	vaultEscrowRelays,
+	vaultEscrows,
+	vaults,
+	vaultWraps
+} from './db/schema';
+import { keyedHash } from './keyed-hash';
 
 /**
  * Every database access for vaults. See docs/encryption.md, "Vaults".
@@ -124,6 +134,12 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 		return null;
 	}
 	const [self] = selfRows;
+	const escrowRows = self
+		? await db
+				.select({ partnershipId: vaultEscrows.partnershipId })
+				.from(vaultEscrows)
+				.where(eq(vaultEscrows.vaultId, self.id))
+		: [];
 
 	return {
 		recipient: keys.recipient,
@@ -133,7 +149,8 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 					kind: 'self',
 					partnershipId: null,
 					keyCheck: self.keyCheck,
-					wrap: wrapOrNull(self.wrapCiphertext, self.wrapFor)
+					wrap: wrapOrNull(self.wrapCiphertext, self.wrapFor),
+					escrowPartnershipIds: escrowRows.map((row) => row.partnershipId)
 				}
 			: null,
 		partnerships: partnershipRows.map((row) => {
@@ -370,4 +387,233 @@ export async function putVaultWrap(
 			set: { ciphertext: wrap.ciphertext, updatedAt: new Date() }
 		});
 	return { ok: true };
+}
+
+// ── escrow ───────────────────────────────────────────────────────────────────
+
+/**
+ * The server's half of an escrow: 32 bytes, as hex, derived from the escrow's
+ * id under the auth secret. Stored nowhere, so the database alone never holds
+ * it — and rotating `BETTER_AUTH_SECRET` invalidates every escrow, until each
+ * user's next load makes new ones.
+ */
+export async function escrowShare(secret: string, escrowId: string): Promise<string> {
+	return await keyedHash(secret, ESCROW_SHARE_PURPOSE, escrowId);
+}
+
+async function selfVaultId(db: Db, userId: string): Promise<string | null> {
+	const [row] = await db
+		.select({ id: vaults.id })
+		.from(vaults)
+		.where(eq(vaults.ownerUserId, userId))
+		.limit(1);
+	return row?.id ?? null;
+}
+
+/**
+ * The share for an escrow the user is about to make.
+ *
+ * Only for an id no escrow has yet. The share of an *existing* escrow is what,
+ * with the partner's half, opens the user's own vault — so outside a
+ * partner-assisted sign-in it is never handed out, even to the account
+ * itself: a stolen session plus a willing partner must not be enough.
+ */
+export async function issueEscrowShare(
+	db: Db,
+	secret: string,
+	userId: string,
+	escrowId: string
+): Promise<string | null> {
+	if (!(await selfVaultId(db, userId))) {
+		return null;
+	}
+	const [taken] = await db
+		.select({ id: vaultEscrows.id })
+		.from(vaultEscrows)
+		.where(eq(vaultEscrows.id, escrowId))
+		.limit(1);
+	return taken ? null : await escrowShare(secret, escrowId);
+}
+
+/**
+ * Stores the user's own vault in escrow with one partner, replacing any
+ * escrow already held with them. Only for an accepted partnership the user is
+ * in, into their own vault.
+ */
+export async function putEscrow(
+	db: Db,
+	userId: string,
+	input: { id: string; partnershipId: string; ciphertext: string }
+): Promise<boolean> {
+	const vaultId = await selfVaultId(db, userId);
+	if (!vaultId) {
+		return false;
+	}
+	const [partnership] = await db
+		.select({ id: partnerships.id })
+		.from(partnerships)
+		.where(
+			and(
+				eq(partnerships.id, input.partnershipId),
+				eq(partnerships.status, 'accepted'),
+				or(eq(partnerships.inviterId, userId), eq(partnerships.inviteeId, userId))
+			)
+		)
+		.limit(1);
+	if (!partnership) {
+		return false;
+	}
+	await db.batch([
+		db
+			.delete(vaultEscrows)
+			.where(
+				and(eq(vaultEscrows.vaultId, vaultId), eq(vaultEscrows.partnershipId, input.partnershipId))
+			),
+		db.insert(vaultEscrows).values({ ...input, vaultId })
+	]);
+	return true;
+}
+
+/**
+ * Drops every escrow of the user's own vault. Called after the server has
+ * released its share of them: a released share is no longer a secret, so the
+ * escrows are made again, under new ids and so new shares.
+ */
+export async function deleteEscrows(db: Db, userId: string): Promise<void> {
+	const vaultId = await selfVaultId(db, userId);
+	if (vaultId) {
+		await db.delete(vaultEscrows).where(eq(vaultEscrows.vaultId, vaultId));
+	}
+}
+
+/** The completed, email-confirmed partner-assisted sign-in still inside the release window. */
+async function releasableRecovery(db: Db, userId: string, now: Date) {
+	const [row] = await db
+		.select({ id: accountRecoveryRequests.id })
+		.from(accountRecoveryRequests)
+		.where(
+			and(
+				eq(accountRecoveryRequests.userId, userId),
+				eq(accountRecoveryRequests.status, 'completed'),
+				isNotNull(accountRecoveryRequests.emailConfirmedAt),
+				gt(accountRecoveryRequests.resolvedAt, new Date(now.getTime() - ESCROW_RELEASE_WINDOW_MS))
+			)
+		)
+		.orderBy(desc(accountRecoveryRequests.resolvedAt))
+		.limit(1);
+	return row ?? null;
+}
+
+export type EscrowRelease = {
+	escrowId: string;
+	vaultId: string;
+	/** The partner's relay: the inner layer, age-encrypted to the account's new key. */
+	ciphertext: string;
+	share: string;
+};
+
+/**
+ * Everything needed to open the user's own vault again after a
+ * partner-assisted sign-in: each relay a partner passed on, and the server's
+ * share for its escrow.
+ *
+ * Released only to the account itself, and only for relays belonging to a
+ * sign-in that completed — which took a partner's approval *and* the link
+ * emailed to the account's address — within `ESCROW_RELEASE_WINDOW_MS`. A
+ * partner alone gets nothing here; neither does the server's own database.
+ * Released as often as asked inside the window, so a device that failed
+ * part-way can try again; the escrows are replaced once it succeeds.
+ */
+export async function releaseEscrow(
+	db: Db,
+	secret: string,
+	userId: string,
+	now: Date = new Date()
+): Promise<EscrowRelease[]> {
+	const recovery = await releasableRecovery(db, userId, now);
+	const vaultId = await selfVaultId(db, userId);
+	if (!(recovery && vaultId)) {
+		return [];
+	}
+	const rows = await db
+		.select({ escrowId: vaultEscrows.id, ciphertext: vaultEscrowRelays.ciphertext })
+		.from(vaultEscrowRelays)
+		.innerJoin(vaultEscrows, eq(vaultEscrows.id, vaultEscrowRelays.escrowId))
+		.where(
+			and(eq(vaultEscrows.vaultId, vaultId), eq(vaultEscrowRelays.recoveryRequestId, recovery.id))
+		);
+	return await Promise.all(
+		rows.map(async (row) => ({ ...row, vaultId, share: await escrowShare(secret, row.escrowId) }))
+	);
+}
+
+/**
+ * Deletes the user's own vault, so a new one can be made — only once it can
+ * never be opened again.
+ *
+ * That is: the account holds no wrap for the key it has now, and nothing could
+ * still bring one back — it has no escrows at all (no partner held one), or the
+ * window for releasing them has passed. Everything sealed in the old vault
+ * goes with it; it was unreadable either way.
+ */
+export async function deleteLostSelfVault(
+	db: Db,
+	userId: string,
+	now: Date = new Date()
+): Promise<boolean> {
+	const vaultId = await selfVaultId(db, userId);
+	if (!vaultId) {
+		return false;
+	}
+	const [keys] = await db
+		.select({ recipient: userKeys.recipient })
+		.from(userKeys)
+		.where(eq(userKeys.userId, userId))
+		.limit(1);
+	const [usable] = await db
+		.select({ id: vaultWraps.id })
+		.from(vaultWraps)
+		.where(
+			and(
+				eq(vaultWraps.vaultId, vaultId),
+				eq(vaultWraps.userId, userId),
+				eq(vaultWraps.forRecipient, keys?.recipient ?? '')
+			)
+		)
+		.limit(1);
+	if (usable) {
+		return false;
+	}
+	const [escrow] = await db
+		.select({ id: vaultEscrows.id })
+		.from(vaultEscrows)
+		.where(eq(vaultEscrows.vaultId, vaultId))
+		.limit(1);
+	if (escrow && (await releasableRecovery(db, userId, now))) {
+		return false;
+	}
+	await db.delete(vaults).where(eq(vaults.id, vaultId));
+	return true;
+}
+
+/**
+ * The requester's escrow held in this partnership, for the partner helping
+ * them back in — who opens their own layer of it and passes the inside on.
+ */
+export async function escrowForRequester(
+	db: Db,
+	input: { requesterId: string; partnershipId: string }
+): Promise<{ id: string; ciphertext: string } | null> {
+	const vaultId = await selfVaultId(db, input.requesterId);
+	if (!vaultId) {
+		return null;
+	}
+	const [row] = await db
+		.select({ id: vaultEscrows.id, ciphertext: vaultEscrows.ciphertext })
+		.from(vaultEscrows)
+		.where(
+			and(eq(vaultEscrows.vaultId, vaultId), eq(vaultEscrows.partnershipId, input.partnershipId))
+		)
+		.limit(1);
+	return row ?? null;
 }

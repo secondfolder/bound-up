@@ -8,7 +8,15 @@ import {
 	StaleIdentityError,
 	type VaultCreation
 } from './ensure-vaults';
+import { decryptBytes, encryptBytesTo, openUnderShare } from './escrow';
+import { generateAgeIdentity } from './identity';
 import { unwrapVaultKey } from './vault';
+
+/** The fake server's share: the same function it uses. */
+async function shareOf(escrowId: string): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(escrowId));
+	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 /**
  * A pretend server: holds vaults and wraps the way the real one does, so the
@@ -24,11 +32,25 @@ function fakeServer() {
 		wraps: Map<string, { ciphertext: string; forRecipient: string }>;
 	};
 	const vaults: Stored[] = [];
+	/** Own-vault escrows, by owner. One per partner — there is only one partner here. */
+	const escrows = new Map<string, { id: string; ciphertext: string }>();
+	const relays: { owner: string; escrowId: string; ciphertext: string }[] = [];
 	const recipients = new Map([
 		['ada', ADA_RECIPIENT],
 		['jun', JUN_RECIPIENT]
 	]);
 	const partnershipId = 'p1';
+
+	function currentWrap(vault: Stored, userId: string) {
+		const wrap = vault.wraps.get(userId);
+		return wrap && wrap.forRecipient === recipients.get(userId) ? wrap : null;
+	}
+
+	/** Stands in for the HMAC: any fixed function of the id will do here. */
+	async function share(escrowId: string): Promise<string> {
+		const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(escrowId));
+		return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+	}
 
 	function listing(userId: string): VaultListingView {
 		const self = vaults.find((v) => v.kind === 'self' && v.owner === userId);
@@ -42,7 +64,9 @@ function fakeServer() {
 						kind: 'self',
 						partnershipId: null,
 						keyCheck: self.keyCheck,
-						wrap: self.wraps.get(userId) ?? null
+						// Only the wrap for the key the user has now, as the real listing.
+						wrap: currentWrap(self, userId),
+						escrowPartnershipIds: escrows.has(userId) ? [partnershipId] : []
 					}
 				: null,
 			partnerships: [
@@ -60,7 +84,7 @@ function fakeServer() {
 								kind: 'partnership',
 								partnershipId,
 								keyCheck: shared.keyCheck,
-								wrap: shared.wraps.get(userId) ?? null,
+								wrap: currentWrap(shared, userId),
 								partnerWrapFor: shared.wraps.get(partnerId)?.forRecipient ?? null
 							}
 						: null
@@ -106,11 +130,37 @@ function fakeServer() {
 			},
 			trustAllows: () => Promise.resolve(true),
 			report: () => undefined,
+			escrow: {
+				issueShare: (escrowId) => share(escrowId),
+				put: (escrow) => {
+					escrows.set(userId, { id: escrow.id, ciphertext: escrow.ciphertext });
+					return Promise.resolve();
+				},
+				release: async () =>
+					await Promise.all(
+						relays
+							.filter((relay) => relay.owner === userId)
+							.map(async (relay) => ({ ...relay, share: await share(relay.escrowId) }))
+					),
+				deleteAll: () => {
+					escrows.delete(userId);
+					return Promise.resolve();
+				},
+				deleteLostSelfVault: () => {
+					const index = vaults.findIndex((v) => v.kind === 'self' && v.owner === userId);
+					const vault = vaults[index];
+					if (!vault || currentWrap(vault, userId) || escrows.has(userId)) {
+						return Promise.resolve(false);
+					}
+					vaults.splice(index, 1);
+					return Promise.resolve(true);
+				}
+			},
 			...overrides
 		};
 	}
 
-	return { vaults, recipients, deps, partnershipId };
+	return { vaults, recipients, escrows, relays, deps, partnershipId };
 }
 
 describe('ensureVaults', () => {
@@ -175,7 +225,6 @@ describe('ensureVaults', () => {
 		const fromAda = await ensureVaults(server.deps('ada', ADA_IDENTITY));
 		const shared = defined(fromAda.partnerships[server.partnershipId], 'shared vault');
 
-		const { generateAgeIdentity } = await import('./identity');
 		const fresh = await generateAgeIdentity();
 		server.recipients.set('jun', fresh.recipient);
 
@@ -207,7 +256,6 @@ describe('ensureVaults', () => {
 	/** After a partner-assisted sign-in elsewhere, this device's key is the old one. */
 	it('opens nothing, with an error the caller can stay quiet about, on a stale identity', async () => {
 		const server = fakeServer();
-		const { generateAgeIdentity } = await import('./identity');
 		server.recipients.set('ada', (await generateAgeIdentity()).recipient);
 		const ada = server.deps('ada', ADA_IDENTITY, {
 			identity: { recipient: ADA_RECIPIENT, identity: ADA_IDENTITY }
@@ -228,5 +276,91 @@ describe('ensureVaults', () => {
 			server.partnershipId,
 			expect.objectContaining({ vaultCheck: shared.keyCheck })
 		);
+	});
+
+	describe('the own vault, in escrow', () => {
+		it('is held in escrow with the partner, who can open only their half', async () => {
+			const server = fakeServer();
+			const { self } = await ensureVaults(server.deps('ada', ADA_IDENTITY));
+			const escrow = defined(server.escrows.get('ada'), "ada's escrow");
+
+			// Jun's layer opens with Jun's key — and leaves the share's layer shut.
+			const inner = defined(await decryptBytes(escrow.ciphertext, JUN_IDENTITY), 'inner layer');
+			const vault = defined(self, 'self vault');
+			await expect(openUnderShare({ inner, share: 'f'.repeat(64), vault })).resolves.toBeNull();
+			// With the real share it is the vault's key.
+			const raw = await openUnderShare({
+				inner,
+				share: await shareOf(escrow.id),
+				vault
+			});
+			expect(raw).not.toBeNull();
+			// Ada cannot open the partner's layer herself.
+			await expect(decryptBytes(escrow.ciphertext, ADA_IDENTITY)).resolves.toBeNull();
+		});
+
+		/**
+		 * Ada lost every way in. Jun's device passed on its half, re-encrypted to
+		 * her new key; the server released its share. Her new device gets the
+		 * same vault back, and the escrows are made again.
+		 */
+		it('comes back after a partner-assisted sign-in, and is escrowed afresh', async () => {
+			const server = fakeServer();
+			const before = defined(
+				(await ensureVaults(server.deps('ada', ADA_IDENTITY))).self,
+				'self vault'
+			);
+			const old = defined(server.escrows.get('ada'), 'old escrow');
+
+			const fresh = await generateAgeIdentity();
+			server.recipients.set('ada', fresh.recipient);
+			const inner = defined(await decryptBytes(old.ciphertext, JUN_IDENTITY), 'inner');
+			server.relays.push({
+				owner: 'ada',
+				escrowId: old.id,
+				ciphertext: await encryptBytesTo(inner, fresh.recipient)
+			});
+
+			const after = await ensureVaults(server.deps('ada', fresh.identity));
+			expect(after.self?.id).toBe(before.id);
+			expect(after.self?.keyCheck).toBe(before.keyCheck);
+			const renewed = defined(server.escrows.get('ada'), 'new escrow');
+			expect(renewed.id).not.toBe(old.id);
+		});
+
+		it('is replaced when nothing can ever bring it back', async () => {
+			const server = fakeServer();
+			// No escrow: trust never allowed one.
+			const before = defined(
+				(
+					await ensureVaults(
+						server.deps('ada', ADA_IDENTITY, { trustAllows: () => Promise.resolve(false) })
+					)
+				).self,
+				'self vault'
+			);
+			const fresh = await generateAgeIdentity();
+			server.recipients.set('ada', fresh.recipient);
+
+			const after = await ensureVaults(
+				server.deps('ada', fresh.identity, { trustAllows: () => Promise.resolve(false) })
+			);
+			expect(after.self?.id).toBeDefined();
+			expect(after.self?.id).not.toBe(before.id);
+		});
+
+		it('waits, rather than replacing, while an escrow could still bring it back', async () => {
+			const server = fakeServer();
+			const before = defined(
+				(await ensureVaults(server.deps('ada', ADA_IDENTITY))).self,
+				'self vault'
+			);
+			const fresh = await generateAgeIdentity();
+			server.recipients.set('ada', fresh.recipient);
+
+			const after = await ensureVaults(server.deps('ada', fresh.identity));
+			expect(after.self).toBeNull();
+			expect(server.vaults.some((vault) => vault.id === before.id)).toBe(true);
+		});
 	});
 });

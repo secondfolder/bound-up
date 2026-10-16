@@ -48,12 +48,14 @@ import {
 	messageThreadTags,
 	partnerships,
 	threadReads,
+	vaultEscrowRelays,
 	vaults,
 	vaultWraps
 } from './db/schema';
 import { listUserFeatures } from './features';
 import { attachmentKey, MEDIA_LIFETIMES, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
+import { escrowForRequester } from './vaults';
 
 /**
  * Every database access for messaging.
@@ -1866,6 +1868,26 @@ async function findRestorableRequest(
 }
 
 /**
+ * The requester's own-vault escrow held in this partnership, for the partner
+ * who is helping them — the same gate as the restore itself.
+ */
+export async function escrowForRestore(
+	db: Db,
+	input: { partnershipId: string; requestId: string; actorId: string }
+): Promise<{ escrow: { id: string; ciphertext: string } | null } | null> {
+	const request = await findRestorableRequest(db, input);
+	if (!request) {
+		return null;
+	}
+	return {
+		escrow: await escrowForRequester(db, {
+			requesterId: request.requesterId,
+			partnershipId: input.partnershipId
+		})
+	};
+}
+
+/**
  * Gives a partner who lost every way in their access back: the partnership
  * vault, wrapped for the key their partner-assisted sign-in will give them.
  *
@@ -1899,9 +1921,17 @@ export async function restoreVaultAccess(
 		/** The partner doing the restore, not the one who lost their key. */
 		actorId: string;
 		vaultWrap: string;
+		/**
+		 * The partner's half of the requester's own-vault escrow, passed on: their
+		 * layer opened and the inside re-encrypted to the requested key. Absent
+		 * when the requester has no escrow with this partner.
+		 */
+		escrowRelay?: { escrowId: string; ciphertext: string };
 	},
 	now: Date = new Date()
-): Promise<{ ok: true } | { ok: false; reason: 'no-such-request' | 'no-vault' }> {
+): Promise<
+	{ ok: true } | { ok: false; reason: 'no-such-request' | 'no-vault' | 'no-such-escrow' }
+> {
 	const request = await findRestorableRequest(db, input, now);
 	if (!request) {
 		return { ok: false, reason: 'no-such-request' };
@@ -1909,6 +1939,19 @@ export async function restoreVaultAccess(
 	const vaultId = await partnershipVaultId(db, input.partnershipId);
 	if (!vaultId) {
 		return { ok: false, reason: 'no-vault' };
+	}
+	// The relay must be for the requester's escrow held in *this* partnership:
+	// a partner can only pass on their own half.
+	let relay: { escrowId: string; ciphertext: string; recoveryRequestId: string } | null = null;
+	if (input.escrowRelay) {
+		const escrow = await escrowForRequester(db, {
+			requesterId: request.requesterId,
+			partnershipId: input.partnershipId
+		});
+		if (escrow?.id !== input.escrowRelay.escrowId || !request.recoveryRequestId) {
+			return { ok: false, reason: 'no-such-escrow' };
+		}
+		relay = { ...input.escrowRelay, recoveryRequestId: request.recoveryRequestId };
 	}
 
 	await db.batch([
@@ -1924,6 +1967,17 @@ export async function restoreVaultAccess(
 				target: [vaultWraps.vaultId, vaultWraps.userId, vaultWraps.forRecipient],
 				set: { ciphertext: input.vaultWrap, updatedAt: now }
 			}),
+		...(relay
+			? [
+					db
+						.insert(vaultEscrowRelays)
+						.values(relay)
+						.onConflictDoUpdate({
+							target: [vaultEscrowRelays.escrowId, vaultEscrowRelays.recoveryRequestId],
+							set: { ciphertext: relay.ciphertext, updatedAt: now }
+						})
+				]
+			: []),
 		db
 			.update(historyRestoreRequests)
 			.set({ status: 'completed', resolvedAt: now })

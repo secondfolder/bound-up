@@ -38,3 +38,11 @@ export const createVaultSchema = z.discriminatedUnion('kind', [
 
 export type CreateVaultInput = z.output<typeof createVaultSchema>;
 export type VaultWrapInput = z.output<typeof vaultWrapField>;
+
+export const escrowShareSchema = z.object({ escrowId: clientId });
+
+export const putEscrowSchema = z.object({
+	id: clientId,
+	partnershipId: z.string().min(1).max(100),
+	ciphertext: z.string().min(1).max(MAX_VAULT_WRAP_LENGTH).regex(VAULT_WRAP_PATTERN)
+});

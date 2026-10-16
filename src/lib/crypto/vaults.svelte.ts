@@ -136,6 +136,48 @@ export async function initialiseVaults(
 				throw new Error(`Could not share a vault with a partner (${response.status})`);
 			}
 		},
+		escrow: {
+			async issueShare(escrowId) {
+				const response = await request('/api/vaults/self/escrow-share', {
+					method: 'POST',
+					body: JSON.stringify({ escrowId })
+				});
+				if (!response.ok) {
+					throw new Error(`Could not start an escrow (${response.status})`);
+				}
+				return ((await response.json()) as { share: string }).share;
+			},
+			async put(escrow) {
+				const response = await request('/api/vaults/self/escrows', {
+					method: 'PUT',
+					body: JSON.stringify(escrow)
+				});
+				if (!response.ok) {
+					throw new Error(`Could not store an escrow (${response.status})`);
+				}
+			},
+			async release() {
+				const response = await request('/api/vaults/self/escrow-release', { method: 'POST' });
+				if (!response.ok) {
+					throw new Error(`Could not ask for the escrow back (${response.status})`);
+				}
+				return (
+					(await response.json()) as {
+						relays: { escrowId: string; ciphertext: string; share: string }[];
+					}
+				).relays;
+			},
+			async deleteAll() {
+				const response = await request('/api/vaults/self/escrows', { method: 'DELETE' });
+				if (!response.ok) {
+					throw new Error(`Could not replace escrows (${response.status})`);
+				}
+			},
+			async deleteLostSelfVault() {
+				const response = await request('/api/vaults/self', { method: 'DELETE' });
+				return response.ok;
+			}
+		},
 		async trustAllows(partnershipId, served) {
 			return trustAllowsSending(await refreshTrust(userId, partnershipId, served));
 		},

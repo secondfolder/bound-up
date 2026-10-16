@@ -1061,6 +1061,71 @@ export const historyRestoreRequests = sqliteTable(
 	]
 );
 
+/**
+ * A user's own vault key, held in escrow by one partner and the server
+ * together. See docs/encryption.md, "Escrow".
+ *
+ * `ciphertext` is age, to the partner's recipient, of the vault key sealed
+ * under a share only the server can produce (`escrowShare` in
+ * `server/vaults.ts`, an HMAC of this row's id under the auth secret — so the
+ * share is stored nowhere). The partner can open their layer but not the
+ * share's; the server has the share but cannot open the partner's layer. It
+ * takes both, and the server releases the share only to the account itself,
+ * after a partner-assisted sign-in it confirmed by email.
+ *
+ * One per partnership the user has. The id is chosen by the browser, because
+ * the share is derived from it before anything is sealed.
+ */
+export const vaultEscrows = sqliteTable(
+	'vault_escrows',
+	{
+		id: text('id').primaryKey(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		partnershipId: text('partnership_id')
+			.notNull()
+			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('vault_escrows_vault_partnership_idx').on(table.vaultId, table.partnershipId)
+	]
+);
+
+/**
+ * The partner's half of an escrow, passed on during a partner-assisted
+ * sign-in: their layer opened, and the inside re-encrypted to the key the
+ * sign-in gives the account. Still sealed under the server's share, so it
+ * opens nothing until the server releases that too.
+ */
+export const vaultEscrowRelays = sqliteTable(
+	'vault_escrow_relays',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		escrowId: text('escrow_id')
+			.notNull()
+			.references(() => vaultEscrows.id, { onDelete: 'cascade' }),
+		recoveryRequestId: text('recovery_request_id')
+			.notNull()
+			.references(() => accountRecoveryRequests.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('vault_escrow_relays_escrow_request_idx').on(
+			table.escrowId,
+			table.recoveryRequestId
+		)
+	]
+);
+
+export type VaultEscrow = typeof vaultEscrows.$inferSelect;
+export type VaultEscrowRelay = typeof vaultEscrowRelays.$inferSelect;
+
 export type UserKeys = typeof userKeys.$inferSelect;
 export type NewUserKeys = typeof userKeys.$inferInsert;
 export type UserKeyWrap = typeof userKeyWraps.$inferSelect;

@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { restoreApplySchema, restoreDeclineSchema } from '$lib/schemas/messageForm';
-import { declineHistoryRestore, restoreVaultAccess } from '$lib/server/messaging';
+import { declineHistoryRestore, escrowForRestore, restoreVaultAccess } from '$lib/server/messaging';
 import type { RequestHandler } from './$types';
 
 /**
@@ -17,7 +17,31 @@ import type { RequestHandler } from './$types';
  * `../sealed-migration`, so that one wrap covers the whole history.
  */
 
-/** Stores the wrap, closes the request, and approves the sign-in. */
+/**
+ * The requester's own-vault escrow held in this partnership, for the helping
+ * partner to open their half of and pass on. `{ escrow: null }` when there is
+ * none — they had no own vault, or it was never held with this partner.
+ */
+export const GET: RequestHandler = async ({ locals, params, url }) => {
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
+	const requestId = url.searchParams.get('requestId');
+	if (!requestId) {
+		error(400, 'Which request?');
+	}
+	const result = await escrowForRestore(locals.db, {
+		partnershipId: params.id,
+		requestId,
+		actorId: locals.user.id
+	});
+	if (!result) {
+		error(404, 'Not found');
+	}
+	return json(result);
+};
+
+/** Stores the wrap and any escrow relay, closes the request, and approves the sign-in. */
 export const POST: RequestHandler = async ({ locals, params, request }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
@@ -32,14 +56,15 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 		partnershipId: params.id,
 		requestId: parsed.data.requestId,
 		actorId: locals.user.id,
-		vaultWrap: parsed.data.vaultWrap
+		vaultWrap: parsed.data.vaultWrap,
+		escrowRelay: parsed.data.escrowRelay
 	});
 
 	// 404 for "not a member", "no such request" and "that request is yours"
 	// all alike: distinguishing them would confirm which partnerships and
 	// requests exist, and the client has nothing different to do.
 	if (!result.ok) {
-		error(result.reason === 'no-vault' ? 409 : 404, result.reason);
+		error(result.reason === 'no-such-request' ? 404 : 409, result.reason);
 	}
 	return json({ ok: true });
 };

@@ -101,6 +101,21 @@ A device that still had the old key cached finds the server serving a
 different public key the next time it loads, drops the stale key, and is sent
 to sign in again (`initialiseKeyring` in `crypto/session.svelte.ts`).
 
+## What comes back
+
+- **Everything shared with a partner who helps** — the partnership vault,
+  wrapped for the new key (docs/messaging.md).
+- **The account's own vault**, if any partner held it in escrow: the partner
+  who helps passes on their half, and the server releases its half once the
+  sign-in completes by email (docs/encryption.md, "Escrow"). Released for
+  seven days after the sign-in; the next load does it automatically.
+- **Nothing from a partner who does not help** until they do — or until their
+  device trusts the new key and shares their partnership's vault on its own.
+
+**Someone with no partner gets nothing back**, because nobody held anything.
+Their own vault is replaced with a new, empty one on the first load after the
+sign-in.
+
 ## Rules the endpoints are built around
 
 **No account-existence oracle.** `POST /api/account-recovery` is

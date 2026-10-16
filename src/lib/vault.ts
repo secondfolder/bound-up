@@ -95,3 +95,31 @@ export function isClientId(value: unknown): value is string {
 export function vaultPinId(partnershipId: string): string {
 	return `vault:${partnershipId}`;
 }
+
+// ── escrow ───────────────────────────────────────────────────────────────────
+
+/** The `purpose` the server's share is derived under: `keyedHash(secret, purpose, escrowId)`. */
+export const ESCROW_SHARE_PURPOSE = 'vault-escrow';
+
+/** Domain separation for the inner layer, which is sealed under the share. */
+export const ESCROW_AAD_INFO = 'bound-up-escrow-v1';
+
+/**
+ * The associated data the vault key is sealed to inside an escrow: the vault
+ * it belongs to and that vault's fingerprint, so an escrow cannot be passed
+ * off as some other vault's.
+ */
+export function escrowAad(vaultId: string, keyCheck: string): string {
+	return `${ESCROW_AAD_INFO}|${vaultId}|${keyCheck}`;
+}
+
+/** What the server's share looks like on the wire: 32 bytes of HMAC, as hex. */
+export const ESCROW_SHARE_PATTERN = /^[0-9a-f]{64}$/;
+
+/**
+ * How long after a partner-assisted sign-in completes the server will still
+ * release its share of the account's escrows. Long enough to sign in on a
+ * second device, or come back the next day; short enough that a session
+ * stolen weeks later finds nothing to release.
+ */
+export const ESCROW_RELEASE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;

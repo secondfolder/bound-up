@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { sql } from './db';
 import { test } from './fixtures';
 import {
 	clickWaButton,
@@ -9,6 +10,7 @@ import {
 	openBoard,
 	signUp,
 	waitForHydration,
+	waitForKeyring,
 	writeThread
 } from './helpers';
 import { linkIn, mailsTo, waitForMailTo } from './mail';
@@ -37,6 +39,25 @@ test.describe('partner-assisted sign-in', () => {
 			await signUp(ada.page, ada.who);
 			await signUp(jun.page, jun.who);
 			await linkAccounts(ada, jun);
+
+			// Ada's device holds her own vault in escrow with Jun once it sees the
+			// partnership. That escrow is what brings it back later.
+			await ada.page.goto('/home');
+			await waitForKeyring(ada.page);
+			const ownVault = async () => {
+				const { rows } = await sql(
+					`SELECT v.id AS vaultId, e.id AS escrowId,
+					        (SELECT COUNT(*) FROM vault_wraps w JOIN user_keys k ON k.user_id = w.user_id
+					          WHERE w.vault_id = v.id AND w.for_recipient = k.recipient) AS usableWraps
+					   FROM vaults v JOIN user u ON u.id = v.owner_user_id
+					   LEFT JOIN vault_escrows e ON e.vault_id = v.id
+					  WHERE u.email = ?`,
+					[ada.who.email.toLowerCase()]
+				);
+				return rows[0] ?? null;
+			};
+			await expect.poll(async () => (await ownVault())?.escrowId ?? null).not.toBeNull();
+			const before = await ownVault();
 
 			await jun.page.goto('/home');
 			await openBoard(jun.page, ada.who.name);
@@ -100,6 +121,19 @@ test.describe('partner-assisted sign-in', () => {
 			expect(await deviceHoldsKey(requester)).toBe(true);
 			await requester.goto(threadPath);
 			await expect(requester.getByText(secret)).toBeVisible();
+
+			// Her own vault came back too: the same one, open to her new key,
+			// and escrowed afresh now its old shares have been released.
+			await expect
+				.poll(async () => {
+					const after = await ownVault();
+					return [
+						after?.vaultId === before?.vaultId,
+						Number(after?.usableWraps),
+						after?.escrowId !== null && after?.escrowId !== before?.escrowId
+					];
+				})
+				.toEqual([true, 1, true]);
 
 			// ── and the lost device is signed out ──────────────────────────────
 			await ada.page.goto('/home');

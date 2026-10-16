@@ -226,7 +226,13 @@ export type VaultListingView = {
 	/** The user's own recipient, as the server has it. */
 	recipient: string;
 	/** Null until the first device creates it. */
-	self: (VaultRowView & { wrap: VaultWrapView | null }) | null;
+	self:
+		| (VaultRowView & {
+				wrap: VaultWrapView | null;
+				/** The partnerships holding this vault in escrow. See docs/encryption.md, "Escrow". */
+				escrowPartnershipIds: string[];
+		  })
+		| null;
 	/** One entry per accepted partnership, with or without a vault yet. */
 	partnerships: {
 		partnershipId: string;

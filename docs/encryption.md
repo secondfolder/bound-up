@@ -579,6 +579,64 @@ owner: such a wrap opens, and replacing it could only break it.
 Vault keys are held in memory for the page's life and fetched again on the
 next load: a few hundred bytes per vault, opened with one age decryption each.
 
+## Escrow
+
+A partnership's vault survives one partner losing every way in, because the
+other partner holds it too and can wrap it for the new key. A user's **own**
+vault has nobody else to hold it, so it is held in **escrow**: half by each
+partner, half by the server, and opened only with both, after the account
+holder proves it is them.
+
+    inner  = AES-256-GCM_share(own vault key),   AAD = "bound-up-escrow-v1|<vault id>|<key check>"
+    escrow = age(inner) → the partner's recipient               (vault_escrows, one per partner)
+    share  = HMAC-SHA256(BETTER_AUTH_SECRET, "vault-escrow|" + escrow id)
+
+- **The partner** can open the outer layer, and gets only `inner`.
+- **The server** can compute the share, but cannot open the partner's layer.
+- **The share is stored nowhere**: it is derived from the escrow's id under
+  the auth secret, so a stolen database alone holds neither half. Rotating
+  `BETTER_AUTH_SECRET` invalidates every escrow, until each user's next load
+  makes new ones.
+- **The server hands out a share only for an escrow id that does not exist
+  yet** (`issueEscrowShare`) — the moment a device is making one. The share of
+  an existing escrow is never handed out outside a recovery, even to the
+  account: a stolen session plus a willing partner must not be enough.
+
+`ensureVaults` keeps one escrow per partner, made as soon as the trust check
+allows writing for them. **A user with no partner has no escrow**, so losing
+every way in loses their own vault: a device that finds it can never be
+brought back deletes it and starts a new one (`deleteLostSelfVault`, which the
+server allows only when the account holds no wrap for its current key and no
+escrow could still be released).
+
+### Getting it back
+
+During a partner-assisted sign-in ([account-recovery.md](account-recovery.md)),
+the helping partner's device opens their layer of the requester's escrow and
+re-encrypts `inner` to the key on the request — a **relay**
+(`vault_escrow_relays`), posted with the vault wrap. It is still sealed under
+the share.
+
+After the sign-in completes, the requester's first load finds its own vault
+with no wrap for its new key, and asks for the escrow back
+(`POST /api/vaults/self/escrow-release`). The server releases each relay with
+its share **only** to the account itself, and only for a sign-in that
+completed — which took a partner's approval **and** the link emailed to the
+account's address — within the last seven days (`ESCROW_RELEASE_WINDOW_MS`).
+The device opens the relay with its new key, then `inner` with the share,
+checks the result matches the vault's key check, and writes itself a wrap.
+Every escrow is then **replaced**, under new ids and so new shares, because the
+old shares have been released.
+
+**What this does not protect against**: the server and a partner working
+together. Each holds half; together they can open the user's own vault. That
+is inherent to splitting a key two ways, and is the price of being able to
+recover it at all. Every other combination — the partner alone, the server's
+database alone, a stolen session, the inbox alone — gets nothing.
+
+`crypto/escrow.test.ts` holds a frozen vector for the inner layer, made by an
+independent implementation, for the same reason as the others.
+
 ## Sealed records
 
 A **sealed record** is a row whose content the server cannot read. It keeps a
