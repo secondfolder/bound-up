@@ -82,18 +82,30 @@
 	const partnershipId = $derived(data.partner.id);
 	$effect(() => {
 		const id = partnershipId;
-		return watchPartnership({
+		// Whether the board is still here when a refresh it started finishes.
+		// Writing a thread sends its writer on to the thread's page, and the
+		// writer's own board hears that message too: the refresh resolved after
+		// the board had gone, read `data.threads` from a destroyed component,
+		// found it undefined, and threw "after is not iterable".
+		let mounted = true;
+		const stop = watchPartnership({
 			partnershipId: id,
 			onChange: (event) => {
 				if (event?.kind === 'read') {
 					return;
 				}
 				const before = data.threads;
-				void invalidate(`messages:board:${id}`).then(() =>
-					highlight(newlyArrived(before, data.threads))
-				);
+				void invalidate(`messages:board:${id}`).then(() => {
+					if (mounted) {
+						void highlight(newlyArrived(before, data.threads));
+					}
+				});
 			}
 		});
+		return () => {
+			mounted = false;
+			stop();
+		};
 	});
 	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 
