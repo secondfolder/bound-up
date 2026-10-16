@@ -10,8 +10,8 @@ Asking for another email-verification link is limited too, per client and
 per address, because each one is an email sent to an address the caller
 chose. Partner-assisted recovery has limits of its own, per email and per
 address, described in [account-recovery.md](account-recovery.md). Daydreams'
-replies are limited per account, for cost rather than guessing (see
-[below](#daydreams-replies)). Nothing else is limited.
+passages and setup suggestions are limited per account, for cost rather than
+guessing (see [below](#daydreams-replies)). Nothing else is limited.
 
 ## Why the app does it, not Better Auth
 
@@ -129,6 +129,13 @@ affect, and an unlimited dev server would still be spending real money. A
 refused reply answers 429 with `Retry-After` and the usual "Try again in …"
 wording, which the page shows beside the conversation. A malformed request is
 refused before it is counted. See [daydreams.md](daydreams.md#cost).
+
+Setup suggestions — more chips, filling in a character or scene, "Surprise
+me" — go to the model through `/api/daydreams/suggest`, counted the same way
+in a scope of their own (`daydream-suggest|user|<id>`,
+`DAYDREAM_SUGGEST_LIMITS`, `locals.daydreamSuggestRateLimit`): 30 a minute
+and 200 a day. Separate so that filling in forms never uses up someone's
+story; each is a small call.
 
 ## Self-hosted: the client's address
 

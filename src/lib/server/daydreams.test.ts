@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
 import {
+	appendTestTurn,
 	createTestDaydream,
 	createTestPartnership,
 	createTestUser,
@@ -16,15 +17,25 @@ import {
 	acceptDisclosure,
 	appendTurn,
 	createDaydream,
+	createLibraryItem,
+	createMark,
 	deleteDaydream,
+	deleteLibraryItem,
+	deleteMark,
 	getDaydream,
 	getDaydreamsWidget,
+	getLibrary,
 	hasAcceptedDisclosure,
+	type LibraryKind,
 	listDaydreams,
-	replaceLatestCharacterTurn,
-	updateDaydreamSetup
+	listLibrary,
+	readTurns,
+	setActiveTurn,
+	updateDaydreamSetup,
+	updateLibraryItem
 } from './daydreams';
 import type { Db } from './db';
+import { daydreams } from './db/schema';
 
 let harness: TestDb;
 let db: Db;
@@ -46,6 +57,27 @@ async function sealed(userId: string, label = 'x') {
 		ciphertext: fakeSealed(label),
 		payloadVersion: 1
 	};
+}
+
+/** Appends straight through `appendTurn`, for the cases the fixture would throw on. */
+async function append(
+	userId: string,
+	daydreamId: string,
+	parentId: string | null,
+	options: { id?: string; role?: 'user' | 'story'; at?: Date; sealedBy?: string } = {}
+) {
+	return await appendTurn(
+		db,
+		userId,
+		daydreamId,
+		{
+			id: options.id ?? crypto.randomUUID(),
+			parentId,
+			role: options.role ?? 'story',
+			content: await sealed(options.sealedBy ?? userId)
+		},
+		options.at
+	);
 }
 
 describe('the disclosure', () => {
@@ -144,48 +176,59 @@ describe('updateDaydreamSetup', () => {
 });
 
 describe('appendTurn', () => {
-	it('adds turns at the next position, and marks when the daydream was last played', async () => {
+	it('adds a root, then each turn one deeper than its parent, and moves the user to it', async () => {
 		const { id } = await createTestDaydream(db, ada.id);
+		const rootId = crypto.randomUUID();
 		const at = new Date('2026-03-01T12:00:00Z');
-		const first = await appendTurn(
-			db,
-			ada.id,
-			id,
-			{ id: crypto.randomUUID(), role: 'character', content: await sealed(ada.id) },
-			at
-		);
-		const second = await appendTurn(db, ada.id, id, {
-			id: crypto.randomUUID(),
-			role: 'user',
-			content: await sealed(ada.id)
+		expect(await append(ada.id, id, null, { id: rootId, at })).toEqual({ ok: true, position: 0 });
+		const childId = crypto.randomUUID();
+		expect(await append(ada.id, id, rootId, { id: childId, role: 'user' })).toEqual({
+			ok: true,
+			position: 1
 		});
-		expect(first).toMatchObject({ ok: true, position: 0, revision: 0 });
-		expect(second).toMatchObject({ ok: true, position: 1 });
-		expect((await readDaydreamTurnRows(db, id)).map((row) => row.role)).toEqual([
-			'character',
-			'user'
+		const rows = await readDaydreamTurnRows(db, id);
+		expect(rows.map((row) => [row.id, row.parentId, row.role, row.position])).toEqual([
+			[rootId, null, 'story', 0],
+			[childId, rootId, 'user', 1]
 		]);
+		expect(await readDaydreamRow(db, id)).toMatchObject({ activeTurnId: childId });
 		expect((await readDaydreamRow(db, id))?.lastTurnAt).not.toBeNull();
 	});
 
-	it('numbers each daydream on its own', async () => {
-		const a = await createTestDaydream(db, ada.id, ['character']);
-		const b = await createTestDaydream(db, ada.id);
-		const result = await appendTurn(db, ada.id, b.id, {
-			id: crypto.randomUUID(),
-			role: 'character',
-			content: await sealed(ada.id)
+	it('keeps two turns after the same one as two branches, never a conflict', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story', 'user']);
+		const parent = defined(turnIds[1], 'parent');
+		const first = await append(ada.id, id, parent);
+		const second = await append(ada.id, id, parent);
+		expect(first).toEqual({ ok: true, position: 2 });
+		expect(second).toEqual({ ok: true, position: 2 });
+		const siblings = (await readDaydreamTurnRows(db, id)).filter((row) => row.parentId === parent);
+		expect(siblings).toHaveLength(2);
+	});
+
+	it('allows a second root: a retried opening', async () => {
+		const { id } = await createTestDaydream(db, ada.id, ['story']);
+		expect(await append(ada.id, id, null)).toEqual({ ok: true, position: 0 });
+	});
+
+	it('refuses a parent that is not one of this daydream’s turns', async () => {
+		const other = await createTestDaydream(db, ada.id, ['story']);
+		const { id } = await createTestDaydream(db, ada.id);
+		expect(await append(ada.id, id, defined(other.turnIds[0], 'other turn'))).toEqual({
+			ok: false,
+			reason: 'bad-parent'
 		});
-		expect(result).toMatchObject({ ok: true, position: 0 });
-		expect(await readDaydreamTurnRows(db, a.id)).toHaveLength(1);
+		expect(await append(ada.id, id, crypto.randomUUID())).toEqual({
+			ok: false,
+			reason: 'bad-parent'
+		});
 	});
 
 	it('refuses a turn id that is taken, so a retried save cannot add it twice', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, ['character']);
-		const result = await appendTurn(db, ada.id, id, {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story']);
+		const result = await append(ada.id, id, null, {
 			id: defined(turnIds[0], 'turn'),
-			role: 'user',
-			content: await sealed(ada.id)
+			role: 'user'
 		});
 		expect(result).toEqual({ ok: false, reason: 'id-taken' });
 		expect(await readDaydreamTurnRows(db, id)).toHaveLength(1);
@@ -193,99 +236,51 @@ describe('appendTurn', () => {
 
 	it("refuses a turn in someone else's daydream", async () => {
 		const { id } = await createTestDaydream(db, ada.id);
-		const result = await appendTurn(db, jun.id, id, {
-			id: crypto.randomUUID(),
-			role: 'user',
-			content: await sealed(jun.id)
-		});
-		expect(result).toEqual({ ok: false, reason: 'not-found' });
+		expect(await append(jun.id, id, null)).toEqual({ ok: false, reason: 'not-found' });
 	});
 
 	it("refuses a turn sealed in a vault that is not the owner's", async () => {
 		const { id } = await createTestDaydream(db, ada.id);
-		const result = await appendTurn(db, ada.id, id, {
-			id: crypto.randomUUID(),
-			role: 'user',
-			content: await sealed(jun.id)
+		expect(await append(ada.id, id, null, { sealedBy: jun.id })).toEqual({
+			ok: false,
+			reason: 'wrong-vault'
 		});
-		expect(result).toEqual({ ok: false, reason: 'wrong-vault' });
 	});
 });
 
-describe('replaceLatestCharacterTurn', () => {
-	it('replaces the newest turn when it is the character’s', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, [
-			'character',
-			'user',
-			'character'
-		]);
-		const content = await sealed(ada.id, 'retried');
-		const result = await replaceLatestCharacterTurn(db, ada.id, id, {
-			turnId: defined(turnIds[2], 'latest'),
-			expectedRevision: 0,
-			content
+describe('moving between branches', () => {
+	it('moves the user to any of the daydream’s turns, and no one else’s', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story', 'user', 'story']);
+		const first = defined(turnIds[0], 'first');
+		expect(await setActiveTurn(db, ada.id, id, first)).toEqual({ ok: true });
+		expect(await readDaydreamRow(db, id)).toMatchObject({ activeTurnId: first });
+
+		const other = await createTestDaydream(db, ada.id, ['story']);
+		expect(await setActiveTurn(db, ada.id, id, defined(other.turnIds[0], 'other'))).toEqual({
+			ok: false,
+			reason: 'bad-parent'
 		});
-		expect(result).toEqual({ ok: true, revision: 1 });
-		const rows = await readDaydreamTurnRows(db, id);
-		expect(rows[2]).toMatchObject({ ciphertext: content.ciphertext, revision: 1, position: 2 });
+		expect(await setActiveTurn(db, jun.id, id, first)).toEqual({ ok: false, reason: 'not-found' });
 	});
 
-	it('refuses any turn but the newest', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, [
-			'character',
-			'user',
-			'character'
-		]);
-		const result = await replaceLatestCharacterTurn(db, ada.id, id, {
-			turnId: defined(turnIds[0], 'opening'),
-			expectedRevision: 0,
-			content: await sealed(ada.id)
-		});
-		expect(result).toEqual({ ok: false, reason: 'not-latest' });
-	});
-
-	it('refuses to rewrite what the user said, even when it is the newest', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, ['character', 'user']);
-		const result = await replaceLatestCharacterTurn(db, ada.id, id, {
-			turnId: defined(turnIds[1], 'user turn'),
-			expectedRevision: 0,
-			content: await sealed(ada.id)
-		});
-		expect(result).toEqual({ ok: false, reason: 'not-latest' });
-	});
-
-	it('refuses a stale revision, so two devices retrying cannot both land', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, ['character']);
-		const turnId = defined(turnIds[0], 'turn');
-		await replaceLatestCharacterTurn(db, ada.id, id, {
-			turnId,
-			expectedRevision: 0,
-			content: await sealed(ada.id)
-		});
-		const second = await replaceLatestCharacterTurn(db, ada.id, id, {
-			turnId,
-			expectedRevision: 0,
-			content: await sealed(ada.id)
-		});
-		expect(second).toEqual({ ok: false, reason: 'conflict' });
-	});
-
-	it("reads someone else's daydream as not there", async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, ['character']);
-		const result = await replaceLatestCharacterTurn(db, jun.id, id, {
-			turnId: defined(turnIds[0], 'turn'),
-			expectedRevision: 0,
-			content: await sealed(jun.id)
-		});
-		expect(result).toEqual({ ok: false, reason: 'not-found' });
+	it('opens turns by id, only from the owner’s own daydream', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story', 'user']);
+		const other = await createTestDaydream(db, ada.id, ['story']);
+		const opened = defined(
+			await readTurns(db, ada.id, id, [...turnIds, defined(other.turnIds[0], 'other')]),
+			'turns'
+		);
+		expect(opened.map((turn) => turn.id).sort()).toEqual([...turnIds].sort());
+		expect(opened[0]?.sealed.recordId).toBe(opened[0]?.id);
+		expect(await readTurns(db, jun.id, id, turnIds)).toBeNull();
 	});
 });
 
 describe('reading', () => {
 	it('lists only the owner’s daydreams, most recently played first', async () => {
-		const older = await createTestDaydream(db, ada.id, ['character']);
+		const older = await createTestDaydream(db, ada.id, ['story']);
 		const fresh = await createTestDaydream(db, ada.id);
-		const newer = await createTestDaydream(db, ada.id, ['character']);
+		const newer = await createTestDaydream(db, ada.id, ['story']);
 		await createTestDaydream(db, jun.id);
 
 		const ids = (await listDaydreams(db, ada.id)).map((daydream) => daydream.id);
@@ -305,17 +300,53 @@ describe('reading', () => {
 		expect(widget.total).toBe(4);
 	});
 
-	it('loads a daydream with its turns, oldest first', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, [
-			'character',
-			'user',
-			'character'
-		]);
+	it('loads the whole tree’s shape, and the branch being read with its content', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story', 'user', 'story']);
+		const [opening, said, reply] = turnIds;
+		// A retried reply beside the last one, then back to the first take.
+		const retry = await appendTestTurn(db, ada.id, id, defined(said, 'said'));
+		await setActiveTurn(db, ada.id, id, defined(reply, 'reply'));
+
 		const daydream = defined(await getDaydream(db, ada.id, id), 'daydream');
-		expect(daydream.turns.map((turn) => turn.id)).toEqual(turnIds);
-		expect(daydream.turns.map((turn) => turn.position)).toEqual([0, 1, 2]);
+		expect(daydream.activeTurnId).toBe(reply);
+		expect(daydream.tree.map((node) => node.id)).toEqual([...turnIds, retry]);
+		expect(daydream.tree.find((node) => node.id === retry)).toMatchObject({
+			parentId: said,
+			position: 2
+		});
+		expect(daydream.path.map((turn) => turn.id)).toEqual([opening, said, reply]);
+		expect(daydream.path[0]?.sealed.recordId).toBe(opening);
 		expect(daydream.setup.recordId).toBe(id);
-		expect(daydream.turns[0]?.sealed.recordId).toBe(turnIds[0]);
+	});
+
+	it('falls back to the newest leaf when the active turn is not set', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story', 'user']);
+		const retry = await appendTestTurn(db, ada.id, id, defined(turnIds[0], 'opening'), 'user');
+		await db.update(daydreams).set({ activeTurnId: null });
+		const daydream = defined(await getDaydream(db, ada.id, id), 'daydream');
+		expect(daydream.activeTurnId).toBe(retry);
+		expect(daydream.path.map((turn) => turn.id)).toEqual([turnIds[0], retry]);
+	});
+
+	it('loads a branch longer than one query can ask for', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id);
+		let parent: string | null = null;
+		for (let index = 0; index < 130; index += 1) {
+			parent = await appendTestTurn(db, ada.id, id, parent, index % 2 ? 'user' : 'story');
+			turnIds.push(parent);
+		}
+		const daydream = defined(await getDaydream(db, ada.id, id), 'daydream');
+		expect(daydream.path.map((turn) => turn.id)).toEqual(turnIds);
+	});
+
+	it('is empty and has no active turn before the opening', async () => {
+		const { id } = await createTestDaydream(db, ada.id);
+		expect(await getDaydream(db, ada.id, id)).toMatchObject({
+			activeTurnId: null,
+			tree: [],
+			path: [],
+			marks: []
+		});
 	});
 
 	it("does not load someone else's daydream", async () => {
@@ -324,12 +355,147 @@ describe('reading', () => {
 	});
 });
 
+describe('marks', () => {
+	it('adds a bookmark or reaction to one of the daydream’s turns, and lists it', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story']);
+		const turnId = defined(turnIds[0], 'turn');
+		const markId = crypto.randomUUID();
+		expect(
+			await createMark(db, ada.id, id, { id: markId, turnId, content: await sealed(ada.id) })
+		).toEqual({
+			ok: true
+		});
+		const daydream = defined(await getDaydream(db, ada.id, id), 'daydream');
+		expect(daydream.marks).toEqual([
+			expect.objectContaining({
+				id: markId,
+				turnId,
+				sealed: expect.objectContaining({ recordId: markId })
+			})
+		]);
+	});
+
+	it('refuses a turn that is not this daydream’s, a taken id, and someone else’s daydream', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story']);
+		const other = await createTestDaydream(db, ada.id, ['story']);
+		const turnId = defined(turnIds[0], 'turn');
+		expect(
+			await createMark(db, ada.id, id, {
+				id: crypto.randomUUID(),
+				turnId: defined(other.turnIds[0], 'other'),
+				content: await sealed(ada.id)
+			})
+		).toEqual({ ok: false, reason: 'bad-parent' });
+		const markId = crypto.randomUUID();
+		await createMark(db, ada.id, id, { id: markId, turnId, content: await sealed(ada.id) });
+		expect(
+			await createMark(db, ada.id, id, { id: markId, turnId, content: await sealed(ada.id) })
+		).toEqual({
+			ok: false,
+			reason: 'id-taken'
+		});
+		expect(
+			await createMark(db, jun.id, id, {
+				id: crypto.randomUUID(),
+				turnId,
+				content: await sealed(jun.id)
+			})
+		).toEqual({ ok: false, reason: 'not-found' });
+	});
+
+	it('deletes a mark, only the owner’s', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story']);
+		const markId = crypto.randomUUID();
+		await createMark(db, ada.id, id, {
+			id: markId,
+			turnId: defined(turnIds[0], 'turn'),
+			content: await sealed(ada.id)
+		});
+		expect(await deleteMark(db, jun.id, id, markId)).toBe(false);
+		expect(await deleteMark(db, ada.id, id, markId)).toBe(true);
+		expect(await deleteMark(db, ada.id, id, markId)).toBe(false);
+	});
+});
+
+describe('the libraries', () => {
+	describe.each(['characters', 'scenes'] as const satisfies readonly LibraryKind[])(
+		'%s',
+		(kind) => {
+			it('adds, lists, edits at a revision, and deletes', async () => {
+				const itemId = crypto.randomUUID();
+				expect(
+					await createLibraryItem(db, ada.id, kind, { id: itemId, content: await sealed(ada.id) })
+				).toEqual({
+					ok: true,
+					revision: 0
+				});
+				expect((await listLibrary(db, ada.id, kind)).map((item) => item.id)).toEqual([itemId]);
+				expect(
+					await updateLibraryItem(db, ada.id, kind, itemId, {
+						content: await sealed(ada.id, 'edited'),
+						expectedRevision: 0
+					})
+				).toEqual({ ok: true, revision: 1 });
+				expect(
+					await updateLibraryItem(db, ada.id, kind, itemId, {
+						content: await sealed(ada.id),
+						expectedRevision: 0
+					})
+				).toEqual({ ok: false, reason: 'conflict' });
+				expect((await listLibrary(db, ada.id, kind))[0]).toMatchObject({ revision: 1 });
+				expect(await deleteLibraryItem(db, ada.id, kind, itemId)).toBe(true);
+				expect(await listLibrary(db, ada.id, kind)).toEqual([]);
+			});
+
+			it('is the owner’s alone', async () => {
+				const itemId = crypto.randomUUID();
+				await createLibraryItem(db, ada.id, kind, { id: itemId, content: await sealed(ada.id) });
+				expect(await listLibrary(db, jun.id, kind)).toEqual([]);
+				expect(
+					await updateLibraryItem(db, jun.id, kind, itemId, {
+						content: await sealed(jun.id),
+						expectedRevision: 0
+					})
+				).toEqual({ ok: false, reason: 'not-found' });
+				expect(await deleteLibraryItem(db, jun.id, kind, itemId)).toBe(false);
+				expect(
+					await createLibraryItem(db, ada.id, kind, {
+						id: crypto.randomUUID(),
+						content: await sealed(jun.id)
+					})
+				).toEqual({ ok: false, reason: 'wrong-vault' });
+			});
+		}
+	);
+
+	it('keeps the two libraries apart, and a deletion leaves daydreams alone', async () => {
+		const itemId = crypto.randomUUID();
+		await createLibraryItem(db, ada.id, 'characters', {
+			id: itemId,
+			content: await sealed(ada.id)
+		});
+		const { id } = await createTestDaydream(db, ada.id, ['story']);
+		expect(await getLibrary(db, ada.id)).toMatchObject({
+			characters: [expect.objectContaining({ id: itemId })],
+			scenes: []
+		});
+		await deleteLibraryItem(db, ada.id, 'characters', itemId);
+		expect(await getDaydream(db, ada.id, id)).not.toBeNull();
+	});
+});
+
 describe('deleteDaydream', () => {
-	it('deletes the daydream and every turn of it', async () => {
-		const { id } = await createTestDaydream(db, ada.id, ['character', 'user']);
+	it('deletes the daydream and every turn and mark of it', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story', 'user']);
+		await createMark(db, ada.id, id, {
+			id: crypto.randomUUID(),
+			turnId: defined(turnIds[0], 'turn'),
+			content: await sealed(ada.id)
+		});
 		expect(await deleteDaydream(db, ada.id, id)).toBe(true);
 		expect(await readDaydreamRow(db, id)).toBeUndefined();
 		expect(await readDaydreamTurnRows(db, id)).toEqual([]);
+		expect(await db.query.daydreamMarks.findMany()).toEqual([]);
 	});
 
 	it("does not delete someone else's", async () => {

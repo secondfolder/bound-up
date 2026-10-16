@@ -125,8 +125,9 @@ the feature does not raise the other side's budget.
 
 ### Daydreams
 
-`daydreams` turns on Daydreams: roleplay with a made-up character whose
-replies are written by a hosted language model (see
+`daydreams` turns on Daydreams: stories the user makes up and plays, with
+characters or a narrator, whose passages are written by a hosted language
+model (see
 [daydreams.md](daydreams.md)). Every load, action and endpoint under
 `/daydreams` and `/api/daydreams` calls `requireFeature` itself, and the
 `/home` load reads the Daydreams card only for an account that holds it.

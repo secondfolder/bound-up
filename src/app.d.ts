@@ -63,6 +63,12 @@ declare global {
 			 */
 			daydreamRateLimit: DaydreamRateLimiter;
 			/**
+			 * One Daydreams suggestion (chips, filling in, "Surprise me") for an
+			 * account, against `DAYDREAM_SUGGEST_LIMITS`: a scope of its own, so
+			 * setting up never uses up the story's replies.
+			 */
+			daydreamSuggestRateLimit: DaydreamRateLimiter;
+			/**
 			 * This server's mailer, built on its first send (`lazyMailer` in
 			 * hooks.server.ts). Send through `sendInBackground` so no response
 			 * waits on the provider. See `$lib/server/mail` and docs/email.md.

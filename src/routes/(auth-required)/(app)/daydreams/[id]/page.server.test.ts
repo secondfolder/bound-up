@@ -36,10 +36,11 @@ const at = (user: TestUser | null, id: string) =>
 	fakeEvent({ db, user, params: { id }, path: `/daydreams/${id}` });
 
 describe('load', () => {
-	it('loads the daydream and its conversation', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, ['character', 'user']);
+	it('loads the daydream and the branch being read', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story', 'user']);
 		const data = await runLoad(load(at(ada, id)));
-		expect(data.daydream.turns.map((turn: { id: string }) => turn.id)).toEqual(turnIds);
+		expect(data.daydream.path.map((turn: { id: string }) => turn.id)).toEqual(turnIds);
+		expect(data.daydream.activeTurnId).toBe(turnIds.at(-1));
 		expect(data).toMatchObject({ available: true, accepted: false });
 	});
 
@@ -67,7 +68,7 @@ describe('load', () => {
 
 describe('delete', () => {
 	it('deletes the daydream and its turns, and goes back to the list', async () => {
-		const { id } = await createTestDaydream(db, ada.id, ['character']);
+		const { id } = await createTestDaydream(db, ada.id, ['story']);
 		expect(await runAndCatch(() => runAction(actions, 'delete', at(ada, id)))).toMatchObject({
 			type: 'redirect',
 			status: 303,

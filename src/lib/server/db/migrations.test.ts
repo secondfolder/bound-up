@@ -85,3 +85,69 @@ test('no migration rebuilds a table without review', async () => {
 	}
 	expect(rebuilds).toEqual([]);
 });
+
+/** Every migration file, in the order they apply, split at the first one named. */
+async function migrationsSplitAt(first: string): Promise<[string[], string[]]> {
+	const { readdir } = await import('node:fs/promises');
+	const folder = path.resolve(process.cwd(), 'drizzle');
+	const files = (await readdir(folder)).filter((file) => file.endsWith('.sql')).sort();
+	const at = files.indexOf(first);
+	if (at === -1) {
+		throw new Error(`${first} is not in drizzle/`);
+	}
+	const read = (names: string[]) =>
+		Promise.all(names.map((name) => readFile(path.join(folder, name), 'utf8')));
+	return [await read(files.slice(0, at)), await read(files.slice(at))];
+}
+
+test('the daydream tree migrations turn each line of turns into a branch', async () => {
+	client = createClient({ url: ':memory:' });
+	const [before, after] = await migrationsSplitAt('0033_daydream_turn_tree.sql');
+	for (const sql of before) {
+		await client.executeMultiple(sql);
+	}
+
+	// Foreign keys off, so the rows need no user or vault behind them: what is
+	// under test is the shape the backfill writes.
+	await client.execute('PRAGMA foreign_keys = OFF');
+	const now = Date.now();
+	for (const daydream of ['d1', 'd2']) {
+		await client.execute({
+			sql: `insert into daydreams (id, owner_id, ciphertext, vault_id, payload_version, created_at, updated_at)
+			      values (?, 'u1', 'sb1.x', 'v1', 1, ?, ?)`,
+			args: [daydream, now, now]
+		});
+	}
+	const turns: [string, string, string, number][] = [
+		['t0', 'd1', 'character', 0],
+		['t1', 'd1', 'user', 1],
+		['t2', 'd1', 'character', 2],
+		['u0', 'd2', 'character', 0]
+	];
+	for (const [id, daydream, role, position] of turns) {
+		await client.execute({
+			sql: `insert into daydream_turns (id, daydream_id, role, position, ciphertext, vault_id, payload_version, created_at, updated_at)
+			      values (?, ?, ?, ?, 'sb1.x', 'v1', 1, ?, ?)`,
+			args: [id, daydream, role, position, now, now]
+		});
+	}
+
+	for (const sql of after) {
+		await client.executeMultiple(sql);
+	}
+
+	const rows = await client.execute(
+		'select id, parent_id, role, position from daydream_turns order by daydream_id, position'
+	);
+	expect(rows.rows.map((row) => ({ ...row }))).toEqual([
+		{ id: 't0', parent_id: null, role: 'story', position: 0 },
+		{ id: 't1', parent_id: 't0', role: 'user', position: 1 },
+		{ id: 't2', parent_id: 't1', role: 'story', position: 2 },
+		{ id: 'u0', parent_id: null, role: 'story', position: 0 }
+	]);
+	const active = await client.execute('select id, active_turn_id from daydreams order by id');
+	expect(active.rows.map((row) => ({ ...row }))).toEqual([
+		{ id: 'd1', active_turn_id: 't2' },
+		{ id: 'd2', active_turn_id: 'u0' }
+	]);
+});

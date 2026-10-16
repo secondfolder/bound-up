@@ -115,13 +115,49 @@
 			"ciphertext": "sb1.NlqqbuwnU9r0s4SE1MTAMmwKC9PFsjZHYL137gwUOED9Vd1D1QwCerDKc6FNcvTWhL6SeDIpQOO5dR-X3C-oCNy7DZAyPo8d1_KFNYVjb9r1MA02eD74LMrU9-tn-fV3P7h66uu0MxX33QNoGMgTLzMcMhuQM0EDA0GmnVkM_QeJqPZ9FkQeweTZkoO45tZ2mYtG9yx2YdygGIAiPGTdnJYJi5k0TErYGkrysglPlQ6yMWXI41g2Ku6dZvA9nvaOlmLCNJ3y7ha1Yv_lFIOxQ790xCwiVorgwpb6F9OoyzcEeILgLJnmUkhiBdz4H31RqnkK124",
 			"expected": {
 				"title": "Frozen evening",
-				"characterName": "Mara",
-				"persona": "Calm, exacting, amused.",
+				"voice": {
+					"narrator": "none",
+					"stance": "self",
+					"protagonistName": ""
+				},
+				"characters": [
+					{
+						"name": "Mara",
+						"archetype": "",
+						"personality": "Calm, exacting, amused.",
+						"speech": "",
+						"appearance": "",
+						"relationship": "",
+						"likes": "",
+						"notes": "",
+						"dials": {
+							"tone": null,
+							"control": null,
+							"strictness": null,
+							"edge": null,
+							"talk": null
+						},
+						"sourceId": null,
+						"sourceRevision": null
+					}
+				],
+				"scene": {
+					"title": "Frozen evening",
+					"setting": "",
+					"premise": "A late meeting that runs over.",
+					"yourRole": "",
+					"tone": "slow-burn",
+					"notes": "",
+					"sourceId": null,
+					"sourceRevision": null
+				},
 				"lead": "character",
-				"scenario": "A late meeting that runs over.",
-				"tone": "slow-burn",
 				"limits": "Nothing public.",
-				"safeword": "pineapple"
+				"dials": {
+					"intensity": 3,
+					"pace": 3,
+					"length": "medium"
+				}
 			}
 		},
 		{
@@ -130,7 +166,184 @@
 			"recordId": "00000000-0000-4000-8000-0000000000d2",
 			"ciphertext": "sb1.kofN1Q2NWHr5q_1uvaoFW0NVdneTBrL1iL-GMiYFIkL0rwpMT0nklZ7EvLq8FRskwAyQfHk9A7s9YuuTAlZa",
 			"expected": {
+				"type": "text",
 				"text": "Frozen.\n\nStill frozen."
+			}
+		},
+		{
+			"kind": "daydream-setup",
+			"version": 2,
+			"recordId": "00000000-0000-4000-8000-0000000000d3",
+			"ciphertext": "sb1.BBmcCBz8khvaJbbN1Oj3wMegZDHtWVdV-zFSn2LwqR7GYQm0436fqeWhq00C72MU2LlRbcBqEyT2VpzTXMF7eUQDQtTvLxfBb6kGAxbAZj4Wk0dPCEsDQmwnI5pVGpc4ZDne_aOx283eTW-JV206YnwqW9lDXE3pNxORu1haVvZIkV0aV8hOqD6tLLQfBwHGSQMGkuT89n9S2rUM5RmP9BjF_350WmTKIREeFuvGDX4F1bziv2HLj7NN32CnuvLUyXE5UIlmdpEELSyWF6kiw5YLilgv16tURHYXUbu9Wj3H_xHa5NRHZDMRy0j1Bs-XDpoSuolnoZZfMUmzbsEC4ZwPGW21ULW64anzObmH3p2Wvq7gVYXsl8ciWf48cNez6KCd2pcsCdEU0S07OyDPPc6szunH3rlntH7vzp9a6Jjy1SKW2BxJL_lJUn5WwvI00zNH1npMcAIderNE6_8uP2RKkQct3Uj4rW6XgKm22Bvl5drb2EW406STJC_6VwWQZEJNEiCDfieaRwmQ8xIFlS0c_sze8G7BOfuZUHb5Kt5x4MdY-qHNd8V7OQrDuwLPjQMIw5o6YGo2MFhLhOdaG4kSbPfuEKd2nMybOEtdMIemfO2HxqVMIFMW31Ye30z4jX77D3SE-LMVhsExqWWjk1qgs_vQS6wFYAXX14TLNtCZtFKNKyCqtQzKBNao22Eg3uc1A-doH2ACh6MqgYTbplG6AfZIVi3Ueren7T6EADLiVdCV6jYr3aACaBWuU_od3AWhjwjdKoYFbAMn1cFquCs-pgkTtFmi09PIOdSSQjnB3rwQz0iVv3DJqaoiXrH_Ncp_HvZtoFmcD9c9NQzAMJ_HmcEuDZgpd5QYBQao7Xvh591Ed7XZSHnMeeCPZMvgPUHgw5VOK1kTw3BHsxLBljszXyQc7Ee7A0TV-cQs2o_9jHTPmeRLehbvhjbyYQSQrlybHi4EiHmDo_YpCDZL95xoyXlX2E_ukN2AJED0OBEYP3J4Qm9jkoHbEubnluE0yIFrtF8x1x_9KknIraE4_Vdts1liBmobeJutysAly3oCFHW5L_socWtowuGlB7ngDNm5nNu6hp7II5kiD4Fgv80zZOuZCf9x6RCeishblpttUJ6iwTMh356OmqBsRLsYHx8mmjnSGSJnhOP6n1x3u2k9EZIFGQtJ9cmjcn-HNAsyx-6EwgwFryeJ6bp3cXQBRpUkFVqDuhM1Ywjd_YYW2Os8-KdFtUKBCENmMstoaWnwrbadVhF8c7vSEyoDJgxkr3ENUiepVUaUg_8Qta-4IUYLVEmOw0q8ZuogrYVfhuza535Apm6gm8wEtNPvK0auB1Kb8qHr0ThonFBIWTH6PKnM-3kawUfMiwlv_3HOKwDBU_GhWhCKIV9LxwFfQicQ2BfpgnurENKfmfB8b7y0rMAyVCRJcPvZJ2dVO2nOZSIrOCHnDfHCNmRWhsA-9gguhJ6_CLZOatLM_hn-Bb6mr3_IDalIHAmmZ-ye2U3MZaPS9WROO4j8P-HE7QPth9SwaTnA-jJKk_OA3UE",
+			"expected": {
+				"title": "Frozen evening, again",
+				"voice": {
+					"narrator": "third-person",
+					"stance": "absent",
+					"protagonistName": ""
+				},
+				"characters": [
+					{
+						"name": "Mara",
+						"archetype": "The exacting mentor",
+						"personality": "Calm, exacting, amused.",
+						"speech": "Short sentences.",
+						"appearance": "Grey suit.",
+						"relationship": "Your manager.",
+						"likes": "Punctuality",
+						"notes": "Never raises her voice.",
+						"dials": {
+							"tone": "cold",
+							"control": 5,
+							"strictness": 4,
+							"edge": null,
+							"talk": 2
+						},
+						"sourceId": "00000000-0000-4000-8000-0000000000d6",
+						"sourceRevision": 2
+					},
+					{
+						"name": "Jun",
+						"archetype": "The exacting mentor",
+						"personality": "Calm, exacting, amused.",
+						"speech": "Short sentences.",
+						"appearance": "Grey suit.",
+						"relationship": "Your manager.",
+						"likes": "Punctuality",
+						"notes": "Never raises her voice.",
+						"dials": {
+							"tone": null,
+							"control": null,
+							"strictness": null,
+							"edge": null,
+							"talk": null
+						},
+						"sourceId": null,
+						"sourceRevision": null
+					}
+				],
+				"scene": {
+					"title": "Frozen evening",
+					"setting": "An empty office.",
+					"premise": "A late meeting that runs over.",
+					"yourRole": "The new hire",
+					"tone": "slow-burn",
+					"notes": "",
+					"sourceId": null,
+					"sourceRevision": null
+				},
+				"lead": "shared",
+				"limits": "Nothing public.",
+				"dials": {
+					"intensity": 4,
+					"pace": 2,
+					"length": "long"
+				}
+			}
+		},
+		{
+			"kind": "daydream-turn",
+			"version": 2,
+			"recordId": "00000000-0000-4000-8000-0000000000d4",
+			"ciphertext": "sb1.CYQ02FM7A85U9Lgov1vcFYlIU4hCGWDa3K5C92glWcWTWXF09cuXTbmZ3aWb129apxZ__i_rH9AtnDMmHwv_FG5E0NQV3k9VAUKWuh8xI3y6aJvSBAB36yfts4BdNo8aeJ-Uqqx2rLkrJi6v5S_9L3yjBKSREml1fL4BWS5csnTyb9TB1caCp2X4VHNBEy5lIom4izNcVud1VpBMfvl378ONab-NDj_qR9tLJRZCP98Wa62y9lTluzIU6_7Gh5z3mSiUOjXVgSKXBnZBLVjRvYwK4HczP3w5O9m1geI7HRBflXC0snU51WkT-94da9gsqFpsZ3B_97lw642gA8kK2bX0QtKFK4bL_fRWJOu0eE9AkUvpOAd_Sn-5BFhW7S7AvSvQys-Op6M3wtY511lGd689R6A1kSrfVokldpknu55ityhaBOeTPRbT7c3FtRyhdvBE7xdE32f2fjeg06cIDUt7ClbKn0J6qeQ-q-amLm78rU5q41OK_BxjDYREQkhrpTPdSeWXpC2Wxgssaywjn7-Uh_1XUVQT4As7xF0N-UWur0PG8iVF7HBoNQLgkdko6FH64iaN5OZeBdCoCE4IL-gPkG40GT900lQSptL4Sxx81gQrFfCsJasmEdiU3F_gmFgxcHCApcOiatzqndEXhebOo5ZKdrUHfyN6g8IsDFMPcFfTjWMNSsmkCDD6Asjgky5TCWU",
+			"expected": {
+				"type": "text",
+				"text": "Frozen.\n\nStill frozen.",
+				"meta": {
+					"suggestions": ["Hold still."],
+					"directions": {
+						"add": [
+							{
+								"id": "slower",
+								"label": "Slower"
+							},
+							{
+								"id": "surprise-me",
+								"label": "Surprise me"
+							}
+						],
+						"remove": ["faster"]
+					},
+					"roll": {
+						"prompt": "Roll to hold still",
+						"sides": 6,
+						"outcomes": [
+							{
+								"min": 1,
+								"max": 3,
+								"label": "You move"
+							},
+							{
+								"min": 4,
+								"max": 6,
+								"label": "You hold"
+							}
+						]
+					},
+					"readAs": "cowrite",
+					"ooc": false,
+					"rewriteOf": {
+						"turnId": "00000000-0000-4000-8000-0000000000d2",
+						"quote": {
+							"start": 0,
+							"end": 7,
+							"text": "Frozen."
+						},
+						"instruction": "Colder."
+					}
+				}
+			}
+		},
+		{
+			"kind": "daydream-mark",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000d5",
+			"ciphertext": "sb1.dYmewyTeFGlWMLKoyiEMctWLgC5yvuxLeb08bvKq2lWCtxL8LqE0MQh6kz6JtfBEWUZRTgukShiDvK_CVWODRuHyjURUmLu93qaQExMUgpJBCsmNB-QVVJZoiFsx3edNNvtfvkZ99i2Pm2fUBZbVPrEGleOGmKcepTk",
+			"expected": {
+				"type": "bookmark",
+				"label": "The good bit",
+				"quote": {
+					"start": 9,
+					"end": 22,
+					"text": "Still frozen."
+				}
+			}
+		},
+		{
+			"kind": "daydream-character",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000d6",
+			"ciphertext": "sb1.0PWB6uU7b6RTIANyLCKgHPHEZQQTpXS3JRFwrwpFGcB0RvHH2ExRHJfEpnrj5ubLW5b49HtG_fvZIgrXCzMEdCxBj__qWolpTjUs6nRwYkUib4V0LBXc8FiDnIvecWgXrOUAYO7U50HnujIV4trfiPEa1_vgyN8SQpfjEgQAiLQY14hJUXjM9gTnyGG5ZqRHZNRZq-JwiQsMhIv3LyhlMzneVH1gZsGH2mDkmzrZAv5VrHg2k79dmdQtmH9qYBgosUBTL21VqTZQGvJ0RrFmINMiLreyEG5wYifbGf2R70tepf5mnGSzgLPs56i1DpsYquty4vsg2ZchCJfdH3NHxw9Mfnd3QAVmPazpR9QHUvx5qgZYaPK5NZhZR_JyddVvm3MxEXppZvE8eGbWYT1fkYYJUdQqe3JJP2X1OZWlShSKqNqP5XXKxCu3",
+			"expected": {
+				"name": "Mara",
+				"archetype": "The exacting mentor",
+				"personality": "Calm, exacting, amused.",
+				"speech": "Short sentences.",
+				"appearance": "Grey suit.",
+				"relationship": "Your manager.",
+				"likes": "Punctuality",
+				"notes": "Never raises her voice.",
+				"dials": {
+					"tone": "cold",
+					"control": 5,
+					"strictness": 4,
+					"edge": null,
+					"talk": 2
+				}
+			}
+		},
+		{
+			"kind": "daydream-scene",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000d7",
+			"ciphertext": "sb1.2T-r4OH8NMMJYT3ldHOG59qKHkhf2UDRVuYZb8JAwQW7I73xVbV_M-7jlzdn4sPEF8jXFWVa_CTNgMgd4ky9Ac4oYreSlzTp0O6-YIcoN5jju70_dqaNQ6JweYDhlkIaeXQ8bnkk4EqLEdp9ghhb6Cp0fzsWcBLhhf-JcfEpTnF9GHMDBJh1k2wVAbWdiMLZzEXLLjGPQMpQRNdYJ4EBuYpqLFOrG0qFH6oqZ4pwDd9QqLhjiWA",
+			"expected": {
+				"title": "Frozen evening",
+				"setting": "An empty office.",
+				"premise": "A late meeting that runs over.",
+				"yourRole": "The new hire",
+				"tone": "slow-burn",
+				"notes": ""
 			}
 		}
 	]

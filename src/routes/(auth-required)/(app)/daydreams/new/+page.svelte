@@ -13,11 +13,16 @@
 		backLabel="Back to daydreams"
 		backText="Daydreams"
 		title="New daydream"
-		description="Who you're playing with, and what happens. You can change any of it later."
+		description="How it's told, who's in it, and what happens. You can change any of it later."
 	/>
 
 	<div class="content">
-		<DaydreamSetupForm setupForm={data.setupForm} submitLabel="Start daydreaming" />
+		<DaydreamSetupForm
+			setupForm={data.setupForm}
+			library={data.library}
+			suggestionsOn={data.accepted && data.available}
+			submitLabel="Start daydreaming"
+		/>
 	</div>
 </section>
 

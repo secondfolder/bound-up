@@ -1,23 +1,42 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { assertNever } from '../assert-never';
 import type { DaydreamTurnRole } from '../daydream';
-import { daydreamSetupKind, daydreamTurnKind } from '../sealed-kinds/daydreams';
+import { indexTree, pathTo } from '../daydream/tree';
+import type { SealedKind } from '../sealed';
+import {
+	daydreamCharacterKind,
+	daydreamMarkKind,
+	daydreamSceneKind,
+	daydreamSetupKind,
+	daydreamTurnKind
+} from '../sealed-kinds/daydreams';
 import type {
+	DaydreamLibraryItemView,
+	DaydreamLibraryView,
 	DaydreamListItemView,
+	DaydreamMarkView,
 	DaydreamsWidgetView,
+	DaydreamTreeNodeView,
 	DaydreamTurnView,
 	DaydreamView
 } from '../types';
 import type { Db } from './db';
-import { daydreamPreferences, daydreams, daydreamTurns } from './db/schema';
+import {
+	daydreamCharacters,
+	daydreamMarks,
+	daydreamPreferences,
+	daydreamScenes,
+	daydreams,
+	daydreamTurns
+} from './db/schema';
 import { type SealedWrite, sealedIsAcceptable, selfVaultIdFor } from './sealed-content';
 
 /**
  * Every database access for Daydreams. See docs/daydreams.md.
  *
  * Everything here is the owner's alone: there is no partner side to a
- * daydream, so every query is scoped to `ownerId`, and someone else's id
- * reads exactly like one that does not exist. The content is sealed; what the
+ * daydream or a library, so every query is scoped to the owner, and someone
+ * else's id reads exactly like one that does not exist. The content is sealed; what the
  * server checks is the envelope (`sealedIsAcceptable`) and that it is sealed
  * under the owner's own vault.
  */
@@ -29,19 +48,28 @@ export type DaydreamRefusal =
 	| 'id-taken'
 	| 'not-found'
 	| 'conflict'
-	| 'not-latest';
+	| 'bad-parent';
 
 export type DaydreamResult<T = object> =
 	| ({ ok: true } & T)
 	| { ok: false; reason: DaydreamRefusal };
 
-/** The most turns a daydream page loads. Older ones stay stored; see `getDaydream`. */
+/** The most turns of the branch being read that a page loads. Older ones stay stored; see `getDaydream`. */
 export const MAX_LOADED_TURNS = 500;
+
+/** The most of a daydream's tree a page loads: the newest, by when they were written. */
+export const MAX_TREE_NODES = 2000;
+
+/** The most marks a page loads. */
+export const MAX_MARKS = 500;
+
+/** The most turns one `readTurns` call opens. D1 allows 100 bound parameters a statement. */
+export const MAX_READ_TURNS = 100;
 
 async function contentProblem(
 	db: Db,
 	userId: string,
-	kind: typeof daydreamSetupKind | typeof daydreamTurnKind,
+	kind: SealedKind<unknown>,
 	content: SealedWrite
 ): Promise<'bad-content' | 'wrong-vault' | null> {
 	if (!sealedIsAcceptable(kind, content.ciphertext, content.payloadVersion)) {
@@ -153,54 +181,131 @@ export async function ownsDaydream(db: Db, userId: string, daydreamId: string): 
 	return Boolean(row);
 }
 
+const treeColumns = {
+	id: daydreamTurns.id,
+	parentId: daydreamTurns.parentId,
+	role: daydreamTurns.role,
+	position: daydreamTurns.position,
+	createdAt: daydreamTurns.createdAt
+} as const;
+
+const turnColumns = {
+	...treeColumns,
+	ciphertext: daydreamTurns.ciphertext,
+	vaultId: daydreamTurns.vaultId,
+	payloadVersion: daydreamTurns.payloadVersion
+} as const;
+
+function toTurnView(row: {
+	id: string;
+	parentId: string | null;
+	role: DaydreamTurnRole;
+	position: number;
+	createdAt: Date;
+	ciphertext: string;
+	vaultId: string;
+	payloadVersion: number;
+}): DaydreamTurnView {
+	return {
+		id: row.id,
+		parentId: row.parentId,
+		role: row.role,
+		position: row.position,
+		createdAt: row.createdAt,
+		sealed: {
+			recordId: row.id,
+			vaultId: row.vaultId,
+			ciphertext: row.ciphertext,
+			payloadVersion: row.payloadVersion
+		}
+	};
+}
+
+/** Turns of one daydream by id, in chunks D1 accepts. Returned in no particular order. */
+async function turnsById(
+	db: Db,
+	daydreamId: string,
+	ids: readonly string[]
+): Promise<DaydreamTurnView[]> {
+	const found: DaydreamTurnView[] = [];
+	for (let start = 0; start < ids.length; start += MAX_READ_TURNS) {
+		const chunk = ids.slice(start, start + MAX_READ_TURNS);
+		const rows = await db
+			.select(turnColumns)
+			.from(daydreamTurns)
+			.where(and(eq(daydreamTurns.daydreamId, daydreamId), inArray(daydreamTurns.id, chunk)));
+		found.push(...rows.map(toTurnView));
+	}
+	return found;
+}
+
 /**
- * A daydream and its conversation, or null when it is not the user's.
+ * A daydream as its page shows it, or null when it is not the user's.
  *
- * At most `MAX_LOADED_TURNS`, the newest, because D1 charges for rows read
- * and a long-running scene could otherwise make every visit cost thousands.
- * The model is only ever sent the newest turns anyway (`MAX_CONTEXT_CHARS`).
+ * The whole tree's shape comes without content — ids, parents, roles, depth —
+ * because that is cheap and draws the branch map and the switchers. Content
+ * comes only for the branch being read: the root down to the active turn,
+ * at most `MAX_LOADED_TURNS` of it, the newest. Other branches' turns are
+ * opened when someone moves to them (`readTurns`). D1 charges for rows read
+ * and their size, and a long story with many retries would otherwise send
+ * every take of every passage on every visit.
  */
 export async function getDaydream(
 	db: Db,
 	userId: string,
 	daydreamId: string
 ): Promise<DaydreamView | null> {
-	const daydream = await getDaydreamSetup(db, userId, daydreamId);
-	if (!daydream) {
+	const [row] = await db
+		.select({
+			id: daydreams.id,
+			revision: daydreams.revision,
+			ciphertext: daydreams.ciphertext,
+			vaultId: daydreams.vaultId,
+			payloadVersion: daydreams.payloadVersion,
+			activeTurnId: daydreams.activeTurnId
+		})
+		.from(daydreams)
+		.where(and(eq(daydreams.id, daydreamId), eq(daydreams.ownerId, userId)))
+		.limit(1);
+	if (!row) {
 		return null;
 	}
-	const turns = await db
-		.select({
-			id: daydreamTurns.id,
-			role: daydreamTurns.role,
-			position: daydreamTurns.position,
-			revision: daydreamTurns.revision,
-			ciphertext: daydreamTurns.ciphertext,
-			vaultId: daydreamTurns.vaultId,
-			payloadVersion: daydreamTurns.payloadVersion
-		})
-		.from(daydreamTurns)
-		.where(eq(daydreamTurns.daydreamId, daydreamId))
-		// Positions are unique per daydream, so `id` never decides; it is
-		// there because ordering is always total here (AGENTS.md, invariant 8).
-		.orderBy(desc(daydreamTurns.position), desc(daydreamTurns.id))
-		.limit(MAX_LOADED_TURNS);
+	const [tree, marks] = await Promise.all([
+		db
+			.select(treeColumns)
+			.from(daydreamTurns)
+			.where(eq(daydreamTurns.daydreamId, daydreamId))
+			.orderBy(desc(daydreamTurns.createdAt), desc(daydreamTurns.id))
+			.limit(MAX_TREE_NODES),
+		listMarks(db, daydreamId)
+	]);
+	const nodes: DaydreamTreeNodeView[] = tree.reverse();
+	const index = indexTree(nodes);
+	// An active turn that is missing (never set, or older than the tree loaded)
+	// falls back to the newest leaf, which is where the story was last left.
+	// `nodes` is oldest first, so that is the last turn with no children.
+	const fallback = nodes.findLast((node) => (index.children.get(node.id)?.length ?? 0) === 0);
+	const activeTurnId =
+		row.activeTurnId !== null && index.byId.has(row.activeTurnId)
+			? row.activeTurnId
+			: (fallback?.id ?? null);
+	const pathIds = pathTo(index, activeTurnId)
+		.slice(-MAX_LOADED_TURNS)
+		.map((node) => node.id);
+	const byId = new Map((await turnsById(db, daydreamId, pathIds)).map((turn) => [turn.id, turn]));
 	return {
-		...daydream,
-		turns: turns.reverse().map(
-			(turn): DaydreamTurnView => ({
-				id: turn.id,
-				role: turn.role,
-				position: turn.position,
-				revision: turn.revision,
-				sealed: {
-					recordId: turn.id,
-					vaultId: turn.vaultId,
-					ciphertext: turn.ciphertext,
-					payloadVersion: turn.payloadVersion
-				}
-			})
-		)
+		id: row.id,
+		revision: row.revision,
+		setup: {
+			recordId: row.id,
+			vaultId: row.vaultId,
+			ciphertext: row.ciphertext,
+			payloadVersion: row.payloadVersion
+		},
+		activeTurnId,
+		tree: nodes,
+		path: pathIds.map((id) => byId.get(id)).filter((turn) => turn !== undefined),
+		marks
 	};
 }
 
@@ -209,7 +314,7 @@ export async function getDaydreamSetup(
 	db: Db,
 	userId: string,
 	daydreamId: string
-): Promise<Omit<DaydreamView, 'turns'> | null> {
+): Promise<Pick<DaydreamView, 'id' | 'revision' | 'setup'> | null> {
 	const [row] = await db
 		.select({
 			id: daydreams.id,
@@ -297,7 +402,7 @@ export async function updateDaydreamSetup(
 	};
 }
 
-/** Deletes a daydream and, by cascade, its turns. False when it was not the user's. */
+/** Deletes a daydream and, by cascade, its turns and marks. False when it was not the user's. */
 export async function deleteDaydream(db: Db, userId: string, daydreamId: string): Promise<boolean> {
 	const rows = await db
 		.delete(daydreams)
@@ -309,20 +414,21 @@ export async function deleteDaydream(db: Db, userId: string, daydreamId: string)
 // ── turns ────────────────────────────────────────────────────────────────────
 
 /**
- * Adds a turn at the end of the conversation.
+ * Adds a turn to the tree, after `parentId` (null for a root: the opening, or
+ * a retried opening), and makes it the turn the user is on.
  *
- * The position is worked out inside the insert, from the turns already
- * there, and the unique index on (daydream, position) refuses a second turn
- * taking the same place — two devices appending at once. That loser is told
- * `conflict` and reloads; it never silently lands out of order.
+ * Nothing is ever in the way: two devices adding after the same turn simply
+ * make two branches, which is what the tree is for. The parent must be one of
+ * this daydream's turns; the id is the caller's and kept across retries of
+ * the same save, so a save whose answer was lost cannot add the turn twice.
  */
 export async function appendTurn(
 	db: Db,
 	userId: string,
 	daydreamId: string,
-	turn: { id: string; role: DaydreamTurnRole; content: SealedWrite },
+	turn: { id: string; parentId: string | null; role: DaydreamTurnRole; content: SealedWrite },
 	now = new Date()
-): Promise<DaydreamResult<{ position: number; revision: number }>> {
+): Promise<DaydreamResult<{ position: number }>> {
 	if (!(await ownsDaydream(db, userId, daydreamId))) {
 		return { ok: false, reason: 'not-found' };
 	}
@@ -330,104 +436,317 @@ export async function appendTurn(
 	if (problem) {
 		return { ok: false, reason: problem };
 	}
-	const next = sql<number>`(select coalesce(max(${daydreamTurns.position}), -1) + 1 from ${daydreamTurns} where ${daydreamTurns.daydreamId} = ${daydreamId})`;
-	const [inserted] = await db
+	let position = 0;
+	if (turn.parentId !== null) {
+		const [parent] = await db
+			.select({ position: daydreamTurns.position })
+			.from(daydreamTurns)
+			.where(and(eq(daydreamTurns.id, turn.parentId), eq(daydreamTurns.daydreamId, daydreamId)))
+			.limit(1);
+		if (!parent) {
+			return { ok: false, reason: 'bad-parent' };
+		}
+		position = parent.position + 1;
+	}
+	const inserted = await db
 		.insert(daydreamTurns)
 		.values({
 			id: turn.id,
 			daydreamId,
+			parentId: turn.parentId,
 			role: turn.role,
-			position: next,
+			position,
 			ciphertext: turn.content.ciphertext,
 			vaultId: turn.content.vaultId,
 			payloadVersion: turn.content.payloadVersion,
 			createdAt: now,
 			updatedAt: now
 		})
-		// No target: SQLite then skips a clash on any unique constraint, the id
-		// or the position, and the check below says which it was.
 		.onConflictDoNothing()
-		.returning({ position: daydreamTurns.position, revision: daydreamTurns.revision });
-	if (!inserted) {
-		const [taken] = await db
-			.select({ id: daydreamTurns.id })
-			.from(daydreamTurns)
-			.where(eq(daydreamTurns.id, turn.id))
-			.limit(1);
-		return { ok: false, reason: taken ? 'id-taken' : 'conflict' };
+		.returning({ id: daydreamTurns.id });
+	if (inserted.length === 0) {
+		return { ok: false, reason: 'id-taken' };
 	}
 	await db
 		.update(daydreams)
-		.set({ lastTurnAt: now })
+		.set({ lastTurnAt: now, activeTurnId: turn.id })
 		.where(and(eq(daydreams.id, daydreamId), eq(daydreams.ownerId, userId)));
-	return { ok: true, position: inserted.position, revision: inserted.revision };
+	return { ok: true, position };
 }
 
-/**
- * Replaces the newest turn, when it is the character's: what "retry" does.
- *
- * Only the newest, so a retry can never rewrite history the rest of the
- * conversation followed from; only the character's, so it can never rewrite
- * what the user said. Compare-and-swap on `revision` as well, so two devices
- * retrying at once cannot both land.
- */
-export async function replaceLatestCharacterTurn(
+/** Moves the user to another turn: switching branch, or carrying on from an earlier point. */
+export async function setActiveTurn(
 	db: Db,
 	userId: string,
 	daydreamId: string,
-	input: { turnId: string; expectedRevision: number; content: SealedWrite },
-	now = new Date()
-): Promise<DaydreamResult<{ revision: number }>> {
+	turnId: string
+): Promise<DaydreamResult> {
 	if (!(await ownsDaydream(db, userId, daydreamId))) {
 		return { ok: false, reason: 'not-found' };
 	}
-	const problem = await contentProblem(db, userId, daydreamTurnKind, input.content);
+	const [turn] = await db
+		.select({ id: daydreamTurns.id })
+		.from(daydreamTurns)
+		.where(and(eq(daydreamTurns.id, turnId), eq(daydreamTurns.daydreamId, daydreamId)))
+		.limit(1);
+	if (!turn) {
+		return { ok: false, reason: 'bad-parent' };
+	}
+	await db
+		.update(daydreams)
+		.set({ activeTurnId: turnId })
+		.where(and(eq(daydreams.id, daydreamId), eq(daydreams.ownerId, userId)));
+	return { ok: true };
+}
+
+/**
+ * Turns by id, sealed: the other branches' turns, opened when someone moves
+ * to them or the branch map shows them. Null when the daydream is not the
+ * user's; ids that are not this daydream's are simply not returned.
+ */
+export async function readTurns(
+	db: Db,
+	userId: string,
+	daydreamId: string,
+	ids: readonly string[]
+): Promise<DaydreamTurnView[] | null> {
+	if (!(await ownsDaydream(db, userId, daydreamId))) {
+		return null;
+	}
+	return await turnsById(db, daydreamId, ids.slice(0, MAX_READ_TURNS));
+}
+
+// ── marks ────────────────────────────────────────────────────────────────────
+
+async function listMarks(db: Db, daydreamId: string): Promise<DaydreamMarkView[]> {
+	const rows = await db
+		.select({
+			id: daydreamMarks.id,
+			turnId: daydreamMarks.turnId,
+			revision: daydreamMarks.revision,
+			ciphertext: daydreamMarks.ciphertext,
+			vaultId: daydreamMarks.vaultId,
+			payloadVersion: daydreamMarks.payloadVersion
+		})
+		.from(daydreamMarks)
+		.where(eq(daydreamMarks.daydreamId, daydreamId))
+		.orderBy(asc(daydreamMarks.createdAt), asc(daydreamMarks.id))
+		.limit(MAX_MARKS);
+	return rows.map((row) => ({
+		id: row.id,
+		turnId: row.turnId,
+		revision: row.revision,
+		sealed: {
+			recordId: row.id,
+			vaultId: row.vaultId,
+			ciphertext: row.ciphertext,
+			payloadVersion: row.payloadVersion
+		}
+	}));
+}
+
+/** Adds a bookmark or a reaction to one of the daydream's turns. */
+export async function createMark(
+	db: Db,
+	userId: string,
+	daydreamId: string,
+	mark: { id: string; turnId: string; content: SealedWrite }
+): Promise<DaydreamResult> {
+	if (!(await ownsDaydream(db, userId, daydreamId))) {
+		return { ok: false, reason: 'not-found' };
+	}
+	const problem = await contentProblem(db, userId, daydreamMarkKind, mark.content);
 	if (problem) {
 		return { ok: false, reason: problem };
 	}
-	const latest = sql`(select max(${daydreamTurns.position}) from ${daydreamTurns} where ${daydreamTurns.daydreamId} = ${daydreamId})`;
+	const [turn] = await db
+		.select({ id: daydreamTurns.id })
+		.from(daydreamTurns)
+		.where(and(eq(daydreamTurns.id, mark.turnId), eq(daydreamTurns.daydreamId, daydreamId)))
+		.limit(1);
+	if (!turn) {
+		return { ok: false, reason: 'bad-parent' };
+	}
+	const inserted = await db
+		.insert(daydreamMarks)
+		.values({
+			id: mark.id,
+			daydreamId,
+			turnId: mark.turnId,
+			ciphertext: mark.content.ciphertext,
+			vaultId: mark.content.vaultId,
+			payloadVersion: mark.content.payloadVersion
+		})
+		.onConflictDoNothing()
+		.returning({ id: daydreamMarks.id });
+	return inserted.length > 0 ? { ok: true } : { ok: false, reason: 'id-taken' };
+}
+
+/** Removes a mark. False when it was not one of this daydream's, or the daydream not the user's. */
+export async function deleteMark(
+	db: Db,
+	userId: string,
+	daydreamId: string,
+	markId: string
+): Promise<boolean> {
+	if (!(await ownsDaydream(db, userId, daydreamId))) {
+		return false;
+	}
 	const rows = await db
-		.update(daydreamTurns)
+		.delete(daydreamMarks)
+		.where(and(eq(daydreamMarks.id, markId), eq(daydreamMarks.daydreamId, daydreamId)))
+		.returning({ id: daydreamMarks.id });
+	return rows.length > 0;
+}
+
+// ── the character and scene libraries ────────────────────────────────────────
+
+export type LibraryKind = 'characters' | 'scenes';
+
+/**
+ * The two library tables have exactly the same columns, so one set of
+ * functions serves both. Typed as the characters table because Drizzle's
+ * query builder does not accept a union of tables; the cast is safe because
+ * the schemas are identical, which `daydreams.test.ts` exercises for both.
+ */
+function libraryTable(kind: LibraryKind): typeof daydreamCharacters {
+	return (kind === 'characters' ? daydreamCharacters : daydreamScenes) as typeof daydreamCharacters;
+}
+
+function librarySealedKind(kind: LibraryKind): SealedKind<unknown> {
+	return kind === 'characters' ? daydreamCharacterKind : daydreamSceneKind;
+}
+
+/** The most library items listed. A library is a person's own; this is a guard, not a page size. */
+export const MAX_LIBRARY_ITEMS = 200;
+
+export async function listLibrary(
+	db: Db,
+	userId: string,
+	kind: LibraryKind
+): Promise<DaydreamLibraryItemView[]> {
+	const table = libraryTable(kind);
+	const rows = await db
+		.select({
+			id: table.id,
+			revision: table.revision,
+			updatedAt: table.updatedAt,
+			ciphertext: table.ciphertext,
+			vaultId: table.vaultId,
+			payloadVersion: table.payloadVersion
+		})
+		.from(table)
+		.where(eq(table.ownerId, userId))
+		.orderBy(desc(table.updatedAt), asc(table.id))
+		.limit(MAX_LIBRARY_ITEMS);
+	return rows.map((row) => ({
+		id: row.id,
+		revision: row.revision,
+		updatedAt: row.updatedAt,
+		sealed: {
+			recordId: row.id,
+			vaultId: row.vaultId,
+			ciphertext: row.ciphertext,
+			payloadVersion: row.payloadVersion
+		}
+	}));
+}
+
+/** Both libraries, for the setup pages. */
+export async function getLibrary(db: Db, userId: string): Promise<DaydreamLibraryView> {
+	const [characters, scenes] = await Promise.all([
+		listLibrary(db, userId, 'characters'),
+		listLibrary(db, userId, 'scenes')
+	]);
+	return { characters, scenes };
+}
+
+/** Adds a character or scene under the id the browser chose and sealed it to. */
+export async function createLibraryItem(
+	db: Db,
+	userId: string,
+	kind: LibraryKind,
+	item: { id: string; content: SealedWrite }
+): Promise<DaydreamResult<{ revision: number }>> {
+	const problem = await contentProblem(db, userId, librarySealedKind(kind), item.content);
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const table = libraryTable(kind);
+	const inserted = await db
+		.insert(table)
+		.values({
+			id: item.id,
+			ownerId: userId,
+			ciphertext: item.content.ciphertext,
+			vaultId: item.content.vaultId,
+			payloadVersion: item.content.payloadVersion
+		})
+		.onConflictDoNothing()
+		.returning({ revision: table.revision });
+	const [row] = inserted;
+	return row ? { ok: true, revision: row.revision } : { ok: false, reason: 'id-taken' };
+}
+
+/**
+ * Replaces a character or scene, compare-and-swap on `revision`. The new
+ * revision is what daydreams' copies are then compared with, so every copy
+ * made before this edit shows as "Updated in your library".
+ */
+export async function updateLibraryItem(
+	db: Db,
+	userId: string,
+	kind: LibraryKind,
+	itemId: string,
+	input: { content: SealedWrite; expectedRevision: number }
+): Promise<DaydreamResult<{ revision: number }>> {
+	const problem = await contentProblem(db, userId, librarySealedKind(kind), input.content);
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const table = libraryTable(kind);
+	const rows = await db
+		.update(table)
 		.set({
 			ciphertext: input.content.ciphertext,
 			vaultId: input.content.vaultId,
 			payloadVersion: input.content.payloadVersion,
 			revision: input.expectedRevision + 1,
-			updatedAt: now
+			updatedAt: new Date()
 		})
 		.where(
 			and(
-				eq(daydreamTurns.id, input.turnId),
-				eq(daydreamTurns.daydreamId, daydreamId),
-				eq(daydreamTurns.role, 'character'),
-				eq(daydreamTurns.revision, input.expectedRevision),
-				eq(daydreamTurns.position, latest)
+				eq(table.id, itemId),
+				eq(table.ownerId, userId),
+				eq(table.revision, input.expectedRevision)
 			)
 		)
-		.returning({ revision: daydreamTurns.revision });
-	const [updated] = rows;
-	if (updated) {
-		await db
-			.update(daydreams)
-			.set({ lastTurnAt: now })
-			.where(and(eq(daydreams.id, daydreamId), eq(daydreams.ownerId, userId)));
-		return { ok: true, revision: updated.revision };
+		.returning({ revision: table.revision });
+	const [row] = rows;
+	if (row) {
+		return { ok: true, revision: row.revision };
 	}
 	const [existing] = await db
-		.select({ role: daydreamTurns.role, revision: daydreamTurns.revision })
-		.from(daydreamTurns)
-		.where(and(eq(daydreamTurns.id, input.turnId), eq(daydreamTurns.daydreamId, daydreamId)))
+		.select({ id: table.id })
+		.from(table)
+		.where(and(eq(table.id, itemId), eq(table.ownerId, userId)))
 		.limit(1);
-	if (!existing) {
-		return { ok: false, reason: 'not-found' };
-	}
-	return {
-		ok: false,
-		reason:
-			existing.role === 'character' && existing.revision !== input.expectedRevision
-				? 'conflict'
-				: 'not-latest'
-	};
+	return { ok: false, reason: existing ? 'conflict' : 'not-found' };
+}
+
+/** Deletes a character or scene. Always safe: daydreams hold copies. False when it was not the user's. */
+export async function deleteLibraryItem(
+	db: Db,
+	userId: string,
+	kind: LibraryKind,
+	itemId: string
+): Promise<boolean> {
+	const table = libraryTable(kind);
+	const rows = await db
+		.delete(table)
+		.where(and(eq(table.id, itemId), eq(table.ownerId, userId)))
+		.returning({ id: table.id });
+	return rows.length > 0;
 }
 
 /** A refusal as a status and words a person can act on, for the API and the forms alike. */
@@ -439,12 +758,12 @@ export function describeRefusal(reason: DaydreamRefusal): { status: number; mess
 			return {
 				status: 409,
 				message:
-					'This daydream changed somewhere else since you opened it. Reload to see the latest, then try again.'
+					'This changed somewhere else since you opened it. Reload to see the latest, then try again.'
 			};
-		case 'not-latest':
+		case 'bad-parent':
 			return {
 				status: 409,
-				message: 'Only the newest reply can be retried. Reload to see the latest.'
+				message: 'That part of the story is not there any more. Reload to see the latest.'
 			};
 		case 'wrong-vault':
 			return {

@@ -308,9 +308,41 @@ export function embedInsertIndexFor(children: RichTextInlineNode[], url: string)
 	return 0;
 }
 
+const BLANK_LINE = /\n\s*\n/;
+
 /** An empty document — what an untouched editor and a blank field both mean. */
 export function emptyRichTextDocument(): RichTextDocument {
 	return { root: { type: 'root', children: [] } };
+}
+
+/**
+ * Plain text as a document with no formatting: blank lines between
+ * paragraphs, single newlines as line breaks.
+ *
+ * For text that was never rich — a suggested response a person wants to edit
+ * before sending, say — and so not the legacy conversion in
+ * `richtext-legacy.ts`, which also turns URLs into embeds to match how old
+ * messages looked. Nothing here is linked or embedded; the editor links URLs
+ * itself as the person edits.
+ */
+export function plainTextToDocument(text: string): RichTextDocument {
+	const children: RichTextBlockNode[] = [];
+	for (const chunk of text.split(BLANK_LINE)) {
+		const lines = chunk.split('\n');
+		const inlines: RichTextInlineNode[] = [];
+		lines.forEach((line, index) => {
+			if (index > 0) {
+				inlines.push({ type: 'linebreak' });
+			}
+			if (line !== '') {
+				inlines.push({ type: 'text', text: line, format: 0 });
+			}
+		});
+		if (inlines.some((node) => node.type === 'text')) {
+			children.push({ type: 'paragraph', children: inlines });
+		}
+	}
+	return { root: { type: 'root', children } };
 }
 
 /**

@@ -609,21 +609,57 @@ export type DaydreamsWidgetView = {
 	total: number;
 };
 
-/** One turn of a daydream. Its text is sealed; who wrote it is not. */
-export type DaydreamTurnView = {
+/**
+ * One turn's place in a daydream's tree: everything the server knows about it
+ * but its content. The whole tree comes with the page, so the branch map and
+ * the sibling switchers can be drawn without opening anything.
+ */
+export type DaydreamTreeNodeView = {
 	id: string;
+	parentId: string | null;
 	role: DaydreamTurnRole;
+	/** Depth in its branch; 0 for a root. */
 	position: number;
+	createdAt: Date;
+};
+
+/** A turn with its sealed content: the turns on the branch being read, and any opened on demand. */
+export type DaydreamTurnView = DaydreamTreeNodeView & { sealed: SealedRefView };
+
+/** A bookmark or a reaction on a turn. What it is is sealed; which turn it marks is not. */
+export type DaydreamMarkView = {
+	id: string;
+	turnId: string;
 	revision: number;
 	sealed: SealedRefView;
 };
 
-/** A daydream as its own page shows it: the setup and the whole conversation, oldest first. */
+/**
+ * A daydream as its own page shows it: the setup, the shape of the whole
+ * tree, the sealed turns of the branch being read (root first), and the marks.
+ */
 export type DaydreamView = {
 	id: string;
 	revision: number;
 	setup: SealedRefView;
-	turns: DaydreamTurnView[];
+	/** The end of the branch being read; null before the opening. */
+	activeTurnId: string | null;
+	tree: DaydreamTreeNodeView[];
+	path: DaydreamTurnView[];
+	marks: DaydreamMarkView[];
+};
+
+/** A character or scene in the user's library. `revision` is what a daydream's copy is compared with. */
+export type DaydreamLibraryItemView = {
+	id: string;
+	revision: number;
+	updatedAt: Date;
+	sealed: SealedRefView;
+};
+
+export type DaydreamLibraryView = {
+	characters: DaydreamLibraryItemView[];
+	scenes: DaydreamLibraryItemView[];
 };
 
 /**

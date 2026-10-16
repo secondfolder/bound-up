@@ -6,19 +6,32 @@ import {
 	daydreamSetupFormSchema,
 	EMPTY_DAYDREAM_SETUP
 } from '$lib/schemas/daydreamForm';
-import { createDaydream, describeRefusal } from '$lib/server/daydreams';
+import { readDaydreamConfig } from '$lib/server/daydream/config';
+import {
+	createDaydream,
+	describeRefusal,
+	getLibrary,
+	hasAcceptedDisclosure
+} from '$lib/server/daydreams';
 import { requireFeature } from '$lib/server/features';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals: { db, user } }) => {
+export const load: PageServerLoad = async ({ locals: { db, user }, platform }) => {
 	if (!user) {
 		error(401, 'Not signed in');
 	}
 	await requireFeature(db, user.id, 'daydreams');
+	const [library, accepted] = await Promise.all([
+		getLibrary(db, user.id),
+		hasAcceptedDisclosure(db, user.id)
+	]);
 	return {
 		setupForm: await superValidate(EMPTY_DAYDREAM_SETUP, zod4(daydreamSetupFormSchema), {
 			errors: false
-		})
+		}),
+		library,
+		accepted,
+		available: readDaydreamConfig(platform) !== null
 	};
 };
 

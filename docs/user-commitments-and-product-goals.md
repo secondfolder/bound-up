@@ -145,9 +145,10 @@ not consent.
 
 Daydreams are the one feature whose content the server, and a third party,
 routinely see in plaintext. A daydream's replies are written by a hosted
-language model, and a model has to read the scene to write it, so while
+language model, and a model has to read the story to write it, so while
 someone plays, the setup and recent turns go through Bound Up to OpenRouter
-and a model provider. Nothing on-device could write well enough to replace
+and a model provider — and so does a character or scene being set up, when
+they ask for ideas. Nothing on-device could write well enough to replace
 that, so the commitment here is honesty rather than zero access:
 
 - **Told first, in plain words, and accepted.** Before the first daydream the
@@ -157,8 +158,13 @@ that, so the commitment here is honesty rather than zero access:
 - **Nothing kept on the way through.** The server does not store or log what
   passes through it, and asks OpenRouter to use only providers that do not
   keep prompts or train on them.
-- **Stored like everything else.** Every turn, and the setup, is sealed in the
-  user's own vault the moment it is saved.
+- **Stored like everything else.** Every turn, mark and setup, and every
+  character and scene in the library, is sealed in the user's own vault the
+  moment it is saved.
+- **Ideas from the model are asked for, never fetched behind someone's back.**
+  The built-in chips and starting points work without anything leaving the
+  device; the model is asked only when "More ideas", "Fill in the rest" or
+  "Surprise me" is pressed.
 - **Opt-in twice.** The feature is granted per account, and a server without
   an OpenRouter key has no Daydreams at all.
 

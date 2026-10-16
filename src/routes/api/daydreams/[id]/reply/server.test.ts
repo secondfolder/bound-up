@@ -3,6 +3,7 @@ import { RULES } from '$lib/server/daydream/prompt';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
 import type { RateLimitResult } from '$lib/server/rate-limit';
+import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import {
@@ -14,8 +15,8 @@ import {
 import { POST } from './+server';
 
 /**
- * The reply endpoint: the one place the server handles a user's words in
- * plaintext. `fetch` stands in for OpenRouter, and `$env/dynamic/private` for
+ * The reply endpoint: one of the two places the server handles a user's
+ * words in plaintext (the suggest endpoint is the other). `fetch` stands in for OpenRouter, and `$env/dynamic/private` for
  * the server's configuration; these routes never see a platform, as under
  * `vite dev`.
  */
@@ -31,24 +32,16 @@ let ada: TestUser;
 let jun: TestUser;
 let upstream: ReturnType<typeof vi.fn>;
 
-const setup = {
-	title: 'Late meeting',
-	characterName: 'Mara',
-	persona: '',
-	lead: 'character',
-	scenario: 'The office has emptied out.',
-	tone: '',
-	limits: '',
-	safeword: ''
-};
+const setup = testDaydreamSetup();
 const USER_TURN = `I tell her about ${SECRET_WORDS}.`;
 const body = {
 	mode: 'reply',
 	setup,
 	turns: [
-		{ role: 'character', text: 'Sit.' },
-		{ role: 'user', text: USER_TURN }
-	]
+		{ type: 'text', role: 'story', text: 'Sit.' },
+		{ type: 'text', role: 'user', text: USER_TURN }
+	],
+	currentDirections: [{ id: 'slower', label: 'Slower' }]
 };
 
 function sse(...pieces: string[]): Response {
@@ -98,7 +91,7 @@ function post(
 
 describe('POST /api/daydreams/[id]/reply', () => {
 	it('streams the model’s reply straight back as server-sent events', async () => {
-		const { id } = await createTestDaydream(db, ada.id, ['character', 'user']);
+		const { id } = await createTestDaydream(db, ada.id, ['story', 'user']);
 		const result = await post(ada, id);
 		expect(result.type).toBe('ok');
 		if (result.type !== 'ok') {
@@ -124,7 +117,11 @@ describe('POST /api/daydreams/[id]/reply', () => {
 		});
 		expect(sent.messages[0].role).toBe('system');
 		expect(sent.messages[0].content.startsWith(RULES)).toBe(true);
+		// The buttons on screen, for the model to add to or prune.
+		expect(sent.messages[0].content).toContain('"Slower" (id "slower")');
 		expect(sent.messages.at(-1)).toEqual({ role: 'user', content: USER_TURN });
+		// Room for the passage and the metadata block after it.
+		expect(sent.max_tokens).toBe(1200);
 		// So pressing Stop ends the request upstream as well.
 		expect(init.signal).toBeInstanceOf(AbortSignal);
 	});
@@ -159,6 +156,27 @@ describe('POST /api/daydreams/[id]/reply', () => {
 		const { id } = await createTestDaydream(db, jun.id);
 		expect(await post(jun, id)).toMatchObject({ type: 'error', status: 409 });
 		expect(upstream).not.toHaveBeenCalled();
+	});
+
+	it('refuses a rewrite that does not say what to rewrite', async () => {
+		const { id } = await createTestDaydream(db, ada.id);
+		expect(await post(ada, id, { ...body, mode: 'rewrite' })).toMatchObject({
+			type: 'error',
+			status: 400
+		});
+		expect(upstream).not.toHaveBeenCalled();
+	});
+
+	it('refuses a setup no device could have sealed', async () => {
+		const { id } = await createTestDaydream(db, ada.id);
+		const watchingNobody = testDaydreamSetup({
+			voice: { narrator: 'third-person', stance: 'absent', protagonistName: '' },
+			characters: []
+		});
+		expect(await post(ada, id, { ...body, setup: watchingNobody })).toMatchObject({
+			type: 'error',
+			status: 400
+		});
 	});
 
 	it('refuses a malformed request without counting it against the limit', async () => {

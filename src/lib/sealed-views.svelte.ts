@@ -20,8 +20,14 @@ import { vaultById } from './crypto/vaults.svelte';
 import type { SealedKind } from './sealed';
 import { sealedReader } from './sealed-cache.svelte';
 import {
+	type DaydreamCharacterContent,
+	type DaydreamMarkContent,
+	type DaydreamSceneContent,
 	type DaydreamSetupContent,
 	type DaydreamTurnContent,
+	daydreamCharacterKind,
+	daydreamMarkKind,
+	daydreamSceneKind,
 	daydreamSetupKind,
 	daydreamTurnKind
 } from './sealed-kinds/daydreams';
@@ -124,14 +130,29 @@ export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
 	}
 }
 
-/** A daydream's setup: its title, character, scenario and limits. Always sealed. */
+/** A daydream's setup: its title, voice, characters, scene, limits and dials. Always sealed. */
 export function openedDaydreamSetup(ref: SealedRefView): Opened<DaydreamSetupContent> {
 	return open(daydreamSetupKind, ref);
 }
 
-/** One turn of a daydream's conversation. Always sealed. */
+/** One turn of a daydream's story. Always sealed. */
 export function openedDaydreamTurn(ref: SealedRefView): Opened<DaydreamTurnContent> {
 	return open(daydreamTurnKind, ref);
+}
+
+/** A bookmark or reaction on a daydream's turn. Always sealed. */
+export function openedDaydreamMark(ref: SealedRefView): Opened<DaydreamMarkContent> {
+	return open(daydreamMarkKind, ref);
+}
+
+/** A character in the user's library. Always sealed. */
+export function openedDaydreamCharacter(ref: SealedRefView): Opened<DaydreamCharacterContent> {
+	return open(daydreamCharacterKind, ref);
+}
+
+/** A scene in the user's library. Always sealed. */
+export function openedDaydreamScene(ref: SealedRefView): Opened<DaydreamSceneContent> {
+	return open(daydreamSceneKind, ref);
 }
 
 /** A message tag's name. */

@@ -6,11 +6,18 @@ import {
 	daydreamSetupFormSchema,
 	EMPTY_DAYDREAM_SETUP
 } from '$lib/schemas/daydreamForm';
-import { describeRefusal, getDaydreamSetup, updateDaydreamSetup } from '$lib/server/daydreams';
+import { readDaydreamConfig } from '$lib/server/daydream/config';
+import {
+	describeRefusal,
+	getDaydreamSetup,
+	getLibrary,
+	hasAcceptedDisclosure,
+	updateDaydreamSetup
+} from '$lib/server/daydreams';
 import { requireFeature } from '$lib/server/features';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals: { db, user }, params }) => {
+export const load: PageServerLoad = async ({ locals: { db, user }, params, platform }) => {
 	if (!user) {
 		error(401, 'Not signed in');
 	}
@@ -19,13 +26,20 @@ export const load: PageServerLoad = async ({ locals: { db, user }, params }) => 
 	if (!daydream) {
 		error(404, 'That daydream is not there any more.');
 	}
+	const [library, accepted] = await Promise.all([
+		getLibrary(db, user.id),
+		hasAcceptedDisclosure(db, user.id)
+	]);
 	return {
 		daydream,
 		// Empty: the setup is sealed, so the browser fills the form once it has
 		// opened it.
 		setupForm: await superValidate(EMPTY_DAYDREAM_SETUP, zod4(daydreamSetupFormSchema), {
 			errors: false
-		})
+		}),
+		library,
+		accepted,
+		available: readDaydreamConfig(platform) !== null
 	};
 };
 

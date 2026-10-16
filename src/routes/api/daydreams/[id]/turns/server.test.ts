@@ -12,7 +12,7 @@ import {
 	readDaydreamTurnRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { POST, PUT } from './+server';
+import { POST } from './+server';
 
 let harness: TestDb;
 let db: Db;
@@ -30,9 +30,10 @@ beforeEach(async () => {
 
 afterEach(() => harness.close());
 
-async function turn(user: TestUser, role = 'user') {
+async function turn(user: TestUser, parentId: string | null = null, role = 'user') {
 	return {
 		id: crypto.randomUUID(),
+		parentId,
 		role,
 		vaultId: await ensureTestSelfVault(db, user.id),
 		ciphertext: fakeSealed('turn'),
@@ -48,23 +49,32 @@ function answered(result: Awaited<ReturnType<typeof call>>): Response {
 	return result.value;
 }
 
-const call = (
-	handler: typeof POST | typeof PUT,
-	user: TestUser | null,
-	id: string,
-	json: unknown,
-	method = 'POST'
-) => runAndCatch(() => handler(fakeEvent({ db, user, params: { id }, json, method })));
+const call = (handler: typeof POST, user: TestUser | null, id: string, json: unknown) =>
+	runAndCatch(() => handler(fakeEvent({ db, user, params: { id }, json, method: 'POST' })));
 
 describe('POST /api/daydreams/[id]/turns', () => {
-	it('saves a sealed turn at the end of the conversation', async () => {
-		const { id } = await createTestDaydream(db, ada.id, ['character']);
-		const body = await turn(ada);
+	it('saves a sealed turn after the one it follows', async () => {
+		const { id, turnIds } = await createTestDaydream(db, ada.id, ['story']);
+		const body = await turn(ada, defined(turnIds[0], 'opening'));
 		const response = answered(await call(POST, ada, id, body));
 		expect(response.status).toBe(201);
-		expect(await response.json()).toEqual({ position: 1, revision: 0 });
+		expect(await response.json()).toEqual({ position: 1 });
 		const rows = await readDaydreamTurnRows(db, id);
-		expect(rows[1]).toMatchObject({ id: body.id, role: 'user', ciphertext: body.ciphertext });
+		expect(rows[1]).toMatchObject({
+			id: body.id,
+			parentId: turnIds[0],
+			role: 'user',
+			ciphertext: body.ciphertext
+		});
+	});
+
+	it('refuses a parent that is not in this daydream, with words that say what to do', async () => {
+		const { id } = await createTestDaydream(db, ada.id, ['story']);
+		expect(await call(POST, ada, id, await turn(ada, crypto.randomUUID()))).toMatchObject({
+			type: 'error',
+			status: 409,
+			message: expect.stringContaining('Reload')
+		});
 	});
 
 	it('refuses an unsigned visitor', async () => {
@@ -102,62 +112,9 @@ describe('POST /api/daydreams/[id]/turns', () => {
 	it('refuses a malformed body', async () => {
 		const { id } = await createTestDaydream(db, ada.id);
 		expect(await call(POST, ada, id, null)).toMatchObject({ type: 'error', status: 400 });
-		expect(await call(POST, ada, id, { ...(await turn(ada)), role: 'system' })).toMatchObject({
+		expect(await call(POST, ada, id, { ...(await turn(ada)), role: 'character' })).toMatchObject({
 			type: 'error',
 			status: 400
-		});
-	});
-});
-
-describe('PUT /api/daydreams/[id]/turns', () => {
-	it('replaces the newest character turn', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, [
-			'character',
-			'user',
-			'character'
-		]);
-		const { vaultId, ciphertext, payloadVersion } = await turn(ada);
-		const result = await call(
-			PUT,
-			ada,
-			id,
-			{
-				turnId: defined(turnIds[2], 'latest'),
-				expectedRevision: 0,
-				vaultId,
-				ciphertext,
-				payloadVersion
-			},
-			'PUT'
-		);
-		expect(await answered(result).json()).toEqual({ revision: 1 });
-		expect((await readDaydreamTurnRows(db, id))[2]?.ciphertext).toBe(ciphertext);
-	});
-
-	it('refuses an older turn, with words that say why', async () => {
-		const { id, turnIds } = await createTestDaydream(db, ada.id, [
-			'character',
-			'user',
-			'character'
-		]);
-		const { vaultId, ciphertext, payloadVersion } = await turn(ada);
-		const result = await call(
-			PUT,
-			ada,
-			id,
-			{
-				turnId: defined(turnIds[0], 'opening'),
-				expectedRevision: 0,
-				vaultId,
-				ciphertext,
-				payloadVersion
-			},
-			'PUT'
-		);
-		expect(result).toMatchObject({
-			type: 'error',
-			status: 409,
-			message: expect.stringContaining('Only the newest reply')
 		});
 	});
 });

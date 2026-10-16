@@ -15,6 +15,13 @@ data would simply stop showing. So:
 - **A new version of a kind gets a new fixture** with that version, sealed by
   an implementation independent of `crypto/sealed.ts`, with the `expected`
   payload as the *latest* version reads it.
+- **Adding a version moves the older fixtures' `expected`, and nothing
+  else.** Opening a record upcasts it to the latest version, so once a
+  version 2 exists, the version 1 fixture opens to what the upcaster makes of
+  it. Update that fixture's `expected` to the upcast value, after reading it
+  as a review of the upcaster. Never touch its `ciphertext`, `recordId` or
+  `version`: those are the stored record, and they are the part that must
+  keep opening. (Daydreams' setup and turn kinds were the first to do this.)
 - **All fixtures share one vault**: the key is bytes 0–31, and the vault id is
   the one at the top of `fixtures.json`.
 

@@ -1,55 +1,330 @@
 /**
- * The sealed kinds behind Daydreams: a daydream's setup, and each turn of its
- * conversation. Both sealed in the writer's own vault. See `../sealed.ts` for
- * what a kind is and the rules every version follows, and docs/daydreams.md
- * for what the server sees beside them, and the one moment it sees more.
+ * The sealed kinds behind Daydreams: a daydream's setup, each turn of its
+ * story, the marks on its turns (bookmarks and reactions), and the user's
+ * library of characters and scenes. All sealed in the writer's own vault. See
+ * `../sealed.ts` for what a kind is and the rules every version follows, and
+ * docs/daydreams.md for what the server sees beside them, and the moments it
+ * sees more.
  *
- * Turns are plain text rather than rich-text documents: a character's reply
- * is written by a language model, which writes prose, and the user's side is
- * flattened to text before it is sent to one anyway.
+ * Turns are plain text rather than rich-text documents: a reply is written by
+ * a language model, which writes prose, and the user's side is flattened to
+ * text before it is sent to one anyway.
  */
 
 import { z } from 'zod';
-import { DAYDREAM_LIMITS } from '../daydream';
+import {
+	DAYDREAM_LIMITS,
+	type DaydreamSetup,
+	DEFAULT_STORY_DIALS,
+	MAX_DAYDREAM_CHARACTERS,
+	MAX_DIRECTIONS,
+	MAX_SUGGESTIONS,
+	UNSET_CHARACTER_DIALS,
+	voiceProblem
+} from '../daydream';
+import { coversEveryFace, MAX_SIDES, MIN_SIDES } from '../daydream/dice';
 import { defineSealedKind } from '../sealed';
+import { isClientId } from '../vault';
 
 const required = (max: number) => z.string().trim().min(1).max(max);
 const optional = (max: number) => z.string().trim().max(max);
+const clientId = z.string().refine(isClientId, 'Malformed id');
+const dial = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]);
+
+// ── characters and scenes ────────────────────────────────────────────────────
+
+const characterDialsSchema = z.object({
+	tone: z.enum(['warm', 'teasing', 'cold', 'clinical']).nullable(),
+	control: dial.nullable(),
+	strictness: dial.nullable(),
+	edge: dial.nullable(),
+	talk: dial.nullable()
+});
+
+const characterShape = {
+	name: required(DAYDREAM_LIMITS.characterName),
+	archetype: optional(DAYDREAM_LIMITS.archetype),
+	personality: optional(DAYDREAM_LIMITS.personality),
+	speech: optional(DAYDREAM_LIMITS.speech),
+	appearance: optional(DAYDREAM_LIMITS.appearance),
+	relationship: optional(DAYDREAM_LIMITS.relationship),
+	likes: optional(DAYDREAM_LIMITS.likes),
+	notes: optional(DAYDREAM_LIMITS.characterNotes),
+	dials: characterDialsSchema
+};
+
+const sceneShape = {
+	title: required(DAYDREAM_LIMITS.title),
+	setting: optional(DAYDREAM_LIMITS.setting),
+	premise: required(DAYDREAM_LIMITS.premise),
+	yourRole: optional(DAYDREAM_LIMITS.yourRole),
+	tone: optional(DAYDREAM_LIMITS.tone),
+	notes: optional(DAYDREAM_LIMITS.sceneNotes)
+};
+
+/** Where a daydream's copy came from (`CopySource` in `../daydream.ts`). */
+const sourceShape = {
+	sourceId: clientId.nullable(),
+	sourceRevision: z.number().int().min(0).nullable()
+};
+
+export const daydreamCharacterKind = defineSealedKind({
+	name: 'daydream-character',
+	maxCiphertextLength: 16 * 1024,
+	versions: [{ version: 1, schema: z.object(characterShape) }]
+});
+
+export type DaydreamCharacterContent = z.output<typeof daydreamCharacterKind.latest>;
+
+export const daydreamSceneKind = defineSealedKind({
+	name: 'daydream-scene',
+	maxCiphertextLength: 16 * 1024,
+	versions: [{ version: 1, schema: z.object(sceneShape) }]
+});
+
+export type DaydreamSceneContent = z.output<typeof daydreamSceneKind.latest>;
+
+// ── setup ────────────────────────────────────────────────────────────────────
+
+const setupV1 = z.object({
+	title: required(DAYDREAM_LIMITS.title),
+	characterName: required(DAYDREAM_LIMITS.characterName),
+	persona: optional(2000),
+	lead: z.enum(['character', 'me', 'shared']),
+	scenario: required(2000),
+	tone: optional(DAYDREAM_LIMITS.tone),
+	limits: optional(DAYDREAM_LIMITS.limits),
+	safeword: optional(40)
+});
+
+const setupV2 = z
+	.object({
+		title: required(DAYDREAM_LIMITS.title),
+		voice: z.object({
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal']),
+			stance: z.enum(['self', 'persona', 'absent']),
+			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
+		}),
+		characters: z
+			.array(z.object({ ...characterShape, ...sourceShape }))
+			.max(MAX_DAYDREAM_CHARACTERS),
+		scene: z.object({ ...sceneShape, ...sourceShape }),
+		lead: z.enum(['character', 'me', 'shared']),
+		limits: optional(DAYDREAM_LIMITS.limits),
+		dials: z.object({
+			intensity: dial,
+			pace: dial,
+			length: z.enum(['short', 'medium', 'long'])
+		})
+	})
+	// The same rule the form shows (`voiceProblem`), so a setup that makes no
+	// sense — a watcher with nothing to watch — cannot be stored either.
+	.superRefine((value, ctx) => {
+		const problem = voiceProblem(value.voice, value.characters.length);
+		if (problem) {
+			ctx.addIssue({ code: 'custom', path: ['voice'], message: problem });
+		}
+	});
 
 export const daydreamSetupKind = defineSealedKind({
 	name: 'daydream-setup',
-	// Every field at its cap, JSON-escaped, sealed and base64url'd, fits well inside.
-	maxCiphertextLength: 32 * 1024,
+	// Four characters with every field at its cap, a scene likewise, JSON-escaped,
+	// sealed and base64url'd, fit inside.
+	maxCiphertextLength: 96 * 1024,
 	versions: [
 		{
 			version: 1,
-			schema: z.object({
-				title: required(DAYDREAM_LIMITS.title),
-				characterName: required(DAYDREAM_LIMITS.characterName),
-				persona: optional(DAYDREAM_LIMITS.persona),
-				lead: z.enum(['character', 'me', 'shared']),
-				scenario: required(DAYDREAM_LIMITS.scenario),
-				tone: optional(DAYDREAM_LIMITS.tone),
-				limits: optional(DAYDREAM_LIMITS.limits),
-				safeword: optional(DAYDREAM_LIMITS.safeword)
+			schema: setupV1,
+			/**
+			 * One character, speaking for themselves, to the user as themselves:
+			 * what every v1 daydream was. The custom safeword is dropped on
+			 * purpose — the Stop the scene control replaces typed safewords
+			 * (docs/daydreams.md, "Safety").
+			 */
+			upcast: (value: z.output<typeof setupV1>): DaydreamSetup => ({
+				title: value.title,
+				voice: { narrator: 'none', stance: 'self', protagonistName: '' },
+				characters: [
+					{
+						sourceId: null,
+						sourceRevision: null,
+						name: value.characterName,
+						archetype: '',
+						personality: value.persona,
+						speech: '',
+						appearance: '',
+						relationship: '',
+						likes: '',
+						notes: '',
+						dials: UNSET_CHARACTER_DIALS
+					}
+				],
+				scene: {
+					sourceId: null,
+					sourceRevision: null,
+					title: value.title,
+					setting: '',
+					premise: value.scenario,
+					yourRole: '',
+					tone: value.tone,
+					notes: ''
+				},
+				lead: value.lead,
+				limits: value.limits,
+				dials: DEFAULT_STORY_DIALS
 			})
-		}
+		},
+		{ version: 2, schema: setupV2 }
 	]
 });
 
 export type DaydreamSetupContent = z.output<typeof daydreamSetupKind.latest>;
 
+// ── turns ────────────────────────────────────────────────────────────────────
+
+/** A stretch of a passage's text, by offset. Turns never change once written, so offsets stay true. */
+export const quoteSchema = z
+	.object({
+		start: z.number().int().min(0),
+		end: z.number().int().min(1),
+		text: z.string().min(1).max(DAYDREAM_LIMITS.quote)
+	})
+	.refine((quote) => quote.end > quote.start, 'A quote ends after it starts');
+
+export type Quote = z.output<typeof quoteSchema>;
+
+/** A direction button. The id is the model's own short name for it, so it can remove it later. */
+export const directionSchema = z.object({
+	id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+	label: z.string().trim().min(1).max(DAYDREAM_LIMITS.directionLabel)
+});
+
+export type Direction = z.output<typeof directionSchema>;
+
+export const rollProposalSchema = z
+	.object({
+		prompt: z.string().trim().min(1).max(DAYDREAM_LIMITS.rollPrompt),
+		sides: z.number().int().min(MIN_SIDES).max(MAX_SIDES),
+		outcomes: z
+			.array(
+				z.object({
+					min: z.number().int(),
+					max: z.number().int(),
+					label: z.string().trim().min(1).max(DAYDREAM_LIMITS.rollOutcome)
+				})
+			)
+			.min(1)
+			.max(MAX_SIDES)
+	})
+	.refine(coversEveryFace, 'Every face must land on exactly one outcome');
+
+/**
+ * What the model says about a passage besides the passage: the buttons and
+ * suggestions it offers next, a roll if it proposes one, how it read the
+ * user's turn, and whether it stepped out of the story. Only ever on a story
+ * turn. Never sent back to the model with past turns (`daydream/context.ts`):
+ * it is for the screen, and would cost context for nothing.
+ */
+export const passageMetaSchema = z.object({
+	suggestions: z
+		.array(z.string().trim().min(1).max(DAYDREAM_LIMITS.suggestion))
+		.max(MAX_SUGGESTIONS)
+		.default([]),
+	directions: z
+		.object({
+			add: z.array(directionSchema).max(MAX_DIRECTIONS).default([]),
+			remove: z
+				.array(z.string().max(40))
+				.max(MAX_DIRECTIONS * 2)
+				.default([])
+		})
+		.default({ add: [], remove: [] }),
+	roll: rollProposalSchema.optional(),
+	readAs: z.enum(['action', 'direction', 'cowrite', 'ooc']).optional(),
+	ooc: z.boolean().optional(),
+	rewriteOf: z
+		.object({
+			turnId: clientId,
+			quote: quoteSchema.optional(),
+			instruction: z.string().trim().max(DAYDREAM_LIMITS.instruction).optional()
+		})
+		.optional()
+});
+
+export type PassageMeta = z.output<typeof passageMetaSchema>;
+
+const turnV1 = z.object({ text: z.string().min(1).max(DAYDREAM_LIMITS.turn) });
+
+const turnV2 = z.discriminatedUnion('type', [
+	// Prose, from either side; the row's `role` says whose. Not trimmed: a
+	// reply's own spacing is part of it, and a turn is stored exactly as shown.
+	z.object({
+		type: z.literal('text'),
+		text: z.string().min(1).max(DAYDREAM_LIMITS.turn),
+		meta: passageMetaSchema.optional()
+	}),
+	// A direction button pressed. Continue is not one: it adds no turn.
+	z.object({
+		type: z.literal('direction'),
+		id: z.string().max(40),
+		label: directionSchema.shape.label
+	}),
+	// Something in a passage selected and acted on.
+	z.object({
+		type: z.literal('steer'),
+		action: z.enum(['more', 'rewrite', 'not-this']),
+		targetTurnId: clientId,
+		quote: quoteSchema
+	}),
+	// Stop the scene, ease off, or carry on after stopping.
+	z.object({ type: z.literal('safety'), signal: z.enum(['red', 'yellow', 'resume']) }),
+	// A die rolled for the roll a passage proposed.
+	z.object({
+		type: z.literal('roll'),
+		proposalTurnId: clientId,
+		sides: z.number().int().min(MIN_SIDES).max(MAX_SIDES),
+		result: z.number().int().min(1).max(MAX_SIDES),
+		outcome: z.string().trim().min(1).max(DAYDREAM_LIMITS.rollOutcome)
+	})
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	maxCiphertextLength: 48 * 1024,
-	// Not trimmed: a reply's own spacing is part of it, and a turn is stored
-	// exactly as it was shown.
 	versions: [
 		{
 			version: 1,
-			schema: z.object({ text: z.string().min(1).max(DAYDREAM_LIMITS.turn) })
-		}
+			schema: turnV1,
+			upcast: (value: z.output<typeof turnV1>) => ({ type: 'text', text: value.text })
+		},
+		{ version: 2, schema: turnV2 }
 	]
 });
 
 export type DaydreamTurnContent = z.output<typeof daydreamTurnKind.latest>;
+
+// ── marks ────────────────────────────────────────────────────────────────────
+
+export const daydreamMarkKind = defineSealedKind({
+	name: 'daydream-mark',
+	maxCiphertextLength: 4 * 1024,
+	versions: [
+		{
+			version: 1,
+			schema: z.discriminatedUnion('type', [
+				// A save point, or a highlighted quote when `quote` is set.
+				z.object({
+					type: z.literal('bookmark'),
+					label: optional(DAYDREAM_LIMITS.bookmarkLabel),
+					quote: quoteSchema.nullable()
+				}),
+				z.object({
+					type: z.literal('reaction'),
+					reaction: z.enum(['love', 'like', 'not-for-me'])
+				})
+			])
+		}
+	]
+});
+
+export type DaydreamMarkContent = z.output<typeof daydreamMarkKind.latest>;

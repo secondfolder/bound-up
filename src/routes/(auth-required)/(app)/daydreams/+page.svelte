@@ -1,17 +1,27 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import DaydreamDisclosure from '$lib/components/DaydreamDisclosure.svelte';
+	import type { DaydreamSetupContent } from '$lib/sealed-kinds/daydreams';
 	import { openedDaydreamSetup, openedPart, shownText } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+
+	/** Who is in it, in a few words: the characters' names, or how it is told when there are none. */
+	function withWhom(setup: DaydreamSetupContent): string {
+		const names = setup.characters.map((character) => character.name);
+		if (names.length > 0) {
+			return `with ${new Intl.ListFormat(undefined, { type: 'conjunction' }).format(names)}`;
+		}
+		return setup.voice.narrator === 'impersonal' ? 'under the rules' : 'told to you';
+	}
 </script>
 
 <div class="page">
 	<h1>Daydreams</h1>
-	<p class="intro">Scenes you play with a character you make up.</p>
+	<p class="intro">Stories you make up and play: with characters, or told to you.</p>
 
 	{#if !data.available}
 		<wa-callout variant="neutral">
@@ -24,6 +34,10 @@
 			<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
 			New daydream
 		</wa-button>
+		<nav class="libraries" aria-label="Your library">
+			<a href={resolve('/(auth-required)/(app)/daydreams/characters')}>Your characters</a>
+			<a href={resolve('/(auth-required)/(app)/daydreams/scenes')}>Your scenes</a>
+		</nav>
 
 		{#if data.daydreams.length > 0}
 			<ul class="daydreams">
@@ -33,7 +47,7 @@
 						<a href={resolve('/(auth-required)/(app)/daydreams/[id]', { id: daydream.id })}>
 							<span class="title">{shownText(openedPart(setup, (value) => value.title))}</span>
 							<span class="detail">
-								{#if setup}with {setup.characterName} ·
+								{#if setup}{withWhom(setup)} ·
 								{/if}{daydream.lastTurnAt
 									? `played ${dateFormat.format(daydream.lastTurnAt)}`
 									: 'not started yet'}
@@ -76,6 +90,13 @@
 			display: flex;
 			max-inline-size: 30rem;
 			margin: 2rem auto 0;
+		}
+
+		.libraries {
+			display: flex;
+			justify-content: center;
+			gap: 1.5rem;
+			margin-block-start: 0.75rem;
 		}
 	}
 

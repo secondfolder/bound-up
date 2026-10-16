@@ -39,9 +39,10 @@ async function sealedPost(overrides: Record<string, string> = {}) {
 }
 
 describe('load', () => {
-	it('starts from an empty setup', async () => {
+	it('starts from an empty setup, with the library to pick from', async () => {
 		const data = await runLoad(load(at(ada)));
-		expect(data.setupForm.data).toMatchObject({ title: '', lead: 'character' });
+		expect(data.setupForm.data).toMatchObject({ title: '', lead: 'character', characters: [] });
+		expect(data).toMatchObject({ library: { characters: [], scenes: [] }, accepted: false });
 	});
 
 	it('refuses an account without the feature', async () => {

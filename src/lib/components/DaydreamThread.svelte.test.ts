@@ -1,14 +1,21 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReplyOutcome, SaveOutcome } from '$lib/daydream/client';
-import type { DaydreamSetupContent } from '$lib/sealed-kinds/daydreams';
+import type { DaydreamTurnRole } from '$lib/daydream';
+import type { ReplyOutcome } from '$lib/daydream/client';
+import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
+import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { pending } from '$lib/testing/pending';
-import { waSettled } from '$lib/testing/web-awesome';
-import type { DaydreamTurnView, DaydreamView, SealedRefView } from '$lib/types';
+import { waByProp, waSettled } from '$lib/testing/web-awesome';
+import type {
+	DaydreamTreeNodeView,
+	DaydreamTurnView,
+	DaydreamView,
+	SealedRefView
+} from '$lib/types';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
-/** Whether this device can open the conversation; flipped by a test. */
+/** Whether this device can open the story; flipped by a test. */
 const keyring = vi.hoisted(() => ({ status: 'unlocked' as string }));
 vi.mock('$lib/crypto/session.svelte', () => ({
 	currentKeyring: () =>
@@ -19,13 +26,14 @@ vi.mock('$lib/crypto/session.svelte', () => ({
 /**
  * What each sealed record opens to, by record id. The real openers are
  * covered by `sealed-cache.svelte.test.ts` and the frozen fixtures; here the
- * conversation is simply what the test says it is.
+ * story is simply what the test says it is.
  */
 const opened = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('$lib/sealed-views.svelte', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/sealed-views.svelte')>()),
 	openedDaydreamSetup: (sealed: SealedRefView) => opened.get(sealed.recordId),
-	openedDaydreamTurn: (sealed: SealedRefView) => opened.get(sealed.recordId)
+	openedDaydreamTurn: (sealed: SealedRefView) => opened.get(sealed.recordId),
+	openedDaydreamMark: (sealed: SealedRefView) => opened.get(sealed.recordId)
 }));
 
 /** The composer's restored draft, so a test can press Send without typing into Lexical. */
@@ -40,284 +48,486 @@ vi.mock('$lib/messaging/drafts', () => ({
 		})
 }));
 
-const writeReply =
-	vi.fn<
-		(
-			id: string,
-			request: { mode: string; turns: unknown[] },
-			options: { signal: AbortSignal; onText: (soFar: string) => void }
-		) => Promise<ReplyOutcome>
-	>();
-const saveTurn =
-	vi.fn<(id: string, turn: { id: string; role: string; text: string }) => Promise<SaveOutcome>>();
-const replaceTurn = vi.fn<() => Promise<SaveOutcome>>();
-vi.mock('$lib/daydream/client', () => ({ writeReply, saveTurn, replaceTurn }));
+type SaveInput = {
+	id: string;
+	parentId: string | null;
+	role: DaydreamTurnRole;
+	content: DaydreamTurnContent;
+};
+
+const client = vi.hoisted(() => ({
+	writeReply: vi.fn(),
+	saveTurn: vi.fn(),
+	readTurns: vi.fn(),
+	setActiveTurn: vi.fn(),
+	saveSetup: vi.fn(),
+	createMark: vi.fn(),
+	deleteMark: vi.fn()
+}));
+vi.mock('$lib/daydream/client', () => client);
 
 const { default: DaydreamThread } = await import('./DaydreamThread.svelte');
 
-const SETUP: DaydreamSetupContent = {
-	title: 'Late meeting',
-	characterName: 'Mara',
-	persona: '',
-	lead: 'character',
-	scenario: 'The office has emptied out.',
-	tone: '',
-	limits: '',
-	safeword: 'pineapple'
-};
+const SETUP = testDaydreamSetup();
+let clock = 0;
 
 function ref(recordId: string): SealedRefView {
-	return { recordId, vaultId: 'v', ciphertext: 'sb1.x', payloadVersion: 1 };
+	return { recordId, vaultId: 'v', ciphertext: 'sb1.x', payloadVersion: 2 };
 }
 
-function turn(id: string, role: 'user' | 'character', position: number, text: string) {
-	opened.set(id, { text });
-	return { id, role, position, revision: 0, sealed: ref(id) } satisfies DaydreamTurnView;
+function turn(
+	id: string,
+	parentId: string | null,
+	role: DaydreamTurnRole,
+	content: DaydreamTurnContent | string
+): DaydreamTurnView {
+	opened.set(id, typeof content === 'string' ? { type: 'text', text: content } : content);
+	clock += 1;
+	return { id, parentId, role, position: 0, createdAt: new Date(clock * 1000), sealed: ref(id) };
 }
 
-function daydream(turns: DaydreamTurnView[] = []): DaydreamView {
+const node = ({ sealed: _sealed, ...rest }: DaydreamTurnView): DaydreamTreeNodeView => rest;
+
+/** A daydream whose tree is `turns` and whose branch being read ends at `active` (the last turn by default). */
+function daydream(turns: DaydreamTurnView[] = [], active?: string): DaydreamView {
 	opened.set('d1', SETUP);
-	return { id: 'd1', revision: 0, setup: ref('d1'), turns };
+	const activeTurnId = active ?? turns.at(-1)?.id ?? null;
+	const byId = new Map(turns.map((each) => [each.id, each]));
+	const path: DaydreamTurnView[] = [];
+	for (
+		let at = activeTurnId ? byId.get(activeTurnId) : undefined;
+		at;
+		at = at.parentId ? byId.get(at.parentId) : undefined
+	) {
+		path.unshift(at);
+	}
+	return {
+		id: 'd1',
+		revision: 0,
+		setup: ref('d1'),
+		activeTurnId,
+		tree: turns.map(node),
+		path,
+		marks: []
+	};
 }
 
-/** What `saveTurn` answers by default: saved, at the next position. */
-function savesAt(position: number) {
-	saveTurn.mockImplementationOnce((_id, saved) => {
-		opened.set(saved.id, { text: saved.text });
-		return Promise.resolve({
-			ok: true,
-			turn: {
-				id: saved.id,
-				role: saved.role as 'user' | 'character',
-				position,
-				revision: 0,
-				sealed: ref(saved.id)
-			}
-		});
-	});
-}
-
-function waButtonWithText(container: HTMLElement, text: string): HTMLElement | undefined {
-	return [...container.querySelectorAll<HTMLElement>('wa-button')].find((button) =>
-		button.textContent?.includes(text)
-	);
-}
+const meta = (overrides: Partial<PassageMeta> = {}): PassageMeta => ({
+	suggestions: [],
+	directions: { add: [], remove: [] },
+	...overrides
+});
 
 beforeEach(() => {
 	keyring.status = 'unlocked';
 	opened.clear();
 	draftText.value = '';
-	writeReply.mockReset();
-	saveTurn.mockReset();
-	replaceTurn.mockReset();
+	for (const fn of Object.values(client)) {
+		fn.mockReset();
+	}
+	client.saveTurn.mockImplementation((_id: string, input: SaveInput) => {
+		opened.set(input.id, input.content);
+		clock += 1;
+		return Promise.resolve({
+			ok: true,
+			turn: { ...input, position: 0, createdAt: new Date(clock * 1000), sealed: ref(input.id) }
+		});
+	});
+	client.setActiveTurn.mockResolvedValue({ ok: true });
+	// Other branches' turns, opened on demand: whatever the test put in `opened`.
+	client.readTurns.mockImplementation((_id: string, ids: string[]) =>
+		Promise.resolve({
+			ok: true,
+			turns: ids.map((id) => ({
+				id,
+				parentId: null,
+				role: 'user',
+				position: 0,
+				createdAt: new Date(0),
+				sealed: ref(id)
+			}))
+		})
+	);
+	client.writeReply.mockImplementation(() => pending());
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+function button(container: HTMLElement, text: string): HTMLElement | undefined {
+	return [...container.querySelectorAll<HTMLElement>('wa-button, button')].find((candidate) =>
+		candidate.textContent?.includes(text)
+	);
+}
+
+async function press(container: HTMLElement, text: string) {
+	await waitFor(() => expect(button(container, text)).toBeDefined());
+	await waSettled(container);
+	button(container, text)?.click();
+}
+
+const saved = (index: number) => client.saveTurn.mock.calls[index]?.[1] as SaveInput | undefined;
+const asked = (index: number) =>
+	client.writeReply.mock.calls[index]?.[1] as Record<string, unknown> | undefined;
+
 describe('DaydreamThread', () => {
-	it('shows only a placeholder while the device cannot open the conversation', () => {
+	it('shows only a placeholder while the device cannot open the story', () => {
 		keyring.status = 'locked';
 		const { container } = render(DaydreamThread, {
-			daydream: daydream([turn('t1', 'character', 0, 'Sit down.')]),
+			daydream: daydream([turn('t1', null, 'story', 'Sit down.')]),
 			available: true
 		});
 		expect(container.textContent).not.toContain('Sit down.');
-		expect(container.textContent).toContain('…');
-		expect(writeReply).not.toHaveBeenCalled();
+		expect(client.writeReply).not.toHaveBeenCalled();
 	});
 
-	it('shows the conversation, naming the character on their turns', () => {
+	it('shows the branch being read, naming a lone character on their passages', () => {
 		const { container } = render(DaydreamThread, {
 			daydream: daydream([
-				turn('t1', 'character', 0, 'Sit down.'),
-				turn('t2', 'user', 1, 'I sit.')
+				turn('t1', null, 'story', 'Sit down.'),
+				turn('t2', 't1', 'user', 'I sit.')
 			]),
 			available: true
 		});
-		expect(container.querySelector('li.character')?.textContent).toContain('Mara');
-		expect(container.querySelector('li.character')?.textContent).toContain('Sit down.');
-		expect(container.querySelector('li.user')?.textContent).toContain('I sit.');
-		expect(writeReply).not.toHaveBeenCalled();
+		expect(container.querySelector('li.passage')?.textContent).toContain('Mara');
+		expect(container.querySelector('li.passage')?.textContent).toContain('Sit down.');
+		expect(container.querySelector('li.said')?.textContent).toContain('I sit.');
 	});
 
-	it('opens a new daydream by itself, showing the reply as it arrives, then saves it', async () => {
+	it('opens a new daydream by itself, then offers what the passage offered', async () => {
 		let finish: (outcome: ReplyOutcome) => void = () => undefined;
-		writeReply.mockImplementationOnce(
-			(_id, _request, options) =>
+		client.writeReply.mockImplementationOnce(
+			(_id: string, _request: unknown, options: { onText: (soFar: string) => void }) =>
 				new Promise((resolve) => {
 					options.onText('Mara looks');
 					finish = resolve;
 				})
 		);
-		savesAt(0);
 		const { container } = render(DaydreamThread, { daydream: daydream(), available: true });
 
 		await waitFor(() =>
 			expect(container.querySelector('li.streaming')?.textContent).toContain('Mara looks')
 		);
-		expect(writeReply.mock.calls[0]?.[1]).toMatchObject({ mode: 'opening', turns: [] });
+		expect(asked(0)).toMatchObject({ mode: 'opening', turns: [] });
 
-		finish({ ok: true, text: 'Mara looks up.' });
-		await waitFor(() => expect(saveTurn).toHaveBeenCalledOnce());
-		expect(saveTurn.mock.calls[0]?.[1]).toMatchObject({
-			role: 'character',
-			text: 'Mara looks up.'
+		finish({
+			ok: true,
+			passage: 'Mara looks up.',
+			meta: meta({
+				suggestions: ['I sit down.'],
+				directions: {
+					add: [
+						{ id: 'slower', label: 'Slower' },
+						{ id: 'surprise-me', label: 'Surprise me' }
+					],
+					remove: []
+				}
+			})
 		});
-		await waitFor(() => expect(container.querySelector('li.streaming')).toBeNull());
-		expect(container.querySelector('li.character')?.textContent).toContain('Mara looks up.');
+		await waitFor(() => expect(saved(0)).toMatchObject({ parentId: null, role: 'story' }));
+		expect(saved(0)?.content).toMatchObject({ type: 'text', text: 'Mara looks up.' });
+		await waitFor(() => expect(button(container, 'Slower')).toBeDefined());
+		expect(button(container, 'Surprise me')).toBeDefined();
+		expect(button(container, 'Continue')).toBeDefined();
+		expect(container.querySelector('.suggestions')?.textContent).toContain('I sit down.');
 	});
 
 	it('does not ask for an opening on a server that cannot write one', () => {
 		render(DaydreamThread, { daydream: daydream(), available: false });
-		expect(writeReply).not.toHaveBeenCalled();
+		expect(client.writeReply).not.toHaveBeenCalled();
 	});
 
-	it('stops a reply when asked, keeping what had arrived', async () => {
-		let signal: AbortSignal | undefined;
-		writeReply.mockImplementationOnce((_id, _request, options) => {
-			({ signal } = options);
-			options.onText('Mara be');
-			return new Promise((_resolve, reject) => {
-				options.signal.addEventListener('abort', () =>
-					reject(new DOMException('stopped', 'AbortError'))
-				);
-			});
+	it('saves what the user sends after the turn they are on, then asks for the next passage', async () => {
+		draftText.value = 'I sit down.';
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
 		});
-		savesAt(0);
-		const { container } = render(DaydreamThread, { daydream: daydream(), available: true });
+		await press(container, 'Send');
+		await waitFor(() => expect(client.writeReply).toHaveBeenCalledOnce());
+		expect(saved(0)).toMatchObject({
+			parentId: 't1',
+			role: 'user',
+			content: { type: 'text', text: 'I sit down.' }
+		});
+		expect(asked(0)).toMatchObject({
+			mode: 'reply',
+			turns: [
+				{ type: 'text', role: 'story', text: 'Sit.' },
+				{ type: 'text', role: 'user', text: 'I sit down.' }
+			]
+		});
+	});
 
-		await waitFor(() => expect(waButtonWithText(container, 'Stop')).toBeDefined());
+	it('sends a suggestion with a tap', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', {
+					type: 'text',
+					text: 'Sit.',
+					meta: meta({ suggestions: ['I kneel instead.'] })
+				})
+			]),
+			available: true
+		});
+		await press(container, 'I kneel instead.');
+		await waitFor(() =>
+			expect(saved(0)?.content).toEqual({ type: 'text', text: 'I kneel instead.' })
+		);
+	});
+
+	it('puts a suggestion in the composer to edit, rather than sending it', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', {
+					type: 'text',
+					text: 'Sit.',
+					meta: meta({ suggestions: ['I kneel instead.'] })
+				})
+			]),
+			available: true
+		});
+		await waitFor(() => expect(container.querySelector('[contenteditable="true"]')).not.toBeNull());
 		await waSettled(container);
-		waButtonWithText(container, 'Stop')?.click();
+		const edit = [...container.querySelectorAll('.suggestions wa-button')][1] as HTMLElement;
+		edit.click();
+		await waitFor(() =>
+			expect(container.querySelector('[contenteditable]')?.textContent).toContain(
+				'I kneel instead.'
+			)
+		);
+		expect(client.saveTurn).not.toHaveBeenCalled();
+	});
+
+	it('continues without adding a turn, and records a direction button as one', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', {
+					type: 'text',
+					text: 'Sit.',
+					meta: meta({ directions: { add: [{ id: 'slower', label: 'Slower' }], remove: [] } })
+				})
+			]),
+			available: true
+		});
+		await press(container, 'Continue');
+		await waitFor(() => expect(client.writeReply).toHaveBeenCalledOnce());
+		expect(client.saveTurn).not.toHaveBeenCalled();
+		expect(asked(0)).toMatchObject({
+			mode: 'reply',
+			currentDirections: [{ id: 'slower', label: 'Slower' }]
+		});
+	});
+
+	it('records a direction as a turn before asking for the passage after it', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', {
+					type: 'text',
+					text: 'Sit.',
+					meta: meta({ directions: { add: [{ id: 'slower', label: 'Slower' }], remove: [] } })
+				})
+			]),
+			available: true
+		});
+		await press(container, 'Slower');
+		await waitFor(() => expect(client.writeReply).toHaveBeenCalledOnce());
+		expect(saved(0)).toMatchObject({
+			parentId: 't1',
+			content: { type: 'direction', id: 'slower', label: 'Slower' }
+		});
+	});
+
+	it('moves between versions of a passage with the switcher', async () => {
+		const opening = turn('t1', null, 'story', 'Sit.');
+		const first = turn('a', 't1', 'user', 'First thing I said.');
+		const second = turn('b', 't1', 'user', 'Second thing I said.');
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([opening, first, second], 'b'),
+			available: true
+		});
+		expect(container.textContent).toContain('Second thing I said.');
+		expect(container.textContent).toContain('2/2');
+		await waSettled(container);
+		const [previous] = waByProp(container, 'wa-icon', 'label', 'Previous version');
+		const switcher = previous?.closest<HTMLElement>('wa-button');
+		if (!switcher) {
+			throw new Error('no switcher');
+		}
+		switcher.click();
+		await waitFor(() => expect(container.textContent).toContain('First thing I said.'));
+		expect(container.textContent).not.toContain('Second thing I said.');
+		expect(client.setActiveTurn).toHaveBeenCalledWith('d1', 'a');
+		// The other branch's turn was not in the page's data: it was opened on demand.
+		expect(client.readTurns).toHaveBeenCalledWith('d1', ['a']);
+	});
+
+	it('writes a passage again as another version beside it', async () => {
+		client.writeReply.mockResolvedValueOnce({ ok: true, passage: 'Second take.', meta: null });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'user', 'Hello.'),
+				turn('t2', 't1', 'story', 'First take.')
+			]),
+			available: true
+		});
+		await waSettled(container);
+		const menu = container.querySelector('li.passage wa-dropdown') as HTMLElement;
+		const [again] = waByProp(menu, 'wa-dropdown-item', 'value', 'again');
+		menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: again } }));
+		await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't1', role: 'story' }));
+		expect(asked(0)).toMatchObject({
+			mode: 'reply',
+			turns: [{ type: 'text', role: 'user', text: 'Hello.' }]
+		});
+		await waitFor(() => expect(container.textContent).toContain('Second take.'));
+		expect(container.textContent).toContain('2/2');
+	});
+
+	it('stops the scene: drops what was arriving, asks for a check-in, and offers to carry on', async () => {
+		let signal: AbortSignal | undefined;
+		client.writeReply.mockImplementationOnce(
+			(
+				_id: string,
+				_request: unknown,
+				options: { signal: AbortSignal; onText: (soFar: string) => void }
+			) => {
+				({ signal } = options);
+				options.onText('Something unwanted');
+				return new Promise((_resolve, reject) => {
+					options.signal.addEventListener('abort', () =>
+						reject(new DOMException('stopped', 'AbortError'))
+					);
+				});
+			}
+		);
+		client.writeReply.mockResolvedValueOnce({ ok: true, passage: 'Are you okay?', meta: null });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.'), turn('t2', 't1', 'user', 'Go on.')]),
+			available: true
+		});
+		await press(container, 'Continue');
+		await waitFor(() => expect(container.textContent).toContain('Something unwanted'));
+		await press(container, 'Stop the scene');
 
 		await waitFor(() => expect(signal?.aborted).toBe(true));
-		await waitFor(() => expect(saveTurn).toHaveBeenCalledOnce());
-		expect(saveTurn.mock.calls[0]?.[1]).toMatchObject({ role: 'character', text: 'Mara be' });
+		await waitFor(() => expect(saved(0)?.content).toEqual({ type: 'safety', signal: 'red' }));
+		await waitFor(() =>
+			expect(saved(1)?.content).toMatchObject({
+				type: 'text',
+				text: 'Are you okay?',
+				meta: { ooc: true }
+			})
+		);
+		// What had arrived was dropped, never saved.
+		expect(JSON.stringify(client.saveTurn.mock.calls)).not.toContain('Something unwanted');
+		await waitFor(() => expect(container.textContent).toContain('The scene is stopped'));
+		expect(button(container, 'Continue')).toBeUndefined();
+
+		await press(container, 'Carry on');
+		await waitFor(() => expect(saved(2)?.content).toEqual({ type: 'safety', signal: 'resume' }));
 	});
 
-	it('says when a reply fails, and tries again on request', async () => {
-		writeReply.mockResolvedValueOnce({
+	it('eases off: lowers the intensity and records it', async () => {
+		client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		await press(container, 'Ease off');
+		await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
+		expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ dials: { intensity: 2 } });
+		await waitFor(() => expect(saved(0)?.content).toEqual({ type: 'safety', signal: 'yellow' }));
+	});
+
+	it('rolls the die a passage proposed, and records the result', async () => {
+		const roll = {
+			prompt: 'Roll to hold still',
+			sides: 6,
+			outcomes: [
+				{ min: 1, max: 3, label: 'You move' },
+				{ min: 4, max: 6, label: 'You hold' }
+			]
+		};
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', { type: 'text', text: 'Hold.', meta: meta({ roll }) })
+			]),
+			available: true
+		});
+		expect(container.textContent).toContain('Roll to hold still');
+		await press(container, 'Roll a d6');
+		await waitFor(() => expect(saved(0)?.content.type).toBe('roll'));
+		const content = saved(0)?.content as Extract<DaydreamTurnContent, { type: 'roll' }>;
+		expect(content.proposalTurnId).toBe('t1');
+		expect(content.result).toBeGreaterThanOrEqual(1);
+		expect(content.result).toBeLessThanOrEqual(6);
+		expect(content.outcome).toBe(content.result <= 3 ? 'You move' : 'You hold');
+	});
+
+	it('offers the selection bar for words selected in a passage', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'She waits. You hold still.')]),
+			available: true
+		});
+		const text = container.querySelector('[data-passage-text="t1"]') as HTMLElement;
+		const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+		let textNode = walker.nextNode() as Text | null;
+		while (textNode && !textNode.data.includes('You hold')) {
+			textNode = walker.nextNode() as Text | null;
+		}
+		if (!textNode) {
+			throw new Error('no passage text');
+		}
+		const start = textNode.data.indexOf('You hold');
+		const range = document.createRange();
+		range.setStart(textNode, start);
+		range.setEnd(textNode, start + 'You hold still.'.length);
+		const selection = document.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+		document.dispatchEvent(new Event('selectionchange'));
+
+		await waitFor(() => expect(button(container, 'More of this')).toBeDefined());
+		await press(container, 'More of this');
+		await waitFor(() =>
+			expect(saved(0)?.content).toEqual({
+				type: 'steer',
+				action: 'more',
+				targetTurnId: 't1',
+				quote: { start, end: start + 15, text: 'You hold still.' }
+			})
+		);
+	});
+
+	it('says when a passage fails, and tries again on request', async () => {
+		client.writeReply.mockResolvedValueOnce({
 			ok: false,
 			error: 'The reply could not be written.',
 			partial: ''
 		});
 		const { container } = render(DaydreamThread, { daydream: daydream(), available: true });
-
 		await waitFor(() => expect(container.textContent).toContain('The reply could not be written.'));
-		expect(saveTurn).not.toHaveBeenCalled();
-
-		writeReply.mockImplementationOnce(() => pending());
-		await waSettled(container);
-		waButtonWithText(container, 'Try again')?.click();
-		await waitFor(() => expect(writeReply).toHaveBeenCalledTimes(2));
+		await press(container, 'Try again');
+		await waitFor(() => expect(client.writeReply).toHaveBeenCalledTimes(2));
 	});
 
-	it('saves what the user sends before asking for the reply to it', async () => {
+	it('keeps what the user wrote when it cannot be saved, and asks for nothing', async () => {
 		draftText.value = 'I sit down.';
-		writeReply.mockImplementation(() => pending());
-		savesAt(1);
-		const { container } = render(DaydreamThread, {
-			daydream: daydream([turn('t1', 'character', 0, 'Sit.')]),
-			available: true
-		});
-
-		await waitFor(() => expect(waButtonWithText(container, 'Send')).toBeDefined());
-		await waSettled(container);
-		waButtonWithText(container, 'Send')?.click();
-
-		await waitFor(() => expect(writeReply).toHaveBeenCalledOnce());
-		expect(saveTurn.mock.calls[0]?.[1]).toMatchObject({ role: 'user', text: 'I sit down.' });
-		// The reply is asked for with the whole conversation, the new turn included.
-		expect(writeReply.mock.calls[0]?.[1]).toMatchObject({
-			mode: 'reply',
-			turns: [
-				{ role: 'character', text: 'Sit.' },
-				{ role: 'user', text: 'I sit down.' }
-			]
-		});
-	});
-
-	it('sends a turn written while a reply is still arriving once that reply is saved', async () => {
-		draftText.value = 'I was already typing.';
-		let finish: (outcome: ReplyOutcome) => void = () => undefined;
-		writeReply.mockImplementationOnce(
-			() =>
-				new Promise((resolve) => {
-					finish = resolve;
-				})
-		);
-		writeReply.mockImplementation(() => pending());
-		savesAt(0);
-		savesAt(1);
-		const { container } = render(DaydreamThread, { daydream: daydream(), available: true });
-
-		await waitFor(() => expect(waButtonWithText(container, 'Send')).toBeDefined());
-		await waSettled(container);
-		waButtonWithText(container, 'Send')?.click();
-		// Nothing of the user's is saved while the opening is still arriving.
-		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(saveTurn).not.toHaveBeenCalled();
-
-		finish({ ok: true, text: 'The opening.' });
-		await waitFor(() => expect(saveTurn).toHaveBeenCalledTimes(2));
-		expect(saveTurn.mock.calls.map(([, saved]) => saved.role)).toEqual(['character', 'user']);
-		await waitFor(() => expect(writeReply).toHaveBeenCalledTimes(2));
-		expect(writeReply.mock.calls[1]?.[1]).toMatchObject({
-			turns: [
-				{ role: 'character', text: 'The opening.' },
-				{ role: 'user', text: 'I was already typing.' }
-			]
-		});
-	});
-
-	it('keeps what the user wrote when it cannot be saved, and asks for no reply', async () => {
-		draftText.value = 'I sit down.';
-		saveTurn.mockResolvedValueOnce({
+		client.saveTurn.mockResolvedValueOnce({
 			ok: false,
 			error: 'Something changed since this page loaded.'
 		});
 		const { container } = render(DaydreamThread, {
-			daydream: daydream([turn('t1', 'character', 0, 'Sit.')]),
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
 			available: true
 		});
-
-		await waitFor(() => expect(waButtonWithText(container, 'Send')).toBeDefined());
-		await waSettled(container);
-		waButtonWithText(container, 'Send')?.click();
-
+		await press(container, 'Send');
 		await waitFor(() =>
 			expect(container.textContent).toContain('Something changed since this page loaded.')
 		);
-		expect(writeReply).not.toHaveBeenCalled();
+		expect(client.writeReply).not.toHaveBeenCalled();
 		expect(container.querySelector('[contenteditable]')?.textContent).toContain('I sit down.');
-	});
-
-	it('writes the newest reply again in its place', async () => {
-		replaceTurn.mockResolvedValueOnce({
-			ok: true,
-			turn: { ...turn('t2', 'character', 1, 'Second take.'), revision: 1 }
-		});
-		writeReply.mockResolvedValueOnce({ ok: true, text: 'Second take.' });
-		const { container } = render(DaydreamThread, {
-			daydream: daydream([
-				turn('t1', 'user', 0, 'Hello.'),
-				turn('t2', 'character', 1, 'First take.')
-			]),
-			available: true
-		});
-
-		await waSettled(container);
-		waButtonWithText(container, 'Write this reply again')?.click();
-
-		await waitFor(() => expect(replaceTurn).toHaveBeenCalledOnce());
-		// Answering the conversation before the reply being replaced.
-		expect(writeReply.mock.calls[0]?.[1]).toMatchObject({
-			mode: 'reply',
-			turns: [{ role: 'user', text: 'Hello.' }]
-		});
-		await waitFor(() => expect(container.textContent).toContain('Second take.'));
-		expect(container.querySelectorAll('li.character')).toHaveLength(1);
 	});
 });

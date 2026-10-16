@@ -11,6 +11,7 @@
 	} from '$lib/messaging';
 	import { type ComposedMessage, checkSizes, checkText } from '$lib/messaging/client';
 	import { PendingAttachment } from '$lib/messaging/pending-attachment.svelte';
+	import { plainTextToDocument } from '$lib/richtext';
 	import { MESSAGE_FEATURES } from '$lib/richtext-editor';
 	import RichTextEditor from './RichTextEditor.svelte';
 
@@ -121,6 +122,19 @@
 			attachment.dispose();
 		}
 	});
+
+	/**
+	 * Puts plain text in the composer, in place of whatever was there, for the
+	 * person to edit and send — a suggested response they want to change
+	 * first. Goes through `onTextChange` like typing would, so the draft keeps
+	 * it.
+	 */
+	export function replaceText(plain: string) {
+		const stored = JSON.stringify(plainTextToDocument(plain));
+		editor?.setValue(stored);
+		onChange(stored);
+		editor?.focus();
+	}
 
 	function onChange(next: string) {
 		text = next;

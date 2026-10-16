@@ -1472,6 +1472,14 @@ export const daydreams = sqliteTable(
 		revision: integer('revision').notNull().default(0),
 		/** What the list sorts by: the newest conversation first. Null before the opening. */
 		lastTurnAt: integer('last_turn_at', { mode: 'timestamp_ms' }),
+		/**
+		 * The turn the user is on: the end of the branch the page shows. Set by
+		 * every append, and by moving between branches. Null before the opening.
+		 *
+		 * No foreign key, for the reason `daydreamTurns.parentId` has none; the
+		 * server checks it names one of this daydream's turns before storing it.
+		 */
+		activeTurnId: text('active_turn_id'),
 		...timestamps
 	},
 	(table) => [
@@ -1481,12 +1489,17 @@ export const daydreams = sqliteTable(
 );
 
 /**
- * One turn of a daydream: something the user said, or the character's reply.
+ * One turn of a daydream: something the user did, or a passage of the story.
  *
- * `role` is the one plaintext fact about a turn, because the server acts on
- * it: only the newest character turn may be replaced (a retried reply).
- * `position` orders the conversation and is unique per daydream, so two
- * devices appending at once cannot both take the same place.
+ * Turns form a tree, so one daydream can hold every branch of its story:
+ * retrying a reply, rewriting a passage or carrying on from an earlier point
+ * adds a sibling rather than replacing anything. A turn is never changed once
+ * written — which is also what keeps a bookmarked quote's offsets true.
+ *
+ * `role` (who wrote it) is the one plaintext fact about a turn's content;
+ * what kind of turn it is lives in the sealed payload. `parentId` and
+ * `position` are the tree's shape, which the server needs to hand back the
+ * branch being read.
  */
 export const daydreamTurns = sqliteTable(
 	'daydream_turns',
@@ -1495,8 +1508,56 @@ export const daydreamTurns = sqliteTable(
 		daydreamId: text('daydream_id')
 			.notNull()
 			.references(() => daydreams.id, { onDelete: 'cascade' }),
+		/**
+		 * The turn this one follows; null for a root (the opening, or a retried
+		 * opening).
+		 *
+		 * No foreign key: added to a live table, where `ALTER TABLE … ADD COLUMN
+		 * … REFERENCES` cannot carry an `ON DELETE` (AGENTS.md, "Traps") and the
+		 * rebuild that could would empty the table on D1. Nothing is lost by it:
+		 * turns are only ever deleted with their daydream, whose cascade takes
+		 * every one at once. `appendTurn` checks the parent is in the same
+		 * daydream.
+		 */
+		parentId: text('parent_id'),
 		role: text('role').$type<DaydreamTurnRole>().notNull(),
+		/**
+		 * How deep in its branch the turn is: 0 for a root, its parent's plus one
+		 * otherwise. Named for what it was when the story was a single line,
+		 * where position and depth were the same number; a rename is a column
+		 * rebuild drizzle-kit only offers interactively, for no gain.
+		 */
 		position: integer('position').notNull(),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		/** Always 0 now that turns are never changed; left from when a retry replaced one. */
+		revision: integer('revision').notNull().default(0),
+		...timestamps
+	},
+	(table) => [
+		// "This turn's children": the branch map, and a parent check on append.
+		index('daydream_turns_daydream_parent_idx').on(table.daydreamId, table.parentId)
+	]
+);
+
+/**
+ * A mark on a turn: a bookmark (a save point, or a highlighted quote) or a
+ * reaction. Sealed, like the turn it marks; the server knows only which turn.
+ */
+export const daydreamMarks = sqliteTable(
+	'daydream_marks',
+	{
+		id: text('id').primaryKey(),
+		daydreamId: text('daydream_id')
+			.notNull()
+			.references(() => daydreams.id, { onDelete: 'cascade' }),
+		// A new table, so the cascade is real here, unlike `parentId`'s.
+		turnId: text('turn_id')
+			.notNull()
+			.references(() => daydreamTurns.id, { onDelete: 'cascade' }),
 		ciphertext: text('ciphertext').notNull(),
 		vaultId: text('vault_id')
 			.notNull()
@@ -1505,9 +1566,50 @@ export const daydreamTurns = sqliteTable(
 		revision: integer('revision').notNull().default(0),
 		...timestamps
 	},
-	(table) => [
-		uniqueIndex('daydream_turns_daydream_position_idx').on(table.daydreamId, table.position)
-	]
+	(table) => [index('daydream_marks_daydream_idx').on(table.daydreamId)]
+);
+
+/**
+ * A character in the user's library, to pick for any daydream. Picking one
+ * copies it into the daydream's setup, with the revision it was copied at, so
+ * an edit here never changes a story under way; the setup page notices the
+ * revision has moved on and offers the newer version.
+ */
+export const daydreamCharacters = sqliteTable(
+	'daydream_characters',
+	{
+		id: text('id').primaryKey(),
+		ownerId: text('owner_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		revision: integer('revision').notNull().default(0),
+		...timestamps
+	},
+	(table) => [index('daydream_characters_owner_updated_idx').on(table.ownerId, table.updatedAt)]
+);
+
+/** A scene in the user's library. Copied into a daydream exactly as a character is. */
+export const daydreamScenes = sqliteTable(
+	'daydream_scenes',
+	{
+		id: text('id').primaryKey(),
+		ownerId: text('owner_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		revision: integer('revision').notNull().default(0),
+		...timestamps
+	},
+	(table) => [index('daydream_scenes_owner_updated_idx').on(table.ownerId, table.updatedAt)]
 );
 
 /**
@@ -1531,3 +1633,9 @@ export type DaydreamTurn = typeof daydreamTurns.$inferSelect;
 export type NewDaydreamTurn = typeof daydreamTurns.$inferInsert;
 export type DaydreamPreferences = typeof daydreamPreferences.$inferSelect;
 export type NewDaydreamPreferences = typeof daydreamPreferences.$inferInsert;
+export type DaydreamMark = typeof daydreamMarks.$inferSelect;
+export type NewDaydreamMark = typeof daydreamMarks.$inferInsert;
+export type DaydreamCharacterRow = typeof daydreamCharacters.$inferSelect;
+export type NewDaydreamCharacterRow = typeof daydreamCharacters.$inferInsert;
+export type DaydreamSceneRow = typeof daydreamScenes.$inferSelect;
+export type NewDaydreamSceneRow = typeof daydreamScenes.$inferInsert;

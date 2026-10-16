@@ -8,9 +8,10 @@ import { SSE_HEADERS } from '$lib/server/realtime';
 import type { RequestHandler } from './$types';
 
 /**
- * Asks the model for the character's next reply, and streams it back.
+ * Asks the model for the story's next passage, and streams it back.
  *
- * **The one place the server handles what a user wrote in plaintext.** The
+ * **One of the two places the server handles what a user wrote in plaintext**
+ * (the other is `../../suggest`). The
  * browser posts the setup and the recent conversation as text, because the
  * model needs the words and the server cannot open the sealed copies; this
  * forwards them to OpenRouter and pipes the answer straight back. Nothing
@@ -75,9 +76,9 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 				model: config.model,
 				messages: buildMessages(parsed.data),
 				stream: true,
-				// A few paragraphs, which is what the rules ask for; also the
-				// most one reply can cost.
-				max_tokens: 900,
+				// A few paragraphs, which is what the dials ask for at most, plus
+				// the metadata block after them; also the most one reply can cost.
+				max_tokens: 1200,
 				temperature: 0.9,
 				// Only route to providers that do not keep or train on prompts.
 				provider: { data_collection: 'deny' }

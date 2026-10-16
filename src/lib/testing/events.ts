@@ -79,6 +79,8 @@ export type FakeEventOptions = {
 	emailRateLimit?: EmailRateLimiter;
 	/** `locals.daydreamRateLimit`, likewise present and allowing everything by default. */
 	daydreamRateLimit?: DaydreamRateLimiter;
+	/** `locals.daydreamSuggestRateLimit`, likewise. */
+	daydreamSuggestRateLimit?: DaydreamRateLimiter;
 	/**
 	 * The method of a `json` request. POST unless given: most `+server.ts`
 	 * routes are POSTs, and a test of a PUT or PATCH says so.
@@ -143,7 +145,8 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 		session: null,
 		authRateLimit: options.authRateLimit ?? unlimited,
 		emailRateLimit: options.emailRateLimit ?? unlimitedEmail,
-		daydreamRateLimit: options.daydreamRateLimit ?? unlimitedDaydreams
+		daydreamRateLimit: options.daydreamRateLimit ?? unlimitedDaydreams,
+		daydreamSuggestRateLimit: options.daydreamSuggestRateLimit ?? unlimitedDaydreams
 	};
 	if (options.db) {
 		locals.db = options.db;

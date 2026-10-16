@@ -14,6 +14,7 @@ import {
 	authRateLimiter,
 	bucketForAuthPath,
 	daydreamRateLimiter,
+	daydreamSuggestRateLimiter,
 	emailRateLimiter,
 	onceEach,
 	rateLimitMessage,
@@ -121,6 +122,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Not behind `limitsOff`: it limits spending, not guessing (see
 	// `DAYDREAM_REPLY_LIMITS`).
 	event.locals.daydreamRateLimit = daydreamRateLimiter(db, secret);
+	event.locals.daydreamSuggestRateLimit = daydreamSuggestRateLimiter(db, secret);
 	event.locals.session = null;
 	event.locals.user = null;
 

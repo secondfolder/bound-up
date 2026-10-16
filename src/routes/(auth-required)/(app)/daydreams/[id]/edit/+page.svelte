@@ -21,7 +21,7 @@
 		backLabel="Back to the daydream"
 		backText="Daydream"
 		title="Change the setup"
-		description="Changes apply from the next reply. What has already been said stays as it is."
+		description="Changes apply from the next passage. What has already happened stays as it is."
 	/>
 
 	<div class="content">
@@ -31,6 +31,8 @@
 			<DaydreamSetupForm
 				setupForm={data.setupForm}
 				daydream={{ id: data.daydream.id, revision: data.daydream.revision, setup }}
+				library={data.library}
+				suggestionsOn={data.accepted && data.available}
 				submitLabel="Save setup"
 			/>
 		{:else}

@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { generateAgeIdentity } from '../crypto/identity';
+import type { DaydreamTurnRole } from '../daydream';
 import type { ThreadIcon } from '../messaging';
 import type { ControlAnswer } from '../partnership';
 import { controlFromAnswer } from '../partnership';
@@ -748,40 +749,62 @@ export async function grantTestDaydreams(db: Db, userId: string): Promise<void> 
 }
 
 /**
- * A daydream with a stand-in sealed setup, and these turns, through the same
- * functions the endpoints use. Returns the daydream's id and its turns' ids.
+ * A daydream with a stand-in sealed setup, and these turns one after another
+ * (each the child of the last), through the same functions the endpoints use.
+ * Returns the daydream's id and its turns' ids.
  */
 export async function createTestDaydream(
 	db: Db,
 	ownerId: string,
-	turns: readonly ('user' | 'character')[] = []
+	turns: readonly DaydreamTurnRole[] = []
 ): Promise<{ id: string; turnIds: string[] }> {
 	const vaultId = await ensureTestSelfVault(db, ownerId);
 	const id = crypto.randomUUID();
 	const created = await createDaydream(db, ownerId, id, {
 		vaultId,
 		ciphertext: fakeSealed('setup'),
-		payloadVersion: 1
+		payloadVersion: 2
 	});
 	if (!created.ok) {
 		throw new Error(`createTestDaydream: ${created.reason}`);
 	}
 	const turnIds: string[] = [];
 	for (const role of turns) {
-		const turnId = crypto.randomUUID();
-		const appended = await appendTurn(
-			db,
-			ownerId,
-			id,
-			{ id: turnId, role, content: { vaultId, ciphertext: fakeSealed('turn'), payloadVersion: 1 } },
-			nextFixtureTime()
-		);
-		if (!appended.ok) {
-			throw new Error(`createTestDaydream: ${appended.reason}`);
-		}
+		const turnId = await appendTestTurn(db, ownerId, id, turnIds.at(-1) ?? null, role);
 		turnIds.push(turnId);
 	}
 	return { id, turnIds };
+}
+
+/** One more turn, after `parentId` (null for a root), with a stand-in sealed body. */
+export async function appendTestTurn(
+	db: Db,
+	ownerId: string,
+	daydreamId: string,
+	parentId: string | null,
+	role: DaydreamTurnRole = 'story'
+): Promise<string> {
+	const turnId = crypto.randomUUID();
+	const appended = await appendTurn(
+		db,
+		ownerId,
+		daydreamId,
+		{
+			id: turnId,
+			parentId,
+			role,
+			content: {
+				vaultId: await ensureTestSelfVault(db, ownerId),
+				ciphertext: fakeSealed('turn'),
+				payloadVersion: 2
+			}
+		},
+		nextFixtureTime()
+	);
+	if (!appended.ok) {
+		throw new Error(`appendTestTurn: ${appended.reason}`);
+	}
+	return turnId;
 }
 
 export async function readDaydreamRow(db: Db, id: string) {

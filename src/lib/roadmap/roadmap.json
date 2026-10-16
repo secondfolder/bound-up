@@ -136,15 +136,29 @@
 				{
 					"id": "generated-roleplay",
 					"title": "Daydreams",
-					"summary": "Play out a scene with a character you make up, who writes back as you go.",
+					"summary": "Play out a story you make up, with characters who write back or a narrator who tells it to you.",
 					"status": "in-progress",
 					"icon": "cloud-moon",
 					"notes": [
-						"Set up the character, the scenario, who leads and your limits",
-						"The scene opens on its own, then you take turns",
-						"A safeword stops the scene, always"
+						"Set up how it's told, who's in it, the scene and your limits",
+						"The story opens on its own, then you take turns",
+						"Stop the scene and Ease off are always there"
 					],
 					"children": [
+						{
+							"id": "daydreams-voices-library",
+							"title": "Characters, scenes and narrators",
+							"summary": "A library of characters and scenes to reuse, made with dials and suggestions, and stories told by a narrator or the rules with no character at all.",
+							"status": "shipped",
+							"shippedOn": "2026-10-16"
+						},
+						{
+							"id": "daydreams-steer-branch",
+							"title": "Steer, branch and roll",
+							"summary": "Buttons and suggestions to move the story on, branches you can go back to, bookmarks, and dice that decide for you.",
+							"status": "shipped",
+							"shippedOn": "2026-10-16"
+						},
 						{
 							"id": "daydreams-kink-list",
 							"title": "Daydreams from your kink list",

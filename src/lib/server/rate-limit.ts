@@ -266,6 +266,25 @@ export function daydreamRateLimiter(db: Db, secret: string): DaydreamRateLimiter
 		consumeRateLimit(db, secret, `daydream-reply|user|${userId}`, DAYDREAM_REPLY_LIMITS);
 }
 
+/**
+ * Suggestions a Daydreams account can ask for while setting up: more chips,
+ * filling in a character or scene, "Surprise me".
+ *
+ * A scope of its own, so that filling in forms never uses up someone's story
+ * replies, and on everywhere for the same reason as the replies'. Each is a
+ * small, cheap call; thirty a minute is someone tapping "More ideas" a lot.
+ */
+export const DAYDREAM_SUGGEST_LIMITS = [
+	{ max: 30, windowSeconds: 60 },
+	{ max: 200, windowSeconds: 24 * 60 * 60 }
+] as const satisfies readonly RateLimitRule[];
+
+/** Builds `locals.daydreamSuggestRateLimit`. */
+export function daydreamSuggestRateLimiter(db: Db, secret: string): DaydreamRateLimiter {
+	return (userId) =>
+		consumeRateLimit(db, secret, `daydream-suggest|user|${userId}`, DAYDREAM_SUGGEST_LIMITS);
+}
+
 /** For tests of everything but the limit. */
 export const unlimitedDaydreams: DaydreamRateLimiter = () => Promise.resolve({ allowed: true });
 

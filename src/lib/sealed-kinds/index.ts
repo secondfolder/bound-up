@@ -10,7 +10,13 @@
  */
 
 import type { SealedKind } from '../sealed';
-import { daydreamSetupKind, daydreamTurnKind } from './daydreams';
+import {
+	daydreamCharacterKind,
+	daydreamMarkKind,
+	daydreamSceneKind,
+	daydreamSetupKind,
+	daydreamTurnKind
+} from './daydreams';
 import { messageBodyKind, messageMetadataKind, messageReactionKind } from './messages';
 import { partnershipInviteKind, partnershipNamesKind } from './partnerships';
 import { tagKind } from './tags';
@@ -26,5 +32,8 @@ export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
 	partnershipNamesKind,
 	partnershipInviteKind,
 	daydreamSetupKind,
-	daydreamTurnKind
+	daydreamTurnKind,
+	daydreamMarkKind,
+	daydreamCharacterKind,
+	daydreamSceneKind
 ];
