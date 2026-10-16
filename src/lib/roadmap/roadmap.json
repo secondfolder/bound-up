@@ -313,9 +313,9 @@
 			"icon": "dice",
 			"items": [
 				{
-					"id": "bimbo-iq-test",
-					"title": "Bimbo IQ test",
-					"summary": "An IQ test built for subs to fail and doms to win, from strictly official to flashing porn.",
+					"id": "iq-test",
+					"title": "IQ test",
+					"summary": "An IQ test that provides humiliation if you score low.",
 					"status": "shipped",
 					"shippedOn": "2026-10-10",
 					"icon": "brain",

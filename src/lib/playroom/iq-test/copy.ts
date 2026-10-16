@@ -46,7 +46,7 @@ export const TOGGLE_LABELS: Record<Toggle, string> = {
 export const TOGGLE_HELP: Record<Toggle, { about: string; on: string; off: string }> = {
 	humiliating: {
 		about: 'How your results are written up, if your score earns it.',
-		on: 'A sub with a low score reads “Such a good, empty girl!” (or, with no theme, “About as dim as we expected.”); a dom is flattered.',
+		on: 'A low score reads “Such a good, empty girl!” (or, with no theme, “About as dim as we expected.”).',
 		off: 'A straight report: “Full Scale IQ: 62”, and where that falls on the scale.'
 	},
 	themedLook: {

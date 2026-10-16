@@ -19,9 +19,8 @@ export type PlayroomTool = {
 export const PLAYROOM_TOOLS: readonly PlayroomTool[] = [
 	{
 		id: 'iq-test',
-		name: 'Bimbo IQ test',
-		blurb:
-			'An IQ test that wants you to fail — or, for the one in charge, to win. Official, porny, or anywhere between.',
+		name: 'IQ test',
+		blurb: "Do you know what you're talking about or are you just a dumb little slut?",
 		icon: 'brain',
 		route: '/(standalone)/playroom/iq-test/[[id]]'
 	}
