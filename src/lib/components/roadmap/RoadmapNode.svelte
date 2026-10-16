@@ -26,7 +26,7 @@
 >
 	<!-- The slot is one line of the title tall, so the marker centres on that
 	     line — which is where the tree's elbow connectors arrive (0.5lh down;
-	     see RoadmapTree). The marker itself cannot measure it: its own lh is
+	     see Tree). The marker itself cannot measure it: its own lh is
 	     its glyph's. -->
 	<span class="marker-slot" aria-hidden="true">
 		<span class="marker">
@@ -57,14 +57,19 @@
 
 <style>
 	.node {
-		--marker-size: 1.25rem;
+		/* Set per depth by RoadmapTree, so the tree's connectors and the
+		   marker they end on agree on its size. */
+		--marker-size: var(--tree-marker-size, 1.25rem);
 
 		/* Positioned so the marker paints over the tree's elbow connector,
-		   which is a positioned pseudo-element on the item around it and
+		   which is a positioned pseudo-element on the node around it and
 		   would otherwise be drawn across the marker's ring. The elbow ends on
 		   the ring's edge; this is what keeps it from showing inside it. */
 		position: relative;
 		display: flex;
+		/* Reversed on a bough mirrored to the left of the trunk (see Tree),
+		   so the marker stays on the trunk side and the text flows away. */
+		flex-direction: var(--tree-row, row);
 		align-items: flex-start;
 		gap: 0.6rem;
 		color: var(--wa-color-text-normal);
@@ -74,7 +79,6 @@
 		scroll-margin-block: 5rem;
 
 		&.twig {
-			--marker-size: 0.85rem;
 			gap: 0.5rem;
 		}
 
@@ -140,6 +144,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
+		justify-content: var(--tree-justify, flex-start);
 		column-gap: 0.5rem;
 		row-gap: 0.1rem;
 		min-inline-size: 0;
@@ -186,7 +191,7 @@
 
 	/* Dimmed: the marker and the text, not the node. The tree draws
 	   connectors on the node too, and those are dimmed by what they lead to,
-	   not by this item alone (see RoadmapTree). */
+	   not by this item alone (see Tree). */
 	.node > .marker-slot,
 	.node > .text {
 		transition: opacity 0.15s ease;
@@ -194,7 +199,7 @@
 
 	.node.dimmed > .marker-slot,
 	.node.dimmed > .text {
-		opacity: var(--dim-opacity, 0.3);
+		opacity: var(--tree-dim-opacity, 0.3);
 	}
 
 	.node:hover .title {

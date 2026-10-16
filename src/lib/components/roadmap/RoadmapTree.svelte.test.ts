@@ -82,10 +82,10 @@ describe('RoadmapTree', () => {
 				return colour;
 			};
 			return {
-				line: resolve('--line-color'),
-				lineDim: resolve('--line-color-dim'),
-				bark: resolve('--bark'),
-				barkDim: resolve('--bark-dim')
+				line: resolve('--_line-color'),
+				lineDim: resolve('--_line-color-dim'),
+				bark: resolve('--_bark'),
+				barkDim: resolve('--_bark-dim')
 			};
 		}
 
@@ -97,21 +97,45 @@ describe('RoadmapTree', () => {
 				: style.borderRightColor;
 		}
 
-		/** Every connector drawn on a pseudo-element, as [element, pseudo]. */
+		/**
+		 * Every thin connector drawn on a pseudo-element, as [element, pseudo]:
+		 * the ones drawn with a border. Boughs and the trunk are bark, drawn as
+		 * a background, and checked on their own.
+		 */
 		function connectors(container: Element): [Element, '::before' | '::after'][] {
-			return [...container.querySelectorAll('.leaves > li, .twigs > li, .node')].flatMap((part) =>
+			return [
+				...container.querySelectorAll('.tree-forks > li, .tree-node, .tree-step, .tree-forks')
+			].flatMap((part) =>
 				(['::before', '::after'] as const)
-					.filter((pseudo) => getComputedStyle(part, pseudo).content !== 'none')
+					.filter((pseudo) => {
+						const style = getComputedStyle(part, pseudo);
+						return (
+							style.content !== 'none' &&
+							(Number.parseFloat(style.borderLeftWidth) > 0 ||
+								Number.parseFloat(style.borderRightWidth) > 0)
+						);
+					})
 					.map((pseudo): [Element, '::before' | '::after'] => [part, pseudo])
 			);
 		}
 
-		function nodeOf(container: Element, id: string): Element {
+		function linkOf(container: Element, id: string): Element {
 			return defined(container.querySelector(`a.node[id="${id}"]`), `node ${id}`);
 		}
 
+		/** The tree's node around an item: its elbow is the ::before, its stem the ::after. */
+		function nodeOf(container: Element, id: string): Element {
+			return defined(linkOf(container, id).closest('.tree-node'), `the tree node around ${id}`);
+		}
+
 		function itemOf(container: Element, id: string): Element {
-			return defined(nodeOf(container, id).parentElement, `the item around ${id}`);
+			return defined(linkOf(container, id).closest('.tree-branch'), `the item around ${id}`);
+		}
+
+		/** A branch head's tree node: its bough is the ::before, its stem the ::after. */
+		function headOf(container: Element, id: string): Element {
+			const head = defined(container.querySelector(`[id="${id}"]`), `the ${id} head`);
+			return defined(head.closest('.tree-node'), `the tree node around the ${id} head`);
 		}
 
 		function renderHiding(...statuses: RoadmapStatus[]) {
@@ -171,6 +195,7 @@ describe('RoadmapTree', () => {
 			// the rest of its twigs, which reach the trunk through Edging.
 			const { container, colours } = renderHiding('in-progress');
 			const edging = nodeOf(container, 'edging');
+			expect(edging.querySelectorAll('.marker-slot')).toHaveLength(1);
 			expect(shown(defined(edging.querySelector('.marker-slot'), 'a marker'))).toBe(Dim);
 			expect(shown(defined(edging.querySelector('.text'), 'the text'))).toBe(Dim);
 			expect(lineColour(edging, '::before')).toBe(colours.line); // the elbow into it
@@ -192,15 +217,26 @@ describe('RoadmapTree', () => {
 			expect(lineColour(chastity, '::before')).toBe(colours.lineDim);
 			expect(lineColour(chastity, '::after')).toBe(colours.lineDim);
 
-			// Sessions has nothing shipped, so nothing in it is shown.
-			const sessions = defined(container.querySelector('[id="sessions"]'), 'the Sessions head');
-			expect(shown(defined(sessions.querySelector('.branch-icon'), 'an icon'))).toBe(Dim);
-			expect(getComputedStyle(sessions, '::before').backgroundColor).toBe(colours.barkDim);
-			expect(getComputedStyle(sessions, '::before').zIndex).toBe('-1');
-			expect(lineColour(sessions, '::after')).toBe(colours.lineDim);
+			// A branch with nothing shipped has nothing in it shown. Found from
+			// the roadmap rather than named: this once named Sessions, and broke
+			// the day Daydreams shipped in it.
+			const unshipped = defined(
+				roadmap.branches.find(
+					(branch) =>
+						!allItems().some(
+							(placed) => placed.branch.id === branch.id && placed.item.status === 'shipped'
+						)
+				),
+				'a branch with nothing shipped'
+			);
+			const emptyBranch = headOf(container, unshipped.id);
+			expect(shown(defined(emptyBranch.querySelector('.branch-icon'), 'an icon'))).toBe(Dim);
+			expect(getComputedStyle(emptyBranch, '::before').backgroundColor).toBe(colours.barkDim);
+			expect(getComputedStyle(emptyBranch, '::before').zIndex).toBe('-1');
+			expect(lineColour(emptyBranch, '::after')).toBe(colours.lineDim);
 
 			// Partners has shipped items, so its head stays.
-			const partners = defined(container.querySelector('[id="partners"]'), 'the Partners head');
+			const partners = headOf(container, 'partners');
 			expect(shown(defined(partners.querySelector('.branch-icon'), 'an icon'))).toBe(1);
 			expect(getComputedStyle(partners, '::before').backgroundColor).toBe(colours.bark);
 			expect(lineColour(partners, '::after')).toBe(colours.line);
@@ -261,7 +297,7 @@ describe('RoadmapTree', () => {
 			const { trunk, boughs } = await renderPacked();
 			const trunkX = centreX(trunk);
 			for (const bough of boughs) {
-				const head = defined(bough.querySelector('.branch-head'), 'a branch head');
+				const head = defined(bough.querySelector(':scope > .tree-node'), 'a branch head');
 				const box = head.getBoundingClientRect();
 				const reach = px(getComputedStyle(head, '::before').width);
 				const end = bough.dataset.side === 'start' ? box.right + reach : box.left - reach;
@@ -273,14 +309,14 @@ describe('RoadmapTree', () => {
 			const { boughs } = await renderPacked();
 			for (const bough of boughs) {
 				const mirrored = bough.dataset.side === 'start';
-				for (const item of bough.querySelectorAll<HTMLElement>('.leaves > li, .twigs > li')) {
+				for (const item of bough.querySelectorAll<HTMLElement>('.tree-forks > li')) {
 					const marker = defined(
-						item.querySelector(':scope > .node .marker'),
+						item.querySelector(':scope > .tree-node .marker'),
 						'the marker an elbow leads to'
 					);
 					// The bend and the run across are the node's ::before, starting
 					// on the item's line and ending on the marker.
-					const node = defined(item.querySelector(':scope > .node'), 'a node');
+					const node = defined(item.querySelector(':scope > .tree-node'), 'a node');
 					const elbow = getComputedStyle(node, '::before');
 					const nodeBox = node.getBoundingClientRect();
 					const itemBox = item.getBoundingClientRect();
@@ -315,7 +351,7 @@ describe('RoadmapTree', () => {
 		it('runs each branch stem from its icon to the start of its leaves', async () => {
 			const { boughs } = await renderPacked();
 			for (const bough of boughs) {
-				const head = defined(bough.querySelector('.branch-head'), 'a branch head');
+				const head = defined(bough.querySelector(':scope > .tree-node'), 'a branch head');
 				const icon = defined(bough.querySelector('.branch-icon'), 'a branch icon');
 				const stem = getComputedStyle(head, '::after');
 				const headBox = head.getBoundingClientRect();
@@ -326,7 +362,7 @@ describe('RoadmapTree', () => {
 				expect(headBox.top + px(stem.top) + px(stem.height)).toBeCloseTo(headBox.bottom + 1, 0);
 
 				// And the leaves' line runs down the middle of the icon.
-				const leaf = defined(bough.querySelector('.leaves > li'), 'a leaf');
+				const leaf = defined(bough.querySelector('.tree-forks > li'), 'a leaf');
 				const leafBox = leaf.getBoundingClientRect();
 				const line =
 					px(getComputedStyle(leaf, '::before').borderInlineStartWidth) ||
@@ -340,8 +376,10 @@ describe('RoadmapTree', () => {
 		it("runs each leaf stem from its marker to its first twig, down the marker's middle", async () => {
 			const { boughs } = await renderPacked();
 			for (const bough of boughs) {
-				for (const leaf of bough.querySelectorAll('.leaves > li:has(> .twigs)')) {
-					const node = defined(leaf.querySelector(':scope > .node'), 'a leaf node');
+				for (const leaf of bough.querySelectorAll(
+					'.tree-forks > li:has(> .tree-fold > .tree-forks)'
+				)) {
+					const node = defined(leaf.querySelector(':scope > .tree-node'), 'a leaf node');
 					const marker = defined(node.querySelector('.marker'), 'a marker');
 					const stem = getComputedStyle(node, '::after');
 					const nodeBox = node.getBoundingClientRect();
@@ -349,12 +387,101 @@ describe('RoadmapTree', () => {
 					// A pixel past the node, overlapping the first twig's line.
 					expect(nodeBox.top + px(stem.top) + px(stem.height)).toBeCloseTo(nodeBox.bottom + 1, 0);
 
-					const twig = defined(leaf.querySelector('.twigs > li'), 'a twig');
+					const twig = defined(leaf.querySelector('.tree-fold > .tree-forks > li'), 'a twig');
 					const twigBox = twig.getBoundingClientRect();
 					const lineX = bough.dataset.side === 'start' ? twigBox.right - 1 : twigBox.left + 1;
 					expect(lineX).toBeCloseTo(centreX(marker), 0);
 				}
 			}
+		});
+	});
+
+	describe('folded', () => {
+		function toggleOf(container: Element, id: string): HTMLButtonElement {
+			const anchor = defined(container.querySelector(`[id="${id}"]`), `${id}`);
+			const node = defined(anchor.closest('.tree-node'), `the tree node around ${id}`);
+			return defined(
+				node.querySelector<HTMLButtonElement>(':scope > .tree-toggle'),
+				`${id}'s toggle`
+			);
+		}
+
+		it('offers a toggle on every branch head and every leaf with twigs, and nowhere else', () => {
+			const { container } = render(RoadmapTree, { branches: roadmap.branches });
+			const expected =
+				roadmap.branches.length +
+				roadmap.branches.flatMap((branch) => branch.items).filter((item) => item.children?.length)
+					.length;
+			expect(container.querySelectorAll('.tree-toggle')).toHaveLength(expected);
+			for (const branch of roadmap.branches) {
+				const toggle = toggleOf(container, branch.id);
+				expect(toggle).toHaveAttribute('aria-expanded', 'true');
+				expect(toggle).toHaveAccessibleName(
+					`Hide ${allItems().filter((placed) => placed.branch.id === branch.id).length} under ${branch.title}`
+				);
+			}
+		});
+
+		it('folds a branch to its head, and opens it again', async () => {
+			const { container } = render(RoadmapTree, { branches: roadmap.branches });
+			const branch = defined(roadmap.branches[0], 'a branch');
+			const first = defined(branch.items[0], 'its first leaf');
+			const toggle = toggleOf(container, branch.id);
+
+			toggle.click();
+			await vi.waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'false'));
+			expect(container.querySelector(`[id="${first.id}"]`)).toBeNull();
+			const count = allItems().filter((placed) => placed.branch.id === branch.id).length;
+			expect(toggle).toHaveTextContent(`+${count}`);
+			expect(toggle).toHaveAccessibleName(`Show ${count} more under ${branch.title}`);
+			// Nothing hangs from a folded head: no stem down to leaves that are gone.
+			const head = defined(toggle.closest('.tree-node'), 'the head');
+			expect(getComputedStyle(head, '::after').content).toBe('none');
+
+			toggle.click();
+			await vi.waitFor(() => expect(container.querySelector(`[id="${first.id}"]`)).not.toBeNull());
+		});
+
+		it('re-packs the boughs when one folds', async () => {
+			const { container } = render(RoadmapTree, { branches: roadmap.branches });
+			await vi.waitFor(() => {
+				if (!container.querySelector('.trunk.packed')) {
+					throw new Error('the boughs were never packed');
+				}
+			});
+			const trunk = defined(container.querySelector<HTMLElement>('.trunk'), 'the trunk');
+			const before = trunk.getBoundingClientRect().height;
+			for (const branch of roadmap.branches) {
+				toggleOf(container, branch.id).click();
+			}
+			await vi.waitFor(() => expect(trunk.getBoundingClientRect().height).toBeLessThan(before / 2));
+		});
+
+		it('keeps open whatever the drawer is showing', async () => {
+			const placed = defined(
+				allItems().find(({ item }) =>
+					roadmap.branches.some((branch) => branch.items.includes(item as never))
+				),
+				'a leaf'
+			);
+			const { container, rerender } = render(RoadmapTree, { branches: roadmap.branches });
+			const toggle = toggleOf(container, placed.branch.id);
+			toggle.click();
+			await vi.waitFor(() =>
+				expect(container.querySelector(`[id="${placed.item.id}"]`)).toBeNull()
+			);
+
+			await rerender({ branches: roadmap.branches, reveal: placed.item.id });
+			await vi.waitFor(() =>
+				expect(container.querySelector(`[id="${placed.item.id}"]`)).not.toBeNull()
+			);
+			// Folding it away again is not on offer while it is shown.
+			expect(toggle).toBeDisabled();
+
+			await rerender({ branches: roadmap.branches, reveal: undefined });
+			await vi.waitFor(() =>
+				expect(container.querySelector(`[id="${placed.item.id}"]`)).toBeNull()
+			);
 		});
 	});
 });
