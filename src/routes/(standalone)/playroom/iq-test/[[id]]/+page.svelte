@@ -22,6 +22,7 @@
 		skippedNoteFor,
 		tauntsFor
 	} from '$lib/playroom/iq-test/copy';
+	import { darkPreference } from '$lib/playroom/iq-test/dark-preference.svelte';
 	import {
 		localId,
 		markDialogSeen,
@@ -342,7 +343,7 @@
 		}
 	}
 
-	const theme = $derived(themeFor(settings));
+	const theme = $derived(themeFor(settings, darkPreference.current));
 	const brand = $derived(brandFor(settings));
 	const intro = $derived(introFor(settings));
 	const taunts = $derived(tauntsFor(settings));

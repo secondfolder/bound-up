@@ -662,6 +662,33 @@ describe('themes', () => {
 			'wa-theme-default'
 		);
 	});
+
+	it('gives every light look a dark one, for a device that prefers dark', () => {
+		const looks = [
+			sub,
+			bambiSub,
+			...(['misogyny', 'feminisation'] as const).map((vibe) => ({ ...bambiSub, vibe }))
+		];
+		for (const settings of looks) {
+			const light = themeFor(settings, false);
+			const dark = themeFor(settings, true);
+			expect(light.scheme).toBe('light');
+			expect(dark.scheme).toBe('dark');
+			expect(schemeClass(dark)).toBe('wa-theme-default');
+			expect(dark.background).not.toBe(light.background);
+			// Still the same look: only the lights go down.
+			expect(dark.brand).toBe(light.brand);
+			expect(dark.fontHeading).toBe(light.fontHeading);
+		}
+	});
+
+	it('keeps a look that is already dark as it is', () => {
+		for (const vibe of ['gooner', 'denial', 'degradation'] as const) {
+			const settings = { ...bambiSub, vibe };
+			expect(themeFor(settings, false).scheme).toBe('dark');
+			expect(themeFor(settings, true)).toEqual(themeFor(settings, false));
+		}
+	});
 });
 
 describe('media', () => {

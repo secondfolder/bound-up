@@ -53,6 +53,14 @@ in three parts.
 3. **`<html>` and `<body>` backgrounds**, set from an effect, so the
    overscroll area matches the page.
 
+Every look comes in both schemes, chosen by the device's
+`prefers-color-scheme` (`dark-preference.svelte.ts`, read by the page and
+`PagePreview` alike). The light ones — clinical, bambi, misogyny and
+feminisation — each have a dark variant that keeps the palette, fonts and
+rounding and only darkens the background; gooner, denial and degradation are
+dark already and look the same either way. The server cannot know the
+preference, so a dark-preferring device sees the light look until hydration.
+
 ## The IQ test
 
 The test is at `/playroom/iq-test`. It is public: the load returns history

@@ -28,7 +28,17 @@ export type Theme = {
 
 const SYSTEM_SANS = '"Helvetica Neue", Arial, ui-sans-serif, system-ui, sans-serif';
 
-const CLINICAL: Theme = {
+/**
+ * A look in both colour schemes, picked by the device's preference. A look
+ * that is already dark has nothing to go darker to, so both are the same.
+ */
+type Looks = { light: Theme; dark: Theme };
+
+function darkOnly(theme: Theme): Looks {
+	return { light: theme, dark: theme };
+}
+
+const CLINICAL_LIGHT: Theme = {
 	scheme: 'light',
 	brand: 'blue',
 	background: '#f4f6f9',
@@ -38,9 +48,46 @@ const CLINICAL: Theme = {
 	radiusScale: 0.4
 };
 
-const VIBE_THEMES: Record<Vibe, Theme> = {
+const CLINICAL: Looks = {
+	light: CLINICAL_LIGHT,
+	// The same waiting room with the lights down: still a neutral grey-blue,
+	// so it reads as a test rather than a vibe.
+	dark: { ...CLINICAL_LIGHT, scheme: 'dark', background: '#13161b', canvas: '#13161b' }
+};
+
+const BAMBI_LIGHT: Theme = {
+	scheme: 'light',
+	brand: 'pink',
+	background: 'linear-gradient(160deg, #ffe6f3 0%, #ffc8e4 55%, #ffb0d8 100%)',
+	canvas: '#ffd6eb',
+	fontBody: '"Trebuchet MS", "Avenir Next", ui-rounded, sans-serif',
+	fontHeading: '"Chalkboard SE", "Comic Sans MS", "Marker Felt", ui-rounded, cursive',
+	radiusScale: 2.5
+};
+
+const MISOGYNY_LIGHT: Theme = {
+	scheme: 'light',
+	brand: 'red',
+	background: 'linear-gradient(180deg, #fbf4ea 0%, #f5e6d3 100%)',
+	canvas: '#f8eddf',
+	fontBody: 'Georgia, ui-serif, serif',
+	fontHeading: '"Brush Script MT", "Snell Roundhand", "Apple Chancery", cursive',
+	radiusScale: 1
+};
+
+const FEMINISATION_LIGHT: Theme = {
+	scheme: 'light',
+	brand: 'pink',
+	background: 'linear-gradient(180deg, #fff3f8 0%, #fde1ee 100%)',
+	canvas: '#fde9f2',
+	fontBody: '"Avenir Next", "Segoe UI", sans-serif',
+	fontHeading: 'Didot, "Bodoni 72", "Bodoni MT", ui-serif, serif',
+	radiusScale: 1.5
+};
+
+const VIBE_THEMES: Record<Vibe, Looks> = {
 	// Screen glow in a dark room: the light a gooner spends the evening in.
-	gooner: {
+	gooner: darkOnly({
 		scheme: 'dark',
 		brand: 'cyan',
 		background: 'radial-gradient(ellipse at 50% 0%, #06343f 0%, #04121a 55%, #020509 100%)',
@@ -48,26 +95,28 @@ const VIBE_THEMES: Record<Vibe, Theme> = {
 		fontBody: SYSTEM_SANS,
 		fontHeading: '"Avenir Next Condensed", "Arial Narrow", "Helvetica Neue", sans-serif',
 		radiusScale: 0.5
-	},
+	}),
 	bambi: {
-		scheme: 'light',
-		brand: 'pink',
-		background: 'linear-gradient(160deg, #ffe6f3 0%, #ffc8e4 55%, #ffb0d8 100%)',
-		canvas: '#ffd6eb',
-		fontBody: '"Trebuchet MS", "Avenir Next", ui-rounded, sans-serif',
-		fontHeading: '"Chalkboard SE", "Comic Sans MS", "Marker Felt", ui-rounded, cursive',
-		radiusScale: 2.5
+		light: BAMBI_LIGHT,
+		// Bubblegum after dark: still unmistakably pink, just a nightlight's.
+		dark: {
+			...BAMBI_LIGHT,
+			scheme: 'dark',
+			background: 'linear-gradient(160deg, #3d1130 0%, #2b0a22 55%, #1d0617 100%)',
+			canvas: '#2b0a22'
+		}
 	},
 	misogyny: {
-		scheme: 'light',
-		brand: 'red',
-		background: 'linear-gradient(180deg, #fbf4ea 0%, #f5e6d3 100%)',
-		canvas: '#f8eddf',
-		fontBody: 'Georgia, ui-serif, serif',
-		fontHeading: '"Brush Script MT", "Snell Roundhand", "Apple Chancery", cursive',
-		radiusScale: 1
+		light: MISOGYNY_LIGHT,
+		// The cream paper becomes a gentlemen's club: oxblood and old leather.
+		dark: {
+			...MISOGYNY_LIGHT,
+			scheme: 'dark',
+			background: 'linear-gradient(180deg, #221813 0%, #16100c 100%)',
+			canvas: '#1c140f'
+		}
 	},
-	denial: {
+	denial: darkOnly({
 		scheme: 'dark',
 		brand: 'purple',
 		background: 'radial-gradient(ellipse at top, #2a1640 0%, #120a1c 70%)',
@@ -75,17 +124,18 @@ const VIBE_THEMES: Record<Vibe, Theme> = {
 		fontBody: SYSTEM_SANS,
 		fontHeading: '"Avenir Next Condensed", "Arial Narrow", sans-serif',
 		radiusScale: 0.6
-	},
+	}),
 	feminisation: {
-		scheme: 'light',
-		brand: 'pink',
-		background: 'linear-gradient(180deg, #fff3f8 0%, #fde1ee 100%)',
-		canvas: '#fde9f2',
-		fontBody: '"Avenir Next", "Segoe UI", sans-serif',
-		fontHeading: 'Didot, "Bodoni 72", "Bodoni MT", ui-serif, serif',
-		radiusScale: 1.5
+		light: FEMINISATION_LIGHT,
+		// The boutique at night: a dusky rose rather than blush.
+		dark: {
+			...FEMINISATION_LIGHT,
+			scheme: 'dark',
+			background: 'linear-gradient(180deg, #2c1724 0%, #1e1019 100%)',
+			canvas: '#25131e'
+		}
 	},
-	degradation: {
+	degradation: darkOnly({
 		scheme: 'dark',
 		brand: 'red',
 		background: '#0b0b0b',
@@ -93,16 +143,18 @@ const VIBE_THEMES: Record<Vibe, Theme> = {
 		fontBody: SYSTEM_SANS,
 		fontHeading: 'Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif',
 		radiusScale: 0
-	}
+	})
 };
 
 /**
  * The theme for a run: its vibe's when the run wears it (`looksThemed`),
- * clinical otherwise. The same on every stage, results included.
+ * clinical otherwise, in the scheme the device prefers (`prefersDark`, from
+ * `dark-preference.svelte.ts`). The same on every stage, results included.
  */
-export function themeFor(settings: SettingsLike): Theme {
+export function themeFor(settings: SettingsLike, prefersDark = false): Theme {
 	const vibe = effectiveVibe(settings);
-	return vibe !== null && looksThemed(settings) ? VIBE_THEMES[vibe] : CLINICAL;
+	const looks = vibe !== null && looksThemed(settings) ? VIBE_THEMES[vibe] : CLINICAL;
+	return prefersDark ? looks.dark : looks.light;
 }
 
 const STEPS = ['95', '90', '80', '70', '60', '50', '40', '30', '20', '10', '05'] as const;

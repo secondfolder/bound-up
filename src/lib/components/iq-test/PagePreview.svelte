@@ -31,6 +31,7 @@
 
 <script lang="ts">
 	import { brandFor } from '$lib/playroom/iq-test/copy';
+	import { darkPreference } from '$lib/playroom/iq-test/dark-preference.svelte';
 	import { flashes, playsBackdrop, playsHypno, showsPorn } from '$lib/playroom/iq-test/settings';
 	import { schemeClass, themeFor, themeStyle } from '$lib/playroom/iq-test/themes';
 
@@ -60,7 +61,7 @@
 		testid?: string;
 	} = $props();
 
-	const theme = $derived(themeFor(settings));
+	const theme = $derived(themeFor(settings, darkPreference.current));
 	const brand = $derived(brandFor(settings));
 	const porn = $derived(showsPorn(settings));
 	const packed = $derived(settings.intensity >= 4);

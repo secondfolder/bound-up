@@ -56,11 +56,19 @@
 
 <style>
 	.answer-card {
+		/* How far in the letter and the tick sit. A fixed inset sat on the
+		   curve itself under bambi's rounding (two and a half times the
+		   usual), so it grows with the corner: a quarter-circle of radius r
+		   cuts about 0.3r into each edge, and the corner glyph goes that far in
+		   plus a little. At ordinary rounding the old fixed inset still wins. */
+		--corner-inset: calc(var(--wa-border-radius-l) * 0.3 + 0.15rem);
+		--letter-inset-block: max(0.375rem, var(--corner-inset));
+
 		position: relative;
 		font: inherit;
 		font-size: 1.05rem;
 		/* Clear of the letter above, and as much again below to stay centred. */
-		padding: 1.375rem 1rem;
+		padding: calc(var(--letter-inset-block) + 1rem) 1rem;
 		border: var(--wa-border-width-s) solid var(--wa-color-neutral-border-normal);
 		border-radius: var(--wa-border-radius-l);
 		background: var(--wa-color-surface-raised);
@@ -109,7 +117,7 @@
 		&.swatch {
 			display: block;
 			block-size: auto;
-			padding: 1.375rem 0.5rem 0.5rem;
+			padding: calc(var(--letter-inset-block) + 1rem) 0.5rem 0.5rem;
 		}
 	}
 
@@ -118,8 +126,8 @@
 	   answer's ink. */
 	.letter {
 		position: absolute;
-		inset-block-start: 0.375rem;
-		inset-inline-start: 0.5rem;
+		inset-block-start: var(--letter-inset-block);
+		inset-inline-start: max(0.5rem, var(--corner-inset));
 		font-size: 0.75rem;
 		font-weight: 700;
 		line-height: 1;
@@ -129,8 +137,8 @@
 	/* A tick-all's tick, in the other corner, only once ticked. */
 	.tick {
 		position: absolute;
-		inset-block-start: 0.3rem;
-		inset-inline-end: 0.4rem;
+		inset-block-start: max(0.3rem, var(--corner-inset));
+		inset-inline-end: max(0.4rem, var(--corner-inset));
 		font-size: 0.8rem;
 		color: var(--wa-color-brand-on-quiet);
 		opacity: 0;
