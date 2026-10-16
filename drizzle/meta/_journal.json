@@ -218,6 +218,13 @@
       "when": 1792131384888,
       "tag": "0030_drop_plaintext_tag_name_index",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1792132323009,
+      "tag": "0031_add_sealed_partnership_names",
+      "breakpoints": true
     }
   ]
 }

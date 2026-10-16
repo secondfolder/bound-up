@@ -1,5 +1,5 @@
-import { error, redirect } from '@sveltejs/kit';
-import { fail, setError, superValidate } from 'sveltekit-superforms';
+import { error, fail, redirect } from '@sveltejs/kit';
+import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import {
 	answerFromControl,
@@ -7,7 +7,12 @@ import {
 	controlFromAnswer,
 	isInviteUsable
 } from '$lib/partnership';
-import { partnerAcceptFormSchema } from '$lib/schemas/partnerForm';
+import {
+	formFields,
+	partnerAcceptFormSchema,
+	partnerAcceptSealedSchema
+} from '$lib/schemas/partnerForm';
+import { getUserRecipient } from '$lib/server/keys';
 import {
 	acceptInvite,
 	findPendingInviteByToken,
@@ -27,35 +32,55 @@ import type { Actions, PageServerLoad } from './$types';
 /** Everything the page can be, rather than a pile of independent booleans. */
 export type InviteState = 'invalid' | 'sign-in-required' | 'self' | 'already-linked' | 'confirm';
 
+/**
+ * What the page is told about the invite: its id, and the invite sealed under
+ * the key in the link's fragment, which the server never sees. The names —
+ * the inviter's included, even the one shown before sign-in — are opened on
+ * the page. See docs/partners.md, "Names are sealed".
+ */
+type SealedInviteView = { partnershipId: string; ciphertext: string; payloadVersion: number };
+
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const invite = await findPendingInviteByToken(locals.db, params.token);
 
 	// A missing token and an expired one are reported the same way. There is no
-	// value in telling an anonymous visitor which of the two they found.
-	if (!(invite && isInviteUsable(invite, new Date()))) {
-		return { state: 'invalid' as const, inviterName: null };
+	// value in telling an anonymous visitor which of the two they found. An
+	// invite from before names were sealed has no key any link could carry, so
+	// it is offered again as a new link, the same way.
+	if (
+		!(
+			invite &&
+			isInviteUsable(invite, new Date()) &&
+			invite.inviteCiphertext !== null &&
+			invite.invitePayloadVersion !== null
+		)
+	) {
+		return { state: 'invalid' as const, invite: null };
 	}
 
-	// The name the *inviter* chose for themselves is the only thing shown before
-	// sign-in. No email, no real name, nothing else off the user row.
-	const { inviterName } = invite;
+	const sealed: SealedInviteView = {
+		partnershipId: invite.id,
+		ciphertext: invite.inviteCiphertext,
+		payloadVersion: invite.invitePayloadVersion
+	};
 
 	if (!locals.user) {
 		return {
 			state: 'sign-in-required' as const,
-			inviterName,
+			invite: sealed,
 			// Round-trips through /login and /signup so the visitor lands back
-			// here. Validated by `safeRedirect` on the way out.
+			// here. Validated by `safeRedirect` on the way out. The key in the
+			// fragment does not make the trip; the page keeps it on the device.
 			redirectTo: url.pathname
 		};
 	}
 
 	if (locals.user.id === invite.inviterId) {
-		return { state: 'self' as const, inviterName };
+		return { state: 'self' as const, invite: sealed };
 	}
 
 	if (await partnershipExistsBetween(locals.db, invite.inviterId, locals.user.id)) {
-		return { state: 'already-linked' as const, inviterName };
+		return { state: 'already-linked' as const, invite: sealed };
 	}
 
 	// "If their permissions are set to them in control or to mix then the invite
@@ -65,15 +90,19 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 
 	return {
 		state: 'confirm' as const,
-		inviterName,
+		invite: sealed,
 		editable,
+		// The inviter's public key as the server has it. The page compares it
+		// with the one inside the invite, which came from the inviter's own
+		// device by way of the link, and refuses to go on if they differ.
+		inviterRecipient: await getUserRecipient(locals.db, invite.inviterId),
 		partnerAcceptForm: await superValidate(
 			{
-				// From the accepter's side: "them" is the inviter.
-				partnerName: invite.inviterName,
-				yourName: invite.inviteeName,
-				partnerRole: invite.inviterRole,
-				yourRole: invite.inviteeRole,
+				// Filled in on the page, once the invite is open.
+				partnerName: '',
+				yourName: '',
+				partnerRole: null,
+				yourRole: null,
 				control: answerFromControl(invite.control, 'invitee')
 			},
 			zod4(partnerAcceptFormSchema),
@@ -90,29 +119,29 @@ export const actions: Actions = {
 			error(401, 'Sign in to accept this invite');
 		}
 
-		const partnerAcceptForm = await superValidate(request, zod4(partnerAcceptFormSchema));
-		if (!partnerAcceptForm.valid) {
-			return fail(400, { partnerAcceptForm });
+		// The names arrive sealed again under the invite key, or not at all; see
+		// `partnerAcceptSealedSchema`.
+		const parsed = partnerAcceptSealedSchema.safeParse(formFields(await request.formData()));
+		if (!parsed.success) {
+			return fail(400, { error: inviteFailureMessage('bad-invite') });
 		}
 
-		const { partnerName, yourName, partnerRole, yourRole, control } = partnerAcceptForm.data;
+		const { control, inviteCiphertext, invitePayloadVersion } = parsed.data;
 		const result = await acceptInvite(locals.db, {
 			token: params.token,
 			inviteeId: locals.user.id,
-			// Storage is in inviter/invitee terms; the accepter is the invitee, so
-			// what they call their partner is the *inviter's* name.
-			inviterName: partnerName,
-			inviteeName: yourName,
-			inviterRole: partnerRole,
-			inviteeRole: yourRole,
-			control: controlFromAnswer(control, 'invitee')
+			control: control ? controlFromAnswer(control, 'invitee') : undefined,
+			invite:
+				inviteCiphertext && invitePayloadVersion
+					? { ciphertext: inviteCiphertext, payloadVersion: invitePayloadVersion }
+					: undefined
 		});
 
 		if (!result.ok) {
 			// acceptInvite decides whether the submitted names are honoured, so a
 			// failure here is about the invite itself, not the fields.
-			return setError(partnerAcceptForm, '', inviteFailureMessage(result.reason), {
-				status: result.reason === 'not-found' ? 404 : 400
+			return fail(result.reason === 'not-found' ? 404 : 400, {
+				error: inviteFailureMessage(result.reason)
 			});
 		}
 
@@ -120,7 +149,9 @@ export const actions: Actions = {
 	}
 };
 
-function inviteFailureMessage(reason: 'not-found' | 'expired' | 'self' | 'already-linked'): string {
+function inviteFailureMessage(
+	reason: 'not-found' | 'expired' | 'self' | 'already-linked' | 'bad-invite'
+): string {
 	switch (reason) {
 		case 'expired':
 			return 'This invite link has expired. Ask them to send you a new one.';
@@ -128,6 +159,8 @@ function inviteFailureMessage(reason: 'not-found' | 'expired' | 'self' | 'alread
 			return 'This is your own invite link.';
 		case 'already-linked':
 			return "You're already linked with this person.";
+		case 'bad-invite':
+			return 'That could not be saved. Reload the page and try again.';
 		default:
 			return 'This invite link is no longer valid. Ask them to send you a new one.';
 	}

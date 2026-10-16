@@ -40,6 +40,7 @@ export const sealedContentSchema = z.object({
 		.max(50),
 	rewards: z.array(z.object({ id: rowId, ciphertext: sealed, payloadVersion: version })).max(50),
 	claims: z.array(z.object({ id: rowId, ciphertext: sealed, payloadVersion: version })).max(50),
+	names: z.object({ ciphertext: sealed, payloadVersion: version }).optional(),
 	tags: z
 		.array(
 			z.object({

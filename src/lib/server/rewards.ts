@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import type { PartnerNamesSource } from '../partnership';
 import { canClaimFromPartnership, type RewardInput } from '../rewards';
 import { rewardKind } from '../sealed-kinds/tasks';
 import type {
@@ -138,7 +139,12 @@ type RewardMembership = {
 };
 
 export type PartnershipRewardsPageView = {
-	partner: { id: string; name: string; canManageRewards: boolean; canClaimRewards: boolean };
+	partner: {
+		id: string;
+		names: PartnerNamesSource;
+		canManageRewards: boolean;
+		canClaimRewards: boolean;
+	};
 	counterpartUserId: string | null;
 	viewerCredits: number;
 	counterpartCredits: number | null;
@@ -500,7 +506,7 @@ export async function getPartnershipRewardsPage(
 	return {
 		partner: {
 			id: partnershipId,
-			name: membership.partnership.partnerName,
+			names: membership.partnership.names,
 			canManageRewards: membership.canManage,
 			canClaimRewards: membership.canClaim
 		},
@@ -524,7 +530,7 @@ export async function getPartnershipRewardForUser(
 	userId: string,
 	rewardId: string
 ): Promise<{
-	partner: { id: string; name: string; canManageRewards: boolean };
+	partner: { id: string; names: PartnerNamesSource; canManageRewards: boolean };
 	reward: PartnershipRewardView;
 } | null> {
 	const membership = await requireRewardMembership(db, partnershipId, userId);
@@ -547,7 +553,7 @@ export async function getPartnershipRewardForUser(
 	return {
 		partner: {
 			id: partnershipId,
-			name: membership.partnership.partnerName,
+			names: membership.partnership.names,
 			canManageRewards: membership.canManage
 		},
 		reward: toPartnershipRewardView(
@@ -834,7 +840,7 @@ export async function listHomePartnerRewardSections(
 		return [
 			{
 				partnershipId: partner.id,
-				name: partner.name,
+				names: partner.names,
 				image: partner.image,
 				credits: creditsByPartnership.get(partner.id) ?? 0,
 				rewards
@@ -854,7 +860,7 @@ type RewardWidgetRow = {
 	payloadVersion: number | null;
 	cost: number;
 	/** Whose section this came from on /home/rewards. Null for your own. */
-	context?: string | null;
+	context?: PartnerNamesSource | null;
 	/**
 	 * The balance this row is priced against.
 	 *
@@ -986,7 +992,7 @@ export async function getHomeRewardsWidget(
 		partnershipRows.map((row) => [row.id, canClaimFromPartnership(row, userId)])
 	);
 	const creditsByPartnership = new Map(creditRows.map((row) => [row.partnershipId, row.credits]));
-	const nameById = new Map(partners.map((partner) => [partner.id, partner.name]));
+	const namesById = new Map(partners.map((partner) => [partner.id, partner.names]));
 
 	const partnerRows: RewardWidgetRow[] = partnerRewardRows.flatMap((row) => {
 		if (!claimable.get(row.partnershipId)) {
@@ -997,8 +1003,8 @@ export async function getHomeRewardsWidget(
 		if (row.createdByUserId === userId) {
 			return [];
 		}
-		const name = nameById.get(row.partnershipId);
-		if (!name) {
+		const names = namesById.get(row.partnershipId);
+		if (!names) {
 			return [];
 		}
 		return [
@@ -1009,7 +1015,7 @@ export async function getHomeRewardsWidget(
 				vaultId: row.vaultId,
 				payloadVersion: row.payloadVersion,
 				cost: row.cost,
-				context: name,
+				context: names,
 				credits: creditsByPartnership.get(row.partnershipId) ?? 0
 			}
 		];
@@ -1024,7 +1030,7 @@ export async function getHomeRewardsWidget(
 				? [
 						{
 							id: partner.id,
-							label: partner.name,
+							label: partner.names,
 							credits: creditsByPartnership.get(partner.id) ?? 0
 						}
 					]

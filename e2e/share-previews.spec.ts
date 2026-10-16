@@ -34,7 +34,13 @@ async function expectCard(page: Page): Promise<void> {
 }
 
 test.describe('link previews', () => {
-	test("an invite's preview names who sent it", async ({ browser }) => {
+	/**
+	 * Names nobody, even with the whole link in hand: the names are sealed under
+	 * the key in the fragment, and a previewer — like the server rendering the
+	 * page for it — never runs the code that would open them (docs/partners.md,
+	 * "Names are sealed"). That is the accepted cost of sealing them.
+	 */
+	test("an invite's preview invites without naming anyone", async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		const previewer = await asPreviewer(browser);
 
@@ -48,9 +54,10 @@ test.describe('link previews', () => {
 			});
 
 			await previewer.page.goto(link);
-			expect(await og(previewer.page, 'title')).toBe('Ada wants to add you as a partner');
+			expect(await og(previewer.page, 'title')).toBe("You've been invited to Bound Up");
 			expect(await og(previewer.page, 'description')).toContain('You can still say no.');
-			await expect(previewer.page).toHaveTitle('Ada wants to add you as a partner · Bound Up');
+			await expect(previewer.page).toHaveTitle("You've been invited to Bound Up · Bound Up");
+			expect(await previewer.page.content()).not.toContain('Ada');
 			await expectCard(previewer.page);
 		} finally {
 			await Promise.all([ada.close(), previewer.close()]);

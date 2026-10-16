@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
+import { legacyNamesSource, testPartnerView } from '$lib/testing/names';
 import type { PageData } from './$types';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
@@ -10,7 +11,7 @@ const { default: Page } = await import('./+page.svelte');
 function data(claimCount: number): PageData {
 	return {
 		user: { id: 'u1', name: 'Ada', email: 'ada@example.com', image: null, timezone: 'UTC' },
-		partners: [{ id: 'p1', name: 'Jun', image: null }],
+		partners: [testPartnerView('p1', 'Jun')],
 		helpRequests: [],
 		features: [],
 		isAdmin: false,
@@ -30,7 +31,7 @@ function data(claimCount: number): PageData {
 		partnerRewards: [
 			{
 				partnershipId: 'p1',
-				name: 'Jun',
+				names: legacyNamesSource('p1', { partnerName: 'Jun' }),
 				image: null,
 				credits: 4,
 				rewards: []

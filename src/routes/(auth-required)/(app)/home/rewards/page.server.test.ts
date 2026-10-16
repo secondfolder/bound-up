@@ -13,6 +13,8 @@ import {
 	setTestSelfRewardCredits,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { testPartnerView } from '$lib/testing/names';
+import type { PartnerView } from '$lib/types';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;
@@ -32,7 +34,7 @@ afterEach(() => harness.close());
 function at(
 	user: TestUser | null,
 	formData?: Record<string, string>,
-	partners = [] as { id: string; name: string; image: string | null }[]
+	partners = [] as PartnerView[]
 ) {
 	return fakeEvent({ db, user, formData, path: '/home/rewards', parentData: { partners } });
 }
@@ -47,7 +49,7 @@ describe('load', () => {
 		const theirs = await createTestPartnershipReward(db, id, jun, { cost: 2 });
 		await setTestPartnershipRewardCredits(db, id, jun, ada, 4);
 
-		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
+		const data = await runLoad(load(at(ada, undefined, [testPartnerView(id, 'Jun')])));
 		expect(data.selfRewards).toMatchObject({ credits: 3 });
 		expect(data.selfRewards.rewards).toContainEqual(
 			expect.objectContaining({
@@ -59,7 +61,7 @@ describe('load', () => {
 		expect(data.partnerRewards).toContainEqual(
 			expect.objectContaining({
 				partnershipId: id,
-				name: 'Jun',
+				names: testPartnerView(id, 'Jun').names,
 				rewards: [
 					expect.objectContaining({
 						id: theirs.id,
@@ -73,9 +75,13 @@ describe('load', () => {
 
 	it('includes an empty section for a partner with no claimable rewards', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
-		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
+		const data = await runLoad(load(at(ada, undefined, [testPartnerView(id, 'Jun')])));
 		expect(data.partnerRewards).toContainEqual(
-			expect.objectContaining({ partnershipId: id, name: 'Jun', rewards: [] })
+			expect.objectContaining({
+				partnershipId: id,
+				names: testPartnerView(id, 'Jun').names,
+				rewards: []
+			})
 		);
 	});
 
@@ -83,7 +89,7 @@ describe('load', () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		await createTestPartnershipReward(db, id, ada, { cost: 2 });
 
-		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
+		const data = await runLoad(load(at(ada, undefined, [testPartnerView(id, 'Jun')])));
 		expect(data.partnerRewards).toEqual([]);
 	});
 
@@ -112,7 +118,7 @@ describe('actions', () => {
 
 		const result = await run(
 			'partnerClaimReward',
-			at(ada, { partnershipId: id, rewardId: reward.id }, [{ id, name: 'Jun', image: null }])
+			at(ada, { partnershipId: id, rewardId: reward.id }, [testPartnerView(id, 'Jun')])
 		);
 		expect(result).toMatchObject({ message: 'Reward claimed.' });
 		await expect(readPartnershipRewardClaimRows(db, id)).resolves.toContainEqual(

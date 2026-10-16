@@ -324,7 +324,8 @@ export async function createInvite(
 	await page.waitForURL(/\/settings\/partners\/[0-9a-f-]{36}$/);
 
 	const link = await page.getByLabel('Invite link').inputValue();
-	expect(link).toMatch(/\/invite\//);
+	// The key rides in the fragment, which no server sees (docs/partners.md).
+	expect(link).toMatch(/\/invite\/[^#]+#k=[A-Za-z0-9_-]{43}$/);
 	return link;
 }
 
@@ -332,6 +333,9 @@ export async function createInvite(
 export async function navTabs(page: Page): Promise<string[]> {
 	const nav = page.getByRole('navigation', { name: 'Primary' });
 	await expect(nav).toBeVisible();
+	// Partner names are sealed and opened in the browser, so a tab reads "…"
+	// until its partnership's vault is open. Waited out, not sampled.
+	await expect(nav).not.toContainText('…');
 	return (await nav.getByRole('link').allTextContents()).map((text) => text.trim());
 }
 

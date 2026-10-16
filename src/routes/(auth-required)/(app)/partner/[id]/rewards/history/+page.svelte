@@ -2,10 +2,13 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RichText from '$lib/components/RichText.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import { openedClaim, shownTitle } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	/** What the viewer calls them, opened in the browser (`partner-names.svelte.ts`). */
+	const partnerShown = $derived(partnerName(data.partner.names));
 	const backHref = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/rewards', { id: data.partner.id })
 	);
@@ -19,7 +22,7 @@
 		{backHref}
 		backLabel="Back to rewards"
 		backText="Rewards"
-		title={`${data.partner.name}'s reward history`}
+		title={`${partnerShown}'s reward history`}
 		description="Every claim is snapshotted with the title and cost it had at the time."
 	/>
 

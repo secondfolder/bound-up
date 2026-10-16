@@ -23,6 +23,13 @@ function partnership(overrides: Partial<PartnershipRecord> = {}): PartnershipRec
 		inviterRole: null,
 		inviteeRole: null,
 		control: 'both',
+		namesCiphertext: null,
+		namesVaultId: null,
+		namesPayloadVersion: null,
+		namesRevision: 0,
+		inviteCiphertext: null,
+		invitePayloadVersion: null,
+		inviteKeyWrap: null,
 		...overrides
 	};
 }

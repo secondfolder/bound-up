@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import TaskListSection from '$lib/components/TaskListSection.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
@@ -39,9 +40,9 @@
 		<div class="partner-sections">
 			{#each data.partnerTasks as section (section.partnershipId)}
 				<TaskListSection
-					title={`${section.name}'s Tasks`}
+					title={`${partnerName(section.names)}'s Tasks`}
 					tasks={section.tasks}
-					emptyMessage={`No active tasks from ${section.name} right now.`}
+					emptyMessage={`No active tasks from ${partnerName(section.names)} right now.`}
 					completeAction="?/partnerCompleteTask"
 					completePartnershipId={section.partnershipId}
 					extraHref={resolve('/(auth-required)/(app)/partner/[id]/tasks', {

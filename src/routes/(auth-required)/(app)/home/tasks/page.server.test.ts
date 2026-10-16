@@ -12,6 +12,8 @@ import {
 	readSelfTaskRow,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { testPartnerView } from '$lib/testing/names';
+import type { PartnerView } from '$lib/types';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;
@@ -31,7 +33,7 @@ afterEach(() => harness.close());
 function at(
 	user: TestUser | null,
 	formData?: Record<string, string>,
-	partners = [] as { id: string; name: string; image: string | null }[]
+	partners = [] as PartnerView[]
 ) {
 	return fakeEvent({ db, user, formData, path: '/home/tasks', parentData: { partners } });
 }
@@ -44,7 +46,7 @@ describe('load', () => {
 		const own = await createTestSelfTask(db, ada);
 		const theirs = await createTestPartnershipTask(db, id, jun, { timezoneOwnerUserId: jun.id });
 
-		const data = await runLoad(load(at(ada, undefined, [{ id, name: 'Jun', image: null }])));
+		const data = await runLoad(load(at(ada, undefined, [testPartnerView(id, 'Jun')])));
 		expect(data.selfTasks.tasks).toContainEqual(
 			expect.objectContaining({
 				id: own.id,
@@ -54,7 +56,7 @@ describe('load', () => {
 		expect(data.partnerTasks).toContainEqual(
 			expect.objectContaining({
 				partnershipId: id,
-				name: 'Jun',
+				names: testPartnerView(id, 'Jun').names,
 				tasks: [
 					expect.objectContaining({
 						id: theirs.id,
@@ -89,7 +91,7 @@ describe('actions', () => {
 
 		const result = await run(
 			'partnerCompleteTask',
-			at(ada, { partnershipId: id, taskId: task.id }, [{ id, name: 'Jun', image: null }])
+			at(ada, { partnershipId: id, taskId: task.id }, [testPartnerView(id, 'Jun')])
 		);
 		expect(result).toMatchObject({ message: 'Task completed.' });
 		await expect(readPartnershipRewardCreditRow(db, id, ada.id)).resolves.toMatchObject({

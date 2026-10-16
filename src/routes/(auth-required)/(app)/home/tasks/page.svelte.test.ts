@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/svelte';
+import { legacyNamesSource, testPartnerView } from '$lib/testing/names';
 import type { PageData } from './$types';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
@@ -16,7 +17,7 @@ function data(partnerTasks: PageData['partnerTasks'] = []): PageData {
 			image: null,
 			timezone: 'Europe/London'
 		},
-		partners: [{ id: 'p1', name: 'Jun', image: null }],
+		partners: [testPartnerView('p1', 'Jun')],
 		helpRequests: [],
 		features: [],
 		isAdmin: false,
@@ -54,7 +55,14 @@ describe('/home/tasks/+page.svelte', () => {
 
 	it('wraps sections in panels once partner task sections exist', () => {
 		const { container } = render(Page, {
-			data: data([{ partnershipId: 'p1', name: 'Jun', image: null, tasks: [] }])
+			data: data([
+				{
+					partnershipId: 'p1',
+					names: legacyNamesSource('p1', { partnerName: 'Jun' }),
+					image: null,
+					tasks: []
+				}
+			])
 		});
 		expect(container.textContent).toContain("Jun's Tasks");
 		expect(container.textContent).toContain('Open full task list');

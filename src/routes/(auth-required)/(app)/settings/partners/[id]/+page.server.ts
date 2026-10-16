@@ -1,9 +1,14 @@
 import { error, fail as kitFail, redirect } from '@sveltejs/kit';
-import { fail, superValidate } from 'sveltekit-superforms';
+import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { inviteUrl } from '$lib/invite-url';
 import { answerFromControl, controlFromAnswer, isInviteUsable } from '$lib/partnership';
-import { partnerEditFormSchema } from '$lib/schemas/partnerForm';
+import {
+	formFields,
+	partnerEditFormSchema,
+	partnerEditSealedSchema,
+	partnerRotateSealedSchema
+} from '$lib/schemas/partnerForm';
 import { createMediaStore } from '$lib/server/media/backend';
 import { purgePartnershipMedia } from '$lib/server/messaging';
 import {
@@ -33,17 +38,18 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			id: partnership.id,
 			status: partnership.status,
 			role: partnership.role,
-			partnerName: partnership.partnerName,
-			yourName: partnership.yourName,
-			partnerRole: partnership.partnerRole,
-			yourRole: partnership.yourRole,
+			// The names are opened in the browser (`partner-names.svelte.ts`):
+			// the server cannot read them, so the form's text fields start empty
+			// here and are filled in by the page.
+			names: partnership.names,
 			canEdit: partnership.canEdit,
 			counterpartImage: partnership.counterpart?.image ?? null,
 			inviteExpiresAt: partnership.inviteExpiresAt
 		},
 		// Only ever sent to the inviter, and only while the link is live: the
 		// token is the whole authorisation to join, so it must not travel in the
-		// page data of anyone who cannot already use it.
+		// page data of anyone who cannot already use it. Without its key: the
+		// page adds the fragment from the inviter's own wrap of it.
 		inviteUrl:
 			usable && partnership.role === 'inviter' && partnership.inviteToken
 				? inviteUrl(url.origin, partnership.inviteToken)
@@ -51,10 +57,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		inviteExpired: partnership.status === 'pending' && !usable,
 		partnerEditForm: await superValidate(
 			{
-				partnerName: partnership.partnerName,
-				yourName: partnership.yourName,
-				partnerRole: partnership.partnerRole,
-				yourRole: partnership.yourRole,
+				partnerName: '',
+				yourName: '',
+				partnerRole: null,
+				yourRole: null,
 				control: answerFromControl(partnership.control, partnership.role)
 			},
 			zod4(partnerEditFormSchema),
@@ -71,9 +77,10 @@ export const actions: Actions = {
 			error(401, 'Not signed in');
 		}
 
-		const partnerEditForm = await superValidate(request, zod4(partnerEditFormSchema));
-		if (!partnerEditForm.valid) {
-			return fail(400, { partnerEditForm });
+		// The names arrive sealed; see `partnerEditSealedSchema`.
+		const parsed = partnerEditSealedSchema.safeParse(formFields(await request.formData()));
+		if (!parsed.success) {
+			return kitFail(400, { error: 'Those changes could not be saved. Reload and try again.' });
 		}
 
 		const current = await getPartnershipForUser(locals.db, params.id, locals.user.id);
@@ -81,22 +88,36 @@ export const actions: Actions = {
 			error(404, 'Partner not found');
 		}
 
-		const { partnerName, yourName, partnerRole, yourRole, control } = partnerEditForm.data;
-		// The submitted names are in the *viewer's* terms; storage is in the
-		// inviter/invitee terms. Which way round they go flips with the role.
-		const viewerIsInviter = current.role === 'inviter';
-		const ok = await updatePartnership(locals.db, params.id, locals.user.id, {
-			inviterName: viewerIsInviter ? yourName : partnerName,
-			inviteeName: viewerIsInviter ? partnerName : yourName,
-			inviterRole: viewerIsInviter ? yourRole : partnerRole,
-			inviteeRole: viewerIsInviter ? partnerRole : yourRole,
-			control: controlFromAnswer(control, current.role)
+		const form = parsed.data;
+		const result = await updatePartnership(locals.db, params.id, locals.user.id, {
+			control: controlFromAnswer(form.control, current.role),
+			names:
+				form.namesVaultId && form.namesCiphertext && form.namesPayloadVersion
+					? {
+							vaultId: form.namesVaultId,
+							ciphertext: form.namesCiphertext,
+							payloadVersion: form.namesPayloadVersion,
+							expectedRevision: form.expectedRevision ?? 0
+						}
+					: undefined,
+			invite:
+				form.inviteCiphertext && form.invitePayloadVersion
+					? { ciphertext: form.inviteCiphertext, payloadVersion: form.invitePayloadVersion }
+					: undefined
 		});
 
 		// Re-checked against the stored row rather than trusting the page having
 		// hidden the form: control can have changed since it was rendered.
-		if (!ok) {
-			return kitFail(403, { partnerEditForm, denied: true });
+		if (!result.ok) {
+			if (result.reason === 'forbidden') {
+				return kitFail(403, { denied: true, error: "They're in control of this link." });
+			}
+			return kitFail(result.reason === 'conflict' ? 409 : 400, {
+				error:
+					result.reason === 'conflict'
+						? 'These were changed somewhere else since you opened them. Reload to see the latest, then make your change again.'
+						: 'Those changes could not be saved. Reload and try again.'
+			});
 		}
 
 		redirect(303, '/settings/partners');
@@ -108,12 +129,21 @@ export const actions: Actions = {
 	 * Returns the URL instead of redirecting so the page can put it straight
 	 * into the share sheet while the click's user activation is still live.
 	 */
-	rotate: async ({ locals, params, url }) => {
+	rotate: async ({ locals, params, request, url }) => {
 		if (!locals.user) {
 			error(401, 'Not signed in');
 		}
 
-		const rotated = await rotateInviteToken(locals.db, params.id, locals.user.id);
+		// A new link has a new invite key, so the invite arrives sealed afresh.
+		const parsed = partnerRotateSealedSchema.safeParse(formFields(await request.formData()));
+		if (!parsed.success) {
+			return kitFail(400, { rotateError: 'That invite can no longer be renewed.' });
+		}
+		const rotated = await rotateInviteToken(locals.db, params.id, locals.user.id, {
+			ciphertext: parsed.data.inviteCiphertext,
+			payloadVersion: parsed.data.invitePayloadVersion,
+			keyWrap: parsed.data.inviteKeyWrap
+		});
 		if (!rotated) {
 			return kitFail(400, { rotateError: 'That invite can no longer be renewed.' });
 		}

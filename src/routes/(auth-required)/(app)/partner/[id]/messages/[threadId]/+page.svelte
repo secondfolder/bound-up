@@ -16,9 +16,12 @@
 	} from '$lib/crypto/trust.svelte';
 	import { hasFeature } from '$lib/features';
 	import { watchPartnership } from '$lib/messaging/live';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	/** What the viewer calls them, opened in the browser (`partner-names.svelte.ts`). */
+	const partnerShown = $derived(partnerName(data.partner.names));
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
@@ -113,11 +116,11 @@
 	);
 </script>
 
-<svelte:head><title>{data.partner.name} — message</title></svelte:head>
+<svelte:head><title>{partnerShown} — message</title></svelte:head>
 
 <div class="page">
-	<NestedPageHeader {backHref} backLabel="Back to messages" backText={data.partner.name} />
-	<MessageToasts bind:this={toasts} partnershipId={data.partner.id} partnerName={data.partner.name} />
+	<NestedPageHeader {backHref} backLabel="Back to messages" backText={partnerShown} />
+	<MessageToasts bind:this={toasts} partnershipId={data.partner.id} partnerName={partnerShown} />
 
 	{#if keyring.status === 'unlocked'}
 		{#if !canSend}
@@ -126,7 +129,7 @@
 			<div class="trust">
 				<PartnerKeyNotice
 					{trust}
-					partnerName={data.partner.name}
+					partnerName={partnerShown}
 					verify={() => markVerified(user.id, data.partner.id, data.recipients)}
 					accept={(which) => acceptKeyChange(user.id, data.partner.id, data.recipients, which)}
 				/>
@@ -135,7 +138,7 @@
 		<ThreadView
 			thread={data.thread}
 			partnershipId={data.partner.id}
-			partner={data.partner}
+			partner={{ name: partnerShown, image: data.partner.image }}
 			tags={data.tags}
 			{canSend}
 			permanentMedia={hasFeature(data.features, 'permanentMedia')}

@@ -71,15 +71,14 @@ is the version Apple accepts: 1.x sent the draft `aesgcm` encoding. The usual
 
 ## What a notification says
 
-**The partner's name and a verb. Never content.** The server could not include
-a message's text if it tried, because it only ever holds ciphertext. The lock
-screen is the one place the app is visible to whoever picks the phone up, so
-the copy stays at "New message from Sam" and "Sam reacted to your message".
+**What happened, never content and never who.** The copy is "New message" or
+"New reaction". The server could not include a message's text if it tried,
+because it only ever holds ciphertext — and it cannot include who sent it
+either, because partnership names are sealed too
+([docs/partners.md](partners.md#names-are-sealed)). The lock screen is the one
+place the app is visible to whoever picks the phone up, so saying less there is
+no loss: a tap opens the thread, where the name is.
 
-- The name is what the **recipient** calls the sender. It comes from the
-  sender's own view of the partnership, as `yourName` ("what the other person
-  calls the viewer"), which is right rather than backwards because the other
-  person is who is being notified. It still goes through `viewPartnership()`.
 - The payload is encrypted to the device, so the push service sees only that
   *a* notification went to *an* endpoint.
 - A reply gets the thread's `Topic` and a `thread-<id>` tag, so a burst of
@@ -241,7 +240,7 @@ The Zod schemas are in `src/lib/schemas/pushSubscription.ts`.
 
 - `src/lib/server/push.test.ts` sends to a fake push service and **decrypts
   what arrived with a real RFC 8291 decoder** (`$lib/testing/push`). It pins
-  that the payload a browser would read names the partner and nothing more,
+  that the payload a browser would read names nobody and says nothing more,
   and covers category opt-outs, watched devices, 410 clean-up and never
   throwing.
 - `notifications.test.ts` covers the copy, topic, labels and the push-service

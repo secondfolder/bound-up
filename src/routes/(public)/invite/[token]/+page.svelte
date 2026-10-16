@@ -1,27 +1,79 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import PartnerAcceptForm from '$lib/components/PartnerAcceptForm.svelte';
 	import ShareMeta from '$lib/components/ShareMeta.svelte';
+	import { openInviteLink, pinInviterFromInvite } from '$lib/partner-sealing';
+	import { namesForViewer } from '$lib/partnership';
+	import type { PartnershipInvite } from '$lib/sealed-kinds/partnerships';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	// What a link preview says. Whoever fetches the preview is signed out, so
-	// in practice it is either the invalid state or the invite itself — and the
-	// inviter's chosen name is already on the page for anyone holding the link,
-	// so the preview shows nothing the page does not.
+	// What a link preview says. It names nobody: the names are sealed under the
+	// key in the link's fragment, which neither the server rendering this nor a
+	// preview fetcher ever sees (docs/partners.md, "Names are sealed").
 	const share = $derived(
-		data.inviterName === null
+		data.invite === null
 			? {
 					title: "This invite link doesn't work",
 					description: 'It may have expired, already been used, or been cancelled.'
 				}
 			: {
-					title: `${data.inviterName} wants to add you as a partner`,
+					title: "You've been invited to Bound Up",
 					description:
 						"Open the link to see what they're proposing on Bound Up. You can still say no."
 				}
 	);
+
+	/**
+	 * The invite, opened with the key from the link — undefined while that runs
+	 * (and on the server, which has no key), null when the link has no key or
+	 * the wrong one.
+	 */
+	let opened = $state<{ invite: PartnershipInvite; key: Uint8Array<ArrayBuffer> } | null>();
+	const sealedInvite = $derived(data.invite);
+	const inviteId = $derived(data.invite?.partnershipId ?? null);
+	$effect(() => {
+		const invite = sealedInvite;
+		// Keyed on the id, a primitive, so a reload of the same invite does not
+		// open it again — see AGENTS.md on effects that read `data`.
+		if (!(inviteId && invite)) {
+			opened = null;
+			return;
+		}
+		opened = undefined;
+		void openInviteLink(invite, globalThis.location.hash)
+			.catch(() => null)
+			.then((result) => {
+				opened = result;
+			});
+	});
+	const inviterName = $derived(opened ? opened.invite.inviterName : '…');
+
+	/**
+	 * Whether the inviter's key the server serves is the one inside the invite.
+	 * Undefined until both are known; once it matches it is pinned as verified,
+	 * since it reached this device from theirs without passing through the server.
+	 */
+	let inviterChecked = $state<boolean | undefined>();
+	$effect(() => {
+		const { user } = page.data;
+		if (!(data.state === 'confirm' && opened && user)) {
+			inviterChecked = undefined;
+			return;
+		}
+		void pinInviterFromInvite({
+			userId: user.id,
+			partnershipId: data.invite.partnershipId,
+			fromInvite: opened.invite.inviterRecipient,
+			served: data.inviterRecipient
+		})
+			.catch(() => false)
+			.then((matched) => {
+				inviterChecked = matched;
+			});
+	});
 </script>
 
 <svelte:head>
@@ -34,8 +86,12 @@
 		<h1>This link doesn't work</h1>
 		<p>It may have expired, already been used, or been cancelled. Ask them to send a new one.</p>
 		<a href={resolve('/')}>Go to the home page</a>
+	{:else if opened === null}
+		<h1>This link is incomplete</h1>
+		<p>Part of it seems to have been cut off. Ask them to send it again.</p>
+		<a href={resolve('/')}>Go to the home page</a>
 	{:else if data.state === 'sign-in-required'}
-		<h1>{data.inviterName} wants to add you as a partner</h1>
+		<h1>{inviterName} wants to add you as a partner</h1>
 		<p>Sign in or create an account to see what they're proposing. You can still say no.</p>
 		<!-- "Create an account" is primary on purpose: someone reaching an invite
 		     link while signed out most likely does not have an account yet, so
@@ -59,21 +115,41 @@
 		<a href={resolve('/(auth-required)/(app)/settings/partners')}>Back to partners</a>
 	{:else if data.state === 'already-linked'}
 		<h1>You're already linked</h1>
-		<p>You and {data.inviterName} are already partners.</p>
+		<p>You and {inviterName} are already partners.</p>
 		<a href={resolve('/(auth-required)/(app)/settings/partners')}>Back to partners</a>
 	{:else if data.state === 'confirm'}
-		<h1>{data.inviterName} wants to add you as a partner</h1>
-		<p>
-			{#if data.editable}
-				Check these over — you can change them — then accept.
-			{:else}
-				If you accept, they'll be able to set tasks, rewards and punishments for you.
-			{/if}
-		</p>
+		<h1>{inviterName} wants to add you as a partner</h1>
+		{#if opened && inviterChecked === false}
+			<!-- The key the server serves for them is not the one their own device
+			     put in the link. Going on would link to whoever made that swap. -->
+			<p class="warning" role="alert">
+				Something about this invite doesn't match what we have for {inviterName}, so it can't be
+				accepted here. Ask them to send you a new link, and let us know if it happens again.
+			</p>
+		{:else if opened && inviterChecked && data.inviterRecipient}
+			<p>
+				{#if data.editable}
+					Check these over — you can change them — then accept.
+				{:else}
+					If you accept, they'll be able to set tasks, rewards and punishments for you.
+				{/if}
+			</p>
 
-		<PartnerAcceptForm data={data.partnerAcceptForm} editable={data.editable}>
-			<a class="decline" href={resolve('/')}>Not now</a>
-		</PartnerAcceptForm>
+			<PartnerAcceptForm
+				data={data.partnerAcceptForm}
+				editable={data.editable}
+				names={namesForViewer(opened.invite, 'invitee')}
+				invite={{
+					partnershipId: data.invite.partnershipId,
+					key: opened.key,
+					inviterRecipient: opened.invite.inviterRecipient
+				}}
+			>
+				<a class="decline" href={resolve('/')}>Not now</a>
+			</PartnerAcceptForm>
+		{:else}
+			<p>…</p>
+		{/if}
 	{/if}
 </section>
 
@@ -102,6 +178,10 @@
 
 		.decline {
 			color: var(--wa-color-text-quiet);
+		}
+
+		.warning {
+			color: var(--wa-color-text-danger);
 		}
 	}
 </style>

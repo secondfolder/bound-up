@@ -7,10 +7,15 @@ import {
 	controlFromAnswer,
 	INVITE_TTL_MS,
 	isInviteUsable,
+	namesForViewer,
+	namesSourceFor,
 	type PartnershipControl,
 	type PartnershipRecord,
 	type PartnershipRole,
 	roleOf,
+	type StoredNames,
+	storedNamesFrom,
+	type ViewerNames,
 	viewPartnership
 } from './partnership';
 
@@ -30,9 +35,35 @@ function record(overrides: Partial<PartnershipRecord> = {}): PartnershipRecord {
 		inviterRole: null,
 		inviteeRole: null,
 		control: 'both',
+		namesCiphertext: null,
+		namesVaultId: null,
+		namesPayloadVersion: null,
+		namesRevision: 0,
+		inviteCiphertext: null,
+		invitePayloadVersion: null,
+		inviteKeyWrap: null,
 		...overrides
 	};
 }
+
+/** The sealed columns of a row whose names are in the partnership's vault. */
+const SEALED_NAMES = {
+	inviterName: '',
+	inviteeName: '',
+	namesCiphertext: 'sb1.names',
+	namesVaultId: 'vault-1',
+	namesPayloadVersion: 1,
+	namesRevision: 3
+} satisfies Partial<PartnershipRecord>;
+
+/** The columns of a row whose names are still sealed under the invite key. */
+const INVITE_NAMES = {
+	inviterName: '',
+	inviteeName: '',
+	inviteCiphertext: 'sb1.invite',
+	invitePayloadVersion: 1,
+	inviteKeyWrap: 'd3JhcA=='
+} satisfies Partial<PartnershipRecord>;
 
 describe('roleOf', () => {
 	it('identifies each side', () => {
@@ -92,28 +123,17 @@ describe('canDisconnect', () => {
 });
 
 describe('viewPartnership', () => {
-	it('the inviter sees the invitee name as their partner', () => {
-		const view = viewPartnership(record(), INVITER);
-		expect(view.partnerName).toBe('Name-For-Invitee');
-		expect(view.yourName).toBe('Name-For-Inviter');
-		expect(view.role).toBe('inviter');
+	it('carries no plaintext names, only where to read them from', () => {
+		const view = viewPartnership(record(SEALED_NAMES), INVITER);
+		expect(view).not.toHaveProperty('partnerName');
+		expect(view).not.toHaveProperty('yourName');
+		expect(view.names.sealed?.ciphertext).toBe('sb1.names');
 	});
 
-	it('the invitee sees the mirror image of the same row', () => {
-		const view = viewPartnership(record(), INVITEE);
-		expect(view.partnerName).toBe('Name-For-Inviter');
-		expect(view.yourName).toBe('Name-For-Invitee');
-		expect(view.role).toBe('invitee');
-	});
-
-	it('the roles flip with the viewer, like the names', () => {
-		const r = record({ inviterRole: 'Role-For-Inviter', inviteeRole: 'Role-For-Invitee' });
-		const inviterView = viewPartnership(r, INVITER);
-		expect(inviterView.partnerRole).toBe('Role-For-Invitee');
-		expect(inviterView.yourRole).toBe('Role-For-Inviter');
-		const inviteeView = viewPartnership(r, INVITEE);
-		expect(inviteeView.partnerRole).toBe('Role-For-Inviter');
-		expect(inviteeView.yourRole).toBe('Role-For-Invitee');
+	it('the names source carries the viewer’s role, so the mapping flips with them', () => {
+		expect(viewPartnership(record(), INVITER).names.role).toBe('inviter');
+		expect(viewPartnership(record(), INVITEE).names.role).toBe('invitee');
+		expect(viewPartnership(record(), INVITEE).role).toBe('invitee');
 	});
 
 	it('canEdit is carried onto the view', () => {
@@ -136,6 +156,125 @@ describe('viewPartnership', () => {
 
 	it('id is the partnership id, never a user id', () => {
 		expect(viewPartnership(record({ id: 'p-42' }), INVITER).id).toBe('p-42');
+	});
+});
+
+describe('namesForViewer / storedNamesFrom', () => {
+	// Named so a swapped assertion is obvious rather than a coin flip.
+	const stored: StoredNames = {
+		inviterName: 'Name-For-Inviter',
+		inviteeName: 'Name-For-Invitee',
+		inviterRole: 'Role-For-Inviter',
+		inviteeRole: 'Role-For-Invitee'
+	};
+
+	it('the inviter sees the invitee name as their partner', () => {
+		expect(namesForViewer(stored, 'inviter')).toEqual({
+			partnerName: 'Name-For-Invitee',
+			yourName: 'Name-For-Inviter',
+			partnerRole: 'Role-For-Invitee',
+			yourRole: 'Role-For-Inviter'
+		});
+	});
+
+	it('the invitee sees the mirror image of the same names', () => {
+		expect(namesForViewer(stored, 'invitee')).toEqual({
+			partnerName: 'Name-For-Inviter',
+			yourName: 'Name-For-Invitee',
+			partnerRole: 'Role-For-Inviter',
+			yourRole: 'Role-For-Invitee'
+		});
+	});
+
+	it('round-trips from storage through either viewer', () => {
+		for (const role of ['inviter', 'invitee'] as PartnershipRole[]) {
+			expect(storedNamesFrom(namesForViewer(stored, role), role)).toEqual(stored);
+		}
+	});
+
+	it('round-trips from what a viewer typed through storage', () => {
+		const typed: ViewerNames = {
+			partnerName: 'Theirs',
+			yourName: 'Mine',
+			partnerRole: null,
+			yourRole: 'My-Role'
+		};
+		for (const role of ['inviter', 'invitee'] as PartnershipRole[]) {
+			expect(namesForViewer(storedNamesFrom(typed, role), role)).toEqual(typed);
+		}
+	});
+
+	it('stores what the inviter typed against the inviter’s columns', () => {
+		const typed: ViewerNames = {
+			partnerName: 'Theirs',
+			yourName: 'Mine',
+			partnerRole: null,
+			yourRole: null
+		};
+		expect(storedNamesFrom(typed, 'inviter').inviterName).toBe('Mine');
+		expect(storedNamesFrom(typed, 'invitee').inviterName).toBe('Theirs');
+	});
+});
+
+describe('namesSourceFor', () => {
+	it('a row from before sealing is a legacy source, in plaintext', () => {
+		const source = namesSourceFor(record({ inviterRole: 'R' }), 'invitee');
+		expect(source).toEqual({
+			partnershipId: 'p1',
+			role: 'invitee',
+			sealed: null,
+			invite: null,
+			legacy: {
+				inviterName: 'Name-For-Inviter',
+				inviteeName: 'Name-For-Invitee',
+				inviterRole: 'R',
+				inviteeRole: null
+			}
+		});
+	});
+
+	it('an invite hands its key wrap to the inviter only', () => {
+		const r = record({ status: 'pending', inviteeId: null, ...INVITE_NAMES });
+		expect(namesSourceFor(r, 'inviter')).toEqual({
+			partnershipId: 'p1',
+			role: 'inviter',
+			sealed: null,
+			invite: { ciphertext: 'sb1.invite', payloadVersion: 1, keyWrap: 'd3JhcA==' },
+			legacy: null
+		});
+		// The invitee keeps the key from the link; a wrap to the inviter is not theirs.
+		expect(namesSourceFor(r, 'invitee').invite).toEqual({
+			ciphertext: 'sb1.invite',
+			payloadVersion: 1,
+			keyWrap: null
+		});
+	});
+
+	it('sealed names are read from the vault, revision included', () => {
+		expect(namesSourceFor(record(SEALED_NAMES), 'invitee')).toEqual({
+			partnershipId: 'p1',
+			role: 'invitee',
+			sealed: { vaultId: 'vault-1', ciphertext: 'sb1.names', payloadVersion: 1, revision: 3 },
+			invite: null,
+			legacy: null
+		});
+	});
+
+	it('sealed names win over a leftover invite', () => {
+		const source = namesSourceFor(record({ ...INVITE_NAMES, ...SEALED_NAMES }), 'inviter');
+		expect(source.sealed).not.toBeNull();
+		expect(source.invite).toBeNull();
+		expect(source.legacy).toBeNull();
+	});
+
+	it('an invite is never mistaken for legacy names', () => {
+		const source = namesSourceFor(record(INVITE_NAMES), 'inviter');
+		expect(source.legacy).toBeNull();
+	});
+
+	it('a half-written sealed record is not a sealed source', () => {
+		const source = namesSourceFor(record({ ...SEALED_NAMES, namesVaultId: null }), 'inviter');
+		expect(source.sealed).toBeNull();
 	});
 });
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '../testing/db';
 import { defined } from '../testing/defined';
 import {
+	createTestInvite,
 	createTestPartnership,
 	createTestSelfReward,
 	createTestSelfTask,
@@ -10,6 +11,7 @@ import {
 	ensureTestSelfVault,
 	fakeSealed,
 	readPartnershipRewardRow,
+	readPartnershipRow,
 	readPartnershipTaskRow,
 	readSelfRewardClaimRows,
 	readSelfRewardRow,
@@ -33,6 +35,7 @@ import {
 	selfTaskCompletions,
 	selfTasks
 } from './db/schema';
+import { acceptInvite } from './partnerships';
 
 let harness: TestDb;
 let ada: TestUser;
@@ -197,6 +200,8 @@ describe('listUnsealedContent', () => {
 			rewards: [{ id: ids.rewardId, title: 'Old reward', description: 'A treat' }],
 			claims: [{ id: ids.claimId, rewardTitle: 'Old reward', rewardDescription: 'A treat' }],
 			tags: [],
+			// The self scope has no names to seal.
+			names: null,
 			next: null
 		});
 	});
@@ -473,5 +478,159 @@ describe('sealUnsealedContent', () => {
 			ciphertext: null,
 			title: 'Shared task'
 		});
+	});
+});
+
+describe('partnership names', () => {
+	const Legacy = { inviterName: 'Ada', inviteeName: 'Jun', inviterRole: 'dom', inviteeRole: null };
+
+	/** A partnership accepted through a sealed invite, its names still under the invite key. */
+	async function acceptedInvite() {
+		const invite = await createTestInvite(harness.db, ada);
+		const accepted = await acceptInvite(harness.db, {
+			token: invite.inviteToken,
+			inviteeId: jun.id
+		});
+		if (!accepted.ok) {
+			throw new Error(`could not accept: ${accepted.reason}`);
+		}
+		return { partnershipId: invite.id, inviteCiphertext: invite.inviteCiphertext };
+	}
+
+	/** Seals only the names, as a device with no other unsealed rows would. */
+	function namesBatch(vaultId: string, ciphertext = fakeSealed('names')): SealedContentBatch {
+		return { vaultId, ...EMPTY_BATCH, names: { ciphertext, payloadVersion: 1 } };
+	}
+
+	it('lists plaintext names from before sealing, from the actor’s end', async () => {
+		const partnershipId = (
+			await createTestPartnership(harness.db, ada, jun, { legacyNames: Legacy })
+		).id;
+		const scope: ContentScope = { kind: 'partnership', partnershipId };
+
+		const forJun = defined(await listUnsealedContent(harness.db, jun.id, scope), 'page');
+		expect(forJun.names).toEqual({
+			partnershipId,
+			role: 'invitee',
+			sealed: null,
+			invite: null,
+			legacy: Legacy
+		});
+		const forAda = defined(await listUnsealedContent(harness.db, ada.id, scope), 'page');
+		expect(forAda.names?.role).toBe('inviter');
+	});
+
+	it('lists names still under an accepted invite’s key, its wrap to the inviter only', async () => {
+		const { partnershipId, inviteCiphertext } = await acceptedInvite();
+		const scope: ContentScope = { kind: 'partnership', partnershipId };
+
+		const forAda = defined(await listUnsealedContent(harness.db, ada.id, scope), 'page');
+		expect(forAda.names?.invite).toMatchObject({ ciphertext: inviteCiphertext, payloadVersion: 1 });
+		expect(forAda.names?.invite?.keyWrap).not.toBeNull();
+		const forJun = defined(await listUnsealedContent(harness.db, jun.id, scope), 'page');
+		expect(forJun.names?.invite).toEqual({
+			ciphertext: inviteCiphertext,
+			payloadVersion: 1,
+			keyWrap: null
+		});
+	});
+
+	it('lists nothing once the names are in the vault', async () => {
+		const { partnershipId } = await acceptedInvite();
+		const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+		const scope: ContentScope = { kind: 'partnership', partnershipId };
+		await sealUnsealedContent(harness.db, jun.id, scope, namesBatch(vaultId));
+
+		const page = defined(await listUnsealedContent(harness.db, ada.id, scope), 'page');
+		expect(page.names).toBeNull();
+	});
+
+	it('seals the names into the vault, clearing the invite and any plaintext', async () => {
+		const partnershipId = (
+			await createTestPartnership(harness.db, ada, jun, { legacyNames: Legacy })
+		).id;
+		const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+		const batch = namesBatch(vaultId);
+
+		await expect(
+			sealUnsealedContent(harness.db, jun.id, { kind: 'partnership', partnershipId }, batch)
+		).resolves.toEqual({ ok: true, sealed: 1 });
+		await expect(readPartnershipRow(harness.db, partnershipId)).resolves.toMatchObject({
+			namesCiphertext: batch.names?.ciphertext,
+			namesVaultId: vaultId,
+			namesPayloadVersion: 1,
+			namesRevision: 1,
+			inviterName: '',
+			inviteeName: '',
+			inviterRole: null,
+			inviteeRole: null,
+			inviteCiphertext: null,
+			invitePayloadVersion: null,
+			inviteKeyWrap: null
+		});
+	});
+
+	it('clears an accepted invite’s ciphertext and key wrap as it seals', async () => {
+		const { partnershipId } = await acceptedInvite();
+		const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+		const batch = namesBatch(vaultId);
+
+		await expect(
+			sealUnsealedContent(harness.db, ada.id, { kind: 'partnership', partnershipId }, batch)
+		).resolves.toEqual({ ok: true, sealed: 1 });
+		await expect(readPartnershipRow(harness.db, partnershipId)).resolves.toMatchObject({
+			namesCiphertext: batch.names?.ciphertext,
+			inviteCiphertext: null,
+			invitePayloadVersion: null,
+			inviteKeyWrap: null
+		});
+	});
+
+	it('never overwrites names already in the vault', async () => {
+		const { partnershipId } = await acceptedInvite();
+		const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+		const scope: ContentScope = { kind: 'partnership', partnershipId };
+		const first = namesBatch(vaultId);
+		await sealUnsealedContent(harness.db, ada.id, scope, first);
+
+		await expect(
+			sealUnsealedContent(harness.db, jun.id, scope, namesBatch(vaultId))
+		).resolves.toEqual({ ok: true, sealed: 0 });
+		await expect(readPartnershipRow(harness.db, partnershipId)).resolves.toMatchObject({
+			namesCiphertext: first.names?.ciphertext,
+			namesRevision: 1
+		});
+	});
+
+	it('refuses a malformed names ciphertext, and writes none of the batch', async () => {
+		const partnershipId = (
+			await createTestPartnership(harness.db, ada, jun, { legacyNames: Legacy })
+		).id;
+		const ids = await insertLegacyPartnershipRows(partnershipId, ada, jun);
+		const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+		const scope: ContentScope = { kind: 'partnership', partnershipId };
+
+		for (const names of [
+			{ ciphertext: 'Ada and Jun', payloadVersion: 1 },
+			{ ciphertext: fakeSealed('names'), payloadVersion: 99 }
+		]) {
+			await expect(
+				sealUnsealedContent(harness.db, ada.id, scope, { ...batchFor(vaultId, ids), names })
+			).resolves.toEqual({ ok: false, reason: 'invalid' });
+		}
+		await expect(readPartnershipRow(harness.db, partnershipId)).resolves.toMatchObject({
+			namesCiphertext: null,
+			inviterName: 'Ada'
+		});
+		await expect(readPartnershipTaskRow(harness.db, ids.taskId)).resolves.toMatchObject({
+			ciphertext: null
+		});
+	});
+
+	it('refuses names in the self scope, which has none', async () => {
+		const vaultId = await ensureTestSelfVault(harness.db, ada.id);
+		await expect(
+			sealUnsealedContent(harness.db, ada.id, SELF, namesBatch(vaultId))
+		).resolves.toEqual({ ok: false, reason: 'invalid' });
 	});
 });

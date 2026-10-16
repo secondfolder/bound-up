@@ -2,9 +2,12 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import TaskListSection from '$lib/components/TaskListSection.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
+	/** What the viewer calls them, opened in the browser (`partner-names.svelte.ts`). */
+	const partnerShown = $derived(partnerName(data.partner.names));
 	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 	const addTaskHref = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/tasks/add', { id: data.partner.id })
@@ -31,7 +34,7 @@
 	<NestedPageHeader
 		{backHref}
 		backLabel="Back to partner"
-		backText={data.partner.name}
+		backText={partnerShown}
 		title="Tasks"
 		{description}
 	/>
@@ -44,16 +47,16 @@
 			<TaskListSection
 				title="Tasks for you"
 				tasks={tasksForViewer}
-				emptyMessage={`No tasks are assigned to you from ${data.partner.name} right now.`}
+				emptyMessage={`No tasks are assigned to you from ${partnerShown} right now.`}
 				completeAction="?/completeTask"
 				{historyHref}
 				{editHref}
 			/>
 
 			<TaskListSection
-				title={`Tasks for ${data.partner.name}`}
+				title={`Tasks for ${partnerShown}`}
 				tasks={tasksForPartner}
-				emptyMessage={`You have not assigned any tasks to ${data.partner.name} yet.`}
+				emptyMessage={`You have not assigned any tasks to ${partnerShown} yet.`}
 				completeAction="?/completeTask"
 				{historyHref}
 				addHref={addTaskHref}
@@ -61,7 +64,7 @@
 			/>
 		{:else}
 			<TaskListSection
-				title={data.partner.canCompleteTasks ? 'Tasks' : `${data.partner.name}'s Tasks`}
+				title={data.partner.canCompleteTasks ? 'Tasks' : `${partnerShown}'s Tasks`}
 				tasks={data.tasks}
 				emptyMessage="No tasks have been created for this partnership yet."
 				completeAction="?/completeTask"

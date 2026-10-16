@@ -45,12 +45,9 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		rewards,
 		partner: {
 			id: partnership.id,
-			name: partnership.partnerName,
-			yourName: partnership.yourName,
+			names: partnership.names,
 			image: partnership.counterpart?.image ?? null,
 			timezone: partnership.counterpart?.timezone ?? null,
-			partnerRole: partnership.partnerRole,
-			yourRole: partnership.yourRole,
 			canEdit: partnership.canEdit
 		}
 	};

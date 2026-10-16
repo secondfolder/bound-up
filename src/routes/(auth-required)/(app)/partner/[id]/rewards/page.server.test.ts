@@ -44,7 +44,7 @@ describe('load', () => {
 		expect(data).toMatchObject({
 			partner: {
 				id,
-				name: 'Them',
+				names: expect.objectContaining({ partnershipId: id, role: 'inviter' }),
 				canManageRewards: false,
 				canClaimRewards: true
 			}

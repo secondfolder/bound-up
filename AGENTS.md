@@ -252,11 +252,15 @@ site it applies to; go read that comment before deciding to break one.
     `disabled={busy}`. This silently broke the "Add a passkey" button until
     the Playwright suite caught it.
 
-12. **Never read `partnerships.inviter_name` / `invitee_name` directly.** Which
-    of the two is "theirs" flips with who is looking, and getting it backwards
-    is the easiest bug in the feature. Go through `viewPartnership()` in
-    `src/lib/partnership.ts`, which is the only place that mapping lives. See
-    [docs/partners.md](docs/partners.md).
+12. **Never map partnership names yourself.** They are sealed (the server
+    cannot read them), and which stored name is "theirs" flips with who is
+    looking — getting it backwards is the easiest bug in the feature. The
+    mapping lives only in `namesForViewer()` in `src/lib/partnership.ts`;
+    screens get names through `partnerName()` / `viewerNames()` in
+    `src/lib/partner-names.svelte.ts`, which open the `PartnerNamesSource` the
+    server hands over. The plaintext columns `inviter_name` … `invitee_role`
+    hold names only on links from before sealing. See
+    [docs/partners.md](docs/partners.md#names-are-sealed).
 
 13. **`src/lib/crypto/**` is browser-only.** Nothing there may be imported from
     `src/lib/server/**` or from any `+*.server.ts`. Every function in it touches
@@ -510,6 +514,18 @@ registrations. A decorator block is a **block at the root while it is being
 edited and an inline node in the stored document**;
 `src/lib/lexical/document-shape.ts` is the bridge, and that split is what gets
 the caret behaviour from Lexical rather than by hand. See [docs/rich-text.md](docs/rich-text.md).
+
+**User-authored content is sealed, never stored in plaintext.** Messages,
+tasks, rewards, tag names and partnership names are sealed records in a vault
+(`src/lib/sealed.ts`, `src/lib/crypto/sealed.ts`; docs/encryption.md, "Sealed
+records"). A form seals its text in the browser and posts the sealed record in
+its place (`sealed-forms.ts`, `partner-sealing.ts`); the server checks only
+the envelope — size, version, which vault — plus every permission, and reads
+content nowhere. A new kind of user-authored field gets a sealed kind, a frozen
+fixture (`src/lib/sealed-fixtures/`), and its content rules in the kind's
+schema, which every reader re-runs. Screens open records through
+`sealed-views.svelte.ts` / `partner-names.svelte.ts` and render "…" until they
+open.
 
 **Every rich-text length limit counts visible text**, via `documentToPlainText`
 — never the stored string, which is several times larger than the prose in it.

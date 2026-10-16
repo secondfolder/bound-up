@@ -751,8 +751,15 @@
 					"id": "expand-encryption",
 					"title": "End-to-end encryption everywhere",
 					"summary": "The protection your messages have, extended to the rest of what you store.",
-					"status": "planned",
+					"status": "shipped",
+					"shippedOn": "2026-10-16",
 					"icon": "user-lock",
+					"notes": [
+						"Tasks, rewards and their history",
+						"Message tags",
+						"The names and roles you and your partner give each other",
+						"What you set up for yourself comes back after a lost sign-in, with your partner's help"
+					],
 					"dependsOn": ["message-encryption"]
 				},
 				{

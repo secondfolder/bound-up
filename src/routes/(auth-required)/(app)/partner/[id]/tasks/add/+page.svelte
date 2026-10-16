@@ -3,9 +3,12 @@
 	import { page } from '$app/state';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SealedTaskEditor from '$lib/components/SealedTaskEditor.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	/** What the viewer calls them, opened in the browser (`partner-names.svelte.ts`). */
+	const partnerShown = $derived(partnerName(data.partner.names));
 	const backHref = $derived(
 		resolve('/(auth-required)/(app)/partner/[id]/tasks', { id: data.partner.id })
 	);
@@ -16,7 +19,7 @@
 					viewerTimezone: page.data.user.timezone,
 					counterpartUserId: data.partner.counterpartUserId,
 					counterpartTimezone: data.partner.counterpartTimezone,
-					counterpartName: data.partner.name
+					counterpartName: partnerShown
 				}
 			: null
 	);
@@ -26,7 +29,7 @@
 	<NestedPageHeader
 		{backHref}
 		backLabel="Back to tasks"
-		backText={data.partner.name}
+		backText={partnerShown}
 		title="Add a partner task"
 		description="This task belongs to the partnership and awards credits to whoever completes it."
 	/>

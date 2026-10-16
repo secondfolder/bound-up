@@ -25,8 +25,8 @@
 			onchange={() => invalidate('app:push-devices')}
 		/>
 		<p class="privacy">
-			Notifications say who and what, never what was said: "New message from" and your partner's
-			name.
+			Notifications say only that something arrived — "New message" or "New reaction" — never who
+			it's from or what was said.
 		</p>
 	</div>
 </section>

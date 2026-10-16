@@ -1,5 +1,6 @@
 import type { KeyWrapParams, KeyWrapType } from './encryption';
 import type { ThreadIcon } from './messaging';
+import type { PartnerNamesSource } from './partnership';
 import type { Intensity, Role, Vibe } from './playroom/iq-test/settings';
 import type { VaultKind } from './vault';
 
@@ -169,7 +170,8 @@ export type SelfTasksSectionView = {
 
 export type HomePartnerTasksSectionView = {
 	partnershipId: string;
-	name: string;
+	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
+	names: PartnerNamesSource;
 	image: string | null;
 	tasks: PartnershipTaskView[];
 };
@@ -191,7 +193,8 @@ export type GuideView = {
  */
 export type PartnerView = {
 	id: string;
-	name: string;
+	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
+	names: PartnerNamesSource;
 	/** Avatar URL, or null to fall back to initials. */
 	image: string | null;
 };
@@ -407,7 +410,8 @@ export type ThreadView = {
 /** One row on /home: a partner with something waiting. */
 export type UnreadPartnerView = {
 	partnershipId: string;
-	name: string;
+	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
+	names: PartnerNamesSource;
 	image: string | null;
 	unreadThreads: number;
 	newestAt: Date;
@@ -464,7 +468,8 @@ export type SelfRewardsSectionView = {
 
 export type HomePartnerRewardsSectionView = {
 	partnershipId: string;
-	name: string;
+	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
+	names: PartnerNamesSource;
 	image: string | null;
 	credits: number;
 	rewards: PartnershipRewardView[];
@@ -500,7 +505,8 @@ export type RestoreRequestView = {
  */
 export type HelpRequestView = {
 	partnershipId: string;
-	partnerName: string;
+	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
+	names: PartnerNamesSource;
 };
 
 /**
@@ -527,9 +533,10 @@ export type WidgetItemView = {
 	 *
 	 * /home merges your things with every partner's into one list, so a row has
 	 * to say which. Without it "Kneel at eight" and "Kneel at eight" from two
-	 * different partners are the same line twice.
+	 * different partners are the same line twice. The partner's names, opened in
+	 * the browser, since the server cannot read them.
 	 */
-	context: string | null;
+	context: PartnerNamesSource | null;
 };
 
 /**
@@ -541,7 +548,8 @@ export type WidgetItemView = {
  */
 export type WidgetBalanceView = {
 	id: string;
-	label: string | null;
+	/** Whose: the partner's names, opened in the browser. */
+	label: PartnerNamesSource | null;
 	credits: number;
 };
 

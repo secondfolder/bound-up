@@ -6,11 +6,15 @@
 	import TasksWidget from '$lib/components/TasksWidget.svelte';
 	import TimeZoneDisplay from '$lib/components/TimeZoneDisplay.svelte';
 	import { initialsFor } from '$lib/initials';
+	import { partnerName, viewerNames } from '$lib/partner-names.svelte';
 	import { UTC_TIMEZONE } from '$lib/timezone';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	let partner = $derived(data.partner);
+	/** The names, opened in the browser (`partner-names.svelte.ts`); placeholders until then. */
+	const names = $derived(viewerNames(partner.names));
+	const shownName = $derived(partnerName(partner.names));
 	const viewerTimezone = $derived(page.data.user?.timezone ?? UTC_TIMEZONE);
 </script>
 
@@ -18,12 +22,12 @@
 	<header>
 		<wa-avatar
 			image={partner.image ?? undefined}
-			initials={initialsFor(partner.name)}
-			label={partner.name}
+			initials={initialsFor(shownName)}
+			label={shownName}
 		></wa-avatar>
-		<h1>{partner.name}</h1>
-		{#if partner.partnerRole}
-			<p class="label">{partner.yourName}'s {partner.partnerRole}</p>
+		<h1>{shownName}</h1>
+		{#if names?.partnerRole}
+			<p class="label">{names.yourName}'s {names.partnerRole}</p>
 		{/if}
 		<TimeZoneDisplay
 			timeZone={partner.timezone}

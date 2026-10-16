@@ -1,4 +1,6 @@
 import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { namesSourceFor, type PartnerNamesSource, roleOf } from '../partnership';
+import { partnershipNamesKind } from '../sealed-kinds/partnerships';
 import { tagKind } from '../sealed-kinds/tags';
 import { rewardKind, taskKind } from '../sealed-kinds/tasks';
 import type { Db } from './db';
@@ -6,6 +8,7 @@ import {
 	messageTags,
 	partnershipRewardClaims,
 	partnershipRewards,
+	partnerships,
 	partnershipTaskCompletions,
 	partnershipTasks,
 	selfRewardClaims,
@@ -63,6 +66,12 @@ export type UnsealedPage = {
 	rewards: { id: string; title: string; description: string | null }[];
 	claims: { id: string; rewardTitle: string; rewardDescription: string | null }[];
 	tags: { id: string; name: string }[];
+	/**
+	 * A partnership's names, when they are not in its vault yet: where the
+	 * device can read them from (`PartnerNamesSource`), for it to seal them in.
+	 * Null when they already are, and always for the self scope.
+	 */
+	names: PartnerNamesSource | null;
 	/** Pass back for the next page; null when this was the last. */
 	next: Cursors | null;
 };
@@ -125,6 +134,8 @@ export async function listUnsealedContent(
 	}
 	const t = tablesFor(scope);
 
+	const names =
+		scope.kind === 'partnership' ? await unsealedNames(db, scope.partnershipId, actorId) : null;
 	const tags =
 		scope.kind === 'partnership'
 			? await db
@@ -225,8 +236,49 @@ export async function listUnsealedContent(
 		rewards: rewards.map((row) => ({ ...row, title: row.title ?? '' })),
 		claims: claims.map((row) => ({ ...row, rewardTitle: row.rewardTitle ?? '' })),
 		tags,
+		names,
 		next: Object.values(next).some((value) => value !== null) ? next : null
 	};
+}
+
+/**
+ * Where the actor can read a partnership's names from, while they are not yet
+ * in its vault: before sealing, in plaintext; after an invite was accepted,
+ * still under its invite key. Null once they are in the vault.
+ */
+async function unsealedNames(
+	db: Db,
+	partnershipId: string,
+	actorId: string
+): Promise<PartnerNamesSource | null> {
+	const [row] = await db
+		.select({
+			id: partnerships.id,
+			status: partnerships.status,
+			inviterId: partnerships.inviterId,
+			inviteeId: partnerships.inviteeId,
+			control: partnerships.control,
+			inviterName: partnerships.inviterName,
+			inviteeName: partnerships.inviteeName,
+			inviterRole: partnerships.inviterRole,
+			inviteeRole: partnerships.inviteeRole,
+			namesCiphertext: partnerships.namesCiphertext,
+			namesVaultId: partnerships.namesVaultId,
+			namesPayloadVersion: partnerships.namesPayloadVersion,
+			namesRevision: partnerships.namesRevision,
+			inviteCiphertext: partnerships.inviteCiphertext,
+			invitePayloadVersion: partnerships.invitePayloadVersion,
+			inviteKeyWrap: partnerships.inviteKeyWrap
+		})
+		.from(partnerships)
+		.where(eq(partnerships.id, partnershipId))
+		.limit(1);
+	const role = row ? roleOf(row, actorId) : null;
+	if (!(row && role) || row.namesCiphertext !== null) {
+		return null;
+	}
+	const source = namesSourceFor(row, role);
+	return source.invite || source.legacy ? source : null;
 }
 
 /** A blind index as `blindIndex` produces it: full-length base64url HMAC-SHA256. */
@@ -292,6 +344,8 @@ export type SealedContentBatch = {
 	rewards: { id: string; ciphertext: string; payloadVersion: number }[];
 	/** Sealed as the reward kind, to the claim's own id. */
 	claims: { id: string; ciphertext: string; payloadVersion: number }[];
+	/** A partnership's names, sealed in its vault. None for the self scope. */
+	names?: { ciphertext: string; payloadVersion: number };
 	/** A partnership's tags, each with the blind index of its name. None for the self scope. */
 	tags?: { id: string; ciphertext: string; payloadVersion: number; nameIndex: string }[];
 };
@@ -324,7 +378,13 @@ export async function sealUnsealedContent(
 		[...batch.rewards, ...batch.claims].every((row) =>
 			sealedIsAcceptable(rewardKind, row.ciphertext, row.payloadVersion)
 		) &&
-		(scope.kind === 'partnership' || batchTags.length === 0) &&
+		(scope.kind === 'partnership' || (batchTags.length === 0 && !batch.names)) &&
+		(!batch.names ||
+			sealedIsAcceptable(
+				partnershipNamesKind,
+				batch.names.ciphertext,
+				batch.names.payloadVersion
+			)) &&
 		batchTags.every(
 			(row) =>
 				sealedIsAcceptable(tagKind, row.ciphertext, row.payloadVersion) &&
@@ -426,6 +486,33 @@ export async function sealUnsealedContent(
 				)
 				.returning({ id: t.claims.id })
 		),
+		...(scope.kind === 'partnership' && batch.names
+			? [
+					db
+						.update(partnerships)
+						.set({
+							namesCiphertext: batch.names.ciphertext,
+							namesVaultId: vaultId,
+							namesPayloadVersion: batch.names.payloadVersion,
+							namesRevision: sql`${partnerships.namesRevision} + 1`,
+							inviterName: '',
+							inviteeName: '',
+							inviterRole: null,
+							inviteeRole: null,
+							inviteCiphertext: null,
+							invitePayloadVersion: null,
+							inviteKeyWrap: null
+						})
+						.where(
+							and(
+								eq(partnerships.id, scope.partnershipId),
+								eq(partnerships.status, 'accepted'),
+								sql`${partnerships.namesCiphertext} is null`
+							)
+						)
+						.returning({ id: partnerships.id })
+				]
+			: []),
 		...(scope.kind === 'partnership'
 			? tags.map((row) =>
 					db

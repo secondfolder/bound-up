@@ -20,6 +20,7 @@ import {
 	readSelfTaskRow,
 	type TestUser
 } from '../testing/fixtures';
+import { testPartnerView } from '../testing/names';
 import { partnerships, selfTasks } from './db/schema';
 import {
 	completePartnershipTask,
@@ -517,7 +518,8 @@ describe('partnership tasks', () => {
 		expect(page).toMatchObject({
 			partner: {
 				id: claimantView,
-				name: 'Them',
+				// Ada is the inviter, so the source is read from her end.
+				names: expect.objectContaining({ partnershipId: claimantView, role: 'inviter' }),
 				canManageTasks: false,
 				canCompleteTasks: true,
 				counterpartUserId: jun.id,
@@ -701,12 +703,16 @@ describe('home tasks aggregation', () => {
 		await createTestPartnershipTask(harness.db, withPat, ada);
 
 		const sections = await listHomePartnerTaskSections(harness.db, ada.id, ada.timezone, [
-			{ id: withCas, name: 'Cas', image: null },
-			{ id: withJun, name: 'Jun', image: null },
-			{ id: withPat, name: 'Pat', image: null }
+			testPartnerView(withCas, 'Cas'),
+			testPartnerView(withJun, 'Jun'),
+			testPartnerView(withPat, 'Pat')
 		]);
 
-		expect(sections.map((section) => section.name)).toEqual(['Cas', 'Jun']);
+		// The names are passed through untouched: the server cannot read them.
+		expect(sections.map((section) => section.names)).toEqual([
+			testPartnerView(withCas, 'Cas').names,
+			testPartnerView(withJun, 'Jun').names
+		]);
 		expect(sections[0]?.tasks).toContainEqual(
 			expect.objectContaining({
 				id: casTask.id,
@@ -824,7 +830,7 @@ describe('task widgets', () => {
 		const assigned = await createTestPartnershipTask(harness.db, partnershipId, jun);
 
 		const widget = await getHomeTasksWidget(harness.db, ada.id, [
-			{ id: partnershipId, name: 'Jun', image: null }
+			testPartnerView(partnershipId, 'Jun')
 		]);
 
 		expect(widget.activeCount).toBe(2);
@@ -839,7 +845,7 @@ describe('task widgets', () => {
 				expect.objectContaining({
 					id: assigned.id,
 					sealed: expect.objectContaining({ ciphertext: assigned.ciphertext }),
-					context: 'Jun'
+					context: testPartnerView(partnershipId, 'Jun').names
 				})
 			])
 		);
@@ -851,14 +857,16 @@ describe('task widgets', () => {
 		const { id } = await createTestPartnershipTask(harness.db, partnershipId, ada);
 
 		const widget = await getHomeTasksWidget(harness.db, ada.id, [
-			{ id: partnershipId, name: 'Jun', image: null }
+			testPartnerView(partnershipId, 'Jun')
 		]);
 		expect(widget).toMatchObject({ activeCount: 0, ready: [] });
 
 		// And it does show up for the side that has to do it.
 		const junsWidget = await getHomeTasksWidget(harness.db, jun.id, [
-			{ id: partnershipId, name: 'Ada', image: null }
+			testPartnerView(partnershipId, 'Ada')
 		]);
-		expect(junsWidget.ready).toEqual([expect.objectContaining({ id, context: 'Ada' })]);
+		expect(junsWidget.ready).toEqual([
+			expect.objectContaining({ id, context: testPartnerView(partnershipId, 'Ada').names })
+		]);
 	});
 });

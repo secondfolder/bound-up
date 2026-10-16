@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { initialsFor } from '$lib/initials';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { PartnerView } from '$lib/types';
 
 	let { partners }: { partners: PartnerView[] } = $props();
@@ -40,10 +41,10 @@
 			     initials, and an empty image="" would render a broken image. -->
 			<wa-avatar
 				image={partner.image ?? undefined}
-				initials={initialsFor(partner.name)}
-				label={partner.name}
+				initials={initialsFor(partnerName(partner.names))}
+				label={partnerName(partner.names)}
 			></wa-avatar>
-			<span>{partner.name}</span>
+			<span>{partnerName(partner.names)}</span>
 		</a>
 	{/each}
 

@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	return {
 		partner: {
 			id: membership.partnership.id,
-			name: membership.partnership.partnerName
+			names: membership.partnership.names
 		}
 	};
 };

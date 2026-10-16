@@ -2,10 +2,13 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardForm from '$lib/components/RewardForm.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import { openedReward } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	/** What the viewer calls them, opened in the browser (`partner-names.svelte.ts`). */
+	const partnerShown = $derived(partnerName(data.partner.names));
 	const opened = $derived(openedReward(data.reward));
 	/**
 	 * The fields' starting values, taken once the reward is opened. Held rather
@@ -35,7 +38,7 @@
 		{backHref}
 		backLabel="Back to rewards"
 		backText="Rewards"
-		title={`Edit a reward for ${data.partner.name}`}
+		title={`Edit a reward for ${partnerShown}`}
 		description="Use the same reward form here that creates a new partnership reward, but with the current values prefilled."
 	/>
 

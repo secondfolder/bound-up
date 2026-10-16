@@ -13,11 +13,12 @@
  * So `sealRecord` takes a grant rather than a boolean. A grant for a
  * partnership vault comes only from `writeGrantFor` in `trust.svelte.ts`,
  * which asks the trust check first, and a grant for the user's own vault from
- * `selfWriteGrant`. A write that skipped the question has nothing to pass.
+ * `selfWriteGrant`, and for an invite's one-off vault from `inviteWriteGrant`
+ * (`invite.ts`). A write that skipped the question has nothing to pass.
  *
  * The brand is a compile-time device: nothing stops code calling `issue`
  * directly, which is why it is not exported from anywhere else and why only
- * those two places do.
+ * those three places do.
  */
 
 declare const grantBrand: unique symbol;
@@ -27,7 +28,7 @@ export type WriteGrant = {
 	readonly [grantBrand]: true;
 };
 
-/** For `trust.svelte.ts` and `selfWriteGrant` only. See the file comment. */
+/** For `trust.svelte.ts`, `selfWriteGrant` and `inviteWriteGrant` only. See the file comment. */
 export function issueWriteGrant(vaultId: string): WriteGrant {
 	return { vaultId } as WriteGrant;
 }

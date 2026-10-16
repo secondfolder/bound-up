@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { HelpRequestView } from '$lib/types';
 
 	/**
@@ -17,14 +18,14 @@
 {#each requests as request (request.partnershipId)}
 	<wa-callout variant="warning" class="help" data-testid="help-request">
 		<wa-icon slot="icon" name="life-ring" variant="solid"></wa-icon>
-		<strong>{request.partnerName} can't sign in and asked for your help</strong>
+		<strong>{partnerName(request.names)} can't sign in and asked for your help</strong>
 		<p>
 			<a
 				href={resolve('/(auth-required)/(app)/partner/[id]/messages', {
 					id: request.partnershipId
 				})}
 			>
-				Help {request.partnerName} sign in
+				Help {partnerName(request.names)} sign in
 			</a>
 		</p>
 	</wa-callout>

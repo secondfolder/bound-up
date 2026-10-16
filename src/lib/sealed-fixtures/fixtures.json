@@ -82,6 +82,31 @@
 			"expected": {
 				"name": "Bedtime"
 			}
+		},
+		{
+			"kind": "partnership-names",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000d1",
+			"ciphertext": "sb1.GHieBeGduYyEBbuOFAECM6Rqfeoethvq5_fhNcy1t8B7OaVKpUP_T3MPuFiZ2iAiAxYGMEdIvzlT5eaWiEpP_hKpZ2_sgr_pY_UgVrEhFKCOsFkegTnDajWm87JKF5rgPVA7Ik_cuCWGNn9L",
+			"expected": {
+				"inviterName": "Sir",
+				"inviteeName": "Pet",
+				"inviterRole": "Dom",
+				"inviteeRole": null
+			}
+		},
+		{
+			"kind": "partnership-invite",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000d2",
+			"ciphertext": "sb1.-AYzSpMatubqBwC8zbLepq-T-MhXT_X1I5BiC1EPuJGEHhFAn5kcjwmKb-ij-QUHoAw7_I0xIQrAVUHFtfJBbPZJvt8QRbbwVaVz8igEeavt5thnAEi_3yFOQlvsR1S014KypYueQnSjiymhAPhouBvVUu-OjtzUYGa1m0JGCnSd_0iLl9234J0GmPujv6aWjW6amkMcxuC9t2KJWRp8cRbamoI-KLw-mRpSvktWhyfwxvPwo575SYGeC8yrc1DpLUveZg",
+			"expected": {
+				"inviterName": "Sir",
+				"inviteeName": "Pet",
+				"inviterRole": null,
+				"inviteeRole": "sub",
+				"inviterRecipient": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+			}
 		}
 	]
 }

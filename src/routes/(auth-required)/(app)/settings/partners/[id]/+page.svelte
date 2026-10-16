@@ -2,23 +2,54 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import PartnerFields from '$lib/components/PartnerFields.svelte';
+	import SealedPartnerEditForm from '$lib/components/SealedPartnerEditForm.svelte';
+	import { inviteFragment } from '$lib/crypto/invite';
 	import { initialsFor } from '$lib/initials';
+	import { openedNames, partnerName, viewerNames } from '$lib/partner-names.svelte';
+	import { inviterInviteKey, sealInvite } from '$lib/partner-sealing';
+	import type { ViewerNames } from '$lib/partnership';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
 	import { shareInviteLink } from '$lib/share';
-	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const partnership = $derived(data.partnership);
 	const backHref = resolve('/(auth-required)/(app)/settings/partners');
-	// svelte-ignore state_referenced_locally
-	// Captures the load's initial `data.partnerEditForm` on purpose: `superForm`
-	// registers its lifecycle once, and re-running it on every `invalidate()`
-	// would reset the form. `resetForm: false` keeps a failed edit populated.
-	const superform = superForm(data.partnerEditForm, { resetForm: false });
-	const { errors, submitting } = superform;
+	/** The names, opened in the browser (`partner-names.svelte.ts`); placeholders until then. */
+	const shownName = $derived(partnerName(partnership.names));
+	const opened = $derived(viewerNames(partnership.names));
+	/**
+	 * The names as first opened, so the edit form is mounted once with them in
+	 * it, rather than torn down when a save's reload briefly reads as "opening".
+	 */
+	let formNames = $state<ViewerNames | null | undefined>(undefined);
+	$effect(() => {
+		if (formNames === undefined && opened !== undefined) {
+			formNames = opened;
+		}
+	});
+
+	/**
+	 * The link with its key. The server sends the inviter the link without one
+	 * — it never has the key — and the key comes back from the inviter's own
+	 * wrap of it. An invite from before names were sealed has no key, and so no
+	 * working link until a new one is made.
+	 */
+	let inviteLink = $state<string | null>(null);
+	const keyWrap = $derived(partnership.names.invite?.keyWrap ?? null);
+	$effect(() => {
+		const base = data.inviteUrl;
+		const wrap = keyWrap;
+		const { id } = partnership;
+		if (!(base && wrap)) {
+			inviteLink = null;
+			return;
+		}
+		void inviterInviteKey(id, wrap).then((key) => {
+			inviteLink = key ? `${base}${inviteFragment(key)}` : null;
+		});
+	});
 
 	let shareStatus: string | null = $state(null);
 	let rotateError: string | null = $state(null);
@@ -40,17 +71,16 @@
 		{backHref}
 		backLabel="Back to partners"
 		backText="Partners"
-		title={partnership.partnerName}
-		description={[partnership.partnerRole, partnership.yourRole].filter(Boolean).join(' / ') ||
-			null}
+		title={shownName}
+		description={[opened?.partnerRole, opened?.yourRole].filter(Boolean).join(' / ') || null}
 	/>
 
 	<div class="content">
 		<header>
 			<wa-avatar
 				image={partnership.counterpartImage ?? undefined}
-				initials={initialsFor(partnership.partnerName)}
-				label={partnership.partnerName}
+				initials={initialsFor(shownName)}
+				label={shownName}
 			></wa-avatar>
 		</header>
 
@@ -58,7 +88,7 @@
 			<div class="pending">
 				<h2>Waiting for them to accept</h2>
 
-				{#if data.inviteUrl}
+				{#if data.inviteUrl && inviteLink}
 					<p>Send them this link. It stops working once they accept it.</p>
 					<!-- readonly rather than disabled so the value can still be selected
 				     and copied by hand when the Clipboard API is unavailable. -->
@@ -66,16 +96,20 @@
 						class="link"
 						type="text"
 						readonly
-						value={data.inviteUrl}
+						value={inviteLink}
 						aria-label="Invite link"
 					/>
-					<wa-button onclick={() => data.inviteUrl && share(data.inviteUrl)}>
+					<wa-button onclick={() => inviteLink && share(inviteLink)}>
 						<wa-icon slot="start" name="share-nodes" variant="solid"></wa-icon>
 						Share link again
 					</wa-button>
 					{#if shareStatus}<p class="status">{shareStatus}</p>{/if}
 				{:else if data.inviteExpired}
 					<p class="invalid">This invite link has expired.</p>
+				{:else if data.inviteUrl && !keyWrap}
+					<p>This link is from an older version of Bound Up. Create a new link to send them.</p>
+				{:else if data.inviteUrl}
+					<p class="hint">…</p>
 				{:else}
 					<p>Only the person who created this invite can see the link.</p>
 				{/if}
@@ -84,11 +118,23 @@
 					<form
 						method="POST"
 						action="?/rotate"
-						use:enhance={() => {
+						use:enhance={async ({ formData, cancel }) => {
 							rotateError = null;
+							// A new link gets a new invite key: the invite is sealed again
+							// under it, from the names as they stand.
+							const stored = openedNames(partnership.names);
+							const sealed = stored ? await sealInvite(partnership.id, stored) : null;
+							if (!sealed?.ok) {
+								rotateError = sealed?.error ?? 'Could not renew the link. Reload and try again.';
+								cancel();
+								return;
+							}
+							for (const [name, value] of Object.entries(sealed.fields)) {
+								formData.set(name, value);
+							}
 							return async ({ result, update }) => {
 								if (result.type === 'success' && typeof result.data?.url === 'string') {
-									await share(result.data.url);
+									await share(`${result.data.url}${inviteFragment(sealed.key)}`);
 								} else if (result.type === 'failure') {
 									rotateError = String(result.data?.rotateError ?? 'Could not renew the link.');
 								} else if (result.type === 'error') {
@@ -112,31 +158,29 @@
 		{#if partnership.status === 'accepted' || partnership.canEdit}
 			<h2>Settings</h2>
 			{#if partnership.canEdit}
-				<!-- The Save button lives outside this form, on a shared row with
-				     Disconnect — `form="partner-edit"` re-associates it, so it still
-				     submits through superforms' enhance. -->
-				<form id="partner-edit" method="POST" action="?/update" use:superform.enhance>
-					<PartnerFields {superform} />
-				</form>
+				{#if formNames}
+					<SealedPartnerEditForm
+						partnerEditForm={data.partnerEditForm}
+						{partnership}
+						names={formNames}
+					/>
+				{:else if formNames === null}
+					<p class="hint">These can't be shown on this device right now.</p>
+				{:else}
+					<p class="hint">…</p>
+				{/if}
 			{:else}
 				<dl class="readonly">
 					<dt>What you call them</dt>
-					<dd>{partnership.partnerName}</dd>
+					<dd>{shownName}</dd>
 					<dt>What they call you</dt>
-					<dd>{partnership.yourName}</dd>
+					<dd>{opened?.yourName ?? '…'}</dd>
 				</dl>
 				<p class="hint">They're in control of this link, so only they can change these.</p>
 			{/if}
 		{/if}
 
 		<div class="actions">
-			{#if partnership.canEdit}
-				<!-- `disabled={x}`, never `disabled={x || undefined}`. Once Web Awesome
-				     upgrades the element Svelte assigns to the `disabled` *property*, and
-				     this alpha coerces `undefined` to true — leaving the button permanently
-				     disabled. A plain boolean assigns false and behaves. -->
-				<wa-button type="submit" form="partner-edit" disabled={$submitting}>Save</wa-button>
-			{/if}
 
 			<!-- Always available, whoever holds control: see the disconnect action. -->
 			<form
@@ -144,7 +188,7 @@
 				action="?/disconnect"
 				use:enhance={({ cancel }) => {
 					// biome-ignore lint/suspicious/noAlert: the native confirm is the whole confirmation step today; a styled dialog would be a UI change of its own.
-					if (!confirm(`Disconnect from ${partnership.partnerName}? This cannot be undone.`)) {
+					if (!confirm(`Disconnect from ${shownName}? This cannot be undone.`)) {
 						cancel();
 					}
 					return async ({ result, update }) => {
@@ -161,7 +205,6 @@
 				</wa-button>
 			</form>
 		</div>
-		{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 	</div>
 </section>
 

@@ -38,7 +38,7 @@ describe('load', () => {
 	it('lets the controlling side open the add page', async () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		await expect(runLoad(load(at(id, ada)))).resolves.toMatchObject({
-			partner: { id, name: 'Them' }
+			partner: { id, names: expect.objectContaining({ partnershipId: id, role: 'inviter' }) }
 		});
 	});
 

@@ -94,6 +94,15 @@ export async function vaultsSettled(): Promise<VaultsState> {
 	return running === null ? state : await running;
 }
 
+/**
+ * The identity the open vaults came from, for opening anything else wrapped
+ * to it — an invite key the user sent (`crypto/invite.ts`). Null until vaults
+ * are worked out, and after sign-out.
+ */
+export function heldVaultIdentity(): { recipient: string; identity: CryptoKey | string } | null {
+	return heldIdentity;
+}
+
 /** A request that never got an answer: offline, or cut short by a navigation. */
 class VaultNetworkError extends Error {}
 
@@ -292,7 +301,20 @@ export async function wrapPartnershipVaultFor(
 	}
 }
 
+const resetListeners = new Set<() => void>();
+
+/**
+ * Runs `listener` whenever the vaults are forgotten, so a cache of anything
+ * opened with them (`partner-names.svelte.ts`) goes with them.
+ */
+export function onVaultsReset(listener: () => void): void {
+	resetListeners.add(listener);
+}
+
 export function resetVaults(): void {
+	for (const listener of resetListeners) {
+		listener();
+	}
 	// Everything opened with these vaults goes with them: the next account in
 	// this tab must not be shown the last one's records from the cache.
 	sealedReader.clear();

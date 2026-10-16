@@ -10,9 +10,11 @@ import {
 	roleOf,
 	viewPartnership
 } from '../partnership';
+import { partnershipInviteKind, partnershipNamesKind } from '../sealed-kinds/partnerships';
 import type { PartnerView } from '../types';
 import type { Db } from './db';
 import { partnerships, user } from './db/schema';
+import { partnershipVaultIdFor, sealedIsAcceptable } from './sealed-content';
 
 const BASE64_PADDING = /[=]+$/;
 
@@ -42,6 +44,13 @@ const partnershipColumns = {
 	inviterRole: partnerships.inviterRole,
 	inviteeRole: partnerships.inviteeRole,
 	control: partnerships.control,
+	namesCiphertext: partnerships.namesCiphertext,
+	namesVaultId: partnerships.namesVaultId,
+	namesPayloadVersion: partnerships.namesPayloadVersion,
+	namesRevision: partnerships.namesRevision,
+	inviteCiphertext: partnerships.inviteCiphertext,
+	invitePayloadVersion: partnerships.invitePayloadVersion,
+	inviteKeyWrap: partnerships.inviteKeyWrap,
 	inviteToken: partnerships.inviteToken,
 	inviteExpiresAt: partnerships.inviteExpiresAt,
 	createdAt: partnerships.createdAt,
@@ -102,7 +111,7 @@ export async function listPartnersForNav(db: Db, userId: string): Promise<Partne
 
 	return rows.map((row) => {
 		const view = toView(row, userId);
-		return { id: view.id, name: view.partnerName, image: view.counterpart?.image ?? null };
+		return { id: view.id, names: view.names, image: view.counterpart?.image ?? null };
 	});
 }
 
@@ -180,73 +189,102 @@ export function generateInviteToken(): string {
 }
 
 /**
- * The caller's value when they gave one, and the stored one when they left it
- * out. Not `??`: a role of `null` is an answer — "no role" — and must replace
- * the stored one rather than fall back to it.
+ * The invite as it is posted: sealed under the invite key, which the server
+ * never sees (it travels in the link's fragment), with that key wrapped to
+ * the inviter's own recipient so their devices can open it again.
  */
-function supplied<T>(next: T | undefined, current: T): T {
-	if (next === undefined) {
-		return current;
-	}
-	return next;
+export type SealedInvite = { ciphertext: string; payloadVersion: number; keyWrap: string };
+
+/** An age-encrypted blob, base64: what `wrapVaultKey` produces. Shape only. */
+const KEY_WRAP = /^[A-Za-z0-9+/]+={0,2}$/;
+
+function inviteIsAcceptable(invite: { ciphertext: string; payloadVersion: number }): boolean {
+	return sealedIsAcceptable(partnershipInviteKind, invite.ciphertext, invite.payloadVersion);
 }
 
 export type CreateInviteInput = {
+	/** Chosen by the inviter's browser: the invite is sealed to it. */
+	id: string;
 	inviterId: string;
-	/** "What's their name/title?" */
-	inviteeName: string;
-	/** "What do they call you?" */
-	inviterName: string;
-	/** Their half of the "Roles" section. Stored against the invitee. */
-	inviteeRole: string | null;
-	/** Your half of the "Roles" section. Stored against the inviter. */
-	inviterRole: string | null;
 	control: PartnershipControl;
+	invite: SealedInvite;
 };
 
-/** Creates the pending row and returns it with its fresh token. */
+/**
+ * Creates the pending row and returns it with its fresh token. The names are
+ * in `invite`, sealed; the name columns are left empty.
+ */
 export async function createInvite(
 	db: Db,
 	input: CreateInviteInput,
 	now: Date = new Date()
-): Promise<{ id: string; inviteToken: string; inviteExpiresAt: Date }> {
+): Promise<
+	| { ok: true; id: string; inviteToken: string; inviteExpiresAt: Date }
+	| { ok: false; reason: 'bad-invite' | 'id-taken' }
+> {
+	if (!(inviteIsAcceptable(input.invite) && KEY_WRAP.test(input.invite.keyWrap))) {
+		return { ok: false, reason: 'bad-invite' };
+	}
 	const inviteToken = generateInviteToken();
 	const inviteExpiresAt = new Date(now.getTime() + INVITE_TTL_MS);
-	const [row] = await db
+	const rows = await db
 		.insert(partnerships)
 		.values({
+			id: input.id,
 			inviterId: input.inviterId,
 			status: 'pending',
-			inviterName: input.inviterName,
-			inviteeName: input.inviteeName,
-			inviterRole: input.inviterRole,
-			inviteeRole: input.inviteeRole,
+			inviterName: '',
+			inviteeName: '',
 			control: input.control,
 			inviteToken,
-			inviteExpiresAt
+			inviteExpiresAt,
+			inviteCiphertext: input.invite.ciphertext,
+			invitePayloadVersion: input.invite.payloadVersion,
+			inviteKeyWrap: input.invite.keyWrap
 		})
+		.onConflictDoNothing()
 		.returning({ id: partnerships.id });
-
-	return { id: row.id, inviteToken, inviteExpiresAt };
+	const [row] = rows;
+	if (!row) {
+		return { ok: false, reason: 'id-taken' };
+	}
+	return { ok: true, id: row.id, inviteToken, inviteExpiresAt };
 }
 
 /**
  * Issues a new token for a pending invite, invalidating the previous link.
  *
  * Offered rather than done automatically on every re-copy: rotating silently
- * would break a link the inviter had already sent.
+ * would break a link the inviter had already sent. The invite is sealed again
+ * under a new invite key at the same time, so the old link fails on both
+ * halves — and an invite from before names were sealed, which has no key at
+ * all, gets one, its plaintext names cleared.
  */
 export async function rotateInviteToken(
 	db: Db,
 	id: string,
 	inviterId: string,
+	invite: SealedInvite,
 	now: Date = new Date()
 ): Promise<{ inviteToken: string; inviteExpiresAt: Date } | null> {
+	if (!(inviteIsAcceptable(invite) && KEY_WRAP.test(invite.keyWrap))) {
+		return null;
+	}
 	const inviteToken = generateInviteToken();
 	const inviteExpiresAt = new Date(now.getTime() + INVITE_TTL_MS);
 	const rows = await db
 		.update(partnerships)
-		.set({ inviteToken, inviteExpiresAt })
+		.set({
+			inviteToken,
+			inviteExpiresAt,
+			inviteCiphertext: invite.ciphertext,
+			invitePayloadVersion: invite.payloadVersion,
+			inviteKeyWrap: invite.keyWrap,
+			inviterName: '',
+			inviteeName: '',
+			inviterRole: null,
+			inviteeRole: null
+		})
 		.where(
 			and(
 				eq(partnerships.id, id),
@@ -262,17 +300,18 @@ export async function rotateInviteToken(
 export type AcceptInviteInput = {
 	token: string;
 	inviteeId: string;
-	/** Only honoured when the accepter is allowed to edit; see the action. */
-	inviterName?: string;
-	inviteeName?: string;
-	inviterRole?: string | null;
-	inviteeRole?: string | null;
+	/**
+	 * The names as the accepter left them, sealed again under the same invite
+	 * key, and the control answer. Only honoured when the accepter is allowed
+	 * to edit; see the action.
+	 */
+	invite?: { ciphertext: string; payloadVersion: number };
 	control?: PartnershipControl;
 };
 
 export type AcceptInviteResult =
 	| { ok: true; id: string }
-	| { ok: false; reason: 'not-found' | 'expired' | 'self' | 'already-linked' };
+	| { ok: false; reason: 'not-found' | 'expired' | 'self' | 'already-linked' | 'bad-invite' };
 
 /**
  * Consumes an invite.
@@ -280,6 +319,11 @@ export type AcceptInviteResult =
  * The token is matched again inside the UPDATE's WHERE rather than trusted from
  * the earlier read, so two accepts racing on the same link cannot both win: the
  * first clears `invite_token` and the second matches no rows.
+ *
+ * The sealed invite stays on the row: there is no partnership vault yet, and
+ * the accepter's browser may not even have its keys open on this page. A
+ * member's device moves the names into the vault once it has one
+ * (`content-sealing.ts`), and clears the invite then.
  */
 export async function acceptInvite(
 	db: Db,
@@ -290,11 +334,16 @@ export async function acceptInvite(
 	if (!existing) {
 		return { ok: false, reason: 'not-found' };
 	}
-	if (!isInviteUsable(existing, now)) {
+	// An invite from before names were sealed has no invite key, so no link to
+	// it can carry one: it is offered again as a new link instead.
+	if (!isInviteUsable(existing, now) || existing.inviteCiphertext === null) {
 		return { ok: false, reason: existing.status === 'accepted' ? 'not-found' : 'expired' };
 	}
 	if (existing.inviterId === input.inviteeId) {
 		return { ok: false, reason: 'self' };
+	}
+	if (input.invite && !inviteIsAcceptable(input.invite)) {
+		return { ok: false, reason: 'bad-invite' };
 	}
 
 	if (await partnershipExistsBetween(db, existing.inviterId, input.inviteeId)) {
@@ -303,7 +352,8 @@ export async function acceptInvite(
 
 	// The accepter may only rewrite the names when control is theirs or shared.
 	// Checked here as well as in the action so the rule cannot be bypassed by a
-	// future caller that forgets.
+	// future caller that forgets. What the server cannot check is what the
+	// re-sealed names say — only that this accepter may write them at all.
 	const accepterMayEdit = canEditPartnership(
 		{ ...existing, inviteeId: input.inviteeId },
 		input.inviteeId
@@ -321,11 +371,13 @@ export async function acceptInvite(
 			inviteExpiresAt: null,
 			...(accepterMayEdit
 				? {
-						inviterName: input.inviterName ?? existing.inviterName,
-						inviteeName: input.inviteeName ?? existing.inviteeName,
-						inviterRole: supplied(input.inviterRole, existing.inviterRole),
-						inviteeRole: supplied(input.inviteeRole, existing.inviteeRole),
-						control: input.control ?? existing.control
+						control: input.control ?? existing.control,
+						...(input.invite
+							? {
+									inviteCiphertext: input.invite.ciphertext,
+									invitePayloadVersion: input.invite.payloadVersion
+								}
+							: {})
 					}
 				: {})
 		})
@@ -358,32 +410,86 @@ export async function partnershipExistsBetween(db: Db, a: string, b: string): Pr
 }
 
 export type UpdatePartnershipInput = {
-	inviterName: string;
-	inviteeName: string;
-	inviterRole: string | null;
-	inviteeRole: string | null;
 	control: PartnershipControl;
+	/**
+	 * The names, sealed in the partnership's vault, and the revision the editor
+	 * opened. Absent on a pending invite, which has no vault: its names change
+	 * by sealing a new invite (`rotateInviteToken`).
+	 */
+	names?: { vaultId: string; ciphertext: string; payloadVersion: number; expectedRevision: number };
+	/** A pending invite's names, sealed again under its invite key by the inviter. */
+	invite?: { ciphertext: string; payloadVersion: number };
 };
+
+export type UpdatePartnershipResult =
+	| { ok: true }
+	| { ok: false; reason: 'forbidden' | 'bad-names' | 'conflict' };
 
 /**
  * Applies an edit, re-checking the permission against the stored row.
  *
- * Returns false when the viewer is not a member or does not hold control —
- * the page hides the form in that case, but the action must not rely on that.
+ * Refused when the viewer is not a member or does not hold control — the page
+ * hides the form in that case, but the action must not rely on that. The
+ * names are compare-and-swap on their revision, so one member's edit cannot
+ * silently replace the other's: the server cannot merge what it cannot read.
  */
 export async function updatePartnership(
 	db: Db,
 	id: string,
 	userId: string,
 	input: UpdatePartnershipInput
-): Promise<boolean> {
+): Promise<UpdatePartnershipResult> {
 	const current = await getPartnershipForUser(db, id, userId);
 	if (!current?.canEdit) {
-		return false;
+		return { ok: false, reason: 'forbidden' };
 	}
-
-	await db.update(partnerships).set(input).where(eq(partnerships.id, id));
-	return true;
+	const { names, invite } = input;
+	if (invite) {
+		// Only the inviter holds the invite key, and only while it is an invite.
+		if (current.status !== 'pending' || current.role !== 'inviter' || !inviteIsAcceptable(invite)) {
+			return { ok: false, reason: 'bad-names' };
+		}
+		await db
+			.update(partnerships)
+			.set({
+				control: input.control,
+				inviteCiphertext: invite.ciphertext,
+				invitePayloadVersion: invite.payloadVersion
+			})
+			.where(and(eq(partnerships.id, id), eq(partnerships.status, 'pending')));
+		return { ok: true };
+	}
+	if (!names) {
+		await db.update(partnerships).set({ control: input.control }).where(eq(partnerships.id, id));
+		return { ok: true };
+	}
+	if (
+		current.status !== 'accepted' ||
+		names.vaultId !== (await partnershipVaultIdFor(db, id)) ||
+		!sealedIsAcceptable(partnershipNamesKind, names.ciphertext, names.payloadVersion)
+	) {
+		return { ok: false, reason: 'bad-names' };
+	}
+	const rows = await db
+		.update(partnerships)
+		.set({
+			control: input.control,
+			namesCiphertext: names.ciphertext,
+			namesVaultId: names.vaultId,
+			namesPayloadVersion: names.payloadVersion,
+			namesRevision: names.expectedRevision + 1,
+			// Whatever the names were held in before, they are in the vault now.
+			inviterName: '',
+			inviteeName: '',
+			inviterRole: null,
+			inviteeRole: null,
+			inviteCiphertext: null,
+			invitePayloadVersion: null,
+			inviteKeyWrap: null
+		})
+		.where(and(eq(partnerships.id, id), eq(partnerships.namesRevision, names.expectedRevision)))
+		.returning({ id: partnerships.id });
+	return rows.length > 0 ? { ok: true } : { ok: false, reason: 'conflict' };
 }
 
 /**

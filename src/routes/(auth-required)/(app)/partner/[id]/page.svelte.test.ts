@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { legacyNamesSource } from '$lib/testing/names';
 import type { PageData } from './$types';
 
 const pageState = {
@@ -55,12 +56,16 @@ function data(timezone: string | null): PageData {
 		},
 		partner: {
 			id: 'p1',
-			name: 'Jun',
-			yourName: 'Ada',
+			// Plaintext, as a partnership from before sealing: the only names
+			// that show without an open vault.
+			names: legacyNamesSource('p1', {
+				partnerName: 'Jun',
+				yourName: 'Ada',
+				partnerRole: 'sub',
+				yourRole: 'dom'
+			}),
 			image: null,
 			timezone,
-			partnerRole: 'sub',
-			yourRole: 'dom',
 			canEdit: true
 		}
 	} as PageData;

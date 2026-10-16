@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { initialsFor } from '$lib/initials';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { UnreadPartnerView } from '$lib/types';
 
 	/**
@@ -30,12 +31,12 @@
 				>
 					<wa-avatar
 						image={partner.image ?? undefined}
-						initials={initialsFor(partner.name)}
-						label={partner.name}
+						initials={initialsFor(partnerName(partner.names))}
+						label={partnerName(partner.names)}
 					></wa-avatar>
 					<span class="what">
 						{partner.unreadThreads} new message{partner.unreadThreads === 1 ? '' : 's'} from
-						{partner.name}
+						{partnerName(partner.names)}
 					</span>
 					<wa-icon name="chevron-right" variant="solid"></wa-icon>
 				</a>

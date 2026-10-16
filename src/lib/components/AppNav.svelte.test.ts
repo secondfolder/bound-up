@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
+import { testPartnerView } from '$lib/testing/names';
 import { waSettled } from '$lib/testing/web-awesome';
 import type { PartnerView } from '$lib/types';
 
@@ -24,8 +25,10 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 const { default: AppNav } = await import('./AppNav.svelte');
 
 const partners: PartnerView[] = [
-	{ id: 'p-ada', name: 'Ada', image: null },
-	{ id: 'p-jun', name: 'Jun', image: '/jun.png' }
+	// Plaintext names, as a partnership from before sealing has: the only kind
+	// that shows without an open vault, which a component test has none of.
+	testPartnerView('p-ada', 'Ada'),
+	testPartnerView('p-jun', 'Jun', '/jun.png')
 ];
 
 function renderNav(routeId: string, params: Record<string, string> = {}) {

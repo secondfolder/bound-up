@@ -7,7 +7,8 @@ itself is [docs/messaging.md](messaging.md).
 
 Beside each user's identity sit **vaults**: one key per user and one per
 partnership, which a user's data is sealed under as **sealed records**. Both
-are described below. Messages and message tags' names are sealed in their partnership's vault;
+are described below. Messages, message tags' names and the partnership's own names are sealed in
+their partnership's vault;
 tasks, rewards, and their completions and claims in the owner's or the
 partnership's vault ([docs/tasks.md](tasks.md#what-the-server-can-see),
 [docs/rewards.md](rewards.md#what-the-server-can-see)). Moving the remaining
@@ -731,9 +732,9 @@ The honest boundary of the above:
   would fix it and is not built. Until then the UI shows _when_ a key was first
   seen, so "first seen a moment ago" cannot be mistaken for "first seen two
   years ago".
-- **Nothing delivers a recipient out of band.** The noted follow-up is to put
-  the inviter's recipient in the invite URL's _fragment_, which never reaches
-  the server — genuine out-of-band key delivery that would remove
-  trust-on-first-use for that direction entirely. It needs the inviter to hold
-  keys at invite-creation time, so it is a change to the partners flow rather
-  than this one.
+- **Only one direction arrives out of band.** The invitee learns the inviter's
+  recipient from the invite itself, sealed under the key in the link's
+  fragment, and pins it as verified — no trust-on-first-use for that direction
+  ([docs/partners.md](partners.md#names-are-sealed)). The inviter still learns
+  the invitee's recipient from the server the first time, as before, until the
+  safety number is compared.

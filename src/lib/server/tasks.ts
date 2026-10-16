@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import type { PartnerNamesSource } from '../partnership';
 import { taskKind } from '../sealed-kinds/tasks';
 import {
 	initialNextEligibleAt,
@@ -195,7 +196,7 @@ type TaskMembership = {
 export type PartnershipTasksPageView = {
 	partner: {
 		id: string;
-		name: string;
+		names: PartnerNamesSource;
 		canManageTasks: boolean;
 		canCompleteTasks: boolean;
 		counterpartUserId: string;
@@ -688,7 +689,7 @@ export async function getPartnershipTasksPage(
 	return {
 		partner: {
 			id: partnershipId,
-			name: membership.partnership.partnerName,
+			names: membership.partnership.names,
 			canManageTasks: membership.canManage,
 			canCompleteTasks: membership.canComplete,
 			counterpartUserId: membership.counterpartUserId,
@@ -776,7 +777,7 @@ export async function getPartnershipTaskForUser(
 ): Promise<{
 	partner: {
 		id: string;
-		name: string;
+		names: PartnerNamesSource;
 		canManageTasks: boolean;
 		canCompleteTasks: boolean;
 		counterpartUserId: string;
@@ -802,7 +803,7 @@ export async function getPartnershipTaskForUser(
 	return {
 		partner: {
 			id: partnershipId,
-			name: membership.partnership.partnerName,
+			names: membership.partnership.names,
 			canManageTasks: membership.canManage,
 			canCompleteTasks: membership.canComplete,
 			counterpartUserId: membership.counterpartUserId,
@@ -1142,7 +1143,7 @@ export async function listHomePartnerTaskSections(
 		return [
 			{
 				partnershipId: partner.id,
-				name: partner.name,
+				names: partner.names,
 				image: partner.image,
 				tasks: tasksByPartnership.get(partner.id) ?? []
 			}
@@ -1168,7 +1169,7 @@ type TaskWidgetRow = {
 	creditsAwarded: number;
 	nextEligibleAt: Date | null;
 	/** Whose section this came from on /home/tasks. Null for your own. */
-	context?: string | null;
+	context?: PartnerNamesSource | null;
 };
 
 function toTasksWidgetView(rows: TaskWidgetRow[], viewerActs: boolean, now: Date): TasksWidgetView {
@@ -1273,7 +1274,7 @@ export async function getHomeTasksWidget(
 	const completable = new Map(
 		partnershipRows.map((row) => [row.id, canCompleteFromPartnership(row, userId)])
 	);
-	const nameById = new Map(partners.map((partner) => [partner.id, partner.name]));
+	const namesById = new Map(partners.map((partner) => [partner.id, partner.names]));
 
 	const partnerRows: TaskWidgetRow[] = partnerTaskRows.flatMap((row) => {
 		if (!completable.get(row.partnershipId)) {
@@ -1284,11 +1285,11 @@ export async function getHomeTasksWidget(
 		if (row.createdByUserId === userId) {
 			return [];
 		}
-		const name = nameById.get(row.partnershipId);
-		if (!name) {
+		const names = namesById.get(row.partnershipId);
+		if (!names) {
 			return [];
 		}
-		return [{ ...row, context: name }];
+		return [{ ...row, context: names }];
 	});
 
 	// Sorted across both sources rather than per source, so the three rows the

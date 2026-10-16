@@ -13,14 +13,17 @@
  * is left to seal; see docs/temporary-code.md.
  */
 
-import { sealRecord } from './crypto/sealed';
+import { forgetInviteKey, inviteVault, recallInviteKey, unwrapInviteKey } from './crypto/invite';
+import { openRecord, sealRecord } from './crypto/sealed';
 import { writeGrantFor } from './crypto/trust.svelte';
 import { blindIndex, type OpenVault } from './crypto/vault';
-import { currentVaults } from './crypto/vaults.svelte';
+import { currentVaults, heldVaultIdentity } from './crypto/vaults.svelte';
 import { selfWriteGrant, type WriteGrant } from './crypto/write-grant';
+import type { PartnerNamesSource, StoredNames } from './partnership';
 import { looksLikeRichTextDocument } from './richtext';
 import { legacyTextToDocument } from './richtext-legacy';
 import type { SealedKind } from './sealed';
+import { partnershipInviteKind, partnershipNamesKind } from './sealed-kinds/partnerships';
 import { normaliseTagName, TAG_NAME_INDEX_PURPOSE, tagKind } from './sealed-kinds/tags';
 import { rewardKind, taskKind } from './sealed-kinds/tasks';
 
@@ -43,6 +46,7 @@ type UnsealedPage = {
 	rewards: { id: string; title: string; description: string | null }[];
 	claims: { id: string; rewardTitle: string; rewardDescription: string | null }[];
 	tags: { id: string; name: string }[];
+	names: PartnerNamesSource | null;
 	next: Cursors | null;
 };
 
@@ -126,8 +130,22 @@ async function sealScope(scopePath: string, writable: Writable): Promise<void> {
 			}[],
 			rewards: [] as { id: string; ciphertext: string; payloadVersion: number }[],
 			claims: [] as { id: string; ciphertext: string; payloadVersion: number }[],
-			tags: [] as { id: string; ciphertext: string; payloadVersion: number; nameIndex: string }[]
+			tags: [] as { id: string; ciphertext: string; payloadVersion: number; nameIndex: string }[],
+			names: undefined as { ciphertext: string; payloadVersion: number } | undefined
 		};
+
+		// The partnership's names, if they are not in its vault yet. Read from
+		// wherever they are now — plaintext from before sealing, or the invite
+		// under its key — and sealed in, which also clears the invite.
+		const namesFrom = page.names;
+		const names = namesFrom ? await readUnsealedNames(namesFrom) : null;
+		if (namesFrom && names) {
+			batch.names = await sealRecord(partnershipNamesKind, {
+				recordId: namesFrom.partnershipId,
+				payload: names,
+				...writable
+			});
+		}
 
 		if (!done.has('tasks')) {
 			for (const row of page.tasks) {
@@ -204,7 +222,8 @@ async function sealScope(scopePath: string, writable: Writable): Promise<void> {
 			batch.completions.length +
 			batch.rewards.length +
 			batch.claims.length +
-			batch.tags.length;
+			batch.tags.length +
+			(batch.names ? 1 : 0);
 		if (any > 0) {
 			const posted = await quietFetch(`/api/sealing/${scopePath}`, {
 				method: 'POST',
@@ -213,6 +232,10 @@ async function sealScope(scopePath: string, writable: Writable): Promise<void> {
 			});
 			if (!posted.ok) {
 				throw new Error(`Could not store sealed content (${posted.status})`);
+			}
+			if (namesFrom && batch.names) {
+				// In the vault now: the key from the link has nothing left to open.
+				forgetInviteKey(namesFrom.partnershipId);
 			}
 		}
 
@@ -229,6 +252,40 @@ async function sealScope(scopePath: string, writable: Writable): Promise<void> {
 			after[kind] = cursor;
 		}
 	}
+}
+
+/**
+ * A partnership's names from wherever they are before the vault, or null when
+ * this device cannot read them — the invitee on a device that never saw the
+ * link, say. The other member's device, or a later load, will move them.
+ */
+async function readUnsealedNames(source: PartnerNamesSource): Promise<StoredNames | null> {
+	if (source.legacy) {
+		const parsed = partnershipNamesKind.latest.safeParse(source.legacy);
+		return parsed.success ? parsed.data : null;
+	}
+	const { invite, partnershipId } = source;
+	if (!invite) {
+		return null;
+	}
+	const held = heldVaultIdentity();
+	const key = invite.keyWrap
+		? held && (await unwrapInviteKey(partnershipId, invite.keyWrap, held.identity))
+		: recallInviteKey(partnershipId);
+	if (!key) {
+		return null;
+	}
+	const opened = await openRecord(partnershipInviteKind, {
+		recordId: partnershipId,
+		ciphertext: invite.ciphertext,
+		payloadVersion: invite.payloadVersion,
+		vault: await inviteVault(partnershipId, key)
+	});
+	if (!opened) {
+		return null;
+	}
+	const { inviterRecipient: _, ...names } = opened;
+	return names;
 }
 
 const started = new Set<string>();

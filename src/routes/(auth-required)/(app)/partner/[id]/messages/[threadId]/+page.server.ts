@@ -73,7 +73,7 @@ export const load: PageServerLoad = async ({ locals, params, depends, platform }
 	return {
 		partner: {
 			id: membership.partnership.id,
-			name: membership.partnership.partnerName,
+			names: membership.partnership.names,
 			// For the read receipt's avatar.
 			image: membership.partnership.counterpart?.image ?? null
 		},

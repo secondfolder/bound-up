@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { partnerName } from '$lib/partner-names.svelte';
 	import { openedWidgetTitle, shownText } from '$lib/sealed-views.svelte';
 	import type { WidgetItemView } from '$lib/types';
 
@@ -33,7 +34,7 @@
 						<!-- Which section this row came from on the page the header links
 						     to. /home merges your things with every partner's, and two
 						     partners can name a task the same thing. -->
-						<span class="context">{item.context}</span>
+						<span class="context">{partnerName(item.context)}</span>
 					{/if}
 				</span>
 				{#if item.note}

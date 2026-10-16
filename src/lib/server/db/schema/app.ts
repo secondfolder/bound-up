@@ -165,6 +165,32 @@ export const partnerships = sqliteTable(
 		inviteToken: text('invite_token').unique(),
 		inviteExpiresAt: integer('invite_expires_at', { mode: 'timestamp_ms' }),
 		acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' }),
+		/**
+		 * The names and roles, sealed in the partnership's vault (kind
+		 * `partnership-names`). Once set, the four name and role columns above
+		 * are empty. No foreign key on the vault: the vault and this row go
+		 * together, with the partnership. See docs/partners.md, "Names are
+		 * sealed".
+		 */
+		namesCiphertext: text('names_ciphertext'),
+		namesVaultId: text('names_vault_id'),
+		namesPayloadVersion: integer('names_payload_version'),
+		/** Bumped by every write of the sealed names, for compare-and-swap. */
+		namesRevision: integer('names_revision').notNull().default(0),
+		/**
+		 * The invite, sealed under the invite key that travels in the link's
+		 * fragment (kind `partnership-invite`): the names before there is a
+		 * vault to put them in. Kept past acceptance until a member's device has
+		 * moved the names into the vault, then cleared.
+		 */
+		inviteCiphertext: text('invite_ciphertext'),
+		invitePayloadVersion: integer('invite_payload_version'),
+		/**
+		 * The invite key, age-encrypted to the inviter's own recipient, so the
+		 * inviter's devices can show the pending invite and copy its link again.
+		 * Cleared with the invite.
+		 */
+		inviteKeyWrap: text('invite_key_wrap'),
 		...timestamps
 	},
 	(table) => [

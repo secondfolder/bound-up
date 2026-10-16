@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import { initialsFor } from '$lib/initials';
+	import { partnerName, viewerNames } from '$lib/partner-names.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -49,13 +50,13 @@
 						>
 							<wa-avatar
 								image={partnership.counterpart?.image ?? undefined}
-								initials={initialsFor(partnership.partnerName)}
-								label={partnership.partnerName}
+								initials={initialsFor(partnerName(partnership.names))}
+								label={partnerName(partnership.names)}
 							></wa-avatar>
 							<span class="who">
-								{partnership.partnerName}
-								{#if partnership.partnerRole}
-									<small>{partnership.partnerRole}</small>
+								{partnerName(partnership.names)}
+								{#if viewerNames(partnership.names)?.partnerRole}
+									<small>{viewerNames(partnership.names)?.partnerRole}</small>
 								{/if}
 							</span>
 							<wa-icon name="chevron-right" variant="solid"></wa-icon>
@@ -76,11 +77,11 @@
 							})}
 						>
 							<wa-avatar
-								initials={initialsFor(partnership.partnerName)}
-								label={partnership.partnerName}
+								initials={initialsFor(partnerName(partnership.names))}
+								label={partnerName(partnership.names)}
 							></wa-avatar>
 							<span class="who">
-								{partnership.partnerName}
+								{partnerName(partnership.names)}
 								<small>Waiting for them to accept</small>
 							</span>
 							<wa-icon name="chevron-right" variant="solid"></wa-icon>

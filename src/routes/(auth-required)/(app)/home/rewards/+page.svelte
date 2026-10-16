@@ -3,6 +3,7 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardCreditsInline from '$lib/components/RewardCreditsInline.svelte';
 	import RewardList from '$lib/components/RewardList.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
@@ -69,7 +70,7 @@
 				<section class="panel partner">
 					<div class="panel-header">
 						<div class="title-row">
-							<h2>{section.name}'s Rewards</h2>
+							<h2>{partnerName(section.names)}'s Rewards</h2>
 							<RewardCreditsInline label="Credits:" unit={null} credits={section.credits} compact />
 						</div>
 						<a
@@ -81,7 +82,7 @@
 
 					<RewardList
 						rewards={section.rewards}
-						emptyMessage={`No claimable rewards from ${section.name} right now.`}
+						emptyMessage={`No claimable rewards from ${partnerName(section.names)} right now.`}
 						claimAction="?/partnerClaimReward"
 						claimPartnershipId={section.partnershipId}
 						editHref={null}

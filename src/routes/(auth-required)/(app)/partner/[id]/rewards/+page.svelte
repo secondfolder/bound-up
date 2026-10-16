@@ -3,9 +3,12 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardCreditsInline from '$lib/components/RewardCreditsInline.svelte';
 	import RewardList from '$lib/components/RewardList.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
+	/** What the viewer calls them, opened in the browser (`partner-names.svelte.ts`). */
+	const partnerShown = $derived(partnerName(data.partner.names));
 	const backHref = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: data.partner.id }));
 	const editHref = (rewardId: string) =>
 		resolve('/(auth-required)/(app)/partner/[id]/rewards/[rewardId]', {
@@ -26,7 +29,7 @@
 	<NestedPageHeader
 		{backHref}
 		backLabel="Back to partner"
-		backText={data.partner.name}
+		backText={partnerShown}
 		title="Rewards"
 		{description}
 	/>
@@ -56,7 +59,7 @@
 		<section class="panel">
 			<div class="panel-header">
 				<div class="title-row">
-					<h2>{data.partner.canClaimRewards ? 'Rewards' : `${data.partner.name}'s Rewards`}</h2>
+					<h2>{data.partner.canClaimRewards ? 'Rewards' : `${partnerShown}'s Rewards`}</h2>
 					{#if data.partner.canClaimRewards}
 						<RewardCreditsInline credits={data.viewerCredits} compact />
 					{:else if data.counterpartCredits !== null && data.counterpartUserId}
@@ -67,9 +70,9 @@
 							compact
 							editable={{
 								action: '?/setCredits',
-								inputLabel: `Set ${data.partner.name}'s reward credits`,
-								editLabel: `Edit ${data.partner.name}'s reward credits`,
-								saveLabel: `Save ${data.partner.name}'s reward credits`,
+								inputLabel: `Set ${partnerShown}'s reward credits`,
+								editLabel: `Edit ${partnerShown}'s reward credits`,
+								saveLabel: `Save ${partnerShown}'s reward credits`,
 								cancelLabel: 'Cancel editing reward credits',
 								targetUserId: data.counterpartUserId
 							}}
@@ -81,13 +84,13 @@
 			{#if data.partner.canClaimRewards && data.counterpartCredits !== null && data.counterpartUserId}
 				<div class="secondary-credit-row">
 					<RewardCreditsInline
-						label={`${data.partner.name}'s credits`}
+						label={`${partnerShown}'s credits`}
 						credits={data.counterpartCredits}
 						editable={{
 							action: '?/setCredits',
-							inputLabel: `Set ${data.partner.name}'s reward credits`,
-							editLabel: `Edit ${data.partner.name}'s reward credits`,
-							saveLabel: `Save ${data.partner.name}'s reward credits`,
+							inputLabel: `Set ${partnerShown}'s reward credits`,
+							editLabel: `Edit ${partnerShown}'s reward credits`,
+							saveLabel: `Save ${partnerShown}'s reward credits`,
 							cancelLabel: 'Cancel editing reward credits',
 							targetUserId: data.counterpartUserId
 						}}

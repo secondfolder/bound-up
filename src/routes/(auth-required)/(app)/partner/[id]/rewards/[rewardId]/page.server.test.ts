@@ -65,7 +65,11 @@ describe('load', () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
 		const reward = await createTestPartnershipReward(db, id, ada, { cost: 2 });
 		await expect(runLoad(load(at(id, reward.id, ada)))).resolves.toMatchObject({
-			partner: { id, name: 'Them', canManageRewards: true },
+			partner: {
+				id,
+				names: expect.objectContaining({ partnershipId: id, role: 'inviter' }),
+				canManageRewards: true
+			},
 			reward: {
 				id: reward.id,
 				cost: 2,

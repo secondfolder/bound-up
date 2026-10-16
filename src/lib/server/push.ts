@@ -236,7 +236,6 @@ export async function sendPush(
 	input: {
 		userId: string;
 		kind: PushKind;
-		partnerName: string;
 		threadId: string;
 		url: string;
 		/** Devices already watching the board, which do not need telling. */
@@ -350,11 +349,8 @@ export function watchingDevices(watching: readonly Watcher[], recipientId: strin
  * whose return value is `watching`. Returns at once: the sending is handed to
  * `inBackground`.
  *
- * The name comes from the *sender's* view of the partnership, and that is
- * correct rather than backwards: `yourName` is "what the other person calls
- * the viewer", and the other person is exactly who is being notified. It still
- * goes through `viewPartnership()` like every other name, never the raw
- * columns.
+ * Names nobody: the server cannot read the partnership's names, and the text
+ * says only "New message" or "New reaction" (`buildPushContent`).
  */
 export function notifyPartner(
 	event: { locals: App.Locals; platform?: App.Platform | undefined; url: URL },
@@ -387,7 +383,6 @@ export function notifyPartner(
 		sendPush(event.locals.db, vapid, {
 			userId: recipientId,
 			kind: input.kind,
-			partnerName: input.partnership.yourName,
 			threadId: input.threadId,
 			url,
 			skipDeviceIds: watchingDevices(input.watching, recipientId)

@@ -23,6 +23,7 @@ import {
 	setTestSelfRewardCredits,
 	type TestUser
 } from '../testing/fixtures';
+import { testPartnerView } from '../testing/names';
 import { partnerships } from './db/schema';
 import {
 	claimPartnershipReward,
@@ -475,7 +476,8 @@ describe('partnership rewards', () => {
 		expect(page).toMatchObject({
 			partner: {
 				id: claimantView,
-				name: 'Them',
+				// Ada is the inviter, so the source is read from her end.
+				names: expect.objectContaining({ partnershipId: claimantView, role: 'inviter' }),
 				canManageRewards: false,
 				canClaimRewards: true
 			},
@@ -513,12 +515,16 @@ describe('home rewards aggregation', () => {
 			.where(eq(partnerships.id, withPat));
 
 		const sections = await listHomePartnerRewardSections(harness.db, ada.id, [
-			{ id: withCas, name: 'Cas', image: null },
-			{ id: withJun, name: 'Jun', image: null },
-			{ id: withPat, name: 'Pat', image: null }
+			testPartnerView(withCas, 'Cas'),
+			testPartnerView(withJun, 'Jun'),
+			testPartnerView(withPat, 'Pat')
 		]);
 
-		expect(sections.map((section) => section.name)).toEqual(['Cas', 'Jun']);
+		// The names are passed through untouched: the server cannot read them.
+		expect(sections.map((section) => section.names)).toEqual([
+			testPartnerView(withCas, 'Cas').names,
+			testPartnerView(withJun, 'Jun').names
+		]);
 		expect(sections[0]).toMatchObject({
 			partnershipId: withCas,
 			credits: 3,
@@ -632,13 +638,16 @@ describe('reward widgets', () => {
 		await setTestPartnershipRewardCredits(harness.db, partnershipId, jun, ada, 2);
 
 		const widget = await getHomeRewardsWidget(harness.db, ada.id, [
-			{ id: partnershipId, name: 'Jun', image: null }
+			testPartnerView(partnershipId, 'Jun')
 		]);
 
 		expect(widget.activeCount).toBe(2);
 		expect(widget.claimable).toEqual([
 			// Cheapest first across BOTH sources, not self first.
-			expect.objectContaining({ id: juns.id, context: 'Jun' }),
+			expect.objectContaining({
+				id: juns.id,
+				context: testPartnerView(partnershipId, 'Jun').names
+			}),
 			expect.objectContaining({ id: own.id, context: null })
 		]);
 	});
@@ -656,7 +665,7 @@ describe('reward widgets', () => {
 		await setTestPartnershipRewardCredits(harness.db, partnershipId, jun, ada, 2);
 
 		const widget = await getHomeRewardsWidget(harness.db, ada.id, [
-			{ id: partnershipId, name: 'Jun', image: null }
+			testPartnerView(partnershipId, 'Jun')
 		]);
 		// Unaffordable, so it is not offered and not counted anywhere the card
 		// can render — only `activeCount`, which the claiming side never shows.
@@ -664,7 +673,7 @@ describe('reward widgets', () => {
 		// And both balances are reported separately, so the card can show them.
 		expect(widget.balances).toEqual([
 			{ id: 'self', label: null, credits: 5 },
-			{ id: partnershipId, label: 'Jun', credits: 2 }
+			{ id: partnershipId, label: testPartnerView(partnershipId, 'Jun').names, credits: 2 }
 		]);
 	});
 
@@ -673,7 +682,7 @@ describe('reward widgets', () => {
 		await createTestPartnershipReward(harness.db, partnershipId, ada);
 
 		const widget = await getHomeRewardsWidget(harness.db, ada.id, [
-			{ id: partnershipId, name: 'Jun', image: null }
+			testPartnerView(partnershipId, 'Jun')
 		]);
 		expect(widget).toMatchObject({ activeCount: 0, claimable: [] });
 		// No balance line either: a balance with nothing to spend it on is a

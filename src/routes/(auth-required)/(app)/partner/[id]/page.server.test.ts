@@ -34,34 +34,38 @@ const at = (id: string, user: TestUser | null) => fakeEvent({ db, user, params: 
 
 test('shows each side their own view of the same link', async () => {
 	const { id } = await createTestPartnership(db, ada, jun, {
-		yourName: 'Ada',
-		partnerName: 'Jun',
-		partnerRole: 'sub',
-		yourRole: 'dom',
+		legacyNames: {
+			inviterName: 'Ada',
+			inviteeName: 'Jun',
+			inviterRole: 'dom',
+			inviteeRole: 'sub'
+		},
 		control: 'me'
 	});
+	const legacy = { inviterName: 'Ada', inviteeName: 'Jun', inviterRole: 'dom', inviteeRole: 'sub' };
 
 	expect((await runLoad(load(at(id, ada)))).partner).toEqual({
 		id,
-		name: 'Jun',
-		yourName: 'Ada',
+		names: { partnershipId: id, role: 'inviter', sealed: null, invite: null, legacy },
 		image: null,
 		timezone: 'America/New_York',
-		partnerRole: 'sub',
-		yourRole: 'dom',
 		canEdit: true
 	});
 
 	expect((await runLoad(load(at(id, jun)))).partner).toEqual({
 		id,
-		name: 'Ada',
-		yourName: 'Jun',
+		names: { partnershipId: id, role: 'invitee', sealed: null, invite: null, legacy },
 		image: '/ada.png',
 		timezone: 'Europe/London',
-		partnerRole: 'dom',
-		yourRole: 'sub',
 		canEdit: false
 	});
+});
+
+test('hands over sealed names without a key wrap to the invitee', async () => {
+	const { id } = await createTestPartnership(db, ada, jun);
+	const { partner } = await runLoad(load(at(id, jun)));
+	expect(partner.names.invite?.keyWrap).toBeNull();
+	expect(partner.names.legacy).toBeNull();
 });
 
 /**

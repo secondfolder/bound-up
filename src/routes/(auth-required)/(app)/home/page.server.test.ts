@@ -16,6 +16,8 @@ import {
 	setTestSelfRewardCredits,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { testPartnerView } from '$lib/testing/names';
+import type { PartnerView } from '$lib/types';
 import { load } from './+page.server';
 
 let harness: TestDb;
@@ -32,11 +34,7 @@ beforeEach(async () => {
 
 afterEach(() => harness.close());
 
-function at(
-	user: TestUser | null,
-	partners = [] as { id: string; name: string; image: string | null }[],
-	features = [] as FeatureKey[]
-) {
+function at(user: TestUser | null, partners = [] as PartnerView[], features = [] as FeatureKey[]) {
 	return fakeEvent({ db, user, path: '/home', parentData: { partners, features } });
 }
 
@@ -45,11 +43,11 @@ describe('load', () => {
 		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
 		await createTestThread(db, id, jun, { at: new Date('2026-09-13T12:00:00Z') });
 
-		const data = await runLoad(load(at(ada, [{ id, name: 'Jun', image: null }])));
+		const data = await runLoad(load(at(ada, [testPartnerView(id, 'Jun')])));
 		expect(data.unread).toContainEqual(
 			expect.objectContaining({
 				partnershipId: id,
-				name: 'Jun',
+				names: testPartnerView(id, 'Jun').names,
 				unreadThreads: 1
 			})
 		);
@@ -116,21 +114,21 @@ describe('load', () => {
 		const junsReward = await createTestPartnershipReward(db, id, jun, { cost: 1 });
 		await setTestPartnershipRewardCredits(db, id, jun, ada, 1);
 
-		const data = await runLoad(load(at(ada, [{ id, name: 'Jun', image: null }])));
+		const data = await runLoad(load(at(ada, [testPartnerView(id, 'Jun')])));
 
 		expect(data.tasks.ready).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ id: own.id, context: null }),
-				expect.objectContaining({ id: junsTask.id, context: 'Jun' })
+				expect.objectContaining({ id: junsTask.id, context: testPartnerView(id, 'Jun').names })
 			])
 		);
 		expect(data.rewards.claimable).toEqual([
-			expect.objectContaining({ id: junsReward.id, context: 'Jun' })
+			expect.objectContaining({ id: junsReward.id, context: testPartnerView(id, 'Jun').names })
 		]);
 		// Both balances, separately — partnership credits do not buy self rewards.
 		expect(data.rewards.balances).toEqual([
 			{ id: 'self', label: null, credits: 0 },
-			{ id, label: 'Jun', credits: 1 }
+			{ id, label: testPartnerView(id, 'Jun').names, credits: 1 }
 		]);
 	});
 

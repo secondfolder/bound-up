@@ -84,7 +84,11 @@ describe('load', () => {
 		const task = await createTestPartnershipTask(db, id, ada, { creditsAwarded: 4 });
 
 		await expect(runLoad(load(at(id, task.id, ada)))).resolves.toMatchObject({
-			partner: { id, name: 'Them', canManageTasks: true },
+			partner: {
+				id,
+				names: expect.objectContaining({ partnershipId: id, role: 'inviter' }),
+				canManageTasks: true
+			},
 			task: {
 				id: task.id,
 				revision: 0,

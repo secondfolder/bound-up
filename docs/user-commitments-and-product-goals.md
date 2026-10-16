@@ -112,6 +112,14 @@ In other words, this class of data should be treated as end-to-end encrypted in
 the product sense: the app stores ciphertext and should have no routine access
 to the contents.
 
+Today that covers everything a user writes for themselves or their partner:
+messages and their attachments, tasks, rewards and their history, message tag
+names, and the names and roles two partners give each other. All of it is
+sealed in a vault the server cannot open (docs/encryption.md, "Vaults"). New
+user-authored content should be sealed the same way from the start; the server
+keeps in plaintext only what it has to act on — schedules, costs, credits,
+permissions — and validates the sealed part only for size and shape.
+
 When implementing that, be precise about the guarantee and document the exact
 boundary the same way [`docs/encryption.md`](encryption.md) does. That document
 spells out the difference between "the server stores ciphertext only" and the

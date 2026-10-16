@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
+import { legacyNamesSource } from '$lib/testing/names';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
@@ -8,7 +9,7 @@ const { default: UnreadMessagesWidget } = await import('./UnreadMessagesWidget.s
 
 const jun = {
 	partnershipId: 'p1',
-	name: 'Jun',
+	names: legacyNamesSource('p1', { partnerName: 'Jun' }),
 	image: null,
 	unreadThreads: 2,
 	newestAt: new Date('2026-09-13T12:00:00Z')

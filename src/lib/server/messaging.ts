@@ -678,7 +678,7 @@ export async function listUnreadCounts(
 		return [
 			{
 				partnershipId: partner.id,
-				name: partner.name,
+				names: partner.names,
 				image: partner.image,
 				unreadThreads: Number(row.unreadThreads),
 				newestAt: new Date(Number(row.newestAt))

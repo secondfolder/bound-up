@@ -61,7 +61,6 @@ async function subscribe(owner: TestUser, browser?: TestBrowserSubscription) {
 
 const message = {
 	kind: 'message' as const,
-	partnerName: 'Ada',
 	threadId: '0b5f6c1e-6a7d-4c43-9a3b-2f1f0e8d9c7b',
 	url: 'https://app.test/partner/p/messages/t'
 };
@@ -168,7 +167,7 @@ describe('checkPushOwnership', () => {
 });
 
 describe('sendPush', () => {
-	it('sends each device a payload only it can open, naming the partner and nothing else', async () => {
+	it('sends each device a payload only it can open, saying nothing about who or what', async () => {
 		const { browser } = await subscribe(bo);
 		const service = createTestPushService();
 
@@ -186,7 +185,7 @@ describe('sendPush', () => {
 		expect(await decryptPush(browser, request.body)).toEqual({
 			web_push: 8030,
 			notification: {
-				title: 'New message from Ada',
+				title: 'New message',
 				navigate: message.url,
 				tag: `thread-${message.threadId}`,
 				lang: 'en'
@@ -212,7 +211,7 @@ describe('sendPush', () => {
 		expect(outcome.sent).toBe(1);
 		expect(service.received.map((request) => request.endpoint)).toEqual([target.browser.endpoint]);
 		const payload = await decryptPush(target.browser, defined(service.received[0], 'push').body);
-		expect(payload).toMatchObject({ notification: { title: 'Ada reacted to your message' } });
+		expect(payload).toMatchObject({ notification: { title: 'New reaction' } });
 	});
 
 	it('deletes a device the push service says is gone, and keeps one that merely failed', async () => {
@@ -256,12 +255,12 @@ describe('watchingDevices', () => {
 });
 
 describe('notifyPartner', () => {
-	it('names the sender as the recipient calls them, and runs in the background', async () => {
-		// Ada invited Bo and calls him "Bo"; Bo's name for Ada is "Ada". Distinct
-		// names on purpose: reading the wrong column would give a wrong title.
+	it('names nobody, and runs in the background', async () => {
+		// Plaintext names on purpose, from before sealing: even when the server
+		// could read them, a notification must not carry them, since it is
+		// shown on a lock screen and passes through the push service.
 		const { id } = await createTestPartnership(db, ada, bo, {
-			partnerName: 'Bobby',
-			yourName: 'Ace'
+			legacyNames: { inviterName: 'Ace', inviteeName: 'Bobby' }
 		});
 		const membership = defined(await requireMembership(db, id, ada.id), 'membership');
 		const { browser } = await subscribe(bo);
@@ -290,11 +289,12 @@ describe('notifyPartner', () => {
 		const payload = await decryptPush(browser, defined(service.received[0], 'push').body);
 		expect(payload).toMatchObject({
 			notification: {
-				title: 'New message from Ace',
+				title: 'New message',
 				// The board, which sends an opened thread on and highlights a new one.
 				navigate: `https://app.test/partner/${id}/messages?thread=t-1`
 			}
 		});
+		expect(JSON.stringify(payload)).not.toMatch(/Ace|Bobby/);
 	});
 
 	it('does nothing when push is not set up on this server', async () => {

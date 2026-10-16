@@ -70,9 +70,14 @@
 	// the live connection. A task being edited is mounted only once it is
 	// opened (see the edit pages), so its content is here from the start, and
 	// the form's own "unsaved changes" baseline includes it.
+	// The opened task gets a distinct id because it is merged into a copy:
+	// superforms recognises its initial form by identity, so the original still
+	// in `page.data` under the same id would read as an update and be written
+	// over the opened content as soon as the page store ticked.
 	const initial: SuperValidated<TaskEditorFormValues> = task
 		? {
 				...taskForm,
+				id: `${taskForm.id}:opened`,
 				data: {
 					...taskForm.data,
 					title: task.content.title,

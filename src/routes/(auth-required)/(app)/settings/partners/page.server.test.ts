@@ -26,18 +26,17 @@ beforeEach(async () => {
 afterEach(() => harness.close());
 
 test('lists both linked partners and outstanding invites', async () => {
-	await createTestPartnership(db, ada, jun, { partnerName: 'Jun' });
-	await createTestInvite(db, ada, { partnerName: 'Kit' });
+	const linked = await createTestPartnership(db, ada, jun);
+	const invite = await createTestInvite(db, ada);
 
 	const { partnerships } = await runLoad(load(fakeEvent({ db, user: ada })));
 
 	expect(partnerships).toHaveLength(2);
-	expect(partnerships.find((p: PartnershipView) => p.status === 'accepted')?.partnerName).toBe(
-		'Jun'
-	);
-	expect(partnerships.find((p: PartnershipView) => p.status === 'pending')?.partnerName).toBe(
-		'Kit'
-	);
+	expect(partnerships.find((p: PartnershipView) => p.status === 'accepted')?.id).toBe(linked.id);
+	// The names come as the sealed invite, for the inviter's browser to open.
+	expect(
+		partnerships.find((p: PartnershipView) => p.status === 'pending')?.names.invite?.ciphertext
+	).toBe(invite.inviteCiphertext);
 });
 
 test('shows nothing to a user with no partners', async () => {

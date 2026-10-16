@@ -1,13 +1,17 @@
-import { error } from '@sveltejs/kit';
-import { fail, message, superValidate } from 'sveltekit-superforms';
+import { error, fail as kitFail } from '@sveltejs/kit';
+import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { inviteUrl } from '$lib/invite-url';
 import { controlFromAnswer } from '$lib/partnership';
-import { partnerInviteFormSchema } from '$lib/schemas/partnerForm';
+import {
+	formFields,
+	partnerInviteFormSchema,
+	partnerInviteSealedSchema
+} from '$lib/schemas/partnerForm';
 import { createInvite } from '$lib/server/partnerships';
 import type { Actions, PageServerLoad } from './$types';
 
-/** The payload `message()` carries back so the page can open the share sheet. */
+/** What the action hands back so the page can open the share sheet. */
 export type InviteCreated = { partnershipId: string; url: string };
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -38,30 +42,39 @@ export const actions: Actions = {
 			error(401, 'Not signed in');
 		}
 
-		const partnerInviteForm = await superValidate(request, zod4(partnerInviteFormSchema));
-		if (!partnerInviteForm.valid) {
-			return fail(400, { partnerInviteForm });
+		// The names arrive sealed under the invite key, which stays in the
+		// browser; see `partnerInviteSealedSchema`.
+		const parsed = partnerInviteSealedSchema.safeParse(formFields(await request.formData()));
+		if (!parsed.success) {
+			return kitFail(400, { error: 'That invite could not be made. Reload and try again.' });
 		}
-
-		const { partnerName, yourName, partnerRole, yourRole, control } = partnerInviteForm.data;
+		const { id, control, inviteCiphertext, invitePayloadVersion, inviteKeyWrap } = parsed.data;
 		const invite = await createInvite(locals.db, {
+			id,
 			inviterId: locals.user.id,
-			inviteeName: partnerName,
-			inviterName: yourName,
-			inviteeRole: partnerRole,
-			inviterRole: yourRole,
 			// The person adding the partner is always the inviter, so "me" is
 			// 'inviter' here.
-			control: controlFromAnswer(control, 'inviter')
+			control: controlFromAnswer(control, 'inviter'),
+			invite: {
+				ciphertext: inviteCiphertext,
+				payloadVersion: invitePayloadVersion,
+				keyWrap: inviteKeyWrap
+			}
 		});
+		if (!invite.ok) {
+			return kitFail(400, { error: 'That invite could not be made. Reload and try again.' });
+		}
 
 		// Deliberately NOT a redirect. `navigator.share()` needs transient user
 		// activation, and a 303 plus a fresh page load loses it — returning the
 		// link to the submitting page keeps the share attempt inside the click
-		// that caused it. The page navigates itself afterwards.
-		return message(partnerInviteForm, {
-			partnershipId: invite.id,
-			url: inviteUrl(url.origin, invite.inviteToken)
-		} satisfies InviteCreated);
+		// that caused it. The page navigates itself afterwards, and adds the
+		// invite key to the link first: the server never has it.
+		return {
+			created: {
+				partnershipId: invite.id,
+				url: inviteUrl(url.origin, invite.inviteToken)
+			} satisfies InviteCreated
+		};
 	}
 };

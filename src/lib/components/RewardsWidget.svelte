@@ -1,6 +1,7 @@
 <script lang="ts">
 	import SectionWidget from '$lib/components/SectionWidget.svelte';
 	import WidgetItems from '$lib/components/WidgetItems.svelte';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { RewardsWidgetView } from '$lib/types';
 
 	let {
@@ -52,7 +53,7 @@
 					<li>
 						<strong>{balance.credits}</strong>
 						{#if balance.label}
-							<span class="whose">with {balance.label}</span>
+							<span class="whose">with {partnerName(balance.label)}</span>
 						{:else}
 							credit{balance.credits === 1 ? '' : 's'}
 						{/if}

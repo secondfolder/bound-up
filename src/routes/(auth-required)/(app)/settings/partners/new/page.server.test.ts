@@ -4,20 +4,34 @@ import { listPartnershipsForUser } from '$lib/server/partnerships';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
-import { createTestUser, readPartnershipRow, type TestUser } from '$lib/testing/fixtures';
-import { actions, load } from './+page.server';
+import {
+	createTestInvite,
+	createTestUser,
+	FAKE_INVITE_KEY_WRAP,
+	fakeSealed,
+	readPartnershipRow,
+	type TestUser
+} from '$lib/testing/fixtures';
+import { actions, type InviteCreated, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
 let ada: TestUser;
 
-const answers = {
-	partnerName: 'Jun',
-	yourName: 'Ada',
-	partnerRole: 'sub',
-	yourRole: 'dom',
-	control: 'me'
-};
+/**
+ * What the browser posts: the names sealed under an invite key the server never
+ * sees, that key wrapped to the inviter, and the id the invite was sealed to.
+ */
+function sealedPost(overrides: Record<string, string> = {}): Record<string, string> {
+	return {
+		id: crypto.randomUUID(),
+		control: 'me',
+		inviteCiphertext: fakeSealed('invite'),
+		invitePayloadVersion: '1',
+		inviteKeyWrap: FAKE_INVITE_KEY_WRAP,
+		...overrides
+	};
+}
 
 beforeEach(async () => {
 	harness = await createTestDb();
@@ -31,6 +45,14 @@ afterEach(() => harness.close());
 // know that — one cast here beats one per call.
 const submit = (formData: Record<string, string>, user: TestUser | null = ada) =>
 	runAction(actions, 'default', fakeEvent({ db, user, formData, path: '/settings/partners/new' }));
+
+/** The created invite, or a failure naming what came back instead. */
+function createdFrom(result: unknown): InviteCreated {
+	if (typeof result === 'object' && result !== null && 'created' in result) {
+		return (result as { created: InviteCreated }).created;
+	}
+	throw new Error(`expected an invite to be created, got ${JSON.stringify(result)}`);
+}
 
 describe('load', () => {
 	it('defaults the control question to a mix', async () => {
@@ -53,81 +75,97 @@ describe('load', () => {
 
 describe('the create action', () => {
 	it('creates a pending invite and hands back a shareable link', async () => {
-		const result = await submit(answers);
+		const post = sealedPost();
+		const created = createdFrom(await submit(post));
 
-		const created = result.form.message;
-		expect(created.partnershipId).toEqual(expect.any(String));
+		// The id the browser chose, since the invite was sealed to it.
+		expect(created.partnershipId).toBe(post.id);
 		expect(created.url).toMatch(/^https:\/\/app\.test\/invite\/[A-Za-z0-9_-]+$/);
 
 		const row = await readPartnershipRow(db, created.partnershipId);
 		expect(row.status).toBe('pending');
 		expect(row.inviterId).toBe(ada.id);
-		expect(row.inviterName).toBe('Ada');
-		expect(row.inviteeName).toBe('Jun');
-		expect(row.inviteeRole).toBe('sub');
-		expect(row.inviterRole).toBe('dom');
+	});
+
+	it('stores the names only as the sealed invite', async () => {
+		const post = sealedPost();
+		const created = createdFrom(await submit(post));
+
+		const row = await readPartnershipRow(db, created.partnershipId);
+		expect(row.inviteCiphertext).toBe(post.inviteCiphertext);
+		expect(row.invitePayloadVersion).toBe(1);
+		expect(row.inviteKeyWrap).toBe(FAKE_INVITE_KEY_WRAP);
+		expect(row.inviterName).toBe('');
+		expect(row.inviteeName).toBe('');
+		expect(row.inviterRole).toBeNull();
+		expect(row.inviteeRole).toBeNull();
 	});
 
 	it('the link in the message actually resolves to the stored token', async () => {
-		const result = await submit(answers);
-		const row = await readPartnershipRow(db, result.form.message.partnershipId);
-		expect(result.form.message.url).toContain(
-			encodeURIComponent(defined(row.inviteToken, 'the invite token'))
-		);
+		const created = createdFrom(await submit(sealedPost()));
+		const row = await readPartnershipRow(db, created.partnershipId);
+		expect(created.url).toContain(encodeURIComponent(defined(row.inviteToken, 'the invite token')));
+		// The invite key is added by the page, in the fragment: the server never has it.
+		expect(created.url).not.toContain('#');
 	});
 
 	it('builds the link on the request origin, not a hard-coded host', async () => {
 		const result = await runAction(
 			actions,
 			'default',
-			fakeEvent({ db, user: ada, formData: answers, origin: 'http://localhost:5173' })
+			fakeEvent({ db, user: ada, formData: sealedPost(), origin: 'http://localhost:5173' })
 		);
-		expect(result.form.message.url).toMatch(/^http:\/\/localhost:5173\/invite\//);
+		expect(createdFrom(result).url).toMatch(/^http:\/\/localhost:5173\/invite\//);
 	});
 
 	it('"me" stores control against the inviter role', async () => {
-		const result = await submit({ ...answers, control: 'me' });
-		expect((await readPartnershipRow(db, result.form.message.partnershipId)).control).toBe(
-			'inviter'
-		);
+		const created = createdFrom(await submit(sealedPost({ control: 'me' })));
+		expect((await readPartnershipRow(db, created.partnershipId)).control).toBe('inviter');
 	});
 
 	it('"them" stores control against the invitee role', async () => {
-		const result = await submit({ ...answers, control: 'them' });
-		expect((await readPartnershipRow(db, result.form.message.partnershipId)).control).toBe(
-			'invitee'
-		);
+		const created = createdFrom(await submit(sealedPost({ control: 'them' })));
+		expect((await readPartnershipRow(db, created.partnershipId)).control).toBe('invitee');
 	});
 
 	it('"mix" stores shared control', async () => {
-		const result = await submit({ ...answers, control: 'mix' });
-		expect((await readPartnershipRow(db, result.form.message.partnershipId)).control).toBe('both');
+		const created = createdFrom(await submit(sealedPost({ control: 'mix' })));
+		expect((await readPartnershipRow(db, created.partnershipId)).control).toBe('both');
 	});
 
-	it('an omitted role is stored as NULL, not an empty string', async () => {
-		const result = await submit({ ...answers, partnerRole: '', yourRole: '' });
-		const row = await readPartnershipRow(db, result.form.message.partnershipId);
-		expect(row.inviteeRole).toBeNull();
-		expect(row.inviterRole).toBeNull();
-	});
-
-	it('rejects a blank name without writing anything', async () => {
-		const result = await submit({ ...answers, partnerName: '   ' });
-		expect(result.status).toBe(400);
+	it.each([
+		['plaintext names in place of the sealed invite', { inviteCiphertext: 'Jun' }],
+		['a missing key wrap', { inviteKeyWrap: '' }],
+		['a key wrap that is not base64', { inviteKeyWrap: 'not base64!' }],
+		['an id that is not a UUID', { id: 'p1' }],
+		['an unknown payload version', { invitePayloadVersion: '99' }]
+	])('rejects %s without writing anything', async (_label, override) => {
+		const result = await submit(sealedPost(override));
+		expect(result).toMatchObject({ status: 400, data: { error: expect.any(String) } });
 		expect(await listPartnershipsForUser(db, ada.id)).toEqual([]);
+	});
+
+	it('rejects an id that is already taken, leaving that invite alone', async () => {
+		const existing = await createTestInvite(db, ada);
+		const result = await submit(sealedPost({ id: existing.id }));
+
+		expect(result).toMatchObject({ status: 400 });
+		expect((await readPartnershipRow(db, existing.id)).inviteCiphertext).toBe(
+			existing.inviteCiphertext
+		);
 	});
 
 	it('rejects a control value that is not one of the three answers', async () => {
 		// 'inviter' is the stored form of the answer. Accepting it here would be
 		// a way to set control without going through controlFromAnswer.
-		const result = await submit({ ...answers, control: 'inviter' });
-		expect(result.status).toBe(400);
+		const result = await submit(sealedPost({ control: 'inviter' }));
+		expect(result).toMatchObject({ status: 400 });
 	});
 
 	it('refuses to run without a session', async () => {
 		// Form actions run BEFORE layout loads, so the (auth-required) group
 		// guard has not fired yet. This check is the only thing standing here.
-		const result = await runAndCatch(() => submit(answers, null));
+		const result = await runAndCatch(() => submit(sealedPost(), null));
 		expect(result).toMatchObject({ type: 'error', status: 401 });
 	});
 });

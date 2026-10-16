@@ -31,6 +31,7 @@ import {
 	type TestUser
 } from '../testing/fixtures';
 import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '../testing/media';
+import { legacyNamesSource } from '../testing/names';
 import {
 	accountRecoveryRequests,
 	messageAttachments,
@@ -102,7 +103,11 @@ const reaction = (label: string) => ({
 });
 
 const at = (ms: number) => new Date(ms);
-const partnerView = (id: string) => ({ id, name: 'Jun', image: null });
+const partnerView = (id: string) => ({
+	id,
+	names: legacyNamesSource(id, { partnerName: 'Jun' }),
+	image: null
+});
 
 beforeEach(async () => {
 	harness = await createTestDb();
@@ -783,7 +788,8 @@ describe('listUnreadCounts', () => {
 		expect(forAda).toEqual([
 			{
 				partnershipId,
-				name: 'Jun',
+				// Passed through from the partner list: the server cannot read it.
+				names: partnerView(partnershipId).names,
 				image: null,
 				unreadThreads: 2,
 				newestAt: at(3000)
@@ -1760,7 +1766,11 @@ describe('getPartnerMessagesWidget', () => {
 		// The same number the /home card shows for the same partnership. These
 		// two predicates have to stay identical or the two screens disagree.
 		const [fromHome] = await listUnreadCounts(harness.db, jun.id, [
-			{ id: partnershipId, name: 'Ada', image: null }
+			{
+				id: partnershipId,
+				names: legacyNamesSource(partnershipId, { partnerName: 'Ada' }),
+				image: null
+			}
 		]);
 		expect(fromHome.unreadThreads).toBe(junsWidget.unreadThreads);
 	});

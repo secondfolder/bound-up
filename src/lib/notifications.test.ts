@@ -11,12 +11,12 @@ const threadId = '0b5f6c1e-6a7d-4c43-9a3b-2f1f0e8d9c7b';
 const url = 'https://app.test/partner/p/messages/t';
 
 describe('buildPushContent', () => {
-	it('says who sent a message, and nothing about what it said', () => {
-		const content = buildPushContent({ kind: 'message', partnerName: 'Sam', threadId, url });
+	it('says a message arrived, and nothing about who sent it or what it said', () => {
+		const content = buildPushContent({ kind: 'message', threadId, url });
 		expect(content.payload).toEqual({
 			web_push: 8030,
 			notification: {
-				title: 'New message from Sam',
+				title: 'New message',
 				navigate: url,
 				tag: `thread-${threadId}`,
 				lang: 'en'
@@ -27,8 +27,8 @@ describe('buildPushContent', () => {
 	});
 
 	it('words a new thread the same as a reply', () => {
-		const thread = buildPushContent({ kind: 'thread', partnerName: 'Sam', threadId, url });
-		const reply = buildPushContent({ kind: 'message', partnerName: 'Sam', threadId, url });
+		const thread = buildPushContent({ kind: 'thread', threadId, url });
+		const reply = buildPushContent({ kind: 'message', threadId, url });
 		expect(thread).toEqual(reply);
 	});
 
@@ -37,9 +37,9 @@ describe('buildPushContent', () => {
 	 * push service, and its tag would let it hide one already on screen.
 	 */
 	it('keeps a reaction from replacing a message notification', () => {
-		const reaction = buildPushContent({ kind: 'reaction', partnerName: 'Sam', threadId, url });
-		const message = buildPushContent({ kind: 'message', partnerName: 'Sam', threadId, url });
-		expect(reaction.payload.notification.title).toBe('Sam reacted to your message');
+		const reaction = buildPushContent({ kind: 'reaction', threadId, url });
+		const message = buildPushContent({ kind: 'message', threadId, url });
+		expect(reaction.payload.notification.title).toBe('New reaction');
 		expect(reaction.topic).toBeUndefined();
 		expect(reaction.payload.notification.tag).not.toBe(message.payload.notification.tag);
 		expect(reaction.urgency).toBe('normal');
@@ -56,7 +56,7 @@ describe('pushTopic', () => {
 
 describe('parsePushPayload', () => {
 	it('reads back what the server sends', () => {
-		const { payload } = buildPushContent({ kind: 'message', partnerName: 'Sam', threadId, url });
+		const { payload } = buildPushContent({ kind: 'message', threadId, url });
 		expect(parsePushPayload(payload)).toEqual(payload.notification);
 	});
 

@@ -22,17 +22,67 @@ export type ControlAnswer = 'me' | 'them' | 'mix';
 /** Either end of a link. Stable for the life of the row — see schema/app.ts. */
 export type PartnershipRole = 'inviter' | 'invitee';
 
-/** The stored columns `viewPartnership` needs. A subset of the Drizzle row. */
-export type PartnershipRecord = {
-	id: string;
-	status: PartnershipStatus;
-	inviterId: string;
-	inviteeId: string | null;
+/**
+ * The four names and roles, stored per *role*: `inviterName` is what the
+ * invitee calls the inviter, and so on. Which of them is "theirs" flips with
+ * who is looking, so nothing reads them except through `namesForViewer`.
+ */
+export type StoredNames = {
 	inviterName: string;
 	inviteeName: string;
 	inviterRole: string | null;
 	inviteeRole: string | null;
+};
+
+/** The names as one member sees them. */
+export type ViewerNames = {
+	/** What the viewer calls the other person. */
+	partnerName: string;
+	/** What the other person calls the viewer. */
+	yourName: string;
+	/** The other person's role in the connection. Optional. */
+	partnerRole: string | null;
+	/** The viewer's role in the connection. Optional. */
+	yourRole: string | null;
+};
+
+/**
+ * Where a partnership's names can be read from, for one viewer.
+ *
+ * The names are end-to-end encrypted (docs/partners.md, "Names are sealed"),
+ * so the server hands this over and the browser opens it
+ * (`partner-names.svelte.ts`). At most one of the three is set:
+ *
+ * - `sealed` — sealed in the partnership's vault: where they live for good.
+ * - `invite` — sealed under the invite key, before a member's device has moved
+ *   them into the vault. `keyWrap` is the key wrapped to the inviter, and is
+ *   only ever handed to the inviter; the invitee keeps the key from the link.
+ * - `legacy` — a partnership from before names were sealed, in plaintext until
+ *   a member's device seals it.
+ */
+export type PartnerNamesSource = {
+	partnershipId: string;
+	/** The viewer's end of the link: which stored name is whose. */
+	role: PartnershipRole;
+	sealed: { vaultId: string; ciphertext: string; payloadVersion: number; revision: number } | null;
+	invite: { ciphertext: string; payloadVersion: number; keyWrap: string | null } | null;
+	legacy: StoredNames | null;
+};
+
+/** The stored columns `viewPartnership` needs. A subset of the Drizzle row. */
+export type PartnershipRecord = StoredNames & {
+	id: string;
+	status: PartnershipStatus;
+	inviterId: string;
+	inviteeId: string | null;
 	control: PartnershipControl;
+	namesCiphertext: string | null;
+	namesVaultId: string | null;
+	namesPayloadVersion: number | null;
+	namesRevision: number;
+	inviteCiphertext: string | null;
+	invitePayloadVersion: number | null;
+	inviteKeyWrap: string | null;
 };
 
 /** The other person in the link, as much of them as a screen may show. */
@@ -50,20 +100,16 @@ export type PartnershipCounterpart = {
  * `/settings/partners/[id]` are keyed on, so that a link can be addressed
  * before the second user exists and so that neither member's user id is ever
  * put in a URL.
+ *
+ * The names are not here: the server cannot read them. `names` says where the
+ * viewer's browser can.
  */
 export type PartnershipView = {
 	id: string;
 	status: PartnershipStatus;
 	role: PartnershipRole;
 	control: PartnershipControl;
-	/** What the viewer calls the other person. */
-	partnerName: string;
-	/** What the other person calls the viewer. */
-	yourName: string;
-	/** The other person's role in the connection. Optional. */
-	partnerRole: string | null;
-	/** The viewer's role in the connection. Optional. */
-	yourRole: string | null;
+	names: PartnerNamesSource;
 	/** Null while the invite is still pending — there is no other person yet. */
 	counterpart: PartnershipCounterpart | null;
 	/** May the viewer change names, label and control? */
@@ -106,6 +152,70 @@ export function canDisconnect(record: PartnershipRecord, userId: string): boolea
 	return roleOf(record, userId) !== null;
 }
 
+/**
+ * The names as `role` sees them. The one place the per-role mapping lives:
+ * which stored name is "theirs" flips with the viewer, and getting that
+ * backwards is the easiest bug in the feature.
+ */
+export function namesForViewer(names: StoredNames, role: PartnershipRole): ViewerNames {
+	const viewerIsInviter = role === 'inviter';
+	return {
+		partnerName: viewerIsInviter ? names.inviteeName : names.inviterName,
+		yourName: viewerIsInviter ? names.inviterName : names.inviteeName,
+		partnerRole: viewerIsInviter ? names.inviteeRole : names.inviterRole,
+		yourRole: viewerIsInviter ? names.inviterRole : names.inviteeRole
+	};
+}
+
+/** The inverse: what `role` typed, as it is stored. */
+export function storedNamesFrom(names: ViewerNames, role: PartnershipRole): StoredNames {
+	const viewerIsInviter = role === 'inviter';
+	return {
+		inviterName: viewerIsInviter ? names.yourName : names.partnerName,
+		inviteeName: viewerIsInviter ? names.partnerName : names.yourName,
+		inviterRole: viewerIsInviter ? names.yourRole : names.partnerRole,
+		inviteeRole: viewerIsInviter ? names.partnerRole : names.yourRole
+	};
+}
+
+/** Where `role` can read the names of `record` from. See `PartnerNamesSource`. */
+export function namesSourceFor(
+	record: PartnershipRecord,
+	role: PartnershipRole
+): PartnerNamesSource {
+	const sealed =
+		record.namesCiphertext !== null &&
+		record.namesVaultId !== null &&
+		record.namesPayloadVersion !== null
+			? {
+					vaultId: record.namesVaultId,
+					ciphertext: record.namesCiphertext,
+					payloadVersion: record.namesPayloadVersion,
+					revision: record.namesRevision
+				}
+			: null;
+	const invite =
+		sealed === null && record.inviteCiphertext !== null && record.invitePayloadVersion !== null
+			? {
+					ciphertext: record.inviteCiphertext,
+					payloadVersion: record.invitePayloadVersion,
+					keyWrap: role === 'inviter' ? record.inviteKeyWrap : null
+				}
+			: null;
+	// A row written before names were sealed. Its name columns are empty once
+	// it has a sealed record or an invite, so this is never set beside them.
+	const legacy =
+		sealed === null && invite === null && record.inviterName !== ''
+			? {
+					inviterName: record.inviterName,
+					inviteeName: record.inviteeName,
+					inviterRole: record.inviterRole,
+					inviteeRole: record.inviteeRole
+				}
+			: null;
+	return { partnershipId: record.id, role, sealed, invite, legacy };
+}
+
 /** Turns a row plus a viewer into the shape every partner screen renders from. */
 export function viewPartnership(
 	record: PartnershipRecord,
@@ -116,20 +226,12 @@ export function viewPartnership(
 	if (!role) {
 		throw new Error(`User ${userId} is not a member of partnership ${record.id}`);
 	}
-
-	const viewerIsInviter = role === 'inviter';
 	return {
 		id: record.id,
 		status: record.status,
 		role,
 		control: record.control,
-		// The names are stored per *role*, so which one is "theirs" flips with
-		// the viewer. Getting this backwards is the easiest bug in the feature,
-		// which is why no screen reads the columns directly.
-		partnerName: viewerIsInviter ? record.inviteeName : record.inviterName,
-		yourName: viewerIsInviter ? record.inviterName : record.inviteeName,
-		partnerRole: viewerIsInviter ? record.inviteeRole : record.inviterRole,
-		yourRole: viewerIsInviter ? record.inviterRole : record.inviteeRole,
+		names: namesSourceFor(record, role),
 		counterpart,
 		canEdit: canEditPartnership(record, userId)
 	};

@@ -25,16 +25,32 @@ beforeEach(async () => {
 
 afterEach(() => harness.close());
 
-test('gives the bottom nav one tab per linked partner', async () => {
-	const { id } = await createTestPartnership(db, ada, jun, { partnerName: 'Jun' });
+test('gives the bottom nav one tab per linked partner, its names sealed', async () => {
+	const { id } = await createTestPartnership(db, ada, jun);
 	const { partners } = await runLoad(load(fakeEvent({ db, user: ada })));
-	expect(partners).toEqual([{ id, name: 'Jun', image: null }]);
+	expect(partners).toEqual([
+		{ id, names: expect.objectContaining({ partnershipId: id, role: 'inviter' }), image: null }
+	]);
+	// The server hands over only ciphertext: it has no name to give.
+	expect(partners[0]?.names.legacy).toBeNull();
+	expect(partners[0]?.names.invite?.ciphertext).toMatch(/^sb1\./);
 });
 
-test('uses the name and picture the viewer would recognise', async () => {
-	await createTestPartnership(db, ada, jun, { yourName: 'Ada', partnerName: 'Jun' });
+test('uses the names source and picture from the viewer’s own end', async () => {
+	await createTestPartnership(db, ada, jun, {
+		legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
+	});
 	const { partners } = await runLoad(load(fakeEvent({ db, user: jun })));
-	expect(partners).toEqual([{ id: expect.any(String), name: 'Ada', image: '/ada.png' }]);
+	expect(partners).toEqual([
+		{
+			id: expect.any(String),
+			names: expect.objectContaining({
+				role: 'invitee',
+				legacy: expect.objectContaining({ inviterName: 'Ada', inviteeName: 'Jun' })
+			}),
+			image: '/ada.png'
+		}
+	]);
 });
 
 test('leaves a pending invite out of the nav', async () => {

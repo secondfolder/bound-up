@@ -22,9 +22,12 @@
 	import { newlyArrived } from '$lib/messaging';
 	import { type ComposedMessage, sendMessage } from '$lib/messaging/client';
 	import { watchPartnership } from '$lib/messaging/live';
+	import { partnerName } from '$lib/partner-names.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	/** What the viewer calls them, opened in the browser (`partner-names.svelte.ts`). */
+	const partnerShown = $derived(partnerName(data.partner.names));
 
 	const user = $derived(page.data.user as { id: string; email: string });
 	const keyring = $derived(currentKeyring());
@@ -174,7 +177,7 @@
 	}
 </script>
 
-<svelte:head><title>{data.partner.name} — messages</title></svelte:head>
+<svelte:head><title>{partnerShown} — messages</title></svelte:head>
 
 {#if keyring.status !== 'unlocked'}
 	<!--
@@ -195,7 +198,7 @@
 		<NestedPageHeader
 			{backHref}
 			backLabel="Back to partner"
-			backText={data.partner.name}
+			backText={partnerShown}
 			title="Messages"
 		/>
 
@@ -203,14 +206,14 @@
 			<header>
 				<PartnerKeyNotice
 					{trust}
-					partnerName={data.partner.name}
+					partnerName={partnerShown}
 					verify={() => markVerified(user.id, data.partner.id, data.recipients)}
 					accept={(which) => acceptKeyChange(user.id, data.partner.id, data.recipients, which)}
 				/>
 				<RestoreRequests
 					requests={data.restoreRequests}
 					partnershipId={data.partner.id}
-					partnerName={data.partner.name}
+					partnerName={partnerShown}
 					userId={user.id}
 				/>
 			</header>
@@ -245,7 +248,7 @@
 
 			{#if canSend && composing}
 				<NewMessageDialog
-					partnerName={data.partner.name}
+					partnerName={partnerShown}
 					partnershipId={data.partner.id}
 					tags={data.tags}
 					{send}

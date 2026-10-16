@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { SEALED_PATTERN } from '$lib/sealed';
+import { isClientId } from '$lib/vault';
 
 /**
  * The questions asked when adding a partner, plus the optional roles.
@@ -43,6 +45,9 @@ export const partnerInviteFormSchema = z.object({
 
 export type PartnerInviteFormSchema = typeof partnerInviteFormSchema;
 
+// `z.output` rather than superforms' `Infer<>`: see AGENTS.md on Biome's stack overflow.
+export type PartnerInviteFormValues = z.output<typeof partnerInviteFormSchema>;
+
 /**
  * The accept screen.
  *
@@ -59,3 +64,73 @@ export type PartnerAcceptFormSchema = typeof partnerAcceptFormSchema;
 export const partnerEditFormSchema = partnerInviteFormSchema;
 
 export type PartnerEditFormSchema = typeof partnerEditFormSchema;
+
+/*
+ * What the partner forms actually post. The names and roles above are
+ * validated in the browser and sealed there — under the invite key before
+ * there is a partnership, in its vault after — and the sealed record is
+ * posted in their place (`partner-sealing.ts`). The server checks these
+ * shapes, the vault, and who may write, never the names. See docs/partners.md,
+ * "Names are sealed".
+ */
+
+const clientId = z.string().refine(isClientId, 'Malformed id');
+const sealed = z.string().max(4096).regex(SEALED_PATTERN);
+const version = z.coerce.number().int().positive();
+/** An age-encrypted key, base64: what `wrapInviteKey` produces. */
+const keyWrap = z
+	.string()
+	.max(4096)
+	.regex(/^[A-Za-z0-9+/]+={0,2}$/);
+
+/** A new invite: chosen by the browser, because the invite is sealed to its id. */
+export const partnerInviteSealedSchema = z.object({
+	id: clientId,
+	control: controlAnswerSchema,
+	inviteCiphertext: sealed,
+	invitePayloadVersion: version,
+	inviteKeyWrap: keyWrap
+});
+
+/** Re-issuing an invite: a new key, so a new sealed invite and wrap. */
+export const partnerRotateSealedSchema = partnerInviteSealedSchema.omit({
+	id: true,
+	control: true
+});
+
+/**
+ * Accepting: the control answer, and the names re-sealed under the same
+ * invite key. Both optional — the server only honours them from an accepter
+ * allowed to edit, and a read-only accept posts neither.
+ */
+export const partnerAcceptSealedSchema = z.object({
+	control: controlAnswerSchema.optional(),
+	inviteCiphertext: sealed.optional(),
+	invitePayloadVersion: version.optional()
+});
+
+/**
+ * Editing: the control answer, and the names — sealed in the vault for an
+ * accepted partnership (compare-and-swap on `expectedRevision`), or sealed
+ * again under the invite key for a pending invite, which has no vault yet.
+ */
+export const partnerEditSealedSchema = z.object({
+	control: controlAnswerSchema,
+	namesVaultId: clientId.optional(),
+	namesCiphertext: sealed.optional(),
+	namesPayloadVersion: version.optional(),
+	expectedRevision: z.coerce.number().int().min(0).optional(),
+	inviteCiphertext: sealed.optional(),
+	invitePayloadVersion: version.optional()
+});
+
+/** A posted form as a plain object of its string fields, for `safeParse`. */
+export function formFields(formData: FormData): Record<string, string> {
+	const fields: Record<string, string> = {};
+	for (const [key, value] of formData) {
+		if (typeof value === 'string' && value !== '') {
+			fields[key] = value;
+		}
+	}
+	return fields;
+}

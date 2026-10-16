@@ -40,7 +40,7 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 	// never call the same partner different things.
 	const helpRequests: HelpRequestView[] = partners
 		.filter((partner) => helpFrom.includes(partner.id))
-		.map((partner) => ({ partnershipId: partner.id, partnerName: partner.name }));
+		.map((partner) => ({ partnershipId: partner.id, names: partner.names }));
 
 	return {
 		partners,

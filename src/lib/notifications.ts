@@ -60,23 +60,24 @@ export type PushContent = {
 /**
  * The notification for one event.
  *
- * `partnerName` is what the *recipient* calls the sender, which is why the
- * caller passes it rather than this reading names off a partnership row.
+ * Says what happened and never who: partnership names are end-to-end
+ * encrypted (docs/partners.md), so the server that sends this has none to put
+ * in it, and a notification is shown on a lock screen to whoever is nearby
+ * besides. See docs/notifications.md, "What a notification may say".
  */
 export function buildPushContent(input: {
 	kind: PushKind;
-	partnerName: string;
 	threadId: string;
 	/** Where a tap goes: the thread, as an absolute URL. */
 	url: string;
 }): PushContent {
-	const { kind, partnerName, threadId, url } = input;
+	const { kind, threadId, url } = input;
 	if (kind === 'reaction') {
 		return {
 			payload: {
 				web_push: 8030,
 				notification: {
-					title: `${partnerName} reacted to your message`,
+					title: 'New reaction',
 					navigate: url,
 					// Tagged apart from messages, so a reaction never hides a message
 					// notification that has not been read yet.
@@ -92,7 +93,7 @@ export function buildPushContent(input: {
 		payload: {
 			web_push: 8030,
 			notification: {
-				title: `New message from ${partnerName}`,
+				title: 'New message',
 				navigate: url,
 				tag: `thread-${threadId}`,
 				lang: 'en'

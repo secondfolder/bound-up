@@ -42,7 +42,7 @@ describe('load', () => {
 		expect(data).toMatchObject({
 			partner: {
 				id,
-				name: 'Them',
+				names: expect.objectContaining({ partnershipId: id, role: 'inviter' }),
 				canManageTasks: false,
 				canCompleteTasks: true
 			}
