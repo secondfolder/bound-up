@@ -22,7 +22,9 @@
 // suggestions, and proposes a roll for a turn containing `[roll]`.
 //
 // A request that is not streamed is a setup suggestion (`api/daydreams/suggest`),
-// answered with fixed JSON for whichever task it asks for.
+// answered with fixed JSON for whichever task it asks for. A daydream is named
+// "The <scene title> story", so a spec knows what to expect, and a naming
+// request fails once like any other when the scene's title has `[fail]` in it.
 import { createServer } from 'node:http';
 
 const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1' } = process.env;
@@ -33,7 +35,10 @@ if (!E2E_MODEL_PORT) {
 
 /** The key the app is given in the suite's environment (playwright.config.ts). */
 const KEY = 'e2e-openrouter-key';
-/** How the server's prompt lists the characters (`describeSetup`): a heading each. */
+/**
+ * How the server's prompt lists the characters (`describeSetup`): a heading
+ * each, "## Mara" or, cast in a part, "## Mara, the interviewer".
+ */
 const CHARACTERS_HEADING = '# The characters\n## ';
 
 /** How many times each conversation has been answered, for the take number. */
@@ -47,7 +52,7 @@ function characterName(system) {
 		return 'The narrator';
 	}
 	const rest = system.slice(at + CHARACTERS_HEADING.length);
-	return rest.slice(0, rest.indexOf('\n'));
+	return rest.slice(0, rest.indexOf('\n')).split(', ')[0];
 }
 
 const ROLL = {
@@ -108,8 +113,14 @@ function suggestionFor(messages) {
 			setting: 'A room nobody expected',
 			premise: 'Something unexpected is about to happen.',
 			yourRole: 'yourself',
-			tone: 'playful'
+			tone: 'playful',
+			parts: [{ name: 'the stub host', description: 'keeps the surprise going' }]
 		};
+	} else if (ask.includes('{"relationship"')) {
+		content = { relationship: 'your stub boss', part: 'stub-testing you' };
+	} else if (ask.includes('{"title": "…"}')) {
+		const scene = ask.split('Its scene is "')[1]?.split('"')[0] ?? 'stub';
+		content = { title: `The ${scene} story` };
 	} else {
 		content = { archetype: 'stub archetype', speech: 'Speaks in stubs.' };
 	}

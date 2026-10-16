@@ -127,7 +127,6 @@
 						"personality": "Calm, exacting, amused.",
 						"speech": "",
 						"appearance": "",
-						"relationship": "",
 						"likes": "",
 						"notes": "",
 						"dials": {
@@ -138,7 +137,12 @@
 							"talk": null
 						},
 						"sourceId": null,
-						"sourceRevision": null
+						"sourceRevision": null,
+						"casting": {
+							"partId": null,
+							"relationship": "",
+							"part": ""
+						}
 					}
 				],
 				"scene": {
@@ -149,7 +153,8 @@
 					"tone": "slow-burn",
 					"notes": "",
 					"sourceId": null,
-					"sourceRevision": null
+					"sourceRevision": null,
+					"parts": []
 				},
 				"lead": "character",
 				"limits": "Nothing public.",
@@ -174,9 +179,9 @@
 			"kind": "daydream-setup",
 			"version": 2,
 			"recordId": "00000000-0000-4000-8000-0000000000d3",
-			"ciphertext": "sb1.BBmcCBz8khvaJbbN1Oj3wMegZDHtWVdV-zFSn2LwqR7GYQm0436fqeWhq00C72MU2LlRbcBqEyT2VpzTXMF7eUQDQtTvLxfBb6kGAxbAZj4Wk0dPCEsDQmwnI5pVGpc4ZDne_aOx283eTW-JV206YnwqW9lDXE3pNxORu1haVvZIkV0aV8hOqD6tLLQfBwHGSQMGkuT89n9S2rUM5RmP9BjF_350WmTKIREeFuvGDX4F1bziv2HLj7NN32CnuvLUyXE5UIlmdpEELSyWF6kiw5YLilgv16tURHYXUbu9Wj3H_xHa5NRHZDMRy0j1Bs-XDpoSuolnoZZfMUmzbsEC4ZwPGW21ULW64anzObmH3p2Wvq7gVYXsl8ciWf48cNez6KCd2pcsCdEU0S07OyDPPc6szunH3rlntH7vzp9a6Jjy1SKW2BxJL_lJUn5WwvI00zNH1npMcAIderNE6_8uP2RKkQct3Uj4rW6XgKm22Bvl5drb2EW406STJC_6VwWQZEJNEiCDfieaRwmQ8xIFlS0c_sze8G7BOfuZUHb5Kt5x4MdY-qHNd8V7OQrDuwLPjQMIw5o6YGo2MFhLhOdaG4kSbPfuEKd2nMybOEtdMIemfO2HxqVMIFMW31Ye30z4jX77D3SE-LMVhsExqWWjk1qgs_vQS6wFYAXX14TLNtCZtFKNKyCqtQzKBNao22Eg3uc1A-doH2ACh6MqgYTbplG6AfZIVi3Ueren7T6EADLiVdCV6jYr3aACaBWuU_od3AWhjwjdKoYFbAMn1cFquCs-pgkTtFmi09PIOdSSQjnB3rwQz0iVv3DJqaoiXrH_Ncp_HvZtoFmcD9c9NQzAMJ_HmcEuDZgpd5QYBQao7Xvh591Ed7XZSHnMeeCPZMvgPUHgw5VOK1kTw3BHsxLBljszXyQc7Ee7A0TV-cQs2o_9jHTPmeRLehbvhjbyYQSQrlybHi4EiHmDo_YpCDZL95xoyXlX2E_ukN2AJED0OBEYP3J4Qm9jkoHbEubnluE0yIFrtF8x1x_9KknIraE4_Vdts1liBmobeJutysAly3oCFHW5L_socWtowuGlB7ngDNm5nNu6hp7II5kiD4Fgv80zZOuZCf9x6RCeishblpttUJ6iwTMh356OmqBsRLsYHx8mmjnSGSJnhOP6n1x3u2k9EZIFGQtJ9cmjcn-HNAsyx-6EwgwFryeJ6bp3cXQBRpUkFVqDuhM1Ywjd_YYW2Os8-KdFtUKBCENmMstoaWnwrbadVhF8c7vSEyoDJgxkr3ENUiepVUaUg_8Qta-4IUYLVEmOw0q8ZuogrYVfhuza535Apm6gm8wEtNPvK0auB1Kb8qHr0ThonFBIWTH6PKnM-3kawUfMiwlv_3HOKwDBU_GhWhCKIV9LxwFfQicQ2BfpgnurENKfmfB8b7y0rMAyVCRJcPvZJ2dVO2nOZSIrOCHnDfHCNmRWhsA-9gguhJ6_CLZOatLM_hn-Bb6mr3_IDalIHAmmZ-ye2U3MZaPS9WROO4j8P-HE7QPth9SwaTnA-jJKk_OA3UE",
+			"ciphertext": "sb1.tncWlVTEPlt8kY4JK_6ogI9rlaiXQofu6y1DS0AoRsH6tHRdJsmfde3nKeMrDP-3o2vi4iPlxloYmGjJJlBI60v1pkK3zwajOYxQcTQj8kBfdjad7nPJytpjjnxNzUSFO4nsixiRfi4n1yOvK7a_zkyHcdrvRCRuTMJgInr6n_HafUwp4F2_T0Q7Uhs_v8ilaXg0Wz90KiJmpg9s7xBryknS7D4bo1SXTbPWK-ghWKFZGpb80EY-wJo_K-nLCJEFa6p9J7q1pY9UktpqHDVnC3a8QhPACLjzjuoFM5Tmej5rK_JnHOwSdCFKK0FkOVOCA0WiX3MbfdKBFgRkHitLWrDjFzgS8HHNaxOXKH7I_YMQSCu0vTd1NNGIIrImPC6FjKj6G-Sj6weOavtNA4e-QBI5UZvoJFeD5yWNvQLIon-Ynet31neHUdY1UUTM71bFviIpbeXIjWU6X9KY8iZExJ_FgII1lCXoHVjdchoesFHhvrUCoeSLJcRCa-sI3DxVY4G1q9VTkCshdWcB-dy3sDoER2pO5cyrbK2Tg1Q2q5hHtrPEMi6e1RBvKog5RiWsjhbsC2Bz7rLMtMNz8EwU2c0vQ0innb1mAnWHSbSfuv-oLc3-1o1uJQyWQvAycdOb_HbieIa0Z2izfu0U0L1PT3unz_11sdWk0cjbhMytD3fdOHfIVugukWS5lK2azKxtryhMYgjjnc8MgpeOn_hS0jUeB-vnGrbUbJa-3NXmyfhrvFg53PJKexv-jaJkKY6gZXly0tHSV1s-5O-1aBfBswoO2JRMoglphQgb8aAqSbFkNd_x92RMjVR-C5I8ELUXhEFA5oV-Uf99rCGy10Jm65M20E1rHocmMLnEiZqeeFYVC7OmBJeAJgLbgNxgi5ykcXJ84aVl0DpQCeaOzyE23G19R6o_IRVQo7xWmsj8-NW4gtQP-kZiOifwww6swIZpK6vWc16UID7pr05YrlvOQKJJfFD0o9WnVk61kFs7IA_yS_4ifX2AauUmUgwcXoWkOS6x14YDjcTXvri449fYqlaVChQxuPBVxe7uIHUBBWc_cE8w0K8Y_6JJ1SNCpl9HTlxnnnsrGm47SKeD4ZlSNmppVBaNK8K1w9MCwMpX1ryNFGuYcqlPzhEL9TIgk5XmNNlHFMDN4tODuqyaCRHCgO7XvAx0PANXo0g19Zhv849npRIhyJmOveLPy6PDsnvYqXQfzTPGYkAgEu8MpmDm_aXZeDc4l3lb5HtKc31yTg5DNu1uIh-jzTdfMyTocBQIc_1S2S9jaGruhc-Tl-xI5GKSU_jbpcj07RKvtJOd7YwXL_33BIALfIAZKTHzp0ZPqunM4Kb46fIi7pr88SaVLyKj9eL3pQqWsHiCHDVELa9qv1bNZPmTSgr-4zm8RFzPqLa3oar5Es9wg10IFgDuy2bqeqHl2xIfXAiEeCTtXkb2VuUizOzPMoSB0BN_iQgT-1N_9QBwb9wIDfF2SzyDoU4if4KvFOVIxvrJbb4Uru7B8cAicIPeF7xHlyacLuTY15GNBZq1FwMrCuKiH410yJJGGrOAXBvi6pssim1q_5xBN4rSb5svpIkXKNB9iVgXgXUhD2RFXq99_UmeDqC2uqlqHwHIAkJvgrmqyFy12YE1dj-PoYnrZL7mFS_A5HWnVhmF5pAm1cZIPhNXY1TlSw5x5ugLcKYMo2MCm6QPWwgfy_pumwvX_LJfEgOV9WuhwXjJQznpQie6yP9m4BS7faUKYfIJFHdmewp_NR22ZkVRf_YCjmO0xB7OkYnI_GuQ9QWXzB4JiJ7CfikDQIUsEw",
 			"expected": {
-				"title": "Frozen evening, again",
+				"title": "",
 				"voice": {
 					"narrator": "third-person",
 					"stance": "absent",
@@ -189,7 +194,6 @@
 						"personality": "Calm, exacting, amused.",
 						"speech": "Short sentences.",
 						"appearance": "Grey suit.",
-						"relationship": "Your manager.",
 						"likes": "Punctuality",
 						"notes": "Never raises her voice.",
 						"dials": {
@@ -200,17 +204,21 @@
 							"talk": 2
 						},
 						"sourceId": "00000000-0000-4000-8000-0000000000d6",
-						"sourceRevision": 2
+						"sourceRevision": 2,
+						"casting": {
+							"partId": "00000000-0000-4000-8000-0000000000e1",
+							"relationship": "Your manager.",
+							"part": "Testing the new hire."
+						}
 					},
 					{
 						"name": "Jun",
-						"archetype": "The exacting mentor",
-						"personality": "Calm, exacting, amused.",
-						"speech": "Short sentences.",
-						"appearance": "Grey suit.",
-						"relationship": "Your manager.",
-						"likes": "Punctuality",
-						"notes": "Never raises her voice.",
+						"archetype": "",
+						"personality": "Quiet.",
+						"speech": "",
+						"appearance": "",
+						"likes": "",
+						"notes": "",
 						"dials": {
 							"tone": null,
 							"control": null,
@@ -219,7 +227,12 @@
 							"talk": null
 						},
 						"sourceId": null,
-						"sourceRevision": null
+						"sourceRevision": null,
+						"casting": {
+							"partId": null,
+							"relationship": "",
+							"part": ""
+						}
 					}
 				],
 				"scene": {
@@ -229,6 +242,18 @@
 					"yourRole": "The new hire",
 					"tone": "slow-burn",
 					"notes": "",
+					"parts": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000e1",
+							"name": "the interviewer",
+							"description": "Runs the meeting."
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000000e2",
+							"name": "the observer",
+							"description": ""
+						}
+					],
 					"sourceId": null,
 					"sourceRevision": null
 				},
@@ -313,14 +338,13 @@
 			"kind": "daydream-character",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d6",
-			"ciphertext": "sb1.0PWB6uU7b6RTIANyLCKgHPHEZQQTpXS3JRFwrwpFGcB0RvHH2ExRHJfEpnrj5ubLW5b49HtG_fvZIgrXCzMEdCxBj__qWolpTjUs6nRwYkUib4V0LBXc8FiDnIvecWgXrOUAYO7U50HnujIV4trfiPEa1_vgyN8SQpfjEgQAiLQY14hJUXjM9gTnyGG5ZqRHZNRZq-JwiQsMhIv3LyhlMzneVH1gZsGH2mDkmzrZAv5VrHg2k79dmdQtmH9qYBgosUBTL21VqTZQGvJ0RrFmINMiLreyEG5wYifbGf2R70tepf5mnGSzgLPs56i1DpsYquty4vsg2ZchCJfdH3NHxw9Mfnd3QAVmPazpR9QHUvx5qgZYaPK5NZhZR_JyddVvm3MxEXppZvE8eGbWYT1fkYYJUdQqe3JJP2X1OZWlShSKqNqP5XXKxCu3",
+			"ciphertext": "sb1.gKMxvEzVR4UpTjfd0zRO-bRXi19ePY2cKUrHicxKcHhwf17HDFUF9DiUZLrjLAFQKWE-CDn-gXreYRNFjDA3I1E15oVSIOBhgS_RvOosNw-it2XMZXR3xuGhjzyCF4088a4Jk_4Kpg_Hvy7NY1BWTpkyiNtnpOqGdlrHx65VlDEgOO-ZGEeXRI-ufNCDW1ygvGIufGhHLG-NhMpfWuuvQ_lWWy3ARAeHs98fPRC9-xGdQJZNJZFAhKzWtPFHSaktWwrcLtffIb05fTnSpd0chxO0qa5cXCiO0hpP3UB-34INxZBm0lyLygmiqg48yapE0V60I-gqqStrotLDP2U0oJYBrR3IgIx9i60ZVE5f0WjmTYP0X0vb3svAuiL5uDMqxYzHOdX3Tbtd0sI",
 			"expected": {
 				"name": "Mara",
 				"archetype": "The exacting mentor",
 				"personality": "Calm, exacting, amused.",
 				"speech": "Short sentences.",
 				"appearance": "Grey suit.",
-				"relationship": "Your manager.",
 				"likes": "Punctuality",
 				"notes": "Never raises her voice.",
 				"dials": {
@@ -336,14 +360,26 @@
 			"kind": "daydream-scene",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d7",
-			"ciphertext": "sb1.2T-r4OH8NMMJYT3ldHOG59qKHkhf2UDRVuYZb8JAwQW7I73xVbV_M-7jlzdn4sPEF8jXFWVa_CTNgMgd4ky9Ac4oYreSlzTp0O6-YIcoN5jju70_dqaNQ6JweYDhlkIaeXQ8bnkk4EqLEdp9ghhb6Cp0fzsWcBLhhf-JcfEpTnF9GHMDBJh1k2wVAbWdiMLZzEXLLjGPQMpQRNdYJ4EBuYpqLFOrG0qFH6oqZ4pwDd9QqLhjiWA",
+			"ciphertext": "sb1.R7GVFSE_7IYgG3ioJ1E22YvenKy7bGNOrTVbUUqUuyW-RQMWPzfjOaakCWb_oTW3_hWRO5QP_5230XSBEWMOt52FwEs1_y2YCORAF3YrNS3PuyJJ7ftRgowCW_P7c-lOSDVXJwAApiwFvgQJUXr1jjRvV15TZXXnoIMch6dXBhwhHJmxWn94Dk58wMNJM_wxKPnAFv8YfG8Z7SrUEZwlc2YJcN4PTxWJMuduspClzXixZjJUh1hOjpQnLqdEKDp4JPyV8Hb1-NXHmJna76hNwHqeKp-edUfu9qPrV1y4O54RVAj1mXXnYzk2k0-noYvl2uPyiJ29MbK2Z5c_d-9EomV_NSGE5YCTw2W62qabkx4-HGsN_c1s_UHM-8DVYedchAXT19Tz8AwWAcPKKguhCh3_53i-lGb9AS5sff4EnZ405_MHnq0T1r7S6O-YyPUgCJZ8BMVwZFuEmgO_DEhKqVV-oIlYlUBT2-fBnzG4pZaxTMXe0MGF3Th0pA6mPg",
 			"expected": {
 				"title": "Frozen evening",
 				"setting": "An empty office.",
 				"premise": "A late meeting that runs over.",
 				"yourRole": "The new hire",
 				"tone": "slow-burn",
-				"notes": ""
+				"notes": "",
+				"parts": [
+					{
+						"id": "00000000-0000-4000-8000-0000000000e1",
+						"name": "the interviewer",
+						"description": "Runs the meeting."
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000000e2",
+						"name": "the observer",
+						"description": ""
+					}
+				]
 			}
 		}
 	]

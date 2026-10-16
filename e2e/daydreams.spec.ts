@@ -18,7 +18,8 @@ import {
  * ends every passage with a `<meta>` block offering "Slower", "Surprise me"
  * and two suggestions, proposes a roll for a turn containing `[roll]`,
  * checks in after Stop the scene, and fails once for a turn containing
- * `[fail]`.
+ * `[fail]`. It names a daydream "The <scene title> story", and casts anyone
+ * as "your stub boss", "stub-testing you".
  */
 
 /** Unique per run: the stub counts takes per conversation for as long as it runs. */
@@ -44,11 +45,17 @@ async function grantDaydreams(email: string) {
 
 const dialog = (page: Page) => page.locator('wa-dialog');
 
-/** Makes a new character in the setup's dialog, with a dial and a chip, saved to the library. */
-async function newCharacter(page: Page, name: string) {
-	await clickWaButton(page, 'Add a character');
+/**
+ * Makes a new character in the setup's dialog, with a dial and a chip, saved
+ * to the library. `picker` is the button that opens the cast menu: "Add a
+ * character" for a scene with no parts, "Cast <part>" for one of its parts.
+ */
+async function newCharacter(page: Page, name: string, picker = 'Add a character') {
+	await clickWaButton(page, picker);
 	await page.getByRole('menuitem', { name: 'New character' }).click();
 	await dialog(page).locator('wa-input[name="name"] input').fill(name);
+	// The dials are under "More detail", closed for a new character.
+	await dialog(page).getByRole('button', { name: 'More detail', exact: true }).click();
 	await dialog(page).getByRole('button', { name: 'Cold', exact: true }).click();
 	await dialog(page).getByRole('button', { name: 'patient', exact: true }).click();
 	await expect(dialog(page).getByRole('textbox', { name: /Personality/ })).toHaveValue('patient');
@@ -57,14 +64,24 @@ async function newCharacter(page: Page, name: string) {
 	await expect(page.locator('form.panel').getByText(name, { exact: true })).toBeVisible();
 }
 
-async function newScene(page: Page, title: string, premise: string) {
+/** Makes a new scene in the setup's dialog, with a part for each of `parts`. */
+async function newScene(page: Page, title: string, premise: string, parts: string[] = []) {
 	await clickWaButton(page, 'New scene');
 	await dialog(page).locator('wa-input[name="title"] input').fill(title);
 	await dialog(page)
 		.getByRole('textbox', { name: /What’s going on/ })
 		.fill(premise);
+	for (const [index, part] of parts.entries()) {
+		await dialog(page).getByRole('button', { name: 'Add a part' }).click();
+		await dialog(page).locator('.part .part-name input').nth(index).fill(part);
+	}
 	await dialog(page).getByRole('button', { name: 'Use this scene' }).click();
 	await expect(dialog(page)).toHaveCount(0);
+}
+
+/** Opens one of the setup form's disclosures, closed for a new daydream. */
+async function openDisclosure(page: Page, summary: string) {
+	await page.locator('form.panel').getByRole('button', { name: summary, exact: true }).click();
 }
 
 /** From the list to the setup page, through the disclosure the first time. */
@@ -82,12 +99,16 @@ async function openSetup(page: Page) {
 	await waitForHydration(page);
 }
 
-/** A new daydream with one new character and a new scene, started; answers its id. */
-async function startDaydream(page: Page, title = 'Late meeting', character = 'Mara') {
+/**
+ * A new daydream with a new scene and one new character, started; answers
+ * its id. It is not named here: the stub names it "The After hours story"
+ * after the opening.
+ */
+async function startDaydream(page: Page, character = 'Mara') {
 	await openSetup(page);
-	await page.locator('form.panel wa-input[name="title"] input').fill(title);
-	await newCharacter(page, character);
 	await newScene(page, 'After hours', 'The office has emptied out.');
+	await newCharacter(page, character);
+	await openDisclosure(page, 'More options');
 	// Typed key by key rather than filled: a space typed here once went
 	// missing, which `fill()` cannot see because it never presses a key.
 	const limits = page.locator('form.panel textarea');
@@ -121,8 +142,9 @@ test.describe('daydreams', () => {
 	}) => {
 		await signedUpDreamer(page);
 		const id = await startDaydream(page);
-		await expect(page.getByRole('heading', { name: 'Late meeting' })).toBeVisible();
 		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		// Named by the model once it has opened, never asked of the user.
+		await expect(page.getByRole('heading', { name: 'The After hours story' })).toBeVisible();
 
 		const said = unique('I close the door,');
 		await reply(page, said);
@@ -140,7 +162,7 @@ test.describe('daydreams', () => {
 		expect(JSON.stringify(rows)).not.toContain(said);
 		expect(JSON.stringify(rows)).not.toContain('Mara');
 		const setup = await sql('select ciphertext from daydreams where id = ?', [id]);
-		expect(JSON.stringify(setup.rows)).not.toContain('Late meeting');
+		expect(JSON.stringify(setup.rows)).not.toContain('After hours');
 
 		// Written again: a second take beside the first, not in its place.
 		await passageMenu(page, 'Write again');
@@ -169,9 +191,9 @@ test.describe('daydreams', () => {
 
 		// Listed, and on the home screen's card.
 		await page.goto('/daydreams');
-		await expect(page.getByRole('link', { name: /Late meeting/ })).toBeVisible();
+		await expect(page.getByRole('link', { name: /The After hours story/ })).toBeVisible();
 		await page.goto('/home');
-		await expect(page.getByText('Late meeting')).toBeVisible();
+		await expect(page.getByText('The After hours story')).toBeVisible();
 	});
 
 	test('directions, suggestions and stepping out of the story', async ({ page }) => {
@@ -318,12 +340,11 @@ test.describe('daydreams', () => {
 		page
 	}) => {
 		await signedUpDreamer(page);
-		const first = await startDaydream(page, 'First');
+		const first = await startDaydream(page);
 		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
 
 		// Picked from the library for a second daydream.
 		await openSetup(page);
-		await page.locator('form.panel wa-input[name="title"] input').fill('Second');
 		await clickWaButton(page, 'Add a character');
 		await page.getByRole('menuitem', { name: 'Mara' }).click();
 		await expect(page.locator('form.panel').getByText('Mara', { exact: true })).toBeVisible();
@@ -369,7 +390,6 @@ test.describe('daydreams', () => {
 		await signedUpDreamer(page);
 
 		await openSetup(page);
-		await page.locator('form.panel wa-input[name="title"] input').fill('Told');
 		await page.getByRole('button', { name: /^A story told to you/ }).click();
 		await newScene(page, 'Quiet', 'Nothing has happened yet.');
 		await clickWaButton(page, 'Start daydreaming');
@@ -377,7 +397,6 @@ test.describe('daydreams', () => {
 		await expect(page.getByText('The narrator looks up as you come in.')).toBeVisible();
 
 		await openSetup(page);
-		await page.locator('form.panel wa-input[name="title"] input').fill('Watched');
 		await page.getByRole('button', { name: /^Watch a story unfold/ }).click();
 		await newCharacter(page, 'Ash');
 		await newCharacter(page, 'Bel');
@@ -424,13 +443,15 @@ test.describe('daydreams', () => {
 
 	test('the setup can be changed, and the daydream deleted', async ({ page }) => {
 		await signedUpDreamer(page);
-		const id = await startDaydream(page, 'First title');
+		const id = await startDaydream(page);
 		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		// Waited for, so the name is saved before the setup is changed from under it.
+		await expect(page.getByRole('heading', { name: 'The After hours story' })).toBeVisible();
 
 		await page.getByRole('link', { name: 'Setup' }).click();
 		await page.waitForURL(`**/daydreams/${id}/edit`);
 		await waitForHydration(page);
-		await expect(page.locator('wa-input[name="title"] input')).toHaveValue('First title');
+		await expect(page.locator('wa-input[name="title"] input')).toHaveValue('The After hours story');
 		await fillWaInput(page, 'title', 'Second title');
 		await clickWaButton(page, 'Save setup');
 		await page.waitForURL(`**/daydreams/${id}`);
@@ -446,6 +467,61 @@ test.describe('daydreams', () => {
 			id
 		]);
 		expect(Number(rows[0]?.n)).toBe(0);
+	});
+
+	test('until it has a name, a daydream goes by its scene’s, and the next visit names it', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		// The stub fails a naming request once when the scene's title says `[fail]`.
+		const scene = `Quiet ${randomUUID().slice(0, 8)} [fail]`;
+		await openSetup(page);
+		await newScene(page, scene, 'Nothing has happened yet.');
+		await newCharacter(page, 'Mara');
+		await clickWaButton(page, 'Start daydreaming');
+		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		await passageSaved(page);
+		await expect(page.getByRole('heading', { name: scene })).toBeVisible();
+		await expect(page.getByText('No suggestions just now')).toHaveCount(0);
+
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByRole('heading', { name: `The ${scene} story` })).toBeVisible();
+	});
+
+	test('a character cast from the library into a scene’s part has that part written for them', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await startDaydream(page);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+
+		await openSetup(page);
+		await newScene(page, 'The interview', 'It goes off script.', ['the interviewer']);
+		await clickWaButton(page, 'Cast the interviewer');
+		await page.getByRole('menuitem', { name: 'Mara' }).click();
+		const row = page.locator('form.panel .part');
+		await expect(row).toContainText('the interviewer');
+		await expect(row).toContainText('your stub boss · stub-testing you');
+
+		// Only this daydream's: the library's Mara is who she is anywhere.
+		await clickWaButton(page, 'Edit Mara');
+		await expect(dialog(page).getByText('In this story', { exact: true })).toBeVisible();
+		await expect(dialog(page).getByRole('textbox', { name: /Who they are to you/ })).toHaveValue(
+			'your stub boss'
+		);
+		await dialog(page).getByRole('button', { name: 'Cancel' }).click();
+		await expect(dialog(page)).toHaveCount(0);
+
+		await clickWaButton(page, 'Start daydreaming');
+		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
+		// The prompt introduces her by her part; the stub still knows her name.
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+
+		await page.goto('/daydreams/characters');
+		await clickWaButton(page, 'Edit Mara');
+		await expect(dialog(page).getByText('In this story', { exact: true })).toHaveCount(0);
 	});
 
 	test('an account without the feature has no way in', async ({ page }) => {

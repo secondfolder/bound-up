@@ -180,14 +180,23 @@ function leadLine(setup: DaydreamSetupContent): string | null {
 	}
 }
 
-function describeCharacter(character: DaydreamSetupContent['characters'][number]): string {
-	const lines = [`## ${character.name}`];
+type SetupCharacter = DaydreamSetupContent['characters'][number];
+type ScenePartContent = DaydreamSetupContent['scene']['parts'][number];
+
+/**
+ * One character: who they are in this story (their casting) first, then who
+ * they are in any story (the library's fields). The casting leads because it
+ * is what this scene is about; the rest is who is playing it.
+ */
+function describeCharacter(character: SetupCharacter, part: ScenePartContent | undefined): string {
+	const lines = [part ? `## ${character.name}, ${part.name}` : `## ${character.name}`];
 	const fields: [string, string][] = [
+		['Who they are to the user', character.casting.relationship],
+		['Their part in this scene', character.casting.part],
 		['Type', character.archetype],
 		['Personality', character.personality],
 		['How they talk', character.speech],
 		['Appearance', character.appearance],
-		['Who they are to the user', character.relationship],
 		['What they enjoy', character.likes],
 		['Notes', character.notes]
 	];
@@ -205,13 +214,37 @@ function describeCharacter(character: DaydreamSetupContent['characters'][number]
 	return lines.join('\n');
 }
 
+/**
+ * The scene's parts that someone plays, as the scene describes them. A part
+ * nobody was cast in is left out: the model would otherwise invent someone
+ * to fill it, which the user chose not to.
+ */
+function describeCastParts(setup: DaydreamSetupContent): string | null {
+	const cast = setup.scene.parts.flatMap((part) => {
+		const player = setup.characters.find((character) => character.casting.partId === part.id);
+		return player
+			? [
+					`- ${part.name}, played by ${player.name}${part.description ? `: ${part.description}` : ''}`
+				]
+			: [];
+	});
+	return cast.length > 0 ? `The parts in it:\n${cast.join('\n')}` : null;
+}
+
 /** The setup, as the model reads it. Empty optional fields are left out rather than shown blank. */
 export function describeSetup(setup: DaydreamSetupContent): string {
 	const { scene } = setup;
 	const sections = [
 		`# How the story is told\n${describeVoice(setup.voice, setup.characters.length)}`,
 		setup.characters.length > 0
-			? `# The characters\n${setup.characters.map(describeCharacter).join('\n\n')}`
+			? `# The characters\n${setup.characters
+					.map((character) =>
+						describeCharacter(
+							character,
+							scene.parts.find((part) => part.id === character.casting.partId)
+						)
+					)
+					.join('\n\n')}`
 			: null,
 		[
 			`# The scene: ${scene.title}`,
@@ -222,6 +255,7 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 				: null,
 			scene.tone ? `Tone: ${scene.tone}` : null,
 			scene.notes ? `Notes: ${scene.notes}` : null,
+			describeCastParts(setup),
 			leadLine(setup)
 		]
 			.filter((line) => line !== null)

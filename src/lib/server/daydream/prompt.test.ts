@@ -21,6 +21,9 @@ function request(overrides: Partial<ReplyRequest> = {}): ReplyRequest {
 	return { mode: 'reply', setup, turns: [], currentDirections: [], ...overrides };
 }
 
+const PART_A = '00000000-0000-4000-8000-0000000000e1';
+const PART_B = '00000000-0000-4000-8000-0000000000e2';
+
 const said = (text: string, role: 'user' | 'story' = 'user'): ContextTurn => ({
 	type: 'text',
 	role,
@@ -194,6 +197,37 @@ describe('describeSetup', () => {
 		expect(content.match(/In short/g)).toHaveLength(1);
 	});
 
+	it('introduces a cast character by their part, with who they are in this story first', () => {
+		const content = describeSetup(
+			testDaydreamSetup({
+				scene: testScene({
+					parts: [
+						{ id: PART_A, name: 'the interviewer', description: 'runs the interview' },
+						{ id: PART_B, name: 'the observer', description: '' }
+					]
+				}),
+				characters: [
+					testCharacter({
+						name: 'Mara',
+						archetype: 'strict mentor',
+						casting: { partId: PART_A, relationship: 'your new boss', part: 'testing you' }
+					}),
+					testCharacter({ name: 'Jun' })
+				]
+			})
+		);
+		expect(content).toContain(
+			'## Mara, the interviewer\nWho they are to the user: your new boss\nTheir part in this scene: testing you\nType: strict mentor'
+		);
+		expect(content).toContain('## Jun');
+		expect(content).not.toContain('## Jun,');
+		// The scene lists the parts someone plays, and not the one nobody was cast in.
+		expect(content).toContain(
+			'The parts in it:\n- the interviewer, played by Mara: runs the interview'
+		);
+		expect(content).not.toContain('the observer');
+	});
+
 	it('leaves out what was not filled in rather than showing it blank', () => {
 		const content = describeSetup(setup);
 		expect(content).not.toContain('Where:');
@@ -305,6 +339,30 @@ describe('replyRequestSchema', () => {
 	it('refuses more story than the budget', () => {
 		const turns = Array.from({ length: 10 }, () => said('x'.repeat(7000)));
 		expect(replyRequestSchema.safeParse({ ...valid, turns }).success).toBe(false);
+	});
+
+	it('accepts a daydream that has no name yet', () => {
+		expect(replyRequestSchema.safeParse({ ...valid, setup: { ...setup, title: '' } }).success).toBe(
+			true
+		);
+	});
+
+	it('refuses a part the scene does not have, or one played twice', () => {
+		const parts = [{ id: PART_A, name: 'the interviewer', description: '' }];
+		const cast = (...partIds: (string | null)[]) =>
+			testDaydreamSetup({
+				scene: testScene({ parts }),
+				characters: partIds.map((partId, index) =>
+					testCharacter({ name: `C${index}`, casting: { partId, relationship: '', part: '' } })
+				)
+			});
+		expect(replyRequestSchema.safeParse({ ...valid, setup: cast(PART_A, null) }).success).toBe(
+			true
+		);
+		expect(replyRequestSchema.safeParse({ ...valid, setup: cast(PART_B) }).success).toBe(false);
+		expect(replyRequestSchema.safeParse({ ...valid, setup: cast(PART_A, PART_A) }).success).toBe(
+			false
+		);
 	});
 
 	it('refuses a setup that no device could seal', () => {

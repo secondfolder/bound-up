@@ -10,14 +10,16 @@
 		voiceCanWork,
 		voiceProblem
 	} from '$lib/daydream';
+	import { startOpen } from './details';
 
 	/**
 	 * How the story is told: who tells it, and where the user stands in it.
 	 * Separate from the characters, so a story can be told with none at all —
 	 * a narrator talking to you, or an impersonal set of rules — or watched
-	 * from outside with several. The presets fill both at once; below them,
-	 * each can be changed, and a combination that could never work is
-	 * disabled with a line saying why.
+	 * from outside with several. The presets fill both at once, and are all
+	 * most people need; "Fine-tune how it's told" opens the two settings
+	 * underneath them, where a combination that could never work is disabled
+	 * with a line saying why.
 	 */
 	let {
 		value,
@@ -31,6 +33,15 @@
 
 	const problem = $derived(voiceProblem(value, characterCount));
 	const id = $props.id();
+
+	const matchesPreset = (voice: DaydreamVoice) =>
+		DAYDREAM_VOICE_PRESETS.some(
+			(preset) => voice.narrator === preset.voice.narrator && voice.stance === preset.voice.stance
+		);
+	// svelte-ignore state_referenced_locally
+	// Captured once: open from the start for a voice no preset gives, so a
+	// customised one is never hidden, and then the user's to open and close.
+	const customised = !matchesPreset(value) || value.protagonistName.trim() !== '';
 
 	function set(patch: Partial<DaydreamVoice>) {
 		onchange({ ...value, ...patch });
@@ -66,59 +77,61 @@
 		{/each}
 	</div>
 
-	<div class="pickers">
-		<fieldset>
-			<legend>Who tells it</legend>
-			{#each DAYDREAM_NARRATORS as choice (choice.value)}
-				{const blocked = $derived(narratorBlocked(choice.value))}
-				<label class="choice" class:blocked>
-					<input
-						type="radio"
-						name={`${id}-narrator`}
-						value={choice.value}
-						checked={value.narrator === choice.value}
-						disabled={blocked !== null}
-						onchange={() => set({ narrator: choice.value })}
-					/>
-					<span>
-						{choice.label}
-						<small>{blocked ?? choice.hint}</small>
-					</span>
-				</label>
-			{/each}
-		</fieldset>
-		<fieldset>
-			<legend>Where you are</legend>
-			{#each DAYDREAM_STANCES as choice (choice.value)}
-				{const blocked = $derived(stanceBlocked(choice.value))}
-				<label class="choice" class:blocked>
-					<input
-						type="radio"
-						name={`${id}-stance`}
-						value={choice.value}
-						checked={value.stance === choice.value}
-						disabled={blocked !== null}
-						onchange={() => set({ stance: choice.value })}
-					/>
-					<span>
-						{choice.label}
-						<small>{blocked ?? choice.hint}</small>
-					</span>
-				</label>
-			{/each}
-		</fieldset>
-	</div>
-
-	{#if value.stance !== 'absent'}
-		<wa-input
-			{@attach nameField}
-			label={value.stance === 'persona' ? 'Who you are playing' : 'What the story calls you (optional)'}
-			value={value.protagonistName}
-			maxlength={DAYDREAM_LIMITS.protagonistName}
-		></wa-input>
-	{/if}
-
 	{#if problem}<p class="problem" role="status">{problem}</p>{/if}
+
+	<wa-details summary="Fine-tune how it's told" class="fine-tune" {@attach startOpen(customised)}>
+		<div class="pickers">
+			<fieldset>
+				<legend>Who tells it</legend>
+				{#each DAYDREAM_NARRATORS as choice (choice.value)}
+					{const blocked = $derived(narratorBlocked(choice.value))}
+					<label class="choice" class:blocked>
+						<input
+							type="radio"
+							name={`${id}-narrator`}
+							value={choice.value}
+							checked={value.narrator === choice.value}
+							disabled={blocked !== null}
+							onchange={() => set({ narrator: choice.value })}
+						/>
+						<span>
+							{choice.label}
+							<small>{blocked ?? choice.hint}</small>
+						</span>
+					</label>
+				{/each}
+			</fieldset>
+			<fieldset>
+				<legend>Where you are</legend>
+				{#each DAYDREAM_STANCES as choice (choice.value)}
+					{const blocked = $derived(stanceBlocked(choice.value))}
+					<label class="choice" class:blocked>
+						<input
+							type="radio"
+							name={`${id}-stance`}
+							value={choice.value}
+							checked={value.stance === choice.value}
+							disabled={blocked !== null}
+							onchange={() => set({ stance: choice.value })}
+						/>
+						<span>
+							{choice.label}
+							<small>{blocked ?? choice.hint}</small>
+						</span>
+					</label>
+				{/each}
+			</fieldset>
+		</div>
+
+		{#if value.stance !== 'absent'}
+			<wa-input
+				{@attach nameField}
+				label={value.stance === 'persona' ? 'Who you are playing' : 'What the story calls you (optional)'}
+				value={value.protagonistName}
+				maxlength={DAYDREAM_LIMITS.protagonistName}
+			></wa-input>
+		{/if}
+	</wa-details>
 </div>
 
 <style>
@@ -171,6 +184,12 @@
 			outline: var(--wa-focus-ring);
 			outline-offset: var(--wa-focus-ring-offset);
 		}
+	}
+
+	.fine-tune::part(content) {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 	}
 
 	.pickers {

@@ -32,8 +32,14 @@
 	let {
 		daydream,
 		/** Whether this server can write passages at all. */
-		available
-	}: { daydream: DaydreamView; available: boolean } = $props();
+		available,
+		onnamed
+	}: {
+		daydream: DaydreamView;
+		available: boolean;
+		/** Told the daydream's name once the model has given it one, for the page's heading. */
+		onnamed?: (name: string) => void;
+	} = $props();
 
 	// svelte-ignore state_referenced_locally
 	// Seeded once: from here on the story is this object, added to as turns are
@@ -86,6 +92,24 @@
 		if (setup && available && !opening) {
 			opening = true;
 			untrack(() => story.open());
+		}
+	});
+
+	// A daydream without a name gets one once its opening is there to name it
+	// from, and nothing is being written: after the opening this visit, or on
+	// the next visit when the last one never got that far. The story asks at
+	// most once per visit (`nameIfUnnamed`).
+	const openingWritten = $derived(
+		story.path.some((node) => node.role === 'story' && story.content(node.id)?.type === 'text')
+	);
+	$effect(() => {
+		if (setup && setup.title.trim() === '' && openingWritten && !busy) {
+			untrack(async () => {
+				const name = await story.nameIfUnnamed();
+				if (name) {
+					onnamed?.(name);
+				}
+			});
 		}
 	});
 

@@ -62,7 +62,8 @@ const client = vi.hoisted(() => ({
 	setActiveTurn: vi.fn(),
 	saveSetup: vi.fn(),
 	createMark: vi.fn(),
-	deleteMark: vi.fn()
+	deleteMark: vi.fn(),
+	requestSuggestion: vi.fn()
 }));
 vi.mock('$lib/daydream/client', () => client);
 
@@ -529,5 +530,62 @@ describe('DaydreamThread', () => {
 		);
 		expect(client.writeReply).not.toHaveBeenCalled();
 		expect(container.querySelector('[contenteditable]')?.textContent).toContain('I sit down.');
+	});
+
+	describe('naming', () => {
+		/** A daydream with no name yet, its opening written. */
+		function unnamed() {
+			const value = daydream([turn('t1', null, 'story', 'Sit down. We have a lot to cover.')]);
+			opened.set('d1', { ...SETUP, title: '' });
+			return value;
+		}
+
+		const completion = (body: unknown) => ({
+			ok: true,
+			value: { choices: [{ message: { content: JSON.stringify(body) } }] }
+		});
+
+		it('names an unnamed daydream from its opening, and tells the page', async () => {
+			client.requestSuggestion.mockResolvedValue(completion({ title: '“After the meeting”' }));
+			client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+			const onnamed = vi.fn();
+			render(DaydreamThread, { daydream: unnamed(), available: true, onnamed });
+
+			await waitFor(() => expect(onnamed).toHaveBeenCalledWith('After the meeting'));
+			expect(client.requestSuggestion).toHaveBeenCalledOnce();
+			expect(client.requestSuggestion.mock.calls[0]?.[0]).toMatchObject({
+				task: 'name',
+				opening: 'Sit down. We have a lot to cover.',
+				characters: ['Mara']
+			});
+			expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ title: 'After the meeting' });
+		});
+
+		it('leaves a daydream that has a name alone', async () => {
+			render(DaydreamThread, {
+				daydream: daydream([turn('t1', null, 'story', 'Sit down.')]),
+				available: true
+			});
+			await waSettled(document.body);
+			expect(client.requestSuggestion).not.toHaveBeenCalled();
+		});
+
+		it('waits for the opening before naming anything', async () => {
+			const value = daydream();
+			opened.set('d1', { ...SETUP, title: '' });
+			render(DaydreamThread, { daydream: value, available: true });
+			await waitFor(() => expect(client.writeReply).toHaveBeenCalled());
+			expect(client.requestSuggestion).not.toHaveBeenCalled();
+		});
+
+		it('says nothing when no name comes back, and keeps the setup as it was', async () => {
+			client.requestSuggestion.mockResolvedValue({ ok: false, error: 'No ideas just now.' });
+			const { container } = render(DaydreamThread, { daydream: unnamed(), available: true });
+
+			await waitFor(() => expect(client.requestSuggestion).toHaveBeenCalledOnce());
+			await waSettled(container);
+			expect(client.saveSetup).not.toHaveBeenCalled();
+			expect(container.textContent).not.toContain('No ideas just now.');
+		});
 	});
 });

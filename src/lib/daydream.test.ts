@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+	castingProblem,
 	DAYDREAM_VOICE_PRESETS,
 	type DaydreamNarrator,
 	type DaydreamStance,
+	daydreamTitle,
+	EMPTY_CASTING,
+	fitCastingToScene,
 	leadApplies,
 	MAX_DAYDREAM_CHARACTERS,
 	voiceCanWork,
@@ -68,5 +72,32 @@ describe('leadApplies', () => {
 		expect(leadApplies(voice('none', 'self'), 1)).toBe(true);
 		expect(leadApplies(voice('second-person', 'self'), 0)).toBe(false);
 		expect(leadApplies(voice('third-person', 'absent'), 2)).toBe(false);
+	});
+});
+
+describe('daydreamTitle', () => {
+	it('is the daydream’s own name, or its scene’s until it has one', () => {
+		const scene = { title: 'After hours' };
+		expect(daydreamTitle({ title: 'Late', scene })).toBe('Late');
+		expect(daydreamTitle({ title: '  ', scene })).toBe('After hours');
+	});
+});
+
+describe('casting', () => {
+	const parts = [{ id: 'p1' }, { id: 'p2' }];
+	const cast = (partId: string | null, relationship = '') => ({
+		casting: { ...EMPTY_CASTING, partId, relationship }
+	});
+
+	it('fits a scene when every part cast is one it has, played once', () => {
+		expect(castingProblem([cast('p1'), cast('p2'), cast(null), cast(null)], parts)).toBeNull();
+		expect(castingProblem([cast('p3')], parts)).toContain('no longer has');
+		expect(castingProblem([cast('p1'), cast('p1')], parts)).toContain('only be played by one');
+	});
+
+	it('lets go of the parts a new scene does not have, and keeps the words', () => {
+		expect(
+			fitCastingToScene([cast('p1', 'your boss'), cast('p3', 'your rival')], [{ id: 'p1' }])
+		).toEqual([cast('p1', 'your boss'), cast(null, 'your rival')]);
 	});
 });

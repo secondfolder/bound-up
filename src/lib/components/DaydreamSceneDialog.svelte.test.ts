@@ -1,0 +1,165 @@
+import { render, waitFor } from '@testing-library/svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
+import { MAX_DAYDREAM_CHARACTERS } from '$lib/daydream';
+import { testScene } from '$lib/testing/daydream-setup';
+import { defined } from '$lib/testing/defined';
+import { waSettled } from '$lib/testing/web-awesome';
+import { isClientId } from '$lib/vault';
+
+vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
+
+const suggest = vi.hoisted(() => ({
+	suggestChips: vi.fn(),
+	suggestFill: vi.fn(),
+	surpriseScene: vi.fn()
+}));
+vi.mock('$lib/daydream/suggest', () => suggest);
+
+const client = vi.hoisted(() => ({ saveLibraryItem: vi.fn() }));
+vi.mock('$lib/daydream/client', () => client);
+
+const { default: DaydreamSceneDialog } = await import('./DaydreamSceneDialog.svelte');
+
+const context = { characters: [], limits: '' };
+const SEALED = { recordId: 'x', vaultId: 'v', ciphertext: 'sb1.x', payloadVersion: 1 };
+
+type Details = HTMLElement & { open: boolean; summary: string };
+
+beforeEach(() => {
+	suggest.suggestFill.mockReset();
+	suggest.surpriseScene.mockReset();
+	client.saveLibraryItem.mockReset();
+});
+
+function button(container: ParentNode, text: string): HTMLElement | undefined {
+	return [...container.querySelectorAll<HTMLElement>('wa-button')].find((candidate) =>
+		candidate.textContent?.includes(text)
+	);
+}
+
+function moreDetail(container: ParentNode): Details {
+	// The property, which is what Svelte set on the upgraded element (AGENTS.md).
+	const found = [...container.querySelectorAll<Details>('wa-details')].find(
+		(candidate) => candidate.summary === 'More detail'
+	);
+	if (!found) {
+		throw new Error('no More detail');
+	}
+	return found;
+}
+
+const partRows = (container: ParentNode) => [...container.querySelectorAll('.part')];
+
+function renderDialog(props: Record<string, unknown> = {}) {
+	return render(DaydreamSceneDialog, {
+		// Under `props`: a top-level `context` is read as Svelte's mount option.
+		props: {
+			context,
+			suggestionsOn: false,
+			onsaved: () => undefined,
+			onclose: () => undefined,
+			...props
+		}
+	});
+}
+
+describe('DaydreamSceneDialog', () => {
+	it('keeps the title, what is going on and the parts up front, and the rest closed', async () => {
+		const { baseElement } = renderDialog();
+		await waSettled(baseElement);
+		expect(moreDetail(baseElement).open).toBe(false);
+		const labels = [...moreDetail(baseElement).querySelectorAll('.chip-field .label')].map(
+			(label) => label.textContent?.trim()
+		);
+		expect(labels).toEqual(['Where', 'Your part', 'Tone', 'Anything else']);
+		expect(baseElement.textContent).toContain('Parts for characters');
+	});
+
+	it('starts with more detail open for a scene that has some', async () => {
+		const { baseElement } = renderDialog({ scene: testScene({ setting: 'An empty office.' }) });
+		await waSettled(baseElement);
+		expect(moreDetail(baseElement).open).toBe(true);
+	});
+
+	it('adds parts up to the cap, and removes them', async () => {
+		const { baseElement } = renderDialog();
+		await waSettled(baseElement);
+		for (let count = 1; count <= MAX_DAYDREAM_CHARACTERS; count += 1) {
+			button(baseElement, 'Add a part')?.click();
+			await waitFor(() => expect(partRows(baseElement)).toHaveLength(count));
+		}
+		await waSettled(baseElement);
+		expect(button(baseElement, 'Add a part')).toBeUndefined();
+
+		const remove = partRows(baseElement)[0]?.querySelector('wa-button') as HTMLElement;
+		remove.click();
+		await waitFor(() => expect(partRows(baseElement)).toHaveLength(MAX_DAYDREAM_CHARACTERS - 1));
+		expect(button(baseElement, 'Add a part')).toBeDefined();
+	});
+
+	it('gives a template’s parts ids of their own, and shows the detail it filled', async () => {
+		client.saveLibraryItem.mockResolvedValue({ ok: true, revision: 0, sealed: SEALED });
+		const onsaved = vi.fn();
+		const { baseElement } = renderDialog({ onsaved });
+		await waSettled(baseElement);
+		button(baseElement, 'The facility')?.click();
+		await waitFor(() => expect(partRows(baseElement)).toHaveLength(2));
+		expect(moreDetail(baseElement).open).toBe(true);
+
+		await waSettled(baseElement);
+		button(baseElement, 'Use this scene')?.click();
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		const saved = defined(onsaved.mock.calls[0], 'the saved scene') as [
+			{ parts: { id: string; name: string }[] }
+		];
+		const [{ parts }] = saved;
+		expect(parts.map((part) => part.name)).toEqual(['the instructor', 'the observer']);
+		expect(parts.every((part) => isClientId(part.id))).toBe(true);
+		expect(new Set(parts.map((part) => part.id)).size).toBe(2);
+	});
+
+	it('saves a part as it was typed, trimmed', async () => {
+		const onsaved = vi.fn();
+		const { baseElement } = renderDialog({
+			scene: testScene({ title: 'Late', premise: 'A meeting.' }),
+			onsaved
+		});
+		await waSettled(baseElement);
+		button(baseElement, 'Add a part')?.click();
+		await waitFor(() => expect(partRows(baseElement)).toHaveLength(1));
+		await waSettled(baseElement);
+		const name = partRows(baseElement)[0]
+			?.querySelector('wa-input')
+			?.shadowRoot?.querySelector('input') as HTMLInputElement;
+		await userEvent.type(name, ' the boss ');
+		await waSettled(baseElement);
+		button(baseElement, 'Save changes')?.click();
+
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		expect(onsaved.mock.calls[0]?.[0]).toMatchObject({
+			parts: [{ name: 'the boss', description: '' }]
+		});
+	});
+
+	it('takes the model’s parts only for a scene that had none', async () => {
+		suggest.suggestFill.mockResolvedValue({
+			ok: true,
+			value: {
+				fields: { setting: 'A hotel bar.' },
+				parts: [{ name: 'the stranger', description: '' }]
+			}
+		});
+		const { baseElement } = renderDialog({
+			scene: testScene({ title: 'Late', premise: 'A meeting.' }),
+			suggestionsOn: true
+		});
+		await waSettled(baseElement);
+		button(baseElement, 'Fill in the rest')?.click();
+		await waitFor(() => expect(partRows(baseElement)).toHaveLength(1));
+		expect(baseElement.querySelector<HTMLElement & { value: string }>('.part-name')?.value).toBe(
+			'the stranger'
+		);
+		expect(moreDetail(baseElement).open).toBe(true);
+	});
+});

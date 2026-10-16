@@ -114,6 +114,49 @@ describe('POST /api/daydreams/suggest', () => {
 		expect(limit).not.toHaveBeenCalled();
 	});
 
+	it('writes a casting, and names a daydream from its opening, under the same rules', async () => {
+		const casting = {
+			task: 'casting',
+			character: { name: 'Mara', notes: SECRET_WORDS },
+			scene: { title: 'After hours', premise: 'an interview' },
+			part: { name: 'the interviewer', description: '' },
+			others: [],
+			stance: 'self',
+			limits: ''
+		};
+		const naming = {
+			task: 'name',
+			scene: { title: 'After hours', premise: 'an interview' },
+			characters: ['Mara'],
+			opening: SECRET_WORDS,
+			limits: ''
+		};
+		for (const json of [casting, naming]) {
+			expect(await post(ada, json)).toMatchObject({ type: 'ok' });
+		}
+		const sent = upstream.mock.calls.map(([, init]) =>
+			JSON.parse(String((init as RequestInit).body))
+		);
+		for (const each of sent) {
+			expect(each.messages[0].content.startsWith(SUGGEST_RULES)).toBe(true);
+			expect(each.provider).toEqual({ data_collection: 'deny' });
+			expect(each.messages.at(-1).content).toContain(SECRET_WORDS);
+		}
+	});
+
+	it('refuses an opening too long to name from, without counting it', async () => {
+		const limit = vi.fn(async (): Promise<RateLimitResult> => ({ allowed: true }));
+		const naming = {
+			task: 'name',
+			scene: { title: 'After hours', premise: 'an interview' },
+			characters: [],
+			opening: 'x'.repeat(2001),
+			limits: ''
+		};
+		expect(await post(ada, naming, limit)).toMatchObject({ status: 400 });
+		expect(limit).not.toHaveBeenCalled();
+	});
+
 	it('refuses past its own limit, saying how long to wait', async () => {
 		const result = await post(ada, body, async () => ({ allowed: false, retryAfterSeconds: 9 }));
 		if (result.type !== 'ok') {

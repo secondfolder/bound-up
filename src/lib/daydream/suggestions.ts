@@ -17,13 +17,17 @@ import {
 	type CharacterTextField,
 	DAYDREAM_LIMITS,
 	type DaydreamScene,
+	MAX_DAYDREAM_CHARACTERS,
 	SCENE_TEXT_FIELDS,
 	type SceneTextField
 } from '../daydream';
 import { unfence } from './reply-format';
 
-export type SuggestTask = 'chips' | 'fill' | 'surprise-scene';
+export type SuggestTask = 'chips' | 'fill' | 'surprise-scene' | 'casting' | 'name';
 export type SuggestTarget = 'character' | 'scene';
+
+/** The longest stretch of the opening passage sent to name a daydream: its start says enough. */
+export const MAX_NAMING_OPENING = 2000;
 
 /** A chip is one phrase, so never a list of them. */
 const SEPARATOR = /[,\n]/;
@@ -41,7 +45,6 @@ export const FIELD_LIMITS: Readonly<
 	personality: DAYDREAM_LIMITS.personality,
 	speech: DAYDREAM_LIMITS.speech,
 	appearance: DAYDREAM_LIMITS.appearance,
-	relationship: DAYDREAM_LIMITS.relationship,
 	likes: DAYDREAM_LIMITS.likes,
 	notes: DAYDREAM_LIMITS.characterNotes,
 	title: DAYDREAM_LIMITS.title,
@@ -116,8 +119,50 @@ export function parseFill(target: SuggestTarget, value: unknown): Partial<Record
 	return filled;
 }
 
+/** A scene part as the model suggests it: no id yet, which the dialog gives it. */
+export type SuggestedPart = { name: string; description: string };
+
+/**
+ * The parts in an answer's `parts`: each with a name within its cap, a
+ * description cut to its own, the first few only, no name twice. Anything
+ * else is dropped.
+ */
+export function parseParts(value: unknown): SuggestedPart[] {
+	if (!value || typeof value !== 'object') {
+		return [];
+	}
+	const list = (value as Record<string, unknown>).parts;
+	if (!Array.isArray(list)) {
+		return [];
+	}
+	const parts: SuggestedPart[] = [];
+	for (const entry of list) {
+		const parsed = z
+			.object({ name: z.string(), description: z.string().optional() })
+			.safeParse(entry);
+		if (!parsed.success) {
+			continue;
+		}
+		const name = parsed.data.name.trim();
+		if (
+			name &&
+			name.length <= DAYDREAM_LIMITS.partName &&
+			!parts.some((part) => part.name.toLowerCase() === name.toLowerCase())
+		) {
+			const description = (parsed.data.description ?? '').trim();
+			parts.push({
+				name,
+				description: description.length <= DAYDREAM_LIMITS.partDescription ? description : ''
+			});
+		}
+	}
+	return parts.slice(0, MAX_DAYDREAM_CHARACTERS);
+}
+
 /** A whole scene from "Surprise me", or null when it lacks the two fields a scene must have. */
-export function parseSurpriseScene(value: unknown): DaydreamScene | null {
+export function parseSurpriseScene(
+	value: unknown
+): (Omit<DaydreamScene, 'parts'> & { parts: SuggestedPart[] }) | null {
 	const fields = parseFill('scene', value);
 	if (!(fields.title && fields.premise)) {
 		return null;
@@ -128,6 +173,44 @@ export function parseSurpriseScene(value: unknown): DaydreamScene | null {
 		premise: fields.premise,
 		yourRole: fields.yourRole ?? '',
 		tone: fields.tone ?? '',
-		notes: fields.notes ?? ''
+		notes: fields.notes ?? '',
+		parts: parseParts(value)
 	};
 }
+
+/** Strings within a cap, trimmed; anything else as empty. */
+function capped(value: unknown, limit: number): string {
+	return typeof value === 'string' && value.trim().length <= limit ? value.trim() : '';
+}
+
+/**
+ * Who a character is in this story, from a `casting` answer: the fields that
+ * fit, empty where one did not. Null when neither came back.
+ */
+export function parseCasting(value: unknown): { relationship: string; part: string } | null {
+	if (!value || typeof value !== 'object') {
+		return null;
+	}
+	const answer = value as Record<string, unknown>;
+	const relationship = capped(answer.relationship, DAYDREAM_LIMITS.relationship);
+	const part = capped(answer.part, DAYDREAM_LIMITS.castPart);
+	return relationship || part ? { relationship, part } : null;
+}
+
+/**
+ * A daydream's name from a `name` answer, or null. Quotation marks around it
+ * are taken off, since a model asked for a title tends to quote it.
+ */
+export function parseName(value: unknown): string | null {
+	if (!value || typeof value !== 'object') {
+		return null;
+	}
+	const { title } = value as Record<string, unknown>;
+	if (typeof title !== 'string') {
+		return null;
+	}
+	const name = title.trim().replace(QUOTES, '').trim();
+	return name && name.length <= DAYDREAM_LIMITS.title ? name : null;
+}
+
+const QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;

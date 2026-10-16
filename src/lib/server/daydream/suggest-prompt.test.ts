@@ -1,10 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_NAMING_OPENING } from '$lib/daydream/suggestions';
 import {
 	buildSuggestMessages,
 	SUGGEST_RULES,
 	type SuggestRequest,
 	suggestRequestSchema
 } from './suggest-prompt';
+
+const casting: SuggestRequest = {
+	task: 'casting',
+	character: { name: 'Mara', archetype: 'strict mentor', personality: 'calm' },
+	scene: {
+		title: 'After hours',
+		premise: 'an interview that goes off script',
+		yourRole: 'the new hire'
+	},
+	part: { name: 'the interviewer', description: 'runs the interview' },
+	others: [{ name: 'Jun', part: 'the observer' }],
+	stance: 'self',
+	limits: 'Nothing public.'
+};
+
+const naming: SuggestRequest = {
+	task: 'name',
+	scene: { title: 'After hours', premise: 'an interview that goes off script' },
+	characters: ['Mara'],
+	opening: 'The door clicks shut behind you.',
+	limits: 'Nothing public.'
+};
 
 const base: SuggestRequest = {
 	task: 'chips',
@@ -70,7 +93,100 @@ describe('buildSuggestMessages', () => {
 	});
 });
 
+describe('buildSuggestMessages, for scene parts', () => {
+	it('asks for parts with a surprise scene', () => {
+		const ask =
+			buildSuggestMessages({
+				task: 'surprise-scene',
+				target: 'scene',
+				draft: {},
+				context: { characters: [], limits: '' }
+			}).messages.at(-1)?.content ?? '';
+		expect(ask).toContain('"parts": [{"name"');
+	});
+
+	it('asks for parts when filling in a scene with none, and not over ones it has', () => {
+		const scene = (parts?: { name: string; description: string }[]) =>
+			buildSuggestMessages({
+				task: 'fill',
+				target: 'scene',
+				draft: { title: 'Late', ...(parts ? { parts } : {}) },
+				context: { characters: [], limits: '' }
+			}).messages.at(-1)?.content ?? '';
+		expect(scene()).toContain('"parts"');
+		const withParts = scene([{ name: 'the boss', description: 'runs it' }]);
+		expect(withParts).not.toContain('"parts": [');
+		expect(withParts).toContain('- the boss: runs it');
+	});
+});
+
+describe('buildSuggestMessages, casting', () => {
+	it('writes who a character is in this scene, from both, with the rules and limits first', () => {
+		const { messages, maxTokens } = buildSuggestMessages(casting);
+		expect(messages[0]?.content.startsWith(SUGGEST_RULES)).toBe(true);
+		expect(messages[0]?.content).toContain('Nothing public.');
+		const ask = messages.at(-1)?.content ?? '';
+		expect(ask).toContain('Name: Mara');
+		expect(ask).toContain('Personality: calm');
+		expect(ask).toContain('Your part: the new hire');
+		expect(ask).toContain('Mara plays the part of the interviewer: runs the interview.');
+		expect(ask).toContain('Also in the story: Jun (the observer).');
+		expect(ask).toContain('{"relationship": "…", "part": "…"}');
+		expect(maxTokens).toBeLessThan(1000);
+	});
+
+	it('says when the user only watches, and when there is no part', () => {
+		const ask =
+			buildSuggestMessages({ ...casting, stance: 'absent', part: null, others: [] }).messages.at(-1)
+				?.content ?? '';
+		expect(ask).toContain('The user is not in the story');
+		expect(ask).toContain('has no particular part');
+		expect(ask).toContain('Nobody else is in the story.');
+	});
+});
+
+describe('buildSuggestMessages, naming', () => {
+	it('names the story from its scene and its opening', () => {
+		const { messages, maxTokens } = buildSuggestMessages(naming);
+		expect(messages[0]?.content.startsWith(SUGGEST_RULES)).toBe(true);
+		const ask = messages.at(-1)?.content ?? '';
+		expect(ask).toContain('The door clicks shut behind you.');
+		expect(ask).toContain('"After hours"');
+		expect(ask).toContain('With: Mara.');
+		expect(ask).toContain('{"title": "…"}');
+		expect(maxTokens).toBeLessThanOrEqual(100);
+	});
+});
+
 describe('suggestRequestSchema', () => {
+	it('accepts a reasonable casting or naming request', () => {
+		expect(suggestRequestSchema.safeParse(casting).success).toBe(true);
+		expect(suggestRequestSchema.safeParse(naming).success).toBe(true);
+	});
+
+	it('holds a casting request to its caps', () => {
+		expect(
+			suggestRequestSchema.safeParse({
+				...casting,
+				others: Array.from({ length: 4 }, () => ({ name: 'Jun', part: null }))
+			}).success
+		).toBe(false);
+		expect(
+			suggestRequestSchema.safeParse({
+				...casting,
+				part: { name: 'x'.repeat(61), description: '' }
+			}).success
+		).toBe(false);
+	});
+
+	it('takes only the start of an opening to name, and needs one', () => {
+		expect(
+			suggestRequestSchema.safeParse({ ...naming, opening: 'x'.repeat(MAX_NAMING_OPENING + 1) })
+				.success
+		).toBe(false);
+		expect(suggestRequestSchema.safeParse({ ...naming, opening: '' }).success).toBe(false);
+	});
+
 	it('accepts a reasonable request', () => {
 		expect(suggestRequestSchema.safeParse(base).success).toBe(true);
 	});

@@ -4,7 +4,8 @@
 	import {
 		type DaydreamCharacterCopy,
 		type DaydreamSceneCopy,
-		DEFAULT_STORY_DIALS
+		DEFAULT_STORY_DIALS,
+		EMPTY_CASTING
 	} from '$lib/daydream';
 	import { deleteLibraryItem } from '$lib/daydream/client';
 	import {
@@ -57,7 +58,8 @@
 				? {
 						name: character.name,
 						detail: character.archetype,
-						character: { ...character, ...source }
+						// From the library there is no story to be cast in.
+						character: { ...character, ...source, casting: EMPTY_CASTING }
 					}
 				: character;
 		}

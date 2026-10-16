@@ -14,6 +14,25 @@ scene with another person.
 
 `/daydreams/new` and `/daydreams/[id]/edit` (`DaydreamSetupForm.svelte`).
 
+**Short by default.** A new daydream needs a voice preset, a scene and
+someone in it, and that is all the page shows: the voice's own settings sit
+under "Fine-tune how it's told", and who leads, the limits and the dials
+under "More options". Nothing is taken away — the same controls are a tap
+further in — and on the edit page each disclosure starts open when what it
+holds differs from the default (a voice no preset gives, a protagonist name,
+a lead other than "They lead", limits written, dials moved), so nothing a
+user customised is ever out of sight. The character and scene dialogs do the
+same with "More detail".
+
+The disclosures are `wa-details`, opened from the start with the `startOpen`
+attachment (`components/details.ts`) rather than `open={…}` in markup: the
+server renders a `false` it does not know as `open="false"`, which Lit reads
+as open.
+
+**No name to think of.** The create page asks for no name; the model names
+the daydream after its opening (see [Naming](#naming)). The edit page has a
+Name field, which may be left empty to have it named again.
+
 ### How it's told
 
 The voice is two settings, separate from who is in the story
@@ -36,7 +55,10 @@ Between them they make every shape of story:
 | Watch a story unfold   | 1+         | third-person  | absent   |
 | The rules              | 0+         | impersonal    | self     |
 
-Those four are the presets; the two pickers under them can make any other.
+Those four are the presets, and all the page shows at first; the two pickers
+under "Fine-tune how it's told" can make any other. A problem with the voice
+is shown under the presets, outside the disclosure, so a closed one never
+hides why the form will not save.
 `voiceProblem` refuses what cannot work — no narrator and no character
 (nobody speaks), no narrator while watching (the characters would be talking
 to no one), watching nothing, a narrator talking to a "you" who is absent, a
@@ -73,20 +95,82 @@ daydreams then see "Updated". Unticking "Save to my characters" keeps the
 edit in this daydream only, as a copy with no source — it never claims to
 match a record it no longer matches.
 
+### Characters, scenes and casting
+
+A character and a scene are reusable on their own, but who a character is
+*in a story* depends on the story. So the two are joined in the daydream, not
+in the library:
+
+- **The library character is the actor**: who they are in any story — type,
+  personality, how they talk, appearance, what they enjoy, notes, dials. It
+  has no relationship to the user, because that changes from one story to the
+  next.
+- **A scene can list parts** (`ScenePart`: a name like "the interviewer" and
+  a few words on it), up to `MAX_DAYDREAM_CHARACTERS`. Parts make a scene a
+  plot any fitting character can step into. They are optional: a scene with
+  none is cast freely. The user's own part stays the scene's `yourRole`
+  ("Your part").
+- **The daydream's copy of each character carries a casting**
+  (`DaydreamCasting`): the part they play (`partId`, or none), who they are
+  to the user in this story (`relationship`), and what they are doing or
+  want as it starts (`part`). It is never saved to the library.
+
+The setup page shows one row per part under "Who's in it", each with who
+plays it or a menu to cast someone, then anyone cast without a part, then
+"Add someone else". The character dialog opened from a daydream is in two
+halves — "In this story" (the casting) and "About <name>" (the actor, which
+is what "Save to my characters" saves); opened from the library it has only
+the second.
+
+The rules that keep this sound:
+
+- **Library sync compares the actor only.** "Use the latest" and "Keep this
+  version" replace or re-date the library's fields and keep the casting, so
+  casting someone differently never makes them look changed, and catching up
+  with the library never loses their part.
+- **A part is played once, and must exist.** `castingProblem` refuses a part
+  the scene does not have or one cast twice; the form schema and the setup
+  kind both run it.
+- **Changing the scene lets go of parts, not words.** Swapping the scene, or
+  taking the library's newer version of it, sets the `partId` of anyone in a
+  part it no longer has to null and keeps their relationship and part text
+  (`fitCastingToScene`). Part ids are stable across a scene's edits, so an
+  edited scene keeps its castings.
+- **Parts nobody plays are left out of the prompt.** Told about an empty
+  part, the model would invent someone to fill it, which the user chose not
+  to.
+
+**The model writes the link.** With suggestions on and a scene chosen,
+casting a library character from a part's menu asks the model who they are
+in this story (the `casting` suggestion, from the actor's fields, the scene,
+the part, the others cast and where the user stands), and fills the
+casting's empty fields with the answer; the card says "Writing their part…"
+meanwhile. That is background work: a failure leaves the fields empty and
+says nothing, and "Write their part" in the dialog asks again. Neither ever
+writes over something already written.
+
 ### Guided, over free text
 
 The character and scene dialogs (`DaydreamCharacterDialog.svelte`,
 `DaydreamSceneDialog.svelte`) are guided rather than blank:
 
 - **Starting points** (`CHARACTER_TEMPLATES`, `SCENE_TEMPLATES` in
-  `daydream/catalog.ts`).
+  `daydream/catalog.ts`). A scene template comes with its parts, which get
+  fresh ids each time one is used.
 - **Character dials**: a tone (warm, teasing, cold, clinical) and four
   sliders — control, strictness, edge, talk — each of which can be left
   unset. The words for each value are in `daydream/dial-words.ts`, shared by
   the sliders and the prompt, so the screen and the model read the same
   thing.
 - **Chips under every field**: phrases that toggle in the field's text
-  (`toggleChip`), leaving whatever else was written exactly as it was.
+  (`toggleChip`), leaving whatever else was written exactly as it was. The
+  casting's two fields have their own (`CASTING_CHIPS`).
+- **Up front, and under "More detail".** A character shows its name, type and
+  personality; a scene its title, what is going on and its parts. The rest —
+  a character's dials and other fields, a scene's setting, your part, tone
+  and notes — is under "More detail", which starts open when any of it is
+  filled, and opens when a template, Fill in the rest or Surprise me writes
+  into it, so what changed is in view.
 
 **The free text is the truth.** Every field is plain text the user can
 rewrite, chips only edit it, and where a description and the dials
@@ -94,9 +178,10 @@ disagree the prompt tells the model to follow the description.
 
 With suggestions on — the disclosure accepted and a key configured — the
 model can be asked too: **More ideas** for more chips on one field, **Fill
-in the rest** for the empty fields (never over written ones), and **Surprise
-me** for a whole scene, which opens in the scene dialog to read, change, or
-**Try another** before it is used. Without them, the curated chips and
+in the rest** for the empty fields (never over written ones, and parts only
+for a scene with none), and **Surprise me** for a whole scene, parts
+included, which opens in the scene dialog to read, change, or **Try
+another** before it is used. Without them, the curated chips and
 templates still work, and nothing leaves the device.
 
 The dialogs are SPA superforms that save through the library endpoints
@@ -116,11 +201,32 @@ nested), and `onSubmit` replaces the whole post with the sealed record.
    the reply and suggest endpoints refuse (409) until it exists.
 2. **Setup**, as above. It is sealed in the user's own vault before posting.
 3. **Opening.** The story page (`DaydreamThread.svelte`) asks for the opening
-   by itself, once per visit, when the daydream has no turns.
+   by itself, once per visit, when the daydream has no turns. Once it is
+   written, a daydream with no name is named (below).
 4. **Playing.** Every way of moving the story on — below — adds a turn after
    the one the user is on and asks for the passage after it. The page's
    state and actions live in one object, `DaydreamStory`
    (`daydream/story.svelte.ts`); the components draw it.
+
+## Naming
+
+A daydream's `title` is empty until it has a name. Everywhere one is shown
+— the list, the story's heading, the home card — goes through
+`daydreamTitle`, which falls back to the scene's title, so an unnamed
+daydream is never blank.
+
+Once the story page has an opening passage and nothing is being written,
+`DaydreamStory.nameIfUnnamed` sends the scene's title and premise, the cast's
+names, the user's limits and the start of the opening (`MAX_NAMING_OPENING`)
+as the `name` suggestion, and saves the answer into the setup through the
+same path as the dials. The page's heading is told the new name directly
+rather than reloading, which would read every turn again.
+
+It is asked at most once per visit, and never retried: a failure says
+nothing (the scene's title is still standing in) and the next visit asks
+again, and an answer that arrives after the setup gained a name some other
+way is dropped. Renaming is the edit page's Name field; clearing it hands the
+naming back to the model.
 
 ## The story is a tree
 
@@ -319,12 +425,21 @@ which validates them (`replyRequestSchema`), wraps them in its own system
 prompt and forwards them to OpenRouter, and the provider that writes the
 reply. The reply streams back through the server unread.
 
-**In transit, for each suggestion:** the character or scene being written,
-the names and types of the daydream's other characters, its limits and its
-dials go to `POST /api/daydreams/suggest`, under the same rules, with a
-prompt of its own (`suggest-prompt.ts`). The answer is a small JSON
-completion, not streamed, passed back unread for the browser to check
-(`daydream/suggestions.ts`).
+**In transit, for each suggestion:** what the suggestion is about goes to
+`POST /api/daydreams/suggest`, under the same rules, with a prompt of its
+own (`suggest-prompt.ts`):
+
+- for a character or scene being written: its fields (and a scene's parts),
+  the names and types of the daydream's other characters, its limits and its
+  dials;
+- for a casting: the character's own fields, the scene's, the part they are
+  cast in, the others' names and parts, where the user stands, and the
+  limits;
+- for a name: the scene's title and premise, the cast's names, the limits,
+  and the first `MAX_NAMING_OPENING` characters of the opening passage.
+
+The answer is a small JSON completion, not streamed, passed back unread for
+the browser to check (`daydream/suggestions.ts`).
 
 For both:
 
@@ -468,7 +583,8 @@ Noted so they are not lost; none is in the code.
 
 ## Tests
 
-- Pure: `daydream.test.ts` (every voice combination),
+- Pure: `daydream.test.ts` (every voice combination, casting against a
+  scene's parts),
   `daydream/tree.test.ts`, `reply-format.test.ts`, `dice.test.ts`,
   `chips.test.ts`, `quotes.test.ts`, `ooc.test.ts`, `suggestions.test.ts`,
   `context.test.ts`, `server/daydream/prompt.test.ts` (the rules always come
@@ -478,8 +594,10 @@ Noted so they are not lost; none is in the code.
 - Server: `server/daydreams.test.ts` (the tree, marks, libraries, ownership),
   the route tests under `routes/(auth-required)/(app)/daydreams/` and
   `routes/api/daydreams/`, and `server/daydream/library-routes.test.ts`.
-- Component: `DaydreamThread.svelte.test.ts`,
-  `DaydreamSetupForm.svelte.test.ts`, `DaydreamSetupFormAdd.svelte.test.ts`,
-  `DaydreamCharacterDialog.svelte.test.ts`.
+- Component: `DaydreamThread.svelte.test.ts` (naming included),
+  `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts),
+  `DaydreamSetupFormAdd.svelte.test.ts`,
+  `DaydreamCharacterDialog.svelte.test.ts` (the two halves),
+  `DaydreamSceneDialog.svelte.test.ts` (the parts editor).
 - End to end: `e2e/daydreams.spec.ts`, against `e2e/model-stub.mjs`, a
   stand-in OpenRouter that `e2e/server.mjs` starts beside the app.

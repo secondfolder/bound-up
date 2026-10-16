@@ -45,6 +45,8 @@ import {
 } from './client';
 import { type ContextTurn, type Reaction, toContextTurn, trimContext } from './context';
 import { outcomeFor, type RollProposal, roll } from './dice';
+import { suggestName } from './suggest';
+import { MAX_NAMING_OPENING } from './suggestions';
 import {
 	childrenOf,
 	currentDirections,
@@ -615,6 +617,48 @@ export class DaydreamStory {
 	async setDials(dials: StoryDials): Promise<string | null> {
 		const { setup } = this;
 		return setup ? await this.saveSetup({ ...setup, dials }) : NOT_READY;
+	}
+
+	/** This visit's request for a name, once made: once is enough, whatever came of it. */
+	#naming: Promise<string | null> | null = null;
+
+	/**
+	 * Names a daydream that has no name yet, once its opening is written: the
+	 * setup form asks for none, so nobody has to think of one before they
+	 * have started (docs/daydreams.md, "Naming").
+	 *
+	 * Answers the name once it is saved, or null. Background work nobody
+	 * waits on, so it never says why it did not: the scene's title stands in
+	 * meanwhile (`daydreamTitle`), and the next visit asks again. Never
+	 * retried on a revision conflict either — something else just changed the
+	 * setup, and naming is not worth overwriting it.
+	 */
+	nameIfUnnamed(): Promise<string | null> {
+		const { setup } = this;
+		const opening = this.path.find((node) => node.role === 'story');
+		const content = opening ? this.content(opening.id) : null;
+		// Only a request worth making is remembered: one asked too early, before
+		// the opening had opened, must not stand in for the real one.
+		if (this.available && setup && setup.title.trim() === '' && content?.type === 'text') {
+			this.#naming ??= this.#name(setup, content.text);
+		}
+		return this.#naming ?? Promise.resolve(null);
+	}
+
+	async #name(setup: DaydreamSetup, opening: string): Promise<string | null> {
+		const answer = await suggestName({
+			scene: { title: setup.scene.title, premise: setup.scene.premise },
+			characters: setup.characters.map((character) => character.name),
+			opening: opening.slice(0, MAX_NAMING_OPENING),
+			limits: setup.limits
+		});
+		// The setup again, as it is now: it may have changed while the model thought.
+		const now = this.setup;
+		if (!(answer.ok && now) || now.title.trim() !== '') {
+			return null;
+		}
+		const failed = await this.saveSetup({ ...now, title: answer.value });
+		return failed === null ? answer.value : null;
 	}
 
 	// ── marks ────────────────────────────────────────────────────────────────

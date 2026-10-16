@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import DaydreamDisclosure from '$lib/components/DaydreamDisclosure.svelte';
+	import { daydreamTitle } from '$lib/daydream';
 	import type { DaydreamSetupContent } from '$lib/sealed-kinds/daydreams';
 	import { openedDaydreamSetup, openedPart, shownText } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
@@ -45,7 +46,7 @@
 					{const setup = $derived(openedDaydreamSetup(daydream.setup))}
 					<li>
 						<a href={resolve('/(auth-required)/(app)/daydreams/[id]', { id: daydream.id })}>
-							<span class="title">{shownText(openedPart(setup, (value) => value.title))}</span>
+							<span class="title">{shownText(openedPart(setup, daydreamTitle))}</span>
 							<span class="detail">
 								{#if setup}{withWhom(setup)} ·
 								{/if}{daydream.lastTurnAt

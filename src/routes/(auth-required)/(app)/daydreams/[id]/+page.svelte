@@ -3,13 +3,20 @@
 	import DaydreamDisclosure from '$lib/components/DaydreamDisclosure.svelte';
 	import DaydreamThread from '$lib/components/DaydreamThread.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import { daydreamTitle } from '$lib/daydream';
 	import { openedDaydreamSetup, openedPart, shownText } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const setup = $derived(openedDaydreamSetup(data.daydream.setup));
-	const title = $derived(shownText(openedPart(setup, (value) => value.title)));
+	/**
+	 * The name the thread gave it this visit, after the opening. Held here
+	 * rather than reloaded: a reload would read every turn again to change
+	 * one heading.
+	 */
+	let named: string | null = $state(null);
+	const title = $derived(named ?? shownText(openedPart(setup, daydreamTitle)));
 </script>
 
 <section class="page">
@@ -36,7 +43,13 @@
 		{:else}
 			<!-- Keyed, so moving between daydreams starts each conversation afresh. -->
 			{#key data.daydream.id}
-				<DaydreamThread daydream={data.daydream} available={data.available} />
+				<DaydreamThread
+					daydream={data.daydream}
+					available={data.available}
+					onnamed={(name) => {
+						named = name;
+					}}
+				/>
 			{/key}
 		{/if}
 	</div>

@@ -19,6 +19,9 @@ vi.mock('$lib/sealed-views.svelte', async (importOriginal) => ({
 	openedDaydreamScene: (sealed: SealedRefView) => opened.get(sealed.recordId)
 }));
 
+const client = vi.hoisted(() => ({ saveLibraryItem: vi.fn(), requestSuggestion: vi.fn() }));
+vi.mock('$lib/daydream/client', () => client);
+
 const { default: DaydreamSetupForm } = await import('./DaydreamSetupForm.svelte');
 
 const EMPTY_LIBRARY: DaydreamLibraryView = { characters: [], scenes: [] };
@@ -64,8 +67,34 @@ function button(container: HTMLElement, text: string): HTMLElement | undefined {
 	);
 }
 
+/** A `wa-details` by its summary. */
+function details(container: HTMLElement, summary: string) {
+	// The property, which is what Svelte set on the upgraded element (AGENTS.md).
+	const found = [
+		...container.querySelectorAll<HTMLElement & { open: boolean; summary: string }>('wa-details')
+	].find((candidate) => candidate.summary === summary);
+	if (!found) {
+		throw new Error(`no "${summary}" details`);
+	}
+	return found;
+}
+
+async function openDetails(container: HTMLElement, summary: string) {
+	details(container, summary).open = true;
+	await waSettled(container);
+}
+
+/** The rows under "Who's in it" for the scene's parts. */
+const partRows = (container: HTMLElement) => [...container.querySelectorAll<HTMLElement>('.part')];
+
+const PARTS = [
+	{ id: 'p1', name: 'the interviewer', description: 'asks the questions' },
+	{ id: 'p2', name: 'the observer', description: '' }
+];
+
 beforeEach(() => {
 	opened.clear();
+	client.requestSuggestion.mockReset();
 });
 
 describe('DaydreamSetupForm', () => {
@@ -78,6 +107,7 @@ describe('DaydreamSetupForm', () => {
 	 */
 	it('keeps the spaces typed into the title and the limits', async () => {
 		const { container } = await renderForm({ setup: testDaydreamSetup() });
+		await openDetails(container, 'More options');
 		const title = container.querySelector('wa-input')?.shadowRoot?.querySelector('input');
 		const limits = container.querySelector('textarea');
 		if (!(title && limits)) {
@@ -151,5 +181,198 @@ describe('DaydreamSetupForm', () => {
 		off.unmount();
 		const on = await renderForm({ suggestionsOn: true });
 		expect(button(on.container, 'Surprise me')).toBeDefined();
+	});
+
+	describe('kept short', () => {
+		it('asks for no name for a new daydream, and offers one to change later', async () => {
+			const created = await renderForm();
+			expect(created.container.querySelector('wa-input[name="title"]')).toBeNull();
+			created.unmount();
+			const edited = await renderForm({ setup: testDaydreamSetup() });
+			expect(edited.container.querySelector('wa-input[name="title"]')).not.toBeNull();
+		});
+
+		it('keeps the voice settings and the rest under closed disclosures for a new daydream', async () => {
+			const { container } = await renderForm();
+			expect(details(container, "Fine-tune how it's told").open).toBe(false);
+			expect(details(container, 'More options').open).toBe(false);
+			// Who leads, the limits and the dials are all in there.
+			const more = details(container, 'More options');
+			expect(more.querySelector('textarea')).not.toBeNull();
+			expect(more.textContent).toContain('Dials');
+		});
+
+		it('opens what an edited daydream has changed, and only that', async () => {
+			const limited = await renderForm({ setup: testDaydreamSetup({ limits: 'Nothing public.' }) });
+			expect(details(limited.container, 'More options').open).toBe(true);
+			expect(details(limited.container, "Fine-tune how it's told").open).toBe(false);
+			limited.unmount();
+
+			const persona = await renderForm({
+				setup: testDaydreamSetup({
+					voice: { narrator: 'none', stance: 'persona', protagonistName: 'Sam' }
+				})
+			});
+			expect(details(persona.container, "Fine-tune how it's told").open).toBe(true);
+			expect(details(persona.container, 'More options').open).toBe(false);
+		});
+
+		it('shows a problem with the voice while its settings are closed', async () => {
+			const { container } = await renderForm();
+			button(container, 'Watch a story unfold')?.click();
+			await waitFor(() => expect(container.querySelector('.problem')).not.toBeNull());
+			expect(container.querySelector('.problem')?.closest('wa-details')).toBeNull();
+		});
+	});
+
+	describe('casting', () => {
+		it('gives each of the scene’s parts a row, with who plays it or a way to cast it', async () => {
+			const setup = testDaydreamSetup({
+				scene: { ...testDaydreamSetup().scene, parts: PARTS },
+				characters: [
+					testCharacter({
+						name: 'Mara',
+						casting: { partId: 'p1', relationship: 'your boss', part: 'testing you' }
+					})
+				]
+			});
+			const { container } = await renderForm({ setup });
+			const [interviewer, observer] = partRows(container);
+			expect(interviewer?.textContent).toContain('the interviewer');
+			expect(interviewer?.querySelector('wa-card')?.textContent).toContain('Mara');
+			expect(interviewer?.textContent).toContain('your boss · testing you');
+			expect(observer?.querySelector('wa-card')).toBeNull();
+			expect(button(observer as HTMLElement, 'Cast the observer')).toBeDefined();
+			// Everyone has a part, so the last picker is for someone besides.
+			expect(button(container, 'Add someone else')).toBeDefined();
+		});
+
+		it('writes the part of someone cast from the library, saying so while it does', async () => {
+			opened.set('c1', testCharacter({ name: 'Mara', personality: 'Calm.' }));
+			let answer: (value: unknown) => void = () => undefined;
+			client.requestSuggestion.mockReturnValue(
+				new Promise((resolve) => {
+					answer = resolve;
+				})
+			);
+			const { container } = await renderForm({
+				setup: testDaydreamSetup({
+					scene: { ...testDaydreamSetup().scene, parts: PARTS },
+					characters: []
+				}),
+				library: {
+					characters: [{ id: 'c1', revision: 0, updatedAt: new Date(), sealed: ref('c1') }],
+					scenes: []
+				},
+				suggestionsOn: true
+			});
+			const picker = partRows(container)[0]?.querySelector('wa-dropdown') as HTMLElement;
+			const item = [
+				...picker.querySelectorAll<HTMLElement & { value: string }>('wa-dropdown-item')
+			].find((candidate) => candidate.value === 'c1');
+			picker.dispatchEvent(new CustomEvent('wa-select', { detail: { item } }));
+
+			await waitFor(() =>
+				expect(partRows(container)[0]?.textContent).toContain('Writing their part…')
+			);
+			expect(client.requestSuggestion.mock.calls[0]?.[0]).toMatchObject({
+				task: 'casting',
+				character: { name: 'Mara', personality: 'Calm.' },
+				part: { name: 'the interviewer', description: 'asks the questions' },
+				stance: 'self'
+			});
+			answer({
+				ok: true,
+				value: {
+					choices: [
+						{ message: { content: '{"relationship": "your new boss", "part": "testing you"}' } }
+					]
+				}
+			});
+			await waitFor(() =>
+				expect(partRows(container)[0]?.textContent).toContain('your new boss · testing you')
+			);
+		});
+
+		it('casts without writing anything when suggestions are off', async () => {
+			opened.set('c1', testCharacter({ name: 'Mara' }));
+			const { container } = await renderForm({
+				setup: testDaydreamSetup({
+					scene: { ...testDaydreamSetup().scene, parts: PARTS },
+					characters: []
+				}),
+				library: {
+					characters: [{ id: 'c1', revision: 0, updatedAt: new Date(), sealed: ref('c1') }],
+					scenes: []
+				}
+			});
+			const picker = partRows(container)[0]?.querySelector('wa-dropdown') as HTMLElement;
+			const item = [
+				...picker.querySelectorAll<HTMLElement & { value: string }>('wa-dropdown-item')
+			].find((candidate) => candidate.value === 'c1');
+			picker.dispatchEvent(new CustomEvent('wa-select', { detail: { item } }));
+			await waitFor(() => expect(partRows(container)[0]?.textContent).toContain('Mara'));
+			expect(client.requestSuggestion).not.toHaveBeenCalled();
+		});
+
+		it('lets go of a part the new scene does not have, and keeps the words', async () => {
+			opened.set('s2', { ...testDaydreamSetup().scene, title: 'Elsewhere', parts: [] });
+			const setup = testDaydreamSetup({
+				scene: { ...testDaydreamSetup().scene, parts: PARTS },
+				characters: [
+					testCharacter({
+						name: 'Mara',
+						casting: { partId: 'p1', relationship: 'your boss', part: '' }
+					})
+				]
+			});
+			const { container } = await renderForm({
+				setup,
+				library: {
+					characters: [],
+					scenes: [{ id: 's2', revision: 0, updatedAt: new Date(), sealed: ref('s2') }]
+				}
+			});
+			const picker = [...container.querySelectorAll('wa-dropdown')].find((dropdown) =>
+				dropdown.textContent?.includes('Choose a saved scene')
+			) as HTMLElement;
+			const item = picker.querySelector(
+				'wa-dropdown-item[value="s2"], wa-dropdown-item'
+			) as HTMLElement;
+			picker.dispatchEvent(new CustomEvent('wa-select', { detail: { item } }));
+			await waitFor(() => expect(container.textContent).toContain('Elsewhere'));
+			expect(partRows(container)).toHaveLength(0);
+			const card = [...container.querySelectorAll('wa-card')].find((each) =>
+				each.textContent?.includes('Mara')
+			);
+			expect(card?.textContent).toContain('your boss');
+		});
+
+		it('keeps their part when taking the library’s newer version of them', async () => {
+			opened.set('c1', { ...testCharacter({ name: 'Mara', archetype: 'stricter now' }) });
+			const setup = testDaydreamSetup({
+				scene: { ...testDaydreamSetup().scene, parts: PARTS },
+				characters: [
+					testCharacter({
+						name: 'Mara',
+						sourceId: 'c1',
+						sourceRevision: 1,
+						casting: { partId: 'p1', relationship: 'your boss', part: '' }
+					})
+				]
+			});
+			const { container } = await renderForm({
+				setup,
+				library: {
+					characters: [{ id: 'c1', revision: 2, updatedAt: new Date(), sealed: ref('c1') }],
+					scenes: []
+				}
+			});
+			button(container, 'Use the latest')?.click();
+			await waitFor(() =>
+				expect(container.textContent).not.toContain('Updated in your library since.')
+			);
+			expect(partRows(container)[0]?.textContent).toContain('your boss');
+		});
 	});
 });

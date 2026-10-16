@@ -3,6 +3,7 @@ import {
 	type DaydreamSceneCopy,
 	type DaydreamSetup,
 	DEFAULT_STORY_DIALS,
+	EMPTY_CASTING,
 	UNSET_CHARACTER_DIALS
 } from '../daydream';
 
@@ -22,10 +23,10 @@ export function testCharacter(
 		personality: '',
 		speech: '',
 		appearance: '',
-		relationship: '',
 		likes: '',
 		notes: '',
 		dials: UNSET_CHARACTER_DIALS,
+		casting: EMPTY_CASTING,
 		...overrides
 	};
 }
@@ -40,6 +41,7 @@ export function testScene(overrides: Partial<DaydreamSceneCopy> = {}): DaydreamS
 		yourRole: '',
 		tone: '',
 		notes: '',
+		parts: [],
 		...overrides
 	};
 }

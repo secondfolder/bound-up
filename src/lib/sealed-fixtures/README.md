@@ -22,6 +22,11 @@ data would simply stop showing. So:
   as a review of the upcaster. Never touch its `ciphertext`, `recordId` or
   `version`: those are the stored record, and they are the part that must
   keep opening. (Daydreams' setup and turn kinds were the first to do this.)
+- **The one exception is a version no deployed build has ever written.** No
+  stored record can be holding it, so it may still be changed in place, and
+  its fixture re-sealed with it. Daydreams' setup v2, character v1 and scene
+  v1 were changed this way (castings and scene parts) before Daydreams first
+  shipped. Once a version has been deployed, it is frozen like the rest.
 - **All fixtures share one vault**: the key is bytes 0–31, and the vault id is
   the one at the top of `fixtures.json`.
 

@@ -173,7 +173,15 @@ export const UNSET_CHARACTER_DIALS: CharacterDials = {
 	talk: null
 };
 
-/** A character as the library holds it and a daydream copies it. Free text is the truth. */
+/**
+ * A character as the library holds it and a daydream copies it: who they
+ * are in any story. Free text is the truth.
+ *
+ * Nothing here depends on the scene. Who they are to the user, and what they
+ * are doing, change from one story to the next, so they live on the
+ * daydream's casting (`DaydreamCasting`) instead — which is what lets one
+ * character be reused across scenes without being rewritten for each.
+ */
 export type DaydreamCharacter = {
 	name: string;
 	archetype: string;
@@ -181,8 +189,6 @@ export type DaydreamCharacter = {
 	/** How they talk. */
 	speech: string;
 	appearance: string;
-	/** Who they are to the user. */
-	relationship: string;
 	likes: string;
 	notes: string;
 	dials: CharacterDials;
@@ -194,12 +200,17 @@ export const CHARACTER_TEXT_FIELDS = [
 	'personality',
 	'speech',
 	'appearance',
-	'relationship',
 	'likes',
 	'notes'
 ] as const satisfies readonly (keyof DaydreamCharacter)[];
 
 export type CharacterTextField = (typeof CHARACTER_TEXT_FIELDS)[number];
+
+/** The ones the dialog shows before "More detail": enough to have someone to play with. */
+export const CHARACTER_PRIMARY_FIELDS = [
+	'archetype',
+	'personality'
+] as const satisfies readonly CharacterTextField[];
 
 export const EMPTY_CHARACTER: DaydreamCharacter = {
 	name: '',
@@ -207,7 +218,6 @@ export const EMPTY_CHARACTER: DaydreamCharacter = {
 	personality: '',
 	speech: '',
 	appearance: '',
-	relationship: '',
 	likes: '',
 	notes: '',
 	dials: UNSET_CHARACTER_DIALS
@@ -215,17 +225,31 @@ export const EMPTY_CHARACTER: DaydreamCharacter = {
 
 // ── scenes ───────────────────────────────────────────────────────────────────
 
+/**
+ * A part a scene has for a character to play: "the interviewer", "the one
+ * who won the bet". Characters are cast into parts, so a scene reads as a
+ * plot any fitting character can step into.
+ */
+export type ScenePart = {
+	/** Stable across edits, so a daydream's castings survive the scene changing. */
+	id: string;
+	name: string;
+	description: string;
+};
+
 export type DaydreamScene = {
 	title: string;
 	/** Where it happens. */
 	setting: string;
 	/** What is going on as it starts. */
 	premise: string;
-	/** Who the user is in it, when they are in it. */
+	/** Who the user is in it, when they are in it: the user's own part. */
 	yourRole: string;
 	/** A few words: playful, strict, slow-burn. */
 	tone: string;
 	notes: string;
+	/** The parts it has for characters. Optional: a scene with none is cast freely. */
+	parts: ScenePart[];
 };
 
 export const SCENE_TEXT_FIELDS = [
@@ -238,13 +262,17 @@ export const SCENE_TEXT_FIELDS = [
 
 export type SceneTextField = (typeof SCENE_TEXT_FIELDS)[number];
 
+/** The ones the dialog shows before "More detail", besides the title and the parts. */
+export const SCENE_PRIMARY_FIELDS = ['premise'] as const satisfies readonly SceneTextField[];
+
 export const EMPTY_SCENE: DaydreamScene = {
 	title: '',
 	setting: '',
 	premise: '',
 	yourRole: '',
 	tone: '',
-	notes: ''
+	notes: '',
+	parts: []
 };
 
 // ── a daydream's setup ───────────────────────────────────────────────────────
@@ -260,7 +288,25 @@ export const EMPTY_SCENE: DaydreamScene = {
  */
 export type CopySource = { sourceId: string | null; sourceRevision: number | null };
 
-export type DaydreamCharacterCopy = DaydreamCharacter & CopySource;
+/**
+ * Who a character is in one daydream: the half of them that depends on the
+ * story. Kept on the daydream's copy and never saved to the library, so
+ * casting someone differently never makes their library record look changed,
+ * and catching up with the library never loses their part.
+ */
+export type DaydreamCasting = {
+	/** The scene part they play (`ScenePart.id`), or null for someone cast without one. */
+	partId: string | null;
+	/** Who they are to the user, in this story. */
+	relationship: string;
+	/** What they are doing, or want, in this scene. */
+	part: string;
+};
+
+export const EMPTY_CASTING: DaydreamCasting = { partId: null, relationship: '', part: '' };
+
+/** A character as a daydream holds it: the library's copy, and their casting in this story. */
+export type DaydreamCharacterCopy = DaydreamCharacter & CopySource & { casting: DaydreamCasting };
 export type DaydreamSceneCopy = DaydreamScene & CopySource;
 
 export type PassageLength = 'short' | 'medium' | 'long';
@@ -276,6 +322,7 @@ export const DEFAULT_STORY_DIALS: StoryDials = { intensity: 3, pace: 3, length: 
 
 /** What a daydream is set up with, as the setup form edits it and the model reads it. */
 export type DaydreamSetup = {
+	/** Empty until it is named: the model names it after the opening (`daydreamTitle`). */
 	title: string;
 	voice: DaydreamVoice;
 	characters: DaydreamCharacterCopy[];
@@ -285,6 +332,43 @@ export type DaydreamSetup = {
 	limits: string;
 	dials: StoryDials;
 };
+
+/** What a daydream is called on screen: its own name, or its scene's until it has one. */
+export function daydreamTitle(setup: { title: string; scene: { title: string } }): string {
+	return setup.title.trim() || setup.scene.title;
+}
+
+/**
+ * Why the casting does not fit the scene, or null when it does: every part
+ * cast is one the scene has, and none is cast twice. The setup kind refuses
+ * the same, so a stale page cannot store one.
+ */
+export function castingProblem(
+	characters: readonly { casting: Pick<DaydreamCasting, 'partId'> }[],
+	parts: readonly Pick<ScenePart, 'id'>[]
+): string | null {
+	const cast = characters.flatMap(({ casting }) =>
+		casting.partId === null ? [] : [casting.partId]
+	);
+	if (cast.some((id) => !parts.some((part) => part.id === id))) {
+		return 'Someone is cast in a part the scene no longer has.';
+	}
+	return new Set(cast).size === cast.length
+		? null
+		: 'Each part can only be played by one character.';
+}
+
+/** The castings again, with any part the scene no longer has let go. Their words are kept. */
+export function fitCastingToScene<T extends { casting: DaydreamCasting }>(
+	characters: readonly T[],
+	parts: readonly Pick<ScenePart, 'id'>[]
+): T[] {
+	return characters.map((character) =>
+		character.casting.partId === null || parts.some((part) => part.id === character.casting.partId)
+			? character
+			: { ...character, casting: { ...character.casting, partId: null } }
+	);
+}
 
 /**
  * Lengths, in characters of visible text.
@@ -307,6 +391,7 @@ export const DAYDREAM_LIMITS = {
 	speech: 500,
 	appearance: 500,
 	relationship: 300,
+	castPart: 500,
 	likes: 500,
 	characterNotes: 1000,
 	setting: 500,
@@ -314,6 +399,8 @@ export const DAYDREAM_LIMITS = {
 	yourRole: 300,
 	tone: 200,
 	sceneNotes: 1000,
+	partName: 60,
+	partDescription: 300,
 	limits: 1000,
 	turn: 8000,
 	suggestion: 300,

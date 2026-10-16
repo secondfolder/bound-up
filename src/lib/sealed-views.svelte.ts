@@ -17,6 +17,7 @@
  */
 
 import { vaultById } from './crypto/vaults.svelte';
+import { daydreamTitle } from './daydream';
 import type { SealedKind } from './sealed';
 import { sealedReader } from './sealed-cache.svelte';
 import {
@@ -124,7 +125,7 @@ export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
 		case 'task':
 			return openedPart(open(taskKind, item.sealed), (value) => value.title);
 		case 'daydream':
-			return openedPart(open(daydreamSetupKind, item.sealed), (value) => value.title);
+			return openedPart(open(daydreamSetupKind, item.sealed), daydreamTitle);
 		default:
 			return openedPart(open(rewardKind, item.sealed), (value) => value.title);
 	}

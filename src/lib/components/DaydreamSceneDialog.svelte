@@ -7,7 +7,10 @@
 		DAYDREAM_LIMITS,
 		type DaydreamSceneCopy,
 		EMPTY_SCENE,
+		MAX_DAYDREAM_CHARACTERS,
+		SCENE_PRIMARY_FIELDS,
 		SCENE_TEXT_FIELDS,
+		type ScenePart,
 		type SceneTextField
 	} from '$lib/daydream';
 	import { SCENE_CHIPS, SCENE_FIELD_LABELS, SCENE_TEMPLATES } from '$lib/daydream/catalog';
@@ -18,10 +21,12 @@
 		suggestFill,
 		surpriseScene
 	} from '$lib/daydream/suggest';
+	import type { SuggestedPart } from '$lib/daydream/suggestions';
 	import { type DaydreamSceneFormValues, daydreamSceneFormSchema } from '$lib/schemas/daydreamForm';
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
+	import { startOpen } from './details';
 
 	/**
 	 * Making or changing a scene, in a dialog, the way
@@ -30,6 +35,10 @@
 	 * free text the truth. With `surprise`, the model writes the whole scene
 	 * first — from the characters, the limits and the dials — and it opens
 	 * here to read, change, or try again before it is used.
+	 *
+	 * Up front: the title, what is going on, and the parts it has for
+	 * characters, which is what a daydream casts them into. The rest is under
+	 * "More detail", which starts open when any of it is filled.
 	 *
 	 * An SPA superform saving through `api/daydreams/scenes`, for the reason
 	 * the character dialog gives.
@@ -69,12 +78,32 @@
 				yourRole: existing.yourRole,
 				tone: existing.tone,
 				notes: existing.notes,
+				parts: existing.parts.map((part) => ({ ...part })),
 				saveToLibrary: inLibrary
 			}
 		: { ...EMPTY_SCENE, saveToLibrary: true };
 
 	let problem: string | null = $state(null);
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();
+	let detail: (HTMLElement & { open: boolean }) | undefined = $state();
+
+	const DETAIL_FIELDS = SCENE_TEXT_FIELDS.filter(
+		(field) => !(SCENE_PRIMARY_FIELDS as readonly SceneTextField[]).includes(field)
+	);
+	const detailFilled = (values: Pick<DaydreamSceneFormValues, SceneTextField>) =>
+		DETAIL_FIELDS.some((field) => values[field].trim() !== '');
+	const startsDetailed = detailFilled(start);
+
+	/** Opens "More detail" when something just wrote into it, so what changed is in view. */
+	function revealDetail() {
+		if (detail && detailFilled($form)) {
+			detail.open = true;
+		}
+	}
+
+	/** Parts from a template or the model, with ids of their own. */
+	const withIds = (parts: readonly SuggestedPart[]): ScenePart[] =>
+		parts.map((part) => ({ ...part, id: crypto.randomUUID() }));
 
 	const superform = superForm(defaults(start, zod4Client(daydreamSceneFormSchema)), {
 		SPA: true,
@@ -93,7 +122,16 @@
 				return;
 			}
 			const { saveToLibrary, ...fields } = submitted.data;
-			const content = { ...fields, title: fields.title.trim(), premise: fields.premise.trim() };
+			const content = {
+				...fields,
+				title: fields.title.trim(),
+				premise: fields.premise.trim(),
+				parts: fields.parts.map((part) => ({
+					...part,
+					name: part.name.trim(),
+					description: part.description.trim()
+				}))
+			};
 			if (!saveToLibrary) {
 				onsaved({ ...content, sourceId: null, sourceRevision: null });
 				close();
@@ -133,14 +171,44 @@
 	);
 
 	const empty = $derived(
-		$form.title.trim() === '' && SCENE_TEXT_FIELDS.every((field) => $form[field].trim() === '')
+		$form.title.trim() === '' &&
+			SCENE_TEXT_FIELDS.every((field) => $form[field].trim() === '') &&
+			$form.parts.length === 0
 	);
 
 	function useTemplate(id: string) {
 		const template = SCENE_TEMPLATES.find((entry) => entry.id === id);
 		if (template) {
-			$form = { ...$form, ...template.scene };
+			$form = { ...$form, ...template.scene, parts: withIds(template.scene.parts) };
+			revealDetail();
 		}
+	}
+
+	// ── parts ────────────────────────────────────────────────────────────────
+
+	function addPart() {
+		$form.parts = [...$form.parts, { id: crypto.randomUUID(), name: '', description: '' }];
+	}
+
+	function setPart(index: number, patch: Partial<ScenePart>) {
+		$form.parts = $form.parts.map((part, at) => (at === index ? { ...part, ...patch } : part));
+	}
+
+	function removePart(index: number) {
+		$form.parts = $form.parts.filter((_, at) => at !== index);
+	}
+
+	/**
+	 * A part's text box, wired by hand: `wa-input`'s own input event comes
+	 * from inside its shadow root, which Svelte's delegated `oninput` does not
+	 * reliably see (AGENTS.md).
+	 */
+	function partField(index: number, key: 'name' | 'description') {
+		return (node: HTMLElement & { value: string }) => {
+			const update = () => setPart(index, { [key]: node.value });
+			node.addEventListener('input', update);
+			return () => node.removeEventListener('input', update);
+		};
 	}
 
 	let thinking = $state(false);
@@ -152,7 +220,8 @@
 		const answer = await surpriseScene(context);
 		thinking = false;
 		if (answer.ok) {
-			$form = { ...$form, ...answer.value };
+			$form = { ...$form, ...answer.value, parts: withIds(answer.value.parts) };
+			revealDetail();
 		} else {
 			problem = answer.error;
 		}
@@ -167,7 +236,7 @@
 	async function fillTheRest() {
 		thinking = true;
 		problem = null;
-		const answer = await suggestFill({ target: 'scene', draft, context });
+		const answer = await suggestFill({ target: 'scene', draft, parts: namedParts(), context });
 		thinking = false;
 		if (!answer.ok) {
 			problem = answer.error;
@@ -175,16 +244,27 @@
 		}
 		const next = { ...$form };
 		for (const field of ['title', ...SCENE_TEXT_FIELDS] as const) {
-			const text = answer.value[field];
+			const text = answer.value.fields[field];
 			if (text && next[field].trim() === '') {
 				next[field] = text;
 			}
 		}
+		// Parts only for a scene that had none: never over the ones written.
+		if (next.parts.length === 0) {
+			next.parts = withIds(answer.value.parts);
+		}
 		$form = next;
+		revealDetail();
 	}
 
+	/** The parts with a name so far, for the model to fit its ideas to. */
+	const namedParts = () =>
+		$form.parts
+			.filter((part) => part.name.trim() !== '')
+			.map(({ name, description }) => ({ name, description }));
+
 	function moreIdeas(field: SceneTextField) {
-		return () => suggestChips({ target: 'scene', field, draft, context });
+		return () => suggestChips({ target: 'scene', field, draft, parts: namedParts(), context });
 	}
 
 	function labelFor(): string {
@@ -203,6 +283,22 @@
 		notes: DAYDREAM_LIMITS.sceneNotes
 	};
 </script>
+
+{#snippet textField(field: SceneTextField)}
+	<DaydreamChipField
+		label={SCENE_FIELD_LABELS[field].label}
+		hint={SCENE_FIELD_LABELS[field].hint}
+		value={$form[field]}
+		limit={LIMIT_OF[field]}
+		chips={SCENE_CHIPS[field]}
+		rows={field === 'premise' ? 4 : 2}
+		onchange={(text) => {
+			$form[field] = text;
+		}}
+		onMoreIdeas={suggestionsOn ? moreIdeas(field) : undefined}
+	/>
+	{#if $errors[field]}<span class="invalid">{$errors[field]}</span>{/if}
+{/snippet}
 
 <wa-dialog
 	bind:this={dialog}
@@ -244,21 +340,52 @@
 			required
 		/>
 
-		{#each SCENE_TEXT_FIELDS as field (field)}
-			<DaydreamChipField
-				label={SCENE_FIELD_LABELS[field].label}
-				hint={SCENE_FIELD_LABELS[field].hint}
-				value={$form[field]}
-				limit={LIMIT_OF[field]}
-				chips={SCENE_CHIPS[field]}
-				rows={field === 'premise' ? 4 : 2}
-				onchange={(text) => {
-					$form[field] = text;
-				}}
-				onMoreIdeas={suggestionsOn ? moreIdeas(field) : undefined}
-			/>
-			{#if $errors[field]}<span class="invalid">{$errors[field]}</span>{/if}
+		{#each SCENE_PRIMARY_FIELDS as field (field)}
+			{@render textField(field)}
 		{/each}
+
+		<fieldset class="parts">
+			<legend>Parts for characters</legend>
+			<p class="hint">
+				Who else the scene needs, like “the interviewer”. Characters are cast into these when you
+				set up a daydream. Optional.
+			</p>
+			{#each $form.parts as part, index (part.id)}
+				<div class="part">
+					<wa-input
+						{@attach partField(index, 'name')}
+						class="part-name"
+						label={`Part ${index + 1}`}
+						placeholder="the interviewer"
+						value={part.name}
+						maxlength={DAYDREAM_LIMITS.partName}
+					></wa-input>
+					<wa-input
+						{@attach partField(index, 'description')}
+						class="part-description"
+						label="What they do in it"
+						value={part.description}
+						maxlength={DAYDREAM_LIMITS.partDescription}
+					></wa-input>
+					<wa-button size="s" appearance="plain" onclick={() => removePart(index)}>
+						<wa-icon name="xmark" variant="solid" label={`Remove ${part.name || `part ${index + 1}`}`}></wa-icon>
+					</wa-button>
+				</div>
+				{#if $errors.parts?.[index]?.name}<span class="invalid">{$errors.parts[index].name}</span>{/if}
+			{/each}
+			{#if $form.parts.length < MAX_DAYDREAM_CHARACTERS}
+				<wa-button class="add-part" size="s" appearance="outlined" onclick={addPart}>
+					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+					Add a part
+				</wa-button>
+			{/if}
+		</fieldset>
+
+		<wa-details bind:this={detail} summary="More detail" class="detail" {@attach startOpen(startsDetailed)}>
+			{#each DETAIL_FIELDS as field (field)}
+				{@render textField(field)}
+			{/each}
+		</wa-details>
 
 		{#if suggestionsOn && !surprising}
 			<wa-button class="fill" size="s" appearance="outlined" disabled={thinking} onclick={fillTheRest}>
@@ -323,6 +450,47 @@
 
 	.fill {
 		align-self: flex-start;
+	}
+
+	.parts {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin: 0;
+		border: 0;
+		padding: 0;
+
+		legend {
+			padding: 0;
+			margin-block-end: 0.25rem;
+			font-weight: 600;
+		}
+	}
+
+	/* Wraps rather than squeezing: on a phone the description drops under the name. */
+	.part {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: end;
+		gap: 0.5rem;
+
+		.part-name {
+			flex: 1 1 8rem;
+		}
+
+		.part-description {
+			flex: 2 1 12rem;
+		}
+	}
+
+	.add-part {
+		align-self: flex-start;
+	}
+
+	.detail::part(content) {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
 	}
 
 	.save-to-library {

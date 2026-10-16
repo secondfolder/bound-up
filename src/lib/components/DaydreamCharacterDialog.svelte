@@ -3,16 +3,23 @@
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import InputField from '$lib/components/InputField.svelte';
 	import {
+		CHARACTER_PRIMARY_FIELDS,
 		CHARACTER_TEXT_FIELDS,
 		type CharacterDials,
 		type CharacterTextField,
 		type CharacterTone,
 		DAYDREAM_LIMITS,
+		type DaydreamCasting,
+		type DaydreamCharacter,
 		type DaydreamCharacterCopy,
 		type DialValue,
-		EMPTY_CHARACTER
+		EMPTY_CASTING,
+		EMPTY_CHARACTER,
+		type ScenePart
 	} from '$lib/daydream';
 	import {
+		CASTING_CHIPS,
+		CASTING_FIELD_LABELS,
 		CHARACTER_CHIPS,
 		CHARACTER_FIELD_LABELS,
 		CHARACTER_TEMPLATES
@@ -27,10 +34,35 @@
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
+	import { startOpen } from './details';
+
+	/** What the dialog needs to edit a character's casting: given only when opened from a daydream. */
+	export type CastingEdit = {
+		value: DaydreamCasting;
+		/** The scene's parts, with who else plays each, so a part cannot be given twice. */
+		parts: (ScenePart & { takenBy: string | null })[];
+		/** Asks the model who this character is in the story; absent when suggestions are off. */
+		write?:
+			| ((
+					character: Omit<DaydreamCharacter, 'dials'>,
+					partId: string | null
+			  ) => Promise<
+					{ ok: true; value: { relationship: string; part: string } } | { ok: false; error: string }
+			  >)
+			| undefined;
+	};
 
 	/**
 	 * Making or changing a character, in a dialog over whatever page wanted
 	 * one: the setup form, or the character library.
+	 *
+	 * In two halves when opened from a daydream. "In this story" is the
+	 * casting — the part they play, who they are to the user, what they are
+	 * doing — which belongs to this daydream alone and is never saved to the
+	 * library. Below it is who they are in any story, which is what "Save to
+	 * my characters" saves. From the library there is only the second half.
+	 * Of that, the name, type and personality are up front; the rest is under
+	 * "More detail", which starts open when any of it is filled.
 	 *
 	 * Guided rather than a blank form: starting points to begin from, dials
 	 * for the broad strokes (a tone, and how much they take charge, how
@@ -46,6 +78,7 @@
 	let {
 		character = null,
 		libraryRevision = null,
+		casting = null,
 		context,
 		suggestionsOn,
 		onsaved,
@@ -55,12 +88,17 @@
 		character?: DaydreamCharacterCopy | null;
 		/** The library's revision of `character.sourceId`, when it is in the library. */
 		libraryRevision?: number | null;
+		/** Their casting in the daydream, to edit beside them; null from the library. */
+		casting?: CastingEdit | null;
 		/** The daydream around it, for suggestions. */
 		context: SuggestContext;
 		/** Whether the model may be asked for ideas (the disclosure has been accepted). */
 		suggestionsOn: boolean;
-		/** The character as saved: a copy for a daydream, with where it came from. */
-		/** The sealed library record too, when it was saved there. */
+		/**
+		 * The character as saved: a copy for a daydream, with where it came
+		 * from and their casting (empty from the library), and the sealed
+		 * library record too, when it was saved there.
+		 */
 		onsaved: (character: DaydreamCharacterCopy, sealed?: SealedRefView) => void;
 		onclose: () => void;
 	} = $props();
@@ -70,6 +108,8 @@
 	const existing = character;
 	// svelte-ignore state_referenced_locally
 	const knownRevision = libraryRevision;
+	// svelte-ignore state_referenced_locally
+	const castingEdit = casting;
 	const inLibrary = existing?.sourceId !== null && knownRevision !== null;
 
 	const start: DaydreamCharacterFormValues = existing
@@ -79,18 +119,34 @@
 				personality: existing.personality,
 				speech: existing.speech,
 				appearance: existing.appearance,
-				relationship: existing.relationship,
 				likes: existing.likes,
 				notes: existing.notes,
 				dials: existing.dials,
+				casting: castingEdit?.value ?? EMPTY_CASTING,
 				// Ticked for one already in the library; a copy kept only in a
 				// daydream stays that way unless asked.
 				saveToLibrary: inLibrary
 			}
-		: { ...EMPTY_CHARACTER, saveToLibrary: true };
+		: { ...EMPTY_CHARACTER, casting: castingEdit?.value ?? EMPTY_CASTING, saveToLibrary: true };
 
 	let problem: string | null = $state(null);
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();
+	let detail: (HTMLElement & { open: boolean }) | undefined = $state();
+
+	const DETAIL_FIELDS = CHARACTER_TEXT_FIELDS.filter(
+		(field) => !(CHARACTER_PRIMARY_FIELDS as readonly CharacterTextField[]).includes(field)
+	);
+	const detailFilled = (values: Pick<DaydreamCharacterFormValues, CharacterTextField | 'dials'>) =>
+		DETAIL_FIELDS.some((field) => values[field].trim() !== '') ||
+		Object.values(values.dials).some((dial) => dial !== null);
+	const startsDetailed = detailFilled(start);
+
+	/** Opens "More detail" when something just wrote into it, so what changed is in view. */
+	function revealDetail() {
+		if (detail && detailFilled($form)) {
+			detail.open = true;
+		}
+	}
 
 	const superform = superForm(defaults(start, zod4Client(daydreamCharacterFormSchema)), {
 		SPA: true,
@@ -110,12 +166,20 @@
 			if (!submitted.valid) {
 				return;
 			}
-			const { saveToLibrary, ...fields } = submitted.data;
+			// The casting is the daydream's alone: never part of what the library keeps.
+			const { saveToLibrary, casting: cast, ...fields } = submitted.data;
 			const content = { ...fields, name: fields.name.trim() };
+			const castingOut = castingEdit
+				? {
+						partId: cast.partId,
+						relationship: cast.relationship.trim(),
+						part: cast.part.trim()
+					}
+				: EMPTY_CASTING;
 			if (!saveToLibrary) {
 				// Kept only in the daydream: a copy with no library record, so it
 				// never claims to match one it no longer does.
-				onsaved({ ...content, sourceId: null, sourceRevision: null });
+				onsaved({ ...content, sourceId: null, sourceRevision: null, casting: castingOut });
 				close();
 				return;
 			}
@@ -129,7 +193,10 @@
 				problem = saved.error;
 				return;
 			}
-			onsaved({ ...content, sourceId: id, sourceRevision: saved.revision }, saved.sealed);
+			onsaved(
+				{ ...content, sourceId: id, sourceRevision: saved.revision, casting: castingOut },
+				saved.sealed
+			);
 			close();
 		}
 	});
@@ -161,6 +228,7 @@
 		const template = CHARACTER_TEMPLATES.find((entry) => entry.id === id);
 		if (template) {
 			$form = { ...$form, ...template.character };
+			revealDetail();
 		}
 	}
 
@@ -196,12 +264,52 @@
 		// Only the empty fields: never over what was written.
 		const next = { ...$form };
 		for (const field of ['name', ...CHARACTER_TEXT_FIELDS] as const) {
-			const text = answer.value[field];
+			const text = answer.value.fields[field];
 			if (text && next[field].trim() === '') {
 				next[field] = text;
 			}
 		}
 		$form = next;
+		revealDetail();
+	}
+
+	// ── in this story ────────────────────────────────────────────────────────
+
+	let writing = $state(false);
+	const castingFull = $derived(
+		$form.casting.relationship.trim() !== '' && $form.casting.part.trim() !== ''
+	);
+
+	/** Who they are in this story, from the model: into the empty fields only. */
+	async function writeCasting() {
+		if (!castingEdit?.write) {
+			return;
+		}
+		writing = true;
+		problem = null;
+		const { dials: _dials, casting: _casting, saveToLibrary: _save, ...actor } = $form;
+		const answer = await castingEdit.write(actor, $form.casting.partId);
+		writing = false;
+		if (!answer.ok) {
+			problem = answer.error;
+			return;
+		}
+		$form.casting = {
+			...$form.casting,
+			relationship: $form.casting.relationship.trim() || answer.value.relationship,
+			part: $form.casting.part.trim() || answer.value.part
+		};
+	}
+
+	const NO_PART = 'none';
+
+	/** The part select, wired by hand: its change event comes from inside a shadow root (AGENTS.md). */
+	function partSelect(node: HTMLElement & { value: string }) {
+		const update = () => {
+			$form.casting = { ...$form.casting, partId: node.value === NO_PART ? null : node.value };
+		};
+		node.addEventListener('change', update);
+		return () => node.removeEventListener('change', update);
 	}
 
 	function moreIdeas(field: CharacterTextField) {
@@ -213,11 +321,26 @@
 		personality: DAYDREAM_LIMITS.personality,
 		speech: DAYDREAM_LIMITS.speech,
 		appearance: DAYDREAM_LIMITS.appearance,
-		relationship: DAYDREAM_LIMITS.relationship,
 		likes: DAYDREAM_LIMITS.likes,
 		notes: DAYDREAM_LIMITS.characterNotes
 	};
 </script>
+
+{#snippet textField(field: CharacterTextField)}
+	<DaydreamChipField
+		label={CHARACTER_FIELD_LABELS[field].label}
+		hint={CHARACTER_FIELD_LABELS[field].hint}
+		value={$form[field]}
+		limit={LIMIT_OF[field]}
+		chips={CHARACTER_CHIPS[field]}
+		rows={field === 'personality' || field === 'notes' ? 3 : 2}
+		onchange={(text) => {
+			$form[field] = text;
+		}}
+		onMoreIdeas={suggestionsOn ? moreIdeas(field) : undefined}
+	/>
+	{#if $errors[field]}<span class="invalid">{$errors[field]}</span>{/if}
+{/snippet}
 
 <!-- No light-dismiss: a stray tap outside would throw away a half-made character. -->
 <wa-dialog
@@ -241,79 +364,126 @@
 			</section>
 		{/if}
 
-		<InputField
-			{superform}
-			field="name"
-			type="text"
-			title="Their name"
-			maxlength={DAYDREAM_LIMITS.characterName}
-			required
-		/>
-
-		<fieldset class="dials">
-			<legend>In broad strokes</legend>
-			<fieldset class="tones">
-				<legend class="wa-visually-hidden">Tone</legend>
-				{#each CHARACTER_TONES as tone (tone.value)}
-					<!-- A toggle: a native button, because wa-button forwards no aria-pressed. -->
-					<button
-						type="button"
-						class="tone"
-						aria-pressed={$form.dials.tone === tone.value}
-						onclick={() => setTone(tone.value)}
+		{#if castingEdit}
+			<fieldset class="section">
+				<legend>In this story</legend>
+				<p class="hint">Only for this daydream: the same character can be someone else in the next.</p>
+				{#if castingEdit.parts.length > 0}
+					<wa-select
+						{@attach partSelect}
+						label="Their part"
+						value={$form.casting.partId ?? NO_PART}
 					>
-						{tone.label}
-					</button>
+						<wa-option value={NO_PART}>No particular part</wa-option>
+						{#each castingEdit.parts as part (part.id)}
+							<wa-option value={part.id} disabled={part.takenBy !== null}>
+								{part.takenBy ? `${part.name} (${part.takenBy})` : part.name}
+							</wa-option>
+						{/each}
+					</wa-select>
+				{/if}
+				{#each ['relationship', 'part'] as const as field (field)}
+					<DaydreamChipField
+						label={CASTING_FIELD_LABELS[field].label}
+						hint={CASTING_FIELD_LABELS[field].hint}
+						value={$form.casting[field]}
+						limit={field === 'relationship' ? DAYDREAM_LIMITS.relationship : DAYDREAM_LIMITS.castPart}
+						chips={CASTING_CHIPS[field]}
+						onchange={(text) => {
+							$form.casting = { ...$form.casting, [field]: text };
+						}}
+					/>
 				{/each}
+				{#if castingEdit.write}
+					<wa-button
+						class="fill"
+						size="s"
+						appearance="outlined"
+						disabled={writing || castingFull || $form.name.trim() === ''}
+						onclick={writeCasting}
+					>
+						<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
+						{writing ? 'Writing…' : 'Write their part'}
+					</wa-button>
+				{/if}
 			</fieldset>
-			{#each CHARACTER_SLIDERS as entry (entry.key)}
-				{const level = $derived($form.dials[entry.key])}
-				<div class="dial" class:unset={level === null}>
-					<wa-slider {@attach slider(entry.key)} label={entry.label} min={1} max={5} step={1} value={level ?? 3}>
-						<span slot="reference">{entry.low}</span>
-						<span slot="reference">{entry.high}</span>
-					</wa-slider>
-					<div class="reading">
-						<span>{level === null ? 'Not set' : entry.scale[level].label}</span>
-						{#if level !== null}
-							<wa-button size="s" appearance="plain" onclick={() => setDial(entry.key, null)}>
-								Clear {entry.label.toLowerCase()}
-							</wa-button>
-						{/if}
-					</div>
-				</div>
-			{/each}
-		</fieldset>
-
-		{#each CHARACTER_TEXT_FIELDS as field (field)}
-			<DaydreamChipField
-				label={CHARACTER_FIELD_LABELS[field].label}
-				hint={CHARACTER_FIELD_LABELS[field].hint}
-				value={$form[field]}
-				limit={LIMIT_OF[field]}
-				chips={CHARACTER_CHIPS[field]}
-				rows={field === 'personality' || field === 'notes' ? 3 : 2}
-				onchange={(text) => {
-					$form[field] = text;
-				}}
-				onMoreIdeas={suggestionsOn ? moreIdeas(field) : undefined}
-			/>
-			{#if $errors[field]}<span class="invalid">{$errors[field]}</span>{/if}
-		{/each}
-
-		{#if suggestionsOn}
-			<wa-button class="fill" size="s" appearance="outlined" disabled={filling} onclick={fillTheRest}>
-				<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
-				{filling ? 'Filling in…' : 'Fill in the rest'}
-			</wa-button>
 		{/if}
+
+		<fieldset class="section" class:bare={!castingEdit}>
+			<legend class:wa-visually-hidden={!castingEdit}>
+				{$form.name.trim() ? `About ${$form.name.trim()}` : 'About them'}
+			</legend>
+
+			<InputField
+				{superform}
+				field="name"
+				type="text"
+				title="Their name"
+				maxlength={DAYDREAM_LIMITS.characterName}
+				required
+			/>
+
+			{#each CHARACTER_PRIMARY_FIELDS as field (field)}
+				{@render textField(field)}
+			{/each}
+
+			<wa-details bind:this={detail} summary="More detail" class="detail" {@attach startOpen(startsDetailed)}>
+				<fieldset class="dials">
+					<legend>In broad strokes</legend>
+					<fieldset class="tones">
+						<legend class="wa-visually-hidden">Tone</legend>
+						{#each CHARACTER_TONES as tone (tone.value)}
+							<!-- A toggle: a native button, because wa-button forwards no aria-pressed. -->
+							<button
+								type="button"
+								class="tone"
+								aria-pressed={$form.dials.tone === tone.value}
+								onclick={() => setTone(tone.value)}
+							>
+								{tone.label}
+							</button>
+						{/each}
+					</fieldset>
+					{#each CHARACTER_SLIDERS as entry (entry.key)}
+						{const level = $derived($form.dials[entry.key])}
+						<div class="dial" class:unset={level === null}>
+							<wa-slider {@attach slider(entry.key)} label={entry.label} min={1} max={5} step={1} value={level ?? 3}>
+								<span slot="reference">{entry.low}</span>
+								<span slot="reference">{entry.high}</span>
+							</wa-slider>
+							<div class="reading">
+								<span>{level === null ? 'Not set' : entry.scale[level].label}</span>
+								{#if level !== null}
+									<wa-button size="s" appearance="plain" onclick={() => setDial(entry.key, null)}>
+										Clear {entry.label.toLowerCase()}
+									</wa-button>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</fieldset>
+
+				{#each DETAIL_FIELDS as field (field)}
+					{@render textField(field)}
+				{/each}
+			</wa-details>
+
+			{#if suggestionsOn}
+				<wa-button class="fill" size="s" appearance="outlined" disabled={filling} onclick={fillTheRest}>
+					<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
+					{filling ? 'Filling in…' : 'Fill in the rest'}
+				</wa-button>
+			{/if}
+		</fieldset>
 
 		<label class="save-to-library">
 			<input type="checkbox" bind:checked={$form.saveToLibrary} />
 			<span>Save to my characters, to use in other daydreams</span>
 		</label>
 		{#if inLibrary && $form.saveToLibrary}
-			<p class="hint">This changes them in your library too.</p>
+			<p class="hint">
+				This changes them in your library too{castingEdit ? ', though not their part in this story' : ''}.
+			</p>
 		{/if}
 
 		{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
@@ -338,6 +508,34 @@
 	}
 
 	.fields {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	/* The two halves of a character met from a daydream. From the library
+	   there is only one, so its box and heading go. */
+	.section {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		margin: 0;
+		border: 1px solid var(--wa-color-surface-border);
+		border-radius: 0.6rem;
+		padding: 0.75rem;
+
+		> legend {
+			padding-inline: 0.35rem;
+			font-weight: 600;
+		}
+
+		&.bare {
+			border: 0;
+			padding: 0;
+		}
+	}
+
+	.detail::part(content) {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;

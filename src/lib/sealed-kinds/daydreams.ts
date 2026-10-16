@@ -13,6 +13,7 @@
 
 import { z } from 'zod';
 import {
+	castingProblem,
 	DAYDREAM_LIMITS,
 	type DaydreamSetup,
 	DEFAULT_STORY_DIALS,
@@ -47,11 +48,16 @@ const characterShape = {
 	personality: optional(DAYDREAM_LIMITS.personality),
 	speech: optional(DAYDREAM_LIMITS.speech),
 	appearance: optional(DAYDREAM_LIMITS.appearance),
-	relationship: optional(DAYDREAM_LIMITS.relationship),
 	likes: optional(DAYDREAM_LIMITS.likes),
 	notes: optional(DAYDREAM_LIMITS.characterNotes),
 	dials: characterDialsSchema
 };
+
+const partSchema = z.object({
+	id: clientId,
+	name: required(DAYDREAM_LIMITS.partName),
+	description: optional(DAYDREAM_LIMITS.partDescription)
+});
 
 const sceneShape = {
 	title: required(DAYDREAM_LIMITS.title),
@@ -59,8 +65,22 @@ const sceneShape = {
 	premise: required(DAYDREAM_LIMITS.premise),
 	yourRole: optional(DAYDREAM_LIMITS.yourRole),
 	tone: optional(DAYDREAM_LIMITS.tone),
-	notes: optional(DAYDREAM_LIMITS.sceneNotes)
+	notes: optional(DAYDREAM_LIMITS.sceneNotes),
+	parts: z
+		.array(partSchema)
+		.max(MAX_DAYDREAM_CHARACTERS)
+		.refine(
+			(parts) => new Set(parts.map((part) => part.id)).size === parts.length,
+			'Duplicate part'
+		)
 };
+
+/** Who a character is in one daydream (`DaydreamCasting`). Only ever in a setup, never the library. */
+const castingSchema = z.object({
+	partId: clientId.nullable(),
+	relationship: optional(DAYDREAM_LIMITS.relationship),
+	part: optional(DAYDREAM_LIMITS.castPart)
+});
 
 /** Where a daydream's copy came from (`CopySource` in `../daydream.ts`). */
 const sourceShape = {
@@ -99,14 +119,15 @@ const setupV1 = z.object({
 
 const setupV2 = z
 	.object({
-		title: required(DAYDREAM_LIMITS.title),
+		// Empty until the model names it after the opening (docs/daydreams.md).
+		title: optional(DAYDREAM_LIMITS.title),
 		voice: z.object({
 			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal']),
 			stance: z.enum(['self', 'persona', 'absent']),
 			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
 		}),
 		characters: z
-			.array(z.object({ ...characterShape, ...sourceShape }))
+			.array(z.object({ ...characterShape, ...sourceShape, casting: castingSchema }))
 			.max(MAX_DAYDREAM_CHARACTERS),
 		scene: z.object({ ...sceneShape, ...sourceShape }),
 		lead: z.enum(['character', 'me', 'shared']),
@@ -117,12 +138,17 @@ const setupV2 = z
 			length: z.enum(['short', 'medium', 'long'])
 		})
 	})
-	// The same rule the form shows (`voiceProblem`), so a setup that makes no
-	// sense — a watcher with nothing to watch — cannot be stored either.
+	// The same rules the form shows (`voiceProblem`, `castingProblem`), so a
+	// setup that makes no sense — a watcher with nothing to watch, a part
+	// played twice — cannot be stored either.
 	.superRefine((value, ctx) => {
 		const problem = voiceProblem(value.voice, value.characters.length);
 		if (problem) {
 			ctx.addIssue({ code: 'custom', path: ['voice'], message: problem });
+		}
+		const miscast = castingProblem(value.characters, value.scene.parts);
+		if (miscast) {
+			ctx.addIssue({ code: 'custom', path: ['characters'], message: miscast });
 		}
 	});
 
@@ -153,10 +179,10 @@ export const daydreamSetupKind = defineSealedKind({
 						personality: value.persona,
 						speech: '',
 						appearance: '',
-						relationship: '',
 						likes: '',
 						notes: '',
-						dials: UNSET_CHARACTER_DIALS
+						dials: UNSET_CHARACTER_DIALS,
+						casting: { partId: null, relationship: '', part: '' }
 					}
 				],
 				scene: {
@@ -167,7 +193,8 @@ export const daydreamSetupKind = defineSealedKind({
 					premise: value.scenario,
 					yourRole: '',
 					tone: value.tone,
-					notes: ''
+					notes: '',
+					parts: []
 				},
 				lead: value.lead,
 				limits: value.limits,

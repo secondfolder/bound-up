@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
+	castingProblem,
 	DAYDREAM_LIMITS,
 	DEFAULT_STORY_DIALS,
+	EMPTY_CASTING,
 	EMPTY_CHARACTER,
 	EMPTY_SCENE,
 	MAX_DAYDREAM_CHARACTERS,
@@ -52,11 +54,16 @@ const characterFields = {
 	personality: optional(DAYDREAM_LIMITS.personality),
 	speech: optional(DAYDREAM_LIMITS.speech),
 	appearance: optional(DAYDREAM_LIMITS.appearance),
-	relationship: optional(DAYDREAM_LIMITS.relationship),
 	likes: optional(DAYDREAM_LIMITS.likes),
 	notes: optional(DAYDREAM_LIMITS.characterNotes),
 	dials: characterDials
 };
+
+const partFields = z.object({
+	id: z.string(),
+	name: required(DAYDREAM_LIMITS.partName, 'the part a name'),
+	description: optional(DAYDREAM_LIMITS.partDescription)
+});
 
 const sceneFields = {
 	title: required(DAYDREAM_LIMITS.title, 'it a title'),
@@ -64,8 +71,16 @@ const sceneFields = {
 	premise: required(DAYDREAM_LIMITS.premise, 'what is going on'),
 	yourRole: optional(DAYDREAM_LIMITS.yourRole),
 	tone: optional(DAYDREAM_LIMITS.tone),
-	notes: optional(DAYDREAM_LIMITS.sceneNotes)
+	notes: optional(DAYDREAM_LIMITS.sceneNotes),
+	parts: z.array(partFields).max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} parts`)
 };
+
+/** Who a character is in this daydream. Edited in the character dialog's "In this story". */
+export const castingFields = z.object({
+	partId: z.string().nullable(),
+	relationship: optional(DAYDREAM_LIMITS.relationship),
+	part: optional(DAYDREAM_LIMITS.castPart)
+});
 
 const source = {
 	sourceId: z.string().nullable(),
@@ -85,14 +100,15 @@ const storyDials = z.object({
  */
 export const daydreamSetupFormSchema = z
 	.object({
-		title: required(DAYDREAM_LIMITS.title, 'it a title'),
+		// Optional: a new daydream is named by the model after its opening.
+		title: optional(DAYDREAM_LIMITS.title),
 		voice: z.object({
 			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal']),
 			stance: z.enum(['self', 'persona', 'absent']),
 			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
 		}),
 		characters: z
-			.array(z.object({ ...characterFields, ...source }))
+			.array(z.object({ ...characterFields, ...source, casting: castingFields }))
 			.max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} characters`),
 		scene: z.object({ ...sceneFields, ...source }),
 		lead: z.enum(['character', 'me', 'shared']),
@@ -103,6 +119,10 @@ export const daydreamSetupFormSchema = z
 		const problem = voiceProblem(value.voice, value.characters.length);
 		if (problem) {
 			ctx.addIssue({ code: 'custom', path: ['voice'], message: problem });
+		}
+		const miscast = castingProblem(value.characters, value.scene.parts);
+		if (miscast) {
+			ctx.addIssue({ code: 'custom', path: ['characters'], message: miscast });
 		}
 	});
 
@@ -123,10 +143,13 @@ export const EMPTY_DAYDREAM_SETUP: DaydreamSetupFormValues = {
 /**
  * The character dialog. `saveToLibrary` is not part of the character: it
  * decides whether the dialog saves one to the library or only hands a copy
- * back to the daydream being set up.
+ * back to the daydream being set up. `casting` is the daydream's half, and is
+ * never saved to the library; opened from the library, it is left empty and
+ * not shown.
  */
 export const daydreamCharacterFormSchema = z.object({
 	...characterFields,
+	casting: castingFields,
 	saveToLibrary: z.boolean()
 });
 
@@ -134,6 +157,7 @@ export type DaydreamCharacterFormValues = z.output<typeof daydreamCharacterFormS
 
 export const EMPTY_CHARACTER_FORM: DaydreamCharacterFormValues = {
 	...EMPTY_CHARACTER,
+	casting: EMPTY_CASTING,
 	saveToLibrary: true
 };
 

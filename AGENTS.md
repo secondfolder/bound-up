@@ -580,7 +580,10 @@ CSS. For buttons in particular:
 - **Boolean properties with no SSR special case stay out of markup.** Svelte's
   server renderer only drops a `false` boolean for attributes it knows, like
   `disabled`; `loading={busy}` renders `loading="false"`, which Lit reads as
-  true until hydration corrects it. Swap the content by hand instead.
+  true until hydration corrects it. Swap the content by hand instead. A
+  `wa-details` that should start open takes `{@attach startOpen(…)}` from
+  `src/lib/components/details.ts`, which sets the property in the browser
+  only.
 
 **Save buttons start outlined and become solid only when there is something valid to save.**
 An idle save/submit action is secondary, not a call to act. When a form becomes dirty, if the contents is valid then

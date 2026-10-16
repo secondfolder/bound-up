@@ -140,7 +140,7 @@
 					"status": "in-progress",
 					"icon": "cloud-moon",
 					"notes": [
-						"Set up how it's told, who's in it, the scene and your limits",
+						"Pick how it's told, a scene and who's in it; the rest is there when you want it",
 						"The story opens on its own, then you take turns",
 						"Stop the scene and Ease off are always there"
 					],
@@ -148,7 +148,7 @@
 						{
 							"id": "daydreams-voices-library",
 							"title": "Characters, scenes and narrators",
-							"summary": "A library of characters and scenes to reuse, made with dials and suggestions, and stories told by a narrator or the rules with no character at all.",
+							"summary": "A library of characters and scenes to reuse, cast into each scene's parts with who they are to you written for the story, and stories told by a narrator or the rules with no character at all.",
 							"status": "shipped",
 							"shippedOn": "2026-10-16"
 						},

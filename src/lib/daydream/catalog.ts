@@ -13,6 +13,7 @@
 
 import type {
 	CharacterTextField,
+	DaydreamCasting,
 	DaydreamCharacter,
 	DaydreamScene,
 	SceneTextField
@@ -25,7 +26,6 @@ export const CHARACTER_FIELD_LABELS: Readonly<
 	personality: { label: 'Personality', hint: 'How they think and behave' },
 	speech: { label: 'How they talk', hint: 'Their voice, their words, their habits' },
 	appearance: { label: 'Appearance', hint: 'What you notice about them' },
-	relationship: { label: 'Who they are to you', hint: 'How you know each other' },
 	likes: { label: 'What they enjoy', hint: 'What they want from a scene' },
 	notes: { label: 'Anything else', hint: 'Whatever the rest leaves out' }
 };
@@ -75,16 +75,6 @@ export const CHARACTER_CHIPS: Readonly<Record<CharacterTextField, readonly strin
 		'an easy smile',
 		'a stare that does not blink'
 	],
-	relationship: [
-		'your partner',
-		'your boss',
-		'a stranger you just met',
-		'an old friend',
-		'your rival',
-		'your landlord',
-		'someone you hired',
-		'your roommate'
-	],
 	likes: [
 		'praise',
 		'teasing',
@@ -98,11 +88,44 @@ export const CHARACTER_CHIPS: Readonly<Record<CharacterTextField, readonly strin
 	notes: []
 };
 
+/** The casting fields a person writes in: who a character is in this story. */
+export const CASTING_FIELD_LABELS: Readonly<
+	Record<Exclude<keyof DaydreamCasting, 'partId'>, { label: string; hint: string }>
+> = {
+	relationship: { label: 'Who they are to you', hint: 'In this story: how you know each other' },
+	part: { label: 'Their part in this', hint: 'What they are doing, or want, as it starts' }
+};
+
+export const CASTING_CHIPS: Readonly<
+	Record<Exclude<keyof DaydreamCasting, 'partId'>, readonly string[]>
+> = {
+	relationship: [
+		'your partner',
+		'your boss',
+		'a stranger you just met',
+		'an old friend',
+		'your rival',
+		'your landlord',
+		'someone you hired',
+		'your roommate'
+	],
+	part: [
+		'testing you',
+		'setting the rules',
+		'collecting on a debt',
+		'watching closely',
+		'making you wait',
+		'keeping a promise',
+		'about to lose patience',
+		'enjoying every minute'
+	]
+};
+
 export const SCENE_FIELD_LABELS: Readonly<Record<SceneTextField, { label: string; hint: string }>> =
 	{
 		setting: { label: 'Where', hint: 'The place it happens' },
 		premise: { label: 'What’s going on', hint: 'How it starts' },
-		yourRole: { label: 'Who you are', hint: 'Your part in it, if you are in it' },
+		yourRole: { label: 'Your part', hint: 'Who you are in it, if you are in it' },
 		tone: { label: 'Tone', hint: 'How it should feel' },
 		notes: { label: 'Anything else', hint: 'Whatever the rest leaves out' }
 	};
@@ -164,7 +187,6 @@ export const CHARACTER_TEMPLATES: readonly {
 			personality: 'patient, demanding, quietly intense',
 			speech: 'short, clipped sentences, never raises their voice',
 			appearance: 'sharp suit, reading glasses',
-			relationship: 'your boss',
 			likes: 'rules and rituals, praise when it is earned',
 			notes: '',
 			dials: { tone: 'cold', control: 5, strictness: 5, edge: 3, talk: 2 }
@@ -179,7 +201,6 @@ export const CHARACTER_TEMPLATES: readonly {
 			personality: 'mischievous, observant, unpredictable',
 			speech: 'teases constantly, uses pet names',
 			appearance: 'an easy smile',
-			relationship: 'your roommate',
 			likes: 'teasing, making you wait',
 			notes: '',
 			dials: { tone: 'teasing', control: 4, strictness: 2, edge: 2, talk: 4 }
@@ -194,7 +215,6 @@ export const CHARACTER_TEMPLATES: readonly {
 			personality: 'calm, protective, patient',
 			speech: 'speaks softly, asks questions rather than giving orders',
 			appearance: 'long hair tied back',
-			relationship: 'your partner',
 			likes: 'praise, slow build-up',
 			notes: '',
 			dials: { tone: 'warm', control: 3, strictness: 2, edge: 1, talk: 3 }
@@ -209,7 +229,6 @@ export const CHARACTER_TEMPLATES: readonly {
 			personality: 'possessive, sardonic, demanding',
 			speech: 'formal and precise',
 			appearance: 'leather gloves, a stare that does not blink',
-			relationship: 'someone you hired',
 			likes: 'being obeyed, keeping score',
 			notes: '',
 			dials: { tone: 'clinical', control: 5, strictness: 4, edge: 4, talk: 2 }
@@ -217,8 +236,15 @@ export const CHARACTER_TEMPLATES: readonly {
 	}
 ];
 
-/** Starting points for a new scene. */
-export const SCENE_TEMPLATES: readonly { id: string; label: string; scene: DaydreamScene }[] = [
+/**
+ * Starting points for a new scene. Their parts have no ids: each use gives
+ * them fresh ones (`DaydreamSceneDialog`), as a part made by hand gets.
+ */
+export const SCENE_TEMPLATES: readonly {
+	id: string;
+	label: string;
+	scene: Omit<DaydreamScene, 'parts'> & { parts: { name: string; description: string }[] };
+}[] = [
 	{
 		id: 'after-hours',
 		label: 'After hours',
@@ -228,7 +254,10 @@ export const SCENE_TEMPLATES: readonly { id: string; label: string; scene: Daydr
 			premise: 'an interview that goes off script',
 			yourRole: 'the new hire',
 			tone: 'slow-burn, tense',
-			notes: ''
+			notes: '',
+			parts: [
+				{ name: 'the interviewer', description: 'runs the interview, and decides how it goes' }
+			]
 		}
 	},
 	{
@@ -240,7 +269,8 @@ export const SCENE_TEMPLATES: readonly { id: string; label: string; scene: Daydr
 			premise: 'a bet you lost, and the evening you promised to give up',
 			yourRole: 'the one who lost the bet',
 			tone: 'playful',
-			notes: ''
+			notes: '',
+			parts: [{ name: 'the winner', description: 'won the bet, and means to collect' }]
 		}
 	},
 	{
@@ -252,7 +282,11 @@ export const SCENE_TEMPLATES: readonly { id: string; label: string; scene: Daydr
 			premise: 'a test you have to pass, under rules you don’t know yet',
 			yourRole: 'the trainee',
 			tone: 'clinical, strict',
-			notes: ''
+			notes: '',
+			parts: [
+				{ name: 'the instructor', description: 'sets the tests and the rules' },
+				{ name: 'the observer', description: 'watches, takes notes, says little' }
+			]
 		}
 	},
 	{
@@ -264,7 +298,8 @@ export const SCENE_TEMPLATES: readonly { id: string; label: string; scene: Daydr
 			premise: 'a reward you earned, a whole weekend of it',
 			yourRole: 'yourself',
 			tone: 'tender, slow-burn',
-			notes: ''
+			notes: '',
+			parts: [{ name: 'the one who planned it', description: 'arranged the whole weekend' }]
 		}
 	}
 ];
