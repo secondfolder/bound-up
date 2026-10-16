@@ -1,4 +1,4 @@
-import { centralCells } from './credit';
+import { centralCells, hasClearCentre } from './credit';
 import type { Generator, Grid } from './types';
 
 /**
@@ -40,22 +40,29 @@ export const visualMemory: Generator = (rng, difficulty, _context, id) => {
 };
 
 /**
- * A board with some points marked: pick the square nearest all of them on
- * average. Credited by how close to the best it is (see `pointCredit`), so a
- * near miss is worth most of the way. Bigger boards and more points as it
- * climbs.
+ * A board with some points marked: pick the square at their centre, their
+ * average position. Credited by how close to it the pick is (see
+ * `pointCredit`), so a near miss is worth some of the way. Bigger boards and
+ * more points as it climbs.
+ *
+ * Points are drawn again until the centre is clearly inside one square
+ * (`hasClearCentre`), so there is only ever one right answer. At least a
+ * third of draws pass at every difficulty, so this ends in a few tries.
  */
 export const centralPoint: Generator = (rng, difficulty, _context, id) => {
 	const size = 4 + difficulty;
 	const grid: Grid = { columns: size, rows: size };
 	const cells = Array.from({ length: size * size }, (_, cell) => cell);
-	const points = rng.sample(cells, difficulty + 2).sort((a, b) => a - b);
+	let points = rng.sample(cells, difficulty + 2);
+	while (!hasClearCentre(grid, points)) {
+		points = rng.sample(cells, difficulty + 2);
+	}
+	points.sort((a, b) => a - b);
 	return {
 		id,
 		kind: 'central-point',
 		difficulty,
-		prompt:
-			'Pick the square closest to all the marked squares on average: the one at their centre.',
+		prompt: 'Pick the square at the centre of the marked squares: their average position.',
 		display: { type: 'none' },
 		format: 'point',
 		grid,

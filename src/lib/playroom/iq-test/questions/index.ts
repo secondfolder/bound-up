@@ -1,7 +1,7 @@
 // biome-ignore-all lint/performance/noBarrelFile: the run builder and the components need the question model as one module; the generators behind it are an implementation detail.
 
 import { anagrams } from './anagrams';
-import { meanDistance, pointCredit } from './credit';
+import { centreDistance, pointCredit } from './credit';
 import { exposureMemory } from './exposure-memory';
 import { centralPoint, visualMemory } from './grids';
 import { matrix } from './matrix';
@@ -14,7 +14,7 @@ import type { AnswerMatch, Generator, Question, QuestionKind } from './types';
 import { analogy, oddOneOut, syllogism, vocabulary } from './verbal';
 import { wordProblem } from './word-problem';
 
-export { centralCells, meanDistance, pointCredit } from './credit';
+export { centralCells, centreDistance, hasClearCentre, pointCredit } from './credit';
 export { cellName } from './grids';
 export { describeCell } from './matrix';
 export { CLOCKS, withClock } from './timers';
@@ -59,8 +59,8 @@ const NON_DIGIT = /\D/g;
  * - A tick-all is one point per right pick and one off per wrong one, over
  *   the number right, never below 0: ticking everything is worth nothing,
  *   so guessing does not pay.
- * - A point is worth 1 at a best cell, falling off with how much further it
- *   is from the points on average (see `pointCredit`).
+ * - A point is worth 1 at the centre's cell, falling off with how much
+ *   further it is from the centre (see `pointCredit`).
  */
 export function credit(question: Question, response: string | null): number {
 	if (response === null || response.trim() === '' || response === TIMED_OUT) {
@@ -118,9 +118,9 @@ export function wrongAnswer(question: Question): string {
 		);
 	}
 	if (question.format === 'point') {
-		// The cell furthest from the points on average: a corner, worth nothing.
+		// The cell furthest from the centre: a corner, worth nothing.
 		const cells = Array.from({ length: question.grid.columns * question.grid.rows }, (_, i) => i);
-		const far = (cell: number) => meanDistance(question.grid, question.points, cell);
+		const far = (cell: number) => centreDistance(question.grid, question.points, cell);
 		return String(cells.reduce((worst, cell) => (far(cell) > far(worst) ? cell : worst), 0));
 	}
 	switch (question.match) {

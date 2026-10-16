@@ -5,6 +5,7 @@ import {
 	credit,
 	type Difficulty,
 	GENERATORS,
+	hasClearCentre,
 	type MultiQuestion,
 	type PointQuestion,
 	pickResponse,
@@ -70,6 +71,17 @@ describe('credit for a central point', () => {
 		expect(near).toBeLessThan(1);
 		expect(pointCredit(grid, [0, 1, 5, 6], 24)).toBe(0);
 		expect(pointCredit(grid, points, 99)).toBe(0);
+	});
+
+	it('is the average position, which a board can put between squares', () => {
+		// Two pairs at opposite corners: the centre is on the edge between
+		// row 2's second and third squares, and both are equally right.
+		const points = [0, 1, 12, 13];
+		expect(centralCells(grid, points)).toEqual([6, 7]);
+		expect(hasClearCentre(grid, points)).toBe(false);
+		// A centre a fifth of a square from an edge is too close to call by eye.
+		expect(hasClearCentre(grid, [0, 1, 2, 3, 13])).toBe(false);
+		expect(hasClearCentre(grid, [0, 1, 12])).toBe(true);
 	});
 });
 
@@ -159,9 +171,11 @@ describe('the new kinds', () => {
 		});
 	});
 
-	it('central point: its answer is a best cell, on a board that grows', () => {
+	it('central point: its answer is the only best cell, on a board that grows', () => {
 		each<PointQuestion>('central-point', (question) => {
-			expect(centralCells(question.grid, question.points)).toContain(Number(question.answer));
+			expect(centralCells(question.grid, question.points)).toEqual([Number(question.answer)]);
+			expect(hasClearCentre(question.grid, question.points)).toBe(true);
+			expect(question.points).toHaveLength(question.difficulty + 2);
 			expect(question.grid.columns).toBe(4 + question.difficulty);
 		});
 	});

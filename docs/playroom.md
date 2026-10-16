@@ -275,9 +275,24 @@ Further rules:
   categories (see "Results"), and a straight-faced one says "Below
   measurable range".
 
-**Nothing ever admits to the rigging**, in any presentation. Results used to
-end with a "between you and us" confession; it went because it broke the spell
-for the very people the test is meant to please.
+**Nothing a user can read admits to the rigging**, in any presentation, and
+nothing says that a dom and a sub sit different tests. The fun depends on the
+taker suspending disbelief: a sub has to feel the low score was earned, and a
+dom the high one. It is fine for players to half-know the truth, but nothing
+may say it out loud. Results used to end with a "between you and us"
+confession; it went because it broke the spell for the very people the test is
+meant to please. The same rule covers every other place the test is described:
+the Playroom blurb (`tools.ts`), its roadmap entry, the README, and the setup
+dialog's option help (`TOGGLE_HELP`), which is read before a role is chosen.
+They describe the test as one test, and the help gives its examples without
+saying whose they are. A dom and a sub may each be shown
+different copy (a sub is mocked, a dom flattered), but no copy may say that
+it differs: each one reads as what anyone would be told for that score. `engine.test.ts` checks the results copy for
+admissions at every intensity and in both roles.
+
+The clocks are the one tell left: a dom who watches a sub take the test, or
+someone who plays both roles, can see that only a sub's questions are timed.
+Keep that in mind before adding anything else that only one role sees.
 
 ### Questions
 
@@ -332,7 +347,7 @@ sub's clock is added by the run (see "Clocks").
 | Mental rotation          | tick all                     | Turns of a shape, not its mirror images                  |
 | Visual memory            | tick all, on a board         | A 5×6 board's shaded squares, shown for 4–5 seconds      |
 | Anagrams                 | tick all                     | Letter sets that make a word                             |
-| Central point            | a board's square             | The square nearest all the marked ones on average        |
+| Central point            | a board's square             | The square at the marked ones' average position          |
 | Exposure memory          | tick all                     | Pictures shown one at a time; which were shown           |
 
 **After openpsychometrics.** The last six kinds are the six sections of
@@ -353,6 +368,12 @@ were not copied: the word lists, shapes and pictures are our own.
   exactly their letters, with none holding an S or both an E and a D, which
   the dictionary's missing plurals and past tenses let through ("OSMP" is
   "mops"). When the time is up, what is ticked is the answer.
+- **Central point**: the centre is the points' average position, and points
+  are drawn again until it sits at least 0.15 of a square inside one square,
+  so exactly one square is right and a person can see which. It used to be
+  the square with the least mean distance to the points, which tied outright
+  on symmetric boards, left neighbours a tenth of a square apart on most
+  others, and disagreed with "the centre" on about two boards in three.
 - **Exposure memory**: emoji, which every device has, need nothing fetched,
   and come with names; 1.5 seconds each at the easiest, 0.6 at the hardest.
 
@@ -363,8 +384,8 @@ were not copied: the word lists, shapes and pictures are our own.
 - a tick-all, one point per right tick and one off per wrong one, over the
   number right, never below 0 — as theirs, so guessing does not pay, and
   ticking everything is worth nothing;
-- a central point, 1 at a best square, a whole point less for every half a
-  square further from the points on average.
+- a central point, 1 at the square holding the points' centre (their
+  average position), half a point less for every square further from it.
 
 A tick-all is answered with Done, and comes back ticked as it was when
 returned to; its response is the ticked ids, comma-joined. A central point
