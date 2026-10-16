@@ -128,6 +128,16 @@ describe('safetyNumberSource', () => {
 		expect(safetyNumberSource('age1aac', 'age1bbb')).not.toBe(base);
 		expect(safetyNumberSource('age1aaa', 'age1bbc')).not.toBe(base);
 	});
+
+	/** Frozen: once a partnership has a vault, the number both partners read covers it. */
+	it('covers the vault once there is one, as v2', () => {
+		expect(safetyNumberSource('age1bbb', 'age1aaa', 'CHECK')).toBe(
+			'bound-up-safety-v2\nage1aaa\nage1bbb\nCHECK'
+		);
+		expect(safetyNumberSource('age1aaa', 'age1bbb', null)).toBe(
+			safetyNumberSource('age1aaa', 'age1bbb')
+		);
+	});
 });
 
 describe('formatSafetyNumber', () => {

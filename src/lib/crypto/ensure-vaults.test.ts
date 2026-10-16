@@ -1,0 +1,232 @@
+import { describe, expect, it, vi } from 'vitest';
+import { ADA_IDENTITY, ADA_RECIPIENT, JUN_IDENTITY, JUN_RECIPIENT } from '../testing/crypto';
+import { defined } from '../testing/defined';
+import type { VaultListingView } from '../types';
+import {
+	type EnsureVaultsDeps,
+	ensureVaults,
+	StaleIdentityError,
+	type VaultCreation
+} from './ensure-vaults';
+import { unwrapVaultKey } from './vault';
+
+/**
+ * A pretend server: holds vaults and wraps the way the real one does, so the
+ * two partners' devices can be run against the same state in turn.
+ */
+function fakeServer() {
+	type Stored = {
+		id: string;
+		kind: 'self' | 'partnership';
+		owner: string | null;
+		partnershipId: string | null;
+		keyCheck: string;
+		wraps: Map<string, { ciphertext: string; forRecipient: string }>;
+	};
+	const vaults: Stored[] = [];
+	const recipients = new Map([
+		['ada', ADA_RECIPIENT],
+		['jun', JUN_RECIPIENT]
+	]);
+	const partnershipId = 'p1';
+
+	function listing(userId: string): VaultListingView {
+		const self = vaults.find((v) => v.kind === 'self' && v.owner === userId);
+		const shared = vaults.find((v) => v.partnershipId === partnershipId);
+		const partnerId = userId === 'ada' ? 'jun' : 'ada';
+		return {
+			recipient: defined(recipients.get(userId), 'recipient'),
+			self: self
+				? {
+						id: self.id,
+						kind: 'self',
+						partnershipId: null,
+						keyCheck: self.keyCheck,
+						wrap: self.wraps.get(userId) ?? null
+					}
+				: null,
+			partnerships: [
+				{
+					partnershipId,
+					partnerId,
+					recipients: {
+						mine: defined(recipients.get(userId), 'mine'),
+						theirs: defined(recipients.get(partnerId), 'theirs'),
+						vaultCheck: shared?.keyCheck ?? null
+					},
+					vault: shared
+						? {
+								id: shared.id,
+								kind: 'partnership',
+								partnershipId,
+								keyCheck: shared.keyCheck,
+								wrap: shared.wraps.get(userId) ?? null,
+								partnerWrapFor: shared.wraps.get(partnerId)?.forRecipient ?? null
+							}
+						: null
+				}
+			]
+		};
+	}
+
+	function deps(
+		userId: string,
+		identity: string,
+		overrides: Partial<EnsureVaultsDeps> = {}
+	): EnsureVaultsDeps & { created: VaultCreation[] } {
+		const created: VaultCreation[] = [];
+		return {
+			created,
+			userId,
+			identity: { recipient: defined(recipients.get(userId), 'recipient'), identity },
+			list: () => Promise.resolve(listing(userId)),
+			create: (vault) => {
+				const scopeTaken = vaults.some((v) =>
+					vault.kind === 'self'
+						? v.kind === 'self' && v.owner === userId
+						: v.partnershipId === vault.partnershipId
+				);
+				if (scopeTaken) {
+					return Promise.resolve('exists');
+				}
+				created.push(vault);
+				vaults.push({
+					id: vault.id,
+					kind: vault.kind,
+					owner: vault.kind === 'self' ? userId : null,
+					partnershipId: vault.kind === 'partnership' ? vault.partnershipId : null,
+					keyCheck: vault.keyCheck,
+					wraps: new Map(vault.wraps.map((wrap) => [wrap.userId, wrap]))
+				});
+				return Promise.resolve('created');
+			},
+			putWrap: (vaultId, wrap) => {
+				vaults.find((v) => v.id === vaultId)?.wraps.set(wrap.userId, wrap);
+				return Promise.resolve();
+			},
+			trustAllows: () => Promise.resolve(true),
+			report: () => undefined,
+			...overrides
+		};
+	}
+
+	return { vaults, recipients, deps, partnershipId };
+}
+
+describe('ensureVaults', () => {
+	it('creates a self vault and a partnership vault the first time, and opens them', async () => {
+		const server = fakeServer();
+		const ada = server.deps('ada', ADA_IDENTITY);
+		const opened = await ensureVaults(ada);
+
+		expect(ada.created.map((vault) => vault.kind)).toEqual(['self', 'partnership']);
+		expect(opened.self?.kind).toBe('self');
+		expect(opened.partnerships[server.partnershipId]?.kind).toBe('partnership');
+	});
+
+	/** The point of a partnership vault: both partners open the same key. */
+	it('lets the partner open the vault the first device made, without making another', async () => {
+		const server = fakeServer();
+		const fromAda = await ensureVaults(server.deps('ada', ADA_IDENTITY));
+		const jun = server.deps('jun', JUN_IDENTITY);
+		const fromJun = await ensureVaults(jun);
+
+		expect(jun.created.map((vault) => vault.kind)).toEqual(['self']);
+		expect(fromJun.partnerships[server.partnershipId]?.keyCheck).toBe(
+			fromAda.partnerships[server.partnershipId]?.keyCheck
+		);
+	});
+
+	/** A device that loses the race opens the winner's vault rather than giving up. */
+	it('opens the winner’s vault when another device created one first', async () => {
+		const server = fakeServer();
+		const jun = server.deps('jun', JUN_IDENTITY);
+		const ada = server.deps('ada', ADA_IDENTITY);
+		const { create } = ada;
+		let raced = false;
+		ada.create = async (vault) => {
+			if (vault.kind === 'partnership' && !raced) {
+				// Jun's device gets there between Ada's listing and Ada's create.
+				raced = true;
+				await ensureVaults(jun);
+			}
+			return await create(vault);
+		};
+		const opened = await ensureVaults(ada);
+		expect(raced).toBe(true);
+		const shared = defined(
+			server.vaults.find((v) => v.partnershipId === server.partnershipId),
+			'the shared vault'
+		);
+		expect(opened.partnerships[server.partnershipId]?.id).toBe(shared.id);
+	});
+
+	it('does not create or wrap for a partner whose key this device has been warned about', async () => {
+		const server = fakeServer();
+		const ada = server.deps('ada', ADA_IDENTITY, { trustAllows: () => Promise.resolve(false) });
+		const opened = await ensureVaults(ada);
+		expect(ada.created.map((vault) => vault.kind)).toEqual(['self']);
+		expect(opened.partnerships).toEqual({});
+	});
+
+	/** After a partner-assisted sign-in: the partner's wrap is for the key they lost. */
+	it('wraps again for a partner whose wrap is for a key they no longer have', async () => {
+		const server = fakeServer();
+		const fromAda = await ensureVaults(server.deps('ada', ADA_IDENTITY));
+		const shared = defined(fromAda.partnerships[server.partnershipId], 'shared vault');
+
+		const { generateAgeIdentity } = await import('./identity');
+		const fresh = await generateAgeIdentity();
+		server.recipients.set('jun', fresh.recipient);
+
+		await ensureVaults(server.deps('ada', ADA_IDENTITY));
+		const wrap = defined(
+			server.vaults.find((v) => v.id === shared.id)?.wraps.get('jun'),
+			"jun's new wrap"
+		);
+		expect(wrap.forRecipient).toBe(fresh.recipient);
+		expect(
+			await unwrapVaultKey({ ciphertext: wrap.ciphertext, identity: fresh.identity, vault: shared })
+		).not.toBeNull();
+	});
+
+	/** A server pairing a real wrap with a made-up vault row. */
+	it('reports a wrap that should open and does not, and carries on', async () => {
+		const server = fakeServer();
+		await ensureVaults(server.deps('ada', ADA_IDENTITY));
+		for (const vault of server.vaults) {
+			vault.keyCheck = 'B'.repeat(43);
+		}
+		const report = vi.fn();
+		const opened = await ensureVaults(server.deps('ada', ADA_IDENTITY, { report }));
+		expect(opened.self).toBeNull();
+		expect(opened.partnerships).toEqual({});
+		expect(report).toHaveBeenCalledTimes(2);
+	});
+
+	/** After a partner-assisted sign-in elsewhere, this device's key is the old one. */
+	it('opens nothing, with an error the caller can stay quiet about, on a stale identity', async () => {
+		const server = fakeServer();
+		const { generateAgeIdentity } = await import('./identity');
+		server.recipients.set('ada', (await generateAgeIdentity()).recipient);
+		const ada = server.deps('ada', ADA_IDENTITY, {
+			identity: { recipient: ADA_RECIPIENT, identity: ADA_IDENTITY }
+		});
+		await expect(ensureVaults(ada)).rejects.toBeInstanceOf(StaleIdentityError);
+		expect(ada.created).toEqual([]);
+	});
+
+	it('pins a vault it has just created', async () => {
+		const server = fakeServer();
+		const trustAllows = vi.fn(() => Promise.resolve(true));
+		await ensureVaults(server.deps('ada', ADA_IDENTITY, { trustAllows }));
+		const shared = defined(
+			server.vaults.find((v) => v.partnershipId === server.partnershipId),
+			'shared vault'
+		);
+		expect(trustAllows).toHaveBeenLastCalledWith(
+			server.partnershipId,
+			expect.objectContaining({ vaultCheck: shared.keyCheck })
+		);
+	});
+});

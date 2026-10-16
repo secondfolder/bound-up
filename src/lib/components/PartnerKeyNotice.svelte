@@ -20,6 +20,9 @@
 	 * - `verified` — matches and was compared. A small, permanent reassurance.
 	 * - `changed` (partner) — blocked. The one state that stops a send.
 	 * - `changed` (own) — the server returned a different key for *you*.
+	 * - `changed` (vault) — the key the partnership's shared data is locked
+	 *   with is not the one this device first saw. Nothing legitimate replaces
+	 *   it, so the only way past is comparing the safety number, which covers it.
 	 */
 	let {
 		trust,
@@ -30,7 +33,7 @@
 		trust: TrustView;
 		partnerName: string;
 		verify: () => Promise<void>;
-		accept: (which: 'partner' | 'own') => Promise<void>;
+		accept: (which: 'partner' | 'own' | 'vault') => Promise<void>;
 	} = $props();
 
 	let showNumber = $state(false);
@@ -112,6 +115,35 @@
 				onclick={() => run(() => accept('partner'))}
 			>
 				I checked with {partnerName} — this is their new key
+			</wa-button>
+		</wa-callout>
+	{:else if trust.vault?.kind === 'changed'}
+		<!--
+			No innocent cause to name, unlike the two above: a partner-assisted
+			sign-in re-wraps the shared key, it never makes a new one. So the copy
+			says so plainly and the only way on is the safety number, which covers
+			this key as well as both of yours.
+		-->
+		<wa-callout variant="danger">
+			<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
+			<strong>The key for everything you share with {partnerName} has changed</strong>
+			<p>
+				This device first saw a different one on {when(trust.vault.pinned.pinnedAt)}. That should
+				never happen on its own, and it is what it would look like if someone were trying to read
+				what you share. Nothing new is saved until you have checked.
+			</p>
+			<p>
+				Read this number to {partnerName} somewhere other than this app. Only if theirs matches,
+				carry on.
+			</p>
+			<SafetyNumber value={trust.safetyNumber} {partnerName} tone="warning" />
+			<wa-button
+				size="s"
+				variant="danger"
+				disabled={working}
+				onclick={() => run(() => accept('vault'))}
+			>
+				Our numbers match — carry on
 			</wa-button>
 		</wa-callout>
 	{:else}

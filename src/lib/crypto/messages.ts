@@ -14,6 +14,7 @@
  */
 
 import { type CachedEmbedDetails, withSafeUrls } from '../embeds';
+import { fromBase64, toBase64 } from '../encryption';
 import { MAX_BODY_CHARS } from '../messaging';
 import { loadAge } from './identity';
 
@@ -63,26 +64,6 @@ export type DraftPayload = { version: 1; text: string; tagIds: string[] };
 
 const encoder = new TextEncoder();
 
-function encodeBase64(bytes: Uint8Array): string {
-	// Standard base64 here, not base64url: this is what goes in a `ciphertext`
-	// column, and the Zod field checks `[A-Za-z0-9+/=]`. base64url is reserved
-	// for values that travel in a URL.
-	let binary = '';
-	for (const byte of bytes) {
-		binary += String.fromCharCode(byte);
-	}
-	return btoa(binary);
-}
-
-function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
-	const binary = atob(value);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i += 1) {
-		bytes[i] = binary.charCodeAt(i);
-	}
-	return bytes;
-}
-
 /** Encrypts a payload to every given recipient. Both partners, in practice. */
 export async function encryptPayload(
 	payload: MessagePayload | MessageMetadataPayload | ReactionPayload | DraftPayload,
@@ -101,7 +82,7 @@ export async function encryptPayload(
 		encrypter.addRecipient(recipient);
 	}
 
-	return encodeBase64(await encrypter.encrypt(encoder.encode(JSON.stringify(payload))));
+	return toBase64(await encrypter.encrypt(encoder.encode(JSON.stringify(payload))));
 }
 
 /**
@@ -121,7 +102,7 @@ export async function decryptPayload<T = MessagePayload>(
 	decrypter.addIdentity(identity);
 
 	try {
-		const opened = await decrypter.decrypt(decodeBase64(ciphertext), 'text');
+		const opened = await decrypter.decrypt(fromBase64(ciphertext), 'text');
 		return JSON.parse(opened) as T;
 	} catch {
 		return null;

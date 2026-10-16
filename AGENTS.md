@@ -36,6 +36,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/components/`         | Presentational Svelte components                                                             |
 | `src/lib/partnership.ts`      | The partners domain rules. Alias-free. See [docs/partners.md](docs/partners.md)              |
 | `src/lib/features.ts`         | Feature registry. Alias-free. See [docs/features-and-admin.md](docs/features-and-admin.md)   |
+| `src/lib/vault.ts`, `src/lib/sealed.ts` | Vaults and sealed records, the pure halves: formats, the per-kind payload versions. Alias-free. See [docs/encryption.md](docs/encryption.md#vaults) |
 | `src/lib/roadmap/`            | The public roadmap's JSON and its validating loader. Alias-free. See [docs/roadmap.md](docs/roadmap.md) |
 | `src/lib/playroom/`           | The Playroom's tool registry and the IQ test's engine: questions, rigging, copy. See [docs/playroom.md](docs/playroom.md) |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |

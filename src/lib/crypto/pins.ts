@@ -27,6 +27,7 @@
  */
 
 import { type PinRecord, type PinState, pinStateFor } from '../encryption';
+import { vaultPinId } from '../vault';
 import { type KeyStore, keyStore, type PinRow } from './keystore';
 
 /**
@@ -178,19 +179,32 @@ export type PartnershipTrust = {
 	partner: PinState;
 	/** Your own. `changed` here means the server swapped *your* recipient. */
 	own: PinState;
+	/**
+	 * The partnership vault's key check, pinned the same way. Null until the
+	 * partnership has a vault. A vault is never replaced — a partner-assisted
+	 * sign-in re-wraps it rather than making a new one — so `changed` here has
+	 * no innocent cause on the server's side.
+	 */
+	vault: PinState | null;
 };
+
+/** What the server served for one partnership: both recipients and the vault's key check. */
+export type ServedKeys = { mine: string; theirs: string; vaultCheck?: string | null };
 
 export async function evaluateTrust(
 	store: KeyStore,
 	userId: string,
 	partnershipId: string,
-	served: { mine: string; theirs: string },
+	served: ServedKeys,
 	now: number = Date.now()
 ): Promise<PartnershipTrust> {
 	const pins = await readPins(store, userId);
 
 	let partner = pinStateFor(pins.get(partnershipId), served.theirs);
 	const own = pinStateFor(pins.get(OWN_KEY_PIN), served.mine);
+	const vault = served.vaultCheck
+		? pinStateFor(pins.get(vaultPinId(partnershipId)), served.vaultCheck)
+		: null;
 
 	// The key this device vouched for, now actually served: verified, with no
 	// warning in between. See `vouchPinId`.
@@ -211,15 +225,18 @@ export async function evaluateTrust(
 	if (own.kind === 'new') {
 		await writePin(store, userId, OWN_KEY_PIN, served.mine, { now });
 	}
+	if (vault?.kind === 'new' && served.vaultCheck) {
+		await writePin(store, userId, vaultPinId(partnershipId), served.vaultCheck, { now });
+	}
 
-	return { partner, own };
+	return { partner, own, vault };
 }
 
 /** The same, against this device's real store. */
 export async function deviceTrust(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string; theirs: string }
+	served: ServedKeys
 ): Promise<PartnershipTrust> {
 	return evaluateTrust(await keyStore(), userId, partnershipId, served);
 }

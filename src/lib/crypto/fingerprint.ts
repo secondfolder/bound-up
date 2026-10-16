@@ -12,16 +12,21 @@
 import { formatSafetyNumber, recoveryCodeSource, safetyNumberSource } from '../encryption';
 
 /**
- * The number both partners should see, given the two public recipients.
+ * The number both partners should see, given the two public recipients and,
+ * once there is one, the partnership vault's key check.
  *
  * Symmetric by construction: `safetyNumberSource` sorts its inputs, so it does
  * not matter which of the two is passed first. That is what lets one person
  * read theirs out and the other simply compare.
  */
-export async function safetyNumber(mine: string, theirs: string): Promise<string> {
+export async function safetyNumber(
+	mine: string,
+	theirs: string,
+	vaultCheck?: string | null
+): Promise<string> {
 	const digest = await crypto.subtle.digest(
 		'SHA-256',
-		new TextEncoder().encode(safetyNumberSource(mine, theirs))
+		new TextEncoder().encode(safetyNumberSource(mine, theirs, vaultCheck))
 	);
 	return formatSafetyNumber(new Uint8Array(digest));
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { vaultPinId } from '../vault';
 import type { CachedIdentity, KeyStore, PinRow } from './keystore';
 import {
 	acceptPin,
@@ -154,6 +155,52 @@ describe('evaluateTrust', () => {
 		// A second account sees everything for the first time, even though the
 		// same partnership id is pinned in the same store.
 		expect(other.partner).toEqual({ kind: 'new' });
+	});
+});
+
+describe('the partnership vault', () => {
+	const check = 'A'.repeat(43);
+	const swapped = 'B'.repeat(43);
+
+	it('is not judged until the partnership has one', async () => {
+		const trust = await evaluateTrust(fakeStore(), ada, partnership, {
+			mine: myKey,
+			theirs: theirKey,
+			vaultCheck: null
+		});
+		expect(trust.vault).toBeNull();
+	});
+
+	it('is pinned on first sight beside the partner’s key', async () => {
+		const store = fakeStore();
+		const served = { mine: myKey, theirs: theirKey, vaultCheck: check };
+		expect((await evaluateTrust(store, ada, partnership, served, 1000)).vault).toEqual({
+			kind: 'new'
+		});
+		expect((await evaluateTrust(store, ada, partnership, served, 2000)).vault).toEqual({
+			kind: 'pinned',
+			pinnedAt: 1000
+		});
+		expect((await readPins(store, ada)).get(vaultPinId(partnership))?.recipient).toBe(check);
+	});
+
+	/** A vault is never replaced, so a different one is the server's doing. */
+	it('reports a swapped vault as changed, and does not re-pin it', async () => {
+		const store = fakeStore();
+		await evaluateTrust(store, ada, partnership, {
+			mine: myKey,
+			theirs: theirKey,
+			vaultCheck: check
+		});
+		const trust = await evaluateTrust(store, ada, partnership, {
+			mine: myKey,
+			theirs: theirKey,
+			vaultCheck: swapped
+		});
+		expect(trust.vault?.kind).toBe('changed');
+		// Both partners' keys are untouched; only the vault moved.
+		expect(trust.partner.kind).toBe('pinned');
+		expect((await readPins(store, ada)).get(vaultPinId(partnership))?.recipient).toBe(check);
 	});
 });
 

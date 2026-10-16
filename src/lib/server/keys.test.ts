@@ -27,6 +27,7 @@ import {
 	listWrapsForUser,
 	putUserKeys
 } from './keys';
+import { createVault } from './vaults';
 
 let harness: TestDb;
 let ada: TestUser;
@@ -289,14 +290,37 @@ describe('getRecipientsForPartnership', () => {
 
 		await expect(getRecipientsForPartnership(harness.db, partnership.id, ada.id)).resolves.toEqual({
 			mine: adaKeys.recipient,
-			theirs: junKeys.recipient
+			theirs: junKeys.recipient,
+			vaultCheck: null
 		});
 
 		// The per-viewer flip, which is the same trap as the name columns.
 		await expect(getRecipientsForPartnership(harness.db, partnership.id, jun.id)).resolves.toEqual({
 			mine: junKeys.recipient,
-			theirs: adaKeys.recipient
+			theirs: adaKeys.recipient,
+			vaultCheck: null
 		});
+	});
+
+	/** So the safety number and the pin cover the vault both partners share. */
+	it("carries the partnership vault's key check once it has one", async () => {
+		const adaKeys = await createTestUserKeys(harness.db, ada);
+		const junKeys = await createTestUserKeys(harness.db, jun);
+		const partnership = await createTestPartnership(harness.db, ada, jun);
+		const keyCheck = 'C'.repeat(43);
+		await createVault(harness.db, ada.id, {
+			kind: 'partnership',
+			id: '00000000-0000-4000-8000-000000000001',
+			partnershipId: partnership.id,
+			keyCheck,
+			wraps: [
+				{ userId: ada.id, ciphertext: 'd3JhcA==', forRecipient: adaKeys.recipient },
+				{ userId: jun.id, ciphertext: 'd3JhcA==', forRecipient: junKeys.recipient }
+			]
+		});
+		await expect(
+			getRecipientsForPartnership(harness.db, partnership.id, jun.id)
+		).resolves.toMatchObject({ vaultCheck: keyCheck });
 	});
 
 	/**

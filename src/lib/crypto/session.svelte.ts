@@ -21,6 +21,7 @@ import { openPasskeyWrap } from './passkey-wraps';
 import { clearStash, takeUnlock } from './stash';
 import { dismissStorageExplanation, offerStorageExplanation } from './storage-persistence.svelte';
 import { resetTrust } from './trust.svelte';
+import { resetVaults } from './vaults.svelte';
 import { unwrapIdentity } from './wrap';
 
 export type Keyring =
@@ -264,6 +265,7 @@ export function resetKeyring(): void {
 	clearStash();
 	dismissStorageExplanation();
 	resetTrust();
+	resetVaults();
 	keyring = { status: 'unknown' };
 	initialisingForUserId = null;
 	initialisingPromise = null;

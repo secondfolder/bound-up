@@ -5,6 +5,12 @@ stores only ciphertext. This document covers the keys: where they come from,
 where they are kept, and what the guarantee actually is. The messaging feature
 itself is [docs/messaging.md](messaging.md).
 
+Beside each user's identity sit **vaults**: one key per user and one per
+partnership, which the rest of a user's data is sealed under as **sealed
+records**. Both are described below. Moving messages and the other kinds of
+user data onto them is in progress; until a kind has moved, it is stored as it
+was.
+
 Two narrow exceptions exist for embeds. First, when a URL is typed into the
 composer, when a new message is sent, or when an embed with no cached preview
 loads, the client may send that URL to `/api/embed-metadata` so the server can resolve preview data and hand it back
@@ -208,6 +214,12 @@ batch (`/api/keys/passkey/[id]`).
 - The server's entire involvement is storing and returning four opaque strings:
   `recipient`, `type`, `params`, `blob`. It reads one field inside `params` — a
   passkey wrap's public `credentialId` — to tie the wrap to its passkey row.
+  For vaults it stores a public key check and age ciphertexts, and decides only
+  who may write which: see [Vaults](#vaults).
+- **`src/lib/vault.ts` and `src/lib/sealed.ts` are the pure halves** of vaults
+  and sealed records, alias-free like `encryption.ts`, so the schema and the
+  server can share their types, formats and size caps. The cryptography is in
+  `crypto/vault.ts`, `crypto/sealed.ts` and `crypto/ensure-vaults.ts`.
 
 ## What the forms do
 
@@ -463,6 +475,16 @@ protocol prevents that. What the design gives you instead is that a
   that already-received messages stay readable, because "key changed" otherwise
   reads as "your history is gone" and would make the safe action look expensive.
 
+**Partnership vaults are pinned too**, under `vault:<partnershipId>`: the
+vault's key check, beside the partner's recipient. A vault is never replaced —
+a partner-assisted sign-in re-wraps it for the new key rather than making a new
+one — so unlike the two above there is no innocent cause for a change. It
+blocks writing into the vault, and the only way on is comparing the safety
+number, which covers the vault: once a partnership has one, the number is v2,
+`SHA-256("bound-up-safety-v2\n" + the two recipients, sorted + "\n" + key check)`.
+Without that, a server could make a vault of its own, wrap it to both partners'
+public recipients, and be the only party who knew it was not theirs.
+
 Two things about this that look like flaws and are not:
 
 **The blocking is client-side only, necessarily.** The server is the adversary
@@ -476,6 +498,166 @@ already falls back to memory when IndexedDB refuses it, so reaching that state
 means something more unusual — and refusing to let someone message their partner
 because their browser will not persist a pin would be the wrong trade. The UI
 says so instead.
+
+## Vaults
+
+A **vault** is one key that a scope's data is sealed under: each user has one
+of their own, and each partnership has one the two partners share. It is 32
+random bytes, made in the browser, and never used directly. HKDF-SHA256 over
+it, each with its own `info` (`src/lib/vault.ts`), gives:
+
+| `info`                      | What it is                                                    |
+| --------------------------- | ------------------------------------------------------------- |
+| `bound-up-vault-enc-v1`     | The AES-256-GCM key records are sealed with                   |
+| `bound-up-vault-check-v1`   | The **key check**: a public fingerprint, stored and pinned    |
+| `bound-up-index-v1\|<purpose>` | One HMAC key per blind index — see below                    |
+
+All three are non-extractable `CryptoKey`s. The raw bytes exist only while a
+vault is being made or wrapped for someone, and are zeroed straight after;
+wrapping for someone later opens the device's own wrap again rather than
+keeping the key around.
+
+| Table         | What                                                                          |
+| ------------- | ----------------------------------------------------------------------------- |
+| `vaults`      | `id` (chosen by the browser), `kind`, the owner or the partnership, `key_check` |
+| `vault_wraps` | One per member: the key age-encrypted to their recipient, and which recipient |
+
+A wrap's plaintext is `{ v: 1, vaultId, key }`, and opening one checks both
+that it names the vault it was served with and that the key it holds derives
+that vault's key check. So a server cannot pair a real wrap with another
+vault's row, or a vault row with a key it made up.
+
+**Why a symmetric key, and not a vault public key.** Anyone can encrypt to a
+public key, the server included, so a public-key vault would let the server
+write a record that opens and validates like a real one. With a symmetric key,
+only someone holding it can produce a record that opens. A partner still can,
+since they hold the key too, and that is accepted: a partner is someone the
+user chose to share this with. The server cannot. It is also cheaper per record than an age header, and
+works as a non-extractable key on every browser, not only those with X25519.
+
+**Why one key per scope.** A change of someone's key — a partner-assisted
+sign-in — then means re-wrapping one key for them, not re-encrypting
+everything in the scope, the same indirection attachments already use with a
+key per file.
+
+### Made by the devices, on one path
+
+Nothing creates a vault on the server's side. After sign-in unlocks the
+identity, `EncryptionGate` runs `initialiseVaults` (`crypto/vaults.svelte.ts`),
+which runs `ensureVaults` (`crypto/ensure-vaults.ts`) over
+`GET /api/vaults`:
+
+- **The self vault** is opened, or made if the account has none.
+- **Each accepted partnership's vault** is opened, or made — wrapped to both
+  members — if the partnership has none. The device that made it pins its key
+  check at once, so its first sighting is the real one.
+- **A partner whose wrap is missing, or made for a key they no longer have**,
+  is wrapped for again (`PUT /api/vaults/[id]/wraps`).
+
+That one path is what covers a new account, a newly linked pair and every
+partnership that existed before vaults, with no migration of its own.
+
+**Making or wrapping for a partner waits on the trust check.** Both hand the
+vault key to whatever recipient the server says the partner has, so a key this
+device has been warned about gets nothing until the user accepts it. Opening a
+vault needs no such check — reading leaks nothing — so a vault is open even
+while writing into it is held back.
+
+**Two devices racing** to make the same partnership's vault is ordinary: the
+unique column refuses the second insert, `POST /api/vaults` answers 409, and the
+device that lost lists again and opens the winner's. The vault and its wraps
+are written in one `db.batch()`, because a vault nobody can open is worse than
+none — the scope could never get another.
+
+**The server checks who may write, nothing else.** A vault is created only by a
+member of its scope, with exactly one wrap per member made for the recipient
+that member has now (a wrap for an old or made-up recipient is a vault silently
+lost to them). A wrap may be added for a member who has none or a stale one,
+but one already made for their current recipient can be replaced only by its
+owner: such a wrap opens, and replacing it could only break it.
+
+Vault keys are held in memory for the page's life and fetched again on the
+next load: a few hundred bytes per vault, opened with one age decryption each.
+
+## Sealed records
+
+A **sealed record** is a row whose content the server cannot read. It keeps a
+plaintext envelope that Drizzle and SQL migrations still manage — its id, its
+scope, foreign keys, whatever fields the server acts on, `payload_version` and
+`revision` — and one `ciphertext` column for everything else:
+
+    ciphertext = "sb1." + base64url( 12-byte IV ‖ AES-256-GCM(JSON) ‖ 16-byte tag )
+
+under the vault's encryption key, with associated data
+`bound-up-sealed-v1|<kind>|<record id>|<vault id>|<payload version>`
+(`sealedAad` in `src/lib/sealed.ts`). A ciphertext moved to another row,
+another kind or another vault fails its tag check, and so does one whose
+plaintext `payload_version` was edited to have it read as an older shape. The
+`sb1.` prefix is so a later change of algorithm can tell old ciphertexts apart
+without guessing. Record ids are chosen by the browser, because they are part
+of what the ciphertext is bound to.
+
+`crypto/sealed.ts` seals and opens. Sealing takes a **write grant**
+(`crypto/write-grant.ts`): for a partnership vault one comes only from
+`writeGrantFor` in `crypto/trust.svelte.ts`, which asks the trust check first,
+so a write that forgot to ask does not compile. Before vaults, reactions and
+embed metadata were written without that check.
+
+### The payload is versioned in code
+
+The server cannot read a payload, so it cannot migrate one either. Each kind
+declares every version of its payload it has ever had, with `defineSealedKind`
+in `src/lib/sealed.ts`:
+
+- **Writers always write the latest version.**
+- **Readers accept every version ever shipped** and upcast, one version at a
+  time, validating against each version's Zod schema on the way. Whatever
+  comes out of a vault was written by a partner's device or forged, so it is
+  parsed, never cast, and a schema that strips undeclared keys is also what
+  keeps a record from carrying extra data.
+- **A new version's reader ships a release before its writer**, so a tab
+  still open on the previous build never meets data it cannot read.
+- **A record read at an older version is written back at the latest**,
+  compare-and-swap on `revision`, so a background upgrade can never overwrite
+  a newer edit from the other partner.
+- **`payload_version` is plaintext** so the server can count records still on
+  an old version; an upcaster can go once its count reaches zero.
+
+The server checks a sealed write's size against the kind's cap and its version
+against the kinds it knows, and nothing about its content. Validation that used
+to happen on the server — lengths, rich-text sanitising — happens in the
+browser before sealing and again after opening. That is a policy that has moved
+into the browser, like password strength above, and not a permission:
+who may write a record is still the server's decision (AGENTS.md invariant 14).
+
+### Showing them
+
+`sealedReader.read(kind, row, vault)` (`src/lib/sealed-cache.svelte.ts`) is
+what a template calls. It answers at once — `undefined` while working or
+before the vault is open, `null` for anything that will not open, the payload
+otherwise — and the answer updates when the open lands. That keeps the rule
+that nothing encrypted renders before the keyring is `unlocked`, by
+construction: there is no vault before then. Results are cached per record and
+ciphertext, and cleared on sign-out.
+
+### Blind indexes
+
+Uniqueness on something the server cannot read is kept with a **blind index**:
+`HMAC-SHA256(indexKey, normalised value)`, at full length, in a plaintext
+column the unique constraint covers (`blindIndex` in `crypto/vault.ts`). The
+key is derived per vault and per purpose, so equal values in two partnerships,
+or two fields, never share an index. What it reveals is what the constraint
+needs: that two values in one scope are equal. Normalisation happens before
+hashing, because afterwards nothing can.
+
+### Frozen vectors
+
+`crypto/vault.test.ts` and `crypto/sealed.test.ts` hold vectors made by an
+independent implementation on `node:crypto`: the key check, a blind index and a
+sealed record. Like the KDF's, they are the tests that matter most: every vault
+and record ever stored was made with these formats, and a drift would fail
+nowhere locally — existing data would simply stop opening. Never regenerate
+them to make a failure go away.
 
 ## Not built yet
 

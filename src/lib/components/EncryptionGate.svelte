@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
 	import { currentKeyring, initialiseKeyring, lock, resetKeyring } from '$lib/crypto/session.svelte';
+	import { initialiseVaults } from '$lib/crypto/vaults.svelte';
 	import { rememberSignInEmail } from '$lib/sign-in-again';
 	import StoragePersistenceDialog from './StoragePersistenceDialog.svelte';
 
@@ -47,6 +48,24 @@
 		return () => {
 			delete document.documentElement.dataset.keyring;
 		};
+	});
+
+	// Once the identity is open, so are the vaults sealed records live in. A
+	// primitive rather than the keyring object, so the effect runs once per
+	// unlock and not on every keyring reassignment (see AGENTS.md on
+	// effects that read reactive objects).
+	const unlockedRecipient = $derived(keyring.status === 'unlocked' ? keyring.recipient : null);
+	const userId = $derived(user?.id ?? null);
+	$effect(() => {
+		if (!(unlockedRecipient && userId)) {
+			return;
+		}
+		const id = userId;
+		untrack(() => {
+			if (keyring.status === 'unlocked') {
+				void initialiseVaults(id, { recipient: keyring.recipient, identity: keyring.identity });
+			}
+		});
 	});
 
 	$effect(() => {

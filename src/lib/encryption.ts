@@ -310,6 +310,38 @@ export function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
 	return bytes;
 }
 
+// ── base64 ───────────────────────────────────────────────────────────────────
+
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/**
+ * Bytes to standard, padded base64.
+ *
+ * For age ciphertexts stored in a column — message bodies and vault wraps —
+ * whose Zod fields check `[A-Za-z0-9+/=]`. Values that travel in a URL use
+ * base64url instead.
+ */
+export function toBase64(bytes: Uint8Array): string {
+	let binary = '';
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+	return btoa(binary);
+}
+
+/** The inverse. Throws on anything that is not base64. */
+export function fromBase64(value: string): Uint8Array<ArrayBuffer> {
+	if (!BASE64.test(value)) {
+		throw new Error('Not base64');
+	}
+	const binary = atob(value);
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i += 1) {
+		bytes[i] = binary.charCodeAt(i);
+	}
+	return bytes;
+}
+
 // ── the safety number ────────────────────────────────────────────────────────
 
 /**
@@ -320,11 +352,21 @@ export function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
  * stable, but a number that depended on them would not match when one partner
  * read theirs out to the other.
  *
+ * Once the partnership has a vault, its key check goes in too (v2). Both
+ * partners' recipients are public, so a dishonest server could make a vault of
+ * its own and wrap it to both of them; comparing a number that covers the
+ * vault is what would show that up. Before the vault exists the number is v1,
+ * and it changes once the vault is made — which happens on the first load
+ * after the partnership is accepted, so in practice before anyone compares.
+ *
  * The version prefix is domain separation — if this format ever changes, an old
  * pinned number cannot be mistaken for a new one.
  */
-export function safetyNumberSource(a: string, b: string): string {
+export function safetyNumberSource(a: string, b: string, vaultCheck?: string | null): string {
 	const [first, second] = [a, b].sort();
+	if (vaultCheck) {
+		return `bound-up-safety-v2\n${first}\n${second}\n${vaultCheck}`;
+	}
 	return `bound-up-safety-v1\n${first}\n${second}`;
 }
 

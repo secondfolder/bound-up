@@ -176,6 +176,13 @@
       "when": 1792064957742,
       "tag": "0024_verify_existing_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1792122311147,
+      "tag": "0025_add_vaults",
+      "breakpoints": true
     }
   ]
 }

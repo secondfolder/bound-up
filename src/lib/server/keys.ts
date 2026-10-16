@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import type { KeyWrapParams, KeyWrapType } from '../encryption';
 import type { KeyWrapView, PartnerRecipientsView, UnlockBundleView } from '../types';
 import type { Db } from './db';
-import { partnerships, passkey, userKeys, userKeyWraps } from './db/schema';
+import { partnerships, passkey, userKeys, userKeyWraps, vaults } from './db/schema';
 
 /**
  * Every database access for encryption keys.
@@ -249,11 +249,13 @@ export async function getRecipientsForPartnership(
 			inviterId: partnerships.inviterId,
 			inviteeId: partnerships.inviteeId,
 			inviterRecipient: inviterKeys.recipient,
-			inviteeRecipient: inviteeKeys.recipient
+			inviteeRecipient: inviteeKeys.recipient,
+			vaultCheck: vaults.keyCheck
 		})
 		.from(partnerships)
 		.innerJoin(inviterKeys, eq(inviterKeys.userId, partnerships.inviterId))
 		.innerJoin(inviteeKeys, eq(inviteeKeys.userId, partnerships.inviteeId))
+		.leftJoin(vaults, eq(vaults.partnershipId, partnerships.id))
 		.where(and(eq(partnerships.id, partnershipId), eq(partnerships.status, 'accepted')))
 		.limit(1);
 
@@ -265,10 +267,10 @@ export async function getRecipientsForPartnership(
 	// Which recipient is "mine" flips with who is looking — the same trap as the
 	// name columns (invariant 12), so it is resolved here and nowhere else.
 	if (row.inviterId === viewerId) {
-		return { mine: row.inviterRecipient, theirs: row.inviteeRecipient };
+		return { mine: row.inviterRecipient, theirs: row.inviteeRecipient, vaultCheck: row.vaultCheck };
 	}
 	if (row.inviteeId === viewerId) {
-		return { mine: row.inviteeRecipient, theirs: row.inviterRecipient };
+		return { mine: row.inviteeRecipient, theirs: row.inviterRecipient, vaultCheck: row.vaultCheck };
 	}
 	return null;
 }

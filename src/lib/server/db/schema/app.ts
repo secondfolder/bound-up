@@ -1,11 +1,12 @@
 import { relations, sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../../encryption';
 import type { FeatureKey, FeatureSource } from '../../../features';
 import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
 import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
+import type { VaultKind } from '../../../vault';
 import { user } from './auth';
 
 /**
@@ -556,6 +557,76 @@ export const userKeyWraps = sqliteTable(
 );
 
 /**
+ * One key that a scope's user data is sealed under: a user's own, or a
+ * partnership's. See docs/encryption.md, "Vaults".
+ *
+ * The key itself is never here. What the server holds is a public fingerprint
+ * of it (`key_check`) and, in `vault_wraps`, a copy of it encrypted to each
+ * member. The id is chosen by the browser, because the wraps — and everything
+ * later sealed under the key — are bound to it before this row exists.
+ *
+ * One vault per scope, enforced by the two unique columns: two devices that
+ * both find a partnership without one race to create it, and the loser's
+ * insert fails rather than leaving the partnership with two keys and its data
+ * split between them. The check constraint keeps the scope columns honest, so
+ * a vault always belongs to exactly the one thing its kind says.
+ */
+export const vaults = sqliteTable(
+	'vaults',
+	{
+		id: text('id').primaryKey(),
+		kind: text('kind').$type<VaultKind>().notNull(),
+		ownerUserId: text('owner_user_id')
+			.unique()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		partnershipId: text('partnership_id')
+			.unique()
+			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		/** HKDF of the key, base64url. Public; see `VAULT_KEY_CHECK_INFO`. */
+		keyCheck: text('key_check').notNull(),
+		...timestamps
+	},
+	(table) => [
+		check(
+			'vaults_scope_matches_kind',
+			sql`(${table.kind} = 'self' AND ${table.ownerUserId} IS NOT NULL AND ${table.partnershipId} IS NULL) OR (${table.kind} = 'partnership' AND ${table.partnershipId} IS NOT NULL AND ${table.ownerUserId} IS NULL)`
+		)
+	]
+);
+
+/**
+ * A vault's key, age-encrypted to one member's recipient.
+ *
+ * One per member: re-wrapping for a member replaces their row, which is what a
+ * partner-assisted sign-in does once the member has a new recipient.
+ * `for_recipient` records which recipient a wrap was made for, so a device can
+ * tell a wrap made for a key it no longer has from one that is simply corrupt.
+ */
+export const vaultWraps = sqliteTable(
+	'vault_wraps',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		/** age, to `for_recipient`, standard base64. See `VaultWrapPayload`. */
+		ciphertext: text('ciphertext').notNull(),
+		forRecipient: text('for_recipient').notNull(),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('vault_wraps_vault_user_idx').on(table.vaultId, table.userId),
+		// Every read is "the wraps this user holds", once per page load.
+		index('vault_wraps_user_id_idx').on(table.userId)
+	]
+);
+
+/**
  * One self-contained exchange between the two people in a partnership.
  *
  * Not a chat log: the feature is many small threads, so `partnership_id` is
@@ -972,6 +1043,10 @@ export type UserKeys = typeof userKeys.$inferSelect;
 export type NewUserKeys = typeof userKeys.$inferInsert;
 export type UserKeyWrap = typeof userKeyWraps.$inferSelect;
 export type NewUserKeyWrap = typeof userKeyWraps.$inferInsert;
+export type Vault = typeof vaults.$inferSelect;
+export type NewVault = typeof vaults.$inferInsert;
+export type VaultWrap = typeof vaultWraps.$inferSelect;
+export type NewVaultWrap = typeof vaultWraps.$inferInsert;
 export type MessageThread = typeof messageThreads.$inferSelect;
 export type NewMessageThread = typeof messageThreads.$inferInsert;
 export type Message = typeof messages.$inferSelect;

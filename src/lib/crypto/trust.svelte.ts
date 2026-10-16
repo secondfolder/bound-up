@@ -11,6 +11,7 @@
  */
 
 import { pinBlocksSending } from '../encryption';
+import { vaultPinId } from '../vault';
 import { safetyNumber } from './fingerprint';
 import { keyStore } from './keystore';
 import {
@@ -19,8 +20,10 @@ import {
 	OWN_KEY_PIN,
 	type PartnershipTrust,
 	recordVouch,
+	type ServedKeys,
 	verifyPin
 } from './pins';
+import { issueWriteGrant, type WriteGrant } from './write-grant';
 
 /** What one partnership's trust looks like while it is being worked out. */
 export type TrustView =
@@ -54,11 +57,11 @@ export function trustFor(partnershipId: string): TrustView {
 export async function refreshTrust(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string; theirs: string }
+	served: ServedKeys
 ): Promise<TrustView> {
 	try {
 		const trust = await deviceTrust(userId, partnershipId, served);
-		const number = await safetyNumber(served.mine, served.theirs);
+		const number = await safetyNumber(served.mine, served.theirs, served.vaultCheck);
 
 		const view: TrustView = { status: 'known', safetyNumber: number, ...trust };
 		views[partnershipId] = view;
@@ -85,16 +88,34 @@ export function trustAllowsSending(view: TrustView): boolean {
 	if (view.status === 'unavailable') {
 		return true;
 	}
-	return !(pinBlocksSending(view.partner) || pinBlocksSending(view.own));
+	return !(
+		pinBlocksSending(view.partner) ||
+		pinBlocksSending(view.own) ||
+		(view.vault !== null && pinBlocksSending(view.vault))
+	);
+}
+
+/**
+ * Permission to seal into a partnership's vault, or null while this device's
+ * trust check says no. The only place a partnership `WriteGrant` comes from —
+ * see `write-grant.ts` for why a write cannot simply skip asking.
+ */
+export function writeGrantFor(partnershipId: string, vaultId: string): WriteGrant | null {
+	return trustAllowsSending(trustFor(partnershipId)) ? issueWriteGrant(vaultId) : null;
 }
 
 /** "We read the number to each other and it matched." */
 export async function markVerified(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string; theirs: string }
+	served: ServedKeys
 ): Promise<void> {
-	await verifyPin(await keyStore(), userId, partnershipId, served.theirs);
+	const store = await keyStore();
+	await verifyPin(store, userId, partnershipId, served.theirs);
+	// The number covers the vault too, so a match verifies it as well.
+	if (served.vaultCheck) {
+		await verifyPin(store, userId, vaultPinId(partnershipId), served.vaultCheck);
+	}
 	await refreshTrust(userId, partnershipId, served);
 }
 
@@ -108,8 +129,8 @@ export async function markVerified(
 export async function acceptKeyChange(
 	userId: string,
 	partnershipId: string,
-	served: { mine: string; theirs: string },
-	which: 'partner' | 'own'
+	served: ServedKeys,
+	which: 'partner' | 'own' | 'vault'
 ): Promise<void> {
 	const store = await keyStore();
 	if (which === 'partner') {
@@ -117,6 +138,9 @@ export async function acceptKeyChange(
 	}
 	if (which === 'own') {
 		await acceptPin(store, userId, OWN_KEY_PIN, served.mine);
+	}
+	if (which === 'vault' && served.vaultCheck) {
+		await acceptPin(store, userId, vaultPinId(partnershipId), served.vaultCheck);
 	}
 	await refreshTrust(userId, partnershipId, served);
 }

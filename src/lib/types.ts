@@ -1,6 +1,7 @@
 import type { KeyWrapParams, KeyWrapType } from './encryption';
 import type { MessageBodyFormat, ThreadIcon } from './messaging';
 import type { Intensity, Role, Vibe } from './playroom/iq-test/settings';
+import type { VaultKind } from './vault';
 
 /**
  * Shared types that BOTH server code and Svelte components need.
@@ -197,6 +198,48 @@ export type UnlockBundleView = {
 export type PartnerRecipientsView = {
 	mine: string;
 	theirs: string;
+	/** The partnership vault's key check, once it has one. Pinned and in the safety number. */
+	vaultCheck: string | null;
+};
+
+/** A vault key wrapped to one member. Opaque to the server. */
+export type VaultWrapView = {
+	ciphertext: string;
+	/** The recipient it was wrapped to, so a stale wrap can be told from a broken one. */
+	forRecipient: string;
+};
+
+/** A vault row as a device sees it: no key, only its public fingerprint. */
+export type VaultRowView = {
+	id: string;
+	kind: VaultKind;
+	partnershipId: string | null;
+	keyCheck: string;
+};
+
+/**
+ * Every vault this user can reach, what they hold of each, and what is
+ * missing — enough for a device to open what it can and create or re-wrap the
+ * rest. See `ensureVaults` in `crypto/vaults.svelte.ts`.
+ */
+export type VaultListingView = {
+	/** The user's own recipient, as the server has it. */
+	recipient: string;
+	/** Null until the first device creates it. */
+	self: (VaultRowView & { wrap: VaultWrapView | null }) | null;
+	/** One entry per accepted partnership, with or without a vault yet. */
+	partnerships: {
+		partnershipId: string;
+		partnerId: string;
+		recipients: PartnerRecipientsView;
+		vault:
+			| (VaultRowView & {
+					wrap: VaultWrapView | null;
+					/** Which recipient the partner's wrap was made for, or null when they have none. */
+					partnerWrapFor: string | null;
+			  })
+			| null;
+	}[];
 };
 
 /**
