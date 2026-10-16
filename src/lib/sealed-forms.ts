@@ -14,10 +14,11 @@
 
 import { sealRecord } from './crypto/sealed';
 import { trustFor, writeGrantFor } from './crypto/trust.svelte';
-import type { OpenVault } from './crypto/vault';
+import { blindIndex, type OpenVault } from './crypto/vault';
 import { partnershipVault, selfVault, vaultsSettled } from './crypto/vaults.svelte';
 import { selfWriteGrant, type WriteGrant } from './crypto/write-grant';
 import type { SealedKind } from './sealed';
+import { normaliseTagName, TAG_NAME_INDEX_PURPOSE, tagKind } from './sealed-kinds/tags';
 
 /** Whose vault a form seals into. */
 export type SealScope = { kind: 'self' } | { kind: 'partnership'; partnershipId: string };
@@ -123,4 +124,38 @@ export function replaceWithSealed(
 	for (const [name, value] of Object.entries(fields)) {
 		formData.set(name, value);
 	}
+}
+
+/**
+ * A tag name, sealed into the partnership's vault, with the blind index the
+ * server checks uniqueness against (`normaliseTagName`, then the vault's
+ * tag-name index key). Both come from the same vault, so a name moved to
+ * another partnership has neither the right ciphertext nor the right index.
+ */
+export async function sealTagName(
+	partnershipId: string,
+	tagId: string,
+	name: string
+): Promise<
+	| {
+			ok: true;
+			name: { vaultId: string; ciphertext: string; payloadVersion: number; nameIndex: string };
+	  }
+	| { ok: false; error: string }
+> {
+	const parsed = tagKind.latest.safeParse({ name });
+	if (!parsed.success) {
+		return { ok: false, error: 'Tag names are 1 to 80 characters' };
+	}
+	const writable = await writableVault({ kind: 'partnership', partnershipId });
+	if (typeof writable === 'string') {
+		return { ok: false, error: writable };
+	}
+	const sealed = await sealRecord(tagKind, { recordId: tagId, payload: parsed.data, ...writable });
+	const nameIndex = await blindIndex(
+		writable.vault,
+		TAG_NAME_INDEX_PURPOSE,
+		normaliseTagName(parsed.data.name)
+	);
+	return { ok: true, name: { vaultId: writable.vault.id, ...sealed, nameIndex } };
 }

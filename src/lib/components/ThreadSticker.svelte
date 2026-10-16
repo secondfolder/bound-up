@@ -17,6 +17,7 @@
 		openMessageMetadata
 	} from '$lib/messaging/client';
 	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
+	import { openedTagName, shownText } from '$lib/sealed-views.svelte';
 	import type { ThreadStickerView } from '$lib/types';
 	import SelfDestructedMedia from './SelfDestructedMedia.svelte';
 
@@ -539,7 +540,7 @@
 			{#if thread.tags?.length}
 				<ul class="tags" aria-label="Tags">
 					{#each thread.tags as tag (tag.id)}
-						<li class="tag" style={`--tag-color: ${tag.color}`}>{tag.name}</li>
+						<li class="tag" style={`--tag-color: ${tag.color}`}>{shownText(openedTagName(tag))}</li>
 					{/each}
 				</ul>
 			{/if}

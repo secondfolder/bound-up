@@ -119,15 +119,32 @@ from the network would be a covert channel for arbitrary prose, so `isThreadIcon
 is checked in `server/messaging.ts` as well as in the endpoint's Zod schema —
 AGENTS.md invariant 14.
 
-**Tags are an intentional plaintext exception.** A tag is reusable metadata for
-finding and filtering threads later, so its name and color live in
-`message_tags`, not in an encrypted message body. Tags are scoped by
-`partnership_id`; the same name in two partnerships is two independent tags.
-Names may contain spaces and emoji, are limited to 80 characters, and are unique
-within their partnership. A random color is assigned when a tag is created, and
-renaming or recoloring the tag updates every thread that uses it. The join table
-keeps assignment separate from the definition so future tag filtering can query
+**Tag names are sealed; their colours are not.** A tag is reusable metadata for
+finding and filtering threads, scoped by `partnership_id` — the same name in two
+partnerships is two independent tags. Its name is a sealed record (kind `tag`,
+`src/lib/sealed-kinds/tags.ts`) in the partnership vault, sealed to the tag's
+id, which the browser therefore chooses. The colour stays plaintext: one of a
+few swatches, or a hex value, says nothing about anyone. Renaming or
+recolouring a tag updates every thread that uses it, and the join table keeps
+assignment separate from the definition so future tag filtering can query
 threads without changing message rows.
+
+Names are 1–80 characters and **unique within their partnership**, which the
+server enforces without reading them through a **blind index**: `name_index` is
+an HMAC of the normalised name (`normaliseTagName` — Unicode NFC and trimmed,
+case kept, as when names were compared in the clear) under a key derived from
+the vault for that purpose alone (`blindIndex` in `crypto/vault.ts`). A unique
+index on `(partnership_id, name_index)` refuses a second tag of the same name
+and the server learns only that two names are equal. Sorting by name happens in
+the browser (`TagPicker.svelte`), the only place a name can be read. Renames are
+last-write-wins, unlike task edits: a tag is a label, and the loser can simply
+rename again.
+
+Tags made before sealing keep their name in plaintext until a member's device
+seals them in the background, with the tasks and rewards
+([docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext)).
+One whose name is already taken by a sealed tag is left as it is rather than
+failing the rest.
 
 **Reactions are encrypted.** The deliberate contrast with the icon, and what
 makes both calls defensible: a reaction only ever renders inside a thread that
@@ -682,7 +699,8 @@ plainly, because the framing of this feature invites the assumption that it does
 - That a partnership exchanges messages at all, and how many threads.
 - Exactly when every thread started and every message was sent.
 - Which side sent each message.
-- The names and colors of the tags used by threads.
+- The colors of the tags used by threads, how many there are, and which threads
+  carry each — but not their names.
 - How many attachments each message has, and **each one's exact byte size** — so
   approximate media sizes. After transcoding that size says more about the
   quality tier than about the original, since an SD photo is always about the
@@ -695,7 +713,7 @@ plainly, because the framing of this feature invites the assumption that it does
   longer surfaces that choice directly.
 
 What it does not know: any message text, any filename, any file type, any
-reaction, and anything that would let it read or forge any of them — a sealed
+reaction, any tag name, and anything that would let it read or forge any of them — a sealed
 record can only be made by someone holding the vault key.
 
 ## Screens and endpoints

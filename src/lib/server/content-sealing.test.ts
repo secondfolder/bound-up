@@ -196,6 +196,7 @@ describe('listUnsealedContent', () => {
 			],
 			rewards: [{ id: ids.rewardId, title: 'Old reward', description: 'A treat' }],
 			claims: [{ id: ids.claimId, rewardTitle: 'Old reward', rewardDescription: 'A treat' }],
+			tags: [],
 			next: null
 		});
 	});

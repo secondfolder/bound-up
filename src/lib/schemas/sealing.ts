@@ -39,5 +39,16 @@ export const sealedContentSchema = z.object({
 		)
 		.max(50),
 	rewards: z.array(z.object({ id: rowId, ciphertext: sealed, payloadVersion: version })).max(50),
-	claims: z.array(z.object({ id: rowId, ciphertext: sealed, payloadVersion: version })).max(50)
+	claims: z.array(z.object({ id: rowId, ciphertext: sealed, payloadVersion: version })).max(50),
+	tags: z
+		.array(
+			z.object({
+				id: rowId,
+				ciphertext: sealed,
+				payloadVersion: version,
+				nameIndex: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+			})
+		)
+		.max(50)
+		.default([])
 });

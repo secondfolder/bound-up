@@ -7,9 +7,9 @@ itself is [docs/messaging.md](messaging.md).
 
 Beside each user's identity sit **vaults**: one key per user and one per
 partnership, which a user's data is sealed under as **sealed records**. Both
-are described below. Messages are sealed in their partnership's vault; tasks,
-rewards, and their completions and claims in the owner's or the partnership's
-vault ([docs/tasks.md](tasks.md#what-the-server-can-see),
+are described below. Messages and message tags' names are sealed in their partnership's vault;
+tasks, rewards, and their completions and claims in the owner's or the
+partnership's vault ([docs/tasks.md](tasks.md#what-the-server-can-see),
 [docs/rewards.md](rewards.md#what-the-server-can-see)). Moving the remaining
 kinds of user data onto vaults is in progress, and until a kind has moved, it
 is stored as it was.

@@ -818,7 +818,6 @@ export const messageTags = sqliteTable(
 		...timestamps
 	},
 	(table) => [
-		uniqueIndex('message_tags_partnership_name_unq').on(table.partnershipId, table.name),
 		uniqueIndex('message_tags_partnership_name_index_unq').on(table.partnershipId, table.nameIndex),
 		index('message_tags_partnership_idx').on(table.partnershipId)
 	]

@@ -11,6 +11,7 @@
 
 import type { SealedKind } from '../sealed';
 import { messageBodyKind, messageMetadataKind, messageReactionKind } from './messages';
+import { tagKind } from './tags';
 import { rewardKind, taskKind } from './tasks';
 
 export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
@@ -18,5 +19,6 @@ export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
 	messageMetadataKind,
 	messageReactionKind,
 	taskKind,
-	rewardKind
+	rewardKind,
+	tagKind
 ];

@@ -217,7 +217,8 @@ partners lost. Those render as unreadable either way.
 ## Tasks and rewards in plaintext
 
 Tasks, rewards, completions and claims are sealed in a vault
-([docs/tasks.md](tasks.md#what-the-server-can-see)). Rows written before that
+([docs/tasks.md](tasks.md#what-the-server-can-see)), and so are message tags'
+names ([docs/messaging.md](messaging.md)). Rows written before that
 keep their text in plaintext columns until a device seals them: once vaults
 are open, `content-sealing.ts` asks `/api/sealing/[scope]` for the scope's
 unsealed rows, seals each into the scope's vault, and posts them back, and the
@@ -239,7 +240,7 @@ given at index 0.
   `completion_messages` on the task tables; `task_title`, `task_description`
   and `completion_message` on the completion tables; `title` and
   `description` on the reward tables; `reward_title` and `reward_description`
-  on the claim tables. A sealed row keeps them empty (`''`, `'[]'` or NULL)
+  on the claim tables; `name` on `message_tags`. A sealed row keeps them empty (`''`, `'[]'` or NULL)
   rather than NULL throughout, because making a NOT NULL column nullable
   means rebuilding the table, and a rebuild cascade-deletes on D1 (see the
   trap in AGENTS.md).
@@ -259,7 +260,8 @@ select
   (select count(*) from self_rewards where ciphertext is null) +
   (select count(*) from partnership_rewards where ciphertext is null) +
   (select count(*) from self_reward_claims where snapshot_ciphertext is null) +
-  (select count(*) from partnership_reward_claims where snapshot_ciphertext is null);
+  (select count(*) from partnership_reward_claims where snapshot_ciphertext is null) +
+  (select count(*) from message_tags where ciphertext is null);
 ```
 
 reaching zero in production. Unlike messages, nothing here is unreadable to

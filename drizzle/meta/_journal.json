@@ -211,6 +211,13 @@
       "when": 1792130966604,
       "tag": "0029_add_sealed_tag_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1792131384888,
+      "tag": "0030_drop_plaintext_tag_name_index",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { NETWORK_FAILURE, tryFetch } from '$lib/request-failure.svelte';
+	import { sealTagName } from '$lib/sealed-forms';
+	import { openedTagName, shownText } from '$lib/sealed-views.svelte';
 	import type { TagView } from '$lib/types';
 
 	let {
@@ -48,8 +50,28 @@
 	/** The option that opens the inline new-tag field. */
 	const NEW_TAG_VALUE = '__new__';
 
-	/** Only tags not yet on the thread appear in the dropdown. */
-	const addableTags = $derived(localTags.filter((tag) => !selectedIds.includes(tag.id)));
+	/** A tag's name as shown: a placeholder until it is opened (`sealed-views.svelte.ts`). */
+	function label(tag: TagView): string {
+		return shownText(openedTagName(tag));
+	}
+
+	/**
+	 * Only tags not yet on the thread appear in the dropdown, by name. Sorted
+	 * here because only here can a sealed name be read.
+	 */
+	const addableTags = $derived(
+		localTags
+			.filter((tag) => !selectedIds.includes(tag.id))
+			.sort((left, right) => label(left).localeCompare(label(right)))
+	);
+
+	/** What a refused tag write means to the person making it. */
+	function refusal(response: Response | null, fallback: string): string {
+		if (!response) {
+			return NETWORK_FAILURE;
+		}
+		return response.status === 409 ? 'There is already a tag with that name' : fallback;
+	}
 
 	function onAddTagSelect(event: CustomEvent) {
 		const { item } = event.detail as { item?: { value?: string } };
@@ -70,17 +92,24 @@
 		if (!newName.trim()) {
 			return;
 		}
+		// The name is sealed to the tag's id, so the id is chosen here.
+		const id = crypto.randomUUID();
+		const sealed = await sealTagName(partnershipId, id, newName);
+		if (!sealed.ok) {
+			({ error: problem } = sealed);
+			return;
+		}
 		const response = await tryFetch(`/api/partnerships/${partnershipId}/tags`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ name: newName, color: newColor })
+			body: JSON.stringify({ id, name: sealed.name, color: newColor })
 		});
 		if (!response?.ok) {
-			problem = response ? 'Could not add that tag' : NETWORK_FAILURE;
+			problem = refusal(response, 'Could not add that tag');
 			return;
 		}
 		const tag = (await response.json()) as TagView;
-		localTags = [...localTags, tag].sort((left, right) => left.name.localeCompare(right.name));
+		localTags = [...localTags, tag];
 		selectedIds = [...selectedIds, tag.id];
 		onTagCreated?.(tag);
 		newName = '';
@@ -89,9 +118,13 @@
 		problem = null;
 	}
 
+	/** The name the rename started from, so an unchanged one is not sealed again. */
+	let draftFrom = '';
+
 	function beginEdit(tag: TagView) {
 		editingTagId = tag.id;
-		draftName = tag.name;
+		draftFrom = openedTagName(tag) ?? '';
+		draftName = draftFrom;
 		draftColor = tag.color;
 		problem = null;
 	}
@@ -100,13 +133,23 @@
 		if (!editingTagId) {
 			return;
 		}
-		const response = await tryFetch(`/api/partnerships/${partnershipId}/tags/${editingTagId}`, {
+		const tagId = editingTagId;
+		let name: unknown;
+		if (draftName.trim() !== draftFrom.trim()) {
+			const sealed = await sealTagName(partnershipId, tagId, draftName);
+			if (!sealed.ok) {
+				({ error: problem } = sealed);
+				return;
+			}
+			({ name } = sealed);
+		}
+		const response = await tryFetch(`/api/partnerships/${partnershipId}/tags/${tagId}`, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ name: draftName, color: draftColor })
+			body: JSON.stringify({ name, color: draftColor })
 		});
 		if (!response?.ok) {
-			problem = response ? 'Could not save that tag' : NETWORK_FAILURE;
+			problem = refusal(response, 'Could not save that tag');
 			return;
 		}
 		const updated = (await response.json()) as TagView;
@@ -187,7 +230,7 @@
 					</span>
 				{:else}
 					<span class="swatch" style={`background: ${tag.color}`}></span>
-					{tag.name}
+					{label(tag)}
 					<wa-button
 						type="button"
 						class="mini"
@@ -196,7 +239,7 @@
 						pill
 						onclick={() => beginEdit(tag)}
 					>
-						<wa-icon name="pencil" variant="solid" label={`Edit ${tag.name}`}></wa-icon>
+						<wa-icon name="pencil" variant="solid" label={`Edit ${label(tag)}`}></wa-icon>
 					</wa-button>
 				{/if}
 			</span>
@@ -207,7 +250,7 @@
 			{#each addableTags as tag (tag.id)}
 				<wa-dropdown-item value={tag.id}>
 					<span class="swatch" slot="icon" style={`background: ${tag.color}`}></span>
-					{tag.name}
+					{label(tag)}
 				</wa-dropdown-item>
 			{/each}
 			{#if addableTags.length > 0}
@@ -246,7 +289,7 @@
 {:else if selectedTags.length > 0}
 	<div class="tag-picker display">
 		{#each selectedTags as tag (tag.id)}
-			<span class="tag" style={`--tag-color: ${tag.color}`}>{tag.name}</span>
+			<span class="tag" style={`--tag-color: ${tag.color}`}>{label(tag)}</span>
 		{/each}
 		<wa-button type="button" size="s" appearance="plain" pill onclick={() => { editing = true; }}>
 			<wa-icon name="pencil" variant="solid" label="Edit tags"></wa-icon>

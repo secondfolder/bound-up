@@ -1,7 +1,9 @@
-import { and, asc, eq, gt, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { tagKind } from '../sealed-kinds/tags';
 import { rewardKind, taskKind } from '../sealed-kinds/tasks';
 import type { Db } from './db';
 import {
+	messageTags,
 	partnershipRewardClaims,
 	partnershipRewards,
 	partnershipTaskCompletions,
@@ -41,6 +43,8 @@ export type Cursors = {
 	completions: string | null;
 	rewards: string | null;
 	claims: string | null;
+	/** A partnership's message tags; always null for the self scope, which has none. */
+	tags: string | null;
 };
 
 export type UnsealedPage = {
@@ -58,6 +62,7 @@ export type UnsealedPage = {
 	}[];
 	rewards: { id: string; title: string; description: string | null }[];
 	claims: { id: string; rewardTitle: string; rewardDescription: string | null }[];
+	tags: { id: string; name: string }[];
 	/** Pass back for the next page; null when this was the last. */
 	next: Cursors | null;
 };
@@ -120,6 +125,21 @@ export async function listUnsealedContent(
 	}
 	const t = tablesFor(scope);
 
+	const tags =
+		scope.kind === 'partnership'
+			? await db
+					.select({ id: messageTags.id, name: messageTags.name })
+					.from(messageTags)
+					.where(
+						and(
+							eq(messageTags.partnershipId, scope.partnershipId),
+							sql`${messageTags.ciphertext} is null`,
+							after.tags ? gt(messageTags.id, after.tags) : undefined
+						)
+					)
+					.orderBy(asc(messageTags.id))
+					.limit(PAGE_SIZE)
+			: [];
 	const [tasks, completions, rewards, claims] = await Promise.all([
 		db
 			.select({
@@ -191,7 +211,8 @@ export async function listUnsealedContent(
 		tasks: cursor(tasks),
 		completions: cursor(completions),
 		rewards: cursor(rewards),
-		claims: cursor(claims)
+		claims: cursor(claims),
+		tags: cursor(tags)
 	};
 	return {
 		tasks: tasks.map((row) => ({
@@ -203,8 +224,49 @@ export async function listUnsealedContent(
 		completions: completions.map((row) => ({ ...row, taskTitle: row.taskTitle ?? '' })),
 		rewards: rewards.map((row) => ({ ...row, title: row.title ?? '' })),
 		claims: claims.map((row) => ({ ...row, rewardTitle: row.rewardTitle ?? '' })),
+		tags,
 		next: Object.values(next).some((value) => value !== null) ? next : null
 	};
+}
+
+/** A blind index as `blindIndex` produces it: full-length base64url HMAC-SHA256. */
+const NAME_INDEX = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * The tags in a batch whose names are free. Two tags made before sealing can
+ * only collide now if a sealed tag of the same name was made since, or if
+ * normalising made two different spellings one; either way the later one is
+ * left in plaintext rather than failing the whole batch on the unique index —
+ * and failing it again on every load after.
+ */
+async function withoutTakenNames<Row extends { nameIndex: string }>(
+	db: Db,
+	partnershipId: string,
+	rows: Row[]
+): Promise<Row[]> {
+	if (rows.length === 0) {
+		return rows;
+	}
+	const taken = await db
+		.select({ nameIndex: messageTags.nameIndex })
+		.from(messageTags)
+		.where(
+			and(
+				eq(messageTags.partnershipId, partnershipId),
+				inArray(
+					messageTags.nameIndex,
+					rows.map((row) => row.nameIndex)
+				)
+			)
+		);
+	const seen = new Set(taken.map((row) => row.nameIndex));
+	return rows.filter((row) => {
+		if (seen.has(row.nameIndex)) {
+			return false;
+		}
+		seen.add(row.nameIndex);
+		return true;
+	});
 }
 
 /** A whole number in [0, max]: a count or an index, as the browser said it. */
@@ -230,6 +292,8 @@ export type SealedContentBatch = {
 	rewards: { id: string; ciphertext: string; payloadVersion: number }[];
 	/** Sealed as the reward kind, to the claim's own id. */
 	claims: { id: string; ciphertext: string; payloadVersion: number }[];
+	/** A partnership's tags, each with the blind index of its name. None for the self scope. */
+	tags?: { id: string; ciphertext: string; payloadVersion: number; nameIndex: string }[];
 };
 
 /**
@@ -251,6 +315,7 @@ export async function sealUnsealedContent(
 	if (!vaultId) {
 		return { ok: false, reason: 'not-found' };
 	}
+	const batchTags = batch.tags ?? [];
 	const acceptable =
 		batch.vaultId === vaultId &&
 		[...batch.tasks, ...batch.completions].every((row) =>
@@ -258,6 +323,12 @@ export async function sealUnsealedContent(
 		) &&
 		[...batch.rewards, ...batch.claims].every((row) =>
 			sealedIsAcceptable(rewardKind, row.ciphertext, row.payloadVersion)
+		) &&
+		(scope.kind === 'partnership' || batchTags.length === 0) &&
+		batchTags.every(
+			(row) =>
+				sealedIsAcceptable(tagKind, row.ciphertext, row.payloadVersion) &&
+				NAME_INDEX.test(row.nameIndex)
 		) &&
 		batch.tasks.every((row) => isCount(row.completionMessageCount, 20)) &&
 		batch.completions.every(
@@ -268,6 +339,8 @@ export async function sealUnsealedContent(
 	}
 
 	const t = tablesFor(scope);
+	const tags =
+		scope.kind === 'partnership' ? await withoutTakenNames(db, scope.partnershipId, batchTags) : [];
 	const updates = [
 		...batch.tasks.map((row) =>
 			db
@@ -352,7 +425,29 @@ export async function sealUnsealedContent(
 					)
 				)
 				.returning({ id: t.claims.id })
-		)
+		),
+		...(scope.kind === 'partnership'
+			? tags.map((row) =>
+					db
+						.update(messageTags)
+						.set({
+							ciphertext: row.ciphertext,
+							vaultId,
+							payloadVersion: row.payloadVersion,
+							nameIndex: row.nameIndex,
+							revision: sql`${messageTags.revision} + 1`,
+							name: ''
+						})
+						.where(
+							and(
+								eq(messageTags.id, row.id),
+								eq(messageTags.partnershipId, scope.partnershipId),
+								sql`${messageTags.ciphertext} is null`
+							)
+						)
+						.returning({ id: messageTags.id })
+				)
+			: [])
 	];
 	if (updates.length === 0) {
 		return { ok: true, sealed: 0 };

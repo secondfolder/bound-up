@@ -17,14 +17,22 @@
  */
 
 import { vaultById } from './crypto/vaults.svelte';
+import type { SealedKind } from './sealed';
 import { sealedReader } from './sealed-cache.svelte';
+import { tagKind } from './sealed-kinds/tags';
 import { type RewardContent, rewardKind, type TaskContent, taskKind } from './sealed-kinds/tasks';
-import type { RewardHistoryView, SealedRefView, TaskCompletionView, WidgetItemView } from './types';
+import type {
+	RewardHistoryView,
+	SealedRefView,
+	TagView,
+	TaskCompletionView,
+	WidgetItemView
+} from './types';
 
 export type Opened<T> = T | null | undefined;
 
-function open<T>(kind: typeof taskKind | typeof rewardKind, ref: SealedRefView): Opened<T> {
-	return sealedReader.read(kind, ref, vaultById(ref.vaultId)) as Opened<T>;
+function open<T>(kind: SealedKind<T>, ref: SealedRefView): Opened<T> {
+	return sealedReader.read(kind, ref, vaultById(ref.vaultId));
 }
 
 /** A task's content: title, description, completion messages. */
@@ -41,7 +49,7 @@ export function openedTask(task: {
 			completionMessages: task.completionMessages
 		};
 	}
-	return open<TaskContent>(taskKind, task.sealed);
+	return open(taskKind, task.sealed);
 }
 
 export type OpenedCompletion = {
@@ -63,7 +71,7 @@ export function openedCompletion(completion: TaskCompletionView): Opened<OpenedC
 			completionMessage: completion.completionMessage
 		};
 	}
-	const task = open<TaskContent>(taskKind, completion.sealed);
+	const task = open(taskKind, completion.sealed);
 	if (!task) {
 		return task;
 	}
@@ -84,7 +92,7 @@ export function openedReward(reward: {
 	if (!reward.sealed) {
 		return { title: reward.title, description: reward.description };
 	}
-	return open<RewardContent>(rewardKind, reward.sealed);
+	return open(rewardKind, reward.sealed);
 }
 
 /** A claim as history shows it: the reward as it was when claimed. */
@@ -92,7 +100,7 @@ export function openedClaim(claim: RewardHistoryView): Opened<RewardContent> {
 	if (!claim.sealed) {
 		return { title: claim.rewardTitle, description: claim.rewardDescription };
 	}
-	return open<RewardContent>(rewardKind, claim.sealed);
+	return open(rewardKind, claim.sealed);
 }
 
 /** A widget row's title, from whichever kind the row is. */
@@ -101,10 +109,16 @@ export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
 		return item.title;
 	}
 	const content =
-		item.kind === 'task'
-			? open<TaskContent>(taskKind, item.sealed)
-			: open<RewardContent>(rewardKind, item.sealed);
+		item.kind === 'task' ? open(taskKind, item.sealed) : open(rewardKind, item.sealed);
 	return openedPart(content, (value) => value.title);
+}
+
+/** A message tag's name. */
+export function openedTagName(tag: TagView): Opened<string> {
+	if (!tag.sealed) {
+		return tag.name;
+	}
+	return openedPart(open(tagKind, tag.sealed), (value) => value.name);
 }
 
 /** What stands in for content that is not open: still working, or will not open here. */

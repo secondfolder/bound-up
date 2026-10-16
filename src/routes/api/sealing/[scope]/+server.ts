@@ -32,7 +32,8 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		tasks: url.searchParams.get('tasks'),
 		completions: url.searchParams.get('completions'),
 		rewards: url.searchParams.get('rewards'),
-		claims: url.searchParams.get('claims')
+		claims: url.searchParams.get('claims'),
+		tags: url.searchParams.get('tags')
 	});
 	if (!page) {
 		error(404, 'Not found');

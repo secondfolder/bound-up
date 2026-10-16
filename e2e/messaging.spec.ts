@@ -1156,6 +1156,21 @@ test.describe('thread tags', () => {
 			// the save, so the confirm pair belongs to the opened thread only.
 			await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
 			await expect(dialog.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
+
+			// Shown above because Ada's device opened it: the server stores the
+			// name only sealed, beside its blind index (docs/messaging.md, "Tags").
+			const { rows } = await sql(
+				`SELECT message_tags.* FROM message_tags
+				 JOIN partnerships ON partnerships.id = message_tags.partnership_id
+				 JOIN user ON user.id = partnerships.inviter_id
+				 WHERE user.email = ?`,
+				[ada.who.email.toLowerCase()]
+			);
+			expect(rows).toHaveLength(1);
+			expect(rows[0]).toMatchObject({ name: '' });
+			expect(String(rows[0]?.ciphertext)).toMatch(/^sb1\./);
+			expect(String(rows[0]?.name_index)).toMatch(/^[A-Za-z0-9_-]{43}$/);
+			expect(JSON.stringify(rows)).not.toContain('planning');
 		} finally {
 			await ada.close();
 			await jun.close();

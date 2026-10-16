@@ -348,10 +348,16 @@ export type UnseenMediaView = {
 	truncated: boolean;
 };
 
+/**
+ * A message tag. `name` is plaintext only on a tag made before sealing; a
+ * sealed one has it in `sealed`, opened in the browser (`openedTagName` in
+ * `sealed-views.svelte.ts`), and `name` is empty.
+ */
 export type TagView = {
 	id: string;
 	name: string;
 	color: string;
+	sealed: SealedRefView | null;
 };
 
 /** An attachment, as much of it as the server knows: an id and a size. */

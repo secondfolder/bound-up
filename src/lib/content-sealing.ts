@@ -1,5 +1,5 @@
 /**
- * TEMPORARY — seals tasks, rewards, completions and claims written before
+ * TEMPORARY — seals tasks, rewards, completions, claims and message tags written before
  * sealing existed, in the background, once per scope per page load.
  *
  * BROWSER ONLY — it seals with `crypto/sealed.ts`.
@@ -15,12 +15,13 @@
 
 import { sealRecord } from './crypto/sealed';
 import { writeGrantFor } from './crypto/trust.svelte';
-import type { OpenVault } from './crypto/vault';
+import { blindIndex, type OpenVault } from './crypto/vault';
 import { currentVaults } from './crypto/vaults.svelte';
 import { selfWriteGrant, type WriteGrant } from './crypto/write-grant';
 import { looksLikeRichTextDocument } from './richtext';
 import { legacyTextToDocument } from './richtext-legacy';
 import type { SealedKind } from './sealed';
+import { normaliseTagName, TAG_NAME_INDEX_PURPOSE, tagKind } from './sealed-kinds/tags';
 import { rewardKind, taskKind } from './sealed-kinds/tasks';
 
 type Cursors = {
@@ -28,6 +29,7 @@ type Cursors = {
 	completions: string | null;
 	rewards: string | null;
 	claims: string | null;
+	tags: string | null;
 };
 
 type UnsealedPage = {
@@ -40,6 +42,7 @@ type UnsealedPage = {
 	}[];
 	rewards: { id: string; title: string; description: string | null }[];
 	claims: { id: string; rewardTitle: string; rewardDescription: string | null }[];
+	tags: { id: string; name: string }[];
 	next: Cursors | null;
 };
 
@@ -86,7 +89,13 @@ async function sealOrSkip<Latest>(
 }
 
 async function sealScope(scopePath: string, writable: Writable): Promise<void> {
-	const after: Cursors = { tasks: null, completions: null, rewards: null, claims: null };
+	const after: Cursors = {
+		tasks: null,
+		completions: null,
+		rewards: null,
+		claims: null,
+		tags: null
+	};
 	const done = new Set<keyof Cursors>();
 	for (;;) {
 		const query = new URLSearchParams();
@@ -116,7 +125,8 @@ async function sealScope(scopePath: string, writable: Writable): Promise<void> {
 				completionMessageIndex: number | null;
 			}[],
 			rewards: [] as { id: string; ciphertext: string; payloadVersion: number }[],
-			claims: [] as { id: string; ciphertext: string; payloadVersion: number }[]
+			claims: [] as { id: string; ciphertext: string; payloadVersion: number }[],
+			tags: [] as { id: string; ciphertext: string; payloadVersion: number; nameIndex: string }[]
 		};
 
 		if (!done.has('tasks')) {
@@ -175,8 +185,26 @@ async function sealScope(scopePath: string, writable: Writable): Promise<void> {
 			}
 		}
 
+		if (!done.has('tags')) {
+			for (const row of page.tags) {
+				const sealed = await sealOrSkip(tagKind, row.id, { name: row.name }, writable);
+				if (sealed) {
+					const nameIndex = await blindIndex(
+						writable.vault,
+						TAG_NAME_INDEX_PURPOSE,
+						normaliseTagName(row.name)
+					);
+					batch.tags.push({ id: row.id, ...sealed, nameIndex });
+				}
+			}
+		}
+
 		const any =
-			batch.tasks.length + batch.completions.length + batch.rewards.length + batch.claims.length;
+			batch.tasks.length +
+			batch.completions.length +
+			batch.rewards.length +
+			batch.claims.length +
+			batch.tags.length;
 		if (any > 0) {
 			const posted = await quietFetch(`/api/sealing/${scopePath}`, {
 				method: 'POST',

@@ -1,0 +1,1 @@
+DROP INDEX `message_tags_partnership_name_unq`;

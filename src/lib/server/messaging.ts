@@ -23,6 +23,7 @@ import {
 	messageMetadataKind,
 	messageReactionKind
 } from '../sealed-kinds/messages';
+import { tagKind } from '../sealed-kinds/tags';
 import type {
 	MessageBodyRef,
 	MessageView,
@@ -53,7 +54,7 @@ import {
 import { listUserFeatures } from './features';
 import { attachmentKey, MEDIA_LIFETIMES, type MediaStore, partnershipMediaPrefix } from './media';
 import { getPartnershipForUser } from './partnerships';
-import { partnershipVaultIdFor, sealedIsAcceptable } from './sealed-content';
+import { partnershipVaultIdFor, sealedIsAcceptable, sealedRef } from './sealed-content';
 import { escrowForRequester } from './vaults';
 
 /**
@@ -315,9 +316,7 @@ export async function listBoard(
 			? await db
 					.select({
 						threadId: messageThreadTags.threadId,
-						id: messageTags.id,
-						name: messageTags.name,
-						color: messageTags.color
+						...TAG_COLUMNS
 					})
 					.from(messageThreadTags)
 					.innerJoin(messageTags, eq(messageTags.id, messageThreadTags.tagId))
@@ -327,7 +326,7 @@ export async function listBoard(
 	const tagsByThread = new Map<string, TagView[]>();
 	for (const tag of tagRows) {
 		const values = tagsByThread.get(tag.threadId) ?? [];
-		values.push({ id: tag.id, name: tag.name, color: tag.color });
+		values.push(toTagView(tag));
 		tagsByThread.set(tag.threadId, values);
 	}
 
@@ -564,7 +563,7 @@ export async function getThread(
 					.where(inArray(messageReactions.messageId, ids))
 			: [],
 		db
-			.select({ id: messageTags.id, name: messageTags.name, color: messageTags.color })
+			.select(TAG_COLUMNS)
 			.from(messageThreadTags)
 			.innerJoin(messageTags, eq(messageTags.id, messageThreadTags.tagId))
 			.where(eq(messageThreadTags.threadId, threadId))
@@ -597,7 +596,7 @@ export async function getThread(
 	const view: ThreadView = {
 		id: threadId,
 		icon,
-		tags: tags.map((tag) => ({ id: tag.id, name: tag.name, color: tag.color })),
+		tags: tags.map(toTagView),
 		messages: messageViews,
 		seenMessageId: seenMessageId(messageViews, partnerReads[0]?.lastReadMessageAt ?? null)
 	};
@@ -1002,14 +1001,33 @@ function markSenderRead(db: Db, threadId: string, senderId: string, now: Date) {
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const TAG_COLORS = ['#d95f59', '#d98c3f', '#c5a33d', '#55a36b', '#3f9caa', '#5d7fc2', '#8b67b5'];
 
-function validTagName(name: string): string | null {
-	const value = name.trim();
-	return value.length > 0 && value.length <= 80 ? value : null;
+/** What a tag view is read from, wherever tags are listed. */
+const TAG_COLUMNS = {
+	id: messageTags.id,
+	name: messageTags.name,
+	color: messageTags.color,
+	ciphertext: messageTags.ciphertext,
+	vaultId: messageTags.vaultId,
+	payloadVersion: messageTags.payloadVersion
+};
+
+function toTagView(row: {
+	id: string;
+	name: string;
+	color: string;
+	ciphertext: string | null;
+	vaultId: string | null;
+	payloadVersion: number | null;
+}): TagView {
+	return { id: row.id, name: row.name, color: row.color, sealed: sealedRef(row.id, row) };
 }
 
 function validTagColor(color: string): boolean {
 	return HEX_COLOR.test(color);
 }
+
+/** A blind index as the browser computes it: a full-length base64url HMAC-SHA256. */
+const NAME_INDEX = /^[A-Za-z0-9_-]{43}$/;
 
 async function tagRowsForPartnership(db: Db, partnershipId: string, tagIds: string[]) {
 	const uniqueIds = [...new Set(tagIds)];
@@ -1023,6 +1041,10 @@ async function tagRowsForPartnership(db: Db, partnershipId: string, tagIds: stri
 	return rows.length === uniqueIds.length ? rows : null;
 }
 
+/**
+ * The partnership's tags, in no particular order: they are sorted by name in
+ * the browser, the only place a sealed name can be read.
+ */
 export async function listTags(
 	db: Db,
 	partnershipId: string,
@@ -1031,97 +1053,192 @@ export async function listTags(
 	if (!(await requireMembership(db, partnershipId, userId))) {
 		return null;
 	}
-	return db
-		.select({ id: messageTags.id, name: messageTags.name, color: messageTags.color })
+	const rows = await db
+		.select(TAG_COLUMNS)
 		.from(messageTags)
 		.where(eq(messageTags.partnershipId, partnershipId))
-		.orderBy(asc(messageTags.name), asc(messageTags.id));
+		.orderBy(asc(messageTags.createdAt), asc(messageTags.id));
+	return rows.map(toTagView);
 }
+
+/**
+ * A tag's name as a write carries it: sealed in the partnership's vault, with
+ * the blind index of its normalised form (`normaliseTagName`) beside it.
+ */
+export type SealedTagName = {
+	vaultId: string;
+	ciphertext: string;
+	payloadVersion: number;
+	nameIndex: string;
+};
 
 export type TagMutationResult =
 	| { ok: true; tag: TagView }
 	| {
 			ok: false;
-			reason: 'not-a-member' | 'invalid-name' | 'invalid-color' | 'duplicate-name' | 'no-such-tag';
+			reason:
+				| 'not-a-member'
+				| 'invalid-name'
+				| 'invalid-color'
+				| 'duplicate-name'
+				| 'no-such-tag'
+				| 'id-taken';
 	  };
 
+/** Why a sealed name is refused, or null: its envelope, and the vault it must be in. */
+async function tagNameProblem(
+	db: Db,
+	partnershipId: string,
+	name: SealedTagName
+): Promise<'invalid-name' | null> {
+	const vaultId = await partnershipVaultIdFor(db, partnershipId);
+	return vaultId !== null &&
+		name.vaultId === vaultId &&
+		NAME_INDEX.test(name.nameIndex) &&
+		sealedIsAcceptable(tagKind, name.ciphertext, name.payloadVersion)
+		? null
+		: 'invalid-name';
+}
+
+/**
+ * Makes a tag. Its id is chosen by the browser, because the name is sealed to
+ * it. A name already in use is refused by its blind index: the server learns
+ * that two names are equal, never what either is.
+ */
 export async function createTag(
 	db: Db,
 	partnershipId: string,
 	userId: string,
-	name: string,
-	color?: string
+	input: { id: string; name: SealedTagName; color?: string }
 ): Promise<TagMutationResult> {
 	if (!(await requireMembership(db, partnershipId, userId))) {
 		return { ok: false, reason: 'not-a-member' };
 	}
-	const validName = validTagName(name);
-	if (!validName) {
-		return { ok: false, reason: 'invalid-name' };
+	const problem = await tagNameProblem(db, partnershipId, input.name);
+	if (problem) {
+		return { ok: false, reason: problem };
 	}
-	const existing = await db
-		.select({ id: messageTags.id })
-		.from(messageTags)
-		.where(and(eq(messageTags.partnershipId, partnershipId), eq(messageTags.name, validName)))
-		.limit(1);
-	if (existing[0]) {
-		return { ok: false, reason: 'duplicate-name' };
-	}
-	// A chosen colour wins; anything malformed falls back to the random pick
-	// rather than refusing, so the picker's default never blocks creation.
-	const chosen = color !== undefined && validTagColor(color) ? color : null;
-	const tag = {
-		id: crypto.randomUUID(),
-		partnershipId,
-		name: validName,
-		color: chosen ?? TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)] ?? TAG_COLORS[0]
-	};
-	await db.insert(messageTags).values(tag);
-	return { ok: true, tag: { id: tag.id, name: tag.name, color: tag.color } };
-}
-
-export async function updateTag(
-	db: Db,
-	partnershipId: string,
-	userId: string,
-	tagId: string,
-	input: { name?: string; color?: string }
-): Promise<TagMutationResult> {
-	if (!(await requireMembership(db, partnershipId, userId))) {
-		return { ok: false, reason: 'not-a-member' };
-	}
-	const current = await db
-		.select({ id: messageTags.id, name: messageTags.name, color: messageTags.color })
-		.from(messageTags)
-		.where(and(eq(messageTags.id, tagId), eq(messageTags.partnershipId, partnershipId)))
-		.limit(1);
-	if (!current[0]) {
-		return { ok: false, reason: 'no-such-tag' };
-	}
-	const name = input.name === undefined ? current[0].name : validTagName(input.name);
-	const color = input.color ?? current[0].color;
-	if (!name) {
-		return { ok: false, reason: 'invalid-name' };
-	}
-	if (!validTagColor(color)) {
-		return { ok: false, reason: 'invalid-color' };
-	}
-	const duplicate = await db
+	const [duplicate] = await db
 		.select({ id: messageTags.id })
 		.from(messageTags)
 		.where(
 			and(
 				eq(messageTags.partnershipId, partnershipId),
-				eq(messageTags.name, name),
-				ne(messageTags.id, tagId)
+				eq(messageTags.nameIndex, input.name.nameIndex)
 			)
 		)
 		.limit(1);
-	if (duplicate[0]) {
+	if (duplicate) {
 		return { ok: false, reason: 'duplicate-name' };
 	}
-	await db.update(messageTags).set({ name, color }).where(eq(messageTags.id, tagId));
-	return { ok: true, tag: { id: tagId, name, color } };
+	// A chosen colour wins; anything malformed falls back to the random pick
+	// rather than refusing, so the picker's default never blocks creation.
+	const chosen = input.color !== undefined && validTagColor(input.color) ? input.color : null;
+	const color =
+		chosen ?? TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)] ?? TAG_COLORS[0];
+	const { vaultId, ciphertext, payloadVersion, nameIndex } = input.name;
+	// The unique index on the name index settles a race the check above lost.
+	const inserted = await db
+		.insert(messageTags)
+		.values({
+			id: input.id,
+			partnershipId,
+			name: '',
+			color,
+			ciphertext,
+			vaultId,
+			payloadVersion,
+			nameIndex
+		})
+		.onConflictDoNothing()
+		.returning({ id: messageTags.id });
+	if (inserted.length === 0) {
+		const [taken] = await db
+			.select({ id: messageTags.id })
+			.from(messageTags)
+			.where(eq(messageTags.id, input.id))
+			.limit(1);
+		return { ok: false, reason: taken ? 'id-taken' : 'duplicate-name' };
+	}
+	return {
+		ok: true,
+		tag: {
+			id: input.id,
+			name: '',
+			color,
+			sealed: { recordId: input.id, vaultId, ciphertext, payloadVersion }
+		}
+	};
+}
+
+/** Renames (a new sealed name) or recolours a tag. Last write wins: a tag is a label. */
+export async function updateTag(
+	db: Db,
+	partnershipId: string,
+	userId: string,
+	tagId: string,
+	input: { name?: SealedTagName; color?: string }
+): Promise<TagMutationResult> {
+	if (!(await requireMembership(db, partnershipId, userId))) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	const [current] = await db
+		.select({ ...TAG_COLUMNS, revision: messageTags.revision })
+		.from(messageTags)
+		.where(and(eq(messageTags.id, tagId), eq(messageTags.partnershipId, partnershipId)))
+		.limit(1);
+	if (!current) {
+		return { ok: false, reason: 'no-such-tag' };
+	}
+	const color = input.color ?? current.color;
+	if (!validTagColor(color)) {
+		return { ok: false, reason: 'invalid-color' };
+	}
+	const { name } = input;
+	if (name) {
+		const problem = await tagNameProblem(db, partnershipId, name);
+		if (problem) {
+			return { ok: false, reason: problem };
+		}
+		const [duplicate] = await db
+			.select({ id: messageTags.id })
+			.from(messageTags)
+			.where(
+				and(
+					eq(messageTags.partnershipId, partnershipId),
+					eq(messageTags.nameIndex, name.nameIndex),
+					ne(messageTags.id, tagId)
+				)
+			)
+			.limit(1);
+		if (duplicate) {
+			return { ok: false, reason: 'duplicate-name' };
+		}
+	}
+	const sealed = name
+		? {
+				name: '',
+				ciphertext: name.ciphertext,
+				vaultId: name.vaultId,
+				payloadVersion: name.payloadVersion,
+				nameIndex: name.nameIndex,
+				revision: current.revision + 1
+			}
+		: {};
+	try {
+		await db
+			.update(messageTags)
+			.set({ color, ...sealed })
+			.where(eq(messageTags.id, tagId));
+	} catch (error) {
+		// The unique index on the name index, after a race the check lost.
+		if (String(error).includes('UNIQUE')) {
+			return { ok: false, reason: 'duplicate-name' };
+		}
+		throw error;
+	}
+	const view = name ? { ...current, ...sealed, color } : { ...current, color };
+	return { ok: true, tag: toTagView(view) };
 }
 
 export async function setThreadTags(

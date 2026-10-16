@@ -73,6 +73,15 @@
 				"title": "A long bath",
 				"description": null
 			}
+		},
+		{
+			"kind": "tag",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000c1",
+			"ciphertext": "sb1.jk7hGvv63f6sqsERBzYGBXvS2cX80S5fMAAuR8yttvHSN8ibDlXNZQxId3DDBw",
+			"expected": {
+				"name": "Bedtime"
+			}
 		}
 	]
 }
