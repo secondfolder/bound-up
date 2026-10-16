@@ -261,8 +261,8 @@ The rigging has four parts.
    against one impressed by under half (mean 0.42). Below the mean a sub's
    spread is narrower (0.1156 rather than 0.15), so nothing right reaches
    their floor of 4 while the top of their range is as it was.
-4. **The clocks.** Every question a sub is asked runs against a clock; a
-   dom's run against none (see "Clocks").
+4. **The clocks.** Every question runs against a clock, but a dom's run four
+   times as long as a sub's (see "Clocks").
 
 Further rules:
 
@@ -290,9 +290,12 @@ different copy (a sub is mocked, a dom flattered), but no copy may say that
 it differs: each one reads as what anyone would be told for that score. `engine.test.ts` checks the results copy for
 admissions at every intensity and in both roles.
 
-The clocks are the one tell left: a dom who watches a sub take the test, or
-someone who plays both roles, can see that only a sub's questions are timed.
-Keep that in mind before adding anything else that only one role sees.
+The clocks used to be a tell: only a sub's questions were timed, which a dom
+watching a sub take the test, or anyone playing both roles, could see at a
+glance. Now both roles get the same clocks on the same questions, a dom's
+four times as long, so the difference is in the numbers rather than in
+whether there is a countdown at all. Keep that in mind before adding anything
+that only one role sees.
 
 ### Questions
 
@@ -327,7 +330,7 @@ Questions are dealt from a seeded PRNG
 Generators live in
 [`questions/`](../src/lib/playroom/iq-test/questions/index.ts), one per kind.
 Each takes `(rng, difficulty, { vibe })`, and deals an untimed question: a
-sub's clock is added by the run (see "Clocks").
+clock is added by the run (see "Clocks").
 
 | Kind                     | Answer                       | Notes                                                    |
 | ------------------------ | ---------------------------- | -------------------------------------------------------- |
@@ -424,10 +427,12 @@ A question with something to memorise goes through phases:
 With the subliminals on, a burst of flashes fires as the items disappear,
 which is when a distraction costs the most.
 
-**Clocks.** Every question a sub is asked runs against one, and a dom's
-against none: the generators deal untimed questions, and the run adds the
-clock for a sub (`withClock`, policy in
+**Clocks.** Every question runs against one: the generators deal untimed
+questions, and the run adds the clock (`withClock`, policy in
 [`questions/timers.ts`](../src/lib/playroom/iq-test/questions/timers.ts)).
+A dom's clocks run `DOM_CLOCK_SCALE` (4) times as long as a sub's, so they
+hardly ever run out; the kind of clock, and everything about how it behaves,
+is the same for both.
 Which clock depends on what hiding the question does:
 
 - **Shown for a while** (`timed`), where looking back at the question is
@@ -459,12 +464,14 @@ and a deadline keeps its place. It is saved as it changes rather than on
 afresh, as it always has.
 
 Each clock is shorter as the difficulty climbs ("What does this word say?",
-for one, is 4 seconds at the easiest down to 2; stroop count's follows its
+for one, is 4 seconds at the easiest down to 2 for a sub, 16 down to 8 for a
+dom; stroop count's follows its
 length, a little under a second a word). Like a memorise question, a
 skipped one with a shown-for-a-while clock is dealt again when it is
 returned to, so going back is not a second look.
 
-**Countdowns** (memorising, and both clocks) show the seconds large,
+**Countdowns** (memorising, and both clocks) show the time left large (a
+minute or more as "1m 23s", the seconds padded so the width holds),
 beside a bar that drains over the whole time, turning to the warning colour
 for the last three
 ([`Countdown`](../src/lib/components/iq-test/Countdown.svelte)). The bar is

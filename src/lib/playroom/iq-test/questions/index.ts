@@ -17,7 +17,7 @@ import { wordProblem } from './word-problem';
 export { centralCells, centreDistance, hasClearCentre, pointCredit } from './credit';
 export { cellName } from './grids';
 export { describeCell } from './matrix';
-export { CLOCKS, withClock } from './timers';
+export { CLOCKS, DOM_CLOCK_SCALE, withClock } from './timers';
 
 /**
  * The response to a question whose time ran out with nothing given: it

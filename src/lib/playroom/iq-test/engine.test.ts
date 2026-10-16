@@ -15,6 +15,7 @@ import {
 	shuffleFeed
 } from './media';
 import {
+	DOM_CLOCK_SCALE,
 	GENERATORS,
 	type MultiQuestion,
 	pickResponse,
@@ -22,6 +23,7 @@ import {
 	type Question,
 	rightAnswer,
 	TIMED_OUT,
+	withClock,
 	wrongAnswer
 } from './questions';
 import { createRng } from './random';
@@ -426,7 +428,7 @@ describe('scoring', () => {
 		}
 	});
 
-	it('times displays and answering for a sub only, and memorising for both', () => {
+	it('times both roles alike, a dom’s clocks four times as long, and memorising the same', () => {
 		const clocks = (settings: Settings) => {
 			const run = playThrough(createRun(settings, 21), () => true);
 			return {
@@ -435,7 +437,23 @@ describe('scoring', () => {
 			};
 		};
 		expect(clocks(sub)).toEqual({ timed: true, memorise: true });
-		expect(clocks(dom)).toEqual({ timed: false, memorise: true });
+		expect(clocks(dom)).toEqual({ timed: true, memorise: true });
+		// The same question under each: dealt from one seed, the clock is all that differs.
+		const seconds = (q: Question) => q.timed?.seconds ?? q.limit?.seconds ?? null;
+		for (const kind of QUESTION_KINDS) {
+			const question = GENERATORS[kind](createRng(4), 3, { vibe: null }, 'q');
+			const forSub = withClock(question);
+			const forDom = withClock(question, DOM_CLOCK_SCALE);
+			const subSeconds = seconds(forSub);
+			const domSeconds = seconds(forDom);
+			expect(domSeconds === null, kind).toBe(subSeconds === null);
+			expect(Boolean(forDom.timed), kind).toBe(Boolean(forSub.timed));
+			// Within rounding of four times as long.
+			expect(
+				Math.abs((domSeconds ?? 0) - (subSeconds ?? 0) * DOM_CLOCK_SCALE),
+				kind
+			).toBeLessThanOrEqual(2);
+		}
 	});
 
 	it('keeps a question lost to the clock answered and wrong, even if it is skipped later', () => {

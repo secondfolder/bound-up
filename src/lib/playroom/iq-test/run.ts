@@ -1,6 +1,7 @@
 import {
 	credit,
 	type Difficulty,
+	DOM_CLOCK_SCALE,
 	GENERATORS,
 	QUESTION_KINDS,
 	type Question,
@@ -246,9 +247,9 @@ function deal(run: Run, index: number, kind: QuestionKind, variant: number): Que
 		{ vibe },
 		id
 	);
-	// Every question against a clock for a sub, none for a dom: a third part
-	// of the rigging (see `timers.ts`).
-	return run.settings.role === 'sub' ? withClock(question) : question;
+	// Every question against a clock, a dom's four times as long as a sub's:
+	// a third part of the rigging (see `timers.ts`).
+	return withClock(question, run.settings.role === 'sub' ? 1 : DOM_CLOCK_SCALE);
 }
 
 export function createRun(settings: Settings, seed: number): Run {

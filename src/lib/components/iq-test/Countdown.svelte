@@ -26,13 +26,26 @@
 
 	// Read once, at mount: the animation runs on its own from there, and a
 	// delay that followed `remaining` would restart it every second.
+	// A minute or more reads as minutes and seconds, "1m 23s" rather than "83s":
+	// a dom's clocks run four times as long, well past a minute. The seconds
+	// are padded beside minutes, so the number keeps its width as it counts.
+	const minutes = $derived(Math.floor(remaining / 60));
+	const secondsLeft = $derived(remaining % 60);
+
 	// svelte-ignore state_referenced_locally
 	const gone = Math.min(seconds, Math.max(0, seconds - remaining));
 </script>
 
 <!-- A timer: assistive tech does not announce it every second (its implicit aria-live is off). -->
 <div class="countdown" class:ending={remaining <= 3} role="timer" data-testid="countdown">
-	<span class="number">{remaining}<span class="unit">s</span></span>
+	<span class="number">
+		{#if minutes > 0}
+			{minutes}<span class="unit">m</span>
+			{String(secondsLeft).padStart(2, '0')}<span class="unit">s</span>
+		{:else}
+			{remaining}<span class="unit">s</span>
+		{/if}
+	</span>
 	<span class="track" aria-hidden="true">
 		<span class="fill" style:animation-duration="{seconds}s" style:animation-delay="{-gone}s"
 		></span>

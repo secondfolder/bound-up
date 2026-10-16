@@ -1,9 +1,11 @@
 import type { Difficulty, Question, QuestionKind } from './types';
 
 /**
- * Every question a sub is asked runs against a clock — part of the rigging,
- * so a dom's are untimed (`run.ts` only calls this for a sub). Which clock
- * depends on what hiding the question does:
+ * Every question runs against a clock, but a dom's run four times as long as
+ * a sub's (`DOM_CLOCK_SCALE`) — part of the rigging. A dom's used to be
+ * untimed, which anyone who saw both roles could tell apart at a glance;
+ * now both look like the same timed test, and a dom's clock is so generous it
+ * hardly ever runs out. Which clock depends on what hiding the question does:
  *
  * - **Shown for a while** (`timed`): where looking back at the question is
  *   how it gets answered — a series, statements, a matrix, a shape to turn,
@@ -68,15 +70,24 @@ export const CLOCKS: Record<QuestionKind, Clock | null> = {
 	'exposure-memory': null
 };
 
-/** A question with its clock on, as a sub gets it. */
-export function withClock(question: Question): Question {
+/** How many times longer a dom's clocks run than a sub's. */
+export const DOM_CLOCK_SCALE = 4;
+
+/**
+ * A question with its clock on: as a sub gets it, or `scale` times as long
+ * (`DOM_CLOCK_SCALE` for a dom).
+ */
+export function withClock(question: Question, scale = 1): Question {
 	const clock = CLOCKS[question.kind];
 	if (clock === null) {
 		return question;
 	}
 	if (clock.type === 'limit') {
-		return { ...question, limit: { seconds: Math.round(clock.seconds(question.difficulty)) } };
+		return {
+			...question,
+			limit: { seconds: Math.round(clock.seconds(question.difficulty) * scale) }
+		};
 	}
-	const seconds = Math.round(clock.seconds(question.difficulty, question));
+	const seconds = Math.round(clock.seconds(question.difficulty, question) * scale);
 	return { ...question, timed: clock.prompt ? { seconds, prompt: true } : { seconds } };
 }

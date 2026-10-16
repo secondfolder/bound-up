@@ -24,4 +24,15 @@ describe('Countdown', () => {
 		expect(container).toHaveTextContent('3s');
 		expect(fill(container).style.animationDelay).toBe('-6s');
 	});
+
+	it('reads a minute or more as minutes and seconds', async () => {
+		const { container, rerender } = render(Countdown, { seconds: 120, remaining: 83 });
+		expect(container.querySelector('.number')).toHaveTextContent('1m 23s');
+		await rerender({ seconds: 120, remaining: 65 });
+		expect(container.querySelector('.number')).toHaveTextContent('1m 05s');
+		await rerender({ seconds: 120, remaining: 60 });
+		expect(container.querySelector('.number')).toHaveTextContent('1m 00s');
+		await rerender({ seconds: 120, remaining: 59 });
+		expect(container.querySelector('.number')).toHaveTextContent(/^59s$/);
+	});
 });
