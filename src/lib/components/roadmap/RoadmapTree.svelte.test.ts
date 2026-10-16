@@ -192,12 +192,26 @@ describe('RoadmapTree', () => {
 			expect(lineColour(chastity, '::before')).toBe(colours.lineDim);
 			expect(lineColour(chastity, '::after')).toBe(colours.lineDim);
 
-			// Sessions has nothing shipped, so nothing in it is shown.
-			const sessions = defined(container.querySelector('[id="sessions"]'), 'the Sessions head');
-			expect(shown(defined(sessions.querySelector('.branch-icon'), 'an icon'))).toBe(Dim);
-			expect(getComputedStyle(sessions, '::before').backgroundColor).toBe(colours.barkDim);
-			expect(getComputedStyle(sessions, '::before').zIndex).toBe('-1');
-			expect(lineColour(sessions, '::after')).toBe(colours.lineDim);
+			// A branch with nothing shipped has nothing in it shown. Found from
+			// the roadmap rather than named: this once named Sessions, and broke
+			// the day Daydreams shipped in it.
+			const unshipped = defined(
+				roadmap.branches.find(
+					(branch) =>
+						!allItems().some(
+							(placed) => placed.branch.id === branch.id && placed.item.status === 'shipped'
+						)
+				),
+				'a branch with nothing shipped'
+			);
+			const emptyBranch = defined(
+				container.querySelector(`[id="${unshipped.id}"]`),
+				`the ${unshipped.title} head`
+			);
+			expect(shown(defined(emptyBranch.querySelector('.branch-icon'), 'an icon'))).toBe(Dim);
+			expect(getComputedStyle(emptyBranch, '::before').backgroundColor).toBe(colours.barkDim);
+			expect(getComputedStyle(emptyBranch, '::before').zIndex).toBe('-1');
+			expect(lineColour(emptyBranch, '::after')).toBe(colours.lineDim);
 
 			// Partners has shipped items, so its head stays.
 			const partners = defined(container.querySelector('[id="partners"]'), 'the Partners head');

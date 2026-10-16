@@ -309,7 +309,14 @@ export default defineConfig(({ command, mode }) => {
 			// tunnel host baked in, a page served from 127.0.0.1 asks the tunnel for
 			// its modules and never hydrates.
 			origin: process.env.VITE_DEV_ORIGIN,
-			allowedHosts: true
+			allowedHosts: true,
+			// Agents' worktrees live in `.claude/worktrees/`, each a whole checkout.
+			// Watched, a `svelte-kit sync` in one rewrote its `.svelte-kit/tsconfig.json`,
+			// which this server took as its own: it cleared its cache and force-reloaded
+			// every page, so e2e runs here failed mid-render whenever an agent worked.
+			watch: {
+				ignored: ['**/.claude/**']
+			}
 		}
 	};
 });

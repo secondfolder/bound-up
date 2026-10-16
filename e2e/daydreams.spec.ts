@@ -171,7 +171,13 @@ test.describe('daydreams', () => {
 		await expect(page.locator('li.passage').last()).toContainText('2/2');
 
 		// Back to the first take with the switcher, and still there after a reload.
+		// The switch shows at once and is saved after, so the reload waits for
+		// the save: one that went first came back on take 2 under load.
+		const moved = page.waitForResponse(
+			(response) => response.url().endsWith(`/api/daydreams/${id}/active`) && response.ok()
+		);
 		await page.getByRole('button', { name: 'Previous version' }).last().click();
+		await moved;
 		await expect(page.getByText(`Mara heard: "${said}"`, { exact: true })).toBeVisible();
 		await expect(page.getByText('(take 2)')).toHaveCount(0);
 		await page.reload();
@@ -479,9 +485,15 @@ test.describe('daydreams', () => {
 		await newScene(page, scene, 'Nothing has happened yet.');
 		await newCharacter(page, 'Mara');
 		await clickWaButton(page, 'Start daydreaming');
+		// Waited for before the reload: the scene's title shows from the start,
+		// so without this a reload could cut the naming request off before the
+		// stub had failed it, and then fail the one after the reload instead.
+		const failedNaming = page.waitForResponse(
+			(response) => response.url().endsWith('/api/daydreams/suggest') && response.status() === 502
+		);
 		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
 		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
-		await passageSaved(page);
+		await failedNaming;
 		await expect(page.getByRole('heading', { name: scene })).toBeVisible();
 		await expect(page.getByText('No suggestions just now')).toHaveCount(0);
 
