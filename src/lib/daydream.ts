@@ -53,7 +53,7 @@ export const DAYDREAM_NARRATORS: readonly {
 	{ value: 'none', label: 'The characters', hint: 'They speak to you directly' },
 	{ value: 'second-person', label: 'A narrator, to you', hint: '“You feel the rope tighten…”' },
 	{ value: 'third-person', label: 'A narrator, about them', hint: '“She waits by the door…”' },
-	{ value: 'impersonal', label: 'The rules', hint: 'A system, a house, a protocol' }
+	{ value: 'impersonal', label: 'A system', hint: '“Kneel at the line. Wait for the tone.”' }
 ];
 
 export const DAYDREAM_STANCES: readonly { value: DaydreamStance; label: string; hint: string }[] = [
@@ -93,8 +93,8 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 	},
 	{
 		id: 'rules',
-		label: 'The rules',
-		hint: 'An impersonal authority, no one behind it',
+		label: 'A system in charge',
+		hint: 'No narrator, just rules giving you orders: “Rule 2 broken. Infraction logged.”',
 		voice: { narrator: 'impersonal', stance: 'self' }
 	}
 ];

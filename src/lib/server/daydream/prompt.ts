@@ -21,6 +21,7 @@ import {
 	daydreamSetupKind,
 	directionSchema
 } from '$lib/sealed-kinds/daydreams';
+import { impersonalGuide } from './impersonal-voice';
 
 /**
  * What a reply request carries, and what is sent on to the model.
@@ -153,7 +154,8 @@ function describeNarrator(voice: DaydreamVoice, characterCount: number): string 
 				.filter(Boolean)
 				.join(' ');
 		case 'impersonal':
-			return `You are not a person. You speak as an impersonal authority — the rules, a system, a protocol, an institution — that governs the user: procedural, exact, never personal, addressing them as "you"${persona ? ` (they are ${name})` : ''}. ${characterCount === 0 ? 'No one is behind it.' : 'The characters below act for it; voice them as its functionaries.'}`;
+			// The full guide, with examples, comes later: `impersonalGuide`.
+			return `There is no narrator. You speak as the system that governs the user — its rules, its protocol, its procedures — addressing them as "you"${persona ? ` (they are ${name})` : ''}. ${characterCount === 0 ? 'No one is behind it.' : 'The characters below act for it, as its functionaries.'} See "Writing as the system" below.`;
 		default:
 			return assertNever(voice.narrator, 'narrator');
 	}
@@ -172,6 +174,9 @@ function leadLine(setup: DaydreamSetupContent): string | null {
 	if (setup.characters.length === 0 || setup.voice.stance === 'absent') {
 		return null;
 	}
+	if (setup.voice.narrator === 'impersonal') {
+		return systemLeadLine(setup.lead);
+	}
 	switch (setup.lead) {
 		case 'character':
 			return 'The characters lead: they set the pace, give instructions and make the decisions.';
@@ -181,6 +186,24 @@ function leadLine(setup: DaydreamSetupContent): string | null {
 			return 'Neither always leads: the characters and the user trade control as the story goes.';
 		default:
 			return assertNever(setup.lead, 'lead');
+	}
+}
+
+/**
+ * Who leads, when the system tells it. "The characters lead" would make its
+ * functionaries people with decisions of their own, which is the narration
+ * this voice is meant to avoid.
+ */
+function systemLeadLine(lead: DaydreamSetupContent['lead']): string {
+	switch (lead) {
+		case 'character':
+			return 'The system leads: its rules and functionaries set the pace and give every instruction.';
+		case 'me':
+			return 'The user leads: the system answers what they ask of it, granting or refusing it under its rules.';
+		case 'shared':
+			return 'Neither always leads: sometimes the system gives instructions, sometimes it answers what the user asks of it.';
+		default:
+			return assertNever(lead, 'lead');
 	}
 }
 
@@ -276,7 +299,23 @@ The user may write what they do in the story, ask for where the story should go 
 A turn marked [Out of character] is the user stepping out of the story: answer it out of character and briefly, and do not move the story on unless they ask.
 A note in brackets — a direction, a roll, a reaction — comes from the buttons on the user's screen. A direction applies to your next passage. "Surprise me" means take the story somewhere the user will not expect, within their limits.`;
 
-function replyFormat(current: readonly Direction[]): string {
+/** What the suggestions and direction buttons should be, which differs when the system tells the story. */
+function steeringIdeas(voice: DaydreamVoice): { suggestions: string; directions: string } {
+	return voice.narrator === 'impersonal'
+		? {
+				suggestions:
+					'Vary them: one complying with an instruction, one asking or petitioning the system for something, one hesitating or refusing.',
+				directions: 'Stricter, Gentler, New rule, Inspection, Skip ahead'
+			}
+		: {
+				suggestions:
+					'Vary them: one something they do, one a line carrying the story on as if co-writing it, one asking to take the story somewhere.',
+				directions: 'Slower, Faster, Crueler, Gentler, Skip ahead, More about the waiting'
+			};
+}
+
+function replyFormat(current: readonly Direction[], voice: DaydreamVoice): string {
+	const ideas = steeringIdeas(voice);
 	const shown =
 		current.length > 0
 			? current.map((direction) => `"${direction.label}" (id "${direction.id}")`).join(', ')
@@ -286,8 +325,8 @@ Write the passage first. Then, on a new line, end every reply with a metadata bl
 <meta>
 {"suggestions": [...], "directions": {"add": [...], "remove": [...]}, "readAs": "..."}
 </meta>
-- "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. Vary them: one something they do, one a line carrying the story on as if co-writing it, one asking to take the story somewhere.
-- "directions": buttons for steering the story. On screen now: ${shown}. Add buttons that suit where the story is now — labels of one to three words, like {"id": "slower", "label": "Slower"} — and remove, by id, any that no longer fit. At most ${MAX_DIRECTIONS} in all. Ideas: Slower, Faster, Crueler, Gentler, Skip ahead, More about the waiting. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
+- "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. ${ideas.suggestions}
+- "directions": buttons for steering the story. On screen now: ${shown}. Add buttons that suit where the story is now — labels of one to three words, like {"id": "slower", "label": "Slower"} — and remove, by id, any that no longer fit. At most ${MAX_DIRECTIONS} in all. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
 - "readAs": how you read the user's last turn: "action", "direction", "cowrite" or "ooc".
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
 - "ooc": true, only when the passage is out of character.`;
@@ -368,8 +407,17 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 	}
 }
 
-/** What the model is asked to write first: the story, before the user has done anything. */
-const OPENING_REQUEST = '(Begin the story. Set the scene, and end at a point where I can respond.)';
+/**
+ * What the model is asked to write first: the story, before the user has
+ * done anything. "Set the scene" asks for a narrator's description, so the
+ * system voice is asked for its first notice instead: the opening is the
+ * example every later passage copies.
+ */
+function openingRequest(voice: DaydreamVoice): string {
+	return voice.narrator === 'impersonal'
+		? '(Begin. Open with the first notice or rules the system issues to me — not a description of the scene — and end where I must respond.)'
+		: '(Begin the story. Set the scene, and end at a point where I can respond.)';
+}
 
 /** Sent when the newest turn is a passage: the user asked for more without saying anything. */
 const CONTINUE_REQUEST = '(Continue.)';
@@ -396,8 +444,15 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 			RULES,
 			describeSetup(request.setup),
 			READING,
-			stopped ? CHECK_IN : replyFormat(request.currentDirections)
-		].join('\n\n')
+			// Last before the format, nearest where the model starts writing,
+			// and not for a check-in, which is out of character.
+			!stopped && request.setup.voice.narrator === 'impersonal'
+				? impersonalGuide(request.setup.characters.length, request.setup.scene.dials.heat)
+				: null,
+			stopped ? CHECK_IN : replyFormat(request.currentDirections, request.setup.voice)
+		]
+			.filter((section) => section !== null)
+			.join('\n\n')
 	};
 
 	const conversation: { role: 'user' | 'assistant'; content: string }[] = [];
@@ -421,7 +476,7 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 		if (request.mode === 'rewrite' && request.rewrite) {
 			add({ role: 'user', content: rewriteRequest(request.rewrite) });
 		} else if (conversation.length === 0) {
-			add({ role: 'user', content: OPENING_REQUEST });
+			add({ role: 'user', content: openingRequest(request.setup.voice) });
 		}
 	}
 	// Chat models expect to answer a user message. A conversation that ends on
