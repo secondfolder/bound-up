@@ -20,6 +20,8 @@ export const PLAYROOM_TOOLS: readonly PlayroomTool[] = [
 	{
 		id: 'iq-test',
 		name: 'IQ test',
+		// Never hints that a dom and a sub are marked differently: it is read
+		// before either takes the test (see docs/playroom.md, "The rigging").
 		blurb: "Do you know what you're talking about or are you just a dumb little slut?",
 		icon: 'brain',
 		route: '/(standalone)/playroom/iq-test/[[id]]'

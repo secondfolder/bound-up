@@ -590,6 +590,80 @@ test.describe('IQ test', () => {
 		await expect(page.getByText(`${MIN_FOR_SCORE - 2} more for a score`)).toBeVisible();
 	});
 
+	test('a reload mid-question carries its clock on from where it was', async ({ page }) => {
+		await page.goto('/playroom/iq-test');
+		await waitForHydration(page);
+		await dialog(page).getByRole('button', { name: SUB }).click();
+		const countdown = page.locator(
+			'section.question[data-phase="answer"] [data-testid="countdown"] .number'
+		);
+		const left = async () => Number.parseInt((await countdown.textContent()) ?? '', 10);
+		// On to a question answered against a clock long enough to watch run down.
+		let at = 0;
+		let start = 0;
+		for (let i = 1; i <= 36 && start < 8; i += 1) {
+			await expect(page.getByText(`Question ${i} of 36`)).toBeVisible();
+			at = i;
+			start = (await countdown.count()) > 0 ? await left() : 0;
+			if (start < 8) {
+				await page.getByRole('button', { name: 'Skip', exact: true }).click();
+			}
+		}
+		expect(start).toBeGreaterThanOrEqual(8);
+		await expect.poll(left).toBeLessThanOrEqual(start - 3);
+		const before = await left();
+
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByText(`Question ${at} of 36`)).toBeVisible();
+		// Not back to the full time: on from what was left, give or take the
+		// second the reload was part way through.
+		expect(await left()).toBeLessThanOrEqual(before);
+	});
+
+	test('a reload mid-memorise carries on memorising, and one after it does not memorise again', async ({
+		page
+	}) => {
+		await page.goto('/playroom/iq-test');
+		await waitForHydration(page);
+		await dialog(page).getByRole('button', { name: SUB }).click();
+		const question = page.locator('section.question');
+		const countdown = page.locator(
+			'section.question[data-kind="working-memory"][data-phase="memorise"] [data-testid="countdown"] .number'
+		);
+		const left = async () => Number.parseInt((await countdown.textContent()) ?? '', 10);
+		// On to the words to remember: every kind comes up in the first round.
+		let at = 0;
+		for (let i = 1; i <= 18; i += 1) {
+			await expect(page.getByText(`Question ${i} of 36`)).toBeVisible();
+			at = i;
+			if ((await question.getAttribute('data-kind')) === 'working-memory') {
+				break;
+			}
+			await page.getByRole('button', { name: 'Skip', exact: true }).click();
+		}
+		const start = await left();
+		expect(start).toBeGreaterThanOrEqual(5);
+		await expect.poll(left).toBeLessThanOrEqual(start - 2);
+		const before = await left();
+		const words = await page.getByTestId('memorise-items').textContent();
+
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByText(`Question ${at} of 36`)).toBeVisible();
+		await expect(page.getByTestId('memorise-items')).toHaveText(words ?? '');
+		expect(await left()).toBeLessThanOrEqual(before);
+
+		// Past the words, a reload stays past them.
+		await page.getByRole('button', { name: "I've got them" }).click();
+		await expect(question).toHaveAttribute('data-phase', 'interference');
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByText(`Question ${at} of 36`)).toBeVisible();
+		await expect(question).toHaveAttribute('data-phase', 'interference');
+		await expect(page.getByTestId('memorise-items')).toHaveCount(0);
+	});
+
 	test('"New porn" swaps the pictures on show for others', async ({ page }) => {
 		// Plenty of distinct pictures, all served locally so nothing leaves the
 		// machine; the page treats any image URL the feed gives it alike.
@@ -1257,7 +1331,7 @@ test.describe('IQ test', () => {
 		await page.waitForURL('**/playroom');
 		await expect(page.getByRole('heading', { level: 1, name: 'Playroom' })).toBeVisible();
 
-		await page.getByRole('link', { name: /Bimbo IQ test/ }).click();
+		await page.getByRole('link', { name: /IQ test/ }).click();
 		await page.waitForURL('**/playroom/iq-test');
 		await expect(dialog(page)).toContainText('agreed to play');
 	});

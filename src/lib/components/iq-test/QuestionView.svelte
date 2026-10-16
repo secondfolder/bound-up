@@ -2,7 +2,9 @@
 	import { rightAnswer, wrongAnswer } from '$lib/playroom/iq-test/questions';
 	import {
 		attemptedCount,
+		type ClockLeft,
 		canFinish,
+		clockLeftFor,
 		firstSkipped,
 		isExhausted,
 		MIN_FOR_SCORE,
@@ -23,6 +25,7 @@
 		skippedNote,
 		taunt = null,
 		answerButton = false,
+		timersCleared = false,
 		onanswer,
 		onskip,
 		onback,
@@ -30,7 +33,9 @@
 		onreturn,
 		ondismiss,
 		onfinish,
-		onphase
+		onphase,
+		onclock,
+		ontimerscleared
 	}: {
 		run: Run;
 		/** Shown once a score is available. */
@@ -45,6 +50,12 @@
 		 * tapped through quickly.
 		 */
 		answerButton?: boolean;
+		/**
+		 * "Clear timer", beside "Correct answer" and behind the same feature: no
+		 * clock runs on any question while it is on. Ignored without
+		 * `answerButton`, so it cannot outlive the feature.
+		 */
+		timersCleared?: boolean;
 		onanswer: (response: string) => void;
 		onskip: () => void;
 		onback: () => void;
@@ -56,6 +67,9 @@
 		ondismiss: () => void;
 		onfinish: () => void;
 		onphase?: (phase: Phase) => void;
+		/** What is left on the question on screen's clocks, each second one runs. */
+		onclock?: (clock: ClockLeft) => void;
+		ontimerscleared?: (cleared: boolean) => void;
 	} = $props();
 
 	const question = $derived(run.questions[run.index]);
@@ -66,6 +80,7 @@
 	/** Whether there is a skipped question to go back to, other than this one. */
 	const canReturn = $derived(firstSkipped(run) !== null);
 	const total = RUN_LENGTH;
+	const untimed = $derived(answerButton && timersCleared);
 </script>
 
 <div class="question-view">
@@ -131,6 +146,13 @@
 				<wa-icon slot="start" name="forward" variant="solid"></wa-icon>
 				Skip question
 			</wa-button>
+			<wa-switch
+				size="s"
+				checked={timersCleared}
+				onchange={(event: Event) =>
+					ontimerscleared?.((event.currentTarget as HTMLInputElement).checked)}
+				>Clear timer</wa-switch
+			>
 		</div>
 	{/if}
 
@@ -168,8 +190,11 @@
 			<QuestionCard
 				{question}
 				previous={run.responses[run.index] ?? null}
+				resume={clockLeftFor(run, question.id)}
+				{untimed}
 				{onanswer}
 				{onphase}
+				onclock={(left) => onclock?.({ id: question.id, ...left })}
 			/>
 		{/key}
 		<nav class="controls" aria-label="Question">
@@ -231,6 +256,7 @@
 	.answer-buttons {
 		display: flex;
 		flex-wrap: wrap;
+		align-items: center;
 		gap: 0.5rem;
 	}
 

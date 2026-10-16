@@ -128,7 +128,8 @@ the feature does not raise the other side's budget.
 A testing aid for the Playroom's IQ test (see
 [playroom.md](playroom.md#testing-aid)). `iqTestAnswerButton` adds a "Correct
 answer" button above each question that answers it correctly, so a run can be
-tapped through to a result quickly.
+tapped through to a result quickly, and a "Clear timer" switch that stops every
+question's clock.
 
 The test page's load reads it with `userHasFeature`, and that only decides what
 is shown. There is nothing else to enforce: the test is marked in the browser,

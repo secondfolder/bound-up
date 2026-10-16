@@ -367,4 +367,180 @@ describe('QuestionCard', () => {
 		expect(container.querySelector('button.answer-card')).toBeNull();
 		expect(container.querySelector('[data-testid="countdown"]')).toBeNull();
 	});
+
+	it('carries on from the seconds left before a reload, and reports them as they run', async () => {
+		vi.useFakeTimers();
+		try {
+			const question = withClock(GENERATORS['odd-one-out'](createRng(2), 3, { vibe: null }, 'q'));
+			const onanswer = vi.fn();
+			const onclock = vi.fn();
+			const { container } = render(QuestionCard, {
+				question,
+				previous: null,
+				resume: { limit: 2 },
+				onanswer,
+				onclock
+			});
+			expect(container.querySelector('[data-testid="countdown"]')).toHaveTextContent('2s');
+			await vi.advanceTimersByTimeAsync(1000);
+			expect(onclock).toHaveBeenLastCalledWith({ phase: 'answer', limit: 1 });
+			await vi.advanceTimersByTimeAsync(1000);
+			expect(onanswer).toHaveBeenCalledWith(TIMED_OUT);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('keeps a display hidden that had run down before a reload', () => {
+		const question = withClock(GENERATORS['central-point'](createRng(3), 2, { vibe: null }, 'q'));
+		const { container } = render(QuestionCard, {
+			question,
+			previous: null,
+			resume: { timed: 0 },
+			onanswer: vi.fn()
+		});
+		expect(container.querySelectorAll('[data-testid="board"] .marked')).toHaveLength(0);
+		expect(container).toHaveTextContent('answer from memory');
+	});
+
+	it('never resumes with more time than the clock has', () => {
+		const question = withClock(GENERATORS['odd-one-out'](createRng(2), 3, { vibe: null }, 'q'));
+		const { seconds } = defined(question.limit, 'its limit');
+		const { container } = render(QuestionCard, {
+			question,
+			previous: null,
+			resume: { limit: seconds + 60 },
+			onanswer: vi.fn()
+		});
+		expect(container.querySelector('[data-testid="countdown"]')).toHaveTextContent(`${seconds}s`);
+	});
+
+	it('runs no clock with the timer cleared: nothing hidden, nothing run out, no countdown', async () => {
+		vi.useFakeTimers();
+		try {
+			const timed = withClock(GENERATORS['central-point'](createRng(3), 2, { vibe: null }, 'q'));
+			const first = render(QuestionCard, {
+				question: timed,
+				previous: null,
+				untimed: true,
+				onanswer: vi.fn()
+			});
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(first.container.querySelector('[data-testid="countdown"]')).toBeNull();
+			expect(
+				first.container.querySelectorAll('[data-testid="board"] .marked').length
+			).toBeGreaterThan(0);
+			first.unmount();
+
+			const limited = withClock(GENERATORS['odd-one-out'](createRng(2), 3, { vibe: null }, 'q'));
+			const onanswer = vi.fn();
+			const { container, rerender } = render(QuestionCard, {
+				question: limited,
+				previous: null,
+				untimed: true,
+				onanswer
+			});
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(onanswer).not.toHaveBeenCalled();
+			// Turned off again, the clock starts from where it was stopped.
+			const { seconds } = defined(limited.limit, 'its limit');
+			await rerender({ question: limited, previous: null, untimed: false, onanswer });
+			expect(container.querySelector('[data-testid="countdown"]')).toHaveTextContent(`${seconds}s`);
+			await vi.advanceTimersByTimeAsync(seconds * 1000);
+			expect(onanswer).toHaveBeenCalledWith(TIMED_OUT);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('leaves memorising to “I’ve got them” with the timer cleared', async () => {
+		vi.useFakeTimers();
+		try {
+			const question = GENERATORS['digit-span'](createRng(1), 2, { vibe: null }, 'q');
+			const { container } = render(QuestionCard, {
+				question,
+				previous: null,
+				untimed: true,
+				onanswer: vi.fn()
+			});
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(container.querySelector('[data-phase="memorise"]')).not.toBeNull();
+			expect(container.querySelector('[data-testid="countdown"]')).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('carries on memorising from the seconds left before a reload, and reports where it is', async () => {
+		vi.useFakeTimers();
+		try {
+			const question = GENERATORS['working-memory'](createRng(1), 2, { vibe: null }, 'q');
+			const { seconds } = defined(question.memorise, 'its memorising');
+			expect(seconds).toBeGreaterThan(2);
+			const onclock = vi.fn();
+			const { container } = render(QuestionCard, {
+				question,
+				previous: null,
+				resume: { phase: 'memorise', memorise: 2 },
+				onanswer: vi.fn(),
+				onclock
+			});
+			expect(container.querySelector('[data-phase="memorise"]')).not.toBeNull();
+			expect(container.querySelector('[data-testid="countdown"]')).toHaveTextContent('2s');
+			// Where it stands is saved straight away, then on every tick.
+			expect(onclock).toHaveBeenLastCalledWith({ phase: 'memorise', memorise: 2 });
+			await vi.advanceTimersByTimeAsync(1000);
+			expect(onclock).toHaveBeenLastCalledWith({ phase: 'memorise', memorise: 1, at: 0 });
+			await vi.advanceTimersByTimeAsync(1000);
+			expect(container.querySelector('[data-phase="interference"]')).not.toBeNull();
+			expect(onclock).toHaveBeenLastCalledWith({ phase: 'interference' });
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('carries a one-at-a-time sequence on from the item it was on', () => {
+		const question = GENERATORS['exposure-memory'](createRng(1), 2, { vibe: null }, 'q');
+		const { items } = defined(question.memorise, 'its memorising');
+		const { container } = render(QuestionCard, {
+			question,
+			previous: null,
+			resume: { phase: 'memorise', at: 2 },
+			onanswer: vi.fn()
+		});
+		expect(container.querySelector('[data-testid="memorise-items"]')).toHaveTextContent(
+			defined(items[2], 'the third item')
+		);
+	});
+
+	it('does not show the items again after a reload past memorising', () => {
+		const question = GENERATORS['working-memory'](createRng(1), 2, { vibe: null }, 'q');
+		const sum = render(QuestionCard, {
+			question,
+			previous: null,
+			resume: { phase: 'interference' },
+			onanswer: vi.fn()
+		});
+		expect(sum.container.querySelector('[data-phase="interference"]')).not.toBeNull();
+		sum.unmount();
+
+		const answering = render(QuestionCard, {
+			question,
+			previous: null,
+			resume: { phase: 'answer' },
+			onanswer: vi.fn()
+		});
+		expect(answering.container.querySelector('[data-phase="answer"]')).not.toBeNull();
+		answering.unmount();
+
+		// A phase the question does not have is ignored: digit span has no sum.
+		const span = GENERATORS['digit-span'](createRng(1), 2, { vibe: null }, 'q');
+		const { container } = render(QuestionCard, {
+			question: span,
+			previous: null,
+			resume: { phase: 'interference' },
+			onanswer: vi.fn()
+		});
+		expect(container.querySelector('[data-phase="memorise"]')).not.toBeNull();
+	});
 });

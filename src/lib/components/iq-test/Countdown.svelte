@@ -8,6 +8,11 @@
 	 * rather than stepped from `remaining`: a once-a-second step reads as a
 	 * stutter, and the smooth drain is what makes the time felt. The number
 	 * is the parent's count, so the two can never disagree about the end.
+	 *
+	 * A countdown that mounts part way through — a clock carried on after a
+	 * reload, or after "Clear timer" is turned off again — starts its bar
+	 * part way through too, with a negative delay of the time already gone.
+	 * Without it the number carried on and the bar went back to full.
 	 */
 	let {
 		seconds,
@@ -18,13 +23,19 @@
 		/** Whole seconds left. */
 		remaining: number;
 	} = $props();
+
+	// Read once, at mount: the animation runs on its own from there, and a
+	// delay that followed `remaining` would restart it every second.
+	// svelte-ignore state_referenced_locally
+	const gone = Math.min(seconds, Math.max(0, seconds - remaining));
 </script>
 
 <!-- A timer: assistive tech does not announce it every second (its implicit aria-live is off). -->
 <div class="countdown" class:ending={remaining <= 3} role="timer" data-testid="countdown">
 	<span class="number">{remaining}<span class="unit">s</span></span>
 	<span class="track" aria-hidden="true">
-		<span class="fill" style:animation-duration="{seconds}s"></span>
+		<span class="fill" style:animation-duration="{seconds}s" style:animation-delay="{-gone}s"
+		></span>
 	</span>
 </div>
 

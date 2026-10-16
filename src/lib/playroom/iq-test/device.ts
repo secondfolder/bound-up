@@ -142,6 +142,22 @@ export function rememberHypnoSource(source: HypnoSource): void {
 	write(local, HYPNO_SOURCE_KEY, source);
 }
 
+const TIMERS_CLEARED_KEY = 'playroom.iq-test.timers-cleared';
+
+/**
+ * Whether "Clear timer", a testing aid beside "Correct answer", was last left
+ * on on this device. Remembered so a reload does not set the clocks running
+ * again under someone looking at a question. Only ever read where that
+ * testing aid is shown: on its own it does nothing.
+ */
+export function timersCleared(): boolean {
+	return read(local, TIMERS_CLEARED_KEY) === true;
+}
+
+export function rememberTimersCleared(cleared: boolean): void {
+	write(local, TIMERS_CLEARED_KEY, cleared ? true : null);
+}
+
 /** Results kept on a device for a signed-out visitor. */
 export const DEVICE_HISTORY_LIMIT = 20;
 

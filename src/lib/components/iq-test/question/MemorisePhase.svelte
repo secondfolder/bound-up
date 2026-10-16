@@ -9,13 +9,35 @@
 	 * all at once, pictures one at a time (`intervalMs`), or a board's shaded
 	 * squares, under a countdown. `ondone` when the time is up, the sequence
 	 * has run, or the taker says they have them.
+	 *
+	 * `untimed` (the "Clear timer" testing aid) takes the countdown away, so
+	 * it lasts until "I've got them". A one-at-a-time sequence still steps:
+	 * that is how it is shown, not a clock on it.
+	 *
+	 * After a reload it carries on from where it was (`resume`), reported as
+	 * it goes (`ontick`): starting over would be a second look at the items.
 	 */
-	let { memorise, ondone }: { memorise: Memorise; ondone: () => void } = $props();
+	let {
+		memorise,
+		untimed = false,
+		resume = null,
+		ondone,
+		ontick
+	}: {
+		memorise: Memorise;
+		untimed?: boolean;
+		/** The seconds left, and the item a sequence was on, before a reload. */
+		resume?: { remaining?: number | undefined; at?: number | undefined } | null;
+		ondone: () => void;
+		ontick?: (progress: { remaining: number; at: number }) => void;
+	} = $props();
 
+	// Read once, at mount: the clock runs on from there on its own.
 	// svelte-ignore state_referenced_locally
-	let remaining = $state(memorise.seconds);
+	let remaining = $state(Math.min(memorise.seconds, resume?.remaining ?? memorise.seconds));
 	/** The one item of a one-at-a-time sequence on screen. */
-	let at = $state(0);
+	// svelte-ignore state_referenced_locally
+	let at = $state(Math.min(Math.max(0, memorise.items.length - 1), resume?.at ?? 0));
 	let finished = false;
 	const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -30,19 +52,23 @@
 	}
 
 	$effect(() => {
-		const clock = setInterval(() => {
-			remaining -= 1;
-			if (remaining <= 0) {
-				finish();
-			}
-		}, 1000);
-		timers.push(clock);
+		if (!untimed) {
+			const clock = setInterval(() => {
+				remaining -= 1;
+				ontick?.({ remaining: Math.max(0, remaining), at });
+				if (remaining <= 0) {
+					finish();
+				}
+			}, 1000);
+			timers.push(clock);
+		}
 		const interval = memorise.intervalMs;
 		if (interval !== undefined) {
 			// Ends when the sequence has run, which is a little before the
 			// rounded-up seconds would.
 			const stepper = setInterval(() => {
 				at += 1;
+				ontick?.({ remaining: Math.max(0, remaining), at });
 				if (at >= memorise.items.length) {
 					finish();
 				}
@@ -81,7 +107,9 @@
 	</ul>
 {/if}
 <div class="footer">
-	<Countdown seconds={memorise.seconds} {remaining} />
+	{#if !untimed}
+		<Countdown seconds={memorise.seconds} {remaining} />
+	{/if}
 	<wa-button appearance="outlined" onclick={finish}>I've got them</wa-button>
 </div>
 

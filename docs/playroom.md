@@ -446,6 +446,18 @@ Which clock depends on what hiding the question does:
 - **Memory questions** keep only their memorising time, which is already
   the clock, and the question itself.
 
+**A reload does not reset a clock.** Which phase the question on screen is
+in, and what is left on each of its clocks, is kept with the run (`clock` on
+the run, a `ClockLeft` tagged with the question's id): the phase as soon as
+it changes, the clocks every second. A question mounted again after a reload
+carries on from there. Mid-memorise, the same items come back with the time
+that was left, a one-at-a-time sequence at the item it was on; past
+memorising, they do not come back at all; a display that had gone stays gone,
+and a deadline keeps its place. It is saved as it changes rather than on
+`pagehide`, which does not reliably fire when a tab is killed. Every move
+(`goTo`) drops it, so going back to a question or on to another starts it
+afresh, as it always has.
+
 Each clock is shorter as the difficulty climbs ("What does this word say?",
 for one, is 4 seconds at the easiest down to 2; stroop count's follows its
 length, a little under a second a word). Like a memorise question, a
@@ -457,6 +469,9 @@ beside a bar that drains over the whole time, turning to the warning colour
 for the last three
 ([`Countdown`](../src/lib/components/iq-test/Countdown.svelte)). The bar is
 a CSS animation rather than stepped each second, which read as a stutter.
+One that appears part way through its time (a clock carried on after a
+reload, or after "Clear timer" is turned off) starts its bar part way through
+too, with a negative `animation-delay` of the time already gone.
 
 ### Pictures
 
@@ -1164,6 +1179,16 @@ between questions. So it stays in one place on screen, and a run can be tapped
 through without moving a finger. A Playwright test checks the button's
 position on every question of a run.
 
+Beside it, with "Incorrect answer" and "Skip question", is a "Clear timer"
+switch. While it is on no clock runs on any question: no countdown, a
+shown-for-a-while display stays up, a deadline never passes, and memorising
+lasts until "I've got them" (a one-at-a-time sequence still steps through).
+Turned off mid-question, the clock carries on from where it was stopped. It is
+remembered on the device (`playroom.iq-test.timers-cleared` in
+`localStorage`), so a reload does not set the clocks going under someone
+looking at a question, and is ignored without the feature, so it cannot
+outlive it.
+
 ### Results
 
 [`analysis.ts`](../src/lib/playroom/iq-test/analysis.ts) builds the results.
@@ -1254,10 +1279,10 @@ dialog is closed. It drops any run in progress,
 rather than keeping it for "Carry on", and reopens the dialog.
 
 **Run in progress.** It is kept in `sessionStorage`, per tab, so nothing
-answered is lost to a reload. A reload resumes at the same question. If the
+answered is lost to a reload. A reload resumes at the same question, with its
+clock where it was (see "Clocks"). If the
 dialog is showing instead, after a new visit in the same tab, closing it offers
-the run back on the intro as "Carry on". A question with something to memorise
-starts that question over: its words were only ever on screen once.
+the run back on the intro as "Carry on".
 
 **Plain HTTP.** Nothing on the page may use `crypto.randomUUID()`. Browsers
 only provide it on a secure origin, and the test is also reached over plain

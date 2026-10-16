@@ -53,7 +53,67 @@ export type Run = {
 	index: number;
 	/** The "enough for a score" banner was dismissed, leaving a small finish button. */
 	enoughDismissed?: boolean;
+	/** What is left on the question on screen's clock (see `ClockLeft`). */
+	clock?: ClockLeft;
 };
+
+/** Which part of a question is on screen: memorising, the sum after it, or answering. */
+export type QuestionPhase = 'memorise' | 'interference' | 'answer';
+
+const PHASES: readonly QuestionPhase[] = ['memorise', 'interference', 'answer'];
+
+/**
+ * Where a question's clocks stand, kept with the run each second so a reload
+ * carries on from there: otherwise a reload was a free reset, a second look
+ * at words or a display that had already gone and a fresh deadline. Tagged
+ * with the question's id, and dropped by every move (`goTo`), so going back
+ * to a question or on to another starts it afresh, as it always has.
+ */
+export type ClockLeft = {
+	/** The question these are for. */
+	id: string;
+	/** The part of it on screen, so a reload after memorising does not memorise again. */
+	phase?: QuestionPhase;
+	/** Seconds left to memorise in. */
+	memorise?: number;
+	/** How far a one-at-a-time sequence to memorise has got: the item on screen. */
+	at?: number;
+	/** Seconds left on a shown-for-a-while display. */
+	timed?: number;
+	/** Seconds left to answer in. */
+	limit?: number;
+};
+
+/** The run with the question on screen's clocks as they now stand. */
+export function withClockLeft(run: Run, clock: ClockLeft): Run {
+	return { ...run, clock };
+}
+
+/**
+ * Where to resume the question on screen from, or null to start it afresh.
+ * Anything that is not a phase, or a whole, non-negative number, is dropped:
+ * the run comes back from storage, which an older build may have written.
+ */
+export function clockLeftFor(run: Run, id: string): Omit<ClockLeft, 'id'> | null {
+	const { clock } = run;
+	if (!clock || clock.id !== id) {
+		return null;
+	}
+	const whole = (value: unknown) =>
+		typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
+	const phase = PHASES.find((candidate) => candidate === clock.phase);
+	const memorise = whole(clock.memorise);
+	const at = whole(clock.at);
+	const timed = whole(clock.timed);
+	const limit = whole(clock.limit);
+	return {
+		...(phase === undefined ? {} : { phase }),
+		...(memorise === undefined ? {} : { memorise }),
+		...(at === undefined ? {} : { at }),
+		...(timed === undefined ? {} : { timed }),
+		...(limit === undefined ? {} : { limit })
+	};
+}
 
 /**
  * How hard question `index` is for this role.
@@ -212,8 +272,11 @@ export function createRun(settings: Settings, seed: number): Run {
  *   for a time, is dealt again: its digits or words were on screen once
  *   already, so going back to it would otherwise be a second look. Same kind
  *   and difficulty, new items, still decided by the seed.
+ * - The clock left on the question being left is dropped (see `ClockLeft`).
  */
-export function goTo(run: Run, index: number): Run {
+export function goTo(current: Run, index: number): Run {
+	// Whatever is left on the clock was for the question being left.
+	const { clock: _left, ...run } = current;
 	const target = Math.max(0, Math.min(RUN_LENGTH, index));
 	if (target === run.questions.length && target < RUN_LENGTH) {
 		return {

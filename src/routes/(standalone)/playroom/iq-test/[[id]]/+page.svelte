@@ -32,9 +32,11 @@
 		rememberHypnoCategories,
 		rememberHypnoSource,
 		rememberSettings,
+		rememberTimersCleared,
 		roleChosen,
 		savedRun,
-		saveRun
+		saveRun,
+		timersCleared
 	} from '$lib/playroom/iq-test/device';
 	import {
 		fullscreenSupported,
@@ -59,6 +61,7 @@
 		type Run,
 		returnToSkipped,
 		skip,
+		withClockLeft,
 		withSettings
 	} from '$lib/playroom/iq-test/run';
 	import { percentileOf, type Score, scoreRun } from '$lib/playroom/iq-test/scoring';
@@ -134,6 +137,8 @@
 	let settings = $state<Settings>(opened ? settingsOf(opened.result) : DEFAULT_SETTINGS);
 	let stage = $state<Stage>(opened ? 'results' : 'intro');
 	let run = $state<Run | null>(null);
+	/** The "Clear timer" testing aid, as last left on this device; read on mount. */
+	let clearTimer = $state(false);
 	let phase = $state<Phase>('answer');
 	let outcome = $state<Outcome | null>(opened ? outcomeOf(opened.result) : null);
 
@@ -222,6 +227,7 @@
 			return stopWatching;
 		}
 		settings = rememberedSettings();
+		clearTimer = timersCleared();
 		resumable = savedRun();
 		// A reload mid-test goes straight back to the question it was on. Only
 		// when the dialog is not up: a new visit starts from the disclaimer,
@@ -648,6 +654,7 @@
 					{run}
 					{taunt}
 					answerButton={data.answerButton}
+					timersCleared={clearTimer}
 					enoughBanner={enoughBannerFor(settings)}
 					skippedNote={(count) => skippedNoteFor(settings, count)}
 					onanswer={(response) => run && update(answer(run, response))}
@@ -659,6 +666,11 @@
 					onfinish={finish}
 					onphase={(next) => {
 						phase = next;
+					}}
+					onclock={(clock) => run && update(withClockLeft(run, clock))}
+					ontimerscleared={(cleared) => {
+						clearTimer = cleared;
+						rememberTimersCleared(cleared);
 					}}
 				/>
 			{:else if stage === 'results' && outcome}

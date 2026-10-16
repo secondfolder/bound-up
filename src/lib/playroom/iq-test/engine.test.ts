@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defined } from '$lib/testing/defined';
 import { isCorrect } from '$lib/testing/iq-test';
 import { analyse, classify, comparisonFor, simplicityFor } from './analysis';
 import { brandFor, flashTauntsFor, introFor, tauntsFor } from './copy';
@@ -29,6 +30,7 @@ import {
 	attemptedCount,
 	back,
 	canFinish,
+	clockLeftFor,
 	createRun,
 	difficultyFor,
 	dismissEnough,
@@ -43,6 +45,7 @@ import {
 	returnToSkipped,
 	skip,
 	skippedCount,
+	withClockLeft,
 	withSettings
 } from './run';
 import { IQ_FLOORS, iqFromAccuracy, NORMS, percentileOf, type Score, scoreRun } from './scoring';
@@ -309,6 +312,33 @@ describe('run', () => {
 
 	it('remembers a dismissed banner on the run', () => {
 		expect(dismissEnough(createRun(sub, 1)).enoughDismissed).toBe(true);
+	});
+
+	it('keeps what is left on the clock for the question on screen, and drops it on any move', () => {
+		const run = createRun(sub, 1);
+		const { id } = defined(run.questions[0], 'the first question');
+		const timed = withClockLeft(run, { id, timed: 3 });
+		expect(clockLeftFor(timed, id)).toEqual({ timed: 3 });
+		// Survives what does not move, such as putting the banner away.
+		expect(clockLeftFor(dismissEnough(timed), id)).toEqual({ timed: 3 });
+		expect(clockLeftFor(timed, 'q2')).toBeNull();
+		// Back and forward again starts the clock afresh, as it always has.
+		const moved = back(skip(timed));
+		expect(moved.index).toBe(0);
+		expect(clockLeftFor(moved, id)).toBeNull();
+		expect(clockLeftFor(answer(timed, 'x'), id)).toBeNull();
+	});
+
+	it('drops a stored clock that is not whole seconds', () => {
+		const run = createRun(sub, 1);
+		const { id } = defined(run.questions[0], 'the first question');
+		const odd = { ...run, clock: { id, timed: -1, limit: 'soon' } } as unknown as Run;
+		expect(clockLeftFor(odd, id)).toEqual({});
+		const memorising = withClockLeft(run, { id, phase: 'memorise', memorise: 4, at: 2 });
+		expect(clockLeftFor(memorising, id)).toEqual({ phase: 'memorise', memorise: 4, at: 2 });
+		const unknown = { ...run, clock: { id, phase: 'napping' } } as unknown as Run;
+		expect(clockLeftFor(unknown, id)).toEqual({});
+		expect(clockLeftFor(withClockLeft(run, { id, limit: 0 }), id)).toEqual({ limit: 0 });
 	});
 });
 

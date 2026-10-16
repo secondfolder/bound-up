@@ -36,8 +36,11 @@ const copy = {
 	skippedNote: (count: number) => `You skipped ${count}.`
 };
 
-async function renderView(run: Run, extra: { answerButton?: boolean } = {}) {
-	const on = handlers();
+async function renderView(
+	run: Run,
+	extra: { answerButton?: boolean; timersCleared?: boolean } = {}
+) {
+	const on = { ...handlers(), ontimerscleared: vi.fn(), onclock: vi.fn() };
 	const view = render(QuestionView, { run, ...copy, ...extra, ...on });
 	await waSettled(view.container);
 	return { ...view, ...on };
@@ -205,9 +208,39 @@ describe('QuestionView', () => {
 
 	it('offers none of the testing buttons without the feature', async () => {
 		const { container } = await renderView(createRun(DEFAULT_SETTINGS, 1));
-		for (const name of ['Correct answer', 'Incorrect answer', 'Skip question']) {
+		for (const name of ['Correct answer', 'Incorrect answer', 'Skip question', 'Clear timer']) {
 			expect(container).not.toHaveTextContent(name);
 		}
+	});
+
+	it('offers "Clear timer" beside them, which takes the clock off the question', async () => {
+		const sub = { ...DEFAULT_SETTINGS, role: 'sub' as const };
+		const seed = Array.from({ length: 500 }, (_, i) => i).find((candidate) => {
+			const [first] = createRun(sub, candidate).questions;
+			return first?.limit !== undefined;
+		});
+		const run = createRun(sub, defined(seed, 'a seed dealing a question with a limit'));
+		const timed = await renderView(run, { answerButton: true });
+		expect(timed.container.querySelector('[data-testid="countdown"]')).not.toBeNull();
+		const toggle = defined(
+			timed.container.querySelector<HTMLElement & { checked: boolean }>(
+				'.answer-buttons wa-switch'
+			),
+			'the switch'
+		);
+		expect(toggle).toHaveTextContent('Clear timer');
+		toggle.checked = true;
+		toggle.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(timed.ontimerscleared).toHaveBeenCalledWith(true);
+		timed.unmount();
+
+		const cleared = await renderView(run, { answerButton: true, timersCleared: true });
+		expect(cleared.container.querySelector('[data-testid="countdown"]')).toBeNull();
+		cleared.unmount();
+
+		// Left on, it does nothing once the feature has gone.
+		const without = await renderView(run, { timersCleared: true });
+		expect(without.container.querySelector('[data-testid="countdown"]')).not.toBeNull();
 	});
 
 	it('keeps "Correct answer" above the banner, so it does not move when the banner appears', async () => {
