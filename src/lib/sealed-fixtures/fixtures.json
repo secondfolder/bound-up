@@ -1,0 +1,57 @@
+{
+	"vaultId": "00000000-0000-4000-8000-00000000f1ed",
+	"fixtures": [
+		{
+			"kind": "message",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000a1",
+			"ciphertext": "sb1.2rPyGnNIMOZQscKtx-NSWn9a7YwC2kR7-LSFurZBF4s6lyCznvbnuyAhjvPvogWR47JJADI0sZce_BWcqIWrrMiYCpl1d8RmlIsDOmuNjT6Jec7hEa5JHuzwNFzBCO35Dkqp_XtFWt4mkkAtp7V-ej-an9p3LyWNqDcsNJCRULnpzElFl9raqfpeXNwOsU7v7pu7eIZ2uvfFrydanNChWWX5zDKbQJW7d4UPYA5RHhiw_6gwo3AH9YWzT0Ck_kGRxp3yNhNO-_s1s35SutOc99-q9hcqvpphyVPvRhYMEf_potT1bHzYLrWGcrWv3nBU0nXRCLN0cnZic37HCXBMmMne74P66lx1uwnvrUnF1I4ClJiwtyayixcWIn6TolK2NZhqL8_tXYrV_daWOWbgGy_GceVDrQI",
+			"expected": {
+				"text": "{\"root\":{\"type\":\"root\",\"children\":[{\"type\":\"paragraph\",\"children\":[{\"type\":\"text\",\"text\":\"frozen\",\"format\":0}]}]}}",
+				"attachments": [
+					{
+						"id": "att-1",
+						"key": "AGE-SECRET-KEY-1FROZENFROZENFROZEN",
+						"kind": "image",
+						"mimeType": "image/jpeg",
+						"fileName": "cat.jpg"
+					}
+				]
+			}
+		},
+		{
+			"kind": "message-metadata",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000a1",
+			"ciphertext": "sb1.w7FvtGpVt368l-fow0kJjncjzHvKu2FzLg2W4hmp66lX-g8g8Ki1i2aawLOl2NomKxJHsJuUWqoLPKCAi35YISJDnUL2kkt3JqQujTAE-Z59gE98twwNvLLVxYNJBSDqomd3V6xPdM2YxVbBRu7467SDSYQmGg5PXQ4qEThtuXNcZL3EBnu0S8OB-8OfzqUddGuT5gF0YVNOECJqEWheWdJW-6NFI4vGbM_B206tSTLL-nO_yhQkNppROtFu25x0HtWf1glxqT5aLq7CHAUQxP129GUcXPNU2IrKjKFgesmlXbA8Jg6WqwNLE_1TA1Ibk7cGfmbkZ1aUr4vyGCqdbf-ZKHn6uqkuo-PLL5ylZIHiQmPNGHywPEQN4Qk_pJVqe8v2xvKhOCXZuOd-WC0i2AOyYfMFj61eeQ32MwAIacg",
+			"expected": {
+				"embeds": [
+					{
+						"href": "https://example.com/",
+						"fetchedAt": 1760000000000,
+						"kind": "card",
+						"providerName": "Example",
+						"title": "A page",
+						"description": null,
+						"thumbnailUrl": null,
+						"canonicalUrl": "https://example.com/",
+						"imageUrl": null,
+						"iframeSrc": null,
+						"iframeHeight": null,
+						"faviconUrl": null,
+						"themeColor": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "message-reaction",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000a2",
+			"ciphertext": "sb1.OKMdvza7FJUSUwlks-M_PddJpf9EfhDdeZ5W7rq5YeUJaSLfqyRxMc5Wpi8",
+			"expected": {
+				"emoji": "🔥"
+			}
+		}
+	]
+}

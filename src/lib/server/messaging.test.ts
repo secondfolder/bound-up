@@ -21,7 +21,9 @@ import {
 	createTestRestoreRequest,
 	createTestThread,
 	createTestUser,
-	markMessageBodyLegacy,
+	ensureTestPartnershipVault,
+	fakeSealed,
+	makeMessageLegacy,
 	readAttachmentRows,
 	readMessageRows,
 	readThreadReadRows,
@@ -29,29 +31,37 @@ import {
 	type TestUser
 } from '../testing/fixtures';
 import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '../testing/media';
-import { accountRecoveryRequests, messageAttachments } from './db/schema';
+import {
+	accountRecoveryRequests,
+	messageAttachments,
+	messageReactions,
+	messages,
+	vaultWraps
+} from './db/schema';
 import { grantFeature } from './features';
 import { attachmentKey, partnershipMediaPrefix } from './media';
 import {
-	applyHistoryRestore,
 	clearReaction,
 	declineHistoryRestore,
 	getAttachmentForDownload,
 	getPartnerMessagesWidget,
 	getThread,
 	isThreadUnread,
+	type LegacyMessagePage,
 	listBoard,
 	listHelpRequests,
-	listHistoryForRestore,
+	listLegacyMessages,
 	listRestoreRequests,
 	listUnreadCounts,
 	markThreadOpened,
-	migrateMessageBodies,
 	purgePartnershipMedia,
 	requireMembership,
 	requireMessageMembership,
 	requireThreadMembership,
+	restoreVaultAccess,
+	sealLegacyMessages,
 	sendMessage,
+	setMessageMetadataCiphertext,
 	setReaction,
 	startThread
 } from './messaging';
@@ -73,6 +83,23 @@ let store: TestMediaStore;
 let ada: TestUser;
 let jun: TestUser;
 let partnershipId: string;
+let vaultId: string;
+
+/** The sealed half of a send: the server checks its shape and vault, never its content. */
+const sealed = (label = 'body') => ({
+	messageId: crypto.randomUUID(),
+	vaultId,
+	ciphertext: fakeSealed(label),
+	payloadVersion: 1
+});
+
+/** A sealed reaction, with the fresh id each write carries. */
+const reaction = (label: string) => ({
+	id: crypto.randomUUID(),
+	vaultId,
+	ciphertext: `sb1.${label}`,
+	payloadVersion: 1
+});
 
 const at = (ms: number) => new Date(ms);
 const partnerView = (id: string) => ({ id, name: 'Jun', image: null });
@@ -83,6 +110,7 @@ beforeEach(async () => {
 	ada = await createTestUser(harness.db, { name: 'Ada' });
 	jun = await createTestUser(harness.db, { name: 'Jun' });
 	partnershipId = (await createTestPartnership(harness.db, ada, jun)).id;
+	vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
 });
 
 afterEach(() => harness.close());
@@ -144,7 +172,7 @@ describe('startThread', () => {
 				partnershipId,
 				senderId: ada.id,
 				icon: 'bottle-droplet',
-				ciphertext: 'Y2lwaGVy',
+				...sealed(),
 				attachments: []
 			},
 			at(5000)
@@ -185,7 +213,7 @@ describe('startThread', () => {
 			partnershipId,
 			senderId: stranger.id,
 			icon: 'envelope',
-			ciphertext: 'eA',
+			...sealed(),
 			attachments: [outgoingAttachment(new Uint8Array([1, 2, 3]))]
 		});
 
@@ -203,7 +231,7 @@ describe('startThread', () => {
 				partnershipId: invite.id,
 				senderId: ada.id,
 				icon: 'envelope',
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: []
 			})
 		).resolves.toEqual({ ok: false, reason: 'not-a-member' });
@@ -217,25 +245,83 @@ describe('startThread', () => {
 				senderId: ada.id,
 				// Bypassing the type, exactly as a crafted request would.
 				icon: 'a message the server can read' as never,
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: []
 			})
 		).resolves.toEqual({ ok: false, reason: 'bad-icon' });
 		expect(await readThreadReadRows(harness.db, 'any')).toEqual([]);
 	});
 
-	it('refuses an empty or oversized body', async () => {
-		for (const ciphertext of ['', 'x'.repeat(MAX_CIPHERTEXT_BYTES + 1)]) {
+	it('refuses an oversized body', async () => {
+		await expect(
+			startThread(harness.db, store, {
+				partnershipId,
+				senderId: ada.id,
+				icon: 'envelope',
+				...sealed(),
+				ciphertext: `sb1.${'x'.repeat(MAX_CIPHERTEXT_BYTES)}`,
+				attachments: []
+			})
+		).resolves.toEqual({ ok: false, reason: 'body-too-large' });
+	});
+
+	/**
+	 * The server cannot read a body, but it can refuse anything that is not a
+	 * sealed record this build knows how to read — a plaintext body posted by
+	 * mistake, a version nothing can open.
+	 */
+	it('refuses a body that is not a sealed record it can read', async () => {
+		for (const bad of [
+			{ ciphertext: '' },
+			{ ciphertext: 'YWdlIGJvZHk=' },
+			{ ciphertext: 'sb1.has spaces in it' },
+			{ payloadVersion: 99 }
+		]) {
 			await expect(
 				startThread(harness.db, store, {
 					partnershipId,
 					senderId: ada.id,
 					icon: 'envelope',
-					ciphertext,
+					...sealed(),
+					...bad,
 					attachments: []
 				})
-			).resolves.toEqual({ ok: false, reason: 'body-too-large' });
+			).resolves.toEqual({ ok: false, reason: 'bad-body' });
 		}
+	});
+
+	/** A body sealed to any other vault is one neither partner could open. */
+	it('refuses a body sealed to a vault that is not the partnership’s', async () => {
+		await expect(
+			startThread(harness.db, store, {
+				partnershipId,
+				senderId: ada.id,
+				icon: 'envelope',
+				...sealed(),
+				vaultId: crypto.randomUUID(),
+				attachments: []
+			})
+		).resolves.toEqual({ ok: false, reason: 'wrong-vault' });
+	});
+
+	it('refuses a message id that is already taken', async () => {
+		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, ada);
+		await expect(
+			sendMessage(harness.db, store, {
+				partnershipId,
+				threadId,
+				senderId: jun.id,
+				...sealed(),
+				messageId,
+				attachments: []
+			})
+		).resolves.toEqual({ ok: false, reason: 'duplicate-message' });
+	});
+
+	it('stores the vault and version beside the body', async () => {
+		const { messageId, threadId } = await createTestThread(harness.db, partnershipId, ada);
+		const [row] = await readMessageRows(harness.db, threadId);
+		expect(row).toMatchObject({ id: messageId, vaultId, payloadVersion: 1 });
 	});
 
 	it('refuses more bytes than a message may carry, without writing an object', async () => {
@@ -243,7 +329,7 @@ describe('startThread', () => {
 			partnershipId,
 			senderId: ada.id,
 			icon: 'envelope',
-			ciphertext: 'eA',
+			...sealed(),
 			attachments: [
 				{ ...outgoingAttachment(new Uint8Array(1)), byteSize: MAX_ATTACHMENT_TOTAL_BYTES },
 				outgoingAttachment(new Uint8Array(1))
@@ -259,7 +345,7 @@ describe('startThread', () => {
 			partnershipId,
 			senderId: ada.id,
 			icon: 'envelope',
-			ciphertext: 'eA',
+			...sealed(),
 			attachments: [outgoingAttachment(bytes)]
 		});
 		if (!result.ok) {
@@ -288,7 +374,7 @@ describe('startThread', () => {
 				partnershipId,
 				senderId: ada.id,
 				icon: 'envelope',
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: [outgoingAttachment(new Uint8Array([1]))]
 			})
 		).rejects.toThrow(/simulated/);
@@ -323,7 +409,7 @@ describe('sendMessage', () => {
 				partnershipId,
 				threadId: 'nope',
 				senderId: ada.id,
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: []
 			})
 		).resolves.toEqual({ ok: false, reason: 'no-such-thread' });
@@ -333,7 +419,7 @@ describe('sendMessage', () => {
 				partnershipId,
 				threadId,
 				senderId: stranger.id,
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: []
 			})
 		).resolves.toEqual({ ok: false, reason: 'not-a-member' });
@@ -396,15 +482,15 @@ describe('listBoard', () => {
 		expect(board.map((t) => t.id)).toEqual([threadId]);
 		expect(board[0].lastFullyReadAt).toBeNull();
 		expect(board[0].unread).toBe(true);
-		expect(board[0].previewCiphertext).toBeTruthy();
+		expect(board[0].preview.ciphertext).toBeTruthy();
 	});
 
 	it('carries the first message metadata sidecar on the board row', async () => {
 		await createTestThread(harness.db, partnershipId, jun, {
-			metadataCiphertext: 'bWV0YWRhdGE'
+			metadataCiphertext: 'sb1.bWV0YWRhdGE'
 		});
 		const [thread] = await listBoard(harness.db, partnershipId, ada.id);
-		expect(thread.previewMetadataCiphertext).toBe('bWV0YWRhdGE');
+		expect(thread.preview.metadataCiphertext).toBe('sb1.bWV0YWRhdGE');
 	});
 
 	it('does not reshuffle a read thread when it is reopened without new messages', async () => {
@@ -519,19 +605,22 @@ describe('markThreadOpened', () => {
 describe('getThread', () => {
 	it('resolves `mine` from each side and orders oldest first', async () => {
 		const { threadId } = await createTestThread(harness.db, partnershipId, ada, {
-			ciphertext: 'Zmlyc3Q',
-			metadataCiphertext: 'bWV0YTE',
+			ciphertext: 'sb1.Zmlyc3Q',
+			metadataCiphertext: 'sb1.bWV0YTE',
 			at: at(1000)
 		});
 		await createTestMessage(harness.db, partnershipId, threadId, jun, {
-			ciphertext: 'c2Vjb25k',
-			metadataCiphertext: 'bWV0YTI',
+			ciphertext: 'sb1.c2Vjb25k',
+			metadataCiphertext: 'sb1.bWV0YTI',
 			at: at(2000)
 		});
 
 		const forAda = await getThread(harness.db, threadId, 'envelope', ada.id);
-		expect(forAda.messages.map((m) => m.ciphertext)).toEqual(['Zmlyc3Q', 'c2Vjb25k']);
-		expect(forAda.messages.map((m) => m.metadataCiphertext)).toEqual(['bWV0YTE', 'bWV0YTI']);
+		expect(forAda.messages.map((m) => m.ciphertext)).toEqual(['sb1.Zmlyc3Q', 'sb1.c2Vjb25k']);
+		expect(forAda.messages.map((m) => m.metadataCiphertext)).toEqual([
+			'sb1.bWV0YTE',
+			'sb1.bWV0YTI'
+		]);
 		expect(forAda.messages.map((m) => m.mine)).toEqual([true, false]);
 
 		const forJun = await getThread(harness.db, threadId, 'envelope', jun.id);
@@ -548,7 +637,7 @@ describe('getThread', () => {
 			partnershipId,
 			messageId: reply.messageId,
 			viewerId: ada.id,
-			ciphertext: 'ZW1vamk'
+			...reaction('ZW1vamk')
 		});
 
 		const thread = await getThread(harness.db, threadId, 'envelope', ada.id);
@@ -556,10 +645,12 @@ describe('getThread', () => {
 		expect(thread.messages[0].attachments).toHaveLength(1);
 		expect(thread.messages[0].attachments[0].byteSize).toBe(3);
 		expect(thread.messages[0].reactions).toEqual([]);
-		expect(thread.messages[1].reactions).toEqual([{ mine: true, ciphertext: 'ZW1vamk' }]);
+		expect(thread.messages[1].reactions).toMatchObject([{ mine: true, ciphertext: 'sb1.ZW1vamk' }]);
 		// The same reaction is "theirs" from the other side.
 		const forJun = await getThread(harness.db, threadId, 'envelope', jun.id);
-		expect(forJun.messages[1].reactions).toEqual([{ mine: false, ciphertext: 'ZW1vamk' }]);
+		expect(forJun.messages[1].reactions).toMatchObject([
+			{ mine: false, ciphertext: 'sb1.ZW1vamk' }
+		]);
 	});
 
 	it('is empty rather than failing for a thread with no messages', async () => {
@@ -617,7 +708,7 @@ describe('setReaction / clearReaction', () => {
 	it('refuses a reaction to your own message', async () => {
 		const { messageId } = await createTestThread(harness.db, partnershipId, ada);
 		await expect(
-			setReaction(harness.db, { partnershipId, messageId, viewerId: ada.id, ciphertext: 'ZQ' })
+			setReaction(harness.db, { partnershipId, messageId, viewerId: ada.id, ...reaction('ZQ') })
 		).resolves.toEqual({ ok: false, reason: 'own-message' });
 	});
 
@@ -629,17 +720,19 @@ describe('setReaction / clearReaction', () => {
 			partnershipId,
 			messageId: reply.messageId,
 			viewerId: ada.id,
-			ciphertext: 'Zmlyc3Q'
+			...reaction('Zmlyc3Q')
 		});
 		await setReaction(harness.db, {
 			partnershipId,
 			messageId: reply.messageId,
 			viewerId: ada.id,
-			ciphertext: 'c2Vjb25k'
+			...reaction('c2Vjb25k')
 		});
 
 		const thread = await getThread(harness.db, threadId, 'envelope', ada.id);
-		expect(thread.messages[1].reactions).toEqual([{ mine: true, ciphertext: 'c2Vjb25k' }]);
+		expect(thread.messages[1].reactions).toMatchObject([
+			{ mine: true, ciphertext: 'sb1.c2Vjb25k' }
+		]);
 	});
 
 	it('refuses a reaction from outside the partnership', async () => {
@@ -650,7 +743,7 @@ describe('setReaction / clearReaction', () => {
 				partnershipId,
 				messageId,
 				viewerId: stranger.id,
-				ciphertext: 'ZQ'
+				...reaction('ZQ')
 			})
 		).resolves.toEqual({ ok: false, reason: 'not-a-member' });
 	});
@@ -662,7 +755,7 @@ describe('setReaction / clearReaction', () => {
 			partnershipId,
 			messageId: reply.messageId,
 			viewerId: ada.id,
-			ciphertext: 'ZQ'
+			...reaction('ZQ')
 		});
 
 		// `threadId` comes back so the endpoint can publish a realtime event
@@ -729,7 +822,7 @@ describe('getAttachmentForDownload', () => {
 			partnershipId,
 			senderId: ada.id,
 			icon: 'envelope',
-			ciphertext: 'eA',
+			...sealed(),
 			attachments: [outgoingAttachment(new Uint8Array([4, 5]))]
 		});
 		if (!result.ok) {
@@ -754,7 +847,7 @@ describe('getAttachmentForDownload', () => {
 			partnershipId,
 			senderId: ada.id,
 			icon: 'envelope',
-			ciphertext: 'eA',
+			...sealed(),
 			attachments: [outgoingAttachment(new Uint8Array([4]))]
 		});
 		if (!result.ok) {
@@ -784,7 +877,7 @@ describe('self-destructing media', () => {
 				partnershipId,
 				senderId: ada.id,
 				icon: 'envelope',
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: files
 			},
 			sentAt
@@ -815,7 +908,7 @@ describe('self-destructing media', () => {
 				partnershipId,
 				threadId: thread.threadId,
 				senderId: ada.id,
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: [outgoingAttachment(new Uint8Array([3]), MEDIA_TTL_MIN_MS)]
 			},
 			sentAt
@@ -995,7 +1088,7 @@ describe('the higher quality uploads byte budget', () => {
 			partnershipId,
 			senderId: ada.id,
 			icon: 'envelope',
-			ciphertext: 'eA',
+			...sealed(),
 			attachments
 		});
 	}
@@ -1016,7 +1109,7 @@ describe('the higher quality uploads byte budget', () => {
 				partnershipId,
 				threadId: thread.threadId,
 				senderId: ada.id,
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: filesOf(MAX_LOW_QUALITY_TOTAL_BYTES + 1)
 			})
 		).resolves.toEqual({ ok: false, reason: 'needs-high-quality-media' });
@@ -1076,7 +1169,14 @@ describe('listBoard: unseen self-destructing media', () => {
 			? await sendMessage(
 					harness.db,
 					store,
-					{ partnershipId, threadId, senderId: sender.id, ciphertext, attachments },
+					{
+						partnershipId,
+						threadId,
+						senderId: sender.id,
+						...sealed(),
+						ciphertext: `sb1.${ciphertext}`,
+						attachments
+					},
 					when
 				)
 			: await startThread(
@@ -1086,7 +1186,8 @@ describe('listBoard: unseen self-destructing media', () => {
 						partnershipId,
 						senderId: sender.id,
 						icon: 'envelope',
-						ciphertext,
+						...sealed(),
+						ciphertext: `sb1.${ciphertext}`,
 						attachments
 					},
 					when
@@ -1109,8 +1210,8 @@ describe('listBoard: unseen self-destructing media', () => {
 		const tile = await boardFor(jun, at(t0.getTime() + 2000));
 		expect(tile.unseenMedia?.expiresAt).toEqual(at(t0.getTime() + 1000 + Hour));
 		expect(tile.unseenMedia?.messages.map((message) => message.ciphertext)).toEqual([
-			'body-2',
-			'body-1'
+			'sb1.body-2',
+			'sb1.body-1'
 		]);
 		expect(tile.unseenMedia?.messages.map((message) => message.attachmentIds.length)).toEqual([
 			1, 2
@@ -1130,7 +1231,7 @@ describe('listBoard: unseen self-destructing media', () => {
 
 		await sendFrom(ada, first.threadId, 2 * Hour, 'new', 1, at(t0.getTime() + 2000));
 		const tile = await boardFor(jun, at(t0.getTime() + 3000));
-		expect(tile.unseenMedia?.messages.map((message) => message.ciphertext)).toEqual(['new']);
+		expect(tile.unseenMedia?.messages.map((message) => message.ciphertext)).toEqual(['sb1.new']);
 	});
 
 	it('leaves out media that has expired or never will', async () => {
@@ -1166,7 +1267,8 @@ describe('purgePartnershipMedia', () => {
 				partnershipId: id,
 				senderId: ada.id,
 				icon: 'envelope',
-				ciphertext: 'eA',
+				...sealed(),
+				vaultId: await ensureTestPartnershipVault(harness.db, id),
 				attachments: [outgoingAttachment(new Uint8Array([1]))]
 			});
 		}
@@ -1194,7 +1296,7 @@ describe('purgePartnershipMedia', () => {
 				partnershipId,
 				senderId: ada.id,
 				icon: 'envelope',
-				ciphertext: 'eA',
+				...sealed(),
 				attachments: [outgoingAttachment(new Uint8Array([1]), mediaTtl)]
 			});
 		}
@@ -1242,17 +1344,17 @@ describe('purgePartnershipMedia', () => {
 });
 
 describe('history restore', () => {
-	it('lets the partner re-encrypt bodies and closes the request', async () => {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun, {
-			ciphertext: 'b2xk'
-		});
+	const Wrap = 'bmV3IHdyYXA=';
 
+	it('wraps the vault for the requester’s new key, beside the old wrap, and closes the request', async () => {
+		await harness.db
+			.insert(vaultWraps)
+			.values({ vaultId, userId: ada.id, ciphertext: 'b2xk', forRecipient: 'age1oldkey' });
 		const request = await requestHistoryRestore(harness.db, {
 			partnershipId,
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-		expect(request).toMatchObject({ ok: true });
 
 		// Ada sees her own request; Jun sees it as someone else's to act on.
 		await expect(listRestoreRequests(harness.db, partnershipId, ada.id)).resolves.toMatchObject([
@@ -1263,62 +1365,64 @@ describe('history restore', () => {
 		]);
 
 		await expect(
-			applyHistoryRestore(harness.db, {
+			restoreVaultAccess(harness.db, {
 				partnershipId,
 				requestId: request.id,
 				actorId: jun.id,
-				messages: [{ id: messageId, ciphertext: 'bmV3' }],
-				final: true
+				vaultWrap: Wrap
 			})
-		).resolves.toEqual({ ok: true, updated: 1 });
+		).resolves.toEqual({ ok: true });
 
-		const rows = await readMessageRows(harness.db, threadId);
-		expect(rows[0].ciphertext).toBe('bmV3');
+		// The old wrap stays until the sign-in completes: it may yet be declined.
+		const wraps = await harness.db
+			.select({ forRecipient: vaultWraps.forRecipient, ciphertext: vaultWraps.ciphertext })
+			.from(vaultWraps)
+			.where(eq(vaultWraps.userId, ada.id));
+		expect(wraps.sort((x, y) => x.forRecipient.localeCompare(y.forRecipient))).toEqual([
+			{ forRecipient: 'age1newkey', ciphertext: Wrap },
+			{ forRecipient: 'age1oldkey', ciphertext: 'b2xk' }
+		]);
 		await expect(listRestoreRequests(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+		await expect(readRecovery(request.recoveryRequestId)).resolves.toMatchObject({
+			status: 'approved',
+			approvedBy: jun.id
+		});
 	});
 
-	// The person who lost their key cannot re-encrypt anything — they cannot
-	// read it. Accepting their upload would let a stolen session rewrite history.
+	// The person who lost their key cannot open the vault, so cannot wrap it —
+	// and accepting a wrap from them would let a stolen session plant one.
 	it('refuses the requester acting on their own request', async () => {
-		const { messageId } = await createTestThread(harness.db, partnershipId, jun);
 		const request = await requestHistoryRestore(harness.db, {
 			partnershipId,
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-
 		await expect(
-			applyHistoryRestore(harness.db, {
+			restoreVaultAccess(harness.db, {
 				partnershipId,
 				requestId: request.id,
 				actorId: ada.id,
-				messages: [{ id: messageId, ciphertext: 'bmV3' }],
-				final: true
+				vaultWrap: Wrap
 			})
 		).resolves.toEqual({ ok: false, reason: 'no-such-request' });
 	});
 
-	it('cannot be used to rewrite another partnership’s messages', async () => {
+	it('refuses a partnership with no vault yet', async () => {
 		const cas = await createTestUser(harness.db, { name: 'Cas' });
 		const other = await createTestPartnership(harness.db, ada, cas);
-		const elsewhere = await createTestThread(harness.db, other.id, cas, { ciphertext: 'c2FmZQ' });
-
 		const request = await requestHistoryRestore(harness.db, {
-			partnershipId,
+			partnershipId: other.id,
 			requesterId: ada.id,
 			recipient: 'age1newkey'
 		});
-
-		await applyHistoryRestore(harness.db, {
-			partnershipId,
-			requestId: request.id,
-			actorId: jun.id,
-			messages: [{ id: elsewhere.messageId, ciphertext: 'dGFtcGVyZWQ' }],
-			final: true
-		});
-
-		const rows = await readMessageRows(harness.db, elsewhere.threadId);
-		expect(rows[0].ciphertext).toBe('c2FmZQ');
+		await expect(
+			restoreVaultAccess(harness.db, {
+				partnershipId: other.id,
+				requestId: request.id,
+				actorId: cas.id,
+				vaultWrap: Wrap
+			})
+		).resolves.toEqual({ ok: false, reason: 'no-vault' });
 	});
 
 	it('lets the partner decline, and only the partner', async () => {
@@ -1346,49 +1450,10 @@ describe('history restore', () => {
 	});
 
 	/**
-	 * Finishing the re-encryption is what lets the requester back in. Only the
-	 * final page does it, and only while the sign-in is still open.
-	 */
-	it('approves the sign-in when the partner finishes, not before', async () => {
-		const { messageId } = await createTestThread(harness.db, partnershipId, jun);
-		const request = await requestHistoryRestore(harness.db, {
-			partnershipId,
-			requesterId: ada.id,
-			recipient: 'age1newkey'
-		});
-
-		await applyHistoryRestore(harness.db, {
-			partnershipId,
-			requestId: request.id,
-			actorId: jun.id,
-			messages: [{ id: messageId, ciphertext: 'bmV3' }],
-			final: false
-		});
-		await expect(readRecovery(request.recoveryRequestId)).resolves.toMatchObject({
-			status: 'pending',
-			approvedBy: null
-		});
-
-		await applyHistoryRestore(harness.db, {
-			partnershipId,
-			requestId: request.id,
-			actorId: jun.id,
-			messages: [],
-			final: true
-		});
-		await expect(readRecovery(request.recoveryRequestId)).resolves.toMatchObject({
-			status: 'approved',
-			approvedBy: jun.id
-		});
-	});
-
-	/**
 	 * A sign-in that expired or was superseded must take its restore request
-	 * with it — nobody should re-encrypt a whole history to a key that will
-	 * never be used.
+	 * with it — nobody should hand a vault to a key that will never be used.
 	 */
 	it('hides and refuses a request whose sign-in has expired', async () => {
-		const { messageId } = await createTestThread(harness.db, partnershipId, jun);
 		const request = await requestHistoryRestore(harness.db, {
 			partnershipId,
 			requesterId: ada.id,
@@ -1398,19 +1463,19 @@ describe('history restore', () => {
 
 		await expect(listRestoreRequests(harness.db, partnershipId, jun.id)).resolves.toEqual([]);
 		await expect(
-			applyHistoryRestore(harness.db, {
+			restoreVaultAccess(harness.db, {
 				partnershipId,
 				requestId: request.id,
 				actorId: jun.id,
-				messages: [{ id: messageId, ciphertext: 'bmV3' }],
-				final: true
+				vaultWrap: Wrap
 			})
 		).resolves.toEqual({ ok: false, reason: 'no-such-request' });
+		expect(await harness.db.select().from(vaultWraps)).toEqual([]);
 	});
 
 	/**
 	 * Once one partner has approved the sign-in, the others still have their own
-	 * histories to bring back — and the copy says the requester is back in.
+	 * vaults to share — and the copy says the requester is back in.
 	 */
 	it('says when another partner already approved the sign-in', async () => {
 		const request = await requestHistoryRestore(harness.db, {
@@ -1491,348 +1556,195 @@ async function readRecovery(id: string) {
 	return row;
 }
 
-describe('listHistoryForRestore', () => {
-	/** Raises a request from Ada and returns its id, for the tests below. */
-	async function openRequest() {
-		const request = await requestHistoryRestore(harness.db, {
-			partnershipId,
-			requesterId: ada.id,
-			recipient: 'age1newkey'
+describe('moving messages into the vault', () => {
+	/** A thread with one message in the original scheme, and a reaction on a reply. */
+	async function legacyThread() {
+		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun);
+		await makeMessageLegacy(harness.db, messageId, { metadataCiphertext: 'bWV0YQ==' });
+		const reply = await createTestMessage(harness.db, partnershipId, threadId, ada);
+		await harness.db.insert(messageReactions).values({
+			messageId: reply.messageId,
+			userId: jun.id,
+			ciphertext: 'YWdlIHJlYWN0aW9u'
 		});
-		return request.id;
+		return { threadId, messageId };
 	}
 
-	it('hands the partner every body and the reactions on them', async () => {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun, {
-			ciphertext: 'Zmlyc3Q=',
-			metadataCiphertext: 'bWV0YQ=='
-		});
-		const second = await createTestMessage(harness.db, partnershipId, threadId, ada, {
-			ciphertext: 'c2Vjb25k'
-		});
-		// Jun's message, so Ada is allowed to react to it.
-		await setReaction(harness.db, {
-			partnershipId,
-			messageId,
-			viewerId: ada.id,
-			ciphertext: 'cmVhY3Q='
-		});
-
-		const requestId = await openRequest();
-		const page = await listHistoryForRestore(harness.db, {
-			partnershipId,
-			requestId,
-			actorId: jun.id
-		});
-
-		expect(page?.messages.map((row) => row.id)).toEqual([messageId, second.messageId]);
-		expect(page?.messages[0]?.metadataCiphertext).toBe('bWV0YQ==');
-		expect(page?.reactions).toEqual([{ id: expect.any(String), ciphertext: 'cmVhY3Q=' }]);
-		expect(page?.nextCursor).toBeNull();
-	});
-
-	/**
-	 * The gate is not "are you a member" but "are you the member who did not ask"
-	 * — this endpoint hands over the entire shared history, and the person who
-	 * lost their key cannot read any of it, so a request from them is either a
-	 * bug or a stolen session.
-	 */
-	it('refuses the requester reading their own request', async () => {
-		await createTestThread(harness.db, partnershipId, jun);
-		const requestId = await openRequest();
-
-		await expect(
-			listHistoryForRestore(harness.db, { partnershipId, requestId, actorId: ada.id })
-		).resolves.toBeNull();
+	it('hands either member the rows still in the original scheme, and nothing else', async () => {
+		const { messageId } = await legacyThread();
+		for (const member of [ada, jun]) {
+			const page = defined(
+				await listLegacyMessages(harness.db, { partnershipId, actorId: member.id }),
+				'page'
+			);
+			expect(page.messages).toEqual([
+				{ id: messageId, ciphertext: 'YWdlIGJvZHk=', metadataCiphertext: 'bWV0YQ==' }
+			]);
+			expect(page.reactions).toEqual([{ id: expect.any(String), ciphertext: 'YWdlIHJlYWN0aW9u' }]);
+			expect(page.next).toBeNull();
+		}
 	});
 
 	it('refuses a non-member', async () => {
 		const stranger = await createTestUser(harness.db);
-		const requestId = await openRequest();
-
 		await expect(
-			listHistoryForRestore(harness.db, { partnershipId, requestId, actorId: stranger.id })
+			listLegacyMessages(harness.db, { partnershipId, actorId: stranger.id })
 		).resolves.toBeNull();
 	});
 
-	it('refuses a request id belonging to another partnership', async () => {
-		const cas = await createTestUser(harness.db, { name: 'Cas' });
-		const other = await createTestPartnership(harness.db, ada, cas);
-		const elsewhere = await requestHistoryRestore(harness.db, {
-			partnershipId: other.id,
-			requesterId: ada.id,
-			recipient: 'age1elsewhere'
-		});
-
-		// Jun is a member of `partnershipId` but the request lives in `other`.
-		await expect(
-			listHistoryForRestore(harness.db, {
-				partnershipId,
-				requestId: elsewhere.id,
-				actorId: jun.id
-			})
-		).resolves.toBeNull();
-	});
-
-	it('never leaks another partnership’s messages into the page', async () => {
-		const cas = await createTestUser(harness.db, { name: 'Cas' });
-		const other = await createTestPartnership(harness.db, ada, cas);
-		await createTestThread(harness.db, other.id, cas, { ciphertext: 'ZWxzZXdoZXJl' });
-		const mine = await createTestThread(harness.db, partnershipId, jun, { ciphertext: 'bWluZQ==' });
-
-		const requestId = await openRequest();
-		const page = await listHistoryForRestore(harness.db, {
-			partnershipId,
-			requestId,
-			actorId: jun.id
-		});
-
-		expect(page?.messages).toEqual([
-			{ id: mine.messageId, ciphertext: 'bWluZQ==', metadataCiphertext: null }
-		]);
-	});
-
-	/**
-	 * The keyset cursor, over more rows than fit in one page.
-	 *
-	 * Asserted as "every message exactly once" rather than by checking the
-	 * boundary by hand, because the two ways a cursor breaks are skipping a row
-	 * and repeating one, and a set comparison catches both.
-	 */
-	it('pages through everything without skipping or repeating a row', async () => {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun);
-		const expected = [messageId];
-		for (let i = 0; i < RESTORE_PAGE_SIZE + 5; i += 1) {
-			const extra = await createTestMessage(harness.db, partnershipId, threadId, i % 2 ? ada : jun);
-			expected.push(extra.messageId);
-		}
-
-		const requestId = await openRequest();
-		const seen: string[] = [];
-		let cursor: string | null = null;
-		let pages = 0;
-		do {
-			const page = await listHistoryForRestore(harness.db, {
-				partnershipId,
-				requestId,
-				actorId: jun.id,
-				cursor
-			});
-			if (!page) {
-				throw new Error('page was refused');
-			}
-			seen.push(...page.messages.map((row) => row.id));
-			cursor = page.nextCursor;
-			pages += 1;
-		} while (cursor);
-
-		expect(pages).toBeGreaterThan(1);
-		expect(seen).toHaveLength(expected.length);
-		expect(new Set(seen)).toEqual(new Set(expected));
-	});
-
-	it('starts from the beginning when given a malformed cursor', async () => {
-		const { messageId } = await createTestThread(harness.db, partnershipId, jun);
-		const requestId = await openRequest();
-
-		for (const cursor of ['', 'nonsense', ':abc', '12x:abc']) {
-			const page = await listHistoryForRestore(harness.db, {
-				partnershipId,
-				requestId,
-				actorId: jun.id,
-				cursor
-			});
-			expect(page?.messages.map((row) => row.id)).toEqual([messageId]);
-		}
-	});
-});
-
-describe('applyHistoryRestore reactions', () => {
-	it('re-encrypts reactions alongside bodies', async () => {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun, {
-			metadataCiphertext: 'b2xkbWV0YQ=='
-		});
-		await setReaction(harness.db, {
-			partnershipId,
-			messageId,
-			viewerId: ada.id,
-			ciphertext: 'b2xkcmVhY3Q='
-		});
-
-		const request = await requestHistoryRestore(harness.db, {
-			partnershipId,
-			requesterId: ada.id,
-			recipient: 'age1newkey'
-		});
-
-		const page = await listHistoryForRestore(harness.db, {
-			partnershipId,
-			requestId: request.id,
-			actorId: jun.id
-		});
-		const reactionId = page?.reactions[0]?.id;
-		expect(reactionId).toBeDefined();
-
-		await expect(
-			applyHistoryRestore(harness.db, {
-				partnershipId,
-				requestId: request.id,
-				actorId: jun.id,
-				messages: [
-					{
-						id: messageId,
-						ciphertext: 'bmV3Ym9keQ==',
-						metadataCiphertext: 'bmV3bWV0YQ=='
-					}
-				],
-				reactions: [{ id: reactionId as string, ciphertext: 'bmV3cmVhY3Q=' }],
-				final: true
-			})
-		).resolves.toEqual({ ok: true, updated: 2 });
-
-		const thread = await getThread(harness.db, threadId, 'envelope', ada.id);
-		expect(thread.messages[0].ciphertext).toBe('bmV3Ym9keQ==');
-		expect(thread.messages[0].metadataCiphertext).toBe('bmV3bWV0YQ==');
-		expect(thread.messages[0].reactions[0].ciphertext).toBe('bmV3cmVhY3Q=');
-	});
-
-	it('cannot rewrite a reaction in another partnership', async () => {
+	it('never leaks another partnership’s rows', async () => {
 		const cas = await createTestUser(harness.db, { name: 'Cas' });
 		const other = await createTestPartnership(harness.db, ada, cas);
 		const elsewhere = await createTestThread(harness.db, other.id, cas);
-		await setReaction(harness.db, {
-			partnershipId: other.id,
-			messageId: elsewhere.messageId,
-			viewerId: ada.id,
-			ciphertext: 'c2FmZQ=='
-		});
-
-		const theirRequest = await requestHistoryRestore(harness.db, {
-			partnershipId: other.id,
-			requesterId: ada.id,
-			recipient: 'age1x'
-		});
-		const theirPage = await listHistoryForRestore(harness.db, {
-			partnershipId: other.id,
-			requestId: theirRequest.id,
-			actorId: cas.id
-		});
-		const reactionId = theirPage?.reactions[0]?.id as string;
-
-		// Jun raises nothing in `other`; he tries to reach that reaction through
-		// his own partnership's request.
-		const mine = await requestHistoryRestore(harness.db, {
-			partnershipId,
-			requesterId: ada.id,
-			recipient: 'age1newkey'
-		});
-
-		await applyHistoryRestore(harness.db, {
-			partnershipId,
-			requestId: mine.id,
-			actorId: jun.id,
-			messages: [],
-			reactions: [{ id: reactionId, ciphertext: 'dGFtcGVyZWQ=' }],
-			final: true
-		});
-
-		const thread = await getThread(harness.db, elsewhere.threadId, 'envelope', ada.id);
-		expect(thread.messages[0].reactions[0].ciphertext).toBe('c2FmZQ==');
-	});
-});
-
-/* ── LEGACY-RICHTEXT — delete with the legacy migration ──────────────────── */
-
-describe('migrateMessageBodies', () => {
-	/**
-	 * The `where` clause in `migrateMessageBodies` is the entire security model
-	 * for an endpoint that lets a client replace stored message bodies. These
-	 * assert each of its clauses, because none of them is visible in the route.
-	 */
-	it('converts the sender own legacy body and marks it migrated', async () => {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, ada, {
-			ciphertext: 'b2xk'
-		});
-		await markMessageBodyLegacy(harness.db, messageId);
-
-		await expect(
-			migrateMessageBodies(harness.db, {
-				partnershipId,
-				actorId: ada.id,
-				messages: [{ id: messageId, ciphertext: 'bmV3' }]
-			})
-		).resolves.toEqual({ ok: true, updated: 1 });
-
-		const [row] = await readMessageRows(harness.db, threadId);
-		expect(row.ciphertext).toBe('bmV3');
-		expect(row.bodyFormat).toBe('lexical');
+		await makeMessageLegacy(harness.db, elsewhere.messageId);
+		const page = await listLegacyMessages(harness.db, { partnershipId, actorId: ada.id });
+		expect(page?.messages).toEqual([]);
 	});
 
-	it('refuses to rewrite a message somebody else sent', async () => {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, jun, {
-			ciphertext: 'b2xk'
-		});
-		await markMessageBodyLegacy(harness.db, messageId);
+	it('pages through everything without skipping or repeating a row', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, jun);
+		const ids: string[] = [];
+		for (let i = 0; i < RESTORE_PAGE_SIZE + 5; i += 1) {
+			const { messageId } = await createTestMessage(harness.db, partnershipId, threadId, jun);
+			await makeMessageLegacy(harness.db, messageId);
+			ids.push(messageId);
+		}
+		const seen: string[] = [];
+		let after: string | null = null;
+		for (;;) {
+			const page: LegacyMessagePage = defined(
+				await listLegacyMessages(harness.db, {
+					partnershipId,
+					actorId: ada.id,
+					messagesAfter: after
+				}),
+				'page'
+			);
+			seen.push(...page.messages.map((message) => message.id));
+			if (!page.next?.messagesAfter) {
+				break;
+			}
+			after = page.next.messagesAfter;
+		}
+		const byId = (a: string, b: string) => a.localeCompare(b);
+		expect(seen.sort(byId)).toEqual(ids.sort(byId));
+	});
 
-		// Ada is a member and can read this message, so only the sender check
-		// stops her rewriting Jun's words.
-		await migrateMessageBodies(harness.db, {
+	it('seals rows into the vault once, from either member, and marks them rich text', async () => {
+		const { messageId, threadId } = await legacyThread();
+		await makeMessageLegacy(harness.db, messageId, { plain: true });
+		const [legacyReaction] = await harness.db.select().from(messageReactions);
+
+		const sealing = {
 			partnershipId,
 			actorId: ada.id,
-			messages: [{ id: messageId, ciphertext: 'bmV3' }]
-		});
+			vaultId,
+			messages: [
+				{
+					id: messageId,
+					ciphertext: 'sb1.c2VhbGVk',
+					payloadVersion: 1,
+					metadataCiphertext: 'sb1.bWV0YQ',
+					metadataVersion: 1
+				}
+			],
+			reactions: [
+				{ id: defined(legacyReaction, 'reaction').id, ciphertext: 'sb1.cmVhY3Q', payloadVersion: 1 }
+			]
+		};
+		await expect(sealLegacyMessages(harness.db, sealing)).resolves.toEqual({ ok: true, sealed: 2 });
 
 		const [row] = await readMessageRows(harness.db, threadId);
-		expect(row.ciphertext).toBe('b2xk');
-		expect(row.bodyFormat).toBe('plain');
-	});
-
-	it('is one-way: an already converted message cannot be rewritten', async () => {
-		const { threadId, messageId } = await createTestThread(harness.db, partnershipId, ada, {
-			ciphertext: 'b2xk'
-		});
-		// No markMessageBodyLegacy: sendMessage already stored it as 'lexical'.
-
-		await migrateMessageBodies(harness.db, {
-			partnershipId,
-			actorId: ada.id,
-			messages: [{ id: messageId, ciphertext: 'bmV3' }]
+		expect(row).toMatchObject({
+			ciphertext: 'sb1.c2VhbGVk',
+			vaultId,
+			payloadVersion: 1,
+			metadataCiphertext: 'sb1.bWV0YQ',
+			metadataVersion: 1,
+			bodyFormat: 'lexical'
 		});
 
-		const [row] = await readMessageRows(harness.db, threadId);
-		// This is what stops the endpoint becoming "edit any message I sent".
-		expect(row.ciphertext).toBe('b2xk');
-	});
-
-	it('refuses a caller who is not in the partnership', async () => {
-		const outsider = await createTestUser(harness.db, { email: 'outsider@example.com' });
-		const { messageId } = await createTestThread(harness.db, partnershipId, ada, {
-			ciphertext: 'b2xk'
-		});
-		await markMessageBodyLegacy(harness.db, messageId);
-
+		// Strictly once: Jun's device, migrating the same row a moment later,
+		// changes nothing — and nor could anyone using this to edit a message.
 		await expect(
-			migrateMessageBodies(harness.db, {
-				partnershipId,
-				actorId: outsider.id,
-				messages: [{ id: messageId, ciphertext: 'bmV3' }]
+			sealLegacyMessages(harness.db, {
+				...sealing,
+				actorId: jun.id,
+				messages: [{ ...sealing.messages[0], ciphertext: 'sb1.b3ZlcndyaXR0ZW4' }]
 			})
-		).resolves.toEqual({ ok: false, reason: 'not-a-member' });
+		).resolves.toEqual({ ok: true, sealed: 0 });
+		const [after] = await readMessageRows(harness.db, threadId);
+		expect(after?.ciphertext).toBe('sb1.c2VhbGVk');
 	});
 
-	it('refuses an oversized body', async () => {
-		const { messageId } = await createTestThread(harness.db, partnershipId, ada, {
-			ciphertext: 'b2xk'
-		});
-		await markMessageBodyLegacy(harness.db, messageId);
-
+	it('refuses another vault, and anything not sealed', async () => {
+		const { messageId } = await legacyThread();
+		const row = {
+			id: messageId,
+			ciphertext: 'sb1.c2VhbGVk',
+			payloadVersion: 1,
+			metadataCiphertext: null,
+			metadataVersion: null
+		};
 		await expect(
-			migrateMessageBodies(harness.db, {
+			sealLegacyMessages(harness.db, {
 				partnershipId,
 				actorId: ada.id,
-				messages: [{ id: messageId, ciphertext: 'a'.repeat(MAX_CIPHERTEXT_BYTES + 1) }]
+				vaultId: crypto.randomUUID(),
+				messages: [row],
+				reactions: []
 			})
-		).resolves.toEqual({ ok: false, reason: 'too-big' });
+		).resolves.toEqual({ ok: false, reason: 'invalid' });
+		await expect(
+			sealLegacyMessages(harness.db, {
+				partnershipId,
+				actorId: ada.id,
+				vaultId,
+				messages: [{ ...row, ciphertext: 'YWdlIGFnYWlu' }],
+				reactions: []
+			})
+		).resolves.toEqual({ ok: false, reason: 'invalid' });
+	});
+
+	it('cannot touch another partnership’s rows', async () => {
+		const cas = await createTestUser(harness.db, { name: 'Cas' });
+		const other = await createTestPartnership(harness.db, ada, cas);
+		const elsewhere = await createTestThread(harness.db, other.id, cas);
+		await makeMessageLegacy(harness.db, elsewhere.messageId, { ciphertext: 'c2FmZQ==' });
+		await sealLegacyMessages(harness.db, {
+			partnershipId,
+			actorId: ada.id,
+			vaultId,
+			messages: [
+				{
+					id: elsewhere.messageId,
+					ciphertext: 'sb1.dGFtcGVyZWQ',
+					payloadVersion: 1,
+					metadataCiphertext: null,
+					metadataVersion: null
+				}
+			],
+			reactions: []
+		});
+		const [row] = await harness.db
+			.select({ ciphertext: messages.ciphertext })
+			.from(messages)
+			.where(eq(messages.id, elsewhere.messageId));
+		expect(row?.ciphertext).toBe('c2FmZQ==');
+	});
+
+	/** A sidecar sealed next to an age body would leave the row half in each scheme. */
+	it('writes a sealed sidecar only beside a sealed body', async () => {
+		const { messageId } = await legacyThread();
+		await expect(
+			setMessageMetadataCiphertext(harness.db, {
+				partnershipId,
+				messageId,
+				viewerId: ada.id,
+				metadataCiphertext: 'sb1.bWV0YQ',
+				metadataVersion: 1
+			})
+		).resolves.toBe('not-sealed');
 	});
 });
 

@@ -75,8 +75,10 @@ exists.** Bodies are E2E encrypted, so the server cannot read them, cannot
 convert them, and never will be able to. The only place a message body can be
 converted is a browser holding the key.
 
-Both paths are written the same way anyway, so the cleanup is one deletion
-rather than two.
+Message bodies are converted as they move into the partnership vault (see
+[Messages in the original scheme](#messages-in-the-original-scheme) below),
+which decrypts every one anyway, so they have no conversion path of their own
+any more.
 
 ### Current temporary code
 
@@ -91,25 +93,21 @@ Whole files, deleted outright:
 
 - `src/lib/richtext-legacy.ts` — plain text → document, including the
   linkifyjs call and the embed insertion
-- `src/lib/richtext-legacy-migrate.ts` — convert and write back, both kinds
+- `src/lib/richtext-legacy-migrate.ts` — convert and write back descriptions
 - `src/lib/server/richtext-legacy.ts` — the permission-checked description writes
-- `src/routes/api/partnerships/[id]/legacy-bodies/+server.ts` — message endpoint
 - `src/routes/api/legacy-descriptions/+server.ts` — description endpoint
 
 Edits inside files that stay:
 
 - `parseStoredRichText` in `src/lib/richtext.ts` — its legacy branch
 - `MESSAGE_BODY_FORMATS` / `isMessageBodyFormat` in `src/lib/messaging.ts`
-- `messages.body_format` in the schema, `bodyFormat` in `MessageView`, and the
-  column in `messageColumns`
-- `migrateMessageBodies` in `src/lib/server/messaging.ts`, and
-  `legacyBodiesSchema` in `src/lib/schemas/messageForm.ts`
-- the migration triggers in `ThreadView.svelte`, `RewardList.svelte` and
-  `ManagedTaskList.svelte`
+- `messages.body_format` in the schema, and where `sealLegacyMessages` and the
+  two send paths set it
+- the migration triggers in `RewardList.svelte` and `ManagedTaskList.svelte`
 - the legacy branch in `src/lib/schemas/richTextField.ts`
-- `markMessageBodyLegacy` in `src/lib/testing/fixtures.ts`, and the
-  `LEGACY-RICHTEXT`-marked `describe` blocks in `richtext.test.ts`,
-  `RichText.svelte.test.ts` and `server/messaging.test.ts`
+- the `asDocument` conversion in `src/lib/messaging/vault-migration.ts`
+- the `LEGACY-RICHTEXT`-marked `describe` blocks in `richtext.test.ts` and
+  `RichText.svelte.test.ts`
 
 ### The `body_format` column, and why it exists
 
@@ -119,19 +117,9 @@ one. `messages.body_format` is a plaintext, closed two-value enum
 `message_threads.icon` under AGENTS.md invariant 14: two fixed values leak
 nothing about content, where a free-text column would be a covert channel.
 
-It earns its place three times:
-
-1. **The migration endpoint is strictly one-way.** `migrateMessageBodies`
-   updates only rows where `sender_id = <caller>` **and**
-   `body_format = 'plain'` **and** the thread is in this partnership. A row
-   already converted cannot be touched again, so an endpoint that lets a client
-   replace stored message bodies can never become a general "edit any message I
-   sent" backdoor — messages are otherwise immutable by design. Those three
-   clauses are the entire security model and are covered by tests in
-   `src/lib/server/messaging.test.ts`.
-2. **"Are we done?" is a query rather than a guess** (below).
-3. The client can find its own un-migrated messages without decrypting
-   every one first.
+Its remaining job is to make **"are we done?" a query rather than a guess**
+(below). Moving a row into the vault converts its body and sets the column to
+`'lexical'`, so it reaches zero exactly when the original scheme does.
 
 ### What removes the need for it
 
@@ -150,8 +138,8 @@ select
   (select count(*) from partnership_tasks   where description is not null and description not like '{"root"%');
 ```
 
-**The caveat that will bite.** A message encrypted to a key its owner no longer
-has can never be migrated _by anyone_, because nobody can read it. Those rows
+**The caveat that will bite.** A message encrypted to keys neither partner
+still has can never be migrated _by anyone_, because nobody can read it. Those rows
 may sit at `'plain'` for ever. The real criterion is therefore "zero legacy
 rows that anyone can still decrypt", and the final cleanup may have to accept a
 residue that renders as unreadable either way — which is what it already does
@@ -159,7 +147,7 @@ today. Do not wait for a literal zero.
 
 ### What to remove when the counts reach zero
 
-1. Delete the three files above.
+1. Delete the files above.
 2. Remove every line found by the `grep`, and `parseStoredRichText` collapses to
    `parseRichTextDocument(stored) ?? emptyRichTextDocument()`.
 3. Drop the `body_format` column with a generated migration — read the SQL,
@@ -175,3 +163,59 @@ today. Do not wait for a literal zero.
   URL", and removing it would change what counts as a link.
 - The `richTextFieldSchema` sanitising behaviour, which is not about legacy
   content at all.
+
+## Messages in the original scheme
+
+Before vaults, every message body, metadata sidecar and reaction was
+age-encrypted to both partners' recipients. Each is now a sealed record in the
+partnership vault, and rows written before that are moved in by a device in
+the background ([docs/messaging.md](messaging.md#moving-into-the-vault)). The
+original scheme is read until nothing is left in it.
+
+### Current temporary code
+
+- `migrate-on-load.ts` and `vault-migration.ts` in `src/lib/messaging/`, and the
+  trigger for them in `EncryptionGate.svelte`
+- `listLegacyMessages` and `sealLegacyMessages` in `src/lib/server/messaging.ts`,
+  `sealedMigrationSchema` in `src/lib/schemas/messageForm.ts`, and the
+  `sealed-migration` endpoint
+- the `vaultId === null` branches of `openMessage`, `openMessageMetadata` and
+  `openReaction` in `src/lib/messaging/client.ts`, and the early return for an
+  unsealed row in `writeMessageMetadataEntry`
+- `decryptMessageMetadata` in `src/lib/crypto/messages.ts`, and `decryptPayload`'s
+  message uses (drafts still use it, so it stays)
+- the migration step in `src/lib/messaging/restore.ts`
+- `makeMessageLegacy` in `src/lib/testing/fixtures.ts`, the
+  "moving messages into the vault" tests in `server/messaging.test.ts`, and the
+  migration test in `e2e/vaults.spec.ts`
+
+`ThreadView.svelte` and `ThreadSticker.svelte` open messages in their own
+`$effect`s rather than through `sealedReader` (`src/lib/sealed-cache.svelte.ts`)
+only because they still have to read both schemes. Moving them onto the reader
+belongs to this cleanup.
+
+### What removes the need for it
+
+```sql
+select
+  (select count(*) from messages where vault_id is null) +
+  (select count(*) from message_reactions where vault_id is null);
+```
+
+reaching zero in production, or the remainder being rows nobody can read — the
+same residue the rich-text cleanup above describes, encrypted to keys both
+partners lost. Those render as unreadable either way.
+
+### What to remove
+
+1. Everything in the list above.
+2. Make `messages.vault_id`, `messages.payload_version`, `message_reactions.vault_id`
+   and `message_reactions.payload_version` `NOT NULL` with a generated migration,
+   after deleting the residue.
+3. Re-run the full verification loop, including `npm run test:e2e`.
+
+### What should stay
+
+- The sealed kinds, the vault, and the restore that wraps it.
+- `decryptPayload` and `encryptPayload`, which drafts use.
+

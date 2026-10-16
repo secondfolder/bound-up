@@ -6,12 +6,14 @@ import {
 	RESTORE_PAGE_SIZE,
 	THREAD_ICONS
 } from '$lib/messaging';
+import { SEALED_PATTERN } from '$lib/sealed';
+import { isClientId, MAX_VAULT_WRAP_LENGTH, VAULT_WRAP_PATTERN } from '$lib/vault';
 
 /**
  * What the browser posts when sending a message.
  *
  * Note what this validates and what it cannot. It checks the *envelope* — the
- * icon is one of a closed list, the body is base64 within a bound — and never
+ * icon is one of a closed list, the body is a sealed record within a bound — and never
  * the content, because the content is ciphertext the server cannot read. Both
  * the endpoint and the client import these, so the client refuses before
  * spending a network round trip on 25 MB.
@@ -26,83 +28,102 @@ import {
 export const threadIconSchema = z.enum(THREAD_ICONS);
 
 /**
- * Standard base64, not base64url: this goes straight into a `ciphertext`
- * column. The charset check also catches a plaintext body posted by mistake,
- * since prose contains spaces and newlines.
+ * A sealed record's ciphertext: `sb1.` and base64url (`src/lib/sealed.ts`).
+ * The charset check also catches a plaintext body posted by mistake, since
+ * prose contains spaces and newlines. Each kind's exact cap is checked again
+ * in the data layer, against the kind.
  */
-const ciphertextSchema = z
-	.string()
-	.min(1, 'Nothing to send')
-	.max(MAX_CIPHERTEXT_BYTES, 'That message is too long')
-	.regex(/^[A-Za-z0-9+/=]+$/, 'Malformed message');
+const sealedSchema = (max: number, tooLong: string) =>
+	z.string().min(1, 'Nothing to send').max(max, tooLong).regex(SEALED_PATTERN, 'Malformed message');
 
-const optionalCiphertextSchema = z.preprocess(
-	(value) => (value === null || value === undefined || value === '' ? undefined : value),
-	ciphertextSchema.optional()
-);
+const bodySchema = sealedSchema(MAX_CIPHERTEXT_BYTES, 'That message is too long');
+const reactionBodySchema = sealedSchema(MAX_REACTION_CIPHERTEXT_BYTES, 'That reaction is too long');
 
-export const newThreadSchema = z.object({
-	icon: threadIconSchema,
-	ciphertext: ciphertextSchema,
-	metadataCiphertext: optionalCiphertextSchema
+/** A record id or vault id chosen by the browser. See `isClientId`. */
+const clientIdSchema = z.string().refine(isClientId, 'Malformed id');
+
+/** A payload version. Coerced, because a send arrives as multipart form fields. */
+const versionSchema = z.coerce.number().int().positive();
+
+/** An optional field of a multipart form: absent, empty and null all mean "none". */
+const optional = <T extends z.ZodType>(schema: T) =>
+	z.preprocess(
+		(value) => (value === null || value === undefined || value === '' ? undefined : value),
+		schema.optional()
+	);
+
+const sealedMessageFields = {
+	/** The new message's id, chosen by the browser: it is part of what the body is sealed to. */
+	messageId: clientIdSchema,
+	/** The partnership vault the body was sealed under. Must be the partnership's own. */
+	vaultId: clientIdSchema,
+	ciphertext: bodySchema,
+	payloadVersion: versionSchema,
+	metadataCiphertext: optional(bodySchema),
+	metadataVersion: optional(versionSchema)
+};
+
+export const newThreadSchema = z.object({ icon: threadIconSchema, ...sealedMessageFields });
+
+export const replySchema = z.object(sealedMessageFields);
+
+export const reactionSchema = z.object({
+	/** A fresh id per write: the record the reaction is sealed to. */
+	id: clientIdSchema,
+	vaultId: clientIdSchema,
+	ciphertext: reactionBodySchema,
+	payloadVersion: versionSchema
 });
 
-export const replySchema = z.object({
-	ciphertext: ciphertextSchema,
-	metadataCiphertext: optionalCiphertextSchema
+export const messageMetadataSchema = z.object({
+	metadataCiphertext: bodySchema,
+	metadataVersion: versionSchema
 });
-
-const reactionCiphertextSchema = ciphertextSchema.max(
-	MAX_REACTION_CIPHERTEXT_BYTES,
-	'That reaction is too long'
-);
-
-export const reactionSchema = z.object({ ciphertext: reactionCiphertextSchema });
-
-export const messageMetadataSchema = z.object({ metadataCiphertext: ciphertextSchema });
 
 /**
- * One page of a partner-assisted history restore.
- *
- * `RESTORE_PAGE_SIZE` is the server's own page size, so a client cannot send
- * back more rows than it could have been given. The ids are checked as UUIDs
- * rather than free strings because they go into a `WHERE id = ?` — the query is
- * parameterised either way, but a shape check here turns a client bug into a
- * 400 instead of a silent no-op update.
+ * One batch of messages moved from the original scheme into the partnership
+ * vault. Bounded by `RESTORE_PAGE_SIZE`, the size of the page the server hands
+ * out, so a client cannot send back more than it could have been given. Ids
+ * are the rows' existing ids, which the re-sealed bodies are bound to.
  */
-const restoreRowSchema = z.object({
-	id: z.string().uuid('Malformed id'),
-	ciphertext: ciphertextSchema,
-	metadataCiphertext: z.union([ciphertextSchema, z.null()]).optional()
+export const sealedMigrationSchema = z.object({
+	vaultId: clientIdSchema,
+	messages: z
+		.array(
+			z.object({
+				id: clientIdSchema,
+				ciphertext: bodySchema,
+				payloadVersion: versionSchema,
+				metadataCiphertext: bodySchema.nullable(),
+				metadataVersion: versionSchema.nullable()
+			})
+		)
+		.max(RESTORE_PAGE_SIZE, 'Too many messages at once'),
+	reactions: z
+		.array(
+			z.object({
+				id: clientIdSchema,
+				ciphertext: reactionBodySchema,
+				payloadVersion: versionSchema
+			})
+		)
+		.max(RESTORE_PAGE_SIZE * MAX_REACTIONS_PER_MESSAGE, 'Too many reactions at once')
 });
 
+/**
+ * Approving a partner-assisted restore: the partnership vault, wrapped for the
+ * key the requester is about to have. See `restoreVaultAccess`.
+ */
 export const restoreApplySchema = z.object({
 	requestId: z.string().uuid('Malformed request id'),
-	messages: z.array(restoreRowSchema).max(RESTORE_PAGE_SIZE, 'Too many messages at once'),
-	reactions: z
-		.array(restoreRowSchema.extend({ ciphertext: reactionCiphertextSchema }))
-		.max(RESTORE_PAGE_SIZE * MAX_REACTIONS_PER_MESSAGE, 'Too many reactions at once')
-		.default([]),
-	/** The last page closes the request, so the requester stops being prompted. */
-	final: z.boolean()
-});
-
-/**
- * LEGACY-RICHTEXT — one batch of converted message bodies.
- *
- * Reuses `restoreRowSchema`: the payload is the same shape as a history
- * restore, because it is the same operation — replace a body's ciphertext —
- * with a different authorisation rule. Bounded by `RESTORE_PAGE_SIZE` for the
- * same reason. Deleted with the rest; see docs/temporary-code.md.
- */
-export const legacyBodiesSchema = z.object({
-	messages: z.array(restoreRowSchema).max(RESTORE_PAGE_SIZE, 'Too many messages at once')
+	vaultWrap: z.string().min(1).max(MAX_VAULT_WRAP_LENGTH).regex(VAULT_WRAP_PATTERN)
 });
 
 export const restoreDeclineSchema = z.object({
 	requestId: z.string().uuid('Malformed request id')
 });
 
-export type NewThreadInput = z.infer<typeof newThreadSchema>;
-export type ReplyInput = z.infer<typeof replySchema>;
-export type RestoreApplyInput = z.infer<typeof restoreApplySchema>;
+export type NewThreadInput = z.output<typeof newThreadSchema>;
+export type ReplyInput = z.output<typeof replySchema>;
+export type SealedMigrationInput = z.output<typeof sealedMigrationSchema>;
+export type RestoreApplyInput = z.output<typeof restoreApplySchema>;

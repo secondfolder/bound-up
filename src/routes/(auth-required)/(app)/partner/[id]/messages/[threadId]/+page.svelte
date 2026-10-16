@@ -137,7 +137,6 @@
 			partnershipId={data.partner.id}
 			partner={data.partner}
 			tags={data.tags}
-			recipients={data.recipients}
 			{canSend}
 			permanentMedia={hasFeature(data.features, 'permanentMedia')}
 			highQualityMedia={hasFeature(data.features, 'highQualityMedia')}

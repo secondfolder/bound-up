@@ -1,5 +1,5 @@
 import type { KeyWrapParams, KeyWrapType } from './encryption';
-import type { MessageBodyFormat, ThreadIcon } from './messaging';
+import type { ThreadIcon } from './messaging';
 import type { Intensity, Role, Vibe } from './playroom/iq-test/settings';
 import type { VaultKind } from './vault';
 
@@ -243,6 +243,26 @@ export type VaultListingView = {
 };
 
 /**
+ * Where one message body lives: enough to open it under either scheme.
+ *
+ * A row with a `vaultId` is sealed under that partnership vault (and its
+ * sidecar too, when it has one); a row without is still in the original
+ * scheme, age-encrypted to both partners, until a device migrates it. See
+ * docs/messaging.md.
+ */
+export type MessageBodyRef = {
+	id: string;
+	/** Never rendered as text, even briefly. */
+	ciphertext: string;
+	vaultId: string | null;
+	/** The sealed body's payload version. Null exactly when `vaultId` is. */
+	payloadVersion: number | null;
+	/** Cached derived metadata for the body, encrypted like the body. */
+	metadataCiphertext: string | null;
+	metadataVersion: number | null;
+};
+
+/**
  * One thread as a sticker on the board.
  *
  * `unread` is already resolved for this viewer. No component compares a sender
@@ -259,9 +279,7 @@ export type ThreadStickerView = {
 	lastFullyReadAt: Date | null;
 	messageCount: number;
 	/** The thread's first message, used for the board preview once unlocked. */
-	previewCiphertext: string;
-	/** Cached derived metadata for the first message, encrypted like the body. */
-	previewMetadataCiphertext: string | null;
+	preview: MessageBodyRef;
 	/**
 	 * Self-destructing media the viewer has not seen yet: files in their
 	 * partner's messages since they last read the thread. Null when there is
@@ -281,7 +299,7 @@ export type UnseenMediaView = {
 	/** The soonest expiry among the unseen files: the most urgent one. */
 	expiresAt: Date;
 	/** Each message with unseen files, and which of its attachments those are. */
-	messages: { ciphertext: string; attachmentIds: string[] }[];
+	messages: (MessageBodyRef & { attachmentIds: string[] })[];
 	/**
 	 * More messages carry unseen files than are listed here, so the browser
 	 * cannot know every kind and should say "media".
@@ -309,25 +327,18 @@ export type AttachmentView = {
 };
 
 export type ReactionView = {
+	/** The record id a sealed reaction is bound to. Chosen by the reacting browser. */
+	id: string;
 	/** Whether this is the viewer's own reaction, so it can be removed. */
 	mine: boolean;
 	ciphertext: string;
+	vaultId: string | null;
+	payloadVersion: number | null;
 };
 
-export type MessageView = {
-	id: string;
+export type MessageView = MessageBodyRef & {
 	/** Which side of the conversation. Resolved server-side, like partnerName. */
 	mine: boolean;
-	/** base64 age ciphertext. Never rendered as text, even briefly. */
-	ciphertext: string;
-	/**
-	 * LEGACY-RICHTEXT — `'plain'` for a body written before rich text existed.
-	 * The client uses it to find its own un-migrated messages; see
-	 * docs/temporary-code.md.
-	 */
-	bodyFormat: MessageBodyFormat;
-	/** Cached derived metadata for the message body, encrypted like the body. */
-	metadataCiphertext: string | null;
 	createdAt: Date;
 	attachments: AttachmentView[];
 	reactions: ReactionView[];

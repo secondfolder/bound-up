@@ -9,6 +9,8 @@ import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import {
 	createTestPartnership,
 	createTestUser,
+	ensureTestPartnershipVault,
+	fakeSealed,
 	readAttachmentRows,
 	type TestUser
 } from '$lib/testing/fixtures';
@@ -43,7 +45,10 @@ async function sendOne(mediaTtl: number | 'never'): Promise<string> {
 		partnershipId,
 		senderId: ada.id,
 		icon: 'envelope',
-		ciphertext: 'eA',
+		messageId: crypto.randomUUID(),
+		vaultId: await ensureTestPartnershipVault(harness.db, partnershipId),
+		ciphertext: fakeSealed(),
+		payloadVersion: 1,
 		attachments: [outgoingAttachment(new Uint8Array([7, 7]), mediaTtl)]
 	});
 	if (!result.ok) {

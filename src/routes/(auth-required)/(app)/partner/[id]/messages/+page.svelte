@@ -14,8 +14,10 @@
 		markVerified,
 		refreshTrust,
 		trustAllowsSending,
-		trustFor
+		trustFor,
+		writeGrantFor
 	} from '$lib/crypto/trust.svelte';
+	import { partnershipVault } from '$lib/crypto/vaults.svelte';
 	import { hasFeature } from '$lib/features';
 	import { newlyArrived } from '$lib/messaging';
 	import { type ComposedMessage, sendMessage } from '$lib/messaging/client';
@@ -139,13 +141,20 @@
 
 	let composing = $state(false);
 
-	const targets = $derived([data.recipients.mine, data.recipients.theirs]);
+	const vault = $derived(partnershipVault(data.partner.id));
 
 	async function send(message: ComposedMessage, tagIds: string[] = []): Promise<string | null> {
+		// The vault, and the trust check's permission to write into it. The
+		// composer is hidden while trust says no, so missing either here means
+		// the vault is still opening.
+		const grant = vault ? writeGrantFor(data.partner.id, vault.id) : null;
+		if (!(vault && grant)) {
+			return 'Still getting ready to send. Try again in a moment.';
+		}
 		const outcome = await sendMessage(
 			{ kind: 'new-thread', partnershipId: data.partner.id, tagIds },
 			message,
-			targets
+			{ vault, grant }
 		);
 		if (!outcome.ok) {
 			return outcome.message;

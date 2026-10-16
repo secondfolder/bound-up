@@ -6,10 +6,10 @@ where they are kept, and what the guarantee actually is. The messaging feature
 itself is [docs/messaging.md](messaging.md).
 
 Beside each user's identity sit **vaults**: one key per user and one per
-partnership, which the rest of a user's data is sealed under as **sealed
-records**. Both are described below. Moving messages and the other kinds of
-user data onto them is in progress; until a kind has moved, it is stored as it
-was.
+partnership, which a user's data is sealed under as **sealed records**. Both
+are described below. Messages are sealed in their partnership's vault; moving
+the other kinds of user data onto them is in progress, and until a kind has
+moved, it is stored as it was.
 
 Two narrow exceptions exist for embeds. First, when a URL is typed into the
 composer, when a new message is sent, or when an embed with no cached preview
@@ -153,7 +153,7 @@ to re-encrypt from.
 
 The single exception is losing every way in — the password and every passkey —
 which loses the identity outright. A partner-assisted sign-in then replaces it
-and a partner re-encrypts the shared history; see
+and a partner wraps the partnership vault for the new one; see
 [docs/account-recovery.md](account-recovery.md).
 
 ### Passkeys
@@ -440,8 +440,8 @@ passkey unlocks, so signing in with one brings the identity back.
 
 **Losing every way in** — the password and every passkey — loses the identity
 for good. What remains is a partner-assisted sign-in, from the login page: a new
-password and a new identity, a partner who compares a code and re-encrypts the
-history the two of them share, a link emailed to the account's address, and
+password and a new identity, a partner who compares a code and shares the
+partnership vault with the new key, a link emailed to the account's address, and
 every old passkey and session removed. See
 [docs/account-recovery.md](account-recovery.md).
 

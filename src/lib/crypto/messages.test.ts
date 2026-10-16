@@ -7,7 +7,6 @@ import {
 	decryptMessageMetadata,
 	decryptPayload,
 	encryptAttachment,
-	encryptMessageMetadata,
 	encryptPayload,
 	type MessagePayload,
 	normaliseBody,
@@ -154,9 +153,7 @@ describe('decryptMessageMetadata', () => {
 	it('passes http(s) URLs from the sender through untouched', async () => {
 		const ada = await generateAgeIdentity();
 		const details = embed({});
-		const ciphertext = await encryptMessageMetadata({ version: 1, embeds: [details] }, [
-			ada.recipient
-		]);
+		const ciphertext = await encryptPayload({ version: 1, embeds: [details] }, [ada.recipient]);
 		await expect(decryptMessageMetadata(ciphertext, ada.identity)).resolves.toEqual({
 			version: 1,
 			embeds: [details]
@@ -167,7 +164,7 @@ describe('decryptMessageMetadata', () => {
 	// it; a `javascript:` iframe src would run on this origin.
 	it('drops every URL field that is not http(s)', async () => {
 		const ada = await generateAgeIdentity();
-		const ciphertext = await encryptMessageMetadata(
+		const ciphertext = await encryptPayload(
 			{
 				version: 1,
 				embeds: [

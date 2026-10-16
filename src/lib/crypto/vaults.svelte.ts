@@ -22,7 +22,7 @@ import {
 	StaleIdentityError
 } from './ensure-vaults';
 import { refreshTrust, trustAllowsSending } from './trust.svelte';
-import type { OpenVault } from './vault';
+import { type OpenVault, unwrapVaultKey, wrapVaultKey } from './vault';
 
 export type VaultsState =
 	/** Not started: the keyring is not unlocked yet. */
@@ -36,6 +36,8 @@ let state = $state<VaultsState>({ status: 'idle' });
 
 let runningFor: string | null = null;
 let running: Promise<VaultsState> | null = null;
+/** The identity the open vaults came from, for re-opening a wrap to share it. */
+let heldIdentity: { recipient: string; identity: CryptoKey | string } | null = null;
 
 /** Reactive: reading this in a template tracks it. */
 export function currentVaults(): VaultsState {
@@ -145,6 +147,7 @@ export async function initialiseVaults(
 	if (state.status !== 'ready') {
 		state = { status: 'loading' };
 	}
+	heldIdentity = identity;
 	runningFor = userId;
 	running = ensureVaults(deps)
 		.then((opened): VaultsState => {
@@ -180,10 +183,51 @@ export async function initialiseVaults(
 }
 
 /** Forgets every open vault — on sign-out, or a different account in the same tab. */
+/**
+ * A partnership's vault key, wrapped for `recipient` — the key a partner is
+ * about to have after a partner-assisted sign-in.
+ *
+ * Opens this device's own wrap again rather than keeping the key around (see
+ * `crypto/vault.ts`), so it fetches the listing for the wrap. Null when this
+ * device holds no usable wrap for the partnership's vault.
+ */
+export async function wrapPartnershipVaultFor(
+	partnershipId: string,
+	recipient: string
+): Promise<string | null> {
+	const identity = heldIdentity;
+	if (!identity) {
+		return null;
+	}
+	const response = await fetch('/api/vaults');
+	if (!response.ok) {
+		throw new Error(`Could not load vaults (${response.status})`);
+	}
+	const listing = (await response.json()) as VaultListingView;
+	const vault = listing.partnerships.find((entry) => entry.partnershipId === partnershipId)?.vault;
+	if (!vault?.wrap) {
+		return null;
+	}
+	const raw = await unwrapVaultKey({
+		ciphertext: vault.wrap.ciphertext,
+		identity: identity.identity,
+		vault
+	});
+	if (!raw) {
+		return null;
+	}
+	try {
+		return await wrapVaultKey({ vaultId: vault.id, raw, recipient });
+	} finally {
+		raw.fill(0);
+	}
+}
+
 export function resetVaults(): void {
 	// Everything opened with these vaults goes with them: the next account in
 	// this tab must not be shown the last one's records from the cache.
 	sealedReader.clear();
+	heldIdentity = null;
 	state = { status: 'idle' };
 	runningFor = null;
 	running = null;

@@ -15,7 +15,8 @@
 	 *
 	 * Someone who lost every way into their account asked for help from the
 	 * login page (`/login/recover`). Their browser made a new key, and each of
-	 * their partners gets a request here to re-encrypt the shared history to it.
+	 * their partners gets a request here to share the partnership's vault with
+	 * it, which brings their history back.
 	 * The first partner to finish is what lets them back in. See
 	 * docs/account-recovery.md.
 	 *
@@ -28,8 +29,8 @@
 	 * The out-of-band comparison is **load-bearing, not a nicety**, and the copy
 	 * has to carry that weight. Without it a dishonest server — or, until email
 	 * verification exists, anyone who knows the partner's email — could inject a
-	 * request carrying their own key and have this partner re-encrypt the whole
-	 * history straight to it, and let them into the account besides. So: the code
+	 * request carrying their own key and have this partner hand the whole vault
+	 * straight to it, and let them into the account besides. So: the code
 	 * is shown before the button, the button says what it means, and declining is
 	 * offered as an equal option rather than buried.
 	 */
@@ -50,10 +51,10 @@
 	 * The code is derived from the recipient **snapshotted on the request**,
 	 * never from whatever `user_keys` currently says.
 	 *
-	 * This is the point of the whole screen. `applyHistoryRestore` seals to the
-	 * snapshot, so the code the partner compares has to describe the same value —
-	 * computing it from the served key would let a server show a matching code
-	 * and receive the history under a different one. The requester's page
+	 * This is the point of the whole screen. `runHistoryRestore` wraps the vault
+	 * for the snapshot, so the code the partner compares has to describe the same
+	 * value — computing it from the served key would let a server show a matching
+	 * code and receive the vault under a different one. The requester's page
 	 * computes the same code from the key their browser made.
 	 */
 	const codes = $derived.by(async () => {

@@ -5,7 +5,8 @@ import {
 	createTestPartnership,
 	createTestUser,
 	readAttachmentRows,
-	type TestUser
+	type TestUser,
+	testSealedSend
 } from '../../testing/fixtures';
 import { createTestMediaStore, outgoingAttachment, type TestMediaStore } from '../../testing/media';
 import { grantFeature } from '../features';
@@ -44,7 +45,7 @@ async function send(mediaTtl: number | 'never', files = 1): Promise<string> {
 			partnershipId,
 			senderId: ada.id,
 			icon: 'envelope',
-			ciphertext: 'eA',
+			...(await testSealedSend(harness.db, partnershipId)),
 			attachments: Array.from({ length: files }, (_, index) =>
 				outgoingAttachment(new Uint8Array([index]), mediaTtl)
 			)

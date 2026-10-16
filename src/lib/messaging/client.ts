@@ -11,13 +11,14 @@ import {
 	decryptMessageMetadata,
 	decryptPayload,
 	encryptAttachment,
-	encryptMessageMetadata,
-	encryptPayload,
 	type MessageAttachmentInfo,
 	type MessageMetadataPayload,
 	type MessagePayload,
 	type ReactionPayload
 } from '$lib/crypto/messages';
+import { openRecord, sealRecord } from '$lib/crypto/sealed';
+import type { OpenVault } from '$lib/crypto/vault';
+import type { WriteGrant } from '$lib/crypto/write-grant';
 import { fetchEmbedMetadata } from '$lib/embeds';
 import { attachmentBudget } from '$lib/media-quality';
 import {
@@ -34,6 +35,29 @@ import {
 	isRichTextDocumentEmpty,
 	parseStoredRichText
 } from '$lib/richtext';
+import {
+	messageBodyKind,
+	messageMetadataKind,
+	messageReactionKind
+} from '$lib/sealed-kinds/messages';
+import type { MessageBodyRef, ReactionView } from '$lib/types';
+
+/**
+ * What a write into a partnership's messages needs: its vault, and the
+ * trust check's permission to write into it (`writeGrantFor` in
+ * `crypto/trust.svelte.ts`).
+ */
+export type MessageWriteKeys = { vault: OpenVault; grant: WriteGrant };
+
+/**
+ * What reading needs. The identity opens a row still in the original scheme;
+ * the vault, one sealed into it. `vault` is `undefined` while vaults are being
+ * worked out, and null when this device cannot open the partnership's.
+ */
+export type MessageReadKeys = {
+	identity: CryptoKey | string;
+	vault: OpenVault | null | undefined;
+};
 
 /** One file as it is about to be encrypted: already compressed, if it was going to be. */
 export type ComposedAttachment = {
@@ -152,9 +176,12 @@ function kindOf(file: File): 'image' | 'video' {
  * manifest. They travel alongside as `fileIds`, in the same order as the files,
  * and the endpoint validates them.
  */
-async function buildBody(message: ComposedMessage, recipients: string[]): Promise<FormData> {
+async function buildBody(message: ComposedMessage, keys: MessageWriteKeys): Promise<FormData> {
 	const attachments: MessageAttachmentInfo[] = [];
 	const body = new FormData();
+	// Chosen here for the same reason as the attachment ids: the body is
+	// sealed to it, so it has to exist before the body does.
+	const messageId = crypto.randomUUID();
 	// Already canonical: the editor serialises through the same schema the
 	// reader validates with, so there is nothing left to normalise.
 	const { text } = message;
@@ -177,15 +204,26 @@ async function buildBody(message: ComposedMessage, recipients: string[]): Promis
 		body.append('mediaTtlMs', String(mediaTtl));
 	}
 
-	const payload: MessagePayload = {
-		version: 1,
-		text,
-		attachments
-	};
-	body.set('ciphertext', await encryptPayload(payload, recipients));
+	const sealed = await sealRecord(messageBodyKind, {
+		recordId: messageId,
+		payload: { text, attachments },
+		vault: keys.vault,
+		grant: keys.grant
+	});
+	body.set('messageId', messageId);
+	body.set('vaultId', keys.vault.id);
+	body.set('ciphertext', sealed.ciphertext);
+	body.set('payloadVersion', String(sealed.payloadVersion));
 	const metadata = await metadataPromise.catch(() => null);
 	if (metadata) {
-		body.set('metadataCiphertext', await encryptMessageMetadata(metadata, recipients));
+		const sidecar = await sealRecord(messageMetadataKind, {
+			recordId: messageId,
+			payload: { embeds: metadata.embeds },
+			vault: keys.vault,
+			grant: keys.grant
+		});
+		body.set('metadataCiphertext', sidecar.ciphertext);
+		body.set('metadataVersion', String(sidecar.payloadVersion));
 	}
 	return body;
 }
@@ -228,17 +266,14 @@ function endpointFor(target: SendTarget): string {
 export async function sendMessage(
 	target: SendTarget,
 	message: ComposedMessage,
-	recipients: string[]
+	keys: MessageWriteKeys
 ): Promise<SendOutcome> {
 	const problem = checkComposed(message);
 	if (problem) {
 		return { ok: false, message: problem.message };
 	}
-	if (recipients.length === 0) {
-		return { ok: false, message: 'Your partner has not set up encrypted messaging yet' };
-	}
 
-	const body = await buildBody(message, recipients);
+	const body = await buildBody(message, keys);
 	if (target.kind === 'new-thread') {
 		body.set('icon', DEFAULT_THREAD_ICON);
 		body.set('tagIds', JSON.stringify(target.tagIds ?? []));
@@ -273,6 +308,11 @@ async function describeFailure(response: Response): Promise<string> {
 	if (response.status === 404) {
 		return 'That conversation is no longer there';
 	}
+	if (response.status === 409) {
+		// Sealed to a vault that is not the partnership's own any more, or an id
+		// that is taken: the page is stale. Reloading fixes either.
+		return 'Something changed since this page loaded. Reload and try again.';
+	}
 	if (response.status === 401) {
 		return 'You have been signed out';
 	}
@@ -288,87 +328,133 @@ async function describeFailure(response: Response): Promise<string> {
 
 // ── reading ──────────────────────────────────────────────────────────────────
 
-export type DecryptedMessage = {
-	/** Null when this identity cannot open it — see `openMessage`. */
-	payload: MessagePayload | null;
-};
-
 /**
- * Opens a message body.
+ * Opens a message body under whichever scheme the row is in.
  *
- * A null payload is not an error: a board can hold messages encrypted to a key
- * the user no longer has, if their password was reset. The UI renders those as
- * "ask your partner to restore this" rather than as a failure.
+ * `undefined` while the row is sealed and the vault is not open yet — the
+ * caller waits and asks again. Null when it will not open here: a row sealed
+ * to a vault this device cannot open, or one in the original scheme encrypted
+ * to a key the user no longer has. The UI renders that as "ask your partner to
+ * restore this" rather than as a failure.
  */
 export async function openMessage(
-	ciphertext: string,
-	identity: CryptoKey | string
-): Promise<MessagePayload | null> {
-	return await decryptPayload<MessagePayload>(ciphertext, identity);
+	ref: MessageBodyRef,
+	keys: MessageReadKeys
+): Promise<MessagePayload | null | undefined> {
+	if (ref.vaultId === null) {
+		return await decryptPayload<MessagePayload>(ref.ciphertext, keys.identity);
+	}
+	const vault = sealedVaultFor(ref.vaultId, keys);
+	if (!vault) {
+		return vault;
+	}
+	const body = await openRecord(messageBodyKind, {
+		recordId: ref.id,
+		ciphertext: ref.ciphertext,
+		payloadVersion: ref.payloadVersion ?? 0,
+		vault
+	});
+	return body ? { version: 1, ...body } : null;
 }
 
+/** The sidecar, in the same three states as `openMessage`. Null when there is none. */
 export async function openMessageMetadata(
-	ciphertext: string,
-	identity: CryptoKey | string
-): Promise<MessageMetadataPayload | null> {
-	return await decryptMessageMetadata(ciphertext, identity);
+	ref: MessageBodyRef,
+	keys: MessageReadKeys
+): Promise<MessageMetadataPayload | null | undefined> {
+	if (ref.metadataCiphertext === null) {
+		return null;
+	}
+	if (ref.vaultId === null) {
+		return await decryptMessageMetadata(ref.metadataCiphertext, keys.identity);
+	}
+	const vault = sealedVaultFor(ref.vaultId, keys);
+	if (!vault) {
+		return vault;
+	}
+	const metadata = await openRecord(messageMetadataKind, {
+		recordId: ref.id,
+		ciphertext: ref.metadataCiphertext,
+		payloadVersion: ref.metadataVersion ?? 0,
+		vault
+	});
+	return metadata ? { version: 1, ...metadata } : null;
 }
 
+/** A reaction's emoji, in the same three states as `openMessage`. */
 export async function openReaction(
-	ciphertext: string,
-	identity: CryptoKey | string
-): Promise<string | null> {
-	const payload = await decryptPayload<ReactionPayload>(ciphertext, identity);
-	return payload?.emoji ?? null;
+	reaction: ReactionView,
+	keys: MessageReadKeys
+): Promise<string | null | undefined> {
+	if (reaction.vaultId === null) {
+		const payload = await decryptPayload<ReactionPayload>(reaction.ciphertext, keys.identity);
+		return payload?.emoji ?? null;
+	}
+	const vault = sealedVaultFor(reaction.vaultId, keys);
+	if (!vault) {
+		return vault;
+	}
+	const opened = await openRecord(messageReactionKind, {
+		recordId: reaction.id,
+		ciphertext: reaction.ciphertext,
+		payloadVersion: reaction.payloadVersion ?? 0,
+		vault
+	});
+	return opened?.emoji ?? null;
 }
 
-export async function buildReaction(emoji: string, recipients: string[]): Promise<string> {
-	return await encryptPayload({ version: 1, emoji }, recipients);
+/** The vault a sealed row needs: undefined while waiting, null when it is not this one. */
+function sealedVaultFor(vaultId: string, keys: MessageReadKeys): OpenVault | null | undefined {
+	if (keys.vault === undefined) {
+		return undefined;
+	}
+	return keys.vault?.id === vaultId ? keys.vault : null;
+}
+
+/** A sealed reaction, ready to put. Each write gets a fresh id, which it is sealed to. */
+export async function buildReaction(
+	emoji: string,
+	keys: MessageWriteKeys
+): Promise<{ id: string; vaultId: string; ciphertext: string; payloadVersion: number }> {
+	const id = crypto.randomUUID();
+	const sealed = await sealRecord(messageReactionKind, {
+		recordId: id,
+		payload: { emoji },
+		vault: keys.vault,
+		grant: keys.grant
+	});
+	return { id, vaultId: keys.vault.id, ...sealed };
 }
 
 export async function fillMissingMessageMetadata(
 	partnershipId: string,
-	messageId: string,
+	message: MessageBodyRef,
 	href: string,
 	current: MessageMetadataPayload | null,
-	recipients: string[]
+	keys: MessageWriteKeys
 ): Promise<MessageMetadataPayload | null> {
-	if (recipients.length === 0) {
-		return null;
-	}
 	if (current?.embeds.some((embed) => embed.href === href)) {
 		return current;
 	}
-
-	return await writeMessageMetadataEntry(
-		partnershipId,
-		messageId,
-		href,
-		current,
-		recipients,
-		false
-	);
+	return await writeMessageMetadataEntry(partnershipId, message, href, current, keys, false);
 }
 
 export async function refreshMessageMetadata(
 	partnershipId: string,
-	messageId: string,
+	message: MessageBodyRef,
 	href: string,
 	current: MessageMetadataPayload | null,
-	recipients: string[]
+	keys: MessageWriteKeys
 ): Promise<MessageMetadataPayload | null> {
-	if (recipients.length === 0) {
-		return null;
-	}
-	return await writeMessageMetadataEntry(partnershipId, messageId, href, current, recipients, true);
+	return await writeMessageMetadataEntry(partnershipId, message, href, current, keys, true);
 }
 
 async function writeMessageMetadataEntry(
 	partnershipId: string,
-	messageId: string,
+	message: MessageBodyRef,
 	href: string,
 	current: MessageMetadataPayload | null,
-	recipients: string[],
+	keys: MessageWriteKeys,
 	replaceExisting: boolean
 ): Promise<MessageMetadataPayload | null> {
 	// A backfill is fired by an embed scrolling into view, so a long thread can
@@ -392,13 +478,28 @@ async function writeMessageMetadataEntry(
 			: [...existing, embed]
 	};
 
-	const metadataCiphertext = await encryptMessageMetadata(metadata, recipients);
+	// A message still in the original scheme gets its sidecar sealed with its
+	// body when it moves into the vault. Until then the details are shown, and
+	// looked up again on the next load, rather than stored half in each scheme.
+	if (message.vaultId === null) {
+		return metadata;
+	}
+
+	const sealed = await sealRecord(messageMetadataKind, {
+		recordId: message.id,
+		payload: { embeds: metadata.embeds },
+		vault: keys.vault,
+		grant: keys.grant
+	});
 	const response = await fetch(
-		`/api/partnerships/${partnershipId}/messages/${messageId}/metadata`,
+		`/api/partnerships/${partnershipId}/messages/${message.id}/metadata`,
 		{
 			method: 'PUT',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ metadataCiphertext })
+			body: JSON.stringify({
+				metadataCiphertext: sealed.ciphertext,
+				metadataVersion: sealed.payloadVersion
+			})
 		}
 	);
 	if (!response.ok) {

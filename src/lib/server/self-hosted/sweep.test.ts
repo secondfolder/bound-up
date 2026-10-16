@@ -8,7 +8,8 @@ import {
 	createTestPartnership,
 	createTestUser,
 	readAttachmentRows,
-	type TestUser
+	type TestUser,
+	testSealedSend
 } from '../../testing/fixtures';
 import { outgoingAttachment } from '../../testing/media';
 import { attachmentKey } from '../media';
@@ -50,7 +51,7 @@ describe('runMediaSweep', () => {
 				partnershipId,
 				senderId: ada.id,
 				icon: 'envelope',
-				ciphertext: 'eA',
+				...(await testSealedSend(harness.db, partnershipId)),
 				attachments: [outgoingAttachment(new Uint8Array([1]), MEDIA_TTL_MIN_MS)]
 			},
 			sentAt

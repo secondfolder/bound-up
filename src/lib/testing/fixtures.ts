@@ -25,7 +25,8 @@ import {
 	threadReads,
 	user,
 	userKeys,
-	userKeyWraps
+	userKeyWraps,
+	vaults
 } from '../server/db/schema';
 import { putUserKeys } from '../server/keys';
 import type { MediaStore } from '../server/media';
@@ -472,6 +473,48 @@ export async function readPartnershipTaskCompletionRows(db: Db, partnershipId: s
  * `at` sets both the thread's `last_message_at` and the message's timestamp, so
  * a test can lay out a board in a known order without sleeping.
  */
+/**
+ * The partnership's vault, made if it has none — directly, with no wraps, since
+ * the server never opens anything sealed in it. For tests of what the server
+ * stores; the vault flow itself is tested in `server/vaults.test.ts`.
+ */
+export async function ensureTestPartnershipVault(db: Db, partnershipId: string): Promise<string> {
+	const [existing] = await db
+		.select({ id: vaults.id })
+		.from(vaults)
+		.where(eq(vaults.partnershipId, partnershipId))
+		.limit(1);
+	if (existing) {
+		return existing.id;
+	}
+	const id = crypto.randomUUID();
+	await db
+		.insert(vaults)
+		.values({ id, kind: 'partnership', partnershipId, keyCheck: 'K'.repeat(43) });
+	return id;
+}
+
+/** A stand-in sealed ciphertext. The server checks only its shape, never its content. */
+export function fakeSealed(label = 'body'): string {
+	return `sb1.${label.replace(/[^A-Za-z0-9_-]/g, '')}${crypto.randomUUID().replaceAll('-', '')}`;
+}
+
+/** The sealed half of a send, for a partnership's vault. */
+export async function testSealedSend(
+	db: Db,
+	partnershipId: string,
+	options: { ciphertext?: string; metadataCiphertext?: string } = {}
+) {
+	return {
+		messageId: crypto.randomUUID(),
+		vaultId: await ensureTestPartnershipVault(db, partnershipId),
+		ciphertext: options.ciphertext ?? fakeSealed(),
+		payloadVersion: 1,
+		metadataCiphertext: options.metadataCiphertext,
+		metadataVersion: options.metadataCiphertext === undefined ? undefined : 1
+	};
+}
+
 export async function createTestThread(
 	db: Db,
 	partnershipId: string,
@@ -492,8 +535,7 @@ export async function createTestThread(
 			partnershipId,
 			senderId: sender.id,
 			icon: options.icon ?? 'envelope',
-			ciphertext: options.ciphertext ?? 'Y2lwaGVydGV4dA',
-			metadataCiphertext: options.metadataCiphertext,
+			...(await testSealedSend(db, partnershipId, options)),
 			attachments: options.attachments ?? []
 		},
 		options.at ?? nextFixtureTime()
@@ -525,8 +567,7 @@ export async function createTestMessage(
 			partnershipId,
 			threadId,
 			senderId: sender.id,
-			ciphertext: options.ciphertext ?? 'cmVwbHk',
-			metadataCiphertext: options.metadataCiphertext,
+			...(await testSealedSend(db, partnershipId, options)),
 			attachments: options.attachments ?? []
 		},
 		options.at ?? nextFixtureTime()
@@ -570,11 +611,24 @@ export async function readMessageRows(db: Db, threadId: string) {
 }
 
 /**
- * LEGACY-RICHTEXT — marks a message as written before rich text existed.
- *
- * `sendMessage` writes `'lexical'`, so a test that needs a pre-migration row
- * has to say so. Delete with the rest; see docs/temporary-code.md.
+ * Turns a message back into a row in the original scheme: an age ciphertext
+ * to both partners, no vault. Nothing sends those any more, so a test of the
+ * migration into the vault has to make them.
  */
-export async function markMessageBodyLegacy(db: Db, messageId: string): Promise<void> {
-	await db.update(messages).set({ bodyFormat: 'plain' }).where(eq(messages.id, messageId));
+export async function makeMessageLegacy(
+	db: Db,
+	messageId: string,
+	options: { ciphertext?: string; metadataCiphertext?: string | null; plain?: boolean } = {}
+): Promise<void> {
+	await db
+		.update(messages)
+		.set({
+			ciphertext: options.ciphertext ?? 'YWdlIGJvZHk=',
+			metadataCiphertext: options.metadataCiphertext ?? null,
+			vaultId: null,
+			payloadVersion: null,
+			metadataVersion: null,
+			bodyFormat: options.plain ? 'plain' : 'lexical'
+		})
+		.where(eq(messages.id, messageId));
 }

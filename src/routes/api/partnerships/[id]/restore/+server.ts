@@ -1,10 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { restoreApplySchema, restoreDeclineSchema } from '$lib/schemas/messageForm';
-import {
-	applyHistoryRestore,
-	declineHistoryRestore,
-	listHistoryForRestore
-} from '$lib/server/messaging';
+import { declineHistoryRestore, restoreVaultAccess } from '$lib/server/messaging';
 import type { RequestHandler } from './$types';
 
 /**
@@ -15,43 +11,13 @@ import type { RequestHandler } from './$types';
  * here opens with its own `locals.user` check and the membership test lives in
  * `server/messaging.ts`.
  *
- * What this endpoint hands over is unusual enough to state plainly: `GET`
- * returns the *entire* shared history of a partnership, as ciphertext, to the
- * member who is re-encrypting it. That is safe only because it goes to somebody
- * who can already decrypt all of it — they are one of the two recipients on
- * every message. The gate is therefore not "are you a member" but "are you the
- * member who did *not* raise this request", which `listHistoryForRestore`
- * checks against the request row rather than trusting the caller.
+ * Restoring is one wrap: the partnership vault, for the key the requester's
+ * sign-in will give them (`restoreVaultAccess`). The helping device first
+ * seals anything still in the original scheme into the vault, through
+ * `../sealed-migration`, so that one wrap covers the whole history.
  */
 
-/** A page of ciphertext to re-encrypt. `cursor` comes from the previous page. */
-export const GET: RequestHandler = async ({ locals, params, url }) => {
-	if (!locals.user) {
-		error(401, 'Not signed in');
-	}
-
-	const requestId = url.searchParams.get('requestId');
-	if (!requestId) {
-		error(400, 'Which request?');
-	}
-
-	const page = await listHistoryForRestore(locals.db, {
-		partnershipId: params.id,
-		requestId,
-		actorId: locals.user.id,
-		cursor: url.searchParams.get('cursor')
-	});
-
-	// 404 for "not a member", "no such request" and "that request is yours" all
-	// alike: distinguishing them would confirm which partnerships and requests
-	// exist, and the client has nothing different to do in any of the cases.
-	if (!page) {
-		error(404, 'Not found');
-	}
-	return json(page);
-};
-
-/** Writes back one page of re-encrypted bodies. */
+/** Stores the wrap, closes the request, and approves the sign-in. */
 export const POST: RequestHandler = async ({ locals, params, request }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
@@ -62,19 +28,20 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 		error(400, parsed.error.issues[0]?.message ?? 'Malformed restore');
 	}
 
-	const result = await applyHistoryRestore(locals.db, {
+	const result = await restoreVaultAccess(locals.db, {
 		partnershipId: params.id,
 		requestId: parsed.data.requestId,
 		actorId: locals.user.id,
-		messages: parsed.data.messages,
-		reactions: parsed.data.reactions,
-		final: parsed.data.final
+		vaultWrap: parsed.data.vaultWrap
 	});
 
+	// 404 for "not a member", "no such request" and "that request is yours"
+	// all alike: distinguishing them would confirm which partnerships and
+	// requests exist, and the client has nothing different to do.
 	if (!result.ok) {
-		error(404, 'Not found');
+		error(result.reason === 'no-vault' ? 409 : 404, result.reason);
 	}
-	return json({ ok: true, updated: result.updated });
+	return json({ ok: true });
 };
 
 /**

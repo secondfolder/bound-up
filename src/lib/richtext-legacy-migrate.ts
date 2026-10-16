@@ -1,4 +1,3 @@
-import { encryptPayload, type MessagePayload } from '$lib/crypto/messages';
 import { looksLikeRichTextDocument } from '$lib/richtext';
 import { legacyTextToDocument } from '$lib/richtext-legacy';
 
@@ -9,85 +8,10 @@ import { legacyTextToDocument } from '$lib/richtext-legacy';
  * docs/temporary-code.md for the removal contract and how to tell when that
  * is. Every call site outside this file carries a `LEGACY-RICHTEXT` comment.
  *
- * Why the client does this at all, rather than a migration script: **message
- * bodies are E2E encrypted**, so the server cannot read them, cannot convert
- * them, and never will be able to. The only place a body can be converted is a
- * browser holding the key. Descriptions are different — the server does hold
- * those in plaintext — but they go through the same shape here so there is one
- * thing to delete rather than two.
+ * Descriptions only. Message bodies used to be converted here too; they are
+ * now converted as they move into the partnership vault
+ * (`messaging/vault-migration.ts`), which has to decrypt every one anyway.
  */
-
-/** One candidate: a message, paired with its decrypted body. */
-export type LegacyMessageEntry = {
-	id: string;
-	/** `undefined` while decrypting, `null` when the key is gone. */
-	payload: MessagePayload | null | undefined;
-};
-
-/**
- * Convert and re-encrypt the viewer's own legacy messages.
- *
- * Silent by design: this is housekeeping the user did not ask for, so a
- * failure must never interrupt reading a thread. It returns the number written
- * so a test can assert on it.
- *
- * Only messages **the viewer sent** are migrated, which keeps one writer per
- * row — two clients cannot race over the same message — and matches what the
- * endpoint will accept anyway.
- */
-export async function migrateLegacyMessages(input: {
-	partnershipId: string;
-	/**
-	 * Already filtered to the viewer's own `'plain'` messages by the caller,
-	 * which reads that state untracked — see the note at the call site.
-	 */
-	entries: LegacyMessageEntry[];
-	/** age recipients for the re-encryption: the same two the send path uses. */
-	targets: string[];
-}): Promise<number> {
-	if (input.targets.length === 0) {
-		return 0;
-	}
-
-	const converted: { id: string; ciphertext: string }[] = [];
-	for (const entry of input.entries) {
-		const { payload } = entry;
-		// `undefined` is still decrypting; `null` is a body encrypted to a key
-		// this device no longer has. Neither can be converted, and the null case
-		// never will be — see the residue note in docs/temporary-code.md.
-		if (!payload) {
-			continue;
-		}
-		// Belt and braces: never rewrite something already converted.
-		if (looksLikeRichTextDocument(payload.text)) {
-			continue;
-		}
-
-		const next: MessagePayload = {
-			...payload,
-			text: JSON.stringify(legacyTextToDocument(payload.text))
-		};
-		converted.push({ id: entry.id, ciphertext: await encryptPayload(next, input.targets) });
-	}
-
-	if (converted.length === 0) {
-		return 0;
-	}
-
-	try {
-		const response = await fetch(`/api/partnerships/${input.partnershipId}/legacy-bodies`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ messages: converted })
-		});
-		if (!response.ok) {
-			return 0;
-		}
-	} catch {
-		return 0;
-	}
-	return converted.length;
-}
 
 /**
  * Convert a description the viewer is allowed to edit, or null when there is

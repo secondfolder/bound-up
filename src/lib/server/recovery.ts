@@ -1,4 +1,4 @@
-import { and, count, eq, gt, inArray, or } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, ne, or } from 'drizzle-orm';
 import { type KeyWrapParams, normaliseEmail, toBase64Url } from '../encryption';
 import { setPasswordHashStatement } from './credentials';
 import type { Db } from './db';
@@ -10,7 +10,8 @@ import {
 	session,
 	user,
 	userKeys,
-	userKeyWraps
+	userKeyWraps,
+	vaultWraps
 } from './db/schema';
 import { hex, keyedHash } from './keyed-hash';
 
@@ -366,6 +367,12 @@ export async function completeAccountRecovery(
 			blob: row.wrapBlob
 		}),
 		db.delete(passkey).where(eq(passkey.userId, userId)),
+		// Vault wraps for the old key open nothing any more. The wraps a helping
+		// partner made for the new one (`restoreVaultAccess`) stay, and are
+		// what brings the partnership's history back.
+		db
+			.delete(vaultWraps)
+			.where(and(eq(vaultWraps.userId, userId), ne(vaultWraps.forRecipient, row.recipient))),
 		setPasswordHashStatement(db, userId, input.passwordHash),
 		db.delete(session).where(eq(session.userId, userId)),
 		db.update(user).set({ emailVerified: true }).where(eq(user.id, userId)),

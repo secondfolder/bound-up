@@ -2,15 +2,17 @@
 
 How someone who has lost every way into their account — their password and
 every passkey — gets back in, with a partner vouching for them. The history
-half of it, the re-encryption, is in [docs/messaging.md](messaging.md); the
-keys themselves are in [docs/encryption.md](encryption.md).
+half of it, sharing the partnership vault again, is in
+[docs/messaging.md](messaging.md); the keys themselves are in
+[docs/encryption.md](encryption.md).
 
 There is no password reset by email alone. The password is turned into a key
 in the browser and the server never sees it (docs/encryption.md), so an emailed
 reset link could set a new password but could not bring back the key that
 decrypts the user's messages — the password was the only thing that could open
-it. A partner can: every message in a partnership is encrypted to both people,
-so the other one can re-encrypt it to a new key. Email still plays a part:
+it. A partner can: everything a partnership shares is sealed in its vault, and
+the other partner holds the vault key, so they can wrap it for a new key.
+Email still plays a part:
 completing needs a partner's approval **and** a link sent to the account's
 address, because each on its own is someone else's say-so (see below).
 
@@ -41,9 +43,9 @@ in and asked for your help" on every screen, because someone who cannot get
 into their account has no way to message you about it. It links to the
 messages board, where `RestoreRequests.svelte` shows the same code, computed
 from the public key snapshotted on the request. If it matches, the partner
-confirms, and their device re-encrypts the history the two of them share to
-the new key (docs/messaging.md). The **final page of that re-encryption
-approves the sign-in**. The partner's device also remembers the new key as
+confirms, and their device wraps their partnership's vault for the new key
+(docs/messaging.md) — moving any messages still in the original scheme into
+the vault first. **Storing that wrap approves the sign-in**. The partner's device also remembers the new key as
 vouched for — comparing the code is the same assurance as comparing a safety
 number — so when the server starts serving it, it is accepted as verified with
 no "key changed" warning. Only on that device: another of the partner's devices
@@ -89,8 +91,8 @@ The page then signs in with Better Auth's ordinary email sign-in, stashes the
 new identity the way signup does, and lands on `/home` with the key in hand.
 
 **More than one partner.** Every partner is asked, and whichever finishes first
-approves the sign-in. The others' requests stay open, and each re-encrypts
-their own partnership's history when they get to it; until they do, the
+approves the sign-in. The others' requests stay open, and each shares their
+own partnership's vault when they get to it; until they do, the
 requester's board with them says their older messages are still on their way,
 and the partner's copy notes that someone else already approved the sign-in —
 and still asks them to check the code with the requester themselves.
@@ -138,7 +140,7 @@ token has to be in a link, so it is in the fragment instead.
 Either alone is someone else's say-so. With only a partner's approval, a partner
 could file a request for your email from their own browser, approve it
 themselves, and sign in as you — and every other partner of yours who then
-approved would re-encrypt their history to that partner's key. With only the
+approved would hand their vault to that partner's key. With only the
 email, anyone who got into your inbox could replace your keys. Together, a
 takeover needs both a partner who lies and your inbox.
 

@@ -21,13 +21,14 @@ export const PUT: RequestHandler = async (event) => {
 		partnershipId: params.id,
 		messageId: params.messageId,
 		viewerId: locals.user.id,
-		ciphertext: parsed.data.ciphertext
+		...parsed.data
 	});
 
 	if (!result.ok) {
 		// "Your own message" is a 409 rather than a 403: the request is
 		// well-formed and authorised, it just conflicts with what a reaction is
 		// for. The UI does not offer the control on your own bubbles anyway.
+		// So is a reaction sealed to a vault that is not the partnership's.
 		error(result.reason === 'not-a-member' ? 404 : 409, result.reason);
 	}
 

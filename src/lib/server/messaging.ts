@@ -18,7 +18,14 @@ import {
 	UNSEEN_MEDIA_MESSAGE_LIMIT
 } from '../messaging';
 import type { PartnershipView } from '../partnership';
+import { isKnownVersion, SEALED_PATTERN, type SealedKind } from '../sealed';
+import {
+	messageBodyKind,
+	messageMetadataKind,
+	messageReactionKind
+} from '../sealed-kinds/messages';
 import type {
+	MessageBodyRef,
 	MessageView,
 	PartnerMessagesWidgetView,
 	PartnerView,
@@ -40,7 +47,9 @@ import {
 	messageThreads,
 	messageThreadTags,
 	partnerships,
-	threadReads
+	threadReads,
+	vaults,
+	vaultWraps
 } from './db/schema';
 import { listUserFeatures } from './features';
 import { attachmentKey, MEDIA_LIFETIMES, type MediaStore, partnershipMediaPrefix } from './media';
@@ -73,27 +82,45 @@ const threadStickerColumns = {
 	lastReadMessageAt: threadReads.lastReadMessageAt
 } as const;
 
-const messageColumns = {
+/** Everything needed to open a body under either scheme. See `MessageBodyRef`. */
+const bodyRefColumns = {
 	id: messages.id,
-	senderId: messages.senderId,
 	ciphertext: messages.ciphertext,
-	// LEGACY-RICHTEXT: lets the client find its own un-migrated messages without
-	// decrypting every one first.
-	bodyFormat: messages.bodyFormat,
+	vaultId: messages.vaultId,
+	payloadVersion: messages.payloadVersion,
 	metadataCiphertext: messages.metadataCiphertext,
+	metadataVersion: messages.metadataVersion
+} as const;
+
+const messageColumns = {
+	...bodyRefColumns,
+	senderId: messages.senderId,
 	createdAt: messages.createdAt
 } as const;
 
-const previewCiphertext = sql<string>`(
-	select ${messages.ciphertext}
-	from ${messages}
-	where ${messages.threadId} = ${messageThreads.id}
-	order by ${messages.createdAt} asc, ${messages.id} asc
-	limit 1
-)`;
+type BodyRefRow = {
+	id: string;
+	ciphertext: string;
+	vaultId: string | null;
+	payloadVersion: number | null;
+	metadataCiphertext: string | null;
+	metadataVersion: number | null;
+};
 
-const previewMetadataCiphertext = sql<string | null>`(
-	select ${messages.metadataCiphertext}
+function toBodyRef(row: BodyRefRow): MessageBodyRef {
+	return {
+		id: row.id,
+		ciphertext: row.ciphertext,
+		vaultId: row.vaultId ?? null,
+		payloadVersion: row.payloadVersion ?? null,
+		metadataCiphertext: row.metadataCiphertext ?? null,
+		metadataVersion: row.metadataVersion ?? null
+	};
+}
+
+/** The id of a thread's first message, for the board preview. */
+const previewMessageId = sql<string>`(
+	select ${messages.id}
 	from ${messages}
 	where ${messages.threadId} = ${messageThreads.id}
 	order by ${messages.createdAt} asc, ${messages.id} asc
@@ -260,8 +287,7 @@ export async function listBoard(
 			...threadStickerColumns,
 			unread,
 			messageCount,
-			previewCiphertext,
-			previewMetadataCiphertext
+			previewMessageId
 		})
 		.from(messageThreads)
 		// The user predicate belongs in the ON, not the WHERE. In the WHERE it
@@ -304,12 +330,18 @@ export async function listBoard(
 		tagsByThread.set(tag.threadId, values);
 	}
 
-	const unseenMedia = await listUnseenMedia(
-		db,
-		rows.filter((row) => Boolean(row.unread)).map((row) => row.id),
-		viewerId,
-		now
-	);
+	const [unseenMedia, previews] = await Promise.all([
+		listUnseenMedia(
+			db,
+			rows.filter((row) => Boolean(row.unread)).map((row) => row.id),
+			viewerId,
+			now
+		),
+		bodyRefsById(
+			db,
+			rows.map((row) => row.previewMessageId)
+		)
+	]);
 
 	return rows.map((row) => ({
 		id: row.id,
@@ -321,10 +353,35 @@ export async function listBoard(
 		lastMessageAt: row.lastMessageAt,
 		lastFullyReadAt: row.lastFullyReadAt ?? null,
 		messageCount: Number(row.messageCount),
-		previewCiphertext: row.previewCiphertext,
-		previewMetadataCiphertext: row.previewMetadataCiphertext ?? null,
+		// Every thread has a first message — it is created with one — so a
+		// missing preview is a row deleted between the two reads.
+		preview: previews.get(row.previewMessageId) ?? emptyPreview(row.previewMessageId),
 		unseenMedia: unseenMedia.get(row.id) ?? null
 	}));
+}
+
+function emptyPreview(id: string): MessageBodyRef {
+	return {
+		id,
+		ciphertext: '',
+		vaultId: null,
+		payloadVersion: null,
+		metadataCiphertext: null,
+		metadataVersion: null
+	};
+}
+
+/** The bodies of some messages, by id, in chunks under D1's parameter cap. */
+async function bodyRefsById(db: Db, ids: string[]): Promise<Map<string, MessageBodyRef>> {
+	const unique = [...new Set(ids.filter(Boolean))];
+	const rows = (
+		await Promise.all(
+			chunked(unique).map((chunk) =>
+				db.select(bodyRefColumns).from(messages).where(inArray(messages.id, chunk))
+			)
+		)
+	).flat();
+	return new Map(rows.map((row) => [row.id, toBodyRef(row)]));
 }
 
 /** Under D1's 100 bound parameters per statement, leaving room for the rest. */
@@ -437,29 +494,16 @@ async function listUnseenMedia(
 	}
 
 	const messageIds = [...byThread.values()].flatMap((entry) => entry.messageIds);
-	const bodies = new Map<string, string>();
-	const bodyRows = (
-		await Promise.all(
-			chunked(messageIds).map((chunk) =>
-				db
-					.select({ id: messages.id, ciphertext: messages.ciphertext })
-					.from(messages)
-					.where(inArray(messages.id, chunk))
-			)
-		)
-	).flat();
-	for (const row of bodyRows) {
-		bodies.set(row.id, row.ciphertext);
-	}
+	const bodies = await bodyRefsById(db, messageIds);
 
 	for (const [threadId, entry] of byThread) {
 		result.set(threadId, {
 			expiresAt: entry.expiresAt,
 			messages: entry.messageIds.flatMap((id) => {
-				const ciphertext = bodies.get(id);
-				return ciphertext === undefined
+				const body = bodies.get(id);
+				return body === undefined
 					? []
-					: [{ ciphertext, attachmentIds: entry.attachments.get(id) ?? [] }];
+					: [{ ...body, attachmentIds: entry.attachments.get(id) ?? [] }];
 			}),
 			truncated: entry.truncated
 		});
@@ -508,9 +552,12 @@ export async function getThread(
 		ids.length > 0
 			? db
 					.select({
+						id: messageReactions.id,
 						messageId: messageReactions.messageId,
 						userId: messageReactions.userId,
-						ciphertext: messageReactions.ciphertext
+						ciphertext: messageReactions.ciphertext,
+						vaultId: messageReactions.vaultId,
+						payloadVersion: messageReactions.payloadVersion
 					})
 					.from(messageReactions)
 					.where(inArray(messageReactions.messageId, ids))
@@ -535,13 +582,10 @@ export async function getThread(
 	const byMessage = new Map<string, MessageView>();
 	const messageViews = rows.map((row) => {
 		const message: MessageView = {
-			id: row.id,
+			...toBodyRef(row),
 			// Resolved here so no component sees a user id, which keeps the
 			// "never return locals.user wholesale" posture intact.
 			mine: row.senderId === viewerId,
-			ciphertext: row.ciphertext,
-			bodyFormat: row.bodyFormat,
-			metadataCiphertext: row.metadataCiphertext ?? null,
 			createdAt: row.createdAt,
 			attachments: [],
 			reactions: []
@@ -567,8 +611,11 @@ export async function getThread(
 	}
 	for (const reaction of reactions) {
 		byMessage.get(reaction.messageId)?.reactions.push({
+			id: reaction.id,
 			mine: reaction.userId === viewerId,
-			ciphertext: reaction.ciphertext
+			ciphertext: reaction.ciphertext,
+			vaultId: reaction.vaultId ?? null,
+			payloadVersion: reaction.payloadVersion ?? null
 		});
 	}
 
@@ -740,16 +787,93 @@ export type SendFailure =
 	| 'duplicate-attachment'
 	| 'bad-media-ttl'
 	| 'needs-permanent-media'
-	| 'needs-high-quality-media';
+	| 'needs-high-quality-media'
+	/** Not a sealed record this build can read: a malformed body or an unknown version. */
+	| 'bad-body'
+	/** Sealed under a vault that is not this partnership's, or the partnership has none yet. */
+	| 'wrong-vault'
+	| 'duplicate-message';
 
 export type SendResult =
 	| { ok: true; threadId: string; messageId: string }
 	| { ok: false; reason: SendFailure };
 
-function checkPayload(ciphertext: string, attachments: OutgoingAttachment[]): SendFailure | null {
-	if (ciphertext.length === 0 || ciphertext.length > MAX_CIPHERTEXT_BYTES) {
+/**
+ * Whether a sealed ciphertext is one the server will store for `kind`: the
+ * format, the kind's cap, and a version this build knows. The content is the
+ * one thing it cannot check, and does not try to.
+ */
+function sealedIsAcceptable(
+	kind: SealedKind<unknown>,
+	ciphertext: string,
+	version: number
+): boolean {
+	return (
+		ciphertext.length > 0 &&
+		ciphertext.length <= kind.maxCiphertextLength &&
+		SEALED_PATTERN.test(ciphertext) &&
+		isKnownVersion(kind, version)
+	);
+}
+
+/** The partnership's vault, or null while it has none — a device makes it on its next load. */
+export async function partnershipVaultId(db: Db, partnershipId: string): Promise<string | null> {
+	const [row] = await db
+		.select({ id: vaults.id })
+		.from(vaults)
+		.where(eq(vaults.partnershipId, partnershipId))
+		.limit(1);
+	return row?.id ?? null;
+}
+
+/** What a send carries besides its attachments: the sealed body and its sidecar. */
+export type SealedMessageInput = {
+	/** Chosen by the browser, because the body is sealed to it. */
+	messageId: string;
+	vaultId: string;
+	ciphertext: string;
+	payloadVersion: number;
+	metadataCiphertext?: string;
+	metadataVersion?: number;
+};
+
+/**
+ * The checks on a sealed body that need the database: that it is sealed to
+ * this partnership's vault, and that its id is new. A body sealed to any
+ * other vault would be one neither partner could open.
+ */
+async function checkSealedMessage(
+	db: Db,
+	partnershipId: string,
+	input: SealedMessageInput
+): Promise<SendFailure | null> {
+	if (input.ciphertext.length > MAX_CIPHERTEXT_BYTES) {
 		return 'body-too-large';
 	}
+	if (!sealedIsAcceptable(messageBodyKind, input.ciphertext, input.payloadVersion)) {
+		return 'bad-body';
+	}
+	if (
+		input.metadataCiphertext !== undefined &&
+		!(
+			input.metadataVersion !== undefined &&
+			sealedIsAcceptable(messageMetadataKind, input.metadataCiphertext, input.metadataVersion)
+		)
+	) {
+		return 'bad-body';
+	}
+	if ((await partnershipVaultId(db, partnershipId)) !== input.vaultId) {
+		return 'wrong-vault';
+	}
+	const [taken] = await db
+		.select({ id: messages.id })
+		.from(messages)
+		.where(eq(messages.id, input.messageId))
+		.limit(1);
+	return taken ? 'duplicate-message' : null;
+}
+
+function checkPayload(attachments: OutgoingAttachment[]): SendFailure | null {
 	if (attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
 		return 'too-many-attachments';
 	}
@@ -1065,8 +1189,9 @@ export async function setMessageMetadataCiphertext(
 		messageId: string;
 		viewerId: string;
 		metadataCiphertext: string;
+		metadataVersion: number;
 	}
-): Promise<boolean> {
+): Promise<'ok' | 'not-found' | 'bad-body' | 'not-sealed'> {
 	const membership = await requireMessageMembership(
 		db,
 		input.partnershipId,
@@ -1074,26 +1199,31 @@ export async function setMessageMetadataCiphertext(
 		input.viewerId
 	);
 	if (!membership) {
-		return false;
+		return 'not-found';
+	}
+	if (!sealedIsAcceptable(messageMetadataKind, input.metadataCiphertext, input.metadataVersion)) {
+		return 'bad-body';
 	}
 
-	await db
+	// Only beside a sealed body. A message still in the original scheme gets
+	// its sidecar when it is migrated, sealed with the body; writing a sealed
+	// sidecar next to an age body would leave the row half in each scheme.
+	const updated = await db
 		.update(messages)
-		.set({ metadataCiphertext: input.metadataCiphertext })
-		.where(eq(messages.id, membership.messageId));
-	return true;
+		.set({ metadataCiphertext: input.metadataCiphertext, metadataVersion: input.metadataVersion })
+		.where(and(eq(messages.id, membership.messageId), sql`${messages.vaultId} is not null`))
+		.returning({ id: messages.id });
+	return updated.length > 0 ? 'ok' : 'not-sealed';
 }
 
 /** Creates a thread and its first message in one shot. */
 export async function startThread(
 	db: Db,
 	store: MediaStore,
-	input: {
+	input: SealedMessageInput & {
 		partnershipId: string;
 		senderId: string;
 		icon: ThreadIcon;
-		ciphertext: string;
-		metadataCiphertext?: string;
 		attachments: OutgoingAttachment[];
 		tagIds?: string[];
 	},
@@ -1111,7 +1241,8 @@ export async function startThread(
 		return { ok: false, reason: 'bad-icon' };
 	}
 
-	const problem = checkPayload(input.ciphertext, input.attachments);
+	const problem =
+		checkPayload(input.attachments) ?? (await checkSealedMessage(db, input.partnershipId, input));
 	if (problem) {
 		return { ok: false, reason: problem };
 	}
@@ -1125,7 +1256,7 @@ export async function startThread(
 	}
 
 	const threadId = crypto.randomUUID();
-	const messageId = crypto.randomUUID();
+	const { messageId } = input;
 	const attachmentRows = await writeAttachments(
 		store,
 		input.partnershipId,
@@ -1149,7 +1280,11 @@ export async function startThread(
 			ciphertext: input.ciphertext,
 			// LEGACY-RICHTEXT: everything sent from now on is a rich-text document.
 			bodyFormat: 'lexical',
+			vaultId: input.vaultId,
+			payloadVersion: input.payloadVersion,
 			metadataCiphertext: input.metadataCiphertext ?? null,
+			metadataVersion:
+				input.metadataCiphertext === undefined ? null : (input.metadataVersion ?? null),
 			createdAt: now
 		}),
 		...attachmentRows.map((row) => db.insert(messageAttachments).values(row)),
@@ -1164,12 +1299,10 @@ export async function startThread(
 export async function sendMessage(
 	db: Db,
 	store: MediaStore,
-	input: {
+	input: SealedMessageInput & {
 		partnershipId: string;
 		threadId: string;
 		senderId: string;
-		ciphertext: string;
-		metadataCiphertext?: string;
 		attachments: OutgoingAttachment[];
 	},
 	now: Date = new Date()
@@ -1185,7 +1318,8 @@ export async function sendMessage(
 		return { ok: false, reason: inPartnership ? 'no-such-thread' : 'not-a-member' };
 	}
 
-	const problem = checkPayload(input.ciphertext, input.attachments);
+	const problem =
+		checkPayload(input.attachments) ?? (await checkSealedMessage(db, input.partnershipId, input));
 	if (problem) {
 		return { ok: false, reason: problem };
 	}
@@ -1194,7 +1328,7 @@ export async function sendMessage(
 		return expiry;
 	}
 
-	const messageId = crypto.randomUUID();
+	const { messageId } = input;
 	const attachmentRows = await writeAttachments(
 		store,
 		input.partnershipId,
@@ -1209,7 +1343,12 @@ export async function sendMessage(
 			threadId: input.threadId,
 			senderId: input.senderId,
 			ciphertext: input.ciphertext,
+			bodyFormat: 'lexical',
+			vaultId: input.vaultId,
+			payloadVersion: input.payloadVersion,
 			metadataCiphertext: input.metadataCiphertext ?? null,
+			metadataVersion:
+				input.metadataCiphertext === undefined ? null : (input.metadataVersion ?? null),
 			createdAt: now
 		}),
 		...attachmentRows.map((row) => db.insert(messageAttachments).values(row)),
@@ -1285,7 +1424,7 @@ export type ReactionResult =
 	 * just changed. `partnership` likewise, for the push notification.
 	 */
 	| { ok: true; threadId: string; partnership: PartnershipView }
-	| { ok: false; reason: 'not-a-member' | 'own-message' | 'too-large' };
+	| { ok: false; reason: 'not-a-member' | 'own-message' | 'too-large' | 'wrong-vault' };
 
 /**
  * Sets or replaces the viewer's reaction to a message.
@@ -1296,7 +1435,16 @@ export type ReactionResult =
  */
 export async function setReaction(
 	db: Db,
-	input: { partnershipId: string; messageId: string; viewerId: string; ciphertext: string }
+	input: {
+		partnershipId: string;
+		messageId: string;
+		viewerId: string;
+		/** A fresh id per write, chosen by the browser: the reaction is sealed to it. */
+		id: string;
+		vaultId: string;
+		ciphertext: string;
+		payloadVersion: number;
+	}
 ): Promise<ReactionResult> {
 	const membership = await requireMessageMembership(
 		db,
@@ -1310,20 +1458,30 @@ export async function setReaction(
 	if (membership.senderId === input.viewerId) {
 		return { ok: false, reason: 'own-message' };
 	}
-	if (input.ciphertext.length === 0 || input.ciphertext.length > MAX_REACTION_CIPHERTEXT_BYTES) {
+	if (input.ciphertext.length > MAX_REACTION_CIPHERTEXT_BYTES) {
 		return { ok: false, reason: 'too-large' };
 	}
+	if (!sealedIsAcceptable(messageReactionKind, input.ciphertext, input.payloadVersion)) {
+		return { ok: false, reason: 'too-large' };
+	}
+	if ((await partnershipVaultId(db, input.partnershipId)) !== input.vaultId) {
+		return { ok: false, reason: 'wrong-vault' };
+	}
 
+	// The row takes the new id too: the ciphertext is sealed to it, so an old
+	// id kept beside a new ciphertext would never open.
+	const sealed = {
+		id: input.id,
+		ciphertext: input.ciphertext,
+		vaultId: input.vaultId,
+		payloadVersion: input.payloadVersion
+	};
 	await db
 		.insert(messageReactions)
-		.values({
-			messageId: input.messageId,
-			userId: input.viewerId,
-			ciphertext: input.ciphertext
-		})
+		.values({ ...sealed, messageId: input.messageId, userId: input.viewerId })
 		.onConflictDoUpdate({
 			target: [messageReactions.messageId, messageReactions.userId],
-			set: { ciphertext: input.ciphertext, updatedAt: new Date() }
+			set: { ...sealed, updatedAt: new Date() }
 		});
 
 	return { ok: true, threadId: membership.threadId, partnership: membership.partnership };
@@ -1447,118 +1605,232 @@ export async function listHelpRequests(
 	return rows.map((row) => row.partnershipId);
 }
 
-export type RestorePage = {
-	messages: { id: string; ciphertext: string; metadataCiphertext?: string | null }[];
-	/** The reactions on *these* messages, so a page is self-contained. */
+// ── moving messages into the partnership vault ──────────────────────────────
+
+/** One page of rows still in the original scheme, for a device to seal into the vault. */
+export type LegacyMessagePage = {
+	messages: { id: string; ciphertext: string; metadataCiphertext: string | null }[];
+	/** Reactions still in the original scheme, whether or not their message has moved. */
 	reactions: { id: string; ciphertext: string }[];
-	/** Pass back as `cursor` for the next page. Null means this was the last. */
-	nextCursor: string | null;
+	/** Pass back for the next page; null when this was the last. */
+	next: { messagesAfter: string | null; reactionsAfter: string | null } | null;
 };
 
+const inPartnership = (db: Db, partnershipId: string) =>
+	db
+		.select({ id: messageThreads.id })
+		.from(messageThreads)
+		.where(eq(messageThreads.partnershipId, partnershipId));
+
 /**
- * A page of the shared history, for the partner who is re-encrypting it.
+ * Messages and reactions in a partnership that are still age-encrypted to both
+ * partners rather than sealed in its vault. See docs/messaging.md, "Moving
+ * into the vault".
  *
- * Only ever called by the *other* member — the person who lost their key
- * cannot read any of this, which is the whole reason the flow exists. That is
- * checked against the request row rather than assumed from the caller.
- *
- * Ordered by `(created_at, id)` and paged on that same pair rather than on an
- * offset: a keyset cursor cannot skip or repeat a row if anything is written
- * while the restore is in flight, and an OFFSET can do both.
+ * Either member may read these: every one is encrypted to both of them, so
+ * this hands over nothing they could not already open. Paged by id on two
+ * independent cursors, because a row a device cannot open (encrypted to a key
+ * it no longer has) stays behind, and the next page has to move past it.
  */
-export async function listHistoryForRestore(
+export async function listLegacyMessages(
 	db: Db,
-	input: { partnershipId: string; requestId: string; actorId: string; cursor?: string | null }
-): Promise<RestorePage | null> {
-	const request = await findRestorableRequest(db, input);
-	if (!request) {
+	input: {
+		partnershipId: string;
+		actorId: string;
+		messagesAfter?: string | null;
+		reactionsAfter?: string | null;
+	}
+): Promise<LegacyMessagePage | null> {
+	const membership = await requireMembership(db, input.partnershipId, input.actorId);
+	if (!membership) {
 		return null;
 	}
+	const threads = inPartnership(db, input.partnershipId);
 
-	const after = parseRestoreCursor(input.cursor);
-
-	const rows = await db
-		.select({
-			id: messages.id,
-			ciphertext: messages.ciphertext,
-			metadataCiphertext: messages.metadataCiphertext,
-			createdAt: messages.createdAt
-		})
-		.from(messages)
-		.where(
-			and(
-				inArray(
-					messages.threadId,
-					db
-						.select({ id: messageThreads.id })
-						.from(messageThreads)
-						.where(eq(messageThreads.partnershipId, input.partnershipId))
-				),
-				// The keyset predicate: strictly after (createdAt, id) as a pair.
-				after
-					? sql`(${messages.createdAt} > ${after.createdAt} or (${messages.createdAt} = ${after.createdAt} and ${messages.id} > ${after.id}))`
-					: undefined
+	const [messageRows, reactionRows] = await Promise.all([
+		db
+			.select({
+				id: messages.id,
+				ciphertext: messages.ciphertext,
+				metadataCiphertext: messages.metadataCiphertext
+			})
+			.from(messages)
+			.where(
+				and(
+					inArray(messages.threadId, threads),
+					sql`${messages.vaultId} is null`,
+					input.messagesAfter ? gt(messages.id, input.messagesAfter) : undefined
+				)
 			)
-		)
-		.orderBy(asc(messages.createdAt), asc(messages.id))
-		.limit(RESTORE_PAGE_SIZE);
+			.orderBy(asc(messages.id))
+			.limit(RESTORE_PAGE_SIZE),
+		db
+			.select({ id: messageReactions.id, ciphertext: messageReactions.ciphertext })
+			.from(messageReactions)
+			.where(
+				and(
+					inArray(
+						messageReactions.messageId,
+						db.select({ id: messages.id }).from(messages).where(inArray(messages.threadId, threads))
+					),
+					sql`${messageReactions.vaultId} is null`,
+					input.reactionsAfter ? gt(messageReactions.id, input.reactionsAfter) : undefined
+				)
+			)
+			.orderBy(asc(messageReactions.id))
+			.limit(RESTORE_PAGE_SIZE)
+	]);
 
-	const ids = rows.map((row) => row.id);
-	const reactions =
-		ids.length > 0
-			? await db
-					.select({ id: messageReactions.id, ciphertext: messageReactions.ciphertext })
-					.from(messageReactions)
-					.where(inArray(messageReactions.messageId, ids))
-			: [];
-
-	const last = rows.at(-1);
+	const moreMessages = messageRows.length === RESTORE_PAGE_SIZE;
+	const moreReactions = reactionRows.length === RESTORE_PAGE_SIZE;
 	return {
-		messages: rows.map((row) => ({
-			id: row.id,
-			ciphertext: row.ciphertext,
+		messages: messageRows.map((row) => ({
+			...row,
 			metadataCiphertext: row.metadataCiphertext ?? null
 		})),
-		reactions,
-		// A short page is the last page. A full page might be exactly the end, in
-		// which case the next call returns nothing and stops — one wasted read,
-		// versus a count query on every page.
-		nextCursor:
-			rows.length === RESTORE_PAGE_SIZE && last ? `${last.createdAt.getTime()}:${last.id}` : null
+		reactions: reactionRows,
+		// A short page is the last page of its kind. A full one might be exactly
+		// the end, which costs one empty read, versus a count on every page.
+		next:
+			moreMessages || moreReactions
+				? {
+						messagesAfter: moreMessages ? (messageRows.at(-1)?.id ?? null) : null,
+						reactionsAfter: moreReactions ? (reactionRows.at(-1)?.id ?? null) : null
+					}
+				: null
 	};
 }
 
-/** `<epoch millis>:<uuid>`. Anything else is treated as "start from the beginning". */
-function parseRestoreCursor(
-	cursor: string | null | undefined
-): { createdAt: Date; id: string } | null {
-	if (!cursor) {
-		return null;
+/**
+ * Replaces rows still in the original scheme with copies sealed in the
+ * partnership vault.
+ *
+ * Either member may do it, for any row in the partnership: both can read
+ * every one, and the copy says what the original said — or the server cannot
+ * tell either way, which is no new trust boundary, since a partner could
+ * always write whatever they liked into the conversation. What the `where`
+ * enforces is the shape of the change:
+ *
+ * - `vault_id IS NULL` — strictly one way, once. A row already sealed cannot
+ *   be touched, so two devices migrating at once write each row at most once
+ *   and neither can overwrite the other, and this can never become an "edit a
+ *   sent message" endpoint.
+ * - the row is in this partnership — the confused-deputy guard.
+ * - the vault is this partnership's own.
+ */
+export async function sealLegacyMessages(
+	db: Db,
+	input: {
+		partnershipId: string;
+		actorId: string;
+		vaultId: string;
+		messages: {
+			id: string;
+			ciphertext: string;
+			payloadVersion: number;
+			metadataCiphertext: string | null;
+			metadataVersion: number | null;
+		}[];
+		reactions: { id: string; ciphertext: string; payloadVersion: number }[];
 	}
-	const separator = cursor.indexOf(':');
-	if (separator < 1) {
-		return null;
+): Promise<{ ok: true; sealed: number } | { ok: false; reason: 'not-a-member' | 'invalid' }> {
+	const membership = await requireMembership(db, input.partnershipId, input.actorId);
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
 	}
-	const millis = Number(cursor.slice(0, separator));
-	const id = cursor.slice(separator + 1);
-	if (!Number.isSafeInteger(millis) || id.length === 0) {
-		return null;
+	if ((await partnershipVaultId(db, input.partnershipId)) !== input.vaultId) {
+		return { ok: false, reason: 'invalid' };
 	}
-	return { createdAt: new Date(millis), id };
+	const acceptable =
+		input.messages.every(
+			(message) =>
+				sealedIsAcceptable(messageBodyKind, message.ciphertext, message.payloadVersion) &&
+				(message.metadataCiphertext === null ||
+					(message.metadataVersion !== null &&
+						sealedIsAcceptable(
+							messageMetadataKind,
+							message.metadataCiphertext,
+							message.metadataVersion
+						)))
+		) &&
+		input.reactions.every((reaction) =>
+			sealedIsAcceptable(messageReactionKind, reaction.ciphertext, reaction.payloadVersion)
+		);
+	if (!acceptable) {
+		return { ok: false, reason: 'invalid' };
+	}
+
+	const threads = inPartnership(db, input.partnershipId);
+	const updates = [
+		...input.messages.map((message) =>
+			db
+				.update(messages)
+				.set({
+					ciphertext: message.ciphertext,
+					// The migration converts a pre-rich-text body as it seals it, so
+					// every sealed body is a document. LEGACY-RICHTEXT.
+					bodyFormat: 'lexical',
+					vaultId: input.vaultId,
+					payloadVersion: message.payloadVersion,
+					metadataCiphertext: message.metadataCiphertext,
+					metadataVersion: message.metadataCiphertext === null ? null : message.metadataVersion
+				})
+				.where(
+					and(
+						eq(messages.id, message.id),
+						sql`${messages.vaultId} is null`,
+						inArray(messages.threadId, threads)
+					)
+				)
+				.returning({ id: messages.id })
+		),
+		...input.reactions.map((reaction) =>
+			db
+				.update(messageReactions)
+				.set({
+					ciphertext: reaction.ciphertext,
+					vaultId: input.vaultId,
+					payloadVersion: reaction.payloadVersion
+				})
+				.where(
+					and(
+						eq(messageReactions.id, reaction.id),
+						sql`${messageReactions.vaultId} is null`,
+						inArray(
+							messageReactions.messageId,
+							db
+								.select({ id: messages.id })
+								.from(messages)
+								.where(inArray(messages.threadId, threads))
+						)
+					)
+				)
+				.returning({ id: messageReactions.id })
+		)
+	];
+	if (updates.length === 0) {
+		return { ok: true, sealed: 0 };
+	}
+	const results = await db.batch(updates as [(typeof updates)[number], ...typeof updates]);
+	return { ok: true, sealed: results.reduce((sum, rows) => sum + rows.length, 0) };
 }
 
 /**
  * The pending request, if `actorId` is the member who can actually act on it.
  *
- * Shared by the read and the write so the two cannot disagree about who is
- * allowed — the read hands over the entire shared history, so it needs exactly
- * the same gate as the write.
+ * The actor must be the OTHER member: the person who lost their key cannot
+ * wrap anything for themselves, since they cannot open the vault.
  */
 async function findRestorableRequest(
 	db: Db,
 	input: { partnershipId: string; requestId: string; actorId: string },
 	now: Date = new Date()
-): Promise<{ id: string; requesterId: string; recoveryRequestId: string | null } | null> {
+): Promise<{
+	id: string;
+	requesterId: string;
+	requestedRecipient: string;
+	recoveryRequestId: string | null;
+} | null> {
 	const membership = await requireMembership(db, input.partnershipId, input.actorId);
 	if (!membership) {
 		return null;
@@ -1568,6 +1840,7 @@ async function findRestorableRequest(
 		.select({
 			id: historyRestoreRequests.id,
 			requesterId: historyRestoreRequests.requesterId,
+			requestedRecipient: historyRestoreRequests.requestedRecipient,
 			recoveryRequestId: historyRestoreRequests.recoveryRequestId
 		})
 		.from(historyRestoreRequests)
@@ -1586,8 +1859,6 @@ async function findRestorableRequest(
 		.limit(1);
 
 	const [request] = rows;
-	// The actor must be the OTHER member: the person who lost their key cannot
-	// re-encrypt anything, since they cannot read it.
 	if (!request || request.requesterId === input.actorId) {
 		return null;
 	}
@@ -1595,226 +1866,84 @@ async function findRestorableRequest(
 }
 
 /**
- * Replaces message bodies with copies re-encrypted to the requester's new key.
+ * Gives a partner who lost every way in their access back: the partnership
+ * vault, wrapped for the key their partner-assisted sign-in will give them.
  *
- * Only the *bodies* — attachments in the object store are never touched,
- * because each file is encrypted under its own ephemeral identity carried
- * inside the body. Re-encrypting a few kilobytes per message therefore restores
- * access to gigabytes of media.
+ * One wrap restores the whole history, because everything in the partnership
+ * is sealed under the vault — the helping device seals any rows still in the
+ * original scheme first (`sealLegacyMessages`), then calls this. Attachments
+ * in the object store are never touched either way: each is encrypted under
+ * its own key, carried inside its message body.
  *
- * The server cannot verify that the new ciphertext says what the old one said;
- * it cannot read either. That is not a new trust boundary — the partner doing
- * the restore could always send whatever they liked — but it is written down in
- * docs/messaging.md rather than left implied.
+ * The wrap is stored *beside* the requester's existing one, for the recipient
+ * on the request rather than the one they have now. Their current wrap must
+ * stay usable until the sign-in actually completes — it may be declined or
+ * expire — and completing it deletes the wraps for the old key
+ * (`completeAccountRecovery` in recovery.ts).
+ *
+ * This closes the request and, if it is the first partnership to finish,
+ * approves the sign-in it belongs to. Approval is half of what completing
+ * needs: the requester must also confirm a link sent to the account's address,
+ * which is what stops a partner who filed a request for someone else's email
+ * from approving it and taking the account over. See docs/account-recovery.md.
+ *
+ * The server cannot check the wrap opens with that key; nothing here can. A
+ * partner could wrap anything — which is no new power, since they could
+ * always write anything into the conversation.
  */
-export async function applyHistoryRestore(
+export async function restoreVaultAccess(
 	db: Db,
 	input: {
 		partnershipId: string;
 		requestId: string;
-		/** The partner doing the re-encryption, not the one who lost their key. */
+		/** The partner doing the restore, not the one who lost their key. */
 		actorId: string;
-		messages: { id: string; ciphertext: string; metadataCiphertext?: string | null }[];
-		/**
-		 * Reactions re-encrypted alongside the bodies.
-		 *
-		 * Included because a reaction is encrypted too (see docs/messaging.md on
-		 * why, when the thread icon is not), so a restore that skipped them would
-		 * hand back a readable history dotted with tapbacks the owner cannot
-		 * open. Optional so the existing callers and tests keep working.
-		 */
-		reactions?: { id: string; ciphertext: string }[];
-		/** True on the final page, which closes the request. */
-		final: boolean;
+		vaultWrap: string;
 	},
 	now: Date = new Date()
-): Promise<
-	{ ok: true; updated: number } | { ok: false; reason: 'not-a-member' | 'no-such-request' }
-> {
-	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) {
-		return { ok: false, reason: 'not-a-member' };
-	}
-
+): Promise<{ ok: true } | { ok: false; reason: 'no-such-request' | 'no-vault' }> {
 	const request = await findRestorableRequest(db, input, now);
 	if (!request) {
 		return { ok: false, reason: 'no-such-request' };
 	}
-
-	const reactions = input.reactions ?? [];
-	const tooBig = (value: string, cap: number) => value.length === 0 || value.length > cap;
-	if (
-		input.messages.some((message) => tooBig(message.ciphertext, MAX_CIPHERTEXT_BYTES)) ||
-		input.messages.some(
-			(message) =>
-				message.metadataCiphertext !== undefined &&
-				message.metadataCiphertext !== null &&
-				tooBig(message.metadataCiphertext, MAX_CIPHERTEXT_BYTES)
-		) ||
-		reactions.some((reaction) => tooBig(reaction.ciphertext, MAX_REACTION_CIPHERTEXT_BYTES))
-	) {
-		return { ok: false, reason: 'no-such-request' };
+	const vaultId = await partnershipVaultId(db, input.partnershipId);
+	if (!vaultId) {
+		return { ok: false, reason: 'no-vault' };
 	}
 
-	// Every write is scoped through the thread to this partnership, so a request
-	// cannot be used to rewrite something in somebody else's conversation. This
-	// is the confused-deputy guard for the restore path.
-	const inThisPartnership = db
-		.select({ id: messageThreads.id })
-		.from(messageThreads)
-		.where(eq(messageThreads.partnershipId, input.partnershipId));
-
-	const updates = [
-		...input.messages.map((message) =>
-			db
-				.update(messages)
-				.set({
-					ciphertext: message.ciphertext,
-					...(message.metadataCiphertext === undefined
-						? {}
-						: { metadataCiphertext: message.metadataCiphertext })
-				})
-				.where(and(eq(messages.id, message.id), inArray(messages.threadId, inThisPartnership)))
-		),
-		...reactions.map((reaction) =>
-			db
-				.update(messageReactions)
-				.set({ ciphertext: reaction.ciphertext })
-				.where(
-					and(
-						eq(messageReactions.id, reaction.id),
-						// Two levels out: reaction → message → thread → partnership.
-						inArray(
-							messageReactions.messageId,
-							db
-								.select({ id: messages.id })
-								.from(messages)
-								.where(inArray(messages.threadId, inThisPartnership))
-						)
-					)
-				)
-		)
-	];
-
-	// The final page closes the request, and — if it is the first partnership to
-	// finish — approves the sign-in it belongs to. That approval is what lets
-	// the requester back into their account, so it happens only here, after
-	// this partner has compared the code and re-encrypted everything.
-	//
-	// Approval is half of what completing needs, not all of it: the requester
-	// must also confirm a link sent to the account's address
-	// (`completeAccountRecovery` in recovery.ts). That is what stops a partner
-	// who filed a request for someone else's email from approving it and
-	// taking the account over. See docs/account-recovery.md.
-	const closing = input.final
-		? [
-				db
-					.update(historyRestoreRequests)
-					.set({ status: 'completed', resolvedAt: now })
-					.where(eq(historyRestoreRequests.id, input.requestId)),
-				...(request.recoveryRequestId
-					? [
-							db
-								.update(accountRecoveryRequests)
-								.set({ status: 'approved', approvedBy: input.actorId, resolvedAt: now })
-								.where(
-									and(
-										eq(accountRecoveryRequests.id, request.recoveryRequestId),
-										eq(accountRecoveryRequests.status, 'pending'),
-										gt(accountRecoveryRequests.expiresAt, now)
-									)
-								)
-						]
-					: [])
-			]
-		: [];
-
-	const statements = [...updates, ...closing];
-	if (statements.length > 0) {
-		await db.batch(statements as [(typeof statements)[number], ...typeof statements]);
-	}
-
-	return { ok: true, updated: input.messages.length + reactions.length };
-}
-
-/**
- * LEGACY-RICHTEXT — replaces a sender's own pre-rich-text bodies with converted
- * ones.
- *
- * Deleted once nothing is left at `body_format = 'plain'`; see
- * docs/temporary-code.md.
- *
- * The `where` clause is the whole security model, and every clause is
- * load-bearing:
- *
- * - `senderId = actorId` — you may rewrite only what you wrote. Partners can
- *   read each other's messages, so without this either side could rewrite the
- *   other's words.
- * - `bodyFormat = 'plain'` — strictly one-way. A row already converted cannot
- *   be touched again, so this can never become a general "edit any message I
- *   sent" endpoint. Messages are immutable by design and this keeps them so.
- * - `threadId in (this partnership)` — the confused-deputy guard, same as
- *   `applyHistoryRestore`.
- *
- * As with a restore, the server cannot check that the new ciphertext says what
- * the old one said; it cannot read either. That is not a new trust boundary —
- * `applyHistoryRestore` already lets a client replace bodies wholesale, and
- * docs/messaging.md records it.
- */
-export async function migrateMessageBodies(
-	db: Db,
-	input: {
-		partnershipId: string;
-		actorId: string;
-		messages: { id: string; ciphertext: string; metadataCiphertext?: string | null }[];
-	}
-): Promise<{ ok: true; updated: number } | { ok: false; reason: 'not-a-member' | 'too-big' }> {
-	const membership = await requireMembership(db, input.partnershipId, input.actorId);
-	if (!membership) {
-		return { ok: false, reason: 'not-a-member' };
-	}
-
-	const tooBig = (value: string) => value.length === 0 || value.length > MAX_CIPHERTEXT_BYTES;
-	if (
-		input.messages.some(
-			(message) =>
-				tooBig(message.ciphertext) ||
-				(typeof message.metadataCiphertext === 'string' && tooBig(message.metadataCiphertext))
-		)
-	) {
-		return { ok: false, reason: 'too-big' };
-	}
-	if (input.messages.length === 0) {
-		return { ok: true, updated: 0 };
-	}
-
-	const inThisPartnership = db
-		.select({ id: messageThreads.id })
-		.from(messageThreads)
-		.where(eq(messageThreads.partnershipId, input.partnershipId));
-
-	const updates = input.messages.map((message) =>
+	await db.batch([
 		db
-			.update(messages)
-			.set({
-				ciphertext: message.ciphertext,
-				bodyFormat: 'lexical',
-				...(message.metadataCiphertext === undefined
-					? {}
-					: { metadataCiphertext: message.metadataCiphertext })
+			.insert(vaultWraps)
+			.values({
+				vaultId,
+				userId: request.requesterId,
+				ciphertext: input.vaultWrap,
+				forRecipient: request.requestedRecipient
 			})
-			.where(
-				and(
-					eq(messages.id, message.id),
-					eq(messages.senderId, input.actorId),
-					eq(messages.bodyFormat, 'plain'),
-					inArray(messages.threadId, inThisPartnership)
-				)
-			)
-	);
-	await db.batch(updates as [(typeof updates)[number], ...typeof updates]);
-
-	return { ok: true, updated: input.messages.length };
+			.onConflictDoUpdate({
+				target: [vaultWraps.vaultId, vaultWraps.userId, vaultWraps.forRecipient],
+				set: { ciphertext: input.vaultWrap, updatedAt: now }
+			}),
+		db
+			.update(historyRestoreRequests)
+			.set({ status: 'completed', resolvedAt: now })
+			.where(eq(historyRestoreRequests.id, input.requestId)),
+		...(request.recoveryRequestId
+			? [
+					db
+						.update(accountRecoveryRequests)
+						.set({ status: 'approved', approvedBy: input.actorId, resolvedAt: now })
+						.where(
+							and(
+								eq(accountRecoveryRequests.id, request.recoveryRequestId),
+								eq(accountRecoveryRequests.status, 'pending'),
+								gt(accountRecoveryRequests.expiresAt, now)
+							)
+						)
+				]
+			: [])
+	]);
+	return { ok: true };
 }
 
 /** Marks a restore request refused, so the requester is told rather than left waiting. */

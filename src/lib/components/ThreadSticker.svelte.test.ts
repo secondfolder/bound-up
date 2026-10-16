@@ -2,7 +2,7 @@ import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
 import { waProp } from '$lib/testing/web-awesome';
-import type { ThreadStickerView } from '$lib/types';
+import type { MessageBodyRef, ThreadStickerView } from '$lib/types';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
@@ -41,6 +41,18 @@ vi.mock('$lib/messaging/client', async (importOriginal) => {
 const { default: ThreadSticker } = await import('./ThreadSticker.svelte');
 const { MediaExpiredError } = await import('$lib/messaging/client');
 
+/** A body in the original scheme: the mocked `openMessage` is what decides what it says. */
+function bodyRef(ciphertext: string): MessageBodyRef {
+	return {
+		id: `m-${ciphertext}`,
+		ciphertext,
+		vaultId: null,
+		payloadVersion: null,
+		metadataCiphertext: null,
+		metadataVersion: null
+	};
+}
+
 function thread(overrides: Partial<ThreadStickerView> = {}): ThreadStickerView {
 	return {
 		id: 't1',
@@ -49,8 +61,7 @@ function thread(overrides: Partial<ThreadStickerView> = {}): ThreadStickerView {
 		lastMessageAt: new Date('2026-09-13T14:15:00Z'),
 		lastFullyReadAt: new Date('2026-09-12T18:00:00Z'),
 		messageCount: 2,
-		previewCiphertext: 'ciphertext',
-		previewMetadataCiphertext: null,
+		preview: bodyRef('ciphertext'),
 		unseenMedia: null,
 		...overrides
 	};
@@ -158,7 +169,7 @@ describe('ThreadSticker', () => {
 
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
-				thread: thread({ previewMetadataCiphertext: 'metadata' }),
+				thread: thread({ preview: { ...bodyRef('ciphertext'), metadataCiphertext: 'metadata' } }),
 				partnershipId: 'p1',
 				position: 1,
 				total: 1
@@ -337,7 +348,7 @@ describe('ThreadSticker', () => {
 			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
 			const { container } = renderTile({
 				expiresAt: new Date(Date.now() + 3 * 24 * Hour),
-				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
 				truncated: false
 			});
 
@@ -346,7 +357,10 @@ describe('ThreadSticker', () => {
 					'Image self-destructs in 3 days'
 				)
 			);
-			expect(openMessage).toHaveBeenCalledWith('c1', 'secret');
+			expect(openMessage).toHaveBeenCalledWith(
+				expect.objectContaining({ ciphertext: 'c1' }),
+				expect.objectContaining({ identity: 'secret' })
+			);
 			// The link's label is what a screen reader hears; the line itself is hidden.
 			expect(container.querySelector('a')?.getAttribute('aria-label')).toContain(
 				'image self-destructs in 3 days'
@@ -362,8 +376,8 @@ describe('ThreadSticker', () => {
 			const { container } = renderTile({
 				expiresAt: new Date(Date.now() + 2 * Hour),
 				messages: [
-					{ ciphertext: 'c1', attachmentIds: ['v1'] },
-					{ ciphertext: 'c2', attachmentIds: ['v2'] }
+					{ ...bodyRef('c1'), attachmentIds: ['v1'] },
+					{ ...bodyRef('c2'), attachmentIds: ['v2'] }
 				],
 				truncated: false
 			});
@@ -379,7 +393,7 @@ describe('ThreadSticker', () => {
 			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
 			const truncated = renderTile({
 				expiresAt: new Date(Date.now() + Hour),
-				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
 				truncated: true
 			});
 			await waitFor(() =>
@@ -392,7 +406,7 @@ describe('ThreadSticker', () => {
 			openMessage.mockResolvedValue(null);
 			const unreadable = renderTile({
 				expiresAt: new Date(Date.now() + Hour),
-				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
 				truncated: false
 			});
 			await waitFor(() =>
@@ -410,7 +424,7 @@ describe('ThreadSticker', () => {
 			openMessage.mockResolvedValue(payloadWith(['image'], ['a1']));
 			const { container } = renderTile({
 				expiresAt: new Date(Date.now() + 90 * 1000),
-				messages: [{ ciphertext: 'c1', attachmentIds: ['a1'] }],
+				messages: [{ ...bodyRef('c1'), attachmentIds: ['a1'] }],
 				truncated: false
 			});
 			await waitFor(() => expect(container.querySelector('.self-destructs')).not.toBeNull());

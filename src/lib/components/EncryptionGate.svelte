@@ -5,7 +5,8 @@
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
 	import { currentKeyring, initialiseKeyring, lock, resetKeyring } from '$lib/crypto/session.svelte';
-	import { initialiseVaults } from '$lib/crypto/vaults.svelte';
+	import { currentVaults, initialiseVaults } from '$lib/crypto/vaults.svelte';
+	import { migrateOpenPartnerships } from '$lib/messaging/migrate-on-load';
 	import { rememberSignInEmail } from '$lib/sign-in-again';
 	import StoragePersistenceDialog from './StoragePersistenceDialog.svelte';
 
@@ -64,6 +65,21 @@
 		untrack(() => {
 			if (keyring.status === 'unlocked') {
 				void initialiseVaults(id, { recipient: keyring.recipient, identity: keyring.identity });
+			}
+		});
+	});
+
+	// Once vaults are open, any messages a partnership still has in the
+	// original scheme are moved into its vault, in the background. Runs once per
+	// partnership per page load (`migrate-on-load.ts`).
+	const vaultsReady = $derived(currentVaults().status === 'ready');
+	$effect(() => {
+		if (!vaultsReady) {
+			return;
+		}
+		untrack(() => {
+			if (keyring.status === 'unlocked') {
+				migrateOpenPartnerships(keyring.identity);
 			}
 		});
 	});

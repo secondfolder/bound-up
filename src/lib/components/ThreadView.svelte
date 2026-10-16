@@ -4,10 +4,13 @@
 	import { invalidate } from '$app/navigation';
 	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
 	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
+	import { writeGrantFor } from '$lib/crypto/trust.svelte';
+	import { partnershipVault } from '$lib/crypto/vaults.svelte';
 	import {
 		buildReaction,
 		type ComposedMessage,
 		fillMissingMessageMetadata,
+		type MessageWriteKeys,
 		openMessage,
 		openMessageMetadata,
 		openReaction,
@@ -16,10 +19,8 @@
 	} from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
 	import { reportRequestFailure, tryFetch } from '$lib/request-failure.svelte';
-	// LEGACY-RICHTEXT — delete with the legacy reader; see docs/temporary-code.md
-	import { migrateLegacyMessages } from '$lib/richtext-legacy-migrate';
 	import { scrollIntoViewWithin } from '$lib/scroll-parent';
-	import type { MessageView, PartnerRecipientsView, TagView, ThreadView } from '$lib/types';
+	import type { MessageView, TagView, ThreadView } from '$lib/types';
 	import MessageBubble from './MessageBubble.svelte';
 	import MessageComposer from './MessageComposer.svelte';
 	import TagPicker from './TagPicker.svelte';
@@ -30,7 +31,6 @@
 		/** For the read receipt's avatar. */
 		partner,
 		tags = [],
-		recipients,
 		/**
 		 * False while this device distrusts one of the two keys.
 		 *
@@ -49,13 +49,15 @@
 		partnershipId: string;
 		partner: { name: string; image: string | null };
 		tags?: TagView[];
-		recipients: PartnerRecipientsView;
 		canSend?: boolean;
 		permanentMedia?: boolean;
 		highQualityMedia?: boolean;
 	} = $props();
 
 	const keyring = $derived(currentKeyring());
+	// `undefined` until vaults are worked out; sealed rows wait for it, and the
+	// effect below runs again when it arrives.
+	const vault = $derived(partnershipVault(partnershipId));
 	// Selection is the live control state; re-deriving it on every thread refresh
 	// would undo a tag click while the assignment request is in flight.
 	// svelte-ignore state_referenced_locally
@@ -79,6 +81,7 @@
 		if (!unlocked) {
 			return;
 		}
+		const keys = { identity: unlocked, vault };
 
 		// Captured so a run superseded by a newer one bails out rather than
 		// writing stale plaintext over fresh — the same guard EdgeTask.svelte uses.
@@ -90,15 +93,25 @@
 				if (cancelled) {
 					return;
 				}
-				if (!(message.id in bodies)) {
-					bodies[message.id] = await openMessage(message.ciphertext, unlocked);
+				// `undefined` is a sealed row whose vault is not open yet: left unset,
+				// so it reads as still working, and filled in when this runs again.
+				// `untrack`, because this effect writes these records and must not
+				// also depend on them.
+				if (!untrack(() => message.id in bodies)) {
+					const body = await openMessage(message, keys);
+					if (body !== undefined) {
+						bodies[message.id] = body;
+					}
 				}
-				if (message.metadataCiphertext !== null && !(message.id in metadata)) {
-					metadata[message.id] = await openMessageMetadata(message.metadataCiphertext, unlocked);
+				if (message.metadataCiphertext !== null && !untrack(() => message.id in metadata)) {
+					const opened = await openMessageMetadata(message, keys);
+					if (opened !== undefined) {
+						metadata[message.id] = opened;
+					}
 				}
 				const decoded: { emoji: string; mine: boolean }[] = [];
 				for (const reaction of message.reactions) {
-					const emoji = await openReaction(reaction.ciphertext, unlocked);
+					const emoji = await openReaction(reaction, keys);
 					if (emoji) {
 						decoded.push({ emoji, mine: reaction.mine });
 					}
@@ -108,30 +121,6 @@
 				}
 				reactions[message.id] = decoded;
 			}
-
-			// LEGACY-RICHTEXT — once everything on screen is readable, quietly
-			// convert and re-save any of the viewer's own pre-rich-text bodies.
-			// Runs last and its failures are swallowed: this is housekeeping, and
-			// it must never get in the way of reading a thread. See
-			// docs/temporary-code.md.
-			if (cancelled) {
-				return;
-			}
-			// `bodies` and `targets` are read through `untrack` on purpose. Both
-			// are reactive, and this effect already *writes* `bodies`; making it
-			// depend on them as well would rebuild the whole decryption pass on
-			// every change — the same class of bug AGENTS.md records for effects
-			// that read the `data` prop.
-			const entries = untrack(() =>
-				messages
-					.filter((message) => message.mine && message.bodyFormat === 'plain')
-					.map((message) => ({ id: message.id, payload: bodies[message.id] }))
-			);
-			await migrateLegacyMessages({
-				partnershipId,
-				entries,
-				targets: untrack(() => targets)
-			});
 		})();
 
 		return () => {
@@ -173,17 +162,33 @@
 		return openDraft({ kind: 'thread', threadId: id }, untrack(unlockedIdentity));
 	}
 
-	const targets = $derived([recipients.mine, recipients.theirs]);
+	/**
+	 * What a write needs right now: the vault, and the trust check's permission
+	 * to write into it. Null while either is missing — the vault still opening,
+	 * or a key this device has been warned about — and every write below
+	 * refuses rather than going ahead without it.
+	 */
+	function writeKeys(): MessageWriteKeys | null {
+		if (!vault) {
+			return null;
+		}
+		const grant = writeGrantFor(partnershipId, vault.id);
+		return grant ? { vault, grant } : null;
+	}
 
 	function formatWhen(date: Date): string {
 		return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
 	}
 
 	async function send(message: ComposedMessage): Promise<string | null> {
+		const keys = writeKeys();
+		if (!keys) {
+			return 'Still getting ready to send. Try again in a moment.';
+		}
 		const outcome = await sendMessage(
 			{ kind: 'reply', partnershipId, threadId: thread.id },
 			message,
-			targets
+			keys
 		);
 		if (!outcome.ok) {
 			return outcome.message;
@@ -193,13 +198,20 @@
 	}
 
 	async function react(message: MessageView, emoji: string) {
-		const ciphertext = await buildReaction(emoji, targets);
+		const keys = writeKeys();
+		if (!keys) {
+			// A reaction is a write like a send, and goes nowhere while this
+			// device distrusts the keys. The callout above says why.
+			reportRequestFailure(null, 'Reactions are paused until the key warning above is resolved.');
+			return;
+		}
+		const reaction = await buildReaction(emoji, keys);
 		const response = await tryFetch(
 			`/api/partnerships/${partnershipId}/messages/${message.id}/reaction`,
 			{
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ ciphertext })
+				body: JSON.stringify(reaction)
 			}
 		);
 		if (!response?.ok) {
@@ -231,7 +243,8 @@
 	 * not once per re-render.
 	 */
 	async function cacheEmbedDetails(message: MessageView, href: string) {
-		if (targets.length === 0) {
+		const keys = writeKeys();
+		if (!keys) {
 			return;
 		}
 		const key = `${message.id}:${href}`;
@@ -240,18 +253,20 @@
 		}
 		attemptedMetadataBackfill.add(key);
 		const current = metadata[message.id] ?? null;
-		const next = await fillMissingMessageMetadata(partnershipId, message.id, href, current, targets);
+		const next = await fillMissingMessageMetadata(partnershipId, message, href, current, keys);
 		if (next) {
 			metadata[message.id] = next;
 		}
 	}
 
 	async function refreshEmbed(message: MessageView, href: string) {
-		if (targets.length === 0) {
+		const keys = writeKeys();
+		if (!keys) {
+			reportRequestFailure(null, "Couldn't refresh this preview. Please try again.");
 			return;
 		}
 		const current = metadata[message.id] ?? null;
-		const next = await refreshMessageMetadata(partnershipId, message.id, href, current, targets);
+		const next = await refreshMessageMetadata(partnershipId, message, href, current, keys);
 		if (!next) {
 			// Pressed and waited on, unlike the backfill above, which is
 			// opportunistic and simply tries again on the next view.

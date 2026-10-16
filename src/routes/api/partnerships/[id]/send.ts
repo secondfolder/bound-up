@@ -131,7 +131,14 @@ export function sendFailureStatus(reason: SendFailure): number {
 		case 'no-such-tag':
 		case 'duplicate-attachment':
 		case 'bad-media-ttl':
+		case 'bad-body':
 			return 400;
+		// The partnership's vault is not the one the body was sealed to — it was
+		// made, or remade elsewhere, after this page loaded — or the id is
+		// taken. Either way the client should reload rather than retry as is.
+		case 'wrong-vault':
+		case 'duplicate-message':
+			return 409;
 		case 'needs-permanent-media':
 			return 403;
 		// 413, not 403: it is a size the account may not send, and a client

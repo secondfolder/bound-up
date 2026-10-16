@@ -7,6 +7,7 @@
 		MessagePayload
 	} from '$lib/crypto/messages';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
+	import { partnershipVault } from '$lib/crypto/vaults.svelte';
 	import { canDisplayAvif, canPlayVideo } from '$lib/media/support';
 	import { describeUnseenMedia, formatTimeLeft, neverOpened } from '$lib/messaging';
 	import {
@@ -92,6 +93,8 @@
 		})
 	);
 	const keyring = $derived(currentKeyring());
+	// `undefined` until vaults are worked out; the effects below wait for it.
+	const vault = $derived(partnershipVault(partnershipId));
 	const sealed = $derived(thread.unread && neverOpened(thread));
 	let preview: MessagePayload | null | undefined = $state(undefined);
 	let previewMetadata = $state<MessageMetadataPayload | null | undefined>(undefined);
@@ -134,26 +137,35 @@
 		if (!unseen) {
 			return;
 		}
-		const { identity } = keyring;
+		const keys = { identity: keyring.identity, vault };
 		let cancelled = false;
 		void Promise.all(
 			unseen.messages.map(async (message) => {
-				const payload = await openMessage(message.ciphertext, identity);
+				const payload = await openMessage(message, keys);
+				if (payload === undefined) {
+					// Sealed, and the vault is not open yet: this runs again when it is.
+					return;
+				}
 				if (!payload) {
 					return null;
 				}
-				const kinds = message.attachmentIds.map(
-					(id) => payload.attachments.find((info) => info.id === id)?.kind
-				);
-				return kinds.every((kind) => kind !== undefined) ? kinds : null;
+				const kinds: MessageAttachmentInfo['kind'][] = [];
+				for (const id of message.attachmentIds) {
+					const kind = payload.attachments.find((info) => info.id === id)?.kind;
+					if (!kind) {
+						return null;
+					}
+					kinds.push(kind);
+				}
+				return kinds;
 			})
 		)
 			.then((perMessage) => {
-				if (cancelled) {
+				if (cancelled || perMessage.some((kinds) => kinds === undefined)) {
 					return;
 				}
-				const known = perMessage.every((kinds) => kinds !== null);
-				unseenKinds = known && !unseen.truncated ? perMessage.flat() : null;
+				const known = perMessage.filter((kinds) => Array.isArray(kinds));
+				unseenKinds = known.length === perMessage.length && !unseen.truncated ? known.flat() : null;
 			})
 			.catch(() => {
 				if (!cancelled) {
@@ -181,7 +193,7 @@
 
 		let cancelled = false;
 		preview = undefined;
-		void openMessage(thread.previewCiphertext, keyring.identity).then((payload) => {
+		void openMessage(thread.preview, { identity: keyring.identity, vault }).then((payload) => {
 			if (!cancelled) {
 				preview = payload;
 			}
@@ -199,18 +211,20 @@
 		if (keyring.status !== 'unlocked') {
 			return;
 		}
-		if (thread.previewMetadataCiphertext === null) {
+		if (thread.preview.metadataCiphertext === null) {
 			previewMetadata = null;
 			return;
 		}
 
 		let cancelled = false;
 		previewMetadata = undefined;
-		void openMessageMetadata(thread.previewMetadataCiphertext, keyring.identity).then((payload) => {
-			if (!cancelled) {
-				previewMetadata = payload;
+		void openMessageMetadata(thread.preview, { identity: keyring.identity, vault }).then(
+			(payload) => {
+				if (!cancelled) {
+					previewMetadata = payload;
+				}
 			}
-		});
+		);
 
 		return () => {
 			cancelled = true;

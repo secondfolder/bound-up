@@ -19,6 +19,7 @@ const myWrap = alias(vaultWraps, 'my_wrap');
 const partnerWrap = alias(vaultWraps, 'partner_wrap');
 const inviterKeys = alias(userKeys, 'vault_inviter_keys');
 const inviteeKeys = alias(userKeys, 'vault_invitee_keys');
+const ownKeys = alias(userKeys, 'vault_own_keys');
 
 function wrapOrNull(ciphertext: string | null, forRecipient: string | null): VaultWrapView | null {
 	return ciphertext !== null && forRecipient !== null ? { ciphertext, forRecipient } : null;
@@ -47,7 +48,18 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 				wrapFor: myWrap.forRecipient
 			})
 			.from(vaults)
-			.leftJoin(myWrap, and(eq(myWrap.vaultId, vaults.id), eq(myWrap.userId, userId)))
+			.innerJoin(ownKeys, eq(ownKeys.userId, userId))
+			// Only the wrap for the key this user has now. A member can hold a
+			// second, for a key a partner-assisted sign-in is about to give them,
+			// which nothing can open yet.
+			.leftJoin(
+				myWrap,
+				and(
+					eq(myWrap.vaultId, vaults.id),
+					eq(myWrap.userId, userId),
+					eq(myWrap.forRecipient, ownKeys.recipient)
+				)
+			)
 			.where(eq(vaults.ownerUserId, userId))
 			.limit(1),
 		db
@@ -67,15 +79,34 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 			.innerJoin(inviterKeys, eq(inviterKeys.userId, partnerships.inviterId))
 			.innerJoin(inviteeKeys, eq(inviteeKeys.userId, partnerships.inviteeId))
 			.leftJoin(vaults, eq(vaults.partnershipId, partnerships.id))
-			.leftJoin(myWrap, and(eq(myWrap.vaultId, vaults.id), eq(myWrap.userId, userId)))
+			// Each side's wrap only for the key that side has now; see above.
+			.leftJoin(
+				myWrap,
+				and(
+					eq(myWrap.vaultId, vaults.id),
+					eq(myWrap.userId, userId),
+					or(
+						and(eq(partnerships.inviterId, userId), eq(myWrap.forRecipient, inviterKeys.recipient)),
+						and(eq(partnerships.inviteeId, userId), eq(myWrap.forRecipient, inviteeKeys.recipient))
+					)
+				)
+			)
 			.leftJoin(
 				partnerWrap,
 				and(
 					eq(partnerWrap.vaultId, vaults.id),
 					// The partner is whichever member is not the viewer.
 					or(
-						and(eq(partnerships.inviterId, userId), eq(partnerWrap.userId, partnerships.inviteeId)),
-						and(eq(partnerships.inviteeId, userId), eq(partnerWrap.userId, partnerships.inviterId))
+						and(
+							eq(partnerships.inviterId, userId),
+							eq(partnerWrap.userId, partnerships.inviteeId),
+							eq(partnerWrap.forRecipient, inviteeKeys.recipient)
+						),
+						and(
+							eq(partnerships.inviteeId, userId),
+							eq(partnerWrap.userId, partnerships.inviterId),
+							eq(partnerWrap.forRecipient, inviterKeys.recipient)
+						)
 					)
 				)
 			)
@@ -264,9 +295,9 @@ export type PutVaultWrapResult =
 	| { ok: false; reason: 'not-found' | 'invalid-wrap' | 'current' };
 
 /**
- * Stores a vault's key wrapped for one member: a member who has none yet, or
- * whose wrap is for a recipient they no longer have (a partner-assisted
- * sign-in gave them a new one).
+ * Stores a vault's key wrapped for one member: a member who has none for the
+ * key they have now — none yet, or only ones for keys they no longer have,
+ * after a partner-assisted sign-in elsewhere gave them a new one.
  *
  * `current` refuses to replace a wrap already made for the member's present
  * recipient. Such a wrap opens, and the only thing replacing it could do is
@@ -311,11 +342,17 @@ export async function putVaultWrap(
 
 	if (wrap.userId !== actorId) {
 		const [existing] = await db
-			.select({ forRecipient: vaultWraps.forRecipient })
+			.select({ id: vaultWraps.id })
 			.from(vaultWraps)
-			.where(and(eq(vaultWraps.vaultId, vaultId), eq(vaultWraps.userId, wrap.userId)))
+			.where(
+				and(
+					eq(vaultWraps.vaultId, vaultId),
+					eq(vaultWraps.userId, wrap.userId),
+					eq(vaultWraps.forRecipient, wrap.forRecipient)
+				)
+			)
 			.limit(1);
-		if (existing?.forRecipient === wrap.forRecipient) {
+		if (existing) {
 			return { ok: false, reason: 'current' };
 		}
 	}
@@ -329,8 +366,8 @@ export async function putVaultWrap(
 			forRecipient: wrap.forRecipient
 		})
 		.onConflictDoUpdate({
-			target: [vaultWraps.vaultId, vaultWraps.userId],
-			set: { ciphertext: wrap.ciphertext, forRecipient: wrap.forRecipient, updatedAt: new Date() }
+			target: [vaultWraps.vaultId, vaultWraps.userId, vaultWraps.forRecipient],
+			set: { ciphertext: wrap.ciphertext, updatedAt: new Date() }
 		});
 	return { ok: true };
 }

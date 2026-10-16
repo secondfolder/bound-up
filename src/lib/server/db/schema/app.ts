@@ -597,10 +597,12 @@ export const vaults = sqliteTable(
 /**
  * A vault's key, age-encrypted to one member's recipient.
  *
- * One per member: re-wrapping for a member replaces their row, which is what a
- * partner-assisted sign-in does once the member has a new recipient.
- * `for_recipient` records which recipient a wrap was made for, so a device can
- * tell a wrap made for a key it no longer has from one that is simply corrupt.
+ * One per member *per recipient*. Ordinarily that is one per member; the second
+ * exists during a partner-assisted sign-in, when the helping partner wraps the
+ * vault for the key the member is about to have while the wrap for the key
+ * they have now stays in place — so a sign-in that is declined or expires
+ * leaves nothing lost. Completing the sign-in deletes the wraps for the old
+ * key. A device only ever reads the wrap made for the recipient it holds.
  */
 export const vaultWraps = sqliteTable(
 	'vault_wraps',
@@ -620,7 +622,11 @@ export const vaultWraps = sqliteTable(
 		...timestamps
 	},
 	(table) => [
-		uniqueIndex('vault_wraps_vault_user_idx').on(table.vaultId, table.userId),
+		uniqueIndex('vault_wraps_vault_user_recipient_idx').on(
+			table.vaultId,
+			table.userId,
+			table.forRecipient
+		),
 		// Every read is "the wraps this user holds", once per page load.
 		index('vault_wraps_user_id_idx').on(table.userId)
 	]
@@ -789,6 +795,19 @@ export const messages = sqliteTable(
 		 * content derived from plaintext the server must not store in the clear.
 		 */
 		metadataCiphertext: text('metadata_ciphertext'),
+		/**
+		 * The partnership vault the body and its sidecar are sealed under, or
+		 * NULL for a row still in the original scheme — age-encrypted to both
+		 * partners' recipients. Rows move from the second to the first as either
+		 * partner's device migrates them; see docs/messaging.md. Nothing ever
+		 * moves back, which is what makes `vault_id IS NULL` a safe condition
+		 * for a migration write.
+		 */
+		vaultId: text('vault_id').references(() => vaults.id, { onDelete: 'cascade' }),
+		/** The sealed body's payload version. NULL exactly when `vault_id` is. */
+		payloadVersion: integer('payload_version'),
+		/** The sealed sidecar's payload version, when there is a sealed sidecar. */
+		metadataVersion: integer('metadata_version'),
 		...timestamps
 	},
 	(table) => [
@@ -885,6 +904,9 @@ export const messageReactions = sqliteTable(
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
 		ciphertext: text('ciphertext').notNull(),
+		/** As on `messages`: the vault it is sealed under, or NULL for the original scheme. */
+		vaultId: text('vault_id').references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version'),
 		...timestamps
 	},
 	(table) => [

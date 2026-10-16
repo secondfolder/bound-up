@@ -33,8 +33,12 @@ export const POST: RequestHandler = async (event) => {
 	const { form, attachments } = await parseSend(request);
 	const parsed = newThreadSchema.safeParse({
 		icon: form.get('icon'),
+		messageId: form.get('messageId'),
+		vaultId: form.get('vaultId'),
 		ciphertext: form.get('ciphertext'),
-		metadataCiphertext: form.get('metadataCiphertext')
+		payloadVersion: form.get('payloadVersion'),
+		metadataCiphertext: form.get('metadataCiphertext'),
+		metadataVersion: form.get('metadataVersion')
 	});
 	if (!parsed.success) {
 		error(400, parsed.error.issues[0]?.message ?? 'Malformed message');
@@ -57,9 +61,7 @@ export const POST: RequestHandler = async (event) => {
 	const result = await startThread(locals.db, store, {
 		partnershipId: params.id,
 		senderId: locals.user.id,
-		icon: parsed.data.icon,
-		ciphertext: parsed.data.ciphertext,
-		metadataCiphertext: parsed.data.metadataCiphertext,
+		...parsed.data,
 		attachments,
 		tagIds
 	});

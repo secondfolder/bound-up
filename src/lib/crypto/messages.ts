@@ -109,13 +109,6 @@ export async function decryptPayload<T = MessagePayload>(
 	}
 }
 
-export async function encryptMessageMetadata(
-	payload: MessageMetadataPayload,
-	recipients: string[]
-): Promise<string> {
-	return await encryptPayload(payload, recipients);
-}
-
 export async function decryptMessageMetadata(
 	ciphertext: string,
 	identity: CryptoKey | string

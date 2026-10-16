@@ -2,7 +2,8 @@
 
 Two linked partners can send each other private messages. The server stores a
 copy of everything so that signing in on a new device restores the history, but
-it stores only ciphertext.
+it stores only ciphertext: each message is a sealed record in the partnership's
+vault (see [Sealed in the partnership vault](#sealed-in-the-partnership-vault)).
 
 The keys are [docs/encryption.md](encryption.md). The link between two accounts
 is [docs/partners.md](partners.md). The body format is
@@ -36,18 +37,67 @@ browser is still working out whether this device can open the history, the
 board and thread render immediately with placeholder previews instead of a
 full-page loading wall.
 
+## Sealed in the partnership vault
+
+A message body, its metadata sidecar and a reaction are each a **sealed record**
+in the partnership's vault — three kinds, `message`, `message-metadata` and
+`message-reaction`, declared in `src/lib/sealed-kinds/messages.ts`. The vault,
+the record format and the version rules are [docs/encryption.md](encryption.md#vaults);
+what is particular to messages:
+
+- **Ids come from the browser.** A body is sealed to its message id, so the
+  sending browser chooses it (`messageId` in the send), the same way it already
+  chose attachment ids. A sidecar is sealed to its message's id. A reaction
+  gets a fresh id on every write, which the row takes on too.
+- **Every write needs the trust check's permission** — a send, a reaction and a
+  cached embed alike. Reactions and embed metadata used not to ask.
+- **The server checks that a body is sealed to this partnership's vault** and
+  that its version is one it knows (`checkSealedMessage` in
+  `server/messaging.ts`). A body sealed to any other vault is one neither
+  partner could open.
+
+### Moving into the vault
+
+Messages sent before vaults were age-encrypted to both partners' recipients,
+and some partnerships still hold rows like that: `vault_id` is NULL on them.
+The server cannot re-encrypt anything, so moving them is done by a device:
+
+- Once its vaults are open, the app shell starts `migrateOpenPartnerships`
+  (`messaging/migrate-on-load.ts`), once per partnership per page load, for
+  every partnership this device may write into.
+- That pages through `GET .../sealed-migration` — rows still in the original
+  scheme, messages and reactions on separate cursors — opens each with the
+  user's identity, seals it into the vault, and posts the copies back
+  (`messaging/vault-migration.ts`).
+- **Either partner can move any row**, since every one is encrypted to both. A
+  row this device cannot open — encrypted to a key it no longer has — is
+  skipped and left for the other partner's device.
+- **The server writes each row at most once** (`sealLegacyMessages`): only
+  where `vault_id IS NULL`, only inside this partnership, only into this
+  partnership's vault. Two devices migrating at once cannot overwrite each
+  other, and the endpoint cannot be used to edit a message.
+- **A body written before rich text is converted as it is sealed**, so
+  nothing in a vault is plain text. That replaced the earlier, separate
+  conversion of a sender's own legacy bodies.
+
+Until a row has moved it still reads the original way: every reader picks the
+scheme from the row (`openMessage` in `messaging/client.ts`). A sidecar is only
+ever sealed beside a sealed body; an embed looked up for a row still in the
+original scheme is shown, and stored when the row moves. How to tell when the
+original scheme can be deleted is in [docs/temporary-code.md](temporary-code.md).
+
 ## Tables
 
 | Table                      | What it holds                                                                                   |
 | -------------------------- | ----------------------------------------------------------------------------------------------- |
 | `message_threads`          | One exchange. Its sticker `icon`, plus two denormalised columns.                                |
-| `messages`                 | One message. The body ciphertext, its format flag, plus an optional encrypted metadata sidecar. |
+| `messages`                 | One message. The sealed body, the vault and versions, an optional sealed metadata sidecar.      |
 | `message_attachments`      | An encrypted file in the object store. Size, key, and when it self-destructs.                   |
 | `message_reactions`        | One tapback per user per message. Encrypted.                                                    |
 | `message_tags`             | A reusable name and color scoped to one partnership.                                            |
 | `message_thread_tags`      | The many-to-many assignment between threads and tags.                                           |
 | `thread_reads`             | Per-user read state for one thread.                                                             |
-| `history_restore_requests` | A partner asked, as part of a partner-assisted sign-in, to re-encrypt the shared history.      |
+| `history_restore_requests` | A partner asked, as part of a partner-assisted sign-in, to share the partnership vault again.  |
 
 Every foreign key cascades. Deleting a partnership takes its threads, messages,
 attachments rows, reactions and read state with it — but **not** the objects in
@@ -212,11 +262,11 @@ so the board no longer offsets or tilts each tile.
 
 Each file is encrypted under **its own ephemeral age identity**, and that
 identity travels inside the encrypted message body — rather than the file being
-encrypted to the two partners directly.
+encrypted under the vault directly.
 
-That indirection is what makes partner-assisted recovery affordable: restoring
-someone's history re-encrypts message _bodies_, a few kilobytes each, and never
-touches the megabytes in the object store.
+That indirection is what lets a body move, between schemes or into a new
+vault, without the file moving with it: re-sealing a body is a few kilobytes,
+and never touches the megabytes in the object store.
 
 `message_attachments` deliberately holds **no filename and no mime type**. Both
 live inside the encrypted body, so the server learns only that a file exists and
@@ -518,9 +568,9 @@ the client falls back to `embed.reddit.com` for the reddit post itself.
 
 Losing every way into an account — the password and every passkey — loses the
 identity for good: the wraps are the only copies and those were the only keys
-to them. But both people can already decrypt every message in the partnership,
-so the _other_ one can re-encrypt it. The server cannot help, and does not need
-to.
+to them. But everything a partnership shares is sealed in its vault, and the
+_other_ partner holds the vault key, so they can share it again. The server
+cannot help, and does not need to.
 
 This is the history half of a **partner-assisted sign-in**, which is how
 someone in that position gets back into their account at all; the sign-in half
@@ -533,10 +583,13 @@ security-critical part:
    **snapshot** of its recipient.
 2. Each partner is shown the request — on every screen, not only the board —
    and must compare the recovery code **out of band** before confirming.
-3. On confirm, the partner's device pages through every message body, encrypted
-   metadata sidecar **and reaction** with its own identity, re-encrypts each to
-   both recipients, and uploads the replacements a page at a time. The final
-   page is what approves the sign-in, if no other partner got there first.
+3. On confirm, the partner's device first moves any rows still in the original
+   scheme into the vault ([Moving into the vault](#moving-into-the-vault)) —
+   they are encrypted to the requester's lost key, so the vault is the only way
+   they will be read again. Then it wraps the vault key for the snapshotted
+   recipient and posts it (`POST .../restore`, `restoreVaultAccess`). That one
+   wrap restores the whole history, closes the request, and approves the
+   sign-in if no other partner got there first.
 4. The partner's device remembers the new key as vouched for, because comparing
    the recovery code is the same assurance as comparing the safety number. It
    is not pinned yet — the server serves the old key until the sign-in
@@ -544,28 +597,16 @@ security-critical part:
    new key is served it is accepted as verified, with no "key changed" warning
    (`recordVouch` in `crypto/pins.ts`).
 
-Reactions are included because they are encrypted too — a restore that skipped
-them would hand back a readable history dotted with tapbacks the owner cannot
-open.
+**The new wrap sits beside the requester's old one** (`vault_wraps` holds one
+per member per recipient). Their current wrap has to keep working until the
+sign-in actually completes — it may be declined or expire — and completing it
+deletes the wraps for the old key.
 
-Paging is a keyset cursor on `(created_at, id)`, not an `OFFSET`: an offset can
-both skip and repeat a row if anything is written while the restore is in
-flight. Each page is written back before the next is fetched, so a dropped
-connection leaves the earlier pages already restored and the request still open;
-running it again simply redoes the lot, which is harmless.
-
-A body that will not open is **skipped rather than failed on**. If both partners
-have reset at different times, a partnership can legitimately contain rows
-readable by neither, and stopping there would mean no restore ever completes for
-those two.
-
-`GET .../restore` is unusual enough to state plainly: it returns the _entire_
-shared history of a partnership as ciphertext. That is safe only because it goes
-to somebody who is already a recipient on every one of those messages, so the
-gate is not "are you a member" but "are you the member who did **not** raise
-this request" — checked against the request row, never inferred from the caller.
-The person who lost their key cannot read any of it, so a request from them is
-either a bug or a stolen session, and it 404s.
+**Another partner who does not confirm in time** still restores the
+requester's access to their partnership, just later: as soon as their device
+trusts the requester's new key, its ordinary vault pass wraps the vault for it
+(`ensureVaults` in `crypto/ensure-vaults.ts`). Until then the requester's board
+with them says their older messages are on their way.
 
 Declining is a first-class answer, not tidiness: the out-of-band comparison is
 the load-bearing step, and someone who finds the code does _not_ match needs a
@@ -573,21 +614,19 @@ way to say so that leaves the requester informed rather than waiting for ever.
 
 A restore request lives only as long as its sign-in: one whose sign-in expired,
 was superseded by a newer request or was declined disappears from the board
-and refuses uploads, so nobody re-encrypts a whole history to a key that will
-never be used.
+and is refused, so nobody hands a vault to a key that will never be used.
 
 Step 2 is load-bearing. Without the out-of-band check, a malicious server could
-inject a request carrying its own recipient and have the partner re-encrypt the
-entire history to it. The snapshot matters for the same reason: the
-re-encryption targets exactly the recipient that was compared, not whatever
-`user_keys` says at upload time.
+inject a request carrying its own recipient and have the partner wrap the vault
+for it. The snapshot matters for the same reason: the wrap is made for exactly
+the recipient that was compared, not whatever `user_keys` says at the time.
 
 Two honest caveats:
 
-- **A restore lets your partner rewrite the shared history.** The server cannot
-  verify that the new ciphertext says what the old one said — it cannot read
-  either. This is not a new trust boundary, since the partner could always send
-  whatever they liked, but it is worth knowing.
+- **A partner can write anything into what you share.** The server cannot check
+  that a re-sealed row says what the original said — it cannot read either. A
+  partner holds the vault key and could always write whatever they liked, so
+  this is no new trust boundary, but it is worth knowing.
 - **If both partners lose every way in, the history is gone.** So is the
   history of anyone with no partner. There is no other copy.
 
@@ -656,7 +695,8 @@ plainly, because the framing of this feature invites the assumption that it does
   longer surfaces that choice directly.
 
 What it does not know: any message text, any filename, any file type, any
-reaction, and anything that would let it read or forge any of them.
+reaction, and anything that would let it read or forge any of them — a sealed
+record can only be made by someone holding the vault key.
 
 ## Screens and endpoints
 
@@ -675,7 +715,9 @@ reaction, and anything that would let it read or forge any of them.
 | `.../messages/[messageId]/reaction` | `PUT` / `DELETE`.                                                           |
 | `.../attachments/[attachmentId]`    | `GET`, streams ciphertext. `410` once the media has self-destructed.        |
 | `.../ack-warning`                   | `POST`, the one-time warning acknowledgement.                               |
-| `.../restore`                       | `GET` a page, `POST` re-encrypted rows, `DELETE`.                           |
+| `.../restore`                       | `POST` the vault wrapped for the requester's new key, `DELETE` to decline.  |
+| `.../sealed-migration`              | `GET` rows still in the original scheme, `POST` them sealed into the vault. |
+| `.../messages/[messageId]/metadata` | `PUT` a sealed sidecar, beside a sealed body only.                          |
 | `.../events`                        | `GET`, the SSE feed. Metadata only.                                         |
 | `.../events/presence`               | `POST`, a stream's lease renewal or goodbye. See [A stream is a lease](#a-stream-is-a-lease). |
 
@@ -936,14 +978,7 @@ A message body is a Lexical `editorState.toJSON()` document, not prose — see
 - **`messages.body_format` is a second plaintext column**, `'plain' | 'lexical'`,
   and a closed list for the same reason `icon` is. It exists only so the server
   can tell a pre-rich-text body from a converted one, which it otherwise cannot
-  do at all. It is temporary — see
+  do at all. Moving a row into the vault converts its body and sets it to
+  `'lexical'`, so once nothing is left in the original scheme nothing is
+  `'plain'` either. It is temporary — see
   [docs/temporary-code.md](temporary-code.md).
-
-### A sender may rewrite their own legacy bodies
-
-`migrateMessageBodies` lets a client replace the ciphertext of messages **it
-sent**, and only while `body_format = 'plain'`. As with a history restore, the
-server cannot check that the new ciphertext says what the old one said; it
-cannot read either. That is the same trust boundary already recorded above for
-restores, narrowed further by being one-way: a converted row can never be
-rewritten again, so this is not a general message-editing capability.

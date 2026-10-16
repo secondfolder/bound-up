@@ -9,6 +9,7 @@ import {
 	createTestThread,
 	createTestUser,
 	createTestUserKeys,
+	ensureTestPartnershipVault,
 	readUserKeysRow,
 	readWrapRows,
 	type TestUser
@@ -19,9 +20,10 @@ import {
 	historyRestoreRequests,
 	passkey,
 	session,
-	user
+	user,
+	vaultWraps
 } from './db/schema';
-import { applyHistoryRestore, declineHistoryRestore, listRestoreRequests } from './messaging';
+import { declineHistoryRestore, listRestoreRequests, restoreVaultAccess } from './messaging';
 import {
 	completeAccountRecovery,
 	confirmRecoveryEmail,
@@ -93,15 +95,15 @@ async function startAndConfirmEmail() {
 	return token;
 }
 
-/** Jun re-encrypts everything and finishes, which is what approves the sign-in. */
+/** Jun wraps the vault for Ada's new key, which is what approves the sign-in. */
 async function approveAsJun() {
+	await ensureTestPartnershipVault(harness.db, partnershipId);
 	const [request] = await listRestoreRequests(harness.db, partnershipId, jun.id);
-	await applyHistoryRestore(harness.db, {
+	await restoreVaultAccess(harness.db, {
 		partnershipId,
 		requestId: request.id,
 		actorId: jun.id,
-		messages: [],
-		final: true
+		vaultWrap: 'bmV3IHdyYXA='
 	});
 }
 
@@ -241,13 +243,13 @@ describe('where a request stands', () => {
 		const token = await startOk();
 		const [request] = await listRestoreRequests(harness.db, partnershipId, ada.id);
 		const stranger = await createTestUser(harness.db);
+		await ensureTestPartnershipVault(harness.db, partnershipId);
 		for (const actorId of [ada.id, stranger.id]) {
-			await applyHistoryRestore(harness.db, {
+			await restoreVaultAccess(harness.db, {
 				partnershipId,
 				requestId: request.id,
 				actorId,
-				messages: [],
-				final: true
+				vaultWrap: 'bmV3IHdyYXA='
 			});
 		}
 		await expect(recoveryStatus(harness.db, token)).resolves.toMatchObject({ status: 'pending' });
@@ -384,6 +386,28 @@ describe('completing a request', () => {
 		await expect(
 			completeAccountRecovery(harness.db, { token, passwordHash: 'again' })
 		).resolves.toEqual({ ok: false, reason: 'not-approved' });
+	});
+
+	/**
+	 * The wrap Jun made for the new key is what brings their shared history
+	 * back; a wrap for the old one opens nothing any more.
+	 */
+	it('keeps the vault wraps for the new key and drops those for the old', async () => {
+		const token = await startAndConfirmEmail();
+		const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+		const old = defined(await readUserKeysRow(harness.db, ada.id), 'keys').recipient;
+		await harness.db
+			.insert(vaultWraps)
+			.values({ vaultId, userId: ada.id, ciphertext: 'b2xk', forRecipient: old });
+		await approveAsJun();
+
+		await completeAccountRecovery(harness.db, { token, passwordHash: 'new-hash' });
+
+		const wraps = await harness.db
+			.select({ forRecipient: vaultWraps.forRecipient })
+			.from(vaultWraps)
+			.where(eq(vaultWraps.userId, ada.id));
+		expect(wraps).toEqual([{ forRecipient: NEW_RECIPIENT }]);
 	});
 
 	it('leaves the partner who helped untouched', async () => {

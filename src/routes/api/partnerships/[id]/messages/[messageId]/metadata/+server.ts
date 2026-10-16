@@ -17,14 +17,22 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 		error(400, parsed.error.issues[0]?.message ?? 'Malformed metadata');
 	}
 
-	const updated = await setMessageMetadataCiphertext(locals.db, {
+	const outcome = await setMessageMetadataCiphertext(locals.db, {
 		partnershipId: params.id,
 		messageId: params.messageId,
 		viewerId: locals.user.id,
-		metadataCiphertext: parsed.data.metadataCiphertext
+		...parsed.data
 	});
-	if (!updated) {
+	if (outcome === 'not-found') {
 		error(404, 'Not found');
+	}
+	if (outcome === 'bad-body') {
+		error(400, 'Malformed metadata');
+	}
+	// A message still in the original scheme gets its sidecar when it is
+	// migrated, with its body. Not an error worth showing anyone.
+	if (outcome === 'not-sealed') {
+		error(409, 'This message has not moved into the vault yet');
 	}
 	return json({ ok: true });
 };
