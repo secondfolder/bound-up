@@ -54,10 +54,10 @@ test.describe('sealed tasks and rewards', () => {
 			expect(rewards.rows).toHaveLength(1);
 			const [task] = tasks.rows;
 			const [reward] = rewards.rows;
-			expect(task).toMatchObject({ title: null, description: null, completion_messages: null });
+			expect(task).toMatchObject({ title: '', description: null, completion_messages: '[]' });
 			expect(task?.ciphertext).toMatch(/^sb1\./);
 			expect(task?.completion_message_count).toBe(1);
-			expect(reward).toMatchObject({ title: null, description: null });
+			expect(reward).toMatchObject({ title: '', description: null });
 			expect(reward?.ciphertext).toMatch(/^sb1\./);
 
 			// Not in any column, under any name.
@@ -108,9 +108,9 @@ test.describe('sealed tasks and rewards', () => {
 					return rows[0];
 				})
 				.toMatchObject({
-					title: null,
+					title: '',
 					description: null,
-					completion_messages: null,
+					completion_messages: '[]',
 					ciphertext: expect.stringMatching(/^sb1\./)
 				});
 

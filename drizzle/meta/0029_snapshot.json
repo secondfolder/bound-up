@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "73e6e80f-7f67-498a-a80f-f62ed38c0121",
+  "id": "0b8ac920-55cc-43ae-9a24-a734dc696567",
   "prevId": "fb551746-87fe-45a8-9dae-ba784a25574c",
   "tables": {
     "account_recovery_requests": {
@@ -880,6 +880,42 @@
           "notNull": true,
           "autoincrement": false
         },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vault_id": {
+          "name": "vault_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payload_version": {
+          "name": "payload_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "name_index": {
+          "name": "name_index",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -906,6 +942,14 @@
           ],
           "isUnique": true
         },
+        "message_tags_partnership_name_index_unq": {
+          "name": "message_tags_partnership_name_index_unq",
+          "columns": [
+            "partnership_id",
+            "name_index"
+          ],
+          "isUnique": true
+        },
         "message_tags_partnership_idx": {
           "name": "message_tags_partnership_idx",
           "columns": [
@@ -921,6 +965,19 @@
           "tableTo": "partnerships",
           "columnsFrom": [
             "partnership_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "message_tags_vault_id_vaults_id_fk": {
+          "name": "message_tags_vault_id_vaults_id_fk",
+          "tableFrom": "message_tags",
+          "tableTo": "vaults",
+          "columnsFrom": [
+            "vault_id"
           ],
           "columnsTo": [
             "id"
@@ -1287,7 +1344,7 @@
           "name": "reward_title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "reward_description": {
@@ -1565,7 +1622,7 @@
           "name": "title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "description": {
@@ -1748,7 +1805,7 @@
           "name": "task_title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "task_description": {
@@ -1948,7 +2005,7 @@
           "name": "title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "description": {
@@ -1978,7 +2035,7 @@
           "name": "completion_messages",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "completion_message_count": {
@@ -2462,7 +2519,7 @@
           "name": "reward_title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "reward_description": {
@@ -2684,7 +2741,7 @@
           "name": "title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "description": {
@@ -2833,7 +2890,7 @@
           "name": "task_title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "task_description": {
@@ -2992,7 +3049,7 @@
           "name": "title",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "description": {
@@ -3022,7 +3079,7 @@
           "name": "completion_messages",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "completion_message_count": {

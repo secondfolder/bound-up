@@ -128,9 +128,9 @@ describe('self tasks', () => {
 		const { id } = await createTestSelfTask(harness.db, ada);
 
 		await expect(readSelfTaskRow(harness.db, id)).resolves.toMatchObject({
-			title: null,
+			title: '',
 			description: null,
-			completionMessages: null
+			completionMessages: []
 		});
 		const task = defined(await getSelfTaskForUser(harness.db, ada.id, ada.timezone, id), 'task');
 		expect(task).toMatchObject({ title: '', description: null, completionMessages: [] });
@@ -182,7 +182,7 @@ describe('self tasks', () => {
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
 			snapshotRecordId: id,
-			taskTitle: null,
+			taskTitle: '',
 			taskDescription: null,
 			completionMessage: null
 		});
@@ -371,9 +371,9 @@ describe('partnership tasks', () => {
 			ciphertext,
 			vaultId,
 			revision: 0,
-			title: null,
+			title: '',
 			description: null,
-			completionMessages: null
+			completionMessages: []
 		});
 
 		const stranger = await createTestUser(harness.db, { name: 'Stranger' });
@@ -611,7 +611,7 @@ describe('partnership tasks', () => {
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
 			snapshotRecordId: id,
-			taskTitle: null,
+			taskTitle: '',
 			taskDescription: null,
 			completionMessage: null
 		});

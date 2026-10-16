@@ -982,6 +982,19 @@ Unless the user explicilty indicates otherwise the plan or major change should i
   check and passkeys bind to the wrong name. adapter-node's default body limit
   is 512 KB; the Dockerfile raises it, and `self-hosted/dockerfile.test.ts`
   fails if `MAX_REQUEST_BYTES` ever outgrows it.
+- **A migration that rebuilds a table deletes data on D1.** drizzle-kit
+  rebuilds a table (`CREATE __new_x`, `DROP TABLE x`, rename) for any change
+  SQLite cannot ALTER — making a column nullable, changing a foreign key — and
+  wraps it in `PRAGMA foreign_keys=OFF`. D1 applies migrations in a
+  transaction, where that pragma does nothing, so the DROP fires every
+  `ON DELETE CASCADE` pointing at the table: rebuilding `self_tasks` emptied
+  `self_task_completions` when measured against local D1. libsql honours the
+  pragma, so dev, the tests and the Docker image never show it.
+  `src/lib/server/db/migrations.test.ts` fails on any new `DROP TABLE`; avoid
+  the rebuild instead (keep the column NOT NULL and write an empty value).
+  Relatedly, a column added by `ALTER TABLE … REFERENCES` gets **no**
+  `ON DELETE` action whatever the schema says, so delete what references it
+  explicitly.
 - **A build-time constant for a new backend branch is `dev || __SELF_HOSTED__`,
   not `!event.platform`.** A runtime check would keep libsql and `node:fs` in
   the worker bundle, where they cannot load.

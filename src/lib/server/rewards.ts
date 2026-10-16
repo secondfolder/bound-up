@@ -175,7 +175,7 @@ function sealedRewardColumns(content: RewardInput['content'], revision: number) 
 		vaultId: content.vaultId,
 		payloadVersion: content.payloadVersion,
 		revision,
-		title: null,
+		title: '',
 		description: null
 	};
 }
@@ -193,7 +193,7 @@ function claimSnapshot(reward: SelfRewardRow | PartnershipRewardRow) {
 			snapshotVaultId: sealed.vaultId,
 			snapshotVersion: sealed.payloadVersion,
 			snapshotRecordId: sealed.recordId,
-			rewardTitle: null,
+			rewardTitle: '',
 			rewardDescription: null
 		};
 	}

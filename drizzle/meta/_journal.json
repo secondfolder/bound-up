@@ -208,8 +208,8 @@
     {
       "idx": 29,
       "version": "6",
-      "when": 1792128548688,
-      "tag": "0029_make_task_and_reward_plaintext_nullable",
+      "when": 1792130966604,
+      "tag": "0029_add_sealed_tag_columns",
       "breakpoints": true
     }
   ]

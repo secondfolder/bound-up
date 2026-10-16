@@ -247,9 +247,9 @@ function sealedTaskColumns(content: SealedTaskContent, revision: number) {
 		completionMessageCount: content.completionMessageCount,
 		revision,
 		// Never both: once the content is sealed, the plaintext goes.
-		title: null,
+		title: '',
 		description: null,
-		completionMessages: null
+		completionMessages: []
 	};
 }
 type CreateTaskResult<TReason extends string> =
@@ -470,7 +470,7 @@ function completionSnapshot(task: SelfTaskRow | PartnershipTaskRow) {
 			snapshotVersion: sealed.payloadVersion,
 			snapshotRecordId: sealed.recordId,
 			completionMessageIndex: chooseCompletionIndex(task.completionMessageCount),
-			taskTitle: null,
+			taskTitle: '',
 			taskDescription: null,
 			completionMessage: null
 		};

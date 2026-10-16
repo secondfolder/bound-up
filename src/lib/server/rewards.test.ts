@@ -121,7 +121,7 @@ describe('self rewards', () => {
 		const { id } = await createTestSelfReward(harness.db, ada);
 
 		await expect(readSelfRewardRow(harness.db, id)).resolves.toMatchObject({
-			title: null,
+			title: '',
 			description: null
 		});
 		const reward = defined(await getSelfRewardForUser(harness.db, ada.id, id), 'reward');
@@ -145,7 +145,7 @@ describe('self rewards', () => {
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
 			snapshotRecordId: id,
-			rewardTitle: null,
+			rewardTitle: '',
 			rewardDescription: null
 		});
 		const section = await getSelfRewardsSection(harness.db, ada.id);
@@ -287,7 +287,7 @@ describe('partnership rewards', () => {
 			ciphertext,
 			vaultId,
 			revision: 0,
-			title: null,
+			title: '',
 			description: null
 		});
 
@@ -351,7 +351,7 @@ describe('partnership rewards', () => {
 			snapshotVaultId: vaultId,
 			snapshotVersion: 1,
 			snapshotRecordId: id,
-			rewardTitle: null,
+			rewardTitle: '',
 			rewardDescription: null
 		});
 		const page = defined(await getPartnershipRewardsPage(harness.db, claimantView, ada.id), 'page');

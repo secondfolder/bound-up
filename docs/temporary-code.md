@@ -221,7 +221,7 @@ Tasks, rewards, completions and claims are sealed in a vault
 keep their text in plaintext columns until a device seals them: once vaults
 are open, `content-sealing.ts` asks `/api/sealing/[scope]` for the scope's
 unsealed rows, seals each into the scope's vault, and posts them back, and the
-server clears the plaintext in the same write. Any member can seal a
+server empties the plaintext in the same write. Any member can seal a
 partnership's rows; only the owner, their own. A completion or claim is sealed
 to its own id, as the task or reward it recorded, with the one message it was
 given at index 0.
@@ -239,7 +239,10 @@ given at index 0.
   `completion_messages` on the task tables; `task_title`, `task_description`
   and `completion_message` on the completion tables; `title` and
   `description` on the reward tables; `reward_title` and `reward_description`
-  on the claim tables. All nullable since migration 0029.
+  on the claim tables. A sealed row keeps them empty (`''`, `'[]'` or NULL)
+  rather than NULL throughout, because making a NOT NULL column nullable
+  means rebuilding the table, and a rebuild cascade-deletes on D1 (see the
+  trap in AGENTS.md).
 
 A row whose old content does not fit the kind — a title over 80 characters,
 say, from before a limit — is skipped rather than sealed, and stays in
@@ -267,7 +270,8 @@ before dropping the columns; dropping them deletes that text.
 ### What to remove
 
 1. Everything in the list above.
-2. Drop the plaintext columns, and make `ciphertext`, `vault_id` and
-   `payload_version` (and the `snapshot_*` columns on completions and claims)
-   `NOT NULL`, with a generated migration.
+2. Drop the plaintext columns with a generated migration. `DROP COLUMN` is
+   an ALTER, not a rebuild, so it is safe; making `ciphertext` and the rest
+   `NOT NULL` is a rebuild, so leave them nullable and let the code hold the
+   line, unless the rebuild has been checked against D1 first.
 3. Re-run the full verification loop, including `npm run test:e2e`.

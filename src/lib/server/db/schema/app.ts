@@ -203,8 +203,13 @@ export const selfRewards = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
-		title: text('title'),
+		/**
+		 * Plaintext until sealed; empty once the content is in `ciphertext`.
+		 * Emptied rather than NULL so the column can stay NOT NULL: making it
+		 * nullable means rebuilding the table, which on D1 cascade-deletes every
+		 * row that references it (see the trap in AGENTS.md).
+		 */
+		title: text('title').notNull(),
 		description: text('description'),
 		cost: integer('cost').notNull(),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
@@ -253,8 +258,8 @@ export const selfRewardClaims = sqliteTable(
 		rewardId: text('reward_id')
 			.notNull()
 			.references(() => selfRewards.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
-		rewardTitle: text('reward_title'),
+		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
+		rewardTitle: text('reward_title').notNull(),
 		rewardDescription: text('reward_description'),
 		rewardCost: integer('reward_cost').notNull(),
 		...sealedSnapshot(),
@@ -284,8 +289,13 @@ export const partnershipRewards = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
-		title: text('title'),
+		/**
+		 * Plaintext until sealed; empty once the content is in `ciphertext`.
+		 * Emptied rather than NULL so the column can stay NOT NULL: making it
+		 * nullable means rebuilding the table, which on D1 cascade-deletes every
+		 * row that references it (see the trap in AGENTS.md).
+		 */
+		title: text('title').notNull(),
 		description: text('description'),
 		cost: integer('cost').notNull(),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
@@ -349,8 +359,8 @@ export const partnershipRewardClaims = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
-		rewardTitle: text('reward_title'),
+		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
+		rewardTitle: text('reward_title').notNull(),
 		rewardDescription: text('reward_description'),
 		rewardCost: integer('reward_cost').notNull(),
 		...sealedSnapshot(),
@@ -383,12 +393,17 @@ export const selfTasks = sqliteTable(
 		ownerId: text('owner_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
-		title: text('title'),
+		/**
+		 * Plaintext until sealed; empty once the content is in `ciphertext`.
+		 * Emptied rather than NULL so the column can stay NOT NULL: making it
+		 * nullable means rebuilding the table, which on D1 cascade-deletes every
+		 * row that references it (see the trap in AGENTS.md).
+		 */
+		title: text('title').notNull(),
 		description: text('description'),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		creditsAwarded: integer('credits_awarded').notNull().default(0),
-		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>(),
+		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>().notNull(),
 		/**
 		 * How many completion messages the sealed content holds. Plaintext so the
 		 * server can still pick one at random on completion — an index, which the
@@ -430,8 +445,8 @@ export const selfTaskCompletions = sqliteTable(
 		taskId: text('task_id')
 			.notNull()
 			.references(() => selfTasks.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
-		taskTitle: text('task_title'),
+		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
+		taskTitle: text('task_title').notNull(),
 		taskDescription: text('task_description'),
 		creditsAwarded: integer('credits_awarded').notNull(),
 		completionMessage: text('completion_message'),
@@ -469,12 +484,17 @@ export const partnershipTasks = sqliteTable(
 		timezoneOwnerUserId: text('timezone_owner_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext until sealed; NULL once the content is in `ciphertext`. */
-		title: text('title'),
+		/**
+		 * Plaintext until sealed; empty once the content is in `ciphertext`.
+		 * Emptied rather than NULL so the column can stay NOT NULL: making it
+		 * nullable means rebuilding the table, which on D1 cascade-deletes every
+		 * row that references it (see the trap in AGENTS.md).
+		 */
+		title: text('title').notNull(),
 		description: text('description'),
 		active: integer('active', { mode: 'boolean' }).notNull().default(true),
 		creditsAwarded: integer('credits_awarded').notNull().default(0),
-		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>(),
+		completionMessages: text('completion_messages', { mode: 'json' }).$type<string[]>().notNull(),
 		/**
 		 * How many completion messages the sealed content holds. Plaintext so the
 		 * server can still pick one at random on completion — an index, which the
@@ -524,8 +544,8 @@ export const partnershipTaskCompletions = sqliteTable(
 		createdByUserId: text('created_by_user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		/** Plaintext snapshot until sealed; NULL once it is in the sealed snapshot. */
-		taskTitle: text('task_title'),
+		/** Plaintext snapshot until sealed; empty once it is in the sealed snapshot. */
+		taskTitle: text('task_title').notNull(),
 		taskDescription: text('task_description'),
 		creditsAwarded: integer('credits_awarded').notNull(),
 		completionMessage: text('completion_message'),
@@ -780,12 +800,26 @@ export const messageTags = sqliteTable(
 		partnershipId: text('partnership_id')
 			.notNull()
 			.references(() => partnerships.id, { onDelete: 'cascade' }),
+		/**
+		 * Plaintext only on a tag written before sealing, empty after; NOT NULL
+		 * for the reason the task tables give.
+		 */
 		name: text('name').notNull(),
 		color: text('color').notNull(),
+		/**
+		 * The name, sealed in the partnership's vault (kind `tag`), and its
+		 * blind index: a keyed hash of the normalised name that only says two
+		 * tags in this partnership are called the same. What the unique index
+		 * below enforces, since the name itself is unreadable here. Both NULL
+		 * on a tag written before sealing, whose `name` is still plaintext.
+		 */
+		...sealedContent(),
+		nameIndex: text('name_index'),
 		...timestamps
 	},
 	(table) => [
 		uniqueIndex('message_tags_partnership_name_unq').on(table.partnershipId, table.name),
+		uniqueIndex('message_tags_partnership_name_index_unq').on(table.partnershipId, table.nameIndex),
 		index('message_tags_partnership_idx').on(table.partnershipId)
 	]
 );

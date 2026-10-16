@@ -127,7 +127,7 @@ describe('actions', () => {
 		await runAndCatch(() => actions.default?.(at(reward.id, ada, post)));
 
 		await expect(readSelfRewardRow(db, reward.id)).resolves.toMatchObject({
-			title: null,
+			title: '',
 			description: null,
 			ciphertext: post.ciphertext
 		});

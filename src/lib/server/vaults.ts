@@ -7,6 +7,10 @@ import type { Db } from './db';
 import {
 	accountRecoveryRequests,
 	partnerships,
+	selfRewardClaims,
+	selfRewards,
+	selfTaskCompletions,
+	selfTasks,
 	userKeys,
 	vaultEscrowRelays,
 	vaultEscrows,
@@ -584,7 +588,19 @@ export async function deleteLostSelfVault(
 	if (escrow && (await releasableRecovery(db, userId, now))) {
 		return false;
 	}
-	await db.delete(vaults).where(eq(vaults.id, vaultId));
+	// Deleted explicitly, not left to the schema's `onDelete: 'cascade'`: the
+	// sealed columns were added with ALTER TABLE, which in SQLite (and D1) gives
+	// a foreign key no ON DELETE action, so the vault delete alone would be
+	// refused while anything still names it. Completions and claims first, as
+	// they copy a task's or reward's record; the rest go with their task or
+	// reward in any case.
+	await db.batch([
+		db.delete(selfTaskCompletions).where(eq(selfTaskCompletions.snapshotVaultId, vaultId)),
+		db.delete(selfRewardClaims).where(eq(selfRewardClaims.snapshotVaultId, vaultId)),
+		db.delete(selfTasks).where(eq(selfTasks.vaultId, vaultId)),
+		db.delete(selfRewards).where(eq(selfRewards.vaultId, vaultId)),
+		db.delete(vaults).where(eq(vaults.id, vaultId))
+	]);
 	return true;
 }
 

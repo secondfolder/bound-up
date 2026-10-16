@@ -162,9 +162,9 @@ describe('actions', () => {
 
 		await actions.default?.(at(task.id, ada, post));
 		await expect(readSelfTaskRow(db, task.id)).resolves.toMatchObject({
-			title: null,
+			title: '',
 			description: null,
-			completionMessages: null,
+			completionMessages: [],
 			ciphertext: post.ciphertext
 		});
 	});

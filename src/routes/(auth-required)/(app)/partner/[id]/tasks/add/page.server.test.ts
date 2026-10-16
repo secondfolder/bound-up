@@ -88,7 +88,7 @@ describe('actions', () => {
 		await runAndCatch(() => actions.default?.(at(id, ada, post)));
 
 		await expect(readPartnershipTaskRow(db, post.recordId)).resolves.toMatchObject({
-			title: null,
+			title: '',
 			description: null,
 			ciphertext: post.ciphertext
 		});

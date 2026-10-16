@@ -278,9 +278,9 @@ export async function sealUnsealedContent(
 					payloadVersion: row.payloadVersion,
 					completionMessageCount: row.completionMessageCount,
 					revision: sql`${t.tasks.revision} + 1`,
-					title: null,
+					title: '',
 					description: null,
-					completionMessages: null
+					completionMessages: []
 				})
 				.where(
 					and(
@@ -300,7 +300,7 @@ export async function sealUnsealedContent(
 					snapshotVersion: row.payloadVersion,
 					snapshotRecordId: row.id,
 					completionMessageIndex: row.completionMessageIndex,
-					taskTitle: null,
+					taskTitle: '',
 					taskDescription: null,
 					completionMessage: null
 				})
@@ -321,7 +321,7 @@ export async function sealUnsealedContent(
 					vaultId,
 					payloadVersion: row.payloadVersion,
 					revision: sql`${t.rewards.revision} + 1`,
-					title: null,
+					title: '',
 					description: null
 				})
 				.where(
@@ -341,7 +341,7 @@ export async function sealUnsealedContent(
 					snapshotVaultId: vaultId,
 					snapshotVersion: row.payloadVersion,
 					snapshotRecordId: row.id,
-					rewardTitle: null,
+					rewardTitle: '',
 					rewardDescription: null
 				})
 				.where(

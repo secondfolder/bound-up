@@ -253,9 +253,9 @@ describe('sealUnsealedContent', () => {
 			payloadVersion: 1,
 			completionMessageCount: 1,
 			revision: 1,
-			title: null,
+			title: '',
 			description: null,
-			completionMessages: null
+			completionMessages: []
 		});
 		const [completion] = await readSelfTaskCompletionRows(harness.db, ada.id);
 		expect(defined(completion, 'completion row')).toMatchObject({
@@ -264,7 +264,7 @@ describe('sealUnsealedContent', () => {
 			snapshotVersion: 1,
 			snapshotRecordId: ids.completionId,
 			completionMessageIndex: 0,
-			taskTitle: null,
+			taskTitle: '',
 			taskDescription: null,
 			completionMessage: null
 		});
@@ -272,7 +272,7 @@ describe('sealUnsealedContent', () => {
 			ciphertext: batch.rewards[0]?.ciphertext,
 			vaultId,
 			revision: 1,
-			title: null,
+			title: '',
 			description: null
 		});
 		const [claim] = await readSelfRewardClaimRows(harness.db, ada.id);
@@ -280,7 +280,7 @@ describe('sealUnsealedContent', () => {
 			snapshotCiphertext: batch.claims[0]?.ciphertext,
 			snapshotVaultId: vaultId,
 			snapshotRecordId: ids.claimId,
-			rewardTitle: null,
+			rewardTitle: '',
 			rewardDescription: null
 		});
 
@@ -307,13 +307,13 @@ describe('sealUnsealedContent', () => {
 			ciphertext: batch.tasks[0]?.ciphertext,
 			vaultId,
 			revision: 1,
-			title: null
+			title: ''
 		});
 		await expect(readPartnershipRewardRow(harness.db, ids.rewardId)).resolves.toMatchObject({
 			ciphertext: batch.rewards[0]?.ciphertext,
 			vaultId,
 			revision: 1,
-			title: null
+			title: ''
 		});
 	});
 

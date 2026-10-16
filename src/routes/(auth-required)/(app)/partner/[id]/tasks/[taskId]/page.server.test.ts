@@ -178,9 +178,9 @@ describe('actions', () => {
 
 		await actions.default?.(at(id, task.id, ada, post));
 		await expect(readPartnershipTaskRow(db, task.id)).resolves.toMatchObject({
-			title: null,
+			title: '',
 			description: null,
-			completionMessages: null,
+			completionMessages: [],
 			ciphertext: post.ciphertext
 		});
 	});

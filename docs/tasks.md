@@ -232,8 +232,8 @@ Important fields on the live task rows:
 - `last_completed_at`
 - `completed_count`
 - `next_eligible_at`
-- `title`, `description`, `completion_messages` — plaintext, set only on rows
-  written before sealing and cleared when a device seals them (see
+- `title`, `description`, `completion_messages` — plaintext, filled only on
+  rows written before sealing and emptied when a device seals them (see
   [docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext))
 
 Completion rows snapshot:
