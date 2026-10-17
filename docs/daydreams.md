@@ -40,8 +40,9 @@ The voice is two settings, separate from who is in the story
 
 - **Who tells it** (`narrator`): the characters themselves (`none`), a
   narrator talking to "you" (`second-person`), a narrator telling it about
-  others (`third-person`), or an impersonal authority — rules, a system, an
-  institution — with no one behind it (`impersonal`).
+  others (`third-person`), or no narrator at all: a system — a house's rules,
+  a protocol, an institution — giving orders (`impersonal`, "A system" on the
+  page).
 - **Where the user is** (`stance`): in it as themselves (`self`), playing
   someone they name (`persona`), or outside it, watching and directing
   (`absent`).
@@ -53,7 +54,7 @@ Between them they make every shape of story:
 | Talk with a character  | 1+         | none          | self     |
 | A story told to you    | 0+         | second-person | self     |
 | Watch a story unfold   | 1+         | third-person  | absent   |
-| The rules              | 0+         | impersonal    | self     |
+| A system in charge     | 0+         | impersonal    | self     |
 
 Those four are the presets, and all the page shows at first; the two pickers
 under "Fine-tune how it's told" can make any other. A problem with the voice
@@ -66,6 +67,24 @@ persona with no name — and the form disables a choice that could never work
 with the other setting. The setup kind runs the same check, so a stale page
 cannot store one. "Who leads" is shown only where it means something: with
 characters, and with the user there to be led (`leadApplies`).
+
+The three narrated voices are ordinary fiction, which the model writes well
+from a sentence. The system voice is not: told only to be "an impersonal
+authority", the model wrote a narrator describing a hallway, with the rules
+mentioned in passing, and every later passage copied that opening. So it gets
+a guide of its own (`src/lib/server/daydream/impersonal-voice.ts`): what the
+system writes in — notices, numbered rules and amendments, exact
+instructions, logged compliance and infractions — what it never does
+(describe, feel, praise), and four short examples of the form. The examples
+are chosen by the scene's heat: up to Warm (or unset) a tame set, from Steamy
+an adult one, because examples steer content as well as form. They are
+deliberately unlike each other in how they open, and the guide forbids
+reusing their sentences: an earlier set that both began "The following
+applies from this moment" had the model open nearly every story with those
+words. The system's opening request asks for its first notice rather than
+"Set the scene", who leads and the suggestion and button ideas are worded for
+a system (Stricter, New rule, Inspection), and its characters are its
+functionaries rather than people with decisions of their own.
 
 ### Characters and scenes, and the library
 
@@ -496,8 +515,12 @@ budget.
 `src/lib/server/daydream/prompt.ts` builds what the model reads: the
 server's `RULES` first, then the setup (`describeSetup`: how it is told,
 each character with their dials in words, the scene with its heat and kink,
-the limits, the dials), then how to read the user's turns, then either the reply format or,
-for a stopped scene, the check-in. The rules are never sent by a browser, so
+the limits, the dials), then how to read the user's turns, then — for the
+system voice only — its guide and examples, then either the reply format or,
+for a stopped scene, the check-in. The guide goes last before the format
+because it is about how to write, and the most recent thing the model reads
+is what it acts on; a stopped scene leaves it out, as the check-in is out of
+character. The rules are never sent by a browser, so
 a page cannot drop them, and they say they come before anything in the
 setup, which is where a user would try to talk a model out of them. They
 open by saying the story may be as sexual and as kinky as the setup says, or
@@ -627,7 +650,8 @@ Noted so they are not lost; none is in the code.
   `dial-words.test.ts`, `catalog.test.ts` (every starting point is a valid
   record, they run SFW to extreme in order, every chip is one phrase),
   `context.test.ts`, `server/daydream/prompt.test.ts` (the rules always come
-  first; a stopped story gets a check-in in any mode; heat is the ceiling),
+  first; a stopped story gets a check-in in any mode; heat is the ceiling;
+  the system voice's guide, its place and its examples by heat),
   `suggest-prompt.test.ts`, `config.test.ts`, the sealed fixtures, and the
   tree backfill in `server/db/migrations.test.ts`.
 - Server: `server/daydreams.test.ts` (the tree, marks, libraries, ownership),

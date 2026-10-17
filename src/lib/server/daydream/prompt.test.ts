@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { type DaydreamNarrator, type DaydreamStance, UNSET_CHARACTER_DIALS } from '$lib/daydream';
+import {
+	type DaydreamNarrator,
+	type DaydreamStance,
+	type DialValue,
+	UNSET_CHARACTER_DIALS
+} from '$lib/daydream';
 import type { ContextTurn } from '$lib/daydream/context';
 import { daydreamSetupKind } from '$lib/sealed-kinds/daydreams';
 import { testCharacter, testDaydreamSetup, testScene } from '$lib/testing/daydream-setup';
@@ -179,6 +184,109 @@ describe('buildMessages', () => {
 	});
 });
 
+describe('the system voice', () => {
+	const systemSetup = (
+		overrides: {
+			heat?: DialValue | null;
+			characters?: number;
+			lead?: 'character' | 'me' | 'shared';
+		} = {}
+	) =>
+		testDaydreamSetup({
+			voice: { narrator: 'impersonal', stance: 'self', protagonistName: '' },
+			characters: Array.from({ length: overrides.characters ?? 0 }, () => testCharacter()),
+			lead: overrides.lead ?? 'character',
+			scene: testScene({ dials: { heat: overrides.heat ?? null, kink: null } })
+		});
+	const systemOf = (s: ReturnType<typeof systemSetup>, turns: ContextTurn[] = []) =>
+		system(buildMessages(request({ mode: 'opening', setup: s, turns })));
+	const Tame = 'NOTICE 1: ARRIVAL';
+	const Adult = 'EVENING SCHEDULE';
+
+	it('gets its own guide, after how to read the user and before the reply format', () => {
+		const content = systemOf(systemSetup());
+		const guide = content.indexOf('# Writing as the system');
+		expect(guide).toBeGreaterThan(content.indexOf("# Reading the user's turns"));
+		expect(guide).toBeLessThan(content.indexOf('# Reply format'));
+		expect(content.indexOf("# Reading the user's turns")).toBeGreaterThan(-1);
+	});
+
+	it('shows the tame examples up to Warm, and the adult ones from Steamy', () => {
+		for (const heat of [null, 1, 2] as const) {
+			const content = systemOf(systemSetup({ heat }));
+			expect(content).toContain(Tame);
+			expect(content).not.toContain(Adult);
+		}
+		for (const heat of [3, 4, 5] as const) {
+			const content = systemOf(systemSetup({ heat }));
+			expect(content).toContain(Adult);
+			expect(content).not.toContain(Tame);
+		}
+	});
+
+	it('says the examples are form only', () => {
+		expect(systemOf(systemSetup())).toContain('These examples show the form only');
+	});
+
+	it('runs on mechanism with no one behind it, and through functionaries with characters', () => {
+		expect(systemOf(systemSetup())).toContain('No one is behind the system');
+		expect(systemOf(systemSetup({ characters: 1 }))).toContain('functionaries');
+	});
+
+	it('is not given to any other voice', () => {
+		for (const narrator of ['none', 'second-person', 'third-person'] as const) {
+			const other = testDaydreamSetup({
+				voice: {
+					narrator,
+					stance: narrator === 'third-person' ? 'absent' : 'self',
+					protagonistName: ''
+				},
+				scene: testScene({ dials: { heat: 4, kink: null } })
+			});
+			const content = system(buildMessages(request({ mode: 'opening', setup: other })));
+			expect(content).not.toContain('# Writing as the system');
+			expect(content).not.toContain(Tame);
+			expect(content).not.toContain(Adult);
+		}
+	});
+
+	it('leaves the guide out of a stopped scene’s check-in', () => {
+		const content = systemOf(systemSetup(), [
+			said('Sit.', 'story'),
+			{ type: 'safety', signal: 'red' }
+		]);
+		expect(content).toContain('# The scene is stopped');
+		expect(content).not.toContain('# Writing as the system');
+	});
+
+	it('opens with the system’s first notice, while the other voices set the scene', () => {
+		const opening = buildMessages(request({ mode: 'opening', setup: systemSetup() })).at(-1);
+		expect(opening?.role).toBe('user');
+		expect(opening?.content).toContain('Open with the first notice or rules the system issues');
+		expect(opening?.content).not.toContain('Set the scene');
+		expect(buildMessages(request({ mode: 'opening' })).at(-1)?.content).toContain('Set the scene');
+	});
+
+	it('says who leads in the system’s terms', () => {
+		expect(systemOf(systemSetup({ characters: 1 }))).toContain(
+			'The system leads: its rules and functionaries set the pace'
+		);
+		expect(systemOf(systemSetup({ characters: 1, lead: 'me' }))).toContain(
+			'granting or refusing it under its rules'
+		);
+		expect(systemOf(systemSetup({ characters: 1 }))).not.toContain('The characters lead');
+	});
+
+	it('suggests replies to the system, and steers it with its own buttons', () => {
+		const content = systemOf(systemSetup());
+		expect(content).toContain('one complying with an instruction');
+		expect(content).toContain('New rule, Inspection');
+		const other = system(buildMessages(request({ mode: 'opening' })));
+		expect(other).toContain('one something they do');
+		expect(other).not.toContain('New rule, Inspection');
+	});
+});
+
 describe('describeSetup', () => {
 	it('describes each character, with their dials in words and the description winning', () => {
 		const content = describeSetup(
@@ -342,7 +450,8 @@ describe('describeVoice', () => {
 		expect(describeVoice(voice('second-person', 'self'), 0)).toContain('second person');
 		expect(describeVoice(voice('second-person', 'self'), 0)).toContain('no set characters');
 		expect(describeVoice(voice('third-person', 'absent'), 2)).toContain('third person');
-		expect(describeVoice(voice('impersonal', 'self'), 0)).toContain('impersonal authority');
+		expect(describeVoice(voice('impersonal', 'self'), 0)).toContain('There is no narrator');
+		expect(describeVoice(voice('impersonal', 'self'), 0)).toContain('Writing as the system');
 		expect(describeVoice(voice('impersonal', 'self'), 0)).toContain('No one is behind it');
 	});
 
