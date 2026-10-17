@@ -362,8 +362,10 @@ row's plaintext `role` says only who wrote it, `user` or `story`.
 - **Direction buttons** are the model's. Each passage says which to add and
   which to remove (`meta.directions`), and the set on offer is the fold of
   every passage on the branch, at most six, oldest dropped first
-  (`currentDirections`). The prompt lists the buttons on screen, gives
-  examples, offers **Surprise me** (`surprise-me`) as a candidate when an
+  (`currentDirections`). The prompt lists the buttons on screen, has them
+  pruned by where the new passage leaves the story rather than where it
+  stood before it (judged by the before, a button for what the passage had
+  just done stayed a turn too long), gives examples, offers **Surprise me** (`surprise-me`) as a candidate when an
   unexpected turn would suit, and says never to add Continue or the safety
   controls, which are always there. They stay on one row and scroll
   sideways rather than wrap (`OverflowScroller.svelte`), with an end faded,

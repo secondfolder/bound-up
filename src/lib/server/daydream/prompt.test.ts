@@ -126,6 +126,14 @@ describe('buildMessages', () => {
 		expect(content).toContain('"roll"');
 	});
 
+	// Judged against the story before the passage, a button for what the
+	// passage just did stayed on screen a turn too long.
+	it('has the buttons pruned by where the new passage leaves the story', () => {
+		const content = system(buildMessages(request({ turns: [said('hi')] })));
+		expect(content).toContain('where the passage you just wrote leaves the story');
+		expect(content).toContain('has now happened or can no longer happen');
+	});
+
 	it('answers a stopped scene with a check-in, whatever was asked for', () => {
 		const stopped = [said('Sit.', 'story'), { type: 'safety', signal: 'red' } as const];
 		for (const mode of ['reply', 'rewrite'] as const) {
