@@ -59,68 +59,28 @@ broken. The objects are strict (a misspelt key is an error, not ignored), and
 
 ## The tree
 
-[RoadmapTree.svelte](../src/lib/components/roadmap/RoadmapTree.svelte) renders
-nested lists: an `<ol>` of branches, each with a `<ul>` of leaves, each with a
-`<ul>` of twigs. The picture is drawn entirely in CSS:
+[RoadmapTree.svelte](../src/lib/components/roadmap/RoadmapTree.svelte) draws
+the roadmap with the generic [Tree](tree.md), which owns the trunk, the
+boughs, the connectors, packing, dimming and folding; this section covers
+only what the roadmap puts on it.
 
-- The **trunk** is a `::before` on the outer list.
-- A **bough** is a `::before` on the branch heading, reaching from the trunk's
-  centre (`--reach`).
-- **Leaves and twigs** use the classic CSS tree, drawn as three stretches per
-  item so that each can be dimmed on its own (see the legend, below):
-  - **above** (the item's `::before`): the vertical from the line above down
-    to where this item's elbow bends off;
-  - **elbow** (the node's `::before`): the bend, and the run across to the
-    marker;
-  - **onward** (the item's `::after`, all but the last): the vertical from the
-    bend down to the next item.
-
-  Each overlaps the next by a pixel, and the bend overlaps the vertical it
-  leaves, so no join shows a hairline seam. That is only sound because hidden
-  stretches are drawn solid and underneath (see the legend, below). The elbow
-  ends `0.5lh` down, and
+- **Shape.** No `main`, so the trunk is bare: each branch is a bough, its
+  head the bough's node, and leaves and twigs elbow off the head's and the
+  leaf's stems. The markup is an `<ol>` of branches with a list of leaves in
+  each and of twigs under a leaf.
+- **Sizes.** `RoadmapTree` sets the per-depth custom properties: a branch
+  head's marker is its 2.75rem icon, centred half the icon down; a leaf's is
+  1.25rem and a twig's 0.85rem, each centred `0.5lh` down.
   [RoadmapNode.svelte](../src/lib/components/roadmap/RoadmapNode.svelte)
-  centres its marker in a slot one line tall, so the two meet whatever the
-  font size.
-- **Stems** join an icon or marker to the line under it. A branch head's text,
-  and a leaf's summary, run longer than the icon or marker is tall, and the
-  list below starts under the text. So the head's `::after`, and the `::after`
-  of a leaf node that has twigs, draw a vertical from the icon's or marker's
-  lower edge down to the list. They start at the lower edge rather than the
-  centre because a positioned pseudo-element paints over the marker.
-- **Elbows end on a marker's edge and go no further.** The elbow is placed
-  against the node, which starts exactly one indent in, and is exactly one
-  indent wide. When the elbow belonged to the item around the node, an
-  unpositioned node let it draw across the marker's ring.
-- **Every `li` has its margin zeroed.** Web Awesome's native styles indent each
-  one by `1.125em`. That left the right-hand boughs 18px short of the trunk and
-  set every line 18px off the centre of what it hangs from.
-
-Every connector hangs off the element it joins, so none of them can drift out
-of line, and the whole tree renders on the server. The component tests measure
-the joins: bough to trunk, stem to icon, line through marker.
-
-**Layout.** On a phone the trunk runs down the left gutter and every branch
-grows to the right. From 720px the trunk is centred and the boughs sit either
-side of it, the left-hand ones mirrored with logical properties.
-
-On a wide screen, `RoadmapTree` measures the boughs and places them itself.
-Each side is packed as its own column, with the same gap (the list's
-`row-gap`) between every pair of boughs on that side. Each bough, in order,
-goes on whichever side is shorter so far, and the left side starts a little
-lower so the first two step up the trunk. CSS cannot do this with the boughs
-kept in reading order:
-
-- A shared grid ties the two sides' rows together, so a tall bough on one side
-  opens an arbitrary gap on the other.
-- Two separate lists would read in a different order, to a screen reader and
-  the keyboard, from the one a phone shows.
-
-Strict alternation was tried first, and left one side over 1000px longer than
-the other. A `ResizeObserver` re-packs when a bough's size changes (a font
-loading, a resize). Until the script runs (without JavaScript, or before
-hydration), a CSS grid stands in: each bough spans two rows (`--row`) and the
-next starts a row later on the other side.
+  sizes its marker from `--tree-marker-size` and centres it in a slot one
+  line tall, so marker and elbow agree, and follows `--tree-row` and
+  `--tree-justify` so a mirrored bough keeps its marker on the trunk side.
+- **Layout.** On a phone the trunk runs down the left gutter and every branch
+  grows to the right. From 720px the trunk is centred and the boughs are
+  packed either side of it (`spread`; see [tree.md](tree.md#packing)).
+- **Folding.** A branch head folds its leaves and a leaf with twigs folds
+  them. The page passes the item the drawer shows as `reveal`, so following
+  a fragment to an item inside a folded branch opens it.
 
 **Status** is shown three ways: by the marker's shape (a filled disc with a
 tick, half-filled and gently pulsing, an outline, a half-transparent outline
@@ -130,43 +90,11 @@ The pulse stops under `prefers-reduced-motion`.
 **The legend** above the tree doubles as a filter. Its toggles are native
 `<button aria-pressed>`, because `wa-button` does not forward ARIA state.
 Switching a status off dims its nodes rather than removing them, so the tree
-keeps its shape.
-
-There are exactly two levels, full and `--dim-opacity` (0.3):
-
-- **A hidden item's marker and text are dimmed.** The node itself is not, since
-  the tree draws connectors on it, and those follow their own rule.
-- **A stretch of connector is dimmed only when everything it leads to is
-  hidden.** For example, a hidden leaf with a shown twig keeps the elbow into
-  it at full strength, because that elbow is the twig's way to the trunk
-  too. Similarly, the vertical past a hidden twig stays full while a shown
-  twig comes after it.
-- **A branch head, and its bough and stem, dim only when the whole branch is
-  hidden.** The trunk never dims.
-
-Markers and text fade with opacity, which is set on the marker and the text
-rather than on anything that contains another dimmed part, so it never
-compounds. Connectors cannot fade that way, because they overlap where they
-join, and two translucent lines over each other add up to a third, darker
-level. A translucent hidden line drawn over a shown one also left a notch at
-the join. So a hidden connector is instead:
-
-- **solid**, in `--line-color-dim` (or `--bark-dim` for a bough). That is the
-  line's colour mixed 30% into `--page-wash-floor`, in sRGB, which is how the
-  browser composites opacity. It matches a translucent line wherever the page
-  behind is the wash's flat floor, which is behind nearly all of the tree.
-- **underneath** (`z-index: -1`, inside the tree's own stacking context).
-  Where it joins a shown stretch, the shown one is on top, so a hidden
-  sibling lower down is never drawn over the branch of a shown one above it.
-
-Connectors colour all four border sides and set only the drawn ones' widths.
-A bough that the packing moves to the other side of the trunk then changes
-widths, not colours. With one side set, the other side's colour was
-`currentColor`, and every moved line faded in from the text's cream on load.
-
-`RoadmapTree` works out which stretches to dim (`dimmed()`). Its tests check
-that nothing ends up at a third opacity or colour, and that every hidden
-stretch is underneath.
+keeps its shape. `RoadmapTree` tells Tree an item is hidden when the legend
+hides its status, and that a branch, which has no status, always is, so a
+branch head and its bough and stem dim only when everything in the branch is
+hidden. How each stretch of connector dims, and why hidden ones are drawn
+solid and underneath, is in [tree.md](tree.md#dimming).
 
 ### Why no graph library
 
@@ -182,7 +110,7 @@ The alternatives were weighed when this was built:
 
 Letting the page scroll do the navigation avoids all of that. The one
 measurement it needs, packing the boughs on a wide screen, is a few lines
-in the component. Dependencies
+in [Tree](tree.md#packing). Dependencies
 between branches are listed in the drawer rather than drawn across the tree,
 where they would cross everything.
 
@@ -224,7 +152,9 @@ reason given in [page-effects.md](page-effects.md).
   the real file passes, has one broken tree per rule, and covers the
   selectors.
 - **Components:** `RoadmapTree`, `RoadmapHighlights` and `RoadmapRecent` have
-  browser tests.
+  browser tests. `RoadmapTree`'s cover the legend's dimming of real items,
+  packing balance, the head and leaf stems and folding; the tree's own
+  geometry is tested with Tree (see [tree.md](tree.md#tests)).
   The page test, `src/routes/(public)/roadmap/page.svelte.test.ts`, covers the
   fragment-driven drawer and the legend.
 - **End to end:** [e2e/roadmap.spec.ts](../e2e/roadmap.spec.ts) covers:

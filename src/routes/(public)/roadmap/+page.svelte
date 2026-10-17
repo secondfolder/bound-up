@@ -106,7 +106,7 @@
 		{/each}
 	</fieldset>
 
-	<RoadmapTree branches={roadmap.branches} {hidden} />
+	<RoadmapTree branches={roadmap.branches} {hidden} reveal={selected?.item.id} />
 </div>
 
 {#if selected}
