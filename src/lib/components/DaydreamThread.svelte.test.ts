@@ -1,9 +1,11 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 import type { DaydreamTurnRole } from '$lib/daydream';
 import type { ReplyOutcome } from '$lib/daydream/client';
 import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
+import { defined } from '$lib/testing/defined';
 import { pending } from '$lib/testing/pending';
 import { waByProp, waSettled } from '$lib/testing/web-awesome';
 import type {
@@ -156,9 +158,12 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+/** The button labelled exactly `text`, or else the first whose label contains it: "Stop" is also in "Stop writing". */
 function button(container: HTMLElement, text: string): HTMLElement | undefined {
-	return [...container.querySelectorAll<HTMLElement>('wa-button, button')].find((candidate) =>
-		candidate.textContent?.includes(text)
+	const buttons = [...container.querySelectorAll<HTMLElement>('wa-button, button')];
+	return (
+		buttons.find((candidate) => candidate.textContent?.trim() === text) ??
+		buttons.find((candidate) => candidate.textContent?.includes(text))
 	);
 }
 
@@ -173,6 +178,48 @@ const asked = (index: number) =>
 	client.writeReply.mock.calls[index]?.[1] as Record<string, unknown> | undefined;
 
 describe('DaydreamThread', () => {
+	it('lets the page narrow to a phone, however many directions there are', async () => {
+		// The route's own chain: a centred column with `margin: 0 auto`, which
+		// sizes to its content's minimum. The directions row once held that
+		// minimum at its full length, so the column, and the composer in it,
+		// stayed at its maximum width on a phone.
+		const shell = document.createElement('main');
+		shell.style.cssText = 'display: flex; flex-direction: column; inline-size: 320px';
+		const column = document.createElement('div');
+		column.style.cssText =
+			'max-inline-size: 48rem; margin: 0 auto; display: flex; flex-direction: column';
+		const content = document.createElement('div');
+		content.style.cssText = 'display: flex; flex-direction: column';
+		column.append(content);
+		shell.append(column);
+		document.body.append(shell);
+		const many = ['Slower', 'Crueler', 'Skip ahead', 'Tease', 'Closer', 'Surprise me'].map(
+			(label) => ({ id: label.toLowerCase().replace(' ', '-'), label })
+		);
+		try {
+			render(DaydreamThread, {
+				target: content,
+				props: {
+					daydream: daydream([
+						turn('t1', null, 'story', {
+							type: 'text',
+							text: 'Sit.',
+							meta: meta({ directions: { add: many, remove: [] } })
+						})
+					]),
+					available: true
+				}
+			});
+			await waitFor(() => expect(content.querySelector('[contenteditable]')).not.toBeNull());
+			await waSettled(content);
+			expect(column.getBoundingClientRect().width).toBeLessThanOrEqual(320);
+			const compose = defined(content.querySelector('.compose'), 'compose');
+			expect(compose.getBoundingClientRect().width).toBeLessThanOrEqual(320);
+		} finally {
+			shell.remove();
+		}
+	});
+
 	it('shows only a placeholder while the device cannot open the story', () => {
 		keyring.status = 'locked';
 		const { container } = render(DaydreamThread, {
@@ -321,6 +368,87 @@ describe('DaydreamThread', () => {
 		});
 	});
 
+	it('keeps the directions on one row beside the safety controls, scrolling with faded ends and chevrons', async () => {
+		const many = ['Slower', 'Crueler', 'Skip ahead', 'Tease', 'Closer', 'Surprise me'].map(
+			(label) => ({ id: label.toLowerCase().replace(' ', '-'), label })
+		);
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', {
+					type: 'text',
+					text: 'Sit.',
+					meta: meta({ directions: { add: many, remove: [] } })
+				})
+			]),
+			available: true
+		});
+		container.style.inlineSize = '24rem';
+		await waitFor(() => expect(button(container, 'Surprise me')).toBeDefined());
+		await waSettled(container);
+		const scroller = defined(
+			container.querySelector<HTMLElement>('.overflow > .scroller'),
+			'scroller'
+		);
+		const chevron = (end: 'start' | 'end') =>
+			defined(container.querySelector<HTMLElement>(`.chevron.${end}`), `${end} chevron`);
+		const stop = defined(button(container, 'Stop'), 'Stop');
+		const continueButton = defined(button(container, 'Continue'), 'Continue');
+		const surprise = defined(button(container, 'Surprise me'), 'Surprise me');
+
+		// One row: the first and last directions, and Stop, share a line.
+		const top = (element: HTMLElement) => Math.round(element.getBoundingClientRect().top);
+		expect(top(surprise)).toBe(top(continueButton));
+		expect(top(stop)).toBe(top(continueButton));
+		expect(stop.getBoundingClientRect().left).toBeGreaterThan(
+			scroller.getBoundingClientRect().right
+		);
+
+		// Only the end with more past it is faded, and has a chevron.
+		await waitFor(() => expect(scroller.hasAttribute('data-more-end')).toBe(true));
+		expect(scroller.hasAttribute('data-more-start')).toBe(false);
+		expect(chevron('end').classList.contains('shown')).toBe(true);
+		expect(chevron('start').classList.contains('shown')).toBe(false);
+		// Square, so `pill` makes its hover background a circle.
+		expect(chevron('end').offsetWidth).toBe(chevron('end').offsetHeight);
+
+		// A chevron scrolls by most of a page.
+		const onePage = scroller.clientWidth * 0.8;
+		chevron('end').click();
+		await waitFor(() => expect(scroller.scrollLeft).toBeCloseTo(onePage, -1));
+		await waitFor(() => expect(chevron('start').classList.contains('shown')).toBe(true));
+		chevron('start').click();
+		await waitFor(() => expect(scroller.scrollLeft).toBe(0));
+		await waitFor(() => expect(chevron('start').classList.contains('shown')).toBe(false));
+
+		// At the far end, that end is crisp and its chevron gone.
+		scroller.scrollLeft = scroller.scrollWidth;
+		await waitFor(() => expect(scroller.hasAttribute('data-more-end')).toBe(false));
+		expect(scroller.hasAttribute('data-more-start')).toBe(true);
+		expect(chevron('end').classList.contains('shown')).toBe(false);
+
+		// A page that would stop a sliver short of the end goes all the way.
+		const farEnd = scroller.scrollWidth - scroller.clientWidth;
+		// A page short of the end, plus 4rem (64px): within the 5rem that counts as nearly there.
+		scroller.scrollLeft = farEnd - scroller.clientWidth * 0.8 - 64;
+		await waitFor(() => expect(chevron('end').classList.contains('shown')).toBe(true));
+		chevron('end').click();
+		await waitFor(() => expect(scroller.scrollLeft).toBeCloseTo(farEnd, 0));
+	});
+
+	it('shows every reaction icon unpressed, in a variant the free icon set has', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		const icon = (label: string) =>
+			container.querySelector(`button[aria-label="${label}"] wa-icon`);
+		await waitFor(() => expect(icon('Loved it')).not.toBeNull());
+		await waSettled(container);
+		// Font Awesome has no free regular `fire`: asked for one, the button sat empty.
+		expect(icon('Loved it')?.getAttribute('variant')).toBe('solid');
+		expect(icon('Liked it')?.getAttribute('variant')).toBe('regular');
+	});
+
 	it('records a direction as a turn before asking for the passage after it', async () => {
 		const { container } = render(DaydreamThread, {
 			daydream: daydream([
@@ -410,7 +538,7 @@ describe('DaydreamThread', () => {
 		});
 		await press(container, 'Continue');
 		await waitFor(() => expect(container.textContent).toContain('Something unwanted'));
-		await press(container, 'Stop the scene');
+		await press(container, 'Stop');
 
 		await waitFor(() => expect(signal?.aborted).toBe(true));
 		await waitFor(() => expect(saved(0)?.content).toEqual({ type: 'safety', signal: 'red' }));
@@ -428,6 +556,47 @@ describe('DaydreamThread', () => {
 
 		await press(container, 'Carry on');
 		await waitFor(() => expect(saved(2)?.content).toEqual({ type: 'safety', signal: 'resume' }));
+	});
+
+	it('folds Ease off and Stop into a menu on a narrow screen', async () => {
+		await page.viewport(600, 800);
+		try {
+			const { container } = render(DaydreamThread, {
+				daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+				available: true
+			});
+			await waitFor(() => expect(button(container, 'Continue')).toBeDefined());
+			await waSettled(container);
+			const visible = (element: Element | null | undefined) => element?.checkVisibility() ?? false;
+			expect(visible(button(container, 'Ease off'))).toBe(false);
+			expect(visible(button(container, 'Stop'))).toBe(false);
+			const menu = defined(container.querySelector('.menu'), 'menu');
+			expect(visible(menu)).toBe(true);
+
+			defined(menu.querySelector<HTMLElement>('[slot="trigger"]'), 'trigger').click();
+			const stop = defined(
+				[...menu.querySelectorAll<HTMLElement>('wa-dropdown-item')].find(
+					(item) => item.textContent?.trim() === 'Stop'
+				),
+				'Stop item'
+			);
+			await waitFor(() => expect(visible(stop)).toBe(true));
+			stop.click();
+			await waitFor(() => expect(saved(0)?.content).toEqual({ type: 'safety', signal: 'red' }));
+		} finally {
+			await page.viewport(1280, 800);
+		}
+	});
+
+	it('shows Ease off and Stop as buttons on a wide screen', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		await waitFor(() => expect(button(container, 'Stop')).toBeDefined());
+		await waSettled(container);
+		expect(button(container, 'Stop')?.checkVisibility()).toBe(true);
+		expect(container.querySelector('.menu')?.checkVisibility()).toBe(false);
 	});
 
 	it('eases off: lowers the intensity and records it', async () => {

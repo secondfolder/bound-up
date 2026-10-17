@@ -241,7 +241,7 @@ test.describe('daydreams', () => {
 		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
 		await passageSaved(page);
 
-		await clickWaButton(page, 'Stop the scene');
+		await clickWaButton(page, /^Stop$/);
 		await expect(page.getByText('Are you all right?')).toBeVisible();
 		await expect(page.getByText('The scene is stopped')).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Continue' })).toHaveCount(0);

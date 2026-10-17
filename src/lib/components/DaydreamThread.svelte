@@ -6,7 +6,7 @@
 	import type { ComposedMessage } from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
 	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
-	import { scrollIntoViewWithin } from '$lib/scroll-parent';
+	import { followEnd, scrollIntoViewWithin } from '$lib/scroll-parent';
 	import type { PassageMeta, Quote } from '$lib/sealed-kinds/daydreams';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 	import type { DaydreamView } from '$lib/types';
@@ -121,20 +121,6 @@
 	});
 
 	let listElement: HTMLElement | undefined = $state();
-
-	// Keeps the newest turn in view as turns are added and a passage streams
-	// in. Through the shared helper because `<main>` is what scrolls in this
-	// shell.
-	$effect(() => {
-		const count = story.path.length;
-		const growing = story.streaming?.text;
-		void tick().then(() => {
-			const last = listElement?.lastElementChild;
-			if (listElement && last && (count > 0 || growing !== undefined)) {
-				scrollIntoViewWithin(last, listElement, { behavior: 'auto', gap: 8 });
-			}
-		});
-	});
 
 	/** Scrolls a turn into view: after a jump from the branch map or the bookmarks. */
 	async function scrollToTurn(turnId: string) {
@@ -278,7 +264,9 @@
 		{/if}
 	</div>
 
-	<ol class="turns" bind:this={listElement} aria-live="polite">
+	<!-- Follows a passage as it arrives only for a reader already at the end:
+	     one who has scrolled up to read is left where they are. -->
+	<ol class="turns" bind:this={listElement} aria-live="polite" {@attach followEnd}>
 		{#each story.path as node (node.id)}
 			{#if node.role === 'story'}
 				<DaydreamPassage
@@ -334,15 +322,16 @@
 
 	{#if available}
 		<div class="compose">
-			<DaydreamSafety {story} />
-			{#if busy}
-				<wa-button class="stop" size="s" appearance="outlined" onclick={() => story.stop()}>
-					<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
-					Stop writing
-				</wa-button>
-			{:else if !story.halted}
-				<DaydreamDirections {story} />
-			{/if}
+			<DaydreamSafety {story}>
+				{#if busy}
+					<wa-button size="s" appearance="outlined" onclick={() => story.stop()}>
+						<wa-icon slot="start" name="stop" variant="solid"></wa-icon>
+						Stop writing
+					</wa-button>
+				{:else if !story.halted}
+					<DaydreamDirections {story} />
+				{/if}
+			</DaydreamSafety>
 			<!-- Nothing until the draft is read and the page has hydrated: an editor
 			     shown empty and then filled would look like the text was lost. -->
 			{#if mounted}
@@ -351,7 +340,8 @@
 						<MessageComposer
 							bind:this={composer}
 							{send}
-							placeholder="Your turn… (start with OOC: to step outside the story)"
+							placeholder="Aa"
+							ariaLabel="Your turn"
 							allowAttachments={false}
 							initialText={draft.initial?.text ?? ''}
 							onTextChange={(text) => draft.save({ text, tagIds: [] })}
@@ -359,7 +349,6 @@
 					{/await}
 				{/key}
 			{/if}
-			<p class="reminder">What you write here goes to the model provider that writes the story.</p>
 		</div>
 	{:else}
 		<wa-callout variant="neutral">
@@ -463,26 +452,24 @@
 	}
 
 	/* Pinned to the bottom of the scrollport, directly above the nav: `<main>`
-	   is what scrolls, so sticky works against it (AGENTS.md, "Adding a route"). */
+	   is what scrolls, so sticky works against it (AGENTS.md, "Adding a route").
+	   The background is a border-image outset rather than a pseudo-element: it
+	   bleeds out of the page's centred column to both edges of the pane, and
+	   fades in above the box so the story scrolls away under it softly, but an
+	   outset is ink overflow — it neither adds a horizontal scrollbar to `<main>`
+	   nor catches clicks meant for the turns behind the fade. */
 	.compose {
+		--fade: 1.5rem;
 		position: sticky;
 		inset-block-end: 0;
 		margin-block-start: 1rem;
 		padding-block: 0.75rem;
-		background: var(--wa-color-surface-default);
+		border-image:
+			linear-gradient(transparent, var(--wa-color-surface-default) var(--fade)) fill 0 / 0 /
+			var(--fade) 100vw 0;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-
-		.stop {
-			align-self: center;
-		}
-
-		.reminder {
-			margin: 0;
-			font-size: 0.75rem;
-			color: var(--wa-color-text-quiet);
-		}
 	}
 
 	.invalid {

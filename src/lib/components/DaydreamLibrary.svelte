@@ -124,7 +124,7 @@
 								Edit {shown.name}
 							</wa-button>
 							<wa-button size="s" appearance="plain" onclick={() => remove(item, shown.name)}>
-								<wa-icon name="trash" variant="regular" label={`Delete ${shown.name}`}></wa-icon>
+								<wa-icon name="trash-can" variant="regular" label={`Delete ${shown.name}`}></wa-icon>
 							</wa-button>
 						{/if}
 					</li>

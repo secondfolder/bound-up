@@ -50,10 +50,16 @@
 			.some((mark) => mark.content?.type === 'bookmark' && !mark.content.quote)
 	);
 
-	const REACTIONS: readonly { value: Reaction; icon: string; label: string }[] = [
-		{ value: 'love', icon: 'fire', label: 'Loved it' },
-		{ value: 'like', icon: 'thumbs-up', label: 'Liked it' },
-		{ value: 'not-for-me', icon: 'thumbs-down', label: 'Not for me' }
+	/**
+	 * `outline` is whether the icon has a free regular (outlined) variant to
+	 * show while unpressed. `fire` has none: Font Awesome's kit CDN refuses
+	 * the request, and the button sat empty until it was pressed and went
+	 * solid. Without one the icon stays solid, and pressed shows by colour.
+	 */
+	const REACTIONS: readonly { value: Reaction; icon: string; label: string; outline: boolean }[] = [
+		{ value: 'love', icon: 'fire', label: 'Loved it', outline: false },
+		{ value: 'like', icon: 'thumbs-up', label: 'Liked it', outline: true },
+		{ value: 'not-for-me', icon: 'thumbs-down', label: 'Not for me', outline: true }
 	];
 
 	function onMenu(event: WaSelectEvent) {
@@ -122,7 +128,7 @@
 							aria-pressed={reaction === choice.value}
 							onclick={() => void story.react(node.id, choice.value)}
 						>
-							<wa-icon name={choice.icon} variant={reaction === choice.value ? 'solid' : 'regular'}></wa-icon>
+							<wa-icon name={choice.icon} variant={choice.outline && reaction !== choice.value ? 'regular' : 'solid'}></wa-icon>
 						</button>
 					{/each}
 				</div>

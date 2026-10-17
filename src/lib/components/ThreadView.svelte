@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { invalidate } from '$app/navigation';
 	import type { MessageMetadataPayload, MessagePayload } from '$lib/crypto/messages';
@@ -19,7 +19,7 @@
 	} from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
 	import { reportRequestFailure, tryFetch } from '$lib/request-failure.svelte';
-	import { scrollIntoViewWithin } from '$lib/scroll-parent';
+	import { followEnd } from '$lib/scroll-parent';
 	import type { MessageView, TagView, ThreadView } from '$lib/types';
 	import MessageBubble from './MessageBubble.svelte';
 	import MessageComposer from './MessageComposer.svelte';
@@ -73,7 +73,6 @@
 	let bodies: Record<string, MessagePayload | null> = $state({});
 	let metadata: Record<string, MessageMetadataPayload | null> = $state({});
 	let reactions: Record<string, { emoji: string; mine: boolean }[]> = $state({});
-	let listElement: HTMLElement | undefined = $state();
 	const attemptedMetadataBackfill = new SvelteSet<string>();
 
 	$effect(() => {
@@ -126,22 +125,6 @@
 		return () => {
 			cancelled = true;
 		};
-	});
-
-	// Keeps the newest message in view. Goes through the shared scroll helper
-	// because `<main>` is the only scrolling element in this shell — the window
-	// does not scroll, so window.scrollTo would move nothing.
-	$effect(() => {
-		const count = thread.messages.length;
-		void tick().then(() => {
-			if (!listElement || count !== thread.messages.length) {
-				return;
-			}
-			const last = listElement.lastElementChild;
-			if (last) {
-				scrollIntoViewWithin(last, listElement, { behavior: 'auto', gap: 8 });
-			}
-		});
 	});
 
 	/**
@@ -281,7 +264,9 @@
 	<div class="thread-tags">
 		<TagPicker {partnershipId} {tags} threadId={thread.id} bind:selectedIds={selectedTagIds} />
 	</div>
-	<ul bind:this={listElement} class="messages">
+	<!-- Opens on the newest message, and follows new ones only for a reader
+	     already at the end: one who has scrolled up to read is left there. -->
+	<ul class="messages" {@attach followEnd}>
 		{#each thread.messages as message (message.id)}
 			<MessageBubble
 				{message}

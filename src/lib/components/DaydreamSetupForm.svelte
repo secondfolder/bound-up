@@ -669,7 +669,7 @@
 				{#if $errors.limits}<span class="invalid">{$errors.limits}</span>{/if}
 			</label>
 			<p class="hint">
-				While it plays, “Stop the scene” and “Ease off” are always there, and selecting words and
+				While it plays, “Stop” and “Ease off” are always there, and selecting words and
 				choosing “Not this” adds them here.
 			</p>
 		</fieldset>

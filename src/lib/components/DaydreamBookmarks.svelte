@@ -81,7 +81,7 @@
 							problem = await story.removeMark(mark.id);
 						}}
 					>
-						<wa-icon name="trash" variant="regular" label={`Remove ${mark.bookmark.label || 'this bookmark'}`}></wa-icon>
+						<wa-icon name="trash-can" variant="regular" label={`Remove ${mark.bookmark.label || 'this bookmark'}`}></wa-icon>
 					</wa-button>
 				</li>
 			{/each}

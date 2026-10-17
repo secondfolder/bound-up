@@ -37,6 +37,7 @@
 	let {
 		send,
 		placeholder = 'Say something…',
+		ariaLabel = placeholder,
 		submitLabel = 'Send',
 		initialText = '',
 		onTextChange,
@@ -46,6 +47,8 @@
 	}: {
 		send: (message: ComposedMessage) => Promise<string | null>;
 		placeholder?: string;
+		/** The text box's name; the placeholder unless given, so needed with an empty one. */
+		ariaLabel?: string;
 		submitLabel?: string;
 		/** A restored draft. Initial only, like the editor's own `value`. */
 		initialText?: string;
@@ -374,7 +377,7 @@
 				onSubmit={submit}
 				{placeholder}
 				features={MESSAGE_FEATURES}
-				ariaLabel={placeholder}
+				{ariaLabel}
 				editorClass="composer-input"
 			/>
 

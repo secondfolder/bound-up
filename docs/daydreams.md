@@ -358,14 +358,16 @@ row's plaintext `role` says only who wrote it, `user` or `story`.
   faintly under the turn when it is anything but an action). Explicit
   out-of-character syntax — a turn starting `(`, `[`, `//` or `OOC:` — is
   always out of character (`explicitOoc`, `daydream/ooc.ts`), whatever the
-  model would have made of it; the composer's placeholder mentions `OOC:`.
+  model would have made of it.
 - **Direction buttons** are the model's. Each passage says which to add and
   which to remove (`meta.directions`), and the set on offer is the fold of
   every passage on the branch, at most six, oldest dropped first
   (`currentDirections`). The prompt lists the buttons on screen, gives
   examples, offers **Surprise me** (`surprise-me`) as a candidate when an
   unexpected turn would suit, and says never to add Continue or the safety
-  controls, which are always there.
+  controls, which are always there. They stay on one row and scroll
+  sideways rather than wrap (`OverflowScroller.svelte`), with an end faded,
+  and a chevron that scrolls by a page, wherever there is more past it.
 - **Suggestions** are two to four things the user might say next, varied by
   instruction. A tap sends one; the pencil beside it puts it in the
   composer (`MessageComposer.replaceText`, through `plainTextToDocument`) to
@@ -412,7 +414,10 @@ one moves to the branch through it and scrolls there.
 ## Safety
 
 **Stop the scene** and **Ease off** are always on screen, while a passage is
-arriving too, and they replace typed safewords.
+arriving too, and they replace typed safewords. They sit at the right-hand
+end of the direction buttons' row; the button reads just **Stop**. Under
+650px wide the two fold into a menu at that end of the row, so the
+directions keep most of it.
 
 - **Stop the scene** drops whatever was arriving — not kept, as an ordinary
   Stop keeps it: it may be the very thing that made someone press — adds a
@@ -511,7 +516,7 @@ For both:
   write passages of usable quality, which is why this exception exists
   rather than a zero-access design (see
   [user-commitments-and-product-goals.md](user-commitments-and-product-goals.md#especially-sensitive-data-should-be-zero-access-by-default)).
-  The disclosure says so plainly, and a reminder sits under the composer.
+  The disclosure says so plainly.
 
 **Not sent:** anything else about the account, the user's name, other
 daydreams, the library beyond what is picked, or turns beyond the context
@@ -644,7 +649,7 @@ Noted so they are not lost; none is in the code.
   library keeps its own, and the setup page does not show the copy as
   changed, since its library revision has not moved.
 - **A stopped passage is kept as it stood**, mid-sentence (Stop writing, not
-  Stop the scene). Writing it again is one press away.
+  Stop the scene's Stop). Writing it again is one press away.
 - **A very long story loads its newest 2,000 turns' shape.** Older turns are
   still stored; a branch through them shows from the oldest loaded turn.
 

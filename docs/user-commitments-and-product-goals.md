@@ -153,8 +153,7 @@ that, so the commitment here is honesty rather than zero access:
 
 - **Told first, in plain words, and accepted.** Before the first daydream the
   user reads where their words go and presses "I understand"; the server
-  refuses to ask for a reply until it has recorded that. A reminder sits
-  under the composer.
+  refuses to ask for a reply until it has recorded that.
 - **Nothing kept on the way through.** The server does not store or log what
   passes through it, and asks OpenRouter to use only providers that do not
   keep prompts or train on them.

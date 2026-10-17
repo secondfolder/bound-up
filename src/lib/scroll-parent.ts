@@ -61,3 +61,63 @@ export function scrollIntoViewWithin(
 		target.getBoundingClientRect().top - scrollerTop + scroller.scrollTop - (options.gap ?? 20);
 	scroller.scrollTo({ top, behavior: options.behavior ?? 'smooth' });
 }
+
+/** How near the end still counts as at it: a reader a few pixels short has not scrolled away. */
+const END_SLACK = 48;
+
+/**
+ * An attachment that keeps a conversation's scrollport at its end while the
+ * reader is there, and leaves it alone once they have scrolled up.
+ *
+ * Whether they are at the end is decided by where they last scrolled to, not
+ * measured when the content changes: by then the new content is already in,
+ * so a reader who was at the end would look as if they had scrolled away. It
+ * starts at the end, so a conversation opens on its newest. Every child of the
+ * scroller is observed, rather than the one list, because more than the list
+ * grows: a passage streaming in, suggestions after it, a picture loading, the
+ * composer growing as someone types.
+ */
+export function followEnd(from: HTMLElement): () => void {
+	const scroller = scrollParentOf(from);
+	const scrollEvents = scroller === document.scrollingElement ? globalThis : scroller;
+	let atEnd = true;
+	// Where our own last scroll put it. Its scroll event is dispatched a frame
+	// later, by when more may have streamed in: measured then, it would look
+	// like the reader had scrolled away, and following would stop mid-passage.
+	let ours = -1;
+	const measure = () => {
+		if (scroller.scrollTop === ours) {
+			ours = -1;
+			return;
+		}
+		atEnd = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= END_SLACK;
+	};
+	const follow = () => {
+		if (atEnd) {
+			const before = scroller.scrollTop;
+			scroller.scrollTop = scroller.scrollHeight;
+			// Only a scroll that moved anything dispatches an event to clear this.
+			if (scroller.scrollTop !== before) {
+				ours = scroller.scrollTop;
+			}
+		}
+	};
+	const resizes = new ResizeObserver(follow);
+	const observeChildren = () => {
+		resizes.disconnect();
+		resizes.observe(scroller);
+		for (const child of scroller.children) {
+			resizes.observe(child);
+		}
+	};
+	const children = new MutationObserver(observeChildren);
+	children.observe(scroller, { childList: true });
+	observeChildren();
+	scrollEvents.addEventListener('scroll', measure, { passive: true });
+	follow();
+	return () => {
+		resizes.disconnect();
+		children.disconnect();
+		scrollEvents.removeEventListener('scroll', measure);
+	};
+}
