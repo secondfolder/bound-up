@@ -8,6 +8,8 @@ import {
 	fillRichText,
 	fillWaInput,
 	reply,
+	scrollShellTo,
+	shellScroll,
 	signUp,
 	waitForHydration
 } from './helpers';
@@ -520,6 +522,38 @@ test.describe('daydreams', () => {
 		await expect(page.locator('.richtext-editor .surface').first()).toHaveText(
 			'I was about to say'
 		);
+	});
+
+	test('a daydream opens on its newest passage, and follows only a reader at the end', async ({
+		page
+	}) => {
+		// Short, so a few turns overflow it.
+		await page.setViewportSize({ width: 400, height: 700 });
+		await signedUpDreamer(page);
+		await startDaydream(page);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		const long = 'I say something long enough to wrap over several lines of the story, '.repeat(3);
+		for (let turn = 0; turn < 4; turn += 1) {
+			await reply(page, unique(long));
+			await passageSaved(page);
+			// Followed as it arrived.
+			expect((await shellScroll(page)).fromEnd).toBeLessThan(2);
+		}
+
+		// Opened on the newest, not part-way down: the earlier turns opening one
+		// by one used to leave it wherever the browser's scroll anchoring put it.
+		await page.reload();
+		await waitForHydration(page);
+		await passageSaved(page);
+		await expect.poll(async () => (await shellScroll(page)).fromEnd).toBeLessThan(2);
+
+		// A reader who has scrolled up to read is left there as the story goes on.
+		await scrollShellTo(page, 100);
+		const said = unique('Go on.');
+		await reply(page, said);
+		await expect(page.getByText(`Mara heard: "${said}"`)).toBeAttached();
+		await passageSaved(page);
+		expect((await shellScroll(page)).top).toBe(100);
 	});
 
 	test('the setup can be changed, and the daydream deleted', async ({ page }) => {

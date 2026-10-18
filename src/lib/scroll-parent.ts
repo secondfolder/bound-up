@@ -72,40 +72,49 @@ const END_SLACK = 48;
  * Whether they are at the end is decided by where they last scrolled to, not
  * measured when the content changes: by then the new content is already in,
  * so a reader who was at the end would look as if they had scrolled away. It
- * starts at the end, so a conversation opens on its newest. Every child of the
- * scroller is observed, rather than the one list, because more than the list
- * grows: a passage streaming in, suggestions after it, a picture loading, the
- * composer growing as someone types.
+ * starts at the end, so a conversation opens on its newest. More than the list
+ * grows — a passage streaming in, suggestions after it, a picture loading, the
+ * composer growing as someone types — so the list is observed, and so is every
+ * element between it and the scroller, and every child of the scroller. Not
+ * only the children: a page root held to the viewport's height (the daydream
+ * page's `min-block-size: 100%`, in a flex column that may shrink it) lets the
+ * story overflow it without changing size itself, and following never woke.
+ *
+ * Only a scroll *upwards* counts as leaving the end. Most scrolls are not the
+ * reader's: ours, dispatched a frame late, by when more may have streamed in;
+ * and the browser's scroll anchoring, which moves the scrollport down when an
+ * earlier turn grows as it opens. Either, measured as "short of the end",
+ * stopped the following — a daydream opened part-way down its story and
+ * stayed there as passages arrived. Neither ever moves it up, and a reader
+ * scrolling away from the newest always does.
  */
 export function followEnd(from: HTMLElement): () => void {
 	const scroller = scrollParentOf(from);
 	const scrollEvents = scroller === document.scrollingElement ? globalThis : scroller;
 	let atEnd = true;
-	// Where our own last scroll put it. Its scroll event is dispatched a frame
-	// later, by when more may have streamed in: measured then, it would look
-	// like the reader had scrolled away, and following would stop mid-passage.
-	let ours = -1;
+	let lastTop = scroller.scrollTop;
 	const measure = () => {
-		if (scroller.scrollTop === ours) {
-			ours = -1;
-			return;
+		const top = scroller.scrollTop;
+		if (scroller.scrollHeight - top - scroller.clientHeight <= END_SLACK) {
+			atEnd = true;
+		} else if (top < lastTop) {
+			atEnd = false;
 		}
-		atEnd = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= END_SLACK;
+		lastTop = top;
 	};
 	const follow = () => {
 		if (atEnd) {
-			const before = scroller.scrollTop;
 			scroller.scrollTop = scroller.scrollHeight;
-			// Only a scroll that moved anything dispatches an event to clear this.
-			if (scroller.scrollTop !== before) {
-				ours = scroller.scrollTop;
-			}
+			lastTop = scroller.scrollTop;
 		}
 	};
 	const resizes = new ResizeObserver(follow);
 	const observeChildren = () => {
 		resizes.disconnect();
 		resizes.observe(scroller);
+		for (let node: Element | null = from; node && node !== scroller; node = node.parentElement) {
+			resizes.observe(node);
+		}
 		for (const child of scroller.children) {
 			resizes.observe(child);
 		}

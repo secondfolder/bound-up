@@ -588,3 +588,28 @@ export async function settle(page: Page): Promise<void> {
 			})
 	);
 }
+
+/**
+ * Where the app shell's scrollport is: how far down, and how far short of its
+ * end. `<main>` is what scrolls in the shell, never the window.
+ */
+export function shellScroll(page: Page): Promise<{ top: number; fromEnd: number }> {
+	return page.evaluate(() => {
+		const main = document.querySelector('main');
+		if (!main) {
+			throw new Error('No <main>: shellScroll is for pages inside the app shell.');
+		}
+		return {
+			top: Math.round(main.scrollTop),
+			fromEnd: Math.round(main.scrollHeight - main.scrollTop - main.clientHeight)
+		};
+	});
+}
+
+/** Scrolls the app shell's scrollport to `top`, as a reader would. */
+export async function scrollShellTo(page: Page, top: number): Promise<void> {
+	await page.evaluate((to) => {
+		document.querySelector('main')?.scrollTo({ top: to, behavior: 'instant' });
+	}, top);
+	await settle(page);
+}

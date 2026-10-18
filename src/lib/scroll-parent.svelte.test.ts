@@ -10,12 +10,23 @@ afterEach(() => {
 	document.body.replaceChildren();
 });
 
-/** A 200px scrollport, as `<main>` is in the app shell, around a list taller than it. */
-function conversation() {
+/**
+ * A 200px scrollport, as `<main>` is in the app shell, around a list taller than it.
+ * With `heldRoot`, the list sits in a page root held to the scrollport's height,
+ * which the list overflows, as the daydream page's does.
+ */
+function conversation({ heldRoot = false } = {}) {
 	const scroller = document.createElement('div');
 	scroller.style.cssText = 'height: 200px; overflow-y: auto';
 	const list = document.createElement('ul');
-	scroller.append(list);
+	if (heldRoot) {
+		const root = document.createElement('section');
+		root.style.cssText = 'height: 200px';
+		root.append(list);
+		scroller.append(root);
+	} else {
+		scroller.append(list);
+	}
 	document.body.append(scroller);
 	const add = (height: number) => {
 		const item = document.createElement('li');
@@ -62,6 +73,28 @@ describe('followEnd', () => {
 		scroller.scrollTop = 0;
 		await frame();
 		scroller.scrollTop = scroller.scrollHeight;
+		await frame();
+		add(300);
+		await frame();
+		expect(atEnd()).toBe(true);
+	});
+
+	it('follows content that overflows a page root held to the scrollport’s height', async () => {
+		const { add, atEnd } = conversation({ heldRoot: true });
+		expect(atEnd()).toBe(true);
+		await frame();
+		add(300);
+		await frame();
+		expect(atEnd()).toBe(true);
+	});
+
+	it('goes on following after a scroll down that stops short of the end', async () => {
+		// The shape of the browser's scroll anchoring as an earlier turn opens,
+		// which once stopped a daydream following as it loaded.
+		const { scroller, add, atEnd } = conversation();
+		await frame();
+		add(300);
+		scroller.scrollTop += 100;
 		await frame();
 		add(300);
 		await frame();

@@ -15,7 +15,9 @@ import {
 	newSide,
 	openBoard,
 	reply,
+	scrollShellTo,
 	settle,
+	shellScroll,
 	signUp,
 	typeRichText,
 	writeThread
@@ -431,6 +433,55 @@ test.describe('live updates', () => {
 				() => (globalThis as unknown as { streamCount?: number }).streamCount ?? 0
 			);
 			expect(streamsAfter).toBe(streamsBefore);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	test('a thread opens on its newest message, and follows only a reader at the end', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			// Short, so a few messages overflow it.
+			await ada.page.setViewportSize({ width: 400, height: 700 });
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			const long = 'a message long enough to wrap over several lines of the thread, '.repeat(3);
+			await writeThread(ada.page, `1 ${long}`);
+			for (let count = 2; count <= 6; count += 1) {
+				await reply(ada.page, `${count} ${long}`);
+				await expect(ada.page.locator('.messages > li')).toHaveCount(count);
+				await expect.poll(async () => (await shellScroll(ada.page)).fromEnd).toBeLessThan(2);
+			}
+			const threadUrl = ada.page.url();
+
+			await ada.page.reload();
+			await expect(ada.page.locator('.messages > li')).toHaveCount(6);
+			await expect.poll(async () => (await shellScroll(ada.page)).fromEnd).toBeLessThan(2);
+
+			await jun.page.goto(threadUrl);
+			await expect(jun.page.getByText(`6 ${long.trim()}`)).toBeVisible();
+
+			// Scrolled up to read, Ada is left there when Jun's reply comes in live.
+			await scrollShellTo(ada.page, 100);
+			await reply(jun.page, 'while you were reading');
+			await expect(ada.page.getByText('while you were reading')).toBeAttached({ timeout: 20_000 });
+			await settle(ada.page);
+			expect((await shellScroll(ada.page)).top).toBe(100);
+
+			// Back at the end, the next one is followed.
+			await scrollShellTo(ada.page, 1_000_000);
+			await reply(jun.page, 'and now');
+			await expect(ada.page.getByText('and now')).toBeAttached({ timeout: 20_000 });
+			await expect.poll(async () => (await shellScroll(ada.page)).fromEnd).toBeLessThan(2);
 		} finally {
 			await ada.close();
 			await jun.close();

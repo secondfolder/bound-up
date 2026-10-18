@@ -754,6 +754,10 @@ ciphertext is never rendered as text, even for a frame — there is a component
 test asserting exactly that, because it is the worst bug this feature could
 have.
 
+**A thread opens on its newest message**, and follows a new one only for a
+reader already at the end; one scrolled up to read is left there. That is
+`followEnd` in `src/lib/scroll-parent.ts`, shared with daydreams.
+
 **This feature does not use superforms**, and that is the marker rather than an
 omission: superforms exists to bind a `SuperValidated` to a `<form>` and
 re-render errors from an action, and there is no action here — the body has to

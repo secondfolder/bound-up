@@ -724,6 +724,15 @@ The composer keeps an encrypted draft per daydream (`daydream:<id>` in
 in the middle of writing survives a reload. It is the same `MessageComposer`,
 with attachments turned off: a turn is text the model reads.
 
+## Following the story
+
+A daydream opens on its newest passage, and a passage streaming in is
+followed only while the reader is at the end: one who has scrolled up to
+read is left where they are, and followed again once they scroll back down.
+Message threads do the same, through the same attachment (`followEnd` in
+`src/lib/scroll-parent.ts`, whose comment says why only a scroll _upwards_
+counts as leaving the end).
+
 ## Ideas, not built
 
 Noted so they are not lost; none is in the code.
