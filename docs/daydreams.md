@@ -328,9 +328,13 @@ would otherwise send every take of every passage on every visit.
   it, and is itself drawn along its own longest path. The branch being read
   is filled in, the turn being read ringed, and bookmarks carry an icon.
   Picking a turn moves to the branch through it; **carry on from here** makes
-  that turn the place to continue from. A side branch folds to its first
-  turn and a trunk turn folds the forks off it; the turn being read is never
-  folded away.
+  that turn the place to continue from. That button sits at the drawer's
+  edge on a thin rule under each turn, between it and the next, rather than
+  in the turn's row, where it left unclear whether the new branch kept that
+  turn; under the rule, it plainly keeps everything above. Its icon is a
+  line splitting into two arrows (`components/icons/diverge.svg`). A side
+  branch folds to its first turn and a trunk turn folds the forks off it;
+  the turn being read is never folded away.
 - **Carry on from here** in a passage's menu, likewise.
 
 ## Moving the story on
