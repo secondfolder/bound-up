@@ -1,13 +1,13 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import type { DaydreamTurnRole } from '$lib/daydream';
 import type { ReplyOutcome } from '$lib/daydream/client';
 import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
 import { pending } from '$lib/testing/pending';
-import { waByProp, waSettled } from '$lib/testing/web-awesome';
+import { waByProp, waProp, waSettled } from '$lib/testing/web-awesome';
 import type {
 	DaydreamTreeNodeView,
 	DaydreamTurnView,
@@ -609,6 +609,79 @@ describe('DaydreamThread', () => {
 		await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
 		expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ dials: { intensity: 2 } });
 		await waitFor(() => expect(saved(0)?.content).toEqual({ type: 'safety', signal: 'yellow' }));
+	});
+
+	it('puts Settings and the dials in one split button, right of Bookmarks', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		await waitFor(() => expect(container.querySelector('#daydream-dials')).not.toBeNull());
+		const tools = defined(container.querySelector('.tools'), 'the tool row');
+		const [, bookmarks, group] = tools.children;
+		expect(bookmarks?.textContent).toContain('Bookmarks');
+		expect(group?.tagName).toBe('WA-BUTTON-GROUP');
+		const [settings, caret] = defined(group, 'the split button').children;
+		expect(settings?.textContent?.trim()).toBe('Settings for this daydream');
+		expect(waProp(defined(settings, 'Settings'), 'href')).toBe(
+			'/(auth-required)/(app)/daydreams/d1/edit'
+		);
+		expect(caret?.id).toBe('daydream-dials');
+		expect(waProp(caret?.querySelector('wa-icon'), 'label')).toBe('Dials');
+		expect(waProp(container.querySelector('wa-popover'), 'for')).toBe('daydream-dials');
+	});
+
+	it('shows a dial’s level as it is dragged, and saves it only when let go', async () => {
+		client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		await waitFor(() => expect(waByProp(container, 'wa-slider', 'label', 'Heat')).toHaveLength(1));
+		await waSettled(container);
+		const heat = waByProp(container, 'wa-slider', 'label', 'Heat')[0] as HTMLElement & {
+			value: number;
+		};
+		const level = () => heat.closest('.dial')?.querySelector('.level')?.textContent;
+		// Unset: a bare knob, its filled track hidden until it is moved.
+		const fill = () =>
+			getComputedStyle(defined(heat.shadowRoot?.querySelector('[part~="indicator"]'), 'the fill'))
+				.visibility;
+		expect(level()).toContain('Not set');
+		expect(fill()).toBe('hidden');
+		heat.value = 4;
+		heat.dispatchEvent(new Event('input'));
+		await waitFor(() => expect(level()).toContain('Explicit'));
+		expect(fill()).toBe('visible');
+		expect(client.saveSetup).not.toHaveBeenCalled();
+		heat.dispatchEvent(new Event('change'));
+		await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
+	});
+
+	it('sets an unset dial to where its knob is when it is pressed and let go', async () => {
+		client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		await waitFor(() => expect(waByProp(container, 'wa-slider', 'label', 'Heat')).toHaveLength(1));
+		await waSettled(container);
+		const heat = defined(waByProp(container, 'wa-slider', 'label', 'Heat')[0], 'the heat dial');
+		const level = () => heat.closest('.dial')?.querySelector('.level')?.textContent;
+		// Held: the level the knob is on shows, and nothing is saved yet.
+		heat.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
+		await waitFor(() => expect(level()).not.toContain('Not set'));
+		expect(client.saveSetup).not.toHaveBeenCalled();
+		globalThis.dispatchEvent(new PointerEvent('pointercancel'));
+		await waitFor(() => expect(level()).toContain('Not set'));
+		// Pressed and let go for real, through Playwright, without moving: set
+		// to where the knob is, though the slider itself sends no change.
+		// Opened first: the dials are in a popover, out of a real pointer's reach.
+		await userEvent.click(defined(container.querySelector('#daydream-dials'), 'the Dials chevron'));
+		const thumb = defined(heat.shadowRoot?.querySelector('[part~="thumb"]'), 'the knob');
+		await userEvent.click(thumb);
+		await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
+		expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ scene: { dials: { heat: 3 } } });
 	});
 
 	it('turns the scene’s heat up mid-story, in this daydream’s copy of the scene', async () => {

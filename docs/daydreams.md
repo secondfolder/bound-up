@@ -202,8 +202,9 @@ away when one is.
 - **A scene has heat** (SFW → Flirty → Steamy → Explicit → Filthy) **and
   kink** (Vanilla → Light → Kinky → Heavy → Extreme). They are saved with a
   library scene, set by its starting point, and shown above the other
-  dials in the story's Dials popover, so they can be turned up or down
-  mid-story. That changes the daydream's copy of the scene only, never the
+  dials in the story's Dials popover (the caret of the Settings split
+  button, right of Bookmarks; its main half goes to the settings page), so
+  they can be turned up or down mid-story. That changes the daydream's copy of the scene only, never the
   library's.
 - **A character has libido** (Chaste → Shy → Interested → Horny → Slutty)
   **and kink** (Vanilla → Curious → Kinky → Very kinky → Depraved).

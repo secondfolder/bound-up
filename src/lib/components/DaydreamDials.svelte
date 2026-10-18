@@ -33,19 +33,34 @@
 
 	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
 
+	/**
+	 * Where each slider is while it is being dragged, so its reading follows
+	 * the thumb. Saved only on `change`, when it is let go: `input` fires at
+	 * every step, and each save is a round trip that rewrites the setup.
+	 */
+	let dragging: Partial<Record<'intensity' | 'pace', DialValue>> = $state({});
+
 	function slider(key: 'intensity' | 'pace') {
 		const scale = STORY_SLIDERS.find((entry) => entry.key === key)?.scale;
 		return (node: WaSlider) => {
 			// What a screen reader announces instead of a bare number.
 			node.valueFormatter = (level) => scale?.[level as DialValue]?.label ?? String(level);
+			const move = () => {
+				dragging[key] = Math.round(node.value) as DialValue;
+			};
 			const update = () => {
 				const level = Math.round(node.value) as DialValue;
+				delete dragging[key];
 				if (level !== value[key]) {
 					onchange({ ...value, [key]: level });
 				}
 			};
+			node.addEventListener('input', move);
 			node.addEventListener('change', update);
-			return () => node.removeEventListener('change', update);
+			return () => {
+				node.removeEventListener('input', move);
+				node.removeEventListener('change', update);
+			};
 		};
 	}
 
@@ -71,7 +86,13 @@
 	{/if}
 
 	{#each STORY_SLIDERS as entry (entry.key)}
+		<!-- The level on the title row, as on the optional dials above
+		     (DaydreamOptionalSlider says why the title is drawn here). -->
 		<div class="dial">
+			<div class="heading">
+				<span class="title" aria-hidden="true">{entry.label}</span>
+				<span class="reading">{entry.scale[dragging[entry.key] ?? value[entry.key]].label}</span>
+			</div>
 			<wa-slider
 				{@attach slider(entry.key)}
 				label={entry.label}
@@ -83,7 +104,6 @@
 				<span slot="reference">{entry.low}</span>
 				<span slot="reference">{entry.high}</span>
 			</wa-slider>
-			<span class="reading">{entry.scale[value[entry.key]].label}</span>
 		</div>
 	{/each}
 
@@ -120,9 +140,31 @@
 		flex-direction: column;
 		gap: 0.25rem;
 
+		.heading {
+			display: flex;
+			align-items: baseline;
+			gap: 0.5rem;
+		}
+
+		.title {
+			flex: 1 1 auto;
+			font-weight: var(--wa-form-control-label-font-weight);
+			color: var(--wa-form-control-label-color);
+		}
+
 		.reading {
 			font-size: 0.8125rem;
 			color: var(--wa-color-text-quiet);
+		}
+
+		/* Out of sight but still the slider's name: the heading shows it. */
+		wa-slider::part(label) {
+			position: absolute;
+			inline-size: 1px;
+			block-size: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
 		}
 	}
 

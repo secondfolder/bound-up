@@ -28,17 +28,18 @@
 	/>
 
 	<div class="content">
-		<wa-button
-			class="setup"
-			size="s"
-			appearance="outlined"
-			href={resolve('/(auth-required)/(app)/daydreams/[id]/edit', { id: data.daydream.id })}
-		>
-			<wa-icon slot="start" name="sliders" variant="solid"></wa-icon>
-			Setup
-		</wa-button>
-
 		{#if !data.accepted}
+			<!-- The thread has Settings in its tool row, beside the dials; until
+			     the disclosure is accepted there is no thread, so it is here. -->
+			<wa-button
+				class="setup"
+				size="s"
+				appearance="outlined"
+				href={resolve('/(auth-required)/(app)/daydreams/[id]/edit', { id: data.daydream.id })}
+			>
+				<wa-icon slot="start" name="gear" variant="solid"></wa-icon>
+				Settings <span class="wa-visually-hidden">for this daydream</span>
+			</wa-button>
 			<DaydreamDisclosure action={`${resolve('/(auth-required)/(app)/daydreams')}?/acceptDisclosure`} />
 		{:else}
 			<!-- Keyed, so moving between daydreams starts each conversation afresh. -->

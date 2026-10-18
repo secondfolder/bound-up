@@ -454,7 +454,7 @@ test.describe('daydreams', () => {
 		// Waited for, so the name is saved before the setup is changed from under it.
 		await expect(page.getByRole('heading', { name: 'The After hours story' })).toBeVisible();
 
-		await page.getByRole('link', { name: 'Setup' }).click();
+		await page.getByRole('link', { name: 'Settings for this daydream' }).click();
 		await page.waitForURL(`**/daydreams/${id}/edit`);
 		await waitForHydration(page);
 		await expect(page.locator('wa-input[name="title"] input')).toHaveValue('The After hours story');

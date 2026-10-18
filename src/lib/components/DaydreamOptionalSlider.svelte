@@ -1,11 +1,12 @@
 <script lang="ts">
 	import type { DialValue } from '$lib/daydream';
+	import InlineButton from './InlineButton.svelte';
 
 	/**
 	 * One 1–5 dial that may be left unset: a character's control or libido, a
 	 * scene's heat or kink. Unset says nothing to the model, rather than
-	 * "middling", so it reads as off until it is moved, and Clear takes it back
-	 * there. The words for each step come from `daydream/dial-words.ts`, which
+	 * "middling", so it shows a bare knob, no filled track, until it is moved,
+	 * and Clear takes it back there. The words for each step come from `daydream/dial-words.ts`, which
 	 * the prompt reads too.
 	 *
 	 * Controlled: `value` is the level, and a change is asked for through
@@ -31,43 +32,117 @@
 
 	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
 
+	/**
+	 * Where the slider is while it is being dragged, so the level follows the
+	 * thumb. Saved only on `change`, when it is let go: `input` fires at every
+	 * step, and a save in a story is a round trip that rewrites the setup.
+	 */
+	let dragging: DialValue | null = $state(null);
+	const shown = $derived(dragging ?? value);
+
 	function wire(node: WaSlider) {
 		// What a screen reader announces instead of a bare number.
 		node.valueFormatter = (level) => scale[level as DialValue]?.label ?? String(level);
-		const update = () => onchange(Math.round(node.value) as DialValue);
+		const move = () => {
+			dragging = Math.round(node.value) as DialValue;
+		};
+		const update = () => {
+			dragging = null;
+			onchange(Math.round(node.value) as DialValue);
+		};
+		// An unset dial's knob sits at a level already, so pressing it shows
+		// that level and letting go sets it. The slider sends no `change` for
+		// that — its value has not moved — so the release does it, a task
+		// later, which is after any `change` that release did send (that one
+		// clears `dragging`, and then there is nothing left to set). Released
+		// anywhere: the pointer is held down, and may have wandered off it.
+		const press = () => {
+			dragging = Math.round(node.value) as DialValue;
+			const release = () => {
+				globalThis.removeEventListener('pointerup', release);
+				globalThis.removeEventListener('pointercancel', release);
+				setTimeout(() => {
+					if (dragging !== null && value === null) {
+						update();
+					} else {
+						dragging = null;
+					}
+				});
+			};
+			globalThis.addEventListener('pointerup', release);
+			globalThis.addEventListener('pointercancel', release);
+		};
+		node.addEventListener('pointerdown', press);
+		node.addEventListener('input', move);
 		node.addEventListener('change', update);
-		return () => node.removeEventListener('change', update);
+		return () => {
+			node.removeEventListener('pointerdown', press);
+			node.removeEventListener('input', move);
+			node.removeEventListener('change', update);
+		};
 	}
 </script>
 
-<div class="dial" class:unset={value === null}>
+<!-- The title row is drawn here rather than by the slider, so the level and
+     Clear can sit on it: the slider's own label is a <label>, which a button
+     must not go in. The slider keeps its label for its accessible name, hidden
+     from sight; this title is hidden from assistive tech instead. Clear's name
+     ends in hidden text, so each is told apart ("Clear heat"). -->
+<div class="dial" class:unset={shown === null}>
+	<div class="heading">
+		<span class="title" aria-hidden="true">{label}</span>
+		<!-- Clear inherits its size and colour from the level beside it. -->
+		<span class="level">
+			{shown === null ? 'Not set' : scale[shown].label}
+			{#if shown !== null}
+				<InlineButton onclick={() => onchange(null)}>
+					Clear <span class="wa-visually-hidden">{label.toLowerCase()}</span>
+				</InlineButton>
+			{/if}
+		</span>
+	</div>
 	<wa-slider {@attach wire} {label} min={1} max={5} step={1} value={value ?? 3}>
 		<span slot="reference">{low}</span>
 		<span slot="reference">{high}</span>
 	</wa-slider>
-	<div class="state">
-		<span>{value === null ? 'Not set' : scale[value].label}</span>
-		{#if value !== null}
-			<wa-button size="s" appearance="plain" onclick={() => onchange(null)}>
-				Clear {label.toLowerCase()}
-			</wa-button>
-		{/if}
-	</div>
 </div>
 
 <style>
 	.dial {
-		.state {
+		.heading {
 			display: flex;
-			align-items: center;
-			justify-content: space-between;
+			align-items: baseline;
+			gap: 0.5rem;
+			margin-block-end: 0.25rem;
+		}
+
+		.title {
+			flex: 1 1 auto;
+			font-weight: var(--wa-form-control-label-font-weight);
+			color: var(--wa-form-control-label-color);
+		}
+
+		.level {
 			font-size: 0.8125rem;
 			color: var(--wa-color-text-quiet);
 		}
 
-		/* An unset dial says nothing, so it reads as off. */
-		&.unset wa-slider {
-			opacity: 0.55;
+		/* Out of sight but still the slider's name: see the heading above. */
+		wa-slider::part(label) {
+			position: absolute;
+			inline-size: 1px;
+			block-size: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+
+		/* An unset dial is the bare knob in the middle, with no filled track
+		   to say it is at a level. Greyed out, as it was, it looked disabled.
+		   The fill comes back once it is grabbed: `dragging` for a press that
+		   has not moved yet, and `unset` goes as soon as it does. */
+		&.unset wa-slider:not(:state(dragging))::part(indicator) {
+			visibility: hidden;
 		}
 	}
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { quoteAt } from '$lib/daydream/quotes';
 	import { DaydreamStory } from '$lib/daydream/story.svelte';
@@ -241,11 +242,28 @@
 			<wa-icon slot="start" name="bookmark" variant="regular"></wa-icon>
 			Bookmarks
 		</wa-button>
-		{#if setup && available}
-			<wa-button id="daydream-dials" size="s" appearance="outlined">
-				<wa-icon slot="start" name="sliders" variant="solid"></wa-icon>
-				Dials
+		<!-- One split button, Web Awesome's pattern: the setup's own page, and
+		     on the chevron the dials, the part of the setup turned most often
+		     mid-story. A popover rather than the pattern's `wa-dropdown`, which
+		     holds menu items, not sliders. Settings' name is finished in hidden
+		     text, as it would otherwise be the same as the app nav's Settings
+		     link (AGENTS.md: no two links share a name). -->
+		<wa-button-group label="Settings">
+			<wa-button
+				size="s"
+				appearance="outlined"
+				href={resolve('/(auth-required)/(app)/daydreams/[id]/edit', { id: daydream.id })}
+			>
+				<wa-icon slot="start" name="gear" variant="solid"></wa-icon>
+				Settings <span class="wa-visually-hidden">for this daydream</span>
 			</wa-button>
+			{#if setup && available}
+				<wa-button id="daydream-dials" size="s" appearance="outlined">
+					<wa-icon name="chevron-down" variant="solid" label="Dials"></wa-icon>
+				</wa-button>
+			{/if}
+		</wa-button-group>
+		{#if setup && available}
 			<wa-popover for="daydream-dials" placement="bottom-end">
 				<div class="dials">
 					<DaydreamDials
