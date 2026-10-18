@@ -334,6 +334,32 @@
 			}
 		},
 		{
+			"kind": "daydream-turn",
+			"version": 3,
+			"recordId": "00000000-0000-4000-8000-0000000000d8",
+			"ciphertext": "sb1.u6YJIge0SSRSO7UKkZKwJEynltn1Gk1dmqNhi322T7dtuPkA7WIiws8QfQUdF4jY24C3Vz2wehCNuBejzMzsAaC6WQq1PgpiEPUm8D6UoFrFIw6jeLC_uAcPYrCQLZyaa3TsJ3cF5fw6g5r5ArvRlB4MqCVaWov4DVhO-wd4ATkeG79MX0dECMio-jPrq__yKu5j0de1vxnDOxacoEyQMBmJlv254b0A4jjpF6OwMacUVJ0r0TCV3U7Cg9d-ZaXrBd2Y1404uL7G0nVi5oMpK8o3fKcXTzGJ282rQXB6QLbleW5cV1sd3rx-62JMwPRGy5O1QlnifA12s1Z9deKDjYUfp8bqQiMkJukbHMb4q1CRGIf9swUbWYX8wh4x7xbMt5WmMdI8NBC1h_dfHv1Utw",
+			"expected": {
+				"type": "text",
+				"text": "Charlie lets out a breath.",
+				"meta": {
+					"suggestions": ["Hold out a hand."],
+					"directions": {
+						"add": [
+							{
+								"id": "slower",
+								"label": "Slower"
+							}
+						],
+						"remove": []
+					},
+					"readAs": "instruction",
+					"expansion": "\"Charlie — the fox is safe. I promise.\"",
+					"ooc": false,
+					"readAsChosen": true
+				}
+			}
+		},
+		{
 			"kind": "daydream-mark",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d5",

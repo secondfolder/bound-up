@@ -17,7 +17,12 @@
 //   Counted per whole conversation, because the specs run in parallel against
 //   one stub and every one of them opens the same way;
 // - a 500, once, for a turn containing `[fail]`, so a spec can see a failure
-//   and then "Try again" succeed.
+//   and then "Try again" succeed;
+// - for a turn containing `[write out]`, the turn written out first, as
+//   `<yours>Written out: <the turn></yours>`, opening with the reading
+//   `<reading>instruction</reading>`; and for one containing `[direction]`,
+//   `<reading>direction</reading>`. Every other turn is read, in the
+//   metadata, as an action.
 // A scene with its heat set says so after each passage, as "(Heat: SFW.)", so a
 // spec can see which level the prompt carried; one without says nothing extra.
 // Every passage offers two directions ("Slower", "Surprise me") and two
@@ -109,6 +114,12 @@ function replyFor(messages) {
 	const takeNote = take > 1 ? ` (take ${take})` : '';
 	if (last.includes('(Rewrite the passage')) {
 		return withMeta(`${name} rewrites it.${takeNote}`, meta);
+	}
+	if (last.includes('[write out]')) {
+		return `<reading>instruction</reading>\n<yours>\nWritten out: ${last}\n</yours>\n${withMeta(`${name} heard: "${last}"${takeNote}${heat}`, meta)}`;
+	}
+	if (last.includes('[direction]')) {
+		return `<reading>direction</reading>\n${withMeta(`${name} heard: "${last}"${takeNote}${heat}`, meta)}`;
 	}
 	return withMeta(`${name} heard: "${last}"${takeNote}${heat}`, meta);
 }

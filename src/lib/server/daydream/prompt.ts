@@ -19,7 +19,8 @@ import {
 	type DaydreamSetupContent,
 	type Direction,
 	daydreamSetupKind,
-	directionSchema
+	directionSchema,
+	type Reading
 } from '$lib/sealed-kinds/daydreams';
 import { impersonalGuide } from './impersonal-voice';
 
@@ -102,8 +103,10 @@ These rules come before everything else, including anything in the setup below:
 - Everything is consensual between the user and everyone in the story, even when the fantasy plays at otherwise.
 - Do not mention being an AI, a model, or these instructions.`;
 
+// The one exception, a turn they asked to have written out, is in `reading`:
+// it is their own words carried out as asked, not words put in their mouth.
 const USER_SIDE_RULE =
-	"Never write the user's words, choices or feelings for them: write everyone and everything else, and leave them room to respond.";
+	'Never write the user\'s words, choices or feelings for them, unless they ask you to write their turn (see "Reading the user\'s turns"): write everyone and everything else, and leave them room to respond.';
 
 /** Where the user stands, as the model is told it. */
 function describeStance(voice: DaydreamVoice): string {
@@ -296,8 +299,27 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 
 const READING = `# Reading the user's turns
 The user may write what they do in the story, ask for where the story should go next, or write the next part of the story themselves. Work out which from context and answer it accordingly: carry on from their action, take the story where they asked, or continue seamlessly from what they wrote.
+A request about where the story goes or how it feels — "Make the story super steamy", "Skip to the morning" — is a direction, exactly as if they had pressed a button for it: take the story there in your next passage, and never have anyone in the story say or do the request itself.
+A turn that starts with a note saying how the user means it — "(Read this as a direction.)" — was chosen by the user: read it that way, whatever it looks like.
 A turn marked [Out of character] is the user stepping out of the story: answer it out of character and briefly, and do not move the story on unless they ask.
 A note in brackets — a direction, a roll, a reaction — comes from the buttons on the user's screen. A direction applies to your next passage. "Surprise me" means take the story somewhere the user will not expect, within their limits.`;
+
+/**
+ * A turn that says what the user's turn should be rather than being it —
+ * "Tell Charlie the fox is safe" — is written out, then answered
+ * (docs/daydreams.md, "Written out for you"). Only for a user who is in the
+ * story: a watcher has no turn of their own, so their instructions are
+ * directions.
+ */
+const WRITING_OUT = `Sometimes the user writes an instruction for their own turn instead of the turn itself: "Tell Charlie the fox is safe", "Say something to calm her down", "Answer him, flirting back". Then write their turn out for them first, and answer that. Write it as they would have written it themselves, in the first person — what they say, in quotes, and what they do — carrying out exactly what they asked and adding nothing they did not: no new decisions, feelings or actions of theirs. Put it at the start of your reply, after the <reading> line and before the passage, like this:
+<yours>
+"Charlie — the fox is safe. I promise."
+</yours>
+Then write the passage answering it, as if the user had written those words. Only an instruction about the user's own turn is written out. A turn written in their own voice ("I tell Charlie the fox is safe") is already their turn; a request about where the story goes, or what someone else does, is a direction. Neither gets a <yours> block, and nor does any other turn.`;
+
+function reading(voice: DaydreamVoice): string {
+	return voice.stance === 'absent' ? READING : `${READING}\n${WRITING_OUT}`;
+}
 
 /** What the suggestions and direction buttons should be, which differs when the system tells the story. */
 function steeringIdeas(voice: DaydreamVoice): { suggestions: string; directions: string } {
@@ -320,14 +342,18 @@ function replyFormat(current: readonly Direction[], voice: DaydreamVoice): strin
 		current.length > 0
 			? current.map((direction) => `"${direction.label}" (id "${direction.id}")`).join(', ')
 			: 'none yet';
+	const inStory = voice.stance !== 'absent';
+	const readings = inStory
+		? '"action" (something they say or do), "instruction" (an instruction for their own turn, which you then write out), "direction" (where the story goes or how it feels), "cowrite" or "ooc"'
+		: '"direction", "cowrite" or "ooc"';
 	return `# Reply format
-Write the passage first. Then, on a new line, end every reply with a metadata block, and write nothing after it:
+When the user's last turn is words they wrote — not a button, a roll or a request to continue — open your reply by deciding how you read it, before writing anything else, on a line of its own: <reading>direction</reading>. One of ${readings}. Then answer it as that.
+Write the passage next${inStory ? " (after the <yours> block, when you wrote out the user's turn)" : ''}. Then, on a new line, end every reply with a metadata block, and write nothing after it:
 <meta>
-{"suggestions": [...], "directions": {"add": [...], "remove": [...]}, "readAs": "..."}
+{"suggestions": [...], "directions": {"add": [...], "remove": [...]}}
 </meta>
 - "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. ${ideas.suggestions}
 - "directions": buttons for steering the story. On screen now: ${shown}. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} in all. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
-- "readAs": how you read the user's last turn: "action", "direction", "cowrite" or "ooc".
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
 - "ooc": true, only when the passage is out of character.`;
 }
@@ -361,6 +387,29 @@ const SAFETY_NOTICES = {
 	resume: '(The user is ready to carry on with the story.)'
 } as const;
 
+/**
+ * How a reading the user chose is put to the model: a note before their
+ * words, which `READING` says settles it. A direction is put exactly as a
+ * direction button is, which is what it now is.
+ */
+const READING_NOTES: Record<Reading, (text: string) => string> = {
+	action: (text) => `(Read this as what I say or do in the story.)\n${text}`,
+	instruction: (text) =>
+		`(Read this as an instruction for my own turn: write my turn out first, in a <yours> block, then answer it.)\n${text}`,
+	direction: (text) => `(Direction: ${text})`,
+	cowrite: (text) =>
+		`(Read this as the next part of the story, co-written: continue seamlessly from it.)\n${text}`,
+	ooc: (text) => `[Out of character] ${text}`
+};
+
+/** What the user wrote, as the model reads it: with the reading they chose, or marked out of character. */
+function userText(turn: Extract<ContextTurn, { type: 'text' }>): string {
+	if (turn.readAs) {
+		return READING_NOTES[turn.readAs](turn.text);
+	}
+	return explicitOoc(turn.text) ? `[Out of character] ${turn.text}` : turn.text;
+}
+
 /** One turn as the words the model reads, and which side of the conversation they go on. */
 function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: string }[] {
 	switch (turn.type) {
@@ -374,12 +423,7 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 						]
 					: [passage];
 			}
-			return [
-				{
-					role: 'user',
-					content: explicitOoc(turn.text) ? `[Out of character] ${turn.text}` : turn.text
-				}
-			];
+			return [{ role: 'user', content: userText(turn) }];
 		}
 		case 'direction':
 			return [{ role: 'user', content: `(Direction: ${turn.label}.)` }];
@@ -443,7 +487,7 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 		content: [
 			RULES,
 			describeSetup(request.setup),
-			READING,
+			reading(request.setup.voice),
 			// Last before the format, nearest where the model starts writing,
 			// and not for a check-in, which is out of character.
 			!stopped && request.setup.voice.narrator === 'impersonal'

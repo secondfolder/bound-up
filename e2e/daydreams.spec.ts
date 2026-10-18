@@ -17,8 +17,10 @@ import {
  * (`e2e/model-stub.mjs`): it writes "<character> heard: "<what you said>"",
  * ends every passage with a `<meta>` block offering "Slower", "Surprise me"
  * and two suggestions, proposes a roll for a turn containing `[roll]`,
- * checks in after Stop the scene, and fails once for a turn containing
- * `[fail]`. It names a daydream "The <scene title> story", and casts anyone
+ * checks in after Stop the scene, fails once for a turn containing
+ * `[fail]`, writes a turn containing `[write out]` out as
+ * "Written out: <the turn>" before answering it, and reads one containing
+ * `[direction]` as a direction. It names a daydream "The <scene title> story", and casts anyone
  * as "your stub boss", "stub-testing you".
  */
 
@@ -231,6 +233,79 @@ test.describe('daydreams', () => {
 		// Out of character, said the usual way, is labelled as such.
 		await reply(page, unique('OOC: this is fun,'));
 		await expect(page.locator('li.said').last()).toContainText('out of character');
+	});
+
+	test('an instruction for the user’s own turn is written out, and what was sent is a press away', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await startDaydream(page);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		await passageSaved(page);
+
+		const instruction = unique('Tell Mara the fox is safe [write out],');
+		await reply(page, instruction);
+		const said = page.locator('li.said').last();
+		await expect(said.locator('.text')).toHaveText(`Written out: ${instruction}`);
+		await expect(said).toContainText('written out for you');
+		await passageSaved(page);
+
+		await said.getByRole('button', { name: 'Show what you sent' }).click();
+		await expect(said.locator('.text')).toHaveText(instruction);
+		await said.getByRole('button', { name: 'Show it written out' }).click();
+		await expect(said.locator('.text')).toHaveText(`Written out: ${instruction}`);
+
+		// Sealed with the passage, so it is still written out on the next visit.
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.locator('li.said').last().locator('.text')).toHaveText(
+			`Written out: ${instruction}`
+		);
+	});
+
+	test('words read one way can be read another, which forks the story there', async ({ page }) => {
+		await signedUpDreamer(page);
+		await startDaydream(page);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		await passageSaved(page);
+
+		// Read as a direction by the model, it is drawn as one, as soon as the
+		// reply says so.
+		const direction = unique('Make the story super steamy [direction],');
+		await reply(page, direction);
+		await expect(page.locator('li.marker').last()).toContainText(direction);
+		await passageSaved(page);
+		await expect(page.locator('li.said')).toHaveCount(0);
+
+		// The stub reads every plain turn as an action: a bubble.
+		const steamy = unique('Make the story super steamy,');
+		await reply(page, steamy);
+		await expect(page.getByText(`Mara heard: "${steamy}"`)).toBeVisible();
+		await passageSaved(page);
+		await expect(page.locator('li.said').last()).toContainText(steamy);
+
+		await page
+			.locator('li.said')
+			.last()
+			.getByRole('button', { name: 'Read it differently' })
+			.click();
+		await page.getByRole('menuitem', { name: 'A direction for the story' }).click();
+
+		// Sent exactly as a direction button is, and drawn as one.
+		await expect(page.getByText(`Mara heard: "(Direction: ${steamy})"`)).toBeVisible();
+		await passageSaved(page);
+		const marker = page.locator('li.marker').last();
+		await expect(marker).toContainText(steamy);
+		await expect(marker).toContainText('read as a direction, as you asked');
+		// The first reading's passage is still there, a branch beside this one.
+		await expect(page.locator('li.passage').last()).toContainText('2/2');
+
+		// Kept: the next visit still reads it as the user chose.
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.locator('li.marker').last()).toContainText(
+			'read as a direction, as you asked'
+		);
 	});
 
 	test('stopping the scene checks in, and carrying on, or easing off, goes on', async ({

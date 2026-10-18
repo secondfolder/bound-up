@@ -22,11 +22,12 @@ import {
 	daydreamSceneKind,
 	daydreamSetupKind,
 	daydreamTurnKind,
-	type PassageMeta
+	type PassageMeta,
+	type Reading
 } from '../sealed-kinds/daydreams';
 import type { DaydreamTurnView, SealedRefView } from '../types';
 import type { ContextTurn } from './context';
-import { parseReply, visiblePassage } from './reply-format';
+import { parseReply, type ReplySoFar, visibleReply } from './reply-format';
 import { readReplyStream } from './stream';
 
 const base = (daydreamId: string) => `/api/daydreams/${encodeURIComponent(daydreamId)}`;
@@ -60,7 +61,14 @@ export type ReplyRequestBody = {
 };
 
 export type ReplyOutcome =
-	| { ok: true; passage: string; meta: PassageMeta | null }
+	| {
+			ok: true;
+			passage: string;
+			meta: PassageMeta | null;
+			expansion: string | null;
+			/** How the reply said, before anything else, it read the user's turn. */
+			reading: Reading | null;
+	  }
 	/** `partial` is what had arrived before it failed, for the page to leave on screen or drop. */
 	| { ok: false; error: string; partial: string };
 
@@ -69,14 +77,15 @@ const EMPTY = 'The reply came back empty. Try again.';
 
 /**
  * Asks for the next passage and streams it in through `onText`, which is
- * given the passage so far each time — never any of the metadata block that
- * follows it (`visiblePassage`). Rejects only on an abort: the user pressed
+ * given the reply so far each time: the user's turn written out, if the
+ * model is writing one, and the passage — never any of the blocks' tags or
+ * the metadata (`visibleReply`). Rejects only on an abort: the user pressed
  * Stop, and nothing needs saying.
  */
 export async function writeReply(
 	daydreamId: string,
 	request: ReplyRequestBody,
-	options: { signal: AbortSignal; onText: (soFar: string) => void }
+	options: { signal: AbortSignal; onText: (soFar: ReplySoFar) => void }
 ): Promise<ReplyOutcome> {
 	const response = await tryFetch(`${base(daydreamId)}/reply`, {
 		method: 'POST',
@@ -93,20 +102,22 @@ export async function writeReply(
 	try {
 		outcome = await readReplyStream(response.body, (piece) => {
 			text += piece;
-			options.onText(visiblePassage(text));
+			options.onText(visibleReply(text));
 		});
 	} catch (problem) {
 		if (problem instanceof DOMException && problem.name === 'AbortError') {
 			throw problem;
 		}
 		// The connection dropped mid-reply.
-		return { ok: false, error: INCOMPLETE, partial: visiblePassage(text) };
+		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage };
 	}
 	if (outcome.kind === 'error') {
-		return { ok: false, error: INCOMPLETE, partial: visiblePassage(text) };
+		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage };
 	}
-	const { passage, meta } = parseReply(text);
-	return passage ? { ok: true, passage, meta } : { ok: false, error: EMPTY, partial: '' };
+	const { passage, meta, expansion, reading } = parseReply(text);
+	return passage
+		? { ok: true, passage, meta, expansion, reading }
+		: { ok: false, error: EMPTY, partial: '' };
 }
 
 // ── sealing ──────────────────────────────────────────────────────────────────

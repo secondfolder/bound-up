@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import type { DaydreamTurnRole } from '$lib/daydream';
 import type { ReplyOutcome } from '$lib/daydream/client';
+import type { ReplySoFar } from '$lib/daydream/reply-format';
 import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
@@ -246,9 +247,9 @@ describe('DaydreamThread', () => {
 	it('opens a new daydream by itself, then offers what the passage offered', async () => {
 		let finish: (outcome: ReplyOutcome) => void = () => undefined;
 		client.writeReply.mockImplementationOnce(
-			(_id: string, _request: unknown, options: { onText: (soFar: string) => void }) =>
+			(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) =>
 				new Promise((resolve) => {
-					options.onText('Mara looks');
+					options.onText({ passage: 'Mara looks', expansion: null, reading: null });
 					finish = resolve;
 				})
 		);
@@ -261,6 +262,8 @@ describe('DaydreamThread', () => {
 
 		finish({
 			ok: true,
+			expansion: null,
+			reading: null,
 			passage: 'Mara looks up.',
 			meta: meta({
 				suggestions: ['I sit down.'],
@@ -493,7 +496,12 @@ describe('DaydreamThread', () => {
 	});
 
 	it('writes a passage again as another version beside it', async () => {
-		client.writeReply.mockResolvedValueOnce({ ok: true, passage: 'Second take.', meta: null });
+		client.writeReply.mockResolvedValueOnce({
+			ok: true,
+			passage: 'Second take.',
+			meta: null,
+			expansion: null
+		});
 		const { container } = render(DaydreamThread, {
 			daydream: daydream([
 				turn('t1', null, 'user', 'Hello.'),
@@ -520,10 +528,10 @@ describe('DaydreamThread', () => {
 			(
 				_id: string,
 				_request: unknown,
-				options: { signal: AbortSignal; onText: (soFar: string) => void }
+				options: { signal: AbortSignal; onText: (soFar: ReplySoFar) => void }
 			) => {
 				({ signal } = options);
-				options.onText('Something unwanted');
+				options.onText({ passage: 'Something unwanted', expansion: null, reading: null });
 				return new Promise((_resolve, reject) => {
 					options.signal.addEventListener('abort', () =>
 						reject(new DOMException('stopped', 'AbortError'))
@@ -531,7 +539,12 @@ describe('DaydreamThread', () => {
 				});
 			}
 		);
-		client.writeReply.mockResolvedValueOnce({ ok: true, passage: 'Are you okay?', meta: null });
+		client.writeReply.mockResolvedValueOnce({
+			ok: true,
+			passage: 'Are you okay?',
+			meta: null,
+			expansion: null
+		});
 		const { container } = render(DaydreamThread, {
 			daydream: daydream([turn('t1', null, 'story', 'Sit.'), turn('t2', 't1', 'user', 'Go on.')]),
 			available: true
@@ -793,6 +806,398 @@ describe('DaydreamThread', () => {
 		);
 		expect(client.writeReply).not.toHaveBeenCalled();
 		expect(container.querySelector('[contenteditable]')?.textContent).toContain('I sit down.');
+	});
+
+	describe('written-out turns', () => {
+		const Instruction = 'Tell Mara the fox is safe';
+		const WrittenOut = '"Mara, the fox is safe."';
+
+		/** A story where the user's instruction was written out by the passage answering it. */
+		function writtenOut() {
+			return daydream([
+				turn('t1', null, 'story', 'Mara frets.'),
+				turn('t2', 't1', 'user', Instruction),
+				turn('t3', 't2', 'story', {
+					type: 'text',
+					text: 'Mara sighs with relief.',
+					meta: meta({ readAs: 'instruction', expansion: WrittenOut })
+				})
+			]);
+		}
+
+		const bubble = (container: HTMLElement) =>
+			container.querySelector('li.said[data-turn-id="t2"]') as HTMLElement;
+
+		it('shows the turn written out, and what was sent at a press', async () => {
+			const { container } = render(DaydreamThread, { daydream: writtenOut(), available: true });
+			expect(bubble(container).querySelector('.text')?.textContent).toBe(WrittenOut);
+			expect(bubble(container).textContent).toContain('written out for you');
+
+			await press(container, 'Show what you sent');
+			await waitFor(() =>
+				expect(bubble(container).querySelector('.text')?.textContent).toBe(Instruction)
+			);
+			expect(bubble(container).querySelector('.text')?.classList.contains('note')).toBe(true);
+			expect(bubble(container).textContent).toContain('what you sent');
+
+			await press(container, 'Show it written out');
+			await waitFor(() =>
+				expect(bubble(container).querySelector('.text')?.textContent).toBe(WrittenOut)
+			);
+		});
+
+		it('leaves an ordinary turn as it was sent, with no switch', () => {
+			const { container } = render(DaydreamThread, {
+				daydream: daydream([
+					turn('t1', null, 'story', 'Mara frets.'),
+					turn('t2', 't1', 'user', 'I hug her.'),
+					turn('t3', 't2', 'story', 'Mara hugs back.')
+				]),
+				available: true
+			});
+			expect(bubble(container).querySelector('.text')?.textContent).toBe('I hug her.');
+			expect(button(container, 'Show what you sent')).toBeUndefined();
+		});
+
+		it('fills the bubble in as the turn is written out, then keeps it with the passage', async () => {
+			draftText.value = Instruction;
+			let finish: (outcome: ReplyOutcome) => void = () => undefined;
+			client.writeReply.mockImplementationOnce(
+				(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) =>
+					new Promise((resolve) => {
+						options.onText({ passage: '', expansion: '"Mara, the fox', reading: null });
+						finish = resolve;
+					})
+			);
+			const { container } = render(DaydreamThread, {
+				daydream: daydream([turn('t1', null, 'story', 'Mara frets.')]),
+				available: true
+			});
+			await press(container, 'Send');
+			await waitFor(() => expect(container.textContent).toContain('"Mara, the fox'));
+			const sent = defined(saved(0), 'the user turn');
+			expect(sent.content).toEqual({ type: 'text', text: Instruction });
+			expect(container.querySelector('li.said .text')?.textContent).toBe('"Mara, the fox');
+
+			finish({
+				ok: true,
+				passage: 'Mara sighs with relief.',
+				meta: meta({ readAs: 'action' }),
+				expansion: WrittenOut,
+				reading: null
+			});
+			await waitFor(() => expect(saved(1)).toMatchObject({ parentId: sent.id, role: 'story' }));
+			// The turn the user sent is kept as sent; the passage carries it written out.
+			expect(saved(1)?.content).toMatchObject({
+				type: 'text',
+				text: 'Mara sighs with relief.',
+				meta: { readAs: 'instruction', expansion: WrittenOut }
+			});
+			await waitFor(() =>
+				expect(container.querySelector('li.said .text')?.textContent).toBe(WrittenOut)
+			);
+		});
+
+		it('drops a turn written out after something the user did not write', async () => {
+			client.writeReply.mockResolvedValueOnce({
+				ok: true,
+				passage: 'Slowly, then.',
+				meta: null,
+				expansion: 'I slow down.'
+			});
+			const { container } = render(DaydreamThread, {
+				daydream: daydream([
+					turn('t1', null, 'story', {
+						type: 'text',
+						text: 'Mara frets.',
+						meta: meta({ directions: { add: [{ id: 'slower', label: 'Slower' }], remove: [] } })
+					})
+				]),
+				available: true
+			});
+			await press(container, 'Slower');
+			await waitFor(() => expect(saved(1)).toMatchObject({ role: 'story' }));
+			expect(saved(1)?.content).toEqual({ type: 'text', text: 'Slowly, then.' });
+		});
+
+		it('tells the model the turn as written out from then on', async () => {
+			draftText.value = 'I sit with her.';
+			const { container } = render(DaydreamThread, { daydream: writtenOut(), available: true });
+			await press(container, 'Send');
+			await waitFor(() => expect(client.writeReply).toHaveBeenCalledOnce());
+			expect(asked(0)).toMatchObject({
+				turns: [
+					{ type: 'text', role: 'story', text: 'Mara frets.' },
+					{ type: 'text', role: 'user', text: WrittenOut },
+					{ type: 'text', role: 'story', text: 'Mara sighs with relief.' },
+					{ type: 'text', role: 'user', text: 'I sit with her.' }
+				]
+			});
+		});
+
+		it('writes the turn out afresh for another take', async () => {
+			client.writeReply.mockResolvedValueOnce({
+				ok: true,
+				passage: 'Mara nods.',
+				meta: null,
+				expansion: '"It\'s safe, Mara."'
+			});
+			const { container } = render(DaydreamThread, { daydream: writtenOut(), available: true });
+			await waSettled(container);
+			const menu = container.querySelector(
+				'li.passage[data-turn-id="t3"] wa-dropdown'
+			) as HTMLElement;
+			const [again] = waByProp(menu, 'wa-dropdown-item', 'value', 'again');
+			menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: again } }));
+			await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't2', role: 'story' }));
+			expect(asked(0)).toMatchObject({
+				turns: [
+					{ type: 'text', role: 'story', text: 'Mara frets.' },
+					{ type: 'text', role: 'user', text: Instruction }
+				]
+			});
+			expect(saved(0)?.content).toMatchObject({ meta: { expansion: '"It\'s safe, Mara."' } });
+		});
+
+		it('keeps the turn as written out when its passage is rewritten', async () => {
+			client.writeReply.mockResolvedValueOnce({
+				ok: true,
+				passage: 'Mara laughs.',
+				meta: null,
+				expansion: 'Something else entirely.'
+			});
+			const { container } = render(DaydreamThread, { daydream: writtenOut(), available: true });
+			const text = container.querySelector('[data-passage-text="t3"]') as HTMLElement;
+			const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+			let textNode = walker.nextNode() as Text | null;
+			while (textNode && !textNode.data.includes('relief')) {
+				textNode = walker.nextNode() as Text | null;
+			}
+			const found = defined(textNode, 'the passage text');
+			const start = found.data.indexOf('relief');
+			const range = document.createRange();
+			range.setStart(found, start);
+			range.setEnd(found, start + 'relief'.length);
+			document.getSelection()?.removeAllRanges();
+			document.getSelection()?.addRange(range);
+			document.dispatchEvent(new Event('selectionchange'));
+
+			await press(container, 'Rewrite this');
+			await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't2', role: 'story' }));
+			expect(asked(0)).toMatchObject({
+				mode: 'rewrite',
+				turns: [
+					{ type: 'text', role: 'story', text: 'Mara frets.' },
+					{ type: 'text', role: 'user', text: WrittenOut }
+				]
+			});
+			expect(saved(0)?.content).toMatchObject({
+				meta: { readAs: 'instruction', expansion: WrittenOut }
+			});
+		});
+	});
+
+	describe('directions and reading a turn differently', () => {
+		const Steamy = 'Make the story super steamy';
+
+		/** A story where the user's words were read by the passage after them as `readAs`. */
+		function readAs(readAsValue: PassageMeta['readAs'], readAsChosen?: boolean) {
+			return daydream([
+				turn('t1', null, 'story', 'Mara waits.'),
+				turn('t2', 't1', 'user', Steamy),
+				turn('t3', 't2', 'story', {
+					type: 'text',
+					text: 'The air grows warm.',
+					meta: meta({
+						readAs: readAsValue,
+						...(readAsChosen === undefined ? {} : { readAsChosen })
+					})
+				})
+			]);
+		}
+
+		/** Picks a reading from the user turn's Read it differently menu. */
+		async function rereadAs(container: HTMLElement, turnId: string, reading: string) {
+			await waSettled(container);
+			const menu = container.querySelector(
+				`li[data-turn-id="${turnId}"] wa-dropdown.reread`
+			) as HTMLElement;
+			const [item] = waByProp(menu, 'wa-dropdown-item', 'value', reading);
+			menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item } }));
+		}
+
+		it('draws words read as a direction as a direction, not something said', () => {
+			const { container } = render(DaydreamThread, {
+				daydream: readAs('direction'),
+				available: true
+			});
+			const marker = container.querySelector('li.marker[data-turn-id="t2"]');
+			expect(marker?.textContent).toContain(Steamy);
+			expect(container.querySelector('li.said[data-turn-id="t2"]')).toBeNull();
+		});
+
+		it('draws a turn as a direction as soon as the reply says it read it as one', async () => {
+			let finish: (outcome: ReplyOutcome) => void = () => undefined;
+			client.writeReply.mockImplementationOnce(
+				(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) =>
+					new Promise((resolve) => {
+						options.onText({ passage: '', expansion: null, reading: 'direction' });
+						finish = resolve;
+					})
+			);
+			draftText.value = Steamy;
+			const { container } = render(DaydreamThread, {
+				daydream: daydream([turn('t1', null, 'story', 'Mara waits.')]),
+				available: true
+			});
+			await press(container, 'Send');
+			await waitFor(() =>
+				expect(container.querySelector('li.marker')?.textContent).toContain(Steamy)
+			);
+
+			// The opening reading outranks the one in the metadata.
+			finish({
+				ok: true,
+				passage: 'The air grows warm.',
+				meta: meta({ readAs: 'action' }),
+				expansion: null,
+				reading: 'direction'
+			});
+			await waitFor(() => expect(saved(1)).toMatchObject({ role: 'story' }));
+			expect(saved(1)?.content).toMatchObject({ meta: { readAs: 'direction' } });
+			expect(saved(1)?.content).not.toMatchObject({ meta: { readAsChosen: true } });
+		});
+
+		it('offers every reading but the one it was read as', async () => {
+			const { container } = render(DaydreamThread, {
+				daydream: readAs('direction'),
+				available: true
+			});
+			await waSettled(container);
+			const values = [...container.querySelectorAll('li[data-turn-id="t2"] wa-dropdown-item')].map(
+				(item) => waProp(item as HTMLElement, 'value')
+			);
+			expect(values).toEqual(['action', 'instruction', 'cowrite', 'ooc']);
+		});
+
+		it('forks from the turn with the reading the user meant, keeping the passage it had', async () => {
+			client.writeReply.mockResolvedValueOnce({
+				ok: true,
+				passage: 'Mara blushes.',
+				meta: meta({ readAs: 'action' }),
+				expansion: null
+			});
+			const { container } = render(DaydreamThread, { daydream: readAs('action'), available: true });
+			expect(container.querySelector('li.said[data-turn-id="t2"]')).not.toBeNull();
+
+			await rereadAs(container, 't2', 'direction');
+			await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't2', role: 'story' }));
+			expect(client.setActiveTurn).toHaveBeenCalledWith('d1', 't2');
+			expect(asked(0)).toMatchObject({
+				mode: 'reply',
+				turns: [
+					{ type: 'text', role: 'story', text: 'Mara waits.' },
+					{ type: 'text', role: 'user', text: Steamy, readAs: 'direction' }
+				]
+			});
+			// The user's choice wins over the model's own reading, and is recorded as theirs.
+			expect(saved(0)?.content).toMatchObject({
+				text: 'Mara blushes.',
+				meta: { readAs: 'direction', readAsChosen: true }
+			});
+			await waitFor(() =>
+				expect(container.querySelector('li.marker[data-turn-id="t2"]')?.textContent).toContain(
+					'read as a direction, as you asked'
+				)
+			);
+			// The passage it had is a branch beside the new one.
+			expect(container.textContent).toContain('2/2');
+		});
+
+		it('stops a passage still arriving, keeps it, then forks', async () => {
+			let signal: AbortSignal | undefined;
+			client.writeReply.mockImplementationOnce(
+				(
+					_id: string,
+					_request: unknown,
+					options: { signal: AbortSignal; onText: (soFar: ReplySoFar) => void }
+				) => {
+					({ signal } = options);
+					options.onText({ passage: 'Mara starts to', expansion: null, reading: null });
+					return new Promise((_resolve, reject) => {
+						options.signal.addEventListener('abort', () =>
+							reject(new DOMException('stopped', 'AbortError'))
+						);
+					});
+				}
+			);
+			client.writeReply.mockResolvedValueOnce({
+				ok: true,
+				passage: 'The room heats up.',
+				meta: null,
+				expansion: null
+			});
+			draftText.value = Steamy;
+			const { container } = render(DaydreamThread, {
+				daydream: daydream([turn('t1', null, 'story', 'Mara waits.')]),
+				available: true
+			});
+			await press(container, 'Send');
+			await waitFor(() => expect(container.textContent).toContain('Mara starts to'));
+			const sent = defined(saved(0), 'the user turn');
+
+			await rereadAs(container, sent.id, 'direction');
+			await waitFor(() => expect(signal?.aborted).toBe(true));
+			await waitFor(() => expect(saved(2)).toMatchObject({ parentId: sent.id, role: 'story' }));
+			expect(saved(1)).toMatchObject({
+				parentId: sent.id,
+				content: { type: 'text', text: 'Mara starts to' }
+			});
+			expect(saved(2)?.content).toMatchObject({
+				text: 'The room heats up.',
+				meta: { readAs: 'direction', readAsChosen: true }
+			});
+		});
+
+		it('keeps the chosen reading for another take, and tells the model it later', async () => {
+			client.writeReply.mockResolvedValueOnce({
+				ok: true,
+				passage: 'Second take.',
+				meta: null,
+				expansion: null
+			});
+			const { container } = render(DaydreamThread, {
+				daydream: readAs('direction', true),
+				available: true
+			});
+			await waSettled(container);
+			const menu = container.querySelector(
+				'li.passage[data-turn-id="t3"] wa-dropdown'
+			) as HTMLElement;
+			const [again] = waByProp(menu, 'wa-dropdown-item', 'value', 'again');
+			menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: again } }));
+			await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't2', role: 'story' }));
+			expect(asked(0)?.turns).toContainEqual({
+				type: 'text',
+				role: 'user',
+				text: Steamy,
+				readAs: 'direction'
+			});
+			expect(saved(0)?.content).toMatchObject({
+				meta: { readAs: 'direction', readAsChosen: true }
+			});
+		});
+
+		it('sends the model’s own reading of an earlier turn as nothing but the words', async () => {
+			draftText.value = 'I kiss her.';
+			const { container } = render(DaydreamThread, {
+				daydream: readAs('direction'),
+				available: true
+			});
+			await press(container, 'Send');
+			await waitFor(() => expect(client.writeReply).toHaveBeenCalledOnce());
+			expect(asked(0)?.turns).toContainEqual({ type: 'text', role: 'user', text: Steamy });
+		});
 	});
 
 	describe('naming', () => {

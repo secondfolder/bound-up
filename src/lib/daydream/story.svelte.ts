@@ -32,7 +32,8 @@ import type {
 	DaydreamTurnContent,
 	Direction,
 	PassageMeta,
-	Quote
+	Quote,
+	Reading
 } from '../sealed-kinds/daydreams';
 import {
 	openedDaydreamMark,
@@ -49,8 +50,16 @@ import {
 	setActiveTurn,
 	writeReply
 } from './client';
-import { type ContextTurn, type Reaction, toContextTurn, trimContext } from './context';
+import {
+	type ContextTurn,
+	chosenReadingIn,
+	expansionIn,
+	type Reaction,
+	toContextTurn,
+	trimContext
+} from './context';
 import { outcomeFor, type RollProposal, roll } from './dice';
+import { explicitOoc } from './ooc';
 import { suggestName } from './suggest';
 import { MAX_NAMING_OPENING } from './suggestions';
 import {
@@ -73,7 +82,23 @@ type Generate = {
 	/** The turn the new passage follows; null for an opening. */
 	parentId: string | null;
 	mode: 'opening' | 'reply' | 'rewrite';
-	rewrite?: { target: { id: string; text: string }; quote?: Quote; instruction?: string };
+	/**
+	 * How the user said they mean the turn the passage follows (Read as…),
+	 * in place of the model working it out. Kept by another take or a rewrite
+	 * of a passage written with one.
+	 */
+	readAs?: Reading;
+	rewrite?: {
+		target: { id: string; text: string };
+		quote?: Quote;
+		instruction?: string;
+		/**
+		 * The user's turn as the passage being rewritten wrote it out, if it
+		 * did. The rewrite answers the same turn, so it is sent written out and
+		 * kept, rather than written out again differently.
+		 */
+		expansion?: string;
+	};
 };
 
 export type MarkState = DaydreamMarkView & { content: DaydreamMarkContent | null | undefined };
@@ -85,8 +110,20 @@ export class DaydreamStory {
 
 	tree: DaydreamTreeNodeView[] = $state([]);
 	activeTurnId: string | null = $state(null);
-	/** The passage arriving now, as far as it has got; null when nothing is. */
-	streaming: { parentId: string | null; text: string } | null = $state(null);
+	/**
+	 * The passage arriving now, as far as it has got; null when nothing is.
+	 * `expansion` is the user's turn (`parentId`) as the model is writing it
+	 * out, when it is (`PassageMeta.expansion`); `readAs`, the reading the
+	 * user chose for it, if they did (Read as…); `reading`, how the reply says
+	 * it read it, once it has.
+	 */
+	streaming: {
+		parentId: string | null;
+		text: string;
+		expansion: string | null;
+		readAs: Reading | null;
+		reading: Reading | null;
+	} | null = $state(null);
 	/** What went wrong with the last request, shown with a way to try again. */
 	problem: string | null = $state(null);
 	/** What "Try again" does. */
@@ -271,10 +308,19 @@ export class DaydreamStory {
 	 * while some of it is still opening — a passage asked for then would be
 	 * written without it. A turn that will not open here at all is left out
 	 * rather than holding the story up for good.
+	 *
+	 * A user's turn that the passage after it wrote out goes as written out,
+	 * and one the user chose a reading for goes with it. The last turn has no
+	 * passage after it on this branch, so `last` says those for it, if
+	 * anything (a rewrite's expansion, a forced reading).
 	 */
-	#contextUpTo(parentId: string | null): ContextTurn[] | null {
+	#contextUpTo(
+		parentId: string | null,
+		last: { expansion?: string; readAs?: Reading } = {}
+	): ContextTurn[] | null {
 		const context: ContextTurn[] = [];
-		for (const node of pathTo(this.index, parentId)) {
+		const path = pathTo(this.index, parentId);
+		for (const [index, node] of path.entries()) {
 			const content = this.content(node.id);
 			if (content === undefined) {
 				return null;
@@ -282,7 +328,13 @@ export class DaydreamStory {
 			if (content === null) {
 				continue;
 			}
-			const turn = toContextTurn(node.role, content, this.reactionFor(node.id)?.reaction);
+			const next = path[index + 1];
+			const after = next ? this.content(next.id) : undefined;
+			const turn = toContextTurn(node.role, content, {
+				reaction: this.reactionFor(node.id)?.reaction,
+				expansion: next ? expansionIn(after) : last.expansion,
+				readAs: next ? chosenReadingIn(after) : last.readAs
+			});
 			if (turn) {
 				context.push(turn);
 			}
@@ -311,7 +363,23 @@ export class DaydreamStory {
 
 	async #generate(request: Generate): Promise<void> {
 		const { setup } = this;
-		const context = this.#contextUpTo(request.parentId);
+		const forced = request.readAs;
+		// A reading forced to anything but an instruction writes nothing out.
+		const carried = forced && forced !== 'instruction' ? undefined : request.rewrite?.expansion;
+		const context = this.#contextUpTo(request.parentId, {
+			...(carried ? { expansion: carried } : {}),
+			...(forced ? { readAs: forced } : {})
+		});
+		const parent = request.parentId === null ? undefined : this.index.byId.get(request.parentId);
+		const parentContent = parent ? this.content(parent.id) : null;
+		// Only words the user wrote, in a story they are in, can be written out:
+		// a block the model writes after a button press, Continue, an explicitly
+		// out-of-character turn or a watcher's direction is dropped.
+		const expandable =
+			parent?.role === 'user' &&
+			parentContent?.type === 'text' &&
+			(forced === 'instruction' || !(forced || explicitOoc(parentContent.text))) &&
+			setup?.voice.stance !== 'absent';
 		if (!(setup && context)) {
 			this.problem = NOT_READY;
 			this.retry = () => void this.#start(request);
@@ -325,12 +393,20 @@ export class DaydreamStory {
 		const stopped = isHalted(before);
 		this.problem = null;
 		this.retry = null;
-		this.streaming = { parentId: request.parentId, text: '' };
+		this.streaming = {
+			parentId: request.parentId,
+			text: '',
+			expansion: carried ?? null,
+			readAs: forced ?? null,
+			reading: null
+		};
 		this.#controller = new AbortController();
 		const { signal } = this.#controller;
 
 		let passage: string;
 		let meta: PassageMeta | null = null;
+		let expansion: string | null = null;
+		let reading: Reading | null = null;
 		try {
 			const outcome = await writeReply(
 				this.id,
@@ -355,7 +431,12 @@ export class DaydreamStory {
 					signal,
 					onText: (soFar) => {
 						if (this.streaming) {
-							this.streaming = { ...this.streaming, text: soFar };
+							this.streaming = {
+								...this.streaming,
+								text: soFar.passage,
+								expansion: carried ?? (expandable ? soFar.expansion : null),
+								reading: soFar.reading
+							};
 						}
 					}
 				}
@@ -366,7 +447,7 @@ export class DaydreamStory {
 				this.retry = () => void this.#start(request);
 				return;
 			}
-			({ passage, meta } = outcome);
+			({ passage, meta, expansion, reading } = outcome);
 		} catch {
 			// Stopped. What had arrived stays, like a sentence cut off: it is
 			// what was on screen, and writing it again is one press away. A Stop
@@ -376,19 +457,31 @@ export class DaydreamStory {
 				this.streaming = null;
 				return;
 			}
+			// A passage had started, so the written-out turn before it was whole.
+			expansion = this.streaming?.expansion ?? null;
+			reading = this.streaming?.reading ?? null;
 		} finally {
 			this.#controller = null;
 		}
 
+		// A check-in answers the user, never a turn written out for them; and a
+		// rewrite keeps the one it was given rather than any the model wrote.
+		const writtenOut =
+			stopped || !expandable ? null : (carried ?? expansion)?.slice(0, 8000) || null;
+		// The reading the reply opened with outranks the one in its metadata,
+		// written after the passage had already decided it.
+		const readAs = forced ?? (writtenOut ? 'instruction' : (reading ?? meta?.readAs));
 		const finalMeta: PassageMeta | undefined =
-			meta || stopped || request.rewrite
+			meta || stopped || request.rewrite || writtenOut || forced || reading
 				? {
 						suggestions: stopped ? [] : (meta?.suggestions ?? []),
 						directions: stopped
 							? { add: [], remove: [] }
 							: (meta?.directions ?? { add: [], remove: [] }),
 						...(meta?.roll && !stopped ? { roll: meta.roll } : {}),
-						...(meta?.readAs ? { readAs: meta.readAs } : {}),
+						...(readAs ? { readAs } : {}),
+						...(writtenOut ? { expansion: writtenOut } : {}),
+						...(forced ? { readAsChosen: true } : {}),
 						// A check-in after Stop the scene is out of character, whatever the model said.
 						...(stopped || meta?.ooc ? { ooc: true } : {}),
 						...(request.rewrite
@@ -472,17 +565,40 @@ export class DaydreamStory {
 		}
 	}
 
-	/** Another take on a passage: a new turn beside it, which the user is moved to. */
+	/**
+	 * Another take on a passage: a new turn beside it, which the user is moved
+	 * to. A reading the user chose for the turn before it still stands.
+	 */
 	async writeAgain(turnId: string): Promise<void> {
 		const node = this.index.byId.get(turnId);
 		if (!node || this.busy) {
 			return;
 		}
+		const readAs = chosenReadingIn(this.content(turnId));
 		await this.#settled();
 		void this.#start({
 			parentId: node.parentId,
-			mode: node.parentId === null ? 'opening' : 'reply'
+			mode: node.parentId === null ? 'opening' : 'reply',
+			...(readAs ? { readAs } : {})
 		});
+	}
+
+	/**
+	 * Read as…: the user's turn read the way they say they meant it rather
+	 * than the way the model took it. A fork, not a correction — the passage
+	 * after it may already be written, and is kept beside the new one (the
+	 * switcher reaches both). One still arriving is stopped and kept, as Stop
+	 * keeps it, and the new passage is asked for from the turn itself.
+	 */
+	async reread(turnId: string, readAs: Reading): Promise<void> {
+		const node = this.index.byId.get(turnId);
+		if (node?.role !== 'user' || this.content(turnId)?.type !== 'text') {
+			return;
+		}
+		this.stop();
+		await this.#settled();
+		await this.#moveTo(turnId);
+		void this.#start({ parentId: turnId, mode: 'reply', readAs });
 	}
 
 	/** A passage rewritten, as a new turn beside it; on an older passage that starts a branch. */
@@ -496,10 +612,17 @@ export class DaydreamStory {
 			return;
 		}
 		await this.#settled();
+		const expansion = expansionIn(content);
+		const readAs = chosenReadingIn(content);
 		void this.#start({
 			parentId: node.parentId,
 			mode: 'rewrite',
-			rewrite: { target: { id: turnId, text: content.text }, ...options }
+			...(readAs ? { readAs } : {}),
+			rewrite: {
+				target: { id: turnId, text: content.text },
+				...options,
+				...(expansion ? { expansion } : {})
+			}
 		});
 	}
 

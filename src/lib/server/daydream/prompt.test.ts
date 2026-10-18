@@ -6,7 +6,7 @@ import {
 	UNSET_CHARACTER_DIALS
 } from '$lib/daydream';
 import type { ContextTurn } from '$lib/daydream/context';
-import { daydreamSetupKind } from '$lib/sealed-kinds/daydreams';
+import { daydreamSetupKind, type Reading } from '$lib/sealed-kinds/daydreams';
 import { testCharacter, testDaydreamSetup, testScene } from '$lib/testing/daydream-setup';
 import {
 	buildMessages,
@@ -124,6 +124,69 @@ describe('buildMessages', () => {
 		expect(content).toContain('<meta>');
 		expect(content).toContain('"suggestions"');
 		expect(content).toContain('"roll"');
+	});
+
+	it('has an instruction for the user’s own turn written out first, then answered', () => {
+		const content = system(buildMessages(request({ turns: [said('hi')] })));
+		expect(content).toContain('Tell Charlie the fox is safe');
+		expect(content).toContain('<yours>');
+		expect(content).toContain('"instruction" (an instruction for their own turn');
+		expect(content).toContain('after the <yours> block');
+		// The rule against writing the user's words makes room for it.
+		expect(content).toContain('unless they ask you to write their turn');
+	});
+
+	it('has the reading decided first, before the passage', () => {
+		const content = system(buildMessages(request({ turns: [said('hi')] })));
+		expect(content).toContain(
+			'open your reply by deciding how you read it, before writing anything else'
+		);
+		expect(content).toContain('<reading>direction</reading>');
+		expect(content.indexOf('<reading>')).toBeLessThan(content.indexOf('Write the passage next'));
+		// Asked for once, up front, not again in the metadata.
+		expect(content).not.toContain('"readAs"');
+	});
+
+	it('treats a request about where the story goes like a direction button', () => {
+		const content = system(buildMessages(request({ turns: [said('hi')] })));
+		expect(content).toContain('"Make the story super steamy"');
+		expect(content).toContain('exactly as if they had pressed a button for it');
+	});
+
+	it('puts the reading the user chose before their words, and says it settles it', () => {
+		const chosenAs = (text: string, readAs: Reading) =>
+			buildMessages(request({ turns: [{ type: 'text', role: 'user', text, readAs }] })).at(-1)
+				?.content;
+		const chosen = (readAs: Reading) => chosenAs('Make it steamy', readAs);
+		expect(chosen('direction')).toBe('(Direction: Make it steamy)');
+		expect(chosen('instruction')).toBe(
+			'(Read this as an instruction for my own turn: write my turn out first, in a <yours> block, then answer it.)\nMake it steamy'
+		);
+		expect(chosen('action')).toContain('what I say or do in the story');
+		expect(chosen('cowrite')).toContain('next part of the story');
+		expect(chosen('ooc')).toBe('[Out of character] Make it steamy');
+		// A chosen reading outranks the explicit out-of-character syntax.
+		expect(chosenAs('(I wave)', 'action')).toContain('what I say or do');
+		expect(system(buildMessages(request({ turns: [said('hi')] })))).toContain(
+			'was chosen by the user: read it that way'
+		);
+	});
+
+	it('writes nothing out for a user watching from outside', () => {
+		const watching = testDaydreamSetup({
+			voice: { narrator: 'third-person', stance: 'absent', protagonistName: '' }
+		});
+		const content = system(buildMessages(request({ setup: watching, turns: [said('hi')] })));
+		expect(content).not.toContain('<yours>');
+		expect(content).not.toContain('"instruction"');
+		expect(content).toContain('<reading>direction</reading>');
+	});
+
+	it('asks for nothing written out in a stopped scene’s check-in', () => {
+		const content = system(
+			buildMessages(request({ turns: [said('hi'), { type: 'safety', signal: 'red' }] }))
+		);
+		expect(content).not.toContain('after the <yours> block');
 	});
 
 	// Judged against the story before the passage, a button for what the

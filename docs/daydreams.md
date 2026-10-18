@@ -356,10 +356,18 @@ row's plaintext `role` says only who wrote it, `user` or `story`.
   model reads a turn as something the user does, a request about where to
   take the story, or the next part of it written co-writing style
   (`READING` in the prompt), and says which it read it as (`readAs`, shown
-  faintly under the turn when it is anything but an action). Explicit
-  out-of-character syntax — a turn starting `(`, `[`, `//` or `OOC:` — is
-  always out of character (`explicitOoc`, `daydream/ooc.ts`), whatever the
-  model would have made of it.
+  faintly under the turn when it is anything but an action). It says so
+  first, opening its reply with `<reading>…</reading>` before writing
+  anything: asked only in the metadata after the passage, it named a reading
+  for whatever the passage had already done, and "Make the story super
+  steamy" came back as an action. A request
+  about where the story goes ("Make the story super steamy") is a direction,
+  treated exactly like a direction button and drawn as one, a marker rather
+  than a bubble. An instruction for the user's own turn is written out for
+  them, and any reading can be overridden, which forks the story (both
+  below). Explicit out-of-character syntax — a turn starting `(`, `[`, `//`
+  or `OOC:` — is always out of character (`explicitOoc`,
+  `daydream/ooc.ts`), whatever the model would have made of it.
 - **Direction buttons** are the model's. Each passage says which to add and
   which to remove (`meta.directions`), and the set on offer is the fold of
   every passage on the branch, at most six, oldest dropped first
@@ -385,6 +393,71 @@ row's plaintext `role` says only who wrote it, `user` or `story`.
 - **Reactions** — loved it, liked it, not for me — one per passage, stored as
   marks. They go to the model with the passage they are on, as taste.
 - **Dice**, below.
+
+## Written out for you
+
+Sometimes a user writes what their turn should be rather than the turn
+itself: "Tell Charlie the fox is safe", not the words they say to Charlie.
+Answered as it stands, the story would have no turn in which they actually
+tell Charlie anything. So the model writes the turn out first — in the first
+person, as the user would have written it, doing exactly what they asked and
+nothing more — and then answers what it wrote (`WRITING_OUT` in the prompt,
+`readAs: "instruction"`).
+
+- **One request.** The written-out turn opens the same reply, in a leading
+  `<yours>` block before the passage (see [The reply format](#the-reply-format)).
+  A separate request to work out whether a turn needs writing out would
+  double the wait and the cost of every turn sent, most of which need
+  nothing; and with the block first, the passage answers the written-out
+  words rather than the instruction.
+- **Stored on the passage that answered it**, as `meta.expansion` beside
+  `readAs` (`daydream-turn` v3). Turns never change once written, so the
+  user's own turn keeps exactly what they sent. It follows that **another
+  take writes the turn out afresh**: Write again answers the instruction
+  again, and each take carries its own wording. A **rewrite** keeps the
+  wording it was given, sending it written out and storing the same one,
+  since a rewrite answers the same turn.
+- **The model reads the written-out turn from then on.** Building the
+  context (`#contextUpTo`, `toContextTurn`), a user's turn followed on the
+  branch by a passage with an `expansion` is sent as the expansion, so the
+  story the model reads is the story the user sees.
+- **Only words the user wrote, in a story they are in.** A watcher
+  (`stance: absent`) has no turn of their own, so the prompt leaves the
+  instruction out for them and their instructions stay directions. A block
+  the model writes anyway after a button press, Continue, an explicitly
+  out-of-character turn, for a watcher, or in a check-in, is dropped.
+- **On screen** (`DaydreamUserTurn.svelte`), the bubble shows the written-out
+  turn, labelled "written out for you", with **Show what you sent** to switch
+  to the words actually sent — set apart as a note, dashed and italic, so the
+  two are never mistaken for each other — and **Show it written out** back.
+  While a reply arrives, the bubble fills in as the turn is written out, and
+  the passage's spinner stays until the block closes.
+
+## Read it differently
+
+The model's reading of a turn can be wrong: a "Make it steamier" taken as
+something the user says in the story, say. Every turn the user wrote has a
+**Read it differently** menu (`DaydreamUserTurn.svelte`, the vertical
+ellipsis by the turn) offering, under "Interpret as…", every other reading — something I say or do, write my turn out for me (not offered to a
+watcher), a direction for the story, part of the story, out of character.
+
+- **It forks, never corrects** (`DaydreamStory.reread`). By the time someone
+  notices, the passage after the turn is usually written or arriving. The
+  user is moved to their turn and a new passage is asked for after it, with
+  the reading forced; the old one stays beside it, reached with the
+  switcher. One still arriving is stopped and kept, as Stop keeps it, before
+  the fork starts.
+- **The forced reading goes to the model as a note before the words**
+  (`readAs` on the context turn; `READING_NOTES` in the prompt), which
+  `READING` says the user chose and settles it. A direction goes exactly as a
+  direction button does, `(Direction: …)`; out of character as
+  `[Out of character]`, and a chosen reading outranks the explicit
+  out-of-character syntax.
+- **It is the user's from then on.** The passage records the reading with
+  `readAsChosen` (`daydream-turn` v3), the turn's label says "as you asked",
+  later requests keep sending the note for that turn (`chosenReadingIn`),
+  and Write again and a rewrite of that passage keep it. The model's own
+  readings are never sent back: the passage it wrote already shows them.
 
 ## Dice
 
@@ -449,23 +522,45 @@ Each passage ends with a metadata block the browser takes off it:
 
 ```
 <meta>
-{"suggestions": [...], "directions": {"add": [...], "remove": [...]}, "readAs": "...", "roll": {...}, "ooc": true}
+{"suggestions": [...], "directions": {"add": [...], "remove": [...]}, "roll": {...}, "ooc": true}
 </meta>
 ```
+
+A reply to words the user wrote starts with how it read them, and, when they
+were an instruction for the user's own turn, that turn written out
+([Written out for you](#written-out-for-you)):
+
+```
+<reading>instruction</reading>
+<yours>
+"Charlie — the fox is safe. I promise."
+</yours>
+```
+
+The reading is stored as the passage's `readAs`. It outranks a `readAs` the
+model puts in the metadata anyway (still read, as a fallback), and a reading
+the user chose outranks both.
 
 A trailing block rather than a JSON reply or a tool call, because the
 passage streams first and can be read as it arrives, and tool calls are not
 supported alike by every model on OpenRouter. While it streams,
-`visiblePassage` hides the block, even half an opening tag. When it ends,
-`parseReply` validates the block with the kind's own schema and **degrades
-rather than fails**: no block, or one that does not parse, keeps the passage
-and simply offers no new buttons or suggestions (the old buttons stay); a
-bad roll is dropped and the rest kept.
+`visibleReply` hides the leading blocks' tags, even half of one, and the
+metadata, and reports the reading as soon as its tag closes, so the turn is
+drawn as it was read (a direction marker, say) while the passage arrives;
+the leading blocks count only at the very start, `<reading>` before
+`<yours>`. When it ends, `parseReply`
+validates the metadata with the kind's own schema and **degrades rather than
+fails**: no block, or one that does not parse, keeps the passage and simply
+offers no new buttons or suggestions (the old buttons stay); a bad roll is
+dropped and the rest kept; a `<yours>` block never closed is no written-out
+turn, and everything after its tag is kept as the passage; a reading that is
+not one of the five is no reading.
 
 **Metadata is never sent back.** Past turns go to the model as their words
 alone (`toContextTurn`); what a passage offered next was for the screen, and
 would cost context on every request for nothing. Reactions are sent, because
-they say what the user enjoyed.
+they say what the user enjoyed, and so is a written-out turn, in place of the
+user's turn it was written from, because it is that turn's words.
 
 ## What the server sees
 
@@ -660,19 +755,26 @@ Noted so they are not lost; none is in the code.
 
 - Pure: `daydream.test.ts` (every voice combination, casting against a
   scene's parts),
-  `daydream/tree.test.ts`, `reply-format.test.ts`, `dice.test.ts`,
+  `daydream/tree.test.ts`, `reply-format.test.ts` (the written-out turn,
+  arriving and finished), `dice.test.ts`,
   `chips.test.ts`, `quotes.test.ts`, `ooc.test.ts`, `suggestions.test.ts`,
   `dial-words.test.ts`, `catalog.test.ts` (every starting point is a valid
   record, they run SFW to extreme in order, every chip is one phrase),
   `context.test.ts`, `server/daydream/prompt.test.ts` (the rules always come
   first; a stopped story gets a check-in in any mode; heat is the ceiling;
-  the system voice's guide, its place and its examples by heat),
+  the system voice's guide, its place and its examples by heat; writing a
+  turn out, never for a watcher; directions like a button; chosen readings
+  as notes that settle it),
   `suggest-prompt.test.ts`, `config.test.ts`, the sealed fixtures, and the
   tree backfill in `server/db/migrations.test.ts`.
 - Server: `server/daydreams.test.ts` (the tree, marks, libraries, ownership),
   the route tests under `routes/(auth-required)/(app)/daydreams/` and
   `routes/api/daydreams/`, and `server/daydream/library-routes.test.ts`.
-- Component: `DaydreamThread.svelte.test.ts` (naming included),
+- Component: `DaydreamThread.svelte.test.ts` (naming and written-out turns
+  included: shown and switched, filled in as they arrive, sent written out
+  afterwards, fresh for another take and kept by a rewrite; directions drawn
+  as markers; Read it differently forking, mid-passage too, and its reading
+  kept),
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts),
   `DaydreamSetupFormAdd.svelte.test.ts`,
   `DaydreamCharacterDialog.svelte.test.ts` (the two halves),

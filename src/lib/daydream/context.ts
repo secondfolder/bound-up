@@ -5,7 +5,12 @@ import {
 	MAX_CONTEXT_CHARS,
 	MAX_CONTEXT_TURNS
 } from '../daydream';
-import type { DaydreamMarkContent, DaydreamTurnContent } from '../sealed-kinds/daydreams';
+import {
+	type DaydreamMarkContent,
+	type DaydreamTurnContent,
+	type Reading,
+	readingSchema
+} from '../sealed-kinds/daydreams';
 
 /**
  * Which turns go with a reply request, and in what shape.
@@ -32,7 +37,9 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 		text: z.string().min(1).max(DAYDREAM_LIMITS.turn),
 		/** A passage stepped out of the story (a check-in, an aside). */
 		ooc: z.boolean().optional(),
-		reaction: z.enum(['love', 'like', 'not-for-me']).optional()
+		reaction: z.enum(['love', 'like', 'not-for-me']).optional(),
+		/** How the user said they mean their turn (Read as…), overriding the model's own reading. */
+		readAs: readingSchema.optional()
 	}),
 	z.object({
 		type: z.literal('direction'),
@@ -73,23 +80,50 @@ export function contextSize(turn: ContextTurn): number {
 }
 
 /**
+ * The user's turn as the passage after it wrote it out, if it did: what the
+ * user wrote was an instruction for their turn ("Tell Charlie the fox is
+ * safe") and this is the turn itself. See `PassageMeta.expansion`.
+ */
+export function expansionIn(next: DaydreamTurnContent | null | undefined): string | null {
+	return next?.type === 'text' ? (next.meta?.expansion ?? null) : null;
+}
+
+/**
+ * The reading the user chose for their turn, if the passage after it was
+ * written with one forced (Read as…). The model's own readings are not
+ * sent back: the passage it wrote already shows how it read the turn.
+ */
+export function chosenReadingIn(next: DaydreamTurnContent | null | undefined): Reading | null {
+	return next?.type === 'text' && next.meta?.readAsChosen ? (next.meta.readAs ?? null) : null;
+}
+
+/**
  * A stored turn as the model reads it. Null for a turn that has nothing to
  * say to the model — there is no such kind today, but a newer build's turn
  * this one cannot read lands here too rather than as a hole in the story.
+ *
+ * For a user's turn, `expansion` is it written out (`expansionIn`), sent in
+ * place of the instruction it was written from, so the story the model reads
+ * is the one the user sees, and the instruction is not written out a second
+ * time; and `readAs` is how the user said they mean it (`chosenReadingIn`).
+ * A turn sent written out goes without a reading: it is the turn itself now.
  */
 export function toContextTurn(
 	role: DaydreamTurnRole,
 	content: DaydreamTurnContent,
-	reaction?: Reaction
+	about: { reaction?: Reaction; expansion?: string | null; readAs?: Reading | null } = {}
 ): ContextTurn | null {
+	const { reaction, expansion, readAs } = about;
+	const asUser = role === 'user';
 	switch (content.type) {
 		case 'text':
 			return {
 				type: 'text',
 				role,
-				text: content.text.slice(0, DAYDREAM_LIMITS.turn),
+				text: (asUser && expansion ? expansion : content.text).slice(0, DAYDREAM_LIMITS.turn),
 				...(content.meta?.ooc ? { ooc: true } : {}),
-				...(reaction && role === 'story' ? { reaction } : {})
+				...(reaction && !asUser ? { reaction } : {}),
+				...(readAs && asUser && !expansion ? { readAs } : {})
 			};
 		case 'direction':
 			return { type: 'direction', label: content.label };

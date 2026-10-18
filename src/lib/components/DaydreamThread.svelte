@@ -8,7 +8,7 @@
 	import { openDraft } from '$lib/messaging/drafts';
 	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
 	import { followEnd, scrollIntoViewWithin } from '$lib/scroll-parent';
-	import type { PassageMeta, Quote } from '$lib/sealed-kinds/daydreams';
+	import type { Quote, Reading } from '$lib/sealed-kinds/daydreams';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 	import type { DaydreamView } from '$lib/types';
 	import DaydreamBookmarkDialog from './DaydreamBookmarkDialog.svelte';
@@ -63,18 +63,36 @@
 			: null;
 	});
 
-	/** How the passage after each user turn read it, by the user turn's id. */
-	const readAs = $derived.by(() => {
-		const map = new Map<string, NonNullable<PassageMeta['readAs']>>();
+	type Answered = { readAs: Reading | null; expansion: string | null; chosen: boolean };
+
+	/**
+	 * How the passage after each user turn read it, and what it wrote the turn
+	 * out to if it did, by the user turn's id. A passage arriving now counts as
+	 * soon as it has written a turn out, so the bubble fills in as it does.
+	 */
+	const answered = $derived.by(() => {
+		const map = new Map<string, Answered>();
 		story.path.forEach((node, index) => {
 			const next = story.path[index + 1];
 			if (node.role === 'user' && next) {
 				const content = story.content(next.id);
-				if (content?.type === 'text' && content.meta?.readAs) {
-					map.set(node.id, content.meta.readAs);
+				if (content?.type === 'text' && content.meta) {
+					map.set(node.id, {
+						readAs: content.meta.readAs ?? null,
+						expansion: content.meta.expansion ?? null,
+						chosen: content.meta.readAsChosen === true
+					});
 				}
 			}
 		});
+		const arriving = story.streaming;
+		if (arriving?.parentId && (arriving.expansion || arriving.readAs || arriving.reading)) {
+			map.set(arriving.parentId, {
+				readAs: arriving.readAs ?? (arriving.expansion ? 'instruction' : arriving.reading),
+				expansion: arriving.expansion,
+				chosen: arriving.readAs !== null
+			});
+		}
 		return map;
 	});
 
@@ -302,7 +320,13 @@
 					}}
 				/>
 			{:else}
-				<DaydreamUserTurn {story} {node} readAs={readAs.get(node.id) ?? null} />
+				<DaydreamUserTurn
+					{story}
+					{node}
+					readAs={answered.get(node.id)?.readAs ?? null}
+					expansion={answered.get(node.id)?.expansion ?? null}
+					chosen={answered.get(node.id)?.chosen ?? false}
+				/>
 			{/if}
 		{/each}
 		{#if story.streaming}

@@ -252,14 +252,8 @@ export const rollProposalSchema = z
 	})
 	.refine(coversEveryFace, 'Every face must land on exactly one outcome');
 
-/**
- * What the model says about a passage besides the passage: the buttons and
- * suggestions it offers next, a roll if it proposes one, how it read the
- * user's turn, and whether it stepped out of the story. Only ever on a story
- * turn. Never sent back to the model with past turns (`daydream/context.ts`):
- * it is for the screen, and would cost context for nothing.
- */
-export const passageMetaSchema = z.object({
+/** A passage's meta as turn v2 stored it. Frozen with v2: see `passageMetaSchema` for the current one. */
+const passageMetaV2 = z.object({
 	suggestions: z
 		.array(z.string().trim().min(1).max(DAYDREAM_LIMITS.suggestion))
 		.max(MAX_SUGGESTIONS)
@@ -285,18 +279,46 @@ export const passageMetaSchema = z.object({
 		.optional()
 });
 
+/**
+ * How a turn the user wrote is meant: something they do or say, an
+ * instruction for their own turn to be written out, a direction for where the
+ * story goes, the next part of the story co-written, or out of character.
+ */
+export const readingSchema = z.enum(['action', 'instruction', 'direction', 'cowrite', 'ooc']);
+
+export type Reading = z.output<typeof readingSchema>;
+
+/**
+ * What the model says about a passage besides the passage: the buttons and
+ * suggestions it offers next, a roll if it proposes one, how it read the
+ * user's turn, and whether it stepped out of the story. Only ever on a story
+ * turn. Never sent back to the model with past turns (`daydream/context.ts`):
+ * it is for the screen, and would cost context for nothing — except
+ * `expansion`, which is the user's own turn rather than the passage's.
+ *
+ * `expansion` is the user's turn written out in full, when they wrote what
+ * their turn should be ("Tell Charlie the fox is safe") rather than the turn
+ * itself, and the model wrote it out before answering it (readAs
+ * `instruction`). It lives here, on the passage that answered it, because
+ * turns never change once written: the user's own turn keeps what they sent.
+ */
+export const passageMetaSchema = passageMetaV2.extend({
+	readAs: readingSchema.optional(),
+	expansion: z.string().trim().min(1).max(DAYDREAM_LIMITS.turn).optional(),
+	/**
+	 * The user picked `readAs` themselves (Read as…), overriding the model's
+	 * reading: this passage was written with it forced, and later requests
+	 * keep telling the model so (`daydream/context.ts`).
+	 */
+	readAsChosen: z.boolean().optional()
+});
+
 export type PassageMeta = z.output<typeof passageMetaSchema>;
 
 const turnV1 = z.object({ text: z.string().min(1).max(DAYDREAM_LIMITS.turn) });
 
-const turnV2 = z.discriminatedUnion('type', [
-	// Prose, from either side; the row's `role` says whose. Not trimmed: a
-	// reply's own spacing is part of it, and a turn is stored exactly as shown.
-	z.object({
-		type: z.literal('text'),
-		text: z.string().min(1).max(DAYDREAM_LIMITS.turn),
-		meta: passageMetaSchema.optional()
-	}),
+/** The turn types besides text, which have not changed since v2. */
+const turnTypesV2 = [
 	// A direction button pressed. Continue is not one: it adds no turn.
 	z.object({
 		type: z.literal('direction'),
@@ -320,7 +342,23 @@ const turnV2 = z.discriminatedUnion('type', [
 		result: z.number().int().min(1).max(MAX_SIDES),
 		outcome: z.string().trim().min(1).max(DAYDREAM_LIMITS.rollOutcome)
 	})
-]);
+] as const;
+
+/** Prose, from either side; the row's `role` says whose. */
+const textTurn = <Meta extends z.ZodType>(meta: Meta) =>
+	z.object({
+		type: z.literal('text'),
+		// Not trimmed: a reply's own spacing is part of it, and a turn is stored
+		// exactly as shown.
+		text: z.string().min(1).max(DAYDREAM_LIMITS.turn),
+		meta: meta.optional()
+	});
+
+const turnV2 = z.discriminatedUnion('type', [textTurn(passageMetaV2), ...turnTypesV2]);
+
+// v3: a passage may carry the user's turn written out (`expansion`), read it
+// as an `instruction`, and say the reading was the user's choice.
+const turnV3 = z.discriminatedUnion('type', [textTurn(passageMetaSchema), ...turnTypesV2]);
 
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
@@ -331,7 +369,13 @@ export const daydreamTurnKind = defineSealedKind({
 			schema: turnV1,
 			upcast: (value: z.output<typeof turnV1>) => ({ type: 'text', text: value.text })
 		},
-		{ version: 2, schema: turnV2 }
+		{
+			version: 2,
+			schema: turnV2,
+			// Everything v2 could say, v3 says the same way.
+			upcast: (value: z.output<typeof turnV2>) => value
+		},
+		{ version: 3, schema: turnV3 }
 	]
 });
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DAYDREAM_LIMITS } from '../daydream';
-import { type ContextTurn, contextSize, toContextTurn, trimContext } from './context';
+import {
+	type ContextTurn,
+	chosenReadingIn,
+	contextSize,
+	expansionIn,
+	toContextTurn,
+	trimContext
+} from './context';
 
 const said = (text: string, role: 'user' | 'story' = 'user'): ContextTurn => ({
 	type: 'text',
@@ -56,7 +63,7 @@ describe('toContextTurn', () => {
 						readAs: 'action'
 					}
 				},
-				'love'
+				{ reaction: 'love' }
 			)
 		).toEqual({ type: 'text', role: 'story', text: 'Sit.', reaction: 'love' });
 	});
@@ -72,7 +79,9 @@ describe('toContextTurn', () => {
 	});
 
 	it('never puts a reaction on the user’s own turn', () => {
-		expect(toContextTurn('user', { type: 'text', text: 'Hi' }, 'like')).toEqual(said('Hi'));
+		expect(toContextTurn('user', { type: 'text', text: 'Hi' }, { reaction: 'like' })).toEqual(
+			said('Hi')
+		);
 	});
 
 	it('turns each kind of turn into what the model reads', () => {
@@ -102,6 +111,58 @@ describe('toContextTurn', () => {
 				outcome: 'You hold'
 			})
 		).toEqual({ type: 'roll', sides: 6, result: 4, outcome: 'You hold' });
+	});
+
+	it('sends a user’s turn as it was written out, not the instruction it came from', () => {
+		const answer = {
+			type: 'text' as const,
+			text: 'Charlie sighs.',
+			meta: {
+				suggestions: [],
+				directions: { add: [], remove: [] },
+				readAs: 'instruction' as const,
+				expansion: '"Charlie, the fox is safe."'
+			}
+		};
+		const instruction = { type: 'text' as const, text: 'Tell Charlie the fox is safe' };
+		expect(toContextTurn('user', instruction, { expansion: expansionIn(answer) })).toEqual(
+			said('"Charlie, the fox is safe."')
+		);
+		// A passage is never replaced, and nothing written out is the turn as sent.
+		expect(toContextTurn('story', answer, { expansion: 'x' })).toEqual(
+			said('Charlie sighs.', 'story')
+		);
+		expect(toContextTurn('user', instruction, { expansion: expansionIn(null) })).toEqual(
+			said('Tell Charlie the fox is safe')
+		);
+	});
+
+	it('says how the user chose to have their turn read, and only theirs', () => {
+		const answer = (readAsChosen: boolean) => ({
+			type: 'text' as const,
+			text: 'The story turns steamy.',
+			meta: {
+				suggestions: [],
+				directions: { add: [], remove: [] },
+				readAs: 'direction' as const,
+				readAsChosen
+			}
+		});
+		const turn = { type: 'text' as const, text: 'Make it steamy' };
+		expect(chosenReadingIn(answer(true))).toBe('direction');
+		// The model's own reading is not sent back.
+		expect(chosenReadingIn(answer(false))).toBeNull();
+		expect(toContextTurn('user', turn, { readAs: chosenReadingIn(answer(true)) })).toEqual({
+			...said('Make it steamy'),
+			readAs: 'direction'
+		});
+		expect(toContextTurn('story', answer(true), { readAs: 'direction' })).toEqual(
+			said('The story turns steamy.', 'story')
+		);
+		// Written out, it is the turn itself, and needs no reading.
+		expect(toContextTurn('user', turn, { expansion: 'I ask.', readAs: 'instruction' })).toEqual(
+			said('I ask.')
+		);
 	});
 
 	it('cuts a text turn to the turn limit', () => {
