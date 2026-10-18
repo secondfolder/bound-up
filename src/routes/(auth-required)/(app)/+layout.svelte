@@ -8,6 +8,7 @@
 	import NotificationsHint from '$lib/components/NotificationsHint.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
 	import { resyncPush } from '$lib/push-client';
+	import { fitVisualViewport } from '$lib/visual-viewport';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
@@ -51,7 +52,7 @@
 </style>
 </svelte:head>
 
-<div class="shell">
+<div class="shell" {@attach fitVisualViewport}>
 	<main>
 		{#if showTimezoneWarning}
 			<TimezoneWarning user={data.user} />
@@ -83,8 +84,15 @@
 </div>
 
 <style>
+	/* Fixed over the visible part of the screen, not sized to the document:
+	   see $lib/visual-viewport.ts for why iOS needs that once the keyboard is
+	   open. The fallbacks are for the first paint, and for a browser without
+	   `visualViewport`. */
 	.shell {
-		height: 100svh;
+		position: fixed;
+		inset-inline: 0;
+		top: var(--viewport-top, 0);
+		height: var(--viewport-height, 100dvh);
 		display: flex;
 		flex-direction: column;
 

@@ -596,8 +596,9 @@ the button follows the same definition of "unsaved changes" as the form logic.
 
 **Three shells, one per group.** `(public)` renders a centred 800px column with
 no header — each of its pages links onwards from its own content;
-`(auth-required)/(app)` renders a `100svh` flex column whose `<main>` scrolls
-and whose `AppNav` bottom bar does not; `(standalone)` renders nothing but
+`(auth-required)/(app)` renders a flex column fixed over the visual viewport
+(`$lib/visual-viewport.ts`, for iOS's keyboard) whose `<main>` scrolls and
+whose `AppNav` bottom bar does not; `(standalone)` renders nothing but
 switches the page texture off, for public tools that should not look like the
 app. `theme.css` still loads there, so such a page re-themes a wrapper of its
 own — and must not give it the `wa-dark` class, which `theme.css` repaints in
