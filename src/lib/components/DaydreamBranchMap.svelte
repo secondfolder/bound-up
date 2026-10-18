@@ -2,6 +2,7 @@
 	import type { DaydreamStory } from '$lib/daydream/story.svelte';
 	import { longestChild } from '$lib/tree';
 	import type { DaydreamTreeNodeView } from '$lib/types';
+	import divergeIcon from './icons/diverge.svg';
 	import Tree from './tree/Tree.svelte';
 
 	/**
@@ -11,6 +12,11 @@
 	 * them. The branch being read is marked, and so are bookmarks. Picking a
 	 * turn moves to the branch through it, where it was last left; "carry on
 	 * from here" makes that turn the place to continue from.
+	 *
+	 * "Carry on from here" sits on a rule under its turn, at the drawer's
+	 * edge, rather than in the turn's row: in the row it read as either
+	 * keeping that turn or starting before it. Under it, the new branch
+	 * plainly keeps everything above the line.
 	 *
 	 * Labels are the first words of each turn, opened when the map is; until
 	 * then a turn shows who wrote it.
@@ -116,13 +122,14 @@
 						class:current={node.id === story.activeTurnId}
 					>
 						<span class="marker" aria-hidden="true"></span>
+						<span class="rule" class:to-edge={node.id === story.activeTurnId} aria-hidden="true"></span>
 						<button type="button" class="node" disabled={story.busy} onclick={() => jump(node, false)}>
 							{#if marked.has(node.id)}<wa-icon name="bookmark" variant="solid" label="Bookmarked"></wa-icon>{/if}
 							<span>{label(node)}</span>
 						</button>
 						{#if node.id !== story.activeTurnId}
 							<wa-button size="s" appearance="plain" pill disabled={story.busy} onclick={() => jump(node, true)}>
-								<wa-icon name="code-branch" variant="solid" label={`Carry on from “${label(node)}”`}></wa-icon>
+								<wa-icon src={divergeIcon} label={`Carry on from “${label(node)}”`}></wa-icon>
 							</wa-button>
 						{/if}
 					</div>
@@ -150,6 +157,8 @@
 		--tree-step-gap: 0.25rem;
 		--tree-indent: 1rem;
 		--tree-elbow-radius: 0.4rem;
+		/* The carry-on button, which straddles the rule under its turn. */
+		--carry-on-size: var(--row);
 
 		/* On the trunk: a touch larger, over the wider bark. */
 		:global(.trunk-step) {
@@ -214,8 +223,24 @@
 			font-style: italic;
 		}
 
+		/* Clear of the carry-on buttons above and below, which overhang the
+		   row at the drawer's edge. */
+		padding-inline-end: calc(var(--carry-on-size) + 0.25rem);
+
+		/* Placed against the tree's own row (positioned, and as wide as the
+		   drawer), not this one, which is only as wide as its label. Raised,
+		   so the next row, positioned too and later, does not take its
+		   lower half's clicks. */
 		wa-button {
-			--wa-form-control-height: var(--row);
+			--wa-form-control-height: var(--carry-on-size);
+			position: absolute;
+			inset-inline-end: 0;
+			inset-block-end: calc(-1 * var(--tree-step-gap) / 2 - var(--carry-on-size) / 2);
+			z-index: 1;
+
+			wa-icon {
+				font-size: 1rem;
+			}
 		}
 	}
 
@@ -238,6 +263,21 @@
 			border-color: var(--accent-color);
 			background: var(--accent-color);
 			box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent-color) 35%, transparent);
+		}
+	}
+
+	/* The line between one turn and the next, from just past the marker to
+	   the carry-on button; to the edge on the turn being read, which has
+	   none. */
+	.rule {
+		position: absolute;
+		inset-block-end: calc(-1 * var(--tree-step-gap) / 2);
+		/* Up to the icon, a hair short of it: the button is wider than its icon. */
+		inset-inline: calc(var(--tree-marker-size) + 0.25rem) calc(var(--carry-on-size) / 2 + 0.65rem);
+		border-block-end: 1px solid var(--wa-color-surface-border);
+
+		&.to-edge {
+			inset-inline-end: 0;
 		}
 	}
 
