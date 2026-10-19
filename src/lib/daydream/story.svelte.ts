@@ -388,10 +388,18 @@ export class DaydreamStory {
 			}
 			const next = path[index + 1];
 			const after = next ? this.content(next.id) : undefined;
+			// What its request listed, worked out as it was then (`#replyBody`):
+			// sent again, the history is what that request sent.
+			const before = path
+				.slice(0, index)
+				.map((earlier) => ({ content: this.content(earlier.id) ?? null }));
 			const turn = toContextTurn(node.role, content, {
 				reaction: this.reactionFor(node.id)?.reaction,
 				expansion: next ? expansionIn(after) : last.expansion,
-				readAs: next ? chosenReadingIn(after) : last.readAs
+				readAs: next ? chosenReadingIn(after) : last.readAs,
+				...(node.role === 'story' && !isHalted(before)
+					? { buttons: currentDirections(before) }
+					: {})
 			});
 			if (turn) {
 				context.push(turn);

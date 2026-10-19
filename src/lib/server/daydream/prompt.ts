@@ -48,7 +48,8 @@ export const replyRequestSchema = z
 		// The kind's own schema, so the server holds a setup to exactly what a
 		// device may seal.
 		setup: daydreamSetupKind.latest,
-		turns: z.array(contextTurnSchema).max(MAX_CONTEXT_TURNS),
+		// One more for the `omitted` marker a trimmed story starts with.
+		turns: z.array(contextTurnSchema).max(MAX_CONTEXT_TURNS + 1),
 		/** The direction buttons on screen now, for the model to add to or prune. */
 		currentDirections: z.array(directionSchema).max(MAX_DIRECTIONS).default([]),
 		rewrite: z
@@ -336,12 +337,16 @@ function steeringIdeas(voice: DaydreamVoice): { suggestions: string; directions:
 			};
 }
 
-function replyFormat(current: readonly Direction[], voice: DaydreamVoice): string {
+/**
+ * The format every reply follows. The same for every request in a story, so
+ * the system prompt — and the history after it — is a prefix a provider can
+ * cache: what changes from one request to the next, the buttons on screen,
+ * goes at the end of the last message instead (`buttonsNote`). Listed here,
+ * it sat before the whole history, and every request paid full price for
+ * the story so far.
+ */
+function replyFormat(voice: DaydreamVoice): string {
 	const ideas = steeringIdeas(voice);
-	const shown =
-		current.length > 0
-			? current.map((direction) => `"${direction.label}" (id "${direction.id}")`).join(', ')
-			: 'none yet';
 	const inStory = voice.stance !== 'absent';
 	const readings = inStory
 		? '"action" (something they say or do), "instruction" (an instruction for their own turn, which you then write out), "direction" (where the story goes or how it feels), "cowrite" or "ooc"'
@@ -353,7 +358,7 @@ Write the passage next${inStory ? " (after the <yours> block, when you wrote out
 {"suggestions": [...], "directions": {"add": [...], "remove": [...]}}
 </meta>
 - "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. ${ideas.suggestions}
-- "directions": buttons for steering the story. On screen now: ${shown}. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} in all. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
+- "directions": buttons for steering the story. The ones on screen now are listed at the end of the last message. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} in all. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
 - "ooc": true, only when the passage is out of character.`;
 }
@@ -439,6 +444,8 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 			];
 		case 'safety':
 			return [{ role: 'user', content: SAFETY_NOTICES[turn.signal] }];
+		case 'omitted':
+			return [{ role: 'user', content: OMITTED_NOTE }];
 		case 'roll':
 			return [
 				{
@@ -462,6 +469,18 @@ function openingRequest(voice: DaydreamVoice): string {
 		? '(Begin. Open with the first notice or rules the system issues to me — not a description of the scene — and end where I must respond.)'
 		: '(Begin the story. Set the scene, and end at a point where I can respond.)';
 }
+
+/** The direction buttons on screen now, for the model to prune and add to (`replyFormat`). */
+function buttonsNote(current: readonly Direction[]): string {
+	const shown =
+		current.length > 0
+			? current.map((direction) => `"${direction.label}" (id "${direction.id}")`).join(', ')
+			: 'none yet';
+	return `(Direction buttons on screen now: ${shown}.)`;
+}
+
+/** Where a trimmed story starts (`trimContext`): the model is not told it is the beginning. */
+const OMITTED_NOTE = '(The story so far is long, so it starts partway through here.)';
 
 /** Sent when the newest turn is a passage: the user asked for more without saying anything. */
 const CONTINUE_REQUEST = '(Continue.)';
@@ -493,7 +512,7 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 			!stopped && request.setup.voice.narrator === 'impersonal'
 				? impersonalGuide(request.setup.characters.length, request.setup.scene.dials.heat)
 				: null,
-			stopped ? CHECK_IN : replyFormat(request.currentDirections, request.setup.voice)
+			stopped ? CHECK_IN : replyFormat(request.setup.voice)
 		]
 			.filter((section) => section !== null)
 			.join('\n\n')
@@ -511,6 +530,21 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 		}
 	};
 	for (const turn of request.turns) {
+		// A passage goes back with the request that asked for it, as it was
+		// sent, so each request only adds to the one before and a provider's
+		// cache of the last covers it (docs/daydreams.md, "Cost"): the
+		// opening's request, Continue's between two passages, and the buttons
+		// it listed. A check-in, asked for while stopped, listed none.
+		if (turn.type === 'text' && turn.role === 'story') {
+			if (conversation.length === 0) {
+				add({ role: 'user', content: openingRequest(request.setup.voice) });
+			} else if (conversation.at(-1)?.role === 'assistant') {
+				add({ role: 'user', content: CONTINUE_REQUEST });
+			}
+			if (turn.buttons) {
+				add({ role: 'user', content: buttonsNote(turn.buttons) });
+			}
+		}
 		for (const message of render(turn)) {
 			add(message);
 		}
@@ -527,6 +561,11 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 	// a passage — Continue, or a retried reply to one — gets an explicit nudge.
 	if (conversation.at(-1)?.role !== 'user') {
 		add({ role: 'user', content: CONTINUE_REQUEST });
+	}
+	// Last, after everything that stays the same from one request to the next
+	// (`replyFormat` says why). A check-in offers no buttons.
+	if (!stopped) {
+		add({ role: 'user', content: buttonsNote(request.currentDirections) });
 	}
 	return [system, ...conversation];
 }

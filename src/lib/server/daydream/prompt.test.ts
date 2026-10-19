@@ -6,8 +6,9 @@ import {
 	UNSET_CHARACTER_DIALS
 } from '$lib/daydream';
 import type { ContextTurn } from '$lib/daydream/context';
-import { daydreamSetupKind, type Reading } from '$lib/sealed-kinds/daydreams';
+import { type Direction, daydreamSetupKind, type Reading } from '$lib/sealed-kinds/daydreams';
 import { testCharacter, testDaydreamSetup, testScene } from '$lib/testing/daydream-setup';
+import { defined } from '$lib/testing/defined';
 import {
 	buildMessages,
 	describeSetup,
@@ -25,6 +26,14 @@ const setup = testDaydreamSetup({
 function request(overrides: Partial<ReplyRequest> = {}): ReplyRequest {
 	return { mode: 'reply', setup, turns: [], currentDirections: [], ...overrides };
 }
+
+/** The buttons note every request ends with (`buttonsNote`), taken off so a test can read the message before it. */
+const BUTTONS_NOTE = /\n\n\(Direction buttons on screen now: [^\n]*\)$/;
+const withoutNote = (content: string | undefined) => content?.replace(BUTTONS_NOTE, '');
+const lastMessage = (messages: { role: string; content: string }[]) => {
+	const last = messages.at(-1);
+	return last && { ...last, content: withoutNote(last.content) };
+};
 
 const PART_A = '00000000-0000-4000-8000-0000000000e1';
 const PART_B = '00000000-0000-4000-8000-0000000000e2';
@@ -72,7 +81,10 @@ describe('buildMessages', () => {
 
 	it('puts the user’s turns on their side and passages on the model’s', () => {
 		const messages = buildMessages(request({ turns: [said('Sit.', 'story'), said('I sit.')] }));
-		expect(messages.slice(1)).toEqual([
+		// After the system prompt and the request the opening passage answered.
+		expect(
+			messages.slice(2).map((message) => ({ ...message, content: withoutNote(message.content) }))
+		).toEqual([
 			{ role: 'assistant', content: 'Sit.' },
 			{ role: 'user', content: 'I sit.' }
 		]);
@@ -80,15 +92,15 @@ describe('buildMessages', () => {
 
 	it('nudges the model to continue when the newest turn is a passage', () => {
 		const messages = buildMessages(request({ turns: [said('Sit.', 'story')] }));
-		expect(messages.at(-1)).toEqual({ role: 'user', content: '(Continue.)' });
+		expect(lastMessage(messages)).toEqual({ role: 'user', content: '(Continue.)' });
 	});
 
 	it('labels an explicitly out-of-character turn', () => {
 		const messages = buildMessages(
 			request({ turns: [said('Sit.', 'story'), said('OOC: love this')] })
 		);
-		expect(messages.at(-1)?.content).toBe('[Out of character] OOC: love this');
-		expect(buildMessages(request({ turns: [said('(brb)')] })).at(-1)?.content).toBe(
+		expect(lastMessage(messages)?.content).toBe('[Out of character] OOC: love this');
+		expect(lastMessage(buildMessages(request({ turns: [said('(brb)')] })))?.content).toBe(
 			'[Out of character] (brb)'
 		);
 	});
@@ -104,7 +116,8 @@ describe('buildMessages', () => {
 				]
 			})
 		);
-		expect(messages).toHaveLength(3);
+		// The system prompt, the opening's request, the passage, and the notes.
+		expect(messages).toHaveLength(4);
 		const notes = messages.at(-1)?.content ?? '';
 		expect(notes).toContain('loved that passage');
 		expect(notes).toContain('(Direction: Slower.)');
@@ -114,16 +127,129 @@ describe('buildMessages', () => {
 	});
 
 	it('lists the buttons on screen, and offers Surprise me', () => {
-		const content = system(
-			buildMessages(
-				request({ turns: [said('hi')], currentDirections: [{ id: 'slower', label: 'Slower' }] })
-			)
+		const messages = buildMessages(
+			request({ turns: [said('hi')], currentDirections: [{ id: 'slower', label: 'Slower' }] })
 		);
-		expect(content).toContain('"Slower" (id "slower")');
+		const content = system(messages);
+		expect(messages.at(-1)?.content).toBe(
+			'hi\n\n(Direction buttons on screen now: "Slower" (id "slower").)'
+		);
+		expect(content).toContain('listed at the end of the last message');
 		expect(content).toContain('"Surprise me" (id "surprise-me")');
 		expect(content).toContain('<meta>');
 		expect(content).toContain('"suggestions"');
 		expect(content).toContain('"roll"');
+	});
+
+	// Providers cache a prompt by its start: anything that changes request to
+	// request goes after the history, or the history is never a cache hit.
+	it('keeps the system prompt and the history the same whatever buttons are on screen', () => {
+		const turns = [said('Sit.', 'story'), said('I sit.')];
+		const none = buildMessages(request({ turns }));
+		const some = buildMessages(
+			request({ turns, currentDirections: [{ id: 'slower', label: 'Slower' }] })
+		);
+		expect(some.slice(0, -1)).toEqual(none.slice(0, -1));
+		expect(withoutNote(some.at(-1)?.content)).toBe(withoutNote(none.at(-1)?.content));
+		expect(none.at(-1)?.content).toContain('(Direction buttons on screen now: none yet.)');
+	});
+
+	// Each request is the one before it with more added, never changed, so a
+	// provider's cache of the last request covers all of the next.
+	describe('the history, request after request', () => {
+		const slower = { id: 'slower', label: 'Slower' };
+		const deeper = { id: 'deeper', label: 'Deeper' };
+		const passage = (text: string, buttons?: Direction[]): ContextTurn => ({
+			type: 'text',
+			role: 'story',
+			text,
+			...(buttons ? { buttons } : {})
+		});
+		const CheckInText = 'Are you all right?';
+		/** A linear story, one turn at a time, through everything that adds a turn. */
+		const story: ContextTurn[] = [
+			passage('The door clicks shut.', []),
+			said('I sit.'),
+			passage('Mara looks up.', [slower]),
+			{ type: 'direction', label: 'Slower' },
+			passage('She takes her time.', [slower, deeper]),
+			{ type: 'roll', sides: 6, result: 4, outcome: 'You hold still' },
+			passage('You hold.', [deeper]),
+			// Continue: a passage straight after a passage.
+			passage('The clock ticks.', [deeper]),
+			{ type: 'text', role: 'story', text: 'She smiles.', buttons: [deeper], reaction: 'love' },
+			{ type: 'safety', signal: 'red' },
+			// A check-in, asked for while stopped, listed no buttons.
+			passage(CheckInText),
+			{ type: 'safety', signal: 'resume' },
+			passage('She carries on.', [deeper]),
+			said('I nod.'),
+			passage('Good.', [])
+		];
+
+		/** The request that asked for each passage: the story before it, and the buttons it listed. */
+		const requests = story.flatMap((turn, at) =>
+			turn.type === 'text' && turn.role === 'story'
+				? [
+						{
+							checkIn: turn.text === CheckInText,
+							messages: buildMessages(
+								request({
+									mode: at === 0 ? 'opening' : 'reply',
+									turns: story.slice(0, at),
+									currentDirections: turn.buttons ?? []
+								})
+							)
+						}
+					]
+				: []
+		);
+
+		it('only ever adds to the request before', () => {
+			// The check-in is the one exception: a stopped scene is answered
+			// under a system prompt of its own (`CHECK_IN`), and the requests
+			// either side of it still chain.
+			const chain = requests.filter((each) => !each.checkIn).map((each) => each.messages);
+			expect(chain).toHaveLength(8);
+			for (const [at, next] of chain.slice(1).entries()) {
+				const before = defined(chain[at], 'the request before');
+				expect(next.slice(0, before.length), `request ${at + 1}`).toEqual(before);
+				expect(next.length, `request ${at + 1}`).toBeGreaterThan(before.length);
+			}
+		});
+
+		it('replays what each passage was asked with: the opening, Continue, and its buttons', () => {
+			const sent = defined(requests.at(-1), 'the last request').messages.map(
+				(message) => message.content
+			);
+			expect(sent[1]).toMatch(/^\(Begin the story/);
+			expect(sent[1]).toContain('(Direction buttons on screen now: none yet.)');
+			expect(sent).toContain(
+				'(Continue.)\n\n(Direction buttons on screen now: "Deeper" (id "deeper").)'
+			);
+			const checkIn = sent.indexOf(CheckInText);
+			expect(sent[checkIn - 1]).not.toContain('on screen now');
+		});
+
+		it('says where a trimmed story starts, rather than that it begins', () => {
+			const messages = buildMessages(
+				request({
+					turns: [{ type: 'omitted' }, passage('Mara looks up.', [slower]), said('I sit.')]
+				})
+			);
+			expect(messages[1]?.content).toMatch(/^\(The story so far is long/);
+			expect(messages.some((message) => message.content.includes('Begin the story'))).toBe(false);
+		});
+	});
+
+	it('lists no buttons for a check-in after Stop the scene', () => {
+		const messages = buildMessages(
+			request({
+				turns: [said('Sit.', 'story'), { type: 'safety', signal: 'red' }],
+				currentDirections: [{ id: 'slower', label: 'Slower' }]
+			})
+		);
+		expect(messages.some((message) => message.content.includes('on screen now'))).toBe(false);
 	});
 
 	it('has an instruction for the user’s own turn written out first, then answered', () => {
@@ -155,7 +281,7 @@ describe('buildMessages', () => {
 
 	it('puts the reading the user chose before their words, and says it settles it', () => {
 		const chosenAs = (text: string, readAs: Reading) =>
-			buildMessages(request({ turns: [{ type: 'text', role: 'user', text, readAs }] })).at(-1)
+			lastMessage(buildMessages(request({ turns: [{ type: 'text', role: 'user', text, readAs }] })))
 				?.content;
 		const chosen = (readAs: Reading) => chosenAs('Make it steamy', readAs);
 		expect(chosen('direction')).toBe('(Direction: Make it steamy)');

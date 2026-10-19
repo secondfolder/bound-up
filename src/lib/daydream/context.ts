@@ -3,11 +3,14 @@ import {
 	DAYDREAM_LIMITS,
 	type DaydreamTurnRole,
 	MAX_CONTEXT_CHARS,
-	MAX_CONTEXT_TURNS
+	MAX_CONTEXT_TURNS,
+	MAX_DIRECTIONS
 } from '../daydream';
 import {
 	type DaydreamMarkContent,
 	type DaydreamTurnContent,
+	type Direction,
+	directionSchema,
 	type Reading,
 	readingSchema
 } from '../sealed-kinds/daydreams';
@@ -26,6 +29,11 @@ import {
  * offered next (its buttons, suggestions and roll card) is never sent back:
  * it was for the screen, and would cost context on every request for
  * nothing. A reaction is, because it says what the user enjoyed.
+ *
+ * The history is sent as it was sent the first time, so each request only
+ * adds to the one before (docs/daydreams.md, "Cost"): a passage carries the
+ * buttons that were on screen when it was asked for, which the server puts
+ * back where they were, and a trimmed story starts with a marker saying so.
  */
 
 export type Reaction = Extract<DaydreamMarkContent, { type: 'reaction' }>['reaction'];
@@ -39,8 +47,16 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 		ooc: z.boolean().optional(),
 		reaction: z.enum(['love', 'like', 'not-for-me']).optional(),
 		/** How the user said they mean their turn (Read as…), overriding the model's own reading. */
-		readAs: readingSchema.optional()
+		readAs: readingSchema.optional(),
+		/**
+		 * A passage's: the direction buttons on screen when it was asked for,
+		 * which that request listed (`buttonsNote`). Absent for one written
+		 * while the scene was stopped, whose request listed none.
+		 */
+		buttons: z.array(directionSchema).max(MAX_DIRECTIONS).optional()
 	}),
+	/** The story before this was trimmed off (`trimContext`). Only ever first. */
+	z.object({ type: z.literal('omitted') }),
 	z.object({
 		type: z.literal('direction'),
 		label: z.string().min(1).max(DAYDREAM_LIMITS.directionLabel)
@@ -65,7 +81,7 @@ export type ContextTurn = z.output<typeof contextTurnSchema>;
 export function contextSize(turn: ContextTurn): number {
 	switch (turn.type) {
 		case 'text':
-			return turn.text.length;
+			return turn.text.length + (turn.buttons ? JSON.stringify(turn.buttons).length : 0);
 		case 'direction':
 			return turn.label.length;
 		case 'steer':
@@ -74,6 +90,8 @@ export function contextSize(turn: ContextTurn): number {
 			return turn.outcome.length + 8;
 		case 'safety':
 			return 8;
+		case 'omitted':
+			return 0;
 		default:
 			return 0;
 	}
@@ -111,9 +129,15 @@ export function chosenReadingIn(next: DaydreamTurnContent | null | undefined): R
 export function toContextTurn(
 	role: DaydreamTurnRole,
 	content: DaydreamTurnContent,
-	about: { reaction?: Reaction; expansion?: string | null; readAs?: Reading | null } = {}
+	about: {
+		reaction?: Reaction;
+		expansion?: string | null;
+		readAs?: Reading | null;
+		/** A passage's buttons on screen when it was asked for; undefined when none were listed. */
+		buttons?: Direction[];
+	} = {}
 ): ContextTurn | null {
-	const { reaction, expansion, readAs } = about;
+	const { reaction, expansion, readAs, buttons } = about;
 	const asUser = role === 'user';
 	switch (content.type) {
 		case 'text':
@@ -123,7 +147,8 @@ export function toContextTurn(
 				text: (asUser && expansion ? expansion : content.text).slice(0, DAYDREAM_LIMITS.turn),
 				...(content.meta?.ooc ? { ooc: true } : {}),
 				...(reaction && !asUser ? { reaction } : {}),
-				...(readAs && asUser && !expansion ? { readAs } : {})
+				...(readAs && asUser && !expansion ? { readAs } : {}),
+				...(buttons && !asUser ? { buttons } : {})
 			};
 		case 'direction':
 			return { type: 'direction', label: content.label };
@@ -143,6 +168,23 @@ export function toContextTurn(
 	}
 }
 
+/**
+ * How far the cut moves when a story outgrows the budget, in turns. Cutting
+ * one turn at a time would change where the history starts on every request,
+ * and a provider caches a prompt by its start, so not one request of a long
+ * story would be a cache hit. Cut at whole steps, counted from the story's
+ * start, the history starts in the same place for a run of requests at the
+ * price of up to a step's worth of turns the budget had room for.
+ */
+export const CONTEXT_TRIM_STEP = 10;
+
+/**
+ * The newest turns of `turns` — the branch from its start — that fit the
+ * budget, oldest first, after an `omitted` marker when any were cut. It stops at the first turn that does not fit rather
+ * than skipping it, so the model never sees a story with a hole in it, and
+ * cuts at a whole `CONTEXT_TRIM_STEP` so the cut stays put from one request
+ * to the next.
+ */
 export function trimContext(
 	turns: readonly ContextTurn[],
 	budget: { chars: number; turns: number } = {
@@ -150,21 +192,25 @@ export function trimContext(
 		turns: MAX_CONTEXT_TURNS
 	}
 ): ContextTurn[] {
-	const kept: ContextTurn[] = [];
+	let start = turns.length;
 	let used = 0;
 	for (let index = turns.length - 1; index >= 0; index -= 1) {
 		const turn = turns[index];
-		if (!turn || kept.length >= budget.turns) {
+		if (!turn || turns.length - index > budget.turns) {
 			break;
 		}
 		const size = contextSize(turn);
 		if (used + size > budget.chars) {
-			// Stop at the first turn that does not fit rather than skipping it,
-			// so the model never sees a story with a hole in it.
 			break;
 		}
 		used += size;
-		kept.push(turn);
+		start = index;
 	}
-	return kept.reverse();
+	if (start === 0) {
+		return [...turns];
+	}
+	const stepped = Math.ceil(start / CONTEXT_TRIM_STEP) * CONTEXT_TRIM_STEP;
+	// Never down to nothing for the sake of a step: the newest turns that fit
+	// are the story's present, and the cache is worth less than they are.
+	return [{ type: 'omitted' }, ...turns.slice(stepped < turns.length ? stepped : start)];
 }

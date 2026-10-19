@@ -70,7 +70,9 @@ describe('POST /api/daydreams/[id]/prompt', () => {
 		};
 		expect(messages[0]?.role).toBe('system');
 		expect(messages[0]?.content).toContain(RULES);
-		expect(messages.at(-1)).toEqual({ role: 'user', content: SECRET_WORDS });
+		expect(
+			messages.at(-1)?.content.startsWith(`${SECRET_WORDS}\n\n(Direction buttons on screen now:`)
+		).toBe(true);
 		expect(upstream).not.toHaveBeenCalled();
 	});
 

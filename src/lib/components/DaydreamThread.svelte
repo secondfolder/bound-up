@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { quoteAt } from '$lib/daydream/quotes';
+	import { RawConversation } from '$lib/daydream/raw-conversation.svelte';
 	import { DaydreamStory } from '$lib/daydream/story.svelte';
 	import type { ComposedMessage } from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
@@ -18,6 +19,8 @@
 	import DaydreamDirections from './DaydreamDirections.svelte';
 	import DaydreamNotThisDialog from './DaydreamNotThisDialog.svelte';
 	import DaydreamPassage from './DaydreamPassage.svelte';
+	import DaydreamRawSent from './DaydreamRawSent.svelte';
+	import DaydreamRawSystem from './DaydreamRawSystem.svelte';
 	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
 	import DaydreamRollCard from './DaydreamRollCard.svelte';
 	import DaydreamSafety from './DaydreamSafety.svelte';
@@ -83,6 +86,14 @@
 		}
 	}
 	const rawLog = $derived(debug && rawLogChosen);
+	/** What the model was sent before each passage, asked for as the raw log draws it. */
+	const conversation = new RawConversation(story);
+	/** The newest passage on the branch, whose request's system prompt heads the raw log. */
+	const newestPassage = $derived(story.path.findLast((node) => node.role === 'story') ?? null);
+	const rawSystem = $derived.by(() => {
+		const state = newestPassage ? conversation.state(newestPassage.id) : undefined;
+		return state && state !== 'loading' && 'system' in state ? state.system : null;
+	});
 
 	/**
 	 * Debug mode's Export: the whole daydream, every branch, opened and saved
@@ -375,8 +386,14 @@
 	<!-- Follows a passage as it arrives only for a reader already at the end:
 	     one who has scrolled up to read is left where they are. -->
 	<ol class="turns" bind:this={listElement} aria-live="polite" {@attach followEnd}>
+		{#if rawLog && newestPassage}
+			<DaydreamRawSystem {conversation} turnId={newestPassage.id} />
+		{/if}
 		{#each story.path as node (node.id)}
 			{#if rawLog}
+				{#if node.role === 'story'}
+					<DaydreamRawSent {conversation} {node} system={rawSystem} />
+				{/if}
 				<DaydreamRawTurn {story} {node} />
 			{:else if node.role === 'story'}
 				<DaydreamPassage

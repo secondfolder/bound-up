@@ -118,8 +118,11 @@ describe('POST /api/daydreams/[id]/reply', () => {
 		expect(sent.messages[0].role).toBe('system');
 		expect(sent.messages[0].content.startsWith(RULES)).toBe(true);
 		// The buttons on screen, for the model to add to or prune.
-		expect(sent.messages[0].content).toContain('"Slower" (id "slower")');
-		expect(sent.messages.at(-1)).toEqual({ role: 'user', content: USER_TURN });
+		expect(sent.messages[0].content).not.toContain('"Slower" (id "slower")');
+		expect(sent.messages.at(-1)).toEqual({
+			role: 'user',
+			content: `${USER_TURN}\n\n(Direction buttons on screen now: "Slower" (id "slower").)`
+		});
 		// Room for the passage and the metadata block after it.
 		expect(sent.max_tokens).toBe(1200);
 		// So pressing Stop ends the request upstream as well.

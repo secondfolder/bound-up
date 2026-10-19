@@ -507,7 +507,9 @@ row's plaintext `role` says only who wrote it, `user` or `story`.
 - **Direction buttons** are the model's. Each passage says which to add and
   which to remove (`meta.directions`), and the set on offer is the fold of
   every passage on the branch, at most six, oldest dropped first
-  (`currentDirections`). The prompt lists the buttons on screen, has them
+  (`currentDirections`). The prompt lists the buttons on screen (in a note
+  at the end of the last message, which keeps the rest cacheable: see
+  [Cost](#cost)), has them
   pruned by where the new passage leaves the story rather than where it
   stood before it (judged by the before, a button for what the passage had
   just done stayed a turn too long), gives examples, offers **Surprise me** (`surprise-me`) as a candidate when an
@@ -839,14 +841,55 @@ The model gets the setup and as much of the branch being read as fits:
 `MAX_CONTEXT_CHARS` (60,000 characters of what is sent) and
 `MAX_CONTEXT_TURNS` (200), and stops at the first turn that does not fit
 rather than skipping it, so the model never sees a story with a hole in it.
-The server refuses anything over the same budget. The setup is always sent
+Once a story outgrows the budget, the cut moves in whole steps of
+`CONTEXT_TRIM_STEP` (10) turns counted from the story's start, rather than
+one turn per request, so the history starts in the same place for a run of
+requests and stays cacheable (see [Cost](#cost)); the price is up to a
+step's worth of turns the budget had room for. The server refuses anything
+over the same budget. The setup is always sent
 whole, which is why the limits live there and not in the story.
 
 ## Cost
 
-Every passage and suggestion is paid for on the server's key. Three things
+Every passage and suggestion is paid for on the server's key. Four things
 hold that down:
 
+- **The prompt is built to be cached.** Most providers cache a prompt by
+  its start and charge a fraction for the part that matches the last
+  request (for the default model's providers, typically a fifth of the
+  input price). So everything that changes from one request to the next goes
+  at the very end: the system prompt says the same for the whole story, the
+  history after it only grows, and the buttons on screen — the one thing the
+  system prompt used to list that changed almost every passage — are a note
+  on the last message instead (`buttonsNote`). With them in the system
+  prompt, nothing after it was ever a cache hit, and the history, most of
+  every request, was paid for in full each time: measured over a six-passage
+  story, the cached part went from a flat ~1,400 tokens to ~89% of the
+  prompt. Changing the setup or its dials mid-story misses the cache once,
+  which is rare enough to leave. Trimming a long story is stepped for the
+  same reason ([Context](#context)).
+
+  **Each request only adds to the one before.** The history is sent as it
+  was sent the first time: each passage goes back with the request that
+  asked for it — the opening's request, "(Continue.)" between two passages,
+  and the buttons that were on screen, which the page sends with the passage
+  (`buttons` on its context turn, worked out as `#replyBody` worked them
+  out then). So a request is the previous one, unchanged, with the reply and
+  the new turn on the end, and the cache covers all of the previous one.
+  `prompt.test.ts` ("the history, request after request") plays a story
+  through every kind of turn and checks exactly that. Where it does not hold,
+  on purpose or not yet, the cost is one request that misses from that point:
+
+  - a check-in after Stop the scene is asked for under a system prompt of
+    its own (`CHECK_IN`); the requests either side of it still chain;
+  - a written-out turn goes back as written out, in place of what the user
+    sent;
+  - a rewrite's instructions are not replayed: the rewritten passage goes
+    back as if asked for plainly;
+  - a reaction to an older passage goes back beside that passage, mid-history;
+  - changing the setup, its dials or the limits changes the system prompt;
+  - trimming cuts the start, at steps, behind an `omitted` marker that tells
+    the model the story starts partway through rather than at its beginning.
 - **The feature is a grant** (`daydreams` in `src/lib/features.ts`), and every
   load, action and endpoint calls `requireFeature` itself (the API routes
   through `daydreamGuard`).

@@ -99,6 +99,20 @@ This is a "Raw log" switch in a daydream's tool row, remembered on the device
 in `localStorage`. While it is on, each turn on the branch being read is drawn
 by `DaydreamRawTurn.svelte`, not as the story:
 
+- **The conversation as the model had it.** Every request in a story is the
+  one before it with more added on the end (see
+  [daydreams.md](daydreams.md#cost)), so the log shows it as one
+  conversation: the system prompt once, at the top (`DaydreamRawSystem`),
+  and before each passage a bubble on the user's side with what its request
+  added (`DaydreamRawSent`, `sentBefore`) — the opening's request,
+  "(Continue.)", a button's or a roll's note, a rewrite's instructions, the
+  user's words as the model got them, and the buttons on screen. A request
+  that sent a different system prompt — a check-in after Stop the scene —
+  shows its own in its bubble. All of it is rebuilt like Show prompt
+  (below): the messages come from the turns, which never change, but the
+  system prompt is built from the setup as it is now, and says so. One
+  passage at a time (`RawConversation`), so a long story does not fire a
+  request per passage at once.
 - **A passage's reply exactly as the model wrote it**: tags, `<meta>` block,
   code fences and all (`raw`, `daydream-turn` v4).
 - **What is stored**, as JSON, under a disclosure.

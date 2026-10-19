@@ -387,6 +387,29 @@ describe('DaydreamThread', () => {
 		});
 	});
 
+	it('sends each passage with the buttons its own request listed, so the history is sent as it was', async () => {
+		const slower = { id: 'slower', label: 'Slower' };
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', {
+					type: 'text',
+					text: 'Sit.',
+					meta: meta({ directions: { add: [slower], remove: [] } })
+				}),
+				turn('t2', 't1', 'user', 'I sit.'),
+				turn('t3', 't2', 'story', { type: 'text', text: 'Good.', meta: meta() })
+			]),
+			available: true
+		});
+		await press(container, 'Continue');
+		await waitFor(() => expect(client.writeReply).toHaveBeenCalledOnce());
+		expect(asked(0)?.turns).toEqual([
+			{ type: 'text', role: 'story', text: 'Sit.', buttons: [] },
+			{ type: 'text', role: 'user', text: 'I sit.' },
+			{ type: 'text', role: 'story', text: 'Good.', buttons: [slower] }
+		]);
+	});
+
 	it('keeps the directions on one row beside the safety controls, scrolling with faded ends and chevrons', async () => {
 		const many = ['Slower', 'Crueler', 'Skip ahead', 'Tease', 'Closer', 'Surprise me'].map(
 			(label) => ({ id: label.toLowerCase().replace(' ', '-'), label })
@@ -1403,6 +1426,73 @@ describe('DaydreamThread in debug mode', () => {
 		}
 	});
 
+	/** The prompt endpoint, answering by which passage it is asked about: the opening, or the reply after it. */
+	function promptsBy(systems: { opening: string; reply: string }) {
+		client.readPrompt.mockImplementation((_id: string, body: { mode: string }) =>
+			Promise.resolve({
+				ok: true,
+				messages:
+					body.mode === 'opening'
+						? [
+								{ role: 'system', content: systems.opening },
+								{ role: 'user', content: '(Begin the story.)' }
+							]
+						: [
+								{ role: 'system', content: systems.reply },
+								{ role: 'user', content: '(Begin the story.)' },
+								{ role: 'assistant', content: 'Sit.' },
+								{ role: 'user', content: 'I sit.' }
+							]
+			})
+		);
+	}
+
+	const twoPassages = () =>
+		daydream([
+			turn('t1', null, 'story', { type: 'text', text: 'Sit.', raw: Raw }),
+			turn('t2', 't1', 'user', 'I sit.'),
+			turn('t3', 't2', 'story', { type: 'text', text: 'Mara looks up.', meta: meta(), raw: Raw })
+		]);
+
+	it('shows what the model was sent before each passage, in the raw log', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		promptsBy({ opening: 'THE RULES', reply: 'THE RULES' });
+		const { container } = render(DaydreamThread, {
+			daydream: twoPassages(),
+			available: true,
+			debug: true
+		});
+		const sent = (id: string) => container.querySelector(`[data-sent-before="${id}"]`);
+		await waitFor(() => expect(sent('t1')?.textContent).toContain('(Begin the story.)'));
+		await waitFor(() => expect(sent('t3')?.querySelector('.message')?.textContent).toBe('I sit.'));
+		// The system prompt once, at the top, and not again with each request
+		// that sent the same one.
+		const system = container.querySelector('[data-raw-system]');
+		expect(system?.textContent).toContain('THE RULES');
+		expect(container.querySelector('.turns')?.firstElementChild).toBe(system);
+		expect(sent('t1')?.textContent).not.toContain('THE RULES');
+		expect(sent('t3')?.textContent).not.toContain('THE RULES');
+		// Before the passage it led to, and only before passages.
+		expect(sent('t1')?.nextElementSibling?.getAttribute('data-turn-id')).toBe('t1');
+		expect(container.querySelectorAll('[data-sent-before]')).toHaveLength(2);
+	});
+
+	it('shows a request’s own system prompt only when it sent a different one', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		promptsBy({ opening: 'CHECK IN', reply: 'THE RULES' });
+		const { container } = render(DaydreamThread, {
+			daydream: twoPassages(),
+			available: true,
+			debug: true
+		});
+		const sent = (id: string) => container.querySelector(`[data-sent-before="${id}"]`);
+		// Its title is the disclosure's `summary`, not text in it.
+		await waitFor(() => expect(sent('t1')?.querySelector('wa-details')).not.toBeNull());
+		expect(sent('t1')?.querySelector('wa-details')?.textContent).toContain('CHECK IN');
+		await waitFor(() => expect(sent('t3')?.textContent).toContain('I sit.'));
+		expect(sent('t3')?.querySelector('wa-details')).toBeNull();
+	});
+
 	it('offers Export only while debug mode is on', async () => {
 		const story = [turn('t1', null, 'story', 'Sit.')];
 		const off = render(DaydreamThread, { daydream: daydream(story), available: true });
@@ -1455,7 +1545,7 @@ describe('DaydreamThread in debug mode', () => {
 			expect.objectContaining({
 				mode: 'reply',
 				turns: [
-					{ type: 'text', role: 'story', text: 'Old passage.' },
+					{ type: 'text', role: 'story', text: 'Old passage.', buttons: [] },
 					{ type: 'text', role: 'user', text: 'I sit.' }
 				]
 			})

@@ -79,6 +79,16 @@ function heatNote(system) {
 	return level ? ` (Heat: ${level}.)` : '';
 }
 
+/**
+ * The user's last message without the buttons note every request ends with
+ * (`buttonsNote` in `server/daydream/prompt.ts`), so the stub echoes what
+ * the user sent rather than what the app adds for the model.
+ */
+function lastUserMessage(messages) {
+	const content = messages.filter((message) => message.role === 'user').at(-1)?.content ?? '';
+	return content.replace(/\n\n\(Direction buttons on screen now: [^\n]*\)$/, '');
+}
+
 function withMeta(passage, meta) {
 	return `${passage}\n\n<meta>\n${JSON.stringify(meta)}\n</meta>`;
 }
@@ -88,7 +98,7 @@ function replyFor(messages) {
 	const name = characterName(system);
 	const heat = heatNote(system);
 	const users = messages.filter((message) => message.role === 'user');
-	const last = users.at(-1)?.content ?? '';
+	const last = lastUserMessage(messages);
 	if (system.includes('# The scene is stopped')) {
 		return withMeta('Are you all right? We can carry on, gently, or stop here.', { ooc: true });
 	}
@@ -202,7 +212,7 @@ const server = createServer(async (request, response) => {
 		raw += piece;
 	}
 	const body = JSON.parse(raw);
-	const last = body.messages.filter((message) => message.role === 'user').at(-1)?.content ?? '';
+	const last = lastUserMessage(body.messages);
 	if (last.includes('[fail]') && !failed.has(last)) {
 		failed.add(last);
 		response.writeHead(500, { 'content-type': 'application/json' });

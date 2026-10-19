@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DAYDREAM_LIMITS } from '../daydream';
 import {
+	CONTEXT_TRIM_STEP,
 	type ContextTurn,
 	chosenReadingIn,
 	contextSize,
@@ -15,8 +16,10 @@ const said = (text: string, role: 'user' | 'story' = 'user'): ContextTurn => ({
 	text
 });
 
+const OMITTED: ContextTurn = { type: 'omitted' };
+
 describe('trimContext', () => {
-	it('keeps everything that fits, in order', () => {
+	it('keeps everything that fits, in order, with no marker', () => {
 		const turns = [said('a'), said('b', 'story'), said('c')];
 		expect(trimContext(turns)).toEqual(turns);
 	});
@@ -24,12 +27,13 @@ describe('trimContext', () => {
 	it('drops the oldest turns first, and stops at the first that does not fit', () => {
 		const turns = [said('oldest-'), said('middle', 'story'), said('newest')];
 		expect(trimContext(turns, { chars: 12, turns: 10 })).toEqual([
+			OMITTED,
 			said('middle', 'story'),
 			said('newest')
 		]);
 		expect(
 			trimContext([said('x'.repeat(5)), said('y'), said('z'.repeat(5))], { chars: 7, turns: 10 })
-		).toEqual([said('y'), said('z'.repeat(5))]);
+		).toEqual([OMITTED, said('y'), said('z'.repeat(5))]);
 	});
 
 	it('counts typed turns by what they say', () => {
@@ -38,14 +42,34 @@ describe('trimContext', () => {
 			{ type: 'direction', label: 'Slower' },
 			{ type: 'safety', signal: 'red' }
 		];
-		expect(trimContext(turns, { chars: 14, turns: 10 })).toEqual(turns.slice(1));
+		expect(trimContext(turns, { chars: 14, turns: 10 })).toEqual([OMITTED, ...turns.slice(1)]);
 	});
 
 	it('keeps at most the turn budget', () => {
 		expect(trimContext([said('a'), said('b'), said('c')], { chars: 100, turns: 2 })).toEqual([
+			OMITTED,
 			said('b'),
 			said('c')
 		]);
+	});
+
+	// A provider caches a prompt by its start, so where the kept history
+	// starts must stay put while a long story grows.
+	it('cuts at whole steps, so the history starts in the same place request after request', () => {
+		const story = Array.from({ length: 60 }, (_, at) => said(`turn ${at}`.padEnd(10, '.')));
+		const budget = { chars: 300, turns: 200 };
+		const cuts = [40, 41, 45, 49, 50, 51, 59, 60].map(
+			// Less one for the marker the trimmed story starts with.
+			(length) => trimContext(story.slice(0, length), budget).length - 1 - length
+		);
+		// 30 turns fit; the cut moves only when it crosses a step.
+		expect(cuts).toEqual([-10, -20, -20, -20, -20, -30, -30, -30]);
+		expect(CONTEXT_TRIM_STEP).toBe(10);
+	});
+
+	it('keeps the newest turns that fit rather than nothing, when a step would take them all', () => {
+		const turns = [said('x'.repeat(50)), said('y'.repeat(50)), said('newest')];
+		expect(trimContext(turns, { chars: 60, turns: 10 })).toEqual([OMITTED, ...turns.slice(1)]);
 	});
 });
 
