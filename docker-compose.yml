@@ -44,6 +44,9 @@ services:
       # money on that key. See docs/daydreams.md.
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       DAYDREAM_MODEL: ${DAYDREAM_MODEL:-}
+      RUNWARE_AI_API_KEY: ${RUNWARE_AI_API_KEY:-}
+      DAYDREAM_IMAGE_MODEL_PHOTO: ${DAYDREAM_IMAGE_MODEL_PHOTO:-}
+      DAYDREAM_IMAGE_MODEL_ILLUSTRATED: ${DAYDREAM_IMAGE_MODEL_ILLUSTRATED:-}
     volumes:
       - bound-up-db:/data/db
       - bound-up-media:/data/media

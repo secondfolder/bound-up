@@ -431,6 +431,18 @@ export type StoryDials = {
 
 export const DEFAULT_STORY_DIALS: StoryDials = { intensity: 3, pace: 3, length: 'medium' };
 
+/** How a daydream's pictures look (`daydream/image-prompt.ts`). */
+export type PictureStyle = 'photo' | 'illustrated';
+
+/**
+ * A daydream's pictures (docs/daydreams.md, "Pictures"): whether each passage
+ * gets one made by itself, and in which style. Neither is sent to the story
+ * model, so changing either mid-story leaves its prompt as it was.
+ */
+export type DaydreamPictures = { on: boolean; style: PictureStyle };
+
+export const DEFAULT_PICTURES: DaydreamPictures = { on: true, style: 'photo' };
+
 /** What a daydream is set up with, as the setup form edits it and the model reads it. */
 export type DaydreamSetup = {
 	/** Empty until it is named: the model names it after the opening (`daydreamTitle`). */
@@ -442,6 +454,7 @@ export type DaydreamSetup = {
 	/** What must not happen, in the user's words. */
 	limits: string;
 	dials: StoryDials;
+	pictures: DaydreamPictures;
 };
 
 /** What a daydream is called on screen: its own name, or its scene's until it has one. */
@@ -537,7 +550,13 @@ export const DAYDREAM_LIMITS = {
 	instruction: 500,
 	bookmarkLabel: 80,
 	rollPrompt: 140,
-	rollOutcome: 80
+	rollOutcome: 80,
+	/**
+	 * A passage's picture, described by the model for the image model
+	 * (`daydream/image-prompt.ts`). SDXL reads well under this; the server
+	 * adds its own style and safety words around it.
+	 */
+	imagePrompt: 1000
 } as const;
 
 /**

@@ -29,6 +29,7 @@ import {
 	daydreams,
 	daydreamTurns
 } from './db/schema';
+import { daydreamPicturesPrefix, type MediaStore } from './media';
 import { type SealedWrite, sealedIsAcceptable, selfVaultIdFor } from './sealed-content';
 
 /**
@@ -78,6 +79,26 @@ async function contentProblem(
 	return content.vaultId === (await selfVaultIdFor(db, userId)) ? null : 'wrong-vault';
 }
 
+// ── pictures ─────────────────────────────────────────────────────────────────
+
+/**
+ * Deletes a daydream's pictures (docs/daydreams.md, "Pictures"), by prefix,
+ * after its row has gone: the delete is what proved it was the owner's.
+ * Reports a failure rather than throwing, like `purgePartnershipMedia`:
+ * deleting a daydream must never wait on storage, and what is left is
+ * ciphertext whose keys went with the daydream's marks.
+ */
+export async function purgeDaydreamPictures(
+	store: MediaStore,
+	daydreamId: string
+): Promise<{ deleted: number; failed: boolean }> {
+	try {
+		return { deleted: await store.deletePrefix(daydreamPicturesPrefix(daydreamId)), failed: false };
+	} catch {
+		return { deleted: 0, failed: true };
+	}
+}
+
 // ── the disclosure ───────────────────────────────────────────────────────────
 
 /** Whether the user has accepted that what they write goes to a model provider. */
@@ -90,7 +111,11 @@ export async function hasAcceptedDisclosure(db: Db, userId: string): Promise<boo
 	return Boolean(row?.at);
 }
 
-/** Idempotent; a second acceptance keeps the first's time. */
+/**
+ * Idempotent; a second acceptance keeps the first's time. It covers pictures
+ * too (docs/daydreams.md, "Pictures"): they go to a third party on the same
+ * terms as the passages, which is what the disclosure is about.
+ */
 export async function acceptDisclosure(db: Db, userId: string, now = new Date()): Promise<void> {
 	await db
 		.insert(daydreamPreferences)

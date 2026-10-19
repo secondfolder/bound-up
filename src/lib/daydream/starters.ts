@@ -20,6 +20,7 @@ import {
 	type DaydreamScene,
 	type DaydreamSetup,
 	type DaydreamVoicePresetId,
+	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
 	inferVoice,
@@ -93,7 +94,8 @@ export function assembleSetup(
 		scene: { ...pieces.scene, parts, sourceId: null, sourceRevision: null },
 		lead: 'character',
 		limits: '',
-		dials: DEFAULT_STORY_DIALS
+		dials: DEFAULT_STORY_DIALS,
+		pictures: DEFAULT_PICTURES
 	};
 }
 

@@ -168,6 +168,10 @@ async function serveImage(image) {
 			'DAYDREAM_MODEL',
 			'--env',
 			`OPENROUTER_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/v1`,
+			'--env',
+			'RUNWARE_AI_API_KEY',
+			'--env',
+			`RUNWARE_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/runware`,
 			// `E2E_CONTAINER_MAIL_DIR` in run-paths.ts, which `e2e/mail.ts` reads
 			// through `docker exec`; the host path in MAIL_OUTBOX_DIR means nothing
 			// inside the container.

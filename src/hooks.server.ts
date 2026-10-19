@@ -13,6 +13,7 @@ import {
 	type AuthRateLimiter,
 	authRateLimiter,
 	bucketForAuthPath,
+	daydreamImageRateLimiter,
 	daydreamRateLimiter,
 	daydreamSuggestRateLimiter,
 	emailRateLimiter,
@@ -123,6 +124,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// `DAYDREAM_REPLY_LIMITS`).
 	event.locals.daydreamRateLimit = daydreamRateLimiter(db, secret);
 	event.locals.daydreamSuggestRateLimit = daydreamSuggestRateLimiter(db, secret);
+	event.locals.daydreamImageRateLimit = daydreamImageRateLimiter(db, secret);
 	event.locals.session = null;
 	event.locals.user = null;
 

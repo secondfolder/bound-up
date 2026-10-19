@@ -122,6 +122,14 @@ by `DaydreamRawTurn.svelte`, not as the story:
   (below), one passage at a time (`RawConversation`), and says it was.
 - **A passage's reply exactly as the model wrote it**: tags, `<meta>` block,
   code fences and all (`raw`, `daydream-turn` v4).
+- **A passage's picture with what made it** ([daydreams.md](daydreams.md#pictures)):
+  the picture, the story model's description, and exactly what the image
+  model was asked — its model, prompt and negative prompt — which the
+  picture endpoint says in a header (`PictureRequest`) and the picture's
+  mark keeps (`sent`, `daydream-mark` v3), for an account granted debug
+  mode only, like `raw`. Outside the raw log too, with debug mode on,
+  tapping a picture opens the same in a dialog
+  (`DaydreamPicturePrompt.svelte`).
 - **What is stored**, as JSON, under a disclosure.
 - **Show prompt**: the system prompt and messages that would write this
   passage, from `POST /api/daydreams/[id]/prompt`. That endpoint takes what

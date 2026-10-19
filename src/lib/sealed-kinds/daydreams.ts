@@ -16,6 +16,7 @@ import {
 	castingProblem,
 	DAYDREAM_LIMITS,
 	type DaydreamSetup,
+	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	MAX_DAYDREAM_CHARACTERS,
 	MAX_DIRECTIONS,
@@ -25,6 +26,7 @@ import {
 	voiceProblem
 } from '../daydream';
 import { coversEveryFace, MAX_SIDES, MIN_SIDES } from '../daydream/dice';
+import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
 import { defineSealedKind } from '../sealed';
 import { isClientId } from '../vault';
 
@@ -123,40 +125,60 @@ const setupV1 = z.object({
 	safeword: optional(40)
 });
 
-const setupV2 = z
-	.object({
-		// Empty until the model names it after the opening (docs/daydreams.md).
-		title: optional(DAYDREAM_LIMITS.title),
-		voice: z.object({
-			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal']),
-			stance: z.enum(['self', 'persona', 'absent']),
-			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
-		}),
-		characters: z
-			.array(z.object({ ...characterShape, ...sourceShape, casting: castingSchema }))
-			.max(MAX_DAYDREAM_CHARACTERS),
-		scene: z.object({ ...sceneShape, ...sourceShape }),
-		lead: z.enum(['character', 'me', 'shared']),
-		limits: optional(DAYDREAM_LIMITS.limits),
-		dials: z.object({
-			intensity: dial,
-			pace: dial,
-			length: z.enum(['short', 'medium', 'long'])
-		})
+const setupV2Shape = {
+	// Empty until the model names it after the opening (docs/daydreams.md).
+	title: optional(DAYDREAM_LIMITS.title),
+	voice: z.object({
+		narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal']),
+		stance: z.enum(['self', 'persona', 'absent']),
+		protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
+	}),
+	characters: z
+		.array(z.object({ ...characterShape, ...sourceShape, casting: castingSchema }))
+		.max(MAX_DAYDREAM_CHARACTERS),
+	scene: z.object({ ...sceneShape, ...sourceShape }),
+	lead: z.enum(['character', 'me', 'shared']),
+	limits: optional(DAYDREAM_LIMITS.limits),
+	dials: z.object({
+		intensity: dial,
+		pace: dial,
+		length: z.enum(['short', 'medium', 'long'])
 	})
-	// The same rules the form shows (`voiceProblem`, `castingProblem`), so a
-	// setup that makes no sense — a watcher with nothing to watch, a part
-	// played twice — cannot be stored either.
-	.superRefine((value, ctx) => {
-		const problem = voiceProblem(value.voice, value.characters.length);
-		if (problem) {
-			ctx.addIssue({ code: 'custom', path: ['voice'], message: problem });
-		}
-		const miscast = castingProblem(value.characters, value.scene.parts);
-		if (miscast) {
-			ctx.addIssue({ code: 'custom', path: ['characters'], message: miscast });
-		}
-	});
+};
+
+/**
+ * The same rules the form shows (`voiceProblem`, `castingProblem`), so a
+ * setup that makes no sense — a watcher with nothing to watch, a part played
+ * twice — cannot be stored either.
+ */
+function refineSetup(
+	value: {
+		voice: z.output<typeof setupV2Shape.voice>;
+		characters: z.output<typeof setupV2Shape.characters>;
+		scene: z.output<typeof setupV2Shape.scene>;
+	},
+	ctx: z.RefinementCtx
+) {
+	const problem = voiceProblem(value.voice, value.characters.length);
+	if (problem) {
+		ctx.addIssue({ code: 'custom', path: ['voice'], message: problem });
+	}
+	const miscast = castingProblem(value.characters, value.scene.parts);
+	if (miscast) {
+		ctx.addIssue({ code: 'custom', path: ['characters'], message: miscast });
+	}
+}
+
+const setupV2 = z.object(setupV2Shape).superRefine(refineSetup);
+
+// v3: a daydream's pictures (docs/daydreams.md, "Pictures"): whether each
+// passage gets one by itself, and in which style.
+const setupV3 = z
+	.object({
+		...setupV2Shape,
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
+	})
+	.superRefine(refineSetup);
 
 export const daydreamSetupKind = defineSealedKind({
 	name: 'daydream-setup',
@@ -173,7 +195,7 @@ export const daydreamSetupKind = defineSealedKind({
 			 * purpose — the Stop the scene control replaces typed safewords
 			 * (docs/daydreams.md, "Safety").
 			 */
-			upcast: (value: z.output<typeof setupV1>): DaydreamSetup => ({
+			upcast: (value: z.output<typeof setupV1>): z.output<typeof setupV2> => ({
 				title: value.title,
 				voice: { narrator: 'none', stance: 'self', protagonistName: '' },
 				characters: [
@@ -208,7 +230,17 @@ export const daydreamSetupKind = defineSealedKind({
 				dials: DEFAULT_STORY_DIALS
 			})
 		},
-		{ version: 2, schema: setupV2 }
+		{
+			version: 2,
+			schema: setupV2,
+			// Pictures came with v3: a daydream from before has them on, in the
+			// default style, like a new one.
+			upcast: (value: z.output<typeof setupV2>): DaydreamSetup => ({
+				...value,
+				pictures: DEFAULT_PICTURES
+			})
+		},
+		{ version: 3, schema: setupV3 }
 	]
 });
 
@@ -313,7 +345,18 @@ export const passageMetaSchema = passageMetaV2.extend({
 	readAsChosen: z.boolean().optional()
 });
 
-export type PassageMeta = z.output<typeof passageMetaSchema>;
+/**
+ * v6's: a passage may carry the picture the model described for it
+ * (`image`, docs/daydreams.md, "Pictures"), what the page asks the image
+ * model for. A schema of its own, since `passageMetaSchema` is frozen with
+ * every turn version from v3 to v5. What `parseReply` reads a reply with.
+ */
+export const passageMetaV6 = passageMetaSchema.extend({
+	image: z.string().trim().min(1).max(DAYDREAM_LIMITS.imagePrompt).optional()
+});
+
+/** A passage's meta as the latest turn version stores it (`passageMetaV6`). */
+export type PassageMeta = z.output<typeof passageMetaV6>;
 
 const turnV1 = z.object({ text: z.string().min(1).max(DAYDREAM_LIMITS.turn) });
 
@@ -403,6 +446,18 @@ const turnV5 = z.discriminatedUnion('type', [
 	...turnTypesV2
 ]);
 
+// v6: a passage may carry the picture the model described for it
+// (`passageMetaV6`).
+
+const turnV6 = z.discriminatedUnion('type', [
+	textTurn(passageMetaV6).extend({
+		raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+		rawTruncated: z.literal(true).optional(),
+		sent: sentRecordSchema.optional()
+	}),
+	...turnTypesV2
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
@@ -433,7 +488,13 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v4 could say, v5 says the same way.
 			upcast: (value: z.output<typeof turnV4>) => value
 		},
-		{ version: 5, schema: turnV5 }
+		{
+			version: 5,
+			schema: turnV5,
+			// Everything v5 could say, v6 says the same way.
+			upcast: (value: z.output<typeof turnV5>) => value
+		},
+		{ version: 6, schema: turnV6 }
 	]
 });
 
@@ -469,9 +530,44 @@ const markV2 = z.discriminatedUnion('type', [
 	})
 ]);
 
+// v3: a passage's picture (docs/daydreams.md, "Pictures"). The image is
+// stored encrypted, apart from this record, under its own per-file age
+// identity (`key`, as a message attachment's is), so only this record — and
+// whoever can open it — can read it.
+const markV3 = z.discriminatedUnion('type', [
+	bookmarkMark,
+	z.object({
+		type: z.literal('reaction'),
+		reaction: z.enum(['love', 'like', 'not-for-me']),
+		after: clientId.optional()
+	}),
+	z.object({
+		type: z.literal('picture'),
+		imageId: clientId,
+		key: z.string().regex(/^AGE-SECRET-KEY-1[0-9A-Z]+$/),
+		mimeType: z.enum(['image/webp', 'image/png', 'image/jpeg']),
+		width: z.number().int().min(1).max(4096),
+		height: z.number().int().min(1).max(4096),
+		/**
+		 * What the image model was asked, exactly (`PictureRequest`): kept for
+		 * debug mode's raw log, and only for an account granted it, as a
+		 * passage's `raw` is.
+		 */
+		sent: z
+			.object({
+				model: z.string().min(1).max(200),
+				positivePrompt: z.string().max(MAX_PICTURE_REQUEST_PROMPT),
+				negativePrompt: z.string().max(MAX_PICTURE_REQUEST_PROMPT)
+			})
+			.optional()
+	})
+]);
+
 export const daydreamMarkKind = defineSealedKind({
 	name: 'daydream-mark',
-	maxCiphertextLength: 4 * 1024,
+	// Raised from 4 KB with v3, whose picture may carry the prompts it was
+	// made from (`sent`), both at their longest.
+	maxCiphertextLength: 8 * 1024,
 	versions: [
 		{
 			version: 1,
@@ -480,7 +576,13 @@ export const daydreamMarkKind = defineSealedKind({
 			// goes back beside its passage, as it always did.
 			upcast: (value: z.output<typeof markV1>) => value
 		},
-		{ version: 2, schema: markV2 }
+		{
+			version: 2,
+			schema: markV2,
+			// Everything v2 could say, v3 says the same way.
+			upcast: (value: z.output<typeof markV2>) => value
+		},
+		{ version: 3, schema: markV3 }
 	]
 });
 

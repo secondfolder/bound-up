@@ -108,8 +108,10 @@ to send, logging what to set — so nobody can finish signing up.
 Daydreams ([daydreams.md](daydreams.md)) need an OpenRouter key, which is
 never asked for: each reply costs money on it. Pass `--openrouter-key sk-or-…`
 to any target to set `OPENROUTER_API_KEY`; without it Daydreams are simply
-off. The Playwright suite never uses a real key: it runs its own stand-in
-provider (`e2e/model-stub.mjs`).
+off. Their pictures likewise need a Runware key: `--runware-key …` sets
+`RUNWARE_AI_API_KEY`, and without it there are none. The Playwright suite
+never uses a real key for either: it runs its own stand-in provider
+(`e2e/model-stub.mjs`), which answers both.
 
 **Set production's before deploying a build that needs them**, or every
 request fails with the message naming what is missing.

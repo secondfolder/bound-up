@@ -3,18 +3,21 @@
 	import type { DaydreamStory } from '$lib/daydream/story.svelte';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 	import type { DaydreamTreeNodeView } from '$lib/types';
+	import DaydreamPicture from './DaydreamPicture.svelte';
 	import { startOpen } from './details';
 
 	/**
 	 * One turn of the story as debug mode's raw log shows it
 	 * (docs/debug-mode.md): for a passage, the model's reply exactly as it
-	 * arrived, when it was kept (`raw`, turn v4); for any turn, what is stored,
+	 * arrived, when it was kept (`raw`, turn v4), and its picture with the
+	 * prompts it was made from; for any turn, what is stored,
 	 * as JSON; and for a passage, the prompt that would write it, rebuilt by
 	 * the server on request. Nothing here acts on the story.
 	 */
 	let { story, node }: { story: DaydreamStory; node: DaydreamTreeNodeView } = $props();
 
 	const content = $derived(story.content(node.id));
+	const pictureRequest = $derived(story.pictureRequest(node.id));
 
 	/** What is stored, less the raw reply shown above it. */
 	const stored = $derived.by(() => {
@@ -52,6 +55,25 @@
 				{/if}
 			{:else}
 				<p class="note">Raw reply not recorded.</p>
+			{/if}
+			{#if content.type === 'text' && content.meta?.image}
+				<!-- The passage's picture, beside what it was made from: the story
+				     model's description, and what the image model was asked. -->
+				<div class="picture">
+					<DaydreamPicture {story} turnId={node.id} />
+					<wa-details summary="Picture prompt" appearance="plain" {@attach startOpen(true)}>
+						<span class="role">Described by the story model</span>
+						<pre>{content.meta.image}</pre>
+						{#if pictureRequest}
+							<span class="role">Sent to {pictureRequest.model}</span>
+							<pre>{pictureRequest.positivePrompt}</pre>
+							<span class="role">Negative prompt</span>
+							<pre>{pictureRequest.negativePrompt}</pre>
+						{:else}
+							<p class="note">What the image model was asked was not recorded.</p>
+						{/if}
+					</wa-details>
+				</div>
 			{/if}
 		{/if}
 		<wa-details summary="Stored" appearance="plain">
@@ -117,6 +139,12 @@
 
 		wa-details::part(header) {
 			color: var(--wa-color-text-quiet);
+		}
+
+		.picture {
+			display: flex;
+			flex-direction: column;
+			gap: 0.375rem;
 		}
 
 		.messages {

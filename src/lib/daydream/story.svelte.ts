@@ -23,6 +23,7 @@ import { openRecord } from '../crypto/sealed';
 import { vaultById, vaultsSettled } from '../crypto/vaults.svelte';
 import {
 	DAYDREAM_LIMITS,
+	type DaydreamPictures,
 	type DaydreamSetup,
 	type DaydreamTurnRole,
 	type DialValue,
@@ -51,13 +52,16 @@ import type { DaydreamMarkView, DaydreamTreeNodeView, DaydreamView, SealedRefVie
 import {
 	createMark,
 	deleteMark,
+	downloadPicture,
 	type PromptMessage,
 	type ReplyRequestBody,
 	readPrompt,
 	readTurns,
+	requestPicture,
 	saveSetup as saveSetupRecord,
 	saveTurn,
 	setActiveTurn,
+	uploadPicture,
 	writeReply
 } from './client';
 import {
@@ -71,6 +75,7 @@ import {
 	trimContext
 } from './context';
 import { outcomeFor, type RollProposal, roll } from './dice';
+import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
 import { explicitOoc } from './ooc';
 import type { SentRecord } from './sent-record';
 import { suggestName } from './suggest';
@@ -87,6 +92,8 @@ import {
 } from './tree';
 
 const NOT_READY = 'This is still getting ready. Try again in a moment.';
+
+const REFUSED_PICTURE = 'This one can’t be pictured.';
 
 /** The direction that hands the next turn to chance, offered to the model as a candidate. */
 export const SURPRISE_ME: Direction = { id: 'surprise-me', label: 'Surprise me' };
@@ -122,6 +129,22 @@ function carriedIn(request: Generate): string | undefined {
 }
 
 export type MarkState = DaydreamMarkView & { content: DaydreamMarkContent | null | undefined };
+
+/**
+ * A passage's picture, as the page has it (docs/daydreams.md, "Pictures"):
+ * `offered` when the passage describes one that has not been made, being
+ * made or opened, shown (`url`; `kept` says whether it is stored yet, and
+ * `failed` that storing it did not work),
+ * or why it could not be.
+ */
+export type PictureState =
+	| { status: 'offered' }
+	| { status: 'generating' }
+	| { status: 'opening' }
+	| { status: 'ready'; url: string; kept: 'saving' | 'kept' | 'failed' }
+	| { status: 'failed'; refused: boolean; error: string };
+
+type PictureMark = Extract<DaydreamMarkContent, { type: 'picture' }>;
 
 /**
  * A whole daydream opened into plain JSON: debug mode's Export
@@ -197,6 +220,11 @@ export class DaydreamStory {
 	/** Whether each passage keeps its reply as it arrived (`raw`): see the constructor. */
 	readonly #keepRawReplies: boolean;
 
+	/** Whether this server makes pictures (docs/daydreams.md, "Pictures"). */
+	readonly picturesAvailable: boolean;
+	/** Pictures this page is making, opening or showing, by passage. */
+	readonly #pictures = new SvelteMap<string, PictureState>();
+
 	/**
 	 * `keepRawReplies` is for an account granted debug mode, whether or not it
 	 * is switched on: every passage then seals the model's reply exactly as it
@@ -207,11 +235,16 @@ export class DaydreamStory {
 	constructor(
 		daydream: DaydreamView,
 		available: boolean,
-		options: { keepRawReplies?: boolean } = {}
+		options: {
+			keepRawReplies?: boolean;
+			/** Whether this server makes pictures. */
+			picturesAvailable?: boolean;
+		} = {}
 	) {
 		this.id = daydream.id;
 		this.available = available;
 		this.#keepRawReplies = options.keepRawReplies ?? false;
+		this.picturesAvailable = options.picturesAvailable ?? false;
 		this.tree = [...daydream.tree];
 		this.activeTurnId = daydream.activeTurnId;
 		this.setupRevision = daydream.revision;
@@ -686,6 +719,8 @@ export class DaydreamStory {
 							? { add: [], remove: [] }
 							: (meta?.directions ?? { add: [], remove: [] }),
 						...(meta?.roll && !stopped ? { roll: meta.roll } : {}),
+						// The picture the model described; a check-in has none.
+						...(meta?.image && !stopped ? { image: meta.image } : {}),
 						...(readAs ? { readAs } : {}),
 						...(writtenOut ? { expansion: writtenOut } : {}),
 						...(forced ? { readAsChosen: true } : {}),
@@ -715,6 +750,10 @@ export class DaydreamStory {
 		this.streaming = null;
 		if (!saved) {
 			this.retry = () => void this.#start(request);
+			return;
+		}
+		if (finalMeta?.image && this.#picturesAutomatic) {
+			void this.illustrate(saved);
 		}
 	}
 
@@ -1071,6 +1110,21 @@ export class DaydreamStory {
 		return setup ? await this.saveSetup({ ...setup, scene: { ...setup.scene, dials } }) : NOT_READY;
 	}
 
+	/**
+	 * A daydream's pictures switched on or off, or their style changed,
+	 * mid-story. Neither reaches the story model's prompt (docs/daydreams.md,
+	 * "Pictures"), so neither costs it its cache.
+	 */
+	async setPictures(pictures: DaydreamPictures): Promise<string | null> {
+		const { setup } = this;
+		return setup ? await this.saveSetup({ ...setup, pictures }) : NOT_READY;
+	}
+
+	async setPicturesOn(on: boolean): Promise<string | null> {
+		const { setup } = this;
+		return setup ? await this.setPictures({ ...setup.pictures, on }) : NOT_READY;
+	}
+
 	/** This visit's request for a name, once made: once is enough, whatever came of it. */
 	#naming: Promise<string | null> | null = null;
 
@@ -1150,6 +1204,181 @@ export class DaydreamStory {
 			}
 		}
 		return await this.#addMark(turnId, { type: 'reaction', reaction, ...(after ? { after } : {}) });
+	}
+
+	// ── pictures ─────────────────────────────────────────────────────────────
+
+	/** Whether a passage's picture is made as soon as it is written. */
+	get #picturesAutomatic(): boolean {
+		return this.picturesAvailable && (this.setup?.pictures.on ?? false);
+	}
+
+	/** A passage's stored picture, if it has one. */
+	#pictureMark(turnId: string): PictureMark | null {
+		for (const mark of this.marks) {
+			if (mark.turnId === turnId && mark.content?.type === 'picture') {
+				return mark.content;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * A passage's picture as the page has it, or null for one with none to
+	 * offer. A stored one not opened yet is `opening`: the passage asks for it
+	 * (`openPicture`) when it is drawn.
+	 */
+	pictureFor(turnId: string): PictureState | null {
+		const known = this.#pictures.get(turnId);
+		if (known) {
+			return known;
+		}
+		if (this.#pictureMark(turnId)) {
+			return { status: 'opening' };
+		}
+		const content = this.content(turnId);
+		return this.picturesAvailable && content?.type === 'text' && content.meta?.image
+			? { status: 'offered' }
+			: null;
+	}
+
+	/**
+	 * What the image model was asked for a passage's picture, for the raw log:
+	 * from its mark when it was kept with one, or from the request just made
+	 * when it is not kept yet. Null when neither says.
+	 */
+	pictureRequest(turnId: string): PictureRequest | null {
+		return this.#pictureMark(turnId)?.sent ?? this.#madePictures.get(turnId)?.sent ?? null;
+	}
+
+	/** Opens a passage's stored picture: downloaded, decrypted, shown. Once. */
+	async openPicture(turnId: string): Promise<void> {
+		const mark = this.#pictureMark(turnId);
+		if (!mark || this.#pictures.has(turnId)) {
+			return;
+		}
+		this.#pictures.set(turnId, { status: 'opening' });
+		const downloaded = await downloadPicture(this.id, mark.imageId);
+		if (!downloaded.ok) {
+			this.#pictures.set(turnId, { status: 'failed', refused: false, error: downloaded.error });
+			return;
+		}
+		const { decryptAttachment } = await import('../crypto/messages');
+		const picture = await decryptAttachment(downloaded.ciphertext, {
+			id: mark.imageId,
+			key: mark.key,
+			kind: 'image',
+			mimeType: mark.mimeType,
+			fileName: ''
+		});
+		this.#pictures.set(turnId, {
+			status: 'ready',
+			url: URL.createObjectURL(picture),
+			kept: 'kept'
+		});
+	}
+
+	/**
+	 * Makes a passage's picture from the description it was written with,
+	 * shows it as soon as it comes, then keeps it: encrypted here under a key
+	 * of its own (`encryptAttachment`), stored, and the key sealed in a mark on
+	 * the passage. A picture that came but could not be kept stays on screen,
+	 * `kept: 'failed'`, for `keepPicture` to try again.
+	 */
+	async illustrate(turnId: string): Promise<void> {
+		const content = this.content(turnId);
+		const prompt = content?.type === 'text' ? content.meta?.image : undefined;
+		const { setup } = this;
+		const busy = this.#pictures.get(turnId)?.status;
+		if (!(prompt && setup && this.picturesAvailable) || busy === 'generating' || busy === 'ready') {
+			return;
+		}
+		// The same check the server makes, so a refused one is never sent.
+		if (imagePromptProblem(prompt) !== null) {
+			this.#pictures.set(turnId, { status: 'failed', refused: true, error: REFUSED_PICTURE });
+			return;
+		}
+		this.#pictures.set(turnId, { status: 'generating' });
+		const made = await requestPicture(this.id, {
+			prompt,
+			style: setup.pictures.style,
+			heat: setup.scene.dials.heat
+		});
+		if (!made.ok) {
+			this.#pictures.set(turnId, {
+				status: 'failed',
+				refused: made.refused,
+				error: made.refused ? REFUSED_PICTURE : made.error
+			});
+			return;
+		}
+		this.#pictures.set(turnId, {
+			status: 'ready',
+			url: URL.createObjectURL(made.picture),
+			kept: 'saving'
+		});
+		this.#madePictures.set(turnId, { picture: made.picture, sent: made.sent });
+		await this.keepPicture(turnId);
+	}
+
+	/**
+	 * Pictures made here and not kept yet, by passage, with what the image
+	 * model was asked for them: what `keepPicture` stores.
+	 */
+	readonly #madePictures = new SvelteMap<string, { picture: Blob; sent: PictureRequest | null }>();
+
+	/** Stores a picture made here, encrypted, and seals its key into a mark on the passage. */
+	async keepPicture(turnId: string): Promise<void> {
+		const made = this.#madePictures.get(turnId);
+		const state = this.#pictures.get(turnId);
+		if (!(made && state?.status === 'ready')) {
+			return;
+		}
+		const { picture, sent } = made;
+		this.#pictures.set(turnId, { ...state, kept: 'saving' });
+		const { encryptAttachment } = await import('../crypto/messages');
+		const sealed = await encryptAttachment(
+			new File([picture], 'picture.webp', { type: picture.type || 'image/webp' })
+		);
+		const ciphertext = await new Response(sealed.body).blob();
+		const imageId = crypto.randomUUID();
+		// The object before the mark, as messaging stores attachments: a crash
+		// between leaves an unreadable orphan, never a mark pointing at nothing.
+		const stored = await uploadPicture(this.id, imageId, ciphertext);
+		const marked = stored.ok
+			? await this.#addMark(turnId, {
+					type: 'picture',
+					imageId,
+					key: sealed.key,
+					mimeType: 'image/webp',
+					width: PICTURE_SIZE.width,
+					height: PICTURE_SIZE.height,
+					// For the raw log, kept under the same rule as a passage's `raw`.
+					...(this.#keepRawReplies && sent ? { sent } : {})
+				})
+			: stored.error;
+		if (marked === null) {
+			this.#madePictures.delete(turnId);
+		}
+		this.#pictures.set(turnId, { ...state, kept: marked === null ? 'kept' : 'failed' });
+	}
+
+	/** Tries a failed picture again: opening it if it was stored, making it if not. */
+	async retryPicture(turnId: string): Promise<void> {
+		if (this.#pictures.get(turnId)?.status !== 'failed') {
+			return;
+		}
+		this.#pictures.delete(turnId);
+		await (this.#pictureMark(turnId) ? this.openPicture(turnId) : this.illustrate(turnId));
+	}
+
+	/** Frees the pictures this page has shown. For when the page is left. */
+	dispose(): void {
+		for (const state of this.#pictures.values()) {
+			if (state.status === 'ready') {
+				URL.revokeObjectURL(state.url);
+			}
+		}
 	}
 
 	async bookmark(

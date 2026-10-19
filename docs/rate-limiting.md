@@ -137,6 +137,13 @@ in a scope of their own (`daydream-suggest|user|<id>`,
 and 200 a day. Separate so that filling in forms never uses up someone's
 story; each is a small call.
 
+Pictures go to Runware through `/api/daydreams/[id]/image`, counted the same
+way again in a scope of their own (`daydream-image|user|<id>`,
+`DAYDREAM_IMAGE_LIMITS`, `locals.daydreamImageRateLimit`): 20 a minute and
+300 a day, the size of the replies' since a picture comes with at most each
+passage. A description refused for what it shows is refused before it is
+counted.
+
 ## Self-hosted: the client's address
 
 Behind a reverse proxy, the connection's peer is the proxy, so every client

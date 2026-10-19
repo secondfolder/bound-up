@@ -47,6 +47,11 @@ export type FakeEventOptions = {
 	 */
 	json?: unknown;
 	/**
+	 * A request built by the test, for an endpoint that reads a raw body (a
+	 * picture's ciphertext, say), which `json` and `formData` cannot send.
+	 */
+	request?: Request;
+	/**
 	 * A stand-in for `locals.auth.api`, for routes that do call Better Auth.
 	 *
 	 * Only the handful of endpoints a route under test actually invokes need to
@@ -81,6 +86,8 @@ export type FakeEventOptions = {
 	daydreamRateLimit?: DaydreamRateLimiter;
 	/** `locals.daydreamSuggestRateLimit`, likewise. */
 	daydreamSuggestRateLimit?: DaydreamRateLimiter;
+	/** `locals.daydreamImageRateLimit`, likewise. */
+	daydreamImageRateLimit?: DaydreamRateLimiter;
 	/**
 	 * The method of a `json` request. POST unless given: most `+server.ts`
 	 * routes are POSTs, and a test of a PUT or PATCH says so.
@@ -125,7 +132,9 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 	const url = new URL(options.path ?? '/', origin);
 
 	let request: Request;
-	if ('json' in options) {
+	if (options.request) {
+		({ request } = options);
+	} else if ('json' in options) {
 		request = new Request(url, {
 			method: options.method ?? 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -147,7 +156,8 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 		authRateLimit: options.authRateLimit ?? unlimited,
 		emailRateLimit: options.emailRateLimit ?? unlimitedEmail,
 		daydreamRateLimit: options.daydreamRateLimit ?? unlimitedDaydreams,
-		daydreamSuggestRateLimit: options.daydreamSuggestRateLimit ?? unlimitedDaydreams
+		daydreamSuggestRateLimit: options.daydreamSuggestRateLimit ?? unlimitedDaydreams,
+		daydreamImageRateLimit: options.daydreamImageRateLimit ?? unlimitedDaydreams
 	};
 	if (options.db) {
 		locals.db = options.db;

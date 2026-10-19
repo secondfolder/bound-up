@@ -68,6 +68,8 @@ declare global {
 			 * setting up never uses up the story's replies.
 			 */
 			daydreamSuggestRateLimit: DaydreamRateLimiter;
+			/** A picture, for this account: `DAYDREAM_IMAGE_LIMITS`, its own scope. */
+			daydreamImageRateLimit: DaydreamRateLimiter;
 			/**
 			 * This server's mailer, built on its first send (`lazyMailer` in
 			 * hooks.server.ts). Send through `sendInBackground` so no response
@@ -142,6 +144,15 @@ declare global {
 				OPENROUTER_API_KEY?: string;
 				DAYDREAM_MODEL?: string;
 				OPENROUTER_BASE_URL?: string;
+				/**
+				 * Daydream pictures. Without the key there are none; the rest
+				 * have defaults. See `$lib/server/daydream/image-config` and
+				 * docs/daydreams.md, "Pictures".
+				 */
+				RUNWARE_AI_API_KEY?: string;
+				RUNWARE_BASE_URL?: string;
+				DAYDREAM_IMAGE_MODEL_PHOTO?: string;
+				DAYDREAM_IMAGE_MODEL_ILLUSTRATED?: string;
 			};
 			/**
 			 * Optional because the self-hosted and dev servers have no platform

@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { recordSent } from '$lib/daydream/sent-record';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
+import { readImageConfig } from '$lib/server/daydream/image-config';
 import { buildMessages, replyRequestSchema } from '$lib/server/daydream/prompt';
 import { hasAcceptedDisclosure, ownsDaydream } from '$lib/server/daydreams';
 import { requireFeature } from '$lib/server/features';
@@ -70,7 +71,7 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		});
 	}
 
-	const messages = buildMessages(parsed.data);
+	const messages = buildMessages(parsed.data, { pictures: readImageConfig(platform) !== null });
 	let upstream: Response;
 	try {
 		upstream = await fetch(`${config.baseUrl}/chat/completions`, {

@@ -6,6 +6,7 @@
 	import type { Quote } from '$lib/sealed-kinds/daydreams';
 	import { PENDING_TEXT, UNREADABLE_TEXT } from '$lib/sealed-views.svelte';
 	import type { DaydreamTreeNodeView } from '$lib/types';
+	import DaydreamPicture from './DaydreamPicture.svelte';
 	import DaydreamSiblings from './DaydreamSiblings.svelte';
 
 	/**
@@ -20,7 +21,8 @@
 		speaker,
 		selected,
 		onBookmark,
-		onNotThis
+		onNotThis,
+		debug = false
 	}: {
 		story: DaydreamStory;
 		node: DaydreamTreeNodeView;
@@ -30,6 +32,8 @@
 		selected: Quote | null;
 		onBookmark: (turnId: string, quote: Quote | null) => void;
 		onNotThis: (turnId: string, quote: Quote) => void;
+		/** Debug mode is on on this device: a picture shows what it was made from when tapped. */
+		debug?: boolean;
 	} = $props();
 
 	const content = $derived(story.content(node.id));
@@ -111,6 +115,8 @@
 	{/if}
 
 	{#if passage}
+		<!-- After the text, never in it: quote offsets are measured against it. -->
+		<DaydreamPicture {story} turnId={node.id} {debug} />
 		<div class="actions">
 			<DaydreamSiblings {story} turnId={node.id} />
 			{#if bookmarked}

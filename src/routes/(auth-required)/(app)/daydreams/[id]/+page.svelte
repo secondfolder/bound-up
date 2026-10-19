@@ -49,6 +49,7 @@
 					daydream={data.daydream}
 					available={data.available}
 					keepRawReplies={hasFeature(data.features, 'debugMode')}
+					picturesAvailable={data.picturesAvailable}
 					debug={data.debug}
 					onnamed={(name) => {
 						named = name;

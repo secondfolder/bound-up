@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
 	castingProblem,
 	DAYDREAM_LIMITS,
+	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
 	EMPTY_CHARACTER,
@@ -118,7 +119,8 @@ export const daydreamSetupFormSchema = z
 		scene: z.object({ ...sceneFields, ...source }),
 		lead: z.enum(['character', 'me', 'shared']),
 		limits: optional(DAYDREAM_LIMITS.limits),
-		dials: storyDials
+		dials: storyDials,
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
 	})
 	.superRefine((value, ctx) => {
 		const problem = voiceProblem(value.voice, value.characters.length);
@@ -142,7 +144,8 @@ export const EMPTY_DAYDREAM_SETUP: DaydreamSetupFormValues = {
 	scene: { ...EMPTY_SCENE, sourceId: null, sourceRevision: null },
 	lead: 'character',
 	limits: '',
-	dials: DEFAULT_STORY_DIALS
+	dials: DEFAULT_STORY_DIALS,
+	pictures: DEFAULT_PICTURES
 };
 
 /**

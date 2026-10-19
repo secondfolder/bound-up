@@ -149,6 +149,7 @@
 					retrying={asking}
 					library={data.library}
 					{suggestionsOn}
+					picturesAvailable={data.picturesAvailable}
 					submitLabel="Start daydreaming"
 				/>
 			{/key}

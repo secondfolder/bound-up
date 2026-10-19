@@ -43,7 +43,7 @@ import {
 	type Direction,
 	directionSchema,
 	type PassageMeta,
-	passageMetaSchema,
+	passageMetaV6,
 	type Reading,
 	readingSchema,
 	rollProposalSchema
@@ -188,7 +188,7 @@ function parseMeta(body: string): PassageMeta | null {
 	if (value === undefined) {
 		return null;
 	}
-	const strict = passageMetaSchema.safeParse(value);
+	const strict = passageMetaV6.safeParse(value);
 	return strict.success ? strict.data : salvageMeta(value);
 }
 
@@ -282,13 +282,15 @@ function salvageMeta(value: unknown): PassageMeta | null {
 		.slice(0, MAX_DIRECTIONS * 2);
 
 	const roll = rollProposalSchema.safeParse(record.roll);
+	const image = passageMetaV6.shape.image.safeParse(record.image);
 	const readAs = readingSchema.safeParse(record.readAs);
-	const salvaged = passageMetaSchema.safeParse({
+	const salvaged = passageMetaV6.safeParse({
 		suggestions,
 		directions: { add, remove },
 		...(roll.success ? { roll: roll.data } : {}),
 		...(readAs.success ? { readAs: readAs.data } : {}),
-		...(record.ooc === true ? { ooc: true } : {})
+		...(record.ooc === true ? { ooc: true } : {}),
+		...(image.success && image.data ? { image: image.data } : {})
 	});
 	return salvaged.success ? salvaged.data : null;
 }

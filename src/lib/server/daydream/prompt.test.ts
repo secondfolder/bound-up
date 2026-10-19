@@ -323,6 +323,24 @@ describe('buildMessages', () => {
 		expect(messages.some((message) => message.content.includes('on screen now'))).toBe(false);
 	});
 
+	it('asks for a picture of each passage only on a server that makes them', () => {
+		const withPictures = system(
+			buildMessages(request({ turns: [said('hi')] }), { pictures: true })
+		);
+		expect(withPictures).toContain('"image": include it in every reply');
+		expect(withPictures).toContain('"image": "..."');
+		expect(withPictures).toContain('as an adult, with an age');
+		const without = system(buildMessages(request({ turns: [said('hi')] })));
+		expect(without).not.toContain('"image"');
+		// A check-in after Stop the scene never has one.
+		const stopped = system(
+			buildMessages(request({ turns: [said('hi'), { type: 'safety', signal: 'red' }] }), {
+				pictures: true
+			})
+		);
+		expect(stopped).not.toContain('"image"');
+	});
+
 	it('has an instruction for the user’s own turn written out first, then answered', () => {
 		const content = system(buildMessages(request({ turns: [said('hi')] })));
 		expect(content).toContain('Tell Charlie the fox is safe');
@@ -683,7 +701,11 @@ describe('describeSetup', () => {
 	});
 
 	it('reads a v1 setup, upcast, the way v1 described it', () => {
-		const upcast = daydreamSetupKind.versions[0]?.upcast as (value: unknown) => unknown;
+		// One step at a time, as a stored record is read: v1 to v2, then v2 to the latest.
+		const steps = daydreamSetupKind.versions
+			.slice(0, -1)
+			.map((version) => version.upcast as (value: unknown) => unknown);
+		const upcast = (value: unknown) => steps.reduce((each, step) => step(each), value);
 		const v2 = daydreamSetupKind.latest.parse(
 			upcast({
 				title: 'Old',

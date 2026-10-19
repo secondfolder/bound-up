@@ -83,6 +83,23 @@ export function partnershipMediaPrefix(lifetime: MediaLifetime, partnershipId: s
 }
 
 /**
+ * Where a daydream's pictures live (docs/daydreams.md, "Pictures"): kept for
+ * good, so under `permanent/`, and under one prefix per daydream so deleting
+ * it can take them all without listing them. No partnership id is ever
+ * `daydreams`, so this can never meet a partnership's prefix. Derived from
+ * the ids rather than stored: there is no table of pictures, only the sealed
+ * marks that point at them.
+ */
+export function daydreamPictureKey(daydreamId: string, imageId: string): string {
+	return `${daydreamPicturesPrefix(daydreamId)}${imageId}`;
+}
+
+/** All of one daydream's pictures, for `deletePrefix`. */
+export function daydreamPicturesPrefix(daydreamId: string): string {
+	return `permanent/daydreams/${daydreamId}/`;
+}
+
+/**
  * The shape of a key both implementations will accept.
  *
  * R2 does not care what is in a key, but the local dev store turns separators

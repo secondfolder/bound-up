@@ -285,6 +285,23 @@ export function daydreamSuggestRateLimiter(db: Db, secret: string): DaydreamRate
 		consumeRateLimit(db, secret, `daydream-suggest|user|${userId}`, DAYDREAM_SUGGEST_LIMITS);
 }
 
+/**
+ * Pictures a Daydreams account can ask for (docs/daydreams.md, "Pictures").
+ * A scope of its own, so a story's pictures never use up its replies, and on
+ * everywhere like theirs: each is a paid call. A picture comes with at most
+ * each passage, so the replies' own limits are the right size.
+ */
+export const DAYDREAM_IMAGE_LIMITS = [
+	{ max: 20, windowSeconds: 60 },
+	{ max: 300, windowSeconds: 24 * 60 * 60 }
+] as const satisfies readonly RateLimitRule[];
+
+/** Builds `locals.daydreamImageRateLimit`. */
+export function daydreamImageRateLimiter(db: Db, secret: string): DaydreamRateLimiter {
+	return (userId) =>
+		consumeRateLimit(db, secret, `daydream-image|user|${userId}`, DAYDREAM_IMAGE_LIMITS);
+}
+
 /** For tests of everything but the limit. */
 export const unlimitedDaydreams: DaydreamRateLimiter = () => Promise.resolve({ allowed: true });
 

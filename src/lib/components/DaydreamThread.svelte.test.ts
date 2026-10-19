@@ -53,6 +53,19 @@ vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
 	vaultsSettled: () => Promise.resolve({ status: 'ready' })
 }));
 
+// Pictures are encrypted and decrypted with the attachment pipeline; here the
+// "ciphertext" is the picture with a marker on it, so a test can tell.
+vi.mock('$lib/crypto/messages', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/messages')>()),
+	encryptAttachment: async (file: File) => ({
+		key: 'AGE-SECRET-KEY-1TESTKEY',
+		body: new Blob(['sealed:', file]).stream(),
+		byteSize: 7 + file.size
+	}),
+	decryptAttachment: async (ciphertext: ArrayBuffer, info: { mimeType: string }) =>
+		new Blob([ciphertext.slice(7)], { type: info.mimeType })
+}));
+
 /** The composer's restored draft, so a test can press Send without typing into Lexical. */
 const draftText = vi.hoisted(() => ({ value: '' }));
 vi.mock('$lib/messaging/drafts', () => ({
@@ -81,7 +94,10 @@ const client = vi.hoisted(() => ({
 	createMark: vi.fn(),
 	deleteMark: vi.fn(),
 	requestSuggestion: vi.fn(),
-	readPrompt: vi.fn()
+	readPrompt: vi.fn(),
+	requestPicture: vi.fn(),
+	uploadPicture: vi.fn(),
+	downloadPicture: vi.fn()
 }));
 vi.mock('$lib/daydream/client', () => client);
 
@@ -1754,3 +1770,237 @@ describe('DaydreamThread in debug mode', () => {
 		expect(client.saveTurn).not.toHaveBeenCalled();
 	});
 });
+
+describe('DaydreamThread pictures', () => {
+	const Prompt = 'A woman in her thirties at a desk';
+	const picture = () => new Blob(['webp-bytes'], { type: 'image/webp' });
+
+	/** A reply whose passage describes `image`, as the stream hands it over. */
+	function replyDescribing(image: string) {
+		client.writeReply.mockImplementationOnce(() =>
+			Promise.resolve({
+				ok: true,
+				passage: 'Mara looks up.',
+				meta: meta({ image }),
+				expansion: null,
+				reading: null,
+				raw: ''
+			} satisfies ReplyOutcome)
+		);
+	}
+
+	beforeEach(() => {
+		client.uploadPicture.mockResolvedValue({ ok: true });
+		client.createMark.mockResolvedValue({ ok: true, sealed: ref('m-picture') });
+	});
+
+	const frame = (container: HTMLElement) => container.querySelector('.picture');
+
+	it('makes the picture a passage describes, with a skeleton while it is made, then keeps it', async () => {
+		const made = Promise.withResolvers<{ ok: true; picture: Blob }>();
+		client.requestPicture.mockReturnValueOnce(made.promise);
+		replyDescribing(Prompt);
+		const { container } = render(DaydreamThread, {
+			daydream: daydream(),
+			available: true,
+			picturesAvailable: true
+		});
+		await waitFor(() => expect(frame(container)?.querySelector('wa-skeleton')).not.toBeNull());
+		await waSettled(container);
+		const skeleton = frame(container)?.querySelector('wa-skeleton') as HTMLElement;
+		const box = skeleton.getBoundingClientRect();
+		const indicator = skeleton.shadowRoot
+			?.querySelector('[part~="indicator"]')
+			?.getBoundingClientRect();
+		// Its shimmer fills it: sized only by its host, it was there but 0px tall.
+		expect(box.width).toBeGreaterThan(300);
+		expect(box.height).toBeGreaterThan(box.width);
+		expect(indicator?.height).toBeCloseTo(box.height, 0);
+		await waitFor(() =>
+			expect(client.requestPicture).toHaveBeenCalledWith('d1', {
+				prompt: Prompt,
+				style: 'photo',
+				heat: SETUP.scene.dials.heat
+			})
+		);
+
+		made.resolve({ ok: true, picture: picture() });
+		await waitFor(() => expect(frame(container)?.querySelector('img')).not.toBeNull());
+		expect(frame(container)?.querySelector('wa-skeleton')).toBeNull();
+		await waitFor(() => expect(client.createMark).toHaveBeenCalled());
+		await waitFor(() => expect(frame(container)?.getAttribute('data-kept')).toBe('kept'));
+		// Saving is quiet: only a failure to keep it says anything.
+		expect(frame(container)?.textContent).not.toContain('kept');
+		const [, mark] = client.createMark.mock.calls[0] as [string, { content: unknown }];
+		expect(mark.content).toMatchObject({
+			type: 'picture',
+			key: 'AGE-SECRET-KEY-1TESTKEY',
+			mimeType: 'image/webp'
+		});
+		const [, imageId, ciphertext] = client.uploadPicture.mock.calls[0] as [string, string, Blob];
+		expect(mark.content).toMatchObject({ imageId });
+		expect(await ciphertext.text()).toBe('sealed:webp-bytes');
+	});
+
+	it('makes none on a server without pictures', async () => {
+		replyDescribing(Prompt);
+		const { container } = render(DaydreamThread, { daydream: daydream(), available: true });
+		await waitFor(() => expect(saved(0)?.role).toBe('story'));
+		await waSettled(container);
+		expect(client.requestPicture).not.toHaveBeenCalled();
+		expect(frame(container)).toBeNull();
+	});
+
+	it('offers one, rather than making it, in a daydream with pictures off', async () => {
+		opened.set('d1', { ...SETUP, pictures: { on: false, style: 'illustrated' } });
+		client.requestPicture.mockResolvedValue({ ok: true, picture: picture() });
+		const { container } = render(DaydreamThread, {
+			daydream: daydreamKeeping([
+				turn('t1', null, 'story', { type: 'text', text: 'Sit.', meta: meta({ image: Prompt }) })
+			]),
+			available: true,
+			picturesAvailable: true
+		});
+		await press(container, 'Picture this');
+		await waitFor(() => expect(frame(container)?.querySelector('img')).not.toBeNull());
+		expect(client.requestPicture).toHaveBeenCalledWith(
+			'd1',
+			expect.objectContaining({ style: 'illustrated' })
+		);
+	});
+
+	it('opens a stored picture when its passage is shown', async () => {
+		opened.set('m1', {
+			type: 'picture',
+			imageId: '00000000-0000-4000-8000-0000000000aa',
+			key: 'AGE-SECRET-KEY-1TESTKEY',
+			mimeType: 'image/webp',
+			width: 832,
+			height: 1216
+		});
+		const ciphertext = await new Blob(['sealed:', picture()]).arrayBuffer();
+		client.downloadPicture.mockResolvedValue({ ok: true, ciphertext });
+		const { container } = render(DaydreamThread, {
+			daydream: {
+				...daydream([
+					turn('t1', null, 'story', { type: 'text', text: 'Sit.', meta: meta({ image: Prompt }) })
+				]),
+				marks: [{ id: 'm1', turnId: 't1', revision: 0, sealed: ref('m1') }]
+			},
+			available: true,
+			picturesAvailable: true
+		});
+		await waitFor(() => expect(frame(container)?.querySelector('img')).not.toBeNull());
+		expect(client.downloadPicture).toHaveBeenCalledWith(
+			'd1',
+			'00000000-0000-4000-8000-0000000000aa'
+		);
+		expect(client.requestPicture).not.toHaveBeenCalled();
+	});
+
+	it('in debug mode, shows what a picture was made from when it is tapped', async () => {
+		opened.set('m1', {
+			type: 'picture',
+			imageId: '00000000-0000-4000-8000-0000000000aa',
+			key: 'AGE-SECRET-KEY-1TESTKEY',
+			mimeType: 'image/webp',
+			width: 832,
+			height: 1216,
+			sent: {
+				model: 'civitai:1@1',
+				positivePrompt: `photograph, adults only. ${Prompt}`,
+				negativePrompt: 'child, minor'
+			}
+		});
+		client.downloadPicture.mockResolvedValue({
+			ok: true,
+			ciphertext: await new Blob(['sealed:', picture()]).arrayBuffer()
+		});
+		const story = () => ({
+			...daydream([
+				turn('t1', null, 'story', { type: 'text', text: 'Sit.', meta: meta({ image: Prompt }) })
+			]),
+			marks: [{ id: 'm1', turnId: 't1', revision: 0, sealed: ref('m1') }]
+		});
+		const plain = render(DaydreamThread, {
+			daydream: story(),
+			available: true,
+			picturesAvailable: true
+		});
+		await waitFor(() => expect(frame(plain.container)?.querySelector('img')).not.toBeNull());
+		expect(frame(plain.container)?.querySelector('button.show-prompt')).toBeNull();
+		plain.unmount();
+
+		const { container, baseElement } = render(DaydreamThread, {
+			daydream: story(),
+			available: true,
+			picturesAvailable: true,
+			debug: true
+		});
+		await waitFor(() =>
+			expect(frame(container)?.querySelector('button.show-prompt')).not.toBeNull()
+		);
+		frame(container)?.querySelector<HTMLButtonElement>('button.show-prompt')?.click();
+		await waitFor(() => expect(baseElement.querySelector('wa-dialog')).not.toBeNull());
+		const dialog = baseElement.querySelector('wa-dialog');
+		expect(dialog?.textContent).toContain(Prompt);
+		expect(dialog?.textContent).toContain('Sent to civitai:1@1');
+		expect(dialog?.textContent).toContain('child, minor');
+	});
+
+	it('says when a picture could not be kept, and keeps it on request', async () => {
+		client.requestPicture.mockResolvedValue({ ok: true, picture: picture(), sent: null });
+		client.uploadPicture
+			.mockResolvedValueOnce({ ok: false, error: 'It could not be saved.' })
+			.mockResolvedValueOnce({ ok: true });
+		replyDescribing(Prompt);
+		const { container } = render(DaydreamThread, {
+			daydream: daydream(),
+			available: true,
+			picturesAvailable: true
+		});
+		await waitFor(() => expect(frame(container)?.textContent).toContain('couldn’t be kept'));
+		// Still on screen, so nothing is lost while it waits.
+		expect(frame(container)?.querySelector('img')).not.toBeNull();
+		await press(container, 'Keep it');
+		await waitFor(() => expect(frame(container)?.getAttribute('data-kept')).toBe('kept'));
+		expect(client.createMark).toHaveBeenCalledOnce();
+	});
+
+	it('says when one could not be made, and tries again on request', async () => {
+		client.requestPicture
+			.mockResolvedValueOnce({ ok: false, refused: false, error: 'The picture could not be made.' })
+			.mockResolvedValueOnce({ ok: true, picture: picture() });
+		replyDescribing(Prompt);
+		const { container } = render(DaydreamThread, {
+			daydream: daydream(),
+			available: true,
+			picturesAvailable: true
+		});
+		await waitFor(() =>
+			expect(frame(container)?.textContent).toContain('The picture could not be made.')
+		);
+		await press(container, 'Try again');
+		await waitFor(() => expect(frame(container)?.querySelector('img')).not.toBeNull());
+	});
+
+	it('never asks for one whose description puts a minor in it, and says so', async () => {
+		replyDescribing('a teen at a desk');
+		const { container } = render(DaydreamThread, {
+			daydream: daydream(),
+			available: true,
+			picturesAvailable: true
+		});
+		await waitFor(() => expect(frame(container)?.textContent).toContain('can’t be pictured'));
+		expect(client.requestPicture).not.toHaveBeenCalled();
+		expect(button(container, 'Try again')).toBeUndefined();
+	});
+});
+
+/** A daydream whose setup is whatever the test put in `opened` for it. */
+function daydreamKeeping(turns: DaydreamTurnView[]): DaydreamView {
+	const setup = opened.get('d1');
+	const view = daydream(turns);
+	opened.set('d1', setup);
+	return view;
+}

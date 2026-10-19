@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db';
+import { daydreamPictureKey, daydreamPicturesPrefix } from '$lib/server/media';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
 import {
@@ -10,10 +11,16 @@ import {
 	readDaydreamTurnRows,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { createTestMediaStore, type TestMediaStore } from '$lib/testing/media';
 import { actions, load } from './+page.server';
 
 const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
 vi.mock('$env/dynamic/private', () => ({ env }));
+
+const media = vi.hoisted(() => ({ store: undefined as TestMediaStore | undefined }));
+vi.mock('$lib/server/media/backend', () => ({
+	createMediaStore: () => Promise.resolve(media.store)
+}));
 
 let harness: TestDb;
 let db: Db;
@@ -28,6 +35,8 @@ beforeEach(async () => {
 	await grantTestDaydreams(db, ada.id);
 	await grantTestDaydreams(db, jun.id);
 	env.OPENROUTER_API_KEY = 'sk-or-test';
+	env.RUNWARE_AI_API_KEY = undefined;
+	media.store = createTestMediaStore();
 });
 
 afterEach(() => harness.close());
@@ -41,7 +50,9 @@ describe('load', () => {
 		const data = await runLoad(load(at(ada, id)));
 		expect(data.daydream.path.map((turn: { id: string }) => turn.id)).toEqual(turnIds);
 		expect(data.daydream.activeTurnId).toBe(turnIds.at(-1));
-		expect(data).toMatchObject({ available: true, accepted: false });
+		expect(data).toMatchObject({ available: true, accepted: false, picturesAvailable: false });
+		env.RUNWARE_AI_API_KEY = 'rw-test';
+		expect(await runLoad(load(at(ada, id)))).toMatchObject({ picturesAvailable: true });
 	});
 
 	it("answers someone else's daydream as not there", async () => {
@@ -76,6 +87,26 @@ describe('delete', () => {
 		});
 		expect(await readDaydreamRow(db, id)).toBeUndefined();
 		expect(await readDaydreamTurnRows(db, id)).toEqual([]);
+	});
+
+	it('deletes its pictures with it, and no other daydream’s', async () => {
+		const store = media.store as TestMediaStore;
+		const { id } = await createTestDaydream(db, ada.id, ['story']);
+		const other = await createTestDaydream(db, ada.id, ['story']);
+		const picture = new Uint8Array([1, 2, 3]);
+		const put = (daydreamId: string) =>
+			store.put(
+				daydreamPictureKey(daydreamId, crypto.randomUUID()),
+				new Blob([picture]).stream(),
+				picture.length
+			);
+		await put(id);
+		await put(id);
+		await put(other.id);
+		await runAndCatch(() => runAction(actions, 'delete', at(ada, id)));
+		expect([...store.objects.keys()]).toEqual([
+			expect.stringContaining(daydreamPicturesPrefix(other.id))
+		]);
 	});
 
 	it("does not delete someone else's", async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DAYDREAM_LIMITS, MAX_SUGGESTIONS } from '../daydream';
-import { daydreamTurnKind } from './daydreams';
+import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
+import { daydreamMarkKind, daydreamTurnKind } from './daydreams';
 
 /**
  * How long `sb1.` sealing makes a payload of `bytes`: a 12-byte IV and a
@@ -59,5 +60,27 @@ describe('daydreamTurnKind', () => {
 				raw: 'r'.repeat(DAYDREAM_LIMITS.rawReply + 1)
 			}).success
 		).toBe(false);
+	});
+});
+
+describe('daydreamMarkKind', () => {
+	it('fits a picture carrying both its prompts at their longest', () => {
+		const picture = {
+			type: 'picture' as const,
+			imageId: '00000000-0000-4000-8000-0000000000aa',
+			key: `AGE-SECRET-KEY-1${'Q'.repeat(58)}`,
+			mimeType: 'image/webp' as const,
+			width: 832,
+			height: 1216,
+			sent: {
+				model: 'm'.repeat(200),
+				// Quotes, the worst for JSON's escaping.
+				positivePrompt: '"'.repeat(MAX_PICTURE_REQUEST_PROMPT),
+				negativePrompt: '"'.repeat(MAX_PICTURE_REQUEST_PROMPT)
+			}
+		};
+		expect(daydreamMarkKind.latest.safeParse(picture).success).toBe(true);
+		const bytes = new TextEncoder().encode(JSON.stringify(picture)).length;
+		expect(sealedLength(bytes)).toBeLessThanOrEqual(daydreamMarkKind.maxCiphertextLength);
 	});
 });

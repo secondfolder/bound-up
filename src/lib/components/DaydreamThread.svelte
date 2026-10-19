@@ -19,6 +19,7 @@
 	import DaydreamDirections from './DaydreamDirections.svelte';
 	import DaydreamNotThisDialog from './DaydreamNotThisDialog.svelte';
 	import DaydreamPassage from './DaydreamPassage.svelte';
+	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
 	import DaydreamRawSent from './DaydreamRawSent.svelte';
 	import DaydreamRawSystem from './DaydreamRawSystem.svelte';
 	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
@@ -39,6 +40,7 @@
 		/** Whether this server can write passages at all. */
 		available,
 		keepRawReplies = false,
+		picturesAvailable = false,
 		debug = false,
 		onnamed
 	}: {
@@ -49,6 +51,8 @@
 		 * reply as it arrived (`DaydreamStory`'s constructor says why).
 		 */
 		keepRawReplies?: boolean;
+		/** Whether this server makes pictures (docs/daydreams.md, "Pictures"). */
+		picturesAvailable?: boolean;
 		/** Debug mode is on on this device: the raw log switch shows. */
 		debug?: boolean;
 		/** Told the daydream's name once the model has given it one, for the page's heading. */
@@ -59,7 +63,7 @@
 	// Seeded once: from here on the story is this object, added to as turns are
 	// saved. The page is keyed on the daydream's id, so another daydream gets a
 	// fresh one.
-	const story = new DaydreamStory(daydream, available, { keepRawReplies });
+	const story = new DaydreamStory(daydream, available, { keepRawReplies, picturesAvailable });
 
 	// ── the raw log (debug mode) ─────────────────────────────────────────────
 
@@ -190,7 +194,10 @@
 	const offerRoll = $derived(leaf?.meta?.roll && !busy && !story.halted ? leaf.meta.roll : null);
 	const suggestions = $derived(busy || story.halted ? [] : (leaf?.meta?.suggestions ?? []));
 
-	onDestroy(() => story.stop());
+	onDestroy(() => {
+		story.stop();
+		story.dispose();
+	});
 
 	// A new daydream starts itself: the setup page's button said "Start", so
 	// the opening is asked for as soon as the setup is open here. Once per
@@ -397,6 +404,15 @@
 							dialsProblem = await story.setSceneDials(dials);
 						}}
 					/>
+					{#if story.picturesAvailable}
+						<DaydreamPicturesControl
+							name="story-picture-style"
+							value={setup.pictures}
+							onchange={async (pictures) => {
+								dialsProblem = await story.setPictures(pictures);
+							}}
+						/>
+					{/if}
 					{#if dialsProblem}<p class="invalid" role="alert">{dialsProblem}</p>{/if}
 				</div>
 			</wa-popover>
@@ -426,6 +442,7 @@
 					{story}
 					{node}
 					{speaker}
+					{debug}
 					selected={selection?.turnId === node.id ? selection.quote : null}
 					onBookmark={(turnId, quote) => {
 						bookmarking = { turnId, quote };

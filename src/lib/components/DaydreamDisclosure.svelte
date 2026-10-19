@@ -36,6 +36,11 @@
 			model provider that writes each reply.
 		</li>
 		<li>
+			For a picture of a passage, a description of the scene goes through Bound Up to
+			<a href="https://runware.ai" rel="noreferrer" target="_blank">Runware</a>, which makes it.
+			The picture comes back through Bound Up and is kept encrypted, so only you can see it.
+		</li>
+		<li>
 			Bound Up doesn't keep or log any of it on the way through, and only uses providers that say
 			they don't keep it either or train on it. They are still other companies, and they do see the
 			words.

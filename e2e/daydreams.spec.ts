@@ -589,6 +589,34 @@ test.describe('daydreams', () => {
 		);
 	});
 
+	test('a passage comes with its picture, kept encrypted and opened again later', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await startDaydream(page);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+
+		// The stub describes a picture only when asked to (`[picture]`).
+		const said = unique('[picture] I look at her.');
+		await reply(page, said);
+		await passageSaved(page);
+		const newest = page.locator('li.passage').last();
+		await expect(newest.locator('.picture img')).toBeVisible();
+		// Stored before the reload: one still being kept would not be there after.
+		await expect(newest.locator('.picture[data-kept="kept"]')).toBeAttached();
+
+		// Stored, then opened again from storage after a reload: downloaded
+		// and decrypted, since the page no longer has the one it made.
+		await page.reload();
+		await waitForHydration(page);
+		await passageSaved(page);
+		await expect(page.locator('li.passage').last().locator('.picture img')).toBeVisible();
+		await expect(page.locator('li.passage').last().locator('.picture img')).toHaveJSProperty(
+			'complete',
+			true
+		);
+	});
+
 	test('a daydream opens on its newest passage, and follows only a reader at the end', async ({
 		page
 	}) => {

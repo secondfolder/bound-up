@@ -357,7 +357,18 @@ function steeringIdeas(voice: DaydreamVoice): { suggestions: string; directions:
  * it sat before the whole history, and every request paid full price for
  * the story so far.
  */
-function replyFormat(voice: DaydreamVoice): string {
+/**
+ * What the model is told about describing a picture (docs/daydreams.md,
+ * "Pictures"): only on a server that makes them, which is the same for every
+ * request, so the prompt stays one a provider can cache. The description is
+ * checked again before it is sent anywhere (`imagePromptProblem`) and wrapped
+ * in the server's own style and safety words (`runwareTask`); this is the
+ * first of those guards, not the only one.
+ */
+const IMAGE_INSTRUCTION = `- "image": include it in every reply. It is a picture of the moment the passage ends on, shown to the user beside it, described for an image model in plain words — who is there and what they look like, what they are doing and wearing (or not), their expressions, where they are and the light. Up to ${DAYDREAM_LIMITS.imagePrompt} characters. Leave it out only when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. A passage that is mostly talk still has people in a place, and gets one.
+  Describe every person as an adult, with an age in years or decades ("a woman in her thirties", "a man of about forty"), and their look from the setup, kept the same from passage to passage. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the scene's heat allows: at SFW, everyone clothed and nothing sexual. Describe only what is in the picture; never a style, a medium or a camera — those are chosen for you.`;
+
+function replyFormat(voice: DaydreamVoice, pictures: boolean): string {
 	const ideas = steeringIdeas(voice);
 	const inStory = voice.stance !== 'absent';
 	const readings = inStory
@@ -367,12 +378,12 @@ function replyFormat(voice: DaydreamVoice): string {
 When the user's last turn is words they wrote — not a button, a roll or a request to continue — open your reply by deciding how you read it, before writing anything else, on a line of its own: <reading>direction</reading>. One of ${readings}. Then answer it as that.
 Write the passage next${inStory ? " (after the <yours> block, when you wrote out the user's turn)" : ''}. Then, on a new line, end every reply with a metadata block, and write nothing after it:
 <meta>
-{"suggestions": [...], "directions": {"add": [...], "remove": [...]}}
+{"suggestions": [...], "directions": {"add": [...], "remove": [...]}${pictures ? ', "image": "..."' : ''}}
 </meta>
 - "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. ${ideas.suggestions}
 - "directions": buttons for steering the story. The ones on screen now are listed at the end of the last message. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} in all. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
-- "ooc": true, only when the passage is out of character.`;
+- "ooc": true, only when the passage is out of character.${pictures ? `\n${IMAGE_INSTRUCTION}` : ''}`;
 }
 
 const CHECK_IN = `# The scene is stopped
@@ -515,7 +526,14 @@ function rewriteRequest(rewrite: NonNullable<ReplyRequest['rewrite']>): string {
 	return parts.join('\n');
 }
 
-export function buildMessages(request: ReplyRequest): ModelMessage[] {
+/**
+ * The messages for one reply. `pictures` is whether this server makes them
+ * (`readImageConfig`): only then is the model asked to describe one.
+ */
+export function buildMessages(
+	request: ReplyRequest,
+	options: { pictures: boolean } = { pictures: false }
+): ModelMessage[] {
 	const stopped = isStopped(request.turns);
 	const system: ModelMessage = {
 		role: 'system',
@@ -528,7 +546,7 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 			!stopped && request.setup.voice.narrator === 'impersonal'
 				? impersonalGuide(request.setup.characters.length, request.setup.scene.dials.heat)
 				: null,
-			stopped ? CHECK_IN : replyFormat(request.setup.voice)
+			stopped ? CHECK_IN : replyFormat(request.setup.voice, options.pictures)
 		]
 			.filter((section) => section !== null)
 			.join('\n\n')

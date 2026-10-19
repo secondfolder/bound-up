@@ -2,6 +2,7 @@ import {
 	type DaydreamCharacterCopy,
 	type DaydreamSceneCopy,
 	type DaydreamSetup,
+	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
 	UNSET_CHARACTER_DIALS,
@@ -58,6 +59,7 @@ export function testDaydreamSetup(overrides: Partial<DaydreamSetup> = {}): Daydr
 		lead: 'character',
 		limits: '',
 		dials: DEFAULT_STORY_DIALS,
+		pictures: DEFAULT_PICTURES,
 		...overrides
 	};
 }

@@ -40,6 +40,7 @@
 	import DaydreamCharacterDialog, { type CastingEdit } from './DaydreamCharacterDialog.svelte';
 	import DaydreamCopyCard from './DaydreamCopyCard.svelte';
 	import DaydreamDials from './DaydreamDials.svelte';
+	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
 	import DaydreamSceneDialog from './DaydreamSceneDialog.svelte';
 	import DaydreamVoicePicker from './DaydreamVoicePicker.svelte';
 	import { startOpen } from './details';
@@ -88,6 +89,7 @@
 		retrying = false,
 		library,
 		suggestionsOn,
+		picturesAvailable = false,
 		submitLabel
 	}: {
 		/** The empty form, as the load prepared it. */
@@ -108,6 +110,8 @@
 		library: DaydreamLibraryView;
 		/** Whether the model may be asked for ideas (the disclosure has been accepted). */
 		suggestionsOn: boolean;
+		/** Whether this server makes pictures: only then is there a setting for them. */
+		picturesAvailable?: boolean;
 		submitLabel: string;
 	} = $props();
 
@@ -903,6 +907,19 @@
 					}}
 				/>
 			</fieldset>
+
+			{#if picturesAvailable}
+				<fieldset>
+					<legend>Pictures</legend>
+					<DaydreamPicturesControl
+						name="setup-picture-style"
+						value={$form.pictures}
+						onchange={(pictures) => {
+							$form.pictures = pictures;
+						}}
+					/>
+				</fieldset>
+			{/if}
 		</wa-details>
 
 		<!-- Last, and as one line: by now who is in it is known, and the guess

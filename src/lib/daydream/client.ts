@@ -9,7 +9,8 @@
  * exception docs/daydreams.md is about: it sends text the model has to read.
  */
 
-import type { DaydreamSetup, DaydreamTurnRole } from '../daydream';
+import { z } from 'zod';
+import type { DaydreamSetup, DaydreamTurnRole, DialValue, PictureStyle } from '../daydream';
 import { describeRequestFailure, SERVER_FAILURE, tryFetch } from '../request-failure.svelte';
 import type { SealedKind } from '../sealed';
 import { sealForSubmit } from '../sealed-forms';
@@ -27,6 +28,7 @@ import {
 } from '../sealed-kinds/daydreams';
 import type { DaydreamTurnView, SealedRefView } from '../types';
 import type { ContextTurn } from './context';
+import { PICTURE_REQUEST_HEADER, type PictureRequest } from './image-prompt';
 import { parseReply, type ReplySoFar, visibleReply } from './reply-format';
 import { readSent, type SentRecord } from './sent-record';
 import { readReplyStream } from './stream';
@@ -206,6 +208,82 @@ async function send(
 		return { ok: false, error: await describeFailure(response) };
 	}
 	return { ok: true, response };
+}
+
+// ── pictures ─────────────────────────────────────────────────────────────────
+
+/** Why a picture could not be made: refused for what it showed, or any other failure. */
+export type PictureFailure = { ok: false; refused: boolean; error: string };
+
+/**
+ * Asks for a passage's picture (docs/daydreams.md, "Pictures"): the
+ * description the model wrote, and the daydream's style and heat. Answers
+ * the picture itself, in the clear, for the page to show and then encrypt.
+ */
+export async function requestPicture(
+	daydreamId: string,
+	request: { prompt: string; style: PictureStyle; heat: DialValue | null },
+	signal?: AbortSignal
+): Promise<{ ok: true; picture: Blob; sent: PictureRequest | null } | PictureFailure> {
+	const response = await tryFetch(`${base(daydreamId)}/image`, {
+		method: 'POST',
+		headers: JSON_HEADERS,
+		body: JSON.stringify(request),
+		...(signal ? { signal } : {})
+	});
+	if (!response?.ok) {
+		return { ok: false, refused: response?.status === 422, error: await describeFailure(response) };
+	}
+	return {
+		ok: true,
+		picture: await response.blob(),
+		sent: readPictureRequest(response.headers.get(PICTURE_REQUEST_HEADER))
+	};
+}
+
+const pictureRequestSchema = z.object({
+	model: z.string(),
+	positivePrompt: z.string(),
+	negativePrompt: z.string()
+});
+
+/** What the picture endpoint says the image model was asked, if it says it in a form this reads. */
+function readPictureRequest(header: string | null): PictureRequest | null {
+	if (!header) {
+		return null;
+	}
+	try {
+		const parsed = pictureRequestSchema.safeParse(JSON.parse(decodeURIComponent(header)));
+		return parsed.success ? parsed.data : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Stores a picture, already encrypted, under the id the page chose for it. */
+export async function uploadPicture(
+	daydreamId: string,
+	imageId: string,
+	ciphertext: Blob
+): Promise<Outcome> {
+	const response = await tryFetch(`${base(daydreamId)}/images/${imageId}`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/octet-stream' },
+		body: ciphertext
+	});
+	return response?.ok ? { ok: true } : { ok: false, error: await describeFailure(response) };
+}
+
+/** A stored picture, still encrypted. */
+export async function downloadPicture(
+	daydreamId: string,
+	imageId: string
+): Promise<Outcome<{ ciphertext: ArrayBuffer }>> {
+	const response = await tryFetch(`${base(daydreamId)}/images/${imageId}`);
+	if (!response?.ok) {
+		return { ok: false, error: await describeFailure(response) };
+	}
+	return { ok: true, ciphertext: await response.arrayBuffer() };
 }
 
 // ── turns ────────────────────────────────────────────────────────────────────

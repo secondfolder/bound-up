@@ -14,6 +14,7 @@
  *   --mail-from <"Name <a@b>">     MAIL_FROM, if it is not set already
  *   --resend-key <re_…>            RESEND_API_KEY, if no mail transport is set
  *   --openrouter-key <sk-or-…>     OPENROUTER_API_KEY, which turns Daydreams on
+ *   --runware-key <…>              RUNWARE_AI_API_KEY, which turns their pictures on
  *   --rotate <BETTER_AUTH_SECRET|VAPID>   regenerate one even though it is set
  *   --dry-run                      say what would be set, and set nothing
  *
@@ -24,7 +25,7 @@
  *
  * Daydreams (docs/daydreams.md) are optional and cost money per reply, so
  * their key is never asked for: it is set only when `--openrouter-key` is
- * given.
+ * given. Their pictures likewise, with `--runware-key`.
  *
  * **Only what is missing is generated.** A secret that is already set is left
  * alone unless `--rotate` names it, because replacing one is never harmless:
@@ -73,7 +74,8 @@ const MANAGED = [
 	'MAIL_FROM',
 	'RESEND_API_KEY',
 	'MAIL_OUTBOX_DIR',
-	'OPENROUTER_API_KEY'
+	'OPENROUTER_API_KEY',
+	'RUNWARE_AI_API_KEY'
 ];
 
 /** Any one of these is a mail transport; the app refuses more than one. */
@@ -103,6 +105,7 @@ const { values: options, positionals } = parseArgs({
 		'mail-from': { type: 'string' },
 		'resend-key': { type: 'string' },
 		'openrouter-key': { type: 'string' },
+		'runware-key': { type: 'string' },
 		rotate: { type: 'string', multiple: true, default: [] },
 		'dry-run': { type: 'boolean', default: false },
 		help: { type: 'boolean', short: 'h', default: false }
@@ -113,7 +116,7 @@ const [targetName] = positionals;
 if (options.help || !targetName || !Object.hasOwn(TARGETS, targetName)) {
 	say('usage: npm run secrets -- <dev|local-preview|production|remote-preview|print>');
 	say('       [--subject mailto:you@example.com] [--mail-from "Bound Up <hi@example.com>"]');
-	say('       [--resend-key re_…] [--openrouter-key sk-or-…]');
+	say('       [--resend-key re_…] [--openrouter-key sk-or-…] [--runware-key …]');
 	say('       [--rotate BETTER_AUTH_SECRET|VAPID] [--dry-run]');
 	process.exit(options.help ? 0 : 1);
 }
@@ -271,6 +274,9 @@ if (targetName === 'print' && !generated.MAIL_FROM) {
 // Daydreams: only when asked for, and only when not set already, like the rest.
 if (options['openrouter-key'] && missing('OPENROUTER_API_KEY')) {
 	generated.OPENROUTER_API_KEY = options['openrouter-key'];
+}
+if (options['runware-key'] && missing('RUNWARE_AI_API_KEY')) {
+	generated.RUNWARE_AI_API_KEY = options['runware-key'];
 }
 
 // ── storing ──────────────────────────────────────────────────────────────────

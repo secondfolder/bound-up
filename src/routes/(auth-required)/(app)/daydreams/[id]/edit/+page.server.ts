@@ -7,6 +7,7 @@ import {
 	EMPTY_DAYDREAM_SETUP
 } from '$lib/schemas/daydreamForm';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
+import { readImageConfig } from '$lib/server/daydream/image-config';
 import {
 	describeRefusal,
 	getDaydreamSetup,
@@ -39,7 +40,8 @@ export const load: PageServerLoad = async ({ locals: { db, user }, params, platf
 		}),
 		library,
 		accepted,
-		available: readDaydreamConfig(platform) !== null
+		available: readDaydreamConfig(platform) !== null,
+		picturesAvailable: readImageConfig(platform) !== null
 	};
 };
 

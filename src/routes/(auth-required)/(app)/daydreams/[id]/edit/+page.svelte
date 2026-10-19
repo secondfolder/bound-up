@@ -33,6 +33,7 @@
 				daydream={{ id: data.daydream.id, revision: data.daydream.revision, setup }}
 				library={data.library}
 				suggestionsOn={data.accepted && data.available}
+				picturesAvailable={data.picturesAvailable}
 				submitLabel="Save setup"
 			/>
 		{:else}

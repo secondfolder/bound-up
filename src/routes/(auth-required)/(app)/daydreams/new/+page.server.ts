@@ -8,6 +8,7 @@ import {
 	EMPTY_DAYDREAM_SETUP
 } from '$lib/schemas/daydreamForm';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
+import { readImageConfig } from '$lib/server/daydream/image-config';
 import {
 	createDaydream,
 	describeRefusal,
@@ -33,6 +34,7 @@ export const load: PageServerLoad = async ({ locals: { db, user }, platform }) =
 		library,
 		accepted,
 		available: readDaydreamConfig(platform) !== null,
+		picturesAvailable: readImageConfig(platform) !== null,
 		// Drawn here rather than in the component so the server's render and
 		// hydration show the same few (`pickIdeas`).
 		ideas: pickIdeas()

@@ -168,6 +168,10 @@
 					"intensity": 3,
 					"pace": 3,
 					"length": "medium"
+				},
+				"pictures": {
+					"on": true,
+					"style": "photo"
 				}
 			}
 		},
@@ -277,6 +281,113 @@
 					"intensity": 4,
 					"pace": 2,
 					"length": "long"
+				},
+				"pictures": {
+					"on": true,
+					"style": "photo"
+				}
+			}
+		},
+		{
+			"kind": "daydream-setup",
+			"version": 3,
+			"recordId": "00000000-0000-4000-8000-0000000000dc",
+			"ciphertext": "sb1.pgn7WDkAwXXyeh8x7z7pVqYm6MAsUNxqzN0sRC3yE8STn653avbqXpNm3mRMuTZwMNnyktyiGvlHglMqrOCi0R5I_ZrLuVMiRPlxVh6wUHv2ne8pwUyzd_MtmEbryVU4Q26YNf6jjQnjHefPtClB1Thlqi_1cA3HJsdboZwm2PcT9dHgK106iZ3JSC174V1bOEEMZiOptzTkbVAvznLdOjII5rGApPed__aprOOCJdl_CCLVFiz474XzM-gDyRjarPmxODw1g_-nWTRc_1-KEA_G-lyKplNYxV2_KJBX5kz99Py9NpqJ7MDEb_uKRSBBGdLWRV7Wh8728_cgIxodYNRyne_vDHsT_20OUV2a1KYq9AoWlVl6hH0u7cfDRD2YHfRMv8xskT4OlPOzZ-KnvxPY9tT7TF_zN8ClAQVdejRayWGM62O5kPvapy8bJjXcxCEo0T0XbIv2olKz83ViaDuvqhenh5_rh-MqvBgdKvwMEn9z1G2jmAYHy1-SXw9gyya1gKSNS5AGzdBNnkYwEKNlRFb3zo5258yCSrQR4yPOVKs9i2H_9nPMxQYBnVRTB0IBaLb6J5e62JsjLtUamr5pTXckPO3rwUEVQZBEPMVXvXFLqeEQyjADS3SHYawWWGC_C11vMOe7JR7Mpj6K5pLjldLviv3f9ZdO6UKqmvIouV0TSi-DaYJHBKLzRebtJkpiKVq3bIxz5vyjF_W-6I-rTcEcSYOrJ_EMp2-zpqQXRR0AcaYc8IHeBJHqsqSLoRbFHmm8w7hAJAIwtHzndV7JYmGsn-mVoF3XybFdeNLVqmIpu1l0WzTWKjPYdFdmcQ32195I8xBCteMbvs95W9ADwjF9qCezeOIH5Vyko2H69VumPvoQ7CuVXvBMWdh81QgcUrZml0XuOJKgzvYaKrUo8BYNY5ovMIEA0TP-_47uCDxmthkiPrh5nYs9kODI6KNEmc4NY_VE_pXNRcaLtVLvkk_DcSt6LujqBjHgWTeblOMpuOEClDlZ0Vq7TfM9N1vDwsHklDd7n5cF_gjnSl49lJ8Gh60FYkZJych-LIcvpLLt0vjS8qIeRzymZOE5AwmOyT9dJv-DS7jFSBDKGY7kZw9SqFhLcvTTEvNXz39wKkNcC7JFvnPhA0oJINJZvl7y1asjzEGrp1PvSrnDw1JCzyLozhxVEn14602c0aj8mQEh6jMQhwLqIiW5XkiobaykO4D7VScBwWFcEG92N9OrZb2VLSh_tA9QnIUcXierPmD_YRbkRKXkYudA__1Yfw5ZtrohUjt1ExkhmyUHOOhAFnIgmc6khIoPDLseEzPzHJTmPqms21T0M5Gp98kwImPXB3lrtyAgwHqyaLV1MpuZhkedYASRYAMWzBxi49axb3Bc9_58C52BdnEMjrHWgBH5i_wikuwUK7KKt_3U1awJv3Jhqf-dSCcty4mJn3h9tXWJaDY9_4PevP4LU4p1KFgztkgt_7SgUFSuYX9jWoCAjsIAt9gCtrvLRtqR9PAuSqhkrbWvWspvEWUl7S5plI1ZoJGuezzJIWwNb41Wyg70c1MlHIuGZC2OSJXIKCh3ip6QWBL5tXOLotPOgJCGgH-fF_34NKJVuEwNjzj1qpjMYRyc9DhG8JEaXfzKeWAEVaE0dCefq4rnleBDh6AurNpGeBo2jtgw6UPEVINpPghDsVSLnN8GlCZ72fRiz9y0dxCDxR6tVYbE7Y5lw4xFZMXmvX4_Rxs-I8chvW8BksXVwa35W7vhKEUgFUpF3DQLw1bbcFbb_JH1m7TjQznpm0xKbCSdv_ndQgqxYMpjw7G7m9XikX1etC1V_PlvXlydp-9VQGDM_aTmSPhZPnu4Yrn_T2UEwrXGGl52YvzOCN1SSqjsahoxNVo5721MKmt6CmG6QrpdofBmpTQ9p9rp8Iqc1SIBFX3nOBzADoNLK8PO-93_oWJx8K4cDrgUIcO0oMuHp5tUnRHWdD9nP0UcTJi4QQrln4wzsh8cbIOPsaN-kSkqjB7kDuef7e4Y7Aa-omJ08amoeT0H3wggQSupITzcc9XK6HtyE7mv1O9iMtaiQfFwjWr7SEL5AKPiqcGsXosoYdG0h5NeIl7hFtLmm5um5qQGTFAj3HfyerST5MDjwmvLqWyBxw_FXfRn4nb7",
+			"expected": {
+				"title": "",
+				"voice": {
+					"narrator": "third-person",
+					"stance": "absent",
+					"protagonistName": ""
+				},
+				"characters": [
+					{
+						"name": "Mara",
+						"archetype": "The exacting mentor",
+						"personality": "Calm, exacting, amused.",
+						"speech": "Short sentences.",
+						"appearance": "Grey suit.",
+						"likes": "Punctuality",
+						"notes": "Never raises her voice.",
+						"dials": {
+							"tone": "cold",
+							"control": 5,
+							"strictness": 4,
+							"edge": null,
+							"talk": 2,
+							"libido": 4,
+							"kink": 3
+						},
+						"sourceId": "00000000-0000-4000-8000-0000000000d6",
+						"sourceRevision": 2,
+						"casting": {
+							"partId": "00000000-0000-4000-8000-0000000000e1",
+							"relationship": "Your manager.",
+							"part": "Testing the new hire."
+						}
+					},
+					{
+						"name": "Jun",
+						"archetype": "",
+						"personality": "Quiet.",
+						"speech": "",
+						"appearance": "",
+						"likes": "",
+						"notes": "",
+						"dials": {
+							"tone": null,
+							"control": null,
+							"strictness": null,
+							"edge": null,
+							"talk": null,
+							"libido": 4,
+							"kink": 3
+						},
+						"sourceId": null,
+						"sourceRevision": null,
+						"casting": {
+							"partId": null,
+							"relationship": "",
+							"part": ""
+						}
+					}
+				],
+				"scene": {
+					"title": "Frozen evening",
+					"setting": "An empty office.",
+					"premise": "A late meeting that runs over.",
+					"yourRole": "The new hire",
+					"tone": "slow-burn",
+					"notes": "",
+					"parts": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000e1",
+							"name": "the interviewer",
+							"description": "Runs the meeting."
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000000e2",
+							"name": "the observer",
+							"description": ""
+						}
+					],
+					"sourceId": null,
+					"sourceRevision": null,
+					"dials": {
+						"heat": 4,
+						"kink": null
+					}
+				},
+				"lead": "shared",
+				"limits": "Nothing public.",
+				"dials": {
+					"intensity": 4,
+					"pace": 2,
+					"length": "long"
+				},
+				"pictures": {
+					"on": false,
+					"style": "illustrated"
 				}
 			}
 		},
@@ -408,6 +519,35 @@
 			}
 		},
 		{
+			"kind": "daydream-turn",
+			"version": 6,
+			"recordId": "00000000-0000-4000-8000-0000000000dd",
+			"ciphertext": "sb1.o-8Her94TZHudk8kU6UBW_TE-LsTJebQ1x2FYVkjKlMvr2t-OlXr39kMMgAbbpol_sKESBjE1xnZy2bG4XxH34ge07ITffzgZ68xSlkSIXCSyrgo6y__q7mDY8C4UmbTA1q6O3q__9pCEv44YiiAR-Rxkxf4okAciWQQSfzYWXYcZKk53FMjAzU_xVardg9fzw5zILyvc91l5t7Bu68JGbCjMW8JBVFdEKaV_qqMKCCvRcsa1Dz-FsY6v_45sd0hGtcCXjCAe6l2lWi0hdmZf5s1dW-jCjFSVzn1_C62Zxe9G5xL0MWktBdLPCE4olQyiJW2h24h55LfK2SiboUxY4_sbyDyaTlcd3d2737SHOlNOQEmesCnR6wJciulgmSXYHmCI9D4mAYFfMZX8q4LFUG8DjbV_4kWnLJkXAvxYUWSWPaMB-dwkfM4F5VwotIWtOuUfM5npnzTml7hbNl9v4qzTuwUJ0jDOsN0vBf6Gv9RXVxBk-KpqNadfNZ5C2etNE5XmNcda3eYAOU00VK_JOaxfY3DqW-aH8NKVYWxvJ_hlicv9B04BAArzY0X7LeahT9sm_MYOHz1OHl85BQLtjGpnlHrC6m27ShIVwGHI9eUfYtZDOZIWcBBX6p9VYxvofAIaLiqNzNcGuqY4a59kgsspNFv0ocX5nvpEiQAt2riUVS-96-FOK4jL7T48wVeMZinYxm2Eb4PzBLWyCadps9-ZXA7XlKJtcTbpjWq0ILoIzBuif9GAvPWxq7kNKLzGBU8DF8GeT2GE5fvR1NT7iCtiozs7lGhdrz3fG-_YsuaUCfYxLbHre5axEgjjUuVfCSccaIOeKD7MD0LkNI_IjDy",
+			"expected": {
+				"type": "text",
+				"text": "Charlie lets out a breath.",
+				"meta": {
+					"suggestions": ["Hold out a hand."],
+					"directions": {
+						"add": [],
+						"remove": []
+					},
+					"readAs": "action",
+					"image": "A woman in her thirties lets out a breath, in a dim kitchen"
+				},
+				"raw": "<reading>action</reading>\nCharlie lets out a breath.\n\n<meta>\n{\"suggestions\": [\"Hold out a hand.\"]}\n</meta>",
+				"sent": {
+					"system": "You are writing an interactive story.",
+					"added": ["I sit.\n\n(Direction buttons on screen now: none yet.)"],
+					"history": {
+						"messages": 2,
+						"chain": "8a2f4c3b1e0d9f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
+					},
+					"truncated": true
+				}
+			}
+		},
+		{
 			"kind": "daydream-mark",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d5",
@@ -431,6 +571,25 @@
 				"type": "reaction",
 				"reaction": "love",
 				"after": "00000000-0000-4000-8000-0000000000d9"
+			}
+		},
+		{
+			"kind": "daydream-mark",
+			"version": 3,
+			"recordId": "00000000-0000-4000-8000-0000000000de",
+			"ciphertext": "sb1.23IjhNeLYRUSE_sF_YDTMIg7CJQHXARFGz9zVGbvjXJFUcEPpA5Td3AuDBSCqHftg4ErDj-6K5fWsYgfYEi4e6KghrULR5faXOuEv2x2IDwkodRn8WBO024NAnjpDTJ_CgIoSRP8x-r2tqXqm6M1Wfjf-caKpJrXtg-WDE4Lg6BIKxsFQLTAuWqXRS102gjewkhK6_dFTvVQM2vRWQhG2_K5jsFvATGBScPTKZzET5I-OlcST-y4JAU3APtfcVkIGRwt7Jbaj4XREMe0gcmNZwTja7PO7Xt10YWgoGG_gqtYR_fimkyJzGn9gDXXnt3jdi3LGJjVH235zFZS32w69MJiHA786XbbLTOiP988MxtiAS2Zkwfgp5QUaZ_Mb5q58cJH72GymvGZVqfYKM_S05Pb0GmVfYIij8cpz4Qwzlk9WTeat4HeN2khLY52FM8br8SxxIXg8M9XFkzWOX78UQlBxvdXwbqSJ9jBEBfyGl5OLZVs7NC6AntQhvg3nQmZSI10KYYc9bqzgCl4QW5uMfy-oPWQug",
+			"expected": {
+				"type": "picture",
+				"imageId": "00000000-0000-4000-8000-0000000000df",
+				"key": "AGE-SECRET-KEY-1QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ",
+				"mimeType": "image/webp",
+				"width": 832,
+				"height": 1216,
+				"sent": {
+					"model": "civitai:573152@1094291",
+					"positivePrompt": "photograph, adults only. A woman in her thirties at a desk",
+					"negativePrompt": "child, minor, teen"
+				}
 			}
 		},
 		{

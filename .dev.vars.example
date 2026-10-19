@@ -23,6 +23,9 @@ RESEND_API_KEY=""
 OPENROUTER_API_KEY=""
 DAYDREAM_MODEL=""
 
+# Daydreams' pictures (docs/daydreams.md). Optional: without a key there are none.
+RUNWARE_AI_API_KEY=""
+
 # Sets the Cloudflare tunnel to use for `npm run preview`.
 CF_TUNNEL_NAME=""
 # If true the Cloudflare will be used automatically when runnning `npm run preview`.

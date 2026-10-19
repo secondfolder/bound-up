@@ -103,6 +103,10 @@ export default defineConfig({
 			OPENROUTER_API_KEY: 'e2e-openrouter-key',
 			OPENROUTER_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/v1`,
 			DAYDREAM_MODEL: 'e2e/stub',
+			// Pictures, against the same stub, for the same reason: a real
+			// Runware key in .env must never make a picture during a run.
+			RUNWARE_AI_API_KEY: 'e2e-runware-key',
+			RUNWARE_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/runware`,
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.
 			VITE_DEV_ORIGIN: E2E_BASE_URL,

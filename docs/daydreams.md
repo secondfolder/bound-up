@@ -631,6 +631,78 @@ passage (`highlightSegments`); the bookmarks drawer
 (`DaydreamBookmarks.svelte`) lists every bookmark in the tree, and picking
 one moves to the branch through it and scrolls there.
 
+## Pictures
+
+A passage can come with a picture of the moment it ends on, made by an
+image model tuned for adult imagery, through Runware.
+
+- **The story model describes it.** On a server with a Runware key, the
+  reply format asks for an `"image"` in every passage's metadata
+  (`IMAGE_INSTRUCTION` in `prompt.ts`): the people, what they are doing and
+  wearing, where, the light — each person an adult with an age, looking as
+  the setup says, and only as explicit as the scene's heat. It is left out
+  only where a picture makes no sense, and never in a check-in. It is
+  constant per server, so the prompt stays cacheable ([Cost](#cost)), and
+  meta is never sent back, so the history is untouched. The description is
+  stored on the passage (`image`, `daydream-turn` v6).
+- **The server wraps it.** `POST /api/daydreams/[id]/image` takes the
+  description, the daydream's style and the scene's heat, and builds the
+  request (`runwareTask`, `daydream/image-prompt.ts`): the style's model
+  and words, an adult floor in the image model's own terms, and a negative
+  prompt that keeps it away from anything youthful — and, at SFW, from
+  nudity. It answers with the picture and, in a header, exactly what it
+  asked (`PictureRequest`). It keeps nothing and logs only status codes.
+- **Two styles, per daydream.** Photo (Lustify, an SDXL checkpoint) or
+  Illustrated (WAI-illustrious), in the setup's `pictures` (`daydream-setup`
+  v3) with whether each passage gets one by itself, which is on by default.
+  Both are in the setup form's "More options" and the story's Dials
+  popover (`DaydreamPicturesControl.svelte`). Neither reaches the story
+  model, so changing either mid-story costs no cache miss. The models are
+  Runware AIRs, pinned to a version (`DEFAULT_PICTURE_MODELS`); Runware does
+  not host every Civitai version, and its own `modelSearch` is where to look
+  for another.
+- **Kept encrypted, like an attachment.** Turns never change, and a picture
+  arrives after its passage is saved, so it is a mark on the passage
+  (`picture`, `daydream-mark` v3). The browser encrypts it under an age
+  identity of its own (`encryptAttachment`), stores the ciphertext at
+  `PUT /api/daydreams/[id]/images/[imageId]` — owner-only, capped at
+  `MAX_PICTURE_BYTES`, under `permanent/daydreams/<daydreamId>/` — and only
+  then seals the key into the mark. The server sees the picture once, on
+  its way through, and stores only ciphertext. Deleting the daydream
+  deletes its pictures by prefix (`purgeDaydreamPictures`).
+- **On the page** (`DaydreamPicture.svelte`), under the passage's text and
+  never in it, since quote offsets are measured against the text: a
+  skeleton the picture's shape while it is made or opened, then the
+  picture. It is shown from the plaintext the moment it comes, and stored
+  quietly after (`kept`); one that could not be stored says so with **Keep
+  it**, one that could not be made with **Try again**, and a daydream with
+  pictures off offers **Picture this** on each passage that describes one.
+  Nothing the story asked for is lost.
+- **The disclosure covers it.** Pictures go to a third party on the same
+  terms as passages, and the Daydreams disclosure says so; there is no
+  separate question.
+
+### Keeping minors out of pictures
+
+An uncensored image model will draw whatever it is asked, so the guard is
+this app's, in three layers, any one of which would stop it:
+
+1. **The story model is told** to describe every person as an adult with
+   an age, and never in youthful terms, under rules that already forbid
+   anyone under 18 anywhere in the story.
+2. **The description is refused** if it mentions a minor in any way — a
+   word list of minors, school and youthful bodies, and any age under 18
+   (`imagePromptProblem`). The browser checks before asking, and the server
+   checks again before counting the request or sending anything, so a
+   refused description is never sent. Refused is not reworded: the passage
+   says "This one can’t be pictured", with no Try again. "Girl" and "boy"
+   are said as "woman" and "man" before sending, since erotica uses them for
+   adults and an image model does not.
+3. **The image model is steered** by the request itself: an adult floor in
+   the positive prompt, and minors and youthful bodies in the negative —
+   for the illustrated style, which draws young faces unless told otherwise,
+   its own tags as well.
+
 ## Safety
 
 **Stop the scene** and **Ease off** are always on screen, while a passage is
@@ -655,6 +727,9 @@ directions keep most of it.
 - **Plain words still stop it.** The rules tell the model that a user who
   steps out of the story to say they want to stop, or seems distressed, is
   stopped exactly as if they had pressed it.
+
+Pictures have guards of their own against anything youthful
+([Keeping minors out of pictures](#keeping-minors-out-of-pictures)).
 
 Typed safewords went because a button does not depend on the model noticing
 a word, and is there before anything has to be typed. Setups from v1 had an
@@ -743,7 +818,14 @@ in plaintext:
 turns of the branch being read, as text, to `POST /api/daydreams/[id]/reply`,
 which validates them (`replyRequestSchema`), wraps them in its own system
 prompt and forwards them to OpenRouter, and the provider that writes the
-reply. The reply streams back through the server unread. For an account
+reply. The reply streams back through the server unread.
+
+**In transit, for each picture:** the passage's description, the
+daydream's picture style and the scene's heat go to
+`POST /api/daydreams/[id]/image`, which wraps them ([Pictures](#pictures))
+and sends them to Runware; the picture comes back through the server to the
+browser. Stored: only the picture's ciphertext, under a key the server
+never has. For an account
 granted debug mode, the endpoint first sends back what it sent the model
 (the system prompt and the messages it added), for the browser to seal into
 the passage; it keeps none of it ([debug-mode.md](debug-mode.md#daydreams-raw-log)).
@@ -863,8 +945,9 @@ whole, which is why the limits live there and not in the story.
 
 ## Cost
 
-Every passage and suggestion is paid for on the server's key. Four things
-hold that down:
+Every passage and suggestion is paid for on the server's OpenRouter key, and
+every picture on its Runware key (about $0.003 each, measured when the
+models were chosen). Four things hold that down:
 
 - **The prompt is built to be cached.** Most providers cache a prompt by
   its start and charge a fraction for the part that matches the last
@@ -907,11 +990,14 @@ hold that down:
 - **Per-account limits**: 20 passages a minute and 300 a day
   (`DAYDREAM_REPLY_LIMITS`), and, in a scope of their own so that setting up
   never uses up the story, 30 suggestions a minute and 200 a day
-  (`DAYDREAM_SUGGEST_LIMITS`). See
+  (`DAYDREAM_SUGGEST_LIMITS`), and pictures likewise apart, 20 a minute and
+  300 a day (`DAYDREAM_IMAGE_LIMITS`). See
   [rate-limiting.md](rate-limiting.md#daydreams-replies). On everywhere, dev
   included.
 - **No key, no feature.** Without `OPENROUTER_API_KEY` the pages say
   Daydreams aren't set up on this server, and the endpoints answer 503.
+  Without `RUNWARE_AI_API_KEY` there are no pictures, and the story model is
+  not asked to describe any.
 
 ## Configuration
 
@@ -920,10 +1006,15 @@ hold that down:
 | `OPENROUTER_API_KEY`  | none — Daydreams are off       | The key every passage is paid for on        |
 | `DAYDREAM_MODEL`      | `DEFAULT_DAYDREAM_MODEL`       | The OpenRouter model id                     |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Only the e2e suite points it anywhere else  |
+| `RUNWARE_AI_API_KEY`  | none — no pictures             | The key every picture is paid for on        |
+| `RUNWARE_BASE_URL`    | `https://api.runware.ai/v1`    | Only the e2e suite points it anywhere else  |
+| `DAYDREAM_IMAGE_MODEL_PHOTO` | `DEFAULT_PICTURE_MODELS.photo` | A Runware model AIR           |
+| `DAYDREAM_IMAGE_MODEL_ILLUSTRATED` | `DEFAULT_PICTURE_MODELS.illustrated` | A Runware model AIR |
 
 Read per request by `readDaydreamConfig`, from `platform.env` on Workers and
 the environment elsewhere. `npm run secrets -- <target> --openrouter-key …`
-sets the key; it is never generated or asked for.
+sets the key; it is never generated or asked for. Pictures read theirs the
+same way (`readImageConfig`), and `--runware-key …` sets it.
 
 ## Drafts
 
@@ -957,6 +1048,14 @@ Noted so they are not lost; none is in the code.
   a narrated story reads better as a page.
 
 ## Known gaps
+
+- **Deleting an account leaves its pictures' ciphertext in storage**, as it
+  leaves its message attachments': nothing purges media when an account
+  goes. The keys went with the account's records, so it is unreadable.
+- **A picture whose storing died midway leaves an orphan**, as an attachment
+  can: an unreadable object nothing points at, under `permanent/`, where no
+  lifecycle rule sweeps. The upload endpoint is not rate-limited, beyond
+  being owner-only for a daydream that exists.
 
 - **No escrow without a partner.** A daydream is sealed in the self vault,
   which is recoverable only through a partner and the server
@@ -993,7 +1092,9 @@ Noted so they are not lost; none is in the code.
   the system voice's guide, its place and its examples by heat; writing a
   turn out, never for a watcher; directions like a button; chosen readings
   as notes that settle it),
-  `suggest-prompt.test.ts`, `config.test.ts`, the sealed fixtures, and the
+  `suggest-prompt.test.ts`, `config.test.ts`, `daydream/image-prompt.test.ts`
+  (the refusal list, the request per style and heat), the sealed fixtures,
+  and the
   tree backfill in `server/db/migrations.test.ts`.
 - Debug mode's raw log and its prompt endpoint are listed in
   [debug-mode.md](debug-mode.md#tests).

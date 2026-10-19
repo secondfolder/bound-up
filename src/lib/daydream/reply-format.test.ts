@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DAYDREAM_LIMITS } from '../daydream';
 import { parseReply, visiblePassage, visibleReply } from './reply-format';
 
 const meta = {
@@ -226,6 +227,19 @@ describe('parseReply', () => {
 		const parsed = parseReply(`x\n<meta>\n${JSON.stringify(bad)}\n</meta>`);
 		expect(parsed.meta?.roll).toBeUndefined();
 		expect(parsed.meta?.suggestions).toEqual(meta.suggestions);
+	});
+
+	it('keeps the picture the model described, and drops one too long to send', () => {
+		const image = 'A woman in her thirties, kneeling by the fire';
+		expect(
+			parseReply(`x\n<meta>\n${JSON.stringify({ ...meta, image })}\n</meta>`).meta?.image
+		).toBe(image);
+		// Too long: salvaged without it, the rest kept.
+		const long = parseReply(
+			`x\n<meta>\n${JSON.stringify({ ...meta, image: 'x'.repeat(DAYDREAM_LIMITS.imagePrompt + 1) })}\n</meta>`
+		).meta;
+		expect(long?.image).toBeUndefined();
+		expect(long?.suggestions).toEqual(meta.suggestions);
 	});
 
 	it('keeps a roll that covers every face', () => {

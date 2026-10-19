@@ -44,6 +44,10 @@ if (!E2E_MODEL_PORT) {
 
 /** The key the app is given in the suite's environment (playwright.config.ts). */
 const KEY = 'e2e-openrouter-key';
+const RUNWARE_KEY = 'e2e-runware-key';
+
+/** A real 1×1 WEBP, so the page has a picture it can show. */
+const PICTURE = 'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=';
 /**
  * How the server's prompt lists the characters (`describeSetup`): a heading
  * each, "## Mara" or, cast in a part, "## Mara, the interviewer".
@@ -112,7 +116,9 @@ function replyFor(messages) {
 			remove: []
 		},
 		readAs: 'action',
-		...(last.includes('[roll]') ? { roll: ROLL } : {})
+		...(last.includes('[roll]') ? { roll: ROLL } : {}),
+		// A picture only when asked, so the other specs' pages stay as they were.
+		...(last.includes('[picture]') ? { image: 'A woman in her thirties at a desk' } : {})
 	};
 	if (users.length === 1 && last.startsWith('(Begin the story')) {
 		return withMeta(
@@ -197,7 +203,31 @@ function chunks(text) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Runware's `imageInference`, answered with `PICTURE` whatever was asked. */
+async function picture(request, response) {
+	if (request.headers.authorization !== `Bearer ${RUNWARE_KEY}`) {
+		response.writeHead(401, { 'content-type': 'application/json' });
+		response.end(JSON.stringify({ errors: [{ code: 'missingApiKey' }] }));
+		return;
+	}
+	let raw = '';
+	for await (const piece of request) {
+		raw += piece;
+	}
+	const [task] = JSON.parse(raw);
+	response.writeHead(200, { 'content-type': 'application/json' });
+	response.end(
+		JSON.stringify({
+			data: [{ taskType: 'imageInference', taskUUID: task.taskUUID, imageBase64Data: PICTURE }]
+		})
+	);
+}
+
 const server = createServer(async (request, response) => {
+	if (request.method === 'POST' && request.url === '/runware') {
+		await picture(request, response);
+		return;
+	}
 	if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {
 		response.writeHead(404).end();
 		return;
