@@ -28,7 +28,12 @@
 	// svelte-ignore state_referenced_locally
 	setKinkListContext({
 		store,
-		paths: { home: '/kink-list', category: (id) => `/kink-list/${id}`, quick: '/kink-list/quick' }
+		paths: {
+			home: '/kink-list',
+			category: (id) => `/kink-list/${id}`,
+			quick: '/kink-list/quick',
+			transfer: '/kink-list/transfer'
+		}
 	});
 
 	const category = $derived(categoryId ? kinkById(categoryId) : undefined);

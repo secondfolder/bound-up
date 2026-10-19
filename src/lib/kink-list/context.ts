@@ -11,6 +11,7 @@ export type KinkListPaths = {
 	home: string;
 	category: (categoryId: string) => string;
 	quick: string;
+	transfer: string;
 };
 
 export type KinkListContext = {

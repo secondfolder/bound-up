@@ -106,6 +106,7 @@
 		<wa-details summary="Share a link to your list">
 			<ShareLink />
 		</wa-details>
+		<p class="transfer"><a href={paths.transfer}>Import or export your list</a></p>
 
 		{#each Object.entries(catalog.sections) as [section, title] (section)}
 			<section class="section" aria-labelledby="section-{section}">
@@ -171,6 +172,10 @@
 
 	.quiet {
 		color: var(--wa-color-text-quiet);
+	}
+
+	.transfer {
+		margin: 0;
 	}
 
 	.categories {

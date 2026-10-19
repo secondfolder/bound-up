@@ -351,6 +351,13 @@
 							"shippedOn": "2026-10-19"
 						},
 						{
+							"id": "kink-list-import",
+							"title": "Import and export your kink list",
+							"summary": "Bring in a list from KinkList, KinkSheet and other popular kink lists, or a spreadsheet, and take yours with you.",
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
+						},
+						{
 							"id": "per-partner-kink-list",
 							"title": "Kink list per partner",
 							"summary": "Your list carries over to each partner, and you can change any answer just for them.",

@@ -1,0 +1,689 @@
+{
+	"id": "kinksheet",
+	"title": "KinkSheet",
+	"levels": [null, "love", "like", "curious", "not-for-me"],
+	"categories": [
+		{
+			"name": "Intimacy",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Romance / Affection",
+					"id": "romance"
+				},
+				{
+					"name": "Hugging",
+					"id": "cuddling"
+				},
+				{
+					"name": "Kissing (body)",
+					"id": "kissing-body"
+				},
+				{
+					"name": "Kissing (mouth)",
+					"id": "kissing-mouth"
+				},
+				{
+					"name": "Spooning",
+					"id": "cuddling"
+				},
+				{
+					"name": "Using real names",
+					"id": "pet-names"
+				},
+				{
+					"name": "Sleepover",
+					"id": "cuddling"
+				}
+			]
+		},
+		{
+			"name": "Clothing",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "Clothed sex",
+					"id": "clothed-sex"
+				},
+				{
+					"name": "Lingerie",
+					"id": "lingerie"
+				},
+				{
+					"name": "Stockings",
+					"id": "stockings"
+				},
+				{
+					"name": "Heels",
+					"id": "heels-boots"
+				},
+				{
+					"name": "Leather",
+					"id": "leather"
+				},
+				{
+					"name": "Latex",
+					"id": "latex"
+				},
+				{
+					"name": "Uniform",
+					"id": "uniforms"
+				},
+				{
+					"name": "Cosplay",
+					"id": "cosplay"
+				},
+				{
+					"name": "Cross-dressing",
+					"id": "crossdressing"
+				},
+				{
+					"name": "Formal clothing",
+					"id": "formal"
+				}
+			]
+		},
+		{
+			"name": "Groupings",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "You and 1 male",
+					"id": "partner-gender"
+				},
+				{
+					"name": "You and 1 female",
+					"id": "partner-gender"
+				},
+				{
+					"name": "You and 1 male, 1 female",
+					"id": "threesome"
+				},
+				{
+					"name": "You and 2 males",
+					"id": "threesome"
+				},
+				{
+					"name": "You and 2 females",
+					"id": "threesome"
+				},
+				{
+					"name": "Orgy setting",
+					"id": "group"
+				}
+			]
+		},
+		{
+			"name": "General",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Handjobs / fingering",
+					"id": "handjobs"
+				},
+				{
+					"name": "Blowjobs",
+					"id": "blowjobs"
+				},
+				{
+					"name": "Deep throating",
+					"id": "deepthroat"
+				},
+				{
+					"name": "Swallowing",
+					"id": "swallowing"
+				},
+				{
+					"name": "Facials",
+					"id": "facials"
+				},
+				{
+					"name": "Cunnilingus",
+					"id": "cunnilingus"
+				},
+				{
+					"name": "Face-sitting",
+					"id": "face-sitting"
+				},
+				{
+					"name": "Edging",
+					"id": "edging"
+				},
+				{
+					"name": "Teasing",
+					"id": "teasing"
+				},
+				{
+					"name": "Stripping / Disrobing",
+					"id": "stripping"
+				},
+				{
+					"name": "Mutual / shared masturbation",
+					"id": "mutual-masturbation"
+				},
+				{
+					"name": "Self-injury / Self-humiliation",
+					"id": "blood-play"
+				}
+			]
+		},
+		{
+			"name": "Penetration",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Penetration",
+					"id": "penetration"
+				},
+				{
+					"name": "Strap-on penetration",
+					"id": "strap-on"
+				},
+				{
+					"name": "Barebacking",
+					"id": "barebacking"
+				},
+				{
+					"name": "Tantric/Yoni stimulation",
+					"id": "tantric"
+				},
+				{
+					"name": "Fingering",
+					"id": "fingering"
+				},
+				{
+					"name": "Object insertion",
+					"id": "object-insertion"
+				},
+				{
+					"name": "Fisting",
+					"id": "fisting"
+				}
+			]
+		},
+		{
+			"name": "Special Positions",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Free-hanging / loveswings",
+					"id": "bondage-furniture"
+				},
+				{
+					"name": "Up against walls",
+					"id": "positions-list"
+				},
+				{
+					"name": "69'ing",
+					"id": "sixty-nine"
+				},
+				{
+					"name": "Rope/chain suspension",
+					"id": "suspension"
+				},
+				{
+					"name": "Unseen actor",
+					"id": "stealth-penetration"
+				},
+				{
+					"name": "Stealth penetration",
+					"id": "stealth-penetration"
+				}
+			]
+		},
+		{
+			"name": "Butt stuff",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Anal teasing / threats",
+					"id": "anal-fingering"
+				},
+				{
+					"name": "Anal toys / plugging",
+					"id": "anal-toys"
+				},
+				{
+					"name": "Anal sex, pegging",
+					"id": "anal-sex"
+				},
+				{
+					"name": "Rimming",
+					"id": "rimming"
+				},
+				{
+					"name": "Double penetration",
+					"id": "double-penetration"
+				},
+				{
+					"name": "Anal fisting",
+					"id": "anal-fisting"
+				}
+			]
+		},
+		{
+			"name": "Restrictive",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "Gag",
+					"id": "gags"
+				},
+				{
+					"name": "Collar",
+					"id": "collar-leash"
+				},
+				{
+					"name": "Leash",
+					"id": "collar-leash"
+				},
+				{
+					"name": "Rope bondage",
+					"id": "rope"
+				},
+				{
+					"name": "Mitts",
+					"id": "armbinders"
+				},
+				{
+					"name": "Cufflings",
+					"id": "cuffs"
+				},
+				{
+					"name": "Wall/cross mounting",
+					"id": "bondage-furniture"
+				},
+				{
+					"name": "Stockades",
+					"id": "bondage-furniture"
+				},
+				{
+					"name": "Chastity gear",
+					"id": "chastity"
+				},
+				{
+					"name": "Encasement",
+					"id": "encasement"
+				},
+				{
+					"name": "Blindfolds",
+					"id": "blindfolds"
+				},
+				{
+					"name": "Sensory deprivation",
+					"id": "sensory-deprivation"
+				}
+			]
+		},
+		{
+			"name": "Toys",
+			"columns": ["On Self", "On others"],
+			"items": [
+				{
+					"name": "Dildos",
+					"id": "dildos"
+				},
+				{
+					"name": "Plugs",
+					"id": "butt-plugs"
+				},
+				{
+					"name": "Vibrators",
+					"id": "vibrators"
+				},
+				{
+					"name": "Magic wands",
+					"id": "magic-wand"
+				},
+				{
+					"name": "Sybians",
+					"id": "sybian"
+				},
+				{
+					"name": "Sex Machines",
+					"id": "sex-machines"
+				}
+			]
+		},
+		{
+			"name": "Domination",
+			"columns": ["As Dom", "As Sub"],
+			"items": [
+				{
+					"name": "Dominant / Submissive",
+					"id": "power"
+				},
+				{
+					"name": "Domestic servitude",
+					"id": "domestic-service"
+				},
+				{
+					"name": "Slavery",
+					"id": "slavery"
+				},
+				{
+					"name": "DD/lg, MD/lb",
+					"id": "age-play"
+				},
+				{
+					"name": "Discipline",
+					"id": "discipline"
+				},
+				{
+					"name": "Begging",
+					"id": "begging"
+				},
+				{
+					"name": "Forced orgasm",
+					"id": "forced-orgasm"
+				},
+				{
+					"name": "Orgasm control",
+					"id": "orgasm-control"
+				},
+				{
+					"name": "Orgasm denial",
+					"id": "orgasm-denial"
+				}
+			]
+		},
+		{
+			"name": "Scenarios",
+			"columns": ["Being center", "Participating"],
+			"items": [
+				{
+					"name": "Glory hole",
+					"id": "glory-hole"
+				},
+				{
+					"name": "Humiliation",
+					"id": "humiliation"
+				},
+				{
+					"name": "Exhibitionism",
+					"id": "exhibition"
+				},
+				{
+					"name": "Voyeurism",
+					"id": "exhibition"
+				},
+				{
+					"name": "Medical",
+					"id": "medical-play"
+				},
+				{
+					"name": "Pet play (soft)"
+				},
+				{
+					"name": "Pet play (hard)"
+				},
+				{
+					"name": "Human furniture",
+					"id": "human-furniture"
+				},
+				{
+					"name": "Human auctioning / appraisal",
+					"id": "auctioned"
+				},
+				{
+					"name": "Slave training",
+					"id": "slavery"
+				},
+				{
+					"name": "Interrogation",
+					"id": "interrogation"
+				},
+				{
+					"name": "Gangbang",
+					"id": "gangbang"
+				},
+				{
+					"name": "Kidnapping",
+					"id": "kidnapping"
+				},
+				{
+					"name": "Sleep play",
+					"id": "sleep-play"
+				},
+				{
+					"name": "Hypnotism",
+					"id": "hypnosis"
+				},
+				{
+					"name": "Unaware / Freeuse",
+					"id": "free-use"
+				},
+				{
+					"name": "Fake public use",
+					"id": "free-use"
+				},
+				{
+					"name": "Practical sex ed",
+					"id": "negotiation"
+				}
+			]
+		},
+		{
+			"name": "Taboo Scenarios",
+			"columns": ["Participating", "Observing"],
+			"items": [
+				{
+					"name": "Incest",
+					"id": "family-roleplay"
+				},
+				{
+					"name": "Ageplay",
+					"id": "age-play"
+				},
+				{
+					"name": "Non-con / rapeplay",
+					"id": "consent"
+				},
+				{
+					"name": "Necrophilia",
+					"id": "necrophilia"
+				},
+				{
+					"name": "Nazi/War symbolism",
+					"id": "war-roleplay"
+				},
+				{
+					"name": "Cheating",
+					"id": "cheating-fantasy"
+				},
+				{
+					"name": "Real public use",
+					"id": "public-sex"
+				}
+			]
+		},
+		{
+			"name": "Surrealism",
+			"columns": ["Self", "Observing"],
+			"items": [
+				{
+					"name": "Futanari",
+					"id": "futanari"
+				},
+				{
+					"name": "Furry",
+					"id": "furry"
+				},
+				{
+					"name": "Transformation",
+					"id": "transformation"
+				},
+				{
+					"name": "Tentacles",
+					"id": "tentacles"
+				},
+				{
+					"name": "Monster/Beast",
+					"id": "monsters"
+				},
+				{
+					"name": "Alien",
+					"id": "aliens"
+				}
+			]
+		},
+		{
+			"name": "Fluids",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Blood",
+					"id": "blood-play"
+				},
+				{
+					"name": "Watersports",
+					"id": "watersports"
+				},
+				{
+					"name": "Scat",
+					"id": "scat"
+				},
+				{
+					"name": "Cum play",
+					"id": "cum"
+				}
+			]
+		},
+		{
+			"name": "Touch & Stimulation",
+			"columns": ["Actor", "Subject"],
+			"items": [
+				{
+					"name": "Cock/Pussy worship",
+					"id": "genital-worship"
+				},
+				{
+					"name": "Ass worship",
+					"id": "ass-worship"
+				},
+				{
+					"name": "Foot play",
+					"id": "foot-worship"
+				},
+				{
+					"name": "Tickling",
+					"id": "tickling"
+				},
+				{
+					"name": "Sensation play",
+					"id": "sensation"
+				},
+				{
+					"name": "Electro stimulation",
+					"id": "electro"
+				},
+				{
+					"name": "Breath play",
+					"id": "breath-play"
+				}
+			]
+		},
+		{
+			"name": "Pain",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Light pain",
+					"id": "light-pain"
+				},
+				{
+					"name": "Heavy pain",
+					"id": "heavy-pain"
+				},
+				{
+					"name": "Hickies",
+					"id": "hickies"
+				},
+				{
+					"name": "Nipple clamps",
+					"id": "clamps"
+				},
+				{
+					"name": "Clothes pins / ZipStrips",
+					"id": "clamps"
+				},
+				{
+					"name": "Body slapping",
+					"id": "slapping"
+				},
+				{
+					"name": "Facial slapping",
+					"id": "face-slapping"
+				},
+				{
+					"name": "Spanking",
+					"id": "spanking"
+				},
+				{
+					"name": "Caning",
+					"id": "caning"
+				},
+				{
+					"name": "Flogging",
+					"id": "flogging"
+				},
+				{
+					"name": "Beatings",
+					"id": "beating"
+				},
+				{
+					"name": "Whips",
+					"id": "whipping"
+				},
+				{
+					"name": "Paddles",
+					"id": "spanking-implements"
+				},
+				{
+					"name": "Cock/Pussy slapping",
+					"id": "genital-slapping"
+				},
+				{
+					"name": "Cock/Pussy torture",
+					"id": "genital-torment"
+				},
+				{
+					"name": "Breast torture",
+					"id": "nipple-torture"
+				},
+				{
+					"name": "Hot Wax",
+					"id": "wax"
+				},
+				{
+					"name": "Scratching",
+					"id": "scratching"
+				},
+				{
+					"name": "Biting",
+					"id": "biting"
+				},
+				{
+					"name": "Burning",
+					"id": "fire-play"
+				},
+				{
+					"name": "Cutting",
+					"id": "blood-play"
+				},
+				{
+					"name": "Sounding",
+					"id": "sounding"
+				},
+				{
+					"name": "Bruising (short-lasting)",
+					"id": "bruising"
+				},
+				{
+					"name": "Markings (long-lasting)",
+					"id": "body-mod"
+				}
+			]
+		}
+	]
+}

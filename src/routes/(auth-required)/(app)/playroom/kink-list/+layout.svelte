@@ -21,7 +21,8 @@
 			home: resolve('/(auth-required)/(app)/playroom/kink-list'),
 			category: (category) =>
 				resolve('/(auth-required)/(app)/playroom/kink-list/[category]', { category }),
-			quick: resolve('/(auth-required)/(app)/playroom/kink-list/quick')
+			quick: resolve('/(auth-required)/(app)/playroom/kink-list/quick'),
+			transfer: resolve('/(auth-required)/(app)/playroom/kink-list/transfer')
 		}
 	});
 

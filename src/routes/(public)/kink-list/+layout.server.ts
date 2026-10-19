@@ -17,5 +17,8 @@ export const load: LayoutServerLoad = ({ locals, route, params }) => {
 	if (route.id === '/(public)/kink-list/quick') {
 		redirect(303, '/playroom/kink-list/quick');
 	}
+	if (route.id === '/(public)/kink-list/transfer') {
+		redirect(303, '/playroom/kink-list/transfer');
+	}
 	redirect(303, '/playroom/kink-list');
 };

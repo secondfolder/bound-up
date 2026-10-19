@@ -110,6 +110,11 @@ export abstract class KinkListStore {
 		this.change({ ...this.list, answers: { ...this.list.answers, [key]: next } });
 	}
 
+	/** Replaces the list with what `update` makes of it: an import, applied by `applyImport`. */
+	transform(update: (list: ListPayload) => ListPayload): void {
+		this.change(update(this.list));
+	}
+
 	setTriage(categoryId: string, value: TriageValue): void {
 		this.change({
 			...this.list,

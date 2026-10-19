@@ -241,3 +241,51 @@ test.describe('without an account', () => {
 		await expect(page.getByRole('heading', { name: /You both want this/ })).toBeVisible();
 	});
 });
+
+test('imports a KinkSheet link, exports the list, and reads the export back', async ({ page }) => {
+	await signUp(page, account('Hal'));
+	const sheet = (await import('../src/lib/kink-list/import/lists/kinksheet.json', {
+		with: { type: 'json' }
+	})) as { default: { levels: unknown[]; categories: { items: unknown[]; columns: unknown[] }[] } };
+	const { encodeKinklistHash } = await import('../src/lib/kink-list/import/kinklist-hash');
+	const positions = sheet.default.categories.reduce(
+		(sum, category) => sum + category.items.length * category.columns.length,
+		0
+	);
+	const values = new Array<number>(positions).fill(0);
+	values[0] = 1; // Romance / Affection: Favorite
+	const link = `https://kinksheet.com/#${encodeKinklistHash(values, sheet.default.levels.length)}`;
+
+	await page.goto('/playroom/kink-list/transfer');
+	await waitForHydration(page);
+	await page.getByRole('textbox', { name: 'A link to a kink list' }).fill(link);
+	await clickWaButton(page, 'Read link');
+	await expect(page.getByRole('heading', { name: 'From KinkSheet' })).toBeVisible();
+	await clickWaButton(page, 'Import');
+	await expect(page.getByText('Imported: 1 new answer.')).toBeVisible();
+	await saved(page);
+
+	const download = page.waitForEvent('download');
+	await clickWaButton(page, 'Everything (JSON)');
+	const file = await (await download).path();
+	const { readFileSync } = await import('node:fs');
+	const exported = JSON.parse(readFileSync(file, 'utf8')) as {
+		format: string;
+		list: { answers: Partial<Record<string, { level?: string }>> };
+	};
+	expect(exported.format).toBe('bound-up-kink-list');
+	expect(exported.list.answers.romance?.level).toBe('love');
+
+	await page.locator('input[type="file"]').setInputFiles(file);
+	// Playwright saves a download under a name of its own, which the preview shows.
+	await expect(page.getByRole('heading', { name: /^From / })).toBeVisible();
+	await expect(page.getByText('1 answer for kinks on this list.')).toBeVisible();
+
+	await page.goto('/playroom/kink-list/intimacy');
+	await waitForHydration(page);
+	await expect(
+		page
+			.getByRole('group', { name: 'Romance and affection', exact: true })
+			.getByRole('radio', { name: 'Love' })
+	).toBeChecked();
+});

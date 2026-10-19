@@ -1,0 +1,1447 @@
+{
+	"id": "adhesivecheese-plsno",
+	"title": "Kinklist by adhesiveCheese (Please Don't)",
+	"levels": [null, "love", "like", "dont-mind", "curious", "limit"],
+	"categories": [
+		{
+			"name": "Body Part Size",
+			"columns": ["Small", "Large"],
+			"items": [
+				{
+					"name": "Asses"
+				},
+				{
+					"name": "Cocks",
+					"id": "cocks"
+				},
+				{
+					"name": "Balls"
+				},
+				{
+					"name": "Breasts",
+					"id": "breasts"
+				}
+			]
+		},
+		{
+			"name": "Bodies",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Skinny",
+					"id": "build"
+				},
+				{
+					"name": "Chubby",
+					"id": "build"
+				},
+				{
+					"name": "Cut Cocks",
+					"id": "cocks"
+				},
+				{
+					"name": "Glasses",
+					"id": "skin"
+				},
+				{
+					"name": "Muscular Partners"
+				},
+				{
+					"name": "Nonsexual Piercings",
+					"id": "skin"
+				},
+				{
+					"name": "Pubic Hair",
+					"id": "body-hair"
+				},
+				{
+					"name": "Twinks",
+					"id": "archetypes"
+				},
+				{
+					"name": "Twins"
+				},
+				{
+					"name": "Uncut Cocks",
+					"id": "cocks"
+				},
+				{
+					"name": "Very Fat Partners"
+				},
+				{
+					"name": "Very Lithe Partners"
+				},
+				{
+					"name": "Very Muscular Partners"
+				},
+				{
+					"name": "Voluptuousness",
+					"id": "build"
+				}
+			]
+		},
+		{
+			"name": "Clothing",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "Cross-dressing",
+					"id": "crossdressing"
+				},
+				{
+					"name": "Clothed sex",
+					"id": "clothed-sex"
+				},
+				{
+					"name": "Heels",
+					"id": "heels-boots"
+				},
+				{
+					"name": "Latex",
+					"id": "latex"
+				},
+				{
+					"name": "Leather",
+					"id": "leather"
+				},
+				{
+					"name": "Lingerie",
+					"id": "lingerie"
+				},
+				{
+					"name": "Masks",
+					"id": "masks"
+				},
+				{
+					"name": "Stockings",
+					"id": "stockings"
+				},
+				{
+					"name": "Uniform / costume",
+					"id": "uniforms"
+				}
+			]
+		},
+		{
+			"name": "Pairings",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "as Male"
+				},
+				{
+					"name": "as Female"
+				},
+				{
+					"name": "as Femboy"
+				},
+				{
+					"name": "as Futa"
+				},
+				{
+					"name": "as MtF trans"
+				},
+				{
+					"name": "as FtM trans"
+				},
+				{
+					"name": "as male & female"
+				},
+				{
+					"name": "as multiple males"
+				},
+				{
+					"name": "as multiple females"
+				},
+				{
+					"name": "as multiple males & females"
+				}
+			]
+		},
+		{
+			"name": "General",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Biting",
+					"id": "biting"
+				},
+				{
+					"name": "Condoms",
+					"id": "safe-sex"
+				},
+				{
+					"name": "Consensual"
+				},
+				{
+					"name": "Cuddling",
+					"id": "cuddling"
+				},
+				{
+					"name": "Dirty Talking",
+					"id": "dirty-talk"
+				},
+				{
+					"name": "Docking",
+					"id": "frottage"
+				},
+				{
+					"name": "Edging",
+					"id": "edging"
+				},
+				{
+					"name": "Ear Play"
+				},
+				{
+					"name": "Femboys"
+				},
+				{
+					"name": "Flexibility/Contortionism"
+				},
+				{
+					"name": "Face-sitting",
+					"id": "face-sitting"
+				},
+				{
+					"name": "Facials",
+					"id": "facials"
+				},
+				{
+					"name": "Frotting",
+					"id": "frottage"
+				},
+				{
+					"name": "Gender Transformation"
+				},
+				{
+					"name": "Handjob / Fingering",
+					"id": "handjobs"
+				},
+				{
+					"name": "Swallowing",
+					"id": "swallowing"
+				},
+				{
+					"name": "Hotdogging",
+					"id": "frottage"
+				},
+				{
+					"name": "Ice",
+					"id": "temperature"
+				},
+				{
+					"name": "Intelligent Partners"
+				},
+				{
+					"name": "Kissing",
+					"id": "kissing"
+				},
+				{
+					"name": "Leather",
+					"id": "leather"
+				},
+				{
+					"name": "Licking",
+					"id": "licking"
+				},
+				{
+					"name": "Masturbation",
+					"id": "masturbation"
+				},
+				{
+					"name": "Navel Play"
+				},
+				{
+					"name": "Photography/Videotaping",
+					"id": "photos-video"
+				},
+				{
+					"name": "Romance / Affection",
+					"id": "romance"
+				},
+				{
+					"name": "Smoking",
+					"id": "smoking"
+				},
+				{
+					"name": "Socks/Stockings",
+					"id": "stockings"
+				},
+				{
+					"name": "Strip Tease",
+					"id": "stripping"
+				},
+				{
+					"name": "Teasing",
+					"id": "teasing"
+				},
+				{
+					"name": "Tickling",
+					"id": "tickling"
+				},
+				{
+					"name": "Tomboys",
+					"id": "archetypes"
+				},
+				{
+					"name": "Transformation",
+					"id": "transformation"
+				},
+				{
+					"name": "Tribadism / Scissoring",
+					"id": "scissoring"
+				},
+				{
+					"name": "Underwear",
+					"id": "lingerie"
+				},
+				{
+					"name": "Unintelligent Partners"
+				},
+				{
+					"name": "Vanilla Sex",
+					"id": "gentle-sex"
+				},
+				{
+					"name": "Voyeurism/Exhibitionism",
+					"id": "exhibition"
+				}
+			]
+		},
+		{
+			"name": "Oral Sex",
+			"columns": ["Giving", "Recieving"],
+			"items": [
+				{
+					"name": "Blowjob",
+					"id": "blowjobs"
+				},
+				{
+					"name": "Cunnilingus",
+					"id": "cunnilingus"
+				},
+				{
+					"name": "Deep throat",
+					"id": "deepthroat"
+				},
+				{
+					"name": "Face-Fucking",
+					"id": "face-fucking"
+				},
+				{
+					"name": "Oral Virginity"
+				},
+				{
+					"name": "Throat Penetration"
+				}
+			]
+		},
+		{
+			"name": "Ass play",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Ass Worship",
+					"id": "ass-worship"
+				},
+				{
+					"name": "Anal Fisting",
+					"id": "anal-fisting"
+				},
+				{
+					"name": "Anal Training",
+					"id": "anal-training"
+				},
+				{
+					"name": "Anal Toys",
+					"id": "anal-toys"
+				},
+				{
+					"name": "Anal Virginity"
+				},
+				{
+					"name": "Anal sex/pegging",
+					"id": "anal-sex"
+				},
+				{
+					"name": "Double penetration",
+					"id": "double-penetration"
+				},
+				{
+					"name": "Enemas",
+					"id": "enemas"
+				},
+				{
+					"name": "Rimming",
+					"id": "rimming"
+				},
+				{
+					"name": "Gaping (Anal)"
+				}
+			]
+		},
+		{
+			"name": "Restrictive",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "Bondage (Light)",
+					"id": "light-bondage"
+				},
+				{
+					"name": "Bondage (Heavy)",
+					"id": "heavy-bondage"
+				},
+				{
+					"name": "Chastity",
+					"id": "chastity"
+				},
+				{
+					"name": "Collar",
+					"id": "collar-leash"
+				},
+				{
+					"name": "Encasement",
+					"id": "encasement"
+				},
+				{
+					"name": "Gag",
+					"id": "gags"
+				},
+				{
+					"name": "Leash",
+					"id": "collar-leash"
+				}
+			]
+		},
+		{
+			"name": "Toys",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "Dildos",
+					"id": "dildos"
+				},
+				{
+					"name": "Plugs",
+					"id": "butt-plugs"
+				},
+				{
+					"name": "Sounding",
+					"id": "sounding"
+				},
+				{
+					"name": "Strap-ons",
+					"id": "strap-on"
+				},
+				{
+					"name": "Vibrators",
+					"id": "vibrators"
+				}
+			]
+		},
+		{
+			"name": "Domination",
+			"columns": ["As Dominant", "As Submissive"],
+			"items": [
+				{
+					"name": "General Dom / General Sub"
+				},
+				{
+					"name": "Domestic servitude",
+					"id": "domestic-service"
+				},
+				{
+					"name": "DD/lg, MD/lb",
+					"id": "age-play"
+				},
+				{
+					"name": "Discipline",
+					"id": "discipline"
+				},
+				{
+					"name": "Forced orgasm",
+					"id": "forced-orgasm"
+				},
+				{
+					"name": "General Dominant / Submissive"
+				},
+				{
+					"name": "Immobilization"
+				},
+				{
+					"name": "Orgasm control",
+					"id": "orgasm-control"
+				},
+				{
+					"name": "Orgasm denial",
+					"id": "orgasm-denial"
+				},
+				{
+					"name": "Power exchange",
+					"id": "power"
+				},
+				{
+					"name": "Pet play",
+					"id": "personas"
+				},
+				{
+					"name": "Slavery",
+					"id": "slavery"
+				}
+			]
+		},
+		{
+			"name": "No consent",
+			"columns": ["Aggressor", "Target"],
+			"items": [
+				{
+					"name": "Blackmail / coercion",
+					"id": "blackmail"
+				},
+				{
+					"name": "Dubious consent",
+					"id": "cnc"
+				},
+				{
+					"name": "Drugs",
+					"id": "drugging-fantasy"
+				},
+				{
+					"name": "Alcohol",
+					"id": "drugging-fantasy"
+				},
+				{
+					"name": "Kidnapping",
+					"id": "kidnapping"
+				},
+				{
+					"name": "Non-con / rape",
+					"id": "cnc"
+				},
+				{
+					"name": "Sleep play",
+					"id": "sleep-play"
+				}
+			]
+		},
+		{
+			"name": "Taboo",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Age Gap",
+					"id": "forbidden"
+				},
+				{
+					"name": "Bestiality",
+					"id": "bestiality"
+				},
+				{
+					"name": "Cheating",
+					"id": "cheating-fantasy"
+				},
+				{
+					"name": "Exhibitionism",
+					"id": "exhibition"
+				},
+				{
+					"name": "Incest",
+					"id": "family-roleplay"
+				},
+				{
+					"name": "Interracial"
+				},
+				{
+					"name": "Raceplay"
+				},
+				{
+					"name": "Necrophilia",
+					"id": "necrophilia"
+				},
+				{
+					"name": "Voyeurism",
+					"id": "exhibition"
+				}
+			]
+		},
+		{
+			"name": "General Surrealism",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "Breast Growth"
+				},
+				{
+					"name": "Cock/Ball Growth"
+				},
+				{
+					"name": "Cum Inflation (Heavy/Extreme)"
+				},
+				{
+					"name": "Cum Inflation (Light/Medium)"
+				},
+				{
+					"name": "Extreme Pregnancy"
+				},
+				{
+					"name": "Forced Growth"
+				},
+				{
+					"name": "Furry",
+					"id": "furry"
+				},
+				{
+					"name": "Futanari/Futa",
+					"id": "futanari"
+				},
+				{
+					"name": "Ghost",
+					"id": "monsters"
+				},
+				{
+					"name": "Growth"
+				},
+				{
+					"name": "Hyper Muscle Growth"
+				},
+				{
+					"name": "Inflation (Heavy/Extreme)"
+				},
+				{
+					"name": "Inflation (Light/Medium)"
+				},
+				{
+					"name": "Macrophilia",
+					"id": "size-difference"
+				},
+				{
+					"name": "Magic Users"
+				},
+				{
+					"name": "Male Pregnancy"
+				},
+				{
+					"name": "Microphilia",
+					"id": "size-difference"
+				},
+				{
+					"name": "Monster or Alien",
+					"id": "monsters"
+				},
+				{
+					"name": "Multiple Breasts"
+				},
+				{
+					"name": "Muscle Growth"
+				},
+				{
+					"name": "Nipple Penetration",
+					"id": "impossible-penetration"
+				},
+				{
+					"name": "Oviposition",
+					"id": "ovipositor"
+				},
+				{
+					"name": "Popping"
+				},
+				{
+					"name": "Prehensile Cocks"
+				},
+				{
+					"name": "Rubber/Gel Characters"
+				},
+				{
+					"name": "Sentient Cocks"
+				},
+				{
+					"name": "Shrinking"
+				},
+				{
+					"name": "Tentacles",
+					"id": "tentacles"
+				},
+				{
+					"name": "Transformation",
+					"id": "transformation"
+				}
+			]
+		},
+		{
+			"name": "Vore / Unbirth",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Absorption"
+				},
+				{
+					"name": "Alternative Vore"
+				},
+				{
+					"name": "Anal Vore"
+				},
+				{
+					"name": "Cock Vore"
+				},
+				{
+					"name": "Digestion"
+				},
+				{
+					"name": "Disposal"
+				},
+				{
+					"name": "Hard Vore"
+				},
+				{
+					"name": "Realistic Vore"
+				},
+				{
+					"name": "Soft Vore"
+				},
+				{
+					"name": "Unbirthing"
+				},
+				{
+					"name": "Unrealistic Vore"
+				},
+				{
+					"name": "Vore - Being Predator"
+				},
+				{
+					"name": "Vore - Being Prey"
+				}
+			]
+		},
+		{
+			"name": "Fluids",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Blood",
+					"id": "blood-play"
+				},
+				{
+					"name": "Cum play",
+					"id": "cum"
+				},
+				{
+					"name": "Diapers",
+					"id": "abdl"
+				},
+				{
+					"name": "Lactation",
+					"id": "lactation"
+				},
+				{
+					"name": "Messy"
+				},
+				{
+					"name": "Saliva",
+					"id": "spit"
+				},
+				{
+					"name": "Scat",
+					"id": "scat"
+				},
+				{
+					"name": "Sweat",
+					"id": "sweat-musk"
+				},
+				{
+					"name": "Watersports",
+					"id": "watersports"
+				}
+			]
+		},
+		{
+			"name": "Degradation",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Begging",
+					"id": "begging"
+				},
+				{
+					"name": "Cock Slapping",
+					"id": "genital-slapping"
+				},
+				{
+					"name": "Forced Nudity",
+					"id": "cnc-humiliation"
+				},
+				{
+					"name": "Force Feeding",
+					"id": "feeding"
+				},
+				{
+					"name": "Glory hole",
+					"id": "glory-hole"
+				},
+				{
+					"name": "Humiliation",
+					"id": "humiliation"
+				},
+				{
+					"name": "Name calling",
+					"id": "verbal-humiliation"
+				},
+				{
+					"name": "Verbal Abuse"
+				}
+			]
+		},
+		{
+			"name": "Touch & Stimulation",
+			"columns": ["Actor", "Subject"],
+			"items": [
+				{
+					"name": "Ass worship",
+					"id": "ass-worship"
+				},
+				{
+					"name": "Cock/Pussy worship",
+					"id": "genital-worship"
+				},
+				{
+					"name": "Electro stimulation",
+					"id": "electro"
+				},
+				{
+					"name": "Foot play",
+					"id": "foot-worship"
+				},
+				{
+					"name": "Sensation play",
+					"id": "sensation"
+				},
+				{
+					"name": "Tickling",
+					"id": "tickling"
+				}
+			]
+		},
+		{
+			"name": "Misc. Fetish",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Breast/Nipple Worship",
+					"id": "breast-worship"
+				},
+				{
+					"name": "Breath play",
+					"id": "breath-play"
+				},
+				{
+					"name": "Breeding",
+					"id": "breeding"
+				},
+				{
+					"name": "Crotch Sniffing"
+				},
+				{
+					"name": "Cuckold / Cuckquean",
+					"id": "cuckolding"
+				},
+				{
+					"name": "Double Penetration",
+					"id": "double-penetration"
+				},
+				{
+					"name": "Extreme Tightness"
+				},
+				{
+					"name": "Feminization",
+					"id": "feminisation"
+				},
+				{
+					"name": "Fisting",
+					"id": "fisting"
+				},
+				{
+					"name": "Food Play",
+					"id": "food-play"
+				},
+				{
+					"name": "Foot Play",
+					"id": "foot-worship"
+				},
+				{
+					"name": "Foreskin Worship",
+					"id": "genital-worship"
+				},
+				{
+					"name": "Gangbang",
+					"id": "gangbang"
+				},
+				{
+					"name": "Genital/Nipple Piercings",
+					"id": "skin"
+				},
+				{
+					"name": "Muscle Worship",
+					"id": "muscle-worship"
+				},
+				{
+					"name": "Musk",
+					"id": "sweat-musk"
+				},
+				{
+					"name": "Onomatopoeia"
+				},
+				{
+					"name": "Pregnancy",
+					"id": "pregnancy"
+				},
+				{
+					"name": "Queefing"
+				},
+				{
+					"name": "Sexual Exhaustion"
+				},
+				{
+					"name": "Sexual Frustration"
+				},
+				{
+					"name": "Shaving",
+					"id": "shaving"
+				},
+				{
+					"name": "Slob"
+				}
+			]
+		},
+		{
+			"name": "Cum-related",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Bukkake",
+					"id": "bukkake"
+				},
+				{
+					"name": "Creampie",
+					"id": "creampie"
+				},
+				{
+					"name": "Cum Bath"
+				},
+				{
+					"name": "Cum Enemas"
+				},
+				{
+					"name": "Cum From Mouth/Nose"
+				},
+				{
+					"name": "Cum Marking",
+					"id": "cum-on-body"
+				},
+				{
+					"name": "Cum Milking",
+					"id": "prostate-play"
+				},
+				{
+					"name": "Cum on Clothes",
+					"id": "cum-on-body"
+				},
+				{
+					"name": "Excessive Precum"
+				},
+				{
+					"name": "Excessive Semen"
+				},
+				{
+					"name": "Heavily Excessive Precum"
+				},
+				{
+					"name": "Heavily Excessive Semen"
+				},
+				{
+					"name": "Premature Ejaculation"
+				},
+				{
+					"name": "Realistic Cum"
+				},
+				{
+					"name": "Shooting Precum"
+				},
+				{
+					"name": "Sloppy Seconds",
+					"id": "cum-eating"
+				},
+				{
+					"name": "Snowballing",
+					"id": "cum-eating"
+				},
+				{
+					"name": "Thick/Sticky Cum"
+				},
+				{
+					"name": "Stomach Bulging"
+				}
+			]
+		},
+		{
+			"name": "BDSM & Related",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Apparatuses",
+					"id": "bondage-furniture"
+				},
+				{
+					"name": "Begging",
+					"id": "begging"
+				},
+				{
+					"name": "Blindfolds",
+					"id": "blindfolds"
+				},
+				{
+					"name": "Branding",
+					"id": "branding"
+				},
+				{
+					"name": "Caging",
+					"id": "cages"
+				},
+				{
+					"name": "Chastity",
+					"id": "chastity"
+				},
+				{
+					"name": "Coiling"
+				},
+				{
+					"name": "Competition"
+				},
+				{
+					"name": "Degradation",
+					"id": "humiliation"
+				},
+				{
+					"name": "Discipline/Reinforcement",
+					"id": "discipline"
+				},
+				{
+					"name": "Extreme Humiliation"
+				},
+				{
+					"name": "Face Slapping",
+					"id": "face-slapping"
+				},
+				{
+					"name": "Flogging/Whipping",
+					"id": "flogging"
+				},
+				{
+					"name": "Gags",
+					"id": "gags"
+				},
+				{
+					"name": "Hand Cuffs",
+					"id": "cuffs"
+				},
+				{
+					"name": "Heavy/Extreme Bondage",
+					"id": "heavy-bondage"
+				},
+				{
+					"name": "Humiliation",
+					"id": "humiliation"
+				},
+				{
+					"name": "Leash & Collar",
+					"id": "collar-leash"
+				},
+				{
+					"name": "Light/Medium Bondage",
+					"id": "light-bondage"
+				},
+				{
+					"name": "Master/Pet"
+				},
+				{
+					"name": "Master/Slave",
+					"id": "total-power-exchange"
+				},
+				{
+					"name": "Objectification",
+					"id": "objectification"
+				},
+				{
+					"name": "Physical Restraints"
+				},
+				{
+					"name": "Public Humiliation"
+				},
+				{
+					"name": "Puppy/Pony Play"
+				},
+				{
+					"name": "Sadism/Masochism",
+					"id": "pain"
+				},
+				{
+					"name": "Sexual Restraints"
+				},
+				{
+					"name": "Sissification",
+					"id": "sissy"
+				},
+				{
+					"name": "Speech Restrictions",
+					"id": "speech-rules"
+				},
+				{
+					"name": "Suspension Play",
+					"id": "suspension"
+				},
+				{
+					"name": "Uppity"
+				},
+				{
+					"name": "Wax Play",
+					"id": "wax"
+				}
+			]
+		},
+		{
+			"name": "Watersports / Scat",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Bathroom Control",
+					"id": "desperation"
+				},
+				{
+					"name": "Diapers",
+					"id": "abdl"
+				},
+				{
+					"name": "Farting"
+				},
+				{
+					"name": "Hyper Scat"
+				},
+				{
+					"name": "Hyper Watersports"
+				},
+				{
+					"name": "Marking",
+					"id": "bruising"
+				},
+				{
+					"name": "Piss Enemas"
+				},
+				{
+					"name": "Scat",
+					"id": "scat"
+				},
+				{
+					"name": "Scat Torture"
+				},
+				{
+					"name": "Soiling"
+				},
+				{
+					"name": "Swallowing Feces"
+				},
+				{
+					"name": "Swallowing Urine",
+					"id": "piss-drinking"
+				},
+				{
+					"name": "Swallowing Vomit"
+				},
+				{
+					"name": "Vomiting"
+				},
+				{
+					"name": "Watersports",
+					"id": "watersports"
+				},
+				{
+					"name": "Wetting",
+					"id": "desperation"
+				}
+			]
+		},
+		{
+			"name": "Pain",
+			"columns": ["Giving", "Receiving"],
+			"items": [
+				{
+					"name": "Light pain",
+					"id": "light-pain"
+				},
+				{
+					"name": "Heavy pain",
+					"id": "heavy-pain"
+				},
+				{
+					"name": "Nipple clamps",
+					"id": "clamps"
+				},
+				{
+					"name": "Clothes pins",
+					"id": "clamps"
+				},
+				{
+					"name": "Caning",
+					"id": "caning"
+				},
+				{
+					"name": "Flogging",
+					"id": "flogging"
+				},
+				{
+					"name": "Gagging / Choking",
+					"id": "choking"
+				},
+				{
+					"name": "Beating",
+					"id": "beating"
+				},
+				{
+					"name": "Spanking",
+					"id": "spanking"
+				},
+				{
+					"name": "Cock/Pussy slapping",
+					"id": "genital-slapping"
+				},
+				{
+					"name": "Cock/Pussy torture",
+					"id": "genital-torment"
+				},
+				{
+					"name": "Hot Wax",
+					"id": "wax"
+				},
+				{
+					"name": "Scratching",
+					"id": "scratching"
+				},
+				{
+					"name": "Biting",
+					"id": "biting"
+				},
+				{
+					"name": "Cutting",
+					"id": "blood-play"
+				},
+				{
+					"name": "Snuff",
+					"id": "snuff"
+				},
+				{
+					"name": "Ballbusting",
+					"id": "cbt"
+				},
+				{
+					"name": "3+ Penetration"
+				},
+				{
+					"name": "Anal Prolapse",
+					"id": "prolapse"
+				},
+				{
+					"name": "Breast Smothering"
+				},
+				{
+					"name": "Breath Control",
+					"id": "breath-play"
+				},
+				{
+					"name": "Choking",
+					"id": "choking"
+				},
+				{
+					"name": "Cock/Ball Smothering"
+				},
+				{
+					"name": "Cock Fucking"
+				},
+				{
+					"name": "Hair Pulling",
+					"id": "hair-pulling"
+				}
+			]
+		},
+		{
+			"name": "Blood & Gore / Torture / Death",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Abrasions"
+				},
+				{
+					"name": "Bloodplay",
+					"id": "blood-play"
+				},
+				{
+					"name": "Breast/Nipple Torture"
+				},
+				{
+					"name": "Burning",
+					"id": "fire-play"
+				},
+				{
+					"name": "Castration",
+					"id": "nullification"
+				},
+				{
+					"name": "Death",
+					"id": "death"
+				},
+				{
+					"name": "Emasculation",
+					"id": "emasculation"
+				},
+				{
+					"name": "Genital Torture",
+					"id": "genital-torment"
+				},
+				{
+					"name": "Impalement"
+				},
+				{
+					"name": "Menses"
+				},
+				{
+					"name": "Mutilation"
+				},
+				{
+					"name": "Necrophilia",
+					"id": "necrophilia"
+				},
+				{
+					"name": "Non-Sexual Pain"
+				},
+				{
+					"name": "Nonsexual Torture"
+				},
+				{
+					"name": "Nullification"
+				},
+				{
+					"name": "Piercing"
+				},
+				{
+					"name": "Sexual Torture"
+				},
+				{
+					"name": "Swallowing Blood"
+				}
+			]
+		},
+		{
+			"name": "Meta",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "First Person",
+					"ignore": true
+				},
+				{
+					"name": "Third Person",
+					"ignore": true
+				},
+				{
+					"name": "Short Post Length (~1-3 sentences)",
+					"ignore": true
+				},
+				{
+					"name": "Medium Post Length (~3-7 sentences)",
+					"ignore": true
+				},
+				{
+					"name": "Long Post Length (~2-4 paragraphs)",
+					"ignore": true
+				},
+				{
+					"name": "Story (3+ paragraphs)",
+					"ignore": true
+				},
+				{
+					"name": "Dynamic Post Length",
+					"ignore": true
+				}
+			]
+		},
+		{
+			"name": "Medium",
+			"columns": ["General"],
+			"items": [
+				{
+					"name": "Skype",
+					"ignore": true
+				},
+				{
+					"name": "Kik",
+					"ignore": true
+				},
+				{
+					"name": "Reddit",
+					"ignore": true
+				},
+				{
+					"name": "E-Mail",
+					"ignore": true
+				},
+				{
+					"name": "Discord",
+					"ignore": true
+				},
+				{
+					"name": "Other",
+					"ignore": true
+				}
+			]
+		},
+		{
+			"name": "Time-Scale",
+			"columns": ["Self", "Partner"],
+			"items": [
+				{
+					"name": "Short-Term Scenes",
+					"ignore": true
+				},
+				{
+					"name": "Medium-Term Scenes",
+					"ignore": true
+				},
+				{
+					"name": "Long-Term Scenes",
+					"ignore": true
+				},
+				{
+					"name": "Quick Replies (0~10 mins)",
+					"ignore": true
+				},
+				{
+					"name": "Fast Replies (10~30 mins)",
+					"ignore": true
+				},
+				{
+					"name": "Normal Replies (30min ~ 2hours)",
+					"ignore": true
+				},
+				{
+					"name": "Slow Replies (2~8 hours)",
+					"ignore": true
+				},
+				{
+					"name": "Glacial Replies (8-24 hours)",
+					"ignore": true
+				},
+				{
+					"name": "Occasional Replies (24+ hours)",
+					"ignore": true
+				}
+			]
+		}
+	]
+}
