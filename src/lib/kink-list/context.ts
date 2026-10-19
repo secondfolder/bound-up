@@ -9,7 +9,6 @@ import type { KinkListStore } from './store.svelte';
  */
 export type KinkListPaths = {
 	home: string;
-	category: (categoryId: string) => string;
 	quick: string;
 	transfer: string;
 	/** Only your own list, signed in, keeps a history. */

@@ -5,7 +5,9 @@ import {
 	hasContent,
 	type ItemKey,
 	type ListPayload,
-	listPayloadSchema
+	listPayloadSchema,
+	normaliseAnswers,
+	type YourSide
 } from './answers';
 
 /**
@@ -28,7 +30,7 @@ const at = z.number().int().nonnegative();
 
 export const partnerPayloadSchema = z.object({
 	/** Answers that differ for this partner. An empty one is an override taken back. */
-	overrides: z.record(itemKey, answerSchema),
+	overrides: z.record(itemKey, answerSchema).transform(normaliseAnswers),
 	/** Kinks not shown to this partner yet; `false` shows one again. */
 	heldBack: z.record(itemKey, z.object({ held: z.boolean(), at })),
 	/** Comparing shows only what you both want, and limits, if either of you turns this on. */
@@ -94,9 +96,24 @@ export function asList(resolved: ResolvedList): ListPayload {
 		answers: resolved.answers,
 		custom: resolved.custom,
 		triage: resolved.triage,
-		settings: { maxIntensity: 6, at: 0 },
+		// Nothing of theirs is hidden from a comparison: filters are a view on
+		// your own list, not a choice about theirs.
+		settings: { maxIntensity: 6, minCommonness: 0, side: 'both', at: 0 },
 		skipped: {}
 	};
+}
+
+/**
+ * Which side a partner's view starts on, from who is in control
+ * (`answerFromControl` in `partnership.ts`, from the viewer's side): whoever
+ * holds control is usually the dom, so the view shows the contexts that
+ * person fills in. Shared control hides nothing.
+ */
+export function sideFromControl(control: 'me' | 'them' | 'mix'): YourSide {
+	if (control === 'me') {
+		return 'dom';
+	}
+	return control === 'them' ? 'sub' : 'both';
 }
 
 /**

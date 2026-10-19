@@ -145,6 +145,21 @@
 		/* A text colour, not Web Awesome's red-40, which is a light-theme value
 		   and all but invisible on rust. */
 		--wa-color-text-danger: var(--wa-color-red-70);
+
+		/* The kink list's answer scale, no to yes. Each step has its own hue on
+		   the no side and in the middle; the three yeses are one green getting
+		   stronger toward Love, so they read as more of the same answer rather
+		   than as three different ones. They differ in lightness as well as
+		   chroma, so they stay apart in greyscale too. */
+		--kink-level-limit: oklch(60% 0.21 27);
+		--kink-level-not-for-me: oklch(72% 0.16 55);
+		--kink-level-conditional: oklch(86% 0.16 95);
+		--kink-level-dont-mind: var(--wa-color-neutral-60);
+		--kink-level-curious: oklch(87% 0.07 150);
+		--kink-level-like: oklch(63% 0.15 148);
+		--kink-level-love: oklch(76% 0.25 145);
+		/* What sits on a filled dot: the check mark. */
+		--kink-level-ink: oklch(18% 0.03 40);
 	}
 }
 

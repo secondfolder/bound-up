@@ -33,7 +33,7 @@ import { kinkById, SHARE_IDS } from './catalog';
  *   not know is dropped rather than failing the whole link.
  * - **Only answers travel**, with their notes when the person chooses, plus
  *   custom kinks and categories limited wholesale (which change what other
- *   kinks show). Quick-fill skips and the intensity setting stay on the device.
+ *   kinks show). Quick-fill skips, the filters and your side stay on the device.
  *
  * Decoding treats the link as untrusted input: it is parsed with Zod, never
  * cast.

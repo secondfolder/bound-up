@@ -7,12 +7,9 @@ import type { LayoutServerLoad } from './$types';
  * empty one on this device. A shared link is the exception: anyone may read
  * one, signed in or not.
  */
-export const load: LayoutServerLoad = ({ locals, route, params }) => {
+export const load: LayoutServerLoad = ({ locals, route }) => {
 	if (!locals.user || route.id === '/(public)/kink-list/shared') {
 		return {};
-	}
-	if (route.id === '/(public)/kink-list/[category]' && params.category) {
-		redirect(303, `/playroom/kink-list/${encodeURIComponent(params.category)}`);
 	}
 	if (route.id === '/(public)/kink-list/quick') {
 		redirect(303, '/playroom/kink-list/quick');

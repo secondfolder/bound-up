@@ -27,10 +27,13 @@ import type { AccountKinkList } from './account-store.svelte';
 import {
 	type Answer,
 	type CustomKink,
+	type Filters,
+	filtersOf,
 	hasContent,
 	type ItemKey,
 	type ListPayload,
-	type TriageValue
+	type TriageValue,
+	type YourSide
 } from './answers';
 import {
 	answerTarget,
@@ -58,6 +61,7 @@ export async function openPartnerCopy(view: KinkListView): Promise<PartnerPayloa
 
 export class PartnerKinkList extends KinkListStore {
 	readonly kind = 'account';
+	override readonly sideFromControl = true;
 	/** The copy for this partner, as it stands here. */
 	partner = $state.raw<PartnerPayload>(emptyPartnerPayload());
 	/** Whether this partner has been given a copy at all. Nothing is sealed for them until they have. */
@@ -67,15 +71,24 @@ export class PartnerKinkList extends KinkListStore {
 	readonly partnershipId: string;
 	#saved: { id: string; revision: number | null };
 	readonly #view: KinkListView | null;
+	/**
+	 * Which side you are on with this partner. It starts from who is in
+	 * control (`sideFromControl` in `partner.ts`) every time the view opens,
+	 * and changing it lasts for the visit: it is a lens on the list, not part
+	 * of it, so it is neither sealed nor shared.
+	 */
+	#side = $state<YourSide>('both');
 
 	/** `name` is read each time: a partner's name is sealed, and may still be opening. */
 	constructor(
 		solo: AccountKinkList,
 		partnershipId: string,
 		view: KinkListView | null,
-		name: () => string
+		name: () => string,
+		side: YourSide
 	) {
 		super();
+		this.#side = side;
 		this.solo = solo;
 		this.partnershipId = partnershipId;
 		this.#view = view;
@@ -168,9 +181,18 @@ export class PartnerKinkList extends KinkListStore {
 		this.#followOwn();
 	}
 
-	override setMaxIntensity(maxIntensity: number): void {
-		this.solo.setMaxIntensity(maxIntensity);
-		this.#followOwn();
+	override get filters(): Filters {
+		return { ...filtersOf(this.list), side: this.#side };
+	}
+
+	override setFilters({ side, ...change }: Partial<Filters>): void {
+		if (side !== undefined) {
+			this.#side = side;
+		}
+		if (Object.keys(change).length > 0) {
+			this.solo.setFilters(change);
+			this.#followOwn();
+		}
 	}
 
 	override setSkipped(key: ItemKey, skipped: boolean): void {

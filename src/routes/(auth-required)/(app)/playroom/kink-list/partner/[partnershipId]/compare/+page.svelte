@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CompareView from '$lib/components/kink-list/CompareView.svelte';
+	import YourSideControl from '$lib/components/kink-list/YourSideControl.svelte';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import { asList, effectiveList, type PartnerPayload } from '$lib/kink-list/partner';
 	import { openPartnerCopy, type PartnerKinkList } from '$lib/kink-list/partner-store.svelte';
@@ -62,7 +63,14 @@
 	{#if blind}
 		<p class="quiet">Blind comparing is on: only what you both want, and limits, are shown.</p>
 	{/if}
-	<CompareView {mine} theirs={asList(theirs.resolved)} theirName={name} {blind} />
+	<YourSideControl />
+	<CompareView
+		{mine}
+		theirs={asList(theirs.resolved)}
+		theirName={name}
+		{blind}
+		side={store.filters.side}
+	/>
 {/if}
 
 <style>

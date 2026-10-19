@@ -423,7 +423,7 @@
 				},
 				{
 					"name": "Human auctioning / appraisal",
-					"id": "auctioned"
+					"id": "auctions"
 				},
 				{
 					"name": "Slave training",

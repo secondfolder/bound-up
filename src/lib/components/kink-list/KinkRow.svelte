@@ -9,9 +9,12 @@
 		type Detail,
 		type DetailKey,
 		effectiveAnswer,
+		isShown,
+		LEVEL_LABELS,
 		type Level,
 		MAX_NOTE_LENGTH,
-		type SideKey
+		type SideKey,
+		shownSides
 	} from '$lib/kink-list/answers';
 	import {
 		childrenOf,
@@ -21,15 +24,22 @@
 		sidesOf
 	} from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
+	import InlineButton from '../InlineButton.svelte';
 	import OptionalSlider from '../OptionalSlider.svelte';
 	import AnswerScale from './AnswerScale.svelte';
 	import KinkRow from './KinkRow.svelte';
 
 	/**
-	 * One kink and its answer: the scale, and behind "More" the detailed
-	 * answer (three sliders), a note, and — for a kink with a role pair — the
-	 * choice of answering each side on its own. A kink's specifics sit under
-	 * it, each showing the kink's answer until it has one of its own.
+	 * One kink on one line: its name, and a row of answer dots for each of its
+	 * contexts — Giving and Receiving, On me and On my partner — or one row for
+	 * a kink without a role pair. "Your side" can narrow a role kink to the
+	 * context that is yours.
+	 *
+	 * The name opens the rest under it: the description, where an inherited
+	 * answer comes from, Clear, the detailed answer (three sliders per
+	 * context), a note, a partner view's controls, and the kink's specifics,
+	 * each a row like this one that shows the kink's answer until it has one
+	 * of its own.
 	 *
 	 * The same row serves a catalogue kink and one the person added
 	 * themselves (`custom:…`), and the same answer shows wherever the kink
@@ -45,17 +55,22 @@
 	const name = $derived(item?.name ?? custom?.name ?? '');
 	const description = $derived(item?.description ?? custom?.description);
 	const sides = $derived(item ? sidesOf(item) : null);
+	/** The contexts on screen: both, or only yours when "Your side" is set and the kink leans. */
+	const contexts = $derived(shownSides(item, store.filters.side));
 	const answer = $derived<Answer | undefined>(store.list.answers[itemKey]);
-	const split = $derived(sides !== null && answer?.sides !== undefined);
 
 	const specifics = $derived(item ? childrenOf(item.id) : []);
-	const shownSpecifics = $derived(
-		specifics.filter((child) => child.intensity <= store.list.settings.maxIntensity)
-	);
+	const shownSpecifics = $derived(specifics.filter((child) => isShown(child, store.filters)));
 	const hiddenSpecifics = $derived(specifics.length - shownSpecifics.length);
 
-	let showMore = $state(false);
-	let showSpecifics = $state(false);
+	let open = $state(false);
+
+	/** Set in a partner's view: whose answer this is, and what to do about it. */
+	const partner = $derived(store.partnerControls);
+
+	function sideLabel(side: SideKey): string {
+		return sides?.[side === 'a' ? 0 : 1] ?? '';
+	}
 
 	function describeSource(source: AnswerSource | undefined): string {
 		if (source?.kind === 'parent') {
@@ -74,6 +89,14 @@
 			return undefined;
 		}
 		return { level: effective.level, from: describeSource(effective.source) };
+	}
+
+	function levelFor(side: SideKey | undefined): Level | undefined {
+		return side ? answer?.sides?.[side]?.level : answer?.level;
+	}
+
+	function detailFor(side: SideKey | undefined): Detail | undefined {
+		return side ? answer?.sides?.[side]?.detail : answer?.detail;
 	}
 
 	function update(change: (current: Answer | undefined) => Omit<Answer, 'at'>) {
@@ -107,22 +130,6 @@
 		});
 	}
 
-	/**
-	 * Answering each side separately starts both from the answer as it was,
-	 * and going back keeps the first side's: nothing is thrown away without
-	 * the person seeing it on screen first.
-	 */
-	function setSplit(on: boolean) {
-		update((current) => {
-			if (on) {
-				const both = { level: current?.level, detail: current?.detail };
-				return { ...current, level: undefined, detail: undefined, sides: { a: both, b: both } };
-			}
-			const first = current?.sides?.a ?? current?.sides?.b;
-			return { ...current, level: first?.level, detail: first?.detail, sides: undefined };
-		});
-	}
-
 	type WaTextarea = HTMLElement & { value: string };
 
 	/** Wired by hand: a wa-textarea's input happens in its shadow root (AGENTS.md). */
@@ -136,125 +143,114 @@
 		return () => node.removeEventListener('input', onInput);
 	}
 
-	const sideKeys: SideKey[] = ['a', 'b'];
+	/** One context, or the whole kink (`undefined`), as the panel lists them. */
+	const parts = $derived<(SideKey | undefined)[]>(contexts ?? [undefined]);
 
-	/** Set in a partner's view: whose answer this is, and what to do about it. */
-	const partner = $derived(store.partnerControls);
-
-	function detailFor(side: SideKey | undefined): Detail | undefined {
-		return side ? answer?.sides?.[side]?.detail : answer?.detail;
-	}
+	/** What the open panel says of each part's answer: its own, or where an inherited one is from. */
+	const summaries = $derived(
+		parts.map((side) => ({ side, level: levelFor(side), inherited: inheritedFor(side) }))
+	);
 </script>
 
-<article class="kink" class:nested aria-labelledby="{id}-name">
-	<header>
-		<svelte:element this={nested ? 'h3' : 'h2'} id="{id}-name" class="name">{name}</svelte:element>
-		{#if item && item.intensity >= 4}
-			<span class="intensity">{intensityLabel(item.intensity)}</span>
-		{/if}
-	</header>
-	{#if description}
-		<p class="description">{description}</p>
-	{/if}
-	{#if item?.safety}
-		<p class="safety">{item.safety}</p>
-	{/if}
+<div class="kink" class:nested={nested} class:two={contexts?.length === 2}>
+	<div class="line">
+		<!-- A disclosure: a native button, because wa-button would not carry aria-expanded. -->
+		<button
+			type="button"
+			class="name"
+			aria-expanded={open}
+			aria-controls="{id}-panel"
+			onclick={() => {
+				open = !open;
+			}}
+		>
+			<wa-icon class="chevron" name="chevron-right" variant="solid"></wa-icon>
+			<span class="text">{name}</span>
+			{#if item && item.intensity >= 4}
+				<span class="intensity">{intensityLabel(item.intensity)}</span>
+			{/if}
+			{#if answer?.note}
+				<wa-icon class="flag" name="note-sticky" label="Has a note"></wa-icon>
+			{/if}
+			{#if shownSpecifics.length > 0}
+				<span class="flag">+{shownSpecifics.length}<span class="wa-visually-hidden">
+						more specific</span
+					></span>
+			{/if}
+			{#if partner?.isOverridden(itemKey)}
+				<wa-icon class="flag override" name="user-pen" label="Just for {partner.name}"></wa-icon>
+			{/if}
+		</button>
 
-	{#if split && sides}
-		<div class="sides">
-			{#each sideKeys as side, index (side)}
-				<div class="side">
-					<span class="side-label" aria-hidden="true">{sides[index]}</span>
+		<div class="contexts">
+			{#each parts as side (side ?? 'whole')}
+				<div class="context">
+					{#if side}
+						<span class="context-label" aria-hidden="true">{sideLabel(side)}</span>
+					{/if}
 					<AnswerScale
-						label="{name}, {sides[index]?.toLowerCase()}"
-						value={answer?.sides?.[side]?.level}
-						inherited={inheritedFor(side)}
+						label={side ? `${name}, ${sideLabel(side).toLowerCase()}` : name}
+						value={levelFor(side)}
+						inherited={inheritedFor(side)?.level}
 						onchange={(level) => setLevel(level, side)}
 					/>
 				</div>
 			{/each}
 		</div>
-	{:else}
-		<AnswerScale
-			label={name}
-			value={answer?.level}
-			inherited={inheritedFor()}
-			onchange={(level) => setLevel(level)}
-		/>
-	{/if}
-
-	{#if partner && (partner.isOverridden(itemKey) || partner.hasOwn(itemKey) || partner.isHeld(itemKey))}
-		<p class="partner">
-			{#if partner.isOverridden(itemKey)}
-				<span class="badge">Just for {partner.name}</span>
-				<button type="button" class="toggle" onclick={() => partner?.reset(itemKey)}>
-					Back to my own answer<span class="wa-visually-hidden">for {name}</span>
-				</button>
-				<button type="button" class="toggle" onclick={() => partner?.copyToOwn(itemKey)}>
-					Copy to my own list<span class="wa-visually-hidden">: {name}</span>
-				</button>
-			{:else if partner.hasOwn(itemKey)}
-				<span class="quiet-badge">From your own list</span>
-			{/if}
-			{#if partner.isHeld(itemKey)}
-				<span class="badge held">Hidden from {partner.name}</span>
-			{/if}
-		</p>
-	{/if}
-
-	{#if answer?.note && !showMore}
-		<p class="note-preview">{answer.note}</p>
-	{/if}
-
-	<div class="toggles">
-		<!-- A disclosure: a native button, because wa-button would not carry aria-expanded. -->
-		<button
-			type="button"
-			class="toggle"
-			aria-expanded={showMore}
-			aria-controls="{id}-more"
-			onclick={() => {
-					showMore = !showMore;
-				}}
-		>
-			{showMore ? 'Less' : 'More detail and notes'}<span class="wa-visually-hidden">for {name}</span>
-		</button>
-		{#if shownSpecifics.length > 0}
-			<button
-				type="button"
-				class="toggle"
-				aria-expanded={showSpecifics}
-				aria-controls="{id}-specifics"
-				onclick={() => {
-					showSpecifics = !showSpecifics;
-				}}
-			>
-				{showSpecifics ? 'Hide specifics' : `Get specific (${shownSpecifics.length})`}<span
-					class="wa-visually-hidden">for {name}</span
-				>
-			</button>
-		{/if}
 	</div>
 
-	{#if showMore}
-		<div class="more" id="{id}-more">
-			{#if sides}
-				<wa-switch
-					checked={split}
-					{@attach (node: HTMLElement & { checked: boolean }) => {
-						const onChange = () => setSplit(node.checked);
-						node.addEventListener('change', onChange);
-						return () => node.removeEventListener('change', onChange);
-					}}
-				>
-					Answer {sides[0].toLowerCase()} and {sides[1].toLowerCase()} separately
-				</wa-switch>
+	{#if open}
+		<div class="panel" id="{id}-panel">
+			{#if description}
+				<p class="description">{description}</p>
+			{/if}
+			{#if item?.safety}
+				<p class="safety">{item.safety}</p>
 			{/if}
 
-			{#each split && sides ? sideKeys : [undefined] as side (side ?? 'both')}
+			<ul class="answers">
+				{#each summaries as { side, level, inherited } (side ?? 'whole')}
+					<li>
+						{#if side}<span class="context-name">{sideLabel(side)}:</span>{/if}
+						{#if level}
+							{LEVEL_LABELS[level]}
+							<InlineButton onclick={() => setLevel(undefined, side)}>
+								Clear <span class="wa-visually-hidden"
+									>{side ? `${name}, ${sideLabel(side).toLowerCase()}` : name}</span
+								>
+							</InlineButton>
+						{:else if inherited}
+							{LEVEL_LABELS[inherited.level]}, {inherited.from}
+						{:else}
+							<span class="quiet">Not answered</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+
+			{#if partner && (partner.isOverridden(itemKey) || partner.hasOwn(itemKey) || partner.isHeld(itemKey))}
+				<p class="partner">
+					{#if partner.isOverridden(itemKey)}
+						<span class="badge">Just for {partner.name}</span>
+						<button type="button" class="link" onclick={() => partner?.reset(itemKey)}>
+							Back to my own answer<span class="wa-visually-hidden">for {name}</span>
+						</button>
+						<button type="button" class="link" onclick={() => partner?.copyToOwn(itemKey)}>
+							Copy to my own list<span class="wa-visually-hidden">: {name}</span>
+						</button>
+					{:else if partner.hasOwn(itemKey)}
+						<span class="quiet">From your own list</span>
+					{/if}
+					{#if partner.isHeld(itemKey)}
+						<span class="badge held">Hidden from {partner.name}</span>
+					{/if}
+				</p>
+			{/if}
+
+			{#each parts as side (side ?? 'whole')}
 				<div class="detail">
-					{#if side && sides}
-						<p class="side-label">{sides[side === 'a' ? 0 : 1]}</p>
+					{#if side}
+						<p class="context-name">{sideLabel(side)}</p>
 					{/if}
 					{#each DETAIL_KEYS as key (key)}
 						<OptionalSlider
@@ -294,50 +290,89 @@
 			{#if item?.aliases?.length}
 				<p class="aliases">Also called: {item.aliases.join(', ')}</p>
 			{/if}
-		</div>
-	{/if}
 
-	{#if showSpecifics}
-		<div class="specifics" id="{id}-specifics">
-			{#each shownSpecifics as child (child.id)}
-				<KinkRow itemKey={child.id} nested />
-			{/each}
-			{#if hiddenSpecifics > 0}
-				<p class="hidden-note">
-					{hiddenSpecifics === 1 ? '1 more is' : `${hiddenSpecifics} more are`} above your intensity setting.
-				</p>
+			{#if shownSpecifics.length > 0 || hiddenSpecifics > 0}
+				<div class="specifics">
+					{#each shownSpecifics as child (child.id)}
+						<KinkRow itemKey={child.id} nested />
+					{/each}
+					{#if hiddenSpecifics > 0}
+						<p class="quiet">
+							{hiddenSpecifics === 1 ? '1 more is' : `${hiddenSpecifics} more are`} hidden by your filters.
+						</p>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	{/if}
-</article>
+</div>
 
 <style>
 	.kink {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		padding: 1rem;
-		border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-		border-radius: var(--wa-border-radius-l);
-		background: var(--wa-color-surface-default);
+		/* The public list's column centres its text; a list reads from the left. */
+		text-align: start;
+		border-block-end: var(--wa-border-width-s) solid var(--wa-color-surface-border);
 
-		&.nested {
-			padding: 0.75rem 0 0;
-			border: 0;
-			border-block-start: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-			border-radius: 0;
-			background: none;
+		&.nested:last-of-type {
+			border-block-end: 0;
 		}
 	}
 
-	header {
-		display: flex;
-		align-items: baseline;
-		gap: 0.5rem;
+	/* The name takes what the dots leave; on a phone a kink with both contexts
+	   puts them under its name, since two rows of dots and a name do not fit. */
+	.line {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 0.125rem 0.5rem;
+		padding-block: 0.125rem;
 
-		.name {
-			margin: 0;
-			font-size: 1.05rem;
+		.two & {
+			@media (max-width: 640px) {
+				grid-template-columns: minmax(0, 1fr);
+			}
+		}
+
+		&:hover {
+			background: color-mix(in oklab, var(--wa-color-surface-raised) 50%, transparent);
+		}
+	}
+
+	.name {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-self: start;
+		gap: 0.125rem 0.375rem;
+		padding: 0.25rem 0;
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: start;
+		cursor: pointer;
+
+		.text {
+			font-weight: var(--wa-font-weight-semibold);
+		}
+
+		&:focus-visible {
+			outline: var(--wa-focus-ring);
+			outline-offset: var(--wa-focus-ring-offset);
+		}
+	}
+
+	.chevron {
+		font-size: 0.65rem;
+		color: var(--wa-color-text-quiet);
+		transition: rotate 120ms ease-out;
+
+		[aria-expanded='true'] > & {
+			rotate: 90deg;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			transition: none;
 		}
 	}
 
@@ -346,11 +381,54 @@
 		color: var(--wa-color-warning-on-quiet);
 	}
 
+	.flag {
+		font-size: 0.75rem;
+		color: var(--wa-color-text-quiet);
+
+		&.override {
+			color: var(--wa-color-brand-on-quiet);
+		}
+	}
+
+	.contexts {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: 0 1rem;
+
+		.two & {
+			@media (max-width: 640px) {
+				flex-direction: column;
+				align-items: flex-end;
+			}
+		}
+	}
+
+	.context {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	.context-label {
+		font-size: 0.75rem;
+		color: var(--wa-color-text-quiet);
+		text-align: end;
+		white-space: nowrap;
+	}
+
+	.panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 0.25rem 0 0.75rem 1rem;
+	}
+
 	.description,
 	.safety,
-	.note-preview,
 	.aliases,
-	.hidden-note {
+	.quiet,
+	.answers {
 		margin: 0;
 		font-size: 0.9rem;
 		color: var(--wa-color-text-quiet);
@@ -360,22 +438,19 @@
 		color: var(--wa-color-warning-on-quiet);
 	}
 
-	.note-preview {
-		font-style: italic;
-		white-space: pre-wrap;
+	.answers {
+		padding: 0;
+		list-style: none;
+
+		li {
+			margin: 0;
+		}
 	}
 
-	.sides {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.side-label {
-		display: block;
-		margin: 0 0 0.25rem;
-		font-size: 0.85rem;
+	.context-name {
+		margin: 0;
 		font-weight: var(--wa-font-weight-semibold);
+		color: var(--wa-color-text-normal);
 	}
 
 	.partner {
@@ -399,37 +474,20 @@
 		}
 	}
 
-	.quiet-badge {
-		color: var(--wa-color-text-quiet);
+	.link {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--wa-color-brand-on-quiet);
+		font: inherit;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	.hold {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-	}
-
-	.toggles {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.25rem 1rem;
-	}
-
-	.toggle {
-		padding: 0;
-		border: 0;
-		background: none;
-		color: var(--wa-color-brand-on-quiet);
-		font: inherit;
-		font-size: 0.875rem;
-		text-decoration: underline;
-		cursor: pointer;
-	}
-
-	.more {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
 	}
 
 	.detail {
@@ -441,7 +499,6 @@
 	.specifics {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
 		padding-inline-start: 0.75rem;
 		border-inline-start: var(--wa-border-width-m) solid var(--wa-color-surface-border);
 	}

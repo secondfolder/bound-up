@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { answerFromControl } from '$lib/partnership';
 import { getKinkList, getPartnerKinkList } from '$lib/server/kink-lists';
 import { getPartnershipForUser } from '$lib/server/partnerships';
 import type { LayoutServerLoad } from './$types';
@@ -24,6 +25,9 @@ export const load: LayoutServerLoad = async ({ locals, params }) => {
 	return {
 		partnershipId: partnership.id,
 		names: partnership.names,
+		// Who is in control, from the viewer's side: what the list's "Your
+		// side" starts on (docs/kink-list.md, "Your side").
+		control: answerFromControl(partnership.control, partnership.role),
 		mine,
 		theirs: theirs.ok ? theirs.list : null
 	};

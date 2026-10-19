@@ -9,7 +9,7 @@ import {
 	type ListPayload,
 	listPayloadSchema
 } from '../answers';
-import { catalog, normaliseSearch } from '../catalog';
+import { catalog, normaliseSearch, sidesOf } from '../catalog';
 import type { ImportedAnswer, ImportResult } from './result';
 
 /**
@@ -117,7 +117,7 @@ export function exportCsv(list: ListPayload): string {
 		while (category.parent) {
 			category = byId.get(category.parent) ?? category;
 		}
-		row(item.id, category.name, item.name, item.roles ? (catalog.roles[item.roles] ?? null) : null);
+		row(item.id, category.name, item.name, sidesOf(item));
 	}
 	for (const [key, kink] of Object.entries(list.custom)) {
 		if (!kink.removed) {

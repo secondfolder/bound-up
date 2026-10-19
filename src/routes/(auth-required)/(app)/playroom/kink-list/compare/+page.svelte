@@ -37,7 +37,12 @@
 	</p>
 {:else}
 	<h1>You and {shared.name?.trim() || 'them'}</h1>
-	<CompareView mine={store.list} theirs={shared.list} theirName={shared.name} />
+	<CompareView
+		mine={store.list}
+		theirs={shared.list}
+		theirName={shared.name}
+		side={store.filters.side}
+	/>
 {/if}
 
 <style>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { catalog, categories } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
-	import IntensitySetting from './IntensitySetting.svelte';
+	import ListFilters from './ListFilters.svelte';
 
 	/**
 	 * Quick fill, step one: which areas to go through. A tile is in until it is
@@ -26,7 +26,7 @@
 		skip it.
 	</p>
 
-	<IntensitySetting />
+	<ListFilters />
 
 	{#each Object.entries(catalog.sections) as [section, title] (section)}
 		<section aria-labelledby="triage-{section}">

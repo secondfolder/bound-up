@@ -4,14 +4,19 @@ import {
 	answeredCount,
 	effectiveAnswer,
 	emptyList,
+	type Filters,
 	hasContent,
 	isAnswered,
 	isPositive,
+	isShown,
 	type ListPayload,
 	listPayloadSchema,
 	mergeLists,
-	newCustomKey
+	newCustomKey,
+	normaliseAnswer,
+	shownSides
 } from './answers';
+import { type KinkItem, kinkById } from './catalog';
 
 function list(fields: Partial<ListPayload> = {}): ListPayload {
 	return { ...emptyList(), ...fields };
@@ -109,11 +114,11 @@ describe('mergeLists', () => {
 	it('merges custom kinks, triage and settings the same way', () => {
 		const a = list({
 			triage: { media: { value: 'skip', at: 1 } },
-			settings: { maxIntensity: 6, at: 9 }
+			settings: { maxIntensity: 6, minCommonness: 0, side: 'both', at: 9 }
 		});
 		const b = list({
 			triage: { media: { value: 'none', at: 2 } },
-			settings: { maxIntensity: 3, at: 4 }
+			settings: { maxIntensity: 3, minCommonness: 0, side: 'both', at: 4 }
 		});
 		const merged = mergeLists(a, b);
 		expect(merged.triage.media?.value).toBe('none');
@@ -132,7 +137,7 @@ describe('the stored shape', () => {
 			},
 			triage: { extreme: { value: 'limit', at } },
 			custom: { [key]: { name: 'Being read to', categoryId: 'intimacy', at } },
-			settings: { maxIntensity: 5, at },
+			settings: { maxIntensity: 5, minCommonness: 0, side: 'both', at },
 			skipped: { tickling: { skipped: true, at } }
 		});
 		expect(parsed.success).toBe(true);
@@ -174,5 +179,82 @@ describe('small rules', () => {
 	it('makes custom keys that the schema accepts', () => {
 		const key = newCustomKey();
 		expect(key).toMatch(/^custom:[0-9a-f]{24}$/);
+	});
+});
+
+describe('the shape of an answer', () => {
+	it('splits a whole answer on a role kink into the same answer on each side', () => {
+		expect(
+			normaliseAnswer('spanking', { level: 'like', detail: { fantasy: 3 }, note: 'Hard', at })
+		).toEqual({
+			sides: {
+				a: { level: 'like', detail: { fantasy: 3 } },
+				b: { level: 'like', detail: { fantasy: 3 } }
+			},
+			note: 'Hard',
+			at
+		});
+	});
+
+	it('keeps a side already answered when a whole answer is laid over it', () => {
+		expect(
+			normaliseAnswer('spanking', { level: 'like', sides: { b: { level: 'limit' } }, at })
+		).toEqual({ sides: { a: { level: 'like' }, b: { level: 'limit' } }, at });
+	});
+
+	it('answers a kink without a role pair whole, from its first side', () => {
+		expect(normaliseAnswer('romance', { sides: { a: { level: 'love' } }, at })).toEqual({
+			level: 'love',
+			at
+		});
+	});
+
+	it('normalises every answer as a list is read, and fills in settings it did not have', () => {
+		const parsed = listPayloadSchema.parse({
+			...emptyList(),
+			answers: { spanking: { level: 'love', at } },
+			settings: { maxIntensity: 5, at }
+		});
+		expect(parsed.answers.spanking).toEqual({
+			sides: { a: { level: 'love' }, b: { level: 'love' } },
+			at
+		});
+		expect(parsed.settings).toEqual({ maxIntensity: 5, minCommonness: 1, side: 'both', at });
+	});
+});
+
+describe('the filters', () => {
+	const filters = (fields: Partial<Filters> = {}): Filters => ({
+		maxIntensity: 6,
+		minCommonness: 0,
+		side: 'both',
+		...fields
+	});
+	const spanking = kinkById('spanking') as KinkItem;
+
+	it('hides what is too intense or too rare', () => {
+		expect(isShown(spanking, filters())).toBe(true);
+		expect(isShown(spanking, filters({ maxIntensity: spanking.intensity - 1 }))).toBe(false);
+		expect(isShown(spanking, filters({ minCommonness: (spanking.commonness ?? 0) + 1 }))).toBe(
+			false
+		);
+	});
+
+	it('hides a one-sided kink from the other side only', () => {
+		const domOnly = { ...spanking, roles: undefined, domSide: undefined, lean: 'dom' } as KinkItem;
+		expect(isShown(domOnly, filters({ side: 'dom' }))).toBe(true);
+		expect(isShown(domOnly, filters({ side: 'both' }))).toBe(true);
+		expect(isShown(domOnly, filters({ side: 'sub' }))).toBe(false);
+	});
+
+	it('narrows a leaning role kink to your own context, and leaves a neutral one whole', () => {
+		// A dom spanks; a sub is spanked.
+		expect(shownSides(spanking, 'both')).toEqual(['a', 'b']);
+		expect(shownSides(spanking, 'dom')).toEqual(['a']);
+		expect(shownSides(spanking, 'sub')).toEqual(['b']);
+		// Giving worship is the sub's side.
+		expect(shownSides(kinkById('genital-worship'), 'sub')).toEqual(['a']);
+		expect(shownSides(kinkById('kissing'), 'sub')).toEqual(['a', 'b']);
+		expect(shownSides(kinkById('romance'), 'sub')).toBeNull();
 	});
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type Answer, emptyList, type ListPayload } from './answers';
-import { compareLists, sidesLabel } from './compare';
+import { type KinkItem, kinkById } from './catalog';
+import { compareLists, pairingsFor, sidesLabel } from './compare';
 
 const at = 1;
 
@@ -15,14 +16,14 @@ describe('compareLists', () => {
 			cuddling: { level: 'love', at },
 			massage: { level: 'conditional', at },
 			'gentle-sex': { level: 'like', at },
-			'pet-names': { level: 'love', at }
+			'sixty-nine': { level: 'love', at }
 		});
 		const theirs = list({
 			romance: { level: 'love', at },
 			cuddling: { level: 'curious', at },
 			massage: { level: 'like', at },
 			'gentle-sex': { level: 'dont-mind', at },
-			'pet-names': { level: 'not-for-me', at }
+			'sixty-nine': { level: 'not-for-me', at }
 		});
 		const { groups } = compareLists(mine, theirs);
 		expect(groups.both.map((pairing) => pairing.key)).toEqual(['romance']);
@@ -33,7 +34,7 @@ describe('compareLists', () => {
 			['massage', 'b']
 		]);
 		expect(groups.talk.map((pairing) => pairing.key)).toEqual(['gentle-sex']);
-		expect(groups.mismatch.map((pairing) => pairing.key)).toEqual(['pet-names']);
+		expect(groups.mismatch.map((pairing) => pairing.key)).toEqual(['sixty-nine']);
 	});
 
 	it('pairs my giving with their receiving, not with their giving', () => {
@@ -72,5 +73,40 @@ describe('sidesLabel', () => {
 		expect(sidesLabel('spanking', 'a')).toBe('You giving, them receiving');
 		expect(sidesLabel('spanking', 'b')).toBe('You receiving, them giving');
 		expect(sidesLabel('romance', null)).toBe('');
+	});
+});
+
+describe('pairingsFor, with a side', () => {
+	const spanking = kinkById('spanking') as KinkItem;
+	// I want to be spanked; they want to spank.
+	const mine = list({ spanking: { sides: { b: { level: 'love' } }, at } });
+	const theirs = list({ spanking: { sides: { a: { level: 'like' } }, at } });
+
+	it('compares my sub context with their dom one', () => {
+		expect(pairingsFor(mine, theirs, spanking, 'sub')).toEqual([
+			{ key: 'spanking', mySide: 'b', mine: 'love', theirs: 'like' }
+		]);
+	});
+
+	it('leaves out the halves that are not my side', () => {
+		const both = list({ spanking: { sides: { a: { level: 'love' }, b: { level: 'love' } }, at } });
+		expect(pairingsFor(both, both, spanking, 'dom').map((pairing) => pairing.mySide)).toEqual([
+			'a'
+		]);
+		expect(pairingsFor(both, both, spanking, 'both')).toHaveLength(2);
+	});
+
+	it('compares neutral contexts whatever the side', () => {
+		const kissing = kinkById('kissing') as KinkItem;
+		const love = list({ kissing: { sides: { a: { level: 'love' }, b: { level: 'love' } }, at } });
+		expect(pairingsFor(love, love, kissing, 'sub')).toHaveLength(2);
+	});
+
+	it('drops a one-sided kink for the other side', () => {
+		const romance = kinkById('romance') as KinkItem;
+		const domOnly = { ...romance, lean: 'dom' } as KinkItem;
+		const answered = list({ romance: { level: 'love', at } });
+		expect(pairingsFor(answered, answered, domOnly, 'sub')).toEqual([]);
+		expect(pairingsFor(answered, answered, domOnly, 'dom')).toHaveLength(1);
 	});
 });

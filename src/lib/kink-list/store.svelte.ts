@@ -18,9 +18,13 @@ import {
 	type Answer,
 	type CustomKink,
 	emptyList,
+	type Filters,
+	filtersOf,
 	type ItemKey,
 	type ListPayload,
 	newCustomKey,
+	normaliseAnswer,
+	normaliseAnswers,
 	type TriageValue
 } from './answers';
 
@@ -57,6 +61,17 @@ export abstract class KinkListStore {
 
 	/** Set on a partner's view of the list: what a kink row needs for overrides and holding back. */
 	partnerControls: PartnerControls | null = null;
+
+	/**
+	 * What the screens filter by. Your own list's settings; a partner's view
+	 * has a side of its own, from who is in control (`partner-store.svelte.ts`).
+	 */
+	get filters(): Filters {
+		return filtersOf(this.list);
+	}
+
+	/** Whether `filters.side` was worked out from the partnership, rather than chosen. */
+	readonly sideFromControl: boolean = false;
 
 	protected abstract persist(list: ListPayload): Promise<SaveState>;
 
@@ -124,13 +139,14 @@ export abstract class KinkListStore {
 	 * is kept as an empty answer so the clearing merges too.
 	 */
 	setAnswer(key: ItemKey, update: (current: Answer | undefined) => Omit<Answer, 'at'>): void {
-		const next = { ...update(this.list.answers[key]), at: Date.now() };
+		const next = normaliseAnswer(key, { ...update(this.list.answers[key]), at: Date.now() });
 		this.change({ ...this.list, answers: { ...this.list.answers, [key]: next } });
 	}
 
 	/** Replaces the list with what `update` makes of it: an import, applied by `applyImport`. */
 	transform(update: (list: ListPayload) => ListPayload): void {
-		this.change(update(this.list));
+		const next = update(this.list);
+		this.change({ ...next, answers: normaliseAnswers(next.answers) });
 	}
 
 	setTriage(categoryId: string, value: TriageValue): void {
@@ -140,8 +156,9 @@ export abstract class KinkListStore {
 		});
 	}
 
-	setMaxIntensity(maxIntensity: number): void {
-		this.change({ ...this.list, settings: { maxIntensity, at: Date.now() } });
+	/** Changes what the list shows: how intense, how common, and which side. */
+	setFilters(change: Partial<Filters>): void {
+		this.change({ ...this.list, settings: { ...this.list.settings, ...change, at: Date.now() } });
 	}
 
 	setSkipped(key: ItemKey, skipped: boolean): void {

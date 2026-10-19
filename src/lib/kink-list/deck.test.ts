@@ -60,7 +60,9 @@ describe('deckCards', () => {
 	});
 
 	it('leaves out kinks above the intensity setting', () => {
-		const cards = deckCards(list({ settings: { maxIntensity: 2, at } }));
+		const cards = deckCards(
+			list({ settings: { maxIntensity: 2, minCommonness: 0, side: 'both', at } })
+		);
 		expect(cards).toContain('spanking');
 		expect(cards).not.toContain('caning');
 	});
@@ -110,5 +112,15 @@ describe('narrows', () => {
 	it('names the kink a specific narrows down, and nothing for a kink', () => {
 		expect(narrows('spanking-implements')?.id).toBe('spanking');
 		expect(narrows('spanking')).toBeUndefined();
+	});
+});
+
+describe('deckCards, with filters', () => {
+	it('leaves out kinks less common than the minimum', () => {
+		const all = deckCards(list());
+		const common = deckCards(list(), { maxIntensity: 6, minCommonness: 4, side: 'both' });
+		expect(common.length).toBeGreaterThan(0);
+		expect(common.length).toBeLessThan(all.length);
+		expect(common).not.toContain('spanking');
 	});
 });

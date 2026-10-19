@@ -1,4 +1,13 @@
-import { type ItemKey, isAnswered, isPositive, type Level, type ListPayload } from './answers';
+import {
+	type Filters,
+	filtersOf,
+	type ItemKey,
+	isAnswered,
+	isPositive,
+	isShown,
+	type Level,
+	type ListPayload
+} from './answers';
 import { catalog, categories, childrenOf, type KinkItem, kinkById } from './catalog';
 
 /**
@@ -19,10 +28,6 @@ function skipped(list: ListPayload, key: ItemKey): boolean {
 	return list.skipped[key]?.skipped === true;
 }
 
-function shown(list: ListPayload, item: KinkItem): boolean {
-	return item.intensity <= list.settings.maxIntensity;
-}
-
 /** Whether any side of a kink's own answer is a yes of some kind. */
 function saidYes(list: ListPayload, key: ItemKey): boolean {
 	const answer = list.answers[key];
@@ -41,15 +46,17 @@ function saidYes(list: ListPayload, key: ItemKey): boolean {
  * after it, but only once it has been answered with a yes of some kind. A no,
  * or Don't mind, leaves them to inherit that answer, which is the point of
  * answering broadly.
+ *
+ * `filters` are the list's own unless a partner's view has its own side.
  */
-export function deckCards(list: ListPayload): ItemKey[] {
+export function deckCards(list: ListPayload, filters: Filters = filtersOf(list)): ItemKey[] {
 	const cards: ItemKey[] = [];
 	for (const category of categories()) {
 		if (!isInDeck(list, category.id)) {
 			continue;
 		}
 		for (const kink of childrenOf(category.id)) {
-			if (!shown(list, kink)) {
+			if (!isShown(kink, filters)) {
 				continue;
 			}
 			if (!(isAnswered(list.answers[kink.id]) || skipped(list, kink.id))) {
@@ -61,7 +68,7 @@ export function deckCards(list: ListPayload): ItemKey[] {
 			}
 			for (const specific of childrenOf(kink.id)) {
 				if (
-					shown(list, specific) &&
+					isShown(specific, filters) &&
 					!isAnswered(list.answers[specific.id]) &&
 					!skipped(list, specific.id)
 				) {

@@ -7,7 +7,8 @@ import {
 	emptyPartnerPayload,
 	mergePartnerPayloads,
 	type PartnerPayload,
-	resolvedFor
+	resolvedFor,
+	sideFromControl
 } from './partner';
 
 const at = 3;
@@ -94,5 +95,13 @@ describe('a partner copy', () => {
 		expect(merged.overrides.caning?.level).toBe('curious');
 		expect(merged.heldBack.flogging?.held).toBe(true);
 		expect(merged.blind.on).toBe(true);
+	});
+});
+
+describe('sideFromControl', () => {
+	it('starts whoever holds control on the dom side, the other on the sub side', () => {
+		expect(sideFromControl('me')).toBe('dom');
+		expect(sideFromControl('them')).toBe('sub');
+		expect(sideFromControl('mix')).toBe('both');
 	});
 });

@@ -45,12 +45,13 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 	if (!parsed.success) {
 		error(400, 'That could not be saved. Reload and try again.');
 	}
-	const { id, vaultId, ciphertext, payloadVersion, expectedRevision } = parsed.data;
+	const { id, vaultId, ciphertext, payloadVersion, expectedRevision, keepVersion } = parsed.data;
 	const result = await saveKinkList(locals.db, userId, {
 		scope,
 		id,
 		content: { vaultId, ciphertext, payloadVersion },
-		expectedRevision
+		expectedRevision,
+		keepVersion: scope === 'self' && keepVersion === true
 	});
 	if (!result.ok) {
 		const { status, message } = describeKinkListRefusal(result.reason);

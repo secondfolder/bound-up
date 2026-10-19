@@ -14,7 +14,12 @@ export const kinkListSaveSchema = z.object({
 	vaultId: clientId,
 	ciphertext: z.string().min(1).max(kinkListKind.maxCiphertextLength).regex(SEALED_PATTERN),
 	payloadVersion: z.number().int().positive(),
-	expectedRevision: z.number().int().min(0).nullable()
+	expectedRevision: z.number().int().min(0).nullable(),
+	/**
+	 * Keep the list being replaced as a version even if it changed within the
+	 * week: sent once, by "Start a new list" on a list that will not open.
+	 */
+	keepVersion: z.boolean().optional()
 });
 
 export type KinkListSave = z.output<typeof kinkListSaveSchema>;

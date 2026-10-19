@@ -4,13 +4,16 @@ import {
 	isAnswered,
 	isPositive,
 	type Level,
-	type ListPayload
+	type ListPayload,
+	shownSides,
+	type YourSide
 } from './answers';
 import {
 	categories,
 	childrenOf,
 	type KinkItem,
 	kinkById,
+	leanOf,
 	primaryCategoryOf,
 	sidesOf
 } from './catalog';
@@ -25,6 +28,12 @@ import {
  * with their "on my partner" — the halves that fit together. A kink without a
  * pair is compared directly. Answers are the effective ones, so a specific
  * that only inherits its kink's answer still counts.
+ *
+ * **A side narrows it.** Someone comparing as a sub sees only the pairings
+ * where their half is the sub one — their "being spanked" against the other
+ * person's "spanking" — and none of the kinks only a dom has. Contexts that
+ * lean neither way are always compared. Limits are listed whatever the side:
+ * knowing them is never the wrong half.
  */
 
 export type MatchGroup =
@@ -86,17 +95,26 @@ function classify(mine: Level, theirs: Level): MatchGroup | null {
 	return other === 'dont-mind' ? 'talk' : 'mismatch';
 }
 
-function pairings(mine: ListPayload, theirs: ListPayload, item: KinkItem): Pairing[] {
-	if (!sidesOf(item)) {
+/** The pairings for one kink: my halves against their opposite ones, for the halves my side shows. */
+export function pairingsFor(
+	mine: ListPayload,
+	theirs: ListPayload,
+	item: KinkItem,
+	side: YourSide = 'both'
+): Pairing[] {
+	const sides = shownSides(item, side);
+	if (!sides) {
+		const lean = leanOf(item);
+		if (side !== 'both' && lean !== null && lean !== side) {
+			return [];
+		}
 		const a = effectiveAnswer(mine, item.id).level;
 		const b = effectiveAnswer(theirs, item.id).level;
 		return a && b ? [{ key: item.id, mySide: null, mine: a, theirs: b }] : [];
 	}
 	const result: Pairing[] = [];
-	for (const [mySide, theirSide] of [
-		['a', 'b'],
-		['b', 'a']
-	] as const) {
+	for (const mySide of sides) {
+		const theirSide = mySide === 'a' ? 'b' : 'a';
 		const a = effectiveAnswer(mine, item.id, mySide).level;
 		const b = effectiveAnswer(theirs, item.id, theirSide).level;
 		if (a && b) {
@@ -129,7 +147,11 @@ function kinksToCompare(mine: ListPayload, theirs: ListPayload): KinkItem[] {
 	);
 }
 
-export function compareLists(mine: ListPayload, theirs: ListPayload): Comparison {
+export function compareLists(
+	mine: ListPayload,
+	theirs: ListPayload,
+	side: YourSide = 'both'
+): Comparison {
 	const groups: Comparison['groups'] = {
 		both: [],
 		explore: [],
@@ -141,7 +163,7 @@ export function compareLists(mine: ListPayload, theirs: ListPayload): Comparison
 	const myLimits: ItemKey[] = [];
 	const overlap = new Map<string, Set<string>>();
 	for (const item of kinksToCompare(mine, theirs)) {
-		for (const pairing of pairings(mine, theirs, item)) {
+		for (const pairing of pairingsFor(mine, theirs, item, side)) {
 			const group = classify(pairing.mine, pairing.theirs);
 			if (group) {
 				groups[group].push(pairing);

@@ -162,6 +162,11 @@ The Zod schema accepts only `me` / `them` / `mix` — posting the _stored_ value
 | Rewrite the names and roles while accepting an invite | The accepter, if control is theirs or shared     |
 | Disconnect, or cancel a pending invite                | **Either member, always**                        |
 
+Control also sets where a partner's view of the kink list starts: whoever
+holds it starts on the dom side, the other on the sub side, and shared control
+on both. It only decides what is shown first, and either person can change it
+for the visit. See [kink-list.md](kink-list.md#your-side).
+
 Disconnecting is deliberately not gated: a user who handed control to their
 partner must still be able to get out. `deletePartnership` checks membership and
 nothing else.

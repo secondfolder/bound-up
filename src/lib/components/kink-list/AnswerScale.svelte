@@ -1,15 +1,22 @@
 <script lang="ts">
 	import { LEVEL_LABELS, LEVELS, type Level } from '$lib/kink-list/answers';
-	import InlineButton from '../InlineButton.svelte';
 
 	/**
-	 * The seven-step scale one kink (or one side of it) is answered on.
+	 * The seven-step scale one kink (or one context of it) is answered on, as a
+	 * row of coloured dots read against the key (`LevelKey.svelte`), so a kink
+	 * fits on one line.
 	 *
-	 * Native radios styled as a row of pills: the state is `checked`, which a
-	 * `wa-button` would not expose (AGENTS.md, "wa-button forwards no ARIA
-	 * state"). An answer that is only inherited — a specific showing its kink's
-	 * answer, or a category's "Hard limit everything here" — is outlined rather
-	 * than filled, and named in the caption, so it never reads as chosen.
+	 * Native radios under the dots: the state is `checked`, which a `wa-button`
+	 * would not expose (AGENTS.md, "wa-button forwards no ARIA state"), and the
+	 * arrow keys move along the scale for free. Each radio is named by its
+	 * level's word, and the dot has it as a tooltip, so colour is never the
+	 * only cue: the position on a fixed no-to-yes scale and the key carry it
+	 * too.
+	 *
+	 * An answer that is only inherited — a specific showing its kink's answer,
+	 * or a category's "Hard limit everything here" — is a dashed ring rather
+	 * than a filled dot, so it never reads as chosen. Choosing the chosen dot
+	 * again clears it.
 	 */
 	let {
 		label,
@@ -20,8 +27,8 @@
 		/** The group's accessible name, e.g. "Spanking" or "Spanking, giving". */
 		label: string;
 		value: Level | undefined;
-		/** What shows when there is no answer of its own, and where it comes from. */
-		inherited?: { level: Level; from: string };
+		/** What shows when there is no answer of its own. Where it comes from is said elsewhere. */
+		inherited?: Level;
 		onchange: (level: Level | undefined) => void;
 	} = $props();
 
@@ -30,108 +37,108 @@
 
 <fieldset class="scale">
 	<legend class="wa-visually-hidden">{label}</legend>
-	<div class="options">
-		{#each LEVELS as level (level)}
-			<label
-				class="option level-{level}"
-				class:inherited={value === undefined && inherited?.level === level}
-			>
-				<input
-					type="radio"
-					{name}
-					value={level}
-					checked={value === level}
-					onchange={() => onchange(level)}
-				/>
-				<span>{LEVEL_LABELS[level]}</span>
-			</label>
-		{/each}
-	</div>
-	{#if value !== undefined}
-		<span class="caption">
-			<InlineButton onclick={() => onchange(undefined)}>
-				Clear <span class="wa-visually-hidden">{label}</span>
-			</InlineButton>
-		</span>
-	{:else if inherited}
-		<span class="caption">{LEVEL_LABELS[inherited.level]}, {inherited.from}</span>
-	{/if}
+	{#each LEVELS as level (level)}
+		<label
+			class="option"
+			style:--dot="var(--kink-level-{level})"
+			class:inherited={value === undefined && inherited === level}
+			title={LEVEL_LABELS[level]}
+		>
+			<input
+				type="radio"
+				{name}
+				value={level}
+				checked={value === level}
+				onchange={() => onchange(level)}
+				onclick={() => {
+					// A radio sends no change when it is already checked, so this
+					// is the one way to take an answer back from the dots.
+					if (value === level) {
+						onchange(undefined);
+					}
+				}}
+			/>
+			<span class="dot" aria-hidden="true"></span>
+			<span class="wa-visually-hidden">{LEVEL_LABELS[level]}</span>
+		</label>
+	{/each}
 </fieldset>
 
 <style>
 	.scale {
+		display: flex;
+		gap: 0.125rem;
 		border: 0;
 		margin: 0;
 		padding: 0;
 		min-inline-size: 0;
 	}
 
-	.options {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.375rem;
-	}
-
+	/* The label is the touch target, larger than the dot it draws. */
 	.option {
 		position: relative;
+		display: grid;
+		place-items: center;
+		inline-size: 1.625rem;
+		block-size: 1.625rem;
+		cursor: pointer;
 
 		input {
 			position: absolute;
-			opacity: 0;
 			inset: 0;
 			margin: 0;
+			opacity: 0;
 			cursor: pointer;
 		}
+	}
 
-		span {
-			display: inline-block;
-			padding: 0.3rem 0.65rem;
-			border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-			border-radius: var(--wa-border-radius-pill);
-			font-size: 0.875rem;
-			line-height: 1.3;
-			color: var(--wa-color-text-normal);
-			background: var(--wa-color-surface-default);
-			white-space: nowrap;
-		}
+	.dot {
+		/* Never the click target: its hover scale makes it a layer of its own,
+		   painted over the radio, which would then never be pressed. */
+		pointer-events: none;
+		inline-size: 1.125rem;
+		block-size: 1.125rem;
+		border: 0.15rem solid var(--dot);
+		border-radius: 50%;
+		background: color-mix(in oklab, var(--dot) 12%, transparent);
+		transition: transform 80ms ease-out;
+	}
 
-		/* Inherited: the level's colour as an outline only, so it cannot be
-		   mistaken for a choice made here. The caption names where it is from. */
-		&.inherited span {
-			border-style: dashed;
-			border-color: var(--kink-level, var(--wa-color-brand-border-loud));
-		}
+	/* Inherited: an outline only, dashed, so it cannot be mistaken for a choice. */
+	.inherited .dot {
+		border-style: dashed;
+		background: color-mix(in oklab, var(--dot) 30%, transparent);
+	}
 
-		input:focus-visible + span {
-			outline: var(--wa-focus-ring);
-			outline-offset: var(--wa-focus-ring-offset);
-		}
+	/* Chosen: filled, with a check, so it differs from the rest by more than colour. */
+	input:checked + .dot {
+		display: grid;
+		place-items: center;
+		background: var(--dot);
 
-		input:checked + span {
-			font-weight: var(--wa-font-weight-bold);
-			color: var(--kink-level-on, var(--wa-color-brand-on-loud));
-			background: var(--kink-level, var(--wa-color-brand-fill-loud));
-			border-color: var(--kink-level, var(--wa-color-brand-fill-loud));
+		&::after {
+			content: '';
+			inline-size: 0.3rem;
+			block-size: 0.55rem;
+			margin-block-start: -0.1rem;
+			border: solid var(--kink-level-ink);
+			border-width: 0 0.13rem 0.13rem 0;
+			transform: rotate(45deg);
 		}
 	}
 
-	/* The ends of the scale get the danger and success palettes; the middle
-	   stays the brand colour. Never colour alone: every option has its word. */
-	.level-limit,
-	.level-not-for-me {
-		--kink-level: var(--wa-color-danger-fill-loud);
-		--kink-level-on: var(--wa-color-danger-on-loud);
-	}
-	.level-like,
-	.level-love {
-		--kink-level: var(--wa-color-success-fill-loud);
-		--kink-level-on: var(--wa-color-success-on-loud);
+	input:focus-visible + .dot {
+		outline: var(--wa-focus-ring);
+		outline-offset: var(--wa-focus-ring-offset);
 	}
 
-	.caption {
-		display: block;
-		margin-block-start: 0.25rem;
-		font-size: 0.8125rem;
-		color: var(--wa-color-text-quiet);
+	.option:hover .dot {
+		transform: scale(1.12);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.dot {
+			transition: none;
+		}
 	}
 </style>

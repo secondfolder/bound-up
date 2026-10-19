@@ -31,6 +31,20 @@ const itemSchema = z.strictObject({
 	/** A role pair from `roles`, for kinks that can be answered for each side. */
 	roles: z.string().optional(),
 	intensity: z.number().int().min(0).max(6),
+	/**
+	 * Kinks and specifics only: how many people are into it or know of it,
+	 * from 0 (rare) to 4 (very common). Independent of intensity — balloons
+	 * are mild and rare, choking intense and well known.
+	 */
+	commonness: z.number().int().min(0).max(4).optional(),
+	/**
+	 * Which side of the role pair a dominant usually takes, overriding the
+	 * pair's own default; `neutral` when either side suits either. The "Your
+	 * side" filter hides the side that leans the other way.
+	 */
+	domSide: z.enum(['a', 'b', 'neutral']).optional(),
+	/** For a kink with no role pair that is only ever one person's side. */
+	lean: z.enum(['dom', 'sub']).optional(),
 	tags: z.array(z.string()).optional(),
 	/** Search terms: synonyms, slang and abbreviations people type. */
 	aliases: z.array(z.string().min(1)).optional(),
@@ -52,8 +66,23 @@ export const catalogSchema = z
 			levels: z.record(z.string(), z.string()),
 			defaultMax: z.number().int().min(0).max(6)
 		}),
+		commonness: z.strictObject({
+			levels: z.record(z.string(), z.string()),
+			defaultMin: z.number().int().min(0).max(4)
+		}),
 		sections: z.record(z.string(), z.string()),
-		roles: z.record(z.string(), z.tuple([z.string(), z.string()])),
+		/**
+		 * Role pairs: the two sides' labels, side `a` being the active, giving,
+		 * dom or self one; and which side a dominant usually takes, or null for
+		 * a pair where that depends on the kink (or on nothing).
+		 */
+		roles: z.record(
+			z.string(),
+			z.strictObject({
+				labels: z.tuple([z.string(), z.string()]),
+				domSide: z.enum(['a', 'b']).nullable()
+			})
+		),
 		tags: z.record(z.string(), z.string()),
 		items: z.array(itemSchema).min(1)
 	})
@@ -113,6 +142,29 @@ export function catalogProblems(
 		}
 		if (item.roles && !(item.roles in parsed.roles)) {
 			problems.push(`"${item.id}" has an unknown role pair "${item.roles}"`);
+		}
+		if (item.parent === undefined && item.commonness !== undefined) {
+			problems.push(`category "${item.id}" has a commonness; only kinks do`);
+		}
+		if (item.parent !== undefined && item.commonness === undefined) {
+			problems.push(`"${item.id}" has no commonness`);
+		}
+		const parent = item.parent ? byId.get(item.parent) : undefined;
+		if (
+			parent?.parent !== undefined &&
+			item.commonness !== undefined &&
+			parent.commonness !== undefined &&
+			item.commonness > parent.commonness
+		) {
+			// A specific is only reached through its kink, so it cannot be seen
+			// by anyone its kink is hidden from.
+			problems.push(`"${item.id}" is more common than "${parent.id}", the kink it narrows`);
+		}
+		if (item.domSide !== undefined && !item.roles) {
+			problems.push(`"${item.id}" has a domSide but no role pair`);
+		}
+		if (item.lean !== undefined && item.roles) {
+			problems.push(`"${item.id}" has a lean and a role pair; a pair takes domSide`);
 		}
 		for (const tag of item.tags ?? []) {
 			if (!(tag in parsed.tags)) {
@@ -190,11 +242,42 @@ export function relatedKinks(categoryId: string): KinkItem[] {
 
 /** The pair of side labels for an item's role pair, or null for an item answered as one. */
 export function sidesOf(item: KinkItem): readonly [string, string] | null {
-	return item.roles ? (catalog.roles[item.roles] ?? null) : null;
+	return item.roles ? (catalog.roles[item.roles]?.labels ?? null) : null;
+}
+
+/**
+ * Which side of an item's role pair a dominant usually takes, or null when
+ * neither does (or there is no pair). A specific with the same pair as its
+ * kink follows the kink unless it says otherwise; then the pair's default.
+ */
+export function domSideOf(item: KinkItem): 'a' | 'b' | null {
+	if (!item.roles) {
+		return null;
+	}
+	const parent = item.parent ? byId.get(item.parent) : undefined;
+	const own =
+		item.domSide ?? (parent?.parent && parent.roles === item.roles ? parent.domSide : undefined);
+	if (own !== undefined) {
+		return own === 'neutral' ? null : own;
+	}
+	return catalog.roles[item.roles]?.domSide ?? null;
+}
+
+/** Whether an item with no role pair is only ever a dom's or a sub's; a specific follows its kink. */
+export function leanOf(item: KinkItem): 'dom' | 'sub' | null {
+	if (item.roles) {
+		return null;
+	}
+	const parent = item.parent ? byId.get(item.parent) : undefined;
+	return item.lean ?? (parent?.parent && !parent.roles ? parent.lean : undefined) ?? null;
 }
 
 export function intensityLabel(intensity: number): string {
 	return catalog.intensity.levels[String(intensity)] ?? String(intensity);
+}
+
+export function commonnessLabel(commonness: number): string {
+	return catalog.commonness.levels[String(commonness)] ?? String(commonness);
 }
 
 /** Lowercase, `&` read as "and", and anything else that isn't a letter or digit as a space. */

@@ -1,11 +1,17 @@
 <script lang="ts">
-	import { MAX_CUSTOM_DESCRIPTION_LENGTH, MAX_CUSTOM_NAME_LENGTH } from '$lib/kink-list/answers';
+	import {
+		isAnswered,
+		isShown,
+		MAX_CUSTOM_DESCRIPTION_LENGTH,
+		MAX_CUSTOM_NAME_LENGTH
+	} from '$lib/kink-list/answers';
 	import { childrenOf, type KinkItem, relatedKinks } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import KinkRow from './KinkRow.svelte';
 
 	/**
-	 * One category: its kinks, any the person added to it, and the kinks that
+	 * One category, as a section of the one-page list that starts open and
+	 * folds away: its kinks, any the person added to it, and the kinks that
 	 * live in another category but fit here too.
 	 *
 	 * Related kinks are behind a button rather than mixed in, so the category
@@ -17,11 +23,15 @@
 	const { store } = kinkListContext();
 	const id = $props.id();
 
-	const max = $derived(store.list.settings.maxIntensity);
-	const kinks = $derived(childrenOf(category.id).filter((kink) => kink.intensity <= max));
+	const kinks = $derived(childrenOf(category.id).filter((kink) => isShown(kink, store.filters)));
 	const hidden = $derived(childrenOf(category.id).length - kinks.length);
-	const related = $derived(relatedKinks(category.id).filter((kink) => kink.intensity <= max));
+	const related = $derived(relatedKinks(category.id).filter((kink) => isShown(kink, store.filters)));
 	const custom = $derived(store.customKinks(category.id));
+	/** "3 of 12": how much of what is shown here is answered. */
+	const answered = $derived(
+		kinks.filter((kink) => isAnswered(store.list.answers[kink.id])).length +
+			custom.filter(([key]) => isAnswered(store.list.answers[key])).length
+	);
 
 	let showRelated = $state(false);
 	let adding = $state(false);
@@ -61,8 +71,13 @@
 	}
 </script>
 
-<section class="category" aria-labelledby="{id}-title">
-	<h1 id="{id}-title">{category.name}</h1>
+<!-- Open from the start, in the server's HTML too: `open` is safe in markup
+     because it is never false here (AGENTS.md, on boolean properties). -->
+<wa-details class="category" id="category-{category.id}" open>
+	<span slot="summary" class="summary">
+		<h3 id="{id}-title">{category.name}</h3>
+		<span class="count">{answered} of {kinks.length + custom.length}</span>
+	</span>
 	<p class="description">{category.description}</p>
 
 	<div class="kinks">
@@ -81,7 +96,7 @@
 
 	{#if hidden > 0}
 		<p class="hidden-note">
-			{hidden === 1 ? '1 more kink is' : `${hidden} more kinks are`} above your intensity setting.
+			{hidden === 1 ? '1 more kink is' : `${hidden} more kinks are`} hidden by your filters.
 		</p>
 	{/if}
 
@@ -142,22 +157,45 @@
 			</div>
 		</form>
 	{/if}
-</section>
+</wa-details>
 
 <style>
 	.category {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-
-		h1 {
-			margin: 0;
+		&::part(header) {
+			padding-block: 0.5rem;
 		}
+
+		&::part(content) {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			padding-block-start: 0;
+		}
+	}
+
+	.summary {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		inline-size: 100%;
+
+		h3 {
+			margin: 0;
+			font-size: 1.05rem;
+		}
+	}
+
+	.count {
+		font-size: 0.8125rem;
+		color: var(--wa-color-text-quiet);
+		white-space: nowrap;
 	}
 
 	.description,
 	.hidden-note {
 		margin: 0;
+		font-size: 0.9rem;
 		color: var(--wa-color-text-quiet);
 	}
 
@@ -165,7 +203,6 @@
 	.related {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
 	}
 
 	.custom {

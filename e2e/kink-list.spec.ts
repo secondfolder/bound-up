@@ -19,14 +19,33 @@ async function saved(page: Page) {
 	await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 }
 
+/**
+ * One context of a kink, or a kink without a role pair, by the name its dots
+ * are grouped under: "Spanking, giving", "Romance and affection".
+ */
+function scale(page: Page, name: string) {
+	return page.getByRole('group', { name, exact: true });
+}
+
+async function answer(page: Page, name: string, level: string) {
+	await scale(page, name).getByRole('radio', { name: level, exact: true }).click();
+}
+
+/** Opens a kink's row: its name is the button, followed by any flags. */
+async function openRow(page: Page, name: string) {
+	await page
+		.getByRole('button', { name: new RegExp(`^${name}\\b`) })
+		.first()
+		.click();
+}
+
 test('an answer is saved, sealed, and still there after a reload', async ({ page }) => {
 	const ada = account('Ada');
 	await signUp(page, ada);
 	await openList(page);
 
-	await page.getByRole('link', { name: /Impact play/ }).click();
-	const spanking = page.getByRole('group', { name: 'Spanking', exact: true });
-	await spanking.getByText('Like', { exact: true }).click();
+	// Every category is on the one page, open.
+	await answer(page, 'Spanking, giving', 'Like');
 	await saved(page);
 
 	// The server holds one sealed record, and nothing it could read.
@@ -42,34 +61,65 @@ test('an answer is saved, sealed, and still there after a reload', async ({ page
 
 	await page.reload();
 	await waitForHydration(page);
+	await expect(scale(page, 'Spanking, giving').getByRole('radio', { name: 'Like' })).toBeChecked();
 	await expect(
-		page.getByRole('group', { name: 'Spanking', exact: true }).getByRole('radio', { name: 'Like' })
-	).toBeChecked();
+		scale(page, 'Spanking, receiving').getByRole('radio', { checked: true })
+	).toHaveCount(0);
+});
+
+test('a category folds away and opens again', async ({ page }) => {
+	await signUp(page, account('Ivy'));
+	await openList(page);
+	await expect(scale(page, 'Spanking, giving')).toBeVisible();
+	await page.locator('#category-impact').getByText('Impact play', { exact: true }).click();
+	await expect(scale(page, 'Spanking, giving')).toBeHidden();
+	await page.getByRole('button', { name: 'Expand all' }).click();
+	await expect(scale(page, 'Spanking, giving')).toBeVisible();
+});
+
+test('your side hides the contexts that lean the other way', async ({ page }) => {
+	await signUp(page, account('Kit'));
+	await openList(page);
+	await page.getByRole('radio', { name: 'Sub', exact: true }).check();
+	await expect(scale(page, 'Spanking, receiving')).toBeVisible();
+	await expect(scale(page, 'Spanking, giving')).toHaveCount(0);
+	// Neutral kinks keep both.
+	await expect(scale(page, 'Kissing, giving')).toBeVisible();
+	await saved(page);
+	await page.reload();
+	await waitForHydration(page);
+	await expect(page.getByRole('radio', { name: 'Sub', exact: true })).toBeChecked();
 });
 
 test('search finds a kink by another name', async ({ page }) => {
 	await signUp(page, account('Bea'));
 	await openList(page);
 	await page.locator('wa-input[type="search"] input').fill('fellatio');
-	await expect(page.getByRole('group', { name: 'Blowjobs', exact: true })).toBeVisible();
+	await expect(
+		page
+			.getByRole('region', { name: 'Search results' })
+			.getByRole('group', { name: 'Blowjobs, giving', exact: true })
+	).toBeVisible();
 });
 
 test('a related kink answered in one category shows the same answer in its own', async ({
 	page
 }) => {
 	await signUp(page, account('Cai'));
-	await openList(page, '/playroom/kink-list/anal');
-	await page.getByRole('button', { name: /related kinks/ }).click();
-	await page
-		.getByRole('group', { name: 'Rimming', exact: true })
-		.getByText('Love', { exact: true })
+	await openList(page);
+	const anal = page.locator('#category-anal');
+	await anal.getByRole('button', { name: /related kinks/ }).click();
+	await anal
+		.getByRole('group', { name: 'Rimming, giving', exact: true })
+		.getByRole('radio', { name: 'Love', exact: true })
 		.click();
 	await saved(page);
 
-	await page.getByRole('link', { name: 'All categories' }).click();
-	await page.getByRole('link', { name: /^Oral/ }).click();
 	await expect(
-		page.getByRole('group', { name: 'Rimming', exact: true }).getByRole('radio', { name: 'Love' })
+		page
+			.locator('#category-oral')
+			.getByRole('group', { name: 'Rimming, giving', exact: true })
+			.getByRole('radio', { name: 'Love' })
 	).toBeChecked();
 });
 
@@ -111,21 +161,18 @@ test.describe('quick fill', () => {
 		await expect(card.getByRole('heading', { name: 'Clit stimulation' })).toBeVisible();
 		await saved(page);
 
-		// The whole list shows them, and Oral's kinks carry the category's limit.
+		// The whole list shows them, on both sides — a card answers for both
+		// unless one is picked — and Oral's kinks carry the category's limit.
 		await page.getByRole('link', { name: 'Whole list' }).click();
-		await page.getByRole('link', { name: /Hands and touch/ }).click();
-		await expect(
-			page
-				.getByRole('group', { name: 'Handjobs', exact: true })
-				.getByRole('radio', { name: 'Like' })
-		).toBeChecked();
-		await expect(
-			page
-				.getByRole('group', { name: 'Fingering', exact: true })
-				.getByRole('radio', { name: 'Hard limit' })
-		).toBeChecked();
-		await page.getByRole('link', { name: 'All categories' }).click();
-		await page.getByRole('link', { name: /^Oral/ }).click();
+		for (const side of ['giving', 'receiving']) {
+			await expect(
+				scale(page, `Handjobs, ${side}`).getByRole('radio', { name: 'Like' })
+			).toBeChecked();
+			await expect(
+				scale(page, `Fingering, ${side}`).getByRole('radio', { name: 'Hard limit' })
+			).toBeChecked();
+		}
+		await openRow(page, 'Blowjobs');
 		await expect(
 			page.getByText('Hard limit, from "Oral": hard limit everything').first()
 		).toBeVisible();
@@ -133,13 +180,12 @@ test.describe('quick fill', () => {
 });
 
 test.describe('without an account', () => {
+	/** Both sides, so a list compared with a copy of itself matches: my giving, their receiving. */
 	async function answerSpanking(page: Page, path: string) {
-		await page.goto(`${path}/impact`);
+		await page.goto(path);
 		await waitForHydration(page);
-		await page
-			.getByRole('group', { name: 'Spanking', exact: true })
-			.getByText('Like', { exact: true })
-			.click();
+		await answer(page, 'Spanking, giving', 'Like');
+		await answer(page, 'Spanking, receiving', 'Like');
 		await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible();
 	}
 
@@ -163,9 +209,7 @@ test.describe('without an account', () => {
 		await page.reload();
 		await waitForHydration(page);
 		await expect(
-			page
-				.getByRole('group', { name: 'Spanking', exact: true })
-				.getByRole('radio', { name: 'Like' })
+			scale(page, 'Spanking, giving').getByRole('radio', { name: 'Like' })
 		).toBeChecked();
 
 		const link = await makeLink(page, 'Ada');
@@ -197,12 +241,10 @@ test.describe('without an account', () => {
 		await signUp(page, account('Eve'), '/signup?redirectTo=/playroom/kink-list');
 		await expect(page).toHaveURL(/\/playroom\/kink-list$/);
 		await expect(page.getByText(/Added the answer saved on this device/)).toBeVisible();
-		await page.goto('/playroom/kink-list/impact');
-		await waitForHydration(page);
+		// Brought in by a store of its own, after this page's opened: a fresh load shows it.
+		await openList(page);
 		await expect(
-			page
-				.getByRole('group', { name: 'Spanking', exact: true })
-				.getByRole('radio', { name: 'Like' })
+			scale(page, 'Spanking, giving').getByRole('radio', { name: 'Like' })
 		).toBeChecked();
 		expect(await page.evaluate(() => localStorage.getItem('kink-list.device'))).toBeNull();
 	});
@@ -225,12 +267,8 @@ test.describe('without an account', () => {
 		await page.goto('/kink-list/quick');
 		await expect(page).toHaveURL(/\/playroom\/kink-list\/quick$/);
 
-		await page.goto('/playroom/kink-list/impact');
-		await waitForHydration(page);
-		await page
-			.getByRole('group', { name: 'Spanking', exact: true })
-			.getByText('Love', { exact: true })
-			.click();
+		await openList(page);
+		await answer(page, 'Spanking, giving', 'Love');
 		await saved(page);
 
 		await page.goto(link);
@@ -281,23 +319,13 @@ test('imports a KinkSheet link, exports the list, and reads the export back', as
 	await expect(page.getByRole('heading', { name: /^From / })).toBeVisible();
 	await expect(page.getByText('1 answer for kinks on this list.')).toBeVisible();
 
-	await page.goto('/playroom/kink-list/intimacy');
-	await waitForHydration(page);
+	await openList(page);
 	await expect(
-		page
-			.getByRole('group', { name: 'Romance and affection', exact: true })
-			.getByRole('radio', { name: 'Love' })
+		scale(page, 'Romance and affection').getByRole('radio', { name: 'Love' })
 	).toBeChecked();
 });
 
 test.describe('with a partner', () => {
-	async function answer(page: Page, kink: string, level: string) {
-		await page
-			.getByRole('group', { name: kink, exact: true })
-			.getByText(level, { exact: true })
-			.click();
-	}
-
 	test('a shared list follows your own, overrides and holds back for one partner, and compares', async ({
 		browser
 	}) => {
@@ -310,11 +338,10 @@ test.describe('with a partner', () => {
 			const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
 			const partnerList = `/playroom/kink-list/partner/${partnershipId}`;
 
-			// Ada's own list: Spanking Like, Caning a hard limit.
-			await ada.page.goto('/playroom/kink-list/impact');
-			await waitForHydration(ada.page);
-			await answer(ada.page, 'Spanking', 'Like');
-			await answer(ada.page, 'Caning', 'Hard limit');
+			// Ada's own list: spanking Like, caning a hard limit.
+			await openList(ada.page);
+			await answer(ada.page, 'Spanking, giving', 'Like');
+			await answer(ada.page, 'Caning, giving', 'Hard limit');
 			await saved(ada.page);
 
 			// Shared with Jun, then Love just for him, and Caning kept from him.
@@ -322,32 +349,31 @@ test.describe('with a partner', () => {
 			await waitForHydration(ada.page);
 			await clickWaButton(ada.page, 'Share my list with Jun');
 			await expect(ada.page.getByRole('heading', { name: 'Your list for Jun' })).toBeVisible();
-			await ada.page.getByRole('link', { name: /Impact play/ }).click();
-			await answer(ada.page, 'Spanking', 'Love');
-			await expect(ada.page.getByText('Just for Jun')).toBeVisible();
-			await ada.page.getByRole('button', { name: 'More detail and notes for Caning' }).click();
-			await ada.page.getByRole('checkbox', { name: "Don't show Jun this yet" }).check();
+			// Control is shared: nothing is narrowed to one side.
+			await expect(ada.page.getByRole('radio', { name: 'Both', exact: true })).toBeChecked();
+			await answer(ada.page, 'Spanking, giving', 'Love');
+			await openRow(ada.page, 'Spanking');
+			await expect(ada.page.getByText('Just for Jun', { exact: true })).toBeVisible();
+			await openRow(ada.page, 'Caning');
+			await ada.page
+				.locator('.kink', { has: scale(ada.page, 'Caning, giving') })
+				.getByRole('checkbox', { name: "Don't show Jun this yet" })
+				.check();
 			// Flogging was never answered on her own list: it goes there, not to Jun's copy.
-			await answer(ada.page, 'Flogging', 'Like');
+			await answer(ada.page, 'Flogging, giving', 'Like');
 			await saved(ada.page);
 
-			await ada.page.goto('/playroom/kink-list/impact');
-			await waitForHydration(ada.page);
+			await openList(ada.page);
 			await expect(
-				ada.page
-					.getByRole('group', { name: 'Spanking', exact: true })
-					.getByRole('radio', { name: 'Like' })
+				scale(ada.page, 'Spanking, giving').getByRole('radio', { name: 'Like' })
 			).toBeChecked();
 			await expect(
-				ada.page
-					.getByRole('group', { name: 'Flogging', exact: true })
-					.getByRole('radio', { name: 'Like' })
+				scale(ada.page, 'Flogging, giving').getByRole('radio', { name: 'Like' })
 			).toBeChecked();
 
-			// Jun shares his: Spanking Love.
-			await jun.page.goto('/playroom/kink-list/impact');
-			await waitForHydration(jun.page);
-			await answer(jun.page, 'Spanking', 'Love');
+			// Jun shares his: being spanked, Love — the half that fits Ada's spanking.
+			await openList(jun.page);
+			await answer(jun.page, 'Spanking, receiving', 'Love');
 			await saved(jun.page);
 			await jun.page.goto(partnerList);
 			await waitForHydration(jun.page);
@@ -395,12 +421,8 @@ test('a partner view starts you on your own list before offering to share it', a
 			0
 		);
 
-		await ada.page.goto('/playroom/kink-list/impact');
-		await waitForHydration(ada.page);
-		await ada.page
-			.getByRole('group', { name: 'Spanking', exact: true })
-			.getByText('Like', { exact: true })
-			.click();
+		await openList(ada.page);
+		await answer(ada.page, 'Spanking, giving', 'Like');
 		await saved(ada.page);
 		await ada.page.goto(`/playroom/kink-list/partner/${partnershipId}`);
 		await waitForHydration(ada.page);
@@ -418,9 +440,7 @@ test('a week without changes keeps a version, and history shows what moved', asy
 	await signUp(page, eve);
 	await openList(page);
 
-	await page.getByRole('link', { name: /Impact play/ }).click();
-	const spanking = page.getByRole('group', { name: 'Spanking', exact: true });
-	await spanking.getByText('Like', { exact: true }).click();
+	await answer(page, 'Spanking, giving', 'Like');
 	await saved(page);
 
 	// A week and a day without changes, without waiting for one.
@@ -431,7 +451,7 @@ test('a week without changes keeps a version, and history shows what moved', asy
 		[eightDays, eightDays, eve.email]
 	);
 
-	await spanking.getByText('Love', { exact: true }).click();
+	await answer(page, 'Spanking, giving', 'Love');
 	await saved(page);
 
 	const { rows } = await sql(
@@ -443,13 +463,44 @@ test('a week without changes keeps a version, and history shows what moved', asy
 	expect(rows).toHaveLength(1);
 	expect(String(rows[0]?.ciphertext)).toMatch(/^sb1\./);
 
-	await page.getByRole('link', { name: 'All categories' }).click();
 	await page.getByRole('link', { name: 'See how your list has changed' }).click();
 	await expect(page.getByRole('heading', { name: 'Versions (1)' })).toBeVisible();
 	const moreInto = page.getByRole('region', { name: 'More into (1)' });
-	await expect(moreInto.getByText('Spanking', { exact: true })).toBeVisible();
+	await expect(moreInto.getByText('Spanking (Giving)', { exact: true })).toBeVisible();
 	await expect(moreInto.getByText('Like → Love')).toBeVisible();
 
 	await moreInto.getByRole('button', { name: 'Over time for Spanking' }).click();
 	await expect(moreInto.getByRole('listitem').filter({ hasText: /^\s*Now/ })).toContainText('Love');
+});
+
+test('a partner view starts on the side who is in control puts you on', async ({ browser }) => {
+	const ada = await newSide(browser, 'Ada');
+	const jun = await newSide(browser, 'Jun');
+	try {
+		await signUp(ada.page, ada.who);
+		await signUp(jun.page, jun.who);
+		// Ada is in control: with Jun, she is on the dom side.
+		await linkAccounts(ada, jun, 'me');
+		const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
+		await openList(ada.page);
+		await answer(ada.page, 'Spanking, giving', 'Like');
+		await saved(ada.page);
+		// Her own list is not narrowed: that is a choice she has not made.
+		await expect(ada.page.getByRole('radio', { name: 'Both', exact: true })).toBeChecked();
+
+		await ada.page.goto(`/playroom/kink-list/partner/${partnershipId}`);
+		await waitForHydration(ada.page);
+		await clickWaButton(ada.page, 'Share my list with Jun');
+		await expect(ada.page.getByRole('radio', { name: 'Dom', exact: true })).toBeChecked();
+		await expect(ada.page.getByText("Set from who's in control")).toBeVisible();
+		await expect(scale(ada.page, 'Spanking, giving')).toBeVisible();
+		await expect(scale(ada.page, 'Spanking, receiving')).toHaveCount(0);
+
+		// Changing it lasts for the visit, and leaves her own list's alone.
+		await ada.page.getByRole('radio', { name: 'Both', exact: true }).check();
+		await expect(scale(ada.page, 'Spanking, receiving')).toBeVisible();
+	} finally {
+		await ada.close();
+		await jun.close();
+	}
 });

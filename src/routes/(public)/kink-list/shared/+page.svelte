@@ -84,7 +84,12 @@
 	</div>
 
 	{#if comparing}
-		<CompareView mine={store.list} theirs={shared.list} theirName={shared.name} />
+		<CompareView
+			mine={store.list}
+			theirs={shared.list}
+			theirName={shared.name}
+			side={store.filters.side}
+		/>
 	{:else}
 		<SharedListView list={shared.list} />
 	{/if}

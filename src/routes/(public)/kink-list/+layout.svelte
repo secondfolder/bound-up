@@ -15,7 +15,6 @@
 		store,
 		paths: {
 			home: resolve('/(public)/kink-list'),
-			category: (category) => resolve('/(public)/kink-list/[category]', { category }),
 			quick: resolve('/(public)/kink-list/quick'),
 			transfer: resolve('/(public)/kink-list/transfer')
 		}

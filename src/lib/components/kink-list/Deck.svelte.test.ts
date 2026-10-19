@@ -46,9 +46,13 @@ describe('Deck', () => {
 		await userEvent.keyboard('7');
 		expect(store.list.answers.romance?.level).toBe('love');
 		await userEvent.keyboard('{ArrowLeft}');
-		expect(store.list.answers.kissing?.level).toBe('not-for-me');
+		// Kissing has a role pair: an answer for both is the same answer on each side.
+		expect(store.list.answers.kissing?.sides).toEqual({
+			a: { level: 'not-for-me' },
+			b: { level: 'not-for-me' }
+		});
 		await userEvent.keyboard('{Backspace}');
-		expect(store.list.answers.kissing?.level).toBeUndefined();
+		expect(store.list.answers.kissing?.sides).toBeUndefined();
 		expect(await screen.findByRole('heading', { name: 'Kissing' })).toBeInTheDocument();
 		await userEvent.keyboard('s');
 		expect(store.list.skipped.kissing?.skipped).toBe(true);
@@ -63,6 +67,24 @@ describe('Deck', () => {
 		waButton(container, 'Love').click();
 		expect(store.list.answers.kissing).toMatchObject({ sides: { b: { level: 'love' } } });
 		expect(store.list.answers.kissing?.level).toBeUndefined();
+	});
+
+	it('starts a leaning kink on your own side, once your side is set', async () => {
+		const store = freshStore();
+		store.list = {
+			...store.list,
+			settings: { ...store.list.settings, side: 'sub' },
+			triage: Object.fromEntries(
+				categories()
+					.filter((category) => category.id !== 'impact')
+					.map((category) => [category.id, { value: 'skip' as const, at: 1 }])
+			)
+		};
+		const { container } = await renderDeck(store);
+		expect(screen.getByRole('heading', { name: 'Spanking' })).toBeInTheDocument();
+		expect(screen.getByRole('radio', { name: 'Receiving' })).toBeChecked();
+		waButton(container, 'Love').click();
+		expect(store.list.answers.spanking?.sides).toEqual({ b: { level: 'love' } });
 	});
 
 	it('holds a Conditional card for its note, then moves on', async () => {
@@ -88,7 +110,7 @@ describe('Deck', () => {
 		// A handful of cards: every category but one skipped, and only the gentlest shown.
 		store.list = {
 			...store.list,
-			settings: { maxIntensity: 0, at: 1 },
+			settings: { maxIntensity: 0, minCommonness: 0, side: 'both', at: 1 },
 			triage: Object.fromEntries(
 				categories()
 					.filter((category) => category.id !== 'intimacy')

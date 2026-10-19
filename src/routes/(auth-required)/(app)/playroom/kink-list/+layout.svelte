@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onDestroy, type Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
+	import UnreadableList from '$lib/components/kink-list/UnreadableList.svelte';
 	import { currentVaults } from '$lib/crypto/vaults.svelte';
-	import { ACCOUNT_LIST_UNREADABLE, AccountKinkList } from '$lib/kink-list/account-store.svelte';
+	import { AccountKinkList } from '$lib/kink-list/account-store.svelte';
 	import { setKinkListContext } from '$lib/kink-list/context';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 	import type { LayoutData } from './$types';
@@ -19,8 +20,6 @@
 		store,
 		paths: {
 			home: resolve('/(auth-required)/(app)/playroom/kink-list'),
-			category: (category) =>
-				resolve('/(auth-required)/(app)/playroom/kink-list/[category]', { category }),
 			quick: resolve('/(auth-required)/(app)/playroom/kink-list/quick'),
 			transfer: resolve('/(auth-required)/(app)/playroom/kink-list/transfer'),
 			history: resolve('/(auth-required)/(app)/playroom/kink-list/history')
@@ -70,8 +69,7 @@
 	{#if store.state === 'ready'}
 		{@render children()}
 	{:else if store.state === 'unreadable'}
-		<h1>Kink list</h1>
-		<p class="quiet">{ACCOUNT_LIST_UNREADABLE} Reload to try again.</p>
+		<UnreadableList {store} />
 	{:else}
 		<h1>Kink list</h1>
 		<p class="quiet" aria-busy="true">{PENDING_TEXT}</p>

@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { catalog, depthOf, type KinkItem, kinkById, primaryCategoryOf } from './catalog';
+import {
+	catalog,
+	depthOf,
+	domSideOf,
+	type KinkItem,
+	kinkById,
+	leanOf,
+	primaryCategoryOf,
+	sidesOf
+} from './catalog';
 
 /**
  * Answers to the kink list: their shape, the rules for what an unanswered kink
@@ -149,12 +158,67 @@ export type CustomKink = z.output<typeof customSchema>;
 const triageSchema = z.object({ value: z.enum(['skip', 'limit', 'none']), at });
 export type TriageValue = z.output<typeof triageSchema>['value'];
 
+/**
+ * Which side someone is on, for hiding what leans the other way: a kink's
+ * dom context from a sub, a sub-only kink from a dom. `both` hides nothing.
+ */
+export const YOUR_SIDES = ['dom', 'sub', 'both'] as const;
+export type YourSide = (typeof YOUR_SIDES)[number];
+export const YOUR_SIDE_LABELS: Record<YourSide, string> = { dom: 'Dom', sub: 'Sub', both: 'Both' };
+
+/**
+ * One answer in the shape its kink takes: a kink with a role pair is answered
+ * per side only, and one without is answered whole only. A whole answer on a
+ * role kink — from quick fill's "Both", an import that had no sides, or a
+ * list from before contexts were always shown — becomes the same answer on
+ * each side. A sided answer on a kink with no pair keeps its first side.
+ *
+ * Done when a list is parsed and when an answer is set, so nothing past those
+ * two points ever has to ask which shape it is looking at; the history, the
+ * comparison and the exports all read one shape.
+ */
+export function normaliseAnswer<A extends Answer>(key: ItemKey, answer: A): A {
+	const item = kinkById(key);
+	const sided = item !== undefined && sidesOf(item) !== null;
+	if (sided && (answer.level !== undefined || answer.detail !== undefined)) {
+		const whole = { level: answer.level, detail: answer.detail };
+		const side = (current: Side | undefined): Side => {
+			const level = current?.level ?? whole.level;
+			const detail = current?.detail ?? whole.detail;
+			return { ...(level ? { level } : {}), ...(detail ? { detail } : {}) };
+		};
+		const { level: _level, detail: _detail, ...rest } = answer;
+		return { ...rest, sides: { a: side(answer.sides?.a), b: side(answer.sides?.b) } } as A;
+	}
+	if (!sided && answer.sides !== undefined) {
+		const first = answer.sides.a ?? answer.sides.b;
+		const { sides: _sides, ...rest } = answer;
+		const level = answer.level ?? first?.level;
+		const detail = answer.detail ?? first?.detail;
+		return { ...rest, ...(level ? { level } : {}), ...(detail ? { detail } : {}) } as A;
+	}
+	return answer;
+}
+
+export function normaliseAnswers<A extends Answer>(answers: Record<string, A>): Record<string, A> {
+	return Object.fromEntries(
+		Object.entries(answers).map(([key, answer]) => [key, normaliseAnswer(key, answer)])
+	);
+}
+
 export const listPayloadSchema = z.object({
-	answers: z.record(itemKey, answerSchema),
+	answers: z.record(itemKey, answerSchema).transform(normaliseAnswers),
 	triage: z.record(z.string().regex(CATALOG_ID), triageSchema),
 	custom: z.record(z.string().regex(CUSTOM_KEY), customSchema),
 	settings: z.object({
 		maxIntensity: z.number().int().min(0).max(6),
+		/**
+		 * Kinks less common than this are hidden: 0 rare … 4 very common.
+		 * Defaulted, like `side`, so a list saved before either existed still
+		 * opens rather than being refused as unreadable.
+		 */
+		minCommonness: z.number().int().min(0).max(4).default(catalog.commonness.defaultMin),
+		side: z.enum(YOUR_SIDES).default('both'),
 		at
 	}),
 	/** Cards skipped in the quick-fill deck, and when; `false` puts one back. */
@@ -167,7 +231,12 @@ export function emptyList(): ListPayload {
 		answers: {},
 		triage: {},
 		custom: {},
-		settings: { maxIntensity: catalog.intensity.defaultMax, at: 0 },
+		settings: {
+			maxIntensity: catalog.intensity.defaultMax,
+			minCommonness: catalog.commonness.defaultMin,
+			side: 'both',
+			at: 0
+		},
 		skipped: {}
 	};
 }
@@ -268,9 +337,48 @@ export function intensityOf(key: ItemKey): number {
 	return kinkById(key)?.intensity ?? 0;
 }
 
-/** Whether an item is within the list's intensity maximum. */
-export function isShown(list: ListPayload, item: KinkItem): boolean {
-	return item.intensity <= list.settings.maxIntensity;
+// ── filters ──────────────────────────────────────────────────────────────────
+
+/** What decides which kinks a list shows: its settings, with the side a partner's view may change. */
+export type Filters = { maxIntensity: number; minCommonness: number; side: YourSide };
+
+export function filtersOf(list: ListPayload): Filters {
+	const { maxIntensity, minCommonness, side } = list.settings;
+	return { maxIntensity, minCommonness, side };
+}
+
+/**
+ * Whether a catalogue item is shown: within the intensity maximum, at least as
+ * common as the minimum, and not a one-sided kink for the other side. A role
+ * kink is shown whatever the side — it is its contexts that are filtered
+ * (`shownSides`). Custom kinks are not catalogue items, and nothing hides them.
+ */
+export function isShown(item: KinkItem, filters: Filters): boolean {
+	if (item.intensity > filters.maxIntensity) {
+		return false;
+	}
+	if ((item.commonness ?? 0) < filters.minCommonness) {
+		return false;
+	}
+	const lean = leanOf(item);
+	return filters.side === 'both' || lean === null || lean === filters.side;
+}
+
+/**
+ * The contexts of a role kink to show: both, unless the item leans and the
+ * side filter is set, in which case only the side's own. Null for an item
+ * without a role pair, which is answered whole.
+ */
+export function shownSides(item: KinkItem | undefined, side: YourSide): SideKey[] | null {
+	if (!(item && sidesOf(item))) {
+		return null;
+	}
+	const domSide = domSideOf(item);
+	if (side === 'both' || domSide === null) {
+		return ['a', 'b'];
+	}
+	const subSide = domSide === 'a' ? 'b' : 'a';
+	return [side === 'dom' ? domSide : subSide];
 }
 
 // ── merging ──────────────────────────────────────────────────────────────────

@@ -16,7 +16,14 @@
  */
 
 import { fromBase64Url, toBase64Url } from '../encryption';
-import { readSealedPayload, SEALED_FORMAT_V1, type SealedKind, sealedAad } from '../sealed';
+import {
+	readSealedPayload,
+	readSealedPayloadDiagnosed,
+	SEALED_FORMAT_V1,
+	type SealedKind,
+	type SealedReadFailure,
+	sealedAad
+} from '../sealed';
 import type { OpenVault } from './vault';
 import type { WriteGrant } from './write-grant';
 
@@ -82,6 +89,14 @@ export async function sealRecord<Latest>(
 	return { ciphertext, payloadVersion };
 }
 
+type SealedInput = {
+	recordId: string;
+	ciphertext: string;
+	payloadVersion: number;
+	vault: OpenVault;
+};
+type Diagnosed<Latest> = { ok: true; value: Latest } | ({ ok: false } & SealedReadFailure);
+
 /**
  * Opens a record and reads it as the kind's latest version, or returns null.
  *
@@ -89,6 +104,11 @@ export async function sealRecord<Latest>(
  * unknown version, a payload that fails its schema — because a screen renders
  * all of them the same way, as something it cannot show. Never a throw for
  * those, so one bad record cannot take a whole list down with it.
+ *
+ * Kept apart from `openRecordDiagnosed`, not written as a wrapper round it:
+ * any extra await moves when a record opens relative to the rendering around
+ * it, and that was enough to make a message thread miss its scroll to the
+ * newest message.
  */
 export async function openRecord<Latest>(
 	kind: SealedKind<Latest>,
@@ -139,6 +159,82 @@ export async function openRecord<Latest>(
 		return null;
 	}
 	return readSealedPayload(kind, payloadVersion, value);
+}
+
+/**
+ * `openRecord`, saying why when it cannot: for a record whose failure is
+ * worth a log line and a debug-mode note, like a whole kink list. The reason
+ * is safe to log (`SealedReadFailure`).
+ */
+export async function openRecordDiagnosed<Latest>(
+	kind: SealedKind<Latest>,
+	input: SealedInput
+): Promise<Diagnosed<Latest>> {
+	const bytes = sealedBytes(input.ciphertext);
+	if (!bytes) {
+		return { ok: false, reason: 'format' };
+	}
+	return readPlaintext(kind, input.payloadVersion, await decrypt(kind, input, bytes));
+}
+
+/** The IV and ciphertext out of a sealed string, or null for one that is not sealed. */
+function sealedBytes(ciphertext: string): Uint8Array<ArrayBuffer> | null {
+	if (!ciphertext.startsWith(SEALED_FORMAT_V1)) {
+		return null;
+	}
+	let bytes: Uint8Array<ArrayBuffer>;
+	try {
+		bytes = fromBase64Url(ciphertext.slice(SEALED_FORMAT_V1.length));
+	} catch {
+		return null;
+	}
+	return bytes.length <= IV_BYTES ? null : bytes;
+}
+
+/** The plaintext, or null when it does not authenticate. */
+async function decrypt(
+	kind: SealedKind<unknown>,
+	{ recordId, payloadVersion, vault }: SealedInput,
+	bytes: Uint8Array<ArrayBuffer>
+): Promise<string | null> {
+	try {
+		const opened = await crypto.subtle.decrypt(
+			{
+				name: 'AES-GCM',
+				iv: bytes.subarray(0, IV_BYTES),
+				additionalData: encoder.encode(
+					sealedAad({ kind: kind.name, recordId, vaultId: vault.id, version: payloadVersion })
+				)
+			},
+			vault.encryptionKey,
+			bytes.subarray(IV_BYTES)
+		);
+		return decoder.decode(opened);
+	} catch (error) {
+		// Every authentication failure is an OperationError with no detail, which
+		// is right: telling a wrong key from a moved row would be an oracle.
+		if (error instanceof DOMException && error.name === 'OperationError') {
+			return null;
+		}
+		throw error;
+	}
+}
+
+function readPlaintext<Latest>(
+	kind: SealedKind<Latest>,
+	payloadVersion: number,
+	plaintext: string | null
+): Diagnosed<Latest> {
+	if (plaintext === null) {
+		return { ok: false, reason: 'decrypt' };
+	}
+	let value: unknown;
+	try {
+		value = JSON.parse(plaintext);
+	} catch {
+		return { ok: false, reason: 'json' };
+	}
+	return readSealedPayloadDiagnosed(kind, payloadVersion, value);
 }
 
 /**

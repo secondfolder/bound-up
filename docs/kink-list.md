@@ -29,9 +29,34 @@ than reaching anyone.
 - **Intensity**, 0–6, from Sweet to Extreme. A list shows kinks up to its own
   maximum, which defaults to `defaultMax` (5), so Extreme is hidden until
   someone asks for it.
+- **Commonness**, 0–4, from Rare to Very common: how many people are into a
+  kink or know of it. It is independent of intensity: balloons are mild and
+  rare, choking intense and well known. A list shows kinks at least as common
+  as its own minimum, which defaults to `defaultMin` (1), so Rare is hidden
+  until someone asks for it. Every kink and specific has one, a category has
+  none, and a specific is never more common than its kink, since it is only
+  reached through it. The anchors the ratings were made against:
+  - Very common: kissing, oral, cuddling
+  - Common: spanking, blindfolds, dirty talk
+  - Fairly common: rope bondage, pet play, CNC
+  - Uncommon: sounding, macrophilia, balloons
+  - Rare: the rarest fetishes in the catalogue
+- **Role pairs.** `roles` names a pair of contexts for a kink that two people
+  do differently: Giving and Receiving, As dom and As sub, On me and On my
+  partner, and narrower ones such as As teacher and As student. Each pair in
+  the top-level `roles` has its two labels and a default `domSide`. Side `a`
+  is the active, giving, dom or self one, which is also how imports read a
+  column ("Giving", "Self", "As Dom" go to `a`).
+- **Which side leans dom.** The "Your side" filter needs to know which
+  context a dominant usually takes. dom-sub and aggressor-target say `a` for
+  every kink in them. Every other pair is neutral by default, and a kink sets
+  `domSide` itself where it leans: spanking's Giving is `a`, but giving
+  worship is the sub's, `b`. A specific with the same pair follows its kink.
+  A kink with no pair that is only ever one person's takes `lean` instead;
+  none needs it today, because the one-sided kinks were rewritten as neutral
+  kinks with a pair ("Following orders" became "Orders", "Being held down"
+  became "Pinning down"). Prefer that rewrite to a `lean`.
 - **Other fields:**
-  - `roles` names a role pair (giving and receiving, as dom and as sub, …)
-    for kinks that can be answered per side
   - `tags` are filters: degrading, public, others present, remote, risky, …
   - `aliases` are search terms: synonyms, slang and abbreviations ("fellatio",
     "BJ")
@@ -43,10 +68,17 @@ the review behind the categories are kept outside the repo, in
 `.local/kinks/`. **Descriptions are original**: one source list is CC BY-SA,
 and copying its wording would put its share-alike licence on ours.
 
-**`share-ids.json` is append-only.** Share links and exports refer to kinks by
-their position in it, so an existing id never moves. A new kink goes on the
-end, and a removed one stays as a tombstone. The loader fails if a catalogue
-id is missing from it.
+**`share-ids.json` is append-only from the first deploy.** Share links and
+exports refer to kinks by their position in it, so once a list has been
+shared, an existing id never moves. A new kink goes on the end, and a removed
+one stays as a tombstone. The loader fails if a catalogue id is missing from
+it. Until the kink list is deployed anywhere, ids may still be renamed in
+place, as three were when the one-sided kinks were rewritten.
+
+**Changing a kink's pair, or swapping its sides, flips saved answers.**
+Answers are stored as `a` and `b`, so after the first deploy a pair may only
+change where `a` keeps its meaning, and the import snapshots in
+`import/lists/` have to follow.
 
 ## Answers
 
@@ -59,12 +91,15 @@ mind, Curious, Like, Love.** Conditional, Curious, Like and Love count as yes
 
 An answer can also have:
 
-- **sides**: `a` and `b` of the kink's role pair, each answered on its own.
-  Turning that on starts both sides from the answer as it was. Turning it off
-  keeps the first side's answer.
+- **sides**: `a` and `b` of the kink's role pair. **A kink with a pair is
+  answered per side only, and one without is answered whole only**
+  (`normaliseAnswer`). A whole answer on a role kink — quick fill's "Both", an
+  import with no sides — becomes the same answer on each side. It is applied
+  when a list is parsed and when an answer is set, so everything past those
+  two points (comparing, history, exports) reads one shape.
 - **a detailed answer**: three sliders from 0 to 4. They are *into it as a
   fantasy*, *into actually doing it*, and *experience*. Each can be left
-  unset, and they apply per side when the sides are split.
+  unset, and they apply per side for a kink with a pair.
 - **a note**, free text up to 1000 characters, on any kink, answered or not.
   Notes are for conditions ("only with a condom") and anything else.
 
@@ -139,11 +174,27 @@ screens are.
     per key, and tries again.
   - **A list this device cannot open** is left alone: the store refuses
     changes rather than writing over it with only what was changed here.
+    [`UnreadableList`](../src/lib/components/kink-list/UnreadableList.svelte)
+    shows instead, with a way out for each likely cause, mildest first:
+    reload, sign out and back in (this device's keys are not the ones the
+    list is sealed with), and last, start a new list. Starting over sends
+    `keepVersion` with its first save, so the server keeps the list it
+    replaces as a version however recently it changed: nothing is lost that a
+    later fix could not bring back.
+  - **Why it would not open** is worked out by `openRecordDiagnosed`
+    (`crypto/sealed.ts`): the wrong format, a failed decryption, bad JSON, an
+    unknown version, or a schema that refused it, with the paths and Zod
+    issue codes where it did. It is logged to the console and shown in debug
+    mode — never a value, since those are the sealed content. The server
+    cannot read a list, so it cannot say why; it logs only that one was
+    replaced and kept.
+  - New settings are defaulted in the schema rather than required, so a list
+    saved before one existed still opens.
 - **`DeviceKinkList`** ([`device-store.svelte.ts`](../src/lib/kink-list/device-store.svelte.ts))
   keeps the same payload in `localStorage`, for someone signed out.
 
-The layout builds the store once, so moving between categories never reopens
-the list or drops an unsaved answer.
+The layout builds the store once, so moving between the list and quick fill
+never reopens it or drops an unsaved answer.
 
 **Nothing typed is lost.** [`SaveStatus`](../src/lib/components/kink-list/SaveStatus.svelte)
 shows Saved, Saving… or the failure with a retry. While anything is unsaved,
@@ -152,22 +203,74 @@ failed save.
 
 ## The screens
 
-- **`/playroom/kink-list`**
-  ([`KinkListHome`](../src/lib/components/kink-list/KinkListHome.svelte)):
-  - search over names and aliases (`searchKinks`) and custom kinks
-  - the intensity maximum
-  - every category by section, with how much of it is answered
-- **`/playroom/kink-list/[category]`**
-  ([`KinkCategory`](../src/lib/components/kink-list/KinkCategory.svelte)):
-  - the category's kinks
-  - its custom kinks, with "Add your own"
-  - "N related kinks"
-- **Each kink** ([`KinkRow`](../src/lib/components/kink-list/KinkRow.svelte)):
-  - the scale ([`AnswerScale`](../src/lib/components/kink-list/AnswerScale.svelte),
-    native radios, because the state is `checked`)
-  - "More detail and notes", for the per-side switch, the three sliders
-    (`OptionalSlider`, shared with Daydreams) and the note
-  - "Get specific" for its specifics
+**The whole list is one page**, `/playroom/kink-list`
+([`KinkListHome`](../src/lib/components/kink-list/KinkListHome.svelte)), dense
+enough to fill in without a click per category:
+
+- search over names and aliases (`searchKinks`) and custom kinks
+- the filters ([`ListFilters`](../src/lib/components/kink-list/ListFilters.svelte))
+- pinned above the list as it scrolls: the key to the answer colours
+  ([`LevelKey`](../src/lib/components/kink-list/LevelKey.svelte)), "Your
+  side" ([`YourSideControl`](../src/lib/components/kink-list/YourSideControl.svelte)),
+  and Expand all / Collapse all
+- every category by section, each a `wa-details`
+  ([`KinkCategory`](../src/lib/components/kink-list/KinkCategory.svelte))
+  that starts open and folds away, with how much of it is answered, its
+  custom kinks and "Add your own", and "N related kinks". Folding is not
+  stored. A category has no page of its own: `id="category-<id>"` is the
+  anchor.
+
+**Each kink is one line**, two at most
+([`KinkRow`](../src/lib/components/kink-list/KinkRow.svelte)): its name on
+the left, and on the right a row of dots per context
+([`AnswerScale`](../src/lib/components/kink-list/AnswerScale.svelte)).
+
+- **The dots** are native radios, because the state is `checked`, coloured
+  by level from the `--kink-level-*` tokens in `theme.css`. The no side runs
+  red, orange, yellow, then grey for Don't mind; the yes side is one green
+  that gets stronger toward Love, so the yeses read as more of one answer.
+  Colour is never the only cue: each radio is named by its word, each dot
+  has it as a tooltip, the position on the scale is fixed, and the key says
+  which is which. A chosen dot is filled with a check; choosing it again
+  clears it. An inherited answer is a dashed ring.
+- **A kink with a role pair always shows both contexts**, side by side with
+  their labels, or stacked under the name on a phone. "Your side" can narrow
+  it to one.
+- **The name opens the rest** under the row: the description and safety
+  note, each context's answer in words ("Love, from Spanking") with Clear,
+  the three sliders per context (`OptionalSlider`, shared with Daydreams),
+  the note, a partner view's controls, aliases, and the specifics as nested
+  rows. The closed row flags a note, how many specifics there are, and an
+  answer that is just for a partner.
+
+### The filters
+
+Two sliders, saved in the list's `settings` and shared by every screen
+through one helper, `isShown`:
+
+- **How intense**, Sweet to Extreme: kinks above it are hidden.
+- **How common**, Very common to Rare: kinks less common are hidden. The
+  slider runs from very common to rare so that, as on intensity, moving right
+  shows more.
+
+Search ignores both, so anything can be found by name, and custom kinks are
+never hidden. A category says how many of its kinks the filters hide.
+
+### Your side
+
+Dom, Sub or Both. Dom or Sub hides the context of a kink that leans the other
+way (`shownSides`), and any one-sided kink for the other side; neutral kinks
+and contexts always show. The store's `filters` carry it, so the list, quick
+fill (which starts each card on your context) and comparing all follow it.
+
+- **On your own list** it is a setting, `settings.side`, and starts on Both:
+  there is nothing to guess it from.
+- **In a partner's view** it starts from that partnership's "Who's in
+  control" (`sideFromControl`, from `answerFromControl` in `partnership.ts`):
+  whoever holds control starts on Dom, the other on Sub, and shared control
+  on Both. Changing it lasts for the visit, kept in `PartnerKinkList`: it is
+  a lens on the list, not part of it, so it is neither sealed nor shared, and
+  the next visit starts from control again.
 
 ## Quick fill
 
@@ -260,7 +363,7 @@ panel works signed in and signed out.
   - categories limited wholesale (they change what other kinks show)
   - an optional name
 
-  Quick-fill skips and the intensity setting stay on the device. A list
+  Quick-fill skips, the filters and your side stay on the device. A list
   answered all the way through is under 4,000 characters.
 - **`k1` is the format.** A new shape gets `k2`, and readers keep reading every
   format ever written. A kink number this build does not know is dropped, not
@@ -285,6 +388,10 @@ using effective answers.
   their receiving, my "as dom" with their "as sub", and my "on me" with their
   "on my partner" ("On you"). A kink answered for both sides yields both
   pairings, each labelled with its sides.
+- **Your side narrows it** (`pairingsFor`). Comparing as a sub keeps only the
+  pairings where my half is the sub one — my being spanked against their
+  spanking — and leaves out the kinks only a dom has. Neutral contexts are
+  always compared, and limits always listed.
 - **Groups** ([`CompareView`](../src/lib/components/kink-list/CompareView.svelte)):
   - **You both want this:** both Like or Love
   - **Worth exploring:** both a yes, one only Curious
@@ -482,20 +589,23 @@ is set by the signed-in layout alone.
 
 ## Tests
 
-- **`kink-list/catalog.test.ts`:** the catalogue's checks, search, and the
-  tree.
+- **`kink-list/catalog.test.ts`:** the catalogue's checks (commonness,
+  `domSide` and `lean` included), search, and the tree.
 - **`kink-list/answers.test.ts`:** the effective answer (sides, specifics,
-  category limits, related kinks), merging, and the stored shape.
+  category limits, related kinks), merging, the stored shape, normalising an
+  answer to its kink's shape, defaulted settings, and the filters
+  (`isShown`, `shownSides`).
 - **`kink-list/deck.test.ts`:** the deck's order, drill-down after yes,
-  triage, intensity, custom kinks, and the review.
+  triage, intensity and commonness, custom kinks, and the review.
 - **`kink-list/share-link.test.ts`:** the round trip (sides, detail, notes,
   custom kinks, wholesale limits, a name), notes left out, the length of a
   full list, broken links, and unknown kink numbers.
-- **`kink-list/compare.test.ts`:** the groups, role-aware pairing, limits, and
-  overlap.
+- **`kink-list/compare.test.ts`:** the groups, role-aware pairing, limits,
+  overlap, and pairing by your side (`pairingsFor`).
 - **`kink-list/partner.test.ts`:** following your own list, overrides taken
   back, what the partner sees (held back, custom kinks, limits), where an
-  answer goes, differences, and merging.
+  answer goes, differences, merging, and the side who is in control starts
+  you on.
 - **`kink-list/import/*.test.ts`:**
   - the hash against the sites' own outputs
   - link detection and sides
@@ -507,16 +617,21 @@ is set by the signed-in layout alone.
   may write a scope; reading a partner's copy (members only, and only the
   other member's), and listing shared copies; versions kept after a quiet
   week (with an injected `now`), none within one, none for a lost race or a
-  partner's copy, and each version starting where the last ended.
+  partner's copy, and each version starting where the last ended; and a
+  fresh start keeping the list it replaced, however recent.
 - **`kink-list/history.test.ts`:** changes grouped by direction, limits, each
   side on its own, experience and notes, and a kink's timeline.
-- **`components/kink-list/KinkRow.svelte.test.ts`:** answering, inherited
-  answers, the sides, notes, related kinks and the intensity setting.
+- **`components/kink-list/KinkRow.svelte.test.ts`:** answering and clearing
+  from the dots, both contexts of a role kink, your side narrowing one,
+  inherited answers, the open panel, notes, a category starting open and
+  folding, related kinks, both filters, and the filter and side controls.
 - **`components/kink-list/Deck.svelte.test.ts`:** buttons, keys, undo, skip,
-  one side, a held Conditional card, and the end of the deck.
+  one side, a card starting on your side, a held Conditional card, and the
+  end of the deck.
 - **`e2e/kink-list.spec.ts`:** answers that are sealed and survive a reload,
-  search by alias, a related kink answered in either place, and quick fill on
-  a phone (triage, a real swipe, a button, and a category ruled out).
+  a category folding and opening, your side hiding contexts and surviving a
+  reload, search by alias, a related kink answered in either place, and quick
+  fill on a phone (triage, a real swipe, a button, and a category ruled out).
   - Signed out: a list kept on the device, shared as a link and opened
     elsewhere, then compared; the device's answers joining the account at
     sign-up; the public list redirecting someone signed in; and a shared link
@@ -526,6 +641,9 @@ is set by the signed-in layout alone.
   - Two partners: sharing, an override and a held-back kink for one partner,
     an answer from the partner view going on your own list, comparing, and
     blind comparing set by the other side.
+  - A partner view starting on the dom side for whoever is in control.
   - A list aged a week with `sql()`, edited, and the version kept and shown
     on the history page.
-- **The sealed fixture** for `kink-list` v1 is in `sealed-fixtures/`.
+- **The sealed fixture** for `kink-list` v1 is in `sealed-fixtures/`. Its
+  `expected` moved when answers began to be normalised and settings
+  defaulted: v1 has never been deployed, the README's one exception.

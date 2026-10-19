@@ -304,6 +304,24 @@ describe('version history', () => {
 		);
 	});
 
+	it('keeps the list a fresh start replaces, however recently it changed', async () => {
+		// "Start a new list", on a list its owner's device could not open.
+		const id = crypto.randomUUID();
+		await save(id, 'unreadable', null, start);
+		const content = await selfContent(ada.id, 'empty');
+		const result = await saveKinkList(db, ada.id, {
+			scope: 'self',
+			id,
+			content,
+			expectedRevision: 0,
+			keepVersion: true,
+			now: dayAfter(1)
+		});
+		expect(result.ok).toBe(true);
+		const versions = await listKinkListVersions(db, ada.id);
+		expect(versions.map((version) => version.sealed.ciphertext)).toEqual([saved.get('unreadable')]);
+	});
+
 	it('starts each version where the one before it ended', async () => {
 		const id = crypto.randomUUID();
 		await save(id, 'one', null, start);

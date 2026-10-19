@@ -456,9 +456,16 @@
 			"expected": {
 				"answers": {
 					"spanking": {
-						"level": "like",
 						"note": "Over the knee, please",
-						"at": 1792000000000
+						"at": 1792000000000,
+						"sides": {
+							"a": {
+								"level": "like"
+							},
+							"b": {
+								"level": "like"
+							}
+						}
 					},
 					"rimming": {
 						"sides": {
@@ -477,8 +484,15 @@
 						"at": 1792000000001
 					},
 					"face-slapping": {
-						"level": "limit",
-						"at": 1792000000002
+						"at": 1792000000002,
+						"sides": {
+							"a": {
+								"level": "limit"
+							},
+							"b": {
+								"level": "limit"
+							}
+						}
 					},
 					"custom:0123456789abcdef": {
 						"level": "conditional",
@@ -512,7 +526,9 @@
 				},
 				"settings": {
 					"maxIntensity": 5,
-					"at": 1792000000008
+					"at": 1792000000008,
+					"minCommonness": 1,
+					"side": "both"
 				},
 				"skipped": {
 					"tickling": {
@@ -530,9 +546,16 @@
 			"expected": {
 				"overrides": {
 					"spanking": {
-						"level": "love",
 						"note": "Only with you",
-						"at": 1792000000010
+						"at": 1792000000010,
+						"sides": {
+							"a": {
+								"level": "love"
+							},
+							"b": {
+								"level": "love"
+							}
+						}
 					},
 					"caning": {
 						"at": 1792000000011
@@ -551,9 +574,16 @@
 				"resolved": {
 					"answers": {
 						"spanking": {
-							"level": "love",
 							"note": "Only with you",
-							"at": 1792000000010
+							"at": 1792000000010,
+							"sides": {
+								"a": {
+									"level": "love"
+								},
+								"b": {
+									"level": "love"
+								}
+							}
 						},
 						"rimming": {
 							"sides": {

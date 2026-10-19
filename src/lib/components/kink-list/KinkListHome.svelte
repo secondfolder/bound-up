@@ -1,24 +1,21 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { adopted } from '$lib/kink-list/adopted.svelte';
-	import { isAnswered } from '$lib/kink-list/answers';
-	import {
-		catalog,
-		categories,
-		childrenOf,
-		type KinkItem,
-		searchKinks
-	} from '$lib/kink-list/catalog';
+	import { catalog, categories, searchKinks } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
-	import IntensitySetting from './IntensitySetting.svelte';
+	import KinkCategory from './KinkCategory.svelte';
 	import KinkRow from './KinkRow.svelte';
+	import LevelKey from './LevelKey.svelte';
+	import ListFilters from './ListFilters.svelte';
 	import SaveStatus from './SaveStatus.svelte';
 	import ShareLink from './ShareLink.svelte';
+	import YourSideControl from './YourSideControl.svelte';
 
 	/**
-	 * The kink list's front page: search, how intense a list to show, and
-	 * every category by section with how much of it is answered. Each
-	 * category opens a page of its own.
+	 * The whole kink list on one page: search, the filters, and every category
+	 * by section, each a section that starts open and folds away, with its
+	 * kinks one to a line. The key to the answer dots and "Your side" stay
+	 * pinned above it while it scrolls.
 	 */
 	let {
 		intro,
@@ -55,16 +52,15 @@
 		return () => node.removeEventListener('input', onInput);
 	}
 
-	/** "3 of 12": how much of a category is answered, within the intensity setting. */
-	function progress(category: KinkItem): string {
-		const kinks = childrenOf(category.id).filter(
-			(kink) => kink.intensity <= store.list.settings.maxIntensity
-		);
-		const custom = store.customKinks(category.id);
-		const answered =
-			kinks.filter((kink) => isAnswered(store.list.answers[kink.id])).length +
-			custom.filter(([key]) => isAnswered(store.list.answers[key])).length;
-		return `${answered} of ${kinks.length + custom.length}`;
+	let sectionsEl: HTMLElement | undefined = $state();
+
+	/** Opens or folds every category at once. Not stored: each visit starts open. */
+	function setAllOpen(open: boolean) {
+		for (const details of sectionsEl?.querySelectorAll<HTMLElement & { open: boolean }>(
+			'wa-details.category'
+		) ?? []) {
+			details.open = open;
+		}
 	}
 </script>
 
@@ -98,7 +94,20 @@
 			with-clear
 			{@attach searchField}
 		></wa-input>
-		<IntensitySetting />
+		<ListFilters />
+	</div>
+
+	<div class="pinned">
+		<LevelKey />
+		<div class="pinned-row">
+			<YourSideControl />
+			{#if !query.trim()}
+				<span class="fold">
+					<button type="button" class="link" onclick={() => setAllOpen(true)}>Expand all</button>
+					<button type="button" class="link" onclick={() => setAllOpen(false)}>Collapse all</button>
+				</span>
+			{/if}
+		</div>
 	</div>
 
 	{#if query.trim()}
@@ -124,21 +133,16 @@
 			{/if}
 		{/if}
 
-		{#each Object.entries(catalog.sections) as [section, title] (section)}
-			<section class="section" aria-labelledby="section-{section}">
-				<h2 id="section-{section}">{title}</h2>
-				<ul class="categories">
+		<div class="sections" bind:this={sectionsEl}>
+			{#each Object.entries(catalog.sections) as [section, title] (section)}
+				<section class="section" aria-labelledby="section-{section}">
+					<h2 id="section-{section}">{title}</h2>
 					{#each categories(section) as category (category.id)}
-						<li>
-							<a href={paths.category(category.id)}>
-								<span class="name">{category.name}</span>
-								<span class="count">{progress(category)}</span>
-							</a>
-						</li>
+						<KinkCategory {category} />
 					{/each}
-				</ul>
-			</section>
-		{/each}
+				</section>
+			{/each}
+		</div>
 	{/if}
 </div>
 
@@ -165,20 +169,64 @@
 	}
 
 	.controls {
-		display: grid;
-		grid-template-columns: 1fr;
+		display: flex;
+		flex-direction: column;
 		gap: 0.75rem;
+	}
 
-		@media (min-width: 600px) {
-			grid-template-columns: 2fr 1fr;
-		}
+	/* Pinned to the top of whatever scrolls: the app shell's <main>, or the
+	   window on the public list. Opaque, so rows scrolling under it don't
+	   show through. */
+	.pinned {
+		position: sticky;
+		inset-block-start: 0;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		/* Out over the page's gutters, so rows scrolling under it are hidden
+		   edge to edge rather than showing at its sides. */
+		margin-inline: -1rem;
+		padding: 0.5rem 1rem;
+		background: var(--wa-color-surface-lowered);
+		border-block-end: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+	}
+
+	.pinned-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.375rem 1rem;
+	}
+
+	.fold {
+		display: flex;
+		gap: 0.75rem;
+		font-size: 0.875rem;
+	}
+
+	.link {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--wa-color-brand-on-quiet);
+		font: inherit;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.sections {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
 	}
 
 	.results,
 	.section {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.5rem;
 
 		h2 {
 			margin: 0;
@@ -192,44 +240,5 @@
 
 	.transfer {
 		margin: 0;
-	}
-
-	.categories {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-		gap: 0.5rem;
-
-		/* Web Awesome's native styles indent every <li> for its marker; a
-		   grid of cards has none. */
-		li {
-			margin: 0;
-		}
-
-		a {
-			display: flex;
-			justify-content: space-between;
-			align-items: baseline;
-			gap: 0.5rem;
-			padding: 0.75rem 1rem;
-			border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-			border-radius: var(--wa-border-radius-l);
-			background: var(--wa-color-surface-default);
-			color: inherit;
-			text-decoration: none;
-
-			&:hover,
-			&:focus-visible {
-				border-color: var(--wa-color-brand-border-loud);
-			}
-		}
-
-		.count {
-			font-size: 0.8125rem;
-			color: var(--wa-color-text-quiet);
-			white-space: nowrap;
-		}
 	}
 </style>

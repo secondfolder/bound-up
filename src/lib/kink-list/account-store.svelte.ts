@@ -6,9 +6,10 @@
  * opened after hydration, once the vaults are worked out.
  */
 
-import { openRecord } from '../crypto/sealed';
+import { openRecord, openRecordDiagnosed } from '../crypto/sealed';
 import { selfVault, vaultById, vaultsSettled } from '../crypto/vaults.svelte';
 import { describeRequestFailure, tryFetch } from '../request-failure.svelte';
+import type { SealedReadFailure } from '../sealed';
 import { sealForSubmit } from '../sealed-forms';
 import { kinkListKind } from '../sealed-kinds/kink-list';
 import type { KinkListView } from '../types';
@@ -32,6 +33,19 @@ export class AccountKinkList extends KinkListStore {
 	 */
 	afterSave: ((list: ListPayload, revision: number) => void) | null = null;
 
+	/**
+	 * Why the saved list would not open, when `state` is `unreadable`: logged,
+	 * and shown in debug mode. Never anything from inside the list.
+	 */
+	failure = $state.raw<SealedReadFailure | null>(null);
+
+	/**
+	 * Set by `startOver`: the next save asks the server to keep the list it
+	 * replaces as a version, whatever its age, so the copy that would not
+	 * open is still there once whatever broke it is fixed.
+	 */
+	#keepReplaced = false;
+
 	/** The revision of the list as last saved, or null before the first save. */
 	get revision(): number | null {
 		return this.#saved.revision;
@@ -51,13 +65,40 @@ export class AccountKinkList extends KinkListStore {
 			this.state = 'ready';
 			return;
 		}
-		const opened = await openSealedList(this.#view);
-		if (opened) {
-			this.list = opened;
+		const opened = await openOwnListDiagnosed(this.#view.sealed);
+		if (opened.ok) {
+			this.list = opened.value;
 			this.state = 'ready';
-		} else {
-			this.state = 'unreadable';
+			return;
 		}
+		const { ok: _ok, ...failure } = opened;
+		this.failure = failure;
+		this.state = 'unreadable';
+		// The one place the reason is known: the server cannot read the list,
+		// so it cannot say what is wrong with it. Paths and codes only.
+		console.error('[kink-list] Your own list could not be opened on this device', {
+			listId: this.#view.id,
+			revision: this.#view.revision,
+			payloadVersion: this.#view.sealed.payloadVersion,
+			...failure
+		});
+	}
+
+	/**
+	 * The last resort for a list that will not open: an empty list in its
+	 * place. The one it replaces is kept as a version on the server
+	 * (`keepVersion`), so starting over loses nothing that a later fix could
+	 * not bring back.
+	 */
+	async startOver(): Promise<void> {
+		if (this.state !== 'unreadable') {
+			return;
+		}
+		this.#keepReplaced = true;
+		this.failure = null;
+		this.state = 'ready';
+		this.change(emptyList());
+		await this.flush();
 	}
 
 	/** Folds another copy of a list into this one: a device's list joining the account. */
@@ -85,12 +126,14 @@ export class AccountKinkList extends KinkListStore {
 					vaultId: sealed.fields.vaultId,
 					ciphertext: sealed.fields.ciphertext,
 					payloadVersion: Number(sealed.fields.payloadVersion),
-					expectedRevision: this.#saved.revision
+					expectedRevision: this.#saved.revision,
+					keepVersion: this.#keepReplaced
 				})
 			});
 			if (response?.ok) {
 				const { revision } = (await response.json()) as { revision: number };
 				this.#saved = { ...this.#saved, revision };
+				this.#keepReplaced = false;
 				this.afterSave?.(current, revision);
 				return { status: 'saved' };
 			}
@@ -112,10 +155,6 @@ export class AccountKinkList extends KinkListStore {
 	}
 }
 
-async function openSealedList(view: KinkListView): Promise<ListPayload | null> {
-	return await openOwnList(view.sealed);
-}
-
 /** Opens your own list, or a version of it, sealed; null for one this device cannot open. */
 export async function openOwnList(sealed: KinkListView['sealed']): Promise<ListPayload | null> {
 	await vaultsSettled();
@@ -124,6 +163,15 @@ export async function openOwnList(sealed: KinkListView['sealed']): Promise<ListP
 		return null;
 	}
 	return await openRecord(kinkListKind, { ...sealed, vault });
+}
+
+async function openOwnListDiagnosed(sealed: KinkListView['sealed']) {
+	await vaultsSettled();
+	const vault = vaultById(sealed.vaultId) ?? selfVault();
+	if (!vault) {
+		return { ok: false, reason: 'no-vault' } as const;
+	}
+	return await openRecordDiagnosed(kinkListKind, { ...sealed, vault });
 }
 
 async function fetchLatest(): Promise<{ view: KinkListView; list: ListPayload } | null> {
@@ -135,6 +183,6 @@ async function fetchLatest(): Promise<{ view: KinkListView; list: ListPayload } 
 	if (!view) {
 		return null;
 	}
-	const list = await openSealedList(view);
+	const list = await openOwnList(view.sealed);
 	return list ? { view, list } : null;
 }

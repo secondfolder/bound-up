@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LEVEL_LABELS, type ListPayload } from '$lib/kink-list/answers';
+	import { LEVEL_LABELS, type ListPayload, type YourSide } from '$lib/kink-list/answers';
 	import { kinkById } from '$lib/kink-list/catalog';
 	import { compareLists, GROUP_LABELS, type MatchGroup, sidesLabel } from '$lib/kink-list/compare';
 
@@ -13,7 +13,8 @@
 		mine,
 		theirs,
 		theirName,
-		blind = false
+		blind = false,
+		side = 'both'
 	}: {
 		mine: ListPayload;
 		theirs: ListPayload;
@@ -24,9 +25,14 @@
 		 * never a risk.
 		 */
 		blind?: boolean;
+		/**
+		 * Yours: Sub compares only your sub halves with their dom ones, and
+		 * leaves out what only a dom does (`pairingsFor`). Limits always show.
+		 */
+		side?: YourSide;
 	} = $props();
 
-	const comparison = $derived(compareLists(mine, theirs));
+	const comparison = $derived(compareLists(mine, theirs, side));
 	const them = $derived(theirName?.trim() || 'Them');
 
 	const OPEN = $derived<MatchGroup[]>(

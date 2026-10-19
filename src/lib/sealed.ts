@@ -122,19 +122,51 @@ export function readSealedPayload<Latest>(
 	version: number,
 	value: unknown
 ): Latest | null {
+	const read = readSealedPayloadDiagnosed(kind, version, value);
+	return read.ok ? read.value : null;
+}
+
+/**
+ * Why a sealed record could not be read, for logs and debug mode. It names
+ * where in the payload a schema refused it and why, as paths and Zod issue
+ * codes, and never the values: those are the content the seal is there to
+ * keep private.
+ */
+export type SealedReadFailure =
+	| { reason: 'format' | 'decrypt' | 'json' | 'no-vault' }
+	| { reason: 'unknown-version'; version: number }
+	| { reason: 'schema'; version: number; issues: { path: string; code: string }[] };
+
+/** The most issues a failure keeps: enough to see the pattern, not a log flood. */
+const MAX_REPORTED_ISSUES = 10;
+
+/** `readSealedPayload`, saying why when it cannot. */
+export function readSealedPayloadDiagnosed<Latest>(
+	kind: SealedKind<Latest>,
+	version: number,
+	value: unknown
+): { ok: true; value: Latest } | ({ ok: false } & SealedReadFailure) {
 	const start = kind.versions.findIndex((entry) => entry.version === version);
 	if (start === -1) {
-		return null;
+		return { ok: false, reason: 'unknown-version', version };
 	}
 	let current: unknown = value;
 	for (let index = start; index < kind.versions.length; index += 1) {
 		const entry = kind.versions[index];
 		if (!entry) {
-			return null;
+			return { ok: false, reason: 'unknown-version', version };
 		}
 		const parsed = entry.schema.safeParse(current);
 		if (!parsed.success) {
-			return null;
+			return {
+				ok: false,
+				reason: 'schema',
+				version: entry.version,
+				issues: parsed.error.issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => ({
+					path: issue.path.map(String).join('.'),
+					code: issue.code
+				}))
+			};
 		}
 		current = parsed.data;
 		if (index < kind.versions.length - 1) {
@@ -143,7 +175,7 @@ export function readSealedPayload<Latest>(
 			current = upcast(current);
 		}
 	}
-	return current as Latest;
+	return { ok: true, value: current as Latest };
 }
 
 /** Whether `version` is one this build can read for `kind`. The server checks this on write. */

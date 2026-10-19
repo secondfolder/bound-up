@@ -344,6 +344,27 @@
 							"shippedOn": "2026-10-19"
 						},
 						{
+							"id": "kink-list-one-page",
+							"title": "The whole list on one page",
+							"summary": "Every category on one page, folded open, with each kink on a line and colour-coded answers.",
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
+						},
+						{
+							"id": "kink-list-filters",
+							"title": "How intense, how common",
+							"summary": "Show only kinks up to an intensity, and as common as you like, from everyday to rare.",
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
+						},
+						{
+							"id": "kink-list-your-side",
+							"title": "Your side",
+							"summary": "Answer giving and receiving side by side, or show only the side that's yours, set from who's in control with a partner.",
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
+						},
+						{
 							"id": "kink-list-no-account",
 							"title": "Kink list without an account",
 							"summary": "Fill in a kink list without signing up, share it as a link, and bring it with you when you do sign up.",

@@ -7,7 +7,8 @@
 		LEVELS,
 		type Level,
 		MAX_NOTE_LENGTH,
-		type SideKey
+		type SideKey,
+		shownSides
 	} from '$lib/kink-list/answers';
 	import { intensityLabel, kinkById, primaryCategoryOf, sidesOf } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
@@ -30,7 +31,7 @@
 
 	const { store } = kinkListContext();
 
-	const cards = $derived(deckCards(store.list));
+	const cards = $derived(deckCards(store.list, store.filters));
 	/** A card answered Conditional, held while its note is written. */
 	let holding = $state<ItemKey | null>(null);
 	const current = $derived(holding ?? cards[0] ?? null);
@@ -50,13 +51,18 @@
 	});
 	const broader = $derived(current ? narrows(current) : undefined);
 
-	/** Which side the next answer is for: both, unless one is picked on this card. */
+	/**
+	 * Which side the next answer is for: both, unless one is picked on this
+	 * card — or "Your side" leaves only one of a kink's contexts showing, in
+	 * which case the card starts on that one.
+	 */
 	let side: SideKey | 'both' = $state('both');
 	let lastCard: ItemKey | null = null;
 	$effect.pre(() => {
 		if (current !== lastCard) {
 			lastCard = current;
-			side = 'both';
+			const shown = shownSides(item, store.filters.side);
+			side = shown?.length === 1 && shown[0] ? shown[0] : 'both';
 		}
 	});
 

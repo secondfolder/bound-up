@@ -36,11 +36,16 @@ describe('the catalogue', () => {
 	});
 
 	it('reports what one item cannot check about itself', () => {
-		const base = { sections: { kinks: 'Kinks' }, roles: {}, tags: {} };
+		const base = {
+			sections: { kinks: 'Kinks' },
+			roles: { pair: { labels: ['A', 'B'], domSide: null } },
+			tags: {}
+		};
 		const item = (fields: Record<string, unknown>) => ({
 			name: 'x',
 			intensity: 1,
 			description: 'x',
+			...(fields.parent ? { commonness: 2 } : {}),
 			...fields
 		});
 		expect(
@@ -56,10 +61,28 @@ describe('the catalogue', () => {
 						item({ id: 'also', parent: 'cat', alsoUnder: ['tagged'] }),
 						item({ id: 'k1', parent: 'cat' }),
 						item({ id: 'k2', parent: 'k1' }),
-						item({ id: 'k3', parent: 'k2' })
+						item({ id: 'k3', parent: 'k2' }),
+						item({ id: 'rated', section: 'kinks', commonness: 2 }),
+						item({ id: 'unrated', parent: 'cat', commonness: undefined }),
+						item({ id: 'narrower', parent: 'k1', commonness: 3 }),
+						item({ id: 'lopsided', parent: 'cat', domSide: 'a' }),
+						item({ id: 'both-ways', parent: 'cat', roles: 'pair', lean: 'dom' })
 					]
 				} as never,
-				['cat', 'orphan', 'nosection', 'tagged', 'also', 'k1', 'k2']
+				[
+					'cat',
+					'orphan',
+					'nosection',
+					'tagged',
+					'also',
+					'k1',
+					'k2',
+					'rated',
+					'unrated',
+					'narrower',
+					'lopsided',
+					'both-ways'
+				]
 			)
 		).toEqual([
 			'duplicate id "cat"',
@@ -70,6 +93,11 @@ describe('the catalogue', () => {
 			'"tagged" has an unknown tag "mystery"',
 			'"also" is also under "tagged", which is not a category',
 			'"k3" is deeper than three levels',
+			'category "rated" has a commonness; only kinks do',
+			'"unrated" has no commonness',
+			'"narrower" is more common than "k1", the kink it narrows',
+			'"lopsided" has a domSide but no role pair',
+			'"both-ways" has a lean and a role pair; a pair takes domSide',
 			'"k3" is missing from share-ids.json'
 		]);
 	});

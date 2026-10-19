@@ -120,6 +120,8 @@ export async function saveKinkList(
 		id: string;
 		content: SealedWrite;
 		expectedRevision: number | null;
+		/** Freeze what this replaces as a version whatever its age (`startOver`). Own list only. */
+		keepVersion?: boolean;
 		now?: Date;
 	}
 ): Promise<KinkListResult<{ revision: number }>> {
@@ -181,10 +183,20 @@ export async function saveKinkList(
 	// Only your own list keeps a history: a partner's copy follows it.
 	const [, updated] =
 		scope === 'self'
-			? await db.batch([freezeVersion(db, matchesExpected, now), update])
+			? await db.batch([freezeVersion(db, matchesExpected, now, input.keepVersion), update])
 			: [null, await update];
 	const [row] = updated;
 	if (row) {
+		if (input.keepVersion) {
+			// The server cannot read a list, so it cannot say why it would not
+			// open; the browser logs that. This is the server's half: that one
+			// was replaced, kept, and whose, to find it in the versions again.
+			console.warn('[kink-list] Replaced a list its owner could not open; kept as a version', {
+				userId,
+				listId: input.id,
+				revision: row.revision
+			});
+		}
 		return { ok: true, revision: row.revision };
 	}
 	return { ok: false, reason: (await getKinkList(db, userId, scope)) ? 'conflict' : 'not-found' };
@@ -202,7 +214,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * devices racing after a quiet week leave one version, not two. And it needs
  * no cron: a list nobody edits has nothing new to keep.
  */
-function freezeVersion(db: Db, matchesExpected: ReturnType<typeof and>, now: Date) {
+function freezeVersion(db: Db, matchesExpected: ReturnType<typeof and>, now: Date, always = false) {
 	const cutoff = new Date(now.getTime() - VERSION_QUIET_DAYS * DAY_MS);
 	return db.insert(kinkListVersions).select(
 		db
@@ -222,7 +234,9 @@ function freezeVersion(db: Db, matchesExpected: ReturnType<typeof and>, now: Dat
 				frozenAt: sql<Date>`${now.getTime()}`.as('frozen_at')
 			})
 			.from(kinkLists)
-			.where(and(matchesExpected, lt(kinkLists.editedAt, cutoff)))
+			// `always`: the list being replaced is one its owner could not open,
+			// and is kept however recently it changed (`keepVersion`).
+			.where(and(matchesExpected, always ? undefined : lt(kinkLists.editedAt, cutoff)))
 	);
 }
 

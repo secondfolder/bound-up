@@ -366,12 +366,19 @@ export async function newSide(
 	return { page, who: account(name), close: () => context.close() };
 }
 
-/** Links two signed-up accounts, leaving both on their own home page. */
-export async function linkAccounts(inviter: Side, invitee: Side): Promise<void> {
+/**
+ * Links two signed-up accounts, leaving both on their own home page. Control
+ * is shared unless `control` says otherwise, from the inviter's side.
+ */
+export async function linkAccounts(
+	inviter: Side,
+	invitee: Side,
+	control: 'me' | 'them' | 'mix' = 'mix'
+): Promise<void> {
 	const link = await createInvite(inviter.page, {
 		partnerName: invitee.who.name,
 		yourName: inviter.who.name,
-		control: 'mix'
+		control
 	});
 	await invitee.page.goto(link);
 	await clickWaButton(invitee.page, 'Accept and link');
