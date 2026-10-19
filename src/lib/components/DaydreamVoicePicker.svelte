@@ -8,6 +8,7 @@
 		type DaydreamStance,
 		type DaydreamVoice,
 		voiceCanWork,
+		voicePreset,
 		voiceProblem
 	} from '$lib/daydream';
 	import { startOpen } from './details';
@@ -20,6 +21,11 @@
 	 * most people need; "Fine-tune how it's told" opens the two settings
 	 * underneath them, where a combination that could never work is disabled
 	 * with a line saying why.
+	 *
+	 * The options are names only, and the selected one is described beside
+	 * them, with examples of what the story will read like: four
+	 * descriptions side by side were a wall of text to compare, where one at
+	 * a time can be tried on by choosing it.
 	 */
 	let {
 		value,
@@ -34,14 +40,16 @@
 	const problem = $derived(voiceProblem(value, characterCount));
 	const id = $props.id();
 
-	const matchesPreset = (voice: DaydreamVoice) =>
-		DAYDREAM_VOICE_PRESETS.some(
-			(preset) => voice.narrator === preset.voice.narrator && voice.stance === preset.voice.stance
-		);
+	const preset = $derived(voicePreset(value));
+	const narratorShown = $derived(
+		DAYDREAM_NARRATORS.find((choice) => choice.value === value.narrator)
+	);
+	const stanceShown = $derived(DAYDREAM_STANCES.find((choice) => choice.value === value.stance));
+
 	// svelte-ignore state_referenced_locally
 	// Captured once: open from the start for a voice no preset gives, so a
 	// customised one is never hidden, and then the user's to open and close.
-	const customised = !matchesPreset(value) || value.protagonistName.trim() !== '';
+	const customised = voicePreset(value) === undefined || value.protagonistName.trim() !== '';
 
 	function set(patch: Partial<DaydreamVoice>) {
 		onchange({ ...value, ...patch });
@@ -65,16 +73,34 @@
 </script>
 
 <div class="voice">
-	<div class="presets">
-		{#each DAYDREAM_VOICE_PRESETS as preset (preset.id)}
-			{const chosen = $derived(value.narrator === preset.voice.narrator && value.stance === preset.voice.stance)}
-			<!-- A choice that fills two settings: a native button with aria-pressed,
-			     which wa-button would not forward (AGENTS.md). -->
-			<button type="button" class="preset" aria-pressed={chosen} onclick={() => set(preset.voice)}>
-				<span class="label">{preset.label}</span>
-				<span class="hint">{preset.hint}</span>
-			</button>
-		{/each}
+	<div class="choose">
+		<div class="options" role="radiogroup" aria-label="How it's told" aria-describedby={`${id}-about`}>
+			{#each DAYDREAM_VOICE_PRESETS as choice (choice.id)}
+				<label class="option">
+					<input
+						type="radio"
+						name={`${id}-preset`}
+						value={choice.id}
+						checked={preset?.id === choice.id}
+						onchange={() => set(choice.voice)}
+					/>
+					<span>{choice.label}</span>
+				</label>
+			{/each}
+		</div>
+
+		<!-- Polite: it changes as an option is chosen, and says what that choice means. -->
+		<div class="about" id={`${id}-about`} aria-live="polite">
+			{#if preset}
+				<p class="description">{preset.description}</p>
+				<ul class="examples" aria-label="For example">
+					{#each preset.examples as example (example)}<li>{example}</li>{/each}
+				</ul>
+			{:else if narratorShown && stanceShown}
+				<p class="description">{narratorShown.description} {stanceShown.description}</p>
+				<ul class="examples" aria-label="For example"><li>{narratorShown.example}</li></ul>
+			{/if}
+		</div>
 	</div>
 
 	{#if problem}<p class="problem" role="status">{problem}</p>{/if}
@@ -96,7 +122,7 @@
 						/>
 						<span>
 							{choice.label}
-							<small>{blocked ?? choice.hint}</small>
+							{#if blocked}<small>{blocked}</small>{/if}
 						</span>
 					</label>
 				{/each}
@@ -116,7 +142,7 @@
 						/>
 						<span>
 							{choice.label}
-							<small>{blocked ?? choice.hint}</small>
+							{#if blocked}<small>{blocked}</small>{/if}
 						</span>
 					</label>
 				{/each}
@@ -141,48 +167,71 @@
 		gap: 0.75rem;
 	}
 
-	.presets {
+	/* The list and the description side by side where there is room for
+	   both, the description under the list where there is not. */
+	.choose {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
-		gap: 0.5rem;
+		grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
+		gap: 0.75rem;
+		align-items: start;
 	}
 
-	.preset {
+	.options {
 		display: flex;
 		flex-direction: column;
-		gap: 0.125rem;
-		/* A grid item's minimum is its content's by default, and a button does
-		   not wrap its text, so a long hint pushed out past the button's edge. */
-		min-inline-size: 0;
-		block-size: 100%;
-		white-space: normal;
-		overflow-wrap: anywhere;
-		padding: 0.6rem 0.75rem;
+		align-items: stretch;
+		gap: 0.375rem;
+	}
+
+	.option {
+		display: flex;
+		box-sizing: border-box;
+		inline-size: 100%;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
 		border: 1px solid var(--wa-color-surface-border);
 		border-radius: 0.6rem;
-		background: transparent;
-		color: inherit;
-		font: inherit;
-		text-align: start;
+		font-weight: 600;
 		cursor: pointer;
 
-		.label {
-			font-weight: 600;
-		}
-
-		.hint {
-			font-size: 0.8125rem;
-			color: var(--wa-color-text-quiet);
-		}
-
-		&[aria-pressed='true'] {
+		&:has(input:checked) {
 			border-color: var(--wa-color-brand-border-loud, var(--wa-color-surface-border));
 			background: var(--wa-color-brand-fill-quiet);
 		}
 
-		&:focus-visible {
+		&:has(input:focus-visible) {
 			outline: var(--wa-focus-ring);
 			outline-offset: var(--wa-focus-ring-offset);
+		}
+	}
+
+	.about {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		border-radius: 0.6rem;
+		background: var(--wa-color-surface-lowered);
+
+		.description {
+			margin: 0;
+		}
+	}
+
+	.examples {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+
+		li {
+			padding-inline-start: 0.75rem;
+			border-inline-start: 2px solid var(--wa-color-surface-border);
+			font-style: italic;
+			color: var(--wa-color-text-quiet);
 		}
 	}
 

@@ -140,7 +140,7 @@
 					"status": "in-progress",
 					"icon": "cloud-moon",
 					"notes": [
-						"Pick how it's told, a scene and who's in it; the rest is there when you want it",
+						"Say what you feel like, or pick a ready-made story; every part is there to change",
 						"The story opens on its own, then you take turns",
 						"Stop the scene and Ease off are always there"
 					],
@@ -165,6 +165,13 @@
 							"summary": "Say how sexual and how kinky a scene is, and how slutty or kinky each character is, with starting points across the whole range.",
 							"status": "shipped",
 							"shippedOn": "2026-10-17"
+						},
+						{
+							"id": "daydreams-easy-start",
+							"title": "Start from a sentence or a ready-made story",
+							"summary": "Say what you feel like and have it put together, or pick a ready-made story, then change any part of it from one sentence.",
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
 						},
 						{
 							"id": "daydreams-kink-list",

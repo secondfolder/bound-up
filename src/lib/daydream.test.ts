@@ -7,9 +7,11 @@ import {
 	daydreamTitle,
 	EMPTY_CASTING,
 	fitCastingToScene,
+	inferVoice,
 	leadApplies,
 	MAX_DAYDREAM_CHARACTERS,
 	voiceCanWork,
+	voicePreset,
 	voiceProblem
 } from './daydream';
 
@@ -64,6 +66,38 @@ describe('voiceProblem', () => {
 		);
 		expect(never).toEqual(['none/absent', 'second-person/absent']);
 		expect(MAX_DAYDREAM_CHARACTERS).toBeGreaterThan(1);
+	});
+});
+
+describe('voicePreset', () => {
+	it('names the preset a voice is, and none for a combination no preset gives', () => {
+		expect(voicePreset(voice('impersonal', 'self'))?.id).toBe('rules');
+		expect(voicePreset(voice('third-person', 'self'))).toBeUndefined();
+	});
+
+	it('gives every preset a description and an example to show beside the list', () => {
+		for (const preset of DAYDREAM_VOICE_PRESETS) {
+			expect(preset.description, preset.id).not.toBe('');
+			expect(preset.examples.length, preset.id).toBeGreaterThan(0);
+		}
+	});
+});
+
+describe('inferVoice', () => {
+	it('is a story told to you with nobody in it, and talking with them with anyone', () => {
+		expect(inferVoice(voice('none', 'self'), 0)).toEqual(voice('second-person', 'self'));
+		expect(inferVoice(voice('second-person', 'self'), 1)).toEqual(voice('none', 'self'));
+		expect(inferVoice(voice('second-person', 'self'), 3)).toEqual(voice('none', 'self'));
+	});
+
+	it('always guesses a voice that works with that cast', () => {
+		for (let count = 0; count <= MAX_DAYDREAM_CHARACTERS; count += 1) {
+			expect(voiceProblem(inferVoice(voice('third-person', 'absent'), count), count)).toBeNull();
+		}
+	});
+
+	it('keeps what the story calls the user', () => {
+		expect(inferVoice(voice('none', 'self', 'Kit'), 0).protagonistName).toBe('Kit');
 	});
 });
 

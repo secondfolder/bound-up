@@ -17,6 +17,7 @@ import type {
 	StoryDials
 } from '../daydream';
 import { requestSuggestion } from './client';
+import type { StoryPieces } from './starters';
 import {
 	completionJson,
 	parseCasting,
@@ -25,6 +26,7 @@ import {
 	parseName,
 	parseParts,
 	parseSceneDials,
+	parseSuggestedDaydream,
 	parseSurpriseScene,
 	type SuggestedPart,
 	type SuggestTarget
@@ -152,4 +154,21 @@ export async function surpriseScene(
 	}
 	const scene = parseSurpriseScene(answer.value);
 	return scene ? { ok: true, value: scene } : { ok: false, error: NOTHING };
+}
+
+/**
+ * A whole daydream, from a sentence the user wrote ("a stranger on a night
+ * train"): its voice, its scene and who is in it, for `assembleSetup` to put
+ * together.
+ */
+export async function suggestDaydream(input: {
+	idea: string;
+	limits: string;
+}): Promise<Answer<StoryPieces>> {
+	const answer = await ask({ task: 'daydream', ...input });
+	if (!answer.ok) {
+		return answer;
+	}
+	const pieces = parseSuggestedDaydream(answer.value);
+	return pieces ? { ok: true, value: pieces } : { ok: false, error: NOTHING };
 }

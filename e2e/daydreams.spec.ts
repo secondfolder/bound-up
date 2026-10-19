@@ -89,8 +89,8 @@ async function openDisclosure(page: Page, summary: string) {
 	await page.locator('form.panel').getByRole('button', { name: summary, exact: true }).click();
 }
 
-/** From the list to the setup page, through the disclosure the first time. */
-async function openSetup(page: Page) {
+/** From the list to the new-daydream page's ways in, through the disclosure the first time. */
+async function openStart(page: Page) {
 	await page.goto('/daydreams');
 	await waitForHydration(page);
 	const understand = page.getByRole('button', { name: 'I understand' });
@@ -102,6 +102,13 @@ async function openSetup(page: Page) {
 	await newLink.click();
 	await page.waitForURL('**/daydreams/new');
 	await waitForHydration(page);
+}
+
+/** On to the full setup form, empty, through "Build it yourself". */
+async function openSetup(page: Page) {
+	await openStart(page);
+	await clickWaButton(page, 'Build it yourself');
+	await expect(page.locator('form.panel')).toBeVisible();
 }
 
 /**
@@ -473,21 +480,78 @@ test.describe('daydreams', () => {
 	}) => {
 		await signedUpDreamer(page);
 
+		// With nobody in it, it is told to you without being asked.
 		await openSetup(page);
-		await page.getByRole('button', { name: /^A story told to you/ }).click();
 		await newScene(page, 'Quiet', 'Nothing has happened yet.');
+		await expect(page.locator('fieldset.told')).toContainText('A story told to you');
 		await clickWaButton(page, 'Start daydreaming');
 		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
 		await expect(page.getByText('The narrator looks up as you come in.')).toBeVisible();
 
 		await openSetup(page);
-		await page.getByRole('button', { name: /^Watch a story unfold/ }).click();
 		await newCharacter(page, 'Ash');
 		await newCharacter(page, 'Bel');
+		// Asked last, and only when the guess is not what is wanted.
+		await clickWaButton(page, 'Change');
+		await page.getByRole('radio', { name: 'Watch a story unfold' }).check();
+		await expect(page.locator('.about')).toContainText('You are not in it');
 		await newScene(page, 'Across the room', 'Two people meet.');
 		await clickWaButton(page, 'Start daydreaming');
 		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
 		await expect(page.getByText('Ash looks up as you come in.')).toBeVisible();
+	});
+
+	test('a ready-made story starts from its sentence, which can be changed or opened up', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await openStart(page);
+		await page.getByRole('button', { name: /^After hours/ }).click();
+		// Read as rendered: the blanks' menus are in the sentence, closed.
+		const sentence = page.locator('.sentence');
+		const reads = (text: string) => expect(sentence).toContainText(text, { useInnerText: true });
+		await reads('I want a steamy story where I talk with Lady Vale in After hours.');
+
+		// A blank is a menu: turned down to SFW here.
+		await page.getByRole('button', { name: 'How sexual: steamy' }).click();
+		await page.getByRole('menuitem', { name: 'SFW' }).click();
+		await reads('I want a SFW story');
+
+		// Every control, with nothing lost, and how it's told last.
+		await clickWaButton(page, 'Customise everything');
+		await expect(page.locator('form.panel')).toContainText('Lady Vale');
+		await expect(page.locator('fieldset.told')).toContainText('Talk with a character');
+
+		await clickWaButton(page, 'Start daydreaming');
+		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
+		await expect(page.getByText('Lady Vale looks up as you come in. (Heat: SFW.)')).toBeVisible();
+	});
+
+	test('a daydream described in a sentence is put together, can be tried again, and opens', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await openStart(page);
+		await page.getByRole('textbox').fill('a stranger on a night train');
+		await clickWaButton(page, 'Write it');
+		const sentence = page.locator('.sentence');
+		await expect(sentence).toContainText('where I talk with Vesper in The stub night train.', {
+			useInnerText: true
+		});
+		await expect(page.locator('.notes')).toContainText(
+			'Vesper: the stranger, a stranger on the train'
+		);
+
+		await clickWaButton(page, 'Try another');
+		await expect(sentence).toContainText('Vesper');
+
+		// Back to the ways in, with what was written still there.
+		await clickWaButton(page, 'Other ways to start');
+		await expect(page.getByRole('textbox')).toHaveValue('a stranger on a night train');
+		await clickWaButton(page, 'Write it');
+		await clickWaButton(page, 'Start daydreaming');
+		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
+		await expect(page.getByText('Vesper looks up as you come in.')).toBeVisible();
 	});
 
 	test('a failed reply says so, and trying again answers', async ({ page }) => {

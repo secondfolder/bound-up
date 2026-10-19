@@ -32,9 +32,10 @@ import type { ModelMessage } from './prompt';
  * The model is asked for JSON only, which the browser checks
  * (`$lib/daydream/suggestions.ts`).
  *
- * Two tasks are about a daydream rather than one record: `casting` writes who
- * a character is in this story, from the character and the scene, and `name`
- * names a daydream from its scene and its opening passage.
+ * Three tasks are about a daydream rather than one record: `casting` writes
+ * who a character is in this story, from the character and the scene, `name`
+ * names a daydream from its scene and its opening passage, and `daydream`
+ * sets a whole one up from a sentence the user wrote.
  */
 
 const text = (max: number) => z.string().max(max).optional();
@@ -110,6 +111,16 @@ const nameRequestSchema = z.object({
 	limits: limitsSchema
 });
 
+/** `daydream`: a whole daydream, from a sentence on the new-daydream page. */
+const daydreamRequestSchema = z.object({
+	task: z.literal('daydream'),
+	idea: z
+		.string()
+		.max(DAYDREAM_LIMITS.idea)
+		.refine((value) => value.trim() !== '', 'Say what the story is about'),
+	limits: limitsSchema
+});
+
 const recordRequestSchema = z
 	.object({
 		task: z.enum(['chips', 'fill', 'surprise-scene']),
@@ -159,13 +170,15 @@ const recordRequestSchema = z
 export const suggestRequestSchema = z.union([
 	recordRequestSchema,
 	castingRequestSchema,
-	nameRequestSchema
+	nameRequestSchema,
+	daydreamRequestSchema
 ]);
 
 export type SuggestRequest = z.output<typeof suggestRequestSchema>;
 type RecordRequest = z.output<typeof recordRequestSchema>;
 type CastingRequest = z.output<typeof castingRequestSchema>;
 type NameRequest = z.output<typeof nameRequestSchema>;
+type DaydreamRequest = z.output<typeof daydreamRequestSchema>;
 
 function fieldsFor(target: RecordRequest['target']): readonly string[] {
 	return target === 'character' ? CHARACTER_TEXT_FIELDS : SCENE_TEXT_FIELDS;
@@ -382,6 +395,41 @@ Answer as: {"title": "…"}`
 	];
 }
 
+/**
+ * The four voices, in the terms of `DAYDREAM_VOICE_PRESETS`. "talk" is the
+ * default, as it is on the form, so a sentence that says nothing about how it
+ * is told gets the shape most people mean.
+ */
+const VOICES = `- "talk": the characters speak to the user directly, with no narrator.
+- "told": a narrator tells it to the user, as "you"; characters are optional.
+- "watch": a narrator tells it about the characters, and the user only watches from outside.
+- "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.`;
+
+function daydreamMessages(request: DaydreamRequest): ModelMessage[] {
+	return [
+		{
+			role: 'system',
+			content: `${SUGGEST_RULES}\n\nThe user's limits, never to be crossed: ${request.limits.trim() || 'none stated beyond the rules above'}`
+		},
+		{
+			role: 'user',
+			content: `The user wants a story like this, in their own words:
+${request.idea.trim()}
+
+Set the whole story up from it, keeping to what they asked for and filling in the rest.
+
+How it is told, as "voice", one of:
+${VOICES}
+Choose "talk" unless what they wrote asks for another.
+
+The scene: a short title; where it happens, what is going on as it starts, who the user is in it, and its tone, a sentence or two each. ${PARTS_INSTRUCTION}${rateInstruction(['heat', 'kink'])} Rate it from what they wrote: a story that says nothing sexual is not sexual.
+
+Who is in it: one to ${MAX_DAYDREAM_CHARACTERS} characters, each playing one of the scene's parts, named exactly as the part is. For each, a name, and a phrase or two for their type, personality, how they talk, appearance and what they enjoy; who they are to the user in this story, in a few words; and what they are doing or want as the scene starts, in a sentence. With "rules", they are the system's functionaries. With "told", there may be none.
+Answer as: {"voice": "talk", "scene": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": 1-5, "kink": 1-5, ${PARTS_SHAPE}}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}]}`
+		}
+	];
+}
+
 export function buildSuggestMessages(request: SuggestRequest): {
 	messages: ModelMessage[];
 	maxTokens: number;
@@ -391,6 +439,9 @@ export function buildSuggestMessages(request: SuggestRequest): {
 	}
 	if (request.task === 'name') {
 		return { messages: nameMessages(request), maxTokens: 100 };
+	}
+	if (request.task === 'daydream') {
+		return { messages: daydreamMessages(request), maxTokens: 1600 };
 	}
 	const { instructions, maxTokens } = taskInstructions(request);
 	return {

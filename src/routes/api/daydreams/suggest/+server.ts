@@ -9,7 +9,8 @@ import type { RequestHandler } from './$types';
 /**
  * Asks the model for suggestions while a character or scene is being set
  * up: more chips for a field, the empty fields filled in, or a whole scene
- * for "Surprise me".
+ * for "Surprise me"; and, for a daydream, who a character is in it, its
+ * name, or the whole of it from a sentence on the new-daydream page.
  *
  * **The second place the server handles what a user wrote in plaintext**,
  * under exactly the rules of `../[id]/reply`: the disclosure must have been

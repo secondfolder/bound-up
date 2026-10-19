@@ -7,6 +7,7 @@ import {
 	parseName,
 	parseParts,
 	parseSceneDials,
+	parseSuggestedDaydream,
 	parseSurpriseScene
 } from './suggestions';
 
@@ -155,5 +156,72 @@ describe('parseName', () => {
 		expect(parseName({ title: '""' })).toBeNull();
 		expect(parseName({ title: 'x'.repeat(81) })).toBeNull();
 		expect(parseName({ name: 'Late' })).toBeNull();
+	});
+});
+
+describe('parseSuggestedDaydream', () => {
+	const scene = {
+		title: 'The night train',
+		premise: 'A stranger takes the seat across from you.',
+		heat: 2,
+		kink: 9,
+		parts: [{ name: 'the stranger', description: 'boarded late' }]
+	};
+
+	it('reads the voice, the scene and who is in it', () => {
+		const pieces = parseSuggestedDaydream({
+			voice: 'watch',
+			scene,
+			characters: [
+				{
+					name: ' Vesper ',
+					archetype: 'mysterious stranger',
+					part: 'the stranger',
+					relationship: 'a stranger',
+					doing: 'pretending to read'
+				}
+			]
+		});
+		expect(pieces).toMatchObject({
+			voice: 'watch',
+			scene: { title: 'The night train', dials: { heat: 2, kink: null } },
+			cast: [
+				{
+					character: { name: 'Vesper', archetype: 'mysterious stranger', personality: '' },
+					partName: 'the stranger',
+					relationship: 'a stranger',
+					doing: 'pretending to read'
+				}
+			]
+		});
+		expect(pieces?.cast[0]?.character.dials.libido).toBeNull();
+	});
+
+	it('leaves a voice it does not know to follow who is in it', () => {
+		expect(parseSuggestedDaydream({ voice: 'chat', scene })?.voice).toBeNull();
+	});
+
+	it('drops anyone with no name, or a name already taken, and keeps at most four', () => {
+		const people = [
+			{ archetype: 'nameless' },
+			{ name: 'Ash' },
+			{ name: 'ash' },
+			...['Bel', 'Cy', 'Dee', 'Eve'].map((name) => ({ name }))
+		];
+		const cast = parseSuggestedDaydream({ scene, characters: people })?.cast ?? [];
+		expect(cast.map((person) => person.character.name)).toEqual(['Ash', 'Bel', 'Cy', 'Dee']);
+	});
+
+	it('holds a casting to its caps, empty where it does not fit', () => {
+		const cast = parseSuggestedDaydream({
+			scene,
+			characters: [{ name: 'Ash', relationship: 'x'.repeat(301), part: 42 }]
+		})?.cast;
+		expect(cast?.[0]).toMatchObject({ relationship: '', partName: null });
+	});
+
+	it('is nothing without a scene that has a title and what is going on', () => {
+		expect(parseSuggestedDaydream({ voice: 'talk', scene: { title: 'Only a title' } })).toBeNull();
+		expect(parseSuggestedDaydream(null)).toBeNull();
 	});
 });

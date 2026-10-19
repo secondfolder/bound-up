@@ -14,15 +14,59 @@ scene with another person.
 
 `/daydreams/new` and `/daydreams/[id]/edit` (`DaydreamSetupForm.svelte`).
 
-**Short by default.** A new daydream needs a voice preset, a scene and
-someone in it, and that is all the page shows: the voice's own settings sit
-under "Fine-tune how it's told", and who leads, the limits and the dials
-under "More options". Nothing is taken away — the same controls are a tap
+### Starting one
+
+`/daydreams/new` opens on the ways in rather than the form
+(`DaydreamStarter.svelte`), friendliest first, because the form asks for
+things — a voice, a scene with parts, a cast — that mean nothing until
+someone has played one:
+
+- **What do you feel like?** One box, with ideas that toggle into it like a
+  field's chips (`DAYDREAM_IDEA_CHIPS`). **Write it** asks the model for a
+  whole daydream (the `daydream` suggestion): a voice, a scene with its parts
+  and its heat and kink, and up to `MAX_DAYDREAM_CHARACTERS` characters, each
+  cast into a part with who they are in it. Only with suggestions on; without
+  them the box is not shown.
+- **Pick one.** Ready-made stories (`DAYDREAM_STARTERS` in
+  `daydream/starters.ts`), each a scene starting point, a voice preset and
+  character starting points cast into the scene's parts, with the casting
+  written for that story. In order of heat, each card saying its level and how
+  it is told. They are built from the catalog rather than written out again,
+  and need no model, so nothing leaves the device.
+- **Build it yourself.** The full form, empty.
+
+Both of the first two hand the form a draft, put together by `assembleSetup`
+(`daydream/starters.ts`): parts get fresh ids, each person is cast into the
+part named for them if it is still free, and a voice that cannot work with
+who is in it — watching nobody — gives way to the one that follows them.
+Every copy is one with no library record, so each card offers **Save to my
+characters** (or scenes) as any such copy does.
+
+A draft opens in the form's **sentence** layout: the setup as one line with
+blanks in it — "I want a [steamy] story where I [talk with] [Lady Vale] in
+[After hours]." — built by `setupSentence` (`daydream/sentence.ts`), with the
+premise and who each character is underneath (`castNotes`). Each blank is the
+control for that part of it: the heat a menu of levels, the voice a menu of
+the four presets, a character's name their dialog, the scene's title the scene
+dialog. "Add someone" and "Anything off the table?" (the limits) sit under it.
+**Customise everything** switches the same form to the full layout, so
+nothing is lost: it is one superform either way, sharing its dialogs, its
+sealing and its submit. For a described daydream, **Try another** asks again
+with the same words and with any limits written since, which go into the new
+draft and to the model. **Other ways to start** goes back, with what was typed
+in the box still there.
+
+The stage is the page's own state, not the URL: a draft is something being
+made, and has no business in the browser's history.
+
+**Short by default.** The full layout shows the scene, who is in it, "More
+options" (who leads, the limits and the dials) and, last, how it is told, as
+one line with **Change**. Nothing is taken away — the same controls are a tap
 further in — and on the edit page each disclosure starts open when what it
-holds differs from the default (a voice no preset gives, a protagonist name,
-a lead other than "They lead", limits written, dials moved), so nothing a
-user customised is ever out of sight. The character and scene dialogs do the
-same with "More detail".
+holds differs from the default (limits written, dials moved, a lead other than
+"They lead"), and the voice's picker starts open for a voice no preset gives
+or one with a name for the user, so nothing a user customised is ever out of
+sight. The character and scene dialogs do the same with "More detail".
 
 The disclosures are `wa-details`, opened from the start with the `startOpen`
 attachment (`components/details.ts`) rather than `open={…}` in markup: the
@@ -56,17 +100,39 @@ Between them they make every shape of story:
 | Watch a story unfold   | 1+         | third-person  | absent   |
 | A system in charge     | 0+         | impersonal    | self     |
 
-Those four are the presets, and all the page shows at first; the two pickers
-under "Fine-tune how it's told" can make any other. A problem with the voice
-is shown under the presets, outside the disclosure, so a closed one never
+Those four are the presets. **It is asked last, and guessed until then.**
+Until the user picks one, the voice follows who is in the story
+(`inferVoice`): nobody in it is a story told to you, anyone is talking with
+them, and the one-line summary says "Picked from who's in it." Watching and a
+system are never guessed, because each changes what the story is rather than
+how it is told. Picking one — in the picker, or from the sentence's voice
+blank — stops the guessing for good. An edited daydream's voice counts as
+picked, and so does a draft's when it is not what the guess would have been
+(a ready-made "A system in charge"); one that matches goes on following its
+cast. The guess goes into the form's starting data rather than being set once
+it is mounted, which superforms would write over.
+
+**One description at a time.** The picker lists the presets by name only,
+and beside them (below them, on a narrow screen) describes the chosen one,
+with two example lines of what the story will read like (`description` and
+`examples` on `DAYDREAM_VOICE_PRESETS`). Choosing another option is how its
+description is seen. Four descriptions side by side were a wall of text to
+compare; one at a time can be tried on. The two settings under "Fine-tune how
+it's told" are names only in the same way, and for a combination no preset
+gives the panel describes the chosen narrator and stance instead, with the
+narrator's example.
+
+A problem with the voice is shown under the presets, outside "Fine-tune", and
+in the one-line summary while the picker is closed, so nothing closed ever
 hides why the form will not save.
 `voiceProblem` refuses what cannot work — no narrator and no character
 (nobody speaks), no narrator while watching (the characters would be talking
 to no one), watching nothing, a narrator talking to a "you" who is absent, a
 persona with no name — and the form disables a choice that could never work
-with the other setting. The setup kind runs the same check, so a stale page
-cannot store one. "Who leads" is shown only where it means something: with
-characters, and with the user there to be led (`leadApplies`).
+with the other setting, saying why beside it. The setup kind runs the same
+check, so a stale page cannot store one. "Who leads" is shown only where it
+means something: with characters, and with the user there to be led
+(`leadApplies`).
 
 The three narrated voices are ordinary fiction, which the model writes well
 from a sentence. The system voice is not: told only to be "an impersonal
@@ -233,7 +299,8 @@ model can be asked too: **More ideas** for more chips on one field, **Fill
 in the rest** for the empty fields (never over written ones, and parts only
 for a scene with none), and **Surprise me** for a whole scene, parts
 included, which opens in the scene dialog to read, change, or **Try
-another** before it is used. Without them, the curated chips and
+another** before it is used. The new-daydream page asks for a whole daydream
+the same way (see [Starting one](#starting-one)). Without them, the curated chips and
 templates still work, and nothing leaves the device.
 
 The dialogs are SPA superforms that save through the library endpoints
@@ -607,7 +674,9 @@ own (`suggest-prompt.ts`):
   cast in, the others' names and parts, where the user stands, and the
   limits;
 - for a name: the scene's title and premise, the cast's names, the limits,
-  and the first `MAX_NAMING_OPENING` characters of the opening passage.
+  and the first `MAX_NAMING_OPENING` characters of the opening passage;
+- for a whole daydream, from the new-daydream page: the sentence the user
+  wrote (up to `DAYDREAM_LIMITS.idea`) and any limits written on the draft.
 
 The answer is a small JSON completion, not streamed, passed back unread for
 the browser to check (`daydream/suggestions.ts`).
@@ -777,11 +846,18 @@ Noted so they are not lost; none is in the code.
   Stop the scene's Stop). Writing it again is one press away.
 - **A very long story loads its newest 2,000 turns' shape.** Older turns are
   still stored; a branch through them shows from the oldest loaded turn.
+- **The new-daydream page keeps no draft.** What is typed in "What do you
+  feel like?" survives going back and forth on the page, but not a reload,
+  and neither does a setup being made; the encrypted drafts
+  (`messaging/drafts.ts`) hold a composer's rich text, not a setup.
 
 ## Tests
 
 - Pure: `daydream.test.ts` (every voice combination, casting against a
-  scene's parts),
+  scene's parts, the voice guessed from the cast),
+  `daydream/starters.test.ts` (every ready-made story is a setup the form
+  would save, cast as written; assembling a draft),
+  `daydream/sentence.test.ts` (each voice in words, the blanks),
   `daydream/tree.test.ts`, `reply-format.test.ts` (the written-out turn,
   arriving and finished), `dice.test.ts`,
   `chips.test.ts`, `quotes.test.ts`, `ooc.test.ts`, `suggestions.test.ts`,
@@ -804,12 +880,16 @@ Noted so they are not lost; none is in the code.
   afterwards, fresh for another take and kept by a rewrite; directions drawn
   as markers; Read it differently forking, mid-passage too, and its reading
   kept),
-  `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts),
+  `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts,
+  the voice last and guessed, the sentence layout),
+  `DaydreamVoicePicker.svelte.test.ts` (names only, the chosen one described),
+  `DaydreamStarter.svelte.test.ts` (the ways in),
   `DaydreamSetupFormAdd.svelte.test.ts`,
   `DaydreamCharacterDialog.svelte.test.ts` (the two halves),
   `DaydreamSceneDialog.svelte.test.ts` (the parts editor, heat and kink),
   `DaydreamBranchMap.svelte.test.ts` (the longest-path trunk, jumping,
   folding).
-- End to end: `e2e/daydreams.spec.ts` and `e2e/daydream-heat.spec.ts`,
+- End to end: `e2e/daydreams.spec.ts` (a ready-made start through its
+  sentence, a described one, and the full form) and `e2e/daydream-heat.spec.ts`,
   against `e2e/model-stub.mjs`, a stand-in OpenRouter that `e2e/server.mjs`
   starts beside the app.

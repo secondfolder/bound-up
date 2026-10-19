@@ -226,6 +226,38 @@ describe('buildSuggestMessages, naming', () => {
 	});
 });
 
+describe('buildSuggestMessages, a whole daydream', () => {
+	const daydream: SuggestRequest = {
+		task: 'daydream',
+		idea: 'a stranger on a night train',
+		limits: 'Nothing public.'
+	};
+
+	it('sets the whole story up from what the user wrote, with the rules and limits first', () => {
+		const { messages, maxTokens } = buildSuggestMessages(daydream);
+		expect(messages[0]?.content).toContain(SUGGEST_RULES);
+		expect(messages[0]?.content).toContain('Nothing public.');
+		const ask = messages[1]?.content ?? '';
+		expect(ask).toContain('a stranger on a night train');
+		// The four voices, the scene with its parts and ratings, and the cast.
+		for (const voice of ['"talk"', '"told"', '"watch"', '"rules"']) {
+			expect(ask).toContain(voice);
+		}
+		expect(ask).toContain('"parts"');
+		expect(ask).toContain('"heat"');
+		expect(ask).toContain('"characters"');
+		expect(maxTokens).toBeGreaterThan(1000);
+	});
+
+	it('accepts a sentence within its cap, and refuses an empty or a long one', () => {
+		expect(suggestRequestSchema.safeParse(daydream).success).toBe(true);
+		expect(suggestRequestSchema.safeParse({ ...daydream, idea: '   ' }).success).toBe(false);
+		expect(suggestRequestSchema.safeParse({ ...daydream, idea: 'x'.repeat(501) }).success).toBe(
+			false
+		);
+	});
+});
+
 describe('suggestRequestSchema', () => {
 	it('accepts a reasonable casting or naming request', () => {
 		expect(suggestRequestSchema.safeParse(casting).success).toBe(true);

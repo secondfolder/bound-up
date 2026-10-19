@@ -45,59 +45,147 @@ export type DaydreamVoice = {
 	protagonistName: string;
 };
 
+/**
+ * The two settings under "Fine-tune how it's told". Each option shows only its
+ * label; the picker describes the selected one beside the list
+ * (`DaydreamVoicePicker.svelte`), with `description` and an `example` line.
+ */
 export const DAYDREAM_NARRATORS: readonly {
 	value: DaydreamNarrator;
 	label: string;
-	hint: string;
+	description: string;
+	example: string;
 }[] = [
-	{ value: 'none', label: 'The characters', hint: 'They speak to you directly' },
-	{ value: 'second-person', label: 'A narrator, to you', hint: '“You feel the rope tighten…”' },
-	{ value: 'third-person', label: 'A narrator, about them', hint: '“She waits by the door…”' },
-	{ value: 'impersonal', label: 'A system', hint: '“Kneel at the line. Wait for the tone.”' }
+	{
+		value: 'none',
+		label: 'The characters',
+		description: 'No narrator: the characters speak for themselves, to you.',
+		example: '“Sit. No — closer. I want to see your face when I tell you.”'
+	},
+	{
+		value: 'second-person',
+		label: 'A narrator, to you',
+		description: 'A narrator tells the story to you, as it happens to you.',
+		example: '“You feel the rope tighten as the door clicks shut behind you.”'
+	},
+	{
+		value: 'third-person',
+		label: 'A narrator, about them',
+		description: 'A narrator tells the story about the people in it.',
+		example: '“She waits by the door, counting his footsteps on the stairs.”'
+	},
+	{
+		value: 'impersonal',
+		label: 'A system',
+		description:
+			'No narrator and no people: rules, notices and instructions, with what you do logged.',
+		example: '“Kneel at the line. Wait for the tone.”'
+	}
 ];
 
-export const DAYDREAM_STANCES: readonly { value: DaydreamStance; label: string; hint: string }[] = [
-	{ value: 'self', label: 'As myself', hint: 'You are in the story' },
-	{ value: 'persona', label: 'As someone else', hint: 'You play a character you name' },
-	{ value: 'absent', label: 'Watching', hint: 'You direct it from outside' }
+export const DAYDREAM_STANCES: readonly {
+	value: DaydreamStance;
+	label: string;
+	description: string;
+}[] = [
+	{ value: 'self', label: 'As myself', description: 'You are in the story, as yourself.' },
+	{
+		value: 'persona',
+		label: 'As someone else',
+		description: 'You are in the story, playing a character you name.'
+	},
+	{
+		value: 'absent',
+		label: 'Watching',
+		description: 'You are not in the story: you watch it, and steer it from outside.'
+	}
 ];
 
 /**
  * One-tap starting points for the voice. Each fills both settings; the
  * pickers below them can then change either. Every one passes `voiceProblem`
  * with the character count it describes.
+ *
+ * The list shows only `label`; the selected one's `description` and
+ * `examples` are shown beside it, so the choice is made from what the story
+ * will read like rather than from a definition.
  */
 export const DAYDREAM_VOICE_PRESETS: readonly {
-	id: string;
+	id: DaydreamVoicePresetId;
 	label: string;
-	hint: string;
+	description: string;
+	examples: readonly string[];
 	voice: Pick<DaydreamVoice, 'narrator' | 'stance'>;
 }[] = [
 	{
 		id: 'talk',
 		label: 'Talk with a character',
-		hint: 'One or more characters, speaking to you',
+		description:
+			'One or more characters speak to you directly, as if you were there. There is no narrator: what happens comes through what they say and do.',
+		examples: [
+			'“Sit. No — closer. I want to see your face when I tell you.”',
+			'*sets the key on the table between you* “You’re late again.”'
+		],
 		voice: { narrator: 'none', stance: 'self' }
 	},
 	{
 		id: 'told',
 		label: 'A story told to you',
-		hint: 'A narrator, with or without characters',
+		description:
+			'A narrator tells the story to you, as it happens to you. Characters are optional: it can be just you and the world.',
+		examples: [
+			'“You feel the rope tighten as the door clicks shut behind you.”',
+			'“The rain has not stopped for three days, and you are the only one still awake.”'
+		],
 		voice: { narrator: 'second-person', stance: 'self' }
 	},
 	{
 		id: 'watch',
 		label: 'Watch a story unfold',
-		hint: 'Characters you watch from outside',
+		description:
+			'A narrator tells a story about other people. You are not in it: you watch, and steer it from outside.',
+		examples: [
+			'“She waits by the door, counting his footsteps on the stairs.”',
+			'“Across the room, Ash finally looks up.”'
+		],
 		voice: { narrator: 'third-person', stance: 'absent' }
 	},
 	{
 		id: 'rules',
 		label: 'A system in charge',
-		hint: 'No narrator, just rules giving you orders: “Rule 2 broken. Infraction logged.”',
+		description:
+			'No narrator, just rules giving you orders: notices, numbered rules and exact instructions, with every infraction logged.',
+		examples: [
+			'“Rule 2: Kneel at the line. Wait for the tone.”',
+			'“Rule 2 broken. Infraction logged.”'
+		],
 		voice: { narrator: 'impersonal', stance: 'self' }
 	}
 ];
+
+export type DaydreamVoicePresetId = 'talk' | 'told' | 'watch' | 'rules';
+
+/** The preset a voice is, or undefined for a combination no preset gives. */
+export function voicePreset(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>) {
+	return DAYDREAM_VOICE_PRESETS.find(
+		(preset) => preset.voice.narrator === voice.narrator && preset.voice.stance === voice.stance
+	);
+}
+
+/**
+ * The voice a setup gets until the user picks one: whatever fits who is in
+ * it. Nobody in it is a story told to you; anyone is talking with them.
+ * Watching and a system are only ever chosen, never guessed, because both
+ * change what the story is rather than just how it is told. What the story
+ * calls the user is kept.
+ */
+export function inferVoice(current: DaydreamVoice, characterCount: number): DaydreamVoice {
+	const preset = characterCount === 0 ? 'told' : 'talk';
+	const { voice } = DAYDREAM_VOICE_PRESETS.find((candidate) => candidate.id === preset) ?? {
+		voice: { narrator: 'none', stance: 'self' } as const
+	};
+	return { ...current, ...voice };
+}
 
 /** The most characters one daydream can have. More than this and none of them gets a voice. */
 export const MAX_DAYDREAM_CHARACTERS = 4;
@@ -425,6 +513,8 @@ export const DAYDREAM_LIMITS = {
 	partName: 60,
 	partDescription: 300,
 	limits: 1000,
+	/** The sentence a daydream is described from on the new-daydream page. */
+	idea: 500,
 	turn: 8000,
 	/**
 	 * A reply exactly as the model wrote it, kept for debug mode's raw log

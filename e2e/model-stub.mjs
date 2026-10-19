@@ -32,6 +32,8 @@
 // answered with fixed JSON for whichever task it asks for. A daydream is named
 // "The <scene title> story", so a spec knows what to expect, and a naming
 // request fails once like any other when the scene's title has `[fail]` in it.
+// A daydream described in a sentence is always "The stub night train", with
+// Vesper cast as its stranger.
 import { createServer } from 'node:http';
 
 const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1' } = process.env;
@@ -128,7 +130,31 @@ function replyFor(messages) {
 function suggestionFor(messages) {
 	const ask = messages.at(-1)?.content ?? '';
 	let content;
-	if (ask.includes('{"chips"')) {
+	if (ask.includes('{"voice"')) {
+		content = {
+			voice: 'talk',
+			scene: {
+				title: 'The stub night train',
+				setting: 'a sleeper carriage',
+				premise: 'A stranger takes the seat across from you.',
+				yourRole: 'a passenger',
+				tone: 'mysterious',
+				heat: 2,
+				kink: 1,
+				parts: [{ name: 'the stranger', description: 'boarded at the last stop' }]
+			},
+			characters: [
+				{
+					name: 'Vesper',
+					archetype: 'mysterious stranger',
+					personality: 'watchful',
+					part: 'the stranger',
+					relationship: 'a stranger on the train',
+					doing: 'pretending to read'
+				}
+			]
+		};
+	} else if (ask.includes('{"chips"')) {
 		content = { chips: ['stub idea', 'another stub idea'] };
 	} else if (ask.includes('Invent a scene')) {
 		content = {

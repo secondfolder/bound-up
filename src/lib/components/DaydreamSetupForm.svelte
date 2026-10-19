@@ -8,17 +8,28 @@
 		CHARACTER_TEXT_FIELDS,
 		DAYDREAM_LEADS,
 		DAYDREAM_LIMITS,
+		DAYDREAM_NARRATORS,
+		DAYDREAM_STANCES,
+		DAYDREAM_VOICE_PRESETS,
 		type DaydreamCharacter,
 		type DaydreamCharacterCopy,
 		type DaydreamSceneCopy,
+		type DaydreamSetup,
+		type DaydreamVoice,
 		DEFAULT_STORY_DIALS,
+		type DialValue,
 		EMPTY_CASTING,
 		fitCastingToScene,
+		inferVoice,
 		leadApplies,
-		MAX_DAYDREAM_CHARACTERS
+		MAX_DAYDREAM_CHARACTERS,
+		voicePreset,
+		voiceProblem
 	} from '$lib/daydream';
 	import { type CopyState, copyState } from '$lib/daydream/chips';
 	import { saveLibraryItem } from '$lib/daydream/client';
+	import { SCENE_SLIDERS } from '$lib/daydream/dial-words';
+	import { castNotes, setupSentence } from '$lib/daydream/sentence';
 	import { type SuggestContext, suggestCasting } from '$lib/daydream/suggest';
 	import { type DaydreamSetupFormValues, daydreamSetupFormSchema } from '$lib/schemas/daydreamForm';
 	import { sealForSubmit } from '$lib/sealed-forms';
@@ -39,10 +50,22 @@
 	 * are made new in a dialog; the daydream keeps a copy of each, and offers
 	 * the newer version when the library's has changed.
 	 *
-	 * Short by default: the voice presets, the scene and the cast are all a
-	 * new daydream needs. The voice's own settings, who leads, the limits and
-	 * the dials are a disclosure away, open from the start when editing a
-	 * daydream that has changed them, so nothing customised is ever hidden.
+	 * Two layouts of the same form. **Full** is every control: the scene, who
+	 * is in it, "More options" (who leads, the limits, the dials), and how it
+	 * is told last, as one line with a Change button. **Sentence** is for a
+	 * story that is already put together — a ready-made one, or one the model
+	 * wrote from a sentence (`draft`) — and shows it as a fill-in-the-blanks
+	 * sentence whose blanks open the same menus and dialogs; "Customise
+	 * everything" switches to the full layout with nothing lost, since it is
+	 * the one superform either way. See docs/daydreams.md, "Starting one".
+	 *
+	 * How it is told follows who is in it until the user picks it themselves
+	 * (`inferVoice`): nobody is a story told to you, anyone is talking with
+	 * them. It is asked last because it is the hardest question to answer
+	 * before knowing who is in the story, and the guess is usually right.
+	 *
+	 * Disclosures start open when editing a daydream that has changed what
+	 * they hold, so nothing customised is ever hidden.
 	 * There is no name to give it: the model names it after its opening
 	 * (`DaydreamStory.nameIfUnnamed`), and it can be renamed here afterwards.
 	 *
@@ -59,6 +82,10 @@
 	let {
 		setupForm,
 		daydream = null,
+		draft = null,
+		layout: startLayout = 'full',
+		onretry,
+		retrying = false,
 		library,
 		suggestionsOn,
 		submitLabel
@@ -67,11 +94,26 @@
 		setupForm: SuperValidated<DaydreamSetupFormValues>;
 		/** The daydream being edited, opened; null to create one. */
 		daydream?: { id: string; revision: number; setup: DaydreamSetupContent } | null;
+		/** A new daydream's setup to start from (a ready-made one, or the model's); null for an empty one. */
+		draft?: DaydreamSetup | null;
+		/** Which layout to show first. The sentence is for a setup that is already put together. */
+		layout?: 'sentence' | 'full';
+		/**
+		 * "Try another": asks for the draft again, with the limits written so
+		 * far, so they are kept. Only for one the model wrote.
+		 */
+		onretry?: (limits: string) => void;
+		/** Whether "Try another" is waiting on its answer. */
+		retrying?: boolean;
 		library: DaydreamLibraryView;
 		/** Whether the model may be asked for ideas (the disclosure has been accepted). */
 		suggestionsOn: boolean;
 		submitLabel: string;
 	} = $props();
+
+	// svelte-ignore state_referenced_locally
+	// The starting layout; switching is the user's from then on.
+	let layout = $state(startLayout);
 
 	let problem = $state<string | null>(null);
 	/**
@@ -81,6 +123,19 @@
 	 */
 	let newId: string | null = null;
 
+	const sameVoice = (a: DaydreamVoice, b: DaydreamVoice) =>
+		a.narrator === b.narrator && a.stance === b.stance;
+
+	// svelte-ignore state_referenced_locally
+	// A stored daydream's voice was chosen, whatever it is. A draft's counts
+	// as chosen only when it is not what the guess would have been anyway — a
+	// ready-made "A system in charge" — so one that matches goes on following
+	// who is in it as the cast changes.
+	let voiceChosen = $state(
+		daydream !== null ||
+			(draft !== null && !sameVoice(draft.voice, inferVoice(draft.voice, draft.characters.length)))
+	);
+
 	// svelte-ignore state_referenced_locally
 	// Captured once on purpose, as on every superform: the stores it returns are
 	// the live connection. An edited daydream is mounted only once it is
@@ -88,9 +143,25 @@
 	// `SealedTaskEditor` gives one: superforms recognises its initial form by
 	// identity, and the empty one still in `page.data` would otherwise be
 	// written over the opened content.
-	const initial: SuperValidated<DaydreamSetupFormValues> = daydream
-		? { ...setupForm, id: `${setupForm.id}:opened`, data: structuredClone(daydream.setup) }
-		: setupForm;
+	//
+	// A new daydream starts with the voice that follows who is in it, worked
+	// out here rather than set once mounted, which superforms would overwrite
+	// with its initial data. A draft, or a new form so changed, gets an id of
+	// its own for the same reason an opened one does, and a fresh one each
+	// time, since the page mounts a new form for each draft it is handed.
+	function startingForm(): SuperValidated<DaydreamSetupFormValues> {
+		if (daydream) {
+			return { ...setupForm, id: `${setupForm.id}:opened`, data: structuredClone(daydream.setup) };
+		}
+		// A snapshot: the page may hand over its own state, and a state proxy
+		// cannot be cloned.
+		const data = structuredClone(draft ? $state.snapshot(draft) : setupForm.data);
+		if (!voiceChosen) {
+			data.voice = inferVoice(data.voice, data.characters.length);
+		}
+		return { ...setupForm, id: `${setupForm.id}:new:${crypto.randomUUID()}`, data };
+	}
+	const initial = startingForm();
 
 	const superform = superForm(initial, {
 		dataType: 'json',
@@ -156,6 +227,67 @@
 			daydream.setup.dials.pace !== DEFAULT_STORY_DIALS.pace ||
 			daydream.setup.dials.length !== DEFAULT_STORY_DIALS.length);
 
+	// ── how it's told ────────────────────────────────────────────────────────
+
+	/** Until the user picks how it is told, it follows who is in it. */
+	function syncVoice() {
+		if (voiceChosen) {
+			return;
+		}
+		const next = inferVoice($form.voice, $form.characters.length);
+		if (!sameVoice(next, $form.voice)) {
+			$form.voice = next;
+		}
+	}
+
+	function chooseVoice(voice: DaydreamVoice) {
+		voiceChosen = true;
+		$form.voice = voice;
+	}
+
+	// svelte-ignore state_referenced_locally
+	// The picker starts open for a voice no one-line summary can say well: a
+	// combination no preset gives, or one with a name for the user.
+	let voiceOpen = $state(
+		daydream !== null &&
+			(voicePreset(daydream.setup.voice) === undefined ||
+				daydream.setup.voice.protagonistName.trim() !== '')
+	);
+
+	/** How it is told, in a few words: the preset's name, or the two settings'. */
+	const voiceLabel = $derived.by(() => {
+		const preset = voicePreset($form.voice);
+		if (preset) {
+			return preset.label;
+		}
+		const narrator = DAYDREAM_NARRATORS.find((choice) => choice.value === $form.voice.narrator);
+		const stance = DAYDREAM_STANCES.find((choice) => choice.value === $form.voice.stance);
+		return [narrator?.label, stance?.label.toLocaleLowerCase()].filter(Boolean).join(', ');
+	});
+
+	const voiceIssue = $derived(voiceProblem($form.voice, $form.characters.length));
+
+	// ── the sentence ─────────────────────────────────────────────────────────
+
+	const sentence = $derived(setupSentence($form));
+	// Captured once, as `startOpen` asks.
+	const limitsWritten = initial.data.limits.trim() !== '';
+	const notes = $derived(castNotes($form));
+	const HEAT_SCALE = SCENE_SLIDERS.find((slider) => slider.key === 'heat')?.scale;
+
+	function pickHeat(event: WaSelectEvent) {
+		const value = selectedValue(event);
+		const heat = value === 'any' ? null : (Number(value) as DialValue);
+		$form.scene = { ...$form.scene, dials: { ...$form.scene.dials, heat } };
+	}
+
+	function pickVoice(event: WaSelectEvent) {
+		const preset = DAYDREAM_VOICE_PRESETS.find((candidate) => candidate.id === selectedValue(event));
+		if (preset) {
+			chooseVoice({ ...$form.voice, ...preset.voice });
+		}
+	}
+
 	/** Solid only when there is something valid to save (AGENTS.md, "Save buttons"). */
 	const canSave = $derived(
 		(daydream === null || isTainted($tainted)) && daydreamSetupFormSchema.safeParse($form).success
@@ -217,6 +349,7 @@
 			list[index] = character;
 		}
 		$form.characters = list;
+		syncVoice();
 		rememberLibrary('characters', character, sealed);
 	}
 
@@ -448,6 +581,9 @@
 	}
 	const showLead = $derived(leadApplies($form.voice, $form.characters.length));
 	const charactersNote = $derived.by(() => {
+		if (!voiceChosen) {
+			return 'Who is in the story. With nobody, it is told to you.';
+		}
 		if ($form.voice.narrator === 'none') {
 			return 'Who you are talking with. At least one.';
 		}
@@ -475,6 +611,7 @@
 		}}
 		onremove={() => {
 			$form.characters = $form.characters.filter((_, at) => at !== index);
+			syncVoice();
 		}}
 		onuselatest={() => useLatestCharacter(index)}
 		latestReady={latestOpened(characterRevisions, character.sourceId, openedDaydreamCharacter)}
@@ -506,185 +643,7 @@
 	</wa-dropdown>
 {/snippet}
 
-<form method="POST" use:superform.enhance class="panel">
-	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
-
-	<!-- Only once there is a daydream to rename: a new one is named by the
-	     model after its opening, and nobody should have to think of a name
-	     before they have started. -->
-	{#if daydream}
-		<InputField
-			{superform}
-			field="title"
-			type="text"
-			title="Name"
-			maxlength={DAYDREAM_LIMITS.title}
-		/>
-		<p class="hint name-hint">Leave it empty to have it named for you.</p>
-	{/if}
-
-	<fieldset>
-		<legend>How it's told</legend>
-		<DaydreamVoicePicker
-			value={$form.voice}
-			characterCount={$form.characters.length}
-			onchange={(voice) => {
-				$form.voice = voice;
-			}}
-		/>
-	</fieldset>
-
-	<fieldset>
-		<legend>The scene</legend>
-		{#if sceneChosen}
-			<DaydreamCopyCard
-				title={$form.scene.title}
-				summary={$form.scene.premise.slice(0, 160)}
-				state={sceneState()}
-				kindName="scenes"
-				onedit={() => {
-					sceneDialog = { surprise: false, edit: true };
-				}}
-				onuselatest={() => {
-					const item = $form.scene.sourceId ? sceneRevisions.get($form.scene.sourceId) : undefined;
-					const opened = item ? openedDaydreamScene(item.sealed) : null;
-					if (item && opened) {
-						putScene({ ...opened, sourceId: item.id, sourceRevision: item.revision });
-					}
-				}}
-				latestReady={latestOpened(sceneRevisions, $form.scene.sourceId, openedDaydreamScene)}
-				onkeep={() => {
-					const item = $form.scene.sourceId ? sceneRevisions.get($form.scene.sourceId) : undefined;
-					if (item) {
-						putScene({ ...$form.scene, sourceRevision: item.revision });
-					}
-				}}
-				onsave={async () => {
-					const saved = await saveCopy('scenes', $form.scene);
-					if (saved) {
-						putScene(saved.copy as DaydreamSceneCopy, saved.sealed);
-					}
-				}}
-			/>
-		{:else}
-			<p class="hint">Where it happens and what is going on.</p>
-		{/if}
-		<div class="scene-choices">
-			{#if scenes.length > 0}
-				<wa-dropdown onwa-select={pickScene}>
-					<wa-button slot="trigger" size="s" appearance="outlined" with-caret>Choose a saved scene</wa-button>
-					{#each scenes as item (item.id)}
-						{const opened = $derived(openedDaydreamScene(item.sealed))}
-						<wa-dropdown-item value={item.id} disabled={!opened}>
-							{opened?.title ?? notShown(opened)}
-						</wa-dropdown-item>
-					{/each}
-				</wa-dropdown>
-			{/if}
-			<wa-button size="s" appearance="outlined" onclick={() => {
-				sceneDialog = { surprise: false, edit: false };
-			}}>
-				<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
-				New scene
-			</wa-button>
-			{#if suggestionsOn}
-				<wa-button size="s" appearance="outlined" onclick={() => {
-					sceneDialog = { surprise: true, edit: false };
-				}}>
-					<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
-					Surprise me
-				</wa-button>
-			{/if}
-		</div>
-		{#if $errors.scene?.premise || $errors.scene?.title}
-			<span class="invalid">Choose a scene, or make one.</span>
-		{/if}
-	</fieldset>
-
-	<fieldset>
-		<legend>Who's in it</legend>
-		<p class="hint">{charactersNote}</p>
-		{#each $form.scene.parts as part (part.id)}
-			{const index = $derived($form.characters.findIndex((character) => character.casting.partId === part.id))}
-			{const player = $derived($form.characters[index])}
-			<div class="part">
-				<div class="part-name">
-					<strong>{part.name}</strong>
-					{#if part.description}<span class="hint">{part.description}</span>{/if}
-				</div>
-				{#if player}
-					{@render castCard(player, index)}
-				{:else if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
-					{@render castPicker(`Cast ${part.name}`, part.id)}
-				{/if}
-			</div>
-		{/each}
-		{#each uncast as { character, index } (character.sourceId ?? `copy-${index}`)}
-			{@render castCard(character, index)}
-		{/each}
-		{#if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
-			{@render castPicker(
-				$form.scene.parts.length > 0 ? 'Add someone else' : 'Add a character',
-				null
-			)}
-		{/if}
-		{#if $errors.characters?._errors}
-			<span class="invalid">{$errors.characters._errors[0]}</span>
-		{/if}
-	</fieldset>
-
-	<wa-details summary="More options" class="more" {@attach startOpen(customisedOptions)}>
-		{#if showLead}
-			<fieldset class="lead">
-				<legend>Who leads</legend>
-				<div class="choices">
-					{#each DAYDREAM_LEADS as choice (choice.value)}
-						<label class="choice">
-							<input
-								type="radio"
-								name="lead"
-								value={choice.value}
-								checked={$form.lead === choice.value}
-								onchange={() => {
-									$form.lead = choice.value;
-								}}
-							/>
-							<span>{choice.label}</span>
-						</label>
-					{/each}
-				</div>
-			</fieldset>
-		{/if}
-
-		<fieldset>
-			<legend>Your limits</legend>
-			<label>
-				<span>What must not happen</span>
-				<textarea
-					rows="3"
-					maxlength={DAYDREAM_LIMITS.limits}
-					placeholder="Anything that is off the table."
-					value={$form.limits}
-					oninput={setLimits}></textarea>
-				{#if $errors.limits}<span class="invalid">{$errors.limits}</span>{/if}
-			</label>
-			<p class="hint">
-				While it plays, “Stop” and “Ease off” are always there, and selecting words and
-				choosing “Not this” adds them here.
-			</p>
-		</fieldset>
-
-		<fieldset>
-			<legend>Dials</legend>
-			<DaydreamDials
-				value={$form.dials}
-				onchange={(dials) => {
-					$form.dials = dials;
-				}}
-			/>
-		</fieldset>
-	</wa-details>
-
+{#snippet submit()}
 	<wa-button
 		type="submit"
 		appearance={canSave ? 'filled' : 'outlined'}
@@ -693,6 +652,293 @@
 	>
 		{submitLabel}
 	</wa-button>
+{/snippet}
+
+<!-- The limits textarea, shared by both layouts: only one is ever on screen. -->
+{#snippet limitsField()}
+	<label>
+		<span>What must not happen</span>
+		<textarea
+			rows="3"
+			maxlength={DAYDREAM_LIMITS.limits}
+			placeholder="Anything that is off the table."
+			value={$form.limits}
+			oninput={setLimits}></textarea>
+		{#if $errors.limits}<span class="invalid">{$errors.limits}</span>{/if}
+	</label>
+	<p class="hint">
+		While it plays, “Stop” and “Ease off” are always there, and selecting words and
+		choosing “Not this” adds them here.
+	</p>
+{/snippet}
+
+<form method="POST" use:superform.enhance class="panel">
+	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
+
+	{#if layout === 'sentence'}
+		<div class="sentence-view">
+			<!-- The blanks are native buttons, not wa-buttons: they sit inside a
+			     line of text, where a wa-button's box would break the sentence.
+			     Each either opens a dialog or is a wa-dropdown's trigger, which
+			     the dropdown keeps aria-expanded on (AGENTS.md). -->
+			<!-- Written with no whitespace between the pieces: any there would
+			     render as a space, and put one before the full stop. The words
+			     between the blanks keep their own spaces (`.words`), which a
+			     space just after a wa-dropdown otherwise lost: "steamystory". -->
+			<p class="sentence">
+				{#each sentence as piece, at (at)}{#if piece.kind === 'text'}<span class="words">{piece.text}</span>{:else if piece.kind === 'heat'}<wa-dropdown onwa-select={pickHeat}
+						><button slot="trigger" type="button" class="blank" aria-label={`How sexual: ${piece.label}`}
+							>{piece.label}</button
+						><wa-dropdown-item value="any">Any kind</wa-dropdown-item
+						>{#if HEAT_SCALE}{#each [1, 2, 3, 4, 5] as const as level (level)}<wa-dropdown-item value={String(level)}
+									>{HEAT_SCALE[level].label}</wa-dropdown-item
+								>{/each}{/if}</wa-dropdown
+					>{:else if piece.kind === 'voice'}<wa-dropdown onwa-select={pickVoice}
+						><button slot="trigger" type="button" class="blank" aria-label={`How it's told: ${voiceLabel}`}
+							>{piece.label}</button
+						>{#each DAYDREAM_VOICE_PRESETS as preset (preset.id)}<wa-dropdown-item value={preset.id}
+								>{preset.label}</wa-dropdown-item
+							>{/each}</wa-dropdown
+					>{:else if piece.kind === 'character'}<button
+						type="button"
+						class="blank"
+						onclick={() => {
+							characterDialog = {
+								index: piece.index,
+								partId: $form.characters[piece.index]?.casting.partId ?? null
+							};
+						}}>{piece.name}</button
+					>{:else}<button
+						type="button"
+						class="blank"
+						onclick={() => {
+							sceneDialog = { surprise: false, edit: true };
+						}}>{piece.title}</button
+					>{/if}{/each}
+			</p>
+			<p class="premise">{$form.scene.premise}</p>
+			{#if notes.length > 0}
+				<ul class="notes">
+					{#each notes as note, at (at)}<li>{note}</li>{/each}
+				</ul>
+			{/if}
+			{#if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
+				<div>{@render castPicker('Add someone', null)}</div>
+			{/if}
+			{#if voiceIssue}<p class="invalid" role="status">{voiceIssue}</p>{/if}
+			{#if $errors.characters?._errors}
+				<span class="invalid">{$errors.characters._errors[0]}</span>
+			{/if}
+			<wa-details summary="Anything off the table?" class="limits" {@attach startOpen(limitsWritten)}>
+				{@render limitsField()}
+			</wa-details>
+		</div>
+
+		<div class="actions">
+			{@render submit()}
+			{#if onretry}
+				<wa-button appearance="outlined" disabled={retrying} onclick={() => onretry($form.limits)}>
+					<wa-icon slot="start" name="rotate" variant="solid"></wa-icon>
+					{retrying ? 'Writing another…' : 'Try another'}
+				</wa-button>
+			{/if}
+			<wa-button
+				appearance="plain"
+				onclick={() => {
+					layout = 'full';
+				}}
+			>
+				<wa-icon slot="start" name="sliders" variant="solid"></wa-icon>
+				Customise everything
+			</wa-button>
+		</div>
+	{:else}
+		<!-- Only once there is a daydream to rename: a new one is named by the
+		     model after its opening, and nobody should have to think of a name
+		     before they have started. -->
+		{#if daydream}
+			<InputField
+				{superform}
+				field="title"
+				type="text"
+				title="Name"
+				maxlength={DAYDREAM_LIMITS.title}
+			/>
+			<p class="hint name-hint">Leave it empty to have it named for you.</p>
+		{/if}
+
+		<fieldset>
+			<legend>The scene</legend>
+			{#if sceneChosen}
+				<DaydreamCopyCard
+					title={$form.scene.title}
+					summary={$form.scene.premise.slice(0, 160)}
+					state={sceneState()}
+					kindName="scenes"
+					onedit={() => {
+						sceneDialog = { surprise: false, edit: true };
+					}}
+					onuselatest={() => {
+						const item = $form.scene.sourceId ? sceneRevisions.get($form.scene.sourceId) : undefined;
+						const opened = item ? openedDaydreamScene(item.sealed) : null;
+						if (item && opened) {
+							putScene({ ...opened, sourceId: item.id, sourceRevision: item.revision });
+						}
+					}}
+					latestReady={latestOpened(sceneRevisions, $form.scene.sourceId, openedDaydreamScene)}
+					onkeep={() => {
+						const item = $form.scene.sourceId ? sceneRevisions.get($form.scene.sourceId) : undefined;
+						if (item) {
+							putScene({ ...$form.scene, sourceRevision: item.revision });
+						}
+					}}
+					onsave={async () => {
+						const saved = await saveCopy('scenes', $form.scene);
+						if (saved) {
+							putScene(saved.copy as DaydreamSceneCopy, saved.sealed);
+						}
+					}}
+				/>
+			{:else}
+				<p class="hint">Where it happens and what is going on.</p>
+			{/if}
+			<div class="scene-choices">
+				{#if scenes.length > 0}
+					<wa-dropdown onwa-select={pickScene}>
+						<wa-button slot="trigger" size="s" appearance="outlined" with-caret>Choose a saved scene</wa-button>
+						{#each scenes as item (item.id)}
+							{const opened = $derived(openedDaydreamScene(item.sealed))}
+							<wa-dropdown-item value={item.id} disabled={!opened}>
+								{opened?.title ?? notShown(opened)}
+							</wa-dropdown-item>
+						{/each}
+					</wa-dropdown>
+				{/if}
+				<wa-button size="s" appearance="outlined" onclick={() => {
+					sceneDialog = { surprise: false, edit: false };
+				}}>
+					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+					New scene
+				</wa-button>
+				{#if suggestionsOn}
+					<wa-button size="s" appearance="outlined" onclick={() => {
+						sceneDialog = { surprise: true, edit: false };
+					}}>
+						<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
+						Surprise me
+					</wa-button>
+				{/if}
+			</div>
+			{#if $errors.scene?.premise || $errors.scene?.title}
+				<span class="invalid">Choose a scene, or make one.</span>
+			{/if}
+		</fieldset>
+
+		<fieldset>
+			<legend>Who's in it</legend>
+			<p class="hint">{charactersNote}</p>
+			{#each $form.scene.parts as part (part.id)}
+				{const index = $derived($form.characters.findIndex((character) => character.casting.partId === part.id))}
+				{const player = $derived($form.characters[index])}
+				<div class="part">
+					<div class="part-name">
+						<strong>{part.name}</strong>
+						{#if part.description}<span class="hint">{part.description}</span>{/if}
+					</div>
+					{#if player}
+						{@render castCard(player, index)}
+					{:else if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
+						{@render castPicker(`Cast ${part.name}`, part.id)}
+					{/if}
+				</div>
+			{/each}
+			{#each uncast as { character, index } (character.sourceId ?? `copy-${index}`)}
+				{@render castCard(character, index)}
+			{/each}
+			{#if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
+				{@render castPicker(
+					$form.scene.parts.length > 0 ? 'Add someone else' : 'Add a character',
+					null
+				)}
+			{/if}
+			{#if $errors.characters?._errors}
+				<span class="invalid">{$errors.characters._errors[0]}</span>
+			{/if}
+		</fieldset>
+
+		<wa-details summary="More options" class="more" {@attach startOpen(customisedOptions)}>
+			{#if showLead}
+				<fieldset class="lead">
+					<legend>Who leads</legend>
+					<div class="choices">
+						{#each DAYDREAM_LEADS as choice (choice.value)}
+							<label class="choice">
+								<input
+									type="radio"
+									name="lead"
+									value={choice.value}
+									checked={$form.lead === choice.value}
+									onchange={() => {
+										$form.lead = choice.value;
+									}}
+								/>
+								<span>{choice.label}</span>
+							</label>
+						{/each}
+					</div>
+				</fieldset>
+			{/if}
+
+			<fieldset>
+				<legend>Your limits</legend>
+				{@render limitsField()}
+			</fieldset>
+
+			<fieldset>
+				<legend>Dials</legend>
+				<DaydreamDials
+					value={$form.dials}
+					onchange={(dials) => {
+						$form.dials = dials;
+					}}
+				/>
+			</fieldset>
+		</wa-details>
+
+		<!-- Last, and as one line: by now who is in it is known, and the guess
+		     it makes from them is usually right. -->
+		<fieldset class="told">
+			<legend>How it's told</legend>
+			{#if voiceOpen}
+				<DaydreamVoicePicker
+					value={$form.voice}
+					characterCount={$form.characters.length}
+					onchange={chooseVoice}
+				/>
+			{:else}
+				<div class="told-summary">
+					<p>
+						<strong>{voiceLabel}</strong>
+						{#if !voiceChosen}<span class="hint">Picked from who’s in it.</span>{/if}
+					</p>
+					<wa-button
+						size="s"
+						appearance="outlined"
+						onclick={() => {
+							voiceOpen = true;
+						}}
+					>
+						Change
+					</wa-button>
+				</div>
+				<!-- The picker shows its own problem; closed, it is said here, so a
+				     closed picker never hides why the form will not save. -->
+				{#if voiceIssue}<p class="invalid" role="status">{voiceIssue}</p>{/if}
+			{/if}
+		</fieldset>
+
+		{@render submit()}
+	{/if}
 </form>
 
 <!-- Outside the form: each dialog is a form of its own, and forms do not nest. -->
@@ -820,5 +1066,97 @@
 
 	.invalid {
 		color: var(--wa-color-text-danger);
+	}
+
+	.told-summary {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+
+		p {
+			margin: 0;
+			display: flex;
+			flex-wrap: wrap;
+			align-items: baseline;
+			gap: 0.25rem 0.75rem;
+		}
+	}
+
+	/* The setup as a sentence with blanks in it. */
+	.sentence-view {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.sentence {
+		margin: 0;
+		font-size: 1.375rem;
+		line-height: 1.8;
+
+		wa-dropdown {
+			display: inline;
+			font-size: inherit;
+		}
+
+		.words {
+			white-space: pre-wrap;
+		}
+	}
+
+	/* A blank to fill in: underlined like a field, and tappable. Undoes Web
+	   Awesome's native button styles, which make a <button> a one-line control
+	   of the form height rather than a word in a sentence. */
+	.blank {
+		display: inline;
+		block-size: auto;
+		margin: 0;
+		padding: 0 0.15em;
+		vertical-align: baseline;
+		white-space: normal;
+		font-size: inherit;
+		line-height: inherit;
+		border: 0;
+		border-block-end: 2px dashed var(--wa-color-brand-border-loud, currentColor);
+		border-radius: 0;
+		background: var(--wa-color-brand-fill-quiet);
+		color: inherit;
+		font-family: inherit;
+		font-weight: 600;
+		cursor: pointer;
+
+		&:focus-visible {
+			outline: var(--wa-focus-ring);
+			outline-offset: var(--wa-focus-ring-offset);
+		}
+	}
+
+	.premise {
+		margin: 0;
+
+		/* The starting points' premises are phrases, written to sit in a field. */
+		&::first-letter {
+			text-transform: uppercase;
+		}
+	}
+
+	.notes {
+		margin: 0;
+		padding-inline-start: 1.25rem;
+		color: var(--wa-color-text-quiet);
+	}
+
+	.limits::part(content) {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 	}
 </style>

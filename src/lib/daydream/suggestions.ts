@@ -21,11 +21,13 @@ import {
 	MAX_DAYDREAM_CHARACTERS,
 	SCENE_TEXT_FIELDS,
 	type SceneDials,
-	type SceneTextField
+	type SceneTextField,
+	UNSET_CHARACTER_DIALS
 } from '../daydream';
 import { unfence } from './reply-format';
+import type { StoryCast, StoryPieces } from './starters';
 
-export type SuggestTask = 'chips' | 'fill' | 'surprise-scene' | 'casting' | 'name';
+export type SuggestTask = 'chips' | 'fill' | 'surprise-scene' | 'casting' | 'name' | 'daydream';
 export type SuggestTarget = 'character' | 'scene';
 
 /** The longest stretch of the opening passage sent to name a daydream: its start says enough. */
@@ -237,3 +239,56 @@ export function parseName(value: unknown): string | null {
 }
 
 const QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;
+
+const VOICE_IDS = ['talk', 'told', 'watch', 'rules'] as const;
+
+/**
+ * A whole daydream from a `daydream` answer, written from a sentence the
+ * user typed: its voice, its scene and who is in it, in pieces for
+ * `assembleSetup` (`starters.ts`) to put together. Null without a scene that
+ * has the two fields a scene must have.
+ *
+ * Lenient like the rest: a voice that is not one of the four is left to
+ * follow who is in it, a person with no name is dropped, and every field is
+ * held to its cap. Characters' dials stay unset, as a person who skipped
+ * them would leave them; the scene's are rated.
+ */
+export function parseSuggestedDaydream(value: unknown): StoryPieces | null {
+	if (!value || typeof value !== 'object') {
+		return null;
+	}
+	const answer = value as Record<string, unknown>;
+	const scene = parseSurpriseScene(answer.scene);
+	if (!scene) {
+		return null;
+	}
+	const voice = VOICE_IDS.find((id) => id === answer.voice) ?? null;
+	const list = Array.isArray(answer.characters) ? answer.characters : [];
+	const cast: StoryCast[] = [];
+	for (const entry of list) {
+		const fields = parseFill('character', entry);
+		if (!fields.name || cast.some((other) => same(other.character.name, fields.name ?? ''))) {
+			continue;
+		}
+		const person = entry as Record<string, unknown>;
+		const partName = capped(person.part, DAYDREAM_LIMITS.partName);
+		cast.push({
+			character: {
+				name: fields.name,
+				archetype: fields.archetype ?? '',
+				personality: fields.personality ?? '',
+				speech: fields.speech ?? '',
+				appearance: fields.appearance ?? '',
+				likes: fields.likes ?? '',
+				notes: fields.notes ?? '',
+				dials: UNSET_CHARACTER_DIALS
+			},
+			partName: partName || null,
+			relationship: capped(person.relationship, DAYDREAM_LIMITS.relationship),
+			doing: capped(person.doing, DAYDREAM_LIMITS.castPart)
+		});
+	}
+	return { voice, scene, cast: cast.slice(0, MAX_DAYDREAM_CHARACTERS) };
+}
+
+const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();

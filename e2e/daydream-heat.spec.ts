@@ -35,6 +35,7 @@ async function openSetup(page: Page) {
 	await newLink.click();
 	await page.waitForURL('**/daydreams/new');
 	await waitForHydration(page);
+	await clickWaButton(page, 'Build it yourself');
 }
 
 test('a SFW starting point keeps the story SFW, and the heat can be turned up mid-story', async ({

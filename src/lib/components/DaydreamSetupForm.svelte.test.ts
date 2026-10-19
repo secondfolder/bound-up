@@ -35,6 +35,9 @@ const ref = (recordId: string): SealedRefView => ({
 async function renderForm(
 	options: {
 		setup?: DaydreamSetupContent;
+		draft?: DaydreamSetupContent;
+		layout?: 'sentence' | 'full';
+		onretry?: (limits: string) => void;
 		library?: DaydreamLibraryView;
 		suggestionsOn?: boolean;
 	} = {}
@@ -45,6 +48,9 @@ async function renderForm(
 	const rendered = render(DaydreamSetupForm, {
 		setupForm,
 		daydream: options.setup ? { id: 'd1', revision: 0, setup: options.setup } : null,
+		draft: options.draft ?? null,
+		layout: options.layout ?? 'full',
+		onretry: options.onretry,
 		library: options.library ?? EMPTY_LIBRARY,
 		suggestionsOn: options.suggestionsOn ?? false,
 		submitLabel: 'Save setup'
@@ -81,6 +87,29 @@ function details(container: HTMLElement, summary: string) {
 
 async function openDetails(container: HTMLElement, summary: string) {
 	details(container, summary).open = true;
+	await waSettled(container);
+}
+
+/** The "How it's told" fieldset, last in the full layout. */
+const told = (container: HTMLElement) => {
+	const found = container.querySelector<HTMLElement>('fieldset.told');
+	if (!found) {
+		throw new Error('no "How it\'s told"');
+	}
+	return found;
+};
+
+/** An icon-only button, named by its icon's label (AGENTS.md). */
+const removeButton = (container: HTMLElement, name: string) =>
+	// The property, which is what Svelte set on the upgraded element (AGENTS.md).
+	[...container.querySelectorAll<HTMLElement & { label: string }>('wa-icon')]
+		.find((icon) => icon.label === `Remove ${name}`)
+		?.closest<HTMLElement>('wa-button');
+
+/** Opens the voice picker from its one-line summary. */
+async function changeVoice(container: HTMLElement) {
+	button(told(container), 'Change')?.click();
+	await waitFor(() => expect(told(container).querySelector('.options')).not.toBeNull());
 	await waSettled(container);
 }
 
@@ -122,7 +151,8 @@ describe('DaydreamSetupForm', () => {
 
 	it('fills both settings from a preset, and disables what could never work with it', async () => {
 		const { container } = await renderForm();
-		button(container, 'Watch a story unfold')?.click();
+		await changeVoice(container);
+		container.querySelector<HTMLInputElement>('.options input[value="watch"]')?.click();
 		await waitFor(() =>
 			expect(
 				container.querySelector<HTMLInputElement>('input[value="third-person"]')?.checked
@@ -141,12 +171,133 @@ describe('DaydreamSetupForm', () => {
 	});
 
 	it('needs no characters for a story told to you', async () => {
-		const { container } = await renderForm();
-		button(container, 'A story told to you')?.click();
+		const { container } = await renderForm({ draft: testDaydreamSetup() });
+		await changeVoice(container);
+		container.querySelector<HTMLInputElement>('.options input[value="told"]')?.click();
 		await waitFor(() =>
 			expect(container.textContent).toContain('Optional: people the narrator brings in')
 		);
 		expect(container.textContent).not.toContain('add a character, or choose a narrator');
+	});
+
+	describe('how it’s told, last', () => {
+		it('comes last, just above the button, as one line', async () => {
+			const { container } = await renderForm();
+			const legends = [...container.querySelectorAll('form > fieldset > legend')].map((legend) =>
+				legend.textContent?.trim()
+			);
+			expect(legends.at(-1)).toBe("How it's told");
+			expect(told(container).nextElementSibling?.textContent?.trim()).toBe('Save setup');
+			expect(told(container).querySelector('.options')).toBeNull();
+			expect(button(told(container), 'Change')).toBeDefined();
+		});
+
+		it('follows who is in it until it is chosen: told to you with nobody, talking with anyone', async () => {
+			const empty = await renderForm();
+			expect(told(empty.container).textContent).toContain('A story told to you');
+			expect(told(empty.container).textContent).toContain('Picked from who’s in it.');
+			// Nobody in it is a story told to you, which works, so nothing is wrong.
+			expect(empty.container.textContent).not.toContain('add a character');
+			empty.unmount();
+
+			const { container } = await renderForm({ draft: testDaydreamSetup() });
+			expect(told(container).textContent).toContain('Talk with a character');
+			removeButton(container, 'Mara')?.click();
+			await waitFor(() => expect(told(container).textContent).toContain('A story told to you'));
+		});
+
+		it('stops following once one is chosen', async () => {
+			const { container } = await renderForm({ draft: testDaydreamSetup() });
+			await changeVoice(container);
+			container.querySelector<HTMLInputElement>('.options input[value="rules"]')?.click();
+			removeButton(container, 'Mara')?.click();
+			await waitFor(() => expect(container.textContent).not.toContain('Mara'));
+			expect(
+				container.querySelector<HTMLInputElement>('.options input[value="rules"]')?.checked
+			).toBe(true);
+		});
+
+		it('treats an edited daydream’s voice as chosen', async () => {
+			const { container } = await renderForm({
+				setup: testDaydreamSetup({
+					voice: { narrator: 'third-person', stance: 'absent', protagonistName: '' },
+					characters: []
+				})
+			});
+			expect(told(container).textContent).toContain('Watch a story unfold');
+			expect(told(container).textContent).not.toContain('Picked from');
+		});
+	});
+
+	describe('as a sentence', () => {
+		const draft = () =>
+			testDaydreamSetup({
+				title: '',
+				scene: { ...testDaydreamSetup().scene, dials: { heat: 3, kink: null } }
+			});
+		/** The sentence as it reads, without the menus' items. */
+		const sentence = (container: HTMLElement) => {
+			const copy = container.querySelector('.sentence')?.cloneNode(true) as HTMLElement | undefined;
+			for (const item of copy?.querySelectorAll('wa-dropdown-item') ?? []) {
+				item.remove();
+			}
+			return copy?.textContent?.replace(/\s+/g, ' ').trim();
+		};
+
+		it('says the setup in one line, each part of it a blank to change', async () => {
+			const { container } = await renderForm({ draft: draft(), layout: 'sentence' });
+			expect(sentence(container)).toBe(
+				'I want a steamy story where I talk with Mara in Late meeting.'
+			);
+			expect(container.querySelectorAll('.sentence .blank')).toHaveLength(4);
+			expect(container.querySelector('fieldset.told')).toBeNull();
+		});
+
+		it('changes the heat and how it is told from the blanks', async () => {
+			const { container } = await renderForm({ draft: draft(), layout: 'sentence' });
+			const [heat, voice] = [...container.querySelectorAll<HTMLElement>('.sentence wa-dropdown')];
+			const pick = (dropdown: HTMLElement | undefined, value: string) => {
+				const item = [
+					...(dropdown?.querySelectorAll<HTMLElement & { value: string }>('wa-dropdown-item') ?? [])
+				].find((candidate) => candidate.value === value);
+				dropdown?.dispatchEvent(new CustomEvent('wa-select', { detail: { item } }));
+			};
+			pick(heat, '4');
+			await waitFor(() => expect(sentence(container)).toMatch(/^I want an explicit story/));
+			pick(voice, 'told');
+			await waitFor(() =>
+				expect(sentence(container)).toBe(
+					'I want an explicit story told to me in Late meeting, with Mara.'
+				)
+			);
+		});
+
+		it('switches to every control with nothing lost', async () => {
+			const { container } = await renderForm({ draft: draft(), layout: 'sentence' });
+			button(container, 'Customise everything')?.click();
+			await waitFor(() => expect(container.querySelector('fieldset.told')).not.toBeNull());
+			expect(container.querySelector('.sentence')).toBeNull();
+			expect(container.textContent).toContain('Late meeting');
+			expect(partRows(container)).toHaveLength(0);
+			expect(button(container, 'Edit Mara')).toBeDefined();
+		});
+
+		it('asks for another with the limits written so far, and only when it can', async () => {
+			const without = await renderForm({ draft: draft(), layout: 'sentence' });
+			expect(button(without.container, 'Try another')).toBeUndefined();
+			without.unmount();
+
+			const onretry = vi.fn();
+			const { container } = await renderForm({ draft: draft(), layout: 'sentence', onretry });
+			await openDetails(container, 'Anything off the table?');
+			const limits = container.querySelector('textarea');
+			if (!limits) {
+				throw new Error('no limits field');
+			}
+			await userEvent.type(limits, 'Nothing public.');
+			button(container, 'Try another')?.click();
+			expect(onretry).toHaveBeenCalledWith('Nothing public.');
+		});
 	});
 
 	it('offers the library’s newer version of a character, and takes it on request', async () => {
@@ -192,9 +343,9 @@ describe('DaydreamSetupForm', () => {
 			expect(edited.container.querySelector('wa-input[name="title"]')).not.toBeNull();
 		});
 
-		it('keeps the voice settings and the rest under closed disclosures for a new daydream', async () => {
+		it('keeps the voice to one line and the rest under a closed disclosure for a new daydream', async () => {
 			const { container } = await renderForm();
-			expect(details(container, "Fine-tune how it's told").open).toBe(false);
+			expect(told(container).querySelector('wa-details')).toBeNull();
 			expect(details(container, 'More options').open).toBe(false);
 			// Who leads, the limits and the dials are all in there.
 			const more = details(container, 'More options');
@@ -205,7 +356,8 @@ describe('DaydreamSetupForm', () => {
 		it('opens what an edited daydream has changed, and only that', async () => {
 			const limited = await renderForm({ setup: testDaydreamSetup({ limits: 'Nothing public.' }) });
 			expect(details(limited.container, 'More options').open).toBe(true);
-			expect(details(limited.container, "Fine-tune how it's told").open).toBe(false);
+			// A preset's voice says all there is to say in one line.
+			expect(told(limited.container).querySelector('.options')).toBeNull();
 			limited.unmount();
 
 			const persona = await renderForm({
@@ -219,9 +371,21 @@ describe('DaydreamSetupForm', () => {
 
 		it('shows a problem with the voice while its settings are closed', async () => {
 			const { container } = await renderForm();
-			button(container, 'Watch a story unfold')?.click();
+			await changeVoice(container);
+			container.querySelector<HTMLInputElement>('.options input[value="watch"]')?.click();
 			await waitFor(() => expect(container.querySelector('.problem')).not.toBeNull());
 			expect(container.querySelector('.problem')?.closest('wa-details')).toBeNull();
+		});
+
+		it('shows a problem with the voice while the picker is closed too', async () => {
+			const { container } = await renderForm({
+				setup: testDaydreamSetup({
+					voice: { narrator: 'third-person', stance: 'absent', protagonistName: '' },
+					characters: []
+				})
+			});
+			expect(told(container).querySelector('.options')).toBeNull();
+			expect(told(container).textContent).toContain('To watch, add at least one character');
 		});
 	});
 
