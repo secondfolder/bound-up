@@ -113,12 +113,17 @@ export class AccountKinkList extends KinkListStore {
 }
 
 async function openSealedList(view: KinkListView): Promise<ListPayload | null> {
+	return await openOwnList(view.sealed);
+}
+
+/** Opens your own list, or a version of it, sealed; null for one this device cannot open. */
+export async function openOwnList(sealed: KinkListView['sealed']): Promise<ListPayload | null> {
 	await vaultsSettled();
-	const vault = vaultById(view.sealed.vaultId) ?? selfVault();
+	const vault = vaultById(sealed.vaultId) ?? selfVault();
 	if (!vault) {
 		return null;
 	}
-	return await openRecord(kinkListKind, { ...view.sealed, vault });
+	return await openRecord(kinkListKind, { ...sealed, vault });
 }
 
 async function fetchLatest(): Promise<{ view: KinkListView; list: ListPayload } | null> {

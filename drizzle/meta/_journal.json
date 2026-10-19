@@ -260,6 +260,13 @@
       "when": 1792401113008,
       "tag": "0036_add_kink_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1792407929423,
+      "tag": "0037_add_kink_list_versions",
+      "breakpoints": true
     }
   ]
 }

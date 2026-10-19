@@ -1,9 +1,9 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
 import { assertNever } from '../assert-never';
 import { kinkListKind, kinkListPartnerKind } from '../sealed-kinds/kink-list';
 import type { KinkListView } from '../types';
 import type { Db } from './db';
-import { kinkLists } from './db/schema';
+import { kinkLists, kinkListVersions } from './db/schema';
 import {
 	isPartnershipMember,
 	partnershipVaultIdFor,
@@ -148,7 +148,10 @@ export async function saveKinkList(
 				ciphertext: content.ciphertext,
 				vaultId: content.vaultId,
 				payloadVersion: content.payloadVersion,
-				editedAt: now
+				editedAt: now,
+				// The first version's history starts here, so it follows an injected `now` too.
+				createdAt: now,
+				updatedAt: now
 			})
 			// Either the id or (owner, scope) already exists: another device
 			// made this list first, and the browser merges into that one.
@@ -157,7 +160,13 @@ export async function saveKinkList(
 		const [row] = inserted;
 		return row ? { ok: true, revision: row.revision } : { ok: false, reason: 'conflict' };
 	}
-	const updated = await db
+	const matchesExpected = and(
+		eq(kinkLists.id, input.id),
+		eq(kinkLists.ownerId, userId),
+		eq(kinkLists.scope, scopeKey(scope)),
+		eq(kinkLists.revision, input.expectedRevision)
+	);
+	const update = db
 		.update(kinkLists)
 		.set({
 			ciphertext: content.ciphertext,
@@ -167,20 +176,92 @@ export async function saveKinkList(
 			editedAt: now,
 			updatedAt: now
 		})
-		.where(
-			and(
-				eq(kinkLists.id, input.id),
-				eq(kinkLists.ownerId, userId),
-				eq(kinkLists.scope, scopeKey(scope)),
-				eq(kinkLists.revision, input.expectedRevision)
-			)
-		)
+		.where(matchesExpected)
 		.returning({ revision: kinkLists.revision });
+	// Only your own list keeps a history: a partner's copy follows it.
+	const [, updated] =
+		scope === 'self'
+			? await db.batch([freezeVersion(db, matchesExpected, now), update])
+			: [null, await update];
 	const [row] = updated;
 	if (row) {
 		return { ok: true, revision: row.revision };
 	}
 	return { ok: false, reason: (await getKinkList(db, userId, scope)) ? 'conflict' : 'not-found' };
+}
+
+/** How long a list has to sit unchanged before the next save keeps what it was as a version. */
+export const VERSION_QUIET_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Copies the list as it stands into `kink_list_versions`, if it has not been
+ * edited for a week. It is an `INSERT … SELECT` conditioned on the same
+ * revision as the save it is batched with, rather than a read and then a
+ * write, so a save that loses the compare-and-swap freezes nothing: two
+ * devices racing after a quiet week leave one version, not two. And it needs
+ * no cron: a list nobody edits has nothing new to keep.
+ */
+function freezeVersion(db: Db, matchesExpected: ReturnType<typeof and>, now: Date) {
+	const cutoff = new Date(now.getTime() - VERSION_QUIET_DAYS * DAY_MS);
+	return db.insert(kinkListVersions).select(
+		db
+			.select({
+				// Generated here: an `INSERT … SELECT` skips the column's own default.
+				id: sql<string>`${crypto.randomUUID()}`.as('id'),
+				listId: kinkLists.id,
+				vaultId: kinkLists.vaultId,
+				ciphertext: kinkLists.ciphertext,
+				payloadVersion: kinkLists.payloadVersion,
+				// The burst began where the previous version ended, or when the list was made.
+				editedFrom:
+					sql<Date>`coalesce((select max(${kinkListVersions.editedTo}) from ${kinkListVersions} where ${kinkListVersions.listId} = ${kinkLists.id}), ${kinkLists.createdAt})`.as(
+						'edited_from'
+					),
+				editedTo: kinkLists.editedAt,
+				frozenAt: sql<Date>`${now.getTime()}`.as('frozen_at')
+			})
+			.from(kinkLists)
+			.where(and(matchesExpected, lt(kinkLists.editedAt, cutoff)))
+	);
+}
+
+/** A version of your own list, oldest first in `listKinkListVersions`. */
+export type KinkListVersionView = {
+	id: string;
+	editedFrom: Date;
+	editedTo: Date;
+	sealed: KinkListView['sealed'];
+};
+
+/** Every version kept of the user's own list, oldest first. Empty before a week has gone by. */
+export async function listKinkListVersions(db: Db, userId: string): Promise<KinkListVersionView[]> {
+	const rows = await db
+		.select({
+			id: kinkListVersions.id,
+			listId: kinkListVersions.listId,
+			editedFrom: kinkListVersions.editedFrom,
+			editedTo: kinkListVersions.editedTo,
+			ciphertext: kinkListVersions.ciphertext,
+			vaultId: kinkListVersions.vaultId,
+			payloadVersion: kinkListVersions.payloadVersion
+		})
+		.from(kinkListVersions)
+		.innerJoin(kinkLists, eq(kinkLists.id, kinkListVersions.listId))
+		.where(and(eq(kinkLists.ownerId, userId), eq(kinkLists.scope, 'self')))
+		.orderBy(kinkListVersions.editedTo, desc(kinkListVersions.frozenAt));
+	return rows.map((row) => ({
+		id: row.id,
+		editedFrom: row.editedFrom,
+		editedTo: row.editedTo,
+		// Sealed to the list's id: a version is the list as it was, sealed then.
+		sealed: {
+			recordId: row.listId,
+			vaultId: row.vaultId,
+			ciphertext: row.ciphertext,
+			payloadVersion: row.payloadVersion
+		}
+	}));
 }
 
 /** Every partnership the user shares their list with, as their own copies there. */

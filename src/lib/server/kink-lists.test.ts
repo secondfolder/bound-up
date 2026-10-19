@@ -9,7 +9,13 @@ import {
 	type TestUser
 } from '$lib/testing/fixtures';
 import type { Db } from './db';
-import { getKinkList, getPartnerKinkList, listSharedKinkLists, saveKinkList } from './kink-lists';
+import {
+	getKinkList,
+	getPartnerKinkList,
+	listKinkListVersions,
+	listSharedKinkLists,
+	saveKinkList
+} from './kink-lists';
 
 let harness: TestDb;
 let db: Db;
@@ -257,5 +263,98 @@ describe('shared copies', () => {
 		expect((await listSharedKinkLists(db, ada.id)).map((list) => list.scope)).toEqual([
 			partnershipId
 		]);
+	});
+});
+
+describe('version history', () => {
+	const Day = 24 * 60 * 60 * 1000;
+	const start = new Date('2026-01-01T00:00:00Z');
+	const dayAfter = (days: number) => new Date(start.getTime() + days * Day);
+
+	const saved = new Map<string, string>();
+
+	/** Saves with the given label, remembering its (random) ciphertext under it. */
+	async function save(id: string, label: string, expectedRevision: number | null, now: Date) {
+		const content = await selfContent(ada.id, label);
+		saved.set(label, content.ciphertext);
+		return await saveKinkList(db, ada.id, { scope: 'self', id, content, expectedRevision, now });
+	}
+
+	it('keeps nothing while edits come within a week of each other', async () => {
+		const id = crypto.randomUUID();
+		await save(id, 'first', null, start);
+		await save(id, 'second', 0, dayAfter(3));
+		await save(id, 'third', 1, dayAfter(9));
+		expect(await listKinkListVersions(db, ada.id)).toEqual([]);
+	});
+
+	it('keeps the list as it was when the next save comes after a quiet week', async () => {
+		const id = crypto.randomUUID();
+		await save(id, 'first', null, start);
+		await save(id, 'second', 0, dayAfter(2));
+		await save(id, 'after the gap', 1, dayAfter(10));
+
+		const versions = await listKinkListVersions(db, ada.id);
+		expect(versions).toHaveLength(1);
+		const [version] = versions;
+		expect(version?.sealed).toMatchObject({ recordId: id, ciphertext: saved.get('second') });
+		expect(version?.editedTo).toEqual(dayAfter(2));
+		expect((await getKinkList(db, ada.id, 'self'))?.sealed.ciphertext).toBe(
+			saved.get('after the gap')
+		);
+	});
+
+	it('starts each version where the one before it ended', async () => {
+		const id = crypto.randomUUID();
+		await save(id, 'one', null, start);
+		await save(id, 'two', 0, dayAfter(8));
+		await save(id, 'three', 1, dayAfter(20));
+
+		const versions = await listKinkListVersions(db, ada.id);
+		expect(versions.map((version) => [version.editedFrom, version.editedTo])).toEqual([
+			[start, start],
+			[start, dayAfter(8)]
+		]);
+	});
+
+	it('freezes nothing for a save that loses the race', async () => {
+		const id = crypto.randomUUID();
+		await save(id, 'first', null, start);
+		await save(id, 'winner', 0, dayAfter(10));
+		expect(await save(id, 'loser', 0, dayAfter(10))).toEqual({ ok: false, reason: 'conflict' });
+		expect(await listKinkListVersions(db, ada.id)).toHaveLength(1);
+	});
+
+	it('keeps no history of a partnership’s copy', async () => {
+		const { id: partnershipId } = await createTestPartnership(db, ada, jun);
+		const content = async () => ({
+			vaultId: await ensureTestPartnershipVault(db, partnershipId),
+			ciphertext: fakeSealed('copy'),
+			payloadVersion: 1
+		});
+		const id = crypto.randomUUID();
+		const scope = { partnershipId };
+		await saveKinkList(db, ada.id, {
+			scope,
+			id,
+			content: await content(),
+			expectedRevision: null,
+			now: start
+		});
+		await saveKinkList(db, ada.id, {
+			scope,
+			id,
+			content: await content(),
+			expectedRevision: 0,
+			now: dayAfter(30)
+		});
+		expect(await listKinkListVersions(db, ada.id)).toEqual([]);
+	});
+
+	it('lists only the user’s own versions', async () => {
+		const id = crypto.randomUUID();
+		await save(id, 'first', null, start);
+		await save(id, 'second', 0, dayAfter(10));
+		expect(await listKinkListVersions(db, jun.id)).toEqual([]);
 	});
 });

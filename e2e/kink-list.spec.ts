@@ -412,3 +412,44 @@ test('a partner view starts you on your own list before offering to share it', a
 		await jun.close();
 	}
 });
+
+test('a week without changes keeps a version, and history shows what moved', async ({ page }) => {
+	const eve = account('Eve');
+	await signUp(page, eve);
+	await openList(page);
+
+	await page.getByRole('link', { name: /Impact play/ }).click();
+	const spanking = page.getByRole('group', { name: 'Spanking', exact: true });
+	await spanking.getByText('Like', { exact: true }).click();
+	await saved(page);
+
+	// A week and a day without changes, without waiting for one.
+	const eightDays = 8 * 24 * 60 * 60 * 1000;
+	await sql(
+		`update kink_lists set edited_at = edited_at - ?, created_at = created_at - ?
+		 where owner_id = (select id from user where email = ?)`,
+		[eightDays, eightDays, eve.email]
+	);
+
+	await spanking.getByText('Love', { exact: true }).click();
+	await saved(page);
+
+	const { rows } = await sql(
+		`select kink_list_versions.ciphertext from kink_list_versions
+		 join kink_lists on kink_lists.id = kink_list_versions.list_id
+		 join user on user.id = kink_lists.owner_id where user.email = ?`,
+		[eve.email]
+	);
+	expect(rows).toHaveLength(1);
+	expect(String(rows[0]?.ciphertext)).toMatch(/^sb1\./);
+
+	await page.getByRole('link', { name: 'All categories' }).click();
+	await page.getByRole('link', { name: 'See how your list has changed' }).click();
+	await expect(page.getByRole('heading', { name: 'Versions (1)' })).toBeVisible();
+	const moreInto = page.getByRole('region', { name: 'More into (1)' });
+	await expect(moreInto.getByText('Spanking', { exact: true })).toBeVisible();
+	await expect(moreInto.getByText('Like → Love')).toBeVisible();
+
+	await moreInto.getByRole('button', { name: 'Over time for Spanking' }).click();
+	await expect(moreInto.getByRole('listitem').filter({ hasText: /^\s*Now/ })).toContainText('Love');
+});

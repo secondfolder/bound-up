@@ -119,6 +119,9 @@
 				<ShareLink />
 			</wa-details>
 			<p class="transfer"><a href={paths.transfer}>Import or export your list</a></p>
+			{#if paths.history}
+				<p class="transfer"><a href={paths.history}>See how your list has changed</a></p>
+			{/if}
 		{/if}
 
 		{#each Object.entries(catalog.sections) as [section, title] (section)}

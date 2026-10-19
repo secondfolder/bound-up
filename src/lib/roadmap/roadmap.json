@@ -380,7 +380,8 @@
 							"id": "kink-list-history",
 							"title": "Kink list history",
 							"summary": "See how what you're into has changed over time.",
-							"status": "planned",
+							"status": "shipped",
+							"shippedOn": "2026-10-19",
 							"notes": [
 								"A new version is kept once a week has gone by without changes",
 								"See what moved: curious to favourite, a new limit, something you've since tried"

@@ -12,6 +12,8 @@ export type KinkListPaths = {
 	category: (categoryId: string) => string;
 	quick: string;
 	transfer: string;
+	/** Only your own list, signed in, keeps a history. */
+	history?: string;
 };
 
 export type KinkListContext = {

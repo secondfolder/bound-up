@@ -1683,3 +1683,35 @@ export const kinkLists = sqliteTable(
 
 export type KinkListRow = typeof kinkLists.$inferSelect;
 export type NewKinkListRow = typeof kinkLists.$inferInsert;
+
+/**
+ * Your own kink list as it stood at the end of a burst of edits. A version is
+ * kept once a week has gone by without changes: the next save copies the
+ * list as it was, before applying itself (`saveKinkList`). It is sealed to
+ * the list's id, which is the record id it was sealed with, so it opens
+ * exactly like the list did. See docs/kink-list.md, "Version history".
+ */
+export const kinkListVersions = sqliteTable(
+	'kink_list_versions',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		listId: text('list_id')
+			.notNull()
+			.references(() => kinkLists.id, { onDelete: 'cascade' }),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		payloadVersion: integer('payload_version').notNull(),
+		/** When the burst of edits this version ends began: the previous version's end, or the list's creation. */
+		editedFrom: integer('edited_from', { mode: 'timestamp_ms' }).notNull(),
+		/** The last edit in the burst. */
+		editedTo: integer('edited_to', { mode: 'timestamp_ms' }).notNull(),
+		frozenAt: integer('frozen_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(table) => [index('kink_list_versions_list_idx').on(table.listId, table.editedTo)]
+);
+
+export type KinkListVersionRow = typeof kinkListVersions.$inferSelect;

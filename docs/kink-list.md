@@ -440,6 +440,46 @@ store).
   partnership they belong to (`getPartnerKinkList`). Anyone else gets a 404,
   however the partnership id was got.
 
+## Version history
+
+Your own list, signed in, keeps a version once it has gone a week without
+changes. **A version is a burst of edits**, not every save: answering is
+done in sittings, and a version per save would bury the one change that
+mattered under dozens that only moved a slider back and forth.
+
+- **Freezing happens on the next save**, in `saveKinkList`
+  ([`server/kink-lists.ts`](../src/lib/server/kink-lists.ts)): if the list's
+  `edited_at` is more than `VERSION_QUIET_DAYS` (7) old, the list as it
+  stood is copied into `kink_list_versions` before the save applies. No cron
+  is needed, because a list nobody edits has nothing new to keep.
+- **The copy is an `INSERT … SELECT` batched with the save**, conditioned on
+  the same revision, rather than a read and then a write. A save that loses
+  the compare-and-swap therefore freezes nothing, so two devices racing after
+  a quiet week leave one version, not two.
+- **A version is the list's ciphertext, as it was.** It stays sealed in your
+  own vault and opens with the list's id as its record id, which is what it
+  was sealed to. The server reads nothing in it, as with the list.
+- Each version has `edited_from` (where the previous version ended, or when
+  the list was made) and `edited_to` (its last edit).
+- **Only your own list keeps a history.** A partner's copy follows your own
+  list, so its history would be the same one again.
+
+**`/playroom/kink-list/history`** opens the versions in the browser and
+compares any two, defaulting to the last version against now
+([`history.ts`](../src/lib/kink-list/history.ts), `changesBetween`):
+
+- new hard limits, more into, less into, limits dropped, more experience,
+  and notes changed
+- each side of a role pair on its own
+- only what was **answered**, never what was inherited: a kink that moved
+  only because its parent did is not a change someone made
+- "Over time" on any change shows that kink's answer at each version where it
+  changed (`kinkTimeline`)
+
+Before the first version the page says when one will be kept. The home page
+links to it ("See how your list has changed") only signed in: `paths.history`
+is set by the signed-in layout alone.
+
 ## Tests
 
 - **`kink-list/catalog.test.ts`:** the catalogue's checks, search, and the
@@ -465,7 +505,11 @@ store).
   - applying an import
 - **`server/kink-lists.test.ts`:** saving, compare-and-swap, vaults, and who
   may write a scope; reading a partner's copy (members only, and only the
-  other member's), and listing shared copies.
+  other member's), and listing shared copies; versions kept after a quiet
+  week (with an injected `now`), none within one, none for a lost race or a
+  partner's copy, and each version starting where the last ended.
+- **`kink-list/history.test.ts`:** changes grouped by direction, limits, each
+  side on its own, experience and notes, and a kink's timeline.
 - **`components/kink-list/KinkRow.svelte.test.ts`:** answering, inherited
   answers, the sides, notes, related kinks and the intensity setting.
 - **`components/kink-list/Deck.svelte.test.ts`:** buttons, keys, undo, skip,
@@ -482,4 +526,6 @@ store).
   - Two partners: sharing, an override and a held-back kink for one partner,
     an answer from the partner view going on your own list, comparing, and
     blind comparing set by the other side.
+  - A list aged a week with `sql()`, edited, and the version kept and shown
+    on the history page.
 - **The sealed fixture** for `kink-list` v1 is in `sealed-fixtures/`.
