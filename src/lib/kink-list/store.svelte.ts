@@ -76,8 +76,18 @@ export abstract class KinkListStore {
 	 */
 	previewDetail: number | null = $state(null);
 
+	/**
+	 * Debug mode's switch: show only the kinks at the level of detail, to
+	 * check what each level adds. Kept for the visit, never saved.
+	 */
+	exactDetail = $state(false);
+
 	protected previewed(filters: Filters): Filters {
-		return this.previewDetail === null ? filters : { ...filters, detail: this.previewDetail };
+		return {
+			...filters,
+			detail: this.previewDetail ?? filters.detail,
+			exactDetail: this.exactDetail
+		};
 	}
 
 	/** Whether `filters.side` was worked out from the partnership, rather than chosen. */

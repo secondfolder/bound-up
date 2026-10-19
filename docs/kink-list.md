@@ -26,9 +26,10 @@ than reaching anyone.
   `alsoUnder`. Each of those categories shows it behind "N related kinks",
   fully answerable. It's the same item, so the answer is shared, and changing
   it in one place changes it in both.
-- **Intensity**, 0–6, from Sweet to Extreme. It is shown beside a kink's
-  name from Intense up, and hides nothing: what a list shows is its level of
-  detail (see [The level of detail](#the-level-of-detail)).
+- **Intensity**, 0–6, from Sweet to Extreme. It is not shown anywhere
+  and hides nothing: what a list shows is its level of detail (see
+  [The level of detail](#the-level-of-detail)). It stays in the catalogue
+  as a rating of each kink.
 - **Commonness**, 0–4, from Rare to Very common: how many people are into a
   kink or know of it. It is independent of intensity: balloons are mild and
   rare, choking intense and well known. It sets a kink's level of detail.
@@ -123,19 +124,22 @@ removed.
 `effectiveAnswer` decides, in this order:
 
 1. The kink's own answer for that side, then its own answer for both sides.
-2. For a specific, its kink's own answer. Answers flow down "kind of" links
-   only: spanking with an implement is a kind of spanking.
-3. A category's **"Hard limit everything here"**, from quick fill's triage,
+2. A category's **"Hard limit everything here"**, from quick fill's triage,
    for kinks whose primary category it is.
+
+**A specific does not take its kink's answer.** It once did, but a specific
+is listed because its answer can differ (loving spanking says little about
+paddles), and an answer shown on a specific nobody rated read as one they
+had given. Unanswered, it is unanswered.
 
 **Nothing positive flows down from a category, and nothing flows into a
 related kink.** If it did, "Love" on Impact would give face slapping a Love
 from someone who hates degradation. A hard limit is the one blanket answer
 allowed, because a wrong "no" costs little and can be overridden.
 
-On screen, an inherited answer is a dashed ring rather than filled, and its
-tooltip names its source ("Love, from Spanking"), so it never reads as a
-choice that was made. Notes are never inherited.
+On screen, that inherited limit is a dashed ring rather than filled, and its
+tooltip names its source, so it never reads as a choice that was made. Notes
+are never inherited.
 
 ### Merging
 
@@ -220,12 +224,12 @@ failed save.
 ([`KinkListHome`](../src/lib/components/kink-list/KinkListHome.svelte)), dense
 enough to fill in without a click per category:
 
-- search over names and aliases (`searchKinks`) and custom kinks, which
-  narrows the list in place (see [Search](#search))
-- the level of detail ([`ListFilters`](../src/lib/components/kink-list/ListFilters.svelte))
 - Quick fill, Share (a dialog that makes a link), Import or export, and
   History, on one row
-- pinned above the list as it scrolls, under that row: the key to the answer colours
+- pinned above the list as it scrolls, under that row: search over names
+  and aliases (`searchKinks`) and custom kinks, which narrows the list in
+  place (see [Search](#search)), the level of detail
+  ([`ListFilters`](../src/lib/components/kink-list/ListFilters.svelte)), the key to the answer colours
   ([`LevelKey`](../src/lib/components/kink-list/LevelKey.svelte)), "Your
   side" ([`YourSideControl`](../src/lib/components/kink-list/YourSideControl.svelte)),
   and Expand all / Collapse all. It has no background of its own until it
@@ -251,14 +255,25 @@ the left, and on the right a row of dots per context
   Colour is never the only cue: each radio is named by its word, each dot
   has it as a tooltip, the position on the scale is fixed, and the key says
   which is which. A chosen dot is filled with a check; choosing it again
-  clears it. An inherited answer is a dashed ring whose tooltip says where it
-  comes from.
+  clears it. An inherited hard limit is a dashed ring whose tooltip says where
+  it comes from.
 - **A kink with a role pair always shows both contexts**, side by side with
   their labels, or stacked under the name on a phone. "Answer as" can narrow
   it to one.
+- **The ratings sit in two columns of one width on every row**, so the first
+  context (Giving) is always in the first and the second (Receiving) in the
+  second. A kink narrowed to one context leaves the other column empty
+  rather than moving into it, and a kink with no contexts is centred across
+  both, so neither reads as the other's column when skimming. Too narrow for
+  two (a container query on the category's rows), the contexts stack in one
+  right-aligned column. A size container adds nothing to its parent's
+  fitted width, so the page column around the list must be full width up to
+  its maximum, not shrink to fit, or it collapses and every pair stacks.
 - **A context whose fantasy and reality have parted shows the two** in place
   of its one row of dots, labelled Fantasy and Reality, and goes back to one
   when they agree again.
+- **A context's experience shows on the line once it is set**, as
+  "Experience: Often" under its rating, so it is seen without opening the row.
 - **The name opens the rest** under the row: the description and safety
   note, then a fieldset per context (none for a kink without contexts)
   holding its fantasy and reality as dots and its experience as a slider
@@ -292,7 +307,7 @@ much as for someone who wants every specific: a kink shows when its own level
   the intensity and commonness filters it replaced opens on the default.
 
 Intensity no longer hides anything. An Extreme kink shows by how common it
-is, like any other, and is flagged beside its name.
+is, like any other.
 
 It sits beside the search when the page is wide enough, at a fixed width
 rather than one taken from the content, since the reading beside its title
@@ -303,6 +318,13 @@ level of detail hides. A category it hides every kink of is left out
 altogether rather than shown as an empty heading, and the foot of the list
 says how many categories went and how many kinks were in them. While
 searching that line gives way to the search's own count.
+
+**In debug mode, "Only this level"** under the slider shows the kinks at
+exactly its level instead of every one up to it, to check what each level
+adds (`exactDetail` in `Filters`, applied by `atDetail`). A kink with a
+specific at that level stays, since specifics only show under their kink,
+and its name is dimmed to say it is there for context. It lives on the store
+for the visit and is never saved.
 
 ### Search
 
@@ -370,8 +392,8 @@ list, so a reload loses nothing and lands back on triage.
      on most cards.
    - **Conditional** keeps the card on screen with a note field until Next.
 3. **Drill down only after yes.** A yes of any kind (`isPositive`) on a kink
-   deals its specifics in straight after it, as "Specifically, for …". A no or
-   Don't mind leaves them to inherit that answer.
+   deals its specifics in straight after it, as "Specifically, for …". After a no
+   or Don't mind they are not asked, and stay unanswered.
 4. **Review** ([`DeckReview`](../src/lib/components/kink-list/DeckReview.svelte)):
    - your hard limits, with each category limited wholesale shown as one line
      rather than every kink in it
@@ -472,8 +494,7 @@ using effective answers.
   - **Not a match:** a yes against Not for me, folded away
 - **Their hard limits** are always listed, and a limit never appears in a
   group.
-- **Specifics** count only when either person answered them; one that merely
-  inherits would repeat its kink's line.
+- **Specifics** count only when either person answered them.
 - **"Where you overlap most"** counts kinks, not pairings, per category.
 - **Custom kinks are not compared:** two people's own kinks have nothing in
   common to match on.
@@ -652,7 +673,8 @@ compares any two, defaulting to the last version against now
   and notes changed
 - each side of a role pair on its own
 - only what was **answered**, never what was inherited: a kink that moved
-  only because its parent did is not a change someone made
+  only because its category was made a hard limit is not a change someone
+  made
 - "Over time" on any change shows that kink's answer at each version where it
   changed (`kinkTimeline`)
 
@@ -700,7 +722,7 @@ visit shows the button from the next load.
   side on its own, experience and notes, and a kink's timeline.
 - **`components/kink-list/KinkRow.svelte.test.ts`:** answering and clearing
   from the dots, both contexts of a role kink, your side narrowing one,
-  inherited answers, the open panel's fieldsets, fantasy and reality parting
+  specifics not taking their kink's answer, the open panel's fieldsets, fantasy and reality parting
   and folding back, notes, a category starting open and
   folding, related kinks, the level of detail and its slider, the side
   control, and

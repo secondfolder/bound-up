@@ -43,9 +43,9 @@ function saidYes(list: ListPayload, key: ItemKey): boolean {
  * catalogue order, then the person's own kinks in it.
  *
  * **Drill down only after yes.** A kink's specifics are dealt in straight
- * after it, but only once it has been answered with a yes of some kind. A no,
- * or Don't mind, leaves them to inherit that answer, which is the point of
- * answering broadly.
+ * after it, but only once it has been answered with a yes of some kind. After
+ * a no, or Don't mind, they are not asked: whoever does not want spanking
+ * has no use for a card about paddles. They stay unanswered on the list.
  *
  * `filters` are the list's own unless a partner's view has its own side.
  */

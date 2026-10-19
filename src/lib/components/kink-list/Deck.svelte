@@ -11,7 +11,7 @@
 		shownSides,
 		withLevel
 	} from '$lib/kink-list/answers';
-	import { intensityLabel, kinkById, primaryCategoryOf, sidesOf } from '$lib/kink-list/catalog';
+	import { kinkById, primaryCategoryOf, sidesOf } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import { deckCards, narrows } from '$lib/kink-list/deck';
 
@@ -311,8 +311,7 @@
 				<span class="hint {pending}" aria-hidden="true">{LEVEL_LABELS[SWIPES[pending]]}</span>
 			{/if}
 			<p class="where">
-				{category?.name ?? ''}{#if item && item.intensity >= 4}
-					· {intensityLabel(item.intensity)}{/if}
+				{category?.name ?? ''}
 			</p>
 			{#if broader}
 				<p class="where">Specifically, for {broader.name}:</p>

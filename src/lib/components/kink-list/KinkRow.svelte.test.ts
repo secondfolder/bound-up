@@ -1,10 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import { userEvent } from 'vitest/browser';
+import { detailOf, type KinkItem, kinkById } from '$lib/kink-list/catalog';
 import { DeviceKinkList } from '$lib/kink-list/device-store.svelte';
 import KinkListHarness from '$lib/testing/KinkListHarness.svelte';
 import { waSettled } from '$lib/testing/web-awesome';
+
+/** Debug mode, which only the level of detail's exact switch reads. */
+const pageState = vi.hoisted(() => ({ data: { debug: false } }));
+vi.mock('$app/state', () => ({
+	get page() {
+		return pageState;
+	}
+}));
+afterEach(() => {
+	pageState.data.debug = false;
+});
 
 function storeWith(answers: DeviceKinkList['list']['answers'] = {}): DeviceKinkList {
 	localStorage.clear();
@@ -62,16 +74,14 @@ describe('KinkRow', () => {
 		expect(screen.queryByRole('group', { name: 'Spanking, giving' })).toBeNull();
 	});
 
-	it('shows a specific its kink’s answer, outlined and named, until it has its own', () => {
+	it('leaves a specific unanswered whatever its kink’s answer', () => {
 		const store = storeWith({ spanking: { sides: { a: { level: 'love' } }, at: 1 } });
 		render(KinkListHarness, { store, itemKey: 'spanking' });
-		// Under the kink without opening it.
+		// Under the kink without opening it, with nothing chosen or shown as inherited.
 		const specific = screen.getByRole('group', { name: 'Spanking with an implement, giving' });
-		// Inherited is not chosen: nothing in the group is checked, and its dot is dashed.
 		expect(within(specific).queryByRole('radio', { checked: true })).toBeNull();
 		const love = within(specific).getByRole('radio', { name: 'Love' });
-		expect(love.closest('label')).toHaveClass('inherited');
-		expect(love.closest('label')).toHaveAttribute('title', 'Love, from Spanking');
+		expect(love.closest('label')).not.toHaveClass('inherited');
 	});
 
 	it('opens to the description and a fieldset per context', async () => {
@@ -113,6 +123,15 @@ describe('KinkRow', () => {
 		expect(store.list.answers.spanking?.sides?.a).toEqual({ level: 'love' });
 		const line = screen.getByRole('group', { name: 'Spanking, giving' });
 		expect(within(line).getByRole('radio', { name: 'Love' })).toBeChecked();
+	});
+
+	it('shows a context’s experience on the line once it is set', () => {
+		const store = storeWith({
+			spanking: { sides: { a: { level: 'like', detail: { experience: 3 } } }, at: 1 }
+		});
+		render(KinkListHarness, { store, itemKey: 'spanking' });
+		// Without opening the row, and only for the context it belongs to.
+		expect(screen.getAllByText('Experience: Often')).toHaveLength(1);
 	});
 
 	it('keeps a note typed against a kink', async () => {
@@ -206,6 +225,31 @@ describe('the filters and your side', () => {
 		slider.dispatchEvent(new Event('change'));
 		expect(store.list.settings.detail).toBe(1);
 		expect(store.previewDetail).toBeNull();
+	});
+
+	it('offers only one level of detail at a time in debug mode, without saving it', async () => {
+		const store = storeWith();
+		store.setFilters({ detail: 2 });
+		const plain = render(KinkListHarness, { store, controls: true, categoryId: 'impact' });
+		await waSettled(plain.container);
+		expect(plain.container.querySelector('wa-switch')).toBeNull();
+		plain.unmount();
+
+		pageState.data.debug = true;
+		const { container } = render(KinkListHarness, { store, controls: true, categoryId: 'impact' });
+		await waSettled(container);
+		const exact = container.querySelector('wa-switch') as HTMLElement & { checked: boolean };
+		expect(screen.getByRole('group', { name: 'Spanking, giving' })).toBeInTheDocument();
+		exact.checked = true;
+		exact.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(store.exactDetail).toBe(true);
+		expect(store.list.settings).not.toHaveProperty('exactDetail');
+		// At its specific's level, spanking stays for the specific's sake, named quietly.
+		store.setFilters({ detail: detailOf(kinkById('spanking-implements') as KinkItem) });
+		await waitFor(() =>
+			expect(screen.getByRole('group', { name: 'Spanking, giving' })).toBeInTheDocument()
+		);
+		expect(screen.getByText('Spanking', { selector: '.text' })).toHaveClass('context-only');
 	});
 
 	it('saves the level of detail when its slider is let go', async () => {

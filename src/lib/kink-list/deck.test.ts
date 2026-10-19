@@ -34,7 +34,7 @@ describe('deckCards', () => {
 		expect(cards.indexOf('slapping')).toBeGreaterThan(after);
 	});
 
-	it('leaves the specifics to inherit after a no, or a don’t mind', () => {
+	it('does not ask about the specifics after a no, or a don’t mind', () => {
 		for (const level of ['not-for-me', 'dont-mind', 'limit'] as const) {
 			const cards = deckCards(list({ answers: { spanking: { level, at } } }));
 			expect(cards).not.toContain('spanking-implements');

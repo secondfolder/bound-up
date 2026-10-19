@@ -13,8 +13,8 @@
 	 * only cue: the position on a fixed no-to-yes scale and the key carry it
 	 * too.
 	 *
-	 * An answer that is only inherited — a specific showing its kink's answer,
-	 * or a category's "Hard limit everything here" — is a dashed ring rather
+	 * An answer that is only inherited — a category's "Hard limit everything
+	 * here" — is a dashed ring rather
 	 * than a filled dot, so it never reads as chosen, and its tooltip says
 	 * where it comes from. Choosing the chosen dot again clears it.
 	 */
@@ -30,7 +30,7 @@
 		value: Level | undefined;
 		/** What shows when there is no answer of its own. */
 		inherited?: Level;
-		/** Where the inherited answer comes from, for its tooltip: "from Spanking". */
+		/** Where the inherited answer comes from, for its tooltip: "from "Oral": …". */
 		inheritedFrom?: string;
 		onchange: (level: Level | undefined) => void;
 	} = $props();

@@ -14,8 +14,8 @@ import { kinkById, sidesOf } from './catalog';
  * see docs/kink-list.md, "Version history".
  *
  * It compares what was **answered**, never what was inherited: a kink that
- * moved only because its parent did is not a change someone made, and listing
- * every child of a category would bury the one answer that did move.
+ * moved only because its category was made a hard limit is not a change
+ * someone made, and listing every kink in it would bury the one that was.
  */
 
 export const CHANGE_GROUPS = [

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { catalog, detailLabel, MAX_DETAIL, MIN_DETAIL } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import Slider from '../Slider.svelte';
@@ -12,6 +13,10 @@
 	 *
 	 * While dragged, the list follows the knob notch by notch
 	 * (`store.previewDetail`); the level is saved only when it is let go.
+	 *
+	 * In debug mode a switch makes it show only the kinks at the level, not
+	 * every one up to it, to check what each level adds (`atDetail`). It
+	 * lasts for the visit and is not saved.
 	 *
 	 * The level in words sits on the title row with the slider's own label
 	 * hidden, as on the app's other sliders with a reading (OptionalSlider
@@ -55,6 +60,16 @@
 			store.previewDetail = null;
 		}}
 	/>
+	{#if page.data.debug}
+		<wa-switch
+			class="exact"
+			size="s"
+			checked={store.exactDetail}
+			onchange={(event: Event) => {
+				store.exactDetail = (event.target as HTMLInputElement).checked;
+			}}>Only this level</wa-switch
+		>
+	{/if}
 </div>
 
 <style>
@@ -79,6 +94,11 @@
 		white-space: nowrap;
 		font-weight: var(--wa-form-control-label-font-weight);
 		color: var(--wa-form-control-label-color);
+	}
+
+	.exact {
+		margin-block-start: 0.375rem;
+		font-size: 0.8125rem;
 	}
 
 	.reading {

@@ -67,6 +67,18 @@ test('an answer is saved, sealed, and still there after a reload', async ({ page
 	).toHaveCount(0);
 });
 
+test('a role kink’s two contexts sit side by side when there is room', async ({ page }) => {
+	// The rows are a size container, which a page column that shrinks to fit
+	// its content collapsed: every pair stacked, however wide the window.
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await signUp(page, account('Wren'));
+	await openList(page);
+	const giving = await scale(page, 'Spanking, giving').boundingBox();
+	const receiving = await scale(page, 'Spanking, receiving').boundingBox();
+	expect(giving && receiving && Math.abs(giving.y - receiving.y)).toBeLessThan(1);
+	expect(giving && receiving && receiving.x > giving.x + giving.width).toBe(true);
+});
+
 test('a category folds away and opens again', async ({ page }) => {
 	await signUp(page, account('Ivy'));
 	await openList(page);

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
 	catalog,
+	childrenOf,
 	depthOf,
 	detailOf,
 	domSideOf,
@@ -390,8 +391,6 @@ export function isAnswered(answer: Answer | undefined): boolean {
 /** Where an effective answer came from. */
 export type AnswerSource =
 	| { kind: 'own' }
-	/** A specific showing its kink's answer. */
-	| { kind: 'parent'; itemId: string }
 	/** A "Hard limit everything here" from the category's triage. */
 	| { kind: 'category'; categoryId: string };
 
@@ -411,16 +410,15 @@ function ownSide(answer: Answer | undefined, side: SideKey | undefined): Effecti
  * What an item shows for one side (or for the whole item, with no side):
  *
  * 1. Its own answer for that side, then its own answer for both.
- * 2. For a specific (a third-level item), its kink's own answer. Answers flow
- *    down "kind of" links only: spanking with a paddle is a kind of spanking.
- * 3. A category's "Hard limit everything here", for kinks whose primary
+ * 2. A category's "Hard limit everything here", for kinks whose primary
  *    category it is.
  *
- * Nothing positive flows down from a category, and nothing flows into a
- * related kink from a category it is only also under. A "Love" on Impact
- * would otherwise give face slapping a Love from someone who hates
- * degradation (categorisation.md, in the research notes). Notes never flow:
- * they belong to the kink they were written on.
+ * A specific does not take its kink's answer. It used to, but a specific is
+ * there because it can differ — loving spanking says little about paddles —
+ * and an answer shown on a specific nobody rated read as one they had given.
+ * Nothing positive flows down from a category either: a "Love" on Impact
+ * would give face slapping a Love from someone who hates degradation
+ * (categorisation.md, in the research notes). Notes never flow.
  */
 export function effectiveAnswer(list: ListPayload, key: ItemKey, side?: SideKey): Effective {
 	const own = ownSide(list.answers[key], side);
@@ -428,16 +426,6 @@ export function effectiveAnswer(list: ListPayload, key: ItemKey, side?: SideKey)
 		return own;
 	}
 	const item = kinkById(key);
-	if (item?.parent && depthOf(item) === 3) {
-		const fromParent = ownSide(list.answers[item.parent], side);
-		if (fromParent?.level) {
-			return {
-				level: fromParent.level,
-				detail: own?.detail ?? fromParent.detail,
-				source: { kind: 'parent', itemId: item.parent }
-			};
-		}
-	}
 	const categoryId = item ? primaryCategoryOf(item).id : list.custom[key]?.categoryId;
 	if (categoryId && list.triage[categoryId]?.value === 'limit') {
 		return {
@@ -449,15 +437,14 @@ export function effectiveAnswer(list: ListPayload, key: ItemKey, side?: SideKey)
 	return own ?? {};
 }
 
-/** The intensity of an item; custom kinks count as the gentlest, since nothing hides them. */
-export function intensityOf(key: ItemKey): number {
-	return kinkById(key)?.intensity ?? 0;
-}
-
 // ── filters ──────────────────────────────────────────────────────────────────
 
-/** What decides which kinks a list shows: its settings, with the side a partner's view may change. */
-export type Filters = { detail: number; side: YourSide };
+/**
+ * What decides which kinks a list shows: its settings, with the side a
+ * partner's view may change. `exactDetail` is debug mode's: only the kinks
+ * at the level of detail, not every one up to it (`atDetail`). Never saved.
+ */
+export type Filters = { detail: number; side: YourSide; exactDetail?: boolean };
 
 export function filtersOf(list: ListPayload): Filters {
 	const { detail, side } = list.settings;
@@ -471,11 +458,23 @@ export function filtersOf(list: ListPayload): Filters {
  * catalogue items, and nothing hides them.
  */
 export function isShown(item: KinkItem, filters: Filters): boolean {
-	if (detailOf(item) > filters.detail) {
+	const fits = filters.exactDetail
+		? atDetail(item, filters.detail)
+		: detailOf(item) <= filters.detail;
+	if (!fits) {
 		return false;
 	}
 	const lean = leanOf(item);
 	return filters.side === 'both' || lean === null || lean === filters.side;
+}
+
+/**
+ * Whether an item is at exactly this level of detail, or has a specific that
+ * is. A kink is kept for its specifics' sake, since they show only under it,
+ * and the row dims its name to say it is there for context (`KinkRow`).
+ */
+export function atDetail(item: KinkItem, level: number): boolean {
+	return detailOf(item) === level || childrenOf(item.id).some((child) => atDetail(child, level));
 }
 
 /**

@@ -23,7 +23,7 @@ import {
 	withInterest,
 	withLevel
 } from './answers';
-import { type KinkItem, kinkById } from './catalog';
+import { childrenOf, detailOf, type KinkItem, kinkById } from './catalog';
 
 function list(fields: Partial<ListPayload> = {}): ListPayload {
 	return { ...emptyList(), ...fields };
@@ -49,12 +49,9 @@ describe('effectiveAnswer', () => {
 		expect(effectiveAnswer(list({ answers }), 'kissing', 'a').level).toBe('like');
 	});
 
-	it('gives a specific its kink’s answer until it has one of its own', () => {
+	it('never gives a specific its kink’s answer', () => {
 		const answers: Record<string, Answer> = { spanking: { level: 'love', at } };
-		expect(effectiveAnswer(list({ answers }), 'spanking-implements')).toMatchObject({
-			level: 'love',
-			source: { kind: 'parent', itemId: 'spanking' }
-		});
+		expect(effectiveAnswer(list({ answers }), 'spanking-implements')).toEqual({});
 		answers['spanking-implements'] = { level: 'not-for-me', at };
 		expect(effectiveAnswer(list({ answers }), 'spanking-implements')).toMatchObject({
 			level: 'not-for-me',
@@ -309,6 +306,22 @@ describe('the filters', () => {
 		// Common, so it shows from level 2.
 		expect(isShown(spanking, filters({ detail: 2 }))).toBe(true);
 		expect(isShown(spanking, filters({ detail: 1 }))).toBe(false);
+	});
+
+	it('shows only one level in debug mode’s exact mode, with the kinks its specifics need', () => {
+		const level = detailOf(spanking);
+		const [specific] = childrenOf('spanking').filter((child) => detailOf(child) > level);
+		if (!specific) {
+			throw new Error('a finer specific of spanking');
+		}
+		const only = (detail: number) => filters({ detail, exactDetail: true });
+		expect(isShown(spanking, only(level))).toBe(true);
+		expect(isShown(specific, only(level))).toBe(false);
+		// The specific's own level keeps spanking, which it shows under.
+		expect(isShown(specific, only(detailOf(specific)))).toBe(true);
+		expect(isShown(spanking, only(detailOf(specific)))).toBe(true);
+		// Below its own level, nothing under it reaches back.
+		expect(isShown(spanking, only(level - 1))).toBe(false);
 	});
 
 	it('hides a one-sided kink from the other side only', () => {

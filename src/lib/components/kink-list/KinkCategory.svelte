@@ -146,10 +146,12 @@
 		color: var(--wa-color-text-quiet);
 	}
 
+	/* The width KinkRow lays its two context columns out against. */
 	.kinks,
 	.related {
 		display: flex;
 		flex-direction: column;
+		container: kinks / inline-size;
 	}
 
 	.custom {

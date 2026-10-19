@@ -26,8 +26,8 @@ import {
  * **Matching is role-aware.** For a kink with a role pair, my giving is
  * compared with their receiving, my "as dom" with their "as sub", my "on me"
  * with their "on my partner" — the halves that fit together. A kink without a
- * pair is compared directly. Answers are the effective ones, so a specific
- * that only inherits its kink's answer still counts.
+ * pair is compared directly. Answers are the effective ones, so a category's
+ * "Hard limit everything here" counts.
  *
  * **A side narrows it.** Someone comparing as a sub sees only the pairings
  * where their half is the sub one — their "being spanked" against the other
@@ -136,8 +136,8 @@ function isLimit(list: ListPayload, item: KinkItem): boolean {
 
 /**
  * The kinks to compare, in catalogue order: every kink, and the specifics
- * either person answered themselves. A specific that only inherits its
- * kink's answer would repeat that kink's line, once for each specific.
+ * either person answered. A specific neither answered has nothing to say,
+ * and most are unanswered.
  */
 function kinksToCompare(mine: ListPayload, theirs: ListPayload): KinkItem[] {
 	const answered = (item: KinkItem) =>

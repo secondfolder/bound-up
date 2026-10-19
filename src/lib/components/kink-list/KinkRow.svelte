@@ -21,13 +21,7 @@
 		withInterest,
 		withLevel
 	} from '$lib/kink-list/answers';
-	import {
-		childrenOf,
-		intensityLabel,
-		type KinkItem,
-		kinkById,
-		sidesOf
-	} from '$lib/kink-list/catalog';
+	import { childrenOf, detailOf, type KinkItem, kinkById, sidesOf } from '$lib/kink-list/catalog';
 	import { kinkListContext, kinkListSearch } from '$lib/kink-list/context';
 	import OptionalSlider from '../OptionalSlider.svelte';
 	import AnswerScale from './AnswerScale.svelte';
@@ -42,8 +36,8 @@
 	 * The name opens the rest under it: the description, the detailed answer
 	 * (a fieldset per context: into it as a fantasy, into actually doing it,
 	 * and experience), a note and a partner view's controls. Under that, open
-	 * or not, come the kink's specifics, each a row like this one that shows
-	 * the kink's answer until it has one of its own.
+	 * or not, come the kink's specifics, each a row like this one, answered
+	 * on its own: it never takes the kink's answer (`effectiveAnswer`).
 	 *
 	 * A context's fantasy and reality are its answer until they differ
 	 * (`settleSide` in answers.ts). Once they do, the line shows the two in
@@ -80,6 +74,13 @@
 		search?.view ? 0 : specifics.filter((child) => !isShown(child, store.filters)).length
 	);
 
+	/** Debug mode's exact level of detail keeps a kink for its specifics' sake: it says so by dimming. */
+	const contextOnly = $derived(
+		item !== undefined &&
+			store.filters.exactDetail === true &&
+			detailOf(item) !== store.filters.detail
+	);
+
 	let open = $state(false);
 
 	/** Set in a partner's view: whose answer this is, and what to do about it. */
@@ -90,9 +91,6 @@
 	}
 
 	function describeSource(source: AnswerSource | undefined): string {
-		if (source?.kind === 'parent') {
-			return `from ${kinkById(source.itemId)?.name ?? 'the kink above'}`;
-		}
 		if (source?.kind === 'category') {
 			const category = kinkById(source.categoryId)?.name ?? 'this category';
 			return `from "${category}": hard limit everything`;
@@ -160,6 +158,7 @@
 				level: part?.level,
 				split: isSplit(part),
 				interest: interestOf(part),
+				experience: part?.detail?.experience,
 				inherited: inheritedFor(side)
 			};
 		})
@@ -170,7 +169,7 @@
 	);
 </script>
 
-<div class="kink" class:nested={nested} class:two={contexts?.length === 2}>
+<div class="kink" class:nested={nested}>
 	<div class="line">
 		<!-- A disclosure: a native button, because wa-button would not carry aria-expanded. -->
 		<button
@@ -187,10 +186,7 @@
 			>
 			<!-- The name and its flags wrap beside the chevron, never under it. -->
 			<span class="label">
-				<span class="text">{name}</span>
-				{#if item && item.intensity >= 4}
-					<span class="intensity">{intensityLabel(item.intensity)}</span>
-				{/if}
+				<span class="text" class:context-only={contextOnly}>{name}</span>
 				{#if answer?.note}
 					<wa-icon class="flag" name="note-sticky" label="Has a note"></wa-icon>
 				{/if}
@@ -201,8 +197,8 @@
 		</button>
 
 		<div class="contexts">
-			{#each summaries as { side, level, split, interest, inherited } (side ?? 'whole')}
-				<div class="context">
+			{#each summaries as { side, level, split, interest, experience, inherited } (side ?? 'whole')}
+				<div class="context side-{side ?? 'whole'}" class:labelled={side !== undefined}>
 					{#if side}
 						<span class="context-label" aria-hidden="true">{sideLabel(side)}</span>
 					{/if}
@@ -226,6 +222,11 @@
 							inheritedFrom={inherited?.from}
 							onchange={(next) => updatePart(side, (part) => withLevel(part, next))}
 						/>
+					{/if}
+					<!-- Experience shows under the rating once set, so it is seen
+					     without opening the row. -->
+					{#if experience !== undefined}
+						<span class="experience-reading">{EXPERIENCE_LABEL}: {EXPERIENCE_STEPS[experience]}</span>
 					{/if}
 				</div>
 			{/each}
@@ -357,8 +358,6 @@
 		}
 	}
 
-	/* The name takes what the dots leave; on a phone a kink with both contexts
-	   puts them under its name, since two rows of dots and a name do not fit. */
 	/* The name, then the dots at the far end — on the same line when the whole
 	   name fits beside them, and on the next when it does not, rather than the
 	   name squeezed into a column of a word a line, or running under them. */
@@ -431,19 +430,14 @@
 		}
 	}
 
+	.context-only {
+		color: var(--wa-color-text-quiet);
+	}
+
 	/* Inline, after the name, so they wrap with it. */
-	.intensity,
 	.flag {
 		margin-inline-start: 0.375rem;
 		white-space: nowrap;
-	}
-
-	.intensity {
-		font-size: 0.75rem;
-		color: var(--wa-color-warning-on-quiet);
-	}
-
-	.flag {
 		font-size: 0.75rem;
 		color: var(--wa-color-text-quiet);
 
@@ -452,25 +446,72 @@
 		}
 	}
 
+	/*
+	 * Two columns of the same width on every row, right-aligned, so skimming
+	 * down the page the first context (Giving) is always in the first and the
+	 * second (Receiving) in the second, whatever "Answer as" left. A kink with
+	 * no contexts is centred across both, so it never reads as one of them.
+	 * A column is a fixed label's width and a row of dots (AnswerScale: seven
+	 * 1.625rem options, 0.125rem apart); fantasy and reality apart, which
+	 * adds their labels, widens its own row's column only.
+	 */
 	.contexts {
+		--context-label: 5rem;
+		--context-width: calc(var(--context-label) + 0.375rem + 7 * 1.625rem + 6 * 0.125rem);
 		margin-inline-start: auto;
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: flex-end;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(var(--context-width), auto));
+		justify-items: end;
+		align-items: start;
 		gap: 0 1rem;
+	}
 
-		.two & {
-			@media (max-width: 640px) {
-				flex-direction: column;
-				align-items: flex-end;
-			}
+	.side-a {
+		grid-column: 1;
+	}
+
+	.side-b {
+		grid-column: 2;
+	}
+
+	.side-whole {
+		grid-column: 1 / -1;
+		justify-self: center;
+	}
+
+	/* Too narrow for two columns side by side: one column, the contexts
+	   stacked, all right-aligned, so the dots still line up down the page. */
+	@container kinks (width < 38rem) {
+		.contexts {
+			grid-template-columns: auto;
+		}
+
+		.side-a,
+		.side-b,
+		.side-whole {
+			grid-column: 1;
+			justify-self: end;
 		}
 	}
 
+	/* The label beside the rating, and the experience under the rating only,
+	   in a row of its own, so it never moves the dots out of line with the
+	   context beside them. One column without a label: an empty one would
+	   still take a gap. The rating and its experience go in the last column
+	   either way. */
 	.context {
-		display: flex;
+		display: grid;
+		grid-template-columns: auto;
 		align-items: center;
-		gap: 0.375rem;
+		gap: 0 0.375rem;
+
+		&.labelled {
+			grid-template-columns: var(--context-label) auto;
+		}
+
+		& > :not(.context-label) {
+			grid-column: -2;
+		}
 	}
 
 	/* Fantasy over reality, each named beside its dots. */
@@ -487,10 +528,19 @@
 		text-align: end;
 	}
 
+	/* Wraps rather than widening its column: "Being cheated on". */
 	.context-label {
+		justify-self: end;
 		font-size: 0.75rem;
+		line-height: 1.2;
 		color: var(--wa-color-text-quiet);
 		text-align: end;
+	}
+
+	.experience-reading {
+		justify-self: center;
+		font-size: 0.7rem;
+		color: var(--wa-color-text-quiet);
 		white-space: nowrap;
 	}
 

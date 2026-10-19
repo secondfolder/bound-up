@@ -290,10 +290,6 @@ export function leanOf(item: KinkItem): 'dom' | 'sub' | null {
 	return item.lean ?? (parent?.parent && !parent.roles ? parent.lean : undefined) ?? null;
 }
 
-export function intensityLabel(intensity: number): string {
-	return catalog.intensity.levels[String(intensity)] ?? String(intensity);
-}
-
 export function commonnessLabel(commonness: number): string {
 	return catalog.commonness.levels[String(commonness)] ?? String(commonness);
 }

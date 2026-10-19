@@ -15,8 +15,9 @@
 	/**
 	 * The whole kink list on one page: search, the filters, and every category
 	 * by section, each a section that starts open and folds away, with its
-	 * kinks one to a line. The key to the answer dots and "Answer as" stay
-	 * pinned above it while it scrolls.
+	 * kinks one to a line. Search, the level of detail, the key to the answer
+	 * dots and "Answer as" stay pinned above it while it scrolls, so the list
+	 * can be narrowed from anywhere in it.
 	 *
 	 * Search narrows the list as the filters do, rather than replacing it with
 	 * a list of results: what matches stays in its category, under its kink,
@@ -160,17 +161,6 @@
 	{/if}
 
 
-	<div class="controls">
-		<wa-input
-			type="search"
-			label="Search"
-			placeholder="Try “fellatio”, “CNC” or “ropes”"
-			with-clear
-			{@attach searchField}
-		></wa-input>
-		<ListFilters />
-	</div>
-
 	{#if !minimal}
 		<div class="more">
 			<wa-button size="s" variant="brand" appearance="accent" href={paths.quick}>
@@ -216,6 +206,21 @@
 
 	<div class="sentinel" aria-hidden="true" {@attach watchStuck}></div>
 	<div class="pinned" class:stuck={stuck}>
+		<div class="controls">
+			<!-- The label stays for screen readers, hidden from sight: the icon
+			     says what the box is, and the pinned bar has no height to spare. -->
+			<wa-input
+				type="search"
+				size="s"
+				label="Search"
+				placeholder="Try “fellatio”, “CNC” or “ropes”"
+				with-clear
+				{@attach searchField}
+			>
+				<wa-icon slot="start" name="magnifying-glass" variant="solid"></wa-icon>
+			</wa-input>
+			<ListFilters />
+		</div>
 		<LevelKey />
 		<div class="pinned-row">
 			<YourSideControl />
@@ -275,7 +280,7 @@
 		}
 	}
 
-	/* The search and the two filters on one row when there is room for them;
+	/* The search and the level of detail on one row when there is room for them;
 	   the filters wrap under it when there is not. */
 	.controls {
 		display: flex;
@@ -285,6 +290,16 @@
 
 		wa-input {
 			flex: 1 1 14rem;
+		}
+
+		/* Visually hidden rather than gone, so the field keeps its name. */
+		wa-input::part(form-control-label) {
+			position: absolute;
+			inline-size: 1px;
+			block-size: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
 		}
 	}
 

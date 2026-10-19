@@ -84,8 +84,14 @@
 
 <style>
 	/* The app shell's <main> is the full-width scroll container, so the page
-	   carries its own column, as the Playroom index does. */
+	   carries its own column, as the Playroom index does. Full width up to
+	   that, rather than its content's: <main> is a flex container, where
+	   auto margins shrink an item to fit, and the kink rows are a size
+	   container (KinkRow's context columns), which counts for nothing when
+	   fitting. The page shrank to a column too narrow for two contexts. */
 	.page {
+		box-sizing: border-box;
+		inline-size: 100%;
 		max-width: 800px;
 		margin-inline: auto;
 		padding: 1em;

@@ -143,6 +143,13 @@ found. Never a value, since those are the sealed content;
 the same goes to the console whether debug mode is on or not. See
 [kink-list.md](kink-list.md#saving).
 
+### The kink list's level of detail
+
+An "Only this level" switch under the level of detail slider shows only the
+kinks at exactly that level, for checking how the catalogue's kinks are
+spread across levels. Never saved. See
+[kink-list.md](kink-list.md#the-level-of-detail).
+
 ## Adding a debug aid
 
 - **Read `page.data.debug`** in the app shell, or `readDebugMode` on a page
