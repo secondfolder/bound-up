@@ -9,13 +9,29 @@
 	 * always shown. "Not a match" is folded away: it is the least useful thing
 	 * to lead with, and still there for anyone who looks.
 	 */
-	let { mine, theirs, theirName }: { mine: ListPayload; theirs: ListPayload; theirName?: string } =
-		$props();
+	let {
+		mine,
+		theirs,
+		theirName,
+		blind = false
+	}: {
+		mine: ListPayload;
+		theirs: ListPayload;
+		theirName?: string;
+		/**
+		 * Only what you both want, and limits: neither of you sees where the
+		 * other is lukewarm or not into something, so marking an interest is
+		 * never a risk.
+		 */
+		blind?: boolean;
+	} = $props();
 
 	const comparison = $derived(compareLists(mine, theirs));
 	const them = $derived(theirName?.trim() || 'Them');
 
-	const OPEN: MatchGroup[] = ['both', 'explore', 'conditions', 'talk'];
+	const OPEN = $derived<MatchGroup[]>(
+		blind ? ['both', 'explore', 'conditions'] : ['both', 'explore', 'conditions', 'talk']
+	);
 
 	function nameOf(key: string): string {
 		return kinkById(key)?.name ?? key;
@@ -64,7 +80,7 @@
 		{/if}
 	</section>
 
-	{#if comparison.groups.mismatch.length > 0}
+	{#if !blind && comparison.groups.mismatch.length > 0}
 		<wa-details summary="{GROUP_LABELS.mismatch} ({comparison.groups.mismatch.length})">
 			<ul class="pairs">
 				{#each comparison.groups.mismatch as pairing (`${pairing.key}-${pairing.mySide}`)}

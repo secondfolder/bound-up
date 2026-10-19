@@ -25,6 +25,21 @@ import {
 } from './answers';
 
 export type StoreState = 'loading' | 'ready' | 'unreadable';
+
+/** What a kink row offers in a partner's view (`partner-store.svelte.ts`). */
+export type PartnerControls = {
+	/** The partner's name, for "Just for Ada". */
+	name: string;
+	isOverridden: (key: ItemKey) => boolean;
+	/** Whether your own list has an answer of its own for the kink. */
+	hasOwn: (key: ItemKey) => boolean;
+	isHeld: (key: ItemKey) => boolean;
+	/** Drops this partner's answer, so your own list's shows again. */
+	reset: (key: ItemKey) => void;
+	/** Makes this partner's answer your own list's too. */
+	copyToOwn: (key: ItemKey) => void;
+	setHeld: (key: ItemKey, held: boolean) => void;
+};
 export type SaveState = { status: 'saved' | 'saving' | 'failed'; error?: string };
 
 const SAVE_DELAY_MS = 600;
@@ -39,6 +54,9 @@ export abstract class KinkListStore {
 
 	/** Who sees this list as theirs: a signed-in account, or just this device. */
 	abstract readonly kind: 'account' | 'device';
+
+	/** Set on a partner's view of the list: what a kink row needs for overrides and holding back. */
+	partnerControls: PartnerControls | null = null;
 
 	protected abstract persist(list: ListPayload): Promise<SaveState>;
 

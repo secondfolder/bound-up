@@ -61,6 +61,16 @@
 		{/if}
 	</div>
 
+	<!-- A plain link rather than a card: the kink list has no summary worth a
+	     widget, and what it shows a partner is sealed until the page opens it. -->
+	<a
+		href={resolve('/(auth-required)/(app)/playroom/kink-list/partner/[partnershipId]', {
+			partnershipId: partner.id
+		})}
+	>
+		Kink lists
+	</a>
+
 	<a href={resolve('/(auth-required)/(app)/settings/partners/[id]', { id: partner.id })}>
 		{partner.canEdit ? 'Edit this connection' : 'Connection settings'}
 	</a>

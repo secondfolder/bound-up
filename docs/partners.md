@@ -245,6 +245,7 @@ token (`not-found`), an expired one (`expired`), the inviter's own link
 | `/partner/[id]/rewards/add`        | `(auth-required)` | The add-reward form for the controlling side of that link.                                                |
 | `/partner/[id]/rewards/[rewardId]` | `(auth-required)` | The edit screen for one reward on that link, using the same form layout as add.                           |
 | `/partner/[id]/rewards/history`    | `(auth-required)` | Reward claim history for that link.                                                                       |
+| `/playroom/kink-list/partner/[id]` | `(auth-required)` | Your kink list for that partner, linked from the partner page. See [kink-list.md](kink-list.md#partners). |
 
 ## Partnership rewards
 

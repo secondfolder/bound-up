@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { assertNever } from '../assert-never';
-import { kinkListKind } from '../sealed-kinds/kink-list';
+import { kinkListKind, kinkListPartnerKind } from '../sealed-kinds/kink-list';
 import type { KinkListView } from '../types';
 import type { Db } from './db';
 import { kinkLists } from './db/schema';
@@ -124,7 +124,9 @@ export async function saveKinkList(
 	}
 ): Promise<KinkListResult<{ revision: number }>> {
 	const { content, scope } = input;
-	if (!sealedIsAcceptable(kinkListKind, content.ciphertext, content.payloadVersion)) {
+	// Your own list and a partner's copy are different kinds, with different payloads.
+	const kind = scope === 'self' ? kinkListKind : kinkListPartnerKind;
+	if (!sealedIsAcceptable(kind, content.ciphertext, content.payloadVersion)) {
 		return { ok: false, reason: 'bad-content' };
 	}
 	const vault = await vaultFor(db, userId, scope);
@@ -179,6 +181,36 @@ export async function saveKinkList(
 		return { ok: true, revision: row.revision };
 	}
 	return { ok: false, reason: (await getKinkList(db, userId, scope)) ? 'conflict' : 'not-found' };
+}
+
+/** Every partnership the user shares their list with, as their own copies there. */
+export async function listSharedKinkLists(db: Db, userId: string): Promise<KinkListView[]> {
+	const rows = await db
+		.select(viewColumns)
+		.from(kinkLists)
+		.where(and(eq(kinkLists.ownerId, userId), ne(kinkLists.scope, 'self')));
+	return rows.map(toView);
+}
+
+/**
+ * The copy the other member of a partnership shares with the user, or null
+ * while they share none. `not-member` for a partnership the user is not an
+ * accepted member of, so a stranger's id reads like a missing one.
+ */
+export async function getPartnerKinkList(
+	db: Db,
+	userId: string,
+	partnershipId: string
+): Promise<KinkListResult<{ list: KinkListView | null }>> {
+	if (!(await isPartnershipMember(db, partnershipId, userId))) {
+		return { ok: false, reason: 'not-member' };
+	}
+	const [row] = await db
+		.select(viewColumns)
+		.from(kinkLists)
+		.where(and(eq(kinkLists.partnershipId, partnershipId), ne(kinkLists.ownerId, userId)))
+		.limit(1);
+	return { ok: true, list: row ? toView(row) : null };
 }
 
 /** A refusal as a status and words a person can act on. */

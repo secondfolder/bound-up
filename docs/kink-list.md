@@ -380,6 +380,66 @@ import joins a list. Every importer produces the same `ImportResult`.
 - KNKI's links are undocumented and expire after 24 hours.
 - bdsmtest.org gives role percentages, not a kink list.
 
+## Partners
+
+`/playroom/kink-list/partner/[partnershipId]`, linked from the partner page as
+"Kink lists". It is built on your own list
+([`partner.ts`](../src/lib/kink-list/partner.ts) holds the rules,
+[`partner-store.svelte.ts`](../src/lib/kink-list/partner-store.svelte.ts) the
+store).
+
+- **Sharing is explicit, once.** Nothing is sealed for a partner until
+  "Share my list with …" makes a copy for them, so being shared with never
+  comes as a surprise. That page explains what sharing means, and appears
+  only once your own list has something in it; before that it starts you on
+  your own list. There is no "stop sharing": while you are linked, sharing is
+  what the partnership is for, and unlinking deletes the copies with the
+  partnership (`ON DELETE CASCADE`).
+- **A shared copy follows your own list.** It stores only what differs for
+  that partner:
+  - **overrides**: answers changed just for them
+  - **held back**: kinks not shown to them yet
+  - **blind**: whether comparing is blind
+
+  Kind `kink-list-partner`, in the `kink_lists` row whose `scope` is the
+  partnership, sealed in the partnership's vault.
+- **Answering in a partner's view** (`answerTarget`):
+  - It writes an override when your own list has an answer for the kink.
+  - When it has none, the answer **goes on your own list**, and the copy
+    follows it. So a list filled in from a partner's view is still yours
+    everywhere.
+  - Custom kinks, triage and settings are always your own list's.
+- **Your partner can't open your own list**, which is in your own vault. So
+  the copy also carries `resolved`: your own list, with the overrides
+  applied, minus anything held back, plus wholesale limits, without
+  quick-fill skips. That is what your partner reads.
+  - It is worked out again on every save of the copy.
+  - After your own list saves, the layout re-seals every shared copy with it
+    ([`partner-sync.ts`](../src/lib/kink-list/partner-sync.ts)). It does the
+    same once when the list opens, in case your list changed on another
+    device.
+  - `soloRevision` records which version of your own list a copy reflects, so
+    a copy already up to date is left alone.
+  - A copy that changed elsewhere in the meantime is left for next time
+    rather than overwritten. An open partner view merges per kink on a lost
+    race, like your own list.
+- **In the partner view**, each kink is marked "Just for …" (with "Back to
+  my own answer" and "Copy to my own list") or "From your own list".
+  "Don't show … this yet" holds it back. **Just for …** lists every
+  override.
+- **Compare** (`…/compare`) puts your effective list against the `resolved`
+  list your partner shares with you, through `compareLists`.
+  - **Blind comparing**, if either of you turns it on, shows only what you
+    both want and each other's limits.
+  - It is a courtesy of the screen, not a seal: the copy your partner shares
+    is in a vault you both hold, so blind mode cannot keep its contents from
+    you, and the copy is honest about that.
+  - A link goes to your messages with that partner. Starting a thread from a
+    match isn't built: the composer has no way to be handed a draft.
+- **The server** lets a member read only the other member's copy in a
+  partnership they belong to (`getPartnerKinkList`). Anyone else gets a 404,
+  however the partnership id was got.
+
 ## Tests
 
 - **`kink-list/catalog.test.ts`:** the catalogue's checks, search, and the
@@ -393,6 +453,9 @@ import joins a list. Every importer produces the same `ImportResult`.
   full list, broken links, and unknown kink numbers.
 - **`kink-list/compare.test.ts`:** the groups, role-aware pairing, limits, and
   overlap.
+- **`kink-list/partner.test.ts`:** following your own list, overrides taken
+  back, what the partner sees (held back, custom kinks, limits), where an
+  answer goes, differences, and merging.
 - **`kink-list/import/*.test.ts`:**
   - the hash against the sites' own outputs
   - link detection and sides
@@ -401,7 +464,8 @@ import joins a list. Every importer produces the same `ImportResult`.
   - JSON and CSV round trips, other spreadsheets, and answer words
   - applying an import
 - **`server/kink-lists.test.ts`:** saving, compare-and-swap, vaults, and who
-  may write a scope.
+  may write a scope; reading a partner's copy (members only, and only the
+  other member's), and listing shared copies.
 - **`components/kink-list/KinkRow.svelte.test.ts`:** answering, inherited
   answers, the sides, notes, related kinks and the intensity setting.
 - **`components/kink-list/Deck.svelte.test.ts`:** buttons, keys, undo, skip,
@@ -414,4 +478,8 @@ import joins a list. Every importer produces the same `ImportResult`.
     sign-up; the public list redirecting someone signed in; and a shared link
     compared with a signed-in list.
   - Importing a KinkSheet link, exporting JSON, and reading it back.
+  - A partner view starting you on your own list while it is empty.
+  - Two partners: sharing, an override and a held-back kink for one partner,
+    an answer from the partner view going on your own list, comparing, and
+    blind comparing set by the other side.
 - **The sealed fixture** for `kink-list` v1 is in `sealed-fixtures/`.

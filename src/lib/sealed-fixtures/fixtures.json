@@ -521,6 +521,65 @@
 					}
 				}
 			}
+		},
+		{
+			"kind": "kink-list-partner",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000c2",
+			"ciphertext": "sb1.GHivMvdBb1wqB9sO7HM4RFQXpDpx-BD99ovjBJ9uL5rJNy019aqyoOZcAbqGqfWO0rjlUN6lswNHzZJcFpLqBYdw8gG0b83lIH74HMR7YLCqJrzYFWZR8VmRx0eZTc3XUVIrZkIdGExq5e5PQD-OmPCDmp136w7DWhQV0emr82pZ1KTmXV4y4DXNbA7h7QedtjKjDA-Wb8jLLc_Z5DpCPGwrP4WvNHTY7dqqwVPtZhQkXPbs8lTQ-39EehZ51pdZT85nJ_c94Vur271KbUQ_pAbu1QpQW5iHN71X4Lvj9CuA_jEaBXEr9xIsIvY-c61bt1pnRTcxUZGi7knPJSxu17f2yu7YextfE36UttMZXx2wsAHVyThJWRPQSamOyJenVXM3w4uVwj2MfBy_GNZKuMVkcR1nk_vnJyd1T3YsgiPiCmnOMa4u2Zp2WQDwRJob1g5zZLDL3GlCwFmEaPr7rZY3fdImDztPwI515k8P4HDm8KR2ooG3G7VrqzCiFb76ecUYiLtVSaMR2QUG8VDCZb1nMSzqbj_aomLQFNR-me3-xZZJjaeAaaIySDcRtFAQCdoPbglnkj5mZfHVrobYqiWuU5UGLu16zoIfzkp8O978oguq9MfbwqWu1bbfHCJFMEOQIt2GrSkknS24NbZ2G8aFCtW-NvXXJpIM1XCKPCsEzTRG5CqW807vtvjy67fAuPKjsPkB-4bkQOid_GaVmiasdRnoHMDVH0qzdyKA4aw303VkYWJluDLk33ThAUk831BbOOM",
+			"expected": {
+				"overrides": {
+					"spanking": {
+						"level": "love",
+						"note": "Only with you",
+						"at": 1792000000010
+					},
+					"caning": {
+						"at": 1792000000011
+					}
+				},
+				"heldBack": {
+					"face-slapping": {
+						"held": true,
+						"at": 1792000000012
+					}
+				},
+				"blind": {
+					"on": true,
+					"at": 1792000000013
+				},
+				"resolved": {
+					"answers": {
+						"spanking": {
+							"level": "love",
+							"note": "Only with you",
+							"at": 1792000000010
+						},
+						"rimming": {
+							"sides": {
+								"b": {
+									"level": "like"
+								}
+							},
+							"at": 1792000000001
+						}
+					},
+					"custom": {
+						"custom:0123456789abcdef": {
+							"name": "Being read to",
+							"categoryId": "intimacy",
+							"at": 1792000000007
+						}
+					},
+					"triage": {
+						"extreme": {
+							"value": "limit",
+							"at": 1792000000005
+						}
+					}
+				},
+				"soloRevision": 4
+			}
 		}
 	]
 }

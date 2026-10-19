@@ -26,6 +26,17 @@ export class AccountKinkList extends KinkListStore {
 	#saved: Saved;
 	readonly #view: KinkListView | null;
 
+	/**
+	 * Called after each save with what was saved, so the copies shared with
+	 * partners can follow it (`partner-sync.ts`).
+	 */
+	afterSave: ((list: ListPayload, revision: number) => void) | null = null;
+
+	/** The revision of the list as last saved, or null before the first save. */
+	get revision(): number | null {
+		return this.#saved.revision;
+	}
+
 	/** `view` is the page's load data: the saved list, or null before the first save. */
 	constructor(view: KinkListView | null) {
 		super();
@@ -80,6 +91,7 @@ export class AccountKinkList extends KinkListStore {
 			if (response?.ok) {
 				const { revision } = (await response.json()) as { revision: number };
 				this.#saved = { ...this.#saved, revision };
+				this.afterSave?.(current, revision);
 				return { status: 'saved' };
 			}
 			if (response?.status !== 409) {

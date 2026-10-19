@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getKinkList } from '$lib/server/kink-lists';
+import { getKinkList, listSharedKinkLists } from '$lib/server/kink-lists';
 import type { LayoutServerLoad } from './$types';
 
 /**
@@ -11,5 +11,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
-	return { list: await getKinkList(locals.db, locals.user.id, 'self') };
+	const [list, shared] = await Promise.all([
+		getKinkList(locals.db, locals.user.id, 'self'),
+		listSharedKinkLists(locals.db, locals.user.id)
+	]);
+	return { list, shared };
 };

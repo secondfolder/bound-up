@@ -20,7 +20,16 @@
 	 * every category by section with how much of it is answered. Each
 	 * category opens a page of its own.
 	 */
-	let { intro }: { intro?: Snippet } = $props();
+	let {
+		intro,
+		title = 'Kink list',
+		minimal = false
+	}: {
+		intro?: Snippet;
+		title?: string;
+		/** A partner's view: the list, without quick fill, sharing a link, or import. */
+		minimal?: boolean;
+	} = $props();
 
 	const { store, paths } = kinkListContext();
 
@@ -61,12 +70,12 @@
 
 <div class="home">
 	<header>
-		<h1>Kink list</h1>
+		<h1>{title}</h1>
 		<SaveStatus />
 	</header>
 	{@render intro?.()}
 
-	{#if store.kind === 'account' && adopted.count > 0}
+	{#if store.kind === 'account' && !minimal && adopted.count > 0}
 		<wa-callout variant="success" appearance="outlined">
 			<wa-icon slot="icon" name="circle-check" variant="solid"></wa-icon>
 			Added {adopted.count === 1 ? 'the answer' : `the ${adopted.count} answers`} saved on this device to
@@ -74,10 +83,12 @@
 		</wa-callout>
 	{/if}
 
-	<wa-button class="quick" variant="brand" appearance="accent" href={paths.quick}>
-		<wa-icon slot="start" name="layer-group" variant="solid"></wa-icon>
-		Quick fill
-	</wa-button>
+	{#if !minimal}
+		<wa-button class="quick" variant="brand" appearance="accent" href={paths.quick}>
+			<wa-icon slot="start" name="layer-group" variant="solid"></wa-icon>
+			Quick fill
+		</wa-button>
+	{/if}
 
 	<div class="controls">
 		<wa-input
@@ -103,10 +114,12 @@
 			{/each}
 		</section>
 	{:else}
-		<wa-details summary="Share a link to your list">
-			<ShareLink />
-		</wa-details>
-		<p class="transfer"><a href={paths.transfer}>Import or export your list</a></p>
+		{#if !minimal}
+			<wa-details summary="Share a link to your list">
+				<ShareLink />
+			</wa-details>
+			<p class="transfer"><a href={paths.transfer}>Import or export your list</a></p>
+		{/if}
 
 		{#each Object.entries(catalog.sections) as [section, title] (section)}
 			<section class="section" aria-labelledby="section-{section}">

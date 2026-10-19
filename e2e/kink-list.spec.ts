@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, clickWaButton, signUp, waitForHydration } from './helpers';
+import { account, clickWaButton, linkAccounts, newSide, signUp, waitForHydration } from './helpers';
 
 /**
  * The kink list, signed in: answering, search, related kinks, and that what
@@ -288,4 +288,127 @@ test('imports a KinkSheet link, exports the list, and reads the export back', as
 			.getByRole('group', { name: 'Romance and affection', exact: true })
 			.getByRole('radio', { name: 'Love' })
 	).toBeChecked();
+});
+
+test.describe('with a partner', () => {
+	async function answer(page: Page, kink: string, level: string) {
+		await page
+			.getByRole('group', { name: kink, exact: true })
+			.getByText(level, { exact: true })
+			.click();
+	}
+
+	test('a shared list follows your own, overrides and holds back for one partner, and compares', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+			const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
+			const partnerList = `/playroom/kink-list/partner/${partnershipId}`;
+
+			// Ada's own list: Spanking Like, Caning a hard limit.
+			await ada.page.goto('/playroom/kink-list/impact');
+			await waitForHydration(ada.page);
+			await answer(ada.page, 'Spanking', 'Like');
+			await answer(ada.page, 'Caning', 'Hard limit');
+			await saved(ada.page);
+
+			// Shared with Jun, then Love just for him, and Caning kept from him.
+			await ada.page.goto(partnerList);
+			await waitForHydration(ada.page);
+			await clickWaButton(ada.page, 'Share my list with Jun');
+			await expect(ada.page.getByRole('heading', { name: 'Your list for Jun' })).toBeVisible();
+			await ada.page.getByRole('link', { name: /Impact play/ }).click();
+			await answer(ada.page, 'Spanking', 'Love');
+			await expect(ada.page.getByText('Just for Jun')).toBeVisible();
+			await ada.page.getByRole('button', { name: 'More detail and notes for Caning' }).click();
+			await ada.page.getByRole('checkbox', { name: "Don't show Jun this yet" }).check();
+			// Flogging was never answered on her own list: it goes there, not to Jun's copy.
+			await answer(ada.page, 'Flogging', 'Like');
+			await saved(ada.page);
+
+			await ada.page.goto('/playroom/kink-list/impact');
+			await waitForHydration(ada.page);
+			await expect(
+				ada.page
+					.getByRole('group', { name: 'Spanking', exact: true })
+					.getByRole('radio', { name: 'Like' })
+			).toBeChecked();
+			await expect(
+				ada.page
+					.getByRole('group', { name: 'Flogging', exact: true })
+					.getByRole('radio', { name: 'Like' })
+			).toBeChecked();
+
+			// Jun shares his: Spanking Love.
+			await jun.page.goto('/playroom/kink-list/impact');
+			await waitForHydration(jun.page);
+			await answer(jun.page, 'Spanking', 'Love');
+			await saved(jun.page);
+			await jun.page.goto(partnerList);
+			await waitForHydration(jun.page);
+			await clickWaButton(jun.page, 'Share my list with Ada');
+			await expect(jun.page.getByRole('heading', { name: 'Your list for Ada' })).toBeVisible();
+
+			// Jun sees Ada's answer for him, and not what she kept back.
+			await jun.page.goto(`${partnerList}/compare`);
+			await waitForHydration(jun.page);
+			const both = jun.page.getByRole('region', { name: /You both want this/ });
+			await expect(both.getByText('Spanking', { exact: true }).first()).toBeVisible();
+			const limits = jun.page.getByRole('region', { name: 'Ada’s hard limits' });
+			await expect(limits).toBeVisible();
+			await expect(limits.getByText(/Caning/)).toHaveCount(0);
+
+			// Blind comparing, turned on by Ada, applies to Jun's view too.
+			await ada.page.goto(partnerList);
+			await waitForHydration(ada.page);
+			await ada.page.locator('wa-switch', { hasText: 'Blind comparing' }).click();
+			await saved(ada.page);
+			await jun.page.reload();
+			await waitForHydration(jun.page);
+			await expect(jun.page.getByText('Blind comparing is on')).toBeVisible();
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+});
+
+test('a partner view starts you on your own list before offering to share it', async ({
+	browser
+}) => {
+	const ada = await newSide(browser, 'Ada');
+	const jun = await newSide(browser, 'Jun');
+	try {
+		await signUp(ada.page, ada.who);
+		await signUp(jun.page, jun.who);
+		await linkAccounts(ada, jun);
+		const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
+		await ada.page.goto(`/playroom/kink-list/partner/${partnershipId}`);
+		await waitForHydration(ada.page);
+		await expect(ada.page.getByText('Start your own kink list first.')).toBeVisible();
+		await expect(ada.page.locator('wa-button', { hasText: 'Share my list with Jun' })).toHaveCount(
+			0
+		);
+
+		await ada.page.goto('/playroom/kink-list/impact');
+		await waitForHydration(ada.page);
+		await ada.page
+			.getByRole('group', { name: 'Spanking', exact: true })
+			.getByText('Like', { exact: true })
+			.click();
+		await saved(ada.page);
+		await ada.page.goto(`/playroom/kink-list/partner/${partnershipId}`);
+		await waitForHydration(ada.page);
+		await expect(
+			ada.page.locator('wa-button', { hasText: 'Share my list with Jun' })
+		).toBeVisible();
+	} finally {
+		await ada.close();
+		await jun.close();
+	}
 });

@@ -361,18 +361,20 @@
 							"id": "per-partner-kink-list",
 							"title": "Kink list per partner",
 							"summary": "Your list carries over to each partner, and you can change any answer just for them.",
-							"status": "planned",
+							"status": "shipped",
 							"notes": [
 								"Answers follow your own list until you change one for a partner",
 								"Answer something for the first time with a partner and it goes on your own list too",
 								"See every answer that's different for a partner, and keep it or put it back"
-							]
+							],
+							"shippedOn": "2026-10-19"
 						},
 						{
 							"id": "compare-kink-lists",
 							"title": "Compare kink lists",
 							"summary": "See where your interests overlap.",
-							"status": "planned"
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
 						},
 						{
 							"id": "kink-list-history",

@@ -36,6 +36,30 @@
 		}
 	});
 
+	// The copies shared with partners follow your own list: sealed again after
+	// it saves, and once when it opens, in case it changed on another device.
+	// One at a time, so two saves in a row cannot race each other's copies.
+	// svelte-ignore state_referenced_locally
+	let { shared } = data;
+	let syncing: Promise<void> = Promise.resolve();
+	function syncShared() {
+		if (shared.length === 0) {
+			return;
+		}
+		syncing = syncing.then(async () => {
+			const { syncSharedCopies } = await import('$lib/kink-list/partner-sync');
+			shared = await syncSharedCopies(store.list, store.revision, shared);
+		});
+	}
+	store.afterSave = () => syncShared();
+	let synced = false;
+	$effect(() => {
+		if (store.state === 'ready' && !synced) {
+			synced = true;
+			syncShared();
+		}
+	});
+
 	onDestroy(() => {
 		void store.flush();
 	});

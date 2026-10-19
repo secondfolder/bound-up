@@ -138,6 +138,9 @@
 
 	const sideKeys: SideKey[] = ['a', 'b'];
 
+	/** Set in a partner's view: whose answer this is, and what to do about it. */
+	const partner = $derived(store.partnerControls);
+
 	function detailFor(side: SideKey | undefined): Detail | undefined {
 		return side ? answer?.sides?.[side]?.detail : answer?.detail;
 	}
@@ -178,6 +181,25 @@
 			inherited={inheritedFor()}
 			onchange={(level) => setLevel(level)}
 		/>
+	{/if}
+
+	{#if partner && (partner.isOverridden(itemKey) || partner.hasOwn(itemKey) || partner.isHeld(itemKey))}
+		<p class="partner">
+			{#if partner.isOverridden(itemKey)}
+				<span class="badge">Just for {partner.name}</span>
+				<button type="button" class="toggle" onclick={() => partner?.reset(itemKey)}>
+					Back to my own answer<span class="wa-visually-hidden">for {name}</span>
+				</button>
+				<button type="button" class="toggle" onclick={() => partner?.copyToOwn(itemKey)}>
+					Copy to my own list<span class="wa-visually-hidden">: {name}</span>
+				</button>
+			{:else if partner.hasOwn(itemKey)}
+				<span class="quiet-badge">From your own list</span>
+			{/if}
+			{#if partner.isHeld(itemKey)}
+				<span class="badge held">Hidden from {partner.name}</span>
+			{/if}
+		</p>
 	{/if}
 
 	{#if answer?.note && !showMore}
@@ -257,6 +279,17 @@
 				maxlength={MAX_NOTE_LENGTH}
 				{@attach noteField}
 			></wa-textarea>
+
+			{#if partner}
+				<label class="hold">
+					<input
+						type="checkbox"
+						checked={partner.isHeld(itemKey)}
+						onchange={(event) => partner?.setHeld(itemKey, event.currentTarget.checked)}
+					/>
+					Don't show {partner.name} this yet
+				</label>
+			{/if}
 
 			{#if item?.aliases?.length}
 				<p class="aliases">Also called: {item.aliases.join(', ')}</p>
@@ -343,6 +376,37 @@
 		margin: 0 0 0.25rem;
 		font-size: 0.85rem;
 		font-weight: var(--wa-font-weight-semibold);
+	}
+
+	.partner {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 0.75rem;
+		margin: 0;
+		font-size: 0.85rem;
+	}
+
+	.badge {
+		padding: 0.05rem 0.5rem;
+		border-radius: var(--wa-border-radius-pill);
+		background: var(--wa-color-brand-fill-quiet);
+		color: var(--wa-color-brand-on-quiet);
+
+		&.held {
+			background: var(--wa-color-warning-fill-quiet);
+			color: var(--wa-color-warning-on-quiet);
+		}
+	}
+
+	.quiet-badge {
+		color: var(--wa-color-text-quiet);
+	}
+
+	.hold {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 	}
 
 	.toggles {

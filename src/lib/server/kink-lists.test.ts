@@ -9,7 +9,7 @@ import {
 	type TestUser
 } from '$lib/testing/fixtures';
 import type { Db } from './db';
-import { getKinkList, saveKinkList } from './kink-lists';
+import { getKinkList, getPartnerKinkList, listSharedKinkLists, saveKinkList } from './kink-lists';
 
 let harness: TestDb;
 let db: Db;
@@ -204,5 +204,58 @@ describe('saveKinkList, a partnership’s copy', () => {
 			expectedRevision: null
 		});
 		expect(result).toEqual({ ok: false, reason: 'wrong-vault' });
+	});
+});
+
+describe('shared copies', () => {
+	async function share(owner: TestUser, partnershipId: string, label = 'shared') {
+		const content = {
+			vaultId: await ensureTestPartnershipVault(db, partnershipId),
+			ciphertext: fakeSealed(label),
+			payloadVersion: 1
+		};
+		await saveKinkList(db, owner.id, {
+			scope: { partnershipId },
+			id: crypto.randomUUID(),
+			content,
+			expectedRevision: null
+		});
+		return content;
+	}
+
+	it('lets each member read the other’s copy, and only the other’s', async () => {
+		const { id: partnershipId } = await createTestPartnership(db, ada, jun);
+		const adas = await share(ada, partnershipId, 'ada');
+		const juns = await share(jun, partnershipId, 'jun');
+
+		const forJun = await getPartnerKinkList(db, jun.id, partnershipId);
+		expect(forJun.ok && forJun.list?.sealed.ciphertext).toBe(adas.ciphertext);
+		const forAda = await getPartnerKinkList(db, ada.id, partnershipId);
+		expect(forAda.ok && forAda.list?.sealed.ciphertext).toBe(juns.ciphertext);
+	});
+
+	it('answers null while the partner shares nothing, and refuses anyone outside', async () => {
+		const { id: partnershipId } = await createTestPartnership(db, ada, jun);
+		expect(await getPartnerKinkList(db, ada.id, partnershipId)).toEqual({ ok: true, list: null });
+		const outsider = await createTestUser(db, { name: 'Mo' });
+		await share(ada, partnershipId);
+		expect(await getPartnerKinkList(db, outsider.id, partnershipId)).toEqual({
+			ok: false,
+			reason: 'not-member'
+		});
+	});
+
+	it('lists your shared copies but not your own list', async () => {
+		const { id: partnershipId } = await createTestPartnership(db, ada, jun);
+		await saveKinkList(db, ada.id, {
+			scope: 'self',
+			id: crypto.randomUUID(),
+			content: await selfContent(ada.id),
+			expectedRevision: null
+		});
+		await share(ada, partnershipId);
+		expect((await listSharedKinkLists(db, ada.id)).map((list) => list.scope)).toEqual([
+			partnershipId
+		]);
 	});
 });
