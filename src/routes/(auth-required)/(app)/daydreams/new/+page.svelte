@@ -1,10 +1,16 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import type { DaydreamSetup } from '$lib/daydream';
-	import { assembleSetup, type StarterSide, starterSetup } from '$lib/daydream/starters';
+	import {
+		assembleSetup,
+		type StarterSide,
+		starterSetup,
+		storedStarterSide
+	} from '$lib/daydream/starters';
 	import { suggestDaydream } from '$lib/daydream/suggest';
 	import type { PageData } from './$types';
 
@@ -37,6 +43,33 @@
 	let asking = $state(false);
 	let problem: string | null = $state(null);
 	let versions = 0;
+
+	/**
+	 * "You as" is remembered on the device, as a convenience: someone who is
+	 * always the sub should not have to say so on every visit. Read on mount,
+	 * because storage is only there in the browser; the server renders
+	 * "Either", which is the right thing to show until then anyway.
+	 */
+	const SIDE_KEY = 'daydreams.starter-side';
+	onMount(() => {
+		try {
+			side = storedStarterSide(localStorage.getItem(SIDE_KEY));
+		} catch {
+			// Storage refused (a private window, say): it starts at "Either".
+		}
+	});
+	function chooseSide(value: StarterSide | null) {
+		side = value;
+		try {
+			if (value) {
+				localStorage.setItem(SIDE_KEY, value);
+			} else {
+				localStorage.removeItem(SIDE_KEY);
+			}
+		} catch {
+			// Not remembered, which only costs a tap on the next visit.
+		}
+	}
 
 	const suggestionsOn = $derived(data.accepted && data.available);
 
@@ -85,7 +118,7 @@
 			<DaydreamStarter
 				bind:idea
 				bind:ideas
-				bind:side
+				bind:side={() => side, chooseSide}
 				{suggestionsOn}
 				{asking}
 				{problem}

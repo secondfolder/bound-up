@@ -822,6 +822,15 @@ export function startersFor(side: StarterSide | null): readonly DaydreamStarter[
 		: DAYDREAM_STARTERS.filter((starter) => starter.you === null || starter.you === side);
 }
 
+/**
+ * The side the start page remembers on the device, read back from storage.
+ * Anything else — nothing stored, "Either", or a value from some other
+ * version — is null, which shows every story.
+ */
+export function storedStarterSide(stored: string | null): StarterSide | null {
+	return stored === 'dom' || stored === 'sub' ? stored : null;
+}
+
 /** The scene template a starter is built on. Throws for a starter that names one that is not there. */
 export function starterScene(starter: DaydreamStarter) {
 	const template = SCENE_TEMPLATES.find((entry) => entry.id === starter.scene);

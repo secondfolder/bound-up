@@ -46,7 +46,9 @@ someone has played one:
   hunt" and "Your hunt" — so both filters have the full range, and the
   catalog keeps sub characters (the eager sub, the pain slut, the fighter,
   the innocent) to cast opposite a dom user. The choice is the page's state,
-  like the box and the ideas, so going back keeps it. They are built from the catalog rather than written out again,
+  like the box and the ideas, so going back keeps it, and it is also
+  remembered on the device (`localStorage`, `storedStarterSide`) so the next
+  visit opens on the same side. They are built from the catalog rather than written out again,
   and need no model, so nothing leaves the device.
 - **Build it yourself.** The full form, empty.
 

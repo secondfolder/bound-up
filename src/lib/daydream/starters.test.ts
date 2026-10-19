@@ -11,7 +11,8 @@ import {
 	type StoryPieces,
 	starterScene,
 	starterSetup,
-	startersFor
+	startersFor,
+	storedStarterSide
 } from './starters';
 
 /** Ids that say which part they are, so a test can read a casting. */
@@ -101,6 +102,19 @@ describe('the ready-made stories', () => {
 		for (const chip of DAYDREAM_IDEA_CHIPS) {
 			expect(chip.length).toBeLessThanOrEqual(60);
 			expect(chip).not.toMatch(/[,\n]/);
+		}
+	});
+});
+
+describe('storedStarterSide', () => {
+	it('reads back a remembered side', () => {
+		expect(storedStarterSide('dom')).toBe('dom');
+		expect(storedStarterSide('sub')).toBe('sub');
+	});
+
+	it('falls back to either for nothing stored or anything it does not know', () => {
+		for (const stored of [null, '', 'either', 'switch', 'Dom']) {
+			expect(storedStarterSide(stored), String(stored)).toBe(null);
 		}
 	});
 });
