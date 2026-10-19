@@ -8,7 +8,8 @@
 		type Level,
 		MAX_NOTE_LENGTH,
 		type SideKey,
-		shownSides
+		shownSides,
+		withLevel
 	} from '$lib/kink-list/answers';
 	import { intensityLabel, kinkById, primaryCategoryOf, sidesOf } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
@@ -53,7 +54,7 @@
 
 	/**
 	 * Which side the next answer is for: both, unless one is picked on this
-	 * card — or "Your side" leaves only one of a kink's contexts showing, in
+	 * card — or "Answer as" leaves only one of a kink's contexts showing, in
 	 * which case the card starts on that one.
 	 */
 	let side: SideKey | 'both' = $state('both');
@@ -98,8 +99,10 @@
 			if (side === 'both') {
 				return { ...existing, level };
 			}
+			// The answer as a whole, so a fantasy and reality that had parted
+			// follow it again rather than outvoting it.
 			const sidesNow = existing?.sides ?? {};
-			return { ...existing, sides: { ...sidesNow, [side]: { ...sidesNow[side], level } } };
+			return { ...existing, sides: { ...sidesNow, [side]: withLevel(sidesNow[side], level) } };
 		});
 		holding = level === 'conditional' ? key : null;
 	}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, within } from '@testing-library/svelte';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import { userEvent } from 'vitest/browser';
 import { DeviceKinkList } from '$lib/kink-list/device-store.svelte';
 import KinkListHarness from '$lib/testing/KinkListHarness.svelte';
@@ -14,9 +14,16 @@ function storeWith(answers: DeviceKinkList['list']['answers'] = {}): DeviceKinkL
 	return store;
 }
 
-/** The row's name, which opens the rest of it. Its flags come after the name. */
+/**
+ * The row's name, which opens the rest of it. Its flags come after the name,
+ * and its specifics' rows after it, so the first match is the kink's own.
+ */
 function openRow(name: string) {
-	return userEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }));
+	const [button] = screen.getAllByRole('button', { name: new RegExp(`^${name}`) });
+	if (!button) {
+		throw new Error(`the row named ${name}`);
+	}
+	return userEvent.click(button);
 }
 
 describe('KinkRow', () => {
@@ -55,29 +62,57 @@ describe('KinkRow', () => {
 		expect(screen.queryByRole('group', { name: 'Spanking, giving' })).toBeNull();
 	});
 
-	it('shows a specific its kink’s answer, outlined and named, until it has its own', async () => {
+	it('shows a specific its kink’s answer, outlined and named, until it has its own', () => {
 		const store = storeWith({ spanking: { sides: { a: { level: 'love' } }, at: 1 } });
 		render(KinkListHarness, { store, itemKey: 'spanking' });
-		await openRow('Spanking');
+		// Under the kink without opening it.
 		const specific = screen.getByRole('group', { name: 'Spanking with an implement, giving' });
 		// Inherited is not chosen: nothing in the group is checked, and its dot is dashed.
 		expect(within(specific).queryByRole('radio', { checked: true })).toBeNull();
 		const love = within(specific).getByRole('radio', { name: 'Love' });
 		expect(love.closest('label')).toHaveClass('inherited');
-		await openRow('Spanking with an implement');
-		expect(screen.getByText(/Love, from Spanking/)).toBeInTheDocument();
+		expect(love.closest('label')).toHaveAttribute('title', 'Love, from Spanking');
 	});
 
-	it('opens to the description, the answer in words, and Clear', async () => {
-		const store = storeWith({ romance: { level: 'curious', at: 1 } });
-		const { container } = render(KinkListHarness, { store, itemKey: 'romance' });
-		expect(screen.queryByText(/Showing love and affection/)).toBeNull();
-		await openRow('Romance and affection');
-		expect(screen.getByText(/Showing love and affection/)).toBeInTheDocument();
-		expect(container.querySelector('.answers')).toHaveTextContent(/Curious/);
-		await waSettled(container);
-		(container.querySelector('.answers wa-button, .answers button') as HTMLElement).click();
-		expect(store.list.answers.romance?.level).toBeUndefined();
+	it('opens to the description and a fieldset per context', async () => {
+		const store = storeWith({ spanking: { sides: { a: { level: 'curious' } }, at: 1 } });
+		render(KinkListHarness, { store, itemKey: 'spanking' });
+		expect(screen.queryByRole('group', { name: 'Giving' })).toBeNull();
+		await openRow('Spanking');
+		const giving = screen.getByRole('group', { name: 'Giving' });
+		expect(screen.getByRole('group', { name: 'Receiving' })).toBeInTheDocument();
+		// Fantasy and reality are the answer until they part.
+		for (const name of ['into it as a fantasy', 'into actually doing it']) {
+			const scale = within(giving).getByRole('group', { name: `Spanking, giving, ${name}` });
+			expect(within(scale).getByRole('radio', { name: 'Curious' })).toBeChecked();
+		}
+		expect(within(giving).getByText('Experience')).toBeInTheDocument();
+	});
+
+	it('shows fantasy and reality apart once they differ, and one answer once they agree', async () => {
+		const store = storeWith({ spanking: { sides: { a: { level: 'like' } }, at: 1 } });
+		render(KinkListHarness, { store, itemKey: 'spanking' });
+		await openRow('Spanking');
+		const giving = screen.getByRole('group', { name: 'Giving' });
+		const fantasy = within(giving).getByRole('group', {
+			name: 'Spanking, giving, into it as a fantasy'
+		});
+		await userEvent.click(within(fantasy).getByRole('radio', { name: 'Love' }));
+		expect(store.list.answers.spanking?.sides?.a).toEqual({
+			level: 'like',
+			detail: { fantasy: 'love', doing: 'like' }
+		});
+		// The line shows the two in place of the one.
+		expect(screen.queryByRole('group', { name: 'Spanking, giving' })).toBeNull();
+		const lineFantasy = screen.getByRole('group', { name: 'Spanking, giving, fantasy' });
+		const lineReality = screen.getByRole('group', { name: 'Spanking, giving, reality' });
+		expect(within(lineFantasy).getByRole('radio', { name: 'Love' })).toBeChecked();
+		expect(within(lineReality).getByRole('radio', { name: 'Like' })).toBeChecked();
+
+		await userEvent.click(within(lineReality).getByRole('radio', { name: 'Love' }));
+		expect(store.list.answers.spanking?.sides?.a).toEqual({ level: 'love' });
+		const line = screen.getByRole('group', { name: 'Spanking, giving' });
+		expect(within(line).getByRole('radio', { name: 'Love' })).toBeChecked();
 	});
 
 	it('keeps a note typed against a kink', async () => {
@@ -157,5 +192,48 @@ describe('the filters and your side', () => {
 		commonness.value = 4;
 		commonness.dispatchEvent(new Event('change'));
 		expect(store.list.settings.minCommonness).toBe(0);
+	});
+});
+
+describe('searching the list', () => {
+	type WaInput = HTMLElement & { value: string };
+
+	async function search(container: HTMLElement, query: string) {
+		await waSettled(container);
+		const field = container.querySelector('wa-input[type="search"]') as WaInput;
+		field.value = query;
+		field.dispatchEvent(new Event('input'));
+	}
+
+	it('narrows the list in place: a match under its category, without its kink’s other specifics', async () => {
+		const store = storeWith();
+		const { container } = render(KinkListHarness, { store, home: true });
+		await search(container, 'paddle');
+		await waitFor(() =>
+			expect(screen.queryByRole('group', { name: 'Kissing, giving' })).toBeNull()
+		);
+		expect(
+			screen.getByRole('group', { name: 'Spanking with an implement, giving' })
+		).toBeInTheDocument();
+		// Under its kink, in its category, and nothing else.
+		const impact = container.querySelector('#category-impact');
+		expect(
+			within(impact as HTMLElement).getByRole('group', { name: 'Spanking, giving' })
+		).toBeInTheDocument();
+		expect(screen.queryByRole('group', { name: 'Kissing, giving' })).toBeNull();
+		expect(container.querySelectorAll('wa-details.category')).toHaveLength(1);
+	});
+
+	it('says how many matches the filters hide', async () => {
+		const store = storeWith();
+		store.setFilters({ maxIntensity: 1 });
+		const { container } = render(KinkListHarness, { store, home: true });
+		await search(container, 'paddle');
+		await waitFor(() =>
+			expect(
+				screen.getByText(/1 kink matches but is hidden by your intensity and rareness filters/)
+			).toBeInTheDocument()
+		);
+		expect(screen.getByText(/Nothing shown matches/)).toBeInTheDocument();
 	});
 });

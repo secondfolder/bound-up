@@ -248,6 +248,20 @@ export type KinkListVersionView = {
 	sealed: KinkListView['sealed'];
 };
 
+/**
+ * Whether the user's own list has any version kept: what decides whether the
+ * list offers its history at all. One row at most, of one column.
+ */
+export async function hasKinkListVersions(db: Db, userId: string): Promise<boolean> {
+	const [row] = await db
+		.select({ id: kinkListVersions.id })
+		.from(kinkListVersions)
+		.innerJoin(kinkLists, eq(kinkLists.id, kinkListVersions.listId))
+		.where(and(eq(kinkLists.ownerId, userId), eq(kinkLists.scope, 'self')))
+		.limit(1);
+	return row !== undefined;
+}
+
 /** Every version kept of the user's own list, oldest first. Empty before a week has gone by. */
 export async function listKinkListVersions(db: Db, userId: string): Promise<KinkListVersionView[]> {
 	const rows = await db

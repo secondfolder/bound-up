@@ -1,18 +1,22 @@
 <script lang="ts">
-	import {
-		isAnswered,
-		isShown,
-		MAX_CUSTOM_DESCRIPTION_LENGTH,
-		MAX_CUSTOM_NAME_LENGTH
-	} from '$lib/kink-list/answers';
+	import { customMatches, isAnswered, isShown } from '$lib/kink-list/answers';
 	import { childrenOf, type KinkItem, relatedKinks } from '$lib/kink-list/catalog';
-	import { kinkListContext } from '$lib/kink-list/context';
+	import { kinkListContext, kinkListSearch } from '$lib/kink-list/context';
 	import KinkRow from './KinkRow.svelte';
 
 	/**
 	 * One category, as a section of the one-page list that starts open and
 	 * folds away: its kinks, any the person added to it, and the kinks that
 	 * live in another category but fit here too.
+	 *
+	 * While the page is searched, it shows only what matches (`searchView`),
+	 * and leaves out its related kinks, which are shown in their own category,
+	 * and its count of kinks the filters hide, which the page gives for the
+	 * search as a whole.
+	 *
+	 * There is no adding a kink of one's own any more: custom kinks already in
+	 * a list, or brought in by an import, still show and can be removed. A way
+	 * to suggest a kink for the catalogue is to come instead.
 	 *
 	 * Related kinks are behind a button rather than mixed in, so the category
 	 * reads as the list it is. They answer exactly as in their own category:
@@ -23,52 +27,27 @@
 	const { store } = kinkListContext();
 	const id = $props.id();
 
-	const kinks = $derived(childrenOf(category.id).filter((kink) => isShown(kink, store.filters)));
-	const hidden = $derived(childrenOf(category.id).length - kinks.length);
+	const search = kinkListSearch();
+	const view = $derived(search?.view ?? null);
+
+	/** What the filters show: what the count is of, search or no search. */
+	const listed = $derived(childrenOf(category.id).filter((kink) => isShown(kink, store.filters)));
+	const hidden = $derived(childrenOf(category.id).length - listed.length);
 	const related = $derived(relatedKinks(category.id).filter((kink) => isShown(kink, store.filters)));
-	const custom = $derived(store.customKinks(category.id));
+	const allCustom = $derived(store.customKinks(category.id));
 	/** "3 of 12": how much of what is shown here is answered. */
 	const answered = $derived(
-		kinks.filter((kink) => isAnswered(store.list.answers[kink.id])).length +
-			custom.filter(([key]) => isAnswered(store.list.answers[key])).length
+		listed.filter((kink) => isAnswered(store.list.answers[kink.id])).length +
+			allCustom.filter(([key]) => isAnswered(store.list.answers[key])).length
+	);
+
+	/** What is on screen: everything listed, or only what a search left of it. */
+	const kinks = $derived(view ? listed.filter((kink) => view.shown.has(kink.id)) : listed);
+	const custom = $derived(
+		view ? allCustom.filter(([, kink]) => customMatches(kink.name, search?.query ?? '')) : allCustom
 	);
 
 	let showRelated = $state(false);
-	let adding = $state(false);
-
-	type WaInput = HTMLElement & { value: string | null };
-	let nameField: WaInput | undefined = $state();
-	let descriptionField: WaInput | undefined = $state();
-	let addError = $state('');
-	/** Followed as it is typed, so Add turns solid once there is a name to add. */
-	let typedName = $state('');
-
-	/** Wired by hand: a wa-input's input happens in its shadow root (AGENTS.md). */
-	function followName(node: WaInput) {
-		const onInput = () => {
-			typedName = node.value?.trim() ?? '';
-		};
-		node.addEventListener('input', onInput);
-		return () => node.removeEventListener('input', onInput);
-	}
-
-	function add(event: SubmitEvent) {
-		event.preventDefault();
-		const name = nameField?.value?.trim() ?? '';
-		if (!name) {
-			addError = 'Give it a name.';
-			return;
-		}
-		const description = descriptionField?.value?.trim() ?? '';
-		store.addCustom({
-			name: name.slice(0, MAX_CUSTOM_NAME_LENGTH),
-			categoryId: category.id,
-			description: description ? description.slice(0, MAX_CUSTOM_DESCRIPTION_LENGTH) : undefined
-		});
-		addError = '';
-		typedName = '';
-		adding = false;
-	}
 </script>
 
 <!-- Open from the start, in the server's HTML too: `open` is safe in markup
@@ -76,7 +55,7 @@
 <wa-details class="category" id="category-{category.id}" open>
 	<span slot="summary" class="summary">
 		<h3 id="{id}-title">{category.name}</h3>
-		<span class="count">{answered} of {kinks.length + custom.length}</span>
+		<span class="count">{answered} of {listed.length + allCustom.length}</span>
 	</span>
 	<p class="description">{category.description}</p>
 
@@ -94,14 +73,14 @@
 		{/each}
 	</div>
 
-	{#if hidden > 0}
+	{#if hidden > 0 && !view}
 		<p class="hidden-note">
 			{hidden === 1 ? '1 more kink is' : `${hidden} more kinks are`} hidden by your filters.
 		</p>
 	{/if}
 
-	<div class="actions">
-		{#if related.length > 0}
+	{#if related.length > 0 && !view}
+		<div class="actions">
 			<!-- A disclosure: aria-expanded, which wa-button would not forward. -->
 			<button
 				type="button"
@@ -114,48 +93,16 @@
 			>
 				{showRelated ? 'Hide related kinks' : `${related.length} related kinks`}
 			</button>
-		{/if}
-		{#if !adding}
-			<button type="button" class="link" onclick={() => {
-					adding = true;
-				}}>Add your own</button>
-		{/if}
-	</div>
-
-	{#if showRelated}
-		<div class="related" id="{id}-related">
-			<p class="description">These live in another category, and fit here too. Answering one here answers it there.</p>
-			{#each related as kink (kink.id)}
-				<KinkRow itemKey={kink.id} />
-			{/each}
 		</div>
-	{/if}
 
-	{#if adding}
-		<form class="add" onsubmit={add}>
-			<wa-input
-				label="Your kink"
-				maxlength={MAX_CUSTOM_NAME_LENGTH}
-				bind:this={nameField}
-				{@attach followName}
-				hint={addError || undefined}
-			></wa-input>
-			<wa-input
-				label="What it is (optional)"
-				maxlength={MAX_CUSTOM_DESCRIPTION_LENGTH}
-				bind:this={descriptionField}
-			></wa-input>
-			<div class="buttons">
-				<wa-button type="submit" variant="brand" appearance={typedName ? 'accent' : 'outlined'}
-					>Add</wa-button
-				>
-				<wa-button type="button" appearance="outlined" onclick={() => {
-					adding = false;
-				}}
-					>Cancel</wa-button
-				>
+		{#if showRelated}
+			<div class="related" id="{id}-related">
+				<p class="description">These live in another category, and fit here too. Answering one here answers it there.</p>
+				{#each related as kink (kink.id)}
+					<KinkRow itemKey={kink.id} />
+				{/each}
 			</div>
-		</form>
+		{/if}
 	{/if}
 </wa-details>
 
@@ -216,6 +163,12 @@
 		}
 	}
 
+	/* The last row's line goes, as in `KinkRow`, also when that row is a
+	   custom kink, which is not the last child of its wrapper (Remove is). */
+	.custom:last-child :global(.kink) {
+		border-block-end: 0;
+	}
+
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
@@ -230,16 +183,5 @@
 		font: inherit;
 		text-decoration: underline;
 		cursor: pointer;
-	}
-
-	.add {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-
-		.buttons {
-			display: flex;
-			gap: 0.5rem;
-		}
 	}
 </style>

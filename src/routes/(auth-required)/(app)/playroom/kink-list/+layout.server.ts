@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getKinkList, listSharedKinkLists } from '$lib/server/kink-lists';
+import { getKinkList, hasKinkListVersions, listSharedKinkLists } from '$lib/server/kink-lists';
 import type { LayoutServerLoad } from './$types';
 
 /**
@@ -11,9 +11,12 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
-	const [list, shared] = await Promise.all([
+	const [list, shared, hasHistory] = await Promise.all([
 		getKinkList(locals.db, locals.user.id, 'self'),
-		listSharedKinkLists(locals.db, locals.user.id)
+		listSharedKinkLists(locals.db, locals.user.id),
+		hasKinkListVersions(locals.db, locals.user.id)
 	]);
-	return { list, shared };
+	// `hasHistory`: History is offered only once there is a version to show.
+	// A version kept during this visit shows it from the next load.
+	return { list, shared, hasHistory };
 };

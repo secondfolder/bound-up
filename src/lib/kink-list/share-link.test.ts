@@ -25,7 +25,12 @@ async function roundTrip(source: ListPayload, withNotes = true, name?: string) {
 describe('share links', () => {
 	it('carry levels, sides, the detailed answer and notes', async () => {
 		const answers: Record<string, Answer> = {
-			spanking: { level: 'like', note: 'Over the knee', detail: { fantasy: 4, doing: 2 }, at },
+			spanking: {
+				level: 'like',
+				note: 'Over the knee',
+				detail: { fantasy: 'love', doing: 'like' },
+				at
+			},
 			kissing: {
 				sides: { a: { level: 'love' }, b: { level: 'limit', detail: { experience: 0 } } },
 				at
@@ -35,7 +40,7 @@ describe('share links', () => {
 		expect(decoded.answers.spanking).toMatchObject({
 			level: 'like',
 			note: 'Over the knee',
-			detail: { fantasy: 4, doing: 2 }
+			detail: { fantasy: 'love', doing: 'like' }
 		});
 		expect(decoded.answers.kissing?.sides?.a?.level).toBe('love');
 		expect(decoded.answers.kissing?.sides?.b).toMatchObject({

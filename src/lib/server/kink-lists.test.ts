@@ -12,6 +12,7 @@ import type { Db } from './db';
 import {
 	getKinkList,
 	getPartnerKinkList,
+	hasKinkListVersions,
 	listKinkListVersions,
 	listSharedKinkLists,
 	saveKinkList
@@ -302,6 +303,14 @@ describe('version history', () => {
 		expect((await getKinkList(db, ada.id, 'self'))?.sealed.ciphertext).toBe(
 			saved.get('after the gap')
 		);
+	});
+
+	it('says whether any version is kept, for the list to offer its history', async () => {
+		const id = crypto.randomUUID();
+		await save(id, 'first', null, start);
+		expect(await hasKinkListVersions(db, ada.id)).toBe(false);
+		await save(id, 'after the gap', 0, dayAfter(10));
+		expect(await hasKinkListVersions(db, ada.id)).toBe(true);
 	});
 
 	it('keeps the list a fresh start replaces, however recently it changed', async () => {

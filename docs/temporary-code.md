@@ -281,3 +281,30 @@ before dropping the columns; dropping them deletes that text.
    `NOT NULL` is a rebuild, so leave them nullable and let the code hold the
    line, unless the rebuild has been checked against D1 first.
 3. Re-run the full verification loop, including `npm run test:e2e`.
+
+## Kink list fantasy and doing as numbers
+
+The kink list's *into it as a fantasy* and *into actually doing it* were
+0–4 sliders during development, and are now levels on the answer's own
+scale (docs/kink-list.md). Lists saved in between still hold the numbers.
+
+### Current temporary code
+
+- `OLD_INTEREST_STEPS` and the `z.preprocess` in `detailSchema`, in
+  `src/lib/kink-list/answers.ts`, which read a number as the nearest level.
+
+### What removes the need for it
+
+The kink list has never been deployed, so only development databases and
+devices hold a number. Once every list there has been saved again (any
+answer change rewrites it in the new shape), or before the first deploy at
+the latest, nothing holds one.
+
+### What to remove
+
+The preprocess and `OLD_INTEREST_STEPS`; `fantasy` and `doing` go back to
+`z.enum(LEVELS).optional()`, and the test that reads old numbers goes.
+
+### What should stay
+
+The schema refusing anything that is not a level.

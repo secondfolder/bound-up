@@ -95,11 +95,11 @@ test('search finds a kink by another name', async ({ page }) => {
 	await signUp(page, account('Bea'));
 	await openList(page);
 	await page.locator('wa-input[type="search"] input').fill('fellatio');
+	// Found in its own category, with the rest of the list narrowed away.
 	await expect(
-		page
-			.getByRole('region', { name: 'Search results' })
-			.getByRole('group', { name: 'Blowjobs, giving', exact: true })
+		page.locator('#category-oral').getByRole('group', { name: 'Blowjobs, giving', exact: true })
 	).toBeVisible();
+	await expect(scale(page, 'Kissing, giving')).toHaveCount(0);
 });
 
 test('a related kink answered in one category shows the same answer in its own', async ({
@@ -172,10 +172,12 @@ test.describe('quick fill', () => {
 				scale(page, `Fingering, ${side}`).getByRole('radio', { name: 'Hard limit' })
 			).toBeChecked();
 		}
-		await openRow(page, 'Blowjobs');
+		// Inherited, so a dashed ring whose tooltip says where it is from.
 		await expect(
-			page.getByText('Hard limit, from "Oral": hard limit everything').first()
-		).toBeVisible();
+			scale(page, 'Blowjobs, giving').locator('label', {
+				has: page.getByRole('radio', { name: 'Hard limit' })
+			})
+		).toHaveAttribute('title', 'Hard limit, from "Oral": hard limit everything');
 	});
 });
 
@@ -192,7 +194,7 @@ test.describe('without an account', () => {
 	async function makeLink(page: Page, name: string): Promise<string> {
 		await page.goto('/kink-list');
 		await waitForHydration(page);
-		await page.getByText('Share a link to your list', { exact: true }).click();
+		await clickWaButton(page, 'Share');
 		// By role: Svelte sets a wa-input's label as a property, not an attribute.
 		await page.getByRole('textbox', { name: 'Your name on it (optional)' }).fill(name);
 		await clickWaButton(page, 'Make a link');
@@ -439,6 +441,8 @@ test('a week without changes keeps a version, and history shows what moved', asy
 	const eve = account('Eve');
 	await signUp(page, eve);
 	await openList(page);
+	// Nothing kept yet: no History to offer.
+	await expect(page.getByRole('link', { name: 'History' })).toHaveCount(0);
 
 	await answer(page, 'Spanking, giving', 'Like');
 	await saved(page);
@@ -463,7 +467,9 @@ test('a week without changes keeps a version, and history shows what moved', asy
 	expect(rows).toHaveLength(1);
 	expect(String(rows[0]?.ciphertext)).toMatch(/^sb1\./);
 
-	await page.getByRole('link', { name: 'See how your list has changed' }).click();
+	// History is offered from the next load after a version is kept.
+	await openList(page);
+	await page.getByRole('link', { name: 'History' }).click();
 	await expect(page.getByRole('heading', { name: 'Versions (1)' })).toBeVisible();
 	const moreInto = page.getByRole('region', { name: 'More into (1)' });
 	await expect(moreInto.getByText('Spanking (Giving)', { exact: true })).toBeVisible();

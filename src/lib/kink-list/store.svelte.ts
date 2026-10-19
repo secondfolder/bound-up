@@ -22,7 +22,6 @@ import {
 	filtersOf,
 	type ItemKey,
 	type ListPayload,
-	newCustomKey,
 	normaliseAnswer,
 	normaliseAnswers,
 	type TriageValue
@@ -166,16 +165,6 @@ export abstract class KinkListStore {
 			...this.list,
 			skipped: { ...this.list.skipped, [key]: { skipped, at: Date.now() } }
 		});
-	}
-
-	/** Adds a kink of the person's own to a category, and answers its key. */
-	addCustom(kink: Omit<CustomKink, 'at' | 'removed'>): `custom:${string}` {
-		const key = newCustomKey();
-		this.change({
-			...this.list,
-			custom: { ...this.list.custom, [key]: { ...kink, at: Date.now() } }
-		});
-		return key;
 	}
 
 	removeCustom(key: `custom:${string}`): void {

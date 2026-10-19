@@ -75,7 +75,7 @@ export class AccountKinkList extends KinkListStore {
 		this.failure = failure;
 		this.state = 'unreadable';
 		// The one place the reason is known: the server cannot read the list,
-		// so it cannot say what is wrong with it. Paths and codes only.
+		// so it cannot say what is wrong with it. Paths, codes and types only.
 		console.error('[kink-list] Your own list could not be opened on this device', {
 			listId: this.#view.id,
 			revision: this.#view.revision,

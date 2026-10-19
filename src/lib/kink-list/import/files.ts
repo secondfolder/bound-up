@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import {
 	DETAIL_KEYS,
-	DETAIL_STEPS,
 	type Detail,
+	EXPERIENCE_STEPS,
 	LEVEL_LABELS,
 	LEVELS,
 	type Level,
@@ -73,9 +73,9 @@ function csvCell(value: string): string {
 	return NEEDS_QUOTES.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 }
 
-function stepWord(detail: Detail | undefined, key: (typeof DETAIL_KEYS)[number]): string {
-	const step = detail?.[key];
-	return step === undefined ? '' : (DETAIL_STEPS[key][step] ?? '');
+function experienceWord(detail: Detail | undefined): string {
+	const step = detail?.experience;
+	return step === undefined ? '' : (EXPERIENCE_STEPS[step] ?? '');
 }
 
 /** Every kink with an answer or a note, one row each, catalogue order then custom kinks. */
@@ -102,9 +102,11 @@ export function exportCsv(list: ListPayload): string {
 			level(answer.sides?.a?.level),
 			answer.sides ? (sides?.[1] ?? 'Second side') : '',
 			level(answer.sides?.b?.level),
-			stepWord(answer.detail, 'fantasy'),
-			stepWord(answer.detail, 'doing'),
-			stepWord(answer.detail, 'experience'),
+			// Fantasy and reality only once they part from the answer: until
+			// then the answer is both, and the columns are left empty.
+			level(answer.detail?.fantasy),
+			level(answer.detail?.doing),
+			experienceWord(answer.detail),
 			answer.note ?? ''
 		]);
 	};
@@ -249,11 +251,11 @@ function column(headings: string[], pattern: RegExp): number {
 	return headings.findIndex((heading) => pattern.test(heading.trim()));
 }
 
-function stepFor(key: (typeof DETAIL_KEYS)[number], word: string | undefined): number | undefined {
+function experienceFor(word: string | undefined): number | undefined {
 	if (!word?.trim()) {
 		return undefined;
 	}
-	const index = DETAIL_STEPS[key].findIndex(
+	const index = EXPERIENCE_STEPS.findIndex(
 		(step) => step.toLowerCase() === word.trim().toLowerCase()
 	);
 	return index === -1 ? undefined : index;
@@ -277,9 +279,9 @@ function readOwnCsv(rows: string[][]): ImportResult {
 			answer.sides = { ...(a ? { a: { level: a } } : {}), ...(b ? { b: { level: b } } : {}) };
 		}
 		const detail: Detail = {
-			fantasy: stepFor('fantasy', cell('Into it as a fantasy')),
-			doing: stepFor('doing', cell('Into actually doing it')),
-			experience: stepFor('experience', cell('Experience'))
+			fantasy: answerFromWord(cell('Into it as a fantasy')),
+			doing: answerFromWord(cell('Into actually doing it')),
+			experience: experienceFor(cell('Experience'))
 		};
 		if (DETAIL_KEYS.some((key) => detail[key] !== undefined)) {
 			answer.detail = detail;

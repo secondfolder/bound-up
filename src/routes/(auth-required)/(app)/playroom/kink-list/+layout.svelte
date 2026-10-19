@@ -22,7 +22,13 @@
 			home: resolve('/(auth-required)/(app)/playroom/kink-list'),
 			quick: resolve('/(auth-required)/(app)/playroom/kink-list/quick'),
 			transfer: resolve('/(auth-required)/(app)/playroom/kink-list/transfer'),
-			history: resolve('/(auth-required)/(app)/playroom/kink-list/history')
+			// Read each time, so it follows `data` after an invalidate: there is
+			// no History to offer until a version has been kept.
+			get history() {
+				return data.hasHistory
+					? resolve('/(auth-required)/(app)/playroom/kink-list/history')
+					: undefined;
+			}
 		}
 	});
 

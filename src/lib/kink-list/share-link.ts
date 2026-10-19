@@ -4,6 +4,7 @@ import {
 	type Answer,
 	type CustomKink,
 	DETAIL_KEYS,
+	DETAIL_MAX,
 	type Detail,
 	emptyList,
 	LEVELS,
@@ -48,9 +49,9 @@ const level = z
 	.int()
 	.min(0)
 	.max(LEVELS.length - 1);
-const step = z.number().int().min(0).max(4);
-/** Fantasy, doing and experience, in order; `null` for unset. */
-const detail = z.tuple([step.nullable(), step.nullable(), step.nullable()]);
+const step = z.number().int().min(0).max(DETAIL_MAX);
+/** Fantasy and doing as levels, then experience as a step, in order; `null` for unset. */
+const detail = z.tuple([level.nullable(), level.nullable(), step.nullable()]);
 const side = z.object({ l: level.optional(), d: detail.optional() });
 const shared = z.object({
 	l: level.optional(),
@@ -88,7 +89,11 @@ function packDetail(value: Detail | undefined): z.output<typeof detail> | undefi
 	if (!value || DETAIL_KEYS.every((key) => value[key] === undefined)) {
 		return undefined;
 	}
-	return [value.fantasy ?? null, value.doing ?? null, value.experience ?? null];
+	return [
+		packLevel(value.fantasy) ?? null,
+		packLevel(value.doing) ?? null,
+		value.experience ?? null
+	];
 }
 
 function unpackDetail(value: z.output<typeof detail> | undefined): Detail | undefined {
@@ -97,8 +102,8 @@ function unpackDetail(value: z.output<typeof detail> | undefined): Detail | unde
 	}
 	const [fantasy, doing, experience] = value;
 	return {
-		fantasy: fantasy ?? undefined,
-		doing: doing ?? undefined,
+		fantasy: fantasy === null ? undefined : LEVELS[fantasy],
+		doing: doing === null ? undefined : LEVELS[doing],
 		experience: experience ?? undefined
 	};
 }

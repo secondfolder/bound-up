@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { defineSealedKind, isKnownVersion, readSealedPayload, sealedAad } from './sealed';
+import {
+	defineSealedKind,
+	isKnownVersion,
+	readSealedPayload,
+	readSealedPayloadDiagnosed,
+	sealedAad
+} from './sealed';
 
 const v1 = z.object({ name: z.string() });
 const v2 = z.object({ first: z.string(), last: z.string() });
@@ -134,5 +140,42 @@ describe('sealedAad', () => {
 		expect(sealedAad({ kind: 'task', recordId: 'r', vaultId: 'v', version: 2 })).toBe(
 			'bound-up-sealed-v1|task|r|v|2'
 		);
+	});
+});
+
+describe('readSealedPayloadDiagnosed', () => {
+	it('says where a schema refused a payload, what it wanted, and the type it got, never the value', () => {
+		const read = readSealedPayloadDiagnosed(person, 3, {
+			first: 42,
+			last: 'Secret surname',
+			pronouns: ['they']
+		});
+		expect(read).toEqual({
+			ok: false,
+			reason: 'schema',
+			version: 3,
+			issues: [
+				{ path: 'first', code: 'invalid_type', expected: 'string', received: 'number' },
+				{ path: 'pronouns', code: 'invalid_type', expected: 'string', received: 'array' }
+			]
+		});
+		expect(JSON.stringify(read)).not.toContain('Secret');
+	});
+
+	it('names the values an enum allows', () => {
+		const kind = defineSealedKind({
+			name: 'level',
+			maxCiphertextLength: 100,
+			versions: [{ version: 1, schema: z.object({ level: z.enum(['like', 'love']) }) }]
+		});
+		const read = readSealedPayloadDiagnosed(kind, 1, { level: 3 });
+		expect(read.ok === false && read.reason === 'schema' && read.issues).toEqual([
+			{
+				path: 'level',
+				code: 'invalid_value',
+				expected: 'one of "like", "love"',
+				received: 'number'
+			}
+		]);
 	});
 });

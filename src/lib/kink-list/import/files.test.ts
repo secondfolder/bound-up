@@ -24,9 +24,10 @@ const full = (): ListPayload => {
 		answers: {
 			// A kink without a role pair: one with a pair is answered per side.
 			romance: {
+				// Fantasy and reality apart, so the answer is reality's.
 				level: 'like',
 				note: 'Over the knee, "firmly", please',
-				detail: { fantasy: 4, experience: 1 },
+				detail: { fantasy: 'love', doing: 'like', experience: 1 },
 				at
 			},
 			kissing: { sides: { a: { level: 'love' }, b: { level: 'limit' } }, at },
@@ -60,7 +61,7 @@ describe('CSV', () => {
 		const result = importCsv(exportCsv(full()));
 		expect(result?.answers.romance).toEqual({
 			level: 'like',
-			detail: { fantasy: 4, experience: 1 },
+			detail: { fantasy: 'love', doing: 'like', experience: 1 },
 			note: 'Over the knee, "firmly", please'
 		});
 		expect(result?.answers.kissing).toEqual({

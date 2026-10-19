@@ -127,18 +127,70 @@ export function readSealedPayload<Latest>(
 }
 
 /**
+ * One place a schema refused a payload: where, Zod's code, what the schema
+ * wanted there, and what kind of value was there instead. `expected` comes
+ * from the schema, never the payload. `received` is only the value's type
+ * ("number", "string", "array"…): the value itself is the content the seal
+ * is there to keep private, and a type is enough to tell a stored shape
+ * from an old one, as with a number where a level's word was expected.
+ */
+export type SealedReadIssue = { path: string; code: string; expected?: string; received: string };
+
+/**
  * Why a sealed record could not be read, for logs and debug mode. It names
- * where in the payload a schema refused it and why, as paths and Zod issue
- * codes, and never the values: those are the content the seal is there to
- * keep private.
+ * where in the payload a schema refused it and why, and never the values (see
+ * `SealedReadIssue`).
  */
 export type SealedReadFailure =
 	| { reason: 'format' | 'decrypt' | 'json' | 'no-vault' }
 	| { reason: 'unknown-version'; version: number }
-	| { reason: 'schema'; version: number; issues: { path: string; code: string }[] };
+	| { reason: 'schema'; version: number; issues: SealedReadIssue[] };
 
 /** The most issues a failure keeps: enough to see the pattern, not a log flood. */
 const MAX_REPORTED_ISSUES = 10;
+
+/** The type of whatever sits at `path` in `value`: never the value itself. */
+function receivedType(value: unknown, path: readonly PropertyKey[]): string {
+	let current = value;
+	for (const key of path) {
+		if (current === null || typeof current !== 'object') {
+			return 'undefined';
+		}
+		current = (current as Record<PropertyKey, unknown>)[key];
+	}
+	if (current === null) {
+		return 'null';
+	}
+	return Array.isArray(current) ? 'array' : typeof current;
+}
+
+/** What the schema wanted, from the issue's own description of the schema. */
+function expectedOf(issue: z.core.$ZodIssue): string | undefined {
+	switch (issue.code) {
+		case 'invalid_type':
+			return issue.expected;
+		case 'invalid_value':
+			return `one of ${issue.values.map((value) => JSON.stringify(value)).join(', ')}`;
+		case 'too_big':
+			return `at most ${String(issue.maximum)}`;
+		case 'too_small':
+			return `at least ${String(issue.minimum)}`;
+		default:
+			return undefined;
+	}
+}
+
+function describeIssues(issues: z.core.$ZodIssue[], value: unknown): SealedReadIssue[] {
+	return issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => {
+		const expected = expectedOf(issue);
+		return {
+			path: issue.path.map(String).join('.'),
+			code: issue.code,
+			...(expected === undefined ? {} : { expected }),
+			received: receivedType(value, issue.path)
+		};
+	});
+}
 
 /** `readSealedPayload`, saying why when it cannot. */
 export function readSealedPayloadDiagnosed<Latest>(
@@ -162,10 +214,7 @@ export function readSealedPayloadDiagnosed<Latest>(
 				ok: false,
 				reason: 'schema',
 				version: entry.version,
-				issues: parsed.error.issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => ({
-					path: issue.path.map(String).join('.'),
-					code: issue.code
-				}))
+				issues: describeIssues(parsed.error.issues, current)
 			};
 		}
 		current = parsed.data;

@@ -352,14 +352,14 @@
 						},
 						{
 							"id": "kink-list-filters",
-							"title": "How intense, how common",
-							"summary": "Show only kinks up to an intensity, and as common as you like, from everyday to rare.",
+							"title": "How intense, how rare",
+							"summary": "Choose the most intense and the rarest kinks the list shows.",
 							"status": "shipped",
 							"shippedOn": "2026-10-19"
 						},
 						{
 							"id": "kink-list-your-side",
-							"title": "Your side",
+							"title": "Answer as dom or sub",
 							"summary": "Answer giving and receiving side by side, or show only the side that's yours, set from who's in control with a partner.",
 							"status": "shipped",
 							"shippedOn": "2026-10-19"

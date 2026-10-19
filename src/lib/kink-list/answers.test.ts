@@ -6,15 +6,22 @@ import {
 	emptyList,
 	type Filters,
 	hasContent,
+	interestOf,
 	isAnswered,
 	isPositive,
 	isShown,
+	isSplit,
 	type ListPayload,
 	listPayloadSchema,
 	mergeLists,
 	newCustomKey,
 	normaliseAnswer,
-	shownSides
+	searchView,
+	settleSide,
+	shownSides,
+	withExperience,
+	withInterest,
+	withLevel
 } from './answers';
 import { type KinkItem, kinkById } from './catalog';
 
@@ -132,7 +139,10 @@ describe('the stored shape', () => {
 		const parsed = listPayloadSchema.safeParse({
 			answers: {
 				spanking: { level: 'like', note: 'Over the knee', at },
-				rimming: { sides: { a: { level: 'curious', detail: { doing: 2 } } }, at },
+				rimming: {
+					sides: { a: { level: 'curious', detail: { doing: 'like', experience: 2 } } },
+					at
+				},
 				[key]: { level: 'conditional', at }
 			},
 			triage: { extreme: { value: 'limit', at } },
@@ -182,14 +192,78 @@ describe('small rules', () => {
 	});
 });
 
+describe('fantasy and reality', () => {
+	it('are the answer until they part', () => {
+		const side = withLevel(undefined, 'like');
+		expect(side).toEqual({ level: 'like' });
+		expect(interestOf(side)).toEqual({ fantasy: 'like', doing: 'like' });
+		expect(isSplit(side)).toBe(false);
+	});
+
+	it('part when one changes, and the answer follows reality', () => {
+		const side = withInterest({ level: 'like' }, 'fantasy', 'love');
+		expect(side).toEqual({ level: 'like', detail: { fantasy: 'love', doing: 'like' } });
+		expect(isSplit(side)).toBe(true);
+	});
+
+	it('follow fantasy while reality is unsaid', () => {
+		expect(withInterest(undefined, 'fantasy', 'love')).toEqual({
+			level: 'love',
+			detail: { fantasy: 'love' }
+		});
+		expect(interestOf({ level: 'love', detail: { fantasy: 'love' } })).toEqual({
+			fantasy: 'love',
+			doing: undefined
+		});
+	});
+
+	it('fold back into one answer when they agree again', () => {
+		const apart = withInterest({ level: 'like' }, 'fantasy', 'love');
+		expect(withInterest(apart, 'doing', 'love')).toEqual({ level: 'love' });
+	});
+
+	it('follow the answer again when it is set as a whole, keeping experience', () => {
+		const apart = {
+			level: 'like',
+			detail: { fantasy: 'love', doing: 'like', experience: 2 }
+		} as const;
+		expect(withLevel(apart, 'curious')).toEqual({ level: 'curious', detail: { experience: 2 } });
+		expect(withExperience({ level: 'like' }, 1)).toEqual({
+			level: 'like',
+			detail: { experience: 1 }
+		});
+	});
+
+	it('read the 0–4 numbers lists saved in development hold as the nearest level', () => {
+		const parsed = listPayloadSchema.parse({
+			...emptyList(),
+			answers: { romance: { level: 'like', detail: { fantasy: 4, doing: 2 }, at } }
+		});
+		expect(parsed.answers.romance).toEqual({
+			level: 'like',
+			detail: { fantasy: 'love', doing: 'like' },
+			at
+		});
+	});
+
+	it('settle as a list is read, so a stored answer is always in one of its two shapes', () => {
+		expect(settleSide({ level: 'love', detail: { fantasy: 'like', doing: 'like' } })).toEqual({
+			level: 'like'
+		});
+		expect(
+			normaliseAnswer('romance', { level: 'like', detail: { fantasy: 'love', doing: 'like' }, at })
+		).toEqual({ level: 'like', detail: { fantasy: 'love', doing: 'like' }, at });
+	});
+});
+
 describe('the shape of an answer', () => {
 	it('splits a whole answer on a role kink into the same answer on each side', () => {
 		expect(
-			normaliseAnswer('spanking', { level: 'like', detail: { fantasy: 3 }, note: 'Hard', at })
+			normaliseAnswer('spanking', { level: 'like', detail: { experience: 3 }, note: 'Hard', at })
 		).toEqual({
 			sides: {
-				a: { level: 'like', detail: { fantasy: 3 } },
-				b: { level: 'like', detail: { fantasy: 3 } }
+				a: { level: 'like', detail: { experience: 3 } },
+				b: { level: 'like', detail: { experience: 3 } }
 			},
 			note: 'Hard',
 			at
@@ -256,5 +330,32 @@ describe('the filters', () => {
 		expect(shownSides(kinkById('genital-worship'), 'sub')).toEqual(['a']);
 		expect(shownSides(kinkById('kissing'), 'sub')).toEqual(['a', 'b']);
 		expect(shownSides(kinkById('romance'), 'sub')).toBeNull();
+	});
+});
+
+describe('searchView', () => {
+	const everything: Filters = { maxIntensity: 6, minCommonness: 0, side: 'both' };
+
+	it('is nothing for an empty search', () => {
+		expect(searchView('  ', everything)).toBeNull();
+	});
+
+	it('shows a matching specific under its kink', () => {
+		const view = searchView('paddle', everything);
+		expect(view?.shown).toEqual(new Set(['spanking-implements', 'spanking']));
+	});
+
+	it('does not bring a matching kink’s specifics along', () => {
+		const view = searchView('fellatio', everything);
+		expect(view?.shown.has('blowjobs')).toBe(true);
+		expect(view?.shown.has('cock-warming')).toBe(false);
+	});
+
+	it('counts the matches the filters hide, including a specific whose kink they hide', () => {
+		expect(searchView('paddle', { ...everything, maxIntensity: 2 })).toEqual({
+			shown: new Set(),
+			hidden: 1
+		});
+		expect(searchView('paddle', { ...everything, maxIntensity: 1 })?.hidden).toBe(1);
 	});
 });

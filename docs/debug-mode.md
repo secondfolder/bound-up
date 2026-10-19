@@ -137,8 +137,9 @@ inspected once it is on.
 On the screen a signed-in kink list shows when this device cannot open it
 (`UnreadableList.svelte`), "Why it won't open" gives the reason
 `openRecordDiagnosed` worked out: the wrong format, a failed decryption, bad
-JSON, an unknown version, or a schema that refused it, with the paths and Zod
-issue codes where it did. Never a value, since those are the sealed content;
+JSON, an unknown version, or a schema that refused it, with where it did: the
+path, Zod's issue code, what the schema expected, and the type of what it
+found. Never a value, since those are the sealed content;
 the same goes to the console whether debug mode is on or not. See
 [kink-list.md](kink-list.md#saving).
 

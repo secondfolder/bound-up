@@ -165,7 +165,7 @@ The Zod schema accepts only `me` / `them` / `mix` — posting the _stored_ value
 Control also sets where a partner's view of the kink list starts: whoever
 holds it starts on the dom side, the other on the sub side, and shared control
 on both. It only decides what is shown first, and either person can change it
-for the visit. See [kink-list.md](kink-list.md#your-side).
+for the visit. See [kink-list.md](kink-list.md#answer-as).
 
 Disconnecting is deliberately not gated: a user who handed control to their
 partner must still be able to get out. `deletePartnership` checks membership and

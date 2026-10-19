@@ -26,7 +26,6 @@ import type { KinkListView } from '../types';
 import type { AccountKinkList } from './account-store.svelte';
 import {
 	type Answer,
-	type CustomKink,
 	type Filters,
 	filtersOf,
 	hasContent,
@@ -198,12 +197,6 @@ export class PartnerKinkList extends KinkListStore {
 	override setSkipped(key: ItemKey, skipped: boolean): void {
 		this.solo.setSkipped(key, skipped);
 		this.#followOwn();
-	}
-
-	override addCustom(kink: Omit<CustomKink, 'at' | 'removed'>): `custom:${string}` {
-		const key = this.solo.addCustom(kink);
-		this.#followOwn();
-		return key;
 	}
 
 	override removeCustom(key: `custom:${string}`): void {

@@ -6,7 +6,9 @@ import {
 	type KinkItem,
 	kinkById,
 	leanOf,
+	normaliseSearch,
 	primaryCategoryOf,
+	searchKinks,
 	sidesOf
 } from './catalog';
 
@@ -55,24 +57,43 @@ export function isPositive(level: Level | undefined): boolean {
 
 // ── the detailed answer ──────────────────────────────────────────────────────
 
-/** The three sliders of a detailed answer, each 0–4. */
-export const DETAIL_KEYS = ['fantasy', 'doing', 'experience'] as const;
+/**
+ * The detailed answer: how into it someone is as a fantasy and in reality,
+ * each on the same scale as the answer itself, and how much they have done it.
+ *
+ * Fantasy and reality start out as the answer: one rating says both until
+ * they part. Once someone says they differ, the row shows the two in place of
+ * the one, and when they come back together they fold into one again
+ * (`settleSide`). So a context is always in one of two shapes: one `level`
+ * and no `fantasy`/`doing`, or the two apart, with `level` following them.
+ */
+export const INTEREST_KEYS = ['fantasy', 'doing'] as const;
+export type InterestKey = (typeof INTEREST_KEYS)[number];
+
+export const INTEREST_LABELS: Record<InterestKey, string> = {
+	fantasy: 'Into it as a fantasy',
+	doing: 'Into actually doing it'
+};
+
+/** What the two are called on the row, beside their dots, once they have parted. */
+export const INTEREST_SHORT_LABELS: Record<InterestKey, string> = {
+	fantasy: 'Fantasy',
+	doing: 'Reality'
+};
+
+export const DETAIL_KEYS = [...INTEREST_KEYS, 'experience'] as const;
 export type DetailKey = (typeof DETAIL_KEYS)[number];
 
-export const DETAIL_LABELS: Record<DetailKey, string> = {
-	fantasy: 'Into it as a fantasy',
-	doing: 'Into actually doing it',
-	experience: 'Experience'
-};
+export const EXPERIENCE_LABEL = 'Experience';
+export const EXPERIENCE_STEPS = [
+	'Never',
+	'Once or twice',
+	'A few times',
+	'Often',
+	'All the time'
+] as const;
 
-const INTEREST_STEPS = ['None', 'A little', 'Some', 'A lot', "Can't get enough"] as const;
-export const DETAIL_STEPS: Record<DetailKey, readonly string[]> = {
-	fantasy: INTEREST_STEPS,
-	doing: INTEREST_STEPS,
-	experience: ['Never', 'Once or twice', 'A few times', 'Often', 'All the time']
-};
-
-export const DETAIL_MAX = 4;
+export const DETAIL_MAX = EXPERIENCE_STEPS.length - 1;
 
 // ── the stored shape ─────────────────────────────────────────────────────────
 
@@ -112,9 +133,25 @@ const itemKey = z
 const at = z.number().int().nonnegative();
 const step = z.number().int().min(0).max(DETAIL_MAX);
 
+/**
+ * Fantasy and doing were 0–4 sliders ("None" … "Can't get enough") before
+ * they moved onto the answer's scale, and lists saved in development still
+ * hold those numbers. Read as the nearest level rather than refused, which
+ * left a whole list unopenable. Temporary: nothing deployed ever wrote a
+ * number, so this goes before the kink list first ships
+ * (docs/temporary-code.md).
+ */
+const OLD_INTEREST_STEPS: readonly Level[] = ['not-for-me', 'curious', 'like', 'love', 'love'];
+const interestSchema = z
+	.preprocess(
+		(value) => (typeof value === 'number' ? (OLD_INTEREST_STEPS[value] ?? value) : value),
+		z.enum(LEVELS)
+	)
+	.optional();
+
 const detailSchema = z.object({
-	fantasy: step.optional(),
-	doing: step.optional(),
+	fantasy: interestSchema,
+	doing: interestSchema,
 	experience: step.optional()
 });
 const sideSchema = z.object({
@@ -166,12 +203,80 @@ export const YOUR_SIDES = ['dom', 'sub', 'both'] as const;
 export type YourSide = (typeof YOUR_SIDES)[number];
 export const YOUR_SIDE_LABELS: Record<YourSide, string> = { dom: 'Dom', sub: 'Sub', both: 'Both' };
 
+/** A context's answer, or a whole kink's: what `settleSide` works on. */
+type Part = { level?: Level; detail?: Detail };
+
+/**
+ * How into it as a fantasy and in reality a context is: its two ratings once
+ * they have parted, and its one rating, twice, while they have not.
+ */
+export function interestOf(part: Part | undefined): Record<InterestKey, Level | undefined> {
+	const detail = part?.detail;
+	if (detail?.fantasy !== undefined || detail?.doing !== undefined) {
+		return { fantasy: detail.fantasy, doing: detail.doing };
+	}
+	return { fantasy: part?.level, doing: part?.level };
+}
+
+/** Whether a context's fantasy and reality have parted, so it shows two ratings. */
+export function isSplit(part: Part | undefined): boolean {
+	const { fantasy, doing } = interestOf(part);
+	return fantasy !== doing;
+}
+
+/**
+ * A context in one of its two shapes (see "the detailed answer"): fantasy and
+ * reality folded into `level` when they agree, and kept apart when they do
+ * not. Apart, `level` is reality's, or fantasy's while reality is unsaid:
+ * everything that reads one answer — compare, progress, the exports, the
+ * history — is asking whether someone would do it.
+ */
+export function settleSide<P extends Part>(part: P): P {
+	const { fantasy, doing } = interestOf(part);
+	const experience = part.detail?.experience;
+	const apart = fantasy !== doing;
+	const level = apart ? (doing ?? fantasy) : fantasy;
+	const detail: Detail = {
+		...(apart && fantasy ? { fantasy } : {}),
+		...(apart && doing ? { doing } : {}),
+		...(experience === undefined ? {} : { experience })
+	};
+	const { level: _level, detail: _detail, ...rest } = part;
+	return {
+		...rest,
+		...(level ? { level } : {}),
+		...(Object.keys(detail).length > 0 ? { detail } : {})
+	} as P;
+}
+
+/** A context answered as a whole: its fantasy and reality follow the answer again. */
+export function withLevel(part: Part | undefined, level: Level | undefined): Side {
+	const experience = part?.detail?.experience;
+	return settleSide({ level, ...(experience === undefined ? {} : { detail: { experience } }) });
+}
+
+/** A context with its fantasy or reality changed, which parts the two or folds them back. */
+export function withInterest(
+	part: Part | undefined,
+	key: InterestKey,
+	level: Level | undefined
+): Side {
+	const interest = { ...interestOf(part), [key]: level };
+	return settleSide({ detail: { ...part?.detail, ...interest } });
+}
+
+/** A context with how much someone has done it changed. */
+export function withExperience(part: Part | undefined, experience: number | undefined): Side {
+	return settleSide({ ...part, detail: { ...part?.detail, experience } });
+}
+
 /**
  * One answer in the shape its kink takes: a kink with a role pair is answered
  * per side only, and one without is answered whole only. A whole answer on a
  * role kink — from quick fill's "Both", an import that had no sides, or a
  * list from before contexts were always shown — becomes the same answer on
- * each side. A sided answer on a kink with no pair keeps its first side.
+ * each side. A sided answer on a kink with no pair keeps its first side. And
+ * each context's fantasy and reality are settled (`settleSide`).
  *
  * Done when a list is parsed and when an answer is set, so nothing past those
  * two points ever has to ask which shape it is looking at; the history, the
@@ -180,24 +285,34 @@ export const YOUR_SIDE_LABELS: Record<YourSide, string> = { dom: 'Dom', sub: 'Su
 export function normaliseAnswer<A extends Answer>(key: ItemKey, answer: A): A {
 	const item = kinkById(key);
 	const sided = item !== undefined && sidesOf(item) !== null;
-	if (sided && (answer.level !== undefined || answer.detail !== undefined)) {
-		const whole = { level: answer.level, detail: answer.detail };
-		const side = (current: Side | undefined): Side => {
-			const level = current?.level ?? whole.level;
-			const detail = current?.detail ?? whole.detail;
-			return { ...(level ? { level } : {}), ...(detail ? { detail } : {}) };
-		};
+	if (sided) {
 		const { level: _level, detail: _detail, ...rest } = answer;
-		return { ...rest, sides: { a: side(answer.sides?.a), b: side(answer.sides?.b) } } as A;
+		const whole = answer.level !== undefined || answer.detail !== undefined;
+		if (!(whole || answer.sides)) {
+			return answer;
+		}
+		const side = (current: Side | undefined): Side =>
+			settleSide({
+				...((current?.level ?? answer.level) ? { level: current?.level ?? answer.level } : {}),
+				...((current?.detail ?? answer.detail) ? { detail: current?.detail ?? answer.detail } : {})
+			});
+		const a = side(answer.sides?.a);
+		const b = side(answer.sides?.b);
+		return {
+			...rest,
+			sides: {
+				...(Object.keys(a).length > 0 ? { a } : {}),
+				...(Object.keys(b).length > 0 ? { b } : {})
+			}
+		} as A;
 	}
-	if (!sided && answer.sides !== undefined) {
-		const first = answer.sides.a ?? answer.sides.b;
-		const { sides: _sides, ...rest } = answer;
-		const level = answer.level ?? first?.level;
-		const detail = answer.detail ?? first?.detail;
-		return { ...rest, ...(level ? { level } : {}), ...(detail ? { detail } : {}) } as A;
-	}
-	return answer;
+	const first = answer.sides?.a ?? answer.sides?.b;
+	const { sides: _sides, ...rest } = answer;
+	return settleSide({
+		...rest,
+		...((answer.level ?? first?.level) ? { level: answer.level ?? first?.level } : {}),
+		...((answer.detail ?? first?.detail) ? { detail: answer.detail ?? first?.detail } : {})
+	}) as A;
 }
 
 export function normaliseAnswers<A extends Answer>(answers: Record<string, A>): Record<string, A> {
@@ -379,6 +494,49 @@ export function shownSides(item: KinkItem | undefined, side: YourSide): SideKey[
 	}
 	const subSide = domSide === 'a' ? 'b' : 'a';
 	return [side === 'dom' ? domSide : subSide];
+}
+
+// ── search ───────────────────────────────────────────────────────────────────
+
+/**
+ * What a search leaves of the list. The list stays in its own shape, so a
+ * match is seen in its category, under its kink:
+ *
+ * - `shown`: the kinks and specifics that match, and the kink above each
+ *   matching specific, as the place it lives. A matching kink does not bring
+ *   its specifics along; each is shown only if it matches too.
+ * - `hidden`: how many matches the filters hide, counted once each, so the
+ *   page can say they are there. A specific whose kink is filtered out is
+ *   hidden with it.
+ *
+ * Null for an empty query: no search, so nothing is narrowed.
+ */
+export type SearchView = { shown: ReadonlySet<ItemKey>; hidden: number };
+
+export function searchView(query: string, filters: Filters): SearchView | null {
+	if (!normaliseSearch(query)) {
+		return null;
+	}
+	const shown = new Set<ItemKey>();
+	let hidden = 0;
+	for (const item of searchKinks(query)) {
+		const parent = depthOf(item) === 3 && item.parent ? kinkById(item.parent) : undefined;
+		if (!isShown(item, filters) || (parent && !isShown(parent, filters))) {
+			hidden += 1;
+			continue;
+		}
+		shown.add(item.id);
+		if (parent) {
+			shown.add(parent.id);
+		}
+	}
+	return { shown, hidden };
+}
+
+/** Whether a custom kink's name matches a search, as a catalogue kink's would. */
+export function customMatches(name: string, query: string): boolean {
+	const needle = normaliseSearch(query);
+	return needle !== '' && normaliseSearch(name).includes(needle);
 }
 
 // ── merging ──────────────────────────────────────────────────────────────────

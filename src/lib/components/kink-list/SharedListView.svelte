@@ -1,10 +1,11 @@
 <script lang="ts">
 	import {
 		type Answer,
-		DETAIL_KEYS,
-		DETAIL_LABELS,
-		DETAIL_STEPS,
 		type Detail,
+		EXPERIENCE_LABEL,
+		EXPERIENCE_STEPS,
+		INTEREST_KEYS,
+		INTEREST_SHORT_LABELS,
 		isAnswered,
 		LEVEL_LABELS,
 		type ListPayload
@@ -43,10 +44,19 @@
 		return rows;
 	}
 
+	/** Fantasy and reality, when they part from the answer, and experience. */
 	function detailText(detail: Detail | undefined): string {
-		return DETAIL_KEYS.filter((key) => detail?.[key] !== undefined)
-			.map((key) => `${DETAIL_LABELS[key]}: ${DETAIL_STEPS[key][detail?.[key] ?? 0]}`)
-			.join(' · ');
+		const parts: string[] = [];
+		for (const key of INTEREST_KEYS) {
+			const level = detail?.[key];
+			if (level) {
+				parts.push(`${INTEREST_SHORT_LABELS[key]}: ${LEVEL_LABELS[level]}`);
+			}
+		}
+		if (detail?.experience !== undefined) {
+			parts.push(`${EXPERIENCE_LABEL}: ${EXPERIENCE_STEPS[detail.experience]}`);
+		}
+		return parts.join(' · ');
 	}
 
 	function answerText(row: Row): string {

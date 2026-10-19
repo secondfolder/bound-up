@@ -1,4 +1,5 @@
 import { getContext, setContext } from 'svelte';
+import type { SearchView } from './answers';
 import type { KinkListStore } from './store.svelte';
 
 /**
@@ -11,7 +12,7 @@ export type KinkListPaths = {
 	home: string;
 	quick: string;
 	transfer: string;
-	/** Only your own list, signed in, keeps a history. */
+	/** Only your own list, signed in, keeps a history; and only once a version has been kept. */
 	history?: string;
 };
 
@@ -32,4 +33,24 @@ export function kinkListContext(): KinkListContext {
 		throw new Error('A kink-list screen was rendered outside a kink-list layout');
 	}
 	return context;
+}
+
+/**
+ * The search on the list page, for the categories and rows under it to
+ * narrow themselves by. Absent on screens without a search, which show
+ * everything the filters do.
+ */
+export type KinkListSearch = {
+	readonly query: string;
+	readonly view: SearchView | null;
+};
+
+const SEARCH_KEY = Symbol('kink-list-search');
+
+export function setKinkListSearch(search: KinkListSearch): void {
+	setContext(SEARCH_KEY, search);
+}
+
+export function kinkListSearch(): KinkListSearch | undefined {
+	return getContext<KinkListSearch | undefined>(SEARCH_KEY);
 }

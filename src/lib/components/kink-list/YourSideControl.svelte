@@ -3,11 +3,11 @@
 	import { kinkListContext } from '$lib/kink-list/context';
 
 	/**
-	 * "Your side: Dom · Sub · Both". Dom or Sub hides the contexts and kinks
+	 * "Answer as: Dom · Sub · Both". Dom or Sub hides the contexts and kinks
 	 * that lean the other way; Both hides nothing. On your own list it is a
 	 * setting that starts on Both; in a partner's view it starts from who is
 	 * in control, and changing it lasts for the visit (docs/kink-list.md,
-	 * "Your side").
+	 * "Answer as").
 	 *
 	 * Native radios, as segments: the state is `checked`, which a `wa-button`
 	 * would not expose (AGENTS.md).
@@ -17,7 +17,7 @@
 </script>
 
 <fieldset class="your-side">
-	<legend>Your side</legend>
+	<legend>Answer as</legend>
 	<div class="segments">
 		{#each YOUR_SIDES as side (side)}
 			<label>

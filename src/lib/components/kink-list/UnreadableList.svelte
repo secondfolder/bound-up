@@ -16,7 +16,7 @@
 	 * loses nothing a later fix could not bring back.
 	 *
 	 * Why it would not open is in the console, and on screen in debug mode
-	 * (docs/debug-mode.md) — paths and codes, never anything from the list.
+	 * (docs/debug-mode.md) — paths, codes and types, never anything from the list.
 	 *
 	 * TODO: once there is a way to send feedback from the app, offer "Report
 	 * this" here, with `store.failure` attached, so a broken list reaches

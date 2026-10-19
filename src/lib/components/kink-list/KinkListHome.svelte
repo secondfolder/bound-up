@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { tick } from 'svelte';
 	import { adopted } from '$lib/kink-list/adopted.svelte';
-	import { catalog, categories, searchKinks } from '$lib/kink-list/catalog';
-	import { kinkListContext } from '$lib/kink-list/context';
+	import { customMatches, searchView } from '$lib/kink-list/answers';
+	import { catalog, categories, childrenOf, type KinkItem } from '$lib/kink-list/catalog';
+	import { kinkListContext, setKinkListSearch } from '$lib/kink-list/context';
 	import KinkCategory from './KinkCategory.svelte';
-	import KinkRow from './KinkRow.svelte';
 	import LevelKey from './LevelKey.svelte';
 	import ListFilters from './ListFilters.svelte';
 	import SaveStatus from './SaveStatus.svelte';
@@ -14,8 +15,13 @@
 	/**
 	 * The whole kink list on one page: search, the filters, and every category
 	 * by section, each a section that starts open and folds away, with its
-	 * kinks one to a line. The key to the answer dots and "Your side" stay
+	 * kinks one to a line. The key to the answer dots and "Answer as" stay
 	 * pinned above it while it scrolls.
+	 *
+	 * Search narrows the list as the filters do, rather than replacing it with
+	 * a list of results: what matches stays in its category, under its kink,
+	 * so it is seen where it lives (`searchView`). Matches the filters hide
+	 * are counted, so a search that seems to find nothing says why.
 	 */
 	let {
 		intro,
@@ -30,18 +36,46 @@
 
 	const { store, paths } = kinkListContext();
 
-	const SEARCH_LIMIT = 30;
-
 	type WaField = HTMLElement & { value: string | null };
 	let query = $state('');
-	const results = $derived(searchKinks(query).slice(0, SEARCH_LIMIT));
-	const customResults = $derived(
-		query.trim()
-			? store
-					.customKinks()
-					.filter(([, kink]) => kink.name.toLowerCase().includes(query.trim().toLowerCase()))
-			: []
+	const searching = $derived(query.trim() !== '');
+	const view = $derived(searchView(query, store.filters));
+	setKinkListSearch({
+		get query() {
+			return query;
+		},
+		get view() {
+			return view;
+		}
+	});
+
+	/** Whether a category has anything to show for the search, or anything at all with none. */
+	function hasMatches(category: KinkItem): boolean {
+		if (!view) {
+			return true;
+		}
+		return (
+			childrenOf(category.id).some((kink) => view.shown.has(kink.id)) ||
+			store.customKinks(category.id).some(([, kink]) => customMatches(kink.name, query))
+		);
+	}
+
+	const sections = $derived(
+		Object.entries(catalog.sections)
+			.map(([section, heading]) => ({
+				section,
+				heading,
+				categories: categories(section).filter(hasMatches)
+			}))
+			.filter((entry) => entry.categories.length > 0)
 	);
+
+	/** A search opens every category, so no match sits folded away in one closed earlier. */
+	$effect(() => {
+		if (searching) {
+			tick().then(() => setAllOpen(true));
+		}
+	});
 
 	/** Wired by hand: a wa-input's input happens in its shadow root (AGENTS.md). */
 	function searchField(node: WaField) {
@@ -53,6 +87,23 @@
 	}
 
 	let sectionsEl: HTMLElement | undefined = $state();
+	let sharing = $state(false);
+
+	/**
+	 * Whether the pinned bar is stuck at the top: it takes a background only
+	 * then, so above the list it sits on the page like the controls around it.
+	 * Watched with a sentinel just above it, which has scrolled out of sight
+	 * exactly when the bar has stuck. The viewport is the root for both
+	 * shells: the app shell's <main> scrolls inside it, starting at its top.
+	 */
+	let stuck = $state(false);
+	function watchStuck(sentinel: HTMLElement) {
+		const observer = new IntersectionObserver(([entry]) => {
+			stuck = entry !== undefined && !entry.isIntersecting && entry.boundingClientRect.top < 0;
+		});
+		observer.observe(sentinel);
+		return () => observer.disconnect();
+	}
 
 	/** Opens or folds every category at once. Not stored: each visit starts open. */
 	function setAllOpen(open: boolean) {
@@ -79,12 +130,6 @@
 		</wa-callout>
 	{/if}
 
-	{#if !minimal}
-		<wa-button class="quick" variant="brand" appearance="accent" href={paths.quick}>
-			<wa-icon slot="start" name="layer-group" variant="solid"></wa-icon>
-			Quick fill
-		</wa-button>
-	{/if}
 
 	<div class="controls">
 		<wa-input
@@ -97,53 +142,86 @@
 		<ListFilters />
 	</div>
 
-	<div class="pinned">
+	{#if !minimal}
+		<div class="more">
+			<wa-button size="s" variant="brand" appearance="accent" href={paths.quick}>
+				<wa-icon slot="start" name="layer-group" variant="solid"></wa-icon>
+				Quick fill
+			</wa-button>
+			<!-- svelte-ignore a11y_click_events_have_key_events,a11y_no_static_element_interactions -->
+			<wa-button
+				size="s"
+				appearance="outlined"
+				onclick={() => {
+					sharing = true;
+				}}
+			>
+				<wa-icon slot="start" name="share-nodes" variant="solid"></wa-icon>
+				Share
+			</wa-button>
+			<wa-button size="s" appearance="outlined" href={paths.transfer}>
+				<wa-icon slot="start" name="file-export" variant="solid"></wa-icon>
+				Import or export
+			</wa-button>
+			{#if paths.history}
+				<wa-button size="s" appearance="outlined" href={paths.history}>
+					<wa-icon slot="start" name="clock-rotate-left" variant="solid"></wa-icon>
+					History
+				</wa-button>
+			{/if}
+		</div>
+		{#if sharing}
+			<!-- Mounted only while open, so it starts fresh each time and its
+			     `open` is never false in markup (AGENTS.md, boolean properties). -->
+			<wa-dialog
+				label="Share a link to your list"
+				open
+				onwa-after-hide={() => {
+					sharing = false;
+				}}
+			>
+				<ShareLink />
+			</wa-dialog>
+		{/if}
+	{/if}
+
+	<div class="sentinel" aria-hidden="true" {@attach watchStuck}></div>
+	<div class="pinned" class:stuck={stuck}>
 		<LevelKey />
 		<div class="pinned-row">
 			<YourSideControl />
-			{#if !query.trim()}
-				<span class="fold">
-					<button type="button" class="link" onclick={() => setAllOpen(true)}>Expand all</button>
-					<button type="button" class="link" onclick={() => setAllOpen(false)}>Collapse all</button>
-				</span>
-			{/if}
+			<span class="fold">
+				<button type="button" class="link" onclick={() => setAllOpen(true)}>Expand all</button>
+				<button type="button" class="link" onclick={() => setAllOpen(false)}>Collapse all</button>
+			</span>
 		</div>
 	</div>
 
-	{#if query.trim()}
-		<section class="results" aria-label="Search results">
-			{#if results.length === 0 && customResults.length === 0}
-				<p class="quiet">Nothing matches “{query.trim()}”. You can add it yourself in any category.</p>
+	<!-- Said as the search changes, so a screen reader hears what it left. -->
+	<div class="search-notes" aria-live="polite">
+		{#if view}
+			{#if sections.length === 0}
+				<p class="quiet">Nothing{view.hidden > 0 ? ' shown' : ''} matches “{query.trim()}”.</p>
 			{/if}
-			{#each results as kink (kink.id)}
-				<KinkRow itemKey={kink.id} />
-			{/each}
-			{#each customResults as [key] (key)}
-				<KinkRow itemKey={key} />
-			{/each}
-		</section>
-	{:else}
-		{#if !minimal}
-			<wa-details summary="Share a link to your list">
-				<ShareLink />
-			</wa-details>
-			<p class="transfer"><a href={paths.transfer}>Import or export your list</a></p>
-			{#if paths.history}
-				<p class="transfer"><a href={paths.history}>See how your list has changed</a></p>
+			{#if view.hidden > 0}
+				<p class="quiet">
+					{view.hidden === 1 ? '1 kink matches' : `${view.hidden} kinks match`} but
+					{view.hidden === 1 ? 'is' : 'are'} hidden by your intensity and rareness filters.
+				</p>
 			{/if}
 		{/if}
+	</div>
 
-		<div class="sections" bind:this={sectionsEl}>
-			{#each Object.entries(catalog.sections) as [section, title] (section)}
-				<section class="section" aria-labelledby="section-{section}">
-					<h2 id="section-{section}">{title}</h2>
-					{#each categories(section) as category (category.id)}
-						<KinkCategory {category} />
-					{/each}
-				</section>
-			{/each}
-		</div>
-	{/if}
+	<div class="sections" bind:this={sectionsEl}>
+		{#each sections as { section, heading, categories: shown } (section)}
+			<section class="section" aria-labelledby="section-{section}">
+				<h2 id="section-{section}">{heading}</h2>
+				{#each shown as category (category.id)}
+					<KinkCategory {category} />
+				{/each}
+			</section>
+		{/each}
+	</div>
 </div>
 
 <style>
@@ -164,14 +242,29 @@
 		}
 	}
 
-	.quick {
-		align-self: center;
-	}
-
+	/* The search and the two filters on one row when there is room for them;
+	   the filters wrap under it when there is not. */
 	.controls {
 		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
+		flex-wrap: wrap;
+		align-items: end;
+		gap: 0.75rem 1.5rem;
+
+		wa-input {
+			flex: 1 1 14rem;
+		}
+	}
+
+	.more {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	/* Zero height: only where it is matters (`watchStuck`). */
+	.sentinel {
+		block-size: 0;
+		margin-block-end: -1.25rem;
 	}
 
 	/* Pinned to the top of whatever scrolls: the app shell's <main>, or the
@@ -184,12 +277,35 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.375rem;
-		/* Out over the page's gutters, so rows scrolling under it are hidden
-		   edge to edge rather than showing at its sides. */
-		margin-inline: -1rem;
-		padding: 0.5rem 1rem;
-		background: var(--wa-color-surface-lowered);
-		border-block-end: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+		padding-block: 0.5rem;
+
+		/* The background it takes once stuck, from one edge of the page to the
+		   other rather than only the column's width, so rows scrolling under it
+		   are hidden right across. A border-image outset reaches out that far
+		   without widening what the page scrolls over, which a wide box would.
+		   Opaque, so nothing shows through, and faded in quickly. */
+		&::before {
+			content: '';
+			position: absolute;
+			inset: 0;
+			z-index: -1;
+			border-image-source: linear-gradient(var(--wa-color-surface-lowered) 0 0);
+			border-image-slice: 0 fill;
+			border-image-outset: 0 100vw;
+			opacity: 0;
+			transition: opacity 150ms ease-out;
+			pointer-events: none;
+		}
+
+		&.stuck::before {
+			opacity: 1;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			&::before {
+				transition: none;
+			}
+		}
 	}
 
 	.pinned-row {
@@ -222,7 +338,14 @@
 		gap: 1.5rem;
 	}
 
-	.results,
+	.search-notes:empty {
+		display: none;
+	}
+
+	.search-notes p {
+		margin: 0;
+	}
+
 	.section {
 		display: flex;
 		flex-direction: column;
@@ -236,9 +359,5 @@
 
 	.quiet {
 		color: var(--wa-color-text-quiet);
-	}
-
-	.transfer {
-		margin: 0;
 	}
 </style>

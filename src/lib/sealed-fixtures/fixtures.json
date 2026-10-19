@@ -452,7 +452,7 @@
 			"kind": "kink-list",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000c1",
-			"ciphertext": "sb1.00P0AjSXsAHbO0Sh9rBV2FEqHMhyvh6S2w_Ns9SIZcntmQRXZ3zKmhBr5LZ3Qldo2ZHPy8bMyyMmWY7ZyiWWyOlLGkAu8ItvrHXk-UidNMVWsIzsSaig5k61_0G3XWtX4toj6X6crUcqVDzO828b7X-PgAwv9xUvVE4q-1CDWft9yhP33OAkfLq4Jb9ptkpY3jShLDDTnE3tN6cUk5UMFT-nFb1Pt63fgdu8DxZjVp3kOvclJ4WlWmKaTFm5z5iCgvn93QGDREcWWuvgB-d8V4yFycNFvAZTGog1jYLEt7TuxWm18-x9AUGu8yVseIaTtBBcFXMQTlmFr03oaSmkFzvRDCmU6m6XqqzLM8rrY9JrZxVcRZiDJs3MA42r-50n9UucuQJnRE5enCIwbvC44AhTy_HSx9VilCObKr2LOzk9N4eC7WR28j6Eb7FLrQNUEYfp9YwmxdubFj38oaJ5qJn-TbMoHrLQboUXF-ZOCf0cTtuHatIFcm9N9GVa2-6TSgF-pLqT_y-s9D1vm_mM705lDM15CAZ5ul2Dxgpts_yUeuVhQyAxNdPSLm4RhG4wzPG76854u6q7gX_TRKAYitzS-IUtbFdqMAEmfxqNb9CByaBjWK-uL_PgaNlftczdFJFznMlvmwrpdUI04qhAWzBjEmNCMI0I8WfvvtLsnu_F4yd9sIegCFytQqXe0nX66wrPwq39sXCLp4nitNe_50rEVz8PpR-dmI_OQiAQWmBwwKcjAr1USySfOQBuX3PMnrq7U1bjzxZVPKi9bu1Pt_utSMxFAzN7CBM_v1ttlfI67sC-WjiC_JWxlo4_a2Ku1dmxtjXLDZFWd2KYmAatwDfUw2mMObqcyB1tKHMhshI5feqmU-i4kj8aLBuCvKbXpQM0e352LLEFNhK-W1o51qiUCUSwRhuq29z_gVCB7e59uvQuHmf5pjHQBGQNqXGUjSOZjEJEwDc3Mb54WP-XJFyBnqJ27vPzBwhu0LxU70AjgE343oyds7RhsF33ZyUX3aAt5rjBhMgYn5N0qSbOcJpCYbBSi_lvzFL6Yhl01Q",
+			"ciphertext": "sb1.T3LQsJFHn8zUU6_jxptXfYXhx-Yn5VtzWlsbXjQcG9yySH3pQoJg8u8jXza5LR8TlulII_5QGnK-wGeHbOMCQpMOXrk-Oj63QDYbNDNZNs_POxIZIYJY0C2MWpBasB3f83QWhC5Flvz7wUi51CBqvVbxrSxBS5tW4ONe9h4XSimjuTmXCdo9a3bV63SHZEq5kwy2XoMX4gau-0CmBx2NLlrDKmslDdGsJGvFjOZyfTG24Y8sIcTEmasvJ8R8oWZJjrMHd9c_Gj21-0gbvGgdtpysJknocHM7bTwwWY_LqAgyBPsw-9JD-HIRcL2xJ6O_Ih6q9YWlEdKht6iUMUa1RbPxoCzHbyyCeEbwT2akfHltO7VaGWmQccg6VV-2BWsJKU9OHX2QDsnu_-lltbNKBFL4FT2IMZeavKQQ5X2q9XSeIo2ZdTjGeWUtID6sw_OxTtPlE4279LEozzLOGuk6dLDu92mqIjouFE9YXazVp0_ukV4xE_S78Enj2AmQ7WzcqncR6YBa4p3tCW4viFTJ6HJXglCjuej3wl9CbnkbuE1OwUg95MCVD0kcnmyldcrjtK5xAvBZlqn-NGxssh2SSyMjXz7EUYwMvPDy4uwWpzwcqQcQXSykM74MLljSjYilAtOQiWasKDJEVGyEXO1sUiCA4KcAU8aCMPOWwKJdi0jJyIE2v0si_GVlJx82jubakr1RvTGPwHlvJfyDC14D82Dr5HziSWXJkQrerq8eQEpYivD-SP8w0vOlFCXzg8Z_BcQCVjwg-BASvVG0yFtW-pUo54-sE6gbceVPQLP8NveWszznhnz7Fl8OP9Z2LZ-pNZpbp4pj8To-noal0u_55bltNdkir0xF_ntyMnY5YWCmgqpf4v1Mx2OecbdyLgj8-7GBR3GSvYL6Hl5Tn8JENI0g-ZLgMaUjQAL_Oy5vMomV4bGXeX68inbVG5xKZuw15Ed44SVU-RoLRohCEMVMMe8ZYGy59sgXd1a_heXulrBA_b3PAw0KlxRIFcHeXs7lO0ZH_Udc0JrxIMqzo86jzD85-K9SphFsZUnbnzW7b1vGmIkyTVxnRxdlxJ8dIg",
 			"expected": {
 				"answers": {
 					"spanking": {
@@ -473,10 +473,10 @@
 								"level": "curious"
 							},
 							"b": {
-								"level": "love",
+								"level": "like",
 								"detail": {
-									"fantasy": 4,
-									"doing": 3,
+									"fantasy": "love",
+									"doing": "like",
 									"experience": 1
 								}
 							}
@@ -498,7 +498,7 @@
 						"level": "conditional",
 						"note": "Only on weekends",
 						"detail": {
-							"doing": 2
+							"experience": 2
 						},
 						"at": 1792000000003
 					},
