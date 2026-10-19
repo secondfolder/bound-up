@@ -4,7 +4,7 @@
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import type { DaydreamSetup } from '$lib/daydream';
-	import { assembleSetup, starterSetup } from '$lib/daydream/starters';
+	import { assembleSetup, type StarterSide, starterSetup } from '$lib/daydream/starters';
 	import { suggestDaydream } from '$lib/daydream/suggest';
 	import type { PageData } from './$types';
 
@@ -29,6 +29,11 @@
 
 	let stage: Stage = $state({ kind: 'start' });
 	let idea = $state('');
+	// The load's first draw, captured once: the shuffle replaces them from
+	// here, and a re-run load drawing again must not swap them underneath.
+	// svelte-ignore state_referenced_locally
+	let ideas = $state(data.ideas);
+	let side: StarterSide | null = $state(null);
 	let asking = $state(false);
 	let problem: string | null = $state(null);
 	let versions = 0;
@@ -79,6 +84,8 @@
 		{#if stage.kind === 'start'}
 			<DaydreamStarter
 				bind:idea
+				bind:ideas
+				bind:side
 				{suggestionsOn}
 				{asking}
 				{problem}

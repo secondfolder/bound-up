@@ -22,7 +22,12 @@ things — a voice, a scene with parts, a cast — that mean nothing until
 someone has played one:
 
 - **What do you feel like?** One box, with ideas that toggle into it like a
-  field's chips (`DAYDREAM_IDEA_CHIPS`). **Write it** asks the model for a
+  field's chips: `SHOWN_IDEA_CHIPS` (three) of `DAYDREAM_IDEA_CHIPS` at a
+  time, so they read as a nudge rather than a list to work through, with a
+  shuffle button for three others. The page's load makes the first draw
+  (`pickIdeas`); drawn while rendering, the server and the browser would
+  each draw their own and hydration would disagree. The page keeps the
+  current few, so "Other ways to start" comes back to the same ones. **Write it** asks the model for a
   whole daydream (the `daydream` suggestion): a voice, a scene with its parts
   and its heat and kink, and up to `MAX_DAYDREAM_CHARACTERS` characters, each
   cast into a part with who they are in it. Only with suggestions on; without
@@ -30,8 +35,18 @@ someone has played one:
 - **Pick one.** Ready-made stories (`DAYDREAM_STARTERS` in
   `daydream/starters.ts`), each a scene starting point, a voice preset and
   character starting points cast into the scene's parts, with the casting
-  written for that story. In order of heat, each card saying its level and how
-  it is told. They are built from the catalog rather than written out again,
+  written for that story. In order of heat, each card saying its level, how
+  it is told, its kinks and tropes as tags (`tags`), so the harder ones
+  can be told apart at a glance, and which side the user is on.
+
+  **You as: Either / Dom / Sub** filters them (`startersFor`). Each story says
+  whether the user is the dom, the sub, or neither (`you`); a side's filter
+  shows its own stories and the ones with no one in charge. Every story with
+  a side has a version from the other side — "Locked" and "The key", "The
+  hunt" and "Your hunt" — so both filters have the full range, and the
+  catalog keeps sub characters (the eager sub, the pain slut, the fighter,
+  the innocent) to cast opposite a dom user. The choice is the page's state,
+  like the box and the ideas, so going back keeps it. They are built from the catalog rather than written out again,
   and need no model, so nothing leaves the device.
 - **Build it yourself.** The full form, empty.
 
@@ -283,7 +298,7 @@ away when one is.
   how a story is made strictly SFW.
 - **The starting points say their level** (`sceneLevel`, `characterLevel`):
   "SFW", "Explicit · kinky". Nobody has to guess what they are picking, and
-  the range is plain to see, from the lighthouse mystery to the dungeon.
+  the range is plain to see, from the snowed-in slow burn to the dungeon.
 - **Suggestions match it.** The suggest prompt is given the dials, so chips
   for a SFW scene stay SFW, and Fill in the rest and Surprise me rate a
   scene's heat and kink where the user left them unset — never over ones
@@ -312,6 +327,56 @@ losing the character just added.
 
 The setup form itself posts as JSON (`dataType: 'json'`, its data is
 nested), and `onSubmit` replaces the whole post with the sealed record.
+
+### What the presets are drawn from
+
+The idea chips, the ready-made stories, the starting points and the field
+chips are weighted towards sex and kink, because that is what people open a
+kink app's daydreams for. Which themes they cover was decided from what
+recurs most, in October 2026, across NSFW roleplay character cards (Chub,
+Character Tavern, muah), r/gonewildaudio's tagged scripts (split by who they
+are for, which is the clearest read of what women and men each ask for),
+Pornhub's year-in-review searches, Literotica's categories and Lehmiller's
+and Joyal's fantasy surveys. The themes at the top were:
+
+- friends to lovers;
+- a dominant partner's praise ("good girl", "good boy"), with aftercare;
+- a strict boss;
+- rivals and hate sex;
+- brat taming;
+- possessive and obsessive lovers (the yandere);
+- demons, monsters and werewolves, with size difference;
+- a primal chase;
+- threesomes;
+- breeding;
+- contracts and protocol;
+- being used.
+
+A second set covers the harder end people asked for by name: free use,
+an anal-only arrangement, chastity and a keyholder, pet play, hypnosis and
+trigger words, a gangbang, an interrogation, a scripted break-in, being made
+to watch, and breeding. Those sit at the top of the heat range, and most at
+the top of the kink range too.
+
+So the catalog reaches for those first, and spreads across both who leads
+and who is led, since the data splits there (men-for-women scripts lean
+male-dominant, praise and aftercare; women-for-men lean female-dominant and
+the older lover).
+
+Three lines are kept on purpose:
+
+- **One SFW slow burn stays.** "Only one bed" shows that the heat range
+  exists and can be turned up mid-story, and a few tame chips stay so a
+  story can start slow.
+- **Consensual non-consent is framed as agreed.** It is one of the most
+  common fantasies in every source. "The hunt", "The break-in" and "Free
+  use" each say in their premise that it was arranged beforehand and that a
+  safeword stops it, and "Trigger words" says the conditioning was agreed.
+  Inside the story the fantasy plays out as written; the framing is what
+  makes it one.
+- **Two things are absent from every source's tallies here.** Nothing is
+  minor-coded, and nothing rests on blood relations, however common either
+  is on the card sites.
 
 ## The flow
 

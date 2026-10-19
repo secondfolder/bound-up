@@ -3,10 +3,12 @@
 	import { hasChip, toggleChip } from '$lib/daydream/chips';
 	import { sceneLevel } from '$lib/daydream/dial-words';
 	import {
-		DAYDREAM_IDEA_CHIPS,
-		DAYDREAM_STARTERS,
 		type DaydreamStarter,
-		starterScene
+		pickIdeas,
+		SHOWN_IDEA_CHIPS,
+		type StarterSide,
+		starterScene,
+		startersFor
 	} from '$lib/daydream/starters';
 
 	/**
@@ -21,6 +23,8 @@
 	 */
 	let {
 		idea = $bindable(),
+		ideas = $bindable(),
+		side = $bindable(),
 		suggestionsOn,
 		asking,
 		problem,
@@ -30,6 +34,13 @@
 	}: {
 		/** What the user has written, kept by the page so it survives going back. */
 		idea: string;
+		/**
+		 * The few ideas on offer (`pickIdeas`): first drawn by the page's load,
+		 * then by the shuffle. Kept by the page, so going back shows the same ones.
+		 */
+		ideas: string[];
+		/** Which side the ready-made stories are shown for, or null for either. Kept by the page. */
+		side: StarterSide | null;
 		/** Whether the model may be asked: without it there is no "describe it". */
 		suggestionsOn: boolean;
 		asking: boolean;
@@ -39,6 +50,14 @@
 		onstarter: (starter: DaydreamStarter) => void;
 		onblank: () => void;
 	} = $props();
+
+	const SIDES: readonly { value: StarterSide | null; label: string }[] = [
+		{ value: null, label: 'Either' },
+		{ value: 'dom', label: 'Dom' },
+		{ value: 'sub', label: 'Sub' }
+	];
+
+	const starters = $derived(startersFor(side));
 
 	const canAsk = $derived(idea.trim() !== '' && !asking);
 
@@ -61,7 +80,7 @@
 			</label>
 			<fieldset class="chips">
 				<legend class="hint">Or start from one of these</legend>
-				{#each DAYDREAM_IDEA_CHIPS as chip (chip)}
+				{#each ideas as chip (chip)}
 					<!-- A toggle: a native button with aria-pressed, which wa-button would not forward (AGENTS.md). -->
 					<button
 						type="button"
@@ -72,6 +91,18 @@
 							idea = toggleChip(idea, chip);
 						}}>{chip}</button>
 				{/each}
+				<wa-button
+					class="shuffle"
+					appearance="plain"
+					size="s"
+					pill
+					disabled={asking}
+					onclick={() => {
+						ideas = pickIdeas(SHOWN_IDEA_CHIPS, Math.random, ideas);
+					}}
+				>
+					<wa-icon name="shuffle" variant="solid" label="Other ideas"></wa-icon>
+				</wa-button>
 			</fieldset>
 			<wa-button
 				appearance={canAsk ? 'filled' : 'outlined'}
@@ -87,9 +118,27 @@
 	{/if}
 
 	<section class="ready-made" aria-labelledby="ready-made-heading">
-		<h2 id="ready-made-heading">{suggestionsOn ? 'Or pick one' : 'Pick one'}</h2>
+		<div class="ready-made-head">
+			<h2 id="ready-made-heading">{suggestionsOn ? 'Or pick one' : 'Pick one'}</h2>
+			<fieldset class="sides">
+				<legend class="hint">You as</legend>
+				{#each SIDES as option (option.label)}
+					<label class="side">
+						<input
+							type="radio"
+							name="starter-side"
+							checked={side === option.value}
+							onchange={() => {
+								side = option.value;
+							}}
+						/>
+						{option.label}
+					</label>
+				{/each}
+			</fieldset>
+		</div>
 		<ul class="cards">
-			{#each DAYDREAM_STARTERS as starter (starter.id)}
+			{#each starters as starter (starter.id)}
 				{const scene = $derived(starterScene(starter).scene)}
 				{const level = $derived(sceneLevel(scene.dials))}
 				<li>
@@ -98,9 +147,13 @@
 					<button type="button" class="card" onclick={() => onstarter(starter)}>
 						<span class="title">{scene.title}</span>
 						<span class="premise">{scene.premise}</span>
+						<span class="tags">
+							{#each starter.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
+						</span>
 						<span class="meta">
 							{#if level}<span class="level">{level}</span>{/if}
 							<span>{voiceLabel(starter)}</span>
+							{#if starter.you}<span>You’re the {starter.you}</span>{/if}
 						</span>
 					</button>
 				</li>
@@ -163,6 +216,10 @@
 		padding: 0;
 		border: 0;
 
+		.shuffle {
+			--wa-form-control-height: 1.9rem;
+		}
+
 		legend {
 			padding: 0;
 			margin-block-end: 0.375rem;
@@ -193,6 +250,58 @@
 		&:focus-visible {
 			outline: var(--wa-focus-ring);
 			outline-offset: var(--wa-focus-ring-offset);
+		}
+	}
+
+	.ready-made-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+	}
+
+	/* A segmented control: native radios, since it is one choice of three,
+	   visually hidden inside labels that look like the idea chips. */
+	.sides {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin: 0;
+		padding: 0;
+		border: 0;
+
+		legend {
+			float: inline-start;
+			padding: 0;
+			margin-inline-end: 0.25rem;
+		}
+	}
+
+	.side {
+		padding: 0.25rem 0.7rem;
+		border: 1px solid var(--wa-color-surface-border);
+		border-radius: 999px;
+		font-size: 0.875rem;
+		cursor: pointer;
+
+		&:has(input:checked) {
+			border-color: var(--wa-color-brand-border-loud, var(--wa-color-surface-border));
+			background: var(--wa-color-brand-fill-quiet);
+		}
+
+		&:has(input:focus-visible) {
+			outline: var(--wa-focus-ring);
+			outline-offset: var(--wa-focus-ring-offset);
+		}
+
+		input {
+			position: absolute;
+			inline-size: 1px;
+			block-size: 1px;
+			margin: 0;
+			opacity: 0;
+			pointer-events: none;
 		}
 	}
 
@@ -250,6 +359,21 @@
 		.premise {
 			font-size: 0.875rem;
 			color: var(--wa-color-text-quiet);
+		}
+
+		.tags {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.25rem;
+			padding-block-start: 0.25rem;
+		}
+
+		.tag {
+			padding: 0.05rem 0.5rem;
+			border-radius: 999px;
+			background: var(--wa-color-brand-fill-quiet);
+			color: var(--wa-color-brand-on-quiet);
+			font-size: 0.75rem;
 		}
 
 		.meta {

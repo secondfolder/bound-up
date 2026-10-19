@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
+import { pickIdeas } from '$lib/daydream/starters';
 import {
 	daydreamSealedSubmitSchema,
 	daydreamSetupFormSchema,
@@ -31,7 +32,10 @@ export const load: PageServerLoad = async ({ locals: { db, user }, platform }) =
 		}),
 		library,
 		accepted,
-		available: readDaydreamConfig(platform) !== null
+		available: readDaydreamConfig(platform) !== null,
+		// Drawn here rather than in the component so the server's render and
+		// hydration show the same few (`pickIdeas`).
+		ideas: pickIdeas()
 	};
 };
 

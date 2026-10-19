@@ -6,9 +6,12 @@ import {
 	assembleSetup,
 	DAYDREAM_IDEA_CHIPS,
 	DAYDREAM_STARTERS,
+	pickIdeas,
+	SHOWN_IDEA_CHIPS,
 	type StoryPieces,
 	starterScene,
-	starterSetup
+	starterSetup,
+	startersFor
 } from './starters';
 
 /** Ids that say which part they are, so a test can read a casting. */
@@ -83,11 +86,85 @@ describe('the ready-made stories', () => {
 		expect(one.scene.parts[0]?.id).not.toBe(two.scene.parts[0]?.id);
 	});
 
+	it('each carries a few short tags, none twice', () => {
+		for (const starter of DAYDREAM_STARTERS) {
+			expect(starter.tags.length, starter.id).toBeGreaterThan(0);
+			expect(starter.tags.length, starter.id).toBeLessThanOrEqual(4);
+			expect(new Set(starter.tags).size, starter.id).toBe(starter.tags.length);
+			for (const tag of starter.tags) {
+				expect(tag.length, `${starter.id}: ${tag}`).toBeLessThanOrEqual(20);
+			}
+		}
+	});
+
 	it('offers ideas that toggle as chips: short, and with no separator in them', () => {
 		for (const chip of DAYDREAM_IDEA_CHIPS) {
 			expect(chip.length).toBeLessThanOrEqual(60);
 			expect(chip).not.toMatch(/[,\n]/);
 		}
+	});
+});
+
+describe('startersFor', () => {
+	it('shows every story for either side', () => {
+		expect(startersFor(null)).toEqual(DAYDREAM_STARTERS);
+	});
+
+	it('shows a side its own stories and those with no one in charge, never the other side’s', () => {
+		for (const [side, other] of [
+			['dom', 'sub'],
+			['sub', 'dom']
+		] as const) {
+			const shown = startersFor(side);
+			expect(shown.filter((starter) => starter.you === side).length, side).toBeGreaterThan(5);
+			expect(
+				shown.some((starter) => starter.you === other),
+				side
+			).toBe(false);
+			expect(shown.filter((starter) => starter.you === null)).toEqual(
+				DAYDREAM_STARTERS.filter((starter) => starter.you === null)
+			);
+		}
+	});
+});
+
+describe('the two sides', () => {
+	// Every story with a side has a version from the other side, so neither
+	// filter is the poor relation.
+	it('have as many stories as each other', () => {
+		const count = (side: 'dom' | 'sub') =>
+			DAYDREAM_STARTERS.filter((starter) => starter.you === side).length;
+		expect(count('dom')).toBe(count('sub'));
+	});
+});
+
+describe('pickIdeas', () => {
+	it('draws a few different ideas from the list', () => {
+		const picked = pickIdeas();
+		expect(picked).toHaveLength(SHOWN_IDEA_CHIPS);
+		expect(new Set(picked).size).toBe(SHOWN_IDEA_CHIPS);
+		for (const idea of picked) {
+			expect(DAYDREAM_IDEA_CHIPS).toContain(idea);
+		}
+		expect(DAYDREAM_IDEA_CHIPS.length).toBeGreaterThan(SHOWN_IDEA_CHIPS);
+	});
+
+	it('draws others than the ones on screen, and never fewer than asked for', () => {
+		const shown = pickIdeas();
+		for (let draw = 0; draw < 20; draw += 1) {
+			const next = pickIdeas(SHOWN_IDEA_CHIPS, Math.random, shown);
+			expect(next).toHaveLength(SHOWN_IDEA_CHIPS);
+			expect(next.filter((idea) => shown.includes(idea))).toEqual([]);
+		}
+		const almostAll = DAYDREAM_IDEA_CHIPS.slice(1);
+		expect(pickIdeas(SHOWN_IDEA_CHIPS, Math.random, almostAll)).toHaveLength(SHOWN_IDEA_CHIPS);
+	});
+
+	it('draws differently with different luck', () => {
+		const always = (value: number) => () => value;
+		expect(pickIdeas(SHOWN_IDEA_CHIPS, always(0))).not.toEqual(
+			pickIdeas(SHOWN_IDEA_CHIPS, always(0.999))
+		);
 	});
 });
 

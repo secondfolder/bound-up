@@ -178,7 +178,7 @@ describe('DaydreamCharacterDialog', () => {
 		await waSettled(baseElement);
 		const sadist = button(baseElement, 'The sadist');
 		expect(sadist?.querySelector('.level')?.textContent?.trim()).toBe('Horny · kinky');
-		expect(button(baseElement, 'The old friend')?.querySelector('.level')?.textContent).toBe(
+		expect(button(baseElement, 'The best friend')?.querySelector('.level')?.textContent).toBe(
 			'Chaste'
 		);
 

@@ -49,15 +49,15 @@ test('a SFW starting point keeps the story SFW, and the heat can be turned up mi
 	// The host, not its role: `getByRole` lands on the inner button, which
 	// holds the slotted label but not as its own text (AGENTS.md).
 	const template = (name: string) => dialog(page).locator('wa-button').filter({ hasText: name });
-	const lighthouse = template('The lighthouse');
-	await expect(lighthouse.locator('.level')).toHaveText('SFW');
+	const oneBed = template('Only one bed');
+	await expect(oneBed.locator('.level')).toHaveText('SFW');
 	await expect(template('The dungeon').locator('.level')).toHaveText('Filthy · kinky');
-	await lighthouse.click();
+	await oneBed.click();
 	await expect(dialog(page).getByRole('button', { name: 'Clear heat' })).toBeVisible();
 	await dialog(page).getByRole('button', { name: 'Use this scene' }).click();
 	await expect(dialog(page)).toHaveCount(0);
 
-	await clickWaButton(page, 'Cast the stranger');
+	await clickWaButton(page, 'Cast the best friend');
 	await page.getByRole('menuitem', { name: 'New character' }).click();
 	await dialog(page).locator('wa-input[name="name"] input').fill('Wren');
 	await dialog(page).getByRole('button', { name: 'Add character' }).click();
