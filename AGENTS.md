@@ -595,6 +595,12 @@ CSS. For buttons in particular:
   `src/lib/components/details.ts`, which sets the property in the browser
   only.
 
+**Sliders are `Slider.svelte`, never a bare `wa-slider`.** The base slider
+drags freely and springs onto a notch, steps a notch from the keyboard, draws
+its notches, and can be left unset; a feature's own slider wraps it. Biome's
+plugins cannot match markup, so this one is on review. See
+[docs/sliders.md](docs/sliders.md).
+
 **Save buttons start outlined and become solid only when there is something valid to save.**
 An idle save/submit action is secondary, not a call to act. When a form becomes dirty, if the contents is valid then
 promote its save/submit button to a solid brand style (appearance = accent). On `superForm(...)` screens,
@@ -945,6 +951,7 @@ Four places, split on scope:
 | [docs/tree.md](docs/tree.md)                                                             | The generic tree: trunk, boughs, longest-path lines, packing, dimming, folding |
 | [docs/debug-mode.md](docs/debug-mode.md)                                                 | Per-device troubleshooting UI behind a feature: the toggle, panel, raw logs  |
 | [docs/kink-list.md](docs/kink-list.md)                                                   | The kink list: the catalogue, answers and inheritance, privacy, saving       |
+| [docs/sliders.md](docs/sliders.md)                                                       | The base slider every slider is built on: notches, springing, unset          |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

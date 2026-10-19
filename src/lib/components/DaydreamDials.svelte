@@ -2,6 +2,7 @@
 	import type { DialValue, PassageLength, SceneDials, StoryDials } from '$lib/daydream';
 	import { PASSAGE_LENGTHS, SCENE_SLIDERS, STORY_SLIDERS } from '$lib/daydream/dial-words';
 	import OptionalSlider from './OptionalSlider.svelte';
+	import Slider from './Slider.svelte';
 
 	/**
 	 * The story's sticky dials: intensity, pace and how long each passage is.
@@ -10,9 +11,7 @@
 	 * story's own Dials popover.
 	 *
 	 * Controlled: `value` is the dials, and a change is asked for through
-	 * `onchange`. The sliders are wired by hand rather than with `oninput=`:
-	 * their events come from inside a shadow root, which Svelte's delegated
-	 * handlers do not reliably see (AGENTS.md).
+	 * `onchange`. The sliders are the app's (`Slider.svelte`).
 	 */
 	let {
 		value,
@@ -31,37 +30,18 @@
 		onscenechange?: (dials: SceneDials) => void;
 	} = $props();
 
-	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
-
 	/**
 	 * Where each slider is while it is being dragged, so its reading follows
-	 * the thumb. Saved only on `change`, when it is let go: `input` fires at
-	 * every step, and each save is a round trip that rewrites the setup.
+	 * the thumb. Saved only on `change`, when it is let go: each save is a
+	 * round trip that rewrites the setup.
 	 */
 	let dragging: Partial<Record<'intensity' | 'pace', DialValue>> = $state({});
 
-	function slider(key: 'intensity' | 'pace') {
-		const scale = STORY_SLIDERS.find((entry) => entry.key === key)?.scale;
-		return (node: WaSlider) => {
-			// What a screen reader announces instead of a bare number.
-			node.valueFormatter = (level) => scale?.[level as DialValue]?.label ?? String(level);
-			const move = () => {
-				dragging[key] = Math.round(node.value) as DialValue;
-			};
-			const update = () => {
-				const level = Math.round(node.value) as DialValue;
-				delete dragging[key];
-				if (level !== value[key]) {
-					onchange({ ...value, [key]: level });
-				}
-			};
-			node.addEventListener('input', move);
-			node.addEventListener('change', update);
-			return () => {
-				node.removeEventListener('input', move);
-				node.removeEventListener('change', update);
-			};
-		};
+	function setDial(key: 'intensity' | 'pace', level: DialValue) {
+		delete dragging[key];
+		if (level !== value[key]) {
+			onchange({ ...value, [key]: level });
+		}
 	}
 
 	function setLength(length: PassageLength) {
@@ -93,17 +73,25 @@
 				<span class="title" aria-hidden="true">{entry.label}</span>
 				<span class="reading">{entry.scale[dragging[entry.key] ?? value[entry.key]].label}</span>
 			</div>
-			<wa-slider
-				{@attach slider(entry.key)}
+			<Slider
 				label={entry.label}
+				labelHidden
 				min={1}
 				max={5}
-				step={1}
 				value={value[entry.key]}
-			>
-				<span slot="reference">{entry.low}</span>
-				<span slot="reference">{entry.high}</span>
-			</wa-slider>
+				low={entry.low}
+				high={entry.high}
+				format={(level) => entry.scale[level as DialValue]?.label ?? String(level)}
+				oninput={(level) => {
+					dragging[entry.key] = level as DialValue;
+				}}
+				onchange={(level) => setDial(entry.key, level as DialValue)}
+				ondrag={(down) => {
+					if (!down) {
+						delete dragging[entry.key];
+					}
+				}}
+			/>
 		</div>
 	{/each}
 
@@ -155,16 +143,6 @@
 		.reading {
 			font-size: 0.8125rem;
 			color: var(--wa-color-text-quiet);
-		}
-
-		/* Out of sight but still the slider's name: the heading shows it. */
-		wa-slider::part(label) {
-			position: absolute;
-			inline-size: 1px;
-			block-size: 1px;
-			overflow: hidden;
-			clip-path: inset(50%);
-			white-space: nowrap;
 		}
 	}
 

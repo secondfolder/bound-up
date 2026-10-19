@@ -117,17 +117,12 @@ The page has three stages: intro, questions, results.
    - the disclaimer;
    - a "Stimulation intensity" slider from None to Max, five
      levels, at most 300px wide and centred
-     ([`IntensitySlider`](../src/lib/components/iq-test/IntensitySlider.svelte)). The knob moves freely while
-     dragged (a step of 0.01), the level following whichever notch it is
-     nearest, so the options under it change as it passes each one; let go
-     (Web Awesome's `change`, which a click on the track fires too), it
-     springs quickly onto that notch with a slight overshoot, or jumps there with
-     reduced motion. The arrow keys and Page Up/Down still move a whole level,
-     caught on the host ahead of the slider's own handler. Its notches are
-     drawn by us, one per level, since Web Awesome's `with-markers` would put
-     one at every hundredth: dots over the track in a stylesheet adopted into
-     its shadow root, light on the filled part and dark on the unfilled part,
-     where Web Awesome's own (the surface colour) all but vanished;
+     ([`IntensitySlider`](../src/lib/components/iq-test/IntensitySlider.svelte)).
+     It is the app's slider ([sliders.md](sliders.md)): the knob moves freely
+     while dragged and springs onto the nearest notch when let go, the keys
+     move a whole level, and the notches are drawn as dots. What is this
+     one's own is that the level changes as the knob passes each notch, not
+     only when it is let go, so the options under it change under the finger;
    - under it, the options that level offers (see "Settings"), all ticked to
      start with. Level 0 offers none. Beside each box — not in its label, where
      a click would tick it — an info button opens a `wa-popover` saying what

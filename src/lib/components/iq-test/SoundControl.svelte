@@ -6,6 +6,7 @@
 		soundVolume,
 		toggleMuted
 	} from '$lib/playroom/iq-test/sound.svelte';
+	import Slider from '../Slider.svelte';
 
 	/**
 	 * The page's one volume, for the clips it plays itself: a mute toggle and a
@@ -35,24 +36,12 @@
 		return percent < 50 ? 'volume-low' : 'volume-high';
 	});
 
-	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
-
 	/**
-	 * By hand, not `oninput=`: the slider's events come from its shadow root,
-	 * which Svelte's delegated handlers do not reliably see (see AGENTS.md).
-	 * The drag is a user gesture, which is what lets turning it up start the
-	 * sound at all.
+	 * The app's slider, continuous: a volume is not steps. Set while it is
+	 * dragged, not only when let go — the drag is a user gesture, which is
+	 * what lets turning it up start the sound at all.
 	 */
-	function volumeSlider(node: WaSlider) {
-		node.valueFormatter = (value) => (value === 0 ? 'Muted' : `${value}%`);
-		const update = () => setSoundVolume(channel, Number(node.value) / 100);
-		node.addEventListener('input', update);
-		node.addEventListener('change', update);
-		return () => {
-			node.removeEventListener('input', update);
-			node.removeEventListener('change', update);
-		};
-	}
+	const setPercent = (value: number) => setSoundVolume(channel, value / 100);
 </script>
 
 <div class="sound-control">
@@ -71,15 +60,20 @@
 		<!-- Named by the button, which is native, so its aria-label applies. -->
 		<wa-icon name={icon} variant="solid"></wa-icon>
 	</button>
-	<wa-slider
-		{@attach volumeSlider}
+	<!-- Named for screen readers; the icon says it to everyone else. -->
+	<Slider
 		{label}
+		labelHidden
+		notched={false}
 		min={0}
 		max={100}
 		step={1}
 		value={percent}
 		size="s"
-	></wa-slider>
+		format={(value) => (value === 0 ? 'Muted' : `${value}%`)}
+		oninput={setPercent}
+		onchange={setPercent}
+	/>
 </div>
 
 <style>
@@ -121,24 +115,8 @@
 			}
 		}
 
-		wa-slider {
+		:global(wa-slider) {
 			flex: 1;
-
-			/* Web Awesome leaves room above the track for the label, unseen
-			   here, which put the track below the middle of the row. */
-			&::part(slider) {
-				margin-block-start: 0;
-			}
-
-			/* Named for screen readers; the icon says it to everyone else. */
-			&::part(label) {
-				position: absolute;
-				inline-size: 1px;
-				block-size: 1px;
-				overflow: hidden;
-				clip-path: inset(50%);
-				white-space: nowrap;
-			}
 		}
 	}
 </style>
