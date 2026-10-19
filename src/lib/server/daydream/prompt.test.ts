@@ -329,7 +329,10 @@ describe('buildMessages', () => {
 		);
 		expect(withPictures).toContain('"image": include it in every reply');
 		expect(withPictures).toContain('"image": "..."');
-		expect(withPictures).toContain('as an adult, with an age');
+		expect(withPictures).toContain('an adult age as a number');
+		// The image model has seen nothing else, so it is told nothing it cannot draw.
+		expect(withPictures).toContain('Never a name and never "you" or "I"');
+		expect(withPictures).toContain('How many people are in it');
 		const without = system(buildMessages(request({ turns: [said('hi')] })));
 		expect(without).not.toContain('"image"');
 		// A check-in after Stop the scene never has one.

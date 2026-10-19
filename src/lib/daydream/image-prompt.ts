@@ -128,9 +128,65 @@ function adultNouns(prompt: string): string {
 		.replace(/\bboy\b/gi, 'man');
 }
 
-const STYLE_WORDS: Readonly<Record<PictureStyle, string>> = {
+/**
+ * How a model is prompted, which follows what it was trained as, not which
+ * style it draws: the request that suits one family is poor for the other.
+ *
+ * - `sdxl` (SDXL, and Illustrious and Pony built on it): comma-separated
+ *   tags, a negative prompt, real classifier-free guidance and ~30 steps.
+ * - `z-image-turbo` (Z-Image Turbo and its fine-tunes): a 6B transformer read
+ *   through a full language model, distilled to ~8 steps. It follows long,
+ *   literal sentences closely, so the style and the safety words are said as
+ *   sentences rather than tags, and "masterpiece, best quality" tags only
+ *   add noise. Its own pipeline runs without guidance (CFG 1), where Runware
+ *   ignores the negative prompt altogether; measured on Dark Beast 9 that
+ *   way, it drew a woman described as 35 looking barely out of her teens. A
+ *   little guidance (`CFGScale` 1.5) brings the negative prompt back and
+ *   her age with it, without the burnt look Z-Image gets past ~2.5.
+ */
+export type PictureArchitecture = 'sdxl' | 'z-image-turbo';
+
+/** A Runware model, and how it is prompted. */
+export type PictureModel = { air: string; architecture: PictureArchitecture };
+
+/** Each style's model AIR, as configured. */
+export type PictureModels = Readonly<Record<PictureStyle, string>>;
+
+/**
+ * Ours, for the `architecture` Runware's `modelSearch` reports for a model,
+ * or null for a family no recipe here suits.
+ */
+export function pictureArchitecture(runware: string): PictureArchitecture | null {
+	if (runware.startsWith('z_image')) {
+		return 'z-image-turbo';
+	}
+	if (['sdxl', 'illustrious', 'pony', 'noobai'].includes(runware)) {
+		return 'sdxl';
+	}
+	return null;
+}
+
+const STYLE_TAGS: Readonly<Record<PictureStyle, string>> = {
 	photo: 'photograph, realistic, natural skin texture, cinematic lighting, shallow depth of field',
 	illustrated: 'masterpiece, best quality, detailed illustration, expressive, soft shading'
+};
+
+/**
+ * The style in Z-Image's terms: an opening that sets the medium, and a close
+ * that asks for the finish. The description itself starts with the framing
+ * (`IMAGE_INSTRUCTION` in `server/daydream/prompt.ts`), so these say nothing
+ * about the shot.
+ */
+const STYLE_SENTENCES: Readonly<Record<PictureStyle, { open: string; close: string }>> = {
+	photo: {
+		open: 'A candid, realistic photograph.',
+		close:
+			'Realistic skin texture, natural adult proportions, sharp focus on the faces, soft shallow depth of field.'
+	},
+	illustrated: {
+		open: 'A detailed digital illustration in a semi-realistic style.',
+		close: 'Clean line art, soft shading, rich colour, adult proportions and adult faces.'
+	}
 };
 
 /**
@@ -144,11 +200,23 @@ const ADULT_ANCHOR: Readonly<Record<PictureStyle, string>> = {
 	illustrated: 'adults only, adult proportions, everyone 20 or older'
 };
 
+/** The same floor as a sentence, for a model that reads sentences. */
+const ADULT_SENTENCE =
+	'Everyone in the picture is a grown adult, at least 20 years old, with an adult face and body.';
+
+/**
+ * Nothing sexual at SFW heat, as a sentence. The negative prompt says it too,
+ * but a sentence is what Z-Image weighs most.
+ */
+const SFW_SENTENCE = 'Everyone is fully clothed, and nothing in it is sexual.';
+
 const NEGATIVE_ALWAYS = [
 	'child',
 	'minor',
+	'teenager',
 	'young-looking',
 	'childlike body',
+	'baby face',
 	'loli',
 	'shota',
 	'deformed',
@@ -165,12 +233,10 @@ const NEGATIVE_ALWAYS = [
  * The illustrated style's own guard against drawing young, in its tags. Not
  * the photo style's: it would rule out adult bodies that are simply small.
  */
-const NEGATIVE_ILLUSTRATED = ['petite', 'small breasts', 'flat chest', 'child face', 'baby face'];
+const NEGATIVE_ILLUSTRATED = ['petite', 'small breasts', 'flat chest', 'child face'];
 
 /** At SFW heat the picture is not sexual, whatever the description says. */
 const NEGATIVE_SFW = ['nude', 'naked', 'nipples', 'genitals', 'sex', 'nsfw', 'explicit'];
-
-export type PictureModels = Readonly<Record<PictureStyle, string>>;
 
 /**
  * What the image model was asked for one picture, exactly: the model, and the
@@ -185,18 +251,54 @@ export const PICTURE_REQUEST_HEADER = 'x-picture-request';
 /** The most each of a `PictureRequest`'s prompts can be: the description, and the server's words round it. */
 export const MAX_PICTURE_REQUEST_PROMPT = DAYDREAM_LIMITS.imagePrompt + 400;
 
+/** The words round the description, the steps and the guidance, for one family. */
+function recipe(
+	architecture: PictureArchitecture,
+	style: PictureStyle,
+	sfw: boolean,
+	description: string
+): { positivePrompt: string; steps: number; CFGScale: number } {
+	if (architecture === 'z-image-turbo') {
+		const { open, close } = STYLE_SENTENCES[style];
+		return {
+			positivePrompt: [
+				open,
+				description,
+				ADULT_SENTENCE,
+				...(sfw ? [SFW_SENTENCE] : []),
+				close,
+				'No text, no watermark.'
+			].join(' '),
+			// Its distilled schedule: more steps cost time and buy nothing.
+			steps: 9,
+			CFGScale: 1.5
+		};
+	}
+	return {
+		positivePrompt: `${STYLE_TAGS[style]}, ${ADULT_ANCHOR[style]}. ${description}`,
+		steps: 30,
+		CFGScale: style === 'photo' ? 4.5 : 6
+	};
+}
+
 /** One Runware `imageInference` task for a description already passed by `imagePromptProblem`. */
 export function runwareTask(
 	input: { prompt: string; style: PictureStyle; heat: DialValue | null },
-	models: PictureModels,
+	model: PictureModel,
 	taskUUID: string
 ) {
 	const sfw = input.heat === 1;
+	const { positivePrompt, steps, CFGScale } = recipe(
+		model.architecture,
+		input.style,
+		sfw,
+		adultNouns(input.prompt.trim())
+	);
 	return {
 		taskType: 'imageInference',
 		taskUUID,
-		model: models[input.style],
-		positivePrompt: `${STYLE_WORDS[input.style]}, ${ADULT_ANCHOR[input.style]}. ${adultNouns(input.prompt.trim())}`,
+		model: model.air,
+		positivePrompt,
 		negativePrompt: [
 			...NEGATIVE_ALWAYS,
 			...(input.style === 'illustrated' ? NEGATIVE_ILLUSTRATED : []),
@@ -204,8 +306,8 @@ export function runwareTask(
 		].join(', '),
 		width: PICTURE_SIZE.width,
 		height: PICTURE_SIZE.height,
-		steps: 30,
-		CFGScale: input.style === 'photo' ? 4.5 : 6,
+		steps,
+		CFGScale,
 		numberResults: 1,
 		outputType: 'base64Data',
 		outputFormat: 'WEBP',

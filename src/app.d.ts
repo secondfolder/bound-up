@@ -151,8 +151,8 @@ declare global {
 				 */
 				RUNWARE_AI_API_KEY?: string;
 				RUNWARE_BASE_URL?: string;
-				DAYDREAM_IMAGE_MODEL_PHOTO?: string;
-				DAYDREAM_IMAGE_MODEL_ILLUSTRATED?: string;
+				RUNWARE_AI_IMAGE_MODEL?: string;
+				RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED?: string;
 			};
 			/**
 			 * Optional because the self-hosted and dev servers have no platform

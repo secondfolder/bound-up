@@ -364,9 +364,24 @@ function steeringIdeas(voice: DaydreamVoice): { suggestions: string; directions:
  * checked again before it is sent anywhere (`imagePromptProblem`) and wrapped
  * in the server's own style and safety words (`runwareTask`); this is the
  * first of those guards, not the only one.
+ *
+ * Written for an image model that reads sentences literally (Z-Image Turbo,
+ * the photo default) and so draws exactly what it is told and nothing it is
+ * not. Each rule answers something seen when it was not there: a story's
+ * "you" and its names mean nothing to the image model, which has never seen
+ * the story or the last picture, so people are re-described in full each
+ * time; an unspecified head count grew a third person; feelings and
+ * backstory are words it cannot draw, and crowd out the ones it can; and an
+ * age in years, rather than "young", is what kept faces from drifting young.
  */
-const IMAGE_INSTRUCTION = `- "image": include it in every reply. It is a picture of the moment the passage ends on, shown to the user beside it, described for an image model in plain words — who is there and what they look like, what they are doing and wearing (or not), their expressions, where they are and the light. Up to ${DAYDREAM_LIMITS.imagePrompt} characters. Leave it out only when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. A passage that is mostly talk still has people in a place, and gets one.
-  Describe every person as an adult, with an age in years or decades ("a woman in her thirties", "a man of about forty"), and their look from the setup, kept the same from passage to passage. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the scene's heat allows: at SFW, everyone clothed and nothing sexual. Describe only what is in the picture; never a style, a medium or a camera — those are chosen for you.`;
+const IMAGE_INSTRUCTION = `- "image": include it in every reply. It is a picture of the moment the passage ends on, shown to the user beside it. Leave it out only when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. A passage that is mostly talk still has people in a place, and gets one.
+  It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it as plain, literal sentences in the present tense, about 80 to 150 words and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
+  1. The framing: close-up, medium shot or wide shot, and from where.
+  2. How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don't). Keep each person's look the same from picture to picture, from the setup where it says.
+  3. What each is doing at that instant: pose, where their hands are, where they look, their expression.
+  4. The place, a few concrete things in it, and the light.
+  Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors.
+  Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the scene's heat allows: at SFW, everyone clothed and nothing sexual. Never a style, a medium or camera settings — those are chosen for you.`;
 
 function replyFormat(voice: DaydreamVoice, pictures: boolean): string {
 	const ideas = steeringIdeas(voice);

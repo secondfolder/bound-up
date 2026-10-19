@@ -656,9 +656,14 @@ image model tuned for adult imagery, through Runware.
 
 - **The story model describes it.** On a server with a Runware key, the
   reply format asks for an `"image"` in every passage's metadata
-  (`IMAGE_INSTRUCTION` in `prompt.ts`): the people, what they are doing and
-  wearing, where, the light — each person an adult with an age, looking as
-  the setup says, and only as explicit as the scene's heat. It is left out
+  (`IMAGE_INSTRUCTION` in `prompt.ts`): the framing, how many people, each
+  one in full — an adult age as a number, their look as the setup says,
+  what they wear — then what they are doing, the place and the light, in
+  literal sentences of 80 to 150 words, and only as explicit as the scene's
+  heat. The image model has seen nothing else and draws what the words say,
+  so it gets no names, no "you", and nothing a camera could not see: a
+  story's names and feelings only crowd out what it can draw, and a head
+  count left unsaid grew a stranger in the frame. It is left out
   only where a picture makes no sense, and never in a check-in. It is
   constant per server, so the prompt stays cacheable ([Cost](#cost)), and
   meta is never sent back, so the history is untouched. The description is
@@ -668,10 +673,20 @@ image model tuned for adult imagery, through Runware.
   request (`runwareTask`, `daydream/image-prompt.ts`): the style's model
   and words, an adult floor in the image model's own terms, and a negative
   prompt that keeps it away from anything youthful — and, at SFW, from
-  nudity. It answers with the picture and, in a header, exactly what it
+  nudity. How it says those follows the model's architecture
+  (`PictureArchitecture`), because what suits one family is poor for the
+  other: an SDXL-family model gets tags, ~30 steps and real guidance; a
+  Z-Image Turbo model gets sentences, its distilled 9 steps and `CFGScale`
+  1.5. Not Z-Image's usual 1: there Runware drops the negative prompt, and
+  Dark Beast drew a woman described as 35 barely out of her teens. The
+  defaults' architectures are known; any other model's is asked of
+  Runware's `modelSearch` once per server process (`resolvePictureModel`),
+  and one that Runware does not host, or of another family, is refused with
+  a 503 and a log line naming the variable to change. It answers with the picture and, in a header, exactly what it
   asked (`PictureRequest`). It keeps nothing and logs only status codes.
-- **Two styles, per daydream.** Photo (Lustify, an SDXL checkpoint) or
-  Illustrated (WAI-illustrious), in the setup's `pictures` (`daydream-setup`
+- **Two styles, per daydream.** Photo (Dark Beast 9, a Z-Image Turbo
+  fine-tune, which draws only photographs) or Illustrated (WAI-illustrious,
+  an SDXL checkpoint), in the setup's `pictures` (`daydream-setup`
   v3) with whether each passage gets one by itself, which is on by default.
   Both are in the setup form's "More options" and the story's Dials
   popover (`DaydreamPicturesControl.svelte`). Neither reaches the story
@@ -1030,8 +1045,8 @@ models were chosen). Four things hold that down:
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Only the e2e suite points it anywhere else  |
 | `RUNWARE_AI_API_KEY`  | none — no pictures             | The key every picture is paid for on        |
 | `RUNWARE_BASE_URL`    | `https://api.runware.ai/v1`    | Only the e2e suite points it anywhere else  |
-| `DAYDREAM_IMAGE_MODEL_PHOTO` | `DEFAULT_PICTURE_MODELS.photo` | A Runware model AIR           |
-| `DAYDREAM_IMAGE_MODEL_ILLUSTRATED` | `DEFAULT_PICTURE_MODELS.illustrated` | A Runware model AIR |
+| `RUNWARE_AI_IMAGE_MODEL` | `DEFAULT_PICTURE_MODELS.photo` | A Runware AIR, Z-Image Turbo or SDXL-family |
+| `RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED` | `DEFAULT_PICTURE_MODELS.illustrated` | The same, for illustrations |
 
 Read per request by `readDaydreamConfig`, from `platform.env` on Workers and
 the environment elsewhere. `npm run secrets -- <target> --openrouter-key …`

@@ -109,6 +109,64 @@ describe('POST /api/daydreams/[id]/image', () => {
 		expect(JSON.parse(String(init.body))[0].model).toBe(DEFAULT_PICTURE_MODELS.illustrated);
 	});
 
+	it('prompts the default photo model as the Z-Image Turbo it is, without asking', async () => {
+		const { id } = await createTestDaydream(db, ada.id);
+		await post(ada, id);
+		expect(upstream).toHaveBeenCalledTimes(1);
+		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
+		const [task] = JSON.parse(String(init.body));
+		expect(task.positivePrompt).toMatch(/^A candid, realistic photograph\./);
+		expect(task.steps).toBe(9);
+	});
+
+	it('asks Runware once what a configured model is, and prompts it to suit', async () => {
+		env.RUNWARE_AI_IMAGE_MODEL = 'civitai:9@9';
+		upstream.mockImplementation((_url: string, init: RequestInit) => {
+			const [task] = JSON.parse(String(init.body));
+			return task.taskType === 'modelSearch'
+				? Response.json({
+						data: [{ results: [{ air: 'civitai:9@9', architecture: 'sdxl' }] }]
+					})
+				: runware();
+		});
+		const { id } = await createTestDaydream(db, ada.id);
+		await post(ada, id);
+		await post(ada, id);
+		const tasks = upstream.mock.calls.map(
+			([, init]) => JSON.parse(String((init as RequestInit).body))[0]
+		);
+		expect(tasks.map((task) => task.taskType)).toEqual([
+			'modelSearch',
+			'imageInference',
+			'imageInference'
+		]);
+		expect(tasks[1]).toMatchObject({ model: 'civitai:9@9', steps: 30 });
+		expect(tasks[1].positivePrompt).toMatch(/^photograph/);
+	});
+
+	it('refuses a configured model no recipe suits, naming the variable to change', async () => {
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		env.RUNWARE_AI_IMAGE_MODEL = 'civitai:8@8';
+		upstream.mockResolvedValueOnce(
+			Response.json({ data: [{ results: [{ air: 'civitai:8@8', architecture: 'flux1d' }] }] })
+		);
+		const { id } = await createTestDaydream(db, ada.id);
+		expect(await post(ada, id)).toMatchObject({ type: 'error', status: 503 });
+		expect(upstream).toHaveBeenCalledTimes(1);
+		expect(JSON.stringify(logged.mock.calls)).toContain('RUNWARE_AI_IMAGE_MODEL');
+	});
+
+	it('refuses a configured model Runware does not host', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		env.RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED = 'civitai:7@7';
+		upstream.mockResolvedValueOnce(Response.json({ data: [{ results: [] }] }));
+		const { id } = await createTestDaydream(db, ada.id);
+		expect(await post(ada, id, { ...body, style: 'illustrated' })).toMatchObject({
+			type: 'error',
+			status: 503
+		});
+	});
+
 	it('refuses a description that puts a minor in the picture, before anything is sent', async () => {
 		const { id } = await createTestDaydream(db, ada.id);
 		const limit = vi.fn(async () => ({ allowed: true }) as const);

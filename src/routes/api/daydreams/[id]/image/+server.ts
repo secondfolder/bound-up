@@ -4,10 +4,15 @@ import { DAYDREAM_LIMITS } from '$lib/daydream';
 import {
 	imagePromptProblem,
 	PICTURE_REQUEST_HEADER,
+	type PictureModel,
 	type PictureRequest,
 	runwareTask
 } from '$lib/daydream/image-prompt';
-import { readImageConfig } from '$lib/server/daydream/image-config';
+import {
+	PictureModelError,
+	readImageConfig,
+	resolvePictureModel
+} from '$lib/server/daydream/image-config';
 import { hasAcceptedDisclosure, ownsDaydream } from '$lib/server/daydreams';
 import { requireFeature } from '$lib/server/features';
 import { rateLimitMessage } from '$lib/server/rate-limit';
@@ -79,7 +84,19 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		});
 	}
 
-	const task = runwareTask(parsed.data, config.models, crypto.randomUUID());
+	let model: PictureModel;
+	try {
+		model = await resolvePictureModel(config, parsed.data.style, request.signal);
+	} catch (cause) {
+		if (cause instanceof PictureModelError) {
+			// The server's own configuration, never the user's words: safe to log whole.
+			console.error(`[daydreams] ${cause.message}`);
+			error(503, 'Pictures are not set up properly on this server.');
+		}
+		console.error('[daydreams] the image provider could not say what the model is');
+		error(502, 'The picture could not be made just now. Try again in a moment.');
+	}
+	const task = runwareTask(parsed.data, model, crypto.randomUUID());
 	let upstream: Response;
 	try {
 		upstream = await fetch(config.baseUrl, {
