@@ -11,7 +11,8 @@
 		starterSetup,
 		storedStarterSide
 	} from '$lib/daydream/starters';
-	import { suggestDaydream } from '$lib/daydream/suggest';
+	import { suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
+	import { type GeneratedIdea, ideaSentence } from '$lib/daydream/suggestions';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -28,10 +29,13 @@
 				kind: 'setup';
 				draft: DaydreamSetup | null;
 				layout: 'sentence' | 'full';
-				/** Whether the model wrote it, so "Try another" can ask again. */
-				described: boolean;
+				/** What the model wrote it from, so "Try another" can ask again; null for none. */
+				described: Described | null;
 				version: number;
 		  };
+
+	/** A sentence a draft is written from, and the side a generated idea was made for. */
+	type Described = { idea: string; side: StarterSide | null };
 
 	let stage: Stage = $state({ kind: 'start' });
 	let idea = $state('');
@@ -42,6 +46,9 @@
 	let side: StarterSide | null = $state(null);
 	let asking = $state(false);
 	let problem: string | null = $state(null);
+	let generated: { request: string; ideas: readonly GeneratedIdea[] } | null = $state(null);
+	let writing: string | null = $state(null);
+	let ideaProblem: string | null = $state(null);
 	let versions = 0;
 	/** Counts draft requests, so only the latest one still wanted is applied. */
 	let requests = 0;
@@ -75,7 +82,7 @@
 
 	const suggestionsOn = $derived(data.accepted && data.available);
 
-	function setUp(draft: DaydreamSetup | null, described: boolean) {
+	function setUp(draft: DaydreamSetup | null, described: Described | null) {
 		versions += 1;
 		stage = {
 			kind: 'setup',
@@ -87,16 +94,25 @@
 	}
 
 	/**
-	 * Asks the model to put a daydream together from what was written.
-	 * `limits` are any the user has written on the setup since, kept on the
-	 * new draft and told to the model, so "Try another" never loses them.
+	 * Asks the model to put a daydream together from a sentence: what was
+	 * written in the box, or a generated idea. `limits` are any the user has
+	 * written on the setup since, kept on the new draft and told to the
+	 * model, so "Try another" never loses them. A failure is said where it
+	 * was asked from, which on the setup is above the form.
 	 */
-	async function writeDraft(limits = '') {
+	async function writeDraft(
+		described: Described,
+		limits = '',
+		failed: (error: string) => void = (error) => {
+			problem = error;
+		}
+	) {
 		requests += 1;
 		const mine = requests;
 		asking = true;
 		problem = null;
-		const answer = await suggestDaydream({ idea, limits });
+		ideaProblem = null;
+		const answer = await suggestDaydream({ ...described, limits });
 		// Left behind: the user went back to the start, or asked again, while
 		// this was out. Applying it anyway pulled someone who had pressed "Other
 		// ways to start" straight back into a draft they had walked away from.
@@ -104,11 +120,36 @@
 			return;
 		}
 		asking = false;
+		writing = null;
 		if (!answer.ok) {
-			problem = answer.error;
+			failed(answer.error);
 			return;
 		}
-		setUp({ ...assembleSetup(answer.value), limits }, true);
+		setUp({ ...assembleSetup(answer.value), limits }, described);
+	}
+
+	/**
+	 * "Generate": a few ideas of the kind asked for, for the side chosen
+	 * under "You as". They replace the last ones, and are kept here so going
+	 * back to the ways in still shows them.
+	 */
+	async function generateIdeas(request: string): Promise<string | null> {
+		const answer = await suggestIdeas({ request, side, limits: '' });
+		if (!answer.ok) {
+			return answer.error;
+		}
+		generated = { request, ideas: answer.value };
+		ideaProblem = null;
+		return null;
+	}
+
+	function writeIdea(chosen: GeneratedIdea) {
+		writing = chosen.title;
+		// The idea's own side, which is the one it was asked for unless it
+		// has no one in charge.
+		writeDraft({ idea: ideaSentence(chosen), side: chosen.you }, '', (error) => {
+			ideaProblem = error;
+		});
 	}
 </script>
 
@@ -132,9 +173,14 @@
 				{suggestionsOn}
 				{asking}
 				{problem}
-				ondescribe={() => writeDraft()}
-				onstarter={(starter) => setUp(starterSetup(starter), false)}
-				onblank={() => setUp(null, false)}
+				{generated}
+				{writing}
+				{ideaProblem}
+				ondescribe={() => writeDraft({ idea, side: null })}
+				onstarter={(starter) => setUp(starterSetup(starter), null)}
+				ongenerate={generateIdeas}
+				onidea={writeIdea}
+				onblank={() => setUp(null, null)}
 			/>
 		{:else}
 			<wa-button
@@ -147,6 +193,7 @@
 					requests += 1;
 					asking = false;
 					problem = null;
+					ideaProblem = null;
 					stage = { kind: 'start' };
 				}}
 			>
@@ -159,7 +206,13 @@
 					setupForm={data.setupForm}
 					draft={stage.draft}
 					layout={stage.layout}
-					onretry={stage.described ? (limits) => writeDraft(limits) : undefined}
+					onretry={stage.described
+						? (limits) => {
+								if (stage.kind === 'setup' && stage.described) {
+									writeDraft(stage.described, limits);
+								}
+							}
+						: undefined}
 					retrying={asking}
 					library={data.library}
 					{suggestionsOn}

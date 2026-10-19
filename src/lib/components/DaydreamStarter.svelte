@@ -4,17 +4,22 @@
 	import { sceneLevel } from '$lib/daydream/dial-words';
 	import {
 		type DaydreamStarter,
+		forSide,
 		pickIdeas,
 		SHOWN_IDEA_CHIPS,
 		type StarterSide,
 		starterScene,
 		startersFor
 	} from '$lib/daydream/starters';
+	import type { GeneratedIdea } from '$lib/daydream/suggestions';
+	import DaydreamIdeasDialog from './DaydreamIdeasDialog.svelte';
 
 	/**
 	 * The ways into a new daydream, friendliest first: describe it in a
 	 * sentence and have the model put it together, pick a ready-made one, or
-	 * build it from scratch. The first two land on the setup form's sentence,
+	 * build it from scratch. "Generate" beside the ready-made ones asks the
+	 * model for a few more, of a kind the user describes, for their side.
+	 * All but the last land on the setup form's sentence,
 	 * where every part of it can still be changed. See docs/daydreams.md,
 	 * "Starting one".
 	 *
@@ -28,8 +33,13 @@
 		suggestionsOn,
 		asking,
 		problem,
+		generated,
+		writing,
+		ideaProblem,
 		ondescribe,
 		onstarter,
+		ongenerate,
+		onidea,
 		onblank
 	}: {
 		/** What the user has written, kept by the page so it survives going back. */
@@ -46,10 +56,21 @@
 		asking: boolean;
 		/** Why the last description came back with nothing, or null. */
 		problem: string | null;
+		/** The last ideas generated and what was asked for, kept by the page; null before any. */
+		generated: { request: string; ideas: readonly GeneratedIdea[] } | null;
+		/** The title of the generated idea being written out, while it is. */
+		writing: string | null;
+		/** Why a generated idea could not be written out, or null. */
+		ideaProblem: string | null;
 		ondescribe: () => void;
 		onstarter: (starter: DaydreamStarter) => void;
+		/** Asks for ideas of the kind described; answers why none came, or null. */
+		ongenerate: (request: string) => Promise<string | null>;
+		onidea: (idea: GeneratedIdea) => void;
 		onblank: () => void;
 	} = $props();
+
+	let generating = $state(false);
 
 	const SIDES: readonly { value: StarterSide | null; label: string }[] = [
 		{ value: null, label: 'Either' },
@@ -58,6 +79,7 @@
 	];
 
 	const starters = $derived(startersFor(side));
+	const ideasShown = $derived(generated ? forSide(generated.ideas, side) : []);
 
 	const canAsk = $derived(idea.trim() !== '' && !asking);
 
@@ -119,7 +141,22 @@
 
 	<section class="ready-made" aria-labelledby="ready-made-heading">
 		<div class="ready-made-head">
-			<h2 id="ready-made-heading">{suggestionsOn ? 'Or pick one' : 'Pick one'}</h2>
+			<div class="heading">
+				<h2 id="ready-made-heading">{suggestionsOn ? 'Or pick one' : 'Pick one'}</h2>
+				{#if suggestionsOn}
+					<wa-button
+						appearance="outlined"
+						size="s"
+						disabled={asking}
+						onclick={() => {
+							generating = true;
+						}}
+					>
+						<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
+						Generate
+					</wa-button>
+				{/if}
+			</div>
 			<fieldset class="sides">
 				<legend class="hint">You as</legend>
 				{#each SIDES as option (option.label)}
@@ -137,6 +174,41 @@
 				{/each}
 			</fieldset>
 		</div>
+		{#if generated}
+			<section class="generated" aria-labelledby="generated-heading">
+				<h3 id="generated-heading">For “{generated.request}”</h3>
+				{#if ideasShown.length === 0}
+					<p class="hint">None of these have you as the {side}. Generate some that do.</p>
+				{/if}
+				<ul class="cards">
+					{#each ideasShown as idea (idea.title)}
+						{const level = $derived(sceneLevel(idea.dials))}
+						<li>
+							<!-- A card, as the ready-made ones are. -->
+							<button
+								type="button"
+								class="card"
+								disabled={asking}
+								onclick={() => onidea(idea)}
+							>
+								<span class="title">{idea.title}</span>
+								<span class="premise">{idea.premise}</span>
+								<span class="tags">
+									{#each idea.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
+								</span>
+								<span class="meta">
+									{#if writing === idea.title}
+										<span class="level">Writing your daydream…</span>
+									{:else if level}<span class="level">{level}</span>{/if}
+									{#if idea.you}<span>You’re the {idea.you}</span>{/if}
+								</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+				{#if ideaProblem}<p class="invalid" role="alert">{ideaProblem}</p>{/if}
+			</section>
+		{/if}
 		<ul class="cards">
 			{#each starters as starter (starter.id)}
 				{const scene = $derived(starterScene(starter).scene)}
@@ -160,6 +232,17 @@
 			{/each}
 		</ul>
 	</section>
+
+	{#if generating}
+		<DaydreamIdeasDialog
+			request={generated?.request ?? ''}
+			{side}
+			{ongenerate}
+			onclose={() => {
+				generating = false;
+			}}
+		/>
+	{/if}
 
 	<p class="blank">
 		Rather choose every part yourself?
@@ -253,6 +336,30 @@
 		}
 	}
 
+	.heading {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 0.75rem;
+	}
+
+	.generated {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+
+		h3 {
+			margin: 0;
+			font-size: 1rem;
+			color: var(--wa-color-text-quiet);
+			overflow-wrap: anywhere;
+		}
+
+		p {
+			margin: 0;
+		}
+	}
+
 	.ready-made-head {
 		display: flex;
 		flex-wrap: wrap;
@@ -343,8 +450,12 @@
 		text-align: start;
 		cursor: pointer;
 
-		&:hover {
+		&:hover:not(:disabled) {
 			background: var(--wa-color-surface-raised);
+		}
+
+		&:disabled {
+			cursor: progress;
 		}
 
 		&:focus-visible {

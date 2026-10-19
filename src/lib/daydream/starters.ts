@@ -819,9 +819,17 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
  * story with no one in charge suits both sides, so it is never filtered out.
  */
 export function startersFor(side: StarterSide | null): readonly DaydreamStarter[] {
+	return forSide(DAYDREAM_STARTERS, side);
+}
+
+/** `startersFor`'s rule for anything with a `you`: the generated ideas are filtered by it too. */
+export function forSide<T extends { you: StarterSide | null }>(
+	stories: readonly T[],
+	side: StarterSide | null
+): readonly T[] {
 	return side === null
-		? DAYDREAM_STARTERS
-		: DAYDREAM_STARTERS.filter((starter) => starter.you === null || starter.you === side);
+		? stories
+		: stories.filter((story) => story.you === null || story.you === side);
 }
 
 /**

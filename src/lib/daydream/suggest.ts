@@ -17,12 +17,14 @@ import type {
 	StoryDials
 } from '../daydream';
 import { requestSuggestion } from './client';
-import type { StoryPieces } from './starters';
+import type { StarterSide, StoryPieces } from './starters';
 import {
 	completionJson,
+	type GeneratedIdea,
 	parseCasting,
 	parseChips,
 	parseFill,
+	parseGeneratedIdeas,
 	parseName,
 	parseParts,
 	parseSceneDials,
@@ -163,6 +165,8 @@ export async function surpriseScene(
  */
 export async function suggestDaydream(input: {
 	idea: string;
+	/** The side a generated idea was made for, so the whole daydream keeps the user on it. */
+	side?: StarterSide | null;
 	limits: string;
 }): Promise<Answer<StoryPieces>> {
 	const answer = await ask({ task: 'daydream', ...input });
@@ -171,4 +175,23 @@ export async function suggestDaydream(input: {
 	}
 	const pieces = parseSuggestedDaydream(answer.value);
 	return pieces ? { ok: true, value: pieces } : { ok: false, error: NOTHING };
+}
+
+/**
+ * A few story ideas of the kind the user asked for, for the side they chose
+ * under "You as" (null for either). Ideas only — a title, a premise, tags,
+ * a level — so asking for a handful stays quick; the one picked is then
+ * written out by `suggestDaydream`.
+ */
+export async function suggestIdeas(input: {
+	request: string;
+	side: StarterSide | null;
+	limits: string;
+}): Promise<Answer<GeneratedIdea[]>> {
+	const answer = await ask({ task: 'ideas', ...input });
+	if (!answer.ok) {
+		return answer;
+	}
+	const ideas = parseGeneratedIdeas(answer.value, input.side);
+	return ideas.length > 0 ? { ok: true, value: ideas } : { ok: false, error: NOTHING };
 }

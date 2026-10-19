@@ -181,6 +181,13 @@
 							"shippedOn": "2026-10-20"
 						},
 						{
+							"id": "daydreams-generated-ideas",
+							"title": "Story ideas made to order",
+							"summary": "Say what kind of stories you're after and get a few fresh ideas to pick from, with you on the side you chose.",
+							"status": "shipped",
+							"shippedOn": "2026-10-20"
+						},
+						{
 							"id": "daydreams-kink-list",
 							"title": "Daydreams from your kink list",
 							"summary": "Scenes that start from what you're into, and stay clear of your hard limits.",

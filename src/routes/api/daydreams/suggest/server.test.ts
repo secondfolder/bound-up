@@ -114,7 +114,7 @@ describe('POST /api/daydreams/suggest', () => {
 		expect(limit).not.toHaveBeenCalled();
 	});
 
-	it('writes a casting, and names a daydream from its opening, under the same rules', async () => {
+	it('writes a casting, names a daydream from its opening, and generates ideas, under the same rules', async () => {
 		const casting = {
 			task: 'casting',
 			character: { name: 'Mara', notes: SECRET_WORDS },
@@ -131,7 +131,8 @@ describe('POST /api/daydreams/suggest', () => {
 			opening: SECRET_WORDS,
 			limits: ''
 		};
-		for (const json of [casting, naming]) {
+		const ideas = { task: 'ideas', request: SECRET_WORDS, side: 'sub', limits: '' };
+		for (const json of [casting, naming, ideas]) {
 			expect(await post(ada, json)).toMatchObject({ type: 'ok' });
 		}
 		const sent = upstream.mock.calls.map(([, init]) =>

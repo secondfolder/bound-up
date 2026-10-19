@@ -50,9 +50,27 @@ someone has played one:
   remembered on the device (`localStorage`, `storedStarterSide`) so the next
   visit opens on the same side. They are built from the catalog rather than written out again,
   and need no model, so nothing leaves the device.
+
+  **Generate**, beside the heading (only with suggestions on), opens a dialog
+  (`DaydreamIdeasDialog.svelte`) asking what kind of stories, and asks the
+  model for `GENERATED_IDEAS` (four) of them: the `ideas` suggestion, sent
+  the request and the side chosen under "You as". With a side, the prompt
+  puts the user on it in every idea, or on neither for a story with no one
+  in charge; with "Either", a mix. Each idea is only what a card shows — a
+  title, a premise, tags, the user's side and a heat and kink — so a handful
+  comes back quickly; `parseGeneratedIdeas` drops any that put the user on
+  the other side from the one asked for. They show as cards above the
+  ready-made ones, under the request, and are filtered by "You as" the same
+  way (`forSide`). The dialog stays open until they arrive, so a failure is
+  said beside what was asked; the page keeps the ideas and the request, so
+  going back shows them and asking again starts from the same words.
+  Picking one asks for the whole daydream as **Write it** does, from the
+  idea's title and premise (`ideaSentence`, which fits the `idea` cap) and
+  with the idea's side, so the cast are written to suit it; **Try another**
+  on the setup asks again from the same idea.
 - **Build it yourself.** The full form, empty.
 
-Both of the first two hand the form a draft, put together by `assembleSetup`
+All but the last hand the form a draft, put together by `assembleSetup`
 (`daydream/starters.ts`): parts get fresh ids, each person is cast into the
 part named for them if it is still free, and a voice that cannot work with
 who is in it — watching nobody — gives way to the one that follows them.
@@ -843,7 +861,11 @@ own (`suggest-prompt.ts`):
 - for a name: the scene's title and premise, the cast's names, the limits,
   and the first `MAX_NAMING_OPENING` characters of the opening passage;
 - for a whole daydream, from the new-daydream page: the sentence the user
-  wrote (up to `DAYDREAM_LIMITS.idea`) and any limits written on the draft.
+  wrote (up to `DAYDREAM_LIMITS.idea`), or a generated idea's title and
+  premise with the side it was made for, and any limits written on the
+  draft;
+- for generated ideas: what the user typed in the dialog (up to
+  `DAYDREAM_LIMITS.idea`) and the side chosen under "You as".
 
 The answer is a small JSON completion, not streamed, passed back unread for
 the browser to check (`daydream/suggestions.ts`).

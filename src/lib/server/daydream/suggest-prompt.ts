@@ -16,7 +16,10 @@ import {
 } from '$lib/daydream/dial-words';
 import {
 	FIELD_LIMITS,
+	GENERATED_IDEAS,
 	MAX_CHIP_LENGTH,
+	MAX_IDEA_PREMISE,
+	MAX_IDEA_TAGS,
 	MAX_NAMING_OPENING,
 	MAX_SUGGESTED_CHIPS
 } from '$lib/daydream/suggestions';
@@ -32,10 +35,11 @@ import type { ModelMessage } from './prompt';
  * The model is asked for JSON only, which the browser checks
  * (`$lib/daydream/suggestions.ts`).
  *
- * Three tasks are about a daydream rather than one record: `casting` writes
+ * Four tasks are about a daydream rather than one record: `casting` writes
  * who a character is in this story, from the character and the scene, `name`
- * names a daydream from its scene and its opening passage, and `daydream`
- * sets a whole one up from a sentence the user wrote.
+ * names a daydream from its scene and its opening passage, `daydream`
+ * sets a whole one up from a sentence the user wrote, and `ideas` offers a
+ * few to choose from, of the kind the user asked for.
  */
 
 const text = (max: number) => z.string().max(max).optional();
@@ -111,6 +115,9 @@ const nameRequestSchema = z.object({
 	limits: limitsSchema
 });
 
+/** The user's side, from the new-daydream page's "You as": null for either. */
+const sideSchema = z.enum(['dom', 'sub']).nullable();
+
 /** `daydream`: a whole daydream, from a sentence on the new-daydream page. */
 const daydreamRequestSchema = z.object({
 	task: z.literal('daydream'),
@@ -118,6 +125,19 @@ const daydreamRequestSchema = z.object({
 		.string()
 		.max(DAYDREAM_LIMITS.idea)
 		.refine((value) => value.trim() !== '', 'Say what the story is about'),
+	/** Set when the sentence is a generated idea, which was made for that side. */
+	side: sideSchema.optional(),
+	limits: limitsSchema
+});
+
+/** `ideas`: a few story ideas of the kind asked for, from "Generate" on the new-daydream page. */
+const ideasRequestSchema = z.object({
+	task: z.literal('ideas'),
+	request: z
+		.string()
+		.max(DAYDREAM_LIMITS.idea)
+		.refine((value) => value.trim() !== '', 'Say what kind of stories'),
+	side: sideSchema,
 	limits: limitsSchema
 });
 
@@ -171,7 +191,8 @@ export const suggestRequestSchema = z.union([
 	recordRequestSchema,
 	castingRequestSchema,
 	nameRequestSchema,
-	daydreamRequestSchema
+	daydreamRequestSchema,
+	ideasRequestSchema
 ]);
 
 export type SuggestRequest = z.output<typeof suggestRequestSchema>;
@@ -179,6 +200,7 @@ type RecordRequest = z.output<typeof recordRequestSchema>;
 type CastingRequest = z.output<typeof castingRequestSchema>;
 type NameRequest = z.output<typeof nameRequestSchema>;
 type DaydreamRequest = z.output<typeof daydreamRequestSchema>;
+type IdeasRequest = z.output<typeof ideasRequestSchema>;
 
 function fieldsFor(target: RecordRequest['target']): readonly string[] {
 	return target === 'character' ? CHARACTER_TEXT_FIELDS : SCENE_TEXT_FIELDS;
@@ -405,6 +427,19 @@ const VOICES = `- "talk": the characters speak to the user directly, with no nar
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.`;
 
+/**
+ * Where the user stands, in the same terms as the ready-made stories' `you`.
+ * "Either" says nothing, so the model is free to choose.
+ */
+const SIDE_LINES = {
+	dom: 'The user is the dominant one: whoever else is in it submits to them, and the story is about the user being in charge.',
+	sub: 'The user is the submissive one: whoever else is in it is in charge of them, and the story is about the user giving up control.'
+} as const;
+
+function sideLine(side: 'dom' | 'sub' | null | undefined): string {
+	return side ? `\n\n${SIDE_LINES[side]}` : '';
+}
+
 function daydreamMessages(request: DaydreamRequest): ModelMessage[] {
 	return [
 		{
@@ -414,7 +449,7 @@ function daydreamMessages(request: DaydreamRequest): ModelMessage[] {
 		{
 			role: 'user',
 			content: `The user wants a story like this, in their own words:
-${request.idea.trim()}
+${request.idea.trim()}${sideLine(request.side)}
 
 Set the whole story up from it, keeping to what they asked for and filling in the rest.
 
@@ -426,6 +461,28 @@ The scene: a short title; where it happens, what is going on as it starts, who t
 
 Who is in it: one to ${MAX_DAYDREAM_CHARACTERS} characters, each playing one of the scene's parts, named exactly as the part is. For each, a name, and a phrase or two for their type, personality, how they talk, appearance and what they enjoy; who they are to the user in this story, in a few words; and what they are doing or want as the scene starts, in a sentence. With "rules", they are the system's functionaries. With "told", there may be none.
 Answer as: {"voice": "talk", "scene": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": 1-5, "kink": 1-5, ${PARTS_SHAPE}}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}]}`
+		}
+	];
+}
+
+function ideasMessages(request: IdeasRequest): ModelMessage[] {
+	const sides = request.side
+		? `${SIDE_LINES[request.side]} Every idea puts them on that side ("you": "${request.side}"), unless it is a story with no one in charge ("you": null).`
+		: 'Mix them: some with the user in charge ("you": "dom"), some with the user submitting ("you": "sub"), and any with no one in charge as "you": null.';
+	return [
+		{
+			role: 'system',
+			content: `${SUGGEST_RULES}\n\nThe user's limits, never to be crossed: ${request.limits.trim() || 'none stated beyond the rules above'}`
+		},
+		{
+			role: 'user',
+			content: `The user wants ideas for stories like this, in their own words:
+${request.request.trim()}
+
+Offer ${GENERATED_IDEAS} different ideas that fit what they asked for, as different from each other as it allows. ${sides}
+
+For each: a short title, at most ${DAYDREAM_LIMITS.title} characters; a premise of a sentence or two, at most ${MAX_IDEA_PREMISE} characters, saying who they are with, where, and what is going on as it starts; up to ${MAX_IDEA_TAGS} tags of a word or two for its kinks and tropes; and ratings as whole numbers from 1 to 5: ${RATINGS.heat} and ${RATINGS.kink}.
+Answer as: {"ideas": [{"title": "…", "premise": "…", "tags": ["…"], "you": "dom", "heat": 1-5, "kink": 1-5}]}`
 		}
 	];
 }
@@ -442,6 +499,9 @@ export function buildSuggestMessages(request: SuggestRequest): {
 	}
 	if (request.task === 'daydream') {
 		return { messages: daydreamMessages(request), maxTokens: 1600 };
+	}
+	if (request.task === 'ideas') {
+		return { messages: ideasMessages(request), maxTokens: 900 };
 	}
 	const { instructions, maxTokens } = taskInstructions(request);
 	return {

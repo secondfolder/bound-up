@@ -6,6 +6,7 @@ import {
 	assembleSetup,
 	DAYDREAM_IDEA_CHIPS,
 	DAYDREAM_STARTERS,
+	forSide,
 	pickIdeas,
 	SHOWN_IDEA_CHIPS,
 	type StoryPieces,
@@ -116,6 +117,19 @@ describe('storedStarterSide', () => {
 		for (const stored of [null, '', 'either', 'switch', 'Dom']) {
 			expect(storedStarterSide(stored), String(stored)).toBe(null);
 		}
+	});
+});
+
+describe('forSide', () => {
+	it('filters anything with a side the way the ready-made stories are', () => {
+		const ideas = [
+			{ title: 'a', you: 'dom' },
+			{ title: 'b', you: 'sub' },
+			{ title: 'c', you: null }
+		] as const;
+		expect(forSide(ideas, null)).toEqual(ideas);
+		expect(forSide(ideas, 'dom').map((idea) => idea.title)).toEqual(['a', 'c']);
+		expect(forSide(ideas, 'sub').map((idea) => idea.title)).toEqual(['b', 'c']);
 	});
 });
 

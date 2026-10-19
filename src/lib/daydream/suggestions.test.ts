@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { DAYDREAM_LIMITS } from '../daydream';
 import {
 	completionJson,
+	GENERATED_IDEAS,
+	ideaSentence,
+	MAX_IDEA_PREMISE,
+	MAX_IDEA_TAGS,
 	parseCasting,
 	parseChips,
 	parseFill,
+	parseGeneratedIdeas,
 	parseName,
 	parseParts,
 	parseSceneDials,
@@ -223,5 +229,91 @@ describe('parseSuggestedDaydream', () => {
 	it('is nothing without a scene that has a title and what is going on', () => {
 		expect(parseSuggestedDaydream({ voice: 'talk', scene: { title: 'Only a title' } })).toBeNull();
 		expect(parseSuggestedDaydream(null)).toBeNull();
+	});
+});
+
+describe('parseGeneratedIdeas', () => {
+	const idea = (fields: Record<string, unknown>) => ({
+		title: 'Caught',
+		premise: 'Your neighbour saw everything.',
+		tags: ['exhibition'],
+		you: 'sub',
+		heat: 4,
+		kink: 3,
+		...fields
+	});
+
+	it('keeps each idea with its tags, its side and its level', () => {
+		expect(parseGeneratedIdeas({ ideas: [idea({})] }, 'sub')).toEqual([
+			{
+				title: 'Caught',
+				premise: 'Your neighbour saw everything.',
+				tags: ['exhibition'],
+				you: 'sub',
+				dials: { heat: 4, kink: 3 }
+			}
+		]);
+	});
+
+	it('drops an idea that puts the user on the other side, but keeps one with nobody in charge', () => {
+		const answer = {
+			ideas: [idea({ title: 'Mine', you: 'dom' }), idea({ title: 'Even', you: null })]
+		};
+		expect(parseGeneratedIdeas(answer, 'sub').map((kept) => kept.title)).toEqual(['Even']);
+		// Asked for either side, every side is fine.
+		expect(parseGeneratedIdeas(answer, null).map((kept) => kept.you)).toEqual(['dom', null]);
+	});
+
+	it('reads anything but the two sides as nobody in charge', () => {
+		expect(parseGeneratedIdeas({ ideas: [idea({ you: 'switch' })] }, 'dom')[0]?.you).toBeNull();
+	});
+
+	it('drops an idea without a title or a premise, past its cap, or with a title already used', () => {
+		const answer = {
+			ideas: [
+				idea({ title: '' }),
+				idea({ premise: undefined }),
+				idea({ title: 'x'.repeat(DAYDREAM_LIMITS.title + 1) }),
+				idea({ premise: 'x'.repeat(MAX_IDEA_PREMISE + 1) }),
+				idea({}),
+				idea({ title: 'caught' })
+			]
+		};
+		expect(parseGeneratedIdeas(answer, null)).toHaveLength(1);
+	});
+
+	it('cleans the tags and the dials, and keeps only the first few ideas', () => {
+		const [kept] = parseGeneratedIdeas(
+			{
+				ideas: [
+					idea({
+						title: '“Quoted”',
+						tags: ['Praise', 'praise', 'a, b', 7, 'x'.repeat(31), 'one', 'two', 'three', 'four'],
+						heat: 9,
+						kink: '3'
+					})
+				]
+			},
+			null
+		);
+		expect(kept?.title).toBe('Quoted');
+		expect(kept?.tags).toEqual(['praise', 'one', 'two', 'three'].slice(0, MAX_IDEA_TAGS));
+		expect(kept?.dials).toEqual({ heat: null, kink: null });
+		const many = { ideas: Array.from({ length: 9 }, (_, at) => idea({ title: `Idea ${at}` })) };
+		expect(parseGeneratedIdeas(many, null)).toHaveLength(GENERATED_IDEAS);
+	});
+
+	it('is empty for anything that is not a list of ideas', () => {
+		expect(parseGeneratedIdeas(null, null)).toEqual([]);
+		expect(parseGeneratedIdeas({ ideas: 'Caught' }, null)).toEqual([]);
+		expect(parseGeneratedIdeas({ ideas: [null, 'Caught'] }, null)).toEqual([]);
+	});
+
+	it('makes a sentence that fits the box a daydream is described in', () => {
+		const sentence = ideaSentence({
+			title: 'x'.repeat(DAYDREAM_LIMITS.title),
+			premise: 'y'.repeat(MAX_IDEA_PREMISE)
+		});
+		expect(sentence.length).toBeLessThanOrEqual(DAYDREAM_LIMITS.idea);
 	});
 });

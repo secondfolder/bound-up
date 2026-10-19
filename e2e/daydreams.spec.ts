@@ -594,6 +594,39 @@ test.describe('daydreams', () => {
 		await expect(page.locator('.sentence')).toHaveCount(0);
 	});
 
+	test('ideas are generated for the side you chose, and one opens as a daydream', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await openStart(page);
+		await page.locator('label.side', { hasText: 'Sub' }).click();
+
+		await page.getByRole('button', { name: 'Generate', exact: true }).click();
+		const asking = dialog(page);
+		await expect(asking).toContainText('as the sub');
+		await asking.getByRole('textbox').fill('something on a train');
+		await asking.getByRole('button', { name: 'Generate', exact: true }).click();
+		await expect(asking).toBeHidden();
+
+		// The side reached the model, and the idea for the other side is left out.
+		const generated = page.locator('.generated');
+		await expect(generated).toContainText('For “something on a train”');
+		await expect(generated.locator('.card .title')).toHaveText([
+			'Stub idea for the sub',
+			'Stub idea for nobody'
+		]);
+
+		await generated.getByRole('button', { name: /Stub idea for the sub/ }).click();
+		const sentence = page.locator('.sentence');
+		await expect(sentence).toContainText('where I talk with Vesper in The stub night train.', {
+			useInnerText: true
+		});
+
+		// Back to the ways in, with the ideas still there.
+		await clickWaButton(page, 'Other ways to start');
+		await expect(generated.locator('.card .title')).toHaveCount(2);
+	});
+
 	test('a failed reply says so, and trying again answers', async ({ page }) => {
 		await signedUpDreamer(page);
 		await startDaydream(page);

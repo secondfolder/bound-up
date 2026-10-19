@@ -25,9 +25,16 @@ import {
 	UNSET_CHARACTER_DIALS
 } from '../daydream';
 import { unfence } from './reply-format';
-import type { StoryCast, StoryPieces } from './starters';
+import type { StarterSide, StoryCast, StoryPieces } from './starters';
 
-export type SuggestTask = 'chips' | 'fill' | 'surprise-scene' | 'casting' | 'name' | 'daydream';
+export type SuggestTask =
+	| 'chips'
+	| 'fill'
+	| 'surprise-scene'
+	| 'casting'
+	| 'name'
+	| 'daydream'
+	| 'ideas';
 export type SuggestTarget = 'character' | 'scene';
 
 /** The longest stretch of the opening passage sent to name a daydream: its start says enough. */
@@ -292,3 +299,88 @@ export function parseSuggestedDaydream(value: unknown): StoryPieces | null {
 }
 
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
+
+/** How many ideas one "Generate" asks for. */
+export const GENERATED_IDEAS = 4;
+
+/** A generated idea's tags: as few as a ready-made story's, and as short. */
+export const MAX_IDEA_TAGS = 4;
+export const MAX_IDEA_TAG_LENGTH = 30;
+
+/**
+ * The longest premise kept for a generated idea: short enough that its title
+ * and premise together fit the `idea` cap, since picking one sends them on as
+ * the sentence a whole daydream is written from (`ideaSentence`).
+ */
+export const MAX_IDEA_PREMISE = DAYDREAM_LIMITS.idea - DAYDREAM_LIMITS.title - 2;
+
+/**
+ * A story idea from "Generate": enough for a card like a ready-made story's,
+ * and nothing more — picking one asks for the whole daydream then, so
+ * generating a handful stays quick and cheap.
+ */
+export type GeneratedIdea = {
+	title: string;
+	premise: string;
+	tags: readonly string[];
+	/** The user's side in it, as a ready-made story's `you`. */
+	you: StarterSide | null;
+	dials: SceneDials;
+};
+
+/**
+ * The ideas in an `ideas` answer, for the side they were asked for. Each
+ * needs a title and a premise within their caps; tags are trimmed, capped
+ * and de-duplicated; a side that is not one of the two is none. An idea that
+ * puts the user on the other side from the one asked for is dropped rather
+ * than shown under the wrong filter, as is a second idea with the same title.
+ */
+export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): GeneratedIdea[] {
+	const parsed = z.object({ ideas: z.array(z.unknown()) }).safeParse(value);
+	if (!parsed.success) {
+		return [];
+	}
+	const ideas: GeneratedIdea[] = [];
+	for (const entry of parsed.data.ideas) {
+		if (!entry || typeof entry !== 'object') {
+			continue;
+		}
+		const idea = entry as Record<string, unknown>;
+		const title = capped(idea.title, DAYDREAM_LIMITS.title).replace(QUOTES, '').trim();
+		const premise = capped(idea.premise, MAX_IDEA_PREMISE);
+		const you = idea.you === 'dom' || idea.you === 'sub' ? idea.you : null;
+		if (
+			!(title && premise) ||
+			(side !== null && you !== null && you !== side) ||
+			ideas.some((other) => same(other.title, title))
+		) {
+			continue;
+		}
+		ideas.push({ title, premise, tags: ideaTags(idea.tags), you, dials: parseSceneDials(idea) });
+	}
+	return ideas.slice(0, GENERATED_IDEAS);
+}
+
+function ideaTags(value: unknown): string[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	const tags: string[] = [];
+	for (const tag of value) {
+		const text = typeof tag === 'string' ? tag.trim().toLocaleLowerCase() : '';
+		if (
+			text &&
+			text.length <= MAX_IDEA_TAG_LENGTH &&
+			!SEPARATOR.test(text) &&
+			!tags.includes(text)
+		) {
+			tags.push(text);
+		}
+	}
+	return tags.slice(0, MAX_IDEA_TAGS);
+}
+
+/** What a picked idea is written from, as if the user had typed it in the box. */
+export function ideaSentence(idea: Pick<GeneratedIdea, 'title' | 'premise'>): string {
+	return `${idea.title}: ${idea.premise}`;
+}

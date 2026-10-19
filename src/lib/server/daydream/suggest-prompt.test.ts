@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_NAMING_OPENING } from '$lib/daydream/suggestions';
+import { GENERATED_IDEAS, MAX_NAMING_OPENING } from '$lib/daydream/suggestions';
 import {
 	buildSuggestMessages,
 	SUGGEST_RULES,
@@ -255,6 +255,70 @@ describe('buildSuggestMessages, a whole daydream', () => {
 		expect(suggestRequestSchema.safeParse({ ...daydream, idea: 'x'.repeat(501) }).success).toBe(
 			false
 		);
+	});
+});
+
+describe('buildSuggestMessages, the side a daydream is for', () => {
+	it('tells the model which side a generated idea put the user on', () => {
+		const { messages } = buildSuggestMessages({
+			task: 'daydream',
+			idea: 'Caught: your neighbour saw everything.',
+			side: 'sub',
+			limits: ''
+		});
+		expect(messages[1]?.content).toContain('The user is the submissive one');
+	});
+
+	it('says nothing about a side when none was given', () => {
+		const { messages } = buildSuggestMessages({
+			task: 'daydream',
+			idea: 'a stranger on a night train',
+			limits: ''
+		});
+		expect(messages[1]?.content).not.toContain('The user is the');
+	});
+});
+
+describe('buildSuggestMessages, story ideas', () => {
+	const ideas: SuggestRequest = {
+		task: 'ideas',
+		request: 'teasing and denial somewhere public',
+		side: 'dom',
+		limits: 'Nothing with strangers.'
+	};
+
+	it('asks for a few ideas of the kind requested, with the rules and limits first', () => {
+		const { messages, maxTokens } = buildSuggestMessages(ideas);
+		expect(messages[0]?.content).toContain(SUGGEST_RULES);
+		expect(messages[0]?.content).toContain('Nothing with strangers.');
+		const ask = messages[1]?.content ?? '';
+		expect(ask).toContain('teasing and denial somewhere public');
+		expect(ask).toContain(`Offer ${GENERATED_IDEAS} different ideas`);
+		expect(ask).toContain('{"ideas": [');
+		expect(ask).toContain('"heat"');
+		expect(maxTokens).toBeLessThan(1600);
+	});
+
+	it('keeps every idea on the side chosen under "You as"', () => {
+		const ask = buildSuggestMessages(ideas).messages[1]?.content ?? '';
+		expect(ask).toContain('The user is the dominant one');
+		expect(ask).toContain('"you": "dom"');
+		expect(ask).not.toContain('The user is the submissive one');
+	});
+
+	it('mixes the sides for "Either"', () => {
+		const ask = buildSuggestMessages({ ...ideas, side: null }).messages[1]?.content ?? '';
+		expect(ask).toContain('Mix them');
+		expect(ask).not.toContain('The user is the');
+	});
+
+	it('accepts a request within its cap, and refuses an empty or long one, or a side that is not one', () => {
+		expect(suggestRequestSchema.safeParse(ideas).success).toBe(true);
+		expect(suggestRequestSchema.safeParse({ ...ideas, request: '  ' }).success).toBe(false);
+		expect(suggestRequestSchema.safeParse({ ...ideas, request: 'x'.repeat(501) }).success).toBe(
+			false
+		);
+		expect(suggestRequestSchema.safeParse({ ...ideas, side: 'switch' }).success).toBe(false);
 	});
 });
 

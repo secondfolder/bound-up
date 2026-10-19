@@ -33,7 +33,9 @@
 // "The <scene title> story", so a spec knows what to expect, and a naming
 // request fails once like any other when the scene's title has `[fail]` in it.
 // A daydream described in a sentence is always "The stub night train", with
-// Vesper cast as its stranger.
+// Vesper cast as its stranger. Generated ideas are one for each side and one
+// with nobody in charge, the first titled for the side the prompt asked for
+// ("Stub idea for the sub"), so a spec can see the side reach the model.
 import { createServer } from 'node:http';
 
 const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1' } = process.env;
@@ -168,6 +170,23 @@ function suggestionFor(messages) {
 					relationship: 'a stranger on the train',
 					doing: 'pretending to read'
 				}
+			]
+		};
+	} else if (ask.includes('{"ideas"')) {
+		const side = ask.match(/The user is the (?<side>dominant|submissive) one/)?.groups?.side;
+		const asked = { dominant: 'dom', submissive: 'sub' }[side] ?? 'either';
+		content = {
+			ideas: [
+				{
+					title: `Stub idea for the ${asked}`,
+					premise: 'A stub premise.',
+					tags: ['stub'],
+					you: asked === 'either' ? 'sub' : asked,
+					heat: 3,
+					kink: 2
+				},
+				{ title: 'Stub idea for the dom', premise: 'In charge.', you: 'dom', heat: 4, kink: 4 },
+				{ title: 'Stub idea for nobody', premise: 'Even.', you: null, heat: 2, kink: 1 }
 			]
 		};
 	} else if (ask.includes('{"chips"')) {
