@@ -11,7 +11,7 @@
 	import { followEnd, scrollIntoViewWithin } from '$lib/scroll-parent';
 	import type { Quote, Reading } from '$lib/sealed-kinds/daydreams';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
-	import type { DaydreamView } from '$lib/types';
+	import type { DaydreamTreeNodeView, DaydreamView } from '$lib/types';
 	import DaydreamBookmarkDialog from './DaydreamBookmarkDialog.svelte';
 	import DaydreamBookmarks from './DaydreamBookmarks.svelte';
 	import DaydreamBranchMap from './DaydreamBranchMap.svelte';
@@ -90,9 +90,29 @@
 	const conversation = new RawConversation(story);
 	/** The newest passage on the branch, whose request's system prompt heads the raw log. */
 	const newestPassage = $derived(story.path.findLast((node) => node.role === 'story') ?? null);
+	/** The system prompt heading the raw log: the newest passage's record, or its rebuild. */
 	const rawSystem = $derived.by(() => {
-		const state = newestPassage ? conversation.state(newestPassage.id) : undefined;
+		if (!newestPassage) {
+			return null;
+		}
+		const content = story.content(newestPassage.id);
+		if (content?.type === 'text' && content.sent) {
+			return content.sent.system;
+		}
+		const state = conversation.state(newestPassage.id);
 		return state && state !== 'loading' && 'system' in state ? state.system : null;
+	});
+	/** Each passage's previous passage on the branch: the request it should add to. */
+	const previousPassage = $derived.by(() => {
+		const map = new Map<string, DaydreamTreeNodeView | null>();
+		let last: DaydreamTreeNodeView | null = null;
+		for (const node of story.path) {
+			if (node.role === 'story') {
+				map.set(node.id, last);
+				last = node;
+			}
+		}
+		return map;
 	});
 
 	/**
@@ -387,12 +407,18 @@
 	     one who has scrolled up to read is left where they are. -->
 	<ol class="turns" bind:this={listElement} aria-live="polite" {@attach followEnd}>
 		{#if rawLog && newestPassage}
-			<DaydreamRawSystem {conversation} turnId={newestPassage.id} />
+			<DaydreamRawSystem {story} {conversation} turnId={newestPassage.id} />
 		{/if}
 		{#each story.path as node (node.id)}
 			{#if rawLog}
 				{#if node.role === 'story'}
-					<DaydreamRawSent {conversation} {node} system={rawSystem} />
+					<DaydreamRawSent
+						{story}
+						{conversation}
+						{node}
+						previous={previousPassage.get(node.id) ?? null}
+						system={rawSystem}
+					/>
 				{/if}
 				<DaydreamRawTurn {story} {node} />
 			{:else if node.role === 'story'}

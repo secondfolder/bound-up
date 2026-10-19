@@ -6,6 +6,7 @@ import {
 	chosenReadingIn,
 	contextSize,
 	expansionIn,
+	passageAsSent,
 	toContextTurn,
 	trimContext
 } from './context';
@@ -74,22 +75,18 @@ describe('trimContext', () => {
 });
 
 describe('toContextTurn', () => {
-	it('sends a passage’s text and reaction, never what it offered next', () => {
+	it('sends a passage’s text, never what it offered next', () => {
 		expect(
-			toContextTurn(
-				'story',
-				{
-					type: 'text',
-					text: 'Sit.',
-					meta: {
-						suggestions: ['Sit.'],
-						directions: { add: [{ id: 'slower', label: 'Slower' }], remove: [] },
-						readAs: 'action'
-					}
-				},
-				{ reaction: 'love' }
-			)
-		).toEqual({ type: 'text', role: 'story', text: 'Sit.', reaction: 'love' });
+			toContextTurn('story', {
+				type: 'text',
+				text: 'Sit.',
+				meta: {
+					suggestions: ['Sit.'],
+					directions: { add: [{ id: 'slower', label: 'Slower' }], remove: [] },
+					readAs: 'action'
+				}
+			})
+		).toEqual({ type: 'text', role: 'story', text: 'Sit.' });
 	});
 
 	it('marks a passage that stepped out of the story', () => {
@@ -100,12 +97,6 @@ describe('toContextTurn', () => {
 				meta: { suggestions: [], directions: { add: [], remove: [] }, ooc: true }
 			})
 		).toEqual({ type: 'text', role: 'story', text: 'Are you okay?', ooc: true });
-	});
-
-	it('never puts a reaction on the user’s own turn', () => {
-		expect(toContextTurn('user', { type: 'text', text: 'Hi' }, { reaction: 'like' })).toEqual(
-			said('Hi')
-		);
 	});
 
 	it('turns each kind of turn into what the model reads', () => {
@@ -137,7 +128,10 @@ describe('toContextTurn', () => {
 		).toEqual({ type: 'roll', sides: 6, result: 4, outcome: 'You hold' });
 	});
 
-	it('sends a user’s turn as it was written out, not the instruction it came from', () => {
+	// Each turn goes back as it was first sent, so each request only adds to
+	// the one before: the user's turn as they wrote it, and the written-out
+	// turn with the passage that wrote it, as the model wrote it.
+	it('sends a user’s turn as they wrote it, and the turn written out with the passage', () => {
 		const answer = {
 			type: 'text' as const,
 			text: 'Charlie sighs.',
@@ -149,16 +143,37 @@ describe('toContextTurn', () => {
 			}
 		};
 		const instruction = { type: 'text' as const, text: 'Tell Charlie the fox is safe' };
-		expect(toContextTurn('user', instruction, { expansion: expansionIn(answer) })).toEqual(
-			said('"Charlie, the fox is safe."')
+		expect(toContextTurn('user', instruction)).toEqual(said('Tell Charlie the fox is safe'));
+		expect(toContextTurn('story', answer)).toEqual({
+			...said('Charlie sighs.', 'story'),
+			expansion: '"Charlie, the fox is safe."'
+		});
+		expect(passageAsSent('Charlie sighs.', expansionIn(answer))).toBe(
+			'<yours>\n"Charlie, the fox is safe."\n</yours>\nCharlie sighs.'
 		);
-		// A passage is never replaced, and nothing written out is the turn as sent.
-		expect(toContextTurn('story', answer, { expansion: 'x' })).toEqual(
-			said('Charlie sighs.', 'story')
-		);
-		expect(toContextTurn('user', instruction, { expansion: expansionIn(null) })).toEqual(
-			said('Tell Charlie the fox is safe')
-		);
+		expect(passageAsSent('Charlie sighs.', null)).toBe('Charlie sighs.');
+	});
+
+	it('sends a rewrite with what it rewrote, so its request goes back with it', () => {
+		const rewritten = {
+			type: 'text' as const,
+			text: 'Charlie laughs.',
+			meta: {
+				suggestions: [],
+				directions: { add: [], remove: [] },
+				rewriteOf: {
+					turnId: crypto.randomUUID(),
+					quote: { start: 0, end: 7, text: 'Charlie' },
+					instruction: 'Warmer.'
+				}
+			}
+		};
+		expect(toContextTurn('story', rewritten, { rewrote: 'Charlie sighs.' })).toEqual({
+			...said('Charlie laughs.', 'story'),
+			rewrite: { targetText: 'Charlie sighs.', quote: 'Charlie', instruction: 'Warmer.' }
+		});
+		// Without the passage it rewrote (one that will not open), it goes as a plain one.
+		expect(toContextTurn('story', rewritten)).toEqual(said('Charlie laughs.', 'story'));
 	});
 
 	it('says how the user chose to have their turn read, and only theirs', () => {
@@ -183,10 +198,12 @@ describe('toContextTurn', () => {
 		expect(toContextTurn('story', answer(true), { readAs: 'direction' })).toEqual(
 			said('The story turns steamy.', 'story')
 		);
-		// Written out, it is the turn itself, and needs no reading.
-		expect(toContextTurn('user', turn, { expansion: 'I ask.', readAs: 'instruction' })).toEqual(
-			said('I ask.')
-		);
+		// Written out by the passage after it or not, it goes with its reading,
+		// as it was first sent.
+		expect(toContextTurn('user', turn, { readAs: 'instruction' })).toEqual({
+			...said('Make it steamy'),
+			readAs: 'instruction'
+		});
 	});
 
 	it('cuts a text turn to the turn limit', () => {

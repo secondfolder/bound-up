@@ -64,12 +64,15 @@ import {
 	type ContextTurn,
 	chosenReadingIn,
 	expansionIn,
+	passageAsSent,
+	passageExcerpt,
 	type Reaction,
 	toContextTurn,
 	trimContext
 } from './context';
 import { outcomeFor, type RollProposal, roll } from './dice';
 import { explicitOoc } from './ooc';
+import type { SentRecord } from './sent-record';
 import { suggestName } from './suggest';
 import { MAX_NAMING_OPENING } from './suggestions';
 import {
@@ -367,17 +370,20 @@ export class DaydreamStory {
 	 * written without it. A turn that will not open here at all is left out
 	 * rather than holding the story up for good.
 	 *
-	 * A user's turn that the passage after it wrote out goes as written out,
-	 * and one the user chose a reading for goes with it. The last turn has no
-	 * passage after it on this branch, so `last` says those for it, if
-	 * anything (a rewrite's expansion, a forced reading).
+	 * Every turn goes as it was first sent (`toContextTurn`), so each request
+	 * only adds to the one before: a passage with the buttons its request
+	 * listed and, for a rewrite, the passage it rewrote; a reaction as a note
+	 * where it was made (`#reactionsAlong`). A user's turn goes with the
+	 * reading they chose for it; the last has no passage after it on this
+	 * branch, so `last` says that for it, if anything.
 	 */
-	#contextUpTo(
-		parentId: string | null,
-		last: { expansion?: string; readAs?: Reading } = {}
-	): ContextTurn[] | null {
+	#contextUpTo(parentId: string | null, last: { readAs?: Reading } = {}): ContextTurn[] | null {
 		const context: ContextTurn[] = [];
 		const path = pathTo(this.index, parentId);
+		const reactions = this.#reactionsAlong(path);
+		if (!reactions) {
+			return null;
+		}
 		for (const [index, node] of path.entries()) {
 			const content = this.content(node.id);
 			if (content === undefined) {
@@ -393,10 +399,13 @@ export class DaydreamStory {
 			const before = path
 				.slice(0, index)
 				.map((earlier) => ({ content: this.content(earlier.id) ?? null }));
+			const rewrote = this.#rewrittenAsSent(node.role === 'story' ? content : null);
+			if (rewrote === undefined) {
+				return null;
+			}
 			const turn = toContextTurn(node.role, content, {
-				reaction: this.reactionFor(node.id)?.reaction,
-				expansion: next ? expansionIn(after) : last.expansion,
 				readAs: next ? chosenReadingIn(after) : last.readAs,
+				...(rewrote === null ? {} : { rewrote }),
 				...(node.role === 'story' && !isHalted(before)
 					? { buttons: currentDirections(before) }
 					: {})
@@ -404,8 +413,65 @@ export class DaydreamStory {
 			if (turn) {
 				context.push(turn);
 			}
+			context.push(...(reactions.get(node.id) ?? []));
 		}
 		return trimContext(context);
+	}
+
+	/**
+	 * For a passage that rewrote another, the passage it rewrote as it was
+	 * sent, which its request quoted (`#replyBody`): null for any other turn,
+	 * or one whose target will not open; undefined while the target opens.
+	 */
+	#rewrittenAsSent(content: DaydreamTurnContent | null): string | null | undefined {
+		const targetId = content?.type === 'text' ? content.meta?.rewriteOf?.turnId : undefined;
+		if (!targetId) {
+			return null;
+		}
+		const target = this.content(targetId);
+		if (target === undefined) {
+			return undefined;
+		}
+		return target?.type === 'text' ? passageAsSent(target.text, expansionIn(target)) : null;
+	}
+
+	/**
+	 * The reactions on `path`, each as a note after the turn it was made after
+	 * (its `after`, or the nearest turn on this path above it when that one is
+	 * on another branch), keyed by that turn. A reaction from before marks
+	 * said so goes after its own passage, as reactions always did. Null while
+	 * a mark on the path is still opening: until it is, which notes there are
+	 * cannot be known.
+	 */
+	#reactionsAlong(path: readonly DaydreamTreeNodeView[]): Map<string, ContextTurn[]> | null {
+		const onPath = new Set(path.map((node) => node.id));
+		const notes = new Map<string, ContextTurn[]>();
+		for (const mark of this.marks) {
+			if (!onPath.has(mark.turnId)) {
+				continue;
+			}
+			if (mark.content === undefined) {
+				return null;
+			}
+			if (mark.content?.type !== 'reaction') {
+				continue;
+			}
+			let anchor: string | null = mark.content.after ?? mark.turnId;
+			while (anchor !== null && !onPath.has(anchor)) {
+				anchor = this.index.byId.get(anchor)?.parentId ?? null;
+			}
+			const at = anchor ?? mark.turnId;
+			const passage = this.content(mark.turnId);
+			notes.set(at, [
+				...(notes.get(at) ?? []),
+				{
+					type: 'reaction',
+					reaction: mark.content.reaction,
+					of: at === mark.turnId || passage?.type !== 'text' ? null : passageExcerpt(passage.text)
+				}
+			]);
+		}
+		return notes;
 	}
 
 	/** Starts a passage, keeping `#replying` for as long as it runs. */
@@ -439,10 +505,16 @@ export class DaydreamStory {
 			setup,
 			turns: context,
 			currentDirections: currentDirections(before),
+			...(this.#keepRawReplies ? { record: true } : {}),
 			...(request.rewrite
 				? {
 						rewrite: {
-							targetText: request.rewrite.target.text,
+							// As the model was shown it, written-out turn and all: the
+							// rewritten passage goes back after this request, quoted the same way.
+							targetText: passageAsSent(
+								request.rewrite.target.text,
+								expansionIn(this.content(request.rewrite.target.id))
+							),
 							...(request.rewrite.quote ? { quote: request.rewrite.quote.text } : {}),
 							...(request.rewrite.instruction ? { instruction: request.rewrite.instruction } : {})
 						}
@@ -453,14 +525,65 @@ export class DaydreamStory {
 
 	/** The story as the model reads it for `request`, or null while some of it is still opening. */
 	#contextFor(request: Generate): ContextTurn[] | null {
-		const carried = carriedIn(request);
-		return this.#contextUpTo(request.parentId, {
-			...(carried ? { expansion: carried } : {}),
-			...(request.readAs ? { readAs: request.readAs } : {})
+		return this.#contextUpTo(request.parentId, request.readAs ? { readAs: request.readAs } : {});
+	}
+
+	/**
+	 * What the story up to `parentId` is sent with but the screen may never
+	 * have shown, and is not open yet: the passages its rewrites rewrote,
+	 * which are on other branches, and the reactions on it. Without them
+	 * `#contextUpTo` would wait for something nothing is opening.
+	 */
+	#unopenedForContext(parentId: string | null): { turns: string[]; marks: DaydreamMarkView[] } {
+		const path = pathTo(this.index, parentId);
+		const turns = path.flatMap((node) => {
+			const content = this.content(node.id);
+			const targetId = content?.type === 'text' ? content.meta?.rewriteOf?.turnId : undefined;
+			return targetId && this.content(targetId) === undefined ? [targetId] : [];
 		});
+		const onPath = new Set(path.map((node) => node.id));
+		// Open already through the page's cache counts: only one still opening waits.
+		const marks = this.#marks.filter(
+			(mark) =>
+				onPath.has(mark.turnId) &&
+				(this.#writtenMarks.get(mark.id) ?? openedDaydreamMark(mark.sealed)) === undefined
+		);
+		return { turns, marks };
+	}
+
+	/**
+	 * Opens what `#unopenedForContext` found. Only awaited when there is
+	 * something to open: a passage starting even a moment later than its
+	 * turn appeared lost the page's scroll-following, which judges whether
+	 * the reader is at the end as each arrives.
+	 */
+	async #openForContext(unopened: { turns: string[]; marks: DaydreamMarkView[] }): Promise<void> {
+		await this.ensureLoaded(unopened.turns);
+		await vaultsSettled();
+		for (const id of unopened.turns) {
+			const ref = this.#refs.get(id);
+			const vault = ref ? vaultById(ref.vaultId) : null;
+			if (ref && vault && this.content(id) === undefined) {
+				const opened = await openRecord(daydreamTurnKind, { ...ref, vault });
+				if (opened) {
+					this.#written.set(id, opened);
+				}
+			}
+		}
+		for (const mark of unopened.marks) {
+			const vault = vaultById(mark.sealed.vaultId);
+			const opened = vault ? await openRecord(daydreamMarkKind, { ...mark.sealed, vault }) : null;
+			if (opened) {
+				this.#writtenMarks.set(mark.id, opened);
+			}
+		}
 	}
 
 	async #generate(request: Generate): Promise<void> {
+		const unopened = this.#unopenedForContext(request.parentId);
+		if (unopened.turns.length > 0 || unopened.marks.length > 0) {
+			await this.#openForContext(unopened);
+		}
 		const { setup } = this;
 		const forced = request.readAs;
 		const carried = carriedIn(request);
@@ -504,9 +627,14 @@ export class DaydreamStory {
 		let reading: Reading | null = null;
 		// The reply as it arrives, tags and all, kept even through a Stop.
 		let raw = '';
+		// What the request sent the model, for the same raw log, also kept through a Stop.
+		let sent: SentRecord | null = null;
 		try {
 			const outcome = await writeReply(this.id, this.#replyBody(request, setup, context), {
 				signal,
+				onSent: (record) => {
+					sent = record;
+				},
 				onText: (soFar, arrived) => {
 					raw = arrived;
 					if (this.streaming) {
@@ -580,7 +708,8 @@ export class DaydreamStory {
 			type: 'text',
 			text: passage.slice(0, 8000),
 			...(finalMeta ? { meta: finalMeta } : {}),
-			...(this.#keepRawReplies ? rawReply(raw) : {})
+			...(this.#keepRawReplies ? rawReply(raw) : {}),
+			...(this.#keepRawReplies && sent ? { sent } : {})
 		};
 		const saved = await this.#append(request.parentId, 'story', content);
 		this.streaming = null;
@@ -594,7 +723,8 @@ export class DaydreamStory {
 	 * the server builds it: debug mode's "Show prompt" (docs/debug-mode.md).
 	 * Rebuilt from the story as it stands — today's setup, the turns as the
 	 * page has them — so it can differ from what was sent when the passage was
-	 * written, which nothing records. The request is the one that passage's
+	 * written, which the passage's own `sent` records (`sent-record.ts`); this
+	 * is what stands in for it on a passage written before. The request is the one that passage's
 	 * own record says it answered: an opening, a reply, or a rewrite of the
 	 * passage it names, with any reading the user chose.
 	 */
@@ -633,6 +763,7 @@ export class DaydreamStory {
 				}
 			};
 		}
+		await this.#openForContext(this.#unopenedForContext(request.parentId));
 		const context = this.#contextFor(request);
 		if (!context) {
 			return { ok: false, error: NOT_READY };
@@ -1006,6 +1137,11 @@ export class DaydreamStory {
 
 	/** One reaction per passage: pressing the one it has takes it off, another replaces it. */
 	async react(turnId: string, reaction: Reaction): Promise<string | null> {
+		// Where in the story it was made, so it goes to the model there
+		// (`#reactionsAlong`). A passage being written now was asked for without
+		// it, so it waits for that passage and goes after it.
+		await this.#settled();
+		const after = this.path.at(-1)?.id;
 		const current = this.reactionFor(turnId);
 		if (current) {
 			const removed = await this.removeMark(current.id);
@@ -1013,7 +1149,7 @@ export class DaydreamStory {
 				return removed;
 			}
 		}
-		return await this.#addMark(turnId, { type: 'reaction', reaction });
+		return await this.#addMark(turnId, { type: 'reaction', reaction, ...(after ? { after } : {}) });
 	}
 
 	async bookmark(

@@ -8,7 +8,13 @@ import {
 	MAX_DIRECTIONS,
 	MAX_SUGGESTIONS
 } from '$lib/daydream';
-import { type ContextTurn, contextSize, contextTurnSchema } from '$lib/daydream/context';
+import {
+	type ContextTurn,
+	contextSize,
+	contextTurnSchema,
+	MAX_PASSAGE_AS_SENT,
+	passageAsSent
+} from '$lib/daydream/context';
 import {
 	describeCharacterDials,
 	describeSceneDials,
@@ -50,11 +56,17 @@ export const replyRequestSchema = z
 		setup: daydreamSetupKind.latest,
 		// One more for the `omitted` marker a trimmed story starts with.
 		turns: z.array(contextTurnSchema).max(MAX_CONTEXT_TURNS + 1),
+		/**
+		 * Debug mode: answer with what was sent, ahead of the reply
+		 * (`daydream/sent-record.ts`), for the passage to keep for the raw log.
+		 */
+		record: z.boolean().optional(),
 		/** The direction buttons on screen now, for the model to add to or prune. */
 		currentDirections: z.array(directionSchema).max(MAX_DIRECTIONS).default([]),
 		rewrite: z
 			.object({
-				targetText: z.string().min(1).max(DAYDREAM_LIMITS.turn),
+				// The passage being rewritten as it was sent (`passageAsSent`).
+				targetText: z.string().min(1).max(MAX_PASSAGE_AS_SENT),
 				quote: z.string().max(DAYDREAM_LIMITS.quote).optional(),
 				instruction: z.string().max(DAYDREAM_LIMITS.instruction).optional()
 			})
@@ -420,13 +432,7 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 	switch (turn.type) {
 		case 'text': {
 			if (turn.role === 'story') {
-				const passage = { role: 'assistant' as const, content: turn.text };
-				return turn.reaction
-					? [
-							passage,
-							{ role: 'user', content: `(Reaction: the user ${REACTION_WORDS[turn.reaction]}.)` }
-						]
-					: [passage];
+				return [{ role: 'assistant', content: passageAsSent(turn.text, turn.expansion) }];
 			}
 			return [{ role: 'user', content: userText(turn) }];
 		}
@@ -446,6 +452,16 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 			return [{ role: 'user', content: SAFETY_NOTICES[turn.signal] }];
 		case 'omitted':
 			return [{ role: 'user', content: OMITTED_NOTE }];
+		case 'reaction':
+			return [
+				{
+					role: 'user',
+					content:
+						turn.of === null
+							? `(Reaction: the user ${REACTION_WORDS[turn.reaction]}.)`
+							: `(Reaction: the user ${REACTION_WORDS[turn.reaction]} — the one that began "${turn.of}".)`
+				}
+			];
 		case 'roll':
 			return [
 				{
@@ -532,11 +548,14 @@ export function buildMessages(request: ReplyRequest): ModelMessage[] {
 	for (const turn of request.turns) {
 		// A passage goes back with the request that asked for it, as it was
 		// sent, so each request only adds to the one before and a provider's
-		// cache of the last covers it (docs/daydreams.md, "Cost"): the
-		// opening's request, Continue's between two passages, and the buttons
-		// it listed. A check-in, asked for while stopped, listed none.
+		// cache of the last covers it (docs/daydreams.md, "Cost"): a rewrite's
+		// instructions, the opening's request, Continue's between two
+		// passages, and the buttons it listed. A check-in, asked for while
+		// stopped, listed none.
 		if (turn.type === 'text' && turn.role === 'story') {
-			if (conversation.length === 0) {
+			if (turn.rewrite) {
+				add({ role: 'user', content: rewriteRequest(turn.rewrite) });
+			} else if (conversation.length === 0) {
 				add({ role: 'user', content: openingRequest(request.setup.voice) });
 			} else if (conversation.at(-1)?.role === 'assistant') {
 				add({ role: 'user', content: CONTINUE_REQUEST });

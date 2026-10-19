@@ -373,6 +373,36 @@ const turnV4 = z.discriminatedUnion('type', [
 	...turnTypesV2
 ]);
 
+// v5: a passage may carry what its request actually sent the model (`sent`,
+// `daydream/sent-record.ts`): the system prompt, what the request added after
+// the last passage, and the history as a hash chain. For debug mode's raw
+// log, alongside `raw`, and written under the same rule.
+const sentRecordSchema = z.object({
+	system: z.string().max(DAYDREAM_LIMITS.sentSystem),
+	added: z
+		.array(z.string().max(DAYDREAM_LIMITS.sentAdded))
+		.max(8)
+		.refine(
+			(added) =>
+				added.reduce((sum, content) => sum + content.length, 0) <= DAYDREAM_LIMITS.sentAdded,
+			'Too much was added to keep'
+		),
+	history: z.object({
+		messages: z.number().int().min(0),
+		chain: z.string().regex(/^[0-9a-f]{64}$/)
+	}),
+	truncated: z.literal(true).optional()
+});
+
+const turnV5 = z.discriminatedUnion('type', [
+	textTurn(passageMetaSchema).extend({
+		raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+		rawTruncated: z.literal(true).optional(),
+		sent: sentRecordSchema.optional()
+	}),
+	...turnTypesV2
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
@@ -397,7 +427,13 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v3 could say, v4 says the same way.
 			upcast: (value: z.output<typeof turnV3>) => value
 		},
-		{ version: 4, schema: turnV4 }
+		{
+			version: 4,
+			schema: turnV4,
+			// Everything v4 could say, v5 says the same way.
+			upcast: (value: z.output<typeof turnV4>) => value
+		},
+		{ version: 5, schema: turnV5 }
 	]
 });
 
@@ -405,25 +441,46 @@ export type DaydreamTurnContent = z.output<typeof daydreamTurnKind.latest>;
 
 // ── marks ────────────────────────────────────────────────────────────────────
 
+const bookmarkMark = z.object({
+	type: z.literal('bookmark'),
+	label: optional(DAYDREAM_LIMITS.bookmarkLabel),
+	quote: quoteSchema.nullable()
+});
+
+const markV1 = z.discriminatedUnion('type', [
+	// A save point, or a highlighted quote when `quote` is set.
+	bookmarkMark,
+	z.object({
+		type: z.literal('reaction'),
+		reaction: z.enum(['love', 'like', 'not-for-me'])
+	})
+]);
+
+// v2: a reaction says where in the story it was made — the turn that was
+// newest then (`after`) — so it goes to the model there, as a note added to
+// the story rather than one put back beside its passage, which would change a
+// history every later request had already sent (docs/daydreams.md, "Cost").
+const markV2 = z.discriminatedUnion('type', [
+	bookmarkMark,
+	z.object({
+		type: z.literal('reaction'),
+		reaction: z.enum(['love', 'like', 'not-for-me']),
+		after: clientId.optional()
+	})
+]);
+
 export const daydreamMarkKind = defineSealedKind({
 	name: 'daydream-mark',
 	maxCiphertextLength: 4 * 1024,
 	versions: [
 		{
 			version: 1,
-			schema: z.discriminatedUnion('type', [
-				// A save point, or a highlighted quote when `quote` is set.
-				z.object({
-					type: z.literal('bookmark'),
-					label: optional(DAYDREAM_LIMITS.bookmarkLabel),
-					quote: quoteSchema.nullable()
-				}),
-				z.object({
-					type: z.literal('reaction'),
-					reaction: z.enum(['love', 'like', 'not-for-me'])
-				})
-			])
-		}
+			schema: markV1,
+			// A reaction from before v2 says nothing of where it was made, and
+			// goes back beside its passage, as it always did.
+			upcast: (value: z.output<typeof markV1>) => value
+		},
+		{ version: 2, schema: markV2 }
 	]
 });
 

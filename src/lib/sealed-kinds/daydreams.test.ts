@@ -12,7 +12,8 @@ const sealedLength = (bytes: number) => 'sb1.'.length + Math.ceil(((12 + bytes +
 describe('daydreamTurnKind', () => {
 	it('fits a passage at every cap, kept raw as well, inside its ciphertext cap', () => {
 		// Prose a model writes is nearly all ASCII; the worst realistic case is
-		// every field full, with the raw reply repeating them.
+		// every field full, with the raw reply repeating them, and what the
+		// request sent recorded beside it.
 		const passage = {
 			type: 'text' as const,
 			text: 'x'.repeat(DAYDREAM_LIMITS.turn),
@@ -24,11 +25,30 @@ describe('daydreamTurnKind', () => {
 				expansion: 'z'.repeat(DAYDREAM_LIMITS.turn)
 			},
 			raw: 'r'.repeat(DAYDREAM_LIMITS.rawReply),
-			rawTruncated: true as const
+			rawTruncated: true as const,
+			sent: {
+				system: 's'.repeat(DAYDREAM_LIMITS.sentSystem),
+				added: ['a'.repeat(DAYDREAM_LIMITS.sentAdded)],
+				history: { messages: 200, chain: 'f'.repeat(64) },
+				truncated: true as const
+			}
 		};
 		expect(daydreamTurnKind.latest.safeParse(passage).success).toBe(true);
 		const bytes = new TextEncoder().encode(JSON.stringify(passage)).length;
 		expect(sealedLength(bytes)).toBeLessThanOrEqual(daydreamTurnKind.maxCiphertextLength);
+	});
+
+	it('refuses a record of what was sent past its caps', () => {
+		const sent = (system: number, added: string[]) =>
+			daydreamTurnKind.latest.safeParse({
+				type: 'text',
+				text: 'x',
+				sent: { system: 's'.repeat(system), added, history: { messages: 0, chain: '0'.repeat(64) } }
+			}).success;
+		expect(sent(DAYDREAM_LIMITS.sentSystem, [])).toBe(true);
+		expect(sent(DAYDREAM_LIMITS.sentSystem + 1, [])).toBe(false);
+		const half = 'a'.repeat(DAYDREAM_LIMITS.sentAdded / 2 + 1);
+		expect(sent(0, [half, half])).toBe(false);
 	});
 
 	it('refuses a raw reply past its cap', () => {

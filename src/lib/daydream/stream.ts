@@ -24,6 +24,8 @@ const LINE_BREAK = /\r?\n/;
 type StreamEvent = {
 	choices?: { delta?: { content?: unknown } }[];
 	error?: unknown;
+	/** The reply endpoint's own event, first, for debug mode: what it sent the model. */
+	boundUpSent?: unknown;
 };
 
 /**
@@ -33,7 +35,9 @@ type StreamEvent = {
  */
 export async function readReplyStream(
 	body: ReadableStream<Uint8Array>,
-	onText: (piece: string) => void
+	onText: (piece: string) => void,
+	/** Given the endpoint's record of what it sent, when it was asked for one. */
+	onSent: (record: unknown) => void = () => undefined
 ): Promise<StreamOutcome> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
@@ -47,7 +51,7 @@ export async function readReplyStream(
 			const lines = buffered.split(LINE_BREAK);
 			buffered = done ? '' : (lines.pop() ?? '');
 			for (const line of lines) {
-				const outcome = handleLine(line, onText);
+				const outcome = handleLine(line, onText, onSent);
 				if (outcome) {
 					return outcome;
 				}
@@ -61,7 +65,11 @@ export async function readReplyStream(
 	}
 }
 
-function handleLine(line: string, onText: (piece: string) => void): StreamOutcome | null {
+function handleLine(
+	line: string,
+	onText: (piece: string) => void,
+	onSent: (record: unknown) => void
+): StreamOutcome | null {
 	if (!line.startsWith('data:')) {
 		// Blank separators, `: keep-alive` comments, `event:` and `id:` fields.
 		return null;
@@ -75,6 +83,10 @@ function handleLine(line: string, onText: (piece: string) => void): StreamOutcom
 		event = JSON.parse(data) as StreamEvent;
 	} catch {
 		// Not an event this reader understands; the rest of the reply still is.
+		return null;
+	}
+	if (event.boundUpSent !== undefined) {
+		onSent(event.boundUpSent);
 		return null;
 	}
 	if (event.error) {

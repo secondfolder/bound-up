@@ -380,6 +380,34 @@
 			}
 		},
 		{
+			"kind": "daydream-turn",
+			"version": 5,
+			"recordId": "00000000-0000-4000-8000-0000000000da",
+			"ciphertext": "sb1.f3qHqRA_OezyyG0xUuNIlABDnpdhfc9pa-OifjVigpn55n2drosWoIHVO6a1AyCuQXQlx7G4LM4PKUw4VjAhqk0ZXXnMKlqb9CiLZXlslvQiPCV5fUS2mNxQc61yjHNOpMs1B--d_2rLgggmioW-3woCxkTW10ZdimP9arTKfRmMSDLP3pQJTGoaJ3_3TFHeqeps8_ijNz744jPSbqCY1uKOGOVVYSnchGNQiH5zjiHNZlO6-dvBdEJvEWETLKx5MnKpM-vD-w4I-mbvu1F24jIUk3rE7v4UR1rvQQvHsCY5rLYJf6KTK7LOWdPDCoO7ZlVGR0_-qi815gpVK2_o-sDnZOcXU-npO3Vd-ltZEPHmKZGfodbyMQbwTfxpkfXKoi-NzOVodBbB5KSX6TwJ4-DH-e0PjJQZtSWI3SL3fLrSdp9QWT1_PDLKbxPGy16BYHxF5yXt6AlB5GV4Xk9ndERxhuGeEIsmhvoeftBRSokm5JqP_YojqIc1MC3Eelj0t8TkPiQ-MhE0Gd4SX1UiqDtlKv74ewLvRNLLsVGjfI6DnS79kxxLvMd-o3LOHEBecXIQxBSlHmaR-Awekuapbf3NuHzGPQ5z2lnehinlEL4QOvA2GxgnaGHgnhyi4tfKIdMGVC55BCm_CmnjkKQfqZz-dvhN6P68C9rH3LEO_GpI0IkriQk_FSLKttow4uU3ckfQuCVUC6yfxAfO16tU",
+			"expected": {
+				"type": "text",
+				"text": "Charlie lets out a breath.",
+				"meta": {
+					"suggestions": ["Hold out a hand."],
+					"directions": {
+						"add": [],
+						"remove": []
+					},
+					"readAs": "action"
+				},
+				"raw": "<reading>action</reading>\nCharlie lets out a breath.\n\n<meta>\n{\"suggestions\": [\"Hold out a hand.\"]}\n</meta>",
+				"sent": {
+					"system": "You are writing an interactive story.",
+					"added": ["I sit.\n\n(Direction buttons on screen now: none yet.)"],
+					"history": {
+						"messages": 2,
+						"chain": "8a2f4c3b1e0d9f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
+					},
+					"truncated": true
+				}
+			}
+		},
+		{
 			"kind": "daydream-mark",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d5",
@@ -392,6 +420,17 @@
 					"end": 22,
 					"text": "Still frozen."
 				}
+			}
+		},
+		{
+			"kind": "daydream-mark",
+			"version": 2,
+			"recordId": "00000000-0000-4000-8000-0000000000db",
+			"ciphertext": "sb1.fvU36Gj2LYFmu5IZ-uwNKDswogevrzkz6YNJYiDUYePYv4MnOuV1dv1ZLcGELSz-hKIlIsf0kxMRtlZgPfjMx_qeWlFEqE6opftgZtHtj787wmUpIJ9LSix9FqO3-lGlRyM3HfzZFHTMw8NGW4X_6A",
+			"expected": {
+				"type": "reaction",
+				"reaction": "love",
+				"after": "00000000-0000-4000-8000-0000000000d9"
 			}
 		},
 		{

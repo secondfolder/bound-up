@@ -1,32 +1,44 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import type { RawConversation } from '$lib/daydream/raw-conversation.svelte';
+	import type { DaydreamStory } from '$lib/daydream/story.svelte';
 
 	/**
 	 * The system prompt, once, at the top of debug mode's raw log
 	 * (docs/debug-mode.md). Every request in a story sends the same one, so it
 	 * is shown once rather than with each passage; a request that sent another
 	 * (a check-in after Stop the scene) shows its own (`DaydreamRawSent`).
-	 * Taken from the newest passage's request, rebuilt with the setup as it is
-	 * now.
+	 * The newest passage's record of what it sent, or, for one written before
+	 * records were kept, rebuilt with the setup as it is now, which it says.
 	 */
-	let { conversation, turnId }: { conversation: RawConversation; turnId: string } = $props();
+	let {
+		story,
+		conversation,
+		turnId
+	}: { story: DaydreamStory; conversation: RawConversation; turnId: string } = $props();
 
-	const state = $derived(conversation.state(turnId));
+	const content = $derived(story.content(turnId));
+	const recorded = $derived(content?.type === 'text' ? (content.sent?.system ?? null) : null);
+	const rebuilt = $derived(recorded === null ? conversation.state(turnId) : undefined);
 
-	onMount(() => {
-		conversation.load(turnId);
+	$effect(() => {
+		if (content !== undefined && recorded === null) {
+			conversation.load(turnId);
+		}
 	});
 </script>
 
 <li class="system" data-raw-system>
-	{#if state === undefined || state === 'loading'}
+	{#if recorded !== null}
+		<wa-details summary="System prompt" appearance="plain">
+			<pre>{recorded}</pre>
+		</wa-details>
+	{:else if rebuilt === undefined || rebuilt === 'loading'}
 		<wa-spinner></wa-spinner>
-	{:else if 'error' in state}
-		<p class="note" role="alert">{state.error}</p>
+	{:else if 'error' in rebuilt}
+		<p class="note" role="alert">{rebuilt.error}</p>
 	{:else}
-		<wa-details summary="System prompt, with the setup as it is now" appearance="plain">
-			<pre>{state.system}</pre>
+		<wa-details summary="System prompt, rebuilt: not recorded when written" appearance="plain">
+			<pre>{rebuilt.system}</pre>
 		</wa-details>
 	{/if}
 </li>

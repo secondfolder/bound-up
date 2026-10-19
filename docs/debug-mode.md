@@ -99,20 +99,27 @@ This is a "Raw log" switch in a daydream's tool row, remembered on the device
 in `localStorage`. While it is on, each turn on the branch being read is drawn
 by `DaydreamRawTurn.svelte`, not as the story:
 
-- **The conversation as the model had it.** Every request in a story is the
-  one before it with more added on the end (see
-  [daydreams.md](daydreams.md#cost)), so the log shows it as one
-  conversation: the system prompt once, at the top (`DaydreamRawSystem`),
-  and before each passage a bubble on the user's side with what its request
-  added (`DaydreamRawSent`, `sentBefore`) — the opening's request,
-  "(Continue.)", a button's or a roll's note, a rewrite's instructions, the
-  user's words as the model got them, and the buttons on screen. A request
-  that sent a different system prompt — a check-in after Stop the scene —
-  shows its own in its bubble. All of it is rebuilt like Show prompt
-  (below): the messages come from the turns, which never change, but the
-  system prompt is built from the setup as it is now, and says so. One
-  passage at a time (`RawConversation`), so a long story does not fire a
-  request per passage at once.
+- **The conversation exactly as it happened.** Each passage records what its
+  request actually sent the model (`sent`, `daydream-turn` v5,
+  `daydream/sent-record.ts`), and the log shows it as one conversation: the
+  system prompt once, at the top (`DaydreamRawSystem`), and before each
+  passage a bubble on the user's side with what its request added
+  (`DaydreamRawSent`) — the opening's request, "(Continue.)", a button's or a
+  roll's note, a rewrite's instructions, the user's words as the model got
+  them, and the buttons on screen. A request that sent a different system
+  prompt (a check-in after Stop the scene, or one sent before the setup
+  changed) shows its own in its bubble.
+- **What the history was, checked.** Every request is the one before it with
+  more on the end ([daydreams.md](daydreams.md#cost)), so a passage records
+  the history it was sent only as a hash chain, not in full: whole, a long
+  story's history would not fit in a sealed turn. From the previous
+  passage's record and the passage itself, the log works out what the
+  history must have been if the request only added to the one before, and
+  compares the chains (`appendedToPrevious`). Where it was not — one of the
+  known exceptions listed there — the bubble says so, rather than the log
+  showing a conversation that did not happen.
+- **A passage written before records were kept** is rebuilt like Show prompt
+  (below), one passage at a time (`RawConversation`), and says it was.
 - **A passage's reply exactly as the model wrote it**: tags, `<meta>` block,
   code fences and all (`raw`, `daydream-turn` v4).
 - **What is stored**, as JSON, under a disclosure.
@@ -120,7 +127,8 @@ by `DaydreamRawTurn.svelte`, not as the story:
   passage, from `POST /api/daydreams/[id]/prompt`. That endpoint takes what
   `/reply` takes and answers with `buildMessages`, and never reaches the model.
   It is a **rebuild from the story as it stands now**, today's setup
-  included, not a record of what was sent: nothing records that.
+  included, which is what the bubbles above are checked against when no
+  record was kept.
 - **A failed reply** as it arrived, under the error. It is never saved, since
   a failed reply is not a turn.
 
@@ -133,13 +141,21 @@ opened afresh, not read from the page's cache, which only holds turns
 something has rendered. The file is the story in the clear, so it is behind
 debug mode and goes nowhere but the download.
 
-**Raw replies are kept only for an account granted debug mode**, whether or
-not it is switched on, so a passage written while it was off can still be
-inspected once it is on.
+**Raw replies, and what was sent, are kept only for an account granted debug
+mode**, whether or not it is switched on, so a passage written while it was
+off can still be inspected once it is on.
 
 - `DaydreamStory` takes `keepRawReplies`, which the page sets from the
   feature. The browser seals the turn, so the server cannot see `raw` and
   cannot enforce this: the flag is the whole of the rule.
+- With it, the reply request asks to `record`, and the reply endpoint sends
+  one event of its own ahead of the model's stream, `{"boundUpSent": …}`,
+  with what it sent (`recordSent`): the system prompt, what the request
+  added, and the history's chain. That is the user's own words and the
+  server's prompt going back to the user who sent them, and the server keeps
+  none of it. The browser caps it (`capSent`: `DAYDREAM_LIMITS.sentSystem`,
+  24,000 characters, and `sentAdded`, 10,000) and seals it beside `raw`. A
+  cut record says so, and a chain cannot be checked from one.
 - A turn written without the grant, or before v4, says "Raw reply not
   recorded".
 - `raw` is capped at `DAYDREAM_LIMITS.rawReply` (16,000 characters). A
@@ -151,7 +167,9 @@ inspected once it is on.
   are authoritative and frozen per version, while the raw text is only ever
   displayed. For v4, the turn kind's ciphertext cap went from 48 KB to 96 KB,
   which is the most the daydream endpoints take.
-- v4's reader and writer shipped together, as v3's did. A turn is read only by
+- `sent` brought v5, whose worst case — every field and both caps full —
+  still fits the 96 KB cap (`sealed-kinds/daydreams.test.ts`).
+- v4's and v5's readers and writers shipped together, as v3's did. A turn is read only by
   its owner, so the only reader that can meet one early is the owner's own
   tab still open on the previous build.
 

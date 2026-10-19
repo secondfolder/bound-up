@@ -4,6 +4,7 @@ import { page, userEvent } from 'vitest/browser';
 import { DAYDREAM_LIMITS, type DaydreamTurnRole } from '$lib/daydream';
 import type { ReplyOutcome } from '$lib/daydream/client';
 import type { ReplySoFar } from '$lib/daydream/reply-format';
+import { recordSent } from '$lib/daydream/sent-record';
 import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
@@ -491,6 +492,69 @@ describe('DaydreamThread', () => {
 		expect(icon('Liked it')?.getAttribute('variant')).toBe('regular');
 	});
 
+	it('records where in the story a reaction was made: after the newest turn', async () => {
+		client.createMark.mockResolvedValue({ ok: true, sealed: ref('m-new') });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', 'Sit.'),
+				turn('t2', 't1', 'user', 'I sit.'),
+				turn('t3', 't2', 'story', 'Good.')
+			]),
+			available: true
+		});
+		const loved = () =>
+			container.querySelector<HTMLButtonElement>(
+				'li.passage[data-turn-id="t1"] button[aria-label="Loved it"]'
+			);
+		await waitFor(() => expect(loved()).not.toBeNull());
+		loved()?.click();
+		await waitFor(() => expect(client.createMark).toHaveBeenCalled());
+		expect(client.createMark.mock.calls[0]?.[1]).toMatchObject({
+			turnId: 't1',
+			content: { type: 'reaction', reaction: 'love', after: 't3' }
+		});
+	});
+
+	// Each a note where it was made, so the history every later request sent
+	// is never changed by one (docs/daydreams.md, "Cost").
+	it('sends each reaction as a note after the turn it was made after', async () => {
+		opened.set('m1', { type: 'reaction', reaction: 'love', after: 't3' });
+		// One from before reactions said where they were made: after its passage.
+		opened.set('m2', { type: 'reaction', reaction: 'like' });
+		const { container } = render(DaydreamThread, {
+			daydream: {
+				...daydream([
+					turn('t1', null, 'story', 'Mara looks up from the letter she was reading.'),
+					turn('t2', 't1', 'user', 'I sit.'),
+					turn('t3', 't2', 'story', 'Good.')
+				]),
+				marks: [
+					{ id: 'm1', turnId: 't1', revision: 0, sealed: ref('m1') },
+					{ id: 'm2', turnId: 't3', revision: 0, sealed: ref('m2') }
+				]
+			},
+			available: true
+		});
+		await press(container, 'Continue');
+		await waitFor(() => expect(client.writeReply).toHaveBeenCalledOnce());
+		expect(asked(0)?.turns).toEqual([
+			{
+				type: 'text',
+				role: 'story',
+				text: 'Mara looks up from the letter she was reading.',
+				buttons: []
+			},
+			{ type: 'text', role: 'user', text: 'I sit.' },
+			{ type: 'text', role: 'story', text: 'Good.', buttons: [] },
+			{
+				type: 'reaction',
+				reaction: 'love',
+				of: 'Mara looks up from the letter she was reading.'
+			},
+			{ type: 'reaction', reaction: 'like', of: null }
+		]);
+	});
+
 	it('records a direction as a turn before asking for the passage after it', async () => {
 		const { container } = render(DaydreamThread, {
 			daydream: daydream([
@@ -960,7 +1024,10 @@ describe('DaydreamThread', () => {
 			expect(saved(1)?.content).toEqual({ type: 'text', text: 'Slowly, then.' });
 		});
 
-		it('tells the model the turn as written out from then on', async () => {
+		// As each was first sent, so each request only adds to the one before:
+		// the user's words as they wrote them, and the written-out turn with
+		// the passage that wrote it (docs/daydreams.md, "Cost").
+		it('tells the model the turn as the user sent it, and the passage with it written out', async () => {
 			draftText.value = 'I sit with her.';
 			const { container } = render(DaydreamThread, { daydream: writtenOut(), available: true });
 			await press(container, 'Send');
@@ -968,8 +1035,13 @@ describe('DaydreamThread', () => {
 			expect(asked(0)).toMatchObject({
 				turns: [
 					{ type: 'text', role: 'story', text: 'Mara frets.' },
-					{ type: 'text', role: 'user', text: WrittenOut },
-					{ type: 'text', role: 'story', text: 'Mara sighs with relief.' },
+					{ type: 'text', role: 'user', text: Instruction },
+					{
+						type: 'text',
+						role: 'story',
+						text: 'Mara sighs with relief.',
+						expansion: WrittenOut
+					},
 					{ type: 'text', role: 'user', text: 'I sit with her.' }
 				]
 			});
@@ -1024,12 +1096,15 @@ describe('DaydreamThread', () => {
 
 			await press(container, 'Rewrite this');
 			await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't2', role: 'story' }));
+			// The turn as sent the first time; the passage being rewritten as the
+			// model was shown it, written-out turn and all.
 			expect(asked(0)).toMatchObject({
 				mode: 'rewrite',
 				turns: [
 					{ type: 'text', role: 'story', text: 'Mara frets.' },
-					{ type: 'text', role: 'user', text: WrittenOut }
-				]
+					{ type: 'text', role: 'user', text: Instruction }
+				],
+				rewrite: { targetText: `<yours>\n${WrittenOut}\n</yours>\nMara sighs with relief.` }
 			});
 			expect(saved(0)?.content).toMatchObject({
 				meta: { readAs: 'instruction', expansion: WrittenOut }
@@ -1336,6 +1411,43 @@ describe('DaydreamThread in debug mode', () => {
 		expect(saved(0)?.content).not.toHaveProperty('rawTruncated');
 	});
 
+	it('keeps what the request sent the model on the passage, for an account granted debug mode', async () => {
+		const record = {
+			system: 'RULES',
+			added: ['(Begin.)'],
+			history: { messages: 0, chain: '0'.repeat(64) }
+		};
+		client.writeReply.mockImplementationOnce(
+			(
+				_id: string,
+				request: { record?: boolean },
+				options: { onSent?: (sent: unknown) => void }
+			) => {
+				expect(request.record).toBe(true);
+				options.onSent?.(record);
+				return Promise.resolve({
+					ok: true,
+					passage: 'Mara looks up.',
+					meta: meta(),
+					expansion: null,
+					reading: null,
+					raw: Raw
+				} satisfies ReplyOutcome);
+			}
+		);
+		render(DaydreamThread, { daydream: daydream(), available: true, keepRawReplies: true });
+		await waitFor(() => expect(saved(0)?.role).toBe('story'));
+		expect(saved(0)?.content).toMatchObject({ sent: record });
+	});
+
+	it('asks for no record, and keeps none, for an account without it', async () => {
+		replyWith(Raw, 'Mara looks up.');
+		render(DaydreamThread, { daydream: daydream(), available: true });
+		await waitFor(() => expect(saved(0)?.role).toBe('story'));
+		expect(asked(0)).not.toHaveProperty('record');
+		expect(saved(0)?.content).not.toHaveProperty('sent');
+	});
+
 	it('keeps nothing raw for an account without it', async () => {
 		replyWith(Raw, 'Mara looks up.');
 		render(DaydreamThread, { daydream: daydream(), available: true });
@@ -1475,6 +1587,77 @@ describe('DaydreamThread in debug mode', () => {
 		// Before the passage it led to, and only before passages.
 		expect(sent('t1')?.nextElementSibling?.getAttribute('data-turn-id')).toBe('t1');
 		expect(container.querySelectorAll('[data-sent-before]')).toHaveLength(2);
+	});
+
+	/** Two passages, each with the record its request would have made, the second's history as given. */
+	async function recorded(secondHistory: 'appended' | 'changed') {
+		const opening = await recordSent([
+			{ role: 'system', content: 'RECORDED RULES' },
+			{ role: 'user', content: '(Begin the story.)' }
+		]);
+		const reply = await recordSent([
+			{ role: 'system', content: 'RECORDED RULES' },
+			{ role: 'user', content: '(Begin the story.)' },
+			{ role: 'assistant', content: secondHistory === 'appended' ? 'Sit.' : 'Stand.' },
+			{ role: 'user', content: 'I sit.' }
+		]);
+		return daydream([
+			turn('t1', null, 'story', { type: 'text', text: 'Sit.', raw: Raw, sent: opening }),
+			turn('t2', 't1', 'user', 'I sit.'),
+			turn('t3', 't2', 'story', {
+				type: 'text',
+				text: 'Good.',
+				meta: meta(),
+				raw: Raw,
+				sent: reply
+			})
+		]);
+	}
+
+	it('shows what each request recorded it sent, without rebuilding anything', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		client.readPrompt.mockClear();
+		const { container } = render(DaydreamThread, {
+			daydream: await recorded('appended'),
+			available: true,
+			debug: true
+		});
+		const sent = (id: string) => container.querySelector(`[data-sent-before="${id}"]`);
+		await waitFor(() => expect(sent('t3')?.querySelector('.message')?.textContent).toBe('I sit.'));
+		expect(sent('t1')?.querySelector('.message')?.textContent).toBe('(Begin the story.)');
+		expect(container.querySelector('[data-raw-system]')?.textContent).toContain('RECORDED RULES');
+		expect(container.textContent).not.toContain('Not recorded');
+		await waSettled(container);
+		expect(container.querySelector('[data-not-appended]')).toBeNull();
+		expect(client.readPrompt).not.toHaveBeenCalled();
+	});
+
+	it('says so when a request’s history was not the request before plus its reply', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		const { container } = render(DaydreamThread, {
+			daydream: await recorded('changed'),
+			available: true,
+			debug: true
+		});
+		await waitFor(() =>
+			expect(container.querySelector('[data-sent-before="t3"] [data-not-appended]')).not.toBeNull()
+		);
+		expect(container.querySelector('[data-sent-before="t1"] [data-not-appended]')).toBeNull();
+	});
+
+	it('says a passage written before records were kept was rebuilt', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		promptsBy({ opening: 'THE RULES', reply: 'THE RULES' });
+		const { container } = render(DaydreamThread, {
+			daydream: twoPassages(),
+			available: true,
+			debug: true
+		});
+		await waitFor(() =>
+			expect(container.querySelector('[data-sent-before="t1"]')?.textContent).toContain(
+				'Not recorded when this passage was written'
+			)
+		);
 	});
 
 	it('shows a request’s own system prompt only when it sent a different one', async () => {

@@ -6,6 +6,8 @@ import {
 	UNSET_CHARACTER_DIALS
 } from '$lib/daydream';
 import type { ContextTurn } from '$lib/daydream/context';
+import { passageAsSent } from '$lib/daydream/context';
+import { appendedToPrevious, recordSent, type SentRecord } from '$lib/daydream/sent-record';
 import { type Direction, daydreamSetupKind, type Reading } from '$lib/sealed-kinds/daydreams';
 import { testCharacter, testDaydreamSetup, testScene } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
@@ -109,7 +111,8 @@ describe('buildMessages', () => {
 		const messages = buildMessages(
 			request({
 				turns: [
-					{ type: 'text', role: 'story', text: 'Hold still.', reaction: 'love' },
+					{ type: 'text', role: 'story', text: 'Hold still.' },
+					{ type: 'reaction', reaction: 'love', of: null },
 					{ type: 'direction', label: 'Slower' },
 					{ type: 'steer', action: 'more', quote: 'Hold still' },
 					{ type: 'roll', sides: 6, result: 5, outcome: 'You hold' }
@@ -159,7 +162,10 @@ describe('buildMessages', () => {
 	describe('the history, request after request', () => {
 		const slower = { id: 'slower', label: 'Slower' };
 		const deeper = { id: 'deeper', label: 'Deeper' };
-		const passage = (text: string, buttons?: Direction[]): ContextTurn => ({
+		const passage = (
+			text: string,
+			buttons?: Direction[]
+		): Extract<ContextTurn, { type: 'text' }> => ({
 			type: 'text',
 			role: 'story',
 			text,
@@ -177,7 +183,20 @@ describe('buildMessages', () => {
 			passage('You hold.', [deeper]),
 			// Continue: a passage straight after a passage.
 			passage('The clock ticks.', [deeper]),
-			{ type: 'text', role: 'story', text: 'She smiles.', buttons: [deeper], reaction: 'love' },
+			passage('She smiles.', [deeper]),
+			// A reaction to the passage just written, and one to an older one,
+			// each a note where it was made.
+			{ type: 'reaction', reaction: 'love', of: null },
+			{ type: 'reaction', reaction: 'like', of: 'Mara looks up.' },
+			// An instruction for the user's own turn, which the passage wrote out.
+			said('Tell Mara the fox is safe'),
+			{ ...passage('Mara lets out a breath.', [deeper]), expansion: '"Mara, the fox is safe."' },
+			said('I lean closer.'),
+			// A rewrite of the passage that answered it, which is on another branch.
+			{
+				...passage('She leans in too.', [deeper]),
+				rewrite: { targetText: 'She pulls away.', instruction: 'Warmer.' }
+			},
 			{ type: 'safety', signal: 'red' },
 			// A check-in, asked for while stopped, listed no buttons.
 			passage(CheckInText),
@@ -187,6 +206,13 @@ describe('buildMessages', () => {
 			passage('Good.', [])
 		];
 
+		const modeFor = (turn: Extract<ContextTurn, { type: 'text' }>, at: number) => {
+			if (turn.rewrite) {
+				return 'rewrite' as const;
+			}
+			return at === 0 ? ('opening' as const) : ('reply' as const);
+		};
+
 		/** The request that asked for each passage: the story before it, and the buttons it listed. */
 		const requests = story.flatMap((turn, at) =>
 			turn.type === 'text' && turn.role === 'story'
@@ -195,9 +221,10 @@ describe('buildMessages', () => {
 							checkIn: turn.text === CheckInText,
 							messages: buildMessages(
 								request({
-									mode: at === 0 ? 'opening' : 'reply',
+									mode: modeFor(turn, at),
 									turns: story.slice(0, at),
-									currentDirections: turn.buttons ?? []
+									currentDirections: turn.buttons ?? [],
+									...(turn.rewrite ? { rewrite: turn.rewrite } : {})
 								})
 							)
 						}
@@ -210,12 +237,42 @@ describe('buildMessages', () => {
 			// under a system prompt of its own (`CHECK_IN`), and the requests
 			// either side of it still chain.
 			const chain = requests.filter((each) => !each.checkIn).map((each) => each.messages);
-			expect(chain).toHaveLength(8);
+			expect(chain).toHaveLength(10);
 			for (const [at, next] of chain.slice(1).entries()) {
 				const before = defined(chain[at], 'the request before');
 				expect(next.slice(0, before.length), `request ${at + 1}`).toEqual(before);
 				expect(next.length, `request ${at + 1}`).toBeGreaterThan(before.length);
 			}
+		});
+
+		// The raw log checks this from each passage's record alone
+		// (`appendedToPrevious`), so its check has to agree with what was sent.
+		it('records each request so the raw log can tell it only added to the one before', async () => {
+			const passages = story.filter(
+				(turn): turn is Extract<ContextTurn, { type: 'text' }> =>
+					turn.type === 'text' && turn.role === 'story'
+			);
+			let before: { record: SentRecord; passage: string } | null = null;
+			for (const [at, each] of requests.entries()) {
+				const record = await recordSent(each.messages);
+				const turn = defined(passages[at], 'the passage');
+				const written = passageAsSent(turn.text, turn.expansion);
+				// The check-in is asked under a system prompt of its own, but its
+				// history still chains.
+				expect(record.system.includes('# The scene is stopped'), `request ${at}`).toBe(
+					each.checkIn
+				);
+				expect(await appendedToPrevious(record, before), `request ${at}`).toBe(true);
+				before = { record, passage: written };
+			}
+		});
+
+		it('tells a request whose history changed from one that only added', async () => {
+			const first = await recordSent(defined(requests[0], 'the opening').messages);
+			const second = await recordSent(defined(requests[1], 'the reply').messages);
+			expect(await appendedToPrevious(second, { record: first, passage: 'Something else.' })).toBe(
+				false
+			);
 		});
 
 		it('replays what each passage was asked with: the opening, Continue, and its buttons', () => {
@@ -229,6 +286,20 @@ describe('buildMessages', () => {
 			);
 			const checkIn = sent.indexOf(CheckInText);
 			expect(sent[checkIn - 1]).not.toContain('on screen now');
+			// Reactions as notes where they were made, saying which passage
+			// when it is not the one just before.
+			expect(sent).toContain(
+				'(Reaction: the user loved that passage.)\n\n(Reaction: the user liked that passage — the one that began "Mara looks up.".)\n\nTell Mara the fox is safe\n\n(Direction buttons on screen now: "Deeper" (id "deeper").)'
+			);
+			// The user's turn as they wrote it, and the passage as the model
+			// wrote it, the turn written out first.
+			expect(sent).toContain(
+				'<yours>\n"Mara, the fox is safe."\n</yours>\nMara lets out a breath.'
+			);
+			// A rewrite goes back after what it was asked.
+			const rewritten = sent.indexOf('She leans in too.');
+			expect(sent[rewritten - 1]).toContain('(Rewrite the passage that comes next.');
+			expect(sent[rewritten - 1]).toContain('She pulls away.');
 		});
 
 		it('says where a trimmed story starts, rather than that it begins', () => {

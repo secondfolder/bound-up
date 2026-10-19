@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { recordSent } from '$lib/daydream/sent-record';
 import { RULES } from '$lib/server/daydream/prompt';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
 import type { RateLimitResult } from '$lib/server/rate-limit';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import {
 	createTestDaydream,
@@ -99,6 +101,34 @@ describe('POST /api/daydreams/[id]/reply', () => {
 		}
 		expect(result.value.headers.get('content-type')).toBe('text/event-stream');
 		expect(await result.value.text()).toContain('smiles.');
+	});
+
+	it('for debug mode, says first what it sent the model, then streams the reply as it came', async () => {
+		const { id } = await createTestDaydream(db, ada.id, ['story', 'user']);
+		const result = await post(ada, id, { ...body, record: true });
+		if (result.type !== 'ok') {
+			throw new Error(`expected a reply, got ${result.type}`);
+		}
+		const text = await result.value.text();
+		const [first, ...rest] = text.split('\n\n');
+		const { boundUpSent } = JSON.parse(defined(first, 'the first event').slice('data: '.length));
+		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
+		const sent = JSON.parse(String(init.body)).messages;
+		expect(boundUpSent).toEqual(await recordSent(sent));
+		expect(boundUpSent.system.startsWith(RULES)).toBe(true);
+		expect(boundUpSent.added).toEqual([
+			`${USER_TURN}\n\n(Direction buttons on screen now: "Slower" (id "slower").)`
+		]);
+		expect(rest.join('\n\n')).toContain('smiles.');
+	});
+
+	it('sends nothing of its own unless asked to record', async () => {
+		const { id } = await createTestDaydream(db, ada.id, ['story', 'user']);
+		const result = await post(ada, id);
+		if (result.type !== 'ok') {
+			throw new Error(`expected a reply, got ${result.type}`);
+		}
+		expect(await result.value.text()).not.toContain('boundUpSent');
 	});
 
 	it('sends the server’s own rules first, and asks only for providers that keep nothing', async () => {

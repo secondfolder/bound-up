@@ -38,6 +38,26 @@ import {
 
 export type Reaction = Extract<DaydreamMarkContent, { type: 'reaction' }>['reaction'];
 
+/** A passage written back with the user's turn it wrote out ahead of it, at the most. */
+export const MAX_PASSAGE_AS_SENT = DAYDREAM_LIMITS.turn * 2 + 32;
+
+/** How much of a passage a reaction quotes to say which one it is on. */
+const REACTION_EXCERPT = 60;
+
+/**
+ * A passage as the model is shown it later: as it wrote it, the user's turn
+ * written out first in its `<yours>` block when it wrote one out, then the
+ * passage. The tags it opened with and the metadata after are left off.
+ */
+export function passageAsSent(text: string, expansion: string | null | undefined): string {
+	return expansion ? `<yours>\n${expansion}\n</yours>\n${text}` : text;
+}
+
+/** The start of a passage, to say which one a reaction is on. */
+export function passageExcerpt(text: string): string {
+	return text.length > REACTION_EXCERPT ? `${text.slice(0, REACTION_EXCERPT).trimEnd()}…` : text;
+}
+
 export const contextTurnSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('text'),
@@ -45,9 +65,26 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 		text: z.string().min(1).max(DAYDREAM_LIMITS.turn),
 		/** A passage stepped out of the story (a check-in, an aside). */
 		ooc: z.boolean().optional(),
-		reaction: z.enum(['love', 'like', 'not-for-me']).optional(),
 		/** How the user said they mean their turn (Read as…), overriding the model's own reading. */
 		readAs: readingSchema.optional(),
+		/**
+		 * A passage's: the user's turn it wrote out first, which goes back
+		 * with it as the model wrote it (`passageAsSent`), the user's own turn
+		 * staying as they sent it.
+		 */
+		expansion: z.string().min(1).max(DAYDREAM_LIMITS.turn).optional(),
+		/**
+		 * A passage's that rewrote another: what its request asked
+		 * (`rewriteRequest` in `server/daydream/prompt.ts`), which goes back in
+		 * place of the plain request it would otherwise have had.
+		 */
+		rewrite: z
+			.object({
+				targetText: z.string().min(1).max(MAX_PASSAGE_AS_SENT),
+				quote: z.string().max(DAYDREAM_LIMITS.quote).optional(),
+				instruction: z.string().max(DAYDREAM_LIMITS.instruction).optional()
+			})
+			.optional(),
 		/**
 		 * A passage's: the direction buttons on screen when it was asked for,
 		 * which that request listed (`buttonsNote`). Absent for one written
@@ -57,6 +94,19 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 	}),
 	/** The story before this was trimmed off (`trimContext`). Only ever first. */
 	z.object({ type: z.literal('omitted') }),
+	/**
+	 * A reaction, where it was made: after the turn that was newest then
+	 * (`reactionAnchors`). `of` is the start of the passage it is on, when it
+	 * is not the passage just before it.
+	 */
+	z.object({
+		type: z.literal('reaction'),
+		reaction: z.enum(['love', 'like', 'not-for-me']),
+		of: z
+			.string()
+			.max(REACTION_EXCERPT + 1)
+			.nullable()
+	}),
 	z.object({
 		type: z.literal('direction'),
 		label: z.string().min(1).max(DAYDREAM_LIMITS.directionLabel)
@@ -81,7 +131,18 @@ export type ContextTurn = z.output<typeof contextTurnSchema>;
 export function contextSize(turn: ContextTurn): number {
 	switch (turn.type) {
 		case 'text':
-			return turn.text.length + (turn.buttons ? JSON.stringify(turn.buttons).length : 0);
+			return (
+				turn.text.length +
+				(turn.expansion?.length ?? 0) +
+				(turn.rewrite
+					? turn.rewrite.targetText.length +
+						(turn.rewrite.quote?.length ?? 0) +
+						(turn.rewrite.instruction?.length ?? 0)
+					: 0) +
+				(turn.buttons ? JSON.stringify(turn.buttons).length : 0)
+			);
+		case 'reaction':
+			return (turn.of?.length ?? 0) + 8;
 		case 'direction':
 			return turn.label.length;
 		case 'steer':
@@ -120,36 +181,50 @@ export function chosenReadingIn(next: DaydreamTurnContent | null | undefined): R
  * say to the model — there is no such kind today, but a newer build's turn
  * this one cannot read lands here too rather than as a hole in the story.
  *
- * For a user's turn, `expansion` is it written out (`expansionIn`), sent in
- * place of the instruction it was written from, so the story the model reads
- * is the one the user sees, and the instruction is not written out a second
- * time; and `readAs` is how the user said they mean it (`chosenReadingIn`).
- * A turn sent written out goes without a reading: it is the turn itself now.
+ * Every turn goes back as it was first sent, so each request only adds to
+ * the one before (docs/daydreams.md, "Cost"). A user's turn goes as they
+ * wrote it, with `readAs` when they chose how it is meant
+ * (`chosenReadingIn`), even when the passage after it wrote it out: the
+ * written-out turn goes back with that passage (`passageAsSent`). A passage
+ * carries what its request listed and asked: `buttons`, and `rewrite` for
+ * one that rewrote another.
  */
 export function toContextTurn(
 	role: DaydreamTurnRole,
 	content: DaydreamTurnContent,
 	about: {
-		reaction?: Reaction;
-		expansion?: string | null;
 		readAs?: Reading | null;
 		/** A passage's buttons on screen when it was asked for; undefined when none were listed. */
 		buttons?: Direction[];
+		/** For a passage that rewrote another: the passage it rewrote, as it was sent. */
+		rewrote?: string;
 	} = {}
 ): ContextTurn | null {
-	const { reaction, expansion, readAs, buttons } = about;
+	const { readAs, buttons, rewrote } = about;
 	const asUser = role === 'user';
 	switch (content.type) {
-		case 'text':
+		case 'text': {
+			const expansion = asUser ? null : (content.meta?.expansion ?? null);
+			const rewriteOf = asUser ? null : (content.meta?.rewriteOf ?? null);
 			return {
 				type: 'text',
 				role,
-				text: (asUser && expansion ? expansion : content.text).slice(0, DAYDREAM_LIMITS.turn),
+				text: content.text.slice(0, DAYDREAM_LIMITS.turn),
 				...(content.meta?.ooc ? { ooc: true } : {}),
-				...(reaction && !asUser ? { reaction } : {}),
-				...(readAs && asUser && !expansion ? { readAs } : {}),
+				...(readAs && asUser ? { readAs } : {}),
+				...(expansion ? { expansion: expansion.slice(0, DAYDREAM_LIMITS.turn) } : {}),
+				...(rewriteOf && rewrote
+					? {
+							rewrite: {
+								targetText: rewrote.slice(0, MAX_PASSAGE_AS_SENT),
+								...(rewriteOf.quote ? { quote: rewriteOf.quote.text } : {}),
+								...(rewriteOf.instruction ? { instruction: rewriteOf.instruction } : {})
+							}
+						}
+					: {}),
 				...(buttons && !asUser ? { buttons } : {})
 			};
+		}
 		case 'direction':
 			return { type: 'direction', label: content.label };
 		case 'steer':

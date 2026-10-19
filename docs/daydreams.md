@@ -553,12 +553,16 @@ nothing more — and then answers what it wrote (`WRITING_OUT` in the prompt,
   user's own turn keeps exactly what they sent. It follows that **another
   take writes the turn out afresh**: Write again answers the instruction
   again, and each take carries its own wording. A **rewrite** keeps the
-  wording it was given, sending it written out and storing the same one,
-  since a rewrite answers the same turn.
-- **The model reads the written-out turn from then on.** Building the
-  context (`#contextUpTo`, `toContextTurn`), a user's turn followed on the
-  branch by a passage with an `expansion` is sent as the expansion, so the
-  story the model reads is the story the user sees.
+  wording it was given, storing the same one, since a rewrite answers the
+  same turn; its request quotes the passage it rewrites written-out turn and
+  all, so the model sees the wording it is keeping.
+- **The model reads the written-out turn from then on, where it wrote it.**
+  Building the context (`#contextUpTo`, `toContextTurn`), the user's turn
+  goes as they sent it, and the passage after it goes back as the model
+  wrote it: its `<yours>` block, then the passage (`passageAsSent`). So the
+  model reads its own written-out turn, and every request still only adds
+  to the one before ([Cost](#cost)). It once went in place of what the user
+  sent, which changed a message every later request had already sent.
 - **Only words the user wrote, in a story they are in.** A watcher
   (`stance: absent`) has no turn of their own, so the prompt leaves the
   instruction out for them and their instructions stay directions. A block
@@ -709,8 +713,11 @@ displayed. See [debug-mode.md](debug-mode.md#daydreams-raw-log).
 **Metadata is never sent back.** Past turns go to the model as their words
 alone (`toContextTurn`); what a passage offered next was for the screen, and
 would cost context on every request for nothing. Reactions are sent, because
-they say what the user enjoyed, and so is a written-out turn, in place of the
-user's turn it was written from, because it is that turn's words.
+they say what the user enjoyed, each as a note where it was made: after the
+turn that was newest then, which the reaction records (`after`,
+`daydream-mark` v2), saying which passage it is on when that is not the one
+just before (`#reactionsAlong`). A reaction from before v2 goes after its
+own passage. A written-out turn goes back with the passage that wrote it.
 
 ## What the server sees
 
@@ -734,7 +741,10 @@ in plaintext:
 turns of the branch being read, as text, to `POST /api/daydreams/[id]/reply`,
 which validates them (`replyRequestSchema`), wraps them in its own system
 prompt and forwards them to OpenRouter, and the provider that writes the
-reply. The reply streams back through the server unread.
+reply. The reply streams back through the server unread. For an account
+granted debug mode, the endpoint first sends back what it sent the model
+(the system prompt and the messages it added), for the browser to seal into
+the passage; it keeps none of it ([debug-mode.md](debug-mode.md#daydreams-raw-log)).
 
 **In transit, for each suggestion:** what the suggestion is about goes to
 `POST /api/daydreams/suggest`, under the same rules, with a prompt of its
@@ -871,10 +881,12 @@ hold that down:
 
   **Each request only adds to the one before.** The history is sent as it
   was sent the first time: each passage goes back with the request that
-  asked for it — the opening's request, "(Continue.)" between two passages,
-  and the buttons that were on screen, which the page sends with the passage
-  (`buttons` on its context turn, worked out as `#replyBody` worked them
-  out then). So a request is the previous one, unchanged, with the reply and
+  asked for it — a rewrite's instructions, the opening's request,
+  "(Continue.)" between two passages, and the buttons that were on screen,
+  which the page sends with the passage (`buttons` and `rewrite` on its
+  context turn, worked out as `#replyBody` worked them out then) — and as
+  the model wrote it, a written-out turn first. Each user's turn goes as they
+  sent it, and each reaction as a note where it was made. So a request is the previous one, unchanged, with the reply and
   the new turn on the end, and the cache covers all of the previous one.
   `prompt.test.ts` ("the history, request after request") plays a story
   through every kind of turn and checks exactly that. Where it does not hold,
@@ -882,11 +894,8 @@ hold that down:
 
   - a check-in after Stop the scene is asked for under a system prompt of
     its own (`CHECK_IN`); the requests either side of it still chain;
-  - a written-out turn goes back as written out, in place of what the user
-    sent;
-  - a rewrite's instructions are not replayed: the rewritten passage goes
-    back as if asked for plainly;
-  - a reaction to an older passage goes back beside that passage, mid-history;
+  - taking a reaction back, or changing it, takes its note out of the
+    history (a changed one is a new note where it was changed);
   - changing the setup, its dials or the limits changes the system prompt;
   - trimming cuts the start, at steps, behind an `omitted` marker that tells
     the model the story starts partway through rather than at its beginning.

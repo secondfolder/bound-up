@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { recordSent } from '$lib/daydream/sent-record';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
 import { buildMessages, replyRequestSchema } from '$lib/server/daydream/prompt';
 import { hasAcceptedDisclosure, ownsDaydream } from '$lib/server/daydreams';
@@ -24,7 +25,12 @@ import type { RequestHandler } from './$types';
  * The answer is OpenRouter's own server-sent events, passed through
  * untouched rather than parsed and re-encoded: the browser parses them
  * (`$lib/daydream/stream.ts`), and the worker spends no CPU on a reply it
- * has no reason to read.
+ * has no reason to read. The one addition is for debug mode: asked to
+ * `record`, it sends one event of its own first, `{"boundUpSent": …}`, with
+ * what it sent the model (`$lib/daydream/sent-record.ts`), for the browser to
+ * seal into the passage beside the reply as it arrived. It is the user's own
+ * words and the server's prompt going back to the user who sent them, and it
+ * is never kept here.
  */
 export const POST: RequestHandler = async ({ locals, params, platform, request }) => {
 	if (!locals.user) {
@@ -64,6 +70,7 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		});
 	}
 
+	const messages = buildMessages(parsed.data);
 	let upstream: Response;
 	try {
 		upstream = await fetch(`${config.baseUrl}/chat/completions`, {
@@ -74,7 +81,7 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 			},
 			body: JSON.stringify({
 				model: config.model,
-				messages: buildMessages(parsed.data),
+				messages,
 				stream: true,
 				// A few paragraphs, which is what the dials ask for at most, plus
 				// the metadata block after them; also the most one reply can cost.
@@ -101,5 +108,32 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		error(502, 'The reply could not be written just now. Try again in a moment.');
 	}
 
-	return new Response(upstream.body, { headers: SSE_HEADERS });
+	if (!parsed.data.record) {
+		return new Response(upstream.body, { headers: SSE_HEADERS });
+	}
+	const first = new TextEncoder().encode(
+		`data: ${JSON.stringify({ boundUpSent: await recordSent(messages) })}\n\n`
+	);
+	const reader = upstream.body.getReader();
+	let started = false;
+	return new Response(
+		new ReadableStream<Uint8Array>({
+			async pull(controller) {
+				if (!started) {
+					started = true;
+					controller.enqueue(first);
+					return;
+				}
+				const { done, value } = await reader.read();
+				if (done) {
+					controller.close();
+				} else {
+					controller.enqueue(value);
+				}
+			},
+			// The reader going away (Stop, or leaving) ends the request upstream.
+			cancel: (reason) => reader.cancel(reason)
+		}),
+		{ headers: SSE_HEADERS }
+	);
 };

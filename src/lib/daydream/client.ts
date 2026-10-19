@@ -28,6 +28,7 @@ import {
 import type { DaydreamTurnView, SealedRefView } from '../types';
 import type { ContextTurn } from './context';
 import { parseReply, type ReplySoFar, visibleReply } from './reply-format';
+import { readSent, type SentRecord } from './sent-record';
 import { readReplyStream } from './stream';
 
 const base = (daydreamId: string) => `/api/daydreams/${encodeURIComponent(daydreamId)}`;
@@ -58,6 +59,8 @@ export type ReplyRequestBody = {
 	turns: ContextTurn[];
 	currentDirections: Direction[];
 	rewrite?: { targetText: string; quote?: string; instruction?: string };
+	/** Debug mode: have the endpoint say what it sent the model (`sent-record.ts`). */
+	record?: boolean;
 };
 
 export type ReplyOutcome =
@@ -107,7 +110,12 @@ export async function readPrompt(
 export async function writeReply(
 	daydreamId: string,
 	request: ReplyRequestBody,
-	options: { signal: AbortSignal; onText: (soFar: ReplySoFar, raw: string) => void }
+	options: {
+		signal: AbortSignal;
+		onText: (soFar: ReplySoFar, raw: string) => void;
+		/** Given what the endpoint sent the model, before the reply, when `record` asked for it. */
+		onSent?: (record: SentRecord) => void;
+	}
 ): Promise<ReplyOutcome> {
 	const response = await tryFetch(`${base(daydreamId)}/reply`, {
 		method: 'POST',
@@ -122,10 +130,19 @@ export async function writeReply(
 	let text = '';
 	let outcome: Awaited<ReturnType<typeof readReplyStream>>;
 	try {
-		outcome = await readReplyStream(response.body, (piece) => {
-			text += piece;
-			options.onText(visibleReply(text), text);
-		});
+		outcome = await readReplyStream(
+			response.body,
+			(piece) => {
+				text += piece;
+				options.onText(visibleReply(text), text);
+			},
+			(value) => {
+				const record = readSent(value);
+				if (record) {
+					options.onSent?.(record);
+				}
+			}
+		);
 	} catch (problem) {
 		if (problem instanceof DOMException && problem.name === 'AbortError') {
 			throw problem;

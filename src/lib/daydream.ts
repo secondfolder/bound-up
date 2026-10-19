@@ -523,6 +523,14 @@ export const DAYDREAM_LIMITS = {
 	 * than one a normal one comes near.
 	 */
 	rawReply: 16_000,
+	/**
+	 * What a request sent, recorded for the raw log alongside `raw`
+	 * (`daydream/sent-record.ts`): the system prompt, and what the request
+	 * added after the last passage. A setup at every limit makes a system
+	 * prompt of around this; a usual one is a few thousand characters.
+	 */
+	sentSystem: 24_000,
+	sentAdded: 10_000,
 	suggestion: 300,
 	directionLabel: 40,
 	quote: 1000,

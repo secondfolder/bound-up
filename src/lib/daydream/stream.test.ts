@@ -68,6 +68,24 @@ describe('readReplyStream', () => {
 		expect(result).toMatchObject({ text: 'Half a ', outcome: { kind: 'error' } });
 	});
 
+	it('hands the endpoint’s record of what it sent to its own callback, not the reply', async () => {
+		const sent: unknown[] = [];
+		const pieces: string[] = [];
+		const record = { system: 'RULES', added: ['I sit.'], history: { messages: 0, chain: 'x' } };
+		const outcome = await readReplyStream(
+			body(
+				`data: ${JSON.stringify({ boundUpSent: record })}\n\n`,
+				event('Sit.'),
+				'data: [DONE]\n\n'
+			),
+			(piece) => pieces.push(piece),
+			(value) => sent.push(value)
+		);
+		expect(sent).toEqual([record]);
+		expect(pieces.join('')).toBe('Sit.');
+		expect(outcome).toEqual({ kind: 'done' });
+	});
+
 	it('treats a stream that just ends as done', async () => {
 		expect((await read(body(event('No DONE'), event(' marker')))).outcome).toEqual({
 			kind: 'done'
