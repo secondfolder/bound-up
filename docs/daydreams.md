@@ -687,8 +687,14 @@ the leading blocks count only at the very start, `<reading>` before
 `<yours>`. When it ends, `parseReply`
 validates the metadata with the kind's own schema and **degrades rather than
 fails**: no block, or one that does not parse, keeps the passage and simply
-offers no new buttons or suggestions (the old buttons stay); a bad roll is
-dropped and the rest kept; a `<yours>` block never closed is no written-out
+offers no new buttons or suggestions (the old buttons stay). A block the
+schema refuses is salvaged part by part (`salvageMeta`), so one bad part
+costs only itself: a suggestion too long, a direction with a bad id (given
+one from its label) or no label, a roll that misses a face. Two slips real
+replies made are mended rather than refused, because each used to cost the
+passage every button and suggestion: `"directions"` written as a plain list,
+read as the ones to add, and a string missing its opening quote
+(`"label":Comply"`); a `<yours>` block never closed is no written-out
 turn, and everything after its tag is kept as the passage; a reading that is
 not one of the five is no reading.
 

@@ -148,7 +148,61 @@ describe('parseReply', () => {
 			expansion: null,
 			reading: null
 		});
-		expect(parseReply('She waits.\n<meta>\n{"suggestions": "no"}\n</meta>').meta).toBeNull();
+		expect(parseReply('She waits.\n<meta>\n["a list"]\n</meta>').meta).toBeNull();
+	});
+
+	it('drops a part that is not what it should be, and keeps the rest', () => {
+		const parsed = parseReply(
+			`x\n<meta>\n${JSON.stringify({ ...meta, suggestions: 'no' })}\n</meta>`
+		);
+		expect(parsed.meta?.suggestions).toEqual([]);
+		expect(parsed.meta?.directions).toEqual(meta.directions);
+	});
+
+	// As a real reply wrote it: directions as a plain list, and no closing tag.
+	it('reads directions written as a plain list as the ones to add', () => {
+		const block =
+			'{"suggestions": ["Walk up behind them", "Watch for a while"], "directions": [{"id": "surprise-me", "label": "Surprise me"}]}';
+		expect(parseReply(`She hums.\n\n<meta>\n${block}`).meta).toEqual({
+			suggestions: ['Walk up behind them', 'Watch for a while'],
+			directions: { add: [{ id: 'surprise-me', label: 'Surprise me' }], remove: [] }
+		});
+	});
+
+	// As real replies wrote them: `"label":Comply"`, `"label": Take your time"`.
+	it('mends a label missing its opening quote', () => {
+		const block =
+			'{"suggestions": ["Kneel."], "directions": {"add": [{"id": "comply", "label":Comply"}, {"id": "slower", "label": Take your time"}], "remove": []}}';
+		expect(parseReply(`x\n<meta>\n${block}\n</meta>`).meta?.directions.add).toEqual([
+			{ id: 'comply', label: 'Comply' },
+			{ id: 'slower', label: 'Take your time' }
+		]);
+	});
+
+	it('keeps the good directions beside a bad one, and makes an id for a bare or bad one', () => {
+		const block = JSON.stringify({
+			suggestions: ['Kneel.', 'x'.repeat(400)],
+			directions: {
+				add: [
+					'Go slower',
+					{ id: 'Make It Hurt', label: 'Make it hurt' },
+					{ id: 'ok', label: '' },
+					{ id: 'faster', label: 'Faster' }
+				],
+				remove: ['old']
+			}
+		});
+		expect(parseReply(`x\n<meta>\n${block}\n</meta>`).meta).toEqual({
+			suggestions: ['Kneel.'],
+			directions: {
+				add: [
+					{ id: 'go-slower', label: 'Go slower' },
+					{ id: 'make-it-hurt', label: 'Make it hurt' },
+					{ id: 'faster', label: 'Faster' }
+				],
+				remove: ['old']
+			}
+		});
 	});
 
 	it('accepts a fenced block, and one never closed', () => {

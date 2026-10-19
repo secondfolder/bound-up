@@ -19,6 +19,8 @@
  */
 
 import { SvelteMap } from 'svelte/reactivity';
+import { openRecord } from '../crypto/sealed';
+import { vaultById, vaultsSettled } from '../crypto/vaults.svelte';
 import {
 	DAYDREAM_LIMITS,
 	type DaydreamSetup,
@@ -28,13 +30,17 @@ import {
 	type StoryDials
 } from '../daydream';
 import { reportRequestFailure } from '../request-failure.svelte';
-import type {
-	DaydreamMarkContent,
-	DaydreamTurnContent,
-	Direction,
-	PassageMeta,
-	Quote,
-	Reading
+import {
+	type DaydreamMarkContent,
+	type DaydreamSetupContent,
+	type DaydreamTurnContent,
+	type Direction,
+	daydreamMarkKind,
+	daydreamSetupKind,
+	daydreamTurnKind,
+	type PassageMeta,
+	type Quote,
+	type Reading
 } from '../sealed-kinds/daydreams';
 import {
 	openedDaydreamMark,
@@ -113,6 +119,27 @@ function carriedIn(request: Generate): string | undefined {
 }
 
 export type MarkState = DaydreamMarkView & { content: DaydreamMarkContent | null | undefined };
+
+/**
+ * A whole daydream opened into plain JSON: debug mode's Export
+ * (docs/debug-mode.md, "Daydreams' raw log"). Every turn on every branch, in
+ * the order they were written, with what is stored for each, `raw` included
+ * where it was kept. A turn this device cannot open has null content.
+ */
+export type DaydreamExport = {
+	format: 'bound-up-daydream-export';
+	version: 1;
+	exportedAt: string;
+	daydreamId: string;
+	setup: DaydreamSetupContent | null;
+	/** The turn the page was on, and the branch to it, root first. */
+	activeTurnId: string | null;
+	branch: string[];
+	/** The direction buttons the page offered when it was exported. */
+	directionsNow: Direction[];
+	turns: (DaydreamTreeNodeView & { content: DaydreamTurnContent | null })[];
+	marks: { id: string; turnId: string; content: DaydreamMarkContent | null }[];
+};
 
 export class DaydreamStory {
 	readonly id: string;
@@ -603,6 +630,57 @@ export class DaydreamStory {
 			return { ok: false, error: NOT_READY };
 		}
 		return await readPrompt(this.id, this.#replyBody(request, setup, context));
+	}
+
+	/**
+	 * Everything in the daydream, opened (`DaydreamExport`). Opens each record
+	 * afresh rather than reading the page's cache, which fills in as turns
+	 * render and would leave a branch never shown as "still opening".
+	 */
+	async exportHistory(): Promise<DaydreamExport> {
+		await this.ensureLoaded(this.tree.map((node) => node.id));
+		await vaultsSettled();
+		const openRef = async <T>(
+			kind: Parameters<typeof openRecord<T>>[0],
+			ref: SealedRefView
+		): Promise<T | null> => {
+			const vault = vaultById(ref.vaultId);
+			return vault ? await openRecord(kind, { ...ref, vault }) : null;
+		};
+		const turns = await Promise.all(
+			[...this.tree]
+				.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+				.map(async (node) => {
+					const written = this.#written.get(node.id);
+					const ref = this.#refs.get(node.id);
+					const content =
+						written ?? (ref ? await openRef<DaydreamTurnContent>(daydreamTurnKind, ref) : null);
+					return { ...node, content };
+				})
+		);
+		const marks = await Promise.all(
+			this.#marks.map(async (mark) => ({
+				id: mark.id,
+				turnId: mark.turnId,
+				content:
+					this.#writtenMarks.get(mark.id) ??
+					(await openRef<DaydreamMarkContent>(daydreamMarkKind, mark.sealed))
+			}))
+		);
+		return {
+			format: 'bound-up-daydream-export',
+			version: 1,
+			exportedAt: new Date().toISOString(),
+			daydreamId: this.id,
+			setup:
+				this.#knownSetup ??
+				(await openRef<DaydreamSetupContent>(daydreamSetupKind, this.#setupRef)),
+			activeTurnId: this.activeTurnId,
+			branch: this.path.map((node) => node.id),
+			directionsNow: this.directions,
+			turns,
+			marks
+		};
 	}
 
 	/** Ends the passage arriving now. `discard` drops what had arrived rather than keeping it. */

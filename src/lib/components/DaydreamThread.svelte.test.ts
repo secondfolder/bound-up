@@ -39,6 +39,19 @@ vi.mock('$lib/sealed-views.svelte', async (importOriginal) => ({
 	openedDaydreamMark: (sealed: SealedRefView) => opened.get(sealed.recordId)
 }));
 
+// Export opens every record itself rather than through the page's cache
+// (`DaydreamStory.exportHistory`), so it reads the same map.
+vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
+	openRecord: (_kind: unknown, input: { recordId: string }) =>
+		Promise.resolve(opened.get(input.recordId) ?? null)
+}));
+vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
+	vaultById: (id: string) => ({ id }),
+	vaultsSettled: () => Promise.resolve({ status: 'ready' })
+}));
+
 /** The composer's restored draft, so a test can press Send without typing into Lexical. */
 const draftText = vi.hoisted(() => ({ value: '' }));
 vi.mock('$lib/messaging/drafts', () => ({
@@ -1347,6 +1360,54 @@ describe('DaydreamThread in debug mode', () => {
 			raw: 'x'.repeat(DAYDREAM_LIMITS.rawReply),
 			rawTruncated: true
 		});
+	});
+
+	it('exports the whole story, every branch, opened, as a file', async () => {
+		const blobs: Blob[] = [];
+		const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+			blobs.push(blob as Blob);
+			return 'blob:export';
+		});
+		const clicked = vi
+			.spyOn(HTMLAnchorElement.prototype, 'click')
+			.mockImplementation(() => undefined);
+		try {
+			const { container } = render(DaydreamThread, {
+				daydream: daydream(
+					[
+						turn('t1', null, 'story', { type: 'text', text: 'Sit.', raw: Raw }),
+						turn('t2', 't1', 'user', 'I sit.')
+					],
+					't2'
+				),
+				available: true,
+				debug: true
+			});
+			await press(container, 'Export');
+			await waitFor(() => expect(blobs).toHaveLength(1));
+			const exported = JSON.parse(await defined(blobs[0], 'the file').text());
+			expect(exported).toMatchObject({
+				format: 'bound-up-daydream-export',
+				daydreamId: 'd1',
+				branch: ['t1', 't2'],
+				turns: [
+					{ id: 't1', role: 'story', content: { text: 'Sit.', raw: Raw } },
+					{ id: 't2', parentId: 't1', role: 'user', content: { text: 'I sit.' } }
+				]
+			});
+			expect(exported.setup).toEqual(SETUP);
+			expect(clicked).toHaveBeenCalled();
+		} finally {
+			createObjectURL.mockRestore();
+			clicked.mockRestore();
+		}
+	});
+
+	it('offers Export only while debug mode is on', async () => {
+		const story = [turn('t1', null, 'story', 'Sit.')];
+		const off = render(DaydreamThread, { daydream: daydream(story), available: true });
+		await waSettled(off.container);
+		expect(button(off.container, 'Export')).toBeUndefined();
 	});
 
 	it('offers the raw log only while debug mode is on', async () => {

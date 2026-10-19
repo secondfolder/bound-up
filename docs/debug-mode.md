@@ -110,6 +110,15 @@ by `DaydreamRawTurn.svelte`, not as the story:
 - **A failed reply** as it arrived, under the error. It is never saved, since
   a failed reply is not a turn.
 
+Beside the switch, **Export** saves the whole daydream to the device as JSON
+(`DaydreamStory.exportHistory`): the setup, every turn on every branch in the
+order written, with what is stored for each (`raw` included where it was
+kept), the marks, the branch being read and the direction buttons on offer.
+It is for handing a misbehaving story to someone debugging it. Each record is
+opened afresh, not read from the page's cache, which only holds turns
+something has rendered. The file is the story in the clear, so it is behind
+debug mode and goes nowhere but the download.
+
 **Raw replies are kept only for an account granted debug mode**, whether or
 not it is switched on, so a passage written while it was off can still be
 inspected once it is on.

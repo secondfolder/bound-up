@@ -38,11 +38,15 @@
  * Pure and alias-free.
  */
 
+import { DAYDREAM_LIMITS, MAX_DIRECTIONS, MAX_SUGGESTIONS } from '../daydream';
 import {
+	type Direction,
+	directionSchema,
 	type PassageMeta,
 	passageMetaSchema,
 	type Reading,
-	readingSchema
+	readingSchema,
+	rollProposalSchema
 } from '../sealed-kinds/daydreams';
 
 const OPEN = '<meta>';
@@ -180,22 +184,111 @@ export function parseReply(full: string): ParsedReply {
 }
 
 function parseMeta(body: string): PassageMeta | null {
-	let value: unknown;
-	try {
-		value = JSON.parse(unfence(body));
-	} catch {
+	const value = parseJsonLeniently(unfence(body));
+	if (value === undefined) {
 		return null;
 	}
 	const strict = passageMetaSchema.safeParse(value);
-	if (strict.success) {
-		return strict.data;
+	return strict.success ? strict.data : salvageMeta(value);
+}
+
+/**
+ * A string value missing its opening quote, `"label":Comply"` or
+ * `"label": Take your time"`: a slip models make often enough that, left
+ * alone, it cost a passage every one of its buttons and suggestions. Never a
+ * literal (true, false, null), a number, a string, an array or an object.
+ */
+const UNOPENED_STRING = /:(?<space>\s*)(?!(?:true|false|null)\b)(?<text>[^\s"\d[{-][^"\n]*)"/g;
+
+/** JSON, or the same with its one common slip mended; undefined when neither parses. */
+function parseJsonLeniently(text: string): unknown {
+	try {
+		return JSON.parse(text);
+	} catch {
+		// Mended below, if it is the slip models make.
 	}
-	// One bad part should not cost the rest: a roll whose outcomes miss a face
-	// is dropped, and the buttons and suggestions beside it still count.
-	if (value && typeof value === 'object' && 'roll' in value) {
-		const { roll: _dropped, ...withoutRoll } = value as Record<string, unknown>;
-		const retried = passageMetaSchema.safeParse(withoutRoll);
-		return retried.success ? retried.data : null;
+	try {
+		return JSON.parse(text.replace(UNOPENED_STRING, ':$<space>"$<text>"'));
+	} catch {
+		return undefined;
+	}
+}
+
+/** A direction's id from its label, for one written as a bare label or with an id the schema refuses. */
+function slug(label: string): string {
+	return label
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, 40);
+}
+
+/** The label of a direction written as a bare label or as an object with one; null for anything else. */
+function labelOf(entry: unknown): string | null {
+	if (typeof entry === 'string') {
+		return entry;
+	}
+	if (entry && typeof entry === 'object' && 'label' in entry && typeof entry.label === 'string') {
+		return entry.label;
 	}
 	return null;
+}
+
+/** One direction as the model wrote it, made a direction if it can be: an object, or a bare label. */
+function toDirection(entry: unknown): Direction | null {
+	const label = labelOf(entry);
+	if (label === null) {
+		return null;
+	}
+	const given = entry && typeof entry === 'object' && 'id' in entry ? entry.id : null;
+	const exact = directionSchema.safeParse({ id: given, label });
+	if (exact.success) {
+		return exact.data;
+	}
+	const mended = directionSchema.safeParse({ id: slug(label), label });
+	return mended.success ? mended.data : null;
+}
+
+/**
+ * Whatever holds up of a block the schema refused, part by part, so one bad
+ * part costs only itself: a suggestion too long, a direction with a bad id,
+ * a roll that misses a face. Directions written as a plain list are read as
+ * the buttons to add, which is what a model writing one means.
+ */
+function salvageMeta(value: unknown): PassageMeta | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return null;
+	}
+	const record = value as Record<string, unknown>;
+	const list = (field: unknown): unknown[] => (Array.isArray(field) ? field : []);
+
+	const suggestions = list(record.suggestions)
+		.filter((entry): entry is string => typeof entry === 'string')
+		.map((entry) => entry.trim())
+		.filter((entry) => entry !== '' && entry.length <= DAYDREAM_LIMITS.suggestion)
+		.slice(0, MAX_SUGGESTIONS);
+
+	const { directions } = record;
+	const asObject =
+		directions && typeof directions === 'object' && !Array.isArray(directions)
+			? (directions as Record<string, unknown>)
+			: null;
+	const add = list(asObject ? asObject.add : directions)
+		.map(toDirection)
+		.filter((entry) => entry !== null)
+		.slice(0, MAX_DIRECTIONS);
+	const remove = list(asObject?.remove)
+		.filter((entry): entry is string => typeof entry === 'string' && entry.length <= 40)
+		.slice(0, MAX_DIRECTIONS * 2);
+
+	const roll = rollProposalSchema.safeParse(record.roll);
+	const readAs = readingSchema.safeParse(record.readAs);
+	const salvaged = passageMetaSchema.safeParse({
+		suggestions,
+		directions: { add, remove },
+		...(roll.success ? { roll: roll.data } : {}),
+		...(readAs.success ? { readAs: readAs.data } : {}),
+		...(record.ooc === true ? { ooc: true } : {})
+	});
+	return salvaged.success ? salvaged.data : null;
 }

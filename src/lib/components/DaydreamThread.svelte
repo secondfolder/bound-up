@@ -84,6 +84,29 @@
 	}
 	const rawLog = $derived(debug && rawLogChosen);
 
+	/**
+	 * Debug mode's Export: the whole daydream, every branch, opened and saved
+	 * to the device as JSON (`DaydreamStory.exportHistory`). It is the story in
+	 * the clear, so it lives behind debug mode and goes nowhere but the file.
+	 */
+	let exporting = $state(false);
+	async function exportHistory() {
+		exporting = true;
+		try {
+			const history = await story.exportHistory();
+			const url = URL.createObjectURL(
+				new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' })
+			);
+			const anchor = document.createElement('a');
+			anchor.href = url;
+			anchor.download = `daydream-${story.id}.json`;
+			anchor.click();
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		} finally {
+			exporting = false;
+		}
+	}
+
 	const keyring = $derived(currentKeyring());
 	const setup = $derived(story.setup);
 	const busy = $derived(story.busy);
@@ -292,6 +315,10 @@
 				onchange={(event: Event) => setRawLog((event.currentTarget as HTMLInputElement).checked)}
 				>Raw log</wa-switch
 			>
+			<wa-button size="s" appearance="outlined" disabled={exporting} onclick={exportHistory}>
+				<wa-icon slot="start" name="file-export" variant="solid"></wa-icon>
+				{exporting ? 'Exporting…' : 'Export'}
+			</wa-button>
 		{/if}
 		<wa-button size="s" appearance="outlined" onclick={() => {
 			showBranches = true;
