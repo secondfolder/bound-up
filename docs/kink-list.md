@@ -1,7 +1,8 @@
 # The kink list
 
 A private record of what someone is into, curious about and won't do. Signed
-in, it lives in the Playroom at `/playroom/kink-list`. Each kink is answered
+in, it lives in the Playroom at `/playroom/kink-list`, and signed out at
+`/kink-list`. Each kink is answered
 on one scale, with more detail where wanted: the two sides of a role pair
 separately, three sliders, and a note.
 
@@ -214,6 +215,94 @@ Answering a card is what moves the deck on, and Undo puts the answer (or
 skip) back, so the card returns. Nothing about the deck's position is ever
 stored.
 
+## Without an account
+
+Like the IQ test, the kink list works signed out, at `/kink-list/…`
+(`(public)/kink-list/`).
+
+- **The same screens** run on a `DeviceKinkList`, which keeps the list in this
+  browser's `localStorage` (key `kink-list.device`, in `device-key.ts`).
+  - There is no key to seal it with until there is an account, so it is kept
+    as it is.
+  - Anything that fails to parse counts as no list, as it does for the IQ
+    test's device storage.
+  - The list opens after hydration, and the server renders a placeholder.
+- **A banner** ([`DeviceBanner`](../src/lib/components/kink-list/DeviceBanner.svelte))
+  says the list is on this device only. It makes the case for an account
+  (keeping it, and comparing with a partner) and links to sign up or log in,
+  with `redirectTo` set to the list in the account.
+- **Someone signed in** who opens `/kink-list/…` is sent to the same screen
+  under `/playroom/kink-list/`, rather than shown an empty list on the device.
+  A shared link is the exception.
+- **Signing in or up brings the device's list along.** Once the vaults are
+  open, the app shell checks for a device list. Only if there is one does it
+  load [`adopt.svelte.ts`](../src/lib/kink-list/adopt.svelte.ts) through
+  `await import()`, so the shell carries no sealing code for everyone else.
+  - The device list is merged into the account's per kink (newest wins) and
+    saved.
+  - The device copy is removed only after that save succeeds; a failure
+    leaves it for the next load.
+  - The kink list then says how many answers were added (`adopted.svelte.ts`).
+
+## Sharing
+
+A list can be shared as a link, `/kink-list/shared#k1.<data>`
+([`share-link.ts`](../src/lib/kink-list/share-link.ts),
+[`ShareLink`](../src/lib/components/kink-list/ShareLink.svelte)). The same
+panel works signed in and signed out.
+
+- **The answers are in the fragment**, which a browser never sends to a
+  server, so a shared list never reaches this one, or a log on the way.
+- **`<data>`** is the answers, deflated (`deflate-raw`) and base64url'd. They
+  are keyed by `share-ids.json` number with short keys, and include notes
+  unless the person unticks them. Also included:
+  - custom kinks
+  - categories limited wholesale (they change what other kinks show)
+  - an optional name
+
+  Quick-fill skips and the intensity setting stay on the device. A list
+  answered all the way through is under 4,000 characters.
+- **`k1` is the format.** A new shape gets `k2`, and readers keep reading every
+  format ever written. A kink number this build does not know is dropped, not
+  fatal.
+- **The link is a snapshot.** It doesn't follow the list, and its answers
+  carry `at: 0`, so they lose to anything the reader has answered themselves
+  if the two are ever merged.
+- **Decoding** treats the fragment as untrusted input: Zod-parsed, never cast.
+
+**The shared page** (`/kink-list/shared`,
+[`SharedListView`](../src/lib/components/kink-list/SharedListView.svelte))
+lists every kink with an answer of its own, by category, with sides, the
+detailed answer and notes, plus any category ruled out wholesale. It is
+`noindex`, and works for anyone.
+
+## Comparing
+
+[`compare.ts`](../src/lib/kink-list/compare.ts) puts two lists side by side,
+using effective answers.
+
+- **Role-aware.** For a kink with a role pair, my giving is compared with
+  their receiving, my "as dom" with their "as sub", and my "on me" with their
+  "on my partner" ("On you"). A kink answered for both sides yields both
+  pairings, each labelled with its sides.
+- **Groups** ([`CompareView`](../src/lib/components/kink-list/CompareView.svelte)):
+  - **You both want this:** both Like or Love
+  - **Worth exploring:** both a yes, one only Curious
+  - **With conditions:** both a yes, one Conditional
+  - **Worth a talk:** a yes against Don't mind
+  - **Not a match:** a yes against Not for me, folded away
+- **Their hard limits** are always listed, and a limit never appears in a
+  group.
+- **Specifics** count only when either person answered them; one that merely
+  inherits would repeat its kink's line.
+- **"Where you overlap most"** counts kinks, not pairings, per category.
+- **Custom kinks are not compared:** two people's own kinks have nothing in
+  common to match on.
+
+**Signed in**, a shared link's "Compare with mine" opens
+`/playroom/kink-list/compare#k1.…`, against the person's sealed list. **Signed
+out**, it compares on the shared page itself, against the list on the device.
+
 ## Tests
 
 - **`kink-list/catalog.test.ts`:** the catalogue's checks, search, and the
@@ -222,6 +311,11 @@ stored.
   category limits, related kinks), merging, and the stored shape.
 - **`kink-list/deck.test.ts`:** the deck's order, drill-down after yes,
   triage, intensity, custom kinks, and the review.
+- **`kink-list/share-link.test.ts`:** the round trip (sides, detail, notes,
+  custom kinks, wholesale limits, a name), notes left out, the length of a
+  full list, broken links, and unknown kink numbers.
+- **`kink-list/compare.test.ts`:** the groups, role-aware pairing, limits, and
+  overlap.
 - **`server/kink-lists.test.ts`:** saving, compare-and-swap, vaults, and who
   may write a scope.
 - **`components/kink-list/KinkRow.svelte.test.ts`:** answering, inherited
@@ -231,4 +325,8 @@ stored.
 - **`e2e/kink-list.spec.ts`:** answers that are sealed and survive a reload,
   search by alias, a related kink answered in either place, and quick fill on
   a phone (triage, a real swipe, a button, and a category ruled out).
+  - Signed out: a list kept on the device, shared as a link and opened
+    elsewhere, then compared; the device's answers joining the account at
+    sign-up; the public list redirecting someone signed in; and a shared link
+    compared with a signed-in list.
 - **The sealed fixture** for `kink-list` v1 is in `sealed-fixtures/`.

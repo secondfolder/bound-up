@@ -151,7 +151,7 @@ export function account(name: string): Account {
 }
 
 /** The routes outside the app shell, where `EncryptionGate` never runs. */
-const PUBLIC_PATH = /^\/(?:$|signup|login|logout|invite|roadmap)(?:\/|$)/;
+const PUBLIC_PATH = /^\/(?:$|signup|login|logout|invite|roadmap|kink-list)(?:\/|$)/;
 
 /**
  * After a sign-in or sign-up, waits until the key it handed over is cached.

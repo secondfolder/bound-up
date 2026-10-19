@@ -7,7 +7,9 @@
 	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
 	import NotificationsHint from '$lib/components/NotificationsHint.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
+	import { currentVaults } from '$lib/crypto/vaults.svelte';
 	import { hasFeature } from '$lib/features';
+	import { DEVICE_LIST_KEY } from '$lib/kink-list/device-key';
 	import { resyncPush } from '$lib/push-client';
 	import { fitVisualViewport } from '$lib/visual-viewport';
 	import type { LayoutData } from './$types';
@@ -19,6 +21,26 @@
 	// notifications. Checked once per full load, here rather than on sign-in,
 	// because a session can end and another begin with nothing of ours running
 	// in between. See docs/notifications.md.
+	// A kink list kept on this device from before signing in joins the
+	// account's once the vaults are open. Loaded only when there is one, so
+	// the shell carries none of it otherwise. See docs/kink-list.md.
+	let adoptionChecked = false;
+	$effect(() => {
+		if (adoptionChecked || currentVaults().status !== 'ready') {
+			return;
+		}
+		adoptionChecked = true;
+		let waiting = false;
+		try {
+			waiting = localStorage.getItem(DEVICE_LIST_KEY) !== null;
+		} catch {
+			// Storage the browser will not let us read holds no list either.
+		}
+		if (waiting) {
+			void import('$lib/kink-list/adopt.svelte').then(({ adoptDeviceList }) => adoptDeviceList());
+		}
+	});
+
 	onMount(() => {
 		if (data.pushAvailable) {
 			void resyncPush().catch(() => {

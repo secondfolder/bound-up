@@ -27,7 +27,9 @@ The roadmap's toy collection and the like are planned for it.
     shell (see below), under `(standalone)/playroom/`, so it can be shared as
     a link and used without an account. It doesn't look like Bound Up.
   - **An app tool** (the kink list) lives in the app shell under
-    `(app)/playroom/`, and looks like the rest of the app.
+    `(app)/playroom/`, and looks like the rest of the app. The kink list also
+    has a public twin under `(public)/kink-list/`, for anyone signed out
+    ([kink-list.md](kink-list.md#without-an-account)).
 
 ## The standalone shell
 

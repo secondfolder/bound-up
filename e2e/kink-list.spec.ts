@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, signUp, waitForHydration } from './helpers';
+import { account, clickWaButton, signUp, waitForHydration } from './helpers';
 
 /**
  * The kink list, signed in: answering, search, related kinks, and that what
@@ -129,5 +129,115 @@ test.describe('quick fill', () => {
 		await expect(
 			page.getByText('Hard limit, from "Oral": hard limit everything').first()
 		).toBeVisible();
+	});
+});
+
+test.describe('without an account', () => {
+	async function answerSpanking(page: Page, path: string) {
+		await page.goto(`${path}/impact`);
+		await waitForHydration(page);
+		await page
+			.getByRole('group', { name: 'Spanking', exact: true })
+			.getByText('Like', { exact: true })
+			.click();
+		await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible();
+	}
+
+	async function makeLink(page: Page, name: string): Promise<string> {
+		await page.goto('/kink-list');
+		await waitForHydration(page);
+		await page.getByText('Share a link to your list', { exact: true }).click();
+		// By role: Svelte sets a wa-input's label as a property, not an attribute.
+		await page.getByRole('textbox', { name: 'Your name on it (optional)' }).fill(name);
+		await clickWaButton(page, 'Make a link');
+		const field = page.getByRole('textbox', { name: 'Your link' });
+		await expect(field).toHaveValue(/#k1\./);
+		return await field.inputValue();
+	}
+
+	test('keeps a list on the device, and shares it as a link anyone can open', async ({
+		page,
+		browser
+	}) => {
+		await answerSpanking(page, '/kink-list');
+		await page.reload();
+		await waitForHydration(page);
+		await expect(
+			page
+				.getByRole('group', { name: 'Spanking', exact: true })
+				.getByRole('radio', { name: 'Like' })
+		).toBeChecked();
+
+		const link = await makeLink(page, 'Ada');
+		// The answers are after the #, which never reaches the server.
+		expect(new URL(link).hash).toMatch(/^#k1\./);
+
+		const stranger = await browser.newContext();
+		try {
+			const other = await stranger.newPage();
+			await other.goto(link);
+			await waitForHydration(other);
+			await expect(other.getByRole('heading', { name: 'Ada’s kink list' })).toBeVisible();
+			await expect(other.getByText('Spanking', { exact: true })).toBeVisible();
+			// Nothing on that device to compare with.
+			await expect(other.locator('wa-button', { hasText: 'Compare with mine' })).toHaveCount(0);
+		} finally {
+			await stranger.close();
+		}
+
+		// On a device with a list of its own, the two can be compared.
+		await page.goto(link);
+		await waitForHydration(page);
+		await page.locator('wa-button', { hasText: 'Compare with mine' }).click();
+		await expect(page.getByRole('heading', { name: /You both want this/ })).toBeVisible();
+	});
+
+	test('the answers on the device join the account at sign-up', async ({ page }) => {
+		await answerSpanking(page, '/kink-list');
+		await signUp(page, account('Eve'), '/signup?redirectTo=/playroom/kink-list');
+		await expect(page).toHaveURL(/\/playroom\/kink-list$/);
+		await expect(page.getByText(/Added the answer saved on this device/)).toBeVisible();
+		await page.goto('/playroom/kink-list/impact');
+		await waitForHydration(page);
+		await expect(
+			page
+				.getByRole('group', { name: 'Spanking', exact: true })
+				.getByRole('radio', { name: 'Like' })
+		).toBeChecked();
+		expect(await page.evaluate(() => localStorage.getItem('kink-list.device'))).toBeNull();
+	});
+
+	test('signed in, the public list sends you to your own, and a shared link compares with it', async ({
+		page,
+		browser
+	}) => {
+		const sharer = await browser.newContext();
+		let link: string;
+		try {
+			const other = await sharer.newPage();
+			await answerSpanking(other, '/kink-list');
+			link = await makeLink(other, 'Fin');
+		} finally {
+			await sharer.close();
+		}
+
+		await signUp(page, account('Gus'));
+		await page.goto('/kink-list/quick');
+		await expect(page).toHaveURL(/\/playroom\/kink-list\/quick$/);
+
+		await page.goto('/playroom/kink-list/impact');
+		await waitForHydration(page);
+		await page
+			.getByRole('group', { name: 'Spanking', exact: true })
+			.getByText('Love', { exact: true })
+			.click();
+		await saved(page);
+
+		await page.goto(link);
+		await waitForHydration(page);
+		await page.locator('wa-button', { hasText: 'Compare with mine' }).click();
+		await expect(page).toHaveURL(/\/playroom\/kink-list\/compare#k1\./);
+		await expect(page.getByRole('heading', { name: 'You and Fin' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /You both want this/ })).toBeVisible();
 	});
 });

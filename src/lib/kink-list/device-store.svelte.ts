@@ -1,4 +1,5 @@
 import { emptyList, type ListPayload, listPayloadSchema } from './answers';
+import { DEVICE_LIST_KEY } from './device-key';
 import { KinkListStore, type SaveState } from './store.svelte';
 
 /**
@@ -7,9 +8,6 @@ import { KinkListStore, type SaveState } from './store.svelte';
  * with until there is an account. Signing in moves it into the account
  * (docs/kink-list.md, "Without an account").
  */
-
-/** Where a list without an account is kept. Read through `readDeviceList`, which tolerates anything. */
-export const DEVICE_LIST_KEY = 'kink-list.device';
 
 /**
  * The list kept on this device, or null when there is none. Anything that

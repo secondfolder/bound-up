@@ -1,12 +1,4 @@
-import { error } from '@sveltejs/kit';
-import { kinkById } from '$lib/kink-list/catalog';
+import { categoryFromParam } from '$lib/kink-list/category-param';
 import type { PageLoad } from './$types';
 
-/** A category of the catalogue, or a 404 for anything else (a kink's id is not a category). */
-export const load: PageLoad = ({ params }) => {
-	const category = kinkById(params.category);
-	if (!category || category.parent !== undefined) {
-		error(404, 'There is no such category.');
-	}
-	return { categoryId: category.id };
-};
+export const load: PageLoad = ({ params }) => categoryFromParam(params.category);

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { adopted } from '$lib/kink-list/adopted.svelte';
 	import { isAnswered } from '$lib/kink-list/answers';
 	import {
 		catalog,
@@ -12,6 +13,7 @@
 	import IntensitySetting from './IntensitySetting.svelte';
 	import KinkRow from './KinkRow.svelte';
 	import SaveStatus from './SaveStatus.svelte';
+	import ShareLink from './ShareLink.svelte';
 
 	/**
 	 * The kink list's front page: search, how intense a list to show, and
@@ -64,6 +66,14 @@
 	</header>
 	{@render intro?.()}
 
+	{#if store.kind === 'account' && adopted.count > 0}
+		<wa-callout variant="success" appearance="outlined">
+			<wa-icon slot="icon" name="circle-check" variant="solid"></wa-icon>
+			Added {adopted.count === 1 ? 'the answer' : `the ${adopted.count} answers`} saved on this device to
+			your list.
+		</wa-callout>
+	{/if}
+
 	<wa-button class="quick" variant="brand" appearance="accent" href={paths.quick}>
 		<wa-icon slot="start" name="layer-group" variant="solid"></wa-icon>
 		Quick fill
@@ -93,6 +103,10 @@
 			{/each}
 		</section>
 	{:else}
+		<wa-details summary="Share a link to your list">
+			<ShareLink />
+		</wa-details>
+
 		{#each Object.entries(catalog.sections) as [section, title] (section)}
 			<section class="section" aria-labelledby="section-{section}">
 				<h2 id="section-{section}">{title}</h2>

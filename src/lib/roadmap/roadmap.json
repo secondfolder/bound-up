@@ -344,6 +344,13 @@
 							"shippedOn": "2026-10-19"
 						},
 						{
+							"id": "kink-list-no-account",
+							"title": "Kink list without an account",
+							"summary": "Fill in a kink list without signing up, share it as a link, and bring it with you when you do sign up.",
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
+						},
+						{
 							"id": "per-partner-kink-list",
 							"title": "Kink list per partner",
 							"summary": "Your list carries over to each partner, and you can change any answer just for them.",
