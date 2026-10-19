@@ -13,7 +13,7 @@
  * is left to seal; see docs/temporary-code.md.
  */
 
-import { forgetInviteKey, inviteVault, recallInviteKey, unwrapInviteKey } from './crypto/invite';
+import { inviteVault, recallInviteKey, unwrapInviteKey } from './crypto/invite';
 import { openRecord, sealRecord } from './crypto/sealed';
 import { writeGrantFor } from './crypto/trust.svelte';
 import { blindIndex, type OpenVault } from './crypto/vault';
@@ -233,10 +233,11 @@ async function sealScope(scopePath: string, writable: Writable): Promise<void> {
 			if (!posted.ok) {
 				throw new Error(`Could not store sealed content (${posted.status})`);
 			}
-			if (namesFrom && batch.names) {
-				// In the vault now: the key from the link has nothing left to open.
-				forgetInviteKey(namesFrom.partnershipId);
-			}
+			// The key from the link has nothing left to open now, but it is not
+			// forgotten here: a page whose load read the invite just before this
+			// landed still needs it, and showed the names as unreadable when it
+			// had gone. `openedNames` forgets it once a load serves the names from
+			// the vault.
 		}
 
 		if (!page.next) {

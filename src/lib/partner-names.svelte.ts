@@ -14,7 +14,7 @@
  */
 
 import { SvelteMap } from 'svelte/reactivity';
-import { inviteVault, recallInviteKey, unwrapInviteKey } from './crypto/invite';
+import { forgetInviteKey, inviteVault, recallInviteKey, unwrapInviteKey } from './crypto/invite';
 import type { OpenVault } from './crypto/vault';
 import { currentVaults, heldVaultIdentity, onVaultsReset, vaultById } from './crypto/vaults.svelte';
 import {
@@ -83,6 +83,22 @@ function inviteVaultFor(source: PartnerNamesSource): Opened<OpenVault> {
 	return undefined;
 }
 
+const forgotten = new Set<string>();
+
+/**
+ * Forgets the invitee's key from the link, now that a load has served the
+ * names from the vault and so cleared the invite it opened. Not when the
+ * sealing pass moves them: a page whose load had read the invite a moment
+ * before still needs the key, and without it showed the names as unreadable
+ * until the next load. Once per partnership, as this runs on every render.
+ */
+function forgetInviteKeyOnce(partnershipId: string) {
+	if (!forgotten.has(partnershipId)) {
+		forgotten.add(partnershipId);
+		forgetInviteKey(partnershipId);
+	}
+}
+
 /** The four stored names and roles, in the three states every sealed read has. */
 export function openedNames(source: PartnerNamesSource): Opened<StoredNames> {
 	if (source.legacy) {
@@ -90,6 +106,7 @@ export function openedNames(source: PartnerNamesSource): Opened<StoredNames> {
 	}
 	const { sealed, invite, partnershipId } = source;
 	if (sealed) {
+		forgetInviteKeyOnce(partnershipId);
 		return sealedReader.read(
 			partnershipNamesKind,
 			{

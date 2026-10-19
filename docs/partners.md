@@ -68,8 +68,10 @@ the same invite key, and the server keeps the invite past acceptance until the
 names move into the vault. The invitee's device keeps the key from the link
 (local storage, `rememberInviteKey`) because the fragment does not survive the
 trip through signing up — the email confirmation link opens a new tab — and
-forgets it once the names are in the vault. On another device, the invitee sees
-"…" for the names until either member's device has moved them.
+forgets it once a page load serves the names from the vault (`openedNames`).
+Not as soon as its own sealing pass has moved them: a page whose load read the
+invite a moment before still needs the key to open it. On another device, the
+invitee sees "…" for the names until either member's device has moved them.
 
 **The inviter's key arrives out of band.** The invite carries the inviter's
 recipient as their device knew it, sealed under a key the server never had.
