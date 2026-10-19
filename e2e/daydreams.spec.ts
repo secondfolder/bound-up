@@ -10,6 +10,7 @@ import {
 	grantFeature,
 	reply,
 	scrollShellTo,
+	settle,
 	shellScroll,
 	signUp,
 	waitForHydration
@@ -543,6 +544,9 @@ test.describe('daydreams', () => {
 		);
 
 		await clickWaButton(page, 'Try another');
+		// The stub's second draft is its first again, so the sentence alone
+		// proves nothing has landed; the button's label is back once it has.
+		await expect(page.getByRole('button', { name: 'Try another' })).toBeVisible();
 		await expect(sentence).toContainText('Vesper');
 
 		// Back to the ways in, with what was written still there.
@@ -552,6 +556,42 @@ test.describe('daydreams', () => {
 		await clickWaButton(page, 'Start daydreaming');
 		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
 		await expect(page.getByText('Vesper looks up as you come in.')).toBeVisible();
+	});
+
+	/**
+	 * A regression test: a "Try another" answering after the user had gone back
+	 * to the start used to land anyway, pulling them into the new draft.
+	 */
+	test('a draft asked for and then walked away from does not come back', async ({ page }) => {
+		await signedUpDreamer(page);
+		await openStart(page);
+		await page.getByRole('textbox').fill('a stranger on a night train');
+		await clickWaButton(page, 'Write it');
+		await expect(page.locator('.sentence')).toContainText('Vesper');
+
+		// Hold the next draft back until the user has left.
+		let release: () => void = () => undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await page.route('**/api/daydreams/suggest', async (route) => {
+			await held;
+			await route.continue();
+		});
+		await clickWaButton(page, 'Try another');
+		await expect(page.getByRole('button', { name: 'Writing another…' })).toBeVisible();
+		await clickWaButton(page, 'Other ways to start');
+		const answered = page.waitForEvent('requestfinished', (request) =>
+			request.url().includes('/api/daydreams/suggest')
+		);
+		release();
+		await answered;
+		// Until the page has read the answer and acted on it.
+		await settle(page);
+		await settle(page);
+
+		await expect(page.getByRole('button', { name: 'Write it' })).toBeVisible();
+		await expect(page.locator('.sentence')).toHaveCount(0);
 	});
 
 	test('a failed reply says so, and trying again answers', async ({ page }) => {

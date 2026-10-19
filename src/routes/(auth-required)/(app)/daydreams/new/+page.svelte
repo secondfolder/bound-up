@@ -43,6 +43,8 @@
 	let asking = $state(false);
 	let problem: string | null = $state(null);
 	let versions = 0;
+	/** Counts draft requests, so only the latest one still wanted is applied. */
+	let requests = 0;
 
 	/**
 	 * "You as" is remembered on the device, as a convenience: someone who is
@@ -90,9 +92,17 @@
 	 * new draft and told to the model, so "Try another" never loses them.
 	 */
 	async function writeDraft(limits = '') {
+		requests += 1;
+		const mine = requests;
 		asking = true;
 		problem = null;
 		const answer = await suggestDaydream({ idea, limits });
+		// Left behind: the user went back to the start, or asked again, while
+		// this was out. Applying it anyway pulled someone who had pressed "Other
+		// ways to start" straight back into a draft they had walked away from.
+		if (mine !== requests) {
+			return;
+		}
 		asking = false;
 		if (!answer.ok) {
 			problem = answer.error;
@@ -132,6 +142,10 @@
 				appearance="plain"
 				size="s"
 				onclick={() => {
+					// Drops a "Try another" still out, which would otherwise land
+					// here and leave the start saying it was writing one.
+					requests += 1;
+					asking = false;
 					problem = null;
 					stage = { kind: 'start' };
 				}}
