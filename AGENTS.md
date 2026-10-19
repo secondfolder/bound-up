@@ -879,6 +879,14 @@ Notes that cost a debugging round each:
   `optimizeDeps.include`. Otherwise Vite discovers it mid-run, forces a
   re-optimization, and tells every connected client to reload — which loses an
   in-flight form submit.
+- **Run nothing that loads the Vite config in a checkout while its e2e suite
+  runs** — `vitest`, `npm run check`, a commit's husky hook. Each runs
+  `svelte-kit sync`, which rewrites `.svelte-kit/generated/`, and the suite's
+  `vite dev` answers by reloading every open page. A reload during sign-in
+  throws away the key stash, so the failures look like the sign-in race above:
+  a test stuck on `/login?reason=device`, or on `/signup` navigated to twice.
+  The server log names it: `page reload .svelte-kit/generated/…`. Use another
+  worktree.
 - **A `<wa-button href=…>` renders an anchor**, so `getByRole('button')` finds
   nothing. And `getByRole('button')` on a `<wa-button>` resolves to the _inner_
   `<button>` inside its shadow root, which is why `wa-button[type=submit]` as a
