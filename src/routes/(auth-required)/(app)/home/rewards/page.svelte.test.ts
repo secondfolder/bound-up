@@ -16,6 +16,7 @@ function data(claimCount: number): PageData {
 		features: [],
 		isAdmin: false,
 		pushAvailable: false,
+		debug: false,
 		selfRewards: {
 			credits: 3,
 			rewards: [],

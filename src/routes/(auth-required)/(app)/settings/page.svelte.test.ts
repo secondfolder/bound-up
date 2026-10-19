@@ -6,7 +6,9 @@ import type { PageData } from './$types';
 const pageState = {
 	data: {
 		user: { id: 'u1', name: 'Ada', email: 'ada@example.com', image: null, timezone: 'UTC' },
-		isAdmin: false
+		isAdmin: false,
+		features: [] as string[],
+		debug: false
 	}
 };
 
@@ -86,5 +88,38 @@ describe('/settings/+page.svelte', () => {
 		const { container } = renderPage();
 		const version = screen.getByText('Version 1.2.3');
 		expect(container.querySelector('section')?.lastElementChild).toBe(version);
+	});
+
+	it('offers the debug mode switch only to an account holding it', () => {
+		const { unmount } = renderPage();
+		expect(screen.queryByText('Debug mode on this device')).not.toBeInTheDocument();
+		unmount();
+
+		pageState.data.features = ['debugMode'];
+		try {
+			const { container } = renderPage();
+			expect(screen.getByText('Debug mode on this device')).toBeInTheDocument();
+			expect(container.querySelector('form[action="?/debug"] input[name="on"]')).toHaveValue(
+				'true'
+			);
+			// Off on this device: no panel yet.
+			expect(screen.queryByRole('region', { name: 'Debug info' })).not.toBeInTheDocument();
+		} finally {
+			pageState.data.features = [];
+		}
+	});
+
+	it('shows the debug info panel while debug mode is on', () => {
+		pageState.data.features = ['debugMode'];
+		pageState.data.debug = true;
+		try {
+			renderPage();
+			const panel = screen.getByRole('region', { name: 'Debug info' });
+			expect(panel).toHaveTextContent('u1');
+			expect(panel).toHaveTextContent('1.2.3');
+		} finally {
+			pageState.data.features = [];
+			pageState.data.debug = false;
+		}
 	});
 });

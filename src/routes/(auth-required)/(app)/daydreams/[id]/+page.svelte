@@ -4,6 +4,7 @@
 	import DaydreamThread from '$lib/components/DaydreamThread.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import { daydreamTitle } from '$lib/daydream';
+	import { hasFeature } from '$lib/features';
 	import { openedDaydreamSetup, openedPart, shownText } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
 
@@ -47,6 +48,8 @@
 				<DaydreamThread
 					daydream={data.daydream}
 					available={data.available}
+					keepRawReplies={hasFeature(data.features, 'debugMode')}
+					debug={data.debug}
 					onnamed={(name) => {
 						named = name;
 					}}

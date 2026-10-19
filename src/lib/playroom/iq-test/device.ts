@@ -148,7 +148,8 @@ const TIMERS_CLEARED_KEY = 'playroom.iq-test.timers-cleared';
  * Whether "Clear timer", a testing aid beside "Correct answer", was last left
  * on on this device. Remembered so a reload does not set the clocks running
  * again under someone looking at a question. Only ever read where that
- * testing aid is shown: on its own it does nothing.
+ * testing aid is shown, which is while debug mode is on: on its own it does
+ * nothing.
  */
 export function timersCleared(): boolean {
 	return read(local, TIMERS_CLEARED_KEY) === true;

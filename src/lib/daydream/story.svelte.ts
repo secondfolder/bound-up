@@ -19,12 +19,13 @@
  */
 
 import { SvelteMap } from 'svelte/reactivity';
-import type {
-	DaydreamSetup,
-	DaydreamTurnRole,
-	DialValue,
-	SceneDials,
-	StoryDials
+import {
+	DAYDREAM_LIMITS,
+	type DaydreamSetup,
+	type DaydreamTurnRole,
+	type DialValue,
+	type SceneDials,
+	type StoryDials
 } from '../daydream';
 import { reportRequestFailure } from '../request-failure.svelte';
 import type {
@@ -44,6 +45,9 @@ import type { DaydreamMarkView, DaydreamTreeNodeView, DaydreamView, SealedRefVie
 import {
 	createMark,
 	deleteMark,
+	type PromptMessage,
+	type ReplyRequestBody,
+	readPrompt,
 	readTurns,
 	saveSetup as saveSetupRecord,
 	saveTurn,
@@ -101,6 +105,13 @@ type Generate = {
 	};
 };
 
+/** The user's turn as `request` sends it written out, if it carries one: a rewrite's. */
+function carriedIn(request: Generate): string | undefined {
+	const forced = request.readAs;
+	// A reading forced to anything but an instruction writes nothing out.
+	return forced && forced !== 'instruction' ? undefined : request.rewrite?.expansion;
+}
+
 export type MarkState = DaydreamMarkView & { content: DaydreamMarkContent | null | undefined };
 
 export class DaydreamStory {
@@ -128,6 +139,12 @@ export class DaydreamStory {
 	problem: string | null = $state(null);
 	/** What "Try again" does. */
 	retry: (() => void) | null = $state(null);
+	/**
+	 * The failed reply's text exactly as it arrived, for debug mode's raw log.
+	 * Never saved, since a failed reply is not a turn. Empty when nothing
+	 * arrived, or the last problem was not a reply's.
+	 */
+	problemRaw: string = $state('');
 	setupRevision: number = $state(0);
 
 	readonly #setupRef: SealedRefView;
@@ -147,10 +164,24 @@ export class DaydreamStory {
 	 */
 	#replying: Promise<void> | null = null;
 	readonly #loading = new Set<string>();
+	/** Whether each passage keeps its reply as it arrived (`raw`): see the constructor. */
+	readonly #keepRawReplies: boolean;
 
-	constructor(daydream: DaydreamView, available: boolean) {
+	/**
+	 * `keepRawReplies` is for an account granted debug mode, whether or not it
+	 * is switched on: every passage then seals the model's reply exactly as it
+	 * arrived beside the parsed passage, so any of them can be looked at in
+	 * the raw log later (docs/debug-mode.md). The server cannot see inside the
+	 * seal to hold anyone to this, so this flag is the whole of the rule.
+	 */
+	constructor(
+		daydream: DaydreamView,
+		available: boolean,
+		options: { keepRawReplies?: boolean } = {}
+	) {
 		this.id = daydream.id;
 		this.available = available;
+		this.#keepRawReplies = options.keepRawReplies ?? false;
 		this.tree = [...daydream.tree];
 		this.activeTurnId = daydream.activeTurnId;
 		this.setupRevision = daydream.revision;
@@ -361,15 +392,44 @@ export class DaydreamStory {
 		return run;
 	}
 
+	/** What `/reply` is sent for `request`, given the story as the model reads it. */
+	#replyBody(request: Generate, setup: DaydreamSetup, context: ContextTurn[]): ReplyRequestBody {
+		// What is on screen at the turn the passage follows: the buttons the
+		// model is asked to add to or prune.
+		const before = pathTo(this.index, request.parentId).map((node) => ({
+			content: this.content(node.id) ?? null
+		}));
+		return {
+			mode: request.mode,
+			setup,
+			turns: context,
+			currentDirections: currentDirections(before),
+			...(request.rewrite
+				? {
+						rewrite: {
+							targetText: request.rewrite.target.text,
+							...(request.rewrite.quote ? { quote: request.rewrite.quote.text } : {}),
+							...(request.rewrite.instruction ? { instruction: request.rewrite.instruction } : {})
+						}
+					}
+				: {})
+		};
+	}
+
+	/** The story as the model reads it for `request`, or null while some of it is still opening. */
+	#contextFor(request: Generate): ContextTurn[] | null {
+		const carried = carriedIn(request);
+		return this.#contextUpTo(request.parentId, {
+			...(carried ? { expansion: carried } : {}),
+			...(request.readAs ? { readAs: request.readAs } : {})
+		});
+	}
+
 	async #generate(request: Generate): Promise<void> {
 		const { setup } = this;
 		const forced = request.readAs;
-		// A reading forced to anything but an instruction writes nothing out.
-		const carried = forced && forced !== 'instruction' ? undefined : request.rewrite?.expansion;
-		const context = this.#contextUpTo(request.parentId, {
-			...(carried ? { expansion: carried } : {}),
-			...(forced ? { readAs: forced } : {})
-		});
+		const carried = carriedIn(request);
+		const context = this.#contextFor(request);
 		const parent = request.parentId === null ? undefined : this.index.byId.get(request.parentId);
 		const parentContent = parent ? this.content(parent.id) : null;
 		// Only words the user wrote, in a story they are in, can be written out:
@@ -385,13 +445,13 @@ export class DaydreamStory {
 			this.retry = () => void this.#start(request);
 			return;
 		}
-		// What is on screen at the turn the passage follows: the buttons the
-		// model is asked to add to or prune.
-		const before = pathTo(this.index, request.parentId).map((node) => ({
-			content: this.content(node.id) ?? null
-		}));
-		const stopped = isHalted(before);
+		const stopped = isHalted(
+			pathTo(this.index, request.parentId).map((node) => ({
+				content: this.content(node.id) ?? null
+			}))
+		);
 		this.problem = null;
+		this.problemRaw = '';
 		this.retry = null;
 		this.streaming = {
 			parentId: request.parentId,
@@ -407,47 +467,31 @@ export class DaydreamStory {
 		let meta: PassageMeta | null = null;
 		let expansion: string | null = null;
 		let reading: Reading | null = null;
+		// The reply as it arrives, tags and all, kept even through a Stop.
+		let raw = '';
 		try {
-			const outcome = await writeReply(
-				this.id,
-				{
-					mode: request.mode,
-					setup,
-					turns: context,
-					currentDirections: currentDirections(before),
-					...(request.rewrite
-						? {
-								rewrite: {
-									targetText: request.rewrite.target.text,
-									...(request.rewrite.quote ? { quote: request.rewrite.quote.text } : {}),
-									...(request.rewrite.instruction
-										? { instruction: request.rewrite.instruction }
-										: {})
-								}
-							}
-						: {})
-				},
-				{
-					signal,
-					onText: (soFar) => {
-						if (this.streaming) {
-							this.streaming = {
-								...this.streaming,
-								text: soFar.passage,
-								expansion: carried ?? (expandable ? soFar.expansion : null),
-								reading: soFar.reading
-							};
-						}
+			const outcome = await writeReply(this.id, this.#replyBody(request, setup, context), {
+				signal,
+				onText: (soFar, arrived) => {
+					raw = arrived;
+					if (this.streaming) {
+						this.streaming = {
+							...this.streaming,
+							text: soFar.passage,
+							expansion: carried ?? (expandable ? soFar.expansion : null),
+							reading: soFar.reading
+						};
 					}
 				}
-			);
+			});
 			if (!outcome.ok) {
 				this.streaming = null;
 				this.problem = outcome.error;
+				this.problemRaw = outcome.raw;
 				this.retry = () => void this.#start(request);
 				return;
 			}
-			({ passage, meta, expansion, reading } = outcome);
+			({ passage, meta, expansion, reading, raw } = outcome);
 		} catch {
 			// Stopped. What had arrived stays, like a sentence cut off: it is
 			// what was on screen, and writing it again is one press away. A Stop
@@ -500,13 +544,65 @@ export class DaydreamStory {
 		const content: DaydreamTurnContent = {
 			type: 'text',
 			text: passage.slice(0, 8000),
-			...(finalMeta ? { meta: finalMeta } : {})
+			...(finalMeta ? { meta: finalMeta } : {}),
+			...(this.#keepRawReplies ? rawReply(raw) : {})
 		};
 		const saved = await this.#append(request.parentId, 'story', content);
 		this.streaming = null;
 		if (!saved) {
 			this.retry = () => void this.#start(request);
 		}
+	}
+
+	/**
+	 * What the model would be sent to write the passage `turnId` again, as
+	 * the server builds it: debug mode's "Show prompt" (docs/debug-mode.md).
+	 * Rebuilt from the story as it stands — today's setup, the turns as the
+	 * page has them — so it can differ from what was sent when the passage was
+	 * written, which nothing records. The request is the one that passage's
+	 * own record says it answered: an opening, a reply, or a rewrite of the
+	 * passage it names, with any reading the user chose.
+	 */
+	async promptFor(
+		turnId: string
+	): Promise<{ ok: true; messages: PromptMessage[] } | { ok: false; error: string }> {
+		const node = this.index.byId.get(turnId);
+		const content = this.content(turnId);
+		const { setup } = this;
+		if (!(node && node.role === 'story' && content?.type === 'text' && setup)) {
+			return { ok: false, error: NOT_READY };
+		}
+		const { meta } = content;
+		const readAs = chosenReadingIn(content);
+		const expansion = expansionIn(content);
+		let request: Generate = {
+			parentId: node.parentId,
+			mode: node.parentId === null ? 'opening' : 'reply',
+			...(readAs ? { readAs } : {})
+		};
+		if (meta?.rewriteOf) {
+			const { turnId: targetId, quote, instruction } = meta.rewriteOf;
+			await this.ensureLoaded([targetId]);
+			const target = this.content(targetId);
+			if (target?.type !== 'text') {
+				return { ok: false, error: NOT_READY };
+			}
+			request = {
+				...request,
+				mode: 'rewrite',
+				rewrite: {
+					target: { id: targetId, text: target.text },
+					...(quote ? { quote } : {}),
+					...(instruction ? { instruction } : {}),
+					...(expansion ? { expansion } : {})
+				}
+			};
+		}
+		const context = this.#contextFor(request);
+		if (!context) {
+			return { ok: false, error: NOT_READY };
+		}
+		return await readPrompt(this.id, this.#replyBody(request, setup, context));
 	}
 
 	/** Ends the passage arriving now. `discard` drops what had arrived rather than keeping it. */
@@ -848,3 +944,17 @@ export class DaydreamStory {
 
 /** The abort reason that means "drop what arrived", from Stop the scene and Ease off. */
 const DISCARD = 'discard';
+
+/**
+ * A reply as it arrived, ready to keep on its passage: cut to
+ * `DAYDREAM_LIMITS.rawReply`, and saying so when it was. Nothing for a reply
+ * that never arrived.
+ */
+export function rawReply(raw: string): { raw?: string; rawTruncated?: true } {
+	if (raw === '') {
+		return {};
+	}
+	return raw.length > DAYDREAM_LIMITS.rawReply
+		? { raw: raw.slice(0, DAYDREAM_LIMITS.rawReply), rawTruncated: true }
+		: { raw };
+}

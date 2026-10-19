@@ -7,6 +7,7 @@ import {
 	clickWaButton,
 	fillRichText,
 	fillWaInput,
+	grantFeature,
 	reply,
 	scrollShellTo,
 	shellScroll,
@@ -643,6 +644,45 @@ test.describe('daydreams', () => {
 		await page.goto('/daydreams/characters');
 		await clickWaButton(page, 'Edit Mara');
 		await expect(dialog(page).getByText('In this story', { exact: true })).toHaveCount(0);
+	});
+
+	test('debug mode keeps each reply as it arrived, shows it raw, and rebuilds its prompt', async ({
+		page
+	}) => {
+		const who = await signedUpDreamer(page);
+		// Written before the grant: no raw reply is kept for it.
+		await startDaydream(page);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		await passageSaved(page);
+
+		await grantFeature(who.email, 'debugMode');
+		await page.reload();
+		await waitForHydration(page);
+		// Granted but switched off on this device: no raw log on offer.
+		await expect(page.locator('wa-switch.raw-log')).toHaveCount(0);
+		await page
+			.getByRole('navigation', { name: 'Primary' })
+			.getByRole('button', { name: 'Debug mode' })
+			.click();
+		await expect(page.locator('wa-switch.raw-log')).toBeVisible();
+
+		// Written with the grant: kept raw.
+		const said = unique('I close the door,');
+		await reply(page, said);
+		await expect(page.getByText(`Mara heard: "${said}"`)).toBeVisible();
+		await passageSaved(page);
+
+		await page.locator('wa-switch.raw-log').click();
+		const raw = page.locator('li.raw');
+		await expect(raw).toHaveCount(3);
+		await expect(raw.first()).toContainText('Raw reply not recorded.');
+		const reply3 = raw.last().locator('pre.reply');
+		await expect(reply3).toContainText(`Mara heard: "${said}"`);
+		await expect(reply3).toContainText('<meta>');
+
+		await raw.last().getByRole('button', { name: 'Show prompt' }).click();
+		await expect(raw.last()).toContainText('# The characters');
+		await expect(raw.last().locator('.messages li').last()).toContainText(said);
 	});
 
 	test('an account without the feature has no way in', async ({ page }) => {

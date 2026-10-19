@@ -6,6 +6,7 @@ import {
 	type Locator,
 	type Page
 } from '@playwright/test';
+import { sql } from './db';
 import { linkIn, waitForMailTo } from './mail';
 
 /**
@@ -612,4 +613,22 @@ export async function scrollShellTo(page: Page, top: number): Promise<void> {
 		document.querySelector('main')?.scrollTo({ top: to, behavior: 'instant' });
 	}, top);
 	await settle(page);
+}
+
+/** Grants an account a feature, as `/admin` would, straight into the database. */
+export async function grantFeature(email: string, feature: string): Promise<void> {
+	await sql(
+		`insert into user_features (id, user_id, feature, source)
+		 select ?, id, ?, 'grant' from user where email = ?`,
+		[randomUUID(), feature, email]
+	);
+}
+
+/**
+ * Switches debug mode on for this browser by setting its cookie, as the
+ * switch does, for a page with no bottom nav to click (the IQ test). Takes
+ * effect on the next load. The account still needs `debugMode` granted.
+ */
+export async function switchOnDebugCookie(page: Page): Promise<void> {
+	await page.context().addCookies([{ name: 'debug', value: '1', url: new URL(page.url()).origin }]);
 }

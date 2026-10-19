@@ -1,9 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { defined } from '../src/lib/testing/defined';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, signUp, waitForHydration } from './helpers';
+import { account, grantFeature, signUp, switchOnDebugCookie, waitForHydration } from './helpers';
 
 /**
  * The Playroom and its IQ test.
@@ -1226,23 +1225,24 @@ test.describe('IQ test', () => {
 		await expect(page.getByTestId('iq-history').locator('li')).toHaveCount(1);
 	});
 
-	test('"Correct answer", for an account granted it, taps through a run to a full score', async ({
-		page
-	}) => {
+	test('"Correct answer", in debug mode, taps through a run to a full score', async ({ page }) => {
 		const who = account('Tester');
 		await signUp(page, who);
 		await page.goto('/playroom/iq-test');
 		await waitForHydration(page);
 		await dialog(page).getByRole('button', { name: SUB }).click();
-		// Not offered without the feature.
+		// Not offered without debug mode.
 		await expect(page.getByText('Question 1 of 36')).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Correct answer', exact: true })).toHaveCount(0);
 
-		await sql(
-			`insert into user_features (id, user_id, feature, source)
-			 select ?, id, 'iqTestAnswerButton', 'grant' from user where email = ?`,
-			[randomUUID(), who.email]
-		);
+		// Nor with it granted but not switched on on this device.
+		await grantFeature(who.email, 'debugMode');
+		await page.reload();
+		await waitForHydration(page);
+		await expect(page.getByText('Question 1 of 36')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Correct answer', exact: true })).toHaveCount(0);
+
+		await switchOnDebugCookie(page);
 		await page.reload();
 		await waitForHydration(page);
 		const button = page.getByRole('button', { name: 'Correct answer', exact: true });
@@ -1268,11 +1268,8 @@ test.describe('IQ test', () => {
 	}) => {
 		const who = account('Tester');
 		await signUp(page, who);
-		await sql(
-			`insert into user_features (id, user_id, feature, source)
-			 select ?, id, 'iqTestAnswerButton', 'grant' from user where email = ?`,
-			[randomUUID(), who.email]
-		);
+		await grantFeature(who.email, 'debugMode');
+		await switchOnDebugCookie(page);
 		await page.goto('/playroom/iq-test');
 		await waitForHydration(page);
 		await dialog(page).getByRole('button', { name: SUB }).click();

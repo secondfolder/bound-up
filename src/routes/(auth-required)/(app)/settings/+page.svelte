@@ -2,7 +2,10 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import DebugInfo from '$lib/components/DebugInfo.svelte';
 	import { lock } from '$lib/crypto/session.svelte';
+	import { submitDebugToggle } from '$lib/debug-toggle';
+	import { hasFeature } from '$lib/features';
 	import { disablePush } from '$lib/push-client';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
 	import type { PageData } from './$types';
@@ -12,6 +15,9 @@
 	// Server load data is the single source of truth for auth state — see the
 	// note in src/routes/+layout.svelte.
 	const user = $derived(page.data.user);
+	// Display only: the action checks the feature again on the server.
+	const debugAvailable = $derived(hasFeature(page.data.features ?? [], 'debugMode'));
+	const debugOn = $derived(page.data.debug ?? false);
 </script>
 
 <section>
@@ -89,6 +95,33 @@
 		{/if}
 	</ul>
 
+	{#if debugAvailable}
+		<!-- Submitted as soon as the switch moves: there is nothing else on the
+		     form to wait for. The hidden field says which way, so the post does
+		     not depend on the switch's own form value. -->
+		<form
+			class="debug"
+			method="POST"
+			action="?/debug"
+			use:enhance={submitDebugToggle}
+		>
+			<input type="hidden" name="on" value={String(!debugOn)} />
+			<wa-switch
+				checked={debugOn}
+				onchange={(event: Event) => (event.currentTarget as HTMLElement).closest('form')?.requestSubmit()}
+				>Debug mode on this device</wa-switch
+			>
+		</form>
+		{#if debugOn && user}
+			<DebugInfo
+				version={data.appVersion}
+				userId={user.id}
+				accountTimezone={user.timezone}
+				features={page.data.features ?? []}
+			/>
+		{/if}
+	{/if}
+
 	<p class="version">Version {data.appVersion}</p>
 </section>
 
@@ -161,6 +194,11 @@
 					color: inherit;
 				}
 			}
+		}
+
+		.debug {
+			padding: 0.75rem 0;
+			border-bottom: 1px solid var(--wa-color-surface-border);
 		}
 
 		.version {

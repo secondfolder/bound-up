@@ -151,3 +151,37 @@ test('the daydream tree migrations turn each line of turns into a branch', async
 		{ id: 'd2', active_turn_id: 'u0' }
 	]);
 });
+
+test('the IQ test answer button folds into debug mode, once per account', async () => {
+	client = createClient({ url: ':memory:' });
+	await client.executeMultiple(`
+		CREATE TABLE user_features (
+			id text PRIMARY KEY NOT NULL,
+			user_id text NOT NULL,
+			feature text NOT NULL,
+			source text NOT NULL
+		);
+		CREATE UNIQUE INDEX user_features_user_feature_idx ON user_features (user_id, feature);
+		INSERT INTO user_features VALUES
+			('f1', 'ada', 'iqTestAnswerButton', 'grant'),
+			('f2', 'jun', 'iqTestAnswerButton', 'grant'),
+			('f3', 'jun', 'debugMode', 'grant'),
+			('f4', 'kit', 'guides', 'grant');
+	`);
+
+	const sql = await readFile(
+		path.resolve(process.cwd(), 'drizzle/0035_fold_iq_answer_button_into_debug_mode.sql'),
+		'utf8'
+	);
+	await client.executeMultiple(sql);
+
+	const rows = await client.execute(
+		'select user_id, feature from user_features order by user_id, feature'
+	);
+	expect(rows.rows.map((row) => [row.user_id, row.feature])).toEqual([
+		['ada', 'debugMode'],
+		// Jun held both: the unique index would refuse a second debugMode row.
+		['jun', 'debugMode'],
+		['kit', 'guides']
+	]);
+});

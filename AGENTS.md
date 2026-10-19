@@ -398,6 +398,12 @@ load, so a check that only lives in a layout gates nothing. Admin pages call
 `requireAdmin` in every load and action for the same reason. See
 [docs/features-and-admin.md](docs/features-and-admin.md).
 
+**Troubleshooting UI goes behind debug mode, not a feature of its own.** Read
+`page.data.debug` (or `readDebugMode` outside the app shell); it is display
+only, like `features`, so anything the server has to serve for it checks
+`requireFeature(…, 'debugMode')` itself. See
+[docs/debug-mode.md](docs/debug-mode.md).
+
 **Never return `locals.user` wholesale from a load.** It is the full DB row and
 load data is serialised into the HTML of every page. Whitelist fields, as
 `src/routes/+layout.server.ts` does.
@@ -936,6 +942,7 @@ Four places, split on scope:
 | [docs/email.md](docs/email.md)                                                           | Email verification, the mailer and its transports, what an email may say     |
 | [docs/daydreams.md](docs/daydreams.md)                                                   | Made-up stories: voices, the library, the story tree, steering, safety, cost |
 | [docs/tree.md](docs/tree.md)                                                             | The generic tree: trunk, boughs, longest-path lines, packing, dimming, folding |
+| [docs/debug-mode.md](docs/debug-mode.md)                                                 | Per-device troubleshooting UI behind a feature: the toggle, panel, raw logs  |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

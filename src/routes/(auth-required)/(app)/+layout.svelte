@@ -7,6 +7,7 @@
 	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
 	import NotificationsHint from '$lib/components/NotificationsHint.svelte';
 	import TimezoneWarning from '$lib/components/TimezoneWarning.svelte';
+	import { hasFeature } from '$lib/features';
 	import { resyncPush } from '$lib/push-client';
 	import { fitVisualViewport } from '$lib/visual-viewport';
 	import type { LayoutData } from './$types';
@@ -80,7 +81,11 @@
 		{/if}
 		{@render children()}
 	</main>
-	<AppNav partners={data.partners} />
+	<AppNav
+		partners={data.partners}
+		debugAvailable={hasFeature(data.features, 'debugMode')}
+		debugOn={data.debug}
+	/>
 </div>
 
 <style>

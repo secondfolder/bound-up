@@ -1184,7 +1184,7 @@ instead of cutting.
 
 ### Testing aid
 
-An account holding the `iqTestAnswerButton` feature, granted from `/admin`,
+While debug mode is on ([debug-mode.md](debug-mode.md)), a signed-in visitor
 gets a "Correct answer" button at the top of each question. It answers the
 question on screen with its stored answer, skipping any memorise phase.
 
@@ -1201,7 +1201,7 @@ lasts until "I've got them" (a one-at-a-time sequence still steps through).
 Turned off mid-question, the clock carries on from where it was stopped. It is
 remembered on the device (`playroom.iq-test.timers-cleared` in
 `localStorage`), so a reload does not set the clocks going under someone
-looking at a question, and is ignored without the feature, so it cannot
+looking at a question, and is ignored outside debug mode, so it cannot
 outlive it.
 
 ### Results

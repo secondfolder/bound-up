@@ -91,4 +91,53 @@ describe('AppNav', () => {
 		expect(ada.shadowRoot?.textContent).toContain('A');
 		expect(jun.shadowRoot?.querySelector('img')?.getAttribute('src')).toBe('/jun.png');
 	});
+
+	it('bunches the tabs in the middle, at least 1em apart', async () => {
+		const { container } = renderNav('/(auth-required)/(app)/home');
+		await waSettled(container);
+		const nav = container.querySelector('nav');
+		const links = screen.getAllByRole('link');
+		const navBox = nav?.getBoundingClientRect();
+		const first = links[0]?.getBoundingClientRect();
+		const last = links.at(-1)?.getBoundingClientRect();
+		if (!(navBox && first && last)) {
+			throw new Error('The nav and its tabs should have rendered');
+		}
+		// Centred: as much room to the left of the first tab as to the right
+		// of the last, give or take a pixel of rounding.
+		expect(Math.abs(first.left - navBox.left - (navBox.right - last.right))).toBeLessThanOrEqual(1);
+		const fontSize = Number.parseFloat(getComputedStyle(links[0] as Element).fontSize);
+		for (const [index, link] of links.slice(1).entries()) {
+			const previous = links[index]?.getBoundingClientRect();
+			expect(link.getBoundingClientRect().left - (previous?.right ?? 0)).toBeGreaterThanOrEqual(
+				fontSize - 0.5
+			);
+		}
+	});
+
+	it('has no debug toggle for an account without debug mode', () => {
+		renderNav('/(auth-required)/(app)/home');
+		expect(screen.queryByRole('button', { name: 'Debug mode' })).not.toBeInTheDocument();
+	});
+
+	it('offers the debug toggle, hidden until hovered while off and shown while on', () => {
+		pageState.route.id = '/(auth-required)/(app)/home';
+		const off = render(AppNav, { partners, debugAvailable: true, debugOn: false });
+		const toggle = screen.getByRole('button', { name: 'Debug mode' });
+		expect(toggle).toHaveAttribute('aria-pressed', 'false');
+		expect(getComputedStyle(toggle).opacity).toBe('0');
+		// Turning it on is what the hidden field asks for.
+		expect(off.container.querySelector('input[name="on"]')).toHaveValue('true');
+		off.unmount();
+
+		const on = render(AppNav, { partners, debugAvailable: true, debugOn: true });
+		const shown = screen.getByRole('button', { name: 'Debug mode' });
+		expect(shown).toHaveAttribute('aria-pressed', 'true');
+		expect(getComputedStyle(shown).opacity).toBe('1');
+		expect(on.container.querySelector('input[name="on"]')).toHaveValue('false');
+		expect(on.container.querySelector('form')).toHaveAttribute(
+			'action',
+			'/(auth-required)/(app)/settings?/debug'
+		);
+	});
 });

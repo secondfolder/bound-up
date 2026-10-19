@@ -1,3 +1,4 @@
+import { DEBUG_COOKIE, debugModeOn } from '$lib/debug';
 import type { FeatureKey } from '$lib/features';
 import { isAdmin } from '$lib/server/admin';
 import { listUserFeatures } from '$lib/server/features';
@@ -7,7 +8,7 @@ import { readVapidConfig } from '$lib/server/push';
 import type { HelpRequestView } from '$lib/types';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals, platform }) => {
+export const load: LayoutServerLoad = async ({ locals, platform, cookies }) => {
 	// Loaded in the layout rather than per page because the bottom nav renders
 	// one tab per partner on every screen in this group. The group's own guard
 	// has already run by the time a layout load does, so `locals.user` is set —
@@ -19,7 +20,8 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 			helpRequests: [] as HelpRequestView[],
 			features: [] as FeatureKey[],
 			isAdmin: false,
-			pushAvailable: false
+			pushAvailable: false,
+			debug: false
 		};
 	}
 
@@ -51,6 +53,9 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 		isAdmin: isAdmin(locals.user),
 		// Whether this server has push keys at all, so the shell only suggests
 		// turning on notifications where they can work. Env, not a query.
-		pushAvailable: readVapidConfig(platform) !== null
+		pushAvailable: readVapidConfig(platform) !== null,
+		// This device's debug switch, honoured only while the account holds
+		// the feature. Display only, like `features`. See docs/debug-mode.md.
+		debug: debugModeOn(features, cookies.get(DEBUG_COOKIE))
 	};
 };

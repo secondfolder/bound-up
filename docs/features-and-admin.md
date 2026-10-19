@@ -5,8 +5,8 @@ account is given them. Nothing can be bought yet; for now an admin grants a
 feature from the admin page. When purchases arrive, buying a feature will write
 the same row a grant does, so nothing that checks access has to change.
 
-There are four so far: guides, permanent media, higher quality uploads, and
-the IQ test answer button.
+There are five so far: guides, permanent media, higher quality uploads,
+Daydreams, and debug mode.
 
 ## The pieces
 
@@ -138,18 +138,17 @@ sends what the user writes to a model provider, which nothing else in the app
 does. A server with no `OPENROUTER_API_KEY` has no Daydreams whatever is
 granted; the pages say so.
 
-### IQ test answer button
+### Debug mode
 
-A testing aid for the Playroom's IQ test (see
-[playroom.md](playroom.md#testing-aid)). `iqTestAnswerButton` adds a "Correct
-answer" button above each question that answers it correctly, so a run can be
-tapped through to a result quickly, and a "Clear timer" switch that stops every
-question's clock.
+`debugMode` lets an account switch troubleshooting UI on and off, one device
+at a time: a toggle in the bottom nav's corner, a switch and an info panel on
+`/settings`, the IQ test's testing aids, and Daydreams' raw log. Holding the
+feature is access; a cookie is whether it is on here. See
+[debug-mode.md](debug-mode.md).
 
-The test page's load reads it with `userHasFeature`, and that only decides what
-is shown. There is nothing else to enforce: the test is marked in the browser,
-the server stores whatever score it is sent, and nothing depends on that score
-being honest.
+It replaced `iqTestAnswerButton`, whose grants migration `0035` turned into
+`debugMode` grants. New troubleshooting controls go behind debug mode rather
+than a feature of their own.
 
 ## Admin
 

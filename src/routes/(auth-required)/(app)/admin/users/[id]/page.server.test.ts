@@ -48,11 +48,7 @@ describe('load', () => {
 				held: null
 			}),
 			expect.objectContaining({ key: 'daydreams', name: 'Daydreams', held: null }),
-			expect.objectContaining({
-				key: 'iqTestAnswerButton',
-				name: 'IQ test answer button',
-				held: null
-			})
+			expect.objectContaining({ key: 'debugMode', name: 'Debug mode', held: null })
 		]);
 		expect(data.isSelf).toBe(false);
 	});

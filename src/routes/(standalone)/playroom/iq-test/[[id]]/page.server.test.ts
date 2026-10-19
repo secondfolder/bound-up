@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DEBUG_COOKIE, DEBUG_COOKIE_ON } from '$lib/debug';
 import { DIALOG_SEEN_COOKIE } from '$lib/playroom/iq-test/device';
 import { iqTestResults } from '$lib/server/db/schema';
 import { grantFeature } from '$lib/server/features';
@@ -50,27 +51,32 @@ describe('/playroom/iq-test load', () => {
 		expect(reload.dialogSeen).toBe(true);
 	});
 
-	it('offers the "Correct answer" button only to an account granted it', async () => {
-		const anonymous = await runLoad(load(fakeEvent({ user: null, cookies: {}, params: {} })));
-		expect(anonymous.answerButton).toBe(false);
-		const before = await runLoad(
-			load(fakeEvent({ db: harness.db, user: ada, cookies: {}, params: {} }))
+	it('shows the testing aids only in debug mode: the feature and this device switched on', async () => {
+		const on = { [DEBUG_COOKIE]: DEBUG_COOKIE_ON };
+		const anonymous = await runLoad(load(fakeEvent({ user: null, cookies: on, params: {} })));
+		expect(anonymous.debug).toBe(false);
+		const ungranted = await runLoad(
+			load(fakeEvent({ db: harness.db, user: ada, cookies: { ...on }, params: {} }))
 		);
-		expect(before.answerButton).toBe(false);
+		expect(ungranted.debug).toBe(false);
 
 		await grantFeature(harness.db, {
 			userId: ada.id,
-			feature: 'iqTestAnswerButton',
+			feature: 'debugMode',
 			grantedByUserId: jun.id
 		});
-		const after = await runLoad(
+		const switchedOff = await runLoad(
 			load(fakeEvent({ db: harness.db, user: ada, cookies: {}, params: {} }))
 		);
-		expect(after.answerButton).toBe(true);
-		const other = await runLoad(
-			load(fakeEvent({ db: harness.db, user: jun, cookies: {}, params: {} }))
+		expect(switchedOff.debug).toBe(false);
+		const switchedOn = await runLoad(
+			load(fakeEvent({ db: harness.db, user: ada, cookies: { ...on }, params: {} }))
 		);
-		expect(other.answerButton).toBe(false);
+		expect(switchedOn.debug).toBe(true);
+		const other = await runLoad(
+			load(fakeEvent({ db: harness.db, user: jun, cookies: { ...on }, params: {} }))
+		);
+		expect(other.debug).toBe(false);
 	});
 
 	it("lists the signed-in user's own results, newest first, and nobody else's", async () => {

@@ -89,8 +89,9 @@ export type FakeEventOptions = {
 	/**
 	 * The request's cookies, by name, for a route that uses `event.cookies`.
 	 * Absent unless given, and reaching for it then fails loudly. `get` reads
-	 * this object and `set` writes into it, so a test can pass `{}` and then
-	 * look at what the route set — its options are not kept.
+	 * this object, `set` writes into it and `delete` removes from it, so a test
+	 * can pass `{}` and then look at what the route set — its options are not
+	 * kept.
 	 */
 	cookies?: Record<string, string>;
 	/**
@@ -222,6 +223,9 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 				get: (name: string) => jar[name],
 				set: (name: string, value: string) => {
 					jar[name] = value;
+				},
+				delete: (name: string) => {
+					delete jar[name];
 				}
 			}
 		});

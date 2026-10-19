@@ -360,9 +360,25 @@ const turnV2 = z.discriminatedUnion('type', [textTurn(passageMetaV2), ...turnTyp
 // as an `instruction`, and say the reading was the user's choice.
 const turnV3 = z.discriminatedUnion('type', [textTurn(passageMetaSchema), ...turnTypesV2]);
 
+// v4: a passage may carry the model's reply exactly as it arrived (`raw`),
+// tags, metadata and all, for debug mode's raw log (docs/debug-mode.md). Only
+// written for an account granted debug mode, and only ever displayed: what
+// the page acts on is still the parsed `text` and `meta`.
+const turnV4 = z.discriminatedUnion('type', [
+	textTurn(passageMetaSchema).extend({
+		raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+		/** The reply ran past `rawReply` and `raw` is its start. */
+		rawTruncated: z.literal(true).optional()
+	}),
+	...turnTypesV2
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
-	maxCiphertextLength: 48 * 1024,
+	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
+	// written-out turn alongside the metadata. No higher than the most a
+	// daydream endpoint takes (`sealedFields` in schemas/daydreamForm.ts).
+	maxCiphertextLength: 96 * 1024,
 	versions: [
 		{
 			version: 1,
@@ -375,7 +391,13 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v2 could say, v3 says the same way.
 			upcast: (value: z.output<typeof turnV2>) => value
 		},
-		{ version: 3, schema: turnV3 }
+		{
+			version: 3,
+			schema: turnV3,
+			// Everything v3 could say, v4 says the same way.
+			upcast: (value: z.output<typeof turnV3>) => value
+		},
+		{ version: 4, schema: turnV4 }
 	]
 });
 

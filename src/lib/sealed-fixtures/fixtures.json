@@ -360,6 +360,26 @@
 			}
 		},
 		{
+			"kind": "daydream-turn",
+			"version": 4,
+			"recordId": "00000000-0000-4000-8000-0000000000d9",
+			"ciphertext": "sb1.Dik2aLXgQJy0xIE7PbQBLuZAZxlPJ7l_8i934uZbgM8wlZP6BKj-7FpwmBYzGjn5KbdfBv0JLIXzugRmNpGBK51OFtBmnc_dbwuEMpCLPdPRxqbSRDmU1HoCcnh-a0QNgrBTw1WRVHt1WGKGl888sMhWD8Ah2XMHZdvI5X5cfZSTj3glDiy8bc1s1gJuun6dEKicV_eJhKhchQhQx8OKMwf34_slWKd6t-S5H8XNGY3xvs6zYvnTsjpC4GL84MMSxoWEc_QRnVwUI4QcJ-k3x_K6wP-5T8NsBsNSNT3QheKZ_MSqS70DwxJO2p8ros5RNdsz7unSKzVpKkPgn03VPjPt5Bj139Aw7imLkjiTtIKKmy0ZDfif97qTLmm0AnEUePherS_OCntSzAiWZj9hQG1kwQOdPtnJLincEzm4A7KPft4vk0cGfcFy9qB_Ek0",
+			"expected": {
+				"type": "text",
+				"text": "Charlie lets out a breath.",
+				"meta": {
+					"suggestions": ["Hold out a hand."],
+					"directions": {
+						"add": [],
+						"remove": []
+					},
+					"readAs": "action"
+				},
+				"raw": "<reading>action</reading>\nCharlie lets out a breath.\n\n<meta>\n```json\n{\"suggestions\": [\"Hold out a hand.\"]}\n```\n</meta>",
+				"rawTruncated": true
+			}
+		},
+		{
 			"kind": "daydream-mark",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d5",

@@ -22,6 +22,7 @@ function data(partnerTasks: PageData['partnerTasks'] = []): PageData {
 		features: [],
 		isAdmin: false,
 		pushAvailable: false,
+		debug: false,
 		selfTasks: {
 			tasks: [],
 			completions: [

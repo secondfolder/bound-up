@@ -18,6 +18,7 @@
 	import DaydreamDirections from './DaydreamDirections.svelte';
 	import DaydreamNotThisDialog from './DaydreamNotThisDialog.svelte';
 	import DaydreamPassage from './DaydreamPassage.svelte';
+	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
 	import DaydreamRollCard from './DaydreamRollCard.svelte';
 	import DaydreamSafety from './DaydreamSafety.svelte';
 	import DaydreamSuggestions from './DaydreamSuggestions.svelte';
@@ -34,10 +35,19 @@
 		daydream,
 		/** Whether this server can write passages at all. */
 		available,
+		keepRawReplies = false,
+		debug = false,
 		onnamed
 	}: {
 		daydream: DaydreamView;
 		available: boolean;
+		/**
+		 * The account is granted debug mode, so each passage keeps the model's
+		 * reply as it arrived (`DaydreamStory`'s constructor says why).
+		 */
+		keepRawReplies?: boolean;
+		/** Debug mode is on on this device: the raw log switch shows. */
+		debug?: boolean;
 		/** Told the daydream's name once the model has given it one, for the page's heading. */
 		onnamed?: (name: string) => void;
 	} = $props();
@@ -46,7 +56,33 @@
 	// Seeded once: from here on the story is this object, added to as turns are
 	// saved. The page is keyed on the daydream's id, so another daydream gets a
 	// fresh one.
-	const story = new DaydreamStory(daydream, available);
+	const story = new DaydreamStory(daydream, available, { keepRawReplies });
+
+	// ── the raw log (debug mode) ─────────────────────────────────────────────
+
+	/** Remembered on the device, as a convenience: a reload keeps the log open. */
+	const RAW_LOG_KEY = 'daydreams.raw-log';
+	let rawLogChosen = $state(false);
+	onMount(() => {
+		try {
+			rawLogChosen = localStorage.getItem(RAW_LOG_KEY) === '1';
+		} catch {
+			// Storage refused (a private window, say): the log starts closed.
+		}
+	});
+	function setRawLog(on: boolean) {
+		rawLogChosen = on;
+		try {
+			if (on) {
+				localStorage.setItem(RAW_LOG_KEY, '1');
+			} else {
+				localStorage.removeItem(RAW_LOG_KEY);
+			}
+		} catch {
+			// Not remembered, which only costs a toggle after a reload.
+		}
+	}
+	const rawLog = $derived(debug && rawLogChosen);
 
 	const keyring = $derived(currentKeyring());
 	const setup = $derived(story.setup);
@@ -248,6 +284,15 @@
 	<p class="placeholder">{PENDING_TEXT}</p>
 {:else}
 	<div class="tools">
+		{#if debug}
+			<wa-switch
+				size="s"
+				class="raw-log"
+				checked={rawLogChosen}
+				onchange={(event: Event) => setRawLog((event.currentTarget as HTMLInputElement).checked)}
+				>Raw log</wa-switch
+			>
+		{/if}
 		<wa-button size="s" appearance="outlined" onclick={() => {
 			showBranches = true;
 		}}>
@@ -304,7 +349,9 @@
 	     one who has scrolled up to read is left where they are. -->
 	<ol class="turns" bind:this={listElement} aria-live="polite" {@attach followEnd}>
 		{#each story.path as node (node.id)}
-			{#if node.role === 'story'}
+			{#if rawLog}
+				<DaydreamRawTurn {story} {node} />
+			{:else if node.role === 'story'}
 				<DaydreamPassage
 					{story}
 					{node}
@@ -360,6 +407,10 @@
 				<wa-button size="s" appearance="outlined" onclick={() => story.retry?.()}>Try again</wa-button>
 			{/if}
 		</wa-callout>
+		{#if rawLog && story.problemRaw}
+			<!-- A failed reply is never saved, so this is the only place its text shows. -->
+			<pre class="problem-raw">{story.problemRaw}</pre>
+		{/if}
 	{/if}
 
 	{#if available}
@@ -441,7 +492,22 @@
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: flex-end;
+		align-items: center;
 		gap: 0.375rem;
+
+		.raw-log {
+			margin-inline-end: auto;
+		}
+	}
+
+	.problem-raw {
+		margin: 0;
+		padding: 0.5rem 0.75rem;
+		border: 1px dashed var(--wa-color-surface-border);
+		font-family: var(--wa-font-family-code, monospace);
+		font-size: var(--wa-font-size-s);
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 	}
 
 	.dials {

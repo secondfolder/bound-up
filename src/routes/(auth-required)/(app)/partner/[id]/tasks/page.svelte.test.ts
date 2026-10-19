@@ -30,6 +30,7 @@ function data({
 		features: [],
 		isAdmin: false,
 		pushAvailable: false,
+		debug: false,
 		partner: {
 			id: 'p1',
 			names: legacyNamesSource('p1', { partnerName: 'Jun' }),

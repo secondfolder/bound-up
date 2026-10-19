@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { DIALOG_SEEN_COOKIE } from '$lib/playroom/iq-test/device';
-import { userHasFeature } from '$lib/server/features';
+import { readDebugMode } from '$lib/server/debug';
 import { getIqTestResult, listIqTestResults } from '$lib/server/iq-test';
 import { verifySharedResult } from '$lib/server/iq-test-share';
 import type { IqTestResultView } from '$lib/types';
@@ -34,17 +34,17 @@ export const load: PageServerLoad = async ({ locals, cookies, params }) => {
 	const shared = params.id ? await sharedResult(locals, params.id) : null;
 	const dialogSeen = shared !== null || cookies.get(DIALOG_SEEN_COOKIE) === '1';
 	if (!locals.user) {
-		return { history: null, dialogSeen, answerButton: false, shared };
+		return { history: null, dialogSeen, debug: false, shared };
 	}
-	const [history, answerButton] = await Promise.all([
+	const [history, debug] = await Promise.all([
 		listIqTestResults(locals.db, locals.user.id),
-		// A testing aid, off for every account until granted from /admin. The
-		// test is marked in the browser and nothing on the server depends on a
-		// score being honest, so there is nothing here to enforce beyond
-		// whether the button is shown.
-		userHasFeature(locals.db, locals.user.id, 'iqTestAnswerButton')
+		// Debug mode shows the testing aids (docs/debug-mode.md). The test is
+		// marked in the browser and nothing on the server depends on a score
+		// being honest, so there is nothing here to enforce beyond whether
+		// they are shown.
+		readDebugMode(locals.db, locals.user.id, cookies)
 	]);
-	return { history, dialogSeen, answerButton, shared };
+	return { history, dialogSeen, debug, shared };
 };
 
 async function sharedResult(locals: App.Locals, id: string): Promise<SharedResultView> {

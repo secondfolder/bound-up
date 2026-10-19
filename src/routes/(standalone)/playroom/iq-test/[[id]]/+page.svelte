@@ -654,7 +654,7 @@
 				<QuestionView
 					{run}
 					{taunt}
-					answerButton={data.answerButton}
+					answerButton={data.debug}
 					timersCleared={clearTimer}
 					enoughBanner={enoughBannerFor(settings)}
 					skippedNote={(count) => skippedNoteFor(settings, count)}

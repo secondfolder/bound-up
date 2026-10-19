@@ -45,15 +45,15 @@
 		/** A line to tease with above the question, at the levels that tease. */
 		taunt?: string | null;
 		/**
-		 * Show "Correct answer", a testing aid behind the `iqTestAnswerButton`
-		 * feature: it answers the question on screen correctly, so a run can be
-		 * tapped through quickly.
+		 * Show "Correct answer", a testing aid shown while debug mode is on
+		 * (docs/debug-mode.md): it answers the question on screen correctly, so
+		 * a run can be tapped through quickly.
 		 */
 		answerButton?: boolean;
 		/**
-		 * "Clear timer", beside "Correct answer" and behind the same feature: no
-		 * clock runs on any question while it is on. Ignored without
-		 * `answerButton`, so it cannot outlive the feature.
+		 * "Clear timer", beside "Correct answer" and shown with it: no clock
+		 * runs on any question while it is on. Ignored without `answerButton`,
+		 * so it cannot outlive debug mode.
 		 */
 		timersCleared?: boolean;
 		onanswer: (response: string) => void;

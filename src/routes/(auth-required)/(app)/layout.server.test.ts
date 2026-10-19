@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
+import { DEBUG_COOKIE, DEBUG_COOKIE_ON } from '$lib/debug';
 import type { Db } from '$lib/server/db';
 import { grantFeature } from '$lib/server/features';
 import { createTestDb, type TestDb } from '$lib/testing/db';
@@ -27,7 +28,7 @@ afterEach(() => harness.close());
 
 test('gives the bottom nav one tab per linked partner, its names sealed', async () => {
 	const { id } = await createTestPartnership(db, ada, jun);
-	const { partners } = await runLoad(load(fakeEvent({ db, user: ada })));
+	const { partners } = await runLoad(load(fakeEvent({ db, user: ada, cookies: {} })));
 	expect(partners).toEqual([
 		{ id, names: expect.objectContaining({ partnershipId: id, role: 'inviter' }), image: null }
 	]);
@@ -40,7 +41,7 @@ test('uses the names source and picture from the viewer’s own end', async () =
 	await createTestPartnership(db, ada, jun, {
 		legacyNames: { inviterName: 'Ada', inviteeName: 'Jun' }
 	});
-	const { partners } = await runLoad(load(fakeEvent({ db, user: jun })));
+	const { partners } = await runLoad(load(fakeEvent({ db, user: jun, cookies: {} })));
 	expect(partners).toEqual([
 		{
 			id: expect.any(String),
@@ -56,29 +57,48 @@ test('uses the names source and picture from the viewer’s own end', async () =
 test('leaves a pending invite out of the nav', async () => {
 	// A tab with nobody behind it would open an empty page and read as a bug.
 	await createTestInvite(db, ada);
-	const { partners } = await runLoad(load(fakeEvent({ db, user: ada })));
+	const { partners } = await runLoad(load(fakeEvent({ db, user: ada, cookies: {} })));
 	expect(partners).toEqual([]);
 });
 
 test('degrades to an empty nav rather than throwing without a session', async () => {
-	const { partners } = await runLoad(load(fakeEvent({ db, user: null })));
+	const { partners } = await runLoad(load(fakeEvent({ db, user: null, cookies: {} })));
 	expect(partners).toEqual([]);
 });
 
 test('lists the features the viewer holds, and only theirs', async () => {
 	await grantFeature(db, { userId: ada.id, feature: 'guides', grantedByUserId: jun.id });
-	expect((await runLoad(load(fakeEvent({ db, user: ada })))).features).toEqual(['guides']);
-	expect((await runLoad(load(fakeEvent({ db, user: jun })))).features).toEqual([]);
+	expect((await runLoad(load(fakeEvent({ db, user: ada, cookies: {} })))).features).toEqual([
+		'guides'
+	]);
+	expect((await runLoad(load(fakeEvent({ db, user: jun, cookies: {} })))).features).toEqual([]);
 });
 
 test('says whether the viewer is an admin', async () => {
 	const admin = await createTestUser(db, { role: 'admin' });
-	expect((await runLoad(load(fakeEvent({ db, user: admin })))).isAdmin).toBe(true);
-	expect((await runLoad(load(fakeEvent({ db, user: ada })))).isAdmin).toBe(false);
+	expect((await runLoad(load(fakeEvent({ db, user: admin, cookies: {} })))).isAdmin).toBe(true);
+	expect((await runLoad(load(fakeEvent({ db, user: ada, cookies: {} })))).isAdmin).toBe(false);
 });
 
 test('gives no features and no admin without a session', async () => {
-	const data = await runLoad(load(fakeEvent({ db, user: null })));
+	const data = await runLoad(load(fakeEvent({ db, user: null, cookies: {} })));
 	expect(data.features).toEqual([]);
 	expect(data.isAdmin).toBe(false);
+});
+
+test('turns debug mode on only for an account holding it, on a device that switched it on', async () => {
+	const on = () => ({ [DEBUG_COOKIE]: DEBUG_COOKIE_ON });
+	const debugFor = async (user: TestUser, cookies: Record<string, string>) =>
+		(await runLoad(load(fakeEvent({ db, user, cookies })))).debug;
+
+	expect(await debugFor(ada, on())).toBe(false);
+	await grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: jun.id });
+	expect(await debugFor(ada, {})).toBe(false);
+	expect(await debugFor(ada, on())).toBe(true);
+	// A partner gets nothing from the other side's grant.
+	expect(await debugFor(jun, on())).toBe(false);
+});
+
+test('has debug mode off without a session', async () => {
+	expect((await runLoad(load(fakeEvent({ db, user: null, cookies: {} })))).debug).toBe(false);
 });

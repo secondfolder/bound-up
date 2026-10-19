@@ -28,10 +28,10 @@ export const FEATURES = {
 		description:
 			'Roleplay with a made-up character, whose replies are written by a hosted language model.'
 	},
-	iqTestAnswerButton: {
-		name: 'IQ test answer button',
+	debugMode: {
+		name: 'Debug mode',
 		description:
-			'A "Correct answer" button in the Playroom IQ test that answers each question correctly, for testing.'
+			'Lets the account switch on troubleshooting options and info, one device at a time: a debug panel in settings, the IQ test answer buttons, and Daydreams raw logs.'
 	}
 } as const satisfies Record<string, { name: string; description: string }>;
 

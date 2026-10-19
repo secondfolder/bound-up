@@ -68,24 +68,46 @@ export type ReplyOutcome =
 			expansion: string | null;
 			/** How the reply said, before anything else, it read the user's turn. */
 			reading: Reading | null;
+			/** The reply exactly as it arrived, for debug mode's raw log. */
+			raw: string;
 	  }
 	/** `partial` is what had arrived before it failed, for the page to leave on screen or drop. */
-	| { ok: false; error: string; partial: string };
+	| { ok: false; error: string; partial: string; raw: string };
 
 const INCOMPLETE = 'The reply stopped partway through. Try again.';
 const EMPTY = 'The reply came back empty. Try again.';
+
+/** One message as the model reads it, as `server/daydream/prompt.ts` builds it. */
+export type PromptMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+
+/**
+ * What the model would be sent for `request`, rebuilt by the server without
+ * sending it: debug mode's "Show prompt". See `api/daydreams/[id]/prompt`.
+ */
+export async function readPrompt(
+	daydreamId: string,
+	request: ReplyRequestBody
+): Promise<Outcome<{ messages: PromptMessage[] }>> {
+	const sent = await send(`${base(daydreamId)}/prompt`, 'POST', request);
+	if (!sent.ok) {
+		return sent;
+	}
+	const { messages } = (await sent.response.json()) as { messages: PromptMessage[] };
+	return { ok: true, messages };
+}
 
 /**
  * Asks for the next passage and streams it in through `onText`, which is
  * given the reply so far each time: the user's turn written out, if the
  * model is writing one, and the passage — never any of the blocks' tags or
- * the metadata (`visibleReply`). Rejects only on an abort: the user pressed
- * Stop, and nothing needs saying.
+ * the metadata (`visibleReply`) — and, second, the reply exactly as it has
+ * arrived, for debug mode's raw log. Rejects only on an abort: the user
+ * pressed Stop, and nothing needs saying.
  */
 export async function writeReply(
 	daydreamId: string,
 	request: ReplyRequestBody,
-	options: { signal: AbortSignal; onText: (soFar: ReplySoFar) => void }
+	options: { signal: AbortSignal; onText: (soFar: ReplySoFar, raw: string) => void }
 ): Promise<ReplyOutcome> {
 	const response = await tryFetch(`${base(daydreamId)}/reply`, {
 		method: 'POST',
@@ -94,7 +116,7 @@ export async function writeReply(
 		signal: options.signal
 	});
 	if (!(response?.ok && response.body)) {
-		return { ok: false, error: await describeFailure(response), partial: '' };
+		return { ok: false, error: await describeFailure(response), partial: '', raw: '' };
 	}
 
 	let text = '';
@@ -102,22 +124,22 @@ export async function writeReply(
 	try {
 		outcome = await readReplyStream(response.body, (piece) => {
 			text += piece;
-			options.onText(visibleReply(text));
+			options.onText(visibleReply(text), text);
 		});
 	} catch (problem) {
 		if (problem instanceof DOMException && problem.name === 'AbortError') {
 			throw problem;
 		}
 		// The connection dropped mid-reply.
-		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage };
+		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage, raw: text };
 	}
 	if (outcome.kind === 'error') {
-		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage };
+		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage, raw: text };
 	}
 	const { passage, meta, expansion, reading } = parseReply(text);
 	return passage
-		? { ok: true, passage, meta, expansion, reading }
-		: { ok: false, error: EMPTY, partial: '' };
+		? { ok: true, passage, meta, expansion, reading, raw: text }
+		: { ok: false, error: EMPTY, partial: '', raw: text };
 }
 
 // ── sealing ──────────────────────────────────────────────────────────────────

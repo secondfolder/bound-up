@@ -1,7 +1,7 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
-import type { DaydreamTurnRole } from '$lib/daydream';
+import { DAYDREAM_LIMITS, type DaydreamTurnRole } from '$lib/daydream';
 import type { ReplyOutcome } from '$lib/daydream/client';
 import type { ReplySoFar } from '$lib/daydream/reply-format';
 import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
@@ -66,11 +66,13 @@ const client = vi.hoisted(() => ({
 	saveSetup: vi.fn(),
 	createMark: vi.fn(),
 	deleteMark: vi.fn(),
-	requestSuggestion: vi.fn()
+	requestSuggestion: vi.fn(),
+	readPrompt: vi.fn()
 }));
 vi.mock('$lib/daydream/client', () => client);
 
 const { default: DaydreamThread } = await import('./DaydreamThread.svelte');
+const { rawReply } = await import('$lib/daydream/story.svelte');
 
 const SETUP = testDaydreamSetup();
 let clock = 0;
@@ -262,6 +264,7 @@ describe('DaydreamThread', () => {
 
 		finish({
 			ok: true,
+			raw: '',
 			expansion: null,
 			reading: null,
 			passage: 'Mara looks up.',
@@ -881,6 +884,7 @@ describe('DaydreamThread', () => {
 
 			finish({
 				ok: true,
+				raw: '',
 				passage: 'Mara sighs with relief.',
 				meta: meta({ readAs: 'action' }),
 				expansion: WrittenOut,
@@ -1058,6 +1062,7 @@ describe('DaydreamThread', () => {
 			// The opening reading outranks the one in the metadata.
 			finish({
 				ok: true,
+				raw: '',
 				passage: 'The air grows warm.',
 				meta: meta({ readAs: 'action' }),
 				expansion: null,
@@ -1255,5 +1260,163 @@ describe('DaydreamThread', () => {
 			expect(client.saveSetup).not.toHaveBeenCalled();
 			expect(container.textContent).not.toContain('No ideas just now.');
 		});
+	});
+});
+
+describe('DaydreamThread in debug mode', () => {
+	const Raw =
+		'<reading>action</reading>\nMara looks up.\n\n<meta>\n```json\n{"suggestions": []}\n```\n</meta>';
+
+	/** A reply that streams `raw` in, then ends: the stream as `writeReply` sees it. */
+	function replyWith(raw: string, passage: string) {
+		client.writeReply.mockImplementationOnce(
+			(
+				_id: string,
+				_request: unknown,
+				options: { onText: (soFar: ReplySoFar, raw: string) => void }
+			) => {
+				options.onText({ passage, expansion: null, reading: 'action' }, raw);
+				return Promise.resolve({
+					ok: true,
+					passage,
+					meta: meta(),
+					expansion: null,
+					reading: 'action',
+					raw
+				} satisfies ReplyOutcome);
+			}
+		);
+	}
+
+	afterEach(() => {
+		localStorage.removeItem('daydreams.raw-log');
+	});
+
+	it('keeps the reply as it arrived on the passage, for an account granted debug mode', async () => {
+		replyWith(Raw, 'Mara looks up.');
+		render(DaydreamThread, { daydream: daydream(), available: true, keepRawReplies: true });
+		await waitFor(() => expect(saved(0)?.role).toBe('story'));
+		expect(saved(0)?.content).toMatchObject({ type: 'text', text: 'Mara looks up.', raw: Raw });
+		expect(saved(0)?.content).not.toHaveProperty('rawTruncated');
+	});
+
+	it('keeps nothing raw for an account without it', async () => {
+		replyWith(Raw, 'Mara looks up.');
+		render(DaydreamThread, { daydream: daydream(), available: true });
+		await waitFor(() => expect(saved(0)?.role).toBe('story'));
+		expect(saved(0)?.content).not.toHaveProperty('raw');
+	});
+
+	it('keeps what had arrived when the reply is stopped', async () => {
+		client.writeReply.mockImplementationOnce(
+			(
+				_id: string,
+				_request: unknown,
+				options: { signal: AbortSignal; onText: (soFar: ReplySoFar, raw: string) => void }
+			) => {
+				options.onText(
+					{ passage: 'Mara half', expansion: null, reading: null },
+					'<reading>action</reading>\nMara half<me'
+				);
+				return new Promise((_resolve, reject) => {
+					options.signal.addEventListener('abort', () =>
+						reject(new DOMException('stopped', 'AbortError'))
+					);
+				});
+			}
+		);
+		const { container } = render(DaydreamThread, {
+			daydream: daydream(),
+			available: true,
+			keepRawReplies: true
+		});
+		await waitFor(() => expect(container.textContent).toContain('Mara half'));
+		await press(container, 'Stop writing');
+		await waitFor(() => expect(saved(0)?.role).toBe('story'));
+		expect(saved(0)?.content).toMatchObject({
+			text: 'Mara half',
+			raw: '<reading>action</reading>\nMara half<me'
+		});
+	});
+
+	it('cuts a runaway reply, and says it did', () => {
+		expect(rawReply('')).toEqual({});
+		expect(rawReply('short')).toEqual({ raw: 'short' });
+		const long = 'x'.repeat(DAYDREAM_LIMITS.rawReply + 10);
+		expect(rawReply(long)).toEqual({
+			raw: 'x'.repeat(DAYDREAM_LIMITS.rawReply),
+			rawTruncated: true
+		});
+	});
+
+	it('offers the raw log only while debug mode is on', async () => {
+		const story = [turn('t1', null, 'story', 'Sit.')];
+		const off = render(DaydreamThread, { daydream: daydream(story), available: true });
+		await waSettled(off.container);
+		expect(off.container.querySelector('wa-switch.raw-log')).toBeNull();
+		off.unmount();
+
+		const on = render(DaydreamThread, { daydream: daydream(story), available: true, debug: true });
+		await waitFor(() => expect(on.container.querySelector('wa-switch.raw-log')).not.toBeNull());
+	});
+
+	it('shows each turn raw: the reply as it arrived, what is stored, and the prompt on request', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		client.readPrompt.mockResolvedValue({
+			ok: true,
+			messages: [
+				{ role: 'system', content: 'THE RULES' },
+				{ role: 'user', content: 'I sit.' }
+			]
+		});
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', { type: 'text', text: 'Old passage.' }),
+				turn('t2', 't1', 'user', 'I sit.'),
+				turn('t3', 't2', 'story', { type: 'text', text: 'Mara looks up.', meta: meta(), raw: Raw })
+			]),
+			available: true,
+			debug: true
+		});
+
+		await waitFor(() => expect(container.querySelectorAll('li.raw')).toHaveLength(3));
+		const [old, said, passage] = [...container.querySelectorAll<HTMLElement>('li.raw')];
+		expect(old?.textContent).toContain('Raw reply not recorded.');
+		expect(said?.querySelector('wa-details pre')?.textContent).toContain('"I sit."');
+		expect(passage?.querySelector('pre.reply')?.textContent).toBe(Raw);
+		// The parsed view is gone while the log is on.
+		expect(container.querySelector('li.passage')).toBeNull();
+
+		await press(defined(passage, 'the passage'), 'Show prompt');
+		await waitFor(() => expect(passage?.textContent).toContain('THE RULES'));
+		expect(client.readPrompt).toHaveBeenCalledWith(
+			'd1',
+			expect.objectContaining({
+				mode: 'reply',
+				turns: [
+					{ type: 'text', role: 'story', text: 'Old passage.' },
+					{ type: 'text', role: 'user', text: 'I sit.' }
+				]
+			})
+		);
+	});
+
+	it('shows a failed reply as it arrived, which is never saved', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		client.writeReply.mockResolvedValueOnce({
+			ok: false,
+			error: 'The reply stopped partway through. Try again.',
+			partial: 'Mara',
+			raw: '<reading>act'
+		} satisfies ReplyOutcome);
+		const { container } = render(DaydreamThread, {
+			daydream: daydream(),
+			available: true,
+			debug: true
+		});
+		await waitFor(() =>
+			expect(container.querySelector('pre.problem-raw')?.textContent).toBe('<reading>act')
+		);
+		expect(client.saveTurn).not.toHaveBeenCalled();
 	});
 });

@@ -560,6 +560,12 @@ dropped and the rest kept; a `<yours>` block never closed is no written-out
 turn, and everything after its tag is kept as the passage; a reading that is
 not one of the five is no reading.
 
+**The reply as it arrived is kept only for debug mode.** For an account
+granted debug mode, a passage also seals the model's reply verbatim, tags and
+metadata included, as `raw` (`daydream-turn` v4), for the raw log. What the
+page acts on is still the parsed passage and metadata; `raw` is only ever
+displayed. See [debug-mode.md](debug-mode.md#daydreams-raw-log).
+
 **Metadata is never sent back.** Past turns go to the model as their words
 alone (`toContextTurn`); what a passage offered next was for the screen, and
 would cost context on every request for nothing. Reactions are sent, because
@@ -606,7 +612,15 @@ own (`suggest-prompt.ts`):
 The answer is a small JSON completion, not streamed, passed back unread for
 the browser to check (`daydream/suggestions.ts`).
 
-For both:
+**In transit, for debug mode's "Show prompt":** the same body as a reply, to
+`POST /api/daydreams/[id]/prompt`, which answers with the messages
+`buildMessages` makes of it and never calls the model. Only for an account
+with both Daydreams and debug mode (see
+[debug-mode.md](debug-mode.md#daydreams-raw-log)). Nothing goes on to a
+provider, and like the two above it stores, logs and inspects none of the
+text; its test spies on the console the same way.
+
+For a passage and a suggestion:
 
 - The server does not store, log or inspect the text. The endpoints log a
   failure by status code alone and never pass a request, reply or error body
@@ -780,6 +794,8 @@ Noted so they are not lost; none is in the code.
   as notes that settle it),
   `suggest-prompt.test.ts`, `config.test.ts`, the sealed fixtures, and the
   tree backfill in `server/db/migrations.test.ts`.
+- Debug mode's raw log and its prompt endpoint are listed in
+  [debug-mode.md](debug-mode.md#tests).
 - Server: `server/daydreams.test.ts` (the tree, marks, libraries, ownership),
   the route tests under `routes/(auth-required)/(app)/daydreams/` and
   `routes/api/daydreams/`, and `server/daydream/library-routes.test.ts`.

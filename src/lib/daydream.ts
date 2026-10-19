@@ -426,6 +426,13 @@ export const DAYDREAM_LIMITS = {
 	partDescription: 300,
 	limits: 1000,
 	turn: 8000,
+	/**
+	 * A reply exactly as the model wrote it, kept for debug mode's raw log
+	 * (docs/debug-mode.md). Replies are asked for at 1200 tokens, a few
+	 * thousand characters, so this is a ceiling a runaway reply hits rather
+	 * than one a normal one comes near.
+	 */
+	rawReply: 16_000,
 	suggestion: 300,
 	directionLabel: 40,
 	quote: 1000,
