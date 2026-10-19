@@ -1,7 +1,8 @@
 # The Playroom
 
-The Playroom holds small kink toys that are not sessions, notebook pages or
-tasks. Its first, and so far only, tool is the **IQ test**: a dumbification
+The Playroom holds small kink toys, games and lists that are not sessions or
+tasks; the roadmap's kink list, toy collection and the like are planned for
+it. Its first, and so far only, tool is the **IQ test**: a dumbification
 test built to give a sub a low score and a dom a flattering one.
 
 ## The container

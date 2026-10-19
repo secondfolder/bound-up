@@ -49,7 +49,10 @@ describe('/roadmap', () => {
 			'href',
 			'#expand-encryption'
 		);
+		// Its twigs, then what depends on it.
 		expect(screen.getByRole('link', { name: 'Compare kink lists' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Kink list history' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Daydreams from your kink list' })).toBeInTheDocument();
 	});
 
 	it('ignores a fragment that is not an item', () => {

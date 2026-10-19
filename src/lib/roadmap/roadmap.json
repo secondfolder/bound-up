@@ -236,55 +236,6 @@
 			"icon": "book",
 			"items": [
 				{
-					"id": "kink-list",
-					"title": "Kink list",
-					"summary": "What you're into, what you're curious about and your hard limits.",
-					"status": "planned",
-					"icon": "list-ul",
-					"featured": true,
-					"dependsOn": ["expand-encryption"],
-					"notes": [
-						"Categories, so a long list stays easy to work through",
-						"Choose your level of detail: answer broadly, or drill right down",
-						"Tag filters, like whether something is degrading"
-					]
-				},
-				{
-					"id": "toy-collection",
-					"title": "Toy collection",
-					"summary": "Keep track of the toys you own.",
-					"status": "planned",
-					"icon": "box-open"
-				},
-				{
-					"id": "stats-deck",
-					"title": "Stats deck",
-					"summary": "Your kinky vital statistics.",
-					"status": "planned",
-					"icon": "id-card",
-					"notes": [
-						"Body details: genital type and the finer details, down to curvature and pubic hair",
-						"Measurements, kept for when they matter",
-						"Markings and tattoos: registration, branding, identifying marks and tattoo placements",
-						"Trigger words: the words that work on you",
-						"Deep-throat stats: how much you can take, and for how long",
-						"STI checks: when you were last tested",
-						"Your partner's version of your deck starts from yours, and you can copy their answers back"
-					]
-				},
-				{
-					"id": "report-card",
-					"title": "Obedience report card",
-					"summary": "Training targets, progress and a grade to live up to.",
-					"status": "planned",
-					"icon": "graduation-cap",
-					"notes": [
-						"Positions to master: kneeling, presenting and the rest, ticked off as you master them",
-						"Study areas: training organised into subjects",
-						"Grades worked out from your progress"
-					]
-				},
-				{
 					"id": "contract-rules",
 					"title": "Contract and rules",
 					"summary": "Write down what you've agreed to, and the rules you live by.",
@@ -312,26 +263,11 @@
 					"icon": "note-sticky"
 				},
 				{
-					"id": "kink-quizzes",
-					"title": "Kink quizzes",
-					"summary": "Quizzes to find out more about what you're into.",
-					"status": "planned",
-					"icon": "circle-question"
-				},
-				{
 					"id": "activity-log",
 					"title": "Activity log",
 					"summary": "A record of what you've done, and when.",
 					"status": "planned",
 					"icon": "clock-rotate-left"
-				},
-				{
-					"id": "wish-list",
-					"title": "Wish list",
-					"summary": "A wish list for kinky and/or non-kinky items.",
-					"status": "planned",
-					"icon": "sack-dollar",
-					"notes": ["Could be useful for findom arrangements"]
 				},
 				{
 					"id": "notebook-organisation",
@@ -365,7 +301,7 @@
 		{
 			"id": "playroom",
 			"title": "Playroom",
-			"summary": "Toys and games to play with, alone or together.",
+			"summary": "Toys, games and lists to play with, alone or together.",
 			"icon": "dice",
 			"items": [
 				{
@@ -382,6 +318,99 @@
 						"Plays hypno music videos for every vibe, among the porn",
 						"Every result gets a link to share, signed in or not",
 						"Learns which questions you struggle with, and asks more of them"
+					]
+				},
+				{
+					"id": "kink-list",
+					"title": "Kink list",
+					"summary": "What you're into, what you're curious about and your hard limits.",
+					"status": "planned",
+					"icon": "list-ul",
+					"featured": true,
+					"dependsOn": ["expand-encryption"],
+					"notes": [
+						"Categories, so a long list stays easy to work through",
+						"Choose your level of detail: answer broadly, or drill right down",
+						"Tag filters, like whether something is degrading"
+					],
+					"children": [
+						{
+							"id": "per-partner-kink-list",
+							"title": "Kink list per partner",
+							"summary": "Your list carries over to each partner, and you can change any answer just for them.",
+							"status": "planned",
+							"notes": [
+								"Answers follow your own list until you change one for a partner",
+								"Answer something for the first time with a partner and it goes on your own list too",
+								"See every answer that's different for a partner, and keep it or put it back"
+							]
+						},
+						{
+							"id": "compare-kink-lists",
+							"title": "Compare kink lists",
+							"summary": "See where your interests overlap.",
+							"status": "planned"
+						},
+						{
+							"id": "kink-list-history",
+							"title": "Kink list history",
+							"summary": "See how what you're into has changed over time.",
+							"status": "planned",
+							"notes": [
+								"A new version is kept once a week has gone by without changes",
+								"See what moved: curious to favourite, a new limit, something you've since tried"
+							]
+						}
+					]
+				},
+				{
+					"id": "kink-quizzes",
+					"title": "Kink quizzes",
+					"summary": "Quizzes to find out more about what you're into.",
+					"status": "planned",
+					"icon": "circle-question"
+				},
+				{
+					"id": "toy-collection",
+					"title": "Toy collection",
+					"summary": "Keep track of the toys you own.",
+					"status": "planned",
+					"icon": "box-open"
+				},
+				{
+					"id": "wish-list",
+					"title": "Wish list",
+					"summary": "A wish list for kinky and/or non-kinky items.",
+					"status": "planned",
+					"icon": "sack-dollar",
+					"notes": ["Could be useful for findom arrangements"]
+				},
+				{
+					"id": "stats-deck",
+					"title": "Stats deck",
+					"summary": "Your kinky vital statistics.",
+					"status": "planned",
+					"icon": "id-card",
+					"notes": [
+						"Body details: genital type and the finer details, down to curvature and pubic hair",
+						"Measurements, kept for when they matter",
+						"Markings and tattoos: registration, branding, identifying marks and tattoo placements",
+						"Trigger words: the words that work on you",
+						"Deep-throat stats: how much you can take, and for how long",
+						"STI checks: when you were last tested",
+						"Your partner's version of your deck starts from yours, and you can copy their answers back"
+					]
+				},
+				{
+					"id": "report-card",
+					"title": "Obedience report card",
+					"summary": "Training targets, progress and a grade to live up to.",
+					"status": "planned",
+					"icon": "graduation-cap",
+					"notes": [
+						"Positions to master: kneeling, presenting and the rest, ticked off as you master them",
+						"Study areas: training organised into subjects",
+						"Grades worked out from your progress"
 					]
 				}
 			]
@@ -597,22 +626,6 @@
 					"summary": "Pause the dynamic while one of you is away or for any other reason.",
 					"status": "planned",
 					"icon": "umbrella-beach"
-				},
-				{
-					"id": "compare-kink-lists",
-					"title": "Compare kink lists",
-					"summary": "See where your interests overlap.",
-					"status": "planned",
-					"icon": "code-compare",
-					"dependsOn": ["kink-list"],
-					"children": [
-						{
-							"id": "per-partner-kink-list",
-							"title": "Kink list per partner",
-							"summary": "Adjust your answers for each partner.",
-							"status": "planned"
-						}
-					]
 				},
 				{
 					"id": "session-notifications",

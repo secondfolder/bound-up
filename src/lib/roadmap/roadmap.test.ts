@@ -128,11 +128,14 @@ describe('selectors', () => {
 		expect(findItem('kink-list')?.item.title).toBe('Kink list');
 		expect(findItem('voice-messages')?.parent?.id).toBe('messages');
 		expect(findItem('notebook')).toBeUndefined();
+		const history = findItem('kink-list-history');
+		expect(history?.parent?.id).toBe('kink-list');
+		expect(history?.branch.id).toBe('playroom');
 	});
 
 	it('dependents is the reverse of dependsOn', () => {
 		const ids = dependents('kink-list').map((p) => p.item.id);
-		expect(ids).toContain('compare-kink-lists');
+		expect(ids).toContain('daydreams-kink-list');
 		expect(ids).toContain('generated-guides');
 	});
 
