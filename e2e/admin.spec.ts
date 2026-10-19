@@ -20,8 +20,14 @@ async function becomeRole(page: Page, who: Account, role: 'admin' | 'user') {
 	await logIn(page, who);
 }
 
-async function guidesStatus(page: Page): Promise<number | undefined> {
-	return (await page.goto('/home/guides'))?.status();
+/**
+ * A request with the page's cookies rather than a page load: only the status
+ * is wanted, and each load here meant a hydration the test never used. Under
+ * a heavily loaded machine one of those hung mid-hydration and took the test
+ * with it. Redirects are not followed, so a sign-in bounce is not read as 200.
+ */
+async function guidesStatus(page: Page): Promise<number> {
+	return (await page.request.get('/home/guides', { maxRedirects: 0 })).status();
 }
 
 async function openAccount(admin: Page, who: Account) {

@@ -7,6 +7,7 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import type { z } from 'zod';
 import type { ViewerNames } from '$lib/partnership';
 import { type PartnerInviteFormSchema, partnerInviteFormSchema } from '$lib/schemas/partnerForm';
+import { TYPE_SLOWLY_TIMEOUT, typeSlowly } from '$lib/testing/type-slowly';
 import { waByProp, waProp, waSettled } from '$lib/testing/web-awesome';
 import PartnerAcceptForm from './PartnerAcceptForm.svelte';
 
@@ -245,11 +246,9 @@ describe('typing a name', () => {
 				throw new Error(`no input inside ${name}`);
 			}
 			await userEvent.clear(input);
-			for (const key of 'Mistress Jane') {
-				await userEvent.type(input, key === ' ' ? '{Space}' : key);
-				await new Promise((resolve) => setTimeout(resolve, 30));
-			}
+			await typeSlowly(input, 'Mistress Jane');
 			expect(input.value).toBe('Mistress Jane');
-		}
+		},
+		TYPE_SLOWLY_TIMEOUT
 	);
 });

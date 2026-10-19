@@ -6,6 +6,7 @@ import { userEvent } from 'vitest/browser';
 import { daydreamSetupFormSchema, EMPTY_DAYDREAM_SETUP } from '$lib/schemas/daydreamForm';
 import type { DaydreamSetupContent } from '$lib/sealed-kinds/daydreams';
 import { testCharacter, testDaydreamSetup } from '$lib/testing/daydream-setup';
+import { TYPE_SLOWLY_TIMEOUT, typeSlowly } from '$lib/testing/type-slowly';
 import { waSettled } from '$lib/testing/web-awesome';
 import type { DaydreamLibraryView, SealedRefView } from '$lib/types';
 
@@ -57,14 +58,6 @@ async function renderForm(
 	});
 	await waSettled(rendered.container);
 	return rendered;
-}
-
-/** Types one key at a time, giving the form's validation time to run between them. */
-async function typeSlowly(field: Element, text: string) {
-	for (const key of text) {
-		await userEvent.type(field, key === ' ' ? '{Space}' : key);
-		await new Promise((resolve) => setTimeout(resolve, 30));
-	}
 }
 
 function button(container: HTMLElement, text: string): HTMLElement | undefined {
@@ -134,20 +127,24 @@ describe('DaydreamSetupForm', () => {
 	 * "The office" came out "Theoffice". It only shows with the rest of the
 	 * form valid and typing paced like a person's, hence a full setup and both.
 	 */
-	it('keeps the spaces typed into the title and the limits', async () => {
-		const { container } = await renderForm({ setup: testDaydreamSetup() });
-		await openDetails(container, 'More options');
-		const title = container.querySelector('wa-input')?.shadowRoot?.querySelector('input');
-		const limits = container.querySelector('textarea');
-		if (!(title && limits)) {
-			throw new Error('no title or limits field');
-		}
-		await userEvent.clear(title);
-		await typeSlowly(title, 'Late at night');
-		expect(title.value).toBe('Late at night');
-		await typeSlowly(limits, 'Nothing in public');
-		expect(limits.value).toBe('Nothing in public');
-	});
+	it(
+		'keeps the spaces typed into the title and the limits',
+		async () => {
+			const { container } = await renderForm({ setup: testDaydreamSetup() });
+			await openDetails(container, 'More options');
+			const title = container.querySelector('wa-input')?.shadowRoot?.querySelector('input');
+			const limits = container.querySelector('textarea');
+			if (!(title && limits)) {
+				throw new Error('no title or limits field');
+			}
+			await userEvent.clear(title);
+			await typeSlowly(title, 'Late at night');
+			expect(title.value).toBe('Late at night');
+			await typeSlowly(limits, 'Nothing in public');
+			expect(limits.value).toBe('Nothing in public');
+		},
+		TYPE_SLOWLY_TIMEOUT
+	);
 
 	it('fills both settings from a preset, and disables what could never work with it', async () => {
 		const { container } = await renderForm();

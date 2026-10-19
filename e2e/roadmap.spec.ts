@@ -1,4 +1,6 @@
 import { expect, type Page } from '@playwright/test';
+import { featuredUpcoming, STATUS_LABELS } from '../src/lib/roadmap';
+import { defined } from '../src/lib/testing/defined';
 import { test } from './fixtures';
 import { waitForHydration } from './helpers';
 
@@ -36,13 +38,19 @@ test.describe('roadmap', () => {
 	});
 
 	test('a landing page tile opens that item on the roadmap', async ({ page }) => {
+		// Whichever item is featured first, read from the roadmap itself: the
+		// tiles change as items ship, and this once named the kink list, which
+		// left the landing page the day it shipped and broke the test with it.
+		const { item } = defined(featuredUpcoming(1)[0], 'a featured roadmap item');
 		await page.goto('/');
 		await waitForHydration(page);
-		await page.getByRole('link', { name: 'Kink list', exact: true }).click();
+		await page
+			.getByRole('link', { name: `${item.title} ${STATUS_LABELS[item.status]}`, exact: true })
+			.click();
 
-		await page.waitForURL('**/roadmap#kink-list');
-		await drawerProp(page, 'label').toBe('Kink list');
-		await expect(drawer(page).getByText("What you're into", { exact: false })).toBeVisible();
+		await page.waitForURL(`**/roadmap#${item.id}`);
+		await drawerProp(page, 'label').toBe(item.title);
+		await expect(drawer(page).getByText(item.summary)).toBeVisible();
 	});
 
 	test('a fragment opened directly shows its drawer, and closing it clears the fragment', async ({
