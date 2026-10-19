@@ -337,6 +337,13 @@
 					],
 					"children": [
 						{
+							"id": "kink-list-quick-fill",
+							"title": "Quick fill",
+							"summary": "Swipe through kinks a card at a time, or rule out whole areas in one go.",
+							"status": "shipped",
+							"shippedOn": "2026-10-19"
+						},
+						{
 							"id": "per-partner-kink-list",
 							"title": "Kink list per partner",
 							"summary": "Your list carries over to each partner, and you can change any answer just for them.",

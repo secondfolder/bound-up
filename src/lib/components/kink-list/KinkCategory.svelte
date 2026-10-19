@@ -73,7 +73,7 @@
 			<div class="custom">
 				<KinkRow itemKey={key} />
 				<button type="button" class="link" onclick={() => store.removeCustom(key)}>
-					Remove<span class="wa-visually-hidden">: {store.list.custom[key]?.name}</span>
+					Remove<span class="wa-visually-hidden">{store.list.custom[key]?.name}</span>
 				</button>
 			</div>
 		{/each}

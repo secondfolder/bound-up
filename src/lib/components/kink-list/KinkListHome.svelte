@@ -5,11 +5,11 @@
 		catalog,
 		categories,
 		childrenOf,
-		intensityLabel,
 		type KinkItem,
 		searchKinks
 	} from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
+	import IntensitySetting from './IntensitySetting.svelte';
 	import KinkRow from './KinkRow.svelte';
 	import SaveStatus from './SaveStatus.svelte';
 
@@ -44,12 +44,6 @@
 		return () => node.removeEventListener('input', onInput);
 	}
 
-	function intensityField(node: WaField) {
-		const onChange = () => store.setMaxIntensity(Number(node.value));
-		node.addEventListener('change', onChange);
-		return () => node.removeEventListener('change', onChange);
-	}
-
 	/** "3 of 12": how much of a category is answered, within the intensity setting. */
 	function progress(category: KinkItem): string {
 		const kinks = childrenOf(category.id).filter(
@@ -61,8 +55,6 @@
 			custom.filter(([key]) => isAnswered(store.list.answers[key])).length;
 		return `${answered} of ${kinks.length + custom.length}`;
 	}
-
-	const levels = Object.keys(catalog.intensity.levels).map(Number);
 </script>
 
 <div class="home">
@@ -72,6 +64,11 @@
 	</header>
 	{@render intro?.()}
 
+	<wa-button class="quick" variant="brand" appearance="accent" href={paths.quick}>
+		<wa-icon slot="start" name="layer-group" variant="solid"></wa-icon>
+		Quick fill
+	</wa-button>
+
 	<div class="controls">
 		<wa-input
 			type="search"
@@ -80,15 +77,7 @@
 			with-clear
 			{@attach searchField}
 		></wa-input>
-		<wa-select
-			label="Show kinks up to"
-			value={String(store.list.settings.maxIntensity)}
-			{@attach intensityField}
-		>
-			{#each levels as level (level)}
-				<wa-option value={String(level)}>{intensityLabel(level)}</wa-option>
-			{/each}
-		</wa-select>
+		<IntensitySetting />
 	</div>
 
 	{#if query.trim()}
@@ -138,6 +127,10 @@
 		h1 {
 			margin: 0;
 		}
+	}
+
+	.quick {
+		align-self: center;
 	}
 
 	.controls {

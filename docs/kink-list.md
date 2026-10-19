@@ -168,16 +168,67 @@ failed save.
     (`OptionalSlider`, shared with Daydreams) and the note
   - "Get specific" for its specifics
 
+## Quick fill
+
+`/playroom/kink-list/quick`, in four steps on one page
+([`QuickFill`](../src/lib/components/kink-list/QuickFill.svelte)). The steps
+are page state rather than separate URLs: the deck is worked out from the
+list, so a reload loses nothing and lands back on triage.
+
+1. **Triage** ([`TriageGrid`](../src/lib/components/kink-list/TriageGrid.svelte)).
+   Every category is a tile, in by default, and tapping one out skips it.
+   "Hard limit everything here" answers a whole category, and the intensity
+   maximum is set here too.
+2. **The deck** ([`Deck`](../src/lib/components/kink-list/Deck.svelte)): one
+   card per kink.
+   - Every answer is always a button under the card, so the deck works
+     without gestures, from the keyboard (1–7, the arrows, Backspace to undo,
+     S to skip), and with a screen reader.
+   - Swiping is a shortcut on top: right for Like, left for Not for me, up for
+     Love, down for Hard limit. A swiped card flies off over 180ms, or not at
+     all under `prefers-reduced-motion`, and taps are ignored while it does,
+     so one cannot land on the card that is leaving.
+   - A kink with a role pair shows **Answering for: Both / Giving /
+     Receiving** on the card, already set to Both. Choosing a side first costs
+     nothing in the usual case, where asking after the answer would cost a tap
+     on most cards.
+   - **Conditional** keeps the card on screen with a note field until Next.
+3. **Drill down only after yes.** A yes of any kind (`isPositive`) on a kink
+   deals its specifics in straight after it, as "Specifically, for …". A no or
+   Don't mind leaves them to inherit that answer.
+4. **Review** ([`DeckReview`](../src/lib/components/kink-list/DeckReview.svelte)):
+   - your hard limits, with each category limited wholesale shown as one line
+     rather than every kink in it
+   - conditional answers, with their notes
+   - skipped cards, with "Go through skipped"
+
+[`deck.ts`](../src/lib/kink-list/deck.ts) is the pure part. `deckCards`
+lists the cards still to go:
+
+- included categories in catalogue order, each category's kinks, then the
+  person's own kinks
+- a kink's specifics only once it has a yes
+- nothing above the intensity maximum, and nothing answered or skipped
+
+Answering a card is what moves the deck on, and Undo puts the answer (or
+skip) back, so the card returns. Nothing about the deck's position is ever
+stored.
+
 ## Tests
 
 - **`kink-list/catalog.test.ts`:** the catalogue's checks, search, and the
   tree.
 - **`kink-list/answers.test.ts`:** the effective answer (sides, specifics,
   category limits, related kinks), merging, and the stored shape.
+- **`kink-list/deck.test.ts`:** the deck's order, drill-down after yes,
+  triage, intensity, custom kinks, and the review.
 - **`server/kink-lists.test.ts`:** saving, compare-and-swap, vaults, and who
   may write a scope.
 - **`components/kink-list/KinkRow.svelte.test.ts`:** answering, inherited
   answers, the sides, notes, related kinks and the intensity setting.
+- **`components/kink-list/Deck.svelte.test.ts`:** buttons, keys, undo, skip,
+  one side, a held Conditional card, and the end of the deck.
 - **`e2e/kink-list.spec.ts`:** answers that are sealed and survive a reload,
-  search by alias, and a related kink answered in either place.
+  search by alias, a related kink answered in either place, and quick fill on
+  a phone (triage, a real swipe, a button, and a category ruled out).
 - **The sealed fixture** for `kink-list` v1 is in `sealed-fixtures/`.

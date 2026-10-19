@@ -38,7 +38,7 @@ test.describe('roadmap', () => {
 	test('a landing page tile opens that item on the roadmap', async ({ page }) => {
 		await page.goto('/');
 		await waitForHydration(page);
-		await page.getByRole('link', { name: /^Kink list/ }).click();
+		await page.getByRole('link', { name: 'Kink list', exact: true }).click();
 
 		await page.waitForURL('**/roadmap#kink-list');
 		await drawerProp(page, 'label').toBe('Kink list');

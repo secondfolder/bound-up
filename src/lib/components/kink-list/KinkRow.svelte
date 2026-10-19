@@ -195,7 +195,7 @@
 					showMore = !showMore;
 				}}
 		>
-			{showMore ? 'Less' : 'More detail and notes'}<span class="wa-visually-hidden">: {name}</span>
+			{showMore ? 'Less' : 'More detail and notes'}<span class="wa-visually-hidden">for {name}</span>
 		</button>
 		{#if shownSpecifics.length > 0}
 			<button
@@ -208,7 +208,7 @@
 				}}
 			>
 				{showSpecifics ? 'Hide specifics' : `Get specific (${shownSpecifics.length})`}<span
-					class="wa-visually-hidden">: {name}</span
+					class="wa-visually-hidden">for {name}</span
 				>
 			</button>
 		{/if}

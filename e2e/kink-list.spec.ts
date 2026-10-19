@@ -72,3 +72,62 @@ test('a related kink answered in one category shows the same answer in its own',
 		page.getByRole('group', { name: 'Rimming', exact: true }).getByRole('radio', { name: 'Love' })
 	).toBeChecked();
 });
+
+test.describe('quick fill', () => {
+	test.use({ viewport: { width: 390, height: 844 } });
+
+	test('triage, a swipe, a button, and a whole category ruled out', async ({ page }) => {
+		await signUp(page, account('Dee'));
+		await page.goto('/playroom/kink-list/quick');
+		await waitForHydration(page);
+
+		// Tap Intimacy out, and rule Oral out wholesale.
+		await page.getByRole('button', { name: /^Intimacy and affection/ }).click();
+		await expect(page.getByRole('button', { name: /^Intimacy and affection/ })).toHaveAttribute(
+			'aria-pressed',
+			'false'
+		);
+		await page.getByRole('button', { name: 'Hard limit everything here (Oral)' }).click();
+		await page.locator('wa-button', { hasText: /^Start/ }).click();
+
+		// The first card is now the first kink in Hands and touch.
+		const card = page.locator('article.card');
+		await expect(card.getByRole('heading', { name: 'Handjobs' })).toBeVisible();
+
+		// Swipe right: Like.
+		const box = await card.boundingBox();
+		if (!box) {
+			throw new Error('no card');
+		}
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 4 });
+		await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2, { steps: 4 });
+		await page.mouse.up();
+		await expect(card.getByRole('heading', { name: 'Fingering' })).toBeVisible();
+
+		// A button: Hard limit.
+		await page.locator('wa-button', { hasText: /^Hard limit/ }).click();
+		await expect(card.getByRole('heading', { name: 'Clit stimulation' })).toBeVisible();
+		await saved(page);
+
+		// The whole list shows them, and Oral's kinks carry the category's limit.
+		await page.getByRole('link', { name: 'Whole list' }).click();
+		await page.getByRole('link', { name: /Hands and touch/ }).click();
+		await expect(
+			page
+				.getByRole('group', { name: 'Handjobs', exact: true })
+				.getByRole('radio', { name: 'Like' })
+		).toBeChecked();
+		await expect(
+			page
+				.getByRole('group', { name: 'Fingering', exact: true })
+				.getByRole('radio', { name: 'Hard limit' })
+		).toBeChecked();
+		await page.getByRole('link', { name: 'All categories' }).click();
+		await page.getByRole('link', { name: /^Oral/ }).click();
+		await expect(
+			page.getByText('Hard limit, from "Oral": hard limit everything').first()
+		).toBeVisible();
+	});
+});
