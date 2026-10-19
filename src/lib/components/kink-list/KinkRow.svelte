@@ -337,7 +337,7 @@
 			{/each}
 			{#if hiddenSpecifics > 0}
 				<p class="quiet">
-					{hiddenSpecifics === 1 ? '1 more is' : `${hiddenSpecifics} more are`} hidden by your filters.
+					{hiddenSpecifics === 1 ? '1 more is' : `${hiddenSpecifics} more are`} hidden by your level of detail.
 				</p>
 			{/if}
 		</div>

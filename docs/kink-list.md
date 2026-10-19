@@ -26,16 +26,15 @@ than reaching anyone.
   `alsoUnder`. Each of those categories shows it behind "N related kinks",
   fully answerable. It's the same item, so the answer is shared, and changing
   it in one place changes it in both.
-- **Intensity**, 0–6, from Sweet to Extreme. A list shows kinks up to its own
-  maximum, which defaults to `defaultMax` (5), so Extreme is hidden until
-  someone asks for it.
+- **Intensity**, 0–6, from Sweet to Extreme. It is shown beside a kink's
+  name from Intense up, and hides nothing: what a list shows is its level of
+  detail (see [The level of detail](#the-level-of-detail)).
 - **Commonness**, 0–4, from Rare to Very common: how many people are into a
   kink or know of it. It is independent of intensity: balloons are mild and
-  rare, choking intense and well known. A list shows kinks at least as common
-  as its own minimum, which defaults to `defaultMin` (1), so Rare is hidden
-  until someone asks for it. Every kink and specific has one, a category has
-  none, and a specific is never more common than its kink, since it is only
-  reached through it. The anchors the ratings were made against:
+  rare, choking intense and well known. It sets a kink's level of detail.
+  Every kink and specific has one, a category has none, and a specific is
+  never more common than its kink, since a narrower act is never more widely
+  known than the act it narrows. The anchors the ratings were made against:
   - Very common: kissing, oral, cuddling
   - Common: spanking, blindfolds, dirty talk
   - Fairly common: rope bondage, pet play, CNC
@@ -223,7 +222,7 @@ enough to fill in without a click per category:
 
 - search over names and aliases (`searchKinks`) and custom kinks, which
   narrows the list in place (see [Search](#search))
-- the filters ([`ListFilters`](../src/lib/components/kink-list/ListFilters.svelte))
+- the level of detail ([`ListFilters`](../src/lib/components/kink-list/ListFilters.svelte))
 - Quick fill, Share (a dialog that makes a link), Import or export, and
   History, on one row
 - pinned above the list as it scrolls, under that row: the key to the answer colours
@@ -271,28 +270,43 @@ the left, and on the right a row of dots per context
 - **A kink's specifics are always shown**, as nested rows under it, open or
   not, rather than inside its panel, where most went unseen.
 
-### The filters
+### The level of detail
 
-Two sliders, saved in the list's `settings` and shared by every screen
-through one helper, `isShown`:
+One slider, from Essentials to Everything (`catalog.detail`, 1–5), saved in
+the list's `settings.detail` and shared by every screen through one helper,
+`isShown`. It is for someone who wants a short list of the commonest kinks as
+much as for someone who wants every specific: a kink shows when its own level
+(`detailOf`) is at most the slider's.
 
-- **Max intensity**, Sweet to Extreme: kinks more intense are hidden.
-- **Max rareness**, Very common to Rare: kinks rarer are hidden. The
-  list stores commonness as a minimum (`minCommonness`), but a minimum beside
-  a maximum reads backwards, so the slider is rareness, its turn-round: both
-  are a most-to-show, and on both moving right shows more.
+- **A kink's level is its commonness**, turned round: very common at 1,
+  rare at 5.
+- **A specific's level is at least its kink's**, since it is only seen under
+  it, and at least its own commonness's, **plus how little its answer adds**
+  to its kink's (`adds`: much +0, some +1, little +2), up to 5. Kissing on the
+  mouth tells little that an answer to kissing did not, so it waits for
+  someone who wants the detail; blindfolds, which people answer apart from
+  sensory deprivation, shows as soon as its commonness allows. `adds` is set
+  on every specific, and only on specifics (`catalogProblems`).
+- **New lists start at Very detailed** (`catalog.detail.default`, 4): all
+  but the rarest kinks, and the specifics that add most. A list saved with
+  the intensity and commonness filters it replaced opens on the default.
 
-They sit beside the search when the page is wide enough, each 15em (narrower
-only when the page is), and wrap under it when it is not. The width is fixed
-rather than taken from the content, since the reading beside each title
+Intensity no longer hides anything. An Extreme kink shows by how common it
+is, like any other, and is flagged beside its name.
+
+It sits beside the search when the page is wide enough, at a fixed width
+rather than one taken from the content, since the reading beside its title
 changes width as the slider moves.
 
 Custom kinks are never hidden. A category says how many of its kinks the
-filters hide.
+level of detail hides. A category it hides every kink of is left out
+altogether rather than shown as an empty heading, and the foot of the list
+says how many categories went and how many kinks were in them. While
+searching that line gives way to the search's own count.
 
 ### Search
 
-Search narrows the list the way the filters do, rather than swapping it for a
+Search narrows the list the way the level of detail does, rather than swapping it for a
 list of results, so a match is seen where it lives: cuddling under Intimacy
 and affection, a paddle under Spanking. `searchView` (`answers.ts`) works out
 what stays:
@@ -301,16 +315,16 @@ what stays:
   above a matching specific**, as its place
 - **not a matching kink's other specifics**: a specific shows only if it
   matches too
-- **only what the filters show.** A match they hide is counted instead,
-  once, and the page says "N kinks match but are hidden by your intensity and
-  rareness filters", so a search that seems to find nothing says why. A
+- **only what the level of detail shows.** A match they hide is counted instead,
+  once, and the page says "N kinks match but are hidden by your level of
+  detail", so a search that seems to find nothing says why. A
   specific whose kink is filtered out counts as hidden with it.
 
 Categories and sections with nothing left are dropped; the rest are opened, so
 no match sits in one folded earlier. While searching, a category leaves out
 its related kinks (each is shown in its own category) and its own count of
 hidden kinks (the page gives one for the search). Its "3 of 12" is still of
-everything the filters show. Custom kinks match by name.
+everything the level of detail shows. Custom kinks match by name.
 
 ### Answer as
 
@@ -318,6 +332,8 @@ Dom, Sub or Both. Dom or Sub hides the context of a kink that leans the other
 way (`shownSides`), and any one-sided kink for the other side; neutral kinks
 and contexts always show. The store's `filters` carry it, so the list, quick
 fill (which starts each card on your context) and comparing all follow it.
+An info button beside it says what it does, in a popover so a tap opens it
+on a phone.
 
 - **On your own list** it is a setting, `settings.side`, and starts on Both:
   there is nothing to guess it from.
@@ -337,8 +353,8 @@ list, so a reload loses nothing and lands back on triage.
 
 1. **Triage** ([`TriageGrid`](../src/lib/components/kink-list/TriageGrid.svelte)).
    Every category is a tile, in by default, and tapping one out skips it.
-   "Hard limit everything here" answers a whole category, and the intensity
-   maximum is set here too.
+   "Hard limit everything here" answers a whole category, and the level of
+   detail is set here too.
 2. **The deck** ([`Deck`](../src/lib/components/kink-list/Deck.svelte)): one
    card per kink.
    - Every answer is always a button under the card, so the deck works
@@ -368,7 +384,7 @@ lists the cards still to go:
 - included categories in catalogue order, each category's kinks, then the
   person's own kinks
 - a kink's specifics only once it has a yes
-- nothing above the intensity maximum, and nothing answered or skipped
+- nothing past the level of detail, and nothing answered or skipped
 
 Answering a card is what moves the deck on, and Undo puts the answer (or
 skip) back, so the card returns. Nothing about the deck's position is ever
@@ -419,7 +435,7 @@ panel works signed in and signed out.
   - categories limited wholesale (they change what other kinks show)
   - an optional name
 
-  Quick-fill skips, the filters and your side stay on the device. A list
+  Quick-fill skips, the level of detail and your side stay on the device. A list
   answered all the way through is under 4,000 characters.
 - **`k1` is the format.** A new shape gets `k2`, and readers keep reading every
   format ever written. A kink number this build does not know is dropped, not
@@ -649,14 +665,15 @@ visit shows the button from the next load.
 ## Tests
 
 - **`kink-list/catalog.test.ts`:** the catalogue's checks (commonness,
-  `domSide` and `lean` included), search, and the tree.
+  `adds`, `domSide` and `lean` included), each item's level of detail
+  (`detailOf`), search, and the tree.
 - **`kink-list/answers.test.ts`:** the effective answer (sides, specifics,
   category limits, related kinks), merging, the stored shape, normalising an
   answer to its kink's shape, fantasy and reality parting and folding back,
   defaulted settings, and the filters
   (`isShown`, `shownSides`), and what a search leaves (`searchView`).
 - **`kink-list/deck.test.ts`:** the deck's order, drill-down after yes,
-  triage, intensity and commonness, custom kinks, and the review.
+  triage, the level of detail, custom kinks, and the review.
 - **`kink-list/share-link.test.ts`:** the round trip (sides, detail, notes,
   custom kinks, wholesale limits, a name), notes left out, the length of a
   full list, broken links, and unknown kink numbers.
@@ -685,8 +702,10 @@ visit shows the button from the next load.
   from the dots, both contexts of a role kink, your side narrowing one,
   inherited answers, the open panel's fieldsets, fantasy and reality parting
   and folding back, notes, a category starting open and
-  folding, related kinks, both filters, the filter and side controls, and
-  search narrowing the page in place and counting what the filters hide.
+  folding, related kinks, the level of detail and its slider, the side
+  control, and
+  search narrowing the page in place and counting what the level of detail
+  hides.
 - **`components/kink-list/Deck.svelte.test.ts`:** buttons, keys, undo, skip,
   one side, a card starting on your side, a held Conditional card, and the
   end of the deck.

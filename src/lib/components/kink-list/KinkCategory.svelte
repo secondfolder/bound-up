@@ -75,7 +75,7 @@
 
 	{#if hidden > 0 && !view}
 		<p class="hidden-note">
-			{hidden === 1 ? '1 more kink is' : `${hidden} more kinks are`} hidden by your filters.
+			{hidden === 1 ? '1 more kink is' : `${hidden} more kinks are`} hidden by your level of detail.
 		</p>
 	{/if}
 

@@ -352,10 +352,10 @@
 						},
 						{
 							"id": "kink-list-filters",
-							"title": "How intense, how rare",
-							"summary": "Choose the most intense and the rarest kinks the list shows.",
+							"title": "Level of detail",
+							"summary": "One slider from the essentials to everything: the commonest kinks, or every rare kink and fine detail.",
 							"status": "shipped",
-							"shippedOn": "2026-10-19"
+							"shippedOn": "2026-10-20"
 						},
 						{
 							"id": "kink-list-your-side",

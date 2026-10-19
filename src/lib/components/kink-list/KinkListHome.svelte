@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { tick } from 'svelte';
 	import { adopted } from '$lib/kink-list/adopted.svelte';
-	import { customMatches, searchView } from '$lib/kink-list/answers';
+	import { customMatches, isShown, searchView } from '$lib/kink-list/answers';
 	import { catalog, categories, childrenOf, type KinkItem } from '$lib/kink-list/catalog';
 	import { kinkListContext, setKinkListSearch } from '$lib/kink-list/context';
 	import KinkCategory from './KinkCategory.svelte';
@@ -60,15 +60,44 @@
 		);
 	}
 
+	/**
+	 * Whether the level of detail leaves anything in a category. One it
+	 * empties is left out rather than shown as an empty heading, and counted
+	 * once at the foot of the list instead (`emptied`).
+	 */
+	function hasShown(category: KinkItem): boolean {
+		return (
+			childrenOf(category.id).some((kink) => isShown(kink, store.filters)) ||
+			store.customKinks(category.id).length > 0
+		);
+	}
+
 	const sections = $derived(
 		Object.entries(catalog.sections)
 			.map(([section, heading]) => ({
 				section,
 				heading,
-				categories: categories(section).filter(hasMatches)
+				categories: categories(section).filter(
+					(category) => hasShown(category) && hasMatches(category)
+				)
 			}))
 			.filter((entry) => entry.categories.length > 0)
 	);
+
+	/** The categories the level of detail empties, and their kinks. Not while searching, which counts its own. */
+	const emptied = $derived(view ? [] : categories().filter((category) => !hasShown(category)));
+	const emptiedKinks = $derived(
+		emptied.reduce((total, category) => total + childrenOf(category.id).length, 0)
+	);
+	const emptiedNote = $derived.by(() => {
+		const count = emptied.length;
+		const what = count === 1 ? '1 more category is' : `${count} more categories are`;
+		let kinks = `all ${emptiedKinks} of ${count === 1 ? 'its' : 'their'} kinks`;
+		if (emptiedKinks === 1) {
+			kinks = 'its 1 kink';
+		}
+		return `${what} hidden, since your level of detail hides ${kinks}.`;
+	});
 
 	/** A search opens every category, so no match sits folded away in one closed earlier. */
 	$effect(() => {
@@ -206,7 +235,7 @@
 			{#if view.hidden > 0}
 				<p class="quiet">
 					{view.hidden === 1 ? '1 kink matches' : `${view.hidden} kinks match`} but
-					{view.hidden === 1 ? 'is' : 'are'} hidden by your intensity and rareness filters.
+					{view.hidden === 1 ? 'is' : 'are'} hidden by your level of detail.
 				</p>
 			{/if}
 		{/if}
@@ -222,6 +251,10 @@
 			</section>
 		{/each}
 	</div>
+
+	{#if emptied.length > 0}
+		<p class="quiet emptied">{emptiedNote}</p>
+	{/if}
 </div>
 
 <style>
@@ -355,6 +388,10 @@
 			margin: 0;
 			font-size: 1.15rem;
 		}
+	}
+
+	.emptied {
+		margin: 0;
 	}
 
 	.quiet {

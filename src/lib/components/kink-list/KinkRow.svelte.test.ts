@@ -151,17 +151,32 @@ describe('KinkCategory', () => {
 		expect(store.list.answers.rimming?.sides?.a?.level).toBe('love');
 	});
 
-	it('hides kinks outside the filters, and says how many', () => {
+	it('hides kinks past the level of detail, and says how many', () => {
 		const store = storeWith();
-		store.setFilters({ maxIntensity: 1 });
+		store.setFilters({ detail: 2 });
 		render(KinkListHarness, { store, categoryId: 'impact' });
 		expect(screen.queryByRole('group', { name: 'Caning, giving' })).toBeNull();
-		expect(screen.getByText(/hidden by your filters/)).toBeInTheDocument();
+		expect(screen.getByText(/more kinks are hidden by your level of detail/)).toBeInTheDocument();
 	});
 
-	it('hides kinks less common than the minimum', () => {
+	it('leaves out a category the level of detail empties, and counts it at the foot', async () => {
 		const store = storeWith();
-		store.setFilters({ minCommonness: 4 });
+		store.setFilters({ detail: 1 });
+		const { container } = render(KinkListHarness, { store, home: true });
+		await waSettled(container);
+		// Impact has nothing very common; Intimacy has kissing.
+		expect(container.querySelector('#category-impact')).toBeNull();
+		expect(container.querySelector('#category-intimacy')).not.toBeNull();
+		expect(
+			screen.getByText(
+				/more categories are hidden, since your level of detail hides all \d+ of their kinks/
+			)
+		).toBeInTheDocument();
+	});
+
+	it('hides even common kinks at the lowest level of detail', () => {
+		const store = storeWith();
+		store.setFilters({ detail: 1 });
 		render(KinkListHarness, { store, categoryId: 'impact' });
 		expect(screen.queryByRole('group', { name: 'Spanking, giving' })).toBeNull();
 	});
@@ -176,22 +191,36 @@ describe('the filters and your side', () => {
 		expect(screen.queryByRole('group', { name: 'Spanking, giving' })).toBeNull();
 	});
 
-	it('saves a slider when it is let go', async () => {
+	it('shows and hides kinks as the level of detail is dragged, saving only when let go', async () => {
+		const store = storeWith();
+		const { container } = render(KinkListHarness, { store, controls: true, categoryId: 'impact' });
+		await waSettled(container);
+		const slider = container.querySelector('wa-slider') as HTMLElement & { value: number };
+		expect(screen.getByRole('group', { name: 'Spanking, giving' })).toBeInTheDocument();
+		slider.value = 1;
+		slider.dispatchEvent(new Event('input'));
+		await waitFor(() =>
+			expect(screen.queryByRole('group', { name: 'Spanking, giving' })).toBeNull()
+		);
+		expect(store.list.settings.detail).toBe(4);
+		slider.dispatchEvent(new Event('change'));
+		expect(store.list.settings.detail).toBe(1);
+		expect(store.previewDetail).toBeNull();
+	});
+
+	it('saves the level of detail when its slider is let go', async () => {
 		const store = storeWith();
 		const { container } = render(KinkListHarness, { store, controls: true });
 		await waSettled(container);
 		const sliders = container.querySelectorAll<HTMLElement & { value: number }>('wa-slider');
-		const [intensity, commonness] = sliders;
-		if (!(intensity && commonness)) {
-			throw new Error('the two sliders');
+		expect(sliders).toHaveLength(1);
+		const [detail] = sliders;
+		if (!detail) {
+			throw new Error('the slider');
 		}
-		intensity.value = 2;
-		intensity.dispatchEvent(new Event('change'));
-		expect(store.list.settings.maxIntensity).toBe(2);
-		// Its position runs from very common to rare: the minimum turned round.
-		commonness.value = 4;
-		commonness.dispatchEvent(new Event('change'));
-		expect(store.list.settings.minCommonness).toBe(0);
+		detail.value = 2;
+		detail.dispatchEvent(new Event('change'));
+		expect(store.list.settings.detail).toBe(2);
 	});
 });
 
@@ -226,12 +255,12 @@ describe('searching the list', () => {
 
 	it('says how many matches the filters hide', async () => {
 		const store = storeWith();
-		store.setFilters({ maxIntensity: 1 });
+		store.setFilters({ detail: 3 });
 		const { container } = render(KinkListHarness, { store, home: true });
 		await search(container, 'paddle');
 		await waitFor(() =>
 			expect(
-				screen.getByText(/1 kink matches but is hidden by your intensity and rareness filters/)
+				screen.getByText(/1 kink matches but is hidden by your level of detail/)
 			).toBeInTheDocument()
 		);
 		expect(screen.getByText(/Nothing shown matches/)).toBeInTheDocument();

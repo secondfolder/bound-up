@@ -2,10 +2,13 @@ import { z } from 'zod';
 import {
 	catalog,
 	depthOf,
+	detailOf,
 	domSideOf,
 	type KinkItem,
 	kinkById,
 	leanOf,
+	MAX_DETAIL,
+	MIN_DETAIL,
 	normaliseSearch,
 	primaryCategoryOf,
 	searchKinks,
@@ -326,13 +329,13 @@ export const listPayloadSchema = z.object({
 	triage: z.record(z.string().regex(CATALOG_ID), triageSchema),
 	custom: z.record(z.string().regex(CUSTOM_KEY), customSchema),
 	settings: z.object({
-		maxIntensity: z.number().int().min(0).max(6),
 		/**
-		 * Kinks less common than this are hidden: 0 rare … 4 very common.
-		 * Defaulted, like `side`, so a list saved before either existed still
-		 * opens rather than being refused as unreadable.
+		 * The level of detail: kinks shown from a higher level (`detailOf`)
+		 * are hidden. Defaulted, like `side`, so a list saved before either
+		 * existed still opens rather than being refused as unreadable; the
+		 * intensity and commonness it replaced are dropped as it is read.
 		 */
-		minCommonness: z.number().int().min(0).max(4).default(catalog.commonness.defaultMin),
+		detail: z.number().int().min(MIN_DETAIL).max(MAX_DETAIL).default(catalog.detail.default),
 		side: z.enum(YOUR_SIDES).default('both'),
 		at
 	}),
@@ -347,8 +350,7 @@ export function emptyList(): ListPayload {
 		triage: {},
 		custom: {},
 		settings: {
-			maxIntensity: catalog.intensity.defaultMax,
-			minCommonness: catalog.commonness.defaultMin,
+			detail: catalog.detail.default,
 			side: 'both',
 			at: 0
 		},
@@ -455,24 +457,21 @@ export function intensityOf(key: ItemKey): number {
 // ── filters ──────────────────────────────────────────────────────────────────
 
 /** What decides which kinks a list shows: its settings, with the side a partner's view may change. */
-export type Filters = { maxIntensity: number; minCommonness: number; side: YourSide };
+export type Filters = { detail: number; side: YourSide };
 
 export function filtersOf(list: ListPayload): Filters {
-	const { maxIntensity, minCommonness, side } = list.settings;
-	return { maxIntensity, minCommonness, side };
+	const { detail, side } = list.settings;
+	return { detail, side };
 }
 
 /**
- * Whether a catalogue item is shown: within the intensity maximum, at least as
- * common as the minimum, and not a one-sided kink for the other side. A role
- * kink is shown whatever the side — it is its contexts that are filtered
- * (`shownSides`). Custom kinks are not catalogue items, and nothing hides them.
+ * Whether a catalogue item is shown: within the level of detail, and not a
+ * one-sided kink for the other side. A role kink is shown whatever the side —
+ * it is its contexts that are filtered (`shownSides`). Custom kinks are not
+ * catalogue items, and nothing hides them.
  */
 export function isShown(item: KinkItem, filters: Filters): boolean {
-	if (item.intensity > filters.maxIntensity) {
-		return false;
-	}
-	if ((item.commonness ?? 0) < filters.minCommonness) {
+	if (detailOf(item) > filters.detail) {
 		return false;
 	}
 	const lean = leanOf(item);

@@ -107,10 +107,10 @@ describe('Deck', () => {
 
 	it('says it is done once every card is answered', async () => {
 		const store = freshStore();
-		// A handful of cards: every category but one skipped, and only the gentlest shown.
+		// A handful of cards: every category but one skipped, and only the commonest shown.
 		store.list = {
 			...store.list,
-			settings: { maxIntensity: 0, minCommonness: 0, side: 'both', at: 1 },
+			settings: { detail: 1, side: 'both', at: 1 },
 			triage: Object.fromEntries(
 				categories()
 					.filter((category) => category.id !== 'intimacy')

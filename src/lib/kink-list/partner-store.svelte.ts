@@ -181,7 +181,7 @@ export class PartnerKinkList extends KinkListStore {
 	}
 
 	override get filters(): Filters {
-		return { ...filtersOf(this.list), side: this.#side };
+		return this.previewed({ ...filtersOf(this.list), side: this.#side });
 	}
 
 	override setFilters({ side, ...change }: Partial<Filters>): void {

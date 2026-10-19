@@ -9,6 +9,7 @@ import {
 	normaliseAnswers,
 	type YourSide
 } from './answers';
+import { MAX_DETAIL } from './catalog';
 
 /**
  * A kink list shared with a partner: the rules. Pure and alias-free; see
@@ -98,7 +99,7 @@ export function asList(resolved: ResolvedList): ListPayload {
 		triage: resolved.triage,
 		// Nothing of theirs is hidden from a comparison: filters are a view on
 		// your own list, not a choice about theirs.
-		settings: { maxIntensity: 6, minCommonness: 0, side: 'both', at: 0 },
+		settings: { detail: MAX_DETAIL, side: 'both', at: 0 },
 		skipped: {}
 	};
 }

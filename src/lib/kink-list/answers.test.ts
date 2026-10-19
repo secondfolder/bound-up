@@ -121,15 +121,15 @@ describe('mergeLists', () => {
 	it('merges custom kinks, triage and settings the same way', () => {
 		const a = list({
 			triage: { media: { value: 'skip', at: 1 } },
-			settings: { maxIntensity: 6, minCommonness: 0, side: 'both', at: 9 }
+			settings: { detail: 5, side: 'both', at: 9 }
 		});
 		const b = list({
 			triage: { media: { value: 'none', at: 2 } },
-			settings: { maxIntensity: 3, minCommonness: 0, side: 'both', at: 4 }
+			settings: { detail: 2, side: 'both', at: 4 }
 		});
 		const merged = mergeLists(a, b);
 		expect(merged.triage.media?.value).toBe('none');
-		expect(merged.settings.maxIntensity).toBe(6);
+		expect(merged.settings.detail).toBe(5);
 	});
 });
 
@@ -147,7 +147,7 @@ describe('the stored shape', () => {
 			},
 			triage: { extreme: { value: 'limit', at } },
 			custom: { [key]: { name: 'Being read to', categoryId: 'intimacy', at } },
-			settings: { maxIntensity: 5, minCommonness: 0, side: 'both', at },
+			settings: { detail: 3, side: 'both', at },
 			skipped: { tickling: { skipped: true, at } }
 		});
 		expect(parsed.success).toBe(true);
@@ -293,25 +293,22 @@ describe('the shape of an answer', () => {
 			sides: { a: { level: 'love' }, b: { level: 'love' } },
 			at
 		});
-		expect(parsed.settings).toEqual({ maxIntensity: 5, minCommonness: 1, side: 'both', at });
+		expect(parsed.settings).toEqual({ detail: 4, side: 'both', at });
 	});
 });
 
 describe('the filters', () => {
 	const filters = (fields: Partial<Filters> = {}): Filters => ({
-		maxIntensity: 6,
-		minCommonness: 0,
+		detail: 5,
 		side: 'both',
 		...fields
 	});
 	const spanking = kinkById('spanking') as KinkItem;
 
-	it('hides what is too intense or too rare', () => {
-		expect(isShown(spanking, filters())).toBe(true);
-		expect(isShown(spanking, filters({ maxIntensity: spanking.intensity - 1 }))).toBe(false);
-		expect(isShown(spanking, filters({ minCommonness: (spanking.commonness ?? 0) + 1 }))).toBe(
-			false
-		);
+	it('hides what sits past the level of detail', () => {
+		// Common, so it shows from level 2.
+		expect(isShown(spanking, filters({ detail: 2 }))).toBe(true);
+		expect(isShown(spanking, filters({ detail: 1 }))).toBe(false);
 	});
 
 	it('hides a one-sided kink from the other side only', () => {
@@ -334,7 +331,7 @@ describe('the filters', () => {
 });
 
 describe('searchView', () => {
-	const everything: Filters = { maxIntensity: 6, minCommonness: 0, side: 'both' };
+	const everything: Filters = { detail: 5, side: 'both' };
 
 	it('is nothing for an empty search', () => {
 		expect(searchView('  ', everything)).toBeNull();
@@ -348,14 +345,14 @@ describe('searchView', () => {
 	it('does not bring a matching kink’s specifics along', () => {
 		const view = searchView('fellatio', everything);
 		expect(view?.shown.has('blowjobs')).toBe(true);
-		expect(view?.shown.has('cock-warming')).toBe(false);
+		expect(view?.shown.has('deepthroat')).toBe(false);
 	});
 
 	it('counts the matches the filters hide, including a specific whose kink they hide', () => {
-		expect(searchView('paddle', { ...everything, maxIntensity: 2 })).toEqual({
+		expect(searchView('paddle', { ...everything, detail: 3 })).toEqual({
 			shown: new Set(),
 			hidden: 1
 		});
-		expect(searchView('paddle', { ...everything, maxIntensity: 1 })?.hidden).toBe(1);
+		expect(searchView('paddle', { ...everything, detail: 1 })?.hidden).toBe(1);
 	});
 });

@@ -19,6 +19,10 @@ import shareIdsData from './share-ids.json' with { type: 'json' };
  * it directly.
  */
 
+/** The level-of-detail scale: 1 shows only the commonest kinks, 5 everything. */
+export const MIN_DETAIL = 1;
+export const MAX_DETAIL = 5;
+
 const id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'ids are kebab-case');
 
 const itemSchema = z.strictObject({
@@ -37,6 +41,14 @@ const itemSchema = z.strictObject({
 	 * are mild and rare, choking intense and well known.
 	 */
 	commonness: z.number().int().min(0).max(4).optional(),
+	/**
+	 * Specifics only: how much answering it adds to its kink's answer. Little
+	 * for one whose answer mostly follows from its kink's (someone who loves
+	 * kissing likely loves kissing on the mouth), much for one people often
+	 * answer differently (blindfolds, beside heavier sensory deprivation).
+	 * With commonness, it sets the level of detail it shows at (`detailOf`).
+	 */
+	adds: z.enum(['little', 'some', 'much']).optional(),
 	/**
 	 * Which side of the role pair a dominant usually takes, overriding the
 	 * pair's own default; `neutral` when either side suits either. The "Your
@@ -62,13 +74,12 @@ const itemSchema = z.strictObject({
 export const catalogSchema = z
 	.strictObject({
 		version: z.literal(1),
-		intensity: z.strictObject({
+		intensity: z.strictObject({ levels: z.record(z.string(), z.string()) }),
+		commonness: z.strictObject({ levels: z.record(z.string(), z.string()) }),
+		/** The level-of-detail filter's levels, 1 (fewest kinks) up, and where a new list starts. */
+		detail: z.strictObject({
 			levels: z.record(z.string(), z.string()),
-			defaultMax: z.number().int().min(0).max(6)
-		}),
-		commonness: z.strictObject({
-			levels: z.record(z.string(), z.string()),
-			defaultMin: z.number().int().min(0).max(4)
+			default: z.number().int().min(MIN_DETAIL).max(MAX_DETAIL)
 		}),
 		sections: z.record(z.string(), z.string()),
 		/**
@@ -156,9 +167,16 @@ export function catalogProblems(
 			parent.commonness !== undefined &&
 			item.commonness > parent.commonness
 		) {
-			// A specific is only reached through its kink, so it cannot be seen
-			// by anyone its kink is hidden from.
+			// A narrower act is never more widely known than the act it narrows:
+			// a specific rated commoner than its kink is a rating to look at again.
 			problems.push(`"${item.id}" is more common than "${parent.id}", the kink it narrows`);
+		}
+		const specific = parent?.parent !== undefined;
+		if (specific && item.adds === undefined) {
+			problems.push(`"${item.id}" is a specific with no "adds"`);
+		}
+		if (!specific && item.adds !== undefined) {
+			problems.push(`"${item.id}" has "adds", which only a specific has`);
 		}
 		if (item.domSide !== undefined && !item.roles) {
 			problems.push(`"${item.id}" has a domSide but no role pair`);
@@ -278,6 +296,37 @@ export function intensityLabel(intensity: number): string {
 
 export function commonnessLabel(commonness: number): string {
 	return catalog.commonness.levels[String(commonness)] ?? String(commonness);
+}
+
+export function detailLabel(detail: number): string {
+	return catalog.detail.levels[String(detail)] ?? String(detail);
+}
+
+/** How many levels a specific's detail sits above its kink's, by how much it adds. */
+const ADDS_STEP = { much: 0, some: 1, little: 2 } as const;
+
+/**
+ * The level of detail an item is shown from (1–5), for the one filter: the
+ * commoner a kink, the lower, from very common at 1 to rare at 5.
+ *
+ * A specific is never lower than its kink, which it is only seen under, and
+ * sits higher the less its answer adds to its kink's (`adds`): kissing on the
+ * mouth tells little that kissing did not, so it waits for someone who wants
+ * the detail, where blindfolds, which people answer apart from sensory
+ * deprivation, shows as soon as its commonness allows. A category is always
+ * shown.
+ */
+export function detailOf(item: KinkItem): number {
+	if (item.parent === undefined) {
+		return MIN_DETAIL;
+	}
+	const own = MAX_DETAIL - (item.commonness ?? 0);
+	const parent = byId.get(item.parent);
+	if (!(parent?.parent !== undefined && parent)) {
+		return own;
+	}
+	const floor = Math.max(own, detailOf(parent));
+	return Math.min(MAX_DETAIL, floor + ADDS_STEP[item.adds ?? 'some']);
 }
 
 /** Lowercase, `&` read as "and", and anything else that isn't a letter or digit as a space. */

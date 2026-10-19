@@ -59,10 +59,8 @@ describe('deckCards', () => {
 		expect(isInDeck(list({ triage }), 'hands')).toBe(true);
 	});
 
-	it('leaves out kinks above the intensity setting', () => {
-		const cards = deckCards(
-			list({ settings: { maxIntensity: 2, minCommonness: 0, side: 'both', at } })
-		);
+	it('leaves out kinks past the level of detail', () => {
+		const cards = deckCards(list({ settings: { detail: 2, side: 'both', at } }));
 		expect(cards).toContain('spanking');
 		expect(cards).not.toContain('caning');
 	});
@@ -116,9 +114,9 @@ describe('narrows', () => {
 });
 
 describe('deckCards, with filters', () => {
-	it('leaves out kinks less common than the minimum', () => {
+	it('leaves out kinks past the level of detail it is given', () => {
 		const all = deckCards(list());
-		const common = deckCards(list(), { maxIntensity: 6, minCommonness: 4, side: 'both' });
+		const common = deckCards(list(), { detail: 1, side: 'both' });
 		expect(common.length).toBeGreaterThan(0);
 		expect(common.length).toBeLessThan(all.length);
 		expect(common).not.toContain('spanking');

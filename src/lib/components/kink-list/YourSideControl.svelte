@@ -11,13 +11,36 @@
 	 *
 	 * Native radios, as segments: the state is `checked`, which a `wa-button`
 	 * would not expose (AGENTS.md).
+	 *
+	 * What it does is behind an info button rather than on the bar, which is
+	 * pinned and has no room for a paragraph. A popover, not a tooltip, so it
+	 * opens with a tap on a phone. The button sits after the legend rather
+	 * than in it, so the group's name stays "Answer as".
 	 */
 	const { store } = kinkListContext();
 	const name = $props.id();
+	const infoId = `${name}-info`;
 </script>
 
 <fieldset class="your-side">
 	<legend>Answer as</legend>
+	<wa-button id={infoId} class="info" size="s" appearance="plain" pill>
+		<!-- Solid: the regular circle-info is a Pro icon, which the free CDN refuses (403). -->
+		<wa-icon name="circle-info" variant="solid" label="What Answer as does"></wa-icon>
+	</wa-button>
+	<wa-popover for={infoId} placement="bottom-start">
+		<div class="about">
+			<p>
+				Many kinks have two sides, like spanking and being spanked. Choose Dom or Sub to see
+				only the side you would take, and hide the kinks only the other side does. Both shows
+				everything.
+			</p>
+			<p>
+				Kinks without a dom or sub side, like kissing, always show both. On your own list this is
+				saved; on a partner's list it starts from who's in control, and is just for this visit.
+			</p>
+		</div>
+	</wa-popover>
 	<div class="segments">
 		{#each YOUR_SIDES as side (side)}
 			<label>
@@ -53,6 +76,24 @@
 			padding: 0;
 			font-size: 0.875rem;
 			font-weight: var(--wa-font-weight-semibold);
+		}
+	}
+
+	.info {
+		--wa-form-control-height: 1.75rem;
+		color: var(--wa-color-text-quiet);
+	}
+
+	.about {
+		max-inline-size: 20rem;
+		font-size: 0.875rem;
+
+		p {
+			margin: 0;
+		}
+
+		p + p {
+			margin-block-start: 0.5rem;
 		}
 	}
 

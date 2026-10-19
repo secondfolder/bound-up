@@ -66,7 +66,18 @@ export abstract class KinkListStore {
 	 * has a side of its own, from who is in control (`partner-store.svelte.ts`).
 	 */
 	get filters(): Filters {
-		return filtersOf(this.list);
+		return this.previewed(filtersOf(this.list));
+	}
+
+	/**
+	 * The level of detail while its slider is being dragged: the list follows
+	 * it at once, so kinks come and go under the finger, but it is saved only
+	 * when the slider is let go (`setFilters`), not once per notch passed.
+	 */
+	previewDetail: number | null = $state(null);
+
+	protected previewed(filters: Filters): Filters {
+		return this.previewDetail === null ? filters : { ...filters, detail: this.previewDetail };
 	}
 
 	/** Whether `filters.side` was worked out from the partnership, rather than chosen. */
@@ -155,7 +166,7 @@ export abstract class KinkListStore {
 		});
 	}
 
-	/** Changes what the list shows: how intense, how common, and which side. */
+	/** Changes what the list shows: the level of detail, and which side. */
 	setFilters(change: Partial<Filters>): void {
 		this.change({ ...this.list, settings: { ...this.list.settings, ...change, at: Date.now() } });
 	}

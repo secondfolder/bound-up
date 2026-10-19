@@ -5,6 +5,7 @@ import {
 	categories,
 	childrenOf,
 	depthOf,
+	detailOf,
 	kinkById,
 	primaryCategoryOf,
 	relatedKinks,
@@ -60,13 +61,15 @@ describe('the catalogue', () => {
 						item({ id: 'tagged', parent: 'cat', tags: ['mystery'], roles: 'who' }),
 						item({ id: 'also', parent: 'cat', alsoUnder: ['tagged'] }),
 						item({ id: 'k1', parent: 'cat' }),
-						item({ id: 'k2', parent: 'k1' }),
-						item({ id: 'k3', parent: 'k2' }),
+						item({ id: 'k2', parent: 'k1', adds: 'some' }),
+						item({ id: 'k3', parent: 'k2', adds: 'some' }),
 						item({ id: 'rated', section: 'kinks', commonness: 2 }),
 						item({ id: 'unrated', parent: 'cat', commonness: undefined }),
-						item({ id: 'narrower', parent: 'k1', commonness: 3 }),
+						item({ id: 'narrower', parent: 'k1', commonness: 3, adds: 'some' }),
 						item({ id: 'lopsided', parent: 'cat', domSide: 'a' }),
-						item({ id: 'both-ways', parent: 'cat', roles: 'pair', lean: 'dom' })
+						item({ id: 'both-ways', parent: 'cat', roles: 'pair', lean: 'dom' }),
+						item({ id: 'adds-on-kink', parent: 'cat', adds: 'little' }),
+						item({ id: 'no-adds', parent: 'k1' })
 					]
 				} as never,
 				[
@@ -81,7 +84,9 @@ describe('the catalogue', () => {
 					'unrated',
 					'narrower',
 					'lopsided',
-					'both-ways'
+					'both-ways',
+					'adds-on-kink',
+					'no-adds'
 				]
 			)
 		).toEqual([
@@ -98,8 +103,44 @@ describe('the catalogue', () => {
 			'"narrower" is more common than "k1", the kink it narrows',
 			'"lopsided" has a domSide but no role pair',
 			'"both-ways" has a lean and a role pair; a pair takes domSide',
+			'"adds-on-kink" has "adds", which only a specific has',
+			'"no-adds" is a specific with no "adds"',
 			'"k3" is missing from share-ids.json'
 		]);
+	});
+});
+
+describe('detailOf', () => {
+	const detail = (id: string) => {
+		const item = kinkById(id);
+		if (!item) {
+			throw new Error(`no kink "${id}"`);
+		}
+		return detailOf(item);
+	};
+
+	it('puts a kink where its commonness says, very common first', () => {
+		expect(detail('kissing')).toBe(1);
+		expect(detail('spanking')).toBe(2);
+		expect(detail('impact')).toBe(1);
+	});
+
+	it('puts a specific above its kink, by how little it adds', () => {
+		// Little: whoever answered kissing has all but answered these.
+		expect(detail('kissing-mouth')).toBe(3);
+		// Much: people answer blindfolds apart from sensory deprivation.
+		expect(detail('blindfolds')).toBe(detail('sensory-deprivation'));
+		// Never below its own commonness, nor past the top.
+		expect(detail('spanking-implements')).toBe(4);
+		expect(detail('double-anal')).toBe(5);
+	});
+
+	it('never shows a specific before its kink', () => {
+		const early = catalog.items.filter((item) => {
+			const parent = item.parent ? kinkById(item.parent) : undefined;
+			return parent !== undefined && detailOf(item) < detailOf(parent);
+		});
+		expect(early.map((item) => item.id)).toEqual([]);
 	});
 });
 

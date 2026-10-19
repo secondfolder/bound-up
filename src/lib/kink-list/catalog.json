@@ -9,8 +9,7 @@
 			"4": "Intense",
 			"5": "Hardcore",
 			"6": "Extreme"
-		},
-		"defaultMax": 5
+		}
 	},
 	"commonness": {
 		"levels": {
@@ -19,8 +18,17 @@
 			"2": "Fairly common",
 			"3": "Common",
 			"4": "Very common"
+		}
+	},
+	"detail": {
+		"levels": {
+			"1": "Essentials",
+			"2": "Common",
+			"3": "Detailed",
+			"4": "Very detailed",
+			"5": "Everything"
 		},
-		"defaultMin": 1
+		"default": 4
 	},
 	"sections": {
 		"kinks": "Kinks",
@@ -176,6 +184,7 @@
 			"roles": "give-receive",
 			"intensity": 0,
 			"commonness": 4,
+			"adds": "little",
 			"description": "Kissing on the lips, with or without tongue."
 		},
 		{
@@ -185,13 +194,14 @@
 			"roles": "give-receive",
 			"intensity": 0,
 			"commonness": 4,
+			"adds": "little",
 			"aliases": ["neck kissing", "body kisses"],
 			"description": "Kissing the neck, chest, thighs or anywhere else on the body."
 		},
 		{
 			"id": "licking",
 			"name": "Licking",
-			"parent": "kissing",
+			"parent": "intimacy",
 			"roles": "give-receive",
 			"intensity": 0,
 			"commonness": 3,
@@ -279,6 +289,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 3,
+			"adds": "some",
 			"aliases": ["deep throat", "throat fucking", "throatpie", "gagging on it"],
 			"description": "Taking a penis or toy deep into the throat, often to the point of gagging."
 		},
@@ -289,26 +300,16 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 3,
+			"adds": "much",
 			"domSide": "a",
 			"tags": ["rough"],
 			"aliases": ["facefuck", "skull fucking", "throat fucking", "irrumatio"],
 			"description": "Thrusting into someone's mouth the way you would a vagina or ass, usually roughly."
 		},
 		{
-			"id": "cock-warming",
-			"name": "Cock warming",
-			"parent": "blowjobs",
-			"roles": "give-receive",
-			"intensity": 2,
-			"commonness": 2,
-			"aliases": ["cockwarming", "cock warmer", "warming"],
-			"description": "Keeping a penis in a partner's mouth or body without thrusting, sometimes for a long time.",
-			"alsoUnder": ["power"]
-		},
-		{
 			"id": "teabagging",
 			"name": "Teabagging",
-			"parent": "blowjobs",
+			"parent": "oral",
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 2,
@@ -445,6 +446,7 @@
 			"parent": "masturbation",
 			"intensity": 1,
 			"commonness": 3,
+			"adds": "some",
 			"aliases": ["jerking off together", "mutual wank"],
 			"description": "Masturbating together, or touching each other at the same time."
 		},
@@ -455,6 +457,7 @@
 			"roles": "dom-sub",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "much",
 			"aliases": ["ordered to masturbate", "masturbation on command"],
 			"description": "Ordering a partner to masturbate, or being ordered to, often in front of them or on camera.",
 			"alsoUnder": ["power"]
@@ -476,6 +479,7 @@
 			"roles": "give-receive",
 			"intensity": 1,
 			"commonness": 3,
+			"adds": "some",
 			"aliases": [
 				"titjob",
 				"titty fuck",
@@ -494,6 +498,7 @@
 			"roles": "give-receive",
 			"intensity": 1,
 			"commonness": 2,
+			"adds": "some",
 			"aliases": ["thighjob", "thigh job", "intercrural sex", "thigh fucking"],
 			"description": "Thrusting a penis between a partner's closed thighs, without penetration."
 		},
@@ -566,6 +571,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["DVP", "double vaginal penetration"],
 			"description": "Two penises or toys in the vagina at the same time."
 		},
@@ -576,6 +582,7 @@
 			"roles": "give-receive",
 			"intensity": 5,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["TP", "triple stuffed", "airtight"],
 			"description": "Being penetrated in three places at once."
 		},
@@ -646,6 +653,17 @@
 			"description": "Pushing a radish or root into the anus, an old punishment for adultery."
 		},
 		{
+			"id": "cock-warming",
+			"name": "Cock warming",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 2,
+			"commonness": 2,
+			"aliases": ["cockwarming", "cock warmer", "warming"],
+			"description": "Keeping a penis in a partner's mouth or body without thrusting, sometimes for a long time.",
+			"alsoUnder": ["oral", "power"]
+		},
+		{
 			"id": "anal",
 			"name": "Anal",
 			"section": "kinks",
@@ -702,6 +720,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 3,
+			"adds": "little",
 			"aliases": ["buttplug", "butt plug", "plug", "anal plug", "tail plug"],
 			"description": "A toy with a flared base, worn in the anus."
 		},
@@ -712,6 +731,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "little",
 			"aliases": ["butt beads"],
 			"description": "A string of beads inserted into the anus one at a time and pulled out."
 		},
@@ -722,6 +742,7 @@
 			"roles": "self-partner",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "much",
 			"domSide": "b",
 			"tags": ["public"],
 			"aliases": ["public plug"],
@@ -734,6 +755,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["tunnel plug", "gape plug"],
 			"description": "A plug with an open tunnel through it that holds the anus open."
 		},
@@ -776,6 +798,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["gape", "anal gape"],
 			"description": "Stretching the anus or vagina until it stays open for a while afterwards."
 		},
@@ -786,6 +809,7 @@
 			"roles": "give-receive",
 			"intensity": 5,
 			"commonness": 0,
+			"adds": "some",
 			"aliases": ["DAP", "double anal penetration"],
 			"description": "Two penises or toys in the anus at the same time."
 		},
@@ -796,6 +820,7 @@
 			"roles": "give-receive",
 			"intensity": 5,
 			"commonness": 0,
+			"adds": "much",
 			"tags": ["risky"],
 			"aliases": ["rosebud", "rosebudding"],
 			"description": "The lining of the rectum pushed or pulled out through the anus.",
@@ -860,6 +885,7 @@
 			"roles": "self-partner",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": [
 				"knotted dildo",
 				"horse dildo",
@@ -877,6 +903,7 @@
 			"roles": "self-partner",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "little",
 			"aliases": ["kegel balls", "ben wa balls", "love eggs"],
 			"description": "A plug with a flared base, worn in the vagina."
 		},
@@ -887,6 +914,7 @@
 			"roles": "self-partner",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "much",
 			"domSide": "b",
 			"tags": ["public"],
 			"description": "Wearing a vaginal plug or toy under your clothes while out in public, or having a partner wear one."
@@ -908,6 +936,7 @@
 			"roles": "self-partner",
 			"intensity": 2,
 			"commonness": 3,
+			"adds": "little",
 			"aliases": ["wand", "hitachi", "wand massager", "magic wand"],
 			"description": "A large, powerful vibrator with a round head, used on the outside of the body."
 		},
@@ -918,6 +947,7 @@
 			"roles": "self-partner",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "much",
 			"domSide": "b",
 			"tags": ["public", "remote"],
 			"aliases": ["lovense", "lush", "app-controlled vibrator", "remote vibe"],
@@ -931,6 +961,7 @@
 			"roles": "self-partner",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["saddle vibrator", "motorbunny"],
 			"description": "A saddle-shaped machine with a vibrating or rotating attachment that someone sits on."
 		},
@@ -1045,6 +1076,7 @@
 			"roles": "dom-sub",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "much",
 			"aliases": ["ruined orgasm", "ruin", "ruining"],
 			"description": "Stopping all stimulation just as orgasm begins, so it happens without the pleasure."
 		},
@@ -1065,6 +1097,7 @@
 			"roles": "dom-sub",
 			"intensity": 3,
 			"commonness": 2,
+			"adds": "some",
 			"aliases": ["post-orgasm torture", "POT", "oversensitivity"],
 			"description": "Stimulation that keeps going after orgasm, when the genitals are too sensitive."
 		},
@@ -1075,6 +1108,7 @@
 			"roles": "dom-sub",
 			"intensity": 3,
 			"commonness": 2,
+			"adds": "some",
 			"aliases": ["marathon", "back to back orgasms"],
 			"description": "Orgasming several times in one session, often one after another."
 		},
@@ -1106,6 +1140,7 @@
 			"roles": "dom-sub",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["spiked chastity", "spiked cage", "punishment cage"],
 			"description": "A chastity cage lined with spikes or points that hurt if the wearer gets hard."
 		},
@@ -1203,6 +1238,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "some",
 			"tags": ["fluids"],
 			"aliases": ["anal cream pie", "cum in ass"],
 			"description": "Ejaculating inside a partner's anus."
@@ -1214,6 +1250,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "much",
 			"tags": ["fluids"],
 			"description": "Sucking semen out of a partner's anus or vagina."
 		},
@@ -1304,6 +1341,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "much",
 			"tags": ["degrading", "fluids"],
 			"aliases": ["drinking piss", "human toilet"],
 			"description": "Drinking a partner's urine."
@@ -1315,6 +1353,7 @@
 			"roles": "give-receive",
 			"intensity": 5,
 			"commonness": 0,
+			"adds": "some",
 			"tags": ["fluids"],
 			"aliases": ["pissing inside", "piss in ass", "piss in mouth"],
 			"description": "Peeing inside a partner's mouth, vagina or anus."
@@ -1459,6 +1498,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "little",
 			"aliases": ["kinbaku", "rope art", "decorative rope", "Japanese rope bondage"],
 			"description": "Japanese-style rope bondage with intricate, decorative ties."
 		},
@@ -1469,6 +1509,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "little",
 			"aliases": ["hog tie", "hogtied"],
 			"description": "Tying wrists and ankles together behind the back."
 		},
@@ -1479,6 +1520,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["tit bondage", "boob bondage", "breast tying"],
 			"description": "Tying rope around the breasts so they bulge or are flattened."
 		},
@@ -1489,6 +1531,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "much",
 			"tags": ["risky"],
 			"aliases": ["rope suspension", "suspended", "flying"],
 			"description": "Lifting a tied person partly or fully off the ground with rope and a hard point.",
@@ -1524,6 +1567,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "little",
 			"aliases": ["ballgag"],
 			"description": "A ball held in the mouth by a strap."
 		},
@@ -1534,6 +1578,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["O-ring gag", "spider gag", "open-mouth gag"],
 			"description": "A ring that holds the mouth open."
 		},
@@ -1544,6 +1589,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "little",
 			"description": "A bar held between the teeth by a strap, like a horse's bit."
 		},
 		{
@@ -1553,6 +1599,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "little",
 			"aliases": ["tape", "duct tape gag", "taped mouth"],
 			"description": "Tape over the mouth."
 		},
@@ -1563,6 +1610,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["dildo gag", "penis gag"],
 			"description": "A penis-shaped gag that fills the mouth."
 		},
@@ -1765,6 +1813,7 @@
 			"roles": "give-receive",
 			"intensity": 1,
 			"commonness": 3,
+			"adds": "much",
 			"aliases": ["blindfold", "blindfolded", "eye mask"],
 			"description": "Covering someone's eyes so they can't see what's coming.",
 			"alsoUnder": ["bondage"]
@@ -1875,6 +1924,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 2,
+			"adds": "some",
 			"tags": ["pain"],
 			"aliases": ["paddle", "paddling", "hairbrush", "belt", "strap", "tawse"],
 			"description": "Spanking with a paddle, hairbrush, belt or strap."
@@ -1898,6 +1948,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 2,
+			"adds": "much",
 			"tags": ["degrading", "pain"],
 			"aliases": ["face slaps", "slapping the face"],
 			"description": "Slapping a partner's face, lightly or hard.",
@@ -1910,6 +1961,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "much",
 			"tags": ["pain"],
 			"aliases": ["pussy slapping", "cock slapping", "ball slapping"],
 			"description": "Slapping a partner's genitals with a hand or implement."
@@ -1981,6 +2033,7 @@
 			"roles": "give-receive",
 			"intensity": 5,
 			"commonness": 0,
+			"adds": "some",
 			"tags": ["pain"],
 			"aliases": ["gut punching", "ball busting", "kicking", "punches"],
 			"description": "Punching, kicking and other hard blows."
@@ -2035,6 +2088,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 3,
+			"adds": "some",
 			"tags": ["pain"],
 			"aliases": ["bites", "nipping"],
 			"description": "Biting or nipping a partner, playfully or hard."
@@ -2046,6 +2100,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 3,
+			"adds": "some",
 			"tags": ["pain"],
 			"aliases": ["claws", "nails", "raking"],
 			"description": "Dragging nails across skin, sometimes leaving marks."
@@ -2057,6 +2112,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 0,
+			"adds": "some",
 			"domSide": "a",
 			"tags": ["pain"],
 			"aliases": ["sandpaper", "scraping", "friction"],
@@ -2195,6 +2251,7 @@
 			"roles": "give-receive",
 			"intensity": 6,
 			"commonness": 0,
+			"adds": "some",
 			"tags": ["risky"],
 			"description": "Losing a lot of blood, or using blood as lube."
 		},
@@ -2293,6 +2350,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "some",
 			"domSide": "a",
 			"aliases": ["buzzcut", "shaved head", "haircut"],
 			"description": "Shaving a partner's head or choosing how their hair is cut, or having yours shaved or chosen."
@@ -2467,6 +2525,7 @@
 			"roles": "dom-sub",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "little",
 			"aliases": ["kneel", "on your knees"],
 			"description": "Kneeling for a partner, as a ritual or on command."
 		},
@@ -2477,6 +2536,7 @@
 			"roles": "dom-sub",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "little",
 			"aliases": ["poses", "inspection", "presenting", "slave positions"],
 			"description": "Learning set poses and holding them on command."
 		},
@@ -2487,6 +2547,7 @@
 			"roles": "dom-sub",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["forms of address", "honorifics", "sir", "ma'am", "speaking permission"],
 			"description": "Rules about when a partner may speak, what they may say and how they address you."
 		},
@@ -2497,6 +2558,7 @@
 			"roles": "dom-sub",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["no eye contact", "eyes down"],
 			"description": "Rules about when a sub may look their partner in the eye."
 		},
@@ -2507,6 +2569,7 @@
 			"roles": "dom-sub",
 			"intensity": 2,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["slut training", "sub training", "conditioning"],
 			"description": "Training a partner over time in skills, positions or behaviour, or being trained."
 		},
@@ -2537,6 +2600,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "some",
 			"domSide": "a",
 			"aliases": ["collar", "leash", "lead", "walked on a leash"],
 			"description": "Collaring a partner and leading them on a leash, or wearing the collar and being led.",
@@ -2559,6 +2623,7 @@
 			"roles": "dom-sub",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["M/s", "master/slave", "slave", "owned", "property"],
 			"description": "A consensual master and slave relationship built on obedience and service."
 		},
@@ -2631,6 +2696,7 @@
 			"roles": "dom-sub",
 			"intensity": 5,
 			"commonness": 0,
+			"adds": "some",
 			"tags": ["others"],
 			"aliases": ["auction", "slave auction", "bidding"],
 			"description": "Putting a partner up for auction to be inspected and bid on, or being auctioned."
@@ -2858,6 +2924,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["degrading"],
 			"aliases": ["dehumanization", "less than human", "cumdump", "fucktoy"],
 			"description": "Treating a partner as less than human, such as an animal or a hole to use, or being treated that way."
@@ -2985,6 +3052,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["trigger", "hypno triggers", "post-hypnotic suggestion"],
 			"description": "Words or phrases that set off a trained response, such as going limp, freezing or orgasming."
 		},
@@ -2995,6 +3063,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["mind control", "conditioning", "mindbreak", "mind break", "reprogramming"],
 			"description": "Conditioning someone over time to think, feel or react differently."
 		},
@@ -3070,6 +3139,7 @@
 			"roles": "aggressor-target",
 			"intensity": 5,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["consent-play", "others"],
 			"aliases": ["gangrape fantasy", "group CNC"],
 			"description": "Acting out non-consent with several people at once.",
@@ -3211,6 +3281,7 @@
 			"roles": "dom-sub",
 			"intensity": 3,
 			"commonness": 2,
+			"adds": "much",
 			"tags": ["taboo"],
 			"aliases": ["daddy dom", "mommy domme", "daddy kink", "mommy kink", "CG"],
 			"description": "A daddy or mummy dom looking after a little."
@@ -3222,6 +3293,7 @@
 			"roles": "dom-sub",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "much",
 			"tags": ["taboo"],
 			"aliases": ["ABDL", "adult baby", "diaper lover", "diapers", "AB/DL", "infantilism"],
 			"description": "Wearing or using diapers, roleplaying as an adult baby, or caring for one."
@@ -3266,6 +3338,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["degrading", "gender"],
 			"aliases": ["sissy training", "sissy"],
 			"description": "Feminising a partner in an exaggerated, often humiliating way, or being feminised."
@@ -3277,6 +3350,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["degrading", "gender"],
 			"aliases": ["bimboification", "himbo"],
 			"description": "Turning a partner into a stereotypical bimbo who is ditzy, made up and focused on sex, or being turned into one."
@@ -3624,6 +3698,7 @@
 			"roles": "give-receive",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["public"],
 			"aliases": ["gloryhole", "glory hole"],
 			"description": "Sex through a hole in a wall with someone you can't see."
@@ -3635,6 +3710,7 @@
 			"roles": "dom-sub",
 			"intensity": 4,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["public"],
 			"aliases": ["stuck in wall", "stuck", "kabeshiri", "wall stuck"],
 			"description": "One partner stuck in a wall or piece of furniture with only part of the body exposed, the other making use of it."
@@ -4418,6 +4494,7 @@
 			"roles": "give-receive",
 			"intensity": 2,
 			"commonness": 3,
+			"adds": "some",
 			"aliases": ["hair grabbing", "pulling hair"],
 			"description": "Pulling or gripping a partner's hair."
 		},
@@ -4444,6 +4521,7 @@
 			"parent": "positions-list",
 			"intensity": 2,
 			"commonness": 2,
+			"adds": "some",
 			"aliases": ["mating press", "piledriver", "folded in half"],
 			"description": "Deep positions where one partner is folded up or pinned underneath."
 		},
@@ -4781,6 +4859,7 @@
 			"roles": "give-receive",
 			"intensity": 3,
 			"commonness": 1,
+			"adds": "some",
 			"aliases": ["feederism", "feedee", "stuffing", "force feeding"],
 			"description": "Feeding someone large amounts, or being fed until stuffed."
 		},
@@ -4823,6 +4902,7 @@
 			"roles": "give-receive",
 			"intensity": 6,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["risky"],
 			"aliases": ["wound fucking"],
 			"description": "Fantasies involving wounds, including sex with them."
@@ -4834,6 +4914,7 @@
 			"roles": "give-receive",
 			"intensity": 6,
 			"commonness": 0,
+			"adds": "some",
 			"domSide": "neutral",
 			"tags": ["risky"],
 			"aliases": ["amputee", "acrotomophilia", "apotemnophilia"],
@@ -4858,6 +4939,7 @@
 			"roles": "give-receive",
 			"intensity": 6,
 			"commonness": 0,
+			"adds": "little",
 			"tags": ["risky"],
 			"description": "Fantasies of injuring or destroying the genitals."
 		},
@@ -4868,6 +4950,7 @@
 			"roles": "give-receive",
 			"intensity": 6,
 			"commonness": 0,
+			"adds": "some",
 			"tags": ["risky"],
 			"description": "Fantasies of poisoning or starving someone, or of being poisoned or starved."
 		},
@@ -4899,6 +4982,7 @@
 			"roles": "give-receive",
 			"intensity": 6,
 			"commonness": 1,
+			"adds": "some",
 			"tags": ["risky"],
 			"aliases": ["death fantasy", "murder fantasy"],
 			"description": "Fantasies of killing or being killed during sex."
@@ -4910,6 +4994,7 @@
 			"roles": "give-receive",
 			"intensity": 6,
 			"commonness": 0,
+			"adds": "some",
 			"tags": ["risky"],
 			"aliases": ["necro"],
 			"description": "Fantasies of sex with a dead body."
