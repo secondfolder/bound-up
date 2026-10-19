@@ -1639,3 +1639,47 @@ export type DaydreamCharacterRow = typeof daydreamCharacters.$inferSelect;
 export type NewDaydreamCharacterRow = typeof daydreamCharacters.$inferInsert;
 export type DaydreamSceneRow = typeof daydreamScenes.$inferSelect;
 export type NewDaydreamSceneRow = typeof daydreamScenes.$inferInsert;
+
+/**
+ * A kink list: one sealed record per person per scope. `scope` is `'self'` for
+ * a person's own list and the partnership's id for the copy they share with
+ * that partner (docs/kink-list.md, "Partners").
+ *
+ * The whole list is one ciphertext rather than a row per kink, so the server
+ * cannot tell which kinks were answered. What it can see is when the list
+ * last changed, which is all version history needs (`edited_at`).
+ *
+ * The id is chosen by the browser, because the ciphertext is bound to it.
+ */
+export const kinkLists = sqliteTable(
+	'kink_lists',
+	{
+		id: text('id').primaryKey(),
+		ownerId: text('owner_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		scope: text('scope').notNull(),
+		/** Set exactly when `scope` is a partnership, so unlinking takes the shared copies with it. */
+		partnershipId: text('partnership_id').references(() => partnerships.id, {
+			onDelete: 'cascade'
+		}),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		revision: integer('revision').notNull().default(0),
+		editedAt: integer('edited_at', { mode: 'timestamp_ms' })
+			.notNull()
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('kink_lists_owner_scope_idx').on(table.ownerId, table.scope),
+		// A partner reads the other member's shared copy by partnership.
+		index('kink_lists_partnership_idx').on(table.partnershipId)
+	]
+);
+
+export type KinkListRow = typeof kinkLists.$inferSelect;
+export type NewKinkListRow = typeof kinkLists.$inferInsert;

@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { PLAYROOM_TOOLS } from '$lib/playroom/tools';
+	import { PLAYROOM_TOOLS, type PlayroomTool } from '$lib/playroom/tools';
+
+	// `resolve()` takes one route at a time, with that route's own params.
+	function href(tool: PlayroomTool): string {
+		return tool.route === '/(standalone)/playroom/iq-test/[[id]]'
+			? resolve(tool.route, {})
+			: resolve(tool.route);
+	}
 </script>
 
 <div class="page">
@@ -12,10 +19,9 @@
 			<li>
 				<!--
 					A plain link rather than a wa-card with an onclick: the whole card is
-					the target, and a link is what it is. Every tool opens outside the
-					app shell, on a page of its own.
+					the target, and a link is what it is.
 				-->
-				<a href={resolve(tool.route, {})}>
+				<a href={href(tool)}>
 					<wa-icon name={tool.icon} variant="solid"></wa-icon>
 					<span class="name">{tool.name}</span>
 					<span class="blurb">{tool.blurb}</span>

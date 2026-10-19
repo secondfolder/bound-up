@@ -68,12 +68,12 @@ describe('/roadmap', () => {
 
 		await userEvent.click(planned);
 		expect(planned).toHaveAttribute('aria-pressed', 'false');
-		expect(container.querySelector('a[id="kink-list"]')).toHaveClass('dimmed');
+		expect(container.querySelector('a[id="toy-collection"]')).toHaveClass('dimmed');
 		expect(container.querySelector('a[id="edging"]')).not.toHaveClass('dimmed');
 
 		await userEvent.click(planned);
 		expect(planned).toHaveAttribute('aria-pressed', 'true');
-		expect(container.querySelector('a[id="kink-list"]')).not.toHaveClass('dimmed');
+		expect(container.querySelector('a[id="toy-collection"]')).not.toHaveClass('dimmed');
 	});
 
 	it('offers sign-up only when signed out', () => {

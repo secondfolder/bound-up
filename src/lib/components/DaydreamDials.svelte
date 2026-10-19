@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { DialValue, PassageLength, SceneDials, StoryDials } from '$lib/daydream';
 	import { PASSAGE_LENGTHS, SCENE_SLIDERS, STORY_SLIDERS } from '$lib/daydream/dial-words';
-	import DaydreamOptionalSlider from './DaydreamOptionalSlider.svelte';
+	import OptionalSlider from './OptionalSlider.svelte';
 
 	/**
 	 * The story's sticky dials: intensity, pace and how long each passage is.
@@ -74,7 +74,7 @@
 <div class="dials">
 	{#if scene && onscenechange}
 		{#each SCENE_SLIDERS as entry (entry.key)}
-			<DaydreamOptionalSlider
+			<OptionalSlider
 				label={entry.label}
 				low={entry.low}
 				high={entry.high}
@@ -87,7 +87,7 @@
 
 	{#each STORY_SLIDERS as entry (entry.key)}
 		<!-- The level on the title row, as on the optional dials above
-		     (DaydreamOptionalSlider says why the title is drawn here). -->
+		     (OptionalSlider says why the title is drawn here). -->
 		<div class="dial">
 			<div class="heading">
 				<span class="title" aria-hidden="true">{entry.label}</span>

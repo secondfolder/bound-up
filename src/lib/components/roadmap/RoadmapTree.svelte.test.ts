@@ -282,7 +282,11 @@ describe('RoadmapTree', () => {
 					.map((bough) => bough.getBoundingClientRect());
 				expect(boxes.length).toBeGreaterThan(1);
 				for (let i = 1; i < boxes.length; i += 1) {
-					expect(boxes[i].top - boxes[i - 1].bottom).toBeCloseTo(gap, 0);
+					// Within a pixel, not `toBeCloseTo(gap, 0)`: a bough whose text wraps
+					// to a fractional height lands its neighbour half a pixel off, which
+					// that assertion (strictly under 0.5) failed on after a roadmap edit
+					// changed nothing but the content.
+					expect(Math.abs(boxes[i].top - boxes[i - 1].bottom - gap)).toBeLessThanOrEqual(1);
 				}
 			}
 		});

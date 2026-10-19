@@ -1,9 +1,13 @@
 # The Playroom
 
 The Playroom holds small kink toys, games and lists that are not sessions or
-tasks; the roadmap's kink list, toy collection and the like are planned for
-it. Its first, and so far only, tool is the **IQ test**: a dumbification
-test built to give a sub a low score and a dom a flattering one.
+tasks. It has two tools so far:
+
+- **The kink list**, with its own doc: [kink-list.md](kink-list.md).
+- **The IQ test**, described below: a dumbification test built to give a sub
+  a low score and a dom a flattering one.
+
+The roadmap's toy collection and the like are planned for it.
 
 ## The container
 
@@ -18,10 +22,12 @@ test built to give a sub a low score and a dom a flattering one.
   `latestIqTestResult` in the home load.
 - **No nav tab.** The bottom bar is left alone on purpose. The Playroom is
   reached from the home card.
-- **Tools are standalone.** Each tool lives in its own page outside the app
-  shell (see below), so it can be shared as a link and used without an
-  account. Adding a tool means a registry entry plus a route under
-  `(standalone)/playroom/`.
+- **Two kinds of tool.** Adding one means a registry entry plus its routes.
+  - **A standalone tool** (the IQ test) lives on its own page outside the app
+    shell (see below), under `(standalone)/playroom/`, so it can be shared as
+    a link and used without an account. It doesn't look like Bound Up.
+  - **An app tool** (the kink list) lives in the app shell under
+    `(app)/playroom/`, and looks like the rest of the app.
 
 ## The standalone shell
 

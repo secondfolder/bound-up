@@ -17,6 +17,7 @@ import {
 	daydreamSetupKind,
 	daydreamTurnKind
 } from './daydreams';
+import { kinkListKind } from './kink-list';
 import { messageBodyKind, messageMetadataKind, messageReactionKind } from './messages';
 import { partnershipInviteKind, partnershipNamesKind } from './partnerships';
 import { tagKind } from './tags';
@@ -35,5 +36,6 @@ export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
 	daydreamTurnKind,
 	daydreamMarkKind,
 	daydreamCharacterKind,
-	daydreamSceneKind
+	daydreamSceneKind,
+	kinkListKind
 ];

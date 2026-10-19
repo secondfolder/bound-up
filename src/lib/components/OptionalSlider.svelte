@@ -1,13 +1,13 @@
-<script lang="ts">
-	import type { DialValue } from '$lib/daydream';
+<script lang="ts" generics="Level extends number">
 	import InlineButton from './InlineButton.svelte';
 
 	/**
-	 * One 1–5 dial that may be left unset: a character's control or libido, a
-	 * scene's heat or kink. Unset says nothing to the model, rather than
-	 * "middling", so it shows a bare knob, no filled track, until it is moved,
-	 * and Clear takes it back there. The words for each step come from `daydream/dial-words.ts`, which
-	 * the prompt reads too.
+	 * A stepped slider that may be left unset: a daydream character's control
+	 * or libido, a scene's heat or kink (1–5, words from
+	 * `daydream/dial-words.ts`, which the prompt reads too), or a kink list's
+	 * detailed answer (0–4). Unset means "not said", rather than "middling",
+	 * so it shows a bare knob, no filled track, until it is moved, and Clear
+	 * takes it back there.
 	 *
 	 * Controlled: `value` is the level, and a change is asked for through
 	 * `onchange`. The slider is wired by hand rather than with `onchange=`: its
@@ -20,15 +20,22 @@
 		high,
 		scale,
 		value,
-		onchange
+		onchange,
+		min = 1,
+		max = 5
 	}: {
 		label: string;
 		low: string;
 		high: string;
-		scale: Readonly<Record<DialValue, { label: string }>>;
-		value: DialValue | null;
-		onchange: (level: DialValue | null) => void;
+		scale: Readonly<Record<Level, { label: string }>>;
+		value: Level | null;
+		onchange: (level: Level | null) => void;
+		min?: number;
+		max?: number;
 	} = $props();
+
+	/** Where an unset knob sits: the middle step. */
+	const middle = $derived(Math.round((min + max) / 2));
 
 	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
 
@@ -37,18 +44,18 @@
 	 * thumb. Saved only on `change`, when it is let go: `input` fires at every
 	 * step, and a save in a story is a round trip that rewrites the setup.
 	 */
-	let dragging: DialValue | null = $state(null);
+	let dragging: Level | null = $state(null);
 	const shown = $derived(dragging ?? value);
 
 	function wire(node: WaSlider) {
 		// What a screen reader announces instead of a bare number.
-		node.valueFormatter = (level) => scale[level as DialValue]?.label ?? String(level);
+		node.valueFormatter = (level) => scale[level as Level]?.label ?? String(level);
 		const move = () => {
-			dragging = Math.round(node.value) as DialValue;
+			dragging = Math.round(node.value) as Level;
 		};
 		const update = () => {
 			dragging = null;
-			onchange(Math.round(node.value) as DialValue);
+			onchange(Math.round(node.value) as Level);
 		};
 		// An unset dial's knob sits at a level already, so pressing it shows
 		// that level and letting go sets it. The slider sends no `change` for
@@ -57,7 +64,7 @@
 		// clears `dragging`, and then there is nothing left to set). Released
 		// anywhere: the pointer is held down, and may have wandered off it.
 		const press = () => {
-			dragging = Math.round(node.value) as DialValue;
+			dragging = Math.round(node.value) as Level;
 			const release = () => {
 				globalThis.removeEventListener('pointerup', release);
 				globalThis.removeEventListener('pointercancel', release);
@@ -101,7 +108,7 @@
 			{/if}
 		</span>
 	</div>
-	<wa-slider {@attach wire} {label} min={1} max={5} step={1} value={value ?? 3}>
+	<wa-slider {@attach wire} {label} {min} {max} step={1} value={value ?? middle}>
 		<span slot="reference">{low}</span>
 		<span slot="reference">{high}</span>
 	</wa-slider>

@@ -39,6 +39,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/vault.ts`, `src/lib/sealed.ts` | Vaults and sealed records, the pure halves: formats, the per-kind payload versions. Alias-free. See [docs/encryption.md](docs/encryption.md#vaults) |
 | `src/lib/tree.ts`, `src/lib/components/tree/` | The generic tree drawing: the pure layout, dimming and folding rules, and `Tree.svelte`. See [docs/tree.md](docs/tree.md) |
 | `src/lib/roadmap/`            | The public roadmap's JSON and its validating loader. Alias-free. See [docs/roadmap.md](docs/roadmap.md) |
+| `src/lib/kink-list/`          | The kink list: the catalogue and its loader, answers and their rules (pure, alias-free), and the stores (browser). See [docs/kink-list.md](docs/kink-list.md) |
 | `src/lib/playroom/`           | The Playroom's tool registry and the IQ test's engine: questions, rigging, copy. See [docs/playroom.md](docs/playroom.md) |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
@@ -943,6 +944,7 @@ Four places, split on scope:
 | [docs/daydreams.md](docs/daydreams.md)                                                   | Made-up stories: voices, the library, the story tree, steering, safety, cost |
 | [docs/tree.md](docs/tree.md)                                                             | The generic tree: trunk, boughs, longest-path lines, packing, dimming, folding |
 | [docs/debug-mode.md](docs/debug-mode.md)                                                 | Per-device troubleshooting UI behind a feature: the toggle, panel, raw logs  |
+| [docs/kink-list.md](docs/kink-list.md)                                                   | The kink list: the catalogue, answers and inheritance, privacy, saving       |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

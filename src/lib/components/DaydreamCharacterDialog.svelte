@@ -34,8 +34,8 @@
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
-	import DaydreamOptionalSlider from './DaydreamOptionalSlider.svelte';
 	import { startOpen } from './details';
+	import OptionalSlider from './OptionalSlider.svelte';
 
 	/** What the dialog needs to edit a character's casting: given only when opened from a daydream. */
 	export type CastingEdit = {
@@ -438,7 +438,7 @@
 						{/each}
 					</fieldset>
 					{#each CHARACTER_SLIDERS as entry (entry.key)}
-						<DaydreamOptionalSlider
+						<OptionalSlider
 							label={entry.label}
 							low={entry.low}
 							high={entry.high}

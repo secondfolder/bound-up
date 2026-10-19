@@ -702,3 +702,13 @@ export type IqTestResultView = {
 	 */
 	shareToken?: string;
 };
+
+/** A kink list as page data: its envelope and its sealed content. See docs/kink-list.md. */
+export type KinkListView = {
+	id: string;
+	/** `'self'`, or the partnership id for a list shared with a partner. */
+	scope: string;
+	revision: number;
+	editedAt: Date;
+	sealed: SealedRefView;
+};

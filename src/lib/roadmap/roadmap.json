@@ -324,14 +324,16 @@
 					"id": "kink-list",
 					"title": "Kink list",
 					"summary": "What you're into, what you're curious about and your hard limits.",
-					"status": "planned",
+					"status": "shipped",
+					"shippedOn": "2026-10-19",
 					"icon": "list-ul",
-					"featured": true,
 					"dependsOn": ["expand-encryption"],
 					"notes": [
 						"Categories, so a long list stays easy to work through",
-						"Choose your level of detail: answer broadly, or drill right down",
-						"Tag filters, like whether something is degrading"
+						"Answer broadly, or get specific",
+						"Answer giving and receiving separately, and add as much detail as you like",
+						"Notes and conditions on any kink",
+						"Find a kink by any name for it"
 					],
 					"children": [
 						{

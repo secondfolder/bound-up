@@ -253,6 +253,13 @@
       "when": 1792384470783,
       "tag": "0035_fold_iq_answer_button_into_debug_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1792401113008,
+      "tag": "0036_add_kink_lists",
+      "breakpoints": true
     }
   ]
 }

@@ -29,8 +29,8 @@
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
-	import DaydreamOptionalSlider from './DaydreamOptionalSlider.svelte';
 	import { startOpen } from './details';
+	import OptionalSlider from './OptionalSlider.svelte';
 
 	/**
 	 * Making or changing a scene, in a dialog, the way
@@ -389,7 +389,7 @@
 			<legend>Heat and kink</legend>
 			<p class="hint">How sexual and how kinky it is, from SFW to filthy. Optional: left unset, the story follows what you wrote.</p>
 			{#each SCENE_SLIDERS as entry (entry.key)}
-				<DaydreamOptionalSlider
+				<OptionalSlider
 					label={entry.label}
 					low={entry.low}
 					high={entry.high}

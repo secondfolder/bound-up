@@ -1,0 +1,4429 @@
+{
+	"version": 1,
+	"intensity": {
+		"levels": {
+			"0": "Sweet",
+			"1": "Mild",
+			"2": "Spicy",
+			"3": "Kinky",
+			"4": "Intense",
+			"5": "Hardcore",
+			"6": "Extreme"
+		},
+		"defaultMax": 5
+	},
+	"sections": {
+		"kinks": "Kinks",
+		"partners": "Who you're into",
+		"stories": "Stories and fantasy",
+		"scene": "Community and relationships"
+	},
+	"roles": {
+		"give-receive": ["Giving", "Receiving"],
+		"dom-sub": ["As dom", "As sub"],
+		"self-partner": ["On me", "On my partner"],
+		"seen-watch": ["Being watched", "Watching"],
+		"aggressor-target": ["Taking", "Being taken"]
+	},
+	"tags": {
+		"care": "Care",
+		"consent-play": "Consent play",
+		"degrading": "Degrading",
+		"fluids": "Fluids",
+		"gender": "Gender",
+		"genital": "Genital",
+		"meta": "Not a kink",
+		"looks": "Looks",
+		"media": "Media",
+		"medical": "Medical",
+		"messy": "Messy",
+		"money": "Money",
+		"others": "Other people",
+		"pain": "Pain",
+		"permanent": "Permanent",
+		"public": "Public",
+		"remote": "Remote",
+		"risky": "Risky",
+		"rough": "Rough",
+		"story": "Story",
+		"taboo": "Taboo"
+	},
+	"items": [
+		{
+			"id": "intimacy",
+			"name": "Intimacy and affection",
+			"section": "kinks",
+			"intensity": 0,
+			"aliases": ["affection", "tenderness", "vanilla"],
+			"description": "Affection and closeness, such as kissing, cuddling and loving sex."
+		},
+		{
+			"id": "romance",
+			"name": "Romance and affection",
+			"parent": "intimacy",
+			"intensity": 0,
+			"aliases": ["romantic", "affection", "loving", "lovemaking"],
+			"description": "Showing love and affection through words and actions, in or out of sex."
+		},
+		{
+			"id": "kissing",
+			"name": "Kissing",
+			"parent": "intimacy",
+			"roles": "give-receive",
+			"intensity": 0,
+			"aliases": ["making out", "snogging", "french kissing", "tongue kissing"],
+			"description": "Kissing or being kissed, usually meaning French kissing."
+		},
+		{
+			"id": "kissing-mouth",
+			"name": "Kissing on the mouth",
+			"parent": "kissing",
+			"roles": "give-receive",
+			"intensity": 0,
+			"description": "Kissing on the lips, with or without tongue."
+		},
+		{
+			"id": "kissing-body",
+			"name": "Kissing the body",
+			"parent": "kissing",
+			"roles": "give-receive",
+			"intensity": 0,
+			"aliases": ["neck kissing", "body kisses"],
+			"description": "Kissing the neck, chest, thighs or anywhere else on the body."
+		},
+		{
+			"id": "licking",
+			"name": "Licking",
+			"parent": "kissing",
+			"roles": "give-receive",
+			"intensity": 0,
+			"description": "Licking a partner's skin, sexually or not."
+		},
+		{
+			"id": "cuddling",
+			"name": "Cuddling",
+			"parent": "intimacy",
+			"intensity": 0,
+			"aliases": ["cuddles", "spooning", "snuggling", "hugging"],
+			"description": "Hugging, snuggling, spooning and other physical closeness."
+		},
+		{
+			"id": "pet-names",
+			"name": "Pet names",
+			"parent": "intimacy",
+			"intensity": 0,
+			"aliases": ["nicknames", "terms of endearment", "babe", "princess"],
+			"description": "Being called by an affectionate or degrading nickname instead of your own name."
+		},
+		{
+			"id": "gentle-sex",
+			"name": "Gentle sex",
+			"parent": "intimacy",
+			"intensity": 1,
+			"aliases": ["vanilla sex", "slow sex", "making love", "lovemaking"],
+			"description": "Slow, soft sex without rough or kinky elements."
+		},
+		{
+			"id": "massage",
+			"name": "Massage",
+			"parent": "intimacy",
+			"roles": "give-receive",
+			"intensity": 0,
+			"aliases": ["rubdown", "back rub", "sensual massage", "erotic massage"],
+			"description": "Rubbing and kneading the body to relax someone or to build arousal."
+		},
+		{
+			"id": "grooming-care",
+			"name": "Being looked after",
+			"parent": "intimacy",
+			"roles": "give-receive",
+			"intensity": 0,
+			"aliases": ["pampering", "bathing", "hair brushing", "spoiling"],
+			"description": "Being bathed, brushed, fed or pampered by a partner."
+		},
+		{
+			"id": "oral",
+			"name": "Oral",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["oral sex", "going down", "head"],
+			"description": "Using the mouth on a partner's genitals or ass."
+		},
+		{
+			"id": "blowjobs",
+			"name": "Blowjobs",
+			"parent": "oral",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": [
+				"blowjob",
+				"fellatio",
+				"BJ",
+				"head",
+				"giving head",
+				"sucking off",
+				"sucking cock"
+			],
+			"description": "Using the mouth, lips and tongue on a penis."
+		},
+		{
+			"id": "deepthroat",
+			"name": "Deepthroating",
+			"parent": "blowjobs",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["deep throat", "throat fucking", "throatpie", "gagging on it"],
+			"description": "Taking a penis or toy deep into the throat, often to the point of gagging."
+		},
+		{
+			"id": "face-fucking",
+			"name": "Face fucking",
+			"parent": "blowjobs",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["rough"],
+			"aliases": ["facefuck", "skull fucking", "throat fucking", "irrumatio"],
+			"description": "Thrusting into someone's mouth the way you would a vagina or ass, usually roughly."
+		},
+		{
+			"id": "cock-warming",
+			"name": "Cock warming",
+			"parent": "blowjobs",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["cockwarming", "cock warmer", "warming"],
+			"description": "Keeping a penis in a partner's mouth or body without thrusting, sometimes for a long time.",
+			"alsoUnder": ["power"]
+		},
+		{
+			"id": "teabagging",
+			"name": "Teabagging",
+			"parent": "blowjobs",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["tea bagging", "ball sucking", "ball licking"],
+			"description": "Putting the testicles in a partner's mouth or resting them on their face."
+		},
+		{
+			"id": "cunnilingus",
+			"name": "Cunnilingus",
+			"parent": "oral",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": [
+				"eating out",
+				"eating pussy",
+				"going down on her",
+				"pussy licking",
+				"muff diving"
+			],
+			"description": "Using the mouth, lips and tongue on a vulva and clit."
+		},
+		{
+			"id": "face-sitting",
+			"name": "Face-sitting",
+			"parent": "oral",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["degrading"],
+			"aliases": ["facesitting", "queening", "kinging", "smothering"],
+			"description": "Sitting on a partner's face for oral sex, sometimes to smother them.",
+			"alsoUnder": ["power"]
+		},
+		{
+			"id": "rimming",
+			"name": "Rimming",
+			"parent": "oral",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["rimjob", "rim job", "anilingus", "ass eating", "eating ass", "tossing salad"],
+			"description": "Licking the anus or pushing the tongue inside it.",
+			"alsoUnder": ["anal", "worship"]
+		},
+		{
+			"id": "sixty-nine",
+			"name": "69",
+			"parent": "oral",
+			"intensity": 1,
+			"aliases": ["sixty nine", "soixante-neuf"],
+			"description": "Two people giving each other oral sex at the same time."
+		},
+		{
+			"id": "oral-fixation",
+			"name": "Oral fixation",
+			"parent": "oral",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["pacifier", "dummy", "finger sucking", "mouth play"],
+			"description": "Wanting something in the mouth to suck or chew, such as fingers, a gag or a pacifier."
+		},
+		{
+			"id": "hands",
+			"name": "Hands and touch",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 1,
+			"description": "Stimulation with the hands and body rather than penetration or oral sex."
+		},
+		{
+			"id": "handjobs",
+			"name": "Handjobs",
+			"parent": "hands",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["handjob", "hand job", "jerking off", "wanking", "tossing off", "stroking"],
+			"description": "Using a hand to stimulate a partner's penis."
+		},
+		{
+			"id": "fingering",
+			"name": "Fingering",
+			"parent": "hands",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["finger fucking", "fingerbang"],
+			"description": "Using fingers to stimulate a partner's vagina or anus."
+		},
+		{
+			"id": "clit-play",
+			"name": "Clit stimulation",
+			"parent": "hands",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["clit rubbing", "clitoral stimulation", "clit"],
+			"description": "Rubbing, licking or sucking the clit, or using a toy on it."
+		},
+		{
+			"id": "nipple-play",
+			"name": "Nipple play",
+			"parent": "hands",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["nipple sucking", "nipple licking", "tit play"],
+			"description": "Touching, sucking, licking and pinching nipples.",
+			"alsoUnder": ["sensation"]
+		},
+		{
+			"id": "masturbation",
+			"name": "Masturbation",
+			"parent": "hands",
+			"intensity": 1,
+			"aliases": [
+				"jerking off",
+				"wanking",
+				"fapping",
+				"touching yourself",
+				"schlicking",
+				"self-pleasure"
+			],
+			"description": "Stimulating yourself, alone or while someone watches."
+		},
+		{
+			"id": "mutual-masturbation",
+			"name": "Mutual masturbation",
+			"parent": "masturbation",
+			"intensity": 1,
+			"aliases": ["jerking off together", "mutual wank"],
+			"description": "Masturbating together, or touching each other at the same time."
+		},
+		{
+			"id": "forced-masturbation",
+			"name": "Made to masturbate",
+			"parent": "masturbation",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["ordered to masturbate", "masturbation on command"],
+			"description": "Being ordered to masturbate, often in front of a partner or on camera.",
+			"alsoUnder": ["power"]
+		},
+		{
+			"id": "frottage",
+			"name": "Grinding",
+			"parent": "hands",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["dry humping", "humping", "tribbing", "docking"],
+			"description": "Rubbing genitals against a partner's body, clothed or naked."
+		},
+		{
+			"id": "titfuck",
+			"name": "Titty fucking",
+			"parent": "frottage",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": [
+				"titjob",
+				"titty fuck",
+				"tit fuck",
+				"boob job",
+				"paizuri",
+				"breast sex",
+				"mammary intercourse"
+			],
+			"description": "Thrusting a penis between a partner's breasts."
+		},
+		{
+			"id": "thigh-sex",
+			"name": "Between the thighs",
+			"parent": "frottage",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["thighjob", "thigh job", "intercrural sex", "thigh fucking"],
+			"description": "Thrusting a penis between a partner's closed thighs, without penetration."
+		},
+		{
+			"id": "footjob",
+			"name": "Footjobs",
+			"parent": "hands",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["foot job"],
+			"description": "Using the feet to stimulate a partner's genitals.",
+			"alsoUnder": ["worship"]
+		},
+		{
+			"id": "penetration",
+			"name": "Penetration",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["penetrative sex", "intercourse"],
+			"description": "Penetrative sex, vaginal or in general."
+		},
+		{
+			"id": "vaginal-sex",
+			"name": "Vaginal sex",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["intercourse", "pussy fucking", "PIV", "penis in vagina", "vanilla sex"],
+			"description": "Penetrating a vagina with a penis, strap-on, fingers or toy."
+		},
+		{
+			"id": "strap-on",
+			"name": "Strap-ons",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["strapon", "strap on", "harness dildo", "strapped"],
+			"description": "Wearing a strap-on dildo to penetrate a partner, or being penetrated by one."
+		},
+		{
+			"id": "barebacking",
+			"name": "Without a condom",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["bareback", "raw", "condomless", "no condom"],
+			"description": "Penetrative sex without a condom.",
+			"safety": "Talk about testing and contraception first."
+		},
+		{
+			"id": "double-penetration",
+			"name": "Double penetration",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["DP", "double stuffed", "double stuffing"],
+			"description": "Being penetrated in two places at once, or twice in one place, by people or toys.",
+			"alsoUnder": ["anal", "group"]
+		},
+		{
+			"id": "double-vaginal",
+			"name": "Double vaginal",
+			"parent": "double-penetration",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["DVP", "double vaginal penetration"],
+			"description": "Two penises or toys in the vagina at the same time."
+		},
+		{
+			"id": "triple-penetration",
+			"name": "Triple penetration",
+			"parent": "double-penetration",
+			"roles": "give-receive",
+			"intensity": 5,
+			"aliases": ["TP", "triple stuffed", "airtight"],
+			"description": "Being penetrated in three places at once."
+		},
+		{
+			"id": "fisting",
+			"name": "Fisting",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": ["vaginal fisting", "handballing"],
+			"description": "Inserting a whole hand into a vagina or anus.",
+			"safety": "Go slowly, with lots of lube and short nails."
+		},
+		{
+			"id": "stretching",
+			"name": "Stretching",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["size training", "size queen", "stretching play"],
+			"description": "Gradually working up to larger insertions over time."
+		},
+		{
+			"id": "object-insertion",
+			"name": "Object insertion",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["objects", "household objects", "insertions"],
+			"description": "Inserting everyday objects that weren't made as sex toys.",
+			"safety": "Only body-safe things with a flared base or a way to pull them out."
+		},
+		{
+			"id": "tantric",
+			"name": "Tantric and slow touch",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["tantra", "yoni massage", "lingam massage", "slow sex"],
+			"description": "Slow, deliberate touch that draws arousal out over a long time."
+		},
+		{
+			"id": "stealth-penetration",
+			"name": "Surprise penetration",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["surprise sex", "taken by surprise"],
+			"description": "Being penetrated without warning, as agreed in advance.",
+			"alsoUnder": ["consent"]
+		},
+		{
+			"id": "rhaphanidosis",
+			"name": "Rhaphanidosis",
+			"parent": "penetration",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["pain"],
+			"description": "Pushing a radish or root into the anus, an old punishment for adultery."
+		},
+		{
+			"id": "anal",
+			"name": "Anal",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["butt stuff", "ass play", "anal play", "backdoor"],
+			"description": "Sexual play involving the anus."
+		},
+		{
+			"id": "anal-sex",
+			"name": "Anal sex",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["butt sex", "buttfucking", "sodomy", "backdoor", "ass fucking"],
+			"description": "Penetrating the anus with a penis, strap-on or toy."
+		},
+		{
+			"id": "pegging",
+			"name": "Pegging",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["strap-on anal", "peg"],
+			"description": "Anal penetration with a strap-on, often a woman penetrating a man."
+		},
+		{
+			"id": "anal-fingering",
+			"name": "Anal fingering",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["butt fingering", "ass fingering"],
+			"description": "Inserting one or more fingers into the anus."
+		},
+		{
+			"id": "anal-toys",
+			"name": "Anal toys",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["butt toys"],
+			"description": "Toys made for the anus, such as plugs, beads and prostate massagers.",
+			"alsoUnder": ["toys"]
+		},
+		{
+			"id": "butt-plugs",
+			"name": "Butt plugs",
+			"parent": "anal-toys",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["buttplug", "butt plug", "plug", "anal plug", "tail plug"],
+			"description": "A toy with a flared base, worn in the anus."
+		},
+		{
+			"id": "anal-beads",
+			"name": "Anal beads",
+			"parent": "anal-toys",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["butt beads"],
+			"description": "A string of beads inserted into the anus one at a time and pulled out."
+		},
+		{
+			"id": "plug-in-public",
+			"name": "Plugged in public",
+			"parent": "anal-toys",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["public"],
+			"aliases": ["public plug"],
+			"description": "Wearing a butt plug under your clothes while out in public."
+		},
+		{
+			"id": "hollow-plugs",
+			"name": "Hollow plugs",
+			"parent": "anal-toys",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["tunnel plug", "gape plug"],
+			"description": "A plug with an open tunnel through it that holds the anus open."
+		},
+		{
+			"id": "prostate-play",
+			"name": "Prostate play",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["prostate massage", "prostate milking", "milking", "p-spot", "aneros"],
+			"description": "Stimulating the prostate through the anus with fingers or toys, sometimes until fluid leaks out."
+		},
+		{
+			"id": "anal-fisting",
+			"name": "Anal fisting",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": ["ass fisting", "fisting"],
+			"description": "Inserting a whole hand, usually gloved and well lubricated, into the anus.",
+			"safety": "Go slowly, with lots of lube and short nails."
+		},
+		{
+			"id": "anal-training",
+			"name": "Anal training",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["butt training", "stretching", "plug training"],
+			"description": "Gradually stretching the anus so it can take larger toys."
+		},
+		{
+			"id": "gaping",
+			"name": "Gaping",
+			"parent": "anal-training",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["gape", "anal gape"],
+			"description": "Stretching the anus or vagina until it stays open for a while afterwards."
+		},
+		{
+			"id": "double-anal",
+			"name": "Double anal",
+			"parent": "anal-training",
+			"roles": "give-receive",
+			"intensity": 5,
+			"aliases": ["DAP", "double anal penetration"],
+			"description": "Two penises or toys in the anus at the same time."
+		},
+		{
+			"id": "prolapse",
+			"name": "Prolapse",
+			"parent": "anal-training",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["rosebud", "rosebudding"],
+			"description": "The lining of the rectum pushed or pulled out through the anus.",
+			"safety": "This is an injury, not a technique; it needs medical care."
+		},
+		{
+			"id": "anal-hooks",
+			"name": "Anal hooks",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 5,
+			"description": "A smooth metal hook in the anus, tied off to the hair or a harness to hold someone in position.",
+			"alsoUnder": ["bondage"]
+		},
+		{
+			"id": "enemas",
+			"name": "Enemas",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["enema", "klismaphilia", "douching", "retention"],
+			"description": "Filling the bowels with water to clean them out, or for discomfort, humiliation or arousal.",
+			"alsoUnder": ["fluids", "roleplay"]
+		},
+		{
+			"id": "inflation",
+			"name": "Inflation",
+			"parent": "anal",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["belly inflation", "stomach bulge", "bulge"],
+			"description": "Filling someone with liquid or air until their belly visibly swells.",
+			"alsoUnder": ["fantasy"]
+		},
+		{
+			"id": "toys",
+			"name": "Toys and machines",
+			"section": "kinks",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["sex toys"],
+			"description": "Sex toys of every kind, from dildos to machines."
+		},
+		{
+			"id": "dildos",
+			"name": "Dildos",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["dildo", "dong", "realistic dildo"],
+			"description": "Penis-shaped toys used for penetration."
+		},
+		{
+			"id": "fantasy-dildos",
+			"name": "Fantasy dildos",
+			"parent": "dildos",
+			"roles": "self-partner",
+			"intensity": 3,
+			"aliases": [
+				"knotted dildo",
+				"horse dildo",
+				"dragon dildo",
+				"monster dildo",
+				"bad dragon",
+				"tentacle dildo"
+			],
+			"description": "Dildos with non-human shapes, such as knotted, horse-like or tentacled."
+		},
+		{
+			"id": "vaginal-plugs",
+			"name": "Vaginal plugs",
+			"parent": "dildos",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["kegel balls", "ben wa balls", "love eggs"],
+			"description": "A plug with a flared base, worn in the vagina."
+		},
+		{
+			"id": "vaginal-plugs-public",
+			"name": "Vaginal plugs in public",
+			"parent": "dildos",
+			"roles": "self-partner",
+			"intensity": 3,
+			"tags": ["public"],
+			"description": "Wearing a vaginal plug or toy under your clothes while out in public."
+		},
+		{
+			"id": "vibrators",
+			"name": "Vibrators",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["vibe", "vibrator", "bullet", "rabbit"],
+			"description": "Toys that vibrate, used on or inside the body."
+		},
+		{
+			"id": "magic-wand",
+			"name": "Wand vibrators",
+			"parent": "vibrators",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["wand", "hitachi", "wand massager", "magic wand"],
+			"description": "A large, powerful vibrator with a round head, used on the outside of the body."
+		},
+		{
+			"id": "remote-vibrator",
+			"name": "Remote-controlled vibrators",
+			"parent": "vibrators",
+			"roles": "self-partner",
+			"intensity": 2,
+			"tags": ["public", "remote"],
+			"aliases": ["lovense", "lush", "app-controlled vibrator", "remote vibe"],
+			"description": "A vibrator worn on or inside the body that a partner controls from a distance, often in public.",
+			"alsoUnder": ["remote"]
+		},
+		{
+			"id": "sybian",
+			"name": "Sybian",
+			"parent": "vibrators",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["saddle vibrator", "motorbunny"],
+			"description": "A saddle-shaped machine with a vibrating or rotating attachment that someone sits on."
+		},
+		{
+			"id": "sex-machines",
+			"name": "Sex machines",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 3,
+			"aliases": ["fuck machine", "fucking machine", "fucksaw", "drilldo"],
+			"description": "Motorised machines that thrust a dildo, often for longer and harder than a person could."
+		},
+		{
+			"id": "strokers",
+			"name": "Strokers",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["fleshlight", "onahole", "masturbator", "sleeve", "pocket pussy"],
+			"description": "Sleeves such as Fleshlights and onaholes that a penis is pushed into."
+		},
+		{
+			"id": "pumps",
+			"name": "Pumps and suckers",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 3,
+			"aliases": ["penis pump", "pussy pump", "clit pump", "nipple suckers", "pumping"],
+			"description": "Suction cylinders on the nipples, clit or penis that make them swell."
+		},
+		{
+			"id": "cock-rings",
+			"name": "Cock rings",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["cockring", "cock ring", "c-ring", "ball stretcher"],
+			"description": "A ring worn around the base of the penis, and sometimes the balls, to keep it hard."
+		},
+		{
+			"id": "sounding",
+			"name": "Sounding",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": ["urethral sounding", "urethral play", "sounds"],
+			"description": "Inserting smooth metal rods into the urethra.",
+			"safety": "Sterile sounds and lube only, and never force it.",
+			"alsoUnder": ["roleplay"]
+		},
+		{
+			"id": "ovipositor",
+			"name": "Ovipositors",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 4,
+			"aliases": ["egg laying", "alien eggs", "gel eggs"],
+			"description": "A toy that pushes gel eggs inside the body, to be laid later.",
+			"alsoUnder": ["fantasy"]
+		},
+		{
+			"id": "speculum",
+			"name": "Speculums",
+			"parent": "toys",
+			"roles": "self-partner",
+			"intensity": 4,
+			"aliases": ["speculum play", "gaping"],
+			"description": "A medical instrument used to hold the vagina or anus open.",
+			"alsoUnder": ["roleplay"]
+		},
+		{
+			"id": "orgasm-control",
+			"name": "Orgasm control",
+			"section": "kinks",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["O control", "cum control", "permission to cum"],
+			"description": "One partner decides when, or whether, the other may orgasm."
+		},
+		{
+			"id": "edging",
+			"name": "Edging",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["edge", "peaking", "gooning", "tease and denial"],
+			"description": "Being brought close to orgasm and stopped, over and over, before being allowed to finish."
+		},
+		{
+			"id": "orgasm-denial",
+			"name": "Orgasm denial",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["denial", "tease and denial", "T&D", "blue balls"],
+			"description": "Being brought close to orgasm and then not allowed to finish."
+		},
+		{
+			"id": "ruined-orgasms",
+			"name": "Ruined orgasms",
+			"parent": "orgasm-denial",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["ruined orgasm", "ruin", "ruining"],
+			"description": "Stopping all stimulation just as orgasm begins, so it happens without the pleasure."
+		},
+		{
+			"id": "forced-orgasm",
+			"name": "Forced orgasms",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["made to cum", "forced cumming"],
+			"description": "Being made to orgasm, often while restrained, whether or not you want to."
+		},
+		{
+			"id": "overstimulation",
+			"name": "Overstimulation",
+			"parent": "forced-orgasm",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["post-orgasm torture", "POT", "oversensitivity"],
+			"description": "Stimulation that keeps going after orgasm, when the genitals are too sensitive."
+		},
+		{
+			"id": "multiple-orgasms",
+			"name": "Multiple orgasms",
+			"parent": "forced-orgasm",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["marathon", "back to back orgasms"],
+			"description": "Orgasming several times in one session, often one after another."
+		},
+		{
+			"id": "coming-on-command",
+			"name": "Coming on command",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["cum on command", "hands-free orgasm", "coming untouched", "cumming untouched"],
+			"description": "Orgasming only when told to, sometimes without being touched."
+		},
+		{
+			"id": "chastity",
+			"name": "Chastity",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["chastity cage", "cock cage", "chastity belt", "keyholder", "locked", "lockup"],
+			"description": "Wearing a locked device that prevents touching or arousal, with a partner holding the key.",
+			"alsoUnder": ["bondage"]
+		},
+		{
+			"id": "anti-erection",
+			"name": "Spiked cages",
+			"parent": "chastity",
+			"roles": "dom-sub",
+			"intensity": 4,
+			"aliases": ["spiked chastity", "spiked cage", "punishment cage"],
+			"description": "A chastity cage lined with spikes or points that hurt if the wearer gets hard."
+		},
+		{
+			"id": "permission-to-come",
+			"name": "Asking permission to come",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["asking to cum", "begging to cum", "permission to cum"],
+			"description": "Having to ask before orgasm, and waiting to hear whether the answer is yes."
+		},
+		{
+			"id": "jerk-off-instructions",
+			"name": "Jerk-off instructions",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"tags": ["remote"],
+			"aliases": ["JOI", "masturbation instructions", "wank instructions"],
+			"description": "Being told exactly how to masturbate, step by step.",
+			"alsoUnder": ["remote"]
+		},
+		{
+			"id": "teasing",
+			"name": "Teasing",
+			"parent": "orgasm-control",
+			"roles": "dom-sub",
+			"intensity": 1,
+			"aliases": ["tease", "tease and denial", "anticipation"],
+			"description": "Building arousal without satisfying it, until a partner is desperate.",
+			"alsoUnder": ["power"]
+		},
+		{
+			"id": "cum",
+			"name": "Cum",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids"],
+			"aliases": ["semen", "spunk", "jizz", "cum play", "load"],
+			"description": "Semen and ejaculation as part of play."
+		},
+		{
+			"id": "facials",
+			"name": "Facials",
+			"parent": "cum",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids"],
+			"aliases": ["facial", "cum on face"],
+			"description": "Ejaculating onto a partner's face."
+		},
+		{
+			"id": "swallowing",
+			"name": "Swallowing",
+			"parent": "cum",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids"],
+			"aliases": ["swallow", "cum swallowing", "cum in mouth"],
+			"description": "Swallowing semen after oral sex."
+		},
+		{
+			"id": "cum-on-body",
+			"name": "Cum on the body",
+			"parent": "cum",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids"],
+			"aliases": ["pearl necklace", "cum on tits", "cum on ass", "cumshot"],
+			"description": "Ejaculating onto a partner's chest, back, stomach, ass or breasts."
+		},
+		{
+			"id": "creampie",
+			"name": "Creampies",
+			"parent": "cum",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids"],
+			"aliases": ["cream pie", "finishing inside", "cum inside", "internal cumshot"],
+			"description": "Ejaculating inside a partner's vagina or anus and leaving it there."
+		},
+		{
+			"id": "anal-creampie",
+			"name": "Anal creampies",
+			"parent": "creampie",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids"],
+			"aliases": ["anal cream pie", "cum in ass"],
+			"description": "Ejaculating inside a partner's anus."
+		},
+		{
+			"id": "felching",
+			"name": "Felching",
+			"parent": "creampie",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["fluids"],
+			"description": "Sucking semen out of a partner's anus or vagina."
+		},
+		{
+			"id": "cum-eating",
+			"name": "Eating cum",
+			"parent": "cum",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["fluids"],
+			"aliases": ["cum eating", "CEI", "cum swapping", "snowballing", "sloppy seconds"],
+			"description": "Eating semen, whether your own, from a partner's mouth or from inside someone."
+		},
+		{
+			"id": "bukkake",
+			"name": "Bukkake",
+			"parent": "cum",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["fluids", "others"],
+			"description": "Several people ejaculating onto one person's face or body.",
+			"alsoUnder": ["group"]
+		},
+		{
+			"id": "breeding",
+			"name": "Breeding",
+			"parent": "cum",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["fluids"],
+			"aliases": ["impregnation", "breeding kink", "knocking up", "bred"],
+			"description": "Sex focused on getting someone pregnant, or the fantasy of it.",
+			"alsoUnder": ["fantasy"]
+		},
+		{
+			"id": "fluids",
+			"name": "Fluids and bodily functions",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["fluids"],
+			"aliases": ["bodily fluids", "body fluids"],
+			"description": "Play involving spit, sweat, urine and other bodily fluids."
+		},
+		{
+			"id": "squirting",
+			"name": "Squirting",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["female ejaculation", "gushing"],
+			"description": "Expelling fluid from the vagina during arousal or orgasm.",
+			"alsoUnder": ["penetration"]
+		},
+		{
+			"id": "spit",
+			"name": "Spit",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading", "fluids"],
+			"aliases": ["spitting", "saliva", "drool", "spit play"],
+			"description": "Spitting on a partner or into their mouth, or using saliva as lube.",
+			"alsoUnder": ["humiliation"]
+		},
+		{
+			"id": "watersports",
+			"name": "Watersports",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["fluids"],
+			"aliases": ["piss play", "pee play", "golden shower", "urolagnia", "WS"],
+			"description": "Play involving urine, such as peeing on a partner or being peed on."
+		},
+		{
+			"id": "piss-drinking",
+			"name": "Drinking pee",
+			"parent": "watersports",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading", "fluids"],
+			"aliases": ["drinking piss", "human toilet"],
+			"description": "Drinking a partner's urine."
+		},
+		{
+			"id": "internal-urination",
+			"name": "Peeing inside",
+			"parent": "watersports",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["fluids"],
+			"aliases": ["pissing inside", "piss in ass", "piss in mouth"],
+			"description": "Peeing inside a partner's mouth, vagina or anus."
+		},
+		{
+			"id": "lactation",
+			"name": "Lactation",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["fluids"],
+			"aliases": ["breast milk", "milking", "lactating", "hucow"],
+			"description": "Breasts producing milk, and play involving it."
+		},
+		{
+			"id": "tears",
+			"name": "Tears",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["fluids"],
+			"aliases": ["crying", "making them cry", "dacryphilia"],
+			"description": "Crying, or making a partner cry, during a scene.",
+			"alsoUnder": ["mind"]
+		},
+		{
+			"id": "period-play",
+			"name": "Period play",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["fluids"],
+			"aliases": ["period sex", "menstrual blood", "menophilia"],
+			"description": "Sex or play during menstruation."
+		},
+		{
+			"id": "smegma",
+			"name": "Smegma",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["fluids"],
+			"description": "The build-up that collects under an unwashed foreskin or clitoral hood."
+		},
+		{
+			"id": "scat",
+			"name": "Scat",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["fluids", "risky"],
+			"aliases": ["shit play", "poop", "coprophilia", "brown showers"],
+			"description": "Play involving faeces.",
+			"safety": "A real risk of infection."
+		},
+		{
+			"id": "snot",
+			"name": "Snot",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["fluids"],
+			"aliases": ["mucus"],
+			"description": "Play involving snot or mucus."
+		},
+		{
+			"id": "vomit",
+			"name": "Vomit",
+			"parent": "fluids",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["fluids"],
+			"aliases": ["puke", "emetophilia"],
+			"description": "Play involving vomit."
+		},
+		{
+			"id": "bondage",
+			"name": "Bondage and restraint",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["restraint", "tying up", "tied up", "BD"],
+			"description": "Restricting a partner's movement with rope, cuffs, tape or other restraints.",
+			"safety": "Never leave someone tied up alone, and keep safety shears to hand."
+		},
+		{
+			"id": "light-bondage",
+			"name": "Light bondage",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["soft bondage", "beginner bondage"],
+			"description": "Simple restraints that are easy to get out of, like tied wrists or a scarf."
+		},
+		{
+			"id": "heavy-bondage",
+			"name": "Heavy bondage",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["strict bondage", "full bondage", "immobilisation"],
+			"description": "Tight, thorough restraint that leaves someone unable to move, sometimes for a long time."
+		},
+		{
+			"id": "manual-restraint",
+			"name": "Being held down",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["pinned down", "held down", "pinning"],
+			"description": "Being held down by a partner's hands or body weight rather than with restraints."
+		},
+		{
+			"id": "rope",
+			"name": "Rope bondage",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["rope", "ropes", "tying up"],
+			"description": "Tying someone up with rope."
+		},
+		{
+			"id": "shibari",
+			"name": "Shibari",
+			"parent": "rope",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["kinbaku", "rope art", "decorative rope", "Japanese rope bondage"],
+			"description": "Japanese-style rope bondage with intricate, decorative ties."
+		},
+		{
+			"id": "hogtie",
+			"name": "Hogtie",
+			"parent": "rope",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["hog tie", "hogtied"],
+			"description": "Tying wrists and ankles together behind the back."
+		},
+		{
+			"id": "breast-bondage",
+			"name": "Breast bondage",
+			"parent": "rope",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["tit bondage", "boob bondage", "breast tying"],
+			"description": "Tying rope around the breasts so they bulge or are flattened."
+		},
+		{
+			"id": "suspension",
+			"name": "Suspension",
+			"parent": "rope",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": ["rope suspension", "suspended", "flying"],
+			"description": "Lifting a tied person partly or fully off the ground with rope and a hard point.",
+			"safety": "Learn from someone experienced before trying it."
+		},
+		{
+			"id": "cuffs",
+			"name": "Cuffs and chains",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["handcuffs", "shackles", "irons", "restraints", "chains"],
+			"description": "Restraint with leather or metal cuffs, handcuffs, chains or irons instead of rope."
+		},
+		{
+			"id": "gags",
+			"name": "Gags",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["gag", "gagged"],
+			"description": "Something in or over the mouth that stops a person speaking clearly.",
+			"safety": "Agree a signal to use instead of a safeword."
+		},
+		{
+			"id": "ball-gag",
+			"name": "Ball gags",
+			"parent": "gags",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["ballgag"],
+			"description": "A ball held in the mouth by a strap."
+		},
+		{
+			"id": "ring-gag",
+			"name": "Ring and spider gags",
+			"parent": "gags",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["O-ring gag", "spider gag", "open-mouth gag"],
+			"description": "A ring that holds the mouth open."
+		},
+		{
+			"id": "bit-gag",
+			"name": "Bit gags",
+			"parent": "gags",
+			"roles": "give-receive",
+			"intensity": 2,
+			"description": "A bar held between the teeth by a strap, like a horse's bit."
+		},
+		{
+			"id": "tape-gag",
+			"name": "Tape gags",
+			"parent": "gags",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["tape", "duct tape gag", "taped mouth"],
+			"description": "Tape over the mouth."
+		},
+		{
+			"id": "phallic-gag",
+			"name": "Phallic gags",
+			"parent": "gags",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["dildo gag", "penis gag"],
+			"description": "A penis-shaped gag that fills the mouth."
+		},
+		{
+			"id": "hoods-masks",
+			"name": "Hoods and muzzles",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["hood", "bondage hood", "gimp mask", "gas mask", "muzzle"],
+			"description": "Hoods, muzzles and gas masks that cover the head or face."
+		},
+		{
+			"id": "spreader-bars",
+			"name": "Spreader bars",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["spreader", "spreader bar"],
+			"description": "A bar fixed between the ankles or wrists to hold them apart."
+		},
+		{
+			"id": "armbinders",
+			"name": "Armbinders and mitts",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["monoglove", "armbinder", "bondage mitts", "fist mitts"],
+			"description": "A sleeve or monoglove that holds the arms together behind the back, or mitts that stop the hands being used."
+		},
+		{
+			"id": "straitjacket",
+			"name": "Straitjackets",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["straight jacket", "strait jacket"],
+			"description": "A jacket whose long sleeves strap around the body to pin the arms."
+		},
+		{
+			"id": "encasement",
+			"name": "Encasement and mummification",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": [
+				"mummification",
+				"vacbed",
+				"vacuum bed",
+				"sleep sack",
+				"plastic wrap",
+				"saran wrap"
+			],
+			"description": "Wrapping the whole body in plastic wrap, tape, a sleep sack or latex so it can't move.",
+			"safety": "Keep the nose and mouth clear, and watch for overheating."
+		},
+		{
+			"id": "bondage-furniture",
+			"name": "Bondage furniture",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": [
+				"St Andrew's cross",
+				"stocks",
+				"pillory",
+				"spanking bench",
+				"bondage bench",
+				"sex swing"
+			],
+			"description": "Crosses, stocks, benches and frames that hold a person in place."
+		},
+		{
+			"id": "cages",
+			"name": "Cages",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["caged", "kennel", "cell", "locked up"],
+			"description": "Being locked in a cage, cell or other small space."
+		},
+		{
+			"id": "predicament-bondage",
+			"name": "Predicament bondage",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["predicament"],
+			"description": "A tie where easing one discomfort makes another worse, so the bound person keeps having to choose."
+		},
+		{
+			"id": "nose-hook",
+			"name": "Nose hooks",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading"],
+			"aliases": ["nosehook", "pig nose"],
+			"description": "A hook in the nostrils pulled up and tied off, lifting the nose.",
+			"alsoUnder": ["humiliation"]
+		},
+		{
+			"id": "public-bondage",
+			"name": "Bondage under clothes",
+			"parent": "bondage",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["public"],
+			"aliases": ["rope under clothes", "hidden bondage"],
+			"description": "Wearing rope or restraints hidden under your clothes while out in public."
+		},
+		{
+			"id": "sensation",
+			"name": "Sensation and sensory play",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["sensation play", "sensory play"],
+			"description": "Play with touch, temperature, sight and sound that doesn't involve hitting."
+		},
+		{
+			"id": "light-touch",
+			"name": "Light touch",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["feathers", "feather tickling", "soft touch", "fingertips"],
+			"description": "Feathers, fingertips, fur and soft fabrics drawn lightly over the skin."
+		},
+		{
+			"id": "tickling",
+			"name": "Tickling",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["tickle torture", "tickle", "knismolagnia"],
+			"description": "Tickling or being tickled, as teasing, punishment or for arousal."
+		},
+		{
+			"id": "temperature",
+			"name": "Temperature play",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["ice play", "hot and cold", "ice cubes"],
+			"description": "Using hot and cold things on the skin, such as ice or warmed oil."
+		},
+		{
+			"id": "wax",
+			"name": "Wax play",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["candle wax", "hot wax"],
+			"description": "Dripping melted candle wax onto skin.",
+			"safety": "Use low-temperature candles made for it.",
+			"alsoUnder": ["pain"]
+		},
+		{
+			"id": "sensory-deprivation",
+			"name": "Sensory deprivation",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["sense dep", "deprivation", "earplugs", "isolation"],
+			"description": "Taking away one or more senses with blindfolds, earplugs or hoods."
+		},
+		{
+			"id": "blindfolds",
+			"name": "Blindfolds",
+			"parent": "sensory-deprivation",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["blindfold", "blindfolded", "eye mask"],
+			"description": "Covering someone's eyes so they can't see what's coming.",
+			"alsoUnder": ["bondage"]
+		},
+		{
+			"id": "sensation-toys",
+			"name": "Sensation toys",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["Wartenberg wheel", "pinwheel", "vampire gloves", "neuro wheel"],
+			"description": "Pinwheels, vampire gloves, brushes and other textured tools used on the skin."
+		},
+		{
+			"id": "electro",
+			"name": "Electrostimulation",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": [
+				"e-stim",
+				"estim",
+				"electrostim",
+				"TENS",
+				"violet wand",
+				"zapping",
+				"shock collar"
+			],
+			"description": "Toys that send electrical current through the body, from a tingle to a jolt.",
+			"safety": "Never run current across the chest.",
+			"alsoUnder": ["pain"]
+		},
+		{
+			"id": "figging",
+			"name": "Figging",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["ginger", "ginger root"],
+			"description": "Inserting a peeled piece of ginger root into the anus or vagina, where it burns.",
+			"alsoUnder": ["anal", "pain"]
+		},
+		{
+			"id": "hickies",
+			"name": "Hickies",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["hickey", "love bite", "love bites"],
+			"description": "Sucking or biting skin hard enough to leave a bruise."
+		},
+		{
+			"id": "sensory-overload",
+			"name": "Endurance",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["holding out", "stress positions"],
+			"description": "Holding out under a sensation or in a position for an agreed length of time."
+		},
+		{
+			"id": "fire-play",
+			"name": "Fire play",
+			"parent": "sensation",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["fire cupping", "flash cotton", "fire"],
+			"description": "Briefly lighting alcohol on the skin, or burning with a flame."
+		},
+		{
+			"id": "impact",
+			"name": "Impact play",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["pain"],
+			"aliases": ["hitting", "striking", "beating"],
+			"description": "Striking the body with hands or implements."
+		},
+		{
+			"id": "spanking",
+			"name": "Spanking",
+			"parent": "impact",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["pain"],
+			"aliases": ["spank", "OTK", "over the knee", "hand spanking"],
+			"description": "Hitting the buttocks with an open hand."
+		},
+		{
+			"id": "spanking-implements",
+			"name": "Spanking with an implement",
+			"parent": "spanking",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": ["paddle", "paddling", "hairbrush", "belt", "strap", "tawse"],
+			"description": "Spanking with a paddle, hairbrush, belt or strap."
+		},
+		{
+			"id": "slapping",
+			"name": "Slapping",
+			"parent": "impact",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["pain"],
+			"aliases": ["slaps", "body slaps"],
+			"description": "Open-handed slaps to the body."
+		},
+		{
+			"id": "face-slapping",
+			"name": "Face slapping",
+			"parent": "slapping",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading", "pain"],
+			"aliases": ["face slaps", "slapping the face"],
+			"description": "Slapping a partner's face, lightly or hard.",
+			"alsoUnder": ["humiliation"]
+		},
+		{
+			"id": "genital-slapping",
+			"name": "Genital slapping",
+			"parent": "slapping",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["pain"],
+			"aliases": ["pussy slapping", "cock slapping", "ball slapping"],
+			"description": "Slapping a partner's genitals with a hand or implement."
+		},
+		{
+			"id": "flogging",
+			"name": "Flogging",
+			"parent": "impact",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": ["flogger", "cat o' nine tails"],
+			"description": "Hitting with a flogger, a handle with many tails."
+		},
+		{
+			"id": "caning",
+			"name": "Caning",
+			"parent": "impact",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["pain"],
+			"aliases": ["cane", "rattan"],
+			"description": "Hitting with a thin, flexible cane, usually on the buttocks."
+		},
+		{
+			"id": "riding-crops",
+			"name": "Riding crops",
+			"parent": "impact",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": ["crop", "riding crop", "cropping"],
+			"description": "Hitting with a riding crop, a stiff rod with a small leather tip."
+		},
+		{
+			"id": "whipping",
+			"name": "Whips",
+			"parent": "impact",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["pain"],
+			"aliases": ["whip", "single tail", "bullwhip", "lashing"],
+			"description": "Hitting with a single-tail whip, a belt or another kind of whip."
+		},
+		{
+			"id": "beating",
+			"name": "Beating",
+			"parent": "impact",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["pain"],
+			"aliases": ["beatings", "heavy impact", "thuddy"],
+			"description": "Heavy, hard strikes across the body with implements or fists."
+		},
+		{
+			"id": "punching",
+			"name": "Punching and kicking",
+			"parent": "beating",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["pain"],
+			"aliases": ["gut punching", "ball busting", "kicking", "punches"],
+			"description": "Punching, kicking and other hard blows."
+		},
+		{
+			"id": "pain",
+			"name": "Pain and torment",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": ["pain play", "sadism", "masochism", "S&M", "SM", "sadomasochism", "algolagnia"],
+			"description": "Pain that doesn't come from hitting, such as clamps, bites and torment."
+		},
+		{
+			"id": "light-pain",
+			"name": "Light pain",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["pain"],
+			"description": "Mild pain that stings but doesn't really hurt."
+		},
+		{
+			"id": "heavy-pain",
+			"name": "Heavy pain",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["pain"],
+			"description": "Intense pain that is likely to leave marks."
+		},
+		{
+			"id": "pinching",
+			"name": "Pinching, biting and scratching",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": ["pinches"],
+			"description": "Pinching, biting or scratching a partner's skin."
+		},
+		{
+			"id": "biting",
+			"name": "Biting",
+			"parent": "pinching",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["pain"],
+			"aliases": ["bites", "nipping"],
+			"description": "Biting or nipping a partner, playfully or hard."
+		},
+		{
+			"id": "scratching",
+			"name": "Scratching",
+			"parent": "pinching",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["pain"],
+			"aliases": ["claws", "nails", "raking"],
+			"description": "Dragging nails across skin, sometimes leaving marks."
+		},
+		{
+			"id": "abrasion",
+			"name": "Abrasion",
+			"parent": "pinching",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": ["sandpaper", "scraping", "friction"],
+			"description": "Rubbing skin with something rough, like sandpaper or a stiff brush."
+		},
+		{
+			"id": "clamps",
+			"name": "Clamps and pegs",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": [
+				"nipple clamps",
+				"clothes pegs",
+				"clothespins",
+				"clover clamps",
+				"zipper",
+				"zipperrino",
+				"weights"
+			],
+			"description": "Clamps and clothes pegs on the nipples, labia, skin or anywhere else."
+		},
+		{
+			"id": "nipple-torture",
+			"name": "Nipple and breast torment",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["pain"],
+			"aliases": ["tit torture", "nipple torture", "breast torture"],
+			"description": "Hard pinching, pulling, clamping or slapping of nipples and breasts."
+		},
+		{
+			"id": "cbt",
+			"name": "Cock and ball torment",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["genital", "pain"],
+			"aliases": [
+				"CBT",
+				"cock and ball torture",
+				"ball busting",
+				"ballbusting",
+				"genitorture",
+				"ball stretching"
+			],
+			"description": "Squeezing, hitting, stretching or binding a penis and testicles to cause pain."
+		},
+		{
+			"id": "pussy-torment",
+			"name": "Pussy torment",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["genital", "pain"],
+			"aliases": ["pussy torture", "clit torture", "genitorture"],
+			"description": "Slapping, clamping or otherwise hurting a vulva."
+		},
+		{
+			"id": "genital-torment",
+			"name": "Genital torment",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["genital", "pain"],
+			"aliases": ["genital torture", "genitorture"],
+			"description": "Intense pain to the genitals with clamps, weights, electricity or blows."
+		},
+		{
+			"id": "bruising",
+			"name": "Bruises and marks",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["pain"],
+			"aliases": ["bruises", "marks", "marking"],
+			"description": "Leaving bruises or marks that fade within days."
+		},
+		{
+			"id": "trampling",
+			"name": "Trampling",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["pain"],
+			"aliases": ["boot stomping", "crushing", "trample"],
+			"description": "Being stood on or walked on."
+		},
+		{
+			"id": "knife-play",
+			"name": "Knife play",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": ["knives", "blade play", "edge play"],
+			"description": "Running a blade over skin, often without cutting, with fear as part of the thrill.",
+			"alsoUnder": ["mind"]
+		},
+		{
+			"id": "blood-play",
+			"name": "Blood play",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["bloodplay", "cutting", "hematolagnia"],
+			"description": "Drawing blood by cutting or with needles, or playing with it.",
+			"safety": "Blood carries infection; use sterile kit.",
+			"alsoUnder": ["fluids"]
+		},
+		{
+			"id": "blood-loss",
+			"name": "Blood loss",
+			"parent": "blood-play",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"description": "Losing a lot of blood, or using blood as lube."
+		},
+		{
+			"id": "needle-play",
+			"name": "Needle play",
+			"parent": "pain",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["needles", "play piercing", "temporary piercing"],
+			"description": "Temporary piercings with sterile needles, usually removed after the scene.",
+			"safety": "Sterile, single-use needles only."
+		},
+		{
+			"id": "breath-play",
+			"name": "Breath play",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": [
+				"breath control",
+				"erotic asphyxiation",
+				"asphyxiophilia",
+				"breathplay",
+				"edge play",
+				"edgeplay",
+				"risky play"
+			],
+			"description": "Restricting a partner's breathing for arousal.",
+			"safety": "There is no safe way to cut off air or blood to the brain; it can kill without warning."
+		},
+		{
+			"id": "choking",
+			"name": "Choking",
+			"parent": "breath-play",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["strangling", "hand around throat", "neck grabbing"],
+			"description": "Pressure on the neck with hands or an object."
+		},
+		{
+			"id": "smothering",
+			"name": "Smothering",
+			"parent": "breath-play",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["suffocation", "face smothering", "pillow smothering"],
+			"description": "Covering a partner's nose and mouth with a hand, pillow or body."
+		},
+		{
+			"id": "water-torture",
+			"name": "Water play",
+			"parent": "breath-play",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["waterboarding", "dunking", "drowning"],
+			"description": "Holding someone's head under water, or waterboarding them."
+		},
+		{
+			"id": "body-mod",
+			"name": "Marks and body modification",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["permanent"],
+			"aliases": ["body modification", "body mods"],
+			"description": "Changes to the body, from a shave to a tattoo or a brand."
+		},
+		{
+			"id": "shaving",
+			"name": "Shaving",
+			"parent": "body-mod",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["shave", "hair removal", "waxing", "shaved"],
+			"description": "Shaving a partner's body hair, or having yours shaved."
+		},
+		{
+			"id": "head-shaving",
+			"name": "Shaving your head",
+			"parent": "shaving",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["buzzcut", "shaved head", "haircut"],
+			"description": "Having your head shaved, or your hair cut the way a partner chooses."
+		},
+		{
+			"id": "piercing",
+			"name": "Piercings",
+			"parent": "body-mod",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["permanent"],
+			"aliases": ["nipple piercing", "genital piercing", "PA", "VCH"],
+			"description": "Getting permanent piercings, sometimes chosen by a partner."
+		},
+		{
+			"id": "tattoos",
+			"name": "Tattoos",
+			"parent": "body-mod",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["permanent"],
+			"aliases": ["tattoo", "ink", "ownership tattoo", "QoS tattoo"],
+			"description": "Getting tattoos, sometimes chosen by a partner or as a sign of ownership."
+		},
+		{
+			"id": "scarification",
+			"name": "Scarring",
+			"parent": "body-mod",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["permanent"],
+			"aliases": ["cutting scars", "scar"],
+			"description": "Cutting the skin on purpose to leave a permanent scar."
+		},
+		{
+			"id": "branding",
+			"name": "Branding",
+			"parent": "body-mod",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["permanent"],
+			"aliases": ["brand", "cattle brand", "strike branding"],
+			"description": "Burning a mark into the skin with a hot iron, usually to show ownership."
+		},
+		{
+			"id": "nullification",
+			"name": "Nullification and castration",
+			"parent": "body-mod",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["permanent"],
+			"aliases": ["nullo", "castration", "eunuch"],
+			"description": "Removing the genitals, for real or as a fantasy."
+		},
+		{
+			"id": "forced-body-mod",
+			"name": "Body changes without asking",
+			"parent": "body-mod",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["consent-play", "permanent"],
+			"aliases": ["forced haircut", "forced piercing"],
+			"description": "A partner changing your body, such as cutting your hair or getting you pierced, without asking first."
+		},
+		{
+			"id": "power",
+			"name": "Power exchange and protocol",
+			"section": "kinks",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": [
+				"power exchange",
+				"D/s",
+				"dominance and submission",
+				"PE",
+				"domination",
+				"submission"
+			],
+			"description": "Power exchange, where one partner hands control to the other."
+		},
+		{
+			"id": "desperation",
+			"name": "Desperation",
+			"parent": "power",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading", "fluids"],
+			"aliases": ["omorashi", "omo", "pee desperation", "bladder control", "wetting"],
+			"description": "Needing to pee and having to hold it, sometimes until you can't, or needing permission to go.",
+			"alsoUnder": ["fluids"]
+		},
+		{
+			"id": "sleep-deprivation",
+			"name": "Sleep deprivation",
+			"parent": "power",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"description": "Keeping a partner from sleeping.",
+			"alsoUnder": ["mind"]
+		},
+		{
+			"id": "weight-control",
+			"name": "Body control",
+			"parent": "power",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["diet control", "weight gain", "exercise control", "feederism"],
+			"description": "A partner controlling what you eat, how you exercise or what you weigh.",
+			"alsoUnder": ["body-mod"]
+		},
+		{
+			"id": "orders",
+			"name": "Following orders",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["commands", "obedience", "instructions"],
+			"description": "Being given commands and obeying them."
+		},
+		{
+			"id": "rules",
+			"name": "Rules",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["rule list", "house rules", "consequences"],
+			"description": "Living by rules a partner sets, with consequences for breaking them."
+		},
+		{
+			"id": "discipline",
+			"name": "Discipline and punishment",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["punishment", "punishments", "correction", "maintenance spanking"],
+			"description": "Punishing a partner for breaking rules, to correct their behaviour."
+		},
+		{
+			"id": "protocol",
+			"name": "Protocol and rituals",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["rituals", "high protocol", "formal protocol"],
+			"description": "Set rituals and formal ways of speaking and behaving."
+		},
+		{
+			"id": "kneeling",
+			"name": "Kneeling",
+			"parent": "protocol",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["kneel", "on your knees"],
+			"description": "Kneeling for a partner, as a ritual or on command."
+		},
+		{
+			"id": "positions",
+			"name": "Held positions",
+			"parent": "protocol",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["poses", "inspection", "presenting", "slave positions"],
+			"description": "Learning set poses and holding them on command."
+		},
+		{
+			"id": "speech-rules",
+			"name": "Speech rules",
+			"parent": "protocol",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["forms of address", "honorifics", "sir", "ma'am", "speaking permission"],
+			"description": "Rules about when a partner may speak, what they may say and how they address you."
+		},
+		{
+			"id": "eye-contact",
+			"name": "Eye contact rules",
+			"parent": "protocol",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["no eye contact", "eyes down"],
+			"description": "Rules about when you may look a partner in the eye."
+		},
+		{
+			"id": "training",
+			"name": "Training",
+			"parent": "protocol",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["slut training", "sub training", "conditioning"],
+			"description": "Being trained over time in skills, positions or behaviour."
+		},
+		{
+			"id": "begging",
+			"name": "Begging",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["beg", "pleading"],
+			"description": "Pleading for something as a form of submission."
+		},
+		{
+			"id": "collaring",
+			"name": "Collaring",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["collared", "day collar", "collar ceremony", "owned"],
+			"description": "Wearing a collar as a sign of being owned, often given in a ceremony."
+		},
+		{
+			"id": "collar-leash",
+			"name": "Collar and leash",
+			"parent": "collaring",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["collar", "leash", "lead", "walked on a leash"],
+			"description": "Wearing a collar, and being led around by a leash attached to it.",
+			"alsoUnder": ["bondage"]
+		},
+		{
+			"id": "total-power-exchange",
+			"name": "Total power exchange",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 4,
+			"aliases": ["TPE", "24/7", "D/s relationship", "lifestyle", "full-time"],
+			"description": "A dynamic where one partner controls all or most of the other's life, all the time."
+		},
+		{
+			"id": "slavery",
+			"name": "Slave dynamic",
+			"parent": "total-power-exchange",
+			"roles": "dom-sub",
+			"intensity": 4,
+			"aliases": ["M/s", "master/slave", "slave", "owned", "property"],
+			"description": "A consensual master and slave relationship built on obedience and service."
+		},
+		{
+			"id": "control-choices",
+			"name": "Choices made for you",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["control of decisions", "outfit control"],
+			"description": "A partner deciding what you wear, eat, buy or do."
+		},
+		{
+			"id": "brat-taming",
+			"name": "Bratting and brat taming",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["brat", "bratting", "brat tamer", "taming"],
+			"description": "A sub who misbehaves on purpose to provoke a reaction, and a dom who puts them in their place."
+		},
+		{
+			"id": "praise",
+			"name": "Praise",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 1,
+			"aliases": ["praise kink", "good girl", "good boy", "good pet", "good slut"],
+			"description": "Being told you're good, or a good girl, good boy or good pet.",
+			"alsoUnder": ["mind"]
+		},
+		{
+			"id": "ignoring",
+			"name": "Being ignored",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["ignored", "silent treatment", "cold shoulder"],
+			"description": "Being deliberately ignored or left alone as part of the play."
+		},
+		{
+			"id": "role-reversal",
+			"name": "Switching",
+			"parent": "power",
+			"intensity": 2,
+			"aliases": ["switch", "role swap"],
+			"description": "Switching who is dominant and who is submissive."
+		},
+		{
+			"id": "lending",
+			"name": "Being lent out",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 5,
+			"tags": ["others"],
+			"aliases": ["loaning", "lent out", "shared", "sharing"],
+			"description": "Being lent to someone else to use, by your partner's choice.",
+			"alsoUnder": ["group"]
+		},
+		{
+			"id": "auctioned",
+			"name": "Being auctioned",
+			"parent": "lending",
+			"roles": "dom-sub",
+			"intensity": 5,
+			"tags": ["others"],
+			"aliases": ["auction", "slave auction", "bidding"],
+			"description": "Being put up for auction, inspected and bid on."
+		},
+		{
+			"id": "long-distance-control",
+			"name": "Control from a distance",
+			"parent": "power",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"tags": ["remote"],
+			"aliases": ["LDR control", "online domination", "remote control"],
+			"description": "Rules, tasks and control kept up while you're apart.",
+			"alsoUnder": ["remote"]
+		},
+		{
+			"id": "free-use",
+			"name": "Free use",
+			"parent": "power",
+			"roles": "aggressor-target",
+			"intensity": 4,
+			"tags": ["consent-play", "degrading"],
+			"aliases": ["freeuse", "use me whenever"],
+			"description": "An agreement that a partner may use you sexually at any time without asking first.",
+			"alsoUnder": ["consent"]
+		},
+		{
+			"id": "service",
+			"name": "Service",
+			"section": "kinks",
+			"roles": "dom-sub",
+			"intensity": 1,
+			"aliases": ["service submission", "service sub", "serving"],
+			"description": "Serving a partner with chores, care or simply being useful to them."
+		},
+		{
+			"id": "domestic-service",
+			"name": "Domestic service",
+			"parent": "service",
+			"roles": "dom-sub",
+			"intensity": 1,
+			"aliases": ["chores", "maid", "housework", "domestic servitude", "butler"],
+			"description": "Doing housework, cooking and errands for a partner as a servant."
+		},
+		{
+			"id": "human-furniture",
+			"name": "Human furniture",
+			"parent": "service",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"aliases": ["forniphilia", "footstool", "human table", "furniture"],
+			"description": "Being used as a footstool, table, seat or ornament.",
+			"alsoUnder": ["humiliation"]
+		},
+		{
+			"id": "personal-service",
+			"name": "Personal service",
+			"parent": "service",
+			"roles": "dom-sub",
+			"intensity": 1,
+			"aliases": ["valet", "body service", "attending"],
+			"description": "Personal care for a partner, such as dressing them, bathing them or rubbing their feet."
+		},
+		{
+			"id": "worship",
+			"name": "Worship",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["body worship", "adoration"],
+			"description": "Showing devotion to a partner's body by kissing, licking and caressing it."
+		},
+		{
+			"id": "genital-worship",
+			"name": "Cock and pussy worship",
+			"parent": "worship",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["cock worship", "pussy worship"],
+			"description": "Showing devotion to a partner's cock or pussy with your mouth, hands and words."
+		},
+		{
+			"id": "ass-worship",
+			"name": "Ass worship",
+			"parent": "worship",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["butt worship"],
+			"description": "Kissing, licking, caressing and praising a partner's ass."
+		},
+		{
+			"id": "breast-worship",
+			"name": "Breast worship",
+			"parent": "worship",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["tit worship", "boob worship"],
+			"description": "Kissing, sucking, caressing and praising a partner's breasts."
+		},
+		{
+			"id": "foot-worship",
+			"name": "Feet",
+			"parent": "worship",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["foot fetish", "foot play", "toe sucking", "podophilia"],
+			"description": "Kissing, licking, sniffing or massaging feet, or being turned on by them."
+		},
+		{
+			"id": "boot-worship",
+			"name": "Boot and heel worship",
+			"parent": "worship",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["boot licking", "bootlicking", "heel worship", "shoe fetish"],
+			"description": "Licking, kissing and polishing a partner's boots or heels."
+		},
+		{
+			"id": "muscle-worship",
+			"name": "Muscle worship",
+			"parent": "worship",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["muscles", "flexing"],
+			"description": "Admiring and touching a partner's muscles."
+		},
+		{
+			"id": "pussy-juice",
+			"name": "Tasting arousal",
+			"parent": "worship",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["girl cum", "pussy juice", "arousal", "wetness"],
+			"description": "Licking or tasting vaginal fluids, or being fed them."
+		},
+		{
+			"id": "humiliation",
+			"name": "Humiliation and degradation",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"aliases": ["degradation", "humiliation kink", "embarrassment"],
+			"description": "Being embarrassed or degraded on purpose, for arousal."
+		},
+		{
+			"id": "body-writing",
+			"name": "Body writing",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["degrading"],
+			"aliases": ["marker", "lipstick writing", "tally marks", "body graffiti"],
+			"description": "Writing or drawing words, often degrading ones, on a partner's body."
+		},
+		{
+			"id": "verbal-humiliation",
+			"name": "Verbal humiliation",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"aliases": ["name calling", "insults", "verbal degradation", "slut shaming"],
+			"description": "Being called names or insulted."
+		},
+		{
+			"id": "private-humiliation",
+			"name": "Humiliation in private",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"description": "Being humiliated with only your partner there to see."
+		},
+		{
+			"id": "public-humiliation",
+			"name": "Humiliation in public",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading", "public"],
+			"description": "Being humiliated in public, whether or not anyone notices."
+		},
+		{
+			"id": "objectification",
+			"name": "Objectification",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"aliases": ["used", "treated as an object", "object"],
+			"description": "Being treated as an object rather than a person."
+		},
+		{
+			"id": "dehumanisation",
+			"name": "Dehumanisation",
+			"parent": "objectification",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading"],
+			"aliases": ["dehumanization", "less than human", "cumdump", "fucktoy"],
+			"description": "Being treated as less than human, such as an animal or a hole to use."
+		},
+		{
+			"id": "soap",
+			"name": "Mouth washed out with soap",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"aliases": ["mouth soaping", "soaping", "washing mouth out"],
+			"description": "Having your mouth washed out with soap as a punishment."
+		},
+		{
+			"id": "small-penis",
+			"name": "Size humiliation",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"aliases": ["SPH", "small penis humiliation"],
+			"description": "Being teased about the size of your penis, breasts or body."
+		},
+		{
+			"id": "degrading-tasks",
+			"name": "Degrading tasks",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["degrading"],
+			"aliases": ["embarrassing tasks", "humiliating tasks", "humiliating outfits"],
+			"description": "Being made to do, wear or say embarrassing things."
+		},
+		{
+			"id": "cnc-humiliation",
+			"name": "Forced exposure",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading"],
+			"aliases": ["forced nudity", "enforced nudity", "exposure", "ENF", "CMNF"],
+			"description": "Being made to strip or show your body, sometimes in front of others.",
+			"alsoUnder": ["exhibition"]
+		},
+		{
+			"id": "slurs",
+			"name": "Slurs",
+			"parent": "humiliation",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["degrading"],
+			"aliases": ["bigoted insults"],
+			"description": "Being called slurs or bigoted insults as degradation."
+		},
+		{
+			"id": "mind",
+			"name": "Mind play",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["mindfuck", "psychological play"],
+			"description": "Psychological play such as hypnosis, mind games and conditioning."
+		},
+		{
+			"id": "fear-play",
+			"name": "Fear play",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["risky"],
+			"aliases": ["fear", "scare play", "terror"],
+			"description": "Deliberately making a partner afraid."
+		},
+		{
+			"id": "gunplay",
+			"name": "Gun play",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["guns", "weapons"],
+			"description": "Using real or fake guns as props during play.",
+			"alsoUnder": ["roleplay"]
+		},
+		{
+			"id": "dirty-talk",
+			"name": "Dirty talk",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["talking dirty", "filthy talk", "narration"],
+			"description": "Explicit talk during sex."
+		},
+		{
+			"id": "hypnosis",
+			"name": "Erotic hypnosis",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["hypno", "hypnokink", "trance", "mind control"],
+			"description": "Using hypnotic suggestion during play, live or through recordings."
+		},
+		{
+			"id": "triggers",
+			"name": "Trigger words",
+			"parent": "hypnosis",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["trigger", "hypno triggers", "post-hypnotic suggestion"],
+			"description": "Words or phrases that set off a trained response, such as going limp, freezing or orgasming."
+		},
+		{
+			"id": "brainwashing",
+			"name": "Brainwashing",
+			"parent": "hypnosis",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["mind control", "conditioning", "mindbreak", "mind break", "reprogramming"],
+			"description": "Conditioning someone over time to think, feel or react differently."
+		},
+		{
+			"id": "mind-games",
+			"name": "Mind games",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["mindfuck", "mind fuck", "psychological torment", "gaslighting play"],
+			"description": "Deliberate psychological pressure, trickery or uncertainty within a scene."
+		},
+		{
+			"id": "corruption",
+			"name": "Corruption",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["corrupting", "corruption kink", "innocence lost"],
+			"description": "Someone innocent being led into depravity, step by step."
+		},
+		{
+			"id": "emotional-catharsis",
+			"name": "Emotional release",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["catharsis", "crying it out"],
+			"description": "A scene meant to bring out and release strong emotions."
+		},
+		{
+			"id": "abandonment",
+			"name": "Abandonment fantasy",
+			"parent": "mind",
+			"roles": "give-receive",
+			"intensity": 4,
+			"aliases": ["abandonment play", "left alone", "left tied up"],
+			"description": "Being left alone or abandoned as part of a scene."
+		},
+		{
+			"id": "consent",
+			"name": "Consent play",
+			"section": "kinks",
+			"roles": "aggressor-target",
+			"intensity": 5,
+			"tags": ["consent-play"],
+			"aliases": ["non-con", "noncon", "CNC"],
+			"description": "Scenes where consent is agreed in advance and resistance is part of the play.",
+			"safety": "Agree a safeword that isn't \"no\" or \"stop\", and talk it through before and after."
+		},
+		{
+			"id": "cnc",
+			"name": "Consensual non-consent",
+			"parent": "consent",
+			"roles": "aggressor-target",
+			"intensity": 5,
+			"tags": ["consent-play"],
+			"aliases": ["CNC", "rape play", "ravishment", "non-con", "noncon", "forced sex fantasy"],
+			"description": "Acting out non-consent, with consent agreed beforehand."
+		},
+		{
+			"id": "gang-cnc",
+			"name": "Group CNC fantasy",
+			"parent": "cnc",
+			"roles": "aggressor-target",
+			"intensity": 5,
+			"tags": ["consent-play", "others"],
+			"aliases": ["gangrape fantasy", "group CNC"],
+			"description": "Acting out non-consent with several people at once.",
+			"alsoUnder": ["group"]
+		},
+		{
+			"id": "sleep-play",
+			"name": "Sleep play",
+			"parent": "consent",
+			"roles": "aggressor-target",
+			"intensity": 4,
+			"tags": ["consent-play"],
+			"aliases": ["somnophilia", "sleep sex", "sleepy sex", "sexsomnia"],
+			"description": "Being touched or used while asleep, as agreed in advance."
+		},
+		{
+			"id": "kidnapping",
+			"name": "Abduction play",
+			"parent": "consent",
+			"roles": "aggressor-target",
+			"intensity": 5,
+			"tags": ["consent-play"],
+			"aliases": ["abduction", "kidnap play"],
+			"description": "A staged abduction, sometimes followed by captivity."
+		},
+		{
+			"id": "blackmail",
+			"name": "Blackmail fantasy",
+			"parent": "consent",
+			"roles": "aggressor-target",
+			"intensity": 5,
+			"tags": ["consent-play"],
+			"aliases": ["consensual blackmail", "coercion"],
+			"description": "Pretend blackmail or threats used to make someone do things."
+		},
+		{
+			"id": "drugging-fantasy",
+			"name": "Drugged fantasy",
+			"parent": "consent",
+			"roles": "aggressor-target",
+			"intensity": 5,
+			"tags": ["consent-play"],
+			"aliases": ["drugged", "drunk", "sex pollen", "aphrodisiac"],
+			"description": "Pretending to be drugged or drunk as part of a scene.",
+			"safety": "Pretend only. Never real substances without informed consent."
+		},
+		{
+			"id": "hate-sex",
+			"name": "Hate sex",
+			"parent": "consent",
+			"roles": "aggressor-target",
+			"intensity": 4,
+			"tags": ["consent-play"],
+			"aliases": ["hatefuck", "hate fuck", "angry sex"],
+			"description": "Angry, aggressive sex between people who resent each other."
+		},
+		{
+			"id": "personas",
+			"name": "Pet, age and persona play",
+			"section": "kinks",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["pet play", "petplay", "persona play", "animal play"],
+			"description": "Taking on a role, such as a pet or a little."
+		},
+		{
+			"id": "primal",
+			"name": "Primal play",
+			"parent": "personas",
+			"roles": "aggressor-target",
+			"intensity": 3,
+			"tags": ["consent-play"],
+			"aliases": ["hunter and prey", "predator and prey", "chase"],
+			"description": "Instinct-driven play with chasing, wrestling, growling and biting.",
+			"alsoUnder": ["consent"]
+		},
+		{
+			"id": "pup-play",
+			"name": "Pup play",
+			"parent": "personas",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["puppy play", "pup", "human pup", "good boy"],
+			"description": "Taking on the role of a puppy, playful, eager and often on all fours."
+		},
+		{
+			"id": "kitten-play",
+			"name": "Kitten play",
+			"parent": "personas",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["kitten", "kitty", "cat play", "neko"],
+			"description": "Taking on the role of a cat that wants to be petted and played with."
+		},
+		{
+			"id": "pony-play",
+			"name": "Pony play",
+			"parent": "personas",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"aliases": ["pony", "ponygirl", "ponyboy", "horse play"],
+			"description": "Taking on the role of a pony, with tack and training, to be ridden or made to pull a cart."
+		},
+		{
+			"id": "hucow",
+			"name": "Hucow",
+			"parent": "personas",
+			"roles": "dom-sub",
+			"intensity": 4,
+			"tags": ["degrading"],
+			"aliases": ["human cow", "cow girl", "milking"],
+			"description": "Playing a human cow that is kept, bred and milked."
+		},
+		{
+			"id": "age-play",
+			"name": "Age play",
+			"parent": "personas",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"tags": ["taboo"],
+			"aliases": ["ageplay", "little space", "CGL", "DDlg", "MDlb", "DDlb", "MDlg", "littles"],
+			"description": "A little and a caregiver roleplaying a younger age, between adults, sexually or not."
+		},
+		{
+			"id": "caregiver",
+			"name": "Daddy or mummy dynamic",
+			"parent": "age-play",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"tags": ["taboo"],
+			"aliases": ["daddy dom", "mommy domme", "daddy kink", "mommy kink", "CG"],
+			"description": "A daddy or mummy dom looking after a little."
+		},
+		{
+			"id": "abdl",
+			"name": "ABDL and diapers",
+			"parent": "age-play",
+			"roles": "dom-sub",
+			"intensity": 4,
+			"tags": ["taboo"],
+			"aliases": ["ABDL", "adult baby", "diaper lover", "diapers", "AB/DL", "infantilism"],
+			"description": "Wearing or using diapers, or roleplaying as an adult baby."
+		},
+		{
+			"id": "furry",
+			"name": "Furries",
+			"parent": "personas",
+			"roles": "dom-sub",
+			"intensity": 2,
+			"aliases": ["fursuit", "anthro", "yiff"],
+			"description": "Anthropomorphic animal characters, or dressing up as one.",
+			"alsoUnder": ["fantasy"]
+		},
+		{
+			"id": "gender",
+			"name": "Gender play",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["gender"],
+			"aliases": ["genderplay"],
+			"description": "Play involving gender roles and presentation."
+		},
+		{
+			"id": "feminisation",
+			"name": "Feminisation",
+			"parent": "gender",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["gender"],
+			"aliases": ["feminization", "forced feminization", "forced fem", "femdom feminisation"],
+			"description": "A partner, usually male, being made to look or act more feminine."
+		},
+		{
+			"id": "sissy",
+			"name": "Sissification",
+			"parent": "feminisation",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading", "gender"],
+			"aliases": ["sissy training", "sissy"],
+			"description": "Being feminised in an exaggerated, often humiliating way."
+		},
+		{
+			"id": "bimbo",
+			"name": "Bimbofication",
+			"parent": "feminisation",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading", "gender"],
+			"aliases": ["bimboification", "himbo"],
+			"description": "Being turned into a stereotypical bimbo who is ditzy, made up and focused on sex."
+		},
+		{
+			"id": "crossdressing",
+			"name": "Crossdressing",
+			"parent": "gender",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["gender"],
+			"aliases": ["cross dressing", "CD", "crossdresser", "en femme"],
+			"description": "Wearing clothes usually worn by another gender."
+		},
+		{
+			"id": "masculinisation",
+			"name": "Masculinisation",
+			"parent": "gender",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["gender"],
+			"aliases": ["masculinization"],
+			"description": "A partner being made to look or act more masculine."
+		},
+		{
+			"id": "emasculation",
+			"name": "Emasculation",
+			"parent": "gender",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["degrading", "gender"],
+			"aliases": ["emasculating", "beta", "unmanned"],
+			"description": "Having your masculinity mocked or taken away.",
+			"alsoUnder": ["humiliation"]
+		},
+		{
+			"id": "makeup",
+			"name": "Makeup",
+			"parent": "gender",
+			"roles": "give-receive",
+			"intensity": 1,
+			"tags": ["gender"],
+			"aliases": ["lipstick", "cosmetics"],
+			"description": "Wearing makeup, or having it put on you by a partner."
+		},
+		{
+			"id": "orientation-play",
+			"name": "Pushed past your orientation",
+			"parent": "gender",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["consent-play", "gender"],
+			"aliases": ["forced bi", "forced gay", "forced bi play"],
+			"description": "Being made to play with a gender you aren't usually attracted to."
+		},
+		{
+			"id": "clothing",
+			"name": "Clothing and materials",
+			"section": "kinks",
+			"roles": "self-partner",
+			"intensity": 1,
+			"description": "Clothes and materials, and what they bring to play."
+		},
+		{
+			"id": "lingerie",
+			"name": "Lingerie",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["underwear", "panties", "bra", "teddy"],
+			"description": "Bras, panties and other underwear worn to look sexy."
+		},
+		{
+			"id": "stockings",
+			"name": "Stockings and socks",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": [
+				"stockings",
+				"hosiery",
+				"nylons",
+				"pantyhose",
+				"thigh highs",
+				"fishnets",
+				"garter"
+			],
+			"description": "Stockings, garters, fishnets and socks."
+		},
+		{
+			"id": "heels-boots",
+			"name": "Heels and boots",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["high heels", "stilettos", "heels", "boots", "thigh high boots"],
+			"description": "High heels and knee-high boots."
+		},
+		{
+			"id": "corsets",
+			"name": "Corsets",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["corset", "tightlacing", "waist training"],
+			"description": "Corsets laced tight to shape the waist."
+		},
+		{
+			"id": "latex",
+			"name": "Latex and rubber",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["rubber", "PVC", "vinyl", "latex catsuit", "rubberist"],
+			"description": "Clothing made of latex, rubber or PVC, often skin-tight or full-body."
+		},
+		{
+			"id": "leather",
+			"name": "Leather",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["leather gear", "leatherman", "harness"],
+			"description": "Leather clothing, harnesses and gear."
+		},
+		{
+			"id": "uniforms",
+			"name": "Uniforms and costumes",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["uniform", "costume", "nurse outfit", "maid outfit", "police uniform"],
+			"description": "Uniforms and costumes, such as a nurse, police officer or maid.",
+			"alsoUnder": ["roleplay"]
+		},
+		{
+			"id": "cosplay",
+			"name": "Cosplay",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["costume", "dress up"],
+			"description": "Dressing up as a fictional character."
+		},
+		{
+			"id": "formal",
+			"name": "Formal clothes",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["suit", "suits", "business attire", "evening wear"],
+			"description": "Suits, dresses and business clothes."
+		},
+		{
+			"id": "slutty-clothes",
+			"name": "Slutty clothes",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["revealing clothes", "slutty outfits", "microskirt"],
+			"description": "Revealing clothes, such as short skirts, tight tops and visible underwear."
+		},
+		{
+			"id": "clothed-sex",
+			"name": "Clothed sex",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["clothed", "clothes on"],
+			"description": "Having sex with clothes on, or only partly undressed."
+		},
+		{
+			"id": "cfnm",
+			"name": "Clothed and naked",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["CFNM", "CMNF", "clothed female naked male", "clothed male naked female"],
+			"description": "One partner fully clothed and the other naked."
+		},
+		{
+			"id": "gloves",
+			"name": "Gloves",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"description": "Wearing gloves, from latex to leather to satin."
+		},
+		{
+			"id": "jewellery",
+			"name": "Jewellery and chokers",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"aliases": ["jewelry", "choker", "ankle chain", "anklet"],
+			"description": "Chokers, necklaces and other jewellery, sometimes as a sign of ownership."
+		},
+		{
+			"id": "masks",
+			"name": "Masks",
+			"parent": "clothing",
+			"roles": "self-partner",
+			"intensity": 1,
+			"description": "Masks that hide the face, from masquerade masks to animal masks."
+		},
+		{
+			"id": "exhibition",
+			"name": "Showing off and watching",
+			"section": "kinks",
+			"roles": "seen-watch",
+			"intensity": 3,
+			"tags": ["public"],
+			"aliases": ["exhibitionism", "voyeurism", "watching"],
+			"description": "Being watched, or watching others."
+		},
+		{
+			"id": "nudity-around-others",
+			"name": "Naked around others",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 3,
+			"tags": ["others", "public"],
+			"aliases": ["exhibitionism", "nude in public", "flashing", "naturism"],
+			"description": "Being naked in front of friends or strangers."
+		},
+		{
+			"id": "public-sex",
+			"name": "Sex in public",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 4,
+			"tags": ["public"],
+			"aliases": ["outdoor sex", "dogging", "getting caught", "risky sex"],
+			"description": "Sex somewhere you might be seen or caught.",
+			"safety": "Know the law where you are, and keep anyone who hasn't agreed out of it."
+		},
+		{
+			"id": "played-with-around-others",
+			"name": "Played with in front of others",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 4,
+			"tags": ["others", "public"],
+			"aliases": ["public play", "play in public"],
+			"description": "Being touched or having sex where others can see."
+		},
+		{
+			"id": "watching-others",
+			"name": "Watching others",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 3,
+			"tags": ["public"],
+			"aliases": ["voyeurism", "voyeur", "peeping"],
+			"description": "Watching other people play or have sex."
+		},
+		{
+			"id": "photos-video",
+			"name": "Photos and video",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 3,
+			"tags": ["public"],
+			"aliases": ["nudes", "sex tape", "filming", "recording", "homemade porn"],
+			"description": "Taking photos or recording video during sex or play.",
+			"safety": "Agree where it's kept and who can see it."
+		},
+		{
+			"id": "posting-online",
+			"name": "Posting online",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 4,
+			"tags": ["public"],
+			"aliases": ["posting nudes", "OnlyFans", "camming", "amateur porn"],
+			"description": "Sharing photos or videos of yourself online."
+		},
+		{
+			"id": "mirror-sex",
+			"name": "Mirror sex",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 1,
+			"tags": ["public"],
+			"aliases": ["mirror", "watching yourself"],
+			"description": "Having sex in front of a mirror so you can watch yourselves."
+		},
+		{
+			"id": "stripping",
+			"name": "Stripping and dancing",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 1,
+			"tags": ["public"],
+			"aliases": ["striptease", "strip tease", "lap dance", "pole dancing"],
+			"description": "Undressing slowly for a partner, dancing or giving a lap dance."
+		},
+		{
+			"id": "anonymity",
+			"name": "Anonymity",
+			"parent": "exhibition",
+			"roles": "seen-watch",
+			"intensity": 4,
+			"tags": ["public"],
+			"aliases": ["anonymous sex", "strangers", "faceless", "anon"],
+			"description": "Sex with strangers, or with faces and names kept hidden."
+		},
+		{
+			"id": "glory-hole",
+			"name": "Glory holes",
+			"parent": "anonymity",
+			"roles": "seen-watch",
+			"intensity": 4,
+			"tags": ["public"],
+			"aliases": ["gloryhole", "glory hole"],
+			"description": "Sex through a hole in a wall with someone you can't see."
+		},
+		{
+			"id": "through-a-wall",
+			"name": "Stuck in a wall",
+			"parent": "anonymity",
+			"roles": "seen-watch",
+			"intensity": 4,
+			"tags": ["public"],
+			"aliases": ["stuck in wall", "stuck", "kabeshiri", "wall stuck"],
+			"description": "Being stuck in a wall or piece of furniture with only part of the body exposed."
+		},
+		{
+			"id": "remote",
+			"name": "Remote and online",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["long distance", "online play", "cybersex"],
+			"description": "Play at a distance through messages, calls and instructions."
+		},
+		{
+			"id": "sexting",
+			"name": "Sexting",
+			"parent": "remote",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["dirty texts", "nudes", "cybersex", "dirty messages"],
+			"description": "Sending sexual messages and photos."
+		},
+		{
+			"id": "phone-sex",
+			"name": "Phone and video calls",
+			"parent": "remote",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["cam sex", "video sex", "FaceTime sex", "skype sex"],
+			"description": "Sexual phone or video calls."
+		},
+		{
+			"id": "remote-tasks",
+			"name": "Tasks from a distance",
+			"parent": "remote",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["online tasks", "tasks", "assignments"],
+			"description": "Doing tasks a partner sets while you're apart."
+		},
+		{
+			"id": "porn-together",
+			"name": "Watching porn together",
+			"parent": "remote",
+			"roles": "give-receive",
+			"intensity": 1,
+			"aliases": ["watching porn", "porn"],
+			"description": "Watching porn with a partner, or being told what to watch."
+		},
+		{
+			"id": "group",
+			"name": "More people",
+			"section": "kinks",
+			"intensity": 3,
+			"tags": ["others"],
+			"aliases": ["group sex", "moresome", "multiple partners"],
+			"description": "Sex or play with more than two people."
+		},
+		{
+			"id": "threesome",
+			"name": "Threesomes",
+			"parent": "group",
+			"intensity": 3,
+			"tags": ["others"],
+			"aliases": ["three way", "MFM", "FMF", "MMF", "FFM", "3some", "menage a trois"],
+			"description": "Sex with three people."
+		},
+		{
+			"id": "orgy",
+			"name": "Orgies",
+			"parent": "group",
+			"intensity": 3,
+			"tags": ["others"],
+			"aliases": ["group sex", "sex party"],
+			"description": "Group sex with many people at once."
+		},
+		{
+			"id": "gangbang",
+			"name": "Gangbangs",
+			"parent": "group",
+			"intensity": 4,
+			"tags": ["others"],
+			"aliases": ["gang bang", "train", "running a train"],
+			"description": "Several people having sex with one person, in turn or all at once."
+		},
+		{
+			"id": "spitroast",
+			"name": "Spitroasting",
+			"parent": "group",
+			"intensity": 3,
+			"tags": ["others"],
+			"aliases": ["spit roast", "spit roasting", "Eiffel tower"],
+			"description": "One person penetrated at both ends at the same time."
+		},
+		{
+			"id": "swinging",
+			"name": "Swinging",
+			"parent": "group",
+			"intensity": 3,
+			"tags": ["others"],
+			"aliases": ["swingers", "partner swap", "wife swap", "swapping"],
+			"description": "Swapping partners with another couple or couples.",
+			"alsoUnder": ["relationships"]
+		},
+		{
+			"id": "cuckolding",
+			"name": "Cuckolding",
+			"parent": "group",
+			"intensity": 4,
+			"tags": ["others"],
+			"aliases": ["cuck", "cuckold", "cuckquean", "hotwife", "hotwifing", "stag and vixen", "bull"],
+			"description": "A partner having sex with someone else while you watch or know about it, often with humiliation.",
+			"alsoUnder": ["humiliation"]
+		},
+		{
+			"id": "harem",
+			"name": "Harems",
+			"parent": "group",
+			"intensity": 3,
+			"tags": ["others"],
+			"aliases": ["sister wives", "multiple subs", "polycule"],
+			"description": "Serving a dominant alongside other subs."
+		},
+		{
+			"id": "roleplay",
+			"name": "Roleplay and scenes",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["role play", "RP", "scenes", "scenarios"],
+			"description": "Acting out scenes with characters and a setting."
+		},
+		{
+			"id": "interrogation",
+			"name": "Interrogation",
+			"parent": "roleplay",
+			"roles": "aggressor-target",
+			"intensity": 4,
+			"tags": ["consent-play"],
+			"aliases": ["interrogation scene", "captured spy"],
+			"description": "Being questioned, and maybe pressured, until you talk.",
+			"alsoUnder": ["consent"]
+		},
+		{
+			"id": "teacher-student",
+			"name": "Teacher and student",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["teacher student", "professor", "detention", "schoolgirl"],
+			"description": "Roleplay between a teacher and an adult student."
+		},
+		{
+			"id": "medical-play",
+			"name": "Medical play",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["medical"],
+			"aliases": ["doctor and patient", "medfet", "medical fetish", "exam", "doctor"],
+			"description": "Roleplay with doctors, examinations and medical equipment."
+		},
+		{
+			"id": "prison",
+			"name": "Prison",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["prisoner", "guard", "jail"],
+			"description": "Roleplay with guards, prisoners and cells."
+		},
+		{
+			"id": "religious",
+			"name": "Religious scenes",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 4,
+			"tags": ["taboo"],
+			"aliases": ["priest", "nun", "confession", "blasphemy", "sacrilege"],
+			"description": "Roleplay with priests, nuns, confession or sin."
+		},
+		{
+			"id": "boss-employee",
+			"name": "Boss and employee",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["office", "secretary", "boss"],
+			"description": "Roleplay between a boss and an employee."
+		},
+		{
+			"id": "stranger",
+			"name": "Strangers meeting",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["stranger roleplay", "pickup", "meeting a stranger"],
+			"description": "Roleplay as strangers meeting or being picked up."
+		},
+		{
+			"id": "sex-work-fantasy",
+			"name": "Sex work fantasy",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["prostitution", "escort", "sugar daddy", "sugar baby", "paying for sex"],
+			"description": "Roleplay where someone pays, or is paid, for sex."
+		},
+		{
+			"id": "family-roleplay",
+			"name": "Family roleplay",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["taboo"],
+			"aliases": ["incest roleplay", "taboo", "step roleplay", "stepfamily"],
+			"description": "Roleplay as characters who are related, between consenting adults."
+		},
+		{
+			"id": "cheating-fantasy",
+			"name": "Cheating fantasy",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 3,
+			"tags": ["taboo"],
+			"aliases": ["cheating", "infidelity", "affair"],
+			"description": "The fantasy of cheating, or of a partner cheating."
+		},
+		{
+			"id": "royalty",
+			"name": "Royalty and servants",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["king", "queen", "prince", "princess", "historical"],
+			"description": "Roleplay with kings, queens and servants, or in a historical setting."
+		},
+		{
+			"id": "war-roleplay",
+			"name": "Nazi and war roleplay",
+			"parent": "roleplay",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["taboo"],
+			"aliases": ["Nazi roleplay", "uniform fetish", "war fantasy"],
+			"description": "Roleplay involving Nazi or wartime uniforms, symbols and power."
+		},
+		{
+			"id": "fantasy",
+			"name": "Fantasy and the impossible",
+			"section": "stories",
+			"intensity": 3,
+			"aliases": ["fantasy", "supernatural", "surreal"],
+			"description": "Fantasies that could only happen in fiction."
+		},
+		{
+			"id": "tentacles",
+			"name": "Tentacles",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["tentacle", "tentacle sex", "hentai tentacles"],
+			"description": "Being penetrated by tentacles, often several at once."
+		},
+		{
+			"id": "monsters",
+			"name": "Monsters",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": [
+				"monster fucking",
+				"monsterfucker",
+				"vampire",
+				"werewolf",
+				"orc",
+				"demon",
+				"xenophilia"
+			],
+			"description": "Sex with monsters, vampires, werewolves and other creatures."
+		},
+		{
+			"id": "aliens",
+			"name": "Aliens",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["alien", "extraterrestrial", "xeno"],
+			"description": "Sex with aliens."
+		},
+		{
+			"id": "robots",
+			"name": "Robots",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["robot", "android", "cyborg", "sexbot", "mecha"],
+			"description": "Sex with robots, cyborgs or androids."
+		},
+		{
+			"id": "transformation",
+			"name": "Transformation",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["TF", "gender bender", "body change", "species change"],
+			"description": "A body changing by magic or science into a different shape, sex or species."
+		},
+		{
+			"id": "futanari",
+			"name": "Futanari",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["futa", "dickgirl"],
+			"description": "Characters with a feminine body and a penis, sometimes along with a vagina."
+		},
+		{
+			"id": "size-difference",
+			"name": "Size difference",
+			"parent": "fantasy",
+			"intensity": 2,
+			"aliases": ["giantess", "macrophilia", "microphilia", "size kink"],
+			"description": "One partner much bigger than the other, up to giants and tiny people."
+		},
+		{
+			"id": "vore",
+			"name": "Vore",
+			"parent": "fantasy",
+			"intensity": 5,
+			"aliases": ["vorarephilia", "being eaten"],
+			"description": "One character swallowing another whole."
+		},
+		{
+			"id": "cumflation",
+			"name": "Cumflation",
+			"parent": "fantasy",
+			"intensity": 4,
+			"aliases": ["cum inflation"],
+			"description": "A belly swelling from an impossible amount of cum."
+		},
+		{
+			"id": "x-ray",
+			"name": "X-ray views",
+			"parent": "fantasy",
+			"intensity": 2,
+			"aliases": ["x-ray", "cross section", "womb view", "all the way through"],
+			"description": "Seeing penetration from the inside, or a cock pushed all the way through, as in hentai."
+		},
+		{
+			"id": "time-stop",
+			"name": "Time stop",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["freeze time", "time freeze"],
+			"description": "Freezing time so that everyone but you stays still."
+		},
+		{
+			"id": "impossible-penetration",
+			"name": "Impossible penetration",
+			"parent": "fantasy",
+			"intensity": 4,
+			"aliases": ["nipple penetration", "nipple fucking"],
+			"description": "Penetrating places that can't be penetrated in real life, such as nipples."
+		},
+		{
+			"id": "omegaverse",
+			"name": "Omegaverse",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["A/B/O", "ABO", "alpha beta omega", "heat", "knotting"],
+			"description": "A world of alphas, betas and omegas with heats, knotting and scent."
+		},
+		{
+			"id": "bestiality",
+			"name": "Bestiality fantasy",
+			"parent": "fantasy",
+			"intensity": 6,
+			"tags": ["taboo"],
+			"aliases": ["zoophilia", "feral", "animal fantasy"],
+			"description": "Sex with animals as a fantasy, explored through stories, art or animal-shaped toys."
+		},
+		{
+			"id": "selfcest",
+			"name": "Sex with yourself",
+			"parent": "fantasy",
+			"intensity": 3,
+			"aliases": ["clone sex", "self sex"],
+			"description": "Sex with another version of yourself, such as a clone or a double."
+		},
+		{
+			"id": "time-travel",
+			"name": "Time travel",
+			"parent": "fantasy",
+			"intensity": 2,
+			"description": "Stories where characters travel through time."
+		},
+		{
+			"id": "tropes",
+			"name": "Story tropes",
+			"section": "stories",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["tropes", "story ideas", "plots"],
+			"description": "Common story setups, mostly useful for stories and Daydreams."
+		},
+		{
+			"id": "enemies-to-lovers",
+			"name": "Enemies to lovers",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["rivals to lovers"],
+			"description": "Rivals or enemies who end up together."
+		},
+		{
+			"id": "friends-to-lovers",
+			"name": "Friends to lovers",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["slow burn", "friends with benefits", "FWB"],
+			"description": "Friends who become lovers after a long time wanting each other."
+		},
+		{
+			"id": "only-one-bed",
+			"name": "Only one bed",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["one bed", "forced proximity", "trapped together"],
+			"description": "Characters forced to share a bed or a small space."
+		},
+		{
+			"id": "forbidden",
+			"name": "Forbidden",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["age gap", "taboo", "forbidden love", "first time", "virginity"],
+			"description": "A relationship that shouldn't happen, such as a big age gap, a power gap or a first time."
+		},
+		{
+			"id": "fake-relationship",
+			"name": "Fake relationship",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["fake dating", "marriage of convenience", "arranged marriage"],
+			"description": "Characters pretending to be a couple, or pushed into a marriage."
+		},
+		{
+			"id": "possessive",
+			"name": "Possessive partner",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["jealousy", "possessiveness", "mine"],
+			"description": "A jealous partner who claims the other as theirs."
+		},
+		{
+			"id": "domestic",
+			"name": "Domestic",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["domestic fluff", "slice of life", "established relationship"],
+			"description": "Everyday life together as a couple."
+		},
+		{
+			"id": "captive",
+			"name": "Captive",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["Stockholm syndrome", "captor", "hostage"],
+			"description": "A captive and captor who grow attached to each other."
+		},
+		{
+			"id": "soulmates",
+			"name": "Soulmates",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["fated mates", "soul bond", "true love"],
+			"description": "Partners who are fated or magically bonded."
+		},
+		{
+			"id": "dystopia",
+			"name": "Dystopia",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"aliases": ["dystopian"],
+			"description": "A story set in an oppressive future society."
+		},
+		{
+			"id": "amnesia",
+			"name": "Amnesia",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"description": "A character who has lost their memory."
+		},
+		{
+			"id": "mistaken-identity",
+			"name": "Mistaken identity",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"description": "Sleeping with someone after mistaking them for someone else."
+		},
+		{
+			"id": "love-triangle",
+			"name": "Love triangles",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"description": "Three people torn between each other."
+		},
+		{
+			"id": "sick-care",
+			"name": "Looking after someone sick",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"description": "Caring for a partner who is ill."
+		},
+		{
+			"id": "trauma",
+			"name": "Trauma and struggles",
+			"parent": "tropes",
+			"intensity": 3,
+			"tags": ["story"],
+			"description": "Characters dealing with trauma, addiction or mental health struggles."
+		},
+		{
+			"id": "fuck-or-die",
+			"name": "Have sex or else",
+			"parent": "tropes",
+			"intensity": 4,
+			"tags": ["story"],
+			"aliases": ["sex or die", "sex pollen", "curse"],
+			"description": "Characters who have to have sex because of a curse, a spell or a deadly ultimatum."
+		},
+		{
+			"id": "magical-healing",
+			"name": "Healing through sex",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"description": "Sex that heals someone, as a fantasy."
+		},
+		{
+			"id": "awkward-sex",
+			"name": "Awkward sex",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"description": "Clumsy, funny or disappointing sex."
+		},
+		{
+			"id": "wet-dreams",
+			"name": "Wet dreams",
+			"parent": "tropes",
+			"intensity": 1,
+			"tags": ["story"],
+			"description": "Sexual dreams, and coming in your sleep."
+		},
+		{
+			"id": "bodies",
+			"name": "Partners and looks",
+			"section": "partners",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["types", "looks", "attraction"],
+			"description": "The bodies and looks you're attracted to."
+		},
+		{
+			"id": "build",
+			"name": "Build",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["body type", "skinny", "chubby", "BBW", "thick", "muscular", "fit", "curvy"],
+			"description": "Body type, from slim to muscular to plus-sized."
+		},
+		{
+			"id": "body-hair",
+			"name": "Body hair",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["hairy", "shaved", "bush", "beard", "trimmed", "smooth"],
+			"description": "Body and pubic hair, from hairy to fully shaved, and beards."
+		},
+		{
+			"id": "hair",
+			"name": "Hair",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["hair colour", "redhead", "blonde", "long hair", "short hair", "bald"],
+			"description": "Hair length and colour, from bald to very long or dyed."
+		},
+		{
+			"id": "breasts",
+			"name": "Breasts",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["tits", "boobs", "big tits", "small tits"],
+			"description": "Breast size, small or large."
+		},
+		{
+			"id": "cocks",
+			"name": "Cocks",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["dick size", "big cock", "small cock", "BBC", "BDC"],
+			"description": "Penis size, small or large."
+		},
+		{
+			"id": "skin",
+			"name": "Skin and markings",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["tattooed", "pierced", "freckles", "tan"],
+			"description": "Skin tone, freckles, tattoos and piercings."
+		},
+		{
+			"id": "pregnancy",
+			"name": "Pregnancy",
+			"parent": "bodies",
+			"intensity": 2,
+			"tags": ["looks"],
+			"aliases": ["pregnant", "preggo", "maternity"],
+			"description": "Attraction to pregnant partners."
+		},
+		{
+			"id": "archetypes",
+			"name": "Types",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["twink", "bear", "otter", "femboy", "tomboy", "hunk", "e-girl", "e-boy"],
+			"description": "Types such as twinks, bears, femboys and tomboys."
+		},
+		{
+			"id": "partner-gender",
+			"name": "Gender",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["men", "women", "trans", "non-binary"],
+			"description": "The genders of the partners you're into."
+		},
+		{
+			"id": "partner-age",
+			"name": "Age",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["older", "younger", "MILF", "DILF", "age gap"],
+			"description": "The ages of the adult partners you're drawn to."
+		},
+		{
+			"id": "ethnicity",
+			"name": "Ethnicity",
+			"parent": "bodies",
+			"intensity": 1,
+			"tags": ["looks"],
+			"aliases": ["race"],
+			"description": "The ethnicities of the partners you're drawn to."
+		},
+		{
+			"id": "sex-styles",
+			"name": "Sex styles and places",
+			"section": "kinks",
+			"intensity": 1,
+			"aliases": ["positions", "places"],
+			"description": "Positions, places and the pace of sex."
+		},
+		{
+			"id": "rough-sex",
+			"name": "Rough sex",
+			"parent": "sex-styles",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["rough", "manhandling", "being thrown around", "wrestling"],
+			"description": "Sex with shoving, grabbing, pinning and wrestling."
+		},
+		{
+			"id": "hair-pulling",
+			"name": "Hair pulling",
+			"parent": "rough-sex",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["hair grabbing", "pulling hair"],
+			"description": "Pulling or gripping a partner's hair."
+		},
+		{
+			"id": "positions-list",
+			"name": "Sex positions",
+			"parent": "sex-styles",
+			"intensity": 1,
+			"aliases": [
+				"missionary",
+				"doggy",
+				"doggystyle",
+				"cowgirl",
+				"reverse cowgirl",
+				"prone bone",
+				"spooning"
+			],
+			"description": "Sex positions such as missionary, doggy style and cowgirl."
+		},
+		{
+			"id": "piledriver",
+			"name": "Piledriver and mating press",
+			"parent": "positions-list",
+			"intensity": 2,
+			"aliases": ["mating press", "piledriver", "folded in half"],
+			"description": "Deep positions where one partner is folded up or pinned underneath."
+		},
+		{
+			"id": "places",
+			"name": "Places",
+			"parent": "sex-styles",
+			"intensity": 1,
+			"aliases": ["shower sex", "bath sex", "car sex"],
+			"description": "Places to have sex, like the shower or the bath."
+		},
+		{
+			"id": "marathon-sex",
+			"name": "Marathon sessions",
+			"parent": "sex-styles",
+			"intensity": 1,
+			"aliases": ["all-nighter", "sex marathon", "fuckfest"],
+			"description": "Long sessions with sex over and over."
+		},
+		{
+			"id": "quickies",
+			"name": "Quickies",
+			"parent": "sex-styles",
+			"intensity": 1,
+			"aliases": ["quickie", "quick sex"],
+			"description": "Quick, hurried sex."
+		},
+		{
+			"id": "scissoring",
+			"name": "Scissoring",
+			"parent": "sex-styles",
+			"intensity": 1,
+			"aliases": ["tribbing", "tribadism", "scissor"],
+			"description": "Two vulvas rubbing together, with legs interlocked."
+		},
+		{
+			"id": "safe-sex",
+			"name": "Safer sex",
+			"parent": "sex-styles",
+			"intensity": 1,
+			"aliases": ["condoms", "PrEP", "STI testing", "protection"],
+			"description": "Condoms, testing and other ways of keeping sex safer."
+		},
+		{
+			"id": "substances",
+			"name": "Sex on substances",
+			"parent": "sex-styles",
+			"intensity": 4,
+			"aliases": ["chemsex", "PnP", "party and play", "drunk sex", "high sex"],
+			"description": "Having sex while drunk or high.",
+			"safety": "Real substances change what someone can agree to; decide everything while sober."
+		},
+		{
+			"id": "money",
+			"name": "Money and gifts",
+			"section": "kinks",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"tags": ["money"],
+			"aliases": ["findom", "financial play"],
+			"description": "Money, gifts and spending as part of a dynamic."
+		},
+		{
+			"id": "findom",
+			"name": "Financial domination",
+			"parent": "money",
+			"roles": "dom-sub",
+			"intensity": 4,
+			"tags": ["money"],
+			"aliases": ["money slave", "paypig", "finsub", "cash slave"],
+			"description": "A sub giving money or gifts to a dominant as an act of submission."
+		},
+		{
+			"id": "tributes",
+			"name": "Tributes and gifts",
+			"parent": "money",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"tags": ["money"],
+			"aliases": ["tribute", "gifts", "spoiling"],
+			"description": "Gifts or payments given to a partner as tribute."
+		},
+		{
+			"id": "spending-control",
+			"name": "Control over spending",
+			"parent": "money",
+			"roles": "dom-sub",
+			"intensity": 3,
+			"tags": ["money"],
+			"aliases": ["financial control", "budget control"],
+			"description": "A partner controlling or approving how you spend money."
+		},
+		{
+			"id": "relationships",
+			"name": "Relationship styles",
+			"section": "scene",
+			"intensity": 1,
+			"aliases": ["relationship style"],
+			"description": "How kink fits into your relationships."
+		},
+		{
+			"id": "monogamous",
+			"name": "Monogamous",
+			"parent": "relationships",
+			"intensity": 1,
+			"aliases": ["monogamy", "exclusive"],
+			"description": "Keeping kink within one exclusive relationship."
+		},
+		{
+			"id": "open",
+			"name": "Open relationships",
+			"parent": "relationships",
+			"intensity": 1,
+			"aliases": [
+				"polyamory",
+				"poly",
+				"open relationship",
+				"ENM",
+				"non-monogamy",
+				"ethical non-monogamy"
+			],
+			"description": "Open relationships and polyamory, where everyone knows and agrees."
+		},
+		{
+			"id": "long-distance",
+			"name": "Long distance",
+			"parent": "relationships",
+			"intensity": 1,
+			"tags": ["remote"],
+			"aliases": ["LDR", "long distance relationship"],
+			"description": "A relationship or dynamic kept up while living apart."
+		},
+		{
+			"id": "solo-kink",
+			"name": "Solo kink",
+			"parent": "relationships",
+			"intensity": 1,
+			"aliases": ["solo", "self-bondage", "solo play"],
+			"description": "Exploring kink alone, through fantasy or on your own."
+		},
+		{
+			"id": "non-sexual-kink",
+			"name": "Non-sexual kink",
+			"parent": "relationships",
+			"intensity": 1,
+			"aliases": ["non-sexual", "platonic kink"],
+			"description": "Kink that doesn't involve sex at all."
+		},
+		{
+			"id": "care",
+			"name": "Care and aftercare",
+			"section": "kinks",
+			"roles": "give-receive",
+			"intensity": 0,
+			"tags": ["care"],
+			"aliases": ["aftercare", "safety"],
+			"description": "Care before, during and after a scene."
+		},
+		{
+			"id": "aftercare",
+			"name": "Aftercare",
+			"parent": "care",
+			"roles": "give-receive",
+			"intensity": 0,
+			"tags": ["care"],
+			"aliases": ["after care", "cuddles after"],
+			"description": "Care after a scene, such as cuddling, water, blankets or talking it through."
+		},
+		{
+			"id": "check-ins",
+			"name": "Check-ins and safewords",
+			"parent": "care",
+			"roles": "give-receive",
+			"intensity": 0,
+			"tags": ["care"],
+			"aliases": ["safeword", "safe word", "traffic light", "red yellow green", "safe signal"],
+			"description": "Agreed ways to slow down or stop a scene, such as safewords or traffic-light colours."
+		},
+		{
+			"id": "negotiation",
+			"name": "Negotiation",
+			"parent": "care",
+			"roles": "give-receive",
+			"intensity": 0,
+			"tags": ["care"],
+			"aliases": ["negotiating", "kink negotiation", "limits talk", "yes no maybe list"],
+			"description": "Talking a scene through beforehand, covering limits, signals and health."
+		},
+		{
+			"id": "drop-care",
+			"name": "Drop care",
+			"parent": "care",
+			"roles": "give-receive",
+			"intensity": 0,
+			"tags": ["care"],
+			"aliases": ["sub drop", "dom drop", "top drop", "drop"],
+			"description": "Looking after each other through the low mood that can follow a scene, sometimes days later."
+		},
+		{
+			"id": "subspace",
+			"name": "Subspace and domspace",
+			"parent": "care",
+			"roles": "give-receive",
+			"intensity": 0,
+			"tags": ["care"],
+			"aliases": ["subspace", "domspace", "topspace", "sub space", "dom space"],
+			"description": "The floaty, euphoric headspace a sub can reach during play, or the focused one a dom can."
+		},
+		{
+			"id": "nurturing",
+			"name": "Comfort",
+			"parent": "care",
+			"roles": "give-receive",
+			"intensity": 0,
+			"tags": ["care"],
+			"aliases": ["cuddles", "coddling"],
+			"description": "Being comforted with blankets, holding and gentle care."
+		},
+		{
+			"id": "media",
+			"name": "Erotica",
+			"section": "stories",
+			"intensity": 1,
+			"tags": ["media"],
+			"aliases": ["porn"],
+			"description": "The erotica you enjoy reading, watching and listening to."
+		},
+		{
+			"id": "text-erotica",
+			"name": "Written erotica",
+			"parent": "media",
+			"intensity": 1,
+			"tags": ["media"],
+			"aliases": ["erotica", "smut", "fanfic", "fan fiction", "sex stories"],
+			"description": "Erotic stories and fan fiction."
+		},
+		{
+			"id": "porn",
+			"name": "Porn",
+			"parent": "media",
+			"intensity": 1,
+			"tags": ["media"],
+			"aliases": ["pornography", "videos"],
+			"description": "Porn videos and photos, professional or amateur."
+		},
+		{
+			"id": "drawn",
+			"name": "Drawn and animated",
+			"parent": "media",
+			"intensity": 1,
+			"tags": ["media"],
+			"aliases": ["hentai", "doujin", "rule 34", "erotic art", "comics"],
+			"description": "Hentai, erotic comics and animation."
+		},
+		{
+			"id": "audio",
+			"name": "Audio and hypno files",
+			"parent": "media",
+			"intensity": 1,
+			"tags": ["media"],
+			"aliases": ["audio porn", "erotic audio", "ASMR", "hypno files", "GWA"],
+			"description": "Erotic audio, ASMR and hypnosis files."
+		},
+		{
+			"id": "fetishes",
+			"name": "Other fetishes",
+			"section": "kinks",
+			"roles": "self-partner",
+			"intensity": 2,
+			"description": "Fetishes that don't fit in any other category."
+		},
+		{
+			"id": "sweat-musk",
+			"name": "Sweat and scent",
+			"parent": "fetishes",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids"],
+			"aliases": ["musk", "sweat", "armpit fetish", "scent", "smell", "pheromones"],
+			"description": "Arousal from the smell or taste of sweat, armpits or worn underwear.",
+			"alsoUnder": ["fluids"]
+		},
+		{
+			"id": "wet-and-messy",
+			"name": "Wet and messy",
+			"parent": "fetishes",
+			"roles": "give-receive",
+			"intensity": 2,
+			"tags": ["fluids", "messy"],
+			"aliases": ["WAM", "sploshing", "messy play", "slime"],
+			"description": "Being covered in food, mud, slime, paint or other mess.",
+			"alsoUnder": ["fluids"]
+		},
+		{
+			"id": "food-play",
+			"name": "Food play",
+			"parent": "fetishes",
+			"roles": "give-receive",
+			"intensity": 2,
+			"aliases": ["food sex", "sploshing", "whipped cream"],
+			"description": "Using food during sex, such as eating it off a body or being fed."
+		},
+		{
+			"id": "feeding",
+			"name": "Feeding and stuffing",
+			"parent": "food-play",
+			"roles": "give-receive",
+			"intensity": 3,
+			"aliases": ["feederism", "feedee", "stuffing", "force feeding"],
+			"description": "Feeding someone large amounts, or being fed until stuffed."
+		},
+		{
+			"id": "smoking",
+			"name": "Smoking",
+			"parent": "fetishes",
+			"roles": "self-partner",
+			"intensity": 2,
+			"aliases": ["smoking fetish", "cigarettes", "cigar", "shotgunning"],
+			"description": "Watching someone smoke, smoking during sex, or blowing smoke into a partner's mouth."
+		},
+		{
+			"id": "extreme",
+			"name": "Gore and extreme fantasy",
+			"section": "stories",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["gore", "guro", "extreme fantasy"],
+			"description": "Injury, death and other dark fantasies, mostly for fiction."
+		},
+		{
+			"id": "gore",
+			"name": "Gore",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["guro", "blood and gore"],
+			"description": "Graphic injury and blood as part of a fantasy."
+		},
+		{
+			"id": "wounds",
+			"name": "Wounds",
+			"parent": "gore",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["wound fucking"],
+			"description": "Fantasies involving wounds, including sex with them."
+		},
+		{
+			"id": "amputation",
+			"name": "Amputation",
+			"parent": "gore",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["amputee", "acrotomophilia", "apotemnophilia"],
+			"description": "Fantasies about amputation or amputees."
+		},
+		{
+			"id": "torture",
+			"name": "Torture",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["torture fantasy"],
+			"description": "Fantasies of torture that causes lasting injury."
+		},
+		{
+			"id": "genital-mutilation",
+			"name": "Genital mutilation",
+			"parent": "torture",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"description": "Fantasies of injuring or destroying the genitals."
+		},
+		{
+			"id": "poisoning",
+			"name": "Poisoning and starvation",
+			"parent": "torture",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"description": "Fantasies of being poisoned or starved."
+		},
+		{
+			"id": "body-horror",
+			"name": "Body horror",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"description": "Bodies changing or breaking in disturbing ways."
+		},
+		{
+			"id": "death",
+			"name": "Death",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"description": "Fantasies involving death and dying."
+		},
+		{
+			"id": "snuff",
+			"name": "Snuff",
+			"parent": "death",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["death fantasy", "murder fantasy"],
+			"description": "Fantasies of killing or being killed during sex."
+		},
+		{
+			"id": "necrophilia",
+			"name": "Necrophilia",
+			"parent": "death",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["necro"],
+			"description": "Fantasies of sex with a dead body."
+		},
+		{
+			"id": "cannibalism",
+			"name": "Cannibalism",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["cannibal"],
+			"description": "Fantasies of eating, or being eaten by, another person."
+		},
+		{
+			"id": "self-harm",
+			"name": "Self-harm",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"aliases": ["self injury", "SH"],
+			"description": "Hurting yourself as part of kink.",
+			"safety": "If self-harm is part of your life outside play, please talk to someone you trust."
+		},
+		{
+			"id": "suicide-themes",
+			"name": "Suicide themes",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 6,
+			"tags": ["risky"],
+			"description": "Fantasies or stories involving suicide."
+		},
+		{
+			"id": "abuse-themes",
+			"name": "Abusive relationships",
+			"parent": "extreme",
+			"roles": "give-receive",
+			"intensity": 5,
+			"tags": ["risky"],
+			"aliases": ["abusive relationship", "toxic relationship", "dark romance"],
+			"description": "An abusive or toxic relationship, played out as fiction."
+		},
+		{
+			"id": "community",
+			"name": "Kink community",
+			"section": "scene",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["kink scene", "community", "events"],
+			"description": "How you like to take part in kink with other people."
+		},
+		{
+			"id": "munches",
+			"name": "Munches",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["munch", "meetups", "kink meetup"],
+			"description": "Casual social meetups for kinky people, usually somewhere vanilla like a pub or cafe."
+		},
+		{
+			"id": "play-parties",
+			"name": "Play parties",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["play party", "dungeon party", "dungeon"],
+			"description": "Parties or dungeons where people play in front of each other."
+		},
+		{
+			"id": "fetish-clubs",
+			"name": "Fetish clubs",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["fetish club", "fetish night", "kink club"],
+			"description": "Clubs and club nights with a fetish dress code."
+		},
+		{
+			"id": "workshops",
+			"name": "Workshops and classes",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["classes", "rope jam", "kink education", "workshop"],
+			"description": "Classes and practice sessions, such as rope jams."
+		},
+		{
+			"id": "conventions",
+			"name": "Conventions and festivals",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["kink convention", "fetish fair", "leather pride", "Folsom"],
+			"description": "Kink conventions, festivals and fairs."
+		},
+		{
+			"id": "online-communities",
+			"name": "Online communities",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["FetLife", "forums", "Discord", "Reddit"],
+			"description": "Kink forums, groups and chats."
+		},
+		{
+			"id": "mentorship",
+			"name": "Mentorship",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["mentor", "protégé"],
+			"description": "Learning from, or teaching, someone more experienced."
+		},
+		{
+			"id": "hanky-code",
+			"name": "Hanky code",
+			"parent": "community",
+			"intensity": 0,
+			"tags": ["meta"],
+			"aliases": ["handkerchief code", "flagging", "hanky"],
+			"description": "Coloured handkerchiefs worn to signal what you're into."
+		}
+	]
+}
