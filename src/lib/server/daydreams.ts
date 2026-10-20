@@ -1,16 +1,19 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { assertNever } from '../assert-never';
 import type { DaydreamTurnRole } from '../daydream';
+import { MAX_READ_EXCHANGE_TURNS } from '../daydream/exchange';
 import { indexTree, pathTo } from '../daydream/tree';
 import type { SealedKind } from '../sealed';
 import {
 	daydreamCharacterKind,
+	daydreamExchangeKind,
 	daydreamIdeaKind,
 	daydreamMarkKind,
 	daydreamSetupKind,
 	daydreamTurnKind
 } from '../sealed-kinds/daydreams';
 import type {
+	DaydreamExchangeView,
 	DaydreamLibraryItemView,
 	DaydreamLibraryView,
 	DaydreamListItemView,
@@ -23,6 +26,7 @@ import type {
 import type { Db } from './db';
 import {
 	daydreamCharacters,
+	daydreamExchanges,
 	daydreamIdeas,
 	daydreamMarks,
 	daydreamPreferences,
@@ -539,6 +543,116 @@ export async function readTurns(
 		return null;
 	}
 	return await turnsById(db, daydreamId, ids.slice(0, MAX_READ_TURNS));
+}
+
+// ── exchanges ────────────────────────────────────────────────────────────────
+
+/**
+ * Keeps one request to the model and its answer (`daydream-exchange`), for
+ * debug mode's raw log. The caller has checked the account holds debug mode;
+ * this checks the daydream is theirs, the envelope, and that the turns it
+ * names are this daydream's. Like a turn, never replaced: the id is the
+ * caller's, so a save whose answer was lost cannot keep it twice.
+ */
+export async function saveExchange(
+	db: Db,
+	userId: string,
+	daydreamId: string,
+	exchange: {
+		id: string;
+		turnId: string | null;
+		parentTurnId: string | null;
+		content: SealedWrite;
+	},
+	now = new Date()
+): Promise<DaydreamResult> {
+	if (!(await ownsDaydream(db, userId, daydreamId))) {
+		return { ok: false, reason: 'not-found' };
+	}
+	const problem = await contentProblem(db, userId, daydreamExchangeKind, exchange.content);
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const named = [exchange.turnId, exchange.parentTurnId].filter((id) => id !== null);
+	if (named.length > 0) {
+		const found = await db
+			.select({ id: daydreamTurns.id })
+			.from(daydreamTurns)
+			.where(and(eq(daydreamTurns.daydreamId, daydreamId), inArray(daydreamTurns.id, named)));
+		if (new Set(found.map((row) => row.id)).size !== new Set(named).size) {
+			return { ok: false, reason: 'bad-parent' };
+		}
+	}
+	const inserted = await db
+		.insert(daydreamExchanges)
+		.values({
+			id: exchange.id,
+			daydreamId,
+			turnId: exchange.turnId,
+			parentTurnId: exchange.parentTurnId,
+			ciphertext: exchange.content.ciphertext,
+			vaultId: exchange.content.vaultId,
+			payloadVersion: exchange.content.payloadVersion,
+			createdAt: now,
+			updatedAt: now
+		})
+		.onConflictDoNothing()
+		.returning({ id: daydreamExchanges.id });
+	return inserted.length > 0 ? { ok: true } : { ok: false, reason: 'id-taken' };
+}
+
+/**
+ * The exchanges that wrote these turns, and the failed ones that answered
+ * them, plus any failed opening (which answered nothing). Null when the
+ * daydream is not the user's. Read only while the raw log is open, a few
+ * turns at a time.
+ */
+export async function readExchanges(
+	db: Db,
+	userId: string,
+	daydreamId: string,
+	turnIds: readonly string[]
+): Promise<DaydreamExchangeView[] | null> {
+	if (!(await ownsDaydream(db, userId, daydreamId))) {
+		return null;
+	}
+	const ids = turnIds.slice(0, MAX_READ_EXCHANGE_TURNS);
+	const rows = await db
+		.select({
+			id: daydreamExchanges.id,
+			turnId: daydreamExchanges.turnId,
+			parentTurnId: daydreamExchanges.parentTurnId,
+			createdAt: daydreamExchanges.createdAt,
+			ciphertext: daydreamExchanges.ciphertext,
+			vaultId: daydreamExchanges.vaultId,
+			payloadVersion: daydreamExchanges.payloadVersion
+		})
+		.from(daydreamExchanges)
+		.where(
+			and(
+				eq(daydreamExchanges.daydreamId, daydreamId),
+				or(
+					inArray(daydreamExchanges.turnId, ids),
+					and(
+						isNull(daydreamExchanges.turnId),
+						or(inArray(daydreamExchanges.parentTurnId, ids), isNull(daydreamExchanges.parentTurnId))
+					)
+				)
+			)
+		)
+		.orderBy(asc(daydreamExchanges.createdAt), asc(daydreamExchanges.id));
+	return rows.map((row) => ({
+		id: row.id,
+		turnId: row.turnId,
+		parentTurnId: row.parentTurnId,
+		createdAt: row.createdAt,
+		sealed: {
+			recordId: row.id,
+			vaultId: row.vaultId,
+			ciphertext: row.ciphertext,
+			payloadVersion: row.payloadVersion
+		}
+	}));
 }
 
 // ── marks ────────────────────────────────────────────────────────────────────

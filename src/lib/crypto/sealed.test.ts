@@ -210,6 +210,53 @@ describe('sealRecord / openRecord', () => {
 	});
 });
 
+/** A compressed kind, as `daydream-exchange` is. */
+const testLog = defineSealedKind({
+	name: 'test-log',
+	maxCiphertextLength: 4096,
+	compressed: true,
+	versions: [{ version: 1, schema: z.object({ body: z.string() }) }]
+});
+
+describe('a compressed kind', () => {
+	it('deflates before sealing, under its own prefix, and opens to the same payload', async () => {
+		const v = await vault();
+		// Far longer than the cap uncompressed: only deflating fits it.
+		const body = 'data: {"choices":[{"delta":{"content":"x"}}]}\n\n'.repeat(500);
+		const sealed = await sealRecord(testLog, {
+			recordId: RECORD_ID,
+			payload: { body },
+			vault: v,
+			grant: selfWriteGrant(v)
+		});
+		expect(sealed.ciphertext.startsWith('sz1.')).toBe(true);
+		expect(sealed.ciphertext.length).toBeLessThan(body.length / 10);
+		expect(await openRecord(testLog, { recordId: RECORD_ID, vault: v, ...sealed })).toEqual({
+			body
+		});
+	});
+
+	it('opens nothing under the other kind of prefix, or that has been tampered with', async () => {
+		const v = await vault();
+		const sealed = await sealRecord(testLog, {
+			recordId: RECORD_ID,
+			payload: { body: 'hello' },
+			vault: v,
+			grant: selfWriteGrant(v)
+		});
+		const open = (ciphertext: string) =>
+			openRecord(testLog, { recordId: RECORD_ID, vault: v, payloadVersion: 1, ciphertext });
+		expect(await open(`sb1.${sealed.ciphertext.slice(4)}`)).toBeNull();
+		const flipped =
+			sealed.ciphertext.slice(0, -2) + (sealed.ciphertext.endsWith('A') ? 'BA' : 'AA');
+		expect(await open(flipped)).toBeNull();
+		// And an ordinary kind does not open a compressed one.
+		expect(
+			await openRecord(testNote, { recordId: RECORD_ID, vault: v, ...sealed, payloadVersion: 2 })
+		).toBeNull();
+	});
+});
+
 describe('selfWriteGrant', () => {
 	it('will not grant a partnership vault, which needs the trust check', () => {
 		expect(() => selfWriteGrant({ id: VAULT_ID, kind: 'partnership' })).toThrow('trust check');

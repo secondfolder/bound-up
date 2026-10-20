@@ -15,10 +15,12 @@ import { describeRequestFailure, SERVER_FAILURE, tryFetch } from '../request-fai
 import type { SealedKind } from '../sealed';
 import { sealForSubmit } from '../sealed-forms';
 import {
+	type DaydreamExchangeContent,
 	type DaydreamMarkContent,
 	type DaydreamTurnContent,
 	type Direction,
 	daydreamCharacterKind,
+	daydreamExchangeKind,
 	daydreamIdeaKind,
 	daydreamMarkKind,
 	daydreamSetupKind,
@@ -26,11 +28,12 @@ import {
 	type PassageMeta,
 	type Reading
 } from '../sealed-kinds/daydreams';
-import type { DaydreamTurnView, SealedRefView } from '../types';
+import type { DaydreamExchangeView, DaydreamTurnView, SealedRefView } from '../types';
 import type { ContextTurn } from './context';
+import type { Exchange } from './exchange';
+import type { ExchangeRecorder } from './exchange-recorder';
 import { PICTURE_REQUEST_HEADER, type PictureRequest } from './image-prompt';
 import { parseReply, type ReplySoFar, visibleReply } from './reply-format';
-import { readSent, type SentRecord } from './sent-record';
 import { readReplyStream } from './stream';
 
 const base = (daydreamId: string) => `/api/daydreams/${encodeURIComponent(daydreamId)}`;
@@ -76,7 +79,7 @@ export type ReplyRequestBody = {
 	turns: ContextTurn[];
 	currentDirections: Direction[];
 	rewrite?: { targetText: string; quote?: string; instruction?: string };
-	/** Debug mode: have the endpoint say what it sent the model (`sent-record.ts`). */
+	/** Debug mode: have the endpoint say what it sent the model, for the exchange (`exchange.ts`). */
 	record?: boolean;
 };
 
@@ -91,8 +94,18 @@ export type ReplyOutcome =
 			/** The reply exactly as it arrived, for debug mode's raw log. */
 			raw: string;
 	  }
-	/** `partial` is what had arrived before it failed, for the page to leave on screen or drop. */
-	| { ok: false; error: string; partial: string; raw: string };
+	/**
+	 * `partial` is what had arrived before it failed, for the page to leave on
+	 * screen or drop. `ended` is how, for the exchange: null when no reply
+	 * started at all.
+	 */
+	| {
+			ok: false;
+			error: string;
+			partial: string;
+			raw: string;
+			ended: 'done' | 'error' | 'dropped' | null;
+	  };
 
 const INCOMPLETE = 'The reply stopped partway through. Try again.';
 const EMPTY = 'The reply came back empty. Try again.';
@@ -130,10 +143,11 @@ export async function writeReply(
 	options: {
 		signal: AbortSignal;
 		onText: (soFar: ReplySoFar, raw: string) => void;
-		/** Given what the endpoint sent the model, before the reply, when `record` asked for it. */
-		onSent?: (record: SentRecord) => void;
-		/** Given every event from the provider, for debug mode's raw log (`ReplyReceipt`). */
-		onEvent?: (event: unknown) => void;
+		/**
+		 * Keeps the exchange, when `record` asked for it: given the request the
+		 * endpoint sent, and a copy of the stream taken before it is read.
+		 */
+		recorder?: ExchangeRecorder;
 	}
 ): Promise<ReplyOutcome> {
 	const response = await tryFetch(`${base(daydreamId)}/reply`, {
@@ -143,40 +157,68 @@ export async function writeReply(
 		signal: options.signal
 	});
 	if (!(response?.ok && response.body)) {
-		return { ok: false, error: await describeFailure(response), partial: '', raw: '' };
+		return {
+			ok: false,
+			error: await describeFailure(response),
+			partial: '',
+			raw: '',
+			ended: null
+		};
 	}
 
+	const { recorder } = options;
+	let reading = response.body;
+	if (recorder) {
+		// The copy is taken before anything reads the stream, so it is every
+		// byte as it arrived.
+		const [read, copy] = response.body.tee();
+		reading = read;
+		recorder.capture(response.status, copy);
+	}
 	let text = '';
 	let outcome: Awaited<ReturnType<typeof readReplyStream>>;
 	try {
 		outcome = await readReplyStream(
-			response.body,
+			reading,
 			(piece) => {
 				text += piece;
 				options.onText(visibleReply(text), text);
 			},
-			(value) => {
-				const record = readSent(value);
-				if (record) {
-					options.onSent?.(record);
-				}
-			},
-			options.onEvent
+			(body) => recorder?.request(body)
 		);
 	} catch (problem) {
 		if (problem instanceof DOMException && problem.name === 'AbortError') {
 			throw problem;
 		}
 		// The connection dropped mid-reply.
-		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage, raw: text };
+		return {
+			ok: false,
+			error: INCOMPLETE,
+			partial: visibleReply(text).passage,
+			raw: text,
+			ended: 'dropped'
+		};
 	}
 	if (outcome.kind === 'error') {
-		return { ok: false, error: INCOMPLETE, partial: visibleReply(text).passage, raw: text };
+		return {
+			ok: false,
+			error: INCOMPLETE,
+			partial: visibleReply(text).passage,
+			raw: text,
+			ended: 'error'
+		};
 	}
-	const { passage, meta, expansion, reading } = parseReply(text);
-	return passage
-		? { ok: true, passage, meta, expansion, reading, raw: text }
-		: { ok: false, error: EMPTY, partial: '', raw: text };
+	const parsed = parseReply(text);
+	return parsed.passage
+		? {
+				ok: true,
+				passage: parsed.passage,
+				meta: parsed.meta,
+				expansion: parsed.expansion,
+				reading: parsed.reading,
+				raw: text
+			}
+		: { ok: false, error: EMPTY, partial: '', raw: text, ended: 'done' };
 }
 
 // ── sealing ──────────────────────────────────────────────────────────────────
@@ -365,6 +407,83 @@ export async function saveTurn(
 			createdAt: new Date(),
 			sealed: sealedRef(turn.id, sealed.fields)
 		}
+	};
+}
+
+/** How many times an exchange over its cap is cut in half again before it is given up on. */
+const EXCHANGE_CUTS = 8;
+
+/**
+ * Keeps an exchange (`exchange.ts`), sealed and compressed, with the passage
+ * it wrote or, for a failed reply, under the turn it answered. One that will
+ * not fit its cap even compressed keeps its request whole and as much of the
+ * response's start as fits, and says so (`truncated`).
+ */
+export async function saveExchange(
+	daydreamId: string,
+	input: { turnId: string | null; parentTurnId: string | null; exchange: Exchange }
+): Promise<Outcome<{ exchange: DaydreamExchangeView; content: DaydreamExchangeContent }>> {
+	const id = crypto.randomUUID();
+	let content: DaydreamExchangeContent = input.exchange;
+	let sealed: Awaited<ReturnType<typeof seal>> | null = null;
+	for (let cut = 0; sealed === null; cut += 1) {
+		try {
+			sealed = await seal(daydreamExchangeKind, id, content);
+		} catch (problem) {
+			// Over the cap: `sealRecord` throws, since for any other kind that is a bug.
+			if (cut >= EXCHANGE_CUTS) {
+				throw problem;
+			}
+			const { body } = content.response;
+			content = {
+				...content,
+				response: { ...content.response, body: body.slice(0, body.length / 2), truncated: true }
+			};
+		}
+	}
+	if (!sealed.ok) {
+		return { ok: false, error: sealed.error };
+	}
+	const sent = await send(`${base(daydreamId)}/exchanges`, 'POST', {
+		id,
+		turnId: input.turnId,
+		parentTurnId: input.parentTurnId,
+		...sealedBody(sealed.fields)
+	});
+	if (!sent.ok) {
+		return sent;
+	}
+	return {
+		ok: true,
+		content,
+		exchange: {
+			id,
+			turnId: input.turnId,
+			parentTurnId: input.parentTurnId,
+			createdAt: new Date(),
+			sealed: sealedRef(id, sealed.fields)
+		}
+	};
+}
+
+/** The exchanges behind some turns, sealed: a few turns at a time (`MAX_READ_EXCHANGE_TURNS`). */
+export async function readExchanges(
+	daydreamId: string,
+	turnIds: readonly string[]
+): Promise<Outcome<{ exchanges: DaydreamExchangeView[] }>> {
+	const sent = await send(`${base(daydreamId)}/exchanges/read`, 'POST', { turnIds });
+	if (!sent.ok) {
+		return sent;
+	}
+	const { exchanges } = (await sent.response.json()) as {
+		exchanges: (Omit<DaydreamExchangeView, 'createdAt'> & { createdAt: string })[];
+	};
+	return {
+		ok: true,
+		exchanges: exchanges.map((exchange) => ({
+			...exchange,
+			createdAt: new Date(exchange.createdAt)
+		}))
 	};
 }
 

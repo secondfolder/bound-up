@@ -140,151 +140,184 @@ rather than read from `page.data` inside it, so the dialogs' tests need no
 
 A draft written from a brief or a generated idea, and the generated ideas
 themselves, show in debug mode a "Chat log" disclosure on the new-daydream
-page (`SuggestChatLog.svelte`): above the draft, under the ideas, or beside
-the failure when nothing usable came back (`SuggestionProblem`). It is the whole exchange, one closed disclosure per
-bubble: the system prompt, the message the request sent (the brief, the
-side, the voice and the instructions), then everything the model answered
-with — its reasoning where the provider shows it, each page it fetched in
-full (its URL, the engine's status, the site's HTTP status and the page's
-title in the heading, or the engine's error), its reply as written — and how it ended (`finish_reason` or `status`,
-and `usage`). Its heading names the model and which of OpenRouter's APIs it
-went to.
+page (`ExchangeLog.svelte`): above the draft, under the ideas, or beside the
+failure when nothing usable came back (`SuggestionProblem`). It is the whole
+exchange, one closed disclosure per bubble: the system prompt, the message
+the request sent (the brief, the side, the voice and the instructions), the
+request's settings, then everything the model answered with — its
+reasoning where the provider shows it, each page it fetched in full (its
+URL, the engine's status, the site's HTTP status and the page's title in the
+heading, or the engine's error), its reply as written — and how it ended
+(`finish_reason` or `status`, and `usage`). Its heading names the model and
+which of OpenRouter's APIs it went to.
 
-What was sent is not in the provider's answer, so the page asks for it: with
-debug mode on, `suggestDaydream` and `suggestIdeas` send `debugLog: true`, and the suggest
-endpoint, for an account holding the feature, reads the answer and adds
-`{ model, api, messages }` to it as `boundUpSent` before passing it back
-(`withSent`). Added to the answer rather than wrapped round it, so every
-other reader of it is unchanged. The flag from an account without the
-feature is ignored, and only the `daydream` and `ideas` tasks take it. The messages are
-the server's prompt and the user's own brief going back to them; nothing is
-kept or logged. `suggestChatLog` (`daydream/suggest-chat-log.ts`) turns the
-answer into the bubbles, reading Chat Completions and Responses answers
-alike, and showing an output item of a shape it does not know whole.
+The request is not in the provider's answer, so the page asks for it: with
+debug mode on, `suggestDaydream` and `suggestIdeas` send `debugLog: true`,
+and the suggest endpoint, for an account holding the feature, adds the
+request body it sent — the very string, stringified once and used for both
+— to the answer as `boundUpRequest` (`withRequest`). Added to the answer
+rather than wrapped round it, so every other reader of it is unchanged. The
+flag from an account without the feature is ignored, and only the `daydream`
+and `ideas` tasks take it. It is the server's prompt and the user's own
+brief going back to them, without the key, which is a header; nothing is
+kept or logged. `suggestionLog` (`daydream/exchange-log.ts`) reads it into
+bubbles, Chat Completions and Responses answers alike, showing an output
+item of a shape it does not know whole. The same reader draws a daydream's
+exchanges in its raw log (below).
 
 The links a brief pointed at are read ([daydreams.md](daydreams.md#links-in-a-brief))
 by OpenRouter's Responses API rather than Chat Completions because only its
 answer lists each fetch, as an `openrouter:web_fetch` item, which is where
-the log's fetched pages come from. It is not in a daydream's raw log: links
-are read while setting one up, before there is a daydream to keep anything
-in, and nothing about a suggestion is stored.
+the log's fetched pages come from. Nothing about a suggestion is stored:
+links are read while setting a daydream up, before there is one to keep
+anything in.
 
-Not a raw log for suggestions generally: chips, fills, castings and names do
-not ask, so they show only what failed (above).
+Not a log for suggestions generally: chips, fills, castings and names do not
+ask, so they show only what failed (above).
 
 ### Daydreams' raw log
 
 This is a "Raw log" switch in a daydream's tool row, remembered on the device
-in `localStorage`. While it is on, each turn on the branch being read is drawn
-by `DaydreamRawTurn.svelte`, not as the story:
+in `localStorage`. While it is on, the branch being read is drawn as what
+happened between the daydream and the model, not as the story.
 
-- **The conversation exactly as it happened.** Each passage records what its
-  request actually sent the model (`sent`, `daydream-turn` v5,
-  `daydream/sent-record.ts`), and the log shows it as one conversation: the
-  system prompt once, at the top (`DaydreamRawSystem`), and before each
-  passage a bubble on the user's side with what its request added
-  (`DaydreamRawSent`) — the opening's request, "(Continue.)", a button's or a
-  roll's note, a rewrite's instructions, the user's words as the model got
-  them, and the buttons on screen. A request that sent a different system
-  prompt (a check-in after Stop the scene, or one sent before the setup
-  changed) shows its own in its bubble.
-- **What the history was, checked.** Every request is the one before it with
-  more on the end ([daydreams.md](daydreams.md#cost)), so a passage records
-  the history it was sent only as a hash chain, not in full: whole, a long
-  story's history would not fit in a sealed turn. From the previous
-  passage's record and the passage itself, the log works out what the
-  history must have been if the request only added to the one before, and
-  compares the chains (`appendedToPrevious`). Where it was not — one of the
-  known exceptions listed there — the bubble says so, rather than the log
-  showing a conversation that did not happen.
-- **A passage written before records were kept** is rebuilt like Show prompt
-  (below), one passage at a time (`RawConversation`), and says it was.
-- **A passage's reply exactly as the model wrote it**: tags, `<meta>` block,
-  code fences and all (`raw`, `daydream-turn` v4).
-- **What else its stream carried** (`received`, `daydream-turn` v7,
-  `daydream/received-record.ts`), the same as the suggestions' chat log
-  shows for an answer that was not streamed: the model's reasoning, above
-  the reply, where the provider streamed it; and under it "How it ended" —
-  why it stopped (`finish_reason`), which model and provider answered (a
-  fallback can differ from the model asked for), OpenRouter's generation
-  id, and the usage. The stream hands every event on (`onEvent` in
-  `stream.ts`) to a `ReplyReceipt`, which gathers them as they arrive and so
-  keeps what it had through a Stop, like `raw`. The usage is only in the
-  stream because a recording request asks for it (`usage: { include: true }`
-  on the reply endpoint's request). A passage from before v7 says "How it
-  ended was not recorded".
+#### Exchanges
+
+Every request a daydream makes to the model — an opening, a reply, a
+rewrite, a check-in — is kept as an **exchange**, for an account granted
+debug mode: the request body exactly as the server sent it, and the
+response's server-sent events exactly as they arrived, every byte, comments
+and all (`daydream-exchange`, `daydream/exchange.ts`). Nothing is parsed out
+of either when it is kept. What the log shows is read from them when it is
+drawn (`exchange-log.ts`), so a better reader shows more of every exchange
+already kept, and anything the reader does not recognise is shown whole
+rather than dropped.
+
+The log draws each passage's exchange above it (`DaydreamRawExchange`):
+
+- what the request added to the one before, open — the passage as it was
+  sent back, the user's words, a button's note, the buttons on screen — and
+  the history before it closed, as one bubble;
+- whether the history was the request before plus its reply, compared
+  message by message. Every request is meant to be (docs/daydreams.md,
+  "Cost"); one that was not says so (`data-not-appended`);
+- the request's settings (model, token limit, temperature, provider);
+- the model's reasoning, where the provider streamed it (a note for pieces
+  it encrypted), its reply, any tool calls, and any event not read here,
+  whole;
+- an error the stream ended on, and "How it ended": why it stopped, which
+  model and provider answered (a fallback can differ from the model asked
+  for), OpenRouter's generation id, the usage, how many events and
+  keep-alive comments came, and whether it said it was done;
+- under it all, **the request and the response exactly as they went**.
+
+A request that wrote no passage — it failed, came back empty, or was
+stopped before anything arrived — is kept too, under the turn it answered,
+so it can be looked at after a reload. Its exchange is all there is of it.
+
+How one is kept:
+
+- The reply request asks to `record`. The reply endpoint, for an account
+  holding the feature (`userHasFeature`, so the server holds it to the
+  grant), sends one event of its own ahead of the model's stream,
+  `{"boundUpRequest": "…"}`: the request body it sent, as the string it
+  sent. The usage is in the stream only because a recording request asks
+  for it (`usage: { include: true }`).
+- `writeReply` `tee()`s the response before anything reads it. One branch
+  is the page's; the other goes to an `ExchangeRecorder`
+  (`exchange-recorder.ts`), which copies it untouched and cuts off the
+  endpoint's own event at its exact end (`stripOwnEvent`: the event is one
+  line, since the body it carries has every newline escaped). A Stop or a
+  dropped connection keeps what had arrived.
+- After the passage is saved — or on its own, for a request that wrote none
+  — the story seals the exchange and posts it to
+  `POST /api/daydreams/[id]/exchanges` (`saveExchange`), in the background:
+  the passage is saved whether or not it is. One that will not save is still
+  shown this visit, saying it was not kept.
+- The raw log reads them a few turns at a time
+  (`POST /api/daydreams/[id]/exchanges/read`, `MAX_READ_EXCHANGE_TURNS`,
+  `RawExchanges`), only while it is open: an exchange can be most of a
+  megabyte, so the story itself never loads one.
+
+How they are stored:
+
+- In a table of their own, `daydream_exchanges`, keyed by the passage it
+  wrote (`turn_id`, null for one that wrote none) and the turn it answered
+  (`parent_turn_id`), both cascading, as does the daydream. Kept apart from
+  the turn so the turn is the story alone, and the 96 KB a turn may be is
+  not shared with debug data.
+- Sealed and **compressed** (`compressed` on `defineSealedKind`, prefix
+  `sz1.`): the request repeats the story's history and the response is
+  hundreds of near-identical events, so it deflates many times over — a
+  long story's request and a reasoning reply's stream, about 800 KB, seal to
+  about 60 KB. Compressing before encrypting lets the ciphertext's length
+  say something about the content, which is safe here only because the
+  server handled every byte of it in plaintext on its way to and from the
+  model. Only this kind opts in ([encryption.md](encryption.md)).
+- Capped at 1 MiB sealed (`MAX_EXCHANGE_CIPHERTEXT`), and at
+  `EXCHANGE_LIMITS` before it is compressed. One past it keeps the request
+  whole and as much of the start of the response as fits, cutting it in
+  half until it does, and says so (`truncated`).
+- Only for an account granted debug mode, whether or not it is switched on,
+  so a passage written while it was off can still be inspected once it is
+  on. The exchanges endpoints check the feature, and the reply endpoint only
+  sends the request to an account holding it.
+
+#### Older passages
+
+A passage written before exchanges were kept falls back to what it carried
+itself, which the log still reads:
+
+- **What its request sent** (`sent`, `daydream-turn` v5,
+  `daydream/sent-record.ts`): the system prompt once, at the top
+  (`DaydreamRawSystem`), and before the passage a bubble with what the
+  request added (`DaydreamRawSent`). The history was recorded only as a
+  hash chain, which the log checks against the previous passage's record
+  (`appendedToPrevious`).
+- **Its reply as the model wrote it** (`raw`, `daydream-turn` v4), tags,
+  `<meta>` block and all, capped at `DAYDREAM_LIMITS.rawReply`.
+- **One with neither** is rebuilt like Show prompt (below), one passage at a
+  time (`RawConversation`), and says it was; its reply says "Raw reply not
+  recorded".
+
+New passages write neither `raw` nor `sent`: the exchange has both, whole.
+
+#### Beside each turn
+
 - **A passage's picture with what made it** ([daydreams.md](daydreams.md#pictures)):
   the picture, the story model's description, and exactly what the image
   model was asked — its model, prompt and negative prompt — which the
   picture endpoint says in a header (`PictureRequest`) and the picture's
   mark keeps (`sent`, `daydream-mark` v3), for an account granted debug
-  mode only, like `raw`. Outside the raw log too, with debug mode on,
-  tapping a picture opens the same in a dialog
-  (`DaydreamPicturePrompt.svelte`): one field, toggled between the image
-  model's prompt, shown first, and the story model's description, closed
-  by a tap outside it. In the image model's prompt, whatever is not in the
-  description — the server's words round it, and anything reworded on the
-  way, such as "girl" to "woman" — is muted (`addedRuns` in
-  `src/lib/word-diff.ts`), and so is the negative prompt, all of it the
-  server's.
-- **What is stored**, as JSON, under a disclosure.
+  mode only. Outside the raw log too, with debug mode on, tapping a picture
+  opens the same in a dialog (`DaydreamPicturePrompt.svelte`): one field,
+  toggled between the image model's prompt, shown first, and the story
+  model's description, closed by a tap outside it. In the image model's
+  prompt, whatever is not in the description — the server's words round it,
+  and anything reworded on the way, such as "girl" to "woman" — is muted
+  (`addedRuns` in `src/lib/word-diff.ts`), and so is the negative prompt,
+  all of it the server's.
+- **What is stored**, as JSON, under a disclosure (`DaydreamRawTurn`).
 - **Show prompt**: the system prompt and messages that would write this
   passage, from `POST /api/daydreams/[id]/prompt`. That endpoint takes what
-  `/reply` takes and answers with `buildMessages`, and never reaches the model.
-  It is a **rebuild from the story as it stands now**, today's setup
-  included, which is what the bubbles above are checked against when no
-  record was kept.
-- **A failed reply** as it arrived, under the error, with its reasoning and
-  how it ended — the error it ended on included. It is never saved, since a
-  failed reply is not a turn.
+  `/reply` takes and answers with `buildMessages`, and never reaches the
+  model. It is a **rebuild from the story as it stands now**, today's setup
+  included, which is what an older passage's bubbles are checked against
+  when no record was kept.
+- **A failed reply** as it arrived, under the error.
+
+#### Export
 
 Beside the switch, **Export** saves the whole daydream to the device as JSON
-(`DaydreamStory.exportHistory`): the setup, every turn on every branch in the
-order written, with what is stored for each (`raw` included where it was
-kept), the marks, the branch being read and the direction buttons on offer.
-It is for handing a misbehaving story to someone debugging it. Each record is
-opened afresh, not read from the page's cache, which only holds turns
-something has rendered. The file is the story in the clear, so it is behind
-debug mode and goes nowhere but the download.
-
-**Raw replies, and what was sent, are kept only for an account granted debug
-mode**, whether or not it is switched on, so a passage written while it was
-off can still be inspected once it is on.
-
-- `DaydreamStory` takes `keepRawReplies`, which the page sets from the
-  feature. The browser seals the turn, so the server cannot see `raw` and
-  cannot enforce this: the flag is the whole of the rule.
-- With it, the reply request asks to `record`, and the reply endpoint sends
-  one event of its own ahead of the model's stream, `{"boundUpSent": …}`,
-  with what it sent (`recordSent`): the system prompt, what the request
-  added, and the history's chain. That is the user's own words and the
-  server's prompt going back to the user who sent them, and the server keeps
-  none of it. The browser caps it (`capSent`: `DAYDREAM_LIMITS.sentSystem`,
-  24,000 characters, and `sentAdded`, 10,000) and seals it beside `raw`. A
-  cut record says so, and a chain cannot be checked from one.
-- A turn written without the grant, or before v4, says "Raw reply not
-  recorded".
-- `raw` is capped at `DAYDREAM_LIMITS.rawReply` (16,000 characters). A
-  longer reply keeps its start, with `rawTruncated`. The reasoning shares
-  that cap: it gets what room the reply leaves, and says so with
-  `reasoningTruncated` when it ran past it. Reasoning counts towards the
-  same 1200 tokens a reply is asked for, so together they still only reach
-  the cap when something has run away, and the turn's 96 KB ciphertext cap
-  has no room for a second budget that size. `received`'s other fields are
-  short (`RECEIVED_LIMITS`), and a usage too long to keep is dropped. Replies are asked for at
-  1200 tokens, so this is a ceiling for a runaway reply, not one a normal one
-  approaches.
-- `raw` repeats the passage and any written-out turn. Storing the parsed
-  fields as references into it was considered and rejected: the parsed fields
-  are authoritative and frozen per version, while the raw text is only ever
-  displayed. For v4, the turn kind's ciphertext cap went from 48 KB to 96 KB,
-  which is the most the daydream endpoints take.
-- `sent` brought v5, whose worst case — every field and both caps full —
-  still fits the 96 KB cap (`sealed-kinds/daydreams.test.ts`), and v7's,
-  with `received` full too, does as well.
-- v4's and v5's readers and writers shipped together, as v3's did. A turn is read only by
-  its owner, so the only reader that can meet one early is the owner's own
-  tab still open on the previous build.
+(`DaydreamStory.exportHistory`, format version 2): the setup, every turn on
+every branch in the order written, with what is stored for each (`raw` and
+`sent` included where an older passage kept them), the marks, every
+exchange, request and response verbatim, the branch being read and the
+direction buttons on offer. It is for handing a misbehaving story to
+someone debugging it. Each record is opened afresh, not read from the
+page's cache, which only holds turns something has rendered. The file is
+the story in the clear, so it is behind debug mode and goes nowhere but the
+download.
 
 ### Why a kink list won't open
 
@@ -320,11 +353,14 @@ spread across levels. Never saved. See
 
 - **Pure:**
   - `src/lib/debug.test.ts`: the rule;
-  - `sealed-kinds/daydreams.test.ts`: a worst-case turn fits its cap, and the
-    reply and its reasoning share theirs;
-  - `daydream/received-record.test.ts`: what a stream's events are gathered
-    into;
-  - the v4 sealed fixture;
+  - `sealed-kinds/daydreams.test.ts`: a worst-case turn fits its cap, and a
+    long story's exchange, compressed, fits well inside its own;
+  - `daydream/exchange-log.test.ts`: reading a request, a stream and a whole
+    answer, and comparing a request's history with the one before;
+  - `daydream/exchange-recorder.test.ts`: every byte kept, through a drop,
+    the endpoint's own event cut off exactly;
+  - `crypto/sealed.test.ts`: the compressed envelope;
+  - the v4 turn and v1 exchange sealed fixtures;
   - the migration in `server/db/migrations.test.ts`.
 - **Server:**
   - `settings/page.server.test.ts`: the action, which refuses without the
@@ -332,21 +368,24 @@ spread across levels. Never saved. See
   - `(app)/layout.server.test.ts`: `debug`;
   - the IQ test's load;
   - `api/daydreams/[id]/prompt/server.test.ts`: both features, ownership, no
-    model call, no console.
-  - `api/daydreams/suggest/server.test.ts`: what was sent added to a draft's
-    answer only when asked and only for the feature, never the key.
+    model call, no console;
+  - `api/daydreams/[id]/exchanges/server.test.ts`: the feature, ownership,
+    the turns, the envelope, the cascade;
+  - `api/daydreams/[id]/reply/server.test.ts` and
+    `api/daydreams/suggest/server.test.ts`: the exact request body, only when
+    asked and only for the feature, never the key.
 - **Component:**
   - `AppNav.svelte.test.ts`: centred tabs, the toggle hidden while off and
     shown while on;
   - `DebugInfo.svelte.test.ts`;
-  - `SuggestChatLog.svelte.test.ts`, and `daydream/suggest-chat-log.test.ts`
-    for reading both kinds of answer;
+  - `ExchangeLog.svelte.test.ts`;
   - the settings page;
-  - `DaydreamThread.svelte.test.ts`, "in debug mode": raw and received kept
-    with the grant and not without, kept through a Stop, cut when long; the
-    log, with a passage's reasoning and how it ended; the prompt; a failed
-    reply.
+  - `DaydreamThread.svelte.test.ts`, "in debug mode": an exchange kept with
+    the grant and not without, through a Stop and for a failure; a passage's
+    exchange drawn in the log; an older passage's `sent` and rebuilt prompt;
+    a failed reply.
 - **End to end:**
   - `e2e/debug-mode.spec.ts`: the toggle, the panel, the switch, a revoke;
-  - the debug test in `e2e/daydreams.spec.ts`;
+  - the debug test in `e2e/daydreams.spec.ts`, which reads a kept exchange
+    after a reload, its reasoning and usage from the model stub;
   - the testing-aid tests in `e2e/iq-test.spec.ts`.

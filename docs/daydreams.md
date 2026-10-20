@@ -137,7 +137,7 @@ OpenRouter's Responses API (`/responses`, `readingLinks`) rather than Chat
 Completions, because only its answer lists each fetch — the URL, whether it
 was read, and what came back — which debug mode's chat log shows
 ([debug-mode.md](debug-mode.md#how-a-daydream-draft-or-ideas-were-written));
-the browser reads either shape (`completionText`, `suggestChatLog`). The answer gets
+the browser reads either shape (`completionText`, `suggestionLog`). The answer gets
 `READING_ALLOWANCE` more tokens, because a model with a tool reasons over
 what it read before it writes.
 
@@ -1199,13 +1199,14 @@ read as the ones to add, and a string missing its opening quote
 turn, and everything after its tag is kept as the passage; a reading that is
 not one of the five is no reading.
 
-**The reply as it arrived is kept only for debug mode.** For an account
-granted debug mode, a passage also seals the model's reply verbatim, tags and
-metadata included, as `raw` (`daydream-turn` v4), and what else its stream
-carried — the model's reasoning, who answered, why it stopped, its usage —
-as `received` (v7), for the raw log. What the page acts on is still the
-parsed passage and metadata; `raw` and `received` are only ever displayed.
-See [debug-mode.md](debug-mode.md#daydreams-raw-log).
+**The exchange with the model is kept only for debug mode.** For an account
+granted debug mode, each request to the model is kept beside the passage it
+wrote, as an exchange: the request body exactly as the server sent it and
+the response's events exactly as they arrived (`daydream-exchange`), for the
+raw log. Passages from before that kept the reply itself in the turn instead
+(`raw`, `daydream-turn` v4). What the page acts on is still the parsed
+passage and metadata; an exchange is only ever displayed. See
+[debug-mode.md](debug-mode.md#daydreams-raw-log).
 
 **Metadata is not sent back, but for the picture.** Past turns go to the
 model as their words (`toContextTurn`); what a passage offered next was for
@@ -1226,15 +1227,19 @@ the boundary is stated exactly.
 
 **Stored:** sealed records only, in the owner's self vault — the setup
 (`daydream-setup`), each turn (`daydream-turn`), each mark
-(`daydream-mark`), and each library character and idea
-(`daydream-character`, `daydream-scene`), with frozen fixtures. Beside them,
-in plaintext:
+(`daydream-mark`), each library character and idea
+(`daydream-character`, `daydream-scene`), and, for an account granted debug
+mode, each request's exchange with the model (`daydream-exchange`,
+compressed before it is sealed; [debug-mode.md](debug-mode.md#exchanges)),
+with frozen fixtures. Beside them, in plaintext:
 
 - who owns each daydream and library item, and when each was changed;
 - each turn's place in the tree (`parent_id`, `position`), when it was
   written, and who wrote it (`user` or `story`) — not what kind of turn it is;
 - which turn the user is on (`active_turn_id`);
 - which turn each mark is on;
+- which passage each exchange wrote, or, for one that wrote none, which turn
+  it answered;
 - each library item's `revision`.
 
 **In transit, for each passage:** the browser posts the setup and the recent
@@ -1249,9 +1254,9 @@ daydream's picture style and the idea's heat go to
 and sends them to Runware; the picture comes back through the server to the
 browser. Stored: only the picture's ciphertext, under a key the server
 never has. For an account
-granted debug mode, the endpoint first sends back what it sent the model
-(the system prompt and the messages it added), for the browser to seal into
-the passage; it keeps none of it ([debug-mode.md](debug-mode.md#daydreams-raw-log)).
+granted debug mode, the reply endpoint first sends back the request body it
+sent the model, for the browser to keep with the stream as the exchange; it
+keeps none of it ([debug-mode.md](debug-mode.md#exchanges)).
 
 **In transit, for each suggestion:** what the suggestion is about goes to
 `POST /api/daydreams/suggest`, under the same rules, with a prompt of its
@@ -1283,7 +1288,7 @@ the 502 says only "No suggestions just now" — except to an account holding
 debug mode, which also gets the provider's status and error body as `detail`
 ([debug-mode.md](debug-mode.md#why-a-daydreams-suggestion-failed)). A whole
 daydream's or generated ideas' request that asks for `debugLog`, from an account holding debug
-mode, gets what was sent the model added to the answer as `boundUpSent`
+mode, gets the request body it sent added to the answer as `boundUpRequest`
 ([debug-mode.md](debug-mode.md#how-a-daydream-draft-or-ideas-were-written)); nothing
 of it is kept or logged.
 

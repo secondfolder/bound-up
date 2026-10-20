@@ -173,7 +173,7 @@ const RESPONSES_ENDING = ['status', 'incomplete_details', 'error', 'usage'] as c
  * inside it and hid the end of the answer, which is where the reason is: a
  * token budget spent on reasoning (`usage`), a turn that stopped after its
  * fetches, or a reply in a shape `completionText` does not read. The pages
- * themselves are in the chat log (`suggestChatLog`). Null for anything that is not a Responses
+ * themselves are in the chat log (`suggestionLog`). Null for anything that is not a Responses
  * answer.
  */
 function responsesOutline(body: unknown): string | null {

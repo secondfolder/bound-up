@@ -10,7 +10,9 @@ import {
 	MAX_DAYDREAM_CHARACTERS,
 	voiceProblem
 } from '$lib/daydream';
-import { SEALED_PATTERN } from '$lib/sealed';
+import { MAX_READ_EXCHANGE_TURNS } from '$lib/daydream/exchange';
+import { SEALED_PATTERN, sealedPatternFor } from '$lib/sealed';
+import { daydreamExchangeKind } from '$lib/sealed-kinds/daydreams';
 import { isClientId } from '$lib/vault';
 
 /**
@@ -203,6 +205,29 @@ export const appendTurnSchema = z.object({
 	parentId: clientId.nullable(),
 	role: z.enum(['user', 'story']),
 	...sealedFields
+});
+
+/**
+ * `POST /api/daydreams/[id]/exchanges`: one request to the model and its
+ * answer, sealed and compressed. Its own envelope and cap, far larger than
+ * `sealedFields`' (`daydreamExchangeKind`).
+ */
+export const saveExchangeSchema = z.object({
+	id: clientId,
+	turnId: clientId.nullable(),
+	parentTurnId: clientId.nullable(),
+	vaultId: clientId,
+	ciphertext: z
+		.string()
+		.min(1)
+		.max(daydreamExchangeKind.maxCiphertextLength)
+		.regex(sealedPatternFor(daydreamExchangeKind)),
+	payloadVersion: z.number().int().positive()
+});
+
+/** `POST /api/daydreams/[id]/exchanges/read`: the turns whose exchanges the raw log is drawing. */
+export const readExchangesSchema = z.object({
+	turnIds: z.array(clientId).min(1).max(MAX_READ_EXCHANGE_TURNS)
 });
 
 /** `POST /api/daydreams/[id]/turns/read`: turns to open, by id. */

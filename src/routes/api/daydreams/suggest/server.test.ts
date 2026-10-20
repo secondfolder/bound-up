@@ -251,9 +251,13 @@ describe('POST /api/daydreams/suggest', () => {
 		upstream.mockResolvedValueOnce(Response.json(answer));
 		const logged = await read(daydream);
 		expect(logged.choices).toEqual(answer.choices);
-		expect(logged.boundUpSent).toMatchObject({ model: 'test/model', api: 'chat/completions' });
-		expect(logged.boundUpSent.messages[0].content.startsWith(SUGGEST_RULES)).toBe(true);
-		expect(logged.boundUpSent.messages.at(-1).content).toContain(SECRET_WORDS);
+		// The very body that went to the provider, as text.
+		const [, init] = upstream.mock.calls.at(-1) as [string, RequestInit];
+		expect(logged.boundUpRequest).toBe(init.body);
+		const sent = JSON.parse(logged.boundUpRequest);
+		expect(sent.model).toBe('test/model');
+		expect(sent.messages[0].content.startsWith(SUGGEST_RULES)).toBe(true);
+		expect(sent.messages.at(-1).content).toContain(SECRET_WORDS);
 		// Never the key.
 		expect(JSON.stringify(logged)).not.toContain('sk-or-test');
 
@@ -266,7 +270,7 @@ describe('POST /api/daydreams/suggest', () => {
 		upstream.mockResolvedValueOnce(Response.json(answer));
 		expect(
 			await read({ task: 'ideas', brief: SECRET_WORDS, side: null, limits: '', debugLog: true })
-		).toHaveProperty('boundUpSent.model', 'test/model');
+		).toHaveProperty('boundUpRequest');
 		// An answer with nowhere to put it goes back as it came.
 		upstream.mockResolvedValueOnce(new Response('not json'));
 		const result = await post(ada, daydream);

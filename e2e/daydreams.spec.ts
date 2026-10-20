@@ -932,7 +932,7 @@ test.describe('daydreams', () => {
 		await expect(dialog(page).getByText('In this daydream', { exact: true })).toHaveCount(0);
 	});
 
-	test('debug mode keeps each reply as it arrived, shows it raw, and rebuilds its prompt', async ({
+	test('debug mode keeps each exchange with the model verbatim, and rebuilds an older passage’s prompt', async ({
 		page
 	}) => {
 		const who = await signedUpDreamer(page);
@@ -952,23 +952,38 @@ test.describe('daydreams', () => {
 			.click();
 		await expect(page.locator('wa-switch.raw-log')).toBeVisible();
 
-		// Written with the grant: kept raw.
+		// Written with the grant: its exchange is kept, beside it.
 		const said = unique('I close the door,');
+		const kept = page.waitForResponse(
+			(response) => response.url().endsWith('/exchanges') && response.status() === 201
+		);
 		await reply(page, said);
 		await expect(page.getByText(`Mara heard: "${said}"`)).toBeVisible();
 		await passageSaved(page);
+		await kept;
 
+		// After a reload, so what is shown is what was kept, not this visit's copy.
+		await page.reload();
+		await waitForHydration(page);
 		await page.locator('wa-switch.raw-log').click();
 		const raw = page.locator('li.raw');
 		await expect(raw).toHaveCount(3);
+		// The opening, from before the grant: nothing kept, so its prompt is rebuilt.
 		await expect(raw.first()).toContainText('Raw reply not recorded.');
-		const reply3 = raw.last().locator('pre.reply');
-		await expect(reply3).toContainText(`Mara heard: "${said}"`);
-		await expect(reply3).toContainText('<meta>');
+		await raw.first().getByRole('button', { name: 'Show prompt' }).click();
+		await expect(raw.first()).toContainText('# The characters');
 
-		await raw.last().getByRole('button', { name: 'Show prompt' }).click();
-		await expect(raw.last()).toContainText('# The characters');
-		await expect(raw.last().locator('.messages li').last()).toContainText(said);
+		// The reply: the request exactly as sent, the reasoning, and how it ended.
+		const exchange = page.locator('li.exchange');
+		await expect(exchange).toHaveCount(1);
+		await expect(exchange).toContainText('The stub thinks it over.');
+		await expect(exchange).toContainText(`Mara heard: "${said}"`);
+		// Its heading is the disclosure's `summary`, drawn in its shadow root.
+		await expect(exchange.getByText(/How it ended: stopped: stop · .* · via Stub/)).toBeVisible();
+		// The request and response exactly as they went, the usage it asked for included.
+		await expect(exchange).toContainText('"usage":{"include":true}');
+		await expect(exchange).toContainText('"total_tokens":120');
+		await expect(raw.last()).not.toContainText('Raw reply not recorded.');
 	});
 
 	test('an account without the feature has no way in', async ({ page }) => {

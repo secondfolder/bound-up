@@ -61,8 +61,9 @@ export const replyRequestSchema = z
 		// One more for the `omitted` marker a trimmed story starts with.
 		turns: z.array(contextTurnSchema).max(MAX_CONTEXT_TURNS + 1),
 		/**
-		 * Debug mode: answer with what was sent, ahead of the reply
-		 * (`daydream/sent-record.ts`), for the passage to keep for the raw log.
+		 * Debug mode: answer with the request body exactly as it was sent,
+		 * ahead of the reply, for the browser to keep as the exchange
+		 * (`daydream/exchange.ts`). Only for an account holding the feature.
 		 */
 		record: z.boolean().optional(),
 		/** The direction buttons on screen now, for the model to add to or prune. */

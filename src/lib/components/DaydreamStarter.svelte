@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { DAYDREAM_LIMITS, DAYDREAM_VOICE_PRESETS, type DaydreamVoicePresetId } from '$lib/daydream';
 	import { ideaLevel } from '$lib/daydream/dial-words';
+	import type { ExchangeLogView as ChatLog } from '$lib/daydream/exchange-log';
 	import {
 		type DaydreamStarter,
 		forSide,
@@ -12,11 +13,10 @@
 		startersFor
 	} from '$lib/daydream/starters';
 	import type { SuggestFailure } from '$lib/daydream/suggest';
-	import type { SuggestChatLog as ChatLog } from '$lib/daydream/suggest-chat-log';
 	import type { GeneratedIdea } from '$lib/daydream/suggestions';
 	import DaydreamSidePicker from './DaydreamSidePicker.svelte';
+	import ExchangeLog from './ExchangeLog.svelte';
 	import SearchField from './SearchField.svelte';
-	import SuggestChatLog from './SuggestChatLog.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/**
@@ -205,7 +205,7 @@
 						Clear
 					</wa-button>
 				</div>
-				{#if debug && generated.log}<SuggestChatLog log={generated.log} />{/if}
+				{#if debug && generated.log}<ExchangeLog log={generated.log} />{/if}
 				{#if ideasForSide.length === 0}
 					<p class="hint">None of these have you as the {side}. Ask for more that do.</p>
 				{:else if ideasShown.length === 0}

@@ -39,6 +39,29 @@ export const SEALED_AAD_INFO = 'bound-up-sealed-v1';
 export const SEALED_PATTERN = /^sb1\.[A-Za-z0-9_-]+$/;
 
 /**
+ * The prefix of a compressed kind's ciphertext (`compressed` on
+ * `defineSealedKind`): the same as `sb1.`, but the plaintext is the payload's
+ * JSON deflated (raw DEFLATE, RFC 1951) before it is encrypted. Only for a
+ * kind whose content the server already handled in plaintext, since
+ * compressing first lets the ciphertext's length say something about what is
+ * in it: a daydream's exchanges with the model (`daydream-exchange`), which
+ * passed through the server on their way to and from it.
+ */
+export const SEALED_FORMAT_COMPRESSED_V1 = 'sz1.';
+
+export const SEALED_COMPRESSED_PATTERN = /^sz1\.[A-Za-z0-9_-]+$/;
+
+/** The prefix a kind's ciphertext carries, and must carry to be opened as one. */
+export function sealedFormatFor(kind: SealedKind<unknown>): string {
+	return kind.compressed ? SEALED_FORMAT_COMPRESSED_V1 : SEALED_FORMAT_V1;
+}
+
+/** What a kind's ciphertext looks like. */
+export function sealedPatternFor(kind: SealedKind<unknown>): RegExp {
+	return kind.compressed ? SEALED_COMPRESSED_PATTERN : SEALED_PATTERN;
+}
+
+/**
  * One version of a kind's payload.
  *
  * `upcast` turns a value of this version into the input for the next one, and
@@ -63,6 +86,8 @@ export type SealedKind<Latest> = {
 	readonly name: string;
 	/** The longest ciphertext the server will store for this kind, in characters. */
 	readonly maxCiphertextLength: number;
+	/** Whether its payload is deflated before it is sealed (`SEALED_FORMAT_COMPRESSED_V1`). */
+	readonly compressed: boolean;
 	/** Every version ever shipped, oldest first. */
 	readonly versions: readonly SealedKindVersion[];
 	readonly latestVersion: number;
@@ -80,6 +105,8 @@ const KIND_NAME = /^[a-z][a-z0-9-]{0,39}$/;
 export function defineSealedKind<Latest>(definition: {
 	name: string;
 	maxCiphertextLength: number;
+	/** Deflate the payload before sealing it: see `SEALED_FORMAT_COMPRESSED_V1` for when that is safe. */
+	compressed?: true;
 	versions: readonly [...SealedKindVersion[], { version: number; schema: z.ZodType<Latest> }];
 }): SealedKind<Latest> {
 	const { name, versions } = definition;
@@ -102,6 +129,7 @@ export function defineSealedKind<Latest>(definition: {
 	return {
 		name,
 		maxCiphertextLength: definition.maxCiphertextLength,
+		compressed: definition.compressed ?? false,
 		versions,
 		latestVersion: last.version,
 		// The definition's own type says the last entry's schema is

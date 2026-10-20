@@ -1,8 +1,10 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
-import { DAYDREAM_LIMITS, type DaydreamTurnRole } from '$lib/daydream';
+import type { DaydreamTurnRole } from '$lib/daydream';
 import type { ReplyOutcome } from '$lib/daydream/client';
+import type { Exchange } from '$lib/daydream/exchange';
+import type { ExchangeRecorder } from '$lib/daydream/exchange-recorder';
 import type { ReplySoFar } from '$lib/daydream/reply-format';
 import { recordSent } from '$lib/daydream/sent-record';
 import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
@@ -98,12 +100,13 @@ const client = vi.hoisted(() => ({
 	requestPicture: vi.fn(),
 	estimatePicture: vi.fn(),
 	uploadPicture: vi.fn(),
-	downloadPicture: vi.fn()
+	downloadPicture: vi.fn(),
+	saveExchange: vi.fn(),
+	readExchanges: vi.fn()
 }));
 vi.mock('$lib/daydream/client', () => client);
 
 const { default: DaydreamThread } = await import('./DaydreamThread.svelte');
-const { rawReply } = await import('$lib/daydream/story.svelte');
 
 const SETUP = testDaydreamSetup();
 let clock = 0;
@@ -162,6 +165,24 @@ beforeEach(() => {
 	for (const fn of Object.values(client)) {
 		fn.mockReset();
 	}
+	client.readExchanges.mockResolvedValue({ ok: true, exchanges: [] });
+	client.saveExchange.mockImplementation(
+		(
+			_id: string,
+			input: { turnId: string | null; parentTurnId: string | null; exchange: unknown }
+		) =>
+			Promise.resolve({
+				ok: true,
+				content: input.exchange,
+				exchange: {
+					id: `x-${input.turnId ?? 'none'}`,
+					turnId: input.turnId,
+					parentTurnId: input.parentTurnId,
+					createdAt: new Date(),
+					sealed: ref('x')
+				}
+			})
+	);
 	client.saveTurn.mockImplementation((_id: string, input: SaveInput) => {
 		opened.set(input.id, input.content);
 		clock += 1;
@@ -1524,78 +1545,53 @@ describe('DaydreamThread in debug mode', () => {
 		localStorage.removeItem('daydreams.raw-log');
 	});
 
-	it('keeps the reply as it arrived on the passage, for an account granted debug mode', async () => {
-		replyWith(Raw, 'Mara looks up.');
-		render(DaydreamThread, { daydream: daydream(), available: true, keepRawReplies: true });
-		await waitFor(() => expect(saved(0)?.role).toBe('story'));
-		expect(saved(0)?.content).toMatchObject({ type: 'text', text: 'Mara looks up.', raw: Raw });
-		expect(saved(0)?.content).not.toHaveProperty('rawTruncated');
+	const Request = JSON.stringify({
+		model: 'test/model',
+		messages: [
+			{ role: 'system', content: 'RULES' },
+			{ role: 'user', content: '(Begin the story.)' }
+		]
 	});
+	const Stream = `data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'Slowly.' } }] })}\n\ndata: [DONE]\n\n`;
 
-	it('keeps what the request sent the model on the passage, for an account granted debug mode', async () => {
-		const record = {
-			system: 'RULES',
-			added: ['(Begin.)'],
-			history: { messages: 0, chain: '0'.repeat(64) }
-		};
+	/** What `writeReply` does with a recorder: hands it the request, and a copy of the stream. */
+	function recordInto(options: { recorder?: ExchangeRecorder }, body = Stream) {
+		options.recorder?.request(Request);
+		options.recorder?.capture(200, new Blob([body]).stream());
+	}
+
+	/** What was kept, the nth time an exchange was saved. */
+	const keptExchange = (index: number) =>
+		client.saveExchange.mock.calls[index]?.[1] as
+			| { turnId: string | null; parentTurnId: string | null; exchange: Exchange }
+			| undefined;
+
+	it('keeps each passage’s exchange verbatim, beside it rather than in it, for an account granted debug mode', async () => {
 		client.writeReply.mockImplementationOnce(
-			(
-				_id: string,
-				request: { record?: boolean },
-				options: { onSent?: (sent: unknown) => void }
-			) => {
+			(_id: string, request: { record?: boolean }, options: { recorder?: ExchangeRecorder }) => {
 				expect(request.record).toBe(true);
-				options.onSent?.(record);
+				recordInto(options);
 				return Promise.resolve({
 					ok: true,
 					passage: 'Mara looks up.',
 					meta: meta(),
 					expansion: null,
-					reading: null,
+					reading: 'action',
 					raw: Raw
 				} satisfies ReplyOutcome);
 			}
 		);
 		render(DaydreamThread, { daydream: daydream(), available: true, keepRawReplies: true });
-		await waitFor(() => expect(saved(0)?.role).toBe('story'));
-		expect(saved(0)?.content).toMatchObject({ sent: record });
-	});
-
-	it('keeps what else the stream carried on the passage: reasoning, model, ending, usage', async () => {
-		client.writeReply.mockImplementationOnce(
-			(_id: string, _request: unknown, options: { onEvent?: (event: unknown) => void }) => {
-				options.onEvent?.({
-					id: 'gen-1',
-					model: 'z-ai/glm-4.6',
-					provider: 'Chutes',
-					choices: [{ delta: { reasoning: 'Keep it ' } }]
-				});
-				options.onEvent?.({ choices: [{ delta: { reasoning: 'slow.' } }] });
-				options.onEvent?.({ choices: [{ delta: {}, finish_reason: 'stop' }] });
-				options.onEvent?.({ choices: [], usage: { total_tokens: 12 } });
-				return Promise.resolve({
-					ok: true,
-					passage: 'Mara looks up.',
-					meta: meta(),
-					expansion: null,
-					reading: null,
-					raw: Raw
-				} satisfies ReplyOutcome);
-			}
-		);
-		render(DaydreamThread, { daydream: daydream(), available: true, keepRawReplies: true });
-		await waitFor(() => expect(saved(0)?.role).toBe('story'));
-		expect(saved(0)?.content).toMatchObject({
-			raw: Raw,
-			received: {
-				reasoning: 'Keep it slow.',
-				model: 'z-ai/glm-4.6',
-				provider: 'Chutes',
-				generationId: 'gen-1',
-				finishReason: 'stop',
-				usage: JSON.stringify({ total_tokens: 12 }, null, 2)
-			}
+		await waitFor(() => expect(client.saveExchange).toHaveBeenCalledOnce());
+		const passage = defined(saved(0), 'the passage');
+		expect(keptExchange(0)).toMatchObject({
+			turnId: passage.id,
+			parentTurnId: null,
+			exchange: { request: Request, response: { status: 200, body: Stream }, ended: 'done' }
 		});
+		// The turn is the story alone now.
+		expect(passage.content).not.toHaveProperty('raw');
+		expect(passage.content).not.toHaveProperty('sent');
 	});
 
 	it('asks for no record, and keeps none, for an account without it', async () => {
@@ -1603,24 +1599,22 @@ describe('DaydreamThread in debug mode', () => {
 		render(DaydreamThread, { daydream: daydream(), available: true });
 		await waitFor(() => expect(saved(0)?.role).toBe('story'));
 		expect(asked(0)).not.toHaveProperty('record');
-		expect(saved(0)?.content).not.toHaveProperty('sent');
-		expect(saved(0)?.content).not.toHaveProperty('received');
+		expect(client.writeReply.mock.calls[0]?.[2]).not.toHaveProperty('recorder');
+		expect(client.saveExchange).not.toHaveBeenCalled();
 	});
 
-	it('keeps nothing raw for an account without it', async () => {
-		replyWith(Raw, 'Mara looks up.');
-		render(DaydreamThread, { daydream: daydream(), available: true });
-		await waitFor(() => expect(saved(0)?.role).toBe('story'));
-		expect(saved(0)?.content).not.toHaveProperty('raw');
-	});
-
-	it('keeps what had arrived when the reply is stopped', async () => {
+	it('keeps what had arrived when the reply is stopped, passage and exchange alike', async () => {
 		client.writeReply.mockImplementationOnce(
 			(
 				_id: string,
 				_request: unknown,
-				options: { signal: AbortSignal; onText: (soFar: ReplySoFar, raw: string) => void }
+				options: {
+					signal: AbortSignal;
+					onText: (soFar: ReplySoFar, raw: string) => void;
+					recorder?: ExchangeRecorder;
+				}
 			) => {
+				recordInto(options);
 				options.onText(
 					{ passage: 'Mara half', expansion: null, reading: null },
 					'<reading>action</reading>\nMara half<me'
@@ -1639,21 +1633,99 @@ describe('DaydreamThread in debug mode', () => {
 		});
 		await waitFor(() => expect(container.textContent).toContain('Mara half'));
 		await press(container, 'Stop writing');
-		await waitFor(() => expect(saved(0)?.role).toBe('story'));
-		expect(saved(0)?.content).toMatchObject({
-			text: 'Mara half',
-			raw: '<reading>action</reading>\nMara half<me'
+		await waitFor(() => expect(client.saveExchange).toHaveBeenCalledOnce());
+		expect(saved(0)?.content).toMatchObject({ text: 'Mara half' });
+		expect(keptExchange(0)).toMatchObject({
+			turnId: saved(0)?.id,
+			exchange: { ended: 'stopped' }
 		});
 	});
 
-	it('cuts a runaway reply, and says it did', () => {
-		expect(rawReply('')).toEqual({});
-		expect(rawReply('short')).toEqual({ raw: 'short' });
-		const long = 'x'.repeat(DAYDREAM_LIMITS.rawReply + 10);
-		expect(rawReply(long)).toEqual({
-			raw: 'x'.repeat(DAYDREAM_LIMITS.rawReply),
-			rawTruncated: true
+	it('keeps a failed reply’s exchange under the turn it answered, though no passage was saved', async () => {
+		client.writeReply.mockImplementationOnce(
+			(_id: string, _request: unknown, options: { recorder?: ExchangeRecorder }) => {
+				recordInto(options, 'data: {"error":{"message":"overloaded"}}\n\n');
+				return Promise.resolve({
+					ok: false,
+					error: 'The reply stopped partway through. Try again.',
+					partial: '',
+					raw: '',
+					ended: 'error'
+				} satisfies ReplyOutcome);
+			}
+		);
+		render(DaydreamThread, { daydream: daydream(), available: true, keepRawReplies: true });
+		await waitFor(() => expect(client.saveExchange).toHaveBeenCalledOnce());
+		expect(client.saveTurn).not.toHaveBeenCalled();
+		expect(keptExchange(0)).toMatchObject({
+			turnId: null,
+			parentTurnId: null,
+			exchange: { ended: 'error' }
 		});
+	});
+
+	it('draws a passage’s exchange in the raw log: what was added, reasoning, the request as sent', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		const exchange = (id: string, turnId: string, request: string, body: string) => {
+			opened.set(id, {
+				endpoint: 'chat/completions',
+				request,
+				response: { status: 200, body },
+				ended: 'done',
+				startedAt: 0,
+				endedAt: 2000
+			});
+			return { id, turnId, parentTurnId: null, createdAt: new Date(), sealed: ref(id) };
+		};
+		const second = JSON.stringify({
+			model: 'test/model',
+			messages: [
+				{ role: 'system', content: 'RULES' },
+				{ role: 'user', content: '(Begin the story.)' },
+				{ role: 'assistant', content: 'Sit.' },
+				{ role: 'user', content: 'I sit.' }
+			]
+		});
+		client.readExchanges.mockResolvedValue({
+			ok: true,
+			exchanges: [exchange('x1', 't1', Request, Stream), exchange('x3', 't3', second, Stream)]
+		});
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', { type: 'text', text: 'Sit.' }),
+				turn('t2', 't1', 'user', 'I sit.'),
+				turn('t3', 't2', 'story', { type: 'text', text: 'Mara looks up.', meta: meta() })
+			]),
+			available: true,
+			debug: true
+		});
+		const drawn = (id: string) => container.querySelector(`[data-exchange-for="${id}"]`);
+		await waitFor(() => expect(drawn('t3')).not.toBeNull());
+		await waSettled(container);
+		const summaries = (id: string) =>
+			[...(drawn(id)?.querySelectorAll('wa-details') ?? [])].map((details) =>
+				waProp(details, 'summary')
+			);
+		// The second request's history is the first's, said once; what it added is its own.
+		expect(summaries('t3')).toEqual([
+			'History: 2 messages, as the request before sent them',
+			'Sent back as the model’s',
+			'Sent',
+			'Settings',
+			'Reasoning',
+			'Reply',
+			expect.stringContaining('How it ended'),
+			'Request, exactly as sent',
+			'Response, exactly as it arrived'
+		]);
+		expect(drawn('t3')?.textContent).toContain('Slowly.');
+		expect(drawn('t3')?.textContent).toContain(second);
+		expect(drawn('t3')?.querySelector('[data-not-appended]')).toBeNull();
+		// Nothing rebuilt or old-style for a story that kept its exchanges.
+		expect(container.querySelector('[data-raw-system]')).toBeNull();
+		expect(container.querySelector('[data-sent-before]')).toBeNull();
+		expect(client.readPrompt).not.toHaveBeenCalled();
+		expect(container.textContent).not.toContain('Raw reply not recorded');
 	});
 
 	it('exports the whole story, every branch, opened, as a file', async () => {
@@ -1748,43 +1820,6 @@ describe('DaydreamThread in debug mode', () => {
 		expect(container.querySelectorAll('[data-sent-before]')).toHaveLength(2);
 	});
 
-	it('shows a passage’s reasoning and how it ended in the raw log, and says when neither was kept', async () => {
-		localStorage.setItem('daydreams.raw-log', '1');
-		promptsBy({ opening: 'THE RULES', reply: 'THE RULES' });
-		const received = {
-			reasoning: 'Keep it slow.',
-			model: 'z-ai/glm-4.6',
-			provider: 'Chutes',
-			finishReason: 'stop',
-			usage: '{ "total_tokens": 12 }'
-		};
-		const { container } = render(DaydreamThread, {
-			daydream: daydream([
-				turn('t1', null, 'story', { type: 'text', text: 'Sit.', raw: Raw, received }),
-				turn('t2', 't1', 'user', 'I sit.'),
-				turn('t3', 't2', 'story', { type: 'text', text: 'Mara looks up.', meta: meta(), raw: Raw })
-			]),
-			available: true,
-			debug: true
-		});
-		const raw = (id: string) => container.querySelector(`[data-turn-id="${id}"]`);
-		await waitFor(() => expect(raw('t1')?.textContent).toContain('Keep it slow.'));
-		await waSettled(container);
-		const summaries = [...(raw('t1')?.querySelectorAll('wa-details') ?? [])].map((details) =>
-			waProp(details, 'summary')
-		);
-		expect(summaries).toContain('Reasoning');
-		expect(summaries).toContain('How it ended: Stopped: stop · z-ai/glm-4.6 · via Chutes');
-		expect(raw('t1')?.textContent).toContain('"total_tokens": 12');
-		// Not in "Stored" again.
-		expect(
-			[...(raw('t1')?.querySelectorAll('pre') ?? [])].filter((pre) =>
-				pre.textContent?.includes('Keep it slow.')
-			)
-		).toHaveLength(1);
-		expect(raw('t3')?.textContent).toContain('How it ended was not recorded.');
-	});
-
 	/** Two passages, each with the record its request would have made, the second's history as given. */
 	async function recorded(secondHistory: 'appended' | 'changed') {
 		const opening = await recordSent([
@@ -1866,8 +1901,10 @@ describe('DaydreamThread in debug mode', () => {
 		});
 		const sent = (id: string) => container.querySelector(`[data-sent-before="${id}"]`);
 		// Its title is the disclosure's `summary`, not text in it.
-		await waitFor(() => expect(sent('t1')?.querySelector('wa-details')).not.toBeNull());
-		expect(sent('t1')?.querySelector('wa-details')?.textContent).toContain('CHECK IN');
+		// The exchanges are asked about first, so this settles a step later than it did.
+		await waitFor(() =>
+			expect(sent('t1')?.querySelector('wa-details')?.textContent).toContain('CHECK IN')
+		);
 		await waitFor(() => expect(sent('t3')?.textContent).toContain('I sit.'));
 		expect(sent('t3')?.querySelector('wa-details')).toBeNull();
 	});
@@ -1937,7 +1974,8 @@ describe('DaydreamThread in debug mode', () => {
 			ok: false,
 			error: 'The reply stopped partway through. Try again.',
 			partial: 'Mara',
-			raw: '<reading>act'
+			raw: '<reading>act',
+			ended: 'dropped'
 		} satisfies ReplyOutcome);
 		const { container } = render(DaydreamThread, {
 			daydream: daydream(),

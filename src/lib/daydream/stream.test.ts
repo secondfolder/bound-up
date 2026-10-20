@@ -68,39 +68,25 @@ describe('readReplyStream', () => {
 		expect(result).toMatchObject({ text: 'Half a ', outcome: { kind: 'error' } });
 	});
 
-	it('hands the endpoint’s record of what it sent to its own callback, not the reply', async () => {
-		const sent: unknown[] = [];
+	it('hands the request body the endpoint sent to its own callback, not the reply', async () => {
+		const sent: string[] = [];
 		const pieces: string[] = [];
-		const record = { system: 'RULES', added: ['I sit.'], history: { messages: 0, chain: 'x' } };
+		const request = JSON.stringify({
+			model: 'm',
+			messages: [{ role: 'user', content: 'I sit.\n' }]
+		});
 		const outcome = await readReplyStream(
 			body(
-				`data: ${JSON.stringify({ boundUpSent: record })}\n\n`,
+				`data: ${JSON.stringify({ boundUpRequest: request })}\n\n`,
 				event('Sit.'),
 				'data: [DONE]\n\n'
 			),
 			(piece) => pieces.push(piece),
 			(value) => sent.push(value)
 		);
-		expect(sent).toEqual([record]);
+		expect(sent).toEqual([request]);
 		expect(pieces.join('')).toBe('Sit.');
 		expect(outcome).toEqual({ kind: 'done' });
-	});
-
-	it('hands every provider event on whole, the one that ends it in error included', async () => {
-		const events: unknown[] = [];
-		const reasoning = { choices: [{ delta: { reasoning: 'Hm.' } }], model: 'm' };
-		const failure = { error: { message: 'overloaded' } };
-		await readReplyStream(
-			body(
-				`data: ${JSON.stringify(reasoning)}\n\n`,
-				event('Sit.'),
-				`data: ${JSON.stringify(failure)}\n\n`
-			),
-			() => undefined,
-			() => undefined,
-			(value) => events.push(value)
-		);
-		expect(events).toEqual([reasoning, { choices: [{ delta: { content: 'Sit.' } }] }, failure]);
 	});
 
 	it('treats a stream that just ends as done', async () => {

@@ -626,6 +626,19 @@ export type DaydreamTreeNodeView = {
 /** A turn with its sealed content: the turns on the branch being read, and any opened on demand. */
 export type DaydreamTurnView = DaydreamTreeNodeView & { sealed: SealedRefView };
 
+/**
+ * One request a daydream made to the model, and its answer, for debug mode's
+ * raw log. Which passage it wrote (`turnId`, null for one that failed) and
+ * what it answered (`parentTurnId`) are plaintext; the exchange is sealed.
+ */
+export type DaydreamExchangeView = {
+	id: string;
+	turnId: string | null;
+	parentTurnId: string | null;
+	createdAt: Date;
+	sealed: SealedRefView;
+};
+
 /** A bookmark or a reaction on a turn. What it is is sealed; which turn it marks is not. */
 export type DaydreamMarkView = {
 	id: string;

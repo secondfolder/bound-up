@@ -1,11 +1,11 @@
 import { render } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import { waProp, waSettled } from '$lib/testing/web-awesome';
-import SuggestChatLog from './SuggestChatLog.svelte';
+import ExchangeLog from './ExchangeLog.svelte';
 
-describe('SuggestChatLog', () => {
+describe('ExchangeLog', () => {
 	it('shows every bubble of the exchange in order, each under its label', async () => {
-		const { container } = render(SuggestChatLog, {
+		const { container } = render(ExchangeLog, {
 			log: {
 				model: 'test/model',
 				api: 'responses',

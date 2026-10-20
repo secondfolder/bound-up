@@ -5,6 +5,9 @@
  *
  *     ciphertext = "sb1." + base64url( 12-byte IV || AES-256-GCM(JSON) || 16-byte tag )
  *
+ * or, for a kind that is `compressed`, "sz1." and the JSON deflated before it
+ * is encrypted (`SEALED_FORMAT_COMPRESSED_V1` says when that is safe).
+ *
  * under the vault's encryption key, with the associated data from `sealedAad`:
  * the kind, the record's id, the vault's id and the payload version. So a
  * ciphertext copied to another row, another kind or another vault does not
@@ -19,10 +22,10 @@ import { fromBase64Url, toBase64Url } from '../encryption';
 import {
 	readSealedPayload,
 	readSealedPayloadDiagnosed,
-	SEALED_FORMAT_V1,
 	type SealedKind,
 	type SealedReadFailure,
-	sealedAad
+	sealedAad,
+	sealedFormatFor
 } from '../sealed';
 import type { OpenVault } from './vault';
 import type { WriteGrant } from './write-grant';
@@ -74,13 +77,13 @@ export async function sealRecord<Latest>(
 			)
 		},
 		vault.encryptionKey,
-		encoder.encode(JSON.stringify(parsed.data))
+		await plaintextBytes(kind, JSON.stringify(parsed.data))
 	);
 	const blob = new Uint8Array(IV_BYTES + sealed.byteLength);
 	blob.set(iv, 0);
 	blob.set(new Uint8Array(sealed), IV_BYTES);
 
-	const ciphertext = `${SEALED_FORMAT_V1}${toBase64Url(blob)}`;
+	const ciphertext = `${sealedFormatFor(kind)}${toBase64Url(blob)}`;
 	if (ciphertext.length > kind.maxCiphertextLength) {
 		// The server would refuse it. Saying so here names the cause; a 400 from
 		// the endpoint would not.
@@ -115,13 +118,14 @@ export async function openRecord<Latest>(
 	input: { recordId: string; ciphertext: string; payloadVersion: number; vault: OpenVault }
 ): Promise<Latest | null> {
 	const { recordId, ciphertext, payloadVersion, vault } = input;
-	if (!ciphertext.startsWith(SEALED_FORMAT_V1)) {
+	const format = sealedFormatFor(kind);
+	if (!ciphertext.startsWith(format)) {
 		return null;
 	}
 
 	let bytes: Uint8Array<ArrayBuffer>;
 	try {
-		bytes = fromBase64Url(ciphertext.slice(SEALED_FORMAT_V1.length));
+		bytes = fromBase64Url(ciphertext.slice(format.length));
 	} catch {
 		return null;
 	}
@@ -142,7 +146,13 @@ export async function openRecord<Latest>(
 			vault.encryptionKey,
 			bytes.subarray(IV_BYTES)
 		);
-		plaintext = decoder.decode(opened);
+		// Only a compressed kind awaits again here, so every other kind opens
+		// exactly as it did (see the note above about extra awaits).
+		const read = kind.compressed ? await inflated(opened) : decoder.decode(opened);
+		if (read === null) {
+			return null;
+		}
+		plaintext = read;
 	} catch (error) {
 		// Every authentication failure is an OperationError with no detail, which
 		// is right: telling a wrong key from a moved row would be an oracle.
@@ -170,7 +180,7 @@ export async function openRecordDiagnosed<Latest>(
 	kind: SealedKind<Latest>,
 	input: SealedInput
 ): Promise<Diagnosed<Latest>> {
-	const bytes = sealedBytes(input.ciphertext);
+	const bytes = sealedBytes(kind, input.ciphertext);
 	if (!bytes) {
 		return { ok: false, reason: 'format' };
 	}
@@ -178,13 +188,17 @@ export async function openRecordDiagnosed<Latest>(
 }
 
 /** The IV and ciphertext out of a sealed string, or null for one that is not sealed. */
-function sealedBytes(ciphertext: string): Uint8Array<ArrayBuffer> | null {
-	if (!ciphertext.startsWith(SEALED_FORMAT_V1)) {
+function sealedBytes(
+	kind: SealedKind<unknown>,
+	ciphertext: string
+): Uint8Array<ArrayBuffer> | null {
+	const format = sealedFormatFor(kind);
+	if (!ciphertext.startsWith(format)) {
 		return null;
 	}
 	let bytes: Uint8Array<ArrayBuffer>;
 	try {
-		bytes = fromBase64Url(ciphertext.slice(SEALED_FORMAT_V1.length));
+		bytes = fromBase64Url(ciphertext.slice(format.length));
 	} catch {
 		return null;
 	}
@@ -209,7 +223,7 @@ async function decrypt(
 			vault.encryptionKey,
 			bytes.subarray(IV_BYTES)
 		);
-		return decoder.decode(opened);
+		return kind.compressed ? await inflated(opened) : decoder.decode(opened);
 	} catch (error) {
 		// Every authentication failure is an OperationError with no detail, which
 		// is right: telling a wrong key from a moved row would be an oracle.
@@ -235,6 +249,39 @@ function readPlaintext<Latest>(
 		return { ok: false, reason: 'json' };
 	}
 	return readSealedPayloadDiagnosed(kind, payloadVersion, value);
+}
+
+/** What is encrypted: the payload's JSON, deflated first for a compressed kind. */
+async function plaintextBytes(
+	kind: SealedKind<unknown>,
+	json: string
+): Promise<Uint8Array<ArrayBuffer>> {
+	const bytes = encoder.encode(json);
+	return kind.compressed ? await through(bytes, new CompressionStream('deflate-raw')) : bytes;
+}
+
+/**
+ * A compressed kind's plaintext, or null for a stream that will not inflate,
+ * which the callers treat as the record not opening. Only ever given bytes
+ * that authenticated, so what it inflates was written by a device holding
+ * the vault key, not by the server.
+ */
+async function inflated(opened: ArrayBuffer): Promise<string | null> {
+	try {
+		return decoder.decode(
+			await through(new Uint8Array(opened), new DecompressionStream('deflate-raw'))
+		);
+	} catch {
+		return null;
+	}
+}
+
+async function through(
+	bytes: Uint8Array<ArrayBuffer>,
+	stream: CompressionStream | DecompressionStream
+): Promise<Uint8Array<ArrayBuffer>> {
+	const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+	return new Uint8Array(await out.arrayBuffer());
 }
 
 /**

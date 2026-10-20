@@ -1,5 +1,6 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
+import type { ExchangeLogView } from '$lib/daydream/exchange-log';
 import {
 	DAYDREAM_STARTERS,
 	matchesSearch,
@@ -9,7 +10,6 @@ import {
 	startersFor
 } from '$lib/daydream/starters';
 import type { SuggestFailure } from '$lib/daydream/suggest';
-import type { SuggestChatLog } from '$lib/daydream/suggest-chat-log';
 import type { GeneratedIdea } from '$lib/daydream/suggestions';
 import { defined } from '$lib/testing/defined';
 import { waProp, waSettled } from '$lib/testing/web-awesome';
@@ -40,7 +40,7 @@ async function renderStarter(
 		brief?: string;
 		problem?: SuggestFailure;
 		side?: StarterSide | null;
-		generated?: { brief: string; ideas: GeneratedIdea[]; log?: SuggestChatLog } | null;
+		generated?: { brief: string; ideas: GeneratedIdea[]; log?: ExchangeLogView } | null;
 		debug?: boolean;
 		ongenerate?: (brief: string) => Promise<SuggestFailure | null>;
 		onmore?: () => Promise<SuggestFailure | null>;

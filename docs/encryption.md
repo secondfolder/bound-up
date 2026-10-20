@@ -679,6 +679,16 @@ plaintext `payload_version` was edited to have it read as an older shape. The
 without guessing. Record ids are chosen by the browser, because they are part
 of what the ciphertext is bound to.
 
+A kind may be **compressed** (`compressed` on `defineSealedKind`): its JSON
+is deflated (raw DEFLATE) before it is encrypted, and the ciphertext starts
+`sz1.` instead, with the same IV, tag and associated data. Compressing first
+lets a ciphertext's length say something about what is in it, so only a
+kind whose content the server already handled in plaintext may opt in: a
+daydream's exchanges with the model (`daydream-exchange`), which passed
+through the server on their way to and from it
+([debug-mode.md](debug-mode.md#exchanges)). A kind opens only under its own
+prefix, so neither kind can be read as the other.
+
 `crypto/sealed.ts` seals and opens. Sealing takes a **write grant**
 (`crypto/write-grant.ts`): for a partnership vault one comes only from
 `writeGrantFor` in `crypto/trust.svelte.ts`, which asks the trust check first,

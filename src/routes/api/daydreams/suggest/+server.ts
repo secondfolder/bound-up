@@ -34,7 +34,7 @@ import type { RequestHandler } from './$types';
  * Not streamed: a suggestion is a small JSON answer, useless until it is
  * whole. The provider's response is passed through unread; the browser
  * checks it (`$lib/daydream/suggestions.ts`). The one exception is debug
- * mode's chat log, which has what was sent added to it (`withSent`).
+ * mode's chat log, which has the request it answered added to it (`withRequest`).
  */
 export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	const userId = await daydreamGuard(locals);
@@ -67,6 +67,21 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	const { messages, maxTokens, readLinks } = buildSuggestMessages(parsed.data, {
 		canReadLinks: config.readsLinks
 	});
+	// Stringified once, so debug mode's chat log shows the very text that was sent.
+	const body = JSON.stringify(
+		readLinks
+			? readingLinks(config.openrouterModelId, messages, maxTokens)
+			: {
+					model: config.openrouterModelId,
+					messages,
+					max_tokens: maxTokens,
+					temperature: 1,
+					// Ignored by a provider that does not support it; the browser
+					// copes with a fenced or chatty answer either way.
+					response_format: { type: 'json_object' },
+					provider: { data_collection: 'deny' }
+				}
+	);
 	let upstream: Response;
 	try {
 		upstream = await fetch(`${config.baseUrl}/${readLinks ? 'responses' : 'chat/completions'}`, {
@@ -75,20 +90,7 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 				authorization: `Bearer ${config.apiKey}`,
 				'content-type': 'application/json'
 			},
-			body: JSON.stringify(
-				readLinks
-					? readingLinks(config.openrouterModelId, messages, maxTokens)
-					: {
-							model: config.openrouterModelId,
-							messages,
-							max_tokens: maxTokens,
-							temperature: 1,
-							// Ignored by a provider that does not support it; the browser
-							// copes with a fenced or chatty answer either way.
-							response_format: { type: 'json_object' },
-							provider: { data_collection: 'deny' }
-						}
-			),
+			body,
 			signal: request.signal
 		});
 	} catch (cause) {
@@ -104,11 +106,11 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	if (!(upstream.ok && upstream.body)) {
 		// The status only. The body of an error can quote the request back.
 		console.error(`[daydreams] the model provider answered ${upstream.status} to a suggestion`);
-		const body = await upstream.text().catch(() => '');
+		const answered = await upstream.text().catch(() => '');
 		return unavailable(
 			locals.db,
 			userId,
-			`The model provider answered ${upstream.status}:\n${body.slice(0, MAX_FAILURE_DETAIL) || '(nothing)'}`
+			`The model provider answered ${upstream.status}:\n${answered.slice(0, MAX_FAILURE_DETAIL) || '(nothing)'}`
 		);
 	}
 
@@ -117,11 +119,7 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		parsed.data.debugLog &&
 		(await userHasFeature(locals.db, userId, 'debugMode'))
 	) {
-		return withSent(await upstream.text(), {
-			model: config.openrouterModelId,
-			api: readLinks ? 'responses' : 'chat/completions',
-			messages
-		});
+		return withRequest(await upstream.text(), body);
 	}
 
 	return new Response(upstream.body, {
@@ -129,19 +127,17 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	});
 };
 
-/** What a suggestion sent the model, as debug mode's chat log shows it (`suggestChatLog`). */
-type Sent = { model: string; api: 'responses' | 'chat/completions'; messages: ModelMessage[] };
-
 /**
- * The provider's answer with what was sent added to it as `boundUpSent`, for
- * debug mode's chat log of how a draft or ideas were written (docs/debug-mode.md). Like
- * the reply endpoint's record, it is the server's prompt and the user's own
- * brief going back to the user who sent them, and nothing is kept or logged.
- * Added to the answer rather than wrapped round it, so every reader of an
- * answer reads this one unchanged; an answer that is not a JSON object has
- * nowhere to put it and goes back as it came.
+ * The provider's answer with the request body the server sent added to it as
+ * `boundUpRequest`, for debug mode's chat log of how a draft or ideas were
+ * written (`suggestionLog`, docs/debug-mode.md). Like the reply endpoint's,
+ * it is the server's prompt and the user's own brief going back to the user
+ * who sent them, without the key, which is a header; nothing is kept or
+ * logged. Added to the answer rather than wrapped round it, so every reader
+ * of an answer reads this one unchanged; an answer that is not a JSON object
+ * has nowhere to put it and goes back as it came.
  */
-function withSent(answer: string, sent: Sent): Response {
+function withRequest(answer: string, request: string): Response {
 	const headers = { 'content-type': 'application/json', 'cache-control': 'no-store' };
 	let parsed: unknown;
 	try {
@@ -152,7 +148,7 @@ function withSent(answer: string, sent: Sent): Response {
 	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
 		return new Response(answer, { headers });
 	}
-	return new Response(JSON.stringify({ ...parsed, boundUpSent: sent }), { headers });
+	return new Response(JSON.stringify({ ...parsed, boundUpRequest: request }), { headers });
 }
 
 /**
@@ -172,7 +168,7 @@ const WEB_FETCH = {
  * The request for a suggestion that reads a brief's links: the same one, sent
  * to OpenRouter's Responses API rather than Chat Completions, because only
  * its answer lists each fetch — the URL, whether it was read, and what came
- * back or why not — for debug mode's chat log (`suggestChatLog`); Chat Completions
+ * back or why not — for debug mode's chat log (`suggestionLog`); Chat Completions
  * says only how many there were. The browser reads both shapes, so the
  * answer is still passed back unread.
  */

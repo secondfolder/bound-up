@@ -1579,6 +1579,43 @@ export const daydreamMarks = sqliteTable(
 );
 
 /**
+ * One request a daydream made to the model and its answer, exactly as they
+ * went, sealed and compressed (`daydream-exchange`), for debug mode's raw log
+ * (docs/debug-mode.md). Kept apart from the turn it wrote so the story loads
+ * without it, and only for an account granted debug mode.
+ *
+ * `turnId` is the passage it wrote; null for a request that wrote none (the
+ * reply failed), which `parentTurnId` places under the turn it answered.
+ * Both cascade: a new table, so unlike `daydreamTurns.parentId` the action
+ * is real.
+ */
+export const daydreamExchanges = sqliteTable(
+	'daydream_exchanges',
+	{
+		id: text('id').primaryKey(),
+		daydreamId: text('daydream_id')
+			.notNull()
+			.references(() => daydreams.id, { onDelete: 'cascade' }),
+		turnId: text('turn_id').references(() => daydreamTurns.id, { onDelete: 'cascade' }),
+		/** What it answered: the turn before it, or null for an opening. */
+		parentTurnId: text('parent_turn_id').references(() => daydreamTurns.id, {
+			onDelete: 'cascade'
+		}),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		...timestamps
+	},
+	(table) => [
+		// The raw log's "these turns' exchanges", and the failed ones under them.
+		index('daydream_exchanges_daydream_turn_idx').on(table.daydreamId, table.turnId),
+		index('daydream_exchanges_daydream_parent_idx').on(table.daydreamId, table.parentTurnId)
+	]
+);
+
+/**
  * A character in the user's library, to pick for any daydream. Picking one
  * copies it into the daydream's setup, with the revision it was copied at, so
  * an edit here never changes a story under way; the setup page notices the
@@ -1688,6 +1725,8 @@ export type NewDaydreamPictureTiming = typeof daydreamPictureTimings.$inferInser
 export type NewDaydreamPreferences = typeof daydreamPreferences.$inferInsert;
 export type DaydreamMark = typeof daydreamMarks.$inferSelect;
 export type NewDaydreamMark = typeof daydreamMarks.$inferInsert;
+export type DaydreamExchange = typeof daydreamExchanges.$inferSelect;
+export type NewDaydreamExchange = typeof daydreamExchanges.$inferInsert;
 export type DaydreamCharacterRow = typeof daydreamCharacters.$inferSelect;
 export type NewDaydreamCharacterRow = typeof daydreamCharacters.$inferInsert;
 export type DaydreamIdeaRow = typeof daydreamIdeas.$inferSelect;

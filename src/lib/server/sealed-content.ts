@@ -1,5 +1,5 @@
 import { and, eq, or } from 'drizzle-orm';
-import { isKnownVersion, SEALED_PATTERN, type SealedKind } from '../sealed';
+import { isKnownVersion, type SealedKind, sealedPatternFor } from '../sealed';
 import type { SealedRefView } from '../types';
 import type { Db } from './db';
 import { partnerships, vaults } from './db/schema';
@@ -26,7 +26,7 @@ export function sealedIsAcceptable(
 	return (
 		ciphertext.length > 0 &&
 		ciphertext.length <= kind.maxCiphertextLength &&
-		SEALED_PATTERN.test(ciphertext) &&
+		sealedPatternFor(kind).test(ciphertext) &&
 		isKnownVersion(kind, version)
 	);
 }

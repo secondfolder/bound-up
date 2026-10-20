@@ -1,8 +1,9 @@
+import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { DAYDREAM_LIMITS, MAX_SUGGESTIONS } from '../daydream';
+import { EXCHANGE_LIMITS } from '../daydream/exchange';
 import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
-import { RECEIVED_LIMITS } from '../daydream/received-record';
-import { daydreamMarkKind, daydreamTurnKind } from './daydreams';
+import { daydreamExchangeKind, daydreamMarkKind, daydreamTurnKind } from './daydreams';
 
 /**
  * How long `sb1.` sealing makes a payload of `bytes`: a 12-byte IV and a
@@ -26,18 +27,8 @@ describe('daydreamTurnKind', () => {
 				directions: { add: [], remove: [] },
 				expansion: 'z'.repeat(DAYDREAM_LIMITS.turn)
 			},
-			// The reasoning shares `rawReply` with `raw`, so all of it is the worst case.
-			raw: 'r'.repeat(DAYDREAM_LIMITS.rawReply / 2),
+			raw: 'r'.repeat(DAYDREAM_LIMITS.rawReply),
 			rawTruncated: true as const,
-			received: {
-				reasoning: 'q'.repeat(DAYDREAM_LIMITS.rawReply / 2),
-				reasoningTruncated: true as const,
-				model: 'm'.repeat(RECEIVED_LIMITS.name),
-				provider: 'p'.repeat(RECEIVED_LIMITS.name),
-				generationId: 'g'.repeat(RECEIVED_LIMITS.name),
-				finishReason: 'f'.repeat(RECEIVED_LIMITS.finishReason),
-				usage: 'u'.repeat(RECEIVED_LIMITS.usage)
-			},
 			sent: {
 				system: 's'.repeat(DAYDREAM_LIMITS.sentSystem),
 				added: ['a'.repeat(DAYDREAM_LIMITS.sentAdded)],
@@ -61,18 +52,6 @@ describe('daydreamTurnKind', () => {
 		expect(sent(DAYDREAM_LIMITS.sentSystem + 1, [])).toBe(false);
 		const half = 'a'.repeat(DAYDREAM_LIMITS.sentAdded / 2 + 1);
 		expect(sent(0, [half, half])).toBe(false);
-	});
-
-	it('refuses a reply and its reasoning past the cap they share', () => {
-		const kept = (raw: number, reasoning: number) =>
-			daydreamTurnKind.latest.safeParse({
-				type: 'text',
-				text: 'x',
-				raw: 'r'.repeat(raw),
-				received: { reasoning: 'q'.repeat(reasoning) }
-			}).success;
-		expect(kept(DAYDREAM_LIMITS.rawReply - 10, 10)).toBe(true);
-		expect(kept(DAYDREAM_LIMITS.rawReply - 10, 11)).toBe(false);
 	});
 
 	it('refuses a raw reply past its cap', () => {
@@ -105,5 +84,88 @@ describe('daydreamMarkKind', () => {
 		expect(daydreamMarkKind.latest.safeParse(picture).success).toBe(true);
 		const bytes = new TextEncoder().encode(JSON.stringify(picture)).length;
 		expect(sealedLength(bytes)).toBeLessThanOrEqual(daydreamMarkKind.maxCiphertextLength);
+	});
+});
+
+describe('daydreamExchangeKind', () => {
+	/**
+	 * Made-up words of random letters: harder to compress than real prose,
+	 * so what fits here fits a real story with room to spare.
+	 */
+	function prose(characters: number, seed: number): string {
+		let state = seed;
+		const next = () => {
+			state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
+			return state;
+		};
+		let text = '';
+		while (text.length < characters) {
+			const length = 2 + (next() % 8);
+			for (let letter = 0; letter < length; letter += 1) {
+				text += 'etaoinshrdlucmfwypvbgk'[next() % 22];
+			}
+			text += next() % 9 === 0 ? '. ' : ' ';
+		}
+		return text.slice(0, characters);
+	}
+
+	it('fits a long story’s request and a reasoning reply’s stream, compressed, well inside its cap', () => {
+		const messages = [
+			{ role: 'system', content: prose(24_000, 1) },
+			...Array.from({ length: 60 }, (_, index) => ({
+				role: index % 2 === 0 ? 'assistant' : 'user',
+				content: prose(1000, index + 2)
+			}))
+		];
+		const request = JSON.stringify({
+			model: 'z-ai/glm-4.6',
+			messages,
+			stream: true,
+			max_tokens: 1200
+		});
+		// 2,400 events: reasoning and a reply, a word each, as OpenRouter streams them.
+		const body = Array.from({ length: 2400 }, (_, index) => {
+			const word = prose(8, index + 100);
+			const delta = index < 1200 ? { reasoning: word } : { content: word };
+			return `data: ${JSON.stringify({
+				id: 'gen-1792500000-AbCdEfGhIjKlMnOp',
+				object: 'chat.completion.chunk',
+				created: 1_792_500_000,
+				model: 'z-ai/glm-4.6',
+				provider: 'Chutes',
+				choices: [
+					{ index: 0, delta, finish_reason: null, native_finish_reason: null, logprobs: null }
+				]
+			})}\n\n`;
+		}).join('');
+		const exchange = {
+			endpoint: 'chat/completions' as const,
+			request,
+			response: { status: 200, body },
+			ended: 'done' as const,
+			startedAt: 0,
+			endedAt: 1
+		};
+		expect(daydreamExchangeKind.latest.safeParse(exchange).success).toBe(true);
+		const plain = new TextEncoder().encode(JSON.stringify(exchange));
+		const sealed = sealedLength(deflateRawSync(plain).length);
+		// About 800 KB of plaintext seals to about 60 KB: a small part of the cap.
+		expect(plain.length).toBeGreaterThan(600_000);
+		expect(sealed).toBeLessThan(daydreamExchangeKind.maxCiphertextLength / 8);
+	});
+
+	it('refuses a request or response past its cap', () => {
+		const exchange = (request: number, response: number) =>
+			daydreamExchangeKind.latest.safeParse({
+				endpoint: 'chat/completions',
+				request: 'r'.repeat(request),
+				response: { status: 200, body: 'b'.repeat(response) },
+				ended: 'done',
+				startedAt: 0,
+				endedAt: 1
+			}).success;
+		expect(exchange(EXCHANGE_LIMITS.request, EXCHANGE_LIMITS.response)).toBe(true);
+		expect(exchange(EXCHANGE_LIMITS.request + 1, 0)).toBe(false);
+		expect(exchange(1, EXCHANGE_LIMITS.response + 1)).toBe(false);
 	});
 });

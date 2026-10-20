@@ -3,10 +3,11 @@
 	import { resolve } from '$app/paths';
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
+	import ExchangeLog from '$lib/components/ExchangeLog.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import SuggestChatLog from '$lib/components/SuggestChatLog.svelte';
 	import SuggestionProblem from '$lib/components/SuggestionProblem.svelte';
 	import type { DaydreamSetup, DaydreamVoicePresetId } from '$lib/daydream';
+	import type { ExchangeLogView as ChatLog } from '$lib/daydream/exchange-log';
 	import {
 		assembleSetup,
 		type StarterSide,
@@ -15,7 +16,6 @@
 		storedStarterSide
 	} from '$lib/daydream/starters';
 	import { type SuggestFailure, suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
-	import type { SuggestChatLog as ChatLog } from '$lib/daydream/suggest-chat-log';
 	import {
 		addIdeas,
 		type GeneratedIdea,
@@ -280,7 +280,7 @@
 				Other ways to start
 			</wa-button>
 			{#if problem}<SuggestionProblem {problem} debug={data.debug} />{/if}
-			{#if data.debug && stage.log}<SuggestChatLog log={stage.log} />{/if}
+			{#if data.debug && stage.log}<ExchangeLog log={stage.log} />{/if}
 			{#key stage.version}
 				<DaydreamSetupForm
 					setupForm={data.setupForm}

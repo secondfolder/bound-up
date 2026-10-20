@@ -5,6 +5,7 @@
 	import { storedOffset } from '$lib/daydream/passage-selection';
 	import { quoteAt } from '$lib/daydream/quotes';
 	import { RawConversation } from '$lib/daydream/raw-conversation.svelte';
+	import { RawExchanges } from '$lib/daydream/raw-exchanges.svelte';
 	import { DaydreamStory } from '$lib/daydream/story.svelte';
 	import type { ComposedMessage } from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
@@ -22,7 +23,7 @@
 	import DaydreamNotThisDialog from './DaydreamNotThisDialog.svelte';
 	import DaydreamPassage from './DaydreamPassage.svelte';
 	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
-	import DaydreamRawEnding from './DaydreamRawEnding.svelte';
+	import DaydreamRawExchange from './DaydreamRawExchange.svelte';
 	import DaydreamRawSent from './DaydreamRawSent.svelte';
 	import DaydreamRawSystem from './DaydreamRawSystem.svelte';
 	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
@@ -95,6 +96,17 @@
 	const rawLog = $derived(debug && rawLogChosen);
 	/** What the model was sent before each passage, asked for as the raw log draws it. */
 	const conversation = new RawConversation(story);
+	/**
+	 * Each request's exchange with the model, kept verbatim, loaded for the
+	 * branch while the raw log is open. A passage from before they were kept
+	 * falls back to its own `sent` and `raw` (`DaydreamRawSent`).
+	 */
+	const exchanges = new RawExchanges(story);
+	$effect(() => {
+		if (rawLog) {
+			exchanges.load(story.path.map((node) => node.id));
+		}
+	});
 	/** The newest passage on the branch, whose request's system prompt heads the raw log. */
 	const newestPassage = $derived(story.path.findLast((node) => node.role === 'story') ?? null);
 	/** The system prompt heading the raw log: the newest passage's record, or its rebuild. */
@@ -109,13 +121,15 @@
 		const state = conversation.state(newestPassage.id);
 		return state && state !== 'loading' && 'system' in state ? state.system : null;
 	});
-	/** Each passage's previous passage on the branch: the request it should add to. */
+	/** Each turn's previous passage on the branch: the request it should add to. */
 	const previousPassage = $derived.by(() => {
 		const map = new Map<string, DaydreamTreeNodeView | null>();
 		let last: DaydreamTreeNodeView | null = null;
 		for (const node of story.path) {
+			// Every turn, so a failed request after the user's turn finds the
+			// passage its history should have added to.
+			map.set(node.id, last);
 			if (node.role === 'story') {
-				map.set(node.id, last);
 				last = node;
 			}
 		}
@@ -478,21 +492,46 @@
 		aria-live="polite"
 		{@attach (list) => followEnd(list, { holdAt: () => heldElement(list) })}
 	>
-		{#if rawLog && newestPassage}
+		{#if rawLog && newestPassage && exchanges.forTurn(newestPassage.id) === null}
+			<!-- A story whose newest passage has an exchange has its system prompt
+			     in it, so this is only for one written before exchanges were kept. -->
 			<DaydreamRawSystem {story} {conversation} turnId={newestPassage.id} />
+		{/if}
+		{#if rawLog}
+			{#each exchanges.failedAfter(null) as failed (failed.id)}
+				<DaydreamRawExchange exchange={failed} previous={null} />
+			{/each}
 		{/if}
 		{#each story.path as node (node.id)}
 			{#if rawLog}
 				{#if node.role === 'story'}
-					<DaydreamRawSent
-						{story}
-						{conversation}
-						{node}
-						previous={previousPassage.get(node.id) ?? null}
-						system={rawSystem}
-					/>
+					{const exchange = $derived(exchanges.forTurn(node.id))}
+					{#if exchange}
+						{const before = $derived(previousPassage.get(node.id))}
+						<DaydreamRawExchange
+							{exchange}
+							previous={before ? (exchanges.forTurn(before.id) ?? null) : null}
+						/>
+					{:else if exchange === null}
+						<DaydreamRawSent
+							{story}
+							{conversation}
+							{node}
+							previous={previousPassage.get(node.id) ?? null}
+							system={rawSystem}
+						/>
+					{:else}
+						<li class="raw-loading"><wa-spinner></wa-spinner></li>
+					{/if}
 				{/if}
-				<DaydreamRawTurn {story} {node} />
+				<DaydreamRawTurn {story} {node} exchanged={Boolean(exchanges.forTurn(node.id))} />
+				{#each exchanges.failedAfter(node.id) as failed (failed.id)}
+					{const before = $derived(node.role === 'story' ? node : previousPassage.get(node.id))}
+					<DaydreamRawExchange
+						exchange={failed}
+						previous={before ? (exchanges.forTurn(before.id) ?? null) : null}
+					/>
+				{/each}
 			{:else if node.role === 'story'}
 				<DaydreamPassage
 					{story}
@@ -552,16 +591,9 @@
 				<wa-button size="s" appearance="outlined" onclick={() => story.retry?.()}>Try again</wa-button>
 			{/if}
 		</wa-callout>
-		{#if rawLog && (story.problemRaw || story.problemReceived)}
-			<!-- A failed reply is never saved, so this is the only place its text,
-			     its reasoning and how it ended show. -->
-			{#if story.problemReceived?.reasoning}
-				<wa-details summary="Reasoning" appearance="plain">
-					<pre class="problem-raw">{story.problemReceived.reasoning}</pre>
-				</wa-details>
-			{/if}
-			{#if story.problemRaw}<pre class="problem-raw">{story.problemRaw}</pre>{/if}
-			{#if story.problemReceived}<DaydreamRawEnding received={story.problemReceived} />{/if}
+		{#if rawLog && story.problemRaw}
+			<!-- A failed reply is never saved, so this is the only place its text shows. -->
+			<pre class="problem-raw">{story.problemRaw}</pre>
 		{/if}
 	{/if}
 

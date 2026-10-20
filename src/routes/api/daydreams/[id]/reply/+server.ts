@@ -1,10 +1,9 @@
 import { error } from '@sveltejs/kit';
-import { recordSent } from '$lib/daydream/sent-record';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
 import { pictureArchitectureFor, readImageConfig } from '$lib/server/daydream/image-config';
 import { buildMessages, replyRequestSchema } from '$lib/server/daydream/prompt';
 import { hasAcceptedDisclosure, ownsDaydream } from '$lib/server/daydreams';
-import { requireFeature } from '$lib/server/features';
+import { requireFeature, userHasFeature } from '$lib/server/features';
 import { rateLimitMessage } from '$lib/server/rate-limit';
 import { SSE_HEADERS } from '$lib/server/realtime';
 import type { RequestHandler } from './$types';
@@ -27,11 +26,12 @@ import type { RequestHandler } from './$types';
  * untouched rather than parsed and re-encoded: the browser parses them
  * (`$lib/daydream/stream.ts`), and the worker spends no CPU on a reply it
  * has no reason to read. The one addition is for debug mode: asked to
- * `record`, it sends one event of its own first, `{"boundUpSent": …}`, with
- * what it sent the model (`$lib/daydream/sent-record.ts`), for the browser to
- * seal into the passage beside the reply as it arrived. It is the user's own
- * words and the server's prompt going back to the user who sent them, and it
- * is never kept here.
+ * `record`, by an account holding the feature, it sends one event of its own
+ * first, `{"boundUpRequest": "…"}`, with the request body exactly as it sent
+ * it, for the browser to keep with the stream as it arrived — the exchange,
+ * sealed (`$lib/daydream/exchange.ts`). It is the user's own words and the
+ * server's prompt going back to the user who sent them, without the key,
+ * which is a header; it is never kept here.
  */
 export const POST: RequestHandler = async ({ locals, params, platform, request }) => {
 	if (!locals.user) {
@@ -77,6 +77,23 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 			parsed.data.setup.pictures.style
 		)
 	});
+	const recording =
+		parsed.data.record === true && (await userHasFeature(locals.db, userId, 'debugMode'));
+	// Stringified once, so what the raw log keeps is the very text that was sent.
+	const body = JSON.stringify({
+		model: config.openrouterModelId,
+		messages,
+		stream: true,
+		// A few paragraphs, which is what the dials ask for at most, plus
+		// the metadata block after them; also the most one reply can cost.
+		max_tokens: 1200,
+		temperature: 0.9,
+		// Only route to providers that do not keep or train on prompts.
+		provider: { data_collection: 'deny' },
+		// For debug mode's raw log: the token counts and cost, in the
+		// stream's last event. Not otherwise, since nothing else reads them.
+		...(recording ? { usage: { include: true } } : {})
+	});
 	let upstream: Response;
 	try {
 		upstream = await fetch(`${config.baseUrl}/chat/completions`, {
@@ -85,21 +102,7 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 				authorization: `Bearer ${config.apiKey}`,
 				'content-type': 'application/json'
 			},
-			body: JSON.stringify({
-				model: config.openrouterModelId,
-				messages,
-				stream: true,
-				// A few paragraphs, which is what the dials ask for at most, plus
-				// the metadata block after them; also the most one reply can cost.
-				max_tokens: 1200,
-				temperature: 0.9,
-				// Only route to providers that do not keep or train on prompts.
-				provider: { data_collection: 'deny' },
-				// For debug mode's raw log: the token counts and cost, in the
-				// stream's last event (`received-record.ts`). Not otherwise,
-				// since nothing else reads them.
-				...(parsed.data.record ? { usage: { include: true } } : {})
-			}),
+			body,
 			// The user pressing Stop, or leaving, ends the request upstream too,
 			// so a reply nobody will read is not paid for to the end.
 			signal: request.signal
@@ -118,12 +121,13 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		error(502, 'The reply could not be written just now. Try again in a moment.');
 	}
 
-	if (!parsed.data.record) {
+	if (!recording) {
 		return new Response(upstream.body, { headers: SSE_HEADERS });
 	}
-	const first = new TextEncoder().encode(
-		`data: ${JSON.stringify({ boundUpSent: await recordSent(messages) })}\n\n`
-	);
+	// One line: `JSON.stringify` escapes every newline in the body, so the
+	// first blank line is where this event ends and the provider's begin
+	// (`stripOwnEvent` in `exchange-recorder.ts`).
+	const first = new TextEncoder().encode(`data: ${JSON.stringify({ boundUpRequest: body })}\n\n`);
 	const reader = upstream.body.getReader();
 	let started = false;
 	return new Response(

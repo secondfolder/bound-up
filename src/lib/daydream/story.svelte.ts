@@ -21,21 +21,22 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { openRecord } from '../crypto/sealed';
 import { vaultById, vaultsSettled } from '../crypto/vaults.svelte';
-import {
-	DAYDREAM_LIMITS,
-	type DaydreamPictures,
-	type DaydreamSetup,
-	type DaydreamTurnRole,
-	type DialValue,
-	type IdeaDials,
-	type StoryDials
+import type {
+	DaydreamPictures,
+	DaydreamSetup,
+	DaydreamTurnRole,
+	DialValue,
+	IdeaDials,
+	StoryDials
 } from '../daydream';
 import { reportRequestFailure } from '../request-failure.svelte';
 import {
+	type DaydreamExchangeContent,
 	type DaydreamMarkContent,
 	type DaydreamSetupContent,
 	type DaydreamTurnContent,
 	type Direction,
+	daydreamExchangeKind,
 	daydreamMarkKind,
 	daydreamSetupKind,
 	daydreamTurnKind,
@@ -56,9 +57,11 @@ import {
 	estimatePicture,
 	type PromptMessage,
 	type ReplyRequestBody,
+	readExchanges,
 	readPrompt,
 	readTurns,
 	requestPicture,
+	saveExchange,
 	saveSetup as saveSetupRecord,
 	saveTurn,
 	setActiveTurn,
@@ -76,10 +79,10 @@ import {
 	trimContext
 } from './context';
 import { outcomeFor, type RollProposal, roll } from './dice';
+import { type ExchangeEnding, MAX_READ_EXCHANGE_TURNS } from './exchange';
+import { ExchangeRecorder } from './exchange-recorder';
 import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
 import { explicitOoc } from './ooc';
-import { type ReceivedLog, type ReceivedRecord, ReplyReceipt } from './received-record';
-import type { SentRecord } from './sent-record';
 import { suggestName } from './suggest';
 import { MAX_NAMING_OPENING } from './suggestions';
 import {
@@ -156,9 +159,24 @@ type PictureMark = Extract<DaydreamMarkContent, { type: 'picture' }>;
  * the order they were written, with what is stored for each, `raw` included
  * where it was kept. A turn this device cannot open has null content.
  */
+/**
+ * An exchange with the model as the raw log shows it: where it sits, and what
+ * it was, or null for one that will not open here. `saved` is false only for
+ * one this visit could not keep.
+ */
+export type OpenedExchange = {
+	id: string;
+	turnId: string | null;
+	parentTurnId: string | null;
+	createdAt: Date;
+	content: DaydreamExchangeContent | null;
+	saved: boolean;
+};
+
 export type DaydreamExport = {
 	format: 'bound-up-daydream-export';
-	version: 1;
+	/** 2 added `exchanges`. */
+	version: 2;
 	exportedAt: string;
 	daydreamId: string;
 	setup: DaydreamSetupContent | null;
@@ -169,6 +187,10 @@ export type DaydreamExport = {
 	directionsNow: Direction[];
 	turns: (DaydreamTreeNodeView & { content: DaydreamTurnContent | null })[];
 	marks: { id: string; turnId: string; content: DaydreamMarkContent | null }[];
+	/** Every request's exchange with the model that was kept, oldest first, request and response verbatim. */
+	exchanges: OpenedExchange[];
+	/** Why the exchanges could not all be read, if they could not. */
+	exchangesProblem?: string;
 };
 
 export class DaydreamStory {
@@ -202,11 +224,6 @@ export class DaydreamStory {
 	 * arrived, or the last problem was not a reply's.
 	 */
 	problemRaw: string = $state('');
-	/**
-	 * What else the failed reply's stream carried — reasoning, the model that
-	 * answered, the error it ended on — for the same log. Never saved either.
-	 */
-	problemReceived: ReceivedLog | null = $state(null);
 	setupRevision: number = $state(0);
 
 	readonly #setupRef: SealedRefView;
@@ -216,6 +233,12 @@ export class DaydreamStory {
 	readonly #refs = new SvelteMap<string, SealedRefView>();
 	/** Turns this visit wrote, as plaintext. */
 	readonly #written = new SvelteMap<string, DaydreamTurnContent>();
+	/**
+	 * The exchanges with the model this visit kept, or tried to, by id: the
+	 * raw log shows these before anything it loads (`RawExchanges`), and says
+	 * of one that would not save that it was not kept.
+	 */
+	readonly writtenExchanges = new SvelteMap<string, OpenedExchange>();
 	#marks: DaydreamMarkView[] = $state([]);
 	readonly #writtenMarks = new SvelteMap<string, DaydreamMarkContent>();
 	#controller: AbortController | null = null;
@@ -385,6 +408,44 @@ export class DaydreamStory {
 	}
 
 	// ── writing ──────────────────────────────────────────────────────────────
+
+	/**
+	 * Keeps a request's exchange with the model (`exchange.ts`), under the
+	 * passage it wrote (`turnId`), or, for one that wrote none, the turn it
+	 * answered. In the background: it is debug data, and the passage is
+	 * saved whether or not this is. A save that fails, or will not seal, is
+	 * still shown this visit, marked as not kept.
+	 */
+	async #keepExchange(
+		recorder: ExchangeRecorder,
+		ended: ExchangeEnding,
+		turnId: string | null,
+		parentTurnId: string | null
+	): Promise<void> {
+		const exchange = await recorder.exchange(ended);
+		if (!exchange) {
+			return;
+		}
+		const saved = await saveExchange(this.id, { turnId, parentTurnId, exchange }).catch(() => null);
+		const opened: OpenedExchange = saved?.ok
+			? {
+					id: saved.exchange.id,
+					turnId,
+					parentTurnId,
+					createdAt: saved.exchange.createdAt,
+					content: saved.content,
+					saved: true
+				}
+			: {
+					id: crypto.randomUUID(),
+					turnId,
+					parentTurnId,
+					createdAt: new Date(),
+					content: exchange,
+					saved: false
+				};
+		this.writtenExchanges.set(opened.id, opened);
+	}
 
 	/** Seals and saves a turn after `parentId`, and moves the user to it. */
 	async #append(
@@ -652,7 +713,6 @@ export class DaydreamStory {
 		);
 		this.problem = null;
 		this.problemRaw = '';
-		this.problemReceived = null;
 		this.retry = null;
 		this.streaming = {
 			parentId: request.parentId,
@@ -665,24 +725,19 @@ export class DaydreamStory {
 		const { signal } = this.#controller;
 
 		let passage: string;
+		// Whether the user stopped it partway, for the exchange.
+		let wasStopped = false;
 		let meta: PassageMeta | null = null;
 		let expansion: string | null = null;
 		let reading: Reading | null = null;
-		// The reply as it arrives, tags and all, kept even through a Stop.
-		let raw = '';
-		// What the request sent the model, for the same raw log, also kept through a Stop.
-		let sent: SentRecord | null = null;
-		// What else the stream carried, for the same raw log, also kept through a Stop.
-		const receipt = new ReplyReceipt();
+		// The request and its answer exactly as they went, for the raw log, kept
+		// through a Stop and a failure too.
+		const recorder = this.#keepRawReplies ? new ExchangeRecorder() : undefined;
 		try {
 			const outcome = await writeReply(this.id, this.#replyBody(request, setup, context), {
 				signal,
-				onSent: (record) => {
-					sent = record;
-				},
-				onEvent: (event) => receipt.take(event),
-				onText: (soFar, arrived) => {
-					raw = arrived;
+				...(recorder ? { recorder } : {}),
+				onText: (soFar) => {
 					if (this.streaming) {
 						this.streaming = {
 							...this.streaming,
@@ -697,11 +752,13 @@ export class DaydreamStory {
 				this.streaming = null;
 				this.problem = outcome.error;
 				this.problemRaw = outcome.raw;
-				this.problemReceived = receipt.log;
 				this.retry = () => void this.#start(request);
+				if (recorder && outcome.ended) {
+					void this.#keepExchange(recorder, outcome.ended, null, request.parentId);
+				}
 				return;
 			}
-			({ passage, meta, expansion, reading, raw } = outcome);
+			({ passage, meta, expansion, reading } = outcome);
 		} catch {
 			// Stopped. What had arrived stays, like a sentence cut off: it is
 			// what was on screen, and writing it again is one press away. A Stop
@@ -709,8 +766,12 @@ export class DaydreamStory {
 			passage = (this.streaming?.text ?? '').trim();
 			if (!passage || signal.reason === DISCARD) {
 				this.streaming = null;
+				if (recorder) {
+					void this.#keepExchange(recorder, 'stopped', null, request.parentId);
+				}
 				return;
 			}
+			wasStopped = true;
 			// A passage had started, so the written-out turn before it was whole.
 			expansion = this.streaming?.expansion ?? null;
 			reading = this.streaming?.reading ?? null;
@@ -756,12 +817,15 @@ export class DaydreamStory {
 		const content: DaydreamTurnContent = {
 			type: 'text',
 			text: passage.slice(0, 8000),
-			...(finalMeta ? { meta: finalMeta } : {}),
-			...(this.#keepRawReplies ? keptReply(raw, receipt) : {}),
-			...(this.#keepRawReplies && sent ? { sent } : {})
+			...(finalMeta ? { meta: finalMeta } : {})
 		};
 		const saved = await this.#append(request.parentId, 'story', content);
 		this.streaming = null;
+		if (recorder) {
+			// Under the passage it wrote, or, when that did not save, as a reply
+			// that wrote nothing.
+			void this.#keepExchange(recorder, wasStopped ? 'stopped' : 'done', saved, request.parentId);
+		}
 		if (!saved) {
 			this.retry = () => void this.#start(request);
 			return;
@@ -859,9 +923,10 @@ export class DaydreamStory {
 					(await openRef<DaydreamMarkContent>(daydreamMarkKind, mark.sealed))
 			}))
 		);
+		const { exchanges, problem: exchangesProblem } = await this.#allExchanges(openRef);
 		return {
 			format: 'bound-up-daydream-export',
-			version: 1,
+			version: 2,
 			exportedAt: new Date().toISOString(),
 			daydreamId: this.id,
 			setup:
@@ -871,7 +936,42 @@ export class DaydreamStory {
 			branch: this.path.map((node) => node.id),
 			directionsNow: this.directions,
 			turns,
-			marks
+			marks,
+			exchanges,
+			...(exchangesProblem ? { exchangesProblem } : {})
+		};
+	}
+
+	/** Every exchange kept for this daydream, for the export: read a few turns at a time, and this visit's own. */
+	async #allExchanges(
+		openRef: <T>(kind: Parameters<typeof openRecord<T>>[0], ref: SealedRefView) => Promise<T | null>
+	): Promise<{ exchanges: OpenedExchange[]; problem: string | null }> {
+		const byId = new Map<string, OpenedExchange>();
+		let problem: string | null = null;
+		const ids = this.tree.map((node) => node.id);
+		for (let start = 0; start < ids.length; start += MAX_READ_EXCHANGE_TURNS) {
+			const read = await readExchanges(this.id, ids.slice(start, start + MAX_READ_EXCHANGE_TURNS));
+			if (!read.ok) {
+				problem = read.error;
+				break;
+			}
+			for (const view of read.exchanges) {
+				byId.set(view.id, {
+					id: view.id,
+					turnId: view.turnId,
+					parentTurnId: view.parentTurnId,
+					createdAt: view.createdAt,
+					content: await openRef<DaydreamExchangeContent>(daydreamExchangeKind, view.sealed),
+					saved: true
+				});
+			}
+		}
+		for (const [id, kept] of this.writtenExchanges) {
+			byId.set(id, kept);
+		}
+		return {
+			exchanges: [...byId.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
+			problem
 		};
 	}
 
@@ -1478,31 +1578,3 @@ export class DaydreamStory {
 
 /** The abort reason that means "drop what arrived", from Stop the scene and Ease off. */
 const DISCARD = 'discard';
-
-/**
- * A reply as it arrived, ready to keep on its passage: cut to
- * `DAYDREAM_LIMITS.rawReply`, and saying so when it was. Nothing for a reply
- * that never arrived.
- */
-export function rawReply(raw: string): { raw?: string; rawTruncated?: true } {
-	if (raw === '') {
-		return {};
-	}
-	return raw.length > DAYDREAM_LIMITS.rawReply
-		? { raw: raw.slice(0, DAYDREAM_LIMITS.rawReply), rawTruncated: true }
-		: { raw };
-}
-
-/**
- * Everything a passage keeps of how its reply arrived: the reply itself
- * (`rawReply`), and what else its stream carried (`received`), whose
- * reasoning gets what room the reply leaves in `rawReply`.
- */
-function keptReply(
-	raw: string,
-	receipt: ReplyReceipt
-): { raw?: string; rawTruncated?: true; received?: ReceivedRecord } {
-	const kept = rawReply(raw);
-	const received = receipt.record(kept.raw ?? '');
-	return received ? { ...kept, received } : kept;
-}

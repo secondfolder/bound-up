@@ -26,8 +26,8 @@ import {
 	voiceProblem
 } from '../daydream';
 import { coversEveryFace, MAX_SIDES, MIN_SIDES } from '../daydream/dice';
+import { EXCHANGE_LIMITS, MAX_EXCHANGE_CIPHERTEXT } from '../daydream/exchange';
 import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
-import { RECEIVED_LIMITS } from '../daydream/received-record';
 import { defineSealedKind } from '../sealed';
 import { isClientId } from '../vault';
 
@@ -492,39 +492,6 @@ const turnV6 = z.discriminatedUnion('type', [
 	...turnTypesV2
 ]);
 
-// v7: a passage may carry what its reply's stream carried besides the text
-// (`received`, `daydream/received-record.ts`): the model's reasoning, which
-// model and provider answered, the generation's id, why it stopped, and its
-// usage. For debug mode's raw log, beside `raw` and `sent`, under the same
-// rule. The reasoning shares `rawReply` with `raw`, so the worst case still
-// fits the ciphertext cap below.
-const receivedRecordSchema = z.object({
-	reasoning: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
-	reasoningTruncated: z.literal(true).optional(),
-	model: z.string().min(1).max(RECEIVED_LIMITS.name).optional(),
-	provider: z.string().min(1).max(RECEIVED_LIMITS.name).optional(),
-	generationId: z.string().min(1).max(RECEIVED_LIMITS.name).optional(),
-	finishReason: z.string().min(1).max(RECEIVED_LIMITS.finishReason).optional(),
-	usage: z.string().min(1).max(RECEIVED_LIMITS.usage).optional()
-});
-
-const turnV7 = z.discriminatedUnion('type', [
-	textTurn(passageMetaV6)
-		.extend({
-			raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
-			rawTruncated: z.literal(true).optional(),
-			sent: sentRecordSchema.optional(),
-			received: receivedRecordSchema.optional()
-		})
-		.refine(
-			(turn) =>
-				(turn.raw?.length ?? 0) + (turn.received?.reasoning?.length ?? 0) <=
-				DAYDREAM_LIMITS.rawReply,
-			'The reply and its reasoning are too long to keep'
-		),
-	...turnTypesV2
-]);
-
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
@@ -561,13 +528,7 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v5 could say, v6 says the same way.
 			upcast: (value: z.output<typeof turnV5>) => value
 		},
-		{
-			version: 6,
-			schema: turnV6,
-			// Everything v6 could say, v7 says the same way.
-			upcast: (value: z.output<typeof turnV6>) => value
-		},
-		{ version: 7, schema: turnV7 }
+		{ version: 6, schema: turnV6 }
 	]
 });
 
@@ -660,3 +621,36 @@ export const daydreamMarkKind = defineSealedKind({
 });
 
 export type DaydreamMarkContent = z.output<typeof daydreamMarkKind.latest>;
+
+// ── exchanges ────────────────────────────────────────────────────────────────
+
+/**
+ * One request to the model and its answer, verbatim, for debug mode's raw
+ * log (`daydream/exchange.ts`). Compressed (`compressed` on
+ * `defineSealedKind`): the request repeats the story's history and the
+ * response is hundreds of near-identical events, so it deflates many times
+ * over, and the server handled every byte of it in plaintext on its way to
+ * and from the model, so what the compressed length could say about it is
+ * nothing the server did not already see.
+ */
+const exchangeV1 = z.object({
+	endpoint: z.literal('chat/completions'),
+	request: z.string().min(1).max(EXCHANGE_LIMITS.request),
+	response: z.object({
+		status: z.number().int().min(100).max(599),
+		body: z.string().max(EXCHANGE_LIMITS.response),
+		truncated: z.literal(true).optional()
+	}),
+	ended: z.enum(['done', 'error', 'stopped', 'dropped']),
+	startedAt: z.number().int().nonnegative(),
+	endedAt: z.number().int().nonnegative()
+});
+
+export const daydreamExchangeKind = defineSealedKind({
+	name: 'daydream-exchange',
+	maxCiphertextLength: MAX_EXCHANGE_CIPHERTEXT,
+	compressed: true,
+	versions: [{ version: 1, schema: exchangeV1 }]
+});
+
+export type DaydreamExchangeContent = z.output<typeof daydreamExchangeKind.latest>;

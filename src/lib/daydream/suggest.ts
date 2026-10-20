@@ -19,8 +19,8 @@ import type {
 	StoryDials
 } from '../daydream';
 import { requestSuggestion } from './client';
+import { type ExchangeLogView, suggestionLog } from './exchange-log';
 import type { DaydreamPieces, StarterSide } from './starters';
-import { type SuggestChatLog, suggestChatLog } from './suggest-chat-log';
 import {
 	completionJson,
 	describeUnusable,
@@ -56,7 +56,7 @@ export type SuggestFailure = {
 	error: string;
 	detail?: string;
 	/** The whole exchange, links read and all, for debug mode, when the request asked for it. */
-	log?: SuggestChatLog;
+	log?: ExchangeLogView;
 };
 
 type Answer<T> = { ok: true; value: T } | ({ ok: false } & SuggestFailure);
@@ -198,7 +198,7 @@ export async function suggestDaydream(input: {
 	/** The voice a generated idea was made for, so the daydream is told that way. */
 	voice?: DaydreamVoicePresetId | null;
 	limits: string;
-	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestChatLog`). */
+	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestionLog`). */
 	debugLog?: boolean;
 }): Promise<WithLog<DaydreamPieces>> {
 	const answer = await ask({ task: 'daydream', ...input });
@@ -211,14 +211,14 @@ export async function suggestDaydream(input: {
 
 /**
  * What a suggestion that took a brief came back with, and the whole exchange
- * where the request asked for it (`suggestChatLog`), for debug mode to show
+ * where the request asked for it (`suggestionLog`), for debug mode to show
  * either way: the links it read are in it, and a link that could not be read
  * is half of why ideas can come back thin.
  */
-export type WithLog<T> = Answer<T> & { log?: SuggestChatLog };
+export type WithLog<T> = Answer<T> & { log?: ExchangeLogView };
 
 function withLog<T>(answer: { body: unknown }, result: Answer<T>): WithLog<T> {
-	const log = suggestChatLog(answer.body);
+	const log = suggestionLog(answer.body);
 	return log ? { ...result, log } : result;
 }
 
@@ -235,7 +235,7 @@ export async function suggestIdeas(input: {
 	limits: string;
 	/** Titles already shown, for "More ideas" not to offer them again. */
 	offered?: readonly string[];
-	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestChatLog`). */
+	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestionLog`). */
 	debugLog?: boolean;
 }): Promise<WithLog<GeneratedIdea[]>> {
 	const answer = await ask({ task: 'ideas', ...input });

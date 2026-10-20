@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { recordSent } from '$lib/daydream/sent-record';
 import { RULES } from '$lib/server/daydream/prompt';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
+import { grantFeature } from '$lib/server/features';
 import type { RateLimitResult } from '$lib/server/rate-limit';
 import type { ServerSettingKey } from '$lib/server-settings';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { createTestDb, type TestDb } from '$lib/testing/db';
-import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import {
 	createTestDaydream,
@@ -110,36 +109,40 @@ describe('POST /api/daydreams/[id]/reply', () => {
 		expect(await result.value.text()).toContain('smiles.');
 	});
 
-	it('for debug mode, says first what it sent the model, then streams the reply as it came', async () => {
+	it('for debug mode, says first the very request it sent the model, then streams the reply as it came', async () => {
+		await grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: ada.id });
 		const { id } = await createTestDaydream(db, ada.id, ['story', 'user']);
 		const result = await post(ada, id, { ...body, record: true });
 		if (result.type !== 'ok') {
 			throw new Error(`expected a reply, got ${result.type}`);
 		}
 		const text = await result.value.text();
-		const [first, ...rest] = text.split('\n\n');
-		const { boundUpSent } = JSON.parse(defined(first, 'the first event').slice('data: '.length));
+		const end = text.indexOf('\n\n');
+		const { boundUpRequest } = JSON.parse(text.slice('data: '.length, end));
 		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
-		const sent = JSON.parse(String(init.body)).messages;
-		expect(boundUpSent).toEqual(await recordSent(sent));
-		expect(boundUpSent.system.startsWith(RULES)).toBe(true);
-		expect(boundUpSent.added).toEqual([
-			`${USER_TURN}\n\n(Direction buttons on screen now: "Slower" (id "slower").)`
-		]);
-		expect(rest.join('\n\n')).toContain('smiles.');
-		// The usage, for the raw log's "How it ended".
-		expect(JSON.parse(String(init.body)).usage).toEqual({ include: true });
+		expect(boundUpRequest).toBe(init.body);
+		const sent = JSON.parse(boundUpRequest);
+		expect(sent.messages[0].content.startsWith(RULES)).toBe(true);
+		expect(sent.messages.at(-1).content).toContain(USER_TURN);
+		// The usage, for the raw log's "How it ended"; and never the key.
+		expect(sent.usage).toEqual({ include: true });
+		expect(text).not.toContain('sk-or-test');
+		// The provider's stream after it, untouched.
+		expect(text.slice(end + 2)).toContain('smiles.');
 	});
 
-	it('sends nothing of its own unless asked to record', async () => {
+	it('sends nothing of its own unless asked to record, by an account holding debug mode', async () => {
 		const { id } = await createTestDaydream(db, ada.id, ['story', 'user']);
-		const result = await post(ada, id);
-		if (result.type !== 'ok') {
-			throw new Error(`expected a reply, got ${result.type}`);
+		for (const asked of [body, { ...body, record: true }]) {
+			const result = await post(ada, id, asked);
+			if (result.type !== 'ok') {
+				throw new Error(`expected a reply, got ${result.type}`);
+			}
+			expect(await result.value.text()).not.toContain('boundUpRequest');
 		}
-		expect(await result.value.text()).not.toContain('boundUpSent');
-		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
-		expect(JSON.parse(String(init.body)).usage).toBeUndefined();
+		for (const call of upstream.mock.calls as unknown as [string, RequestInit][]) {
+			expect(JSON.parse(String(call[1].body)).usage).toBeUndefined();
+		}
 	});
 
 	it('sends the server’s own rules first, and asks only for providers that keep nothing', async () => {

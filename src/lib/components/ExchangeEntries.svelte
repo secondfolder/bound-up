@@ -1,27 +1,32 @@
 <script lang="ts">
-	import type { SuggestChatLog } from '$lib/daydream/suggest-chat-log';
+	import type { LogEntry } from '$lib/daydream/exchange-log';
+	import { startOpen } from './details';
 
 	/**
-	 * How a draft was written, for debug mode (docs/debug-mode.md): the whole
-	 * exchange with the model, from the system prompt to how it ended, as
-	 * `suggestChatLog` read it. Each bubble is a disclosure, closed, because
-	 * the system prompt and a fetched page are each longer than the screen.
-	 * Nothing here is kept; it is the answer's own.
+	 * An exchange with the model as bubbles (`exchange-log.ts`), for debug
+	 * mode: the suggestions' chat log and a daydream's raw log both draw them
+	 * here. Each is a disclosure, closed unless `open` says, because a system
+	 * prompt or a fetched page is longer than the screen.
 	 */
-	let { log }: { log: SuggestChatLog } = $props();
+	let {
+		entries,
+		open = () => false
+	}: {
+		entries: readonly LogEntry[];
+		/** Which to show open: in the raw log, what the request added. */
+		open?: (entry: LogEntry, index: number) => boolean;
+	} = $props();
 </script>
 
-<wa-details summary="Chat log: {log.model}, {log.api}" class="log">
-	<ol>
-		{#each log.entries as entry, index (index)}
-			<li class={entry.who}>
-				<wa-details summary={entry.label} appearance="plain">
-					<pre>{entry.text}</pre>
-				</wa-details>
-			</li>
-		{/each}
-	</ol>
-</wa-details>
+<ol>
+	{#each entries as entry, index (index)}
+		<li class={entry.who}>
+			<wa-details summary={entry.label} appearance="plain" {@attach startOpen(open(entry, index))}>
+				<pre>{entry.text}</pre>
+			</wa-details>
+		</li>
+	{/each}
+</ol>
 
 <style>
 	ol {
@@ -49,6 +54,7 @@
 		}
 
 		&.system,
+		&.settings,
 		&.end {
 			border-style: dashed;
 		}

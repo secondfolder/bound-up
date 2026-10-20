@@ -5,7 +5,11 @@
 //
 // It speaks just enough of the OpenAI-compatible streaming API the reply
 // endpoint relays: `POST /v1/chat/completions` answered with `data:` events,
-// a keep-alive comment like OpenRouter sends, and `data: [DONE]`.
+// a keep-alive comment like OpenRouter sends, a first event of reasoning
+// ("The stub thinks it over."), the reply, its finish reason, a usage event
+// when the request asks for one (as a debug-mode reply does), and
+// `data: [DONE]`. Every event names the model and a provider, as
+// OpenRouter's do, so the raw log has something to show for them.
 //
 // What it writes, as a passage followed by the `<meta>` block the prompt asks
 // for (`src/lib/server/daydream/prompt.ts`, "Reply format"):
@@ -401,12 +405,24 @@ const server = createServer(async (request, response) => {
 
 	response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
 	response.write(': OPENROUTER PROCESSING\n\n');
+	const event = (fields) =>
+		`data: ${JSON.stringify({ id: 'gen-stub', model: body.model, provider: 'Stub', ...fields })}\n\n`;
+	response.write(event({ choices: [{ delta: { reasoning: 'The stub thinks it over.' } }] }));
 	for (const piece of chunks(replyFor(body.messages))) {
 		if (response.destroyed) {
 			return;
 		}
-		response.write(`data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n\n`);
+		response.write(event({ choices: [{ delta: { content: piece } }] }));
 		await sleep(20);
+	}
+	response.write(event({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
+	if (body.usage?.include) {
+		response.write(
+			event({
+				choices: [],
+				usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 }
+			})
+		);
 	}
 	response.end('data: [DONE]\n\n');
 });
