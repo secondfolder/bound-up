@@ -23,6 +23,8 @@ import {
 	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
+	type IdeaOriginField,
+	type IdeaWithoutOrigin,
 	inferVoice,
 	MAX_DAYDREAM_CHARACTERS,
 	voiceProblem
@@ -45,7 +47,9 @@ export type DaydreamCast = {
 export type DaydreamPieces = {
 	/** Null to have it follow who is in it (`inferVoice`). */
 	voice: DaydreamVoicePresetId | null;
-	idea: Omit<DaydreamIdea, 'parts'> & { parts: readonly SuggestedPart[] };
+	/** Its brief and research only when it was written from a brief: empty otherwise. */
+	idea: Omit<IdeaWithoutOrigin, 'parts'> &
+		Partial<Pick<DaydreamIdea, IdeaOriginField>> & { parts: readonly SuggestedPart[] };
 	cast: readonly DaydreamCast[];
 	/**
 	 * The model's summary of it, with its blanks marked; none for a
@@ -98,7 +102,14 @@ export function assembleSetup(
 				? voice
 				: inferVoice(voice, characters.length),
 		characters,
-		idea: { ...pieces.idea, parts, sourceId: null, sourceRevision: null },
+		idea: {
+			...pieces.idea,
+			brief: pieces.idea.brief ?? '',
+			research: pieces.idea.research ?? '',
+			parts,
+			sourceId: null,
+			sourceRevision: null
+		},
 		lead: 'character',
 		limits: '',
 		dials: DEFAULT_STORY_DIALS,

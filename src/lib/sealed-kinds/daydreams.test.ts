@@ -1,9 +1,20 @@
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { DAYDREAM_LIMITS, MAX_SUGGESTIONS } from '../daydream';
+import {
+	DAYDREAM_LIMITS,
+	MAX_DAYDREAM_CHARACTERS,
+	MAX_SUGGESTIONS,
+	UNSET_CHARACTER_DIALS
+} from '../daydream';
 import { EXCHANGE_LIMITS } from '../daydream/exchange';
 import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
-import { daydreamExchangeKind, daydreamMarkKind, daydreamTurnKind } from './daydreams';
+import {
+	daydreamExchangeKind,
+	daydreamIdeaKind,
+	daydreamMarkKind,
+	daydreamSetupKind,
+	daydreamTurnKind
+} from './daydreams';
 
 /**
  * How long `sb1.` sealing makes a payload of `bytes`: a 12-byte IV and a
@@ -11,6 +22,78 @@ import { daydreamExchangeKind, daydreamMarkKind, daydreamTurnKind } from './dayd
  * (`src/lib/sealed-fixtures/README.md`).
  */
 const sealedLength = (bytes: number) => 'sb1.'.length + Math.ceil(((12 + bytes + 16) * 4) / 3);
+
+/** An idea with every field at its cap, the brief and research included. */
+const fullIdea = (part: (index: number) => string) => ({
+	title: 't'.repeat(DAYDREAM_LIMITS.title),
+	setting: 's'.repeat(DAYDREAM_LIMITS.setting),
+	premise: 'p'.repeat(DAYDREAM_LIMITS.premise),
+	yourRole: 'y'.repeat(DAYDREAM_LIMITS.yourRole),
+	tone: 'o'.repeat(DAYDREAM_LIMITS.tone),
+	notes: 'n'.repeat(DAYDREAM_LIMITS.ideaNotes),
+	brief: 'b'.repeat(DAYDREAM_LIMITS.brief),
+	research: 'r'.repeat(DAYDREAM_LIMITS.ideaResearch),
+	parts: Array.from({ length: MAX_DAYDREAM_CHARACTERS }, (_, index) => ({
+		id: part(index),
+		name: 'n'.repeat(DAYDREAM_LIMITS.partName),
+		description: 'd'.repeat(DAYDREAM_LIMITS.partDescription)
+	})),
+	dials: { heat: 5, kink: 5 }
+});
+
+const partId = (index: number) => `0000000${index}-0000-4000-8000-000000000000`;
+
+const encodedLength = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
+
+describe('daydreamIdeaKind', () => {
+	it('fits an idea at every cap, brief and research included, inside its ciphertext cap', () => {
+		const idea = fullIdea(partId);
+		expect(daydreamIdeaKind.latest.safeParse(idea).success).toBe(true);
+		expect(sealedLength(encodedLength(idea))).toBeLessThanOrEqual(
+			daydreamIdeaKind.maxCiphertextLength
+		);
+	});
+
+	it('refuses research past its cap', () => {
+		const idea = { ...fullIdea(partId), research: 'r'.repeat(DAYDREAM_LIMITS.ideaResearch + 1) };
+		expect(daydreamIdeaKind.latest.safeParse(idea).success).toBe(false);
+	});
+});
+
+describe('daydreamSetupKind', () => {
+	it('fits four characters and an idea at every cap inside its ciphertext cap', () => {
+		const setup = {
+			title: 't'.repeat(DAYDREAM_LIMITS.title),
+			voice: { narrator: 'none', stance: 'self', protagonistName: '' },
+			characters: Array.from({ length: MAX_DAYDREAM_CHARACTERS }, (_, index) => ({
+				sourceId: null,
+				sourceRevision: null,
+				name: `${index}`.repeat(DAYDREAM_LIMITS.characterName),
+				archetype: 'a'.repeat(DAYDREAM_LIMITS.archetype),
+				personality: 'p'.repeat(DAYDREAM_LIMITS.personality),
+				speech: 's'.repeat(DAYDREAM_LIMITS.speech),
+				appearance: 'a'.repeat(DAYDREAM_LIMITS.appearance),
+				likes: 'l'.repeat(DAYDREAM_LIMITS.likes),
+				notes: 'n'.repeat(DAYDREAM_LIMITS.characterNotes),
+				dials: UNSET_CHARACTER_DIALS,
+				casting: {
+					partId: partId(index),
+					relationship: 'r'.repeat(DAYDREAM_LIMITS.relationship),
+					part: 'p'.repeat(DAYDREAM_LIMITS.castPart)
+				}
+			})),
+			idea: { ...fullIdea(partId), sourceId: null, sourceRevision: null },
+			lead: 'character',
+			limits: 'l'.repeat(DAYDREAM_LIMITS.limits),
+			dials: { intensity: 3, pace: 3, length: 'medium' },
+			pictures: { on: true, style: 'photo' }
+		};
+		expect(daydreamSetupKind.latest.safeParse(setup).success).toBe(true);
+		expect(sealedLength(encodedLength(setup))).toBeLessThanOrEqual(
+			daydreamSetupKind.maxCiphertextLength
+		);
+	});
+});
 
 describe('daydreamTurnKind', () => {
 	it('fits a passage at every cap, kept raw as well, inside its ciphertext cap', () => {

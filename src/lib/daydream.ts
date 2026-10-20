@@ -388,6 +388,20 @@ export type DaydreamIdea = {
 	/** A few words: playful, strict, slow-burn. */
 	tone: string;
 	notes: string;
+	/**
+	 * What the user asked for, in their own words, when the idea was written
+	 * from a brief on the new-daydream page. Kept as typed, beside the fields
+	 * the model wrote from it, so the story model reads the request itself and
+	 * not only a synthesis of it. Empty for an idea written by hand.
+	 */
+	brief: string;
+	/**
+	 * The model's own notes from writing the idea: what it found in the pages
+	 * the brief linked, the themes and sayings there in their own words, and
+	 * what it built on or left out. The fields are a summary; this is the
+	 * material behind them, for the story model to draw on.
+	 */
+	research: string;
 	/** The parts it has for characters. Optional: an idea with none is cast freely. */
 	parts: IdeaPart[];
 	dials: IdeaDials;
@@ -402,6 +416,26 @@ export const IDEA_TEXT_FIELDS = [
 ] as const satisfies readonly (keyof DaydreamIdea)[];
 
 export type IdeaTextField = (typeof IDEA_TEXT_FIELDS)[number];
+
+/**
+ * Where an idea came from: the brief and the notes behind it. Text fields
+ * too, but kept out of `IDEA_TEXT_FIELDS` because that list is what the
+ * suggestions write in — Fill in the rest inventing a brief the user never
+ * wrote, or research nobody did, would make both worthless.
+ */
+export const IDEA_ORIGIN_FIELDS = [
+	'brief',
+	'research'
+] as const satisfies readonly (keyof DaydreamIdea)[];
+
+export type IdeaOriginField = (typeof IDEA_ORIGIN_FIELDS)[number];
+
+/**
+ * An idea with nowhere it came from: a ready-made one, or one a suggestion
+ * wrote with no brief behind it. Whatever makes it a real idea gives it the
+ * empty origin (`EMPTY_IDEA`'s), rather than every template spelling it out.
+ */
+export type IdeaWithoutOrigin = Omit<DaydreamIdea, IdeaOriginField>;
 
 /**
  * The ones the dialog shows before "More detail", besides the title and the
@@ -421,6 +455,8 @@ export const EMPTY_IDEA: DaydreamIdea = {
 	yourRole: '',
 	tone: '',
 	notes: '',
+	brief: '',
+	research: '',
 	parts: [],
 	dials: UNSET_IDEA_DIALS
 };
@@ -569,6 +605,12 @@ export const DAYDREAM_LIMITS = {
 	limits: 1000,
 	/** The brief a daydream is written from on the new-daydream page: what the user typed. */
 	brief: 500,
+	/**
+	 * An idea's research notes (`DaydreamIdea.research`): room for what a few
+	 * linked pages said, quoted where it is worth keeping, without growing
+	 * every reply's system prompt by more than a thousand tokens or so.
+	 */
+	ideaResearch: 4000,
 	turn: 8000,
 	/**
 	 * A reply exactly as the model wrote it, kept for debug mode's raw log

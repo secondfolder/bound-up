@@ -16,12 +16,7 @@
 		storedStarterSide
 	} from '$lib/daydream/starters';
 	import { type SuggestFailure, suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
-	import {
-		addIdeas,
-		type GeneratedIdea,
-		ideaBrief,
-		MAX_OFFERED_IDEAS
-	} from '$lib/daydream/suggestions';
+	import { addIdeas, type GeneratedIdea, MAX_OFFERED_IDEAS } from '$lib/daydream/suggestions';
 	import type { MarkedSummary } from '$lib/daydream/summary';
 	import type { PageData } from './$types';
 
@@ -50,13 +45,17 @@
 
 	/**
 	 * The brief a draft is written from, the side it was asked for (or a
-	 * generated idea made for), and the voice a generated idea was made for,
-	 * if any, so the draft is told the way the idea was.
+	 * generated idea made for), and for a generated idea, the idea itself,
+	 * its voice, so the draft is told the way the idea was, and the research
+	 * its round of ideas was written with. The brief is always what the user
+	 * typed, even for a generated idea, so the draft keeps their own words.
 	 */
 	type Described = {
 		brief: string;
 		side: StarterSide | null;
 		voice?: DaydreamVoicePresetId | null;
+		chosen?: Pick<GeneratedIdea, 'title' | 'premise'>;
+		research?: string;
 	};
 
 	let stage: Stage = $state({ kind: 'start' });
@@ -214,12 +213,25 @@
 	}
 
 	function writeIdea(chosen: GeneratedIdea) {
+		if (!generated) {
+			return;
+		}
 		writing = chosen.title;
 		// The idea's own side, which is the one it was asked for unless it
 		// has no one in charge.
-		writeDraft({ brief: ideaBrief(chosen), side: chosen.you, voice: chosen.voice }, '', (failure) => {
-			ideaProblem = failure;
-		});
+		writeDraft(
+			{
+				brief: generated.brief,
+				side: chosen.you,
+				voice: chosen.voice,
+				chosen: { title: chosen.title, premise: chosen.premise },
+				research: chosen.research
+			},
+			'',
+			(failure) => {
+				ideaProblem = failure;
+			}
+		);
 	}
 </script>
 

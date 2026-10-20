@@ -16,6 +16,7 @@ import type {
 	DaydreamVoicePresetId,
 	IdeaDials,
 	IdeaPart,
+	IdeaWithoutOrigin,
 	StoryDials
 } from '../daydream';
 import { requestSuggestion } from './client';
@@ -171,7 +172,7 @@ export async function suggestName(input: {
 export async function surpriseIdea(
 	context: SuggestContext,
 	ideaDials?: IdeaDials
-): Promise<Answer<Omit<DaydreamIdea, 'parts'> & { parts: SuggestedPart[] }>> {
+): Promise<Answer<Omit<IdeaWithoutOrigin, 'parts'> & { parts: SuggestedPart[] }>> {
 	const answer = await ask({
 		task: 'surprise-idea',
 		target: 'idea',
@@ -197,6 +198,10 @@ export async function suggestDaydream(input: {
 	side?: StarterSide | null;
 	/** The voice a generated idea was made for, so the daydream is told that way. */
 	voice?: DaydreamVoicePresetId | null;
+	/** The generated idea picked, when it is one; `brief` is then what the ideas were asked for with. */
+	chosen?: { title: string; premise: string };
+	/** The research the generated ideas were written with, to build on rather than read again. */
+	research?: string;
 	limits: string;
 	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestionLog`). */
 	debugLog?: boolean;
@@ -206,7 +211,25 @@ export async function suggestDaydream(input: {
 		return answer;
 	}
 	const pieces = parseSuggestedDaydream(answer.value);
-	return withLog(answer, pieces ? { ok: true, value: pieces } : nothing(answer));
+	return withLog(
+		answer,
+		pieces
+			? {
+					ok: true,
+					value: {
+						...pieces,
+						idea: {
+							...pieces.idea,
+							// What the user typed, kept as they typed it: the model's
+							// version of it is everything else in the idea.
+							brief: input.brief.trim(),
+							// A model that forgot its notes still leaves the earlier ones.
+							research: pieces.idea.research || input.research?.trim() || ''
+						}
+					}
+				}
+			: nothing(answer)
+	);
 }
 
 /**

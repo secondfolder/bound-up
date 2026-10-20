@@ -96,6 +96,48 @@ describe('DaydreamIdeaDialog', () => {
 		expect(moreDetail(baseElement).open).toBe(true);
 	});
 
+	it('shows where an idea came from under more detail, only for one that has it, and saves it', async () => {
+		const detailLabels = (container: ParentNode) =>
+			[...moreDetail(container).querySelectorAll('.chip-field .label')].map((label) =>
+				label.textContent?.trim()
+			);
+		const handMade = renderDialog({ idea: testIdea() });
+		await waSettled(handMade.baseElement);
+		expect(detailLabels(handMade.baseElement)).not.toContain('What you asked for');
+		handMade.unmount();
+
+		const onsaved = vi.fn();
+		const { baseElement } = renderDialog({
+			idea: testIdea({ brief: 'a stranger on a night train', research: 'Trains at night.' }),
+			onsaved
+		});
+		await waSettled(baseElement);
+		expect(detailLabels(baseElement)).toEqual([
+			'Where',
+			'Your part',
+			'Tone',
+			'Anything else',
+			'What you asked for',
+			'Background'
+		]);
+		// Where it came from is nothing the user customised, so it opens nothing.
+		expect(moreDetail(baseElement).open).toBe(false);
+
+		moreDetail(baseElement).open = true;
+		await waSettled(baseElement);
+		const research = [...baseElement.querySelectorAll('.chip-field')]
+			.find((field) => field.querySelector('.label')?.textContent?.trim() === 'Background')
+			?.querySelector('textarea');
+		await userEvent.type(defined(research, 'the research box'), ' Sleeper cars.');
+		await waSettled(baseElement);
+		button(baseElement, 'Save changes')?.click();
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		expect(onsaved.mock.calls[0]?.[0]).toMatchObject({
+			brief: 'a stranger on a night train',
+			research: 'Trains at night. Sleeper cars.'
+		});
+	});
+
 	it('adds parts up to the cap, and removes them', async () => {
 		const { baseElement } = renderDialog();
 		await waSettled(baseElement);

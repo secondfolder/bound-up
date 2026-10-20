@@ -49,9 +49,10 @@ someone has played one:
   idea fields and cast: a monologue has no parts and nobody in it unless a
   named character is the one speaking, and its sayings go in the idea's
   notes ([Ideas](#ideas)). Who speaks is a voice of its own, talking to the
-  user, by default; the user's own inner voice is the model's to choose where
-  it judges the idea works better as their thoughts, but not merely because
-  the brief is about what someone is or what people believe. Told that the
+  user, by default — even when the voice and the user are on the same side,
+  so long as it does not make the user the one it is talking about — and the
+  user's own inner voice only when the brief asks for it, never merely
+  because the brief is about what someone is or what people believe. Told that the
   inner voice "suits a brief about what they are or think", a model read a
   brief listing what a community says women are for as the user's own
   beliefs, and spoke it as their inner voice.
@@ -112,11 +113,15 @@ someone has played one:
   failure is said under the box for **Suggest daydreams for this** and under its
   button for **More ideas**; the page keeps the ideas and the brief, so
   going back shows them. Picking one asks for the whole daydream as
-  **Write this daydream** does, from the
-  idea's title and premise (`ideaBrief`, which fits the `brief` cap) and
-  with the idea's side and voice, so the cast are written to suit it and an
-  idea for a monologue is written out as one, not as a story about its
-  theme; **Try another** on the setup asks again from the same idea.
+  **Write this daydream** does, from the brief the ideas were asked for
+  with, the idea picked (`chosen`: its title and premise) and the research
+  its round was written with ([What a brief leaves
+  behind](#what-a-brief-leaves-behind)), and with the idea's side and voice,
+  so the cast are written to suit it and an idea for a monologue is written
+  out as one, not as a story about its theme; **Try another** on the setup
+  asks again from the same idea. It used to send `"title: premise"` as the
+  brief, which lost the user's own words, and with them every link they had
+  given.
 - **Build your own.** A section like the others, its **Build it yourself**
   button opening the full form, empty.
 
@@ -161,6 +166,54 @@ what it read before it writes.
   from three subreddits took about 15 seconds and 2–2.5¢ through Chat
   Completions, and from one subreddit about 6 seconds and 0.8¢ through the
   Responses API, against 4 seconds and a quarter of a cent without links.
+
+### What a brief leaves behind
+
+The fields a `daydream` answer fills are a synthesis: a premise of a
+sentence or two, a tone in a few words, a monologue's eight to twelve
+sayings. That is right for them, but on its own it threw away what they were
+made from — the brief as the user typed it, and whatever the model read in
+its links and thought through. A brief pointing at a caption subreddit came
+back as a premise about its theme, and the story model never saw a single
+caption. So an idea written from a brief keeps both (`DaydreamIdea.brief`,
+`.research`), and the story model reads them ([The system prompt is the
+server's](#the-system-prompt-is-the-servers)):
+
+- **The brief**, as typed. `suggestDaydream` puts it on the idea itself,
+  from the request rather than the answer, so it is the user's words and
+  never the model's version of them. For a picked idea it is the brief the
+  ideas were asked for with.
+- **The research**: notes the model is asked for beside its answer
+  (`RESEARCH_NOTES` in `suggest-prompt.ts`), for whoever writes the daydream
+  — what each linked page was and what it said, its recurring themes,
+  tropes and sayings quoted as written where the wording matters, what in
+  the brief it built on, and what it weighed and left out. Short lines, so
+  notes that run over `DAYDREAM_LIMITS.ideaResearch` keep their first lines
+  (`parseResearch`), like a monologue's sayings. The `daydream` answer gives
+  them after the voice; the `ideas` answer gives one set first, for the
+  whole round, and every idea in it carries them (`GeneratedIdea.research`).
+- **A picked idea is not read twice.** Its request sends the round's notes
+  as `research`, said to the model as material, never instructions, since
+  they may quote pages; the links are not fetched again
+  (`buildSuggestMessages`), and the model carries over what is still useful
+  into its own notes. A model that writes none leaves the round's in place.
+  Notes that came back empty are nothing to build on, so then the links are
+  read.
+
+Neither field is in `IDEA_TEXT_FIELDS`, the list the suggestions write in
+(`IDEA_ORIGIN_FIELDS` instead): Fill in the rest inventing a brief nobody
+typed, or research nobody did, would make both worthless. The idea dialog
+shows them under "More detail" for an idea that has them, as **What you
+asked for** and **Background**, editable like any field, and they go with
+the idea when it is saved to the library. They alone do not open "More
+detail", since nobody customised them, and an idea written by hand shows
+neither. Ready-made ideas leave them out (`IdeaWithoutOrigin`), and get the
+empty ones when they become an idea.
+
+They came with the idea kind's (`daydream-scene`) v2 and setup v5, reader
+and writer in one release (docs/encryption.md, "Sealed records"): every idea
+and setup from before opens with both empty, and a tab left open on the
+previous build cannot open one saved after the deploy until it reloads.
 
 All but the last hand the form a draft, put together by `assembleSetup`
 (`daydream/starters.ts`): parts get fresh ids, each person is cast into the
@@ -377,7 +430,9 @@ Two ready-made daydreams are monologues, one for each side ("Owned" and
 
 What a daydream is about is its **idea**: a title, what it is about
 (`premise`), where (`setting`), the user's part (`yourRole`), a tone, notes,
-the parts it has for characters, and its heat and kink. It was called the
+the parts it has for characters, and its heat and kink — and, for one
+written from a brief, the brief and the research behind it ([What a brief
+leaves behind](#what-a-brief-leaves-behind)). It was called the
 *scene* until the monologue, which has no scene: the word, and the fields
 it named ("What's going on: how it starts"), made the model and the form
 alike treat every daydream as a plot. "Idea" fits a story and a monologue
@@ -1275,12 +1330,16 @@ them, not from the user or this server:
   and the first `MAX_NAMING_OPENING` characters of the opening passage;
 - for a whole daydream, from the new-daydream page: the brief the user
   wrote (up to `DAYDREAM_LIMITS.brief`) with the side chosen under "You as",
-  or a generated idea's title and premise with the side and voice it was
-  made for, and any limits written on the draft; it answers with a summary
-  to show the draft as, too (see "Starting one");
+  and for a generated idea also its title and premise, the side and voice it
+  was made for, and the research its round came with; and any limits written
+  on the draft; it answers with research notes and a summary to show the
+  draft as, too (see "Starting one");
 - for generated ideas: the brief (up to `DAYDREAM_LIMITS.brief`), the side
   chosen under "You as", and for **More ideas** the titles of those already
-  shown.
+  shown; it answers with research notes for the round.
+
+An idea's brief and research are part of the setup, so each passage's
+request carries them too, like the rest of the idea.
 
 The answer is a small JSON completion, not streamed, passed back unread for
 the browser to check (`daydream/suggestions.ts`). When the provider fails,
@@ -1320,16 +1379,39 @@ budget.
 
 ## The system prompt is the server's
 
-`src/lib/server/daydream/prompt.ts` builds what the model reads: the
-server's `RULES` first, then the setup (`describeSetup`: how it is told,
-each character with their dials in words, the idea with its heat and kink,
-the limits, the dials), then how to read the user's turns, then how a
-passage is written (see below), then — for the
-system voice only — its guide and examples, then either how to format the
-passage and the reply format or, for a stopped scene, the check-in. The guide goes last before the format
-because it is about how to write, and the most recent thing the model reads
-is what it acts on; a stopped scene leaves it out, as the check-in is out of
-character. The rules are never sent by a browser, so
+`src/lib/server/daydream/prompt.ts` builds what the model reads in two
+halves, split by a line of dashes and a "This daydream" heading
+(`THIS_DAYDREAM`):
+
+1. **How to write**, the app's own: the server's `RULES` first, then how to
+   read the user's turns, then how a passage is written (see below), then —
+   for the system voice and a monologue — its guide and examples, then
+   either how to format the passage and the reply format or, for a stopped
+   scene, the check-in. The guides are left out of a stopped scene, as the
+   check-in is out of character. Which of these is sent depends on how the
+   daydream is told and its heat, but nothing in them is the daydream's
+   own: no name, title or anything the user wrote.
+2. **This daydream**, the setup (`describeSetup`): how it is told, each
+   character with their dials in words, the idea with its heat and kink,
+   where the idea came from when it was written from a brief, the limits,
+   the dials. A persona's name for a monologue is said here
+   (`describeNarrator`), not in its guide.
+
+The split is for whoever reads a prompt in debug mode, who can tell at a
+glance which half is which, and for the model, told past the line that what
+follows is what to write, never a change to how, and that the rules come
+first. Until then the setup went straight after the rules, with the guides
+and the format after it, on the reasoning that the most recent thing the
+model reads is what it acts on. That reasoning only ever held for the
+opening, since the whole conversation follows the system prompt; it is the
+reply format's own example that keeps replies in shape. With the setup
+last, the part holding what the user wrote — the idea's research, quoted
+from web pages, included — is the part most plainly marked as material.
+Where the idea came from (`describeOrigin`) is the brief in the user's own
+words and the research as material, never instructions — it may quote web
+pages, which anyone can write — and says that the idea and characters above
+come first where they differ, since the user may have changed them since.
+The rules are never sent by a browser, so
 a page cannot drop them, and they say they come before anything in the
 setup, which is where a user would try to talk a model out of them. They
 open by saying the story may be as sexual and as kinky as the setup says, or
@@ -1480,7 +1562,10 @@ $1 per 1,000 pages fetched, and the pages' text as input
     its own (`CHECK_IN`); the requests either side of it still chain;
   - taking a reaction back, or changing it, takes its note out of the
     history (a changed one is a new note where it was changed);
-  - changing the setup, its dials or the limits changes the system prompt;
+  - changing the setup, its dials or the limits changes the system prompt,
+    but only from the line on: the setup is its second half, so the general
+    half before it still matches, unless the change is to how it is told or
+    its heat, which choose what the general half says;
   - trimming cuts the start, at steps, behind an `omitted` marker that tells
     the model the story starts partway through rather than at its beginning.
 - **The feature is a grant** (`daydreams` in `src/lib/features.ts`), and every

@@ -43,6 +43,8 @@ export function testIdea(overrides: Partial<DaydreamIdeaCopy> = {}): DaydreamIde
 		yourRole: '',
 		tone: '',
 		notes: '',
+		brief: '',
+		research: '',
 		parts: [],
 		dials: UNSET_IDEA_DIALS,
 		...overrides

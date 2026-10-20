@@ -715,7 +715,8 @@ in `src/lib/sealed.ts`:
   ([versions-and-updates.md](versions-and-updates.md)), and only a record made
   after the deploy is affected. Daydreams' setup v4 (the monologue voice,
   and the scene renamed the idea) shipped this way, since a stale tab
-  missing one new daydream costs nothing but a reload.
+  missing one new daydream costs nothing but a reload, and so did setup v5
+  with the idea kind's v2 (an idea's brief and research).
 - **A record read at an older version is written back at the latest**,
   compare-and-swap on `revision`, so a background upgrade can never overwrite
   a newer edit from the other partner.

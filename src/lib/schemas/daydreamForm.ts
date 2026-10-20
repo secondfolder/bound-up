@@ -79,6 +79,8 @@ const ideaFields = {
 	yourRole: optional(DAYDREAM_LIMITS.yourRole),
 	tone: optional(DAYDREAM_LIMITS.tone),
 	notes: optional(DAYDREAM_LIMITS.ideaNotes),
+	brief: optional(DAYDREAM_LIMITS.brief),
+	research: optional(DAYDREAM_LIMITS.ideaResearch),
 	parts: z.array(partFields).max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} parts`),
 	dials: ideaDials
 };

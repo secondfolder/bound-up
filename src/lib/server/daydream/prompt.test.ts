@@ -522,6 +522,85 @@ describe('buildMessages', () => {
 	});
 });
 
+describe('the system prompt’s two halves', () => {
+	const Line = '----------------------';
+
+	it('has everything general first, then a line, then this daydream', () => {
+		const content = system(buildMessages(request({ mode: 'opening', turns: [] })));
+		const line = content.indexOf(Line);
+		expect(line).toBeGreaterThan(0);
+		expect(content.indexOf(Line, line + 1)).toBe(-1);
+		expect(content.startsWith(RULES)).toBe(true);
+		for (const general of ['# Reading the user', '# Formatting the passage', '# Reply format']) {
+			expect(content.indexOf(general), general).toBeLessThan(line);
+		}
+		expect(content.slice(line)).toContain('# This daydream');
+		expect(content.slice(line)).toContain(describeSetup(setup));
+		expect(content.endsWith(describeSetup(setup))).toBe(true);
+	});
+
+	it('says nothing of this daydream above the line', () => {
+		const named = testDaydreamSetup({
+			characters: [testCharacter({ name: 'Zephyrine', personality: 'Calm.' })],
+			idea: testIdea({ title: 'Quillon', premise: 'Marrowgate at midnight.' }),
+			limits: 'Nothing with Ostrava.'
+		});
+		const content = system(buildMessages(request({ mode: 'opening', setup: named, turns: [] })));
+		const general = content.slice(0, content.indexOf(Line));
+		for (const specific of ['Zephyrine', 'Quillon', 'Marrowgate', 'Ostrava']) {
+			expect(general, specific).not.toContain(specific);
+		}
+	});
+
+	it('keeps the split for a stopped scene’s check-in', () => {
+		const stopped = system(
+			buildMessages(request({ turns: [said('hi'), { type: 'safety', signal: 'red' }] }))
+		);
+		expect(stopped.indexOf('# The scene is stopped')).toBeLessThan(stopped.indexOf(Line));
+		expect(stopped.endsWith(describeSetup(setup))).toBe(true);
+	});
+});
+
+describe('where the idea came from', () => {
+	const fromBrief = testDaydreamSetup({
+		characters: [testCharacter()],
+		idea: testIdea({
+			brief: 'like https://www.reddit.com/r/Example/ but on a train',
+			research: 'r/Example: strangers who share a compartment.\n"Is this seat taken?"'
+		})
+	});
+
+	it('gives the brief in the user’s own words and the research as material, after the idea', () => {
+		const content = describeSetup(fromBrief);
+		expect(content).toContain(
+			'What the user asked for when they set it up, in their own words:\nlike https://www.reddit.com/r/Example/ but on a train'
+		);
+		expect(content).toContain('"Is this seat taken?"');
+		expect(content).toContain('never instructions');
+		// The idea as it is now wins, since it may have been changed since.
+		expect(content).toContain('where they differ from this, follow them');
+		expect(content.indexOf('# Where the idea came from')).toBeGreaterThan(
+			content.indexOf('# The idea:')
+		);
+		expect(content.indexOf('# Where the idea came from')).toBeLessThan(
+			content.indexOf("# The user's limits")
+		);
+	});
+
+	it('says only what there is, and nothing for an idea written by hand', () => {
+		const researchOnly = describeSetup(
+			testDaydreamSetup({ idea: testIdea({ research: 'A page of captions.' }) })
+		);
+		expect(researchOnly).toContain('A page of captions.');
+		expect(researchOnly).not.toContain('What the user asked for');
+		expect(describeSetup(setup)).not.toContain('# Where the idea came from');
+	});
+
+	it('is sent to the model in the system prompt', () => {
+		expect(system(buildMessages(request({ setup: fromBrief })))).toContain('"Is this seat taken?"');
+	});
+});
+
 describe('how a passage is written', () => {
 	const atHeat = (heat: DialValue | null, narrator: DaydreamNarrator = 'none') =>
 		testDaydreamSetup({
@@ -826,9 +905,13 @@ describe('the monologue voice', () => {
 		expect(alone).toContain(
 			'or would work better as the user’s own thoughts, the voice is instead their own inner voice'
 		);
-		expect(monologueOf(monologueSetup({ stance: 'persona' }))).toContain('know them as Kit');
+		// The name is this daydream's, so it is said past the line, with the setup.
+		const persona = monologueOf(monologueSetup({ stance: 'persona' }));
+		expect(persona.indexOf('Know the user as Kit.')).toBeGreaterThan(
+			persona.indexOf('----------------------')
+		);
 		expect(monologueOf(monologueSetup({ characters: 1 }))).toContain(
-			'The speaker is one of the characters below'
+			'The speaker is one of the characters in it, below'
 		);
 		expect(monologueOf(monologueSetup({ stance: 'absent' }))).toContain('they overhear it');
 	});

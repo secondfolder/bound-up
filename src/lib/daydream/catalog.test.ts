@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EMPTY_IDEA } from '../daydream';
 import { daydreamCharacterKind, daydreamIdeaKind } from '../sealed-kinds/daydreams';
 import {
 	CASTING_CHIPS,
@@ -18,7 +19,9 @@ describe('the catalog', () => {
 			expect(daydreamCharacterKind.latest.safeParse(character).success, character.name).toBe(true);
 		}
 		for (const { idea } of IDEA_TEMPLATES) {
+			// As the idea dialog saves one: over an empty idea, so with no brief or research.
 			const withIds = {
+				...EMPTY_IDEA,
 				...idea,
 				parts: idea.parts.map((part) => ({ ...part, id: crypto.randomUUID() }))
 			};

@@ -154,6 +154,8 @@
 					"yourRole": "",
 					"tone": "slow-burn",
 					"notes": "",
+					"brief": "",
+					"research": "",
 					"sourceId": null,
 					"sourceRevision": null,
 					"parts": [],
@@ -256,6 +258,8 @@
 					"yourRole": "The new hire",
 					"tone": "slow-burn",
 					"notes": "",
+					"brief": "",
+					"research": "",
 					"parts": [
 						{
 							"id": "00000000-0000-4000-8000-0000000000e1",
@@ -359,6 +363,8 @@
 					"yourRole": "The new hire",
 					"tone": "slow-burn",
 					"notes": "",
+					"brief": "",
+					"research": "",
 					"parts": [
 						{
 							"id": "00000000-0000-4000-8000-0000000000e1",
@@ -411,6 +417,51 @@
 					"yourRole": "The listener",
 					"tone": "devoted",
 					"notes": "",
+					"brief": "",
+					"research": "",
+					"parts": [],
+					"sourceId": null,
+					"sourceRevision": null,
+					"dials": {
+						"heat": 4,
+						"kink": 4
+					}
+				},
+				"lead": "character",
+				"limits": "Nothing public.",
+				"dials": {
+					"intensity": 3,
+					"pace": 3,
+					"length": "medium"
+				},
+				"pictures": {
+					"on": true,
+					"style": "photo"
+				}
+			}
+		},
+		{
+			"kind": "daydream-setup",
+			"version": 5,
+			"recordId": "00000000-0000-4000-8000-000000000101",
+			"ciphertext": "sb1.L5nnQP7tADa5Z4NcojAEAVQTIisEbODursyEykjcDMavBg6u0Q-6hjcNEM3jZvikXN0K0-aA00rAeEPvGXhWH7c-3LZECdCXvDgs0zKzb185soHV6MPmJKtLbL-ddn7hCi7zJaresaVjy6GkCdLiTkD-ZgX8bYOtO-j955zJgMY8m7d3g44aKajYrgD8rh8DvFywCc1MRXQc71kMu2YFR5gShDSoISduAtZk-MUxoeZRgihTvX_yGFxE2Jp0JQhFVswDSkrdm_P5FKM1-taBidG3ll8p5p3JilNoReVR99bFlreDkLdZEGxtWYv-RxZNTQQDAhL3Vtf2tf2H2gH-uKqTe_cxAC62ABXlM-c1IdEZurJXFrttREE0xZ3rsA3cBVVIeACE-7G7ho_Jh__NMycGWPtpKrQNpNxc50WS-CQakoet-5SDkSczh1aOgU3XpQ29g5Gp7ZVYk8c0NpD1LcUNTRJEH1E6I4FmZo6ROZ9NV9D2x60yE4XiS5ERqPg0C0h6ij0gpa3yN_VgjuWxbcFkht4l727btCpJgBzZrIWe5k10a7V96zKFZO4Tgw-XBRNClH27UToqboeer4hNaFWf5gCziENn03JqzfLiQXiuakPDgl1deIy6HMm3icwEiisyIdVqdcy6ysdTqatdgxueZVs-O5ptmT4xUnXcWkVZt1Y4BfY4sA1VJzqk4L7kI4s0oyZb5mS7srckw2-qYjbaIb4CdIuNXFp8ijDpjFkob9BpVpbm2ut6aCWTN_RjszS4UZm6m6wtOlu7pKWuj-EFF-JIy3M1eVAnQ6K7z3lEjrhkCadRaRc6ocT0cx3IErXC2_AiYYYjkg74uv8YtKAFyCFqxP23rHDrdEwGHkJAKpok5V9qXRYFxN3cOA53MOWp6ECwjES5gL02amttvNwJyd1nQA6l36o06-r7BBm7OQetByJbwyV9fdrX5BaUZRwBz-Tfki7hcVzxTv6CShAi6TaINVHnqXlEuZQkbEHnyIhB",
+			"expected": {
+				"title": "",
+				"voice": {
+					"narrator": "monologue",
+					"stance": "persona",
+					"protagonistName": "Kit"
+				},
+				"characters": [],
+				"idea": {
+					"title": "Frozen mantras",
+					"setting": "Nowhere in particular.",
+					"premise": "A voice that says what belonging means.",
+					"yourRole": "The listener",
+					"tone": "devoted",
+					"notes": "",
+					"brief": "A late train, a stranger, and https://example.com/stories for the mood",
+					"research": "The linked page is a list of short stories set on night trains.\nRecurring: a shared compartment, a ticket inspector, \"next stop is yours\".",
 					"parts": [],
 					"sourceId": null,
 					"sourceRevision": null,
@@ -686,6 +737,40 @@
 				"yourRole": "The new hire",
 				"tone": "slow-burn",
 				"notes": "",
+				"brief": "",
+				"research": "",
+				"parts": [
+					{
+						"id": "00000000-0000-4000-8000-0000000000e1",
+						"name": "the interviewer",
+						"description": "Runs the meeting."
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000000e2",
+						"name": "the observer",
+						"description": ""
+					}
+				],
+				"dials": {
+					"heat": 4,
+					"kink": null
+				}
+			}
+		},
+		{
+			"kind": "daydream-scene",
+			"version": 2,
+			"recordId": "00000000-0000-4000-8000-000000000100",
+			"ciphertext": "sb1.Tq6BwRh83v_ZHrJEGkjxxm6CFEGJoOOzQjHj3E7PCxBDDcZsl_49CwdikcggsNRjQCEuijbA5MJEjct3avnATttbibs5MOLW7ifSe7pKNC7Z8mJjI_7U3s6lMTKsY4W5xDxOpeJ0wAdG7q48tTp1Xew7CKjwlxhPR4n9m_b6jOnAi8Th1kBcJlBp_AnWe4LQodrZWXKvBKOANwS04buJUWuMKQRptLfib5rbLQmxphBOTvYnDlovYcVFhpZcovJF1gLfaY2pfr99dADkUce56HtWsRl_pbCgtmkB1nsylYsFxat4DEKp7Uw25RKwcF7fGK9UuXOn4Mwh2eL_AVkLfI6HR-mecBEoK9XD_DubEQNNhwOUaVnyibfVP5IoY78ry3l0hprMQkoHUnajHFdjioaRhY5Kt9mq3Grnybqowc7vPlmL0F9M69-NaoOY9n2tyWKLSI95J3u0469yrMOiXKLP_IAB3NCILNOsOZ6HfB5mc9xa6zecM5wSYa4O-EFMQhmapBmCMQ1DrOVFJK7D8uU62KjuERyQOxMXqzBSLNb76y4B2NrRQIzP6IrkAJFNLOs9Zz96cCufGMY9JBC2-XY9cZJWnuYilN2MAVePxzS5s4wXr3zwNVyyX6mgc8VdB6IvssooUz0ec5ti4Y0OtGdwC_wiZ8UMQtBEnmGqBNTQ7O-AZyWAcza6--CoomQ7xu-f-DMW2AVkZyci1rZ0QU286JAUphqvmETUgbPGZtFedG0Exdvm-g06rmWoABwuDLdOxzHOwRLFAl2sQ7tiLxlqoZOP0gYEq_pS6UhZFlLDZ4Ge9HoFtAeLlOXEJaxRAmzjoqJfbP8lzp8KRqQjAiLSx0VdWPJhHw",
+			"expected": {
+				"title": "Frozen evening",
+				"setting": "An empty office.",
+				"premise": "A late meeting that runs over.",
+				"yourRole": "The new hire",
+				"tone": "slow-burn",
+				"notes": "",
+				"brief": "A late train, a stranger, and https://example.com/stories for the mood",
+				"research": "The linked page is a list of short stories set on night trains.\nRecurring: a shared compartment, a ticket inspector, \"next stop is yours\".",
 				"parts": [
 					{
 						"id": "00000000-0000-4000-8000-0000000000e1",

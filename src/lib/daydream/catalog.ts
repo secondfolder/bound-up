@@ -23,9 +23,10 @@ import type {
 	CharacterTextField,
 	DaydreamCasting,
 	DaydreamCharacter,
-	DaydreamIdea,
 	DaydreamNarrator,
-	IdeaTextField
+	IdeaOriginField,
+	IdeaTextField,
+	IdeaWithoutOrigin
 } from '../daydream';
 
 export const CHARACTER_FIELD_LABELS: Readonly<
@@ -275,6 +276,23 @@ const MONOLOGUE_FIELD_LABELS: FieldLabels = {
 	notes: {
 		label: 'Sayings to build on',
 		hint: 'Lines it starts from, one to a line, and anything else'
+	}
+};
+
+/**
+ * Where an idea came from, as the idea dialog shows it. The same for a
+ * monologue as a story: neither field is read differently for one.
+ */
+export const IDEA_ORIGIN_LABELS: Readonly<
+	Record<IdeaOriginField, { label: string; hint: string }>
+> = {
+	brief: {
+		label: 'What you asked for',
+		hint: 'The words this idea was written from, as you typed them'
+	},
+	research: {
+		label: 'Background',
+		hint: 'What was found and thought through as it was written, from any pages you linked'
 	}
 };
 
@@ -878,7 +896,7 @@ export const CHARACTER_TEMPLATES: readonly {
 export const IDEA_TEMPLATES: readonly {
 	id: string;
 	label: string;
-	idea: Omit<DaydreamIdea, 'parts'> & { parts: { name: string; description: string }[] };
+	idea: Omit<IdeaWithoutOrigin, 'parts'> & { parts: { name: string; description: string }[] };
 }[] = [
 	{
 		id: 'one-bed',

@@ -6,7 +6,6 @@ import {
 	completionText,
 	describeUnusable,
 	GENERATED_IDEAS,
-	ideaBrief,
 	MAX_IDEA_PREMISE,
 	MAX_IDEA_TAGS,
 	MAX_REPLY_DETAIL,
@@ -17,6 +16,7 @@ import {
 	parseIdeaDials,
 	parseName,
 	parseParts,
+	parseResearch,
 	parseSuggestedDaydream,
 	parseSurpriseIdea
 } from './suggestions';
@@ -279,6 +279,19 @@ describe('parseSuggestedDaydream', () => {
 		expect(pieces?.idea.notes).toBe('Good girls say thank you.\nAsking is the point.');
 	});
 
+	it('keeps the research on the idea, and leaves the brief for the caller', () => {
+		const pieces = parseSuggestedDaydream({
+			voice: 'talk',
+			research: 'The subreddit is captions.\nRecurring: "you asked for this".',
+			idea
+		});
+		expect(pieces?.idea.research).toBe(
+			'The subreddit is captions.\nRecurring: "you asked for this".'
+		);
+		expect(pieces?.idea.brief).toBeUndefined();
+		expect(parseSuggestedDaydream({ voice: 'talk', idea })?.idea.research).toBe('');
+	});
+
 	it('keeps as many whole sayings as fit when they run over, where any other field is dropped', () => {
 		const line = 'x'.repeat(300);
 		const pieces = parseSuggestedDaydream({
@@ -395,7 +408,8 @@ describe('parseGeneratedIdeas', () => {
 				tags: ['exhibition'],
 				you: 'sub',
 				voice: null,
-				dials: { heat: 4, kink: 3 }
+				dials: { heat: 4, kink: 3 },
+				research: ''
 			}
 		]);
 	});
@@ -476,11 +490,40 @@ describe('parseGeneratedIdeas', () => {
 		expect(parseGeneratedIdeas({ ideas: [null, 'Caught'] }, null)).toEqual([]);
 	});
 
-	it('makes a brief that fits the box a daydream is described in', () => {
-		const brief = ideaBrief({
-			title: 'x'.repeat(DAYDREAM_LIMITS.title),
-			premise: 'y'.repeat(MAX_IDEA_PREMISE)
-		});
-		expect(brief.length).toBeLessThanOrEqual(DAYDREAM_LIMITS.brief);
+	it('gives every idea the research its round was written with', () => {
+		const ideas = parseGeneratedIdeas(
+			{
+				research: 'r/example: captions about being kept.\n"Good pets wait."',
+				ideas: [idea({}), idea({ title: 'Kept' })]
+			},
+			null
+		);
+		expect(ideas.map((kept) => kept.research)).toEqual([
+			'r/example: captions about being kept.\n"Good pets wait."',
+			'r/example: captions about being kept.\n"Good pets wait."'
+		]);
+		expect(parseGeneratedIdeas({ ideas: [idea({})] }, null)[0]?.research).toBe('');
+	});
+});
+
+describe('parseResearch', () => {
+	it('keeps the notes, trimmed', () => {
+		expect(parseResearch({ research: '  A page of captions.\nThemes: being kept.  ' })).toBe(
+			'A page of captions.\nThemes: being kept.'
+		);
+	});
+
+	it('keeps as many whole lines as fit when the notes run over', () => {
+		const line = 'x'.repeat(1000);
+		expect(parseResearch({ research: [line, line, line, line, line].join('\n') })).toBe(
+			[line, line, line].join('\n')
+		);
+	});
+
+	it('is empty for no notes, notes that are not text, or a first line too long by itself', () => {
+		expect(parseResearch({})).toBe('');
+		expect(parseResearch(null)).toBe('');
+		expect(parseResearch({ research: ['a'] })).toBe('');
+		expect(parseResearch({ research: 'x'.repeat(DAYDREAM_LIMITS.ideaResearch + 1) })).toBe('');
 	});
 });

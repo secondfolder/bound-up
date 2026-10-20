@@ -16,12 +16,12 @@ import {
 	CHARACTER_TEXT_FIELDS,
 	type CharacterTextField,
 	DAYDREAM_LIMITS,
-	type DaydreamIdea,
 	type DaydreamVoicePresetId,
 	type DialValue,
 	IDEA_TEXT_FIELDS,
 	type IdeaDials,
 	type IdeaTextField,
+	type IdeaWithoutOrigin,
 	MAX_DAYDREAM_CHARACTERS,
 	UNSET_CHARACTER_DIALS
 } from '../daydream';
@@ -274,6 +274,24 @@ function wholeLines(text: string, limit: number): string {
 	return kept;
 }
 
+/**
+ * The research notes in an answer (`research`, for a whole daydream or a
+ * round of ideas), as many whole lines as fit the cap: like a monologue's
+ * sayings, notes that run over are still worth their first lines. Empty for
+ * anything else, or a first line too long by itself.
+ */
+export function parseResearch(value: unknown): string {
+	if (!value || typeof value !== 'object') {
+		return '';
+	}
+	const { research } = value as Record<string, unknown>;
+	if (typeof research !== 'string') {
+		return '';
+	}
+	const kept = wholeLines(research.trim(), DAYDREAM_LIMITS.ideaResearch);
+	return kept.length <= DAYDREAM_LIMITS.ideaResearch ? kept : '';
+}
+
 /** An idea part as the model suggests it: no id yet, which the dialog gives it. */
 export type SuggestedPart = { name: string; description: string };
 
@@ -337,7 +355,7 @@ export function parseIdeaDials(value: unknown): IdeaDials {
 /** A whole idea from "Surprise me", or null when it lacks the two fields an idea must have. */
 export function parseSurpriseIdea(
 	value: unknown
-): (Omit<DaydreamIdea, 'parts'> & { parts: SuggestedPart[] }) | null {
+): (Omit<IdeaWithoutOrigin, 'parts'> & { parts: SuggestedPart[] }) | null {
 	const fields = parseFill('idea', value);
 	if (!(fields.title && fields.premise)) {
 		return null;
@@ -408,7 +426,9 @@ const voiceOf = (value: unknown): DaydreamVoicePresetId | null =>
  * Lenient like the rest: a voice that is not one of the five is left to
  * follow who is in it, a person with no name is dropped, and every field is
  * held to its cap. Characters' dials stay unset, as a person who skipped
- * them would leave them; the idea's are rated.
+ * them would leave them; the idea's are rated. The idea's research is the
+ * answer's notes (`parseResearch`); its brief is the caller's to add, since
+ * it is what the user typed, not anything the model said.
  */
 export function parseSuggestedDaydream(value: unknown): DaydreamPieces | null {
 	if (!value || typeof value !== 'object') {
@@ -420,6 +440,7 @@ export function parseSuggestedDaydream(value: unknown): DaydreamPieces | null {
 		return null;
 	}
 	const voice = voiceOf(answer.voice);
+	const research = parseResearch(answer);
 	const list = Array.isArray(answer.characters) ? answer.characters : [];
 	const cast: DaydreamCast[] = [];
 	for (const entry of list) {
@@ -450,7 +471,7 @@ export function parseSuggestedDaydream(value: unknown): DaydreamPieces | null {
 		answer.summary,
 		kept.map((person) => person.character.name)
 	);
-	return { voice, idea, cast: kept, summary };
+	return { voice, idea: { ...idea, research }, cast: kept, summary };
 }
 
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
@@ -470,9 +491,11 @@ export const MAX_IDEA_TAGS = 4;
 export const MAX_IDEA_TAG_LENGTH = 30;
 
 /**
- * The longest premise kept for a generated idea: short enough that its title
- * and premise together fit the `brief` cap, since picking one sends them on as
- * the brief a whole daydream is written from (`ideaBrief`).
+ * The longest premise kept for a generated idea. Picking one sends it back as
+ * the idea to write out (`chosen`), held to the same cap there. It was first
+ * set so that title and premise together fit the `brief` cap, when a picked
+ * idea was sent as the brief in place of the one the user wrote; that lost
+ * the user's own words, and is why it is a separate field now.
  */
 export const MAX_IDEA_PREMISE = DAYDREAM_LIMITS.brief - DAYDREAM_LIMITS.title - 2;
 
@@ -494,6 +517,12 @@ export type GeneratedIdea = {
 	 */
 	voice: DaydreamVoicePresetId | null;
 	dials: IdeaDials;
+	/**
+	 * The notes the round of ideas it came in was written with, shared by
+	 * every idea in it (`parseResearch`), for the one picked to be written out
+	 * from without the brief's links being read a second time.
+	 */
+	research: string;
 };
 
 /**
@@ -502,12 +531,14 @@ export type GeneratedIdea = {
  * and de-duplicated; a side that is not one of the two is none. An idea that
  * puts the user on the other side from the one asked for is dropped rather
  * than shown under the wrong filter, as is a second idea with the same title.
+ * Each carries the round's research.
  */
 export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): GeneratedIdea[] {
 	const parsed = z.object({ ideas: z.array(z.unknown()) }).safeParse(value);
 	if (!parsed.success) {
 		return [];
 	}
+	const research = parseResearch(value);
 	const ideas: GeneratedIdea[] = [];
 	for (const entry of parsed.data.ideas) {
 		if (!entry || typeof entry !== 'object') {
@@ -530,7 +561,8 @@ export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): G
 			tags: ideaTags(idea.tags),
 			you,
 			voice: voiceOf(idea.voice),
-			dials: parseIdeaDials(idea)
+			dials: parseIdeaDials(idea),
+			research
 		});
 	}
 	return ideas.slice(0, GENERATED_IDEAS);
@@ -571,9 +603,4 @@ function ideaTags(value: unknown): string[] {
 		}
 	}
 	return tags.slice(0, MAX_IDEA_TAGS);
-}
-
-/** What a picked idea is written from, as if the user had typed it in the box. */
-export function ideaBrief(idea: Pick<GeneratedIdea, 'title' | 'premise'>): string {
-	return `${idea.title}: ${idea.premise}`;
 }

@@ -72,15 +72,15 @@ export function monologueExamples(heat: DialValue | null): readonly string[] {
 
 /** Who speaks, and where the user stands: left to the setup, with a default for when it says nothing. */
 export function monologueSpeaker(voice: DaydreamVoice, characterCount: number): string {
-	const name = voice.protagonistName.trim();
 	const who =
 		characterCount === 0
 			? 'No speaker is set. Unless the idea suggests one, speak as an unnamed voice with the user listening. Where the idea says so, or would work better as the user’s own thoughts, the voice is instead their own inner voice, in the first person as them — but an idea about what someone is or what people believe is no reason on its own.'
-			: 'The speaker is one of the characters below — the first, unless the idea says otherwise — or, where the idea says so or would work better as their own thoughts, the user’s own inner voice; anyone else is someone the voice talks about or to.';
+			: 'The speaker is one of the characters in it, below — the first, unless the idea says otherwise — or, where the idea says so or would work better as their own thoughts, the user’s own inner voice; anyone else is someone the voice talks about or to.';
 	const user =
 		voice.stance === 'absent'
 			? 'The user is not spoken to: they overhear it.'
-			: `Speak to the user as "you" where it fits${voice.stance === 'persona' && name ? `, and know them as ${name}` : ''}.`;
+			: // Their name, for a persona, is with the rest of this daydream (`describeNarrator`).
+				'Speak to the user as "you" where it fits.';
 	return `${who} Whoever it is stands in for the story's ideas rather than being a character with a life of their own: give them a way of talking, and keep their own history to a touch. ${user}`;
 }
 
@@ -94,7 +94,7 @@ export function monologueGuide(
 		.map((example) => `"""\n${example}\n"""`)
 		.join('\n');
 	return `# Writing a monologue
-This is not a story told scene by scene. It is one voice speaking its mind about what this daydream is about — the kinks, tropes and dynamics in the idea above — taking their ideas, the things people into them say and the sayings that go with them, and turning them into statements.
+This is not a story told scene by scene. It is one voice speaking its mind about what this daydream is about — the kinks, tropes and dynamics in the idea below — taking their ideas, the things people into them say and the sayings that go with them, and turning them into statements.
 - Write many short paragraphs. Most open with a statement on a line of its own, in bold — a belief, a rule, a mantra, a confession, something someone into this would say — followed by the voice's own words on it: a few sentences, or a longer run when the idea has more in it — what it means to them, why it gets to them, where it shows up in their day.
 - Ground it in everyday life where it fits: the voice catches the idea at work on the bus, at a café table, in a meeting, in bed, so it reads as something lived with rather than recited.
 - Keep each statement short enough to land: a sentence, rarely two.
@@ -103,6 +103,6 @@ This is not a story told scene by scene. It is one voice speaking its mind about
 - Little or no scene: no description of a room, and of anyone only what the voice would mention in passing. There is no plot to move along.
 - When the user writes, the voice takes it up: what they ask about, it dwells on; what they push for, it goes further into; what they want less of, it drops.
 ${monologueSpeaker(voice, characterCount)}
-These examples show the form only. Do not reuse any of their statements or sentences: take every idea from the one above, and follow its heat and kink, not theirs.
+These examples show the form only. Do not reuse any of their statements or sentences: take every idea from the one below, and follow its heat and kink, not theirs.
 ${examples}`;
 }

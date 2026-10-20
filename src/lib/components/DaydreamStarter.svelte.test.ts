@@ -22,7 +22,8 @@ const generatedIdeas: GeneratedIdea[] = [
 		tags: ['exhibition'],
 		you: 'sub',
 		voice: null,
-		dials: { heat: 4, kink: 3 }
+		dials: { heat: 4, kink: 3 },
+		research: ''
 	},
 	{
 		title: 'Your rules',
@@ -30,7 +31,8 @@ const generatedIdeas: GeneratedIdea[] = [
 		tags: ['protocol'],
 		you: 'dom',
 		voice: null,
-		dials: { heat: 4, kink: 4 }
+		dials: { heat: 4, kink: 4 },
+		research: ''
 	}
 ];
 

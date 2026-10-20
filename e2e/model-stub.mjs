@@ -52,6 +52,8 @@
 // ("Stub idea for the sub"), so a spec can see the side reach the model.
 // Asked for more, having been told what it already offered, each title ends
 // ", again", so "More ideas" has something new to add. The one with nobody in charge is a monologue.
+// The night train and the ideas both come with research notes of their own,
+// so a spec can see them kept on the idea, and carried to a picked idea.
 import { createServer } from 'node:http';
 
 const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1' } = process.env;
@@ -194,6 +196,7 @@ function suggestionFor(messages) {
 			summary:
 				'[[idea|A stranger on the stub night train]]. [[Vesper|A watchful stranger called Vesper]] takes the seat across from you, and the journey turns [[heat|slow-burning]].',
 			voice: 'talk',
+			research: 'Stub notes: night trains, and the strangers who share them.',
 			idea: {
 				title: 'The stub night train',
 				setting: 'a sleeper carriage',
@@ -215,11 +218,12 @@ function suggestionFor(messages) {
 				}
 			]
 		};
-	} else if (ask.includes('{"ideas"')) {
+	} else if (ask.includes('"ideas": [{"title"')) {
 		const side = ask.match(/The user is the (?<side>dominant|submissive) one/)?.groups?.side;
 		const asked = { dominant: 'dom', submissive: 'sub' }[side] ?? 'either';
 		const again = ask.includes('already been offered') ? ', again' : '';
 		content = {
+			research: 'Stub notes on what was asked for.',
 			ideas: [
 				{
 					title: `Stub idea for the ${asked}${again}`,

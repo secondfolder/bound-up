@@ -84,6 +84,21 @@ const ideaShape = {
 	dials: ideaDialsSchema
 };
 
+/**
+ * v2 of an idea: the brief it was written from and the model's research
+ * behind it (`DaydreamIdea.brief`, `.research`). A shape of its own, since
+ * `ideaShape` is v1's and every setup version up to v4's, and a shipped
+ * version's schema must never change under it.
+ */
+const ideaV2Shape = {
+	...ideaShape,
+	brief: optional(DAYDREAM_LIMITS.brief),
+	research: optional(DAYDREAM_LIMITS.ideaResearch)
+};
+
+/** An idea from before v2 had no brief or research: it was written by hand, or they were not kept. */
+const NO_ORIGIN = { brief: '', research: '' } as const;
+
 /** Who a character is in one daydream (`DaydreamCasting`). Only ever in a setup, never the library. */
 const castingSchema = z.object({
 	partId: clientId.nullable(),
@@ -109,8 +124,16 @@ export type DaydreamCharacterContent = z.output<typeof daydreamCharacterKind.lat
 // stored envelope, so it cannot follow the rename (docs/daydreams.md, "Ideas").
 export const daydreamIdeaKind = defineSealedKind({
 	name: 'daydream-scene',
-	maxCiphertextLength: 16 * 1024,
-	versions: [{ version: 1, schema: z.object(ideaShape) }]
+	// Every field at its cap, research included, JSON-escaped, sealed and base64url'd.
+	maxCiphertextLength: 24 * 1024,
+	versions: [
+		{
+			version: 1,
+			schema: z.object(ideaShape),
+			upcast: (value: z.output<z.ZodObject<typeof ideaShape>>) => ({ ...value, ...NO_ORIGIN })
+		},
+		{ version: 2, schema: z.object(ideaV2Shape) }
+	]
 });
 
 export type DaydreamIdeaContent = z.output<typeof daydreamIdeaKind.latest>;
@@ -205,6 +228,20 @@ const setupV4 = z
 	})
 	.superRefine(refineSetup);
 
+// v5: the idea's brief and research (v2 of the idea kind).
+const setupV5 = z
+	.object({
+		...setupV2Rest,
+		idea: z.object({ ...ideaV2Shape, ...sourceShape }),
+		voice: z.object({
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
+			stance: z.enum(['self', 'persona', 'absent']),
+			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
+		}),
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
+	})
+	.superRefine(refineSetup);
+
 export const daydreamSetupKind = defineSealedKind({
 	name: 'daydream-setup',
 	// Four characters with every field at its cap, an idea likewise, JSON-escaped,
@@ -274,7 +311,15 @@ export const daydreamSetupKind = defineSealedKind({
 				idea: scene
 			})
 		},
-		{ version: 4, schema: setupV4 }
+		{
+			version: 4,
+			schema: setupV4,
+			upcast: ({ idea, ...rest }: z.output<typeof setupV4>): z.output<typeof setupV5> => ({
+				...rest,
+				idea: { ...idea, ...NO_ORIGIN }
+			})
+		},
+		{ version: 5, schema: setupV5 }
 	]
 });
 

@@ -8,14 +8,21 @@
 		type DaydreamIdeaCopy,
 		type DialValue,
 		EMPTY_IDEA,
+		IDEA_ORIGIN_FIELDS,
 		IDEA_TEXT_FIELDS,
 		type IdeaDials,
+		type IdeaOriginField,
 		type IdeaPart,
 		type IdeaTextField,
 		ideaPrimaryFields,
 		MAX_DAYDREAM_CHARACTERS
 	} from '$lib/daydream';
-	import { IDEA_CHIPS, IDEA_TEMPLATES, ideaFieldLabels } from '$lib/daydream/catalog';
+	import {
+		IDEA_CHIPS,
+		IDEA_ORIGIN_LABELS,
+		IDEA_TEMPLATES,
+		ideaFieldLabels
+	} from '$lib/daydream/catalog';
 	import { saveLibraryItem } from '$lib/daydream/client';
 	import { IDEA_SLIDERS, ideaLevel } from '$lib/daydream/dial-words';
 	import {
@@ -46,7 +53,10 @@
 	 * and the parts it has for characters, which is what a daydream casts
 	 * them into. Heat and kink are up front because they decide what kind of
 	 * story it is — SFW or filthy — more than any other field. The rest is
-	 * under "More detail", which starts open when any of it is filled.
+	 * under "More detail", which starts open when any of it is filled. So is
+	 * where it came from — the brief it was written from and the research
+	 * behind it — for an idea that has either; those alone do not open it,
+	 * since nobody customised them.
 	 *
 	 * An SPA superform saving through `api/daydreams/ideas`, for the reason
 	 * the character dialog gives.
@@ -89,6 +99,8 @@
 				yourRole: existing.yourRole,
 				tone: existing.tone,
 				notes: existing.notes,
+				brief: existing.brief,
+				research: existing.research,
 				parts: existing.parts.map((part) => ({ ...part })),
 				dials: { ...existing.dials },
 				saveToLibrary: inLibrary
@@ -109,6 +121,9 @@
 	const detailFilled = (values: Pick<DaydreamIdeaFormValues, IdeaTextField>) =>
 		DETAIL_FIELDS.some((field) => values[field].trim() !== '');
 	const startsDetailed = detailFilled(start);
+	// Only for an idea that came with them: an empty "What you asked for" on
+	// an idea written by hand would ask for something nobody needs to write.
+	const ORIGIN_FIELDS = IDEA_ORIGIN_FIELDS.filter((field) => start[field].trim() !== '');
 
 	/** Opens "More detail" when something just wrote into it, so what changed is in view. */
 	function revealDetail() {
@@ -330,6 +345,11 @@
 		tone: DAYDREAM_LIMITS.tone,
 		notes: DAYDREAM_LIMITS.ideaNotes
 	};
+
+	const ORIGIN_LIMIT_OF: Record<IdeaOriginField, number> = {
+		brief: DAYDREAM_LIMITS.brief,
+		research: DAYDREAM_LIMITS.ideaResearch
+	};
 </script>
 
 {#snippet textField(field: IdeaTextField)}
@@ -450,6 +470,21 @@
 		<wa-details bind:this={detail} summary="More detail" class="detail" {@attach startOpen(startsDetailed)}>
 			{#each DETAIL_FIELDS as field (field)}
 				{@render textField(field)}
+			{/each}
+			<!-- No chips: these are what was asked for and found, not ideas to pick from. -->
+			{#each ORIGIN_FIELDS as field (field)}
+				<DaydreamChipField
+					label={IDEA_ORIGIN_LABELS[field].label}
+					hint={IDEA_ORIGIN_LABELS[field].hint}
+					value={$form[field]}
+					limit={ORIGIN_LIMIT_OF[field]}
+					chips={[]}
+					rows={field === 'research' ? 6 : 2}
+					onchange={(text) => {
+						$form[field] = text;
+					}}
+				/>
+				{#if $errors[field]}<span class="invalid">{$errors[field]}</span>{/if}
 			{/each}
 		</wa-details>
 

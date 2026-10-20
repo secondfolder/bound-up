@@ -608,6 +608,16 @@ test.describe('daydreams', () => {
 			page.getByRole('button', { name: 'a watchful stranger called Vesper' })
 		).toBeVisible();
 
+		// The idea keeps what was asked for as typed, and the notes behind it.
+		await summary.getByText('A stranger on the stub night train').click();
+		await expect(dialog(page).getByLabel('What you asked for')).toHaveValue(
+			'a stranger on a night train'
+		);
+		await expect(dialog(page).getByLabel('Background')).toHaveValue(
+			'Stub notes: night trains, and the strangers who share them.'
+		);
+		await dialog(page).getByRole('button', { name: 'Cancel' }).click();
+
 		await clickWaButton(page, 'Try another');
 		// The stub's second draft is its first again, so the summary alone
 		// proves nothing has landed; the button's label is back once it has.
@@ -735,7 +745,19 @@ test.describe('daydreams', () => {
 			'Stub idea for nobody, again'
 		]);
 
+		// Written out from the brief as typed, the idea picked, and the
+		// research its round was written with, rather than reading again.
+		const writing = page.waitForRequest(
+			(request) =>
+				request.url().includes('/api/daydreams/suggest') &&
+				request.postDataJSON()?.task === 'daydream'
+		);
 		await generated.getByRole('button', { name: /^Stub idea for the sub A stub/ }).click();
+		expect((await writing).postDataJSON()).toMatchObject({
+			brief: 'something on a train',
+			chosen: { title: 'Stub idea for the sub', premise: 'A stub premise.' },
+			research: 'Stub notes on what was asked for.'
+		});
 		await expect
 			.poll(() => selectedText(page.locator('.setup-summary')))
 			.toContain('It’s told in the characters’ own words, with no narrator.');
