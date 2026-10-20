@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 	const userId = locals.user.id;
 	await requireFeature(locals.db, userId, 'daydreams');
 
-	const config = readDaydreamConfig(platform);
+	const config = readDaydreamConfig(locals.settings, platform);
 	if (!config) {
 		// The pages say so before anyone gets this far, so reaching here is a
 		// stale page rather than something to explain.
@@ -71,7 +71,9 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		});
 	}
 
-	const messages = buildMessages(parsed.data, { pictures: readImageConfig(platform) !== null });
+	const messages = buildMessages(parsed.data, {
+		pictures: readImageConfig(locals.settings, platform) !== null
+	});
 	let upstream: Response;
 	try {
 		upstream = await fetch(`${config.baseUrl}/chat/completions`, {
@@ -81,7 +83,7 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 				'content-type': 'application/json'
 			},
 			body: JSON.stringify({
-				model: config.model,
+				model: config.openrouterModelId,
 				messages,
 				stream: true,
 				// A few paragraphs, which is what the dials ask for at most, plus

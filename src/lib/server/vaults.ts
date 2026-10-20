@@ -399,7 +399,7 @@ export async function putVaultWrap(
 /**
  * The server's half of an escrow: 32 bytes, as hex, derived from the escrow's
  * id under the auth secret. Stored nowhere, so the database alone never holds
- * it — and rotating `BETTER_AUTH_SECRET` invalidates every escrow, until each
+ * it — and regenerating the `serverSecret` setting invalidates every escrow, until each
  * user's next load makes new ones.
  */
 export async function escrowShare(secret: string, escrowId: string): Promise<string> {

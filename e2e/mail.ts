@@ -9,7 +9,7 @@ import { E2E_CONTAINER, E2E_CONTAINER_MAIL_DIR, E2E_MAIL_DIR } from './run-paths
 /**
  * The email the server would have sent, read back out of its outbox.
  *
- * The suite's server runs with `MAIL_OUTBOX_DIR` (playwright.config.ts), so
+ * The suite's server sends mail to an outbox (`e2e/global-setup.ts`), so
  * every message is a JSON file rather than a real email — see `writeToOutbox`
  * in `src/lib/server/mail/local.ts`. Against `vite dev` that directory is in
  * the run directory and read from here; against a Docker image it is inside the

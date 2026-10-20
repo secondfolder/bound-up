@@ -34,6 +34,8 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		error(400, 'That could not be sent. Reload and try again.');
 	}
 	return json({
-		messages: buildMessages(parsed.data, { pictures: readImageConfig(platform) !== null })
+		messages: buildMessages(parsed.data, {
+			pictures: readImageConfig(locals.settings, platform) !== null
+		})
 	});
 };

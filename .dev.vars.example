@@ -1,30 +1,10 @@
-# Secrets for the locally emulated Cloudflare Worker — used ONLY by
+# Variables for the locally emulated Cloudflare Worker — used ONLY by
 # `npm run preview` (wrangler dev reads .dev.vars, not .env).
 # Everyday `npm run dev` does not need this file.
 #
-#   npm run secrets -- local-preview   # creates .dev.vars and fills the secrets
-#
-# Production's are wrangler secrets, set with `npm run secrets -- production`.
-BETTER_AUTH_SECRET=""
-
-# Web Push (notifications). Optional: without all three, the notifications
-# settings say they are not set up here and nothing is sent.
-VAPID_PUBLIC_KEY=""
-VAPID_PRIVATE_KEY=""
-VAPID_SUBJECT=""
-
-# Email (docs/email.md). Required. This is the real Workers runtime, which
-# cannot write files or open SMTP connections, so only Resend works here:
-# `npm run secrets -- local-preview` asks for both.
-MAIL_FROM=""
-RESEND_API_KEY=""
-
-# Daydreams (docs/daydreams.md). Optional: without a key the feature is off.
-OPENROUTER_API_KEY=""
-DAYDREAM_MODEL=""
-
-# Daydreams' pictures (docs/daydreams.md). Optional: without a key there are none.
-RUNWARE_AI_API_KEY=""
+# The server's secrets, email and providers are not set here: they are server
+# settings, in the D1 database, set from Settings → Admin → Server settings
+# (docs/server-settings.md). Only Resend can send email on Workers.
 
 # Sets the Cloudflare tunnel to use for `npm run preview`.
 CF_TUNNEL_NAME=""

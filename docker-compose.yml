@@ -1,15 +1,12 @@
 # A self-hosted Bound Up. See docs/self-hosting.md.
 #
-#   docker run --rm --entrypoint node ghcr.io/secondfolder/bound-up \
-#     scripts/secrets.mjs print --subject mailto:you@example.com > .env
 #   docker compose up -d
 #
-# The first command writes the secrets to .env, which compose reads for the
-# ${…} below. Then add MAIL_FROM and either RESEND_API_KEY or SMTP_URL to it:
-# accounts confirm their email before they can sign in, so the server will
-# not start without a way to send it. Keep .env: replacing it signs everyone
-# out and stops every device's push notifications. The first account to sign
-# up becomes the admin.
+# Then open it and sign up: the first account becomes the admin, and is let in
+# without confirming its email, because there is no email yet. Set it up in
+# Settings → Admin → Server settings, with the push contact address and, if
+# you want Daydreams, the model providers' keys. The server makes its own auth
+# secret and push keys and keeps them in the database volume.
 services:
   bound-up:
     image: ghcr.io/secondfolder/bound-up:latest
@@ -17,7 +14,6 @@ services:
     ports:
       - '3000:3000'
     environment:
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env, see the top of this file}
       # The address people type into their browser. Required behind a TLS
       # proxy: without it the server believes it is on plain http, and form
       # posts, sign-in and passkeys all fail its origin checks. Passkeys also
@@ -28,20 +24,18 @@ services:
       # See docs/rate-limiting.md.
       # ADDRESS_HEADER: X-Forwarded-For
       # XFF_DEPTH: 1
-      # Push notifications, from .env. Optional: left empty, notifications are
-      # simply off. See docs/notifications.md.
+      # TEMPORARY: settings from before they moved into the admin screen.
+      # Read once, from an .env beside this file, to carry an existing server
+      # over — its BETTER_AUTH_SECRET above all, which keeps everyone signed
+      # in — and ignored after that; the admin screen says which are still
+      # set. A new server needs none of them. See docs/temporary-code.md.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
-      # Email, from .env. Required: MAIL_FROM, and exactly one of the two
-      # transports — an API key from resend.com, or any SMTP server as a URL
-      # (smtps://user:password@mail.example.com:465). See docs/email.md.
-      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env, see the top of this file}
+      MAIL_FROM: ${MAIL_FROM:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       SMTP_URL: ${SMTP_URL:-}
-      # Daydreams, from .env. Optional: left empty, the feature is off. An
-      # OpenRouter key, and optionally the model to use. Each reply costs
-      # money on that key. See docs/daydreams.md.
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       DAYDREAM_MODEL: ${DAYDREAM_MODEL:-}
       RUNWARE_AI_API_KEY: ${RUNWARE_AI_API_KEY:-}

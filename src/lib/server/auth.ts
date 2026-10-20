@@ -70,7 +70,7 @@ const adminRole = defaultAc.newRole({
 });
 
 export type AuthRequestConfig = {
-	/** `platform.env.BETTER_AUTH_SECRET` in production, `.env` in dev. */
+	/** The `serverSecret` server setting (`locals.settings`), generated when missing. */
 	secret: string;
 	/**
 	 * MUST be `event.url.origin` verbatim. `svelteKitHandler`'s `isAuthPath`

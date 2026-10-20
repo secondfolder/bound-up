@@ -31,7 +31,7 @@ async function guidesStatus(page: Page): Promise<number> {
 }
 
 async function openAccount(admin: Page, who: Account) {
-	await admin.goto(`/admin?q=${encodeURIComponent(who.email)}`);
+	await admin.goto(`/admin/users?q=${encodeURIComponent(who.email)}`);
 	await admin.getByRole('link', { name: new RegExp(who.email) }).click();
 	await expect(admin.getByRole('heading', { name: who.name })).toBeVisible();
 }

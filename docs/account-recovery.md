@@ -135,7 +135,10 @@ that not even the response time differs.
 **Nothing usable at rest.** Both tokens are stored as their SHA-256. The email and
 the client address are stored only as HMACs keyed with the auth secret, used
 for the rate limit and for superseding — an unkeyed hash of either would be
-reversible by guessing. The new password's `authSecret` reaches the server
+reversible by guessing. The auth secret is a server setting in the same
+database (docs/server-settings.md), so this protects the rows from anyone who
+reads the table alone — a log, an export of one table, a support query — but
+not from someone with the whole database, who has the key too. The new password's `authSecret` reaches the server
 only at completion, and only as the hash Better Auth stores.
 
 **Rate limits.** Three requests per email and ten per client address, per

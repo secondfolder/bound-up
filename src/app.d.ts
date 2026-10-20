@@ -14,6 +14,7 @@ import type {
 	EmailRateLimiter
 } from '$lib/server/rate-limit';
 import type { RealtimeNamespace } from '$lib/server/realtime/binding';
+import type { ServerSettings } from '$lib/server-settings';
 
 declare global {
 	var litIssuedWarnings: Set<string> | undefined;
@@ -76,6 +77,12 @@ declare global {
 			 * waits on the provider. See `$lib/server/mail` and docs/email.md.
 			 */
 			mailer: Mailer;
+			/**
+			 * This server's settings, read once per request in hooks.server.ts
+			 * (`loadServerSettings`). `''` for one that is not set. See
+			 * `$lib/server/settings` and docs/server-settings.md.
+			 */
+			settings: ServerSettings;
 		}
 		// interface PageData {}
 		// interface PageState {}
@@ -88,7 +95,6 @@ declare global {
 			// including the component test project.
 			env: {
 				DB: AnyD1Database;
-				BETTER_AUTH_SECRET: string;
 				/** `off` disables the sign-in rate limit. Unset in production. */
 				AUTH_RATE_LIMIT?: string;
 				/**
@@ -121,36 +127,29 @@ declare global {
 				TUNNEL_REDGIFS?: TunnelService;
 				TUNNEL_PMVHAVEN?: TunnelService;
 				/**
-				 * Web Push. All three or none: without them push is off rather
-				 * than an error. See `$lib/server/push` and docs/notifications.md.
+				 * The stand-in model providers' roots, which only the e2e suite
+				 * sets. Test seams rather than settings: see
+				 * `$lib/server/daydream/config` and `image-config`.
 				 */
+				OPENROUTER_BASE_URL?: string;
+				RUNWARE_BASE_URL?: string;
+				/**
+				 * TEMPORARY: what the server settings were before they moved into
+				 * the database. Read only by the one-time import
+				 * (`$lib/server/settings/legacy-env`); remove with it. See
+				 * docs/temporary-code.md.
+				 */
+				BETTER_AUTH_SECRET?: string;
 				VAPID_PUBLIC_KEY?: string;
 				VAPID_PRIVATE_KEY?: string;
 				VAPID_SUBJECT?: string;
-				/**
-				 * Email. `MAIL_FROM` and one transport are required: the server
-				 * refuses to start without them. On Workers the transport can only
-				 * be `RESEND_API_KEY`. See `$lib/server/mail` and docs/email.md.
-				 */
 				MAIL_FROM?: string;
 				RESEND_API_KEY?: string;
 				SMTP_URL?: string;
 				MAIL_OUTBOX_DIR?: string;
-				/**
-				 * Daydreams. Without the key the feature is off on this server
-				 * rather than an error; the other two have defaults. See
-				 * `$lib/server/daydream/config` and docs/daydreams.md.
-				 */
 				OPENROUTER_API_KEY?: string;
 				DAYDREAM_MODEL?: string;
-				OPENROUTER_BASE_URL?: string;
-				/**
-				 * Daydream pictures. Without the key there are none; the rest
-				 * have defaults. See `$lib/server/daydream/image-config` and
-				 * docs/daydreams.md, "Pictures".
-				 */
 				RUNWARE_AI_API_KEY?: string;
-				RUNWARE_BASE_URL?: string;
 				RUNWARE_AI_IMAGE_MODEL?: string;
 				RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED?: string;
 			};

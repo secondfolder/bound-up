@@ -308,3 +308,50 @@ The preprocess and `OLD_INTEREST_STEPS`; `fantasy` and `doing` go back to
 ### What should stay
 
 The schema refusing anything that is not a level.
+
+## Server settings from the environment
+
+The server's secrets, email and model providers moved from environment
+variables into the database (docs/server-settings.md). So that existing
+deployments carry over — production's `BETTER_AUTH_SECRET` above all, since a
+new one signs everyone out and stops every recovery escrow working — each
+setting that has no row yet is copied **once** from its old variable, and
+the variable is ignored from then on.
+
+### Where it lives
+
+- `src/lib/server/settings/legacy-env.ts` — the import itself
+  (`legacyEnvSettings`) and `legacyEnvStillSet`, which the admin page uses to
+  say which old variables are still set.
+- `src/lib/server/settings/index.ts` — `fillsFor` calls `legacyEnvSettings`
+  before generating anything.
+- `src/routes/(auth-required)/(app)/admin/server/` — the `legacyEnv` load
+  field and the `envNote` snippet that renders it.
+- `src/app.d.ts` — the old names in `App.Platform['env']`, under a
+  TEMPORARY comment.
+- `docker-compose.yml` — the optional pass-through lines, so an upgraded
+  self-hoster's `.env` is read on the first start.
+- `src/lib/server/settings/index.test.ts` — the
+  "the one-time import from the environment" tests.
+
+### What removes the need for it
+
+Production (and its previews) having started once on this build, with the
+admin page no longer listing any old variable as still set — at which point
+delete them (`wrangler secret delete …`, and the Preview base config's) —
+and enough time passed that self-hosters have upgraded through it.
+
+### Removing it
+
+1. Delete `legacy-env.ts`, and in `fillsFor` the loop over
+   `legacyEnvSettings`.
+2. Drop the `legacyEnv` load field, the `stillInEnv` helper, the `envNote`
+   snippet and each `{@render envNote(…)}` on the settings page.
+3. Drop the old names from `App.Platform['env']` (keep
+   `OPENROUTER_BASE_URL` and `RUNWARE_BASE_URL`, which are test seams) and
+   the pass-through block from `docker-compose.yml`.
+4. Delete the import tests, and the paragraph about it in
+   docs/server-settings.md and docs/self-hosting.md.
+
+What stays: everything else in `src/lib/server/settings/`, including
+generating the secrets — a new server still needs nothing set.

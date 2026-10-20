@@ -606,14 +606,19 @@ holder proves it is them.
 
     inner  = AES-256-GCM_share(own vault key),   AAD = "bound-up-escrow-v1|<vault id>|<key check>"
     escrow = age(inner) → the partner's recipient               (vault_escrows, one per partner)
-    share  = HMAC-SHA256(BETTER_AUTH_SECRET, "vault-escrow|" + escrow id)
+    share  = HMAC-SHA256(auth secret, "vault-escrow|" + escrow id)
 
 - **The partner** can open the outer layer, and gets only `inner`.
 - **The server** can compute the share, but cannot open the partner's layer.
 - **The share is stored nowhere**: it is derived from the escrow's id under
-  the auth secret, so a stolen database alone holds neither half. Rotating
-  `BETTER_AUTH_SECRET` invalidates every escrow, until each user's next load
-  makes new ones.
+  the auth secret. The auth secret is a server setting, in the same database
+  (docs/server-settings.md), so a stolen database holds the server's half —
+  but never the partner's, which is sealed to a key only the partner's
+  devices hold, so it still opens nothing. Before the secret moved into the
+  database a stolen database held neither half; that extra margin is what was
+  given up for a server that needs nothing set up. Regenerating the auth
+  secret invalidates every escrow, until each user's next load makes new
+  ones.
 - **The server hands out a share only for an escrow id that does not exist
   yet** (`issueEscrowShare`) — the moment a device is making one. The share of
   an existing escrow is never handed out outside a recovery, even to the
@@ -648,8 +653,10 @@ old shares have been released.
 **What this does not protect against**: the server and a partner working
 together. Each holds half; together they can open the user's own vault. That
 is inherent to splitting a key two ways, and is the price of being able to
-recover it at all. Every other combination — the partner alone, the server's
-database alone, a stolen session, the inbox alone — gets nothing.
+recover it at all. Since the auth secret lives in the database, a partner with
+a copy of the server's database counts as the server here. Every other
+combination — the partner alone, the server's database alone, a stolen
+session, the inbox alone — gets nothing.
 
 `crypto/escrow.test.ts` holds a frozen vector for the inner layer, made by an
 independent implementation, for the same reason as the others.

@@ -5,6 +5,14 @@
 
 	let { data }: { data: PageData } = $props();
 	const backHref = resolve('/(auth-required)/(app)/settings');
+
+	/** One line per part of the server, in the order the settings page has them. */
+	const parts = $derived([
+		{ name: 'Email', ready: data.status.mailProblem === null },
+		{ name: 'Language models', ready: data.status.languageModels },
+		{ name: 'Image models', ready: data.status.imageModels },
+		{ name: 'Notifications', ready: data.status.push }
+	]);
 </script>
 
 <section>
@@ -13,44 +21,52 @@
 		backLabel="Back to settings"
 		backText="Settings"
 		title="Admin"
-		description="Find an account to give it features or admin access."
+		description="How this server runs, and who can do what on it."
 	/>
 
 	<div class="content">
-		<!-- A plain GET form, not a superform: searching is navigation, and the
-		     query belongs in the URL. SvelteKit handles it client-side. -->
-		<search>
-			<form method="GET">
-				<wa-input
-					name="q"
-					type="search"
-					label="Email or name"
-					value={data.query}
-					autocomplete="off"
-				></wa-input>
-				<wa-button type="submit" appearance="outlined">Search</wa-button>
-			</form>
-		</search>
-
-		<h2>{data.query ? 'Matching accounts' : 'Newest accounts'}</h2>
-		{#if data.users.length === 0}
-			<p class="empty">No accounts match “{data.query}”.</p>
-		{:else}
-			<ul>
-				{#each data.users as account (account.id)}
-					<li>
-						<a href={resolve('/(auth-required)/(app)/admin/users/[id]', { id: account.id })}>
-							<span class="who">
-								<span class="email">{account.email}</span>
-								<small>{account.name}</small>
-							</span>
-							{#if account.isAdmin}<wa-badge variant="brand">Admin</wa-badge>{/if}
-							<wa-icon name="chevron-right" variant="solid"></wa-icon>
-						</a>
-					</li>
-				{/each}
-			</ul>
+		{#if data.status.mailProblem}
+			<!-- The one part a server cannot do without: nobody can confirm a new
+			     account until it works, so it is said here and not only on the
+			     settings page. -->
+			<wa-callout variant="warning" size="s" data-testid="mail-warning">
+				<wa-icon slot="icon" name="envelope" variant="solid"></wa-icon>
+				Email isn't set up, so nobody who signs up can confirm their address.
+				<a href={resolve('/(auth-required)/(app)/admin/server')}>Set it up</a>
+			</wa-callout>
 		{/if}
+
+		<ul>
+			<li>
+				<a href={resolve('/(auth-required)/(app)/admin/server')}>
+					<span class="what">
+						<span>Server settings</span>
+						<small class="parts">
+							{#each parts as part (part.name)}
+								<span class:off={!part.ready}>
+									<wa-icon
+										name={part.ready ? 'circle-check' : 'circle-minus'}
+										variant="solid"
+										label={part.ready ? 'set up' : 'not set up'}
+									></wa-icon>
+									{part.name}
+								</span>
+							{/each}
+						</small>
+					</span>
+					<wa-icon name="chevron-right" variant="solid"></wa-icon>
+				</a>
+			</li>
+			<li>
+				<a href={resolve('/(auth-required)/(app)/admin/users')}>
+					<span class="what">
+						<span>Accounts</span>
+						<small>Give an account features or admin access.</small>
+					</span>
+					<wa-icon name="chevron-right" variant="solid"></wa-icon>
+				</a>
+			</li>
+		</ul>
 	</div>
 </section>
 
@@ -68,25 +84,6 @@
 			padding: var(--wa-space-l);
 		}
 
-		form {
-			display: flex;
-			align-items: end;
-			gap: 0.5rem;
-
-			wa-input {
-				flex: 1 1 auto;
-			}
-		}
-
-		h2 {
-			margin: 0;
-		}
-
-		.empty {
-			margin: 0;
-			color: var(--wa-color-text-quiet);
-		}
-
 		ul {
 			padding: 0;
 			margin: 0;
@@ -99,24 +96,38 @@
 					display: flex;
 					align-items: center;
 					gap: 0.75rem;
-					padding: 0.75rem 0;
+					padding: 0.875rem 0;
 					text-decoration: none;
 					color: inherit;
 				}
 			}
 		}
 
-		.who {
+		.what {
 			display: flex;
 			flex-direction: column;
+			gap: 0.25rem;
 			flex: 1 1 auto;
 			min-width: 0;
 
-			.email {
-				overflow-wrap: anywhere;
+			small {
+				color: var(--wa-color-text-quiet);
+			}
+		}
+
+		.parts {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.25rem 0.875rem;
+
+			span {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.3rem;
+				color: var(--wa-color-success-on-quiet);
 			}
 
-			small {
+			.off {
 				color: var(--wa-color-text-quiet);
 			}
 		}

@@ -222,7 +222,69 @@ function chunks(text) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Runware's `imageInference`, answered with `PICTURE` whatever was asked. */
+/**
+ * OpenRouter's model list, for the admin screen's search: a couple of
+ * made-up models, so a spec can find one by name without the real list.
+ */
+const MODELS = {
+	data: [
+		{
+			id: 'stubvendor/stub-storyteller-70b',
+			name: 'Stub: Storyteller 70B',
+			description: 'A stand-in storyteller for the suite.',
+			context_length: 131_072,
+			pricing: { prompt: '0.0000007', completion: '0.0000008' }
+		},
+		// Long enough to have to wrap in the picker on a phone.
+		{
+			id: 'stubvendor/a-model-with-an-identifier-long-enough-to-wrap-rather-than-scroll-sideways-instruct',
+			name: 'Stub: A Model With A Name Long Enough That It Has To Wrap Onto A Second Line',
+			context_length: 32_768,
+			pricing: { prompt: '0.0000001', completion: '0.0000002' }
+		},
+		{
+			id: 'stubvendor/other-model',
+			name: 'Stub: Other',
+			context_length: 8192,
+			pricing: { prompt: '0.000001', completion: '0.000002' }
+		}
+	]
+};
+
+/**
+ * Runware's `modelSearch`: one made-up Pony checkpoint, whatever was searched
+ * for — except an AIR, which finds only itself, as Runware's own does.
+ */
+function modelSearch(task) {
+	const asksForAir = /^[a-z0-9_-]+:[a-z0-9_-]+@[a-z0-9_.-]+$/i.test(task.search ?? '');
+	const found = !asksForAir || task.search === 'civitai:111111@222222';
+	return {
+		data: [
+			{
+				taskType: 'modelSearch',
+				taskUUID: task.taskUUID,
+				results: found
+					? [
+							{
+								air: 'civitai:111111@222222',
+								name: 'Stub Pony Checkpoint',
+								version: 'v1.0',
+								architecture: 'pony',
+								category: 'checkpoint',
+								shortDescription: '<p>A <b>stub</b> checkpoint for the suite.</p>',
+								tags: ['pony', 'stub'],
+								defaultSteps: 30,
+								defaultCFG: 6,
+								positiveTriggerWords: 'score_9'
+							}
+						]
+					: []
+			}
+		]
+	};
+}
+
+/** Runware's `imageInference`, answered with `PICTURE` whatever was asked, and its `modelSearch`. */
 async function picture(request, response) {
 	if (request.headers.authorization !== `Bearer ${RUNWARE_KEY}`) {
 		response.writeHead(401, { 'content-type': 'application/json' });
@@ -235,6 +297,10 @@ async function picture(request, response) {
 	}
 	const [task] = JSON.parse(raw);
 	response.writeHead(200, { 'content-type': 'application/json' });
+	if (task.taskType === 'modelSearch') {
+		response.end(JSON.stringify(modelSearch(task)));
+		return;
+	}
 	response.end(
 		JSON.stringify({
 			data: [{ taskType: 'imageInference', taskUUID: task.taskUUID, imageBase64Data: PICTURE }]
@@ -245,6 +311,11 @@ async function picture(request, response) {
 const server = createServer(async (request, response) => {
 	if (request.method === 'POST' && request.url === '/runware') {
 		await picture(request, response);
+		return;
+	}
+	if (request.method === 'GET' && request.url === '/v1/models') {
+		response.writeHead(200, { 'content-type': 'application/json' });
+		response.end(JSON.stringify(MODELS));
 		return;
 	}
 	if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {

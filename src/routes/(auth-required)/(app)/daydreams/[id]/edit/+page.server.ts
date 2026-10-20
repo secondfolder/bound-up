@@ -18,7 +18,11 @@ import {
 import { requireFeature } from '$lib/server/features';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals: { db, user }, params, platform }) => {
+export const load: PageServerLoad = async ({
+	locals: { db, user, settings },
+	params,
+	platform
+}) => {
 	if (!user) {
 		error(401, 'Not signed in');
 	}
@@ -40,8 +44,8 @@ export const load: PageServerLoad = async ({ locals: { db, user }, params, platf
 		}),
 		library,
 		accepted,
-		available: readDaydreamConfig(platform) !== null,
-		picturesAvailable: readImageConfig(platform) !== null
+		available: readDaydreamConfig(settings, platform) !== null,
+		picturesAvailable: readImageConfig(settings, platform) !== null
 	};
 };
 

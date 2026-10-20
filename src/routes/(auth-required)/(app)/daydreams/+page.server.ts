@@ -4,7 +4,7 @@ import { acceptDisclosure, hasAcceptedDisclosure, listDaydreams } from '$lib/ser
 import { requireFeature } from '$lib/server/features';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals: { db, user }, platform }) => {
+export const load: PageServerLoad = async ({ locals: { db, user, settings }, platform }) => {
 	if (!user) {
 		error(401, 'Not signed in');
 	}
@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ locals: { db, user }, platform }) =
 	// decides what is shown.
 	await requireFeature(db, user.id, 'daydreams');
 
-	const available = readDaydreamConfig(platform) !== null;
+	const available = readDaydreamConfig(settings, platform) !== null;
 	const accepted = await hasAcceptedDisclosure(db, user.id);
 	return {
 		available,

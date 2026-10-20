@@ -11,11 +11,11 @@ import type { RequestHandler } from './$types';
  * reply is the id the device is known by from then on, which the browser keeps
  * so the live feed can say which device is watching.
  */
-export const POST: RequestHandler = async ({ locals, platform, request }) => {
+export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
 	}
-	if (!readVapidConfig(platform)) {
+	if (!readVapidConfig(locals.settings)) {
 		// The settings screen does not offer the switch in this case, so reaching
 		// here is a stale page rather than something to explain to a person.
 		error(503, 'Push notifications are not set up on this server');

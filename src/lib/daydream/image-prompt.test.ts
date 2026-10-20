@@ -5,12 +5,11 @@ import {
 	MAX_PICTURE_REQUEST_PROMPT,
 	PICTURE_SIZE,
 	type PictureModel,
-	pictureArchitecture,
 	runwareTask
 } from './image-prompt';
 
-const sdxl: PictureModel = { air: 'civitai:1@1', architecture: 'sdxl' };
-const zImage: PictureModel = { air: 'persona:2@2', architecture: 'z-image-turbo' };
+const sdxl: PictureModel = { runwareModelAir: 'civitai:1@1', architecture: 'sdxl' };
+const zImage: PictureModel = { runwareModelAir: 'persona:2@2', architecture: 'z-image-turbo' };
 
 describe('imagePromptProblem', () => {
 	it('lets an adult scene through', () => {
@@ -133,15 +132,5 @@ describe('runwareTask', () => {
 				expect(task.negativePrompt.length).toBeLessThanOrEqual(MAX_PICTURE_REQUEST_PROMPT);
 			}
 		}
-	});
-});
-
-describe('pictureArchitecture', () => {
-	it('reads Runware’s architectures as the recipe that suits them', () => {
-		expect(pictureArchitecture('z_image_turbo')).toBe('z-image-turbo');
-		expect(pictureArchitecture('sdxl')).toBe('sdxl');
-		expect(pictureArchitecture('illustrious')).toBe('sdxl');
-		expect(pictureArchitecture('pony')).toBe('sdxl');
-		expect(pictureArchitecture('flux1d')).toBeNull();
 	});
 });

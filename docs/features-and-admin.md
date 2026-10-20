@@ -2,8 +2,9 @@
 
 Some parts of the app are **features**: off for every account until that
 account is given them. Nothing can be bought yet; for now an admin grants a
-feature from the admin page. When purchases arrive, buying a feature will write
-the same row a grant does, so nothing that checks access has to change.
+feature from an account's admin page. When purchases arrive, buying a feature
+will write the same row a grant does, so nothing that checks access has to
+change.
 
 There are five so far: guides, permanent media, higher quality uploads,
 Daydreams, and debug mode.
@@ -17,7 +18,9 @@ Daydreams, and debug mode.
 | `src/lib/server/features.ts`    | `requireFeature`, `listUserFeatures`, `grantFeature`, `revokeFeature`  |
 | `user.role` (`schema/auth`)     | Better Auth's admin plugin: `'admin'`, `'user'`, or null (pre-plugin)  |
 | `src/lib/server/admin.ts`       | `requireAdmin`, `isAdmin`, and the admin page's queries                |
-| `/admin`, `/admin/users/[id]`   | Find an account; grant or revoke features; make or unmake an admin     |
+| `/admin`                        | The hub: links to the two below, with each area's status               |
+| `/admin/users`, `/admin/users/[id]` | Find an account; grant or revoke features; make or unmake an admin |
+| `/admin/server`                 | Server settings: secrets, email, language models, image models, push            |
 
 ## Features
 
@@ -135,8 +138,8 @@ model (see
 It is a grant rather than on for everyone for two reasons that are not about
 testing: every reply is paid for on the server's OpenRouter key, and using it
 sends what the user writes to a model provider, which nothing else in the app
-does. A server with no `OPENROUTER_API_KEY` has no Daydreams whatever is
-granted; the pages say so.
+does. A server with no OpenRouter key set at Settings → Admin → Server
+settings has no Daydreams whatever is granted; the pages say so.
 
 ### Debug mode
 
@@ -187,7 +190,10 @@ page. An admin cannot remove their own admin access; another admin can. That
 refusal is on the server.
 
 The known gap: on a brand new deployment, **whoever signs up first becomes
-admin**. Sign up yourself straight after the first deploy.
+admin**. Sign up yourself straight after the first deploy. A new server has no
+email set up yet, so that first account is confirmed without a link, and the
+login page tells them to set email up (see
+[email.md](email.md#the-first-account-on-a-new-server)).
 
 In tests the trigger means creation order decides who is an admin, which a test
 must never rely on. `createTestUser` writes the role it is given (default
@@ -199,7 +205,9 @@ themselves before signing in afresh.
 `requireAdmin(locals)` returns the admin or throws a **404** — not a 403, so the
 pages do not confirm they exist. The admin layout calls it, but a layout load
 never runs for a form action, so every admin load and every admin action also
-calls it. Changing a role goes through `locals.auth.api.setRole`, so the
+calls it, as do the two model search endpoints the server settings page
+uses, `/api/admin/models/openrouter` and `/api/admin/models/runware`. Changing
+a role goes through `locals.auth.api.setRole`, so the
 plugin's own permission check applies as well.
 
 The role travels in the session, and sessions use Better Auth's cookie cache
@@ -209,7 +217,15 @@ Feature grants have no such lag.
 
 ### The pages
 
-- `/admin` searches accounts by email or name, case-insensitively, and lists
+- `/admin` is a hub with two links. **Server settings** shows a one-line
+  status for each area — Email, Language models, Image models, Notifications — and the
+  hub warns, above both, when email is not set up, since nobody new can finish
+  signing up until it is. **Accounts** goes to the search.
+- `/admin/server` edits the server settings, one form per area, and has the
+  Regenerate buttons for the auth secret and the push keys and the "Send a
+  test email" button. What each setting does, and what regenerating costs, is
+  in [server-settings.md](server-settings.md).
+- `/admin/users` searches accounts by email or name, case-insensitively, and lists
   the newest accounts when the box is empty. It is a GET form with `?q=`, not a
   superform: searching is navigation, so the query belongs in the URL. `instr`
   rather than `LIKE`, so a typed `%` or `_` means itself.

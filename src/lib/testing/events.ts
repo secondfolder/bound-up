@@ -8,7 +8,9 @@ import {
 	unlimitedDaydreams,
 	unlimitedEmail
 } from '../server/rate-limit';
+import type { ServerSettings } from '../server-settings';
 import type { TestUser } from './fixtures';
+import { testSettings } from './settings';
 
 /**
  * A stand-in `RequestEvent` for calling a `load` or an action directly.
@@ -107,6 +109,13 @@ export type FakeEventOptions = {
 	 * fails loudly.
 	 */
 	mailer?: Mailer;
+	/**
+	 * `locals.settings`. Present by default, like the rate limits, as a server
+	 * with nothing set up (`testSettings()`): what a route does without a
+	 * provider key is as much its behaviour as what it does with one. Pass
+	 * `testSettings({ … })` for the settings a test is about.
+	 */
+	settings?: ServerSettings;
 	/** `event.fetch`, for a route that calls out through it. Absent otherwise. */
 	fetch?: typeof fetch;
 	/**
@@ -157,7 +166,8 @@ export function fakeEvent<Event = never>(options: FakeEventOptions): Event {
 		emailRateLimit: options.emailRateLimit ?? unlimitedEmail,
 		daydreamRateLimit: options.daydreamRateLimit ?? unlimitedDaydreams,
 		daydreamSuggestRateLimit: options.daydreamSuggestRateLimit ?? unlimitedDaydreams,
-		daydreamImageRateLimit: options.daydreamImageRateLimit ?? unlimitedDaydreams
+		daydreamImageRateLimit: options.daydreamImageRateLimit ?? unlimitedDaydreams,
+		settings: options.settings ?? testSettings()
 	};
 	if (options.db) {
 		locals.db = options.db;

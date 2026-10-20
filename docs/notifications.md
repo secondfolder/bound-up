@@ -185,23 +185,25 @@ long.
 
 ## Configuration
 
-Three variables, all or none: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and
-`VAPID_SUBJECT` (a `mailto:` or `https:` URL that push services can contact).
-`npm run secrets -- <target>` generates a pair into `.env`, `.dev.vars`,
-production's wrangler secrets or the Preview base config, and never replaces
-one that is already set (see docs/development.md). `npm run secrets -- print`
-prints one instead; without a checkout, `npx web-push generate-vapid-keys`
-prints one in the same format. In dev they go in `.env`; self-hosted, in the
-container's environment.
+Three server settings ([server-settings.md](server-settings.md)), set at
+Settings → Admin → Server settings: `vapidPublicKey`, `vapidPrivateKey` and
+`vapidSubject`, read by `readVapidConfig` in `src/lib/server/push.ts`.
 
-**Optional, unlike `BETTER_AUTH_SECRET`.** Without them `readVapidConfig`
-returns null, nothing is sent, and the settings screen says notifications are
-not set up on this server, so a self-hosted instance upgraded from before push
-existed keeps starting.
+**The key pair generates itself** the first time the server finds it missing,
+like the auth secret, so a new server, a fresh dev database and each Worker
+database have a pair of their own without anyone making one.
+
+**The subject is optional.** It is the `mailto:` or `https:` URL push services
+can contact. Left empty it defaults to `mailto:` and the address in the mail
+sender setting, so a server with email set up needs nothing more. Only with
+neither is push off: `readVapidConfig` returns null, nothing is sent, and the
+settings screen says notifications are not set up on this server.
 
 **Keep the pair once it is in use.** Every subscription is bound to the public
-key it was made with. Replacing the pair stops notifications on every device
-until each one is turned on again.
+key it was made with, so the admin page's Regenerate button deletes every push
+subscription along with the old pair: they could never be sent to again, and
+leaving them would only make every send fail. Each device has to turn
+notifications on again.
 
 ## The service worker
 

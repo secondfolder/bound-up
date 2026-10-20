@@ -48,6 +48,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/daydream/`           | Daydreams: the story tree, reply format, dice, chips, catalog, ready-made stories and the setup sentence (pure, alias-free), and the page's `DaydreamStory` and calls (browser). See [docs/daydreams.md](docs/daydreams.md) |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `src/lib/server/mail/`        | The mailer: Resend, SMTP or an outbox, and every email's copy. See [docs/email.md](docs/email.md) |
+| `src/lib/server-settings.ts`, `src/lib/server/settings/` | Server settings: the keys and model presets (pure, alias-free), and loading, generating and saving them. See [docs/server-settings.md](docs/server-settings.md) |
 | `src/lib/server/self-hosted/` | What only the Docker build runs: the media sweep. See [docs/self-hosting.md](docs/self-hosting.md) |
 | `src/service-worker.ts`       | Shows push notifications, and nothing else: no `fetch` handler, no cache. See [docs/notifications.md](docs/notifications.md) |
 | `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
@@ -227,10 +228,17 @@ site it applies to; go read that comment before deciding to break one.
 8. **Order edge tasks by `order`, then `id`.** Never by `id` alone — ids are UUIDs,
    not a sequence. Guides order by `createdAt`, then `id`.
 
-9. **Secrets: `platform.env` in production, `.env` in dev.** `hooks.server.ts`
-   throws when `BETTER_AUTH_SECRET` is missing, because Better Auth would
-   otherwise silently use a hard-coded default (its own guard only fires on
-   `NODE_ENV === 'production'`, which Workers does not set).
+9. **Secrets and providers are server settings, not environment variables.**
+   The auth secret, push keys, mailer and model providers are rows in
+   `server_settings`, read once per request into `locals.settings` and edited
+   at Settings → Admin → Server settings. Read them from there; never add a
+   new one as an env var or a wrangler secret. The auth secret is generated
+   when missing, so Better Auth can never fall back to its hard-coded default
+   (its own guard only fires on `NODE_ENV === 'production'`, which Workers
+   does not set). A credential's value never goes into load data: the page
+   gets whether it is set and its last four characters. On Workers the
+   settings are cached per isolate for a minute. See
+   [docs/server-settings.md](docs/server-settings.md).
 
 10. **Passkeys are bound to a hostname.** One registered on `localhost` will not
     work on the tunnel host or in production. WebAuthn, not a bug.
@@ -331,10 +339,9 @@ site it applies to; go read that comment before deciding to break one.
     - **The `previews` block in `wrangler.jsonc` inherits nothing.** Every
       binding has to be repeated in it (`DB`, `MEDIA`, `REALTIME`,
       `PORN_RELAY` and the `TUNNEL_*` VPC services, each pointing at preview
-      resources where it has any), and secrets live on the Preview base
-      config instead (`npm run secrets -- remote-preview`). A binding
-      added at the top level and not there is simply absent in previews. See
-      docs/development.md.
+      resources where it has any). Secrets are not bindings: they are server
+      settings in the preview D1 database. A binding added at the top level
+      and not there is simply absent in previews. See docs/development.md.
 
 16. **Web Awesome's Lit dependencies must resolve to their `node/` builds in
     the wrangler bundle.** `src/routes/+layout.svelte` statically imports the
@@ -436,11 +443,12 @@ load data is serialised into the HTML of every page. Whitelist fields, as
   reliably cross a custom element's shadow boundary.** An `oninput=` on a
   `<wa-textarea>` never fires, because the editable node is in a shadow root.
   `MessageComposer.svelte` attaches its listener with `addEventListener` instead
-  and explains why at the site. Note that `InputField.svelte` has the same
-  `oninput=` shape and has never visibly broken — it gets away with it because
-  `<wa-input>` is form-associated and contributes its own value to the FormData,
-  so nothing there depends on the Svelte state updating. Anything that _does_
-  depend on it must not use the shorthand.
+  and explains why at the site. `InputField.svelte` used to have the same `oninput=` shape and got away
+  with it for a long time, because `<wa-input>` is form-associated and the
+  posted FormData had the value either way; it broke the moment something read
+  `$form` live (the admin model picker went on describing the previous AIR),
+  and now listens with `addEventListener` too. Anything whose Svelte state is
+  load-bearing must not use the shorthand.
 - **A value can arrive in an input without any event this app can see, so read
   the element, not the event.** A password manager extension fills a field by
   assigning `input.value` and dispatching `new Event('input', { bubbles: true })`
@@ -486,7 +494,8 @@ is in [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-pro
 throw into it, would let response time or an error say whether an address has
 an account — the sign-up, resend and recovery forms all promise it does not.
 Copy goes in `mail/templates.ts` and says nothing about what the app is for.
-See [docs/email.md](docs/email.md).
+The one exception is the admin's test email, sent to their own address and
+awaited so the page can say whether it worked. See [docs/email.md](docs/email.md).
 
 **Never log a form object.** It no longer contains a plaintext password —
 the browser posts a derived value instead (see
@@ -727,7 +736,10 @@ const data = await runLoad(load(fakeEvent({ db, user: ada }))); // $lib/testing/
   absent until asked for: leave out `db` for a route that never queries, and
   pass `parentData` / `fetch` for one that calls `parent()` or `event.fetch`.
   Reaching for anything it was not given fails loudly rather than as
-  `undefined`. Its return type is inferred from the call it is passed to.
+  `undefined`. The exceptions are the rate limits, which allow
+  everything, and `locals.settings`, a server with nothing set up
+  (`testSettings()` from `$lib/testing/settings`); pass `settings` for the
+  ones a test is about. Its return type is inferred from the call it is passed to.
 - **A test asserts on a value, it does not assume one.** `defined(value, what)`
   from `$lib/testing/defined` replaces `value!`: the non-null assertion only
   silences the type checker, so a missing value surfaced as "Cannot read
@@ -960,6 +972,7 @@ Four places, split on scope:
 | [docs/debug-mode.md](docs/debug-mode.md)                                                 | Per-device troubleshooting UI behind a feature: the toggle, panel, raw logs  |
 | [docs/kink-list.md](docs/kink-list.md)                                                   | The kink list: the catalogue, answers and inheritance, privacy, saving       |
 | [docs/sliders.md](docs/sliders.md)                                                       | The base slider every slider is built on: notches, springing, unset          |
+| [docs/server-settings.md](docs/server-settings.md)                                       | Secrets, email and model providers in the database: generating, the admin page, presets |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 
@@ -1051,7 +1064,9 @@ Unless the user explicilty indicates otherwise the plan or major change should i
 - `local.db`, `.env`, and `.dev.vars` are gitignored; `drizzle/` is not. Do not
   commit the first three or gitignore the last.
 - `.env` (vite dev) and `.dev.vars` (wrangler dev) are **separate files**.
-  `preview` reads only the latter.
+  `preview` reads only the latter. Neither holds secrets any more (server
+  settings do), but `vite dev` still reads old ones from `.env` for the
+  one-time import — which is why `e2e/global-setup.ts` writes every setting.
 - `wrangler.jsonc` ships `"database_id": "REPLACE_ME"`. `npm run dev` never
   reads it; `preview` and `deploy` do.
 - `vite.config.ts` hardcodes a personal tunnel host in `allowedHosts` /

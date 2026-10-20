@@ -21,7 +21,13 @@
 
 <!-- Where a verification link lands. An old or broken link needs no resend
      button here: signing in to an unconfirmed account sends a fresh one. -->
-{#if data.verification === 'verified'}
+{#if data.verification === 'first-account'}
+	<wa-callout variant="brand" size="s" class="notice" data-testid="verification-notice">
+		<wa-icon slot="icon" name="key" variant="solid"></wa-icon>
+		You're the first account here, so you're its admin, and this server can't send email yet. Log in,
+		then set up email in Settings → Admin so the next people to sign up can confirm theirs.
+	</wa-callout>
+{:else if data.verification === 'verified'}
 	<wa-callout variant="success" size="s" class="notice" data-testid="verification-notice">
 		<wa-icon slot="icon" name="envelope-circle-check" variant="solid"></wa-icon>
 		Your email is confirmed. Log in to continue.

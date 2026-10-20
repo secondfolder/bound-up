@@ -6,6 +6,7 @@ import type { FeatureKey, FeatureSource } from '../../../features';
 import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
+import type { ServerSettingKey, ServerSettingSource } from '../../../server-settings';
 import type { EdgeTaskInstructions, TaskSchedule } from '../../../types';
 import type { VaultKind } from '../../../vault';
 import { user } from './auth';
@@ -1715,3 +1716,23 @@ export const kinkListVersions = sqliteTable(
 );
 
 export type KinkListVersionRow = typeof kinkListVersions.$inferSelect;
+
+/**
+ * The server's own settings, edited from Admin → Server settings: its secrets,
+ * how it sends email, and which model providers and models it uses. One row
+ * per setting (`SERVER_SETTING_KEYS`), read through
+ * `$lib/server/settings`. See docs/server-settings.md.
+ *
+ * A cleared setting is a row holding `''`, never a deleted row: a missing row
+ * is what the one-time import from the environment fills, and it must not
+ * bring back something an admin removed.
+ */
+export const serverSettings = sqliteTable('server_settings', {
+	key: text('key').$type<ServerSettingKey>().primaryKey(),
+	value: text('value').notNull(),
+	source: text('source').$type<ServerSettingSource>().notNull(),
+	...timestamps
+});
+
+export type ServerSettingRow = typeof serverSettings.$inferSelect;
+export type NewServerSettingRow = typeof serverSettings.$inferInsert;

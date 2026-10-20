@@ -17,11 +17,17 @@ SQLite file.
 
 ```sh
 npm install
-npm run secrets -- dev       # creates .env, fills BETTER_AUTH_SECRET and the push keys
+cp .env.example .env         # just the database path and the tunnel settings
 npm run db:migrate:dev       # create the tables in ./local.db
 npm run db:seed              # insert the dev guide + edge task
 npm run dev
 ```
+
+There are no secrets to make: the auth secret and the push keys are generated
+the first time the server needs them (see [Secrets](#secrets)). Email goes to
+`./.mail-outbox` until you set something else, so the newest JSON file there
+holds your sign-up link. The first account you create is the admin, and
+Settings → Admin → Server settings is where everything else is configured.
 
 ## Deploy setup (only when you actually deploy)
 
@@ -32,10 +38,15 @@ npx wrangler r2 bucket create bound-up-media
 # Deletes self-destructing media (and orphans from failed sends) that outlive the
 # 30-day maximum. Lives on the bucket, not in wrangler.jsonc. See docs/messaging.md.
 npx wrangler r2 bucket lifecycle add bound-up-media expire-self-destructing expiring/ --expire-days 31
-npm run secrets -- production --subject mailto:you@example.com
 npm run db:migrate:production
 npm run deploy
 ```
+
+No wrangler secrets are needed. Once it is deployed, sign up — the first account
+is the admin, and while no mail is set up it skips email confirmation — then set
+up email (and the Daydreams providers, if wanted) at Settings → Admin → Server
+settings. Workers can only send through Resend: SMTP and the outbox need a Node
+build. The sender's domain must be verified in Resend.
 
 Run `npm run preview` before every deploy — it is the only local step that
 exercises the real Workers runtime (`nodejs_compat`, the assets binding,
@@ -67,54 +78,37 @@ defaults — build command `npm run build`, deploy command `npx wrangler deploy`
 
 ## Secrets
 
-`npm run secrets -- <target>` generates `BETTER_AUTH_SECRET` and the VAPID push
-key pair, fills in the email settings, and stores them where that environment
-reads them:
+The server's secrets live in its database, beside the rest of the server
+settings ([server-settings.md](server-settings.md)), not in an env file or in
+wrangler secrets. That way the Docker image, `vite dev` and a Worker are set up
+the same way — from the admin page — and a self-hoster has nothing to generate
+before the first start.
 
-| Target           | Where                                          | Read by                        |
-| ---------------- | ---------------------------------------------- | ------------------------------ |
-| `dev`            | `.env` (created from `.env.example`)           | `npm run dev`                  |
-| `local-preview`  | `.dev.vars` (created from `.dev.vars.example`) | `npm run preview`              |
-| `production`     | wrangler secrets                               | the deployed Worker            |
-| `remote-preview` | the Preview base config                        | every branch preview           |
-| `print`          | stdout                                         | you: a self-hosted `.env`, say |
+- **The auth secret and the VAPID push key pair generate themselves** the first
+  time the server finds them missing, so each database — `local.db`, the
+  emulated D1, production's, the previews' shared one, a container's volume —
+  has its own.
+- **Each has a Regenerate button** on the admin page, because replacing either
+  is never harmless: a new auth secret signs every account out (the admin's
+  included), resets the rate-limit counts and stops partner-assisted recovery
+  working until each user next opens the app; a new VAPID pair deletes every
+  push subscription, so each device has to turn notifications on again.
+- **Email is not required to start.** A server with no mailer runs, and the
+  admin pages say so. Under `vite dev` only, unset email falls back to the
+  outbox `./.mail-outbox`, from `Bound Up <dev@localhost>`, so signing up
+  works without configuring anything. See [email.md](email.md).
+- **Daydreams need an OpenRouter key and their pictures a Runware key**
+  ([daydreams.md](daydreams.md)), both set on the admin page; without them each
+  is simply off. The Playwright suite never uses a real key for either: it runs
+  its own stand-in provider (`e2e/model-stub.mjs`), which answers both, and
+  `e2e/global-setup.ts` writes every setting into the run's database.
 
-**It only fills what is missing**, so it is safe to run again. A secret that is
-already set is kept unless `--rotate BETTER_AUTH_SECRET` or `--rotate VAPID`
-names it, because replacing either is never harmless: a new auth secret signs
-every account out, and a new VAPID pair stops notifications on every device
-until each turns them on again. For a remote target it learns what is set from
-`wrangler … secret list`, which returns names only.
-
-`VAPID_SUBJECT` is not random: it is the contact address sent to push
-services. Pass `--subject mailto:you@example.com`, or the script asks for it.
-The local targets default to a placeholder. `--dry-run` shows what would be
-set without setting it.
-
-**Email is required** ([email.md](email.md)): without `MAIL_FROM` and exactly
-one transport the Docker image will not start, and elsewhere every email fails
-to send, logging what to set — so nobody can finish signing up.
-
-- `dev` sets `MAIL_OUTBOX_DIR=./.mail-outbox`, so nothing is sent: each email
-  is a JSON file there, and the newest holds your sign-up link. To send for
-  real instead, put `RESEND_API_KEY` (or `SMTP_URL`) in `.env` and remove
-  `MAIL_OUTBOX_DIR`.
-- `local-preview`, `production` and `remote-preview` run on Workers, which can
-  only use Resend. They ask for `MAIL_FROM` and `RESEND_API_KEY`, or take
-  `--mail-from "Bound Up <hello@your-domain>"` and `--resend-key re_…`. The
-  sender's domain must be verified in Resend.
-- `print` leaves both to you, since a self-hoster may prefer SMTP.
-
-Daydreams ([daydreams.md](daydreams.md)) need an OpenRouter key, which is
-never asked for: each reply costs money on it. Pass `--openrouter-key sk-or-…`
-to any target to set `OPENROUTER_API_KEY`; without it Daydreams are simply
-off. Their pictures likewise need a Runware key: `--runware-key …` sets
-`RUNWARE_AI_API_KEY`, and without it there are none. The Playwright suite
-never uses a real key for either: it runs its own stand-in provider
-(`e2e/model-stub.mjs`), which answers both.
-
-**Set production's before deploying a build that needs them**, or every
-request fails with the message naming what is missing.
+An installation whose settings are still in the environment
+(`BETTER_AUTH_SECRET`, `VAPID_*`, `MAIL_FROM` and the rest) has each one copied
+into the database once, on the first request that finds the setting missing,
+and ignored after that — the admin page lists any that are
+still set so they can be removed (`wrangler secret delete …` on Workers). That
+import is temporary; see [temporary-code.md](temporary-code.md).
 
 ## Branch previews
 
@@ -137,15 +131,16 @@ One-time setup, and again whenever a migration lands:
 
 ```sh
 npm run db:migrate:remote-preview  # --remote --preview: the D1 entry's preview_database_id
-# Secrets live on the Preview base config, shared by all previews. This
-# generates values of their own, never production's.
-npm run secrets -- remote-preview --subject mailto:you@example.com
 # The same expiry rule production's bucket has, since no sweep runs here.
 npx wrangler r2 bucket lifecycle add bound-up-media-preview expire-self-destructing expiring/ --expire-days 31
 ```
 
 Add a binding at the top level and it is missing in previews until it is
 added to `previews` too.
+
+Previews need no secrets of their own. Their server settings live in
+`bound-up-preview`, so they generate their own auth secret and push keys —
+never production's — and are set up from the admin page of any preview.
 
 ## How the database works
 
@@ -192,10 +187,12 @@ page. On a fresh deployment, sign up straight after the first deploy. See
 - **`db.transaction()` works locally but fails on D1.** Drizzle's D1 driver emits
   raw `begin`/`commit`; D1 is auto-commit and offers `batch()` instead. Use
   `batch()`. (Better Auth is unaffected — its adapter runs writes sequentially.)
-- **Secrets come from three places**: `platform.env` on Workers (wrangler
-  secrets), `.env` in dev (there is no `platform` in dev — `svelte.config.js`
-  strips the adapter's `emulate` hook so `vite dev` needs no workerd), and the
-  container's environment when self-hosted.
+- **Secrets live in the database**, as server settings, everywhere. What is
+  left in the environment — `.env` in dev, `.dev.vars` for `npm run preview`,
+  the container's environment when self-hosted — is the database path, the
+  tunnel and a few deployment details. There is no `platform` in dev:
+  `svelte.config.js` strips the adapter's `emulate` hook so `vite dev` needs no
+  workerd.
 - **Passkeys are bound to a hostname.** One registered on `localhost` will not work
   on a tunnel host or in production, and vice versa. That is WebAuthn, not a bug.
 - **Logging in and signing up need JavaScript, and always did.** Every text
@@ -282,5 +279,4 @@ other is half a script, is in
 | `db:seed` / `db:reset`                                        | Seed dev data / wipe local.db and re-seed                     |
 | `db:studio`                                                   | Drizzle Studio against `./local.db`                           |
 | `auth:schema`                                                 | Regenerate the Better Auth tables                             |
-| `secrets -- <target>`                                         | Generate missing secrets into one environment (see Secrets)   |
 | `cf-typegen`                                                  | Regenerate Cloudflare binding types (not currently committed) |

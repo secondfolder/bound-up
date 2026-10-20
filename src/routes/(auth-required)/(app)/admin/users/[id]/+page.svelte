@@ -5,7 +5,7 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-	const backHref = resolve('/(auth-required)/(app)/admin');
+	const backHref = resolve('/(auth-required)/(app)/admin/users');
 
 	// svelte-ignore state_referenced_locally
 	// Both capture the load's initial forms on purpose: `superForm` registers
@@ -24,8 +24,8 @@
 <section>
 	<NestedPageHeader
 		{backHref}
-		backLabel="Back to admin"
-		backText="Admin"
+		backLabel="Back to accounts"
+		backText="Accounts"
 		title={data.account.name}
 		description={data.account.email}
 	/>

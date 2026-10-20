@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
-import { eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { fail, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import {
@@ -8,6 +8,7 @@ import {
 	CHECK_EMAIL_COOKIE_OPTIONS,
 	checkEmailCookie,
 	checkEmailPath,
+	firstAccountPath,
 	verifiedCallback
 } from '$lib/email-verification';
 import { parseKeyWrapParams } from '$lib/encryption';
@@ -15,6 +16,7 @@ import { safeRedirect } from '$lib/safe-redirect';
 import { signupFormSchema } from '$lib/schemas/signupForm';
 import { user } from '$lib/server/db/schema';
 import { putUserKeys } from '$lib/server/keys';
+import { mailProblem } from '$lib/server/mail/config';
 import { rateLimitMessage } from '$lib/server/rate-limit';
 import { holdUntilFloor, SIGN_UP_RESPONSE_FLOOR_MS, startTimer } from '$lib/server/response-floor';
 import type { Actions, PageServerLoad } from './$types';
@@ -59,7 +61,11 @@ export const actions: Actions = {
 		}
 
 		const redirectTo = url.searchParams.get('redirectTo');
-		/** Everything whose length could say whether the address was taken. A failure, or null. */
+		/**
+		 * Everything whose length could say whether the address was taken. A
+		 * failure, or how the account was left: waiting for its link, or — the
+		 * first account on a server with no email yet — let straight in.
+		 */
 		const createAccount = async () => {
 			let userId: string;
 			try {
@@ -124,10 +130,34 @@ export const actions: Actions = {
 				}
 			}
 
+			if (stored && (await isFirstAccountWithoutMail())) {
+				await locals.db.update(user).set({ emailVerified: true }).where(eq(user.id, userId));
+				return 'first-account' as const;
+			}
+
 			// The link just sent is counted against the address's limit where
 			// Better Auth sends it (`sendLimited` in auth.ts), so the check-email
 			// page cannot send a second one within the minute.
-			return null;
+			return 'sent' as const;
+		};
+
+		/**
+		 * Whether this is the only account, on a server that cannot send email.
+		 *
+		 * Email is set up from the admin screen now, so a new server has none,
+		 * and its first account — which the 0018 trigger has just made the admin
+		 * — could never confirm its address to get there. So that one account
+		 * is confirmed without a link. It widens nothing: whoever signs up first
+		 * is the admin either way, and once email works, or a second account
+		 * exists, everyone confirms as usual. The link Better Auth tried to send
+		 * fails in the background and is logged, saying where to set email up.
+		 */
+		const isFirstAccountWithoutMail = async () => {
+			if (mailProblem(locals.settings) === null) {
+				return false;
+			}
+			const [row] = await locals.db.select({ accounts: count() }).from(user);
+			return row?.accounts === 1;
 		};
 
 		// From here on, how long this takes would depend on whether the
@@ -135,7 +165,10 @@ export const actions: Actions = {
 		const started = startTimer();
 		const outcome = await createAccount();
 		await holdUntilFloor(started, SIGN_UP_RESPONSE_FLOOR_MS);
-		if (outcome) {
+		if (outcome === 'first-account') {
+			redirect(303, firstAccountPath(redirectTo));
+		}
+		if (outcome !== 'sent') {
 			return outcome;
 		}
 

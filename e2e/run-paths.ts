@@ -35,7 +35,7 @@ export const E2E_MODEL_PORT = 20_000 + ((KEY + 10_000) % 20_000);
 export const E2E_RUN_DIR = join(tmpdir(), `bound-up-e2e-${KEY}`);
 export const E2E_MEDIA_DIR = join(E2E_RUN_DIR, 'media');
 /**
- * Where the server writes the email it would have sent (`MAIL_OUTBOX_DIR`),
+ * Where the server writes the email it would have sent (the `mailOutboxDir` setting),
  * for `e2e/mail.ts` to read the links back out. Inside the run directory, so
  * every run starts with an empty one.
  */

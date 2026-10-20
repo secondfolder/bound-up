@@ -3,7 +3,6 @@ import {
 	E2E_BASE_URL,
 	E2E_DATABASE_URL,
 	E2E_LOCK_PATH,
-	E2E_MAIL_DIR,
 	E2E_MEDIA_DIR,
 	E2E_MODEL_PORT,
 	E2E_PORT,
@@ -47,6 +46,9 @@ export default defineConfig({
 		trace: 'retain-on-failure'
 	},
 	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+	// After the web server is up, which is what lets it write the server's
+	// settings into the database the server has just made.
+	globalSetup: './e2e/global-setup.ts',
 	webServer: {
 		// A script rather than a shell one-liner so it can hold this checkout's
 		// lock for as long as the server runs — see the header of e2e/server.mjs.
@@ -75,37 +77,11 @@ export default defineConfig({
 			// Without this, attachments go to the repo's shared ./local-media, where
 			// concurrent runs — and `npm run dev` — would all write.
 			MEDIA_DIR: E2E_MEDIA_DIR,
-			// hooks.server.ts throws without this rather than letting Better Auth
-			// fall back to its hard-coded default.
-			BETTER_AUTH_SECRET: 'e2e-secret-not-used-anywhere-else',
-			// Required like the secret. Nothing is sent: the outbox writes each
-			// email to a file, and `e2e/mail.ts` reads the links back out of it.
-			// The image gets a path of its own instead (`e2e/server.mjs`).
-			MAIL_FROM: 'Bound Up <e2e@example.test>',
-			MAIL_OUTBOX_DIR: E2E_MAIL_DIR,
-			// Blanked, so a real transport in a developer's .env — which `vite dev`
-			// also reads — cannot make two transports set at once, or send real
-			// email to example.test. An empty value counts as unset.
-			RESEND_API_KEY: '',
-			SMTP_URL: '',
-			// A key pair for this suite only, so the notification settings have
-			// something to subscribe with. Nothing is ever pushed with it: the specs
-			// fake the browser's PushManager and send no message to a subscribed
-			// device, so the server never calls a real push service.
-			VAPID_PUBLIC_KEY:
-				'BKTAQZYEZVpAT8IakACU85Y4RXzpvWbqsTI6lvLuAr_1wPRiV6EftpzbBa7NuMdxbSk87DJWSMmDjlPxSd4Etf0',
-			VAPID_PRIVATE_KEY: 'QX3e-wqGMS2973OcACY5PsLlFsMLbwj1rZE1x5NsHSI',
-			VAPID_SUBJECT: 'mailto:e2e@example.test',
-			// Daydreams, against the stand-in provider `e2e/server.mjs` starts
-			// (`e2e/model-stub.mjs`), which checks for exactly this key. Set here so
-			// a real key in a developer's .env is never used — or billed — by a
-			// run. The image is pointed at the stub through the Docker host instead.
-			OPENROUTER_API_KEY: 'e2e-openrouter-key',
+			// The stand-in model providers (`e2e/model-stub.mjs`), which
+			// `e2e/server.mjs` starts. The keys and models that go with them are
+			// server settings, written by `e2e/global-setup.ts`; the image is
+			// pointed at the stub through the Docker host instead.
 			OPENROUTER_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/v1`,
-			DAYDREAM_MODEL: 'e2e/stub',
-			// Pictures, against the same stub, for the same reason: a real
-			// Runware key in .env must never make a picture during a run.
-			RUNWARE_AI_API_KEY: 'e2e-runware-key',
 			RUNWARE_BASE_URL: `http://127.0.0.1:${E2E_MODEL_PORT}/runware`,
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.

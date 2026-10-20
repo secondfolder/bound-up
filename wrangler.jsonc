@@ -181,9 +181,10 @@
 	// deploy with (`wrangler preview`), which refuses to run without this block.
 	// NOTHING is inherited from the top level, so every binding the app reads
 	// has to be repeated here, or it is simply absent and the code behind it
-	// throws. Secrets are not set here either: they live on the Preview base
-	// config (`npm run secrets -- remote-preview` fills it), and without
-	// BETTER_AUTH_SECRET every request fails. See docs/development.md.
+	// throws. No secrets are set here or on the Preview base config: the auth
+	// secret, push keys and providers are server settings in the preview D1
+	// database, made on its first request or set from its admin screen
+	// (docs/server-settings.md). See docs/development.md.
 	"previews": {
 		// One database for every preview, kept apart from production's. Its
 		// migrations are applied by `npm run db:migrate:remote-preview`, through

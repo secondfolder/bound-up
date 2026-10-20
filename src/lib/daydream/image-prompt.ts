@@ -147,24 +147,7 @@ function adultNouns(prompt: string): string {
 export type PictureArchitecture = 'sdxl' | 'z-image-turbo';
 
 /** A Runware model, and how it is prompted. */
-export type PictureModel = { air: string; architecture: PictureArchitecture };
-
-/** Each style's model AIR, as configured. */
-export type PictureModels = Readonly<Record<PictureStyle, string>>;
-
-/**
- * Ours, for the `architecture` Runware's `modelSearch` reports for a model,
- * or null for a family no recipe here suits.
- */
-export function pictureArchitecture(runware: string): PictureArchitecture | null {
-	if (runware.startsWith('z_image')) {
-		return 'z-image-turbo';
-	}
-	if (['sdxl', 'illustrious', 'pony', 'noobai'].includes(runware)) {
-		return 'sdxl';
-	}
-	return null;
-}
+export type PictureModel = { runwareModelAir: string; architecture: PictureArchitecture };
 
 const STYLE_TAGS: Readonly<Record<PictureStyle, string>> = {
 	photo: 'photograph, realistic, natural skin texture, cinematic lighting, shallow depth of field',
@@ -297,7 +280,7 @@ export function runwareTask(
 	return {
 		taskType: 'imageInference',
 		taskUUID,
-		model: model.air,
+		model: model.runwareModelAir,
 		positivePrompt,
 		negativePrompt: [
 			...NEGATIVE_ALWAYS,

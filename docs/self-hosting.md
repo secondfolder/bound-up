@@ -11,45 +11,54 @@ tested, and how it is versioned and published.
 ## Running it
 
 ```sh
-docker run --rm --entrypoint node ghcr.io/secondfolder/bound-up \
-  scripts/secrets.mjs print --subject mailto:you@example.com > .env
 docker compose up -d
 ```
 
-The first command runs `scripts/secrets.mjs` from the image itself, so it needs
-nothing installed but Docker, and writes `BETTER_AUTH_SECRET` and the push
-notification keys to `.env`. Compose reads a `.env` beside the compose file for
-the `${…}` in it. Run it once: a second run would replace both, signing
-everyone out and stopping every device's notifications. To add a missing one
-later, append the line it needs rather than regenerating the file. The script
-itself is described in [development.md](development.md#secrets).
+That is all it needs: no `.env`, and nothing to generate first. The server
+makes its own auth secret and push keys the first time it needs them and keeps
+them in the database volume, beside every other server setting
+([server-settings.md](server-settings.md)).
 
-**Then add email to `.env` before starting.** Accounts confirm their address
-before they can sign in, so the server will not start without a way to send
-the link (see [email.md](email.md)). It needs a sender and exactly one
-transport:
+**Then sign up, and set it up from inside.** The first account to sign up
+becomes the admin, as on Workers (see
+[features-and-admin.md](features-and-admin.md)). A new server has no email,
+and accounts confirm their address before they can sign in, so while that
+account is the only one and email is not set up, it is let in without a link
+(see [email.md](email.md#the-first-account-on-a-new-server)). Then, at
+Settings → Admin → Server settings:
 
-```sh
-MAIL_FROM="Bound Up <hello@bound.example.com>"
-# Either an API key from resend.com, allowed to send from that address…
-RESEND_API_KEY="re_…"
-# …or any SMTP server, as a URL (smtps:// for TLS on connect, smtp:// for STARTTLS)
-SMTP_URL="smtps://user:password@mail.example.com:465"
-```
+- **Email** — a sender address and either an API key from resend.com allowed
+  to send from it, or any SMTP server as a URL (`smtps://` for TLS on
+  connect, `smtp://` for STARTTLS). Until it is set, nobody else can finish
+  signing up, and the admin pages say so. The page has a "Send a test email"
+  button.
+- **Notifications** — optional: the contact address push services are given
+  defaults to the email sender's.
+- **Language models** and **Image models** — optional: an OpenRouter key and
+  a Runware key, each paid for per use, and which models to use. Daydreams
+  need the first for their stories and the second for their pictures.
 
-**Upgrading from a version before email verification:** add those lines before
-pulling the new image, or it will exit at startup saying which are missing.
-Existing accounts are marked verified by a migration, so nobody already signed
-up is asked to confirm anything.
+**Upgrading from a version that took these as environment variables**
+(`BETTER_AUTH_SECRET`, `VAPID_*`, `MAIL_FROM`, `RESEND_API_KEY`, `SMTP_URL`,
+`OPENROUTER_API_KEY`, `DAYDREAM_MODEL`, `RUNWARE_AI_*`): keep your `.env` for
+the first start. `docker-compose.yml` still passes them through, and each is
+copied into the database once, the first time the server finds that setting
+missing — keeping your auth secret keeps everyone signed in, and keeping your
+push keys keeps every device's notifications. After that the database owns
+them and the variables are ignored; the admin page lists any still set, so
+they can be removed. A `RUNWARE_AI_IMAGE_MODEL*` is imported only if it is
+one of the presets' models; any other is skipped with a logged warning, since
+its base model is not known, and is chosen again on the admin page. This
+import is temporary (see
+[temporary-code.md](temporary-code.md)).
 
 `docker-compose.yml` at the repo root is a working example: the image from
 `ghcr.io/secondfolder/bound-up`, a volume for the database and a volume for
-media. The first account to sign up becomes the admin, as on Workers (see
-[features-and-admin.md](features-and-admin.md)).
+media. The environment variables left are about where and how the container
+runs; everything else is a server setting.
 
 | Variable             | Default                     | What it is                                                     |
 | -------------------- | --------------------------- | -------------------------------------------------------------- |
-| `BETTER_AUTH_SECRET` | none — the container exits  | Signs sessions. Changing it signs everyone out                 |
 | `ORIGIN`             | none                        | The URL people use, e.g. `https://bound.example.com`           |
 | `DATABASE_URL`       | `file:/data/db/bound-up.db` | The SQLite file. Must be a `file:` URL                         |
 | `MEDIA_DIR`          | `/data/media`               | Encrypted attachments                                          |
@@ -58,17 +67,9 @@ media. The first account to sign up becomes the admin, as on Workers (see
 | `ADDRESS_HEADER`     | none                        | Behind a proxy: where it puts the client's address             |
 | `XFF_DEPTH`          | none                        | With `X-Forwarded-For`: how many proxies are in front          |
 | `AUTH_RATE_LIMIT`    | on                          | `off` disables the sign-in rate limit                          |
-| `VAPID_PUBLIC_KEY`   | none — push is off          | Push notifications. `secrets.mjs print` makes the pair         |
-| `VAPID_PRIVATE_KEY`  | none — push is off          | Keep the pair: replacing it stops every subscription           |
-| `VAPID_SUBJECT`      | none — push is off          | A `mailto:` or `https:` URL push services can contact          |
-| `MAIL_FROM`          | none — the server exits     | The sender of every email, e.g. `Bound Up <hi@example.com>`    |
-| `RESEND_API_KEY`     | none                        | Send through Resend. Exactly one of this and `SMTP_URL`        |
-| `SMTP_URL`           | none                        | Send through an SMTP server: `smtps://user:pass@host:465`      |
-| `OPENROUTER_API_KEY` | none — Daydreams are off    | Daydreams' replies. Each one is paid for on this key           |
-| `DAYDREAM_MODEL`     | an adult-fiction model      | The OpenRouter model id that writes Daydreams' replies         |
-| `RUNWARE_AI_API_KEY` | none — no pictures          | Daydreams' pictures. Each one is paid for on this key          |
-| `RUNWARE_AI_IMAGE_MODEL` | an adult-tuned Z-Image Turbo | The Runware model AIR for photo-style pictures   |
-| `RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED` | an adult-tuned Illustrious | The Runware model AIR for illustrated pictures |
+
+**Back up the database volume** as you would any secret: it holds the auth
+secret, the push keys and the provider keys as well as everyone's data.
 
 `/data/db` and `/data/media` are the two volumes. Back up both together: a
 database row without its file shows as missing media, and a file without its
@@ -127,7 +128,6 @@ global through `javascript.globals` in `biome.jsonc`; TypeScript through
 | `RealtimeRoom` Durable Object | an in-process `Map` of SSE streams (`realtime/local`) | `src/lib/server/realtime/backend.ts` |
 | cron trigger → `scheduled.ts` | `startMediaSweep` from the `init` hook                | `src/hooks.server.ts`             |
 | R2 lifecycle rule on `expiring/` | `deleteOlderThan` in the same sweep               | `src/lib/server/self-hosted/sweep.ts` |
-| `wrangler secret`             | the container's environment                           | `src/hooks.server.ts`             |
 | Resend over `fetch`           | Resend, or SMTP through nodemailer (`mail/local.ts`)  | `src/lib/server/mail/config.ts`   |
 | `wrangler d1 migrations apply` | the entrypoint, on every start                       | `scripts/docker-entrypoint.mjs`   |
 
@@ -185,33 +185,37 @@ it. `src/lib/server/self-hosted/dockerfile.test.ts` reads the Dockerfile and
 fails if it does not, so raising the attachment budget cannot silently break
 self-hosted sends.
 
-**The entrypoint** (`scripts/docker-entrypoint.mjs`) refuses to start without
-`BETTER_AUTH_SECRET` or with a non-`file:` `DATABASE_URL`, creates the volume
+**The entrypoint** (`scripts/docker-entrypoint.mjs`) refuses to start with a
+non-`file:` `DATABASE_URL`, creates the volume
 directories, applies `drizzle/` with drizzle-orm's `migrate()`, and only then
 imports the server. It keeps the same `__drizzle_migrations` ledger as
 `drizzle-kit migrate` (`npm run db:migrate:dev`), so a database made by one can
 be carried on by the other, and a restart applies nothing. A migration that
 fails stops the container before it serves anything against a half-migrated
-database. `drizzle-kit push` is still never used.
+database. `drizzle-kit push` is still never used. It checks for no secrets:
+the server generates its own, so a container with nothing but `ORIGIN` set is
+a working one.
 
 ## How the image is tested
 
 Before anything is published, CI runs the image through three checks.
 
-- **`scripts/docker-smoke.sh`** first starts it with no email settings and
-  checks it exits saying `MAIL_FROM is not set`. Then it starts it on fresh
-  named volumes, checks every
+- **`scripts/docker-smoke.sh`** starts it on fresh named volumes with
+  nothing set but `ORIGIN`, checks every
   migration was applied, checks over HTTP that a sixth sign-in in a minute is
   refused as too many (and that Better Auth never logged that it could not tell
-  clients apart), writes a marker row and a marker file, then replaces
+  clients apart), checks the server generated an auth secret, writes a marker
+  row and a marker file, then replaces
   the container with a new one on the same volumes. The new one must be
-  healthy, must not re-apply migrations, and must still have both markers.
+  healthy, must not re-apply migrations, must still have both markers, and
+  must have kept the same auth secret — a new one would sign everyone out.
 - **The whole Playwright suite runs against it.** With `E2E_IMAGE` set,
   `e2e/server.mjs` runs the image instead of `vite dev`, on the same
   per-checkout port, with two fresh named volumes mounted where a self-hoster's
   go, and `AUTH_RATE_LIMIT=off` — every test signs up from the same address,
-  which is why the smoke test checks the limit instead. Email goes to an
-  outbox directory under `/tmp` inside the container, which `e2e/mail.ts`
+  which is why the smoke test checks the limit instead. `e2e/global-setup.ts`
+  writes every server setting into the container's database, and email goes
+  to an outbox directory under `/tmp` inside the container, which `e2e/mail.ts`
   reads through `docker exec` the same way `e2e/db.ts` reaches the database. `npm run test:e2e:image` does this locally (it builds `bound-up:local`
   first).
 - **The specs that touch the database go through the container.** `e2e/db.ts`

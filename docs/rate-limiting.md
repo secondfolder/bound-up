@@ -98,7 +98,10 @@ Better Auth has a rate limiter, and it is switched off (`rateLimit` in
 - **What it stores.** The row key is an HMAC of the rule and the address,
   keyed with the auth secret (`keyed-hash.ts`, shared with account recovery),
   because an address is guessable and a plain hash of one is reversible.
-  Nothing else about the client is kept.
+  The secret is a server setting in the same database
+  (docs/server-settings.md), so the keying protects against a leak of these
+  rows alone, not of the whole database. Regenerating it starts every count
+  again. Nothing else about the client is kept.
 - **Pruning.** Rows whose window has closed are deleted by the scheduled sweep:
   `scheduled.ts` on Workers, `self-hosted/sweep.ts` in the Docker image. The
   table holds about an hour of clients at most, and a day of Daydreams

@@ -28,16 +28,9 @@ function fail(message) {
 	process.exit(1);
 }
 
-// hooks.server.ts would catch this too, but only on the first request, as a
-// 500. Refusing to start is the clearer failure for a container.
-if (!process.env.BETTER_AUTH_SECRET) {
-	fail(
-		'BETTER_AUTH_SECRET is not set. Generate it, with the push notification keys, by ' +
-			'running `docker run --rm --entrypoint node <this image> scripts/secrets.mjs print ' +
-			'--subject mailto:you@example.com > .env` beside docker-compose.yml, or pass one ' +
-			'with `-e BETTER_AUTH_SECRET=…`. Keep it: changing it signs everyone out.'
-	);
-}
+// No secrets are checked for here any more: the server generates its own on
+// the first request and keeps them in the database, beside every other
+// setting (docs/server-settings.md).
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl?.startsWith('file:')) {

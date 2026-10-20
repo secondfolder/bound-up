@@ -679,21 +679,19 @@ image model tuned for adult imagery, through Runware.
   Z-Image Turbo model gets sentences, its distilled 9 steps and `CFGScale`
   1.5. Not Z-Image's usual 1: there Runware drops the negative prompt, and
   Dark Beast drew a woman described as 35 barely out of her teens. The
-  defaults' architectures are known; any other model's is asked of
-  Runware's `modelSearch` once per server process (`resolvePictureModel`),
-  and one that Runware does not host, or of another family, is refused with
-  a 503 and a log line naming the variable to change. It answers with the picture and, in a header, exactly what it
-  asked (`PictureRequest`). It keeps nothing and logs only status codes.
+  architecture comes from the model's base model, which is stored with the
+  model in the server settings (see [Configuration](#configuration)), so
+  nothing has to be looked up when a picture is made. It answers with the
+  picture and, in a header, exactly what it asked (`PictureRequest`). It keeps nothing and logs only status codes.
 - **Two styles, per daydream.** Photo (Dark Beast 9, a Z-Image Turbo
   fine-tune, which draws only photographs) or Illustrated (WAI-illustrious,
   an SDXL checkpoint), in the setup's `pictures` (`daydream-setup`
   v3) with whether each passage gets one by itself, which is on by default.
   Both are in the setup form's "More options" and the story's Dials
   popover (`DaydreamPicturesControl.svelte`). Neither reaches the story
-  model, so changing either mid-story costs no cache miss. The models are
-  Runware AIRs, pinned to a version (`DEFAULT_PICTURE_MODELS`); Runware does
-  not host every Civitai version, and its own `modelSearch` is where to look
-  for another.
+  model, so changing either mid-story costs no cache miss. Which model draws
+  each style is a server setting; the defaults are Runware AIRs pinned to a
+  version (`RUNWARE_PICTURE_MODEL_PRESETS` in `src/lib/server-settings.ts`).
 - **Kept encrypted, like an attachment.** Turns never change, and a picture
   arrives after its passage is saved, so it is a mark on the passage
   (`picture`, `daydream-mark` v3). The browser encrypts it under an age
@@ -950,9 +948,9 @@ and a rewrite a request quoting the passage and what to change.
 
 ## The model
 
-`DAYDREAM_MODEL` names an OpenRouter model. The default
-(`DEFAULT_DAYDREAM_MODEL` in `server/daydream/config.ts`) is an open-weights
-model whose terms, and its providers' on OpenRouter, allow adult fiction.
+The story model is an OpenRouter model, chosen on the admin page (see
+[Configuration](#configuration)). Every preset is an open-weights model whose
+terms, and its providers' on OpenRouter, allow adult fiction.
 Most hosted models' terms (Anthropic's, OpenAI's, Workers AI's) do not,
 which is why the choice is made here rather than left to OpenRouter's
 routing. A passage is capped at 1,200 tokens, room for a few paragraphs and
@@ -1031,27 +1029,52 @@ models were chosen). Four things hold that down:
   300 a day (`DAYDREAM_IMAGE_LIMITS`). See
   [rate-limiting.md](rate-limiting.md#daydreams-replies). On everywhere, dev
   included.
-- **No key, no feature.** Without `OPENROUTER_API_KEY` the pages say
+- **No key, no feature.** Without an OpenRouter key the pages say
   Daydreams aren't set up on this server, and the endpoints answer 503.
-  Without `RUNWARE_AI_API_KEY` there are no pictures, and the story model is
+  Without a Runware key there are no pictures, and the story model is
   not asked to describe any.
 
 ## Configuration
 
-| Variable              | Default                        | What it is                                  |
-| --------------------- | ------------------------------ | ------------------------------------------- |
-| `OPENROUTER_API_KEY`  | none — Daydreams are off       | The key every passage is paid for on        |
-| `DAYDREAM_MODEL`      | `DEFAULT_DAYDREAM_MODEL`       | The OpenRouter model id                     |
-| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Only the e2e suite points it anywhere else  |
-| `RUNWARE_AI_API_KEY`  | none — no pictures             | The key every picture is paid for on        |
-| `RUNWARE_BASE_URL`    | `https://api.runware.ai/v1`    | Only the e2e suite points it anywhere else  |
-| `RUNWARE_AI_IMAGE_MODEL` | `DEFAULT_PICTURE_MODELS.photo` | A Runware AIR, Z-Image Turbo or SDXL-family |
-| `RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED` | `DEFAULT_PICTURE_MODELS.illustrated` | The same, for illustrations |
+Set at Settings → Admin → Server settings, and stored as server settings
+([server-settings.md](server-settings.md)); read per request by
+`readDaydreamConfig` (`server/daydream/config.ts`) and `readImageConfig`
+(`server/daydream/image-config.ts`). Neither key is ever generated: each
+reply and each picture is paid for on it.
 
-Read per request by `readDaydreamConfig`, from `platform.env` on Workers and
-the environment elsewhere. `npm run secrets -- <target> --openrouter-key …`
-sets the key; it is never generated or asked for. Pictures read theirs the
-same way (`readImageConfig`), and `--runware-key …` sets it.
+| Setting                   | Default                      | What it is                               |
+| ------------------------- | ---------------------------- | ---------------------------------------- |
+| `openrouterApiKey`        | none — Daydreams are off     | The key every passage is paid for on     |
+| `openrouterStoryModel`    | the `hermes` preset          | The story model: a preset or a custom id |
+| `runwareApiKey`           | none — no pictures           | The key every picture is paid for on     |
+| `runwarePhotoModel`       | the `dark-beast` preset      | The model for photo-style pictures       |
+| `runwareIllustratedModel` | the `wai-illustrious` preset | The same, for illustrations              |
+
+**A model is a preset or a custom one**, stored as JSON. A preset is stored
+by its id — `{"preset":"hermes"}` — and mapped to the provider's model in code
+(`OPENROUTER_STORY_MODEL_PRESETS`, `RUNWARE_PICTURE_MODEL_PRESETS` in
+`src/lib/server-settings.ts`), so a preset can move to a newer version of its
+model without anyone touching a setting. The story presets are Hermes (the
+default), a larger Hermes, Euryale and Cydonia; the picture presets are Dark
+Beast (a Z-Image Turbo fine-tune, the photo default), Lustify (SDXL), and
+WAI-illustrious (Illustrious, the illustrated default).
+
+- **A custom story model** is any OpenRouter id, `{"openrouterModelId":
+  "vendor/id"}`, found on the admin page by searching OpenRouter's public
+  model list (`GET /api/admin/models/openrouter?q=`).
+- **A custom picture model** is a Runware AIR and the base model it was
+  trained from, `{"runwareModelAir":"…","base":"pony"}`, where the base is one
+  of SDXL, Illustrious, Pony, NoobAI or Z-Image Turbo. The base decides the
+  prompt recipe (`PictureArchitecture` in `daydream/image-prompt.ts`): the
+  SDXL family all take tags, Z-Image Turbo takes sentences. It is found by
+  searching Runware's checkpoints with the saved key
+  (`GET /api/admin/models/runware?q=`, 409 until a key is saved), which fills
+  in the base from Runware's own architecture for that model. The search is
+  Runware's rather than Civitai's because Runware does not host every Civitai
+  version, and one it does not host fails as an invalid model.
+
+`OPENROUTER_BASE_URL` and `RUNWARE_BASE_URL` stay environment variables: only
+the e2e suite points them anywhere else, at its stand-in provider.
 
 ## Drafts
 

@@ -8,7 +8,7 @@ import { readVapidConfig } from '$lib/server/push';
 import type { HelpRequestView } from '$lib/types';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals, platform, cookies }) => {
+export const load: LayoutServerLoad = async ({ locals, cookies }) => {
 	// Loaded in the layout rather than per page because the bottom nav renders
 	// one tab per partner on every screen in this group. The group's own guard
 	// has already run by the time a layout load does, so `locals.user` is set —
@@ -53,7 +53,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies }) => {
 		isAdmin: isAdmin(locals.user),
 		// Whether this server has push keys at all, so the shell only suggests
 		// turning on notifications where they can work. Env, not a query.
-		pushAvailable: readVapidConfig(platform) !== null,
+		pushAvailable: readVapidConfig(locals.settings) !== null,
 		// This device's debug switch, honoured only while the account holds
 		// the feature. Display only, like `features`. See docs/debug-mode.md.
 		debug: debugModeOn(features, cookies.get(DEBUG_COOKIE))

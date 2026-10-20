@@ -11,7 +11,11 @@ import { requireFeature } from '$lib/server/features';
 import { createMediaStore } from '$lib/server/media/backend';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals: { db, user }, params, platform }) => {
+export const load: PageServerLoad = async ({
+	locals: { db, user, settings },
+	params,
+	platform
+}) => {
 	if (!user) {
 		error(401, 'Not signed in');
 	}
@@ -24,10 +28,10 @@ export const load: PageServerLoad = async ({ locals: { db, user }, params, platf
 	}
 	return {
 		daydream,
-		available: readDaydreamConfig(platform) !== null,
+		available: readDaydreamConfig(settings, platform) !== null,
 		accepted: await hasAcceptedDisclosure(db, user.id),
 		// Whether this server makes pictures (docs/daydreams.md, "Pictures").
-		picturesAvailable: readImageConfig(platform) !== null
+		picturesAvailable: readImageConfig(settings, platform) !== null
 	};
 };
 

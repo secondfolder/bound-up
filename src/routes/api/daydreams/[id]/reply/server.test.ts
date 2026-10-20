@@ -4,6 +4,7 @@ import { RULES } from '$lib/server/daydream/prompt';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
 import type { RateLimitResult } from '$lib/server/rate-limit';
+import type { ServerSettingKey } from '$lib/server-settings';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
@@ -14,6 +15,7 @@ import {
 	grantTestDaydreams,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { testSettings } from '$lib/testing/settings';
 import { POST } from './+server';
 
 /**
@@ -24,6 +26,9 @@ import { POST } from './+server';
  */
 const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
 vi.mock('$env/dynamic/private', () => ({ env }));
+
+/** The server's settings for the next request, reset before each test. */
+let configured: Partial<Record<ServerSettingKey, string>> = {};
 
 /** Something only the user wrote, to look for anywhere it must not be. */
 const SECRET_WORDS = 'the-blue-door-in-the-cellar';
@@ -52,6 +57,7 @@ function sse(...pieces: string[]): Response {
 }
 
 beforeEach(async () => {
+	configured = {};
 	harness = await createTestDb();
 	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada' });
@@ -59,8 +65,8 @@ beforeEach(async () => {
 	await grantTestDaydreams(db, ada.id);
 	await grantTestDaydreams(db, jun.id);
 	await acceptDisclosure(db, ada.id);
-	env.OPENROUTER_API_KEY = 'sk-or-test';
-	env.DAYDREAM_MODEL = 'test/model';
+	configured.openrouterApiKey = 'sk-or-test';
+	configured.openrouterStoryModel = JSON.stringify({ openrouterModelId: 'test/model' });
 	env.OPENROUTER_BASE_URL = 'https://models.test/api/v1';
 	upstream = vi.fn(async () => sse('Mara ', 'smiles.'));
 	vi.stubGlobal('fetch', upstream);
@@ -81,6 +87,7 @@ function post(
 	return runAndCatch(() =>
 		POST(
 			fakeEvent({
+				settings: testSettings(configured),
 				db,
 				user,
 				params: { id },
@@ -172,7 +179,7 @@ describe('POST /api/daydreams/[id]/reply', () => {
 	});
 
 	it('is unavailable on a server with no key', async () => {
-		env.OPENROUTER_API_KEY = undefined;
+		configured.openrouterApiKey = '';
 		const { id } = await createTestDaydream(db, ada.id);
 		expect(await post(ada, id)).toMatchObject({ type: 'error', status: 503 });
 		expect(upstream).not.toHaveBeenCalled();

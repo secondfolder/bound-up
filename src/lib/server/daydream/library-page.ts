@@ -21,5 +21,9 @@ export async function loadLibraryPage(
 		listLibrary(db, user.id, kind),
 		hasAcceptedDisclosure(db, user.id)
 	]);
-	return { items, accepted, available: readDaydreamConfig(event.platform) !== null };
+	return {
+		items,
+		accepted,
+		available: readDaydreamConfig(event.locals.settings, event.platform) !== null
+	};
 }

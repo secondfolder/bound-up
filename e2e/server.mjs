@@ -148,35 +148,15 @@ async function serveImage(image) {
 			`${name}-db:/data/db`,
 			'--volume',
 			`${name}-media:/data/media`,
-			'--env',
-			'BETTER_AUTH_SECRET',
-			'--env',
-			'VAPID_PUBLIC_KEY',
-			'--env',
-			'VAPID_PRIVATE_KEY',
-			'--env',
-			'VAPID_SUBJECT',
-			'--env',
-			'MAIL_FROM',
-			// Daydreams, against the stub on the host. `host-gateway` makes the
-			// name resolve on Linux as well, where Docker does not add it itself.
+			// The model stub on the host, whose keys `e2e/global-setup.ts` sets.
+			// `host-gateway` makes the name resolve on Linux as well, where Docker
+			// does not add it itself.
 			'--add-host',
 			'host.docker.internal:host-gateway',
 			'--env',
-			'OPENROUTER_API_KEY',
-			'--env',
-			'DAYDREAM_MODEL',
-			'--env',
 			`OPENROUTER_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/v1`,
 			'--env',
-			'RUNWARE_AI_API_KEY',
-			'--env',
 			`RUNWARE_BASE_URL=http://host.docker.internal:${E2E_MODEL_PORT}/runware`,
-			// `E2E_CONTAINER_MAIL_DIR` in run-paths.ts, which `e2e/mail.ts` reads
-			// through `docker exec`; the host path in MAIL_OUTBOX_DIR means nothing
-			// inside the container.
-			'--env',
-			'MAIL_OUTBOX_DIR=/tmp/mail-outbox',
 			// Every test signs up from the same address, many times a minute; the
 			// sign-in limit would refuse most of them. `vite dev` has it off for
 			// the same reason. scripts/docker-smoke.sh checks the limit instead.

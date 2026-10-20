@@ -3,6 +3,7 @@
 </script>
 
 <script lang="ts" generics="T extends Record<string, unknown>">
+	import type { Attachment } from 'svelte/attachments';
 	import { type FormPathLeaves, formFieldProxy, type SuperForm } from 'sveltekit-superforms';
 
 	let {
@@ -59,12 +60,47 @@
 	 * Svelte cannot know it has a value property until the CDN bundle upgrades
 	 * it, and the binding silently does nothing until then.
 	 */
-	function onInput(event: Event) {
-		const target = event.target as HTMLInputElement | null;
-		// `as` because the proxy is typed to the field's own type; every input
-		// this component renders is a string field.
-		$value = (target?.value ?? '') as typeof $value;
-	}
+	type WaInput = HTMLElement & { value?: unknown; input?: HTMLInputElement | null };
+
+	/**
+	 * Follows what is typed with listeners of its own, on the element and on
+	 * the native control inside it, rather than an `oninput=` attribute.
+	 *
+	 * The attribute is delegated by Svelte to one listener at the root, which
+	 * does not reliably see an input event from inside `<wa-input>`'s shadow
+	 * root (AGENTS.md). For a long while that went unnoticed here, because the
+	 * element is form-associated and the posted FormData had the value either
+	 * way; what went wrong was everything reading `$form` — a model picker's
+	 * details went on describing the model the field held before it was
+	 * edited. The value is read from the native control, which is
+	 * authoritative, falling back to the element's own before it upgrades.
+	 */
+	const follow: Attachment<HTMLElement> = (element) => {
+		const host = element as WaInput;
+		const controller = new AbortController();
+		const { signal } = controller;
+		const sync = () => {
+			const typed = host.input?.value ?? host.value ?? '';
+			// `as` because the proxy is typed to the field's own type; every input
+			// this component renders is a string field.
+			$value = String(typed) as typeof $value;
+		};
+		for (const name of ['input', 'change']) {
+			host.addEventListener(name, sync, { signal });
+		}
+		customElements
+			.whenDefined('wa-input')
+			.then(async () => {
+				await (host as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
+				if (!signal.aborted) {
+					for (const name of ['input', 'change']) {
+						host.input?.addEventListener(name, sync, { signal });
+					}
+				}
+			})
+			.catch(() => undefined);
+		return () => controller.abort();
+	};
 
 	// null is a legitimate stored value (an omitted relationship label), but it
 	// would render as the literal string "null".
@@ -78,7 +114,7 @@
 			name={field}
 			{type}
 			value={displayValue}
-			oninput={onInput}
+			{@attach follow}
 			password-toggle
 			aria-invalid={$errors ? 'true' : undefined}
 			{...attributes}
@@ -92,7 +128,7 @@
 			name={field}
 			{type}
 			value={displayValue}
-			oninput={onInput}
+			{@attach follow}
 			aria-invalid={$errors ? 'true' : undefined}
 			{...attributes}
 			{...otherProps}

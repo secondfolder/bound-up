@@ -24,10 +24,7 @@ trap cleanup EXIT
 start() {
 	docker run -d --name "$name" -p "127.0.0.1:$port:3000" \
 		-v "$db_volume:/data/db" -v "$media_volume:/data/media" \
-		-e BETTER_AUTH_SECRET="smoke-test-secret-$(date +%s)-padding-to-32-chars" \
 		-e ORIGIN="http://localhost:$port" \
-		-e MAIL_FROM="Bound Up <smoke@example.test>" \
-		-e MAIL_OUTBOX_DIR=/tmp/mail-outbox \
 		"$image" >/dev/null
 }
 
@@ -54,22 +51,9 @@ query() {
 	"
 }
 
-# Email is required: without it the server must refuse to start, and say what
-# to set, rather than come up and fail every sign-up.
-echo "Starting $image without email settings, which it must refuse"
-if docker run --rm -e BETTER_AUTH_SECRET="smoke-test-secret-padding-to-32-chars" \
-	"$image" >"/tmp/$name-nomail.log" 2>&1; then
-	echo 'The server started without MAIL_FROM' >&2
-	exit 1
-fi
-if ! grep -q 'MAIL_FROM is not set' "/tmp/$name-nomail.log"; then
-	echo 'The server failed without email settings, but not by naming them. Its log:' >&2
-	cat "/tmp/$name-nomail.log" >&2
-	exit 1
-fi
-rm -f "/tmp/$name-nomail.log"
-
-echo "Starting $image on fresh volumes"
+# Started with nothing but ORIGIN: every other setting is made by the server
+# itself or set from its admin screen (docs/server-settings.md).
+echo "Starting $image on fresh volumes, with no settings"
 start
 wait_healthy
 migrations=$(query 'select count(*) from __drizzle_migrations')
@@ -105,6 +89,14 @@ if docker logs "$name" 2>&1 | grep -q 'could not determine a client IP'; then
 	exit 1
 fi
 
+# The auth secret it made for itself on the first request, which a restart
+# must keep: a new one would sign everyone out.
+secret=$(query "select value from server_settings where key = 'serverSecret' and source = 'generated'")
+if [ -z "$secret" ] || [ "$secret" = undefined ]; then
+	echo 'The server did not generate an auth secret' >&2
+	exit 1
+fi
+
 # A marker that only survives if /data/db really is the volume.
 query "insert into verification (id, identifier, value, expires_at, created_at, updated_at) values ('smoke', 'smoke', 'smoke', 0, 0, 0) returning id" >/dev/null
 docker exec "$name" sh -c 'echo smoke > "$MEDIA_DIR/smoke"'
@@ -121,8 +113,12 @@ if [ "$(query "select count(*) from verification where id = 'smoke'")" != 1 ]; t
 	echo 'The database did not survive the restart' >&2
 	exit 1
 fi
+if [ "$(query "select value from server_settings where key = 'serverSecret'")" != "$secret" ]; then
+	echo 'The auth secret changed across a restart' >&2
+	exit 1
+fi
 if [ "$(docker exec "$name" sh -c 'cat "$MEDIA_DIR/smoke"')" != smoke ]; then
 	echo 'The media directory did not survive the restart' >&2
 	exit 1
 fi
-echo "OK: refused to start without email, healthy, sign-in rate limited, $migrations migrations applied once, database and media persisted"
+echo "OK: started with no settings, healthy, sign-in rate limited, $migrations migrations applied once, auth secret generated and kept, database and media persisted"

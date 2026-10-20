@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_PICTURE_MODELS } from '$lib/server/daydream/image-config';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
 import type { RateLimitResult } from '$lib/server/rate-limit';
+import { RUNWARE_PICTURE_MODEL_PRESETS, type ServerSettings } from '$lib/server-settings';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import {
@@ -11,12 +11,13 @@ import {
 	grantTestDaydreams,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { testSettings } from '$lib/testing/settings';
 import { POST } from './+server';
 
 /**
  * The picture endpoint: like the reply endpoint, it handles what a story says
- * in plaintext. `fetch` stands in for Runware, and `$env/dynamic/private` for
- * the server's configuration.
+ * in plaintext. `fetch` stands in for Runware, `settings` for the server's
+ * settings, and `$env/dynamic/private` for the base URL test seam.
  */
 const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
 vi.mock('$env/dynamic/private', () => ({ env }));
@@ -30,6 +31,7 @@ let harness: TestDb;
 let db: Db;
 let ada: TestUser;
 let upstream: ReturnType<typeof vi.fn>;
+let settings: ServerSettings;
 
 const body = { prompt: PROMPT, style: 'photo', heat: 4 };
 
@@ -44,7 +46,7 @@ beforeEach(async () => {
 	ada = await createTestUser(db, { name: 'Ada' });
 	await grantTestDaydreams(db, ada.id);
 	await acceptDisclosure(db, ada.id);
-	env.RUNWARE_AI_API_KEY = 'rw-test';
+	settings = testSettings({ runwareApiKey: 'rw-test' });
 	env.RUNWARE_BASE_URL = 'https://images.test/v1';
 	upstream = vi.fn(async () => runware());
 	vi.stubGlobal('fetch', upstream);
@@ -72,6 +74,7 @@ function post(
 				user,
 				params: { id },
 				json,
+				settings,
 				...(daydreamImageRateLimit ? { daydreamImageRateLimit } : {})
 			})
 		)
@@ -95,7 +98,7 @@ describe('POST /api/daydreams/[id]/image', () => {
 		const [task] = JSON.parse(String(init.body));
 		expect(task).toMatchObject({
 			taskType: 'imageInference',
-			model: DEFAULT_PICTURE_MODELS.photo,
+			model: RUNWARE_PICTURE_MODEL_PRESETS.photo[0].runwareModelAir,
 			outputType: 'base64Data'
 		});
 		expect(task.positivePrompt).toContain(PROMPT);
@@ -106,7 +109,9 @@ describe('POST /api/daydreams/[id]/image', () => {
 		const { id } = await createTestDaydream(db, ada.id);
 		await post(ada, id, { ...body, style: 'illustrated' });
 		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
-		expect(JSON.parse(String(init.body))[0].model).toBe(DEFAULT_PICTURE_MODELS.illustrated);
+		expect(JSON.parse(String(init.body))[0].model).toBe(
+			RUNWARE_PICTURE_MODEL_PRESETS.illustrated[0].runwareModelAir
+		);
 	});
 
 	it('prompts the default photo model as the Z-Image Turbo it is, without asking', async () => {
@@ -119,51 +124,31 @@ describe('POST /api/daydreams/[id]/image', () => {
 		expect(task.steps).toBe(9);
 	});
 
-	it('asks Runware once what a configured model is, and prompts it to suit', async () => {
-		env.RUNWARE_AI_IMAGE_MODEL = 'civitai:9@9';
-		upstream.mockImplementation((_url: string, init: RequestInit) => {
-			const [task] = JSON.parse(String(init.body));
-			return task.taskType === 'modelSearch'
-				? Response.json({
-						data: [{ results: [{ air: 'civitai:9@9', architecture: 'sdxl' }] }]
-					})
-				: runware();
+	it('prompts a custom model by the base model it was saved with, without asking Runware', async () => {
+		settings = testSettings({
+			runwareApiKey: 'rw-test',
+			runwarePhotoModel: JSON.stringify({ runwareModelAir: 'civitai:9@9', base: 'pony' })
 		});
 		const { id } = await createTestDaydream(db, ada.id);
 		await post(ada, id);
-		await post(ada, id);
-		const tasks = upstream.mock.calls.map(
-			([, init]) => JSON.parse(String((init as RequestInit).body))[0]
-		);
-		expect(tasks.map((task) => task.taskType)).toEqual([
-			'modelSearch',
-			'imageInference',
-			'imageInference'
-		]);
-		expect(tasks[1]).toMatchObject({ model: 'civitai:9@9', steps: 30 });
-		expect(tasks[1].positivePrompt).toMatch(/^photograph/);
-	});
-
-	it('refuses a configured model no recipe suits, naming the variable to change', async () => {
-		const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-		env.RUNWARE_AI_IMAGE_MODEL = 'civitai:8@8';
-		upstream.mockResolvedValueOnce(
-			Response.json({ data: [{ results: [{ air: 'civitai:8@8', architecture: 'flux1d' }] }] })
-		);
-		const { id } = await createTestDaydream(db, ada.id);
-		expect(await post(ada, id)).toMatchObject({ type: 'error', status: 503 });
 		expect(upstream).toHaveBeenCalledTimes(1);
-		expect(JSON.stringify(logged.mock.calls)).toContain('RUNWARE_AI_IMAGE_MODEL');
+		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
+		const [task] = JSON.parse(String(init.body));
+		expect(task).toMatchObject({ taskType: 'imageInference', model: 'civitai:9@9', steps: 30 });
+		expect(task.positivePrompt).toMatch(/^photograph/);
 	});
 
-	it('refuses a configured model Runware does not host', async () => {
-		vi.spyOn(console, 'error').mockImplementation(() => undefined);
-		env.RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED = 'civitai:7@7';
-		upstream.mockResolvedValueOnce(Response.json({ data: [{ results: [] }] }));
+	it('uses a preset other than the default by its pinned AIR and base model', async () => {
+		settings = testSettings({
+			runwareApiKey: 'rw-test',
+			runwarePhotoModel: JSON.stringify({ preset: 'lustify' })
+		});
 		const { id } = await createTestDaydream(db, ada.id);
-		expect(await post(ada, id, { ...body, style: 'illustrated' })).toMatchObject({
-			type: 'error',
-			status: 503
+		await post(ada, id);
+		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
+		expect(JSON.parse(String(init.body))[0]).toMatchObject({
+			model: 'civitai:573152@1094291',
+			steps: 30
 		});
 	});
 
@@ -198,7 +183,7 @@ describe('POST /api/daydreams/[id]/image', () => {
 	});
 
 	it('is unavailable on a server with no key', async () => {
-		env.RUNWARE_AI_API_KEY = undefined;
+		settings = testSettings();
 		const { id } = await createTestDaydream(db, ada.id);
 		expect(await post(ada, id)).toMatchObject({ type: 'error', status: 503 });
 		expect(upstream).not.toHaveBeenCalled();

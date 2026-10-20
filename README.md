@@ -86,21 +86,19 @@ accounts confirm their address before they can sign in: either your own mail
 server, or a free [Resend](https://resend.com) account.
 
 ```sh
-docker run --rm --entrypoint node ghcr.io/secondfolder/bound-up \
-  scripts/secrets.mjs print --subject mailto:you@example.com > .env
 docker compose up -d
 ```
 
-The first command writes the server's secrets to a `.env` file, which
-`docker compose` reads from then on. Use your own email address: it is passed
-to Apple and Google so they can reach you about the server's push
-notifications. Before starting it, add the email settings to `.env` —
-[docs/self-hosting.md](docs/self-hosting.md#running-it) shows the three lines.
-Then, starting from [`docker-compose.yml`](docker-compose.yml), sign up
-straight away: the first account on a new server becomes its admin.
+Starting from [`docker-compose.yml`](docker-compose.yml), that is all it
+takes: the server makes its own secrets. Then sign up straight away: the first
+account on a new server becomes its admin, and gets in without confirming its
+email, since there is no email yet. Set email up under Settings → Admin →
+Server settings, where the push notifications and Daydreams are set up too.
+[docs/self-hosting.md](docs/self-hosting.md#running-it) has the details.
 
-Keep `.env` safe and back it up. Losing or replacing it signs everyone out and
-switches off notifications on every phone. If the server sits behind a
+Back up the database volume, and keep the backups safe: it holds the
+server's secrets as well as everyone's data, and losing them signs everyone
+out and switches off notifications on every phone. If the server sits behind a
 reverse proxy, set `ORIGIN` to the address people will use.
 
 [docs/self-hosting.md](docs/self-hosting.md) covers the settings, backups,

@@ -3,9 +3,11 @@ import { SUGGEST_RULES } from '$lib/server/daydream/suggest-prompt';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
 import type { RateLimitResult } from '$lib/server/rate-limit';
+import type { ServerSettingKey } from '$lib/server-settings';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import { createTestUser, grantTestDaydreams, type TestUser } from '$lib/testing/fixtures';
+import { testSettings } from '$lib/testing/settings';
 import { POST } from './+server';
 
 /**
@@ -14,6 +16,9 @@ import { POST } from './+server';
  */
 const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
 vi.mock('$env/dynamic/private', () => ({ env }));
+
+/** The server's settings for the next request, reset before each test. */
+let configured: Partial<Record<ServerSettingKey, string>> = {};
 
 const SECRET_WORDS = 'the-blue-door-in-the-cellar';
 
@@ -31,13 +36,14 @@ const body = {
 };
 
 beforeEach(async () => {
+	configured = {};
 	harness = await createTestDb();
 	({ db } = harness);
 	ada = await createTestUser(db, { name: 'Ada' });
 	await grantTestDaydreams(db, ada.id);
 	await acceptDisclosure(db, ada.id);
-	env.OPENROUTER_API_KEY = 'sk-or-test';
-	env.DAYDREAM_MODEL = 'test/model';
+	configured.openrouterApiKey = 'sk-or-test';
+	configured.openrouterStoryModel = JSON.stringify({ openrouterModelId: 'test/model' });
 	env.OPENROUTER_BASE_URL = 'https://models.test/api/v1';
 	upstream = vi.fn(async () =>
 		Response.json({ choices: [{ message: { content: '{"chips":["praise"]}' } }] })
@@ -59,6 +65,7 @@ function post(
 	return runAndCatch(() =>
 		POST(
 			fakeEvent({
+				settings: testSettings(configured),
 				db,
 				user,
 				json,
@@ -104,7 +111,7 @@ describe('POST /api/daydreams/suggest', () => {
 	});
 
 	it('is unavailable on a server with no key', async () => {
-		env.OPENROUTER_API_KEY = undefined;
+		configured.openrouterApiKey = '';
 		expect(await post(ada)).toMatchObject({ status: 503 });
 	});
 

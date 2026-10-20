@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { listPushDevices } from '$lib/server/push';
+import type { ServerSettingKey } from '$lib/server-settings';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import { createTestUser, type TestUser } from '$lib/testing/fixtures';
 import { createTestBrowserSubscription, createTestVapid } from '$lib/testing/push';
+import { testSettings } from '$lib/testing/settings';
 import { POST } from './+server';
 import { DELETE, PATCH } from './[id]/+server';
 import { POST as CHECK } from './check/+server';
@@ -15,18 +17,22 @@ import { POST as CHECK } from './check/+server';
 const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
 vi.mock('$env/dynamic/private', () => ({ env }));
 
+/** The server's settings for the next request, reset before each test. */
+let configured: Partial<Record<ServerSettingKey, string>> = {};
+
 let harness: TestDb;
 let ada: TestUser;
 let bo: TestUser;
 
 beforeEach(async () => {
+	configured = {};
 	harness = await createTestDb();
 	ada = await createTestUser(harness.db, { name: 'Ada' });
 	bo = await createTestUser(harness.db, { name: 'Bo' });
 	const vapid = await createTestVapid();
-	env.VAPID_PUBLIC_KEY = vapid.publicKey;
-	env.VAPID_PRIVATE_KEY = vapid.privateKey;
-	env.VAPID_SUBJECT = vapid.subject;
+	configured.vapidPublicKey = vapid.publicKey;
+	configured.vapidPrivateKey = vapid.privateKey;
+	configured.vapidSubject = vapid.subject;
 });
 
 afterEach(() => harness.close());
@@ -44,15 +50,22 @@ async function body(endpoint?: string) {
 describe('POST /api/push/subscriptions', () => {
 	it('refuses an unsigned visitor', async () => {
 		const result = await runAndCatch(() =>
-			POST(fakeEvent({ db: harness.db, json: {} as unknown }))
+			POST(fakeEvent({ settings: testSettings(configured), db: harness.db, json: {} as unknown }))
 		);
 		expect(result).toMatchObject({ type: 'error', status: 401 });
 	});
 
 	it('is unavailable when this server has no VAPID keys', async () => {
-		env.VAPID_PRIVATE_KEY = undefined;
+		configured.vapidPrivateKey = '';
 		const result = await runAndCatch(async () =>
-			POST(fakeEvent({ db: harness.db, user: ada, json: await body() }))
+			POST(
+				fakeEvent({
+					settings: testSettings(configured),
+					db: harness.db,
+					user: ada,
+					json: await body()
+				})
+			)
 		);
 		expect(result).toMatchObject({ type: 'error', status: 503 });
 	});
@@ -69,13 +82,22 @@ describe('POST /api/push/subscriptions', () => {
 		'https://169.254.169.254/latest'
 	])('refuses an endpoint that is not a known push service: %s', async (endpoint) => {
 		const json = await body(endpoint);
-		const result = await runAndCatch(() => POST(fakeEvent({ db: harness.db, user: ada, json })));
+		const result = await runAndCatch(() =>
+			POST(fakeEvent({ settings: testSettings(configured), db: harness.db, user: ada, json }))
+		);
 		expect(result).toMatchObject({ type: 'error', status: 400 });
 		expect(await listPushDevices(harness.db, ada.id)).toEqual([]);
 	});
 
 	it('saves the device and returns its id', async () => {
-		const response = await POST(fakeEvent({ db: harness.db, user: ada, json: await body() }));
+		const response = await POST(
+			fakeEvent({
+				settings: testSettings(configured),
+				db: harness.db,
+				user: ada,
+				json: await body()
+			})
+		);
 		expect(response.status).toBe(201);
 		const { id } = (await response.json()) as { id: string };
 		expect(await listPushDevices(harness.db, ada.id)).toMatchObject([
@@ -86,14 +108,27 @@ describe('POST /api/push/subscriptions', () => {
 
 describe('/api/push/subscriptions/[id]', () => {
 	async function adaDevice() {
-		const response = await POST(fakeEvent({ db: harness.db, user: ada, json: await body() }));
+		const response = await POST(
+			fakeEvent({
+				settings: testSettings(configured),
+				db: harness.db,
+				user: ada,
+				json: await body()
+			})
+		);
 		return ((await response.json()) as { id: string }).id;
 	}
 
 	it('changes a category on the user’s own device', async () => {
 		const id = await adaDevice();
 		const response = await PATCH(
-			fakeEvent({ db: harness.db, user: ada, params: { id }, json: { notifyReactions: false } })
+			fakeEvent({
+				settings: testSettings(configured),
+				db: harness.db,
+				user: ada,
+				params: { id },
+				json: { notifyReactions: false }
+			})
 		);
 		expect(response.status).toBe(200);
 		expect((await listPushDevices(harness.db, ada.id))[0]?.notifyReactions).toBe(false);
@@ -104,7 +139,15 @@ describe('/api/push/subscriptions/[id]', () => {
 		async (json) => {
 			const id = await adaDevice();
 			const result = await runAndCatch(() =>
-				PATCH(fakeEvent({ db: harness.db, user: ada, params: { id }, json }))
+				PATCH(
+					fakeEvent({
+						settings: testSettings(configured),
+						db: harness.db,
+						user: ada,
+						params: { id },
+						json
+					})
+				)
 			);
 			expect(result).toMatchObject({ type: 'error', status: 400 });
 		}
@@ -115,12 +158,20 @@ describe('/api/push/subscriptions/[id]', () => {
 		const id = await adaDevice();
 		const patched = await runAndCatch(() =>
 			PATCH(
-				fakeEvent({ db: harness.db, user: bo, params: { id }, json: { notifyMessages: false } })
+				fakeEvent({
+					settings: testSettings(configured),
+					db: harness.db,
+					user: bo,
+					params: { id },
+					json: { notifyMessages: false }
+				})
 			)
 		);
 		expect(patched).toMatchObject({ type: 'error', status: 404 });
 		const deleted = await runAndCatch(() =>
-			DELETE(fakeEvent({ db: harness.db, user: bo, params: { id } }))
+			DELETE(
+				fakeEvent({ settings: testSettings(configured), db: harness.db, user: bo, params: { id } })
+			)
 		);
 		expect(deleted).toMatchObject({ type: 'error', status: 404 });
 		expect(await listPushDevices(harness.db, ada.id)).toHaveLength(1);
@@ -128,7 +179,9 @@ describe('/api/push/subscriptions/[id]', () => {
 
 	it('deletes the user’s own device', async () => {
 		const id = await adaDevice();
-		const response = await DELETE(fakeEvent({ db: harness.db, user: ada, params: { id } }));
+		const response = await DELETE(
+			fakeEvent({ settings: testSettings(configured), db: harness.db, user: ada, params: { id } })
+		);
 		expect(response.status).toBe(200);
 		expect(await listPushDevices(harness.db, ada.id)).toEqual([]);
 	});
@@ -136,7 +189,9 @@ describe('/api/push/subscriptions/[id]', () => {
 
 describe('POST /api/push/subscriptions/check', () => {
 	async function check(user: TestUser | null, json: unknown) {
-		return await CHECK(fakeEvent({ db: harness.db, user, json }));
+		return await CHECK(
+			fakeEvent({ settings: testSettings(configured), db: harness.db, user, json })
+		);
 	}
 
 	it('refuses an unsigned visitor', async () => {
@@ -154,7 +209,14 @@ describe('POST /api/push/subscriptions/check', () => {
 
 	it('says whose the browser is, and lets go of another account’s', async () => {
 		const subscription = await body();
-		const created = await POST(fakeEvent({ db: harness.db, user: ada, json: subscription }));
+		const created = await POST(
+			fakeEvent({
+				settings: testSettings(configured),
+				db: harness.db,
+				user: ada,
+				json: subscription
+			})
+		);
 		const { id } = (await created.json()) as { id: string };
 
 		const mine = await check(ada, { endpoint: subscription.endpoint });

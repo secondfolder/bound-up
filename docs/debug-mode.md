@@ -10,8 +10,8 @@ and off themselves, one device at a time.
 **Debug mode is on when the account holds the `debugMode` feature _and_ this
 device has switched it on.**
 
-- **Access** is the `debugMode` feature, granted from `/admin` like any other
-  (see [features-and-admin.md](features-and-admin.md)).
+- **Access** is the `debugMode` feature, granted from an account's admin
+  page like any other (see [features-and-admin.md](features-and-admin.md)).
 - **On or off** is a cookie, `debug=1`, set and cleared only by the `debug`
   action on `/settings` (`src/routes/(auth-required)/(app)/settings/+page.server.ts`).
   The action checks the feature before it sets anything.

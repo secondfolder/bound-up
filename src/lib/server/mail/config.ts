@@ -1,13 +1,16 @@
 import { dev } from '$app/environment';
-import { env as privateEnv } from '$env/dynamic/private';
+import { isMailTransport, type ServerSettings } from '$lib/server-settings';
 
 /**
- * Where this server's email goes, read from its environment. See docs/email.md.
+ * Where this server's email goes, from its settings (Admin → Server settings).
+ * See docs/email.md.
  *
- * Required, unlike push (`readVapidConfig`): signing in needs a verified
+ * Needed, unlike push (`readVapidConfig`): signing in needs a verified
  * address, and a server that cannot send the link has accounts nobody can
- * finish creating. So a missing mailer is a startup failure with the fix in the
- * message, the same as a missing `BETTER_AUTH_SECRET`.
+ * finish creating. But it is not a startup failure any more, because it is set
+ * from inside the app: a server without it starts, its admin page says email
+ * is not set up, and the very first account is let in without a link so that
+ * someone can get to that page (see the sign-up action).
  */
 export type MailConfig = {
 	/** The `From:` header, as given: `Bound Up <hello@example.com>` or a bare address. */
@@ -20,84 +23,105 @@ export type MailTransportConfig =
 	| { kind: 'resend'; apiKey: string }
 	/** Any SMTP server, as a `smtp://` or `smtps://` URL. Node targets only. */
 	| { kind: 'smtp'; url: string }
-	/** Writes each message to a JSON file instead of sending it. Dev and tests only. */
+	/** Writes each message to a JSON file instead of sending it. Node targets only. */
 	| { kind: 'outbox'; dir: string };
 
-export type MailEnv = {
-	MAIL_FROM?: string | undefined;
-	RESEND_API_KEY?: string | undefined;
-	SMTP_URL?: string | undefined;
-	MAIL_OUTBOX_DIR?: string | undefined;
-};
+export type MailSettings = Pick<
+	ServerSettings,
+	'mailFrom' | 'mailTransport' | 'resendApiKey' | 'smtpUrl' | 'mailOutboxDir'
+>;
 
-const SMTP_URL_SCHEME: RegExp = /^smtps?:\/\//;
-
-const HOW_TO_FIX =
-	'In development `npm run secrets -- dev` fills in a local outbox; on Workers set ' +
-	'MAIL_FROM and RESEND_API_KEY with `npm run secrets -- production` (or ' +
-	'`-- remote-preview`); self-hosted, set MAIL_FROM and either RESEND_API_KEY or ' +
-	'SMTP_URL in the .env beside docker-compose.yml. See docs/email.md.';
+export const SMTP_URL_SCHEME: RegExp = /^smtps?:\/\//;
 
 /**
- * Turns the environment into a config, or throws saying what is missing.
- *
- * `nodeTarget` is whether this build can open sockets and files: `vite dev` and
- * the Docker image can, Workers cannot. SMTP and the outbox both need that, so
- * on Workers they are refused here rather than failing on the first send.
+ * Under `vite dev` with nothing set, mail goes to files here, so nobody needs
+ * a provider to click their own sign-up link. Gitignored.
  */
-export function parseMailConfig(values: MailEnv, nodeTarget: boolean): MailConfig {
-	const from = values.MAIL_FROM?.trim();
-	if (!from) {
-		throw new Error(`MAIL_FROM is not set, so this server cannot send email. ${HOW_TO_FIX}`);
-	}
+export const DEV_OUTBOX_DIR = './.mail-outbox';
+export const DEV_MAIL_FROM = 'Bound Up <dev@localhost>';
 
-	const set = (
-		[
-			['RESEND_API_KEY', values.RESEND_API_KEY],
-			['SMTP_URL', values.SMTP_URL],
-			['MAIL_OUTBOX_DIR', values.MAIL_OUTBOX_DIR]
-		] as const
-	).filter(([, given]) => given?.trim());
-	if (set.length !== 1) {
-		const which =
-			set.length === 0 ? 'none of' : `more than one of (${set.map(([key]) => key).join(', ')})`;
-		throw new Error(
-			`Set exactly one of RESEND_API_KEY, SMTP_URL or MAIL_OUTBOX_DIR; ${which} them is set. ${HOW_TO_FIX}`
+const HOW_TO_FIX = 'Set it up in Settings → Admin → Server settings. See docs/email.md.';
+
+/** Why this server cannot send email, said to whoever runs it. */
+export class MailNotSetUpError extends Error {}
+
+/**
+ * Turns the settings into a config, or throws `MailNotSetUpError` saying what
+ * is missing.
+ *
+ * `nodeTarget` is whether this build can open sockets and files: `vite dev`
+ * and the Docker image can, Workers cannot. SMTP and the outbox both need
+ * that, so on Workers they are refused here rather than failing on the first
+ * send. `devDefaults` fills an unset sender and transport with the local
+ * outbox above.
+ */
+export function parseMailConfig(
+	values: MailSettings,
+	nodeTarget: boolean,
+	devDefaults = false
+): MailConfig {
+	const from = values.mailFrom.trim() || (devDefaults ? DEV_MAIL_FROM : '');
+	if (!from) {
+		throw new MailNotSetUpError(
+			`No sender address is set, so this server cannot send email. ${HOW_TO_FIX}`
 		);
 	}
-	const [[name, raw = '']] = set as [readonly [string, string]];
-	const value = raw.trim();
-
-	if (name === 'RESEND_API_KEY') {
-		return { from, transport: { kind: 'resend', apiKey: value } };
+	const kind = values.mailTransport.trim();
+	if (kind === '' && devDefaults) {
+		return { from, transport: { kind: 'outbox', dir: DEV_OUTBOX_DIR } };
+	}
+	if (!isMailTransport(kind)) {
+		throw new MailNotSetUpError(`No way to send email is chosen. ${HOW_TO_FIX}`);
+	}
+	if (kind === 'resend') {
+		const apiKey = values.resendApiKey.trim();
+		if (!apiKey) {
+			throw new MailNotSetUpError(
+				`Email is to go through Resend, but no API key is set. ${HOW_TO_FIX}`
+			);
+		}
+		return { from, transport: { kind, apiKey } };
 	}
 	if (!nodeTarget) {
-		throw new Error(
-			`${name} only works on the Node builds (vite dev and the Docker image); on Workers use RESEND_API_KEY. ${HOW_TO_FIX}`
+		throw new MailNotSetUpError(
+			`Sending through ${kind === 'smtp' ? 'SMTP' : 'files'} only works on the Node builds (vite dev and the Docker image); on Workers use Resend. ${HOW_TO_FIX}`
 		);
 	}
-	if (name === 'SMTP_URL') {
-		if (!SMTP_URL_SCHEME.test(value)) {
-			throw new Error(`SMTP_URL must start with smtp:// or smtps://. ${HOW_TO_FIX}`);
+	if (kind === 'smtp') {
+		const url = values.smtpUrl.trim();
+		if (!SMTP_URL_SCHEME.test(url)) {
+			throw new MailNotSetUpError(
+				`The SMTP server must be a URL starting smtp:// or smtps://. ${HOW_TO_FIX}`
+			);
 		}
-		return { from, transport: { kind: 'smtp', url: value } };
+		return { from, transport: { kind, url } };
 	}
-	return { from, transport: { kind: 'outbox', dir: value } };
+	const dir = values.mailOutboxDir.trim();
+	if (!dir) {
+		throw new MailNotSetUpError(
+			`Email is to be written to files, but no folder is set. ${HOW_TO_FIX}`
+		);
+	}
+	return { from, transport: { kind, dir } };
 }
 
-/**
- * This request's mail config: `platform.env` on Workers, the process
- * environment everywhere else, like every other secret here.
- */
-export function readMailConfig(platform: App.Platform | undefined): MailConfig {
-	const read = (name: keyof MailEnv) => platform?.env?.[name] ?? privateEnv[name];
-	return parseMailConfig(
-		{
-			MAIL_FROM: read('MAIL_FROM'),
-			RESEND_API_KEY: read('RESEND_API_KEY'),
-			SMTP_URL: read('SMTP_URL'),
-			MAIL_OUTBOX_DIR: read('MAIL_OUTBOX_DIR')
-		},
-		dev || __SELF_HOSTED__
-	);
+/** Whether SMTP and the outbox can work on this build. */
+export const MAIL_NODE_TARGET: boolean = dev || __SELF_HOSTED__;
+
+/** This server's mail config, from its settings; throws `MailNotSetUpError` when there is none. */
+export function readMailConfig(settings: MailSettings): MailConfig {
+	return parseMailConfig(settings, MAIL_NODE_TARGET, dev);
+}
+
+/** Why mail cannot be sent, or null when it can. For the admin screen and the sign-up bootstrap. */
+export function mailProblem(settings: MailSettings): string | null {
+	try {
+		readMailConfig(settings);
+		return null;
+	} catch (error) {
+		if (error instanceof MailNotSetUpError) {
+			return error.message;
+		}
+		throw error;
+	}
 }

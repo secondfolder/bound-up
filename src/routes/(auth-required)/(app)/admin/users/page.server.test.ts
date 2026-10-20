@@ -3,7 +3,7 @@ import type { Db } from '$lib/server/db';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAndCatch, runLoad } from '$lib/testing/events';
 import { createTestUser, type TestUser } from '$lib/testing/fixtures';
-import { load as loadLayout } from './+layout.server';
+import { load as loadLayout } from '../+layout.server';
 import { load } from './+page.server';
 
 let harness: TestDb;
@@ -21,7 +21,11 @@ beforeEach(async () => {
 afterEach(() => harness.close());
 
 const search = (q?: string) =>
-	runLoad(load(fakeEvent({ db, user: admin, path: q === undefined ? '/admin' : `/admin?q=${q}` })));
+	runLoad(
+		load(
+			fakeEvent({ db, user: admin, path: q === undefined ? '/admin/users' : `/admin/users?q=${q}` })
+		)
+	);
 
 describe('access', () => {
 	it.each([
@@ -33,7 +37,9 @@ describe('access', () => {
 			type: 'error',
 			status: 404
 		});
-		expect(await runAndCatch(() => load(fakeEvent({ db, user, path: '/admin' })))).toMatchObject({
+		expect(
+			await runAndCatch(() => load(fakeEvent({ db, user, path: '/admin/users' })))
+		).toMatchObject({
 			type: 'error',
 			status: 404
 		});

@@ -1,35 +1,53 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_DAYDREAM_MODEL, DEFAULT_OPENROUTER_BASE_URL, parseDaydreamConfig } from './config';
+import { OPENROUTER_STORY_MODEL_PRESETS } from '$lib/server-settings';
+import { testSettings } from '$lib/testing/settings';
+import { DEFAULT_OPENROUTER_BASE_URL, openrouterBaseUrl, parseDaydreamConfig } from './config';
 
-vi.mock('$env/dynamic/private', () => ({ env: {} }));
+const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
+vi.mock('$env/dynamic/private', () => ({ env }));
 
 describe('parseDaydreamConfig', () => {
 	it('is off without a key', () => {
-		expect(parseDaydreamConfig({})).toBeNull();
-		expect(parseDaydreamConfig({ OPENROUTER_API_KEY: '  ', DAYDREAM_MODEL: 'x' })).toBeNull();
+		expect(parseDaydreamConfig(testSettings(), DEFAULT_OPENROUTER_BASE_URL)).toBeNull();
+		expect(
+			parseDaydreamConfig(testSettings({ openrouterApiKey: '  ' }), DEFAULT_OPENROUTER_BASE_URL)
+		).toBeNull();
 	});
 
-	it('defaults the model and the base URL', () => {
-		expect(parseDaydreamConfig({ OPENROUTER_API_KEY: 'sk-or-1' })).toEqual({
+	it('defaults the model to the first preset', () => {
+		expect(
+			parseDaydreamConfig(
+				testSettings({ openrouterApiKey: 'sk-or-1' }),
+				DEFAULT_OPENROUTER_BASE_URL
+			)
+		).toEqual({
 			apiKey: 'sk-or-1',
-			model: DEFAULT_DAYDREAM_MODEL,
+			openrouterModelId: OPENROUTER_STORY_MODEL_PRESETS[0].openrouterModelId,
 			baseUrl: DEFAULT_OPENROUTER_BASE_URL
 		});
 	});
 
-	it('takes a model and a base URL, without its trailing slash', () => {
-		expect(
-			parseDaydreamConfig({
-				OPENROUTER_API_KEY: 'sk-or-1',
-				DAYDREAM_MODEL: 'some/model',
-				OPENROUTER_BASE_URL: 'http://127.0.0.1:9999/v1/'
-			})
-		).toMatchObject({ model: 'some/model', baseUrl: 'http://127.0.0.1:9999/v1' });
+	it('sends a preset to its current model, and a custom choice as given', () => {
+		const read = (openrouterStoryModel: string) =>
+			parseDaydreamConfig(
+				testSettings({ openrouterApiKey: 'k', openrouterStoryModel }),
+				DEFAULT_OPENROUTER_BASE_URL
+			)?.openrouterModelId;
+		expect(read(JSON.stringify({ preset: 'euryale' }))).toBe('sao10k/l3.1-euryale-70b');
+		expect(read(JSON.stringify({ openrouterModelId: 'some/model' }))).toBe('some/model');
+	});
+});
+
+describe('openrouterBaseUrl', () => {
+	it('defaults to OpenRouter, and takes the test seam without its trailing slash', () => {
+		env.OPENROUTER_BASE_URL = undefined;
+		expect(openrouterBaseUrl(undefined)).toBe(DEFAULT_OPENROUTER_BASE_URL);
+		env.OPENROUTER_BASE_URL = 'http://127.0.0.1:9999/v1/';
+		expect(openrouterBaseUrl(undefined)).toBe('http://127.0.0.1:9999/v1');
 	});
 
-	it('refuses a base URL that is not http(s), naming the fix', () => {
-		expect(() =>
-			parseDaydreamConfig({ OPENROUTER_API_KEY: 'k', OPENROUTER_BASE_URL: 'openrouter.ai' })
-		).toThrow(/Unset it to use OpenRouter itself/);
+	it('refuses one that is not http(s), naming the fix', () => {
+		env.OPENROUTER_BASE_URL = 'openrouter.ai';
+		expect(() => openrouterBaseUrl(undefined)).toThrow(/Unset it to use OpenRouter itself/);
 	});
 });

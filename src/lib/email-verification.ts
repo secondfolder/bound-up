@@ -32,8 +32,19 @@ export function checkEmailPath(redirectTo: string | null | undefined): string {
 	return withRedirect('/signup/check-email', redirectTo);
 }
 
-/** What the login page says about the link someone just followed, if anything. */
-export type VerificationNotice = 'verified' | 'expired' | 'invalid' | null;
+/**
+ * Where sign-up sends the very first account on a server whose email is not
+ * set up yet, which is let in without a link (see the sign-up action).
+ */
+export function firstAccountPath(redirectTo: string | null | undefined): string {
+	return withRedirect('/login?setup=1', redirectTo);
+}
+
+/**
+ * What the login page says about the link someone just followed, if anything;
+ * or, for `first-account`, that there was no link to follow.
+ */
+export type VerificationNotice = 'verified' | 'expired' | 'invalid' | 'first-account' | null;
 
 /**
  * Reads the login page's query. `verified=1` is ours; `error` is appended by
@@ -48,6 +59,9 @@ export function verificationNotice(query: URLSearchParams): VerificationNotice {
 	}
 	if (error) {
 		return 'invalid';
+	}
+	if (query.get('setup') === '1') {
+		return 'first-account';
 	}
 	return query.get('verified') === '1' ? 'verified' : null;
 }

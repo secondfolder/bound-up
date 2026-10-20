@@ -1,65 +1,69 @@
 import { describe, expect, it } from 'vitest';
-import { parseMailConfig } from './config';
+import { testSettings } from '$lib/testing/settings';
+import { DEV_MAIL_FROM, DEV_OUTBOX_DIR, MailNotSetUpError, parseMailConfig } from './config';
 
 describe('parseMailConfig', () => {
 	const from = 'Bound Up <hello@example.test>';
+	const mail = (values: Parameters<typeof testSettings>[0]) =>
+		testSettings({ mailFrom: from, ...values });
 
 	it('takes a Resend key on any target', () => {
 		for (const nodeTarget of [true, false]) {
-			expect(parseMailConfig({ MAIL_FROM: from, RESEND_API_KEY: 're_123' }, nodeTarget)).toEqual({
-				from,
-				transport: { kind: 'resend', apiKey: 're_123' }
-			});
+			expect(
+				parseMailConfig(mail({ mailTransport: 'resend', resendApiKey: 're_123' }), nodeTarget)
+			).toEqual({ from, transport: { kind: 'resend', apiKey: 're_123' } });
 		}
 	});
 
-	it('takes SMTP and the outbox on the Node targets', () => {
+	it('takes an SMTP URL or an outbox on a Node target', () => {
 		expect(
-			parseMailConfig({ MAIL_FROM: from, SMTP_URL: 'smtps://u:p@mail.example.test' }, true)
-		).toEqual({
-			from,
-			transport: { kind: 'smtp', url: 'smtps://u:p@mail.example.test' }
-		});
-		expect(parseMailConfig({ MAIL_FROM: from, MAIL_OUTBOX_DIR: './.mail-outbox' }, true)).toEqual({
-			from,
-			transport: { kind: 'outbox', dir: './.mail-outbox' }
-		});
-	});
-
-	// Workers can open neither a socket to an SMTP server nor a file.
-	it('refuses SMTP and the outbox on Workers, naming the alternative', () => {
-		expect(() =>
-			parseMailConfig({ MAIL_FROM: from, SMTP_URL: 'smtp://mail.example.test' }, false)
-		).toThrow(/only works on the Node builds.*RESEND_API_KEY/);
-		expect(() => parseMailConfig({ MAIL_FROM: from, MAIL_OUTBOX_DIR: '/tmp/x' }, false)).toThrow(
-			/only works on the Node builds/
-		);
-	});
-
-	it('requires MAIL_FROM, and says how to set it', () => {
-		expect(() => parseMailConfig({ RESEND_API_KEY: 're_123' }, true)).toThrow(
-			/MAIL_FROM is not set.*npm run secrets/
-		);
-		expect(() => parseMailConfig({ MAIL_FROM: '  ', RESEND_API_KEY: 're_123' }, true)).toThrow(
-			/MAIL_FROM/
-		);
-	});
-
-	it('requires exactly one transport', () => {
-		expect(() => parseMailConfig({ MAIL_FROM: from }, true)).toThrow(/none of them is set/);
-		expect(() =>
-			parseMailConfig({ MAIL_FROM: from, RESEND_API_KEY: 're_123', SMTP_URL: 'smtp://x' }, true)
-		).toThrow(/more than one of \(RESEND_API_KEY, SMTP_URL\)/);
-		// An empty value is not set, as docker-compose's `${X:-}` leaves it.
+			parseMailConfig(
+				mail({ mailTransport: 'smtp', smtpUrl: 'smtps://u:p@mail.example.test' }),
+				true
+			).transport
+		).toEqual({ kind: 'smtp', url: 'smtps://u:p@mail.example.test' });
 		expect(
-			parseMailConfig({ MAIL_FROM: from, RESEND_API_KEY: 're_123', SMTP_URL: '' }, true).transport
-				.kind
-		).toBe('resend');
+			parseMailConfig(mail({ mailTransport: 'outbox', mailOutboxDir: './.mail-outbox' }), true)
+				.transport
+		).toEqual({ kind: 'outbox', dir: './.mail-outbox' });
 	});
 
-	it('refuses an SMTP URL that is not one', () => {
+	it('uses only the chosen transport, whatever else is stored', () => {
+		expect(
+			parseMailConfig(
+				mail({ mailTransport: 'resend', resendApiKey: 're_1', smtpUrl: 'smtp://x' }),
+				true
+			).transport
+		).toEqual({ kind: 'resend', apiKey: 're_1' });
+	});
+
+	it('refuses SMTP and the outbox on Workers, naming Resend', () => {
 		expect(() =>
-			parseMailConfig({ MAIL_FROM: from, SMTP_URL: 'mail.example.test:587' }, true)
+			parseMailConfig(mail({ mailTransport: 'smtp', smtpUrl: 'smtp://mail.example.test' }), false)
+		).toThrow(/only works on the Node builds.*use Resend/);
+		expect(() =>
+			parseMailConfig(mail({ mailTransport: 'outbox', mailOutboxDir: '/tmp/x' }), false)
+		).toThrow(MailNotSetUpError);
+	});
+
+	it('says what is missing and where to set it', () => {
+		expect(() => parseMailConfig(testSettings({ mailTransport: 'resend' }), true)).toThrow(
+			/No sender address.*Admin → Server settings/
+		);
+		expect(() => parseMailConfig(mail({}), true)).toThrow(/No way to send email is chosen/);
+		expect(() => parseMailConfig(mail({ mailTransport: 'resend' }), true)).toThrow(/no API key/);
+		expect(() => parseMailConfig(mail({ mailTransport: 'outbox' }), true)).toThrow(/no folder/);
+		expect(() =>
+			parseMailConfig(mail({ mailTransport: 'smtp', smtpUrl: 'mail.example.test:587' }), true)
 		).toThrow(/smtp:\/\/ or smtps:\/\//);
+	});
+
+	it('falls back to the local outbox under vite dev, and only there', () => {
+		expect(parseMailConfig(testSettings(), true, true)).toEqual({
+			from: DEV_MAIL_FROM,
+			transport: { kind: 'outbox', dir: DEV_OUTBOX_DIR }
+		});
+		expect(parseMailConfig(mail({}), true, true).from).toBe(from);
+		expect(() => parseMailConfig(testSettings(), true, false)).toThrow(MailNotSetUpError);
 	});
 });

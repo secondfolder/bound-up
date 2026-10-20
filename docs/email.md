@@ -17,7 +17,7 @@ address.
    `/home`. `autoSignIn` is off, and the sign-up form no longer stashes the
    unlock material, because nothing follows that could use it.
 2. **The email** carries Better Auth's link, `/api/auth/verify-email?token=…`,
-   a JWT signed with `BETTER_AUTH_SECRET` and good for 24 hours
+   a JWT signed with the server's auth secret and good for 24 hours
    (`VERIFICATION_LINK_TTL_SECONDS`). Following it marks the address verified
    and redirects to the `callbackURL` sign-up gave it: `/login?verified=1`.
 3. **The login page** says "Your email is confirmed. Log in to continue", and
@@ -91,6 +91,23 @@ an account:
   out `SIGN_UP_RESPONSE_FLOOR_MS` (`src/lib/server/response-floor.ts`), set
   above the slower path.
 
+### The first account on a new server
+
+A new server has no email set up — that is done from the admin page — and the
+first account is the admin, so it could never confirm its address to get
+there. So when the account sign-up just made is the only one, and email is not
+set up (`mailProblem` in `mail/config.ts` says why not), the action marks it
+verified and sends the browser to `/login?setup=1` instead of the check-email
+page. The login page says they are the admin and should set up email at
+Settings → Admin → Server settings once signed in. This widens nothing:
+whoever signs up first is the admin either way, and once email works, or a
+second account exists, everyone confirms as usual. The link Better Auth tried
+to send fails in the background and is logged, saying where to set email up.
+
+Under `vite dev` this never happens, because unset email falls back to the
+outbox there (see below), so the first account confirms by link like any
+other.
+
 ### Accounts from before
 
 `drizzle/0024_verify_existing_accounts.sql` marks every account that existed
@@ -104,22 +121,38 @@ benefit.
 `hooks.server.ts` the first time a request sends something, not on every
 request.
 
-| Transport | Set with          | Works on                       | For                                  |
-| --------- | ----------------- | ------------------------------ | ------------------------------------ |
-| Resend    | `RESEND_API_KEY`  | Workers, the Docker image, dev | Production on Workers                |
-| SMTP      | `SMTP_URL`        | the Docker image, dev          | Self-hosters with a mail server      |
-| Outbox    | `MAIL_OUTBOX_DIR` | the Docker image, dev          | `npm run dev` and the Playwright suite |
+It is configured at Settings → Admin → Server settings, from the server
+settings `mailFrom` (the sender), `mailTransport` and the chosen transport's
+own setting ([server-settings.md](server-settings.md)):
 
-**Required, not optional.** `MAIL_FROM` and exactly one transport must be set
+| Transport | Set with        | Works on                       | For                                  |
+| --------- | --------------- | ------------------------------ | ------------------------------------ |
+| Resend    | `resendApiKey`  | Workers, the Docker image, dev | Production on Workers                |
+| SMTP      | `smtpUrl`       | the Docker image, dev          | Self-hosters with a mail server      |
+| Outbox    | `mailOutboxDir` | the Docker image, dev          | `npm run dev` and the Playwright suite |
+
+**Needed, but not a startup failure.** A sender and one transport must be set
 (`parseMailConfig` in `mail/config.ts`). Push is optional because a server
 without it still works; a server without email has sign-ups nobody can finish.
-So a missing setting fails with a message naming what to set and where: the
-Docker image refuses to start (the `init` hook). On Workers and under
-`vite dev`, where there is no environment to read before a request, the first
-send fails with it and `sendInBackground` logs it. It used to fail every
-request, the landing page included. And it must not fail the request that
+But email is set from inside the app, so a server without it has to start for
+anyone to set it: the admin hub and the server settings page warn that email
+is not set up, and the first account gets in without a link (above). A send
+attempted meanwhile fails with a message naming what is missing and where to
+set it, which `sendInBackground` logs. It must not fail the request that
 sends: only some addresses are sent anything, so an error there would say
 which have accounts.
+
+**Under `vite dev`, unset email is the outbox.** With no sender and no
+transport chosen, mail goes to `./.mail-outbox` from `Bound Up <dev@localhost>`
+(`DEV_OUTBOX_DIR`, `DEV_MAIL_FROM`), so nobody needs a provider to click their
+own sign-up link. Only `vite dev`: the Docker image and Workers never send
+anywhere nobody chose.
+
+**The test email.** The server settings page has a "Send a test email" button,
+which sends one to the admin's own address and waits for it, so the page can
+say whether it worked and, if not, the provider's error. It is the one awaited
+send: the never-await rule below protects a stranger's address, and this goes
+to the address of whoever pressed the button.
 
 **What is logged.** A failed send is logged by what kind of email it was,
 never with the address. A Resend refusal logs its status and its error `name`
@@ -132,14 +165,15 @@ A self-hoster may well have a mail server and no wish for a third-party
 account, so the Node build also speaks SMTP, through nodemailer. SMTP and the
 outbox live in `mail/local.ts`, imported only behind `dev || __SELF_HOSTED__`,
 so neither nodemailer nor `node:fs` is in the worker bundle. `parseMailConfig`
-refuses them outright on Workers rather than failing at the first send.
+refuses them outright on Workers rather than failing at the first send, and
+the admin page says so.
 
 **The outbox** writes each message to `<dir>/<time>-<uuid>.json`, holding
-`to`, `subject`, `text`, `html` and `sentAt`. `npm run secrets -- dev` points it
-at `./.mail-outbox` (gitignored): open the newest file to find a sign-up link.
-The Playwright suite points it at its run directory and reads the links back
-with `e2e/mail.ts`, so `signUp` in `e2e/helpers.ts` follows the real link
-before signing in.
+`to`, `subject`, `text`, `html` and `sentAt`. Under `vite dev` it defaults to
+`./.mail-outbox` (gitignored): open the newest file to find a sign-up link.
+The Playwright suite points it at its run directory (`e2e/global-setup.ts`
+writes the setting) and reads the links back with `e2e/mail.ts`, so `signUp`
+in `e2e/helpers.ts` follows the real link before signing in.
 
 ## What an email says
 
@@ -160,9 +194,11 @@ body, and the link appears in full in both.
 | Where                                       | What                                               |
 | ------------------------------------------- | -------------------------------------------------- |
 | `src/lib/server/mail/`                      | Config, transports, templates, `sendInBackground`  |
+| `src/lib/server/mail/config.ts`             | Settings to config, the dev outbox, `mailProblem`  |
 | `src/lib/server/auth.ts`                    | `requireEmailVerification`, `emailVerification`    |
 | `src/lib/email-verification.ts`             | The round trip's URLs, and what the login page says |
-| `src/routes/(public)/signup/`               | Sign-up, ending on the check-email page            |
+| `src/routes/(public)/signup/`               | Sign-up, ending on the check-email page (or, for the first account without email, on login) |
 | `src/routes/(public)/signup/check-email/`   | "Check your email", and the resend form            |
-| `src/routes/(public)/login/`                | The confirmed / expired notice, the unconfirmed error |
+| `src/routes/(public)/login/`                | The confirmed / expired / first-account notice, the unconfirmed error |
+| `src/routes/(auth-required)/(app)/admin/server/` | The email settings and the test email         |
 | `e2e/mail.ts`                               | Reading the outbox in the Playwright suite         |

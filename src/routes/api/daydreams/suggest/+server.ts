@@ -25,7 +25,7 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	const userId = await daydreamGuard(locals);
 
-	const config = readDaydreamConfig(platform);
+	const config = readDaydreamConfig(locals.settings, platform);
 	if (!config) {
 		error(503, 'Daydreams are not set up on this server.');
 	}
@@ -60,7 +60,7 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 				'content-type': 'application/json'
 			},
 			body: JSON.stringify({
-				model: config.model,
+				model: config.openrouterModelId,
 				messages,
 				max_tokens: maxTokens,
 				temperature: 1,

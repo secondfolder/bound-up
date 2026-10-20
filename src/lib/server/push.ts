@@ -1,6 +1,5 @@
 import { buildPushPayload, type VapidKeys } from '@block65/webcrypto-web-push';
 import { and, desc, eq, inArray, ne } from 'drizzle-orm';
-import { env as privateEnv } from '$env/dynamic/private';
 import {
 	buildPushContent,
 	CATEGORY_OF,
@@ -9,6 +8,7 @@ import {
 	type PushKind
 } from '$lib/notifications';
 import type { PartnershipView } from '$lib/partnership';
+import type { ServerSettings } from '$lib/server-settings';
 import { inBackground } from './background';
 import type { Db } from './db';
 import { pushSubscriptions } from './db/schema';
@@ -38,19 +38,35 @@ export type VapidConfig = {
 /**
  * The server's VAPID keys, or null when push is not set up here.
  *
- * Optional rather than a startup failure like `BETTER_AUTH_SECRET`, because a
- * self-hosted instance upgraded from before push existed would otherwise stop
- * starting. Without them the settings screen says notifications are not
- * available on this server, and nothing is sent.
+ * The key pair is generated when the server first finds it missing
+ * (`$lib/server/settings`), so in practice it is always there. The subject is
+ * the contact address push services are given: the one set in Admin → Server
+ * settings, or else the address email is sent from. With neither, push is
+ * off, the settings screen says notifications are not available on this
+ * server, and nothing is sent.
  */
-export function readVapidConfig(platform: App.Platform | undefined): VapidConfig | null {
-	const publicKey = platform?.env?.VAPID_PUBLIC_KEY ?? privateEnv.VAPID_PUBLIC_KEY;
-	const privateKey = platform?.env?.VAPID_PRIVATE_KEY ?? privateEnv.VAPID_PRIVATE_KEY;
-	const subject = platform?.env?.VAPID_SUBJECT ?? privateEnv.VAPID_SUBJECT;
+export function readVapidConfig(
+	settings: Pick<ServerSettings, 'vapidPublicKey' | 'vapidPrivateKey' | 'vapidSubject' | 'mailFrom'>
+): VapidConfig | null {
+	const publicKey = settings.vapidPublicKey.trim();
+	const privateKey = settings.vapidPrivateKey.trim();
+	const subject = settings.vapidSubject.trim() || defaultVapidSubject(settings.mailFrom);
 	if (!(publicKey && privateKey && subject)) {
 		return null;
 	}
 	return { publicKey, privateKey, subject };
+}
+
+const BARE_ADDRESS = /^[^\s<>@]+@[^\s<>@]+$/;
+const ANGLED_ADDRESS = /<(?<address>[^\s<>@]+@[^\s<>@]+)>/;
+
+/** `mailto:` the sender's address, from `Name <a@b>` or a bare `a@b`; `''` without one. */
+export function defaultVapidSubject(mailFrom: string): string {
+	const from = mailFrom.trim();
+	// Annotated: Biome's inference believes `exec` never returns null (AGENTS.md).
+	const angled: RegExpExecArray | null = ANGLED_ADDRESS.exec(from);
+	const address = BARE_ADDRESS.test(from) ? from : angled?.groups?.address;
+	return address ? `mailto:${address}` : '';
 }
 
 // ── devices ──────────────────────────────────────────────────────────────────
@@ -361,7 +377,7 @@ export function notifyPartner(
 		watching: readonly Watcher[];
 	}
 ): void {
-	const vapid = readVapidConfig(event.platform);
+	const vapid = readVapidConfig(event.locals.settings);
 	const recipientId = input.partnership.counterpart?.userId;
 	if (!(vapid && recipientId)) {
 		return;

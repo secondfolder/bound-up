@@ -22,6 +22,8 @@ import {
 	unlimited,
 	unlimitedEmail
 } from '$lib/server/rate-limit';
+import { loadServerSettings } from '$lib/server/settings';
+import type { ServerSettings } from '$lib/server-settings';
 
 const AUTH_PATH_PREFIX = '/api/auth';
 
@@ -29,21 +31,21 @@ const AUTH_PATH_PREFIX = '/api/auth';
  * The mailer, built the first time something is sent rather than on every
  * request.
  *
- * Built eagerly, a missing `MAIL_FROM` made every page a 500 — the landing
- * page and the roadmap included — and every request parsed the mail settings
- * for nothing. Built here, inside `send`, a bad setting rejects that send, and
- * `sendInBackground` logs it with the fix `readMailConfig` names. It must not
- * throw where the request can see it instead: only some addresses are sent
- * mail (an unconfirmed account, an account being recovered), so a send that
- * failed the response would tell a stranger which addresses have accounts.
- * The self-hosted server still checks the settings once at start-up (`init`).
+ * Built eagerly, a server whose email is not set up yet would make every page
+ * a 500 — the landing page and the roadmap included — and every request would
+ * parse the mail settings for nothing. Built here, inside `send`, a missing
+ * setting rejects that send, and `sendInBackground` logs it with the fix
+ * `readMailConfig` names. It must not throw where the request can see it
+ * instead: only some addresses are sent mail (an unconfirmed account, an
+ * account being recovered), so a send that failed the response would tell a
+ * stranger which addresses have accounts.
  */
-function lazyMailer(platform: App.Platform | undefined): Mailer {
+function lazyMailer(settings: ServerSettings): Mailer {
 	let built: Mailer | undefined;
 	return {
 		send(message) {
 			try {
-				built ??= createMailer(readMailConfig(platform));
+				built ??= createMailer(readMailConfig(settings));
 			} catch (error) {
 				return Promise.reject(error);
 			}
@@ -54,19 +56,15 @@ function lazyMailer(platform: App.Platform | undefined): Mailer {
 
 /**
  * Runs once when the server starts. Only the self-hosted Node build does
- * anything here: it checks the mail settings, and, having no cron trigger,
- * starts the media sweep that `scheduled.ts` is on Workers. `__SELF_HOSTED__` is a build-time constant, so
+ * anything here: having no cron trigger, it starts the media sweep that `scheduled.ts` is on Workers. `__SELF_HOSTED__` is a build-time constant, so
  * this is empty in the worker bundle and never runs under `vite dev`, which
  * keeps its behaviour as it was. See docs/self-hosting.md.
  */
 export const init: ServerInit = async () => {
 	if (__SELF_HOSTED__ && !building) {
-		// Read once up front so a server with no way to send email refuses to
-		// start, with the fix in the message, rather than answering every
-		// request with it. Workers has no environment to read here (its
-		// `platform.env` exists only inside a request), so there the check in
-		// `handle` is the one that fires.
-		readMailConfig(undefined);
+		// It used to refuse to start here without mail settings. They are set
+		// from the admin screen now, which a server that will not start cannot
+		// show, so a missing mailer is reported there instead.
 		const { runMediaSweep, startMediaSweep } = await import('$lib/server/self-hosted/sweep');
 		const db = await getLocalDb();
 		const store = await getLocalMediaStore();
@@ -85,23 +83,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const db = await createDb(event);
 
-	// Workers reads wrangler secrets from platform.env; dev has no platform
-	// at all (svelte.config.js strips the adapter's emulate hook) and reads
-	// .env instead, and the self-hosted server reads its process environment. Fail loudly: Better Auth otherwise falls back to a
-	// hard-coded default secret, and its own check only throws when
-	// NODE_ENV === 'production', which Workers does not set.
-	const secret = event.platform?.env?.BETTER_AUTH_SECRET ?? privateEnv.BETTER_AUTH_SECRET;
-	if (!secret) {
-		throw new Error(
-			'BETTER_AUTH_SECRET is not set. In development put it in .env ' +
-				'(`npm run secrets -- dev` fills it in); on Workers run ' +
-				'`npm run secrets -- production`, or `-- remote-preview` for branch ' +
-				'previews; self-hosted, put it in the .env beside docker-compose.yml ' +
-				'(docs/self-hosting.md shows the one command that writes it).'
-		);
-	}
+	// The auth secret is one of the server's settings, generated the first
+	// time it is found missing (`loadServerSettings`), so unlike the
+	// environment variable it replaced it cannot be unset: Better Auth never
+	// gets the chance to fall back to its hard-coded default.
+	const settings = await loadServerSettings(db, event.platform);
+	const secret = settings.serverSecret;
 
-	const mailer = lazyMailer(event.platform);
+	const mailer = lazyMailer(settings);
 	const limitsOff = rateLimitsOff(event);
 	const emailRateLimit = limitsOff ? unlimitedEmail : onceEach(emailRateLimiter(db, secret));
 
@@ -116,6 +105,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	});
 
 	event.locals.db = db;
+	event.locals.settings = settings;
 	event.locals.auth = auth;
 	event.locals.mailer = mailer;
 	event.locals.authRateLimit = limitsOff ? unlimited : rateLimiterFor(event, db, secret);

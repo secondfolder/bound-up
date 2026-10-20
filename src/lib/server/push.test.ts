@@ -11,6 +11,7 @@ import {
 	decryptPush,
 	type TestBrowserSubscription
 } from '$lib/testing/push';
+import { testSettings } from '$lib/testing/settings';
 import type { Db } from './db';
 import { pushSubscriptions } from './db/schema';
 import { requireMembership } from './messaging';
@@ -66,13 +67,31 @@ const message = {
 };
 
 describe('readVapidConfig', () => {
-	it('is null unless all three are set, so a half-configured server sends nothing', () => {
-		expect(readVapidConfig(undefined)).toBeNull();
-		const env = { VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv' };
-		expect(readVapidConfig({ env } as unknown as App.Platform)).toBeNull();
+	const keys = { vapidPublicKey: 'pub', vapidPrivateKey: 'priv' };
+
+	it('is null without both keys, so a half-configured server sends nothing', () => {
+		expect(readVapidConfig(testSettings({ vapidSubject: 'mailto:a@b' }))).toBeNull();
 		expect(
-			readVapidConfig({ env: { ...env, VAPID_SUBJECT: 'mailto:a@b' } } as unknown as App.Platform)
-		).toEqual({ publicKey: 'pub', privateKey: 'priv', subject: 'mailto:a@b' });
+			readVapidConfig(testSettings({ vapidPublicKey: 'pub', vapidSubject: 'mailto:a@b' }))
+		).toBeNull();
+	});
+
+	it('takes the contact address set for it', () => {
+		expect(readVapidConfig(testSettings({ ...keys, vapidSubject: 'mailto:a@b' }))).toEqual({
+			publicKey: 'pub',
+			privateKey: 'priv',
+			subject: 'mailto:a@b'
+		});
+	});
+
+	it('falls back to the address email is sent from, and is off with neither', () => {
+		expect(
+			readVapidConfig(testSettings({ ...keys, mailFrom: 'Bound Up <hello@example.test>' }))
+		).toMatchObject({ subject: 'mailto:hello@example.test' });
+		expect(readVapidConfig(testSettings({ ...keys, mailFrom: 'hi@example.test' }))).toMatchObject({
+			subject: 'mailto:hi@example.test'
+		});
+		expect(readVapidConfig(testSettings(keys))).toBeNull();
 	});
 });
 
@@ -270,14 +289,16 @@ describe('notifyPartner', () => {
 		const tasks: Promise<unknown>[] = [];
 		notifyPartner(
 			{
-				locals: { db } as App.Locals,
+				locals: {
+					db,
+					settings: testSettings({
+						vapidPublicKey: vapid.publicKey,
+						vapidPrivateKey: vapid.privateKey,
+						vapidSubject: vapid.subject
+					})
+				} as App.Locals,
 				url: new URL('https://app.test/api/partnerships/x/threads'),
 				platform: {
-					env: {
-						VAPID_PUBLIC_KEY: vapid.publicKey,
-						VAPID_PRIVATE_KEY: vapid.privateKey,
-						VAPID_SUBJECT: vapid.subject
-					},
 					ctx: { waitUntil: (task: Promise<unknown>) => tasks.push(task) }
 				} as unknown as App.Platform
 			},
@@ -305,10 +326,9 @@ describe('notifyPartner', () => {
 
 		notifyPartner(
 			{
-				locals: { db } as App.Locals,
+				locals: { db, settings: testSettings() } as App.Locals,
 				url: new URL('https://app.test/'),
 				platform: {
-					env: {},
 					ctx: { waitUntil: (task: Promise<unknown>) => tasks.push(task) }
 				} as unknown as App.Platform
 			},

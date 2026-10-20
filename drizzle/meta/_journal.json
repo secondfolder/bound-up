@@ -267,6 +267,13 @@
       "when": 1792407929423,
       "tag": "0037_add_kink_list_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1792455542628,
+      "tag": "0038_add_server_settings",
+      "breakpoints": true
     }
   ]
 }

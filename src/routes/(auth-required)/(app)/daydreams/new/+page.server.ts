@@ -18,7 +18,7 @@ import {
 import { requireFeature } from '$lib/server/features';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals: { db, user }, platform }) => {
+export const load: PageServerLoad = async ({ locals: { db, user, settings }, platform }) => {
 	if (!user) {
 		error(401, 'Not signed in');
 	}
@@ -33,8 +33,8 @@ export const load: PageServerLoad = async ({ locals: { db, user }, platform }) =
 		}),
 		library,
 		accepted,
-		available: readDaydreamConfig(platform) !== null,
-		picturesAvailable: readImageConfig(platform) !== null,
+		available: readDaydreamConfig(settings, platform) !== null,
+		picturesAvailable: readImageConfig(settings, platform) !== null,
 		// Drawn here rather than in the component so the server's render and
 		// hydration show the same few (`pickIdeas`).
 		ideas: pickIdeas()
