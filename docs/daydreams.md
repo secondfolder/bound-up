@@ -842,7 +842,7 @@ image model tuned for adult imagery, through Runware.
 
 - **The story model describes it.** On a server with a Runware key, the
   reply format asks for an `"image"` in every passage's metadata
-  (`IMAGE_INSTRUCTION` in `prompt.ts`) of one moment in the passage —
+  (`imageInstruction` in `prompt.ts`) of one moment in the passage —
   usually the one it ends on, but the most striking one, and when the
   idea is sexual the hottest, if that came earlier: the framing, how many
   people, each one in full — an adult age as a number, their look as the
@@ -858,6 +858,14 @@ image model tuned for adult imagery, through Runware.
   where a picture makes no sense, never in a check-in, and when little a
   camera could see has changed since the last passage that had one — a
   second picture of the same moment costs a request and shows nothing new.
+  A monologue's is judged differently: it has no moment of its own, and
+  asked for one anyway the model drew the speaker at a café table looking
+  out of a window — SFW beside a filthy passage, and nothing the daydream is
+  about. So it pictures the passage's ideas rather than its speaker — what
+  the voice says someone is for, a scene it imagines, an image of one of its
+  ideas — and only when that would interest the user, which usually means
+  one carrying the passage's kink and sex, as explicit as the passage and
+  the idea's heat allow. The speaker going about their day never gets one.
   The instruction is constant per server, so the prompt stays cacheable
   ([Cost](#cost)). The description is stored on the passage (`image`,
   `daydream-turn` v6), and goes back to the model with it, as a `<meta>`

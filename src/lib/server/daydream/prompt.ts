@@ -427,7 +427,23 @@ function steeringIdeas(
  * new. The model can judge that because each past passage goes back with
  * the description it wrote (`passageAsSent`).
  */
-const IMAGE_INSTRUCTION = `- "image": include it in most replies. It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the passage is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the passage to see. Leave it out, too, when little a camera could see has changed since the last passage that had one (its "image" is in that passage's metadata): the same people, in the same place and much the same pose, doing much the same thing — another picture of it would show nothing new. A new act, position, place, person or outfit is a change worth one. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.
+/**
+ * When a passage gets a picture. In a story, most do: there are people
+ * somewhere, doing something. A monologue has no moment of its own — asked
+ * for one anyway, the model drew the speaker at a café table, looking out of
+ * the window: SFW beside a filthy passage, and nothing the daydream is about.
+ * So a monologue's picture is of its ideas, not its speaker, and only when it
+ * is worth having: usually one that carries the passage's kink and sex, as
+ * explicit as the passage.
+ */
+const IMAGE_WHEN = {
+	story: 'include it in most replies.',
+	monologue:
+		"include it when a picture would be of real interest to the user, and leave it out when it would not. A monologue has no moment of its own, but its ideas can still be pictured: draw what the passage is about rather than who is saying it — someone doing what the voice says they are for, a scene it pictures or describes, an image that embodies one of its ideas. A picture is most worth making when it carries the passage's kink and sexual themes, as explicit as the passage is and the idea's heat allows, never toned down. The speaker sitting somewhere, thinking, looking out of a window or going about their day is not worth a picture, however the passage places them."
+} as const;
+
+function imageInstruction(voice: DaydreamVoice): string {
+	return `- "image": ${voice.narrator === 'monologue' ? IMAGE_WHEN.monologue : IMAGE_WHEN.story} It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the passage is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the passage to see. Leave it out, too, when little a camera could see has changed since the last passage that had one (its "image" is in that passage's metadata): the same people, in the same place and much the same pose, doing much the same thing — another picture of it would show nothing new. A new act, position, place, person or outfit is a change worth one. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.
   It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it as plain, literal sentences in the present tense, about 80 to 150 words and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
   1. The framing: close-up, medium shot or wide shot, and from where.
   2. How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don't). Count and describe anyone the moment implies, too: if someone is being fucked, whoever is fucking them is in the picture. Keep each person's look the same from picture to picture, from the setup where it says.
@@ -435,6 +451,7 @@ const IMAGE_INSTRUCTION = `- "image": include it in most replies. It is a pictur
   4. The place, a few concrete things in it, and the light: its quality, direction and colour ("warm lamplight from the left", "direct on-camera flash", "overcast daylight through a window").
   Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
   Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the idea's heat allows: at SFW, everyone clothed and nothing sexual. Never a style, a medium or camera settings — those are chosen for you.`;
+}
 
 /**
  * How a passage is written so the page can draw it (`daydream/passage-format.ts`,
@@ -478,7 +495,7 @@ Write the passage next${inStory ? " (after the <yours> block, when you wrote out
 - "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. ${ideas.suggestions}
 - "directions": buttons for steering the story. The ones on screen now are listed at the end of the last message. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} in all. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
-- "ooc": true, only when the passage is out of character.${pictures ? `\n${IMAGE_INSTRUCTION}` : ''}`;
+- "ooc": true, only when the passage is out of character.${pictures ? `\n${imageInstruction(voice)}` : ''}`;
 }
 
 const CHECK_IN = `# The scene is stopped

@@ -53,7 +53,7 @@ const REACTION_EXCERPT = 60;
  * it in. The tags it opened with and the rest of the metadata are left off.
  *
  * The picture goes back so the model can tell whether a new one would show
- * anything the last did not (`IMAGE_INSTRUCTION`): it cannot judge "little
+ * anything the last did not (`imageInstruction`): it cannot judge "little
  * has changed since the last picture" without knowing what that picture was.
  * It is part of the passage from the moment it is written, so the history
  * still only ever adds to itself (docs/daydreams.md, "Cost"). A rewrite's

@@ -157,7 +157,7 @@ const STYLE_TAGS: Readonly<Record<PictureStyle, string>> = {
 /**
  * The style in Z-Image's terms: an opening that sets the medium, and a close
  * that asks for the finish. The description itself starts with the framing
- * (`IMAGE_INSTRUCTION` in `server/daydream/prompt.ts`), so these say nothing
+ * (`imageInstruction` in `server/daydream/prompt.ts`), so these say nothing
  * about the shot.
  */
 const STYLE_SENTENCES: Readonly<Record<PictureStyle, { open: string; close: string }>> = {

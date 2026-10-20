@@ -328,6 +328,28 @@ describe('buildMessages', () => {
 		expect(messages.some((message) => message.content.includes('on screen now'))).toBe(false);
 	});
 
+	it('asks a monologue for a picture of its ideas when worth having, never its speaker idling', () => {
+		const monologue = system(
+			buildMessages(
+				request({
+					turns: [said('hi')],
+					setup: testDaydreamSetup({
+						voice: { narrator: 'monologue', stance: 'self', protagonistName: '' },
+						characters: []
+					})
+				}),
+				{ pictures: true }
+			)
+		);
+		expect(monologue).toContain('"image": include it when a picture would be of real interest');
+		expect(monologue).toContain('draw what the passage is about rather than who is saying it');
+		expect(monologue).toContain("carries the passage's kink and sexual themes");
+		expect(monologue).toContain(
+			'looking out of a window or going about their day is not worth a picture'
+		);
+		expect(monologue).not.toContain('include it in most replies');
+	});
+
 	it('asks for a picture of each passage only on a server that makes them', () => {
 		const withPictures = system(
 			buildMessages(request({ turns: [said('hi')] }), { pictures: true })
