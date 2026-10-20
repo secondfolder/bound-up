@@ -53,6 +53,7 @@ import {
 	createMark,
 	deleteMark,
 	downloadPicture,
+	estimatePicture,
 	type PromptMessage,
 	type ReplyRequestBody,
 	readPrompt,
@@ -133,13 +134,15 @@ export type MarkState = DaydreamMarkView & { content: DaydreamMarkContent | null
 /**
  * A passage's picture, as the page has it (docs/daydreams.md, "Pictures"):
  * `offered` when the passage describes one that has not been made, being
- * made or opened, shown (`url`; `kept` says whether it is stored yet, and
+ * made (since `startedAt`, so the page can say how long it has waited, and
+ * `estimateMs`, how long one usually takes here, once the server has said)
+ * or opened, shown (`url`; `kept` says whether it is stored yet, and
  * `failed` that storing it did not work),
  * or why it could not be.
  */
 export type PictureState =
 	| { status: 'offered' }
-	| { status: 'generating' }
+	| { status: 'generating'; startedAt: number; estimateMs: number | null }
 	| { status: 'opening' }
 	| { status: 'ready'; url: string; kept: 'saving' | 'kept' | 'failed' }
 	| { status: 'failed'; refused: boolean; error: string };
@@ -1282,6 +1285,23 @@ export class DaydreamStory {
 	}
 
 	/**
+	 * The picture nearest above a passage on its own branch that is on screen
+	 * already, if any: what its picture's placeholder is drawn from while it
+	 * is made, since the next picture of a story tends to look like the last.
+	 */
+	previousPictureUrl(turnId: string): string | null {
+		let id = this.index.byId.get(turnId)?.parentId ?? null;
+		while (id !== null) {
+			const state = this.#pictures.get(id);
+			if (state?.status === 'ready') {
+				return state.url;
+			}
+			id = this.index.byId.get(id)?.parentId ?? null;
+		}
+		return null;
+	}
+
+	/**
 	 * What the image model was asked for a passage's picture, for the raw log:
 	 * from its mark when it was kept with one, or from the request just made
 	 * when it is not kept yet. Null when neither says.
@@ -1337,7 +1357,20 @@ export class DaydreamStory {
 			this.#pictures.set(turnId, { status: 'failed', refused: true, error: REFUSED_PICTURE });
 			return;
 		}
-		this.#pictures.set(turnId, { status: 'generating' });
+		const generating = { status: 'generating', startedAt: Date.now(), estimateMs: null } as const;
+		this.#pictures.set(turnId, generating);
+		// Alongside, not before: the picture waits on nothing. Only applied to
+		// the same attempt, still going, so a late answer cannot touch a retry.
+		void estimatePicture(this.id, setup.pictures.style).then((estimateMs) => {
+			const now = this.#pictures.get(turnId);
+			if (
+				estimateMs !== null &&
+				now?.status === 'generating' &&
+				now.startedAt === generating.startedAt
+			) {
+				this.#pictures.set(turnId, { ...generating, estimateMs });
+			}
+		});
 		const made = await requestPicture(this.id, {
 			prompt,
 			style: setup.pictures.style,

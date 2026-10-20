@@ -1,5 +1,13 @@
 import { relations, sql } from 'drizzle-orm';
-import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+	check,
+	index,
+	integer,
+	real,
+	sqliteTable,
+	text,
+	uniqueIndex
+} from 'drizzle-orm/sqlite-core';
 import type { DaydreamTurnRole } from '../../../daydream';
 import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../../encryption';
 import type { FeatureKey, FeatureSource } from '../../../features';
@@ -1628,11 +1636,51 @@ export const daydreamPreferences = sqliteTable('daydream_preferences', {
 	...timestamps
 });
 
+/**
+ * How long Runware takes to make a picture, as a weighted moving average per
+ * workload: everything that decides the time (`PictureWorkload` in
+ * `daydream/image-prompt.ts`), and nothing about who asked or what of. The
+ * picture's progress ring is drawn against it. See docs/daydreams.md,
+ * "Pictures".
+ *
+ * An average rather than a history of runs: one row per workload is all the
+ * estimate needs, and nothing grows with use. A workload no longer made just
+ * stops being updated; a handful of rows is not worth sweeping.
+ */
+export const daydreamPictureTimings = sqliteTable(
+	'daydream_picture_timings',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		model: text('model').notNull(),
+		steps: integer('steps').notNull(),
+		cfgScale: real('cfg_scale').notNull(),
+		width: integer('width').notNull(),
+		height: integer('height').notNull(),
+		averageMs: real('average_ms').notNull(),
+		/** How many runs the average is over, which sets how much the next one moves it. */
+		samples: integer('samples').notNull(),
+		...timestamps
+	},
+	(table) => [
+		uniqueIndex('daydream_picture_timings_workload_idx').on(
+			table.model,
+			table.steps,
+			table.cfgScale,
+			table.width,
+			table.height
+		)
+	]
+);
+
 export type Daydream = typeof daydreams.$inferSelect;
 export type NewDaydream = typeof daydreams.$inferInsert;
 export type DaydreamTurn = typeof daydreamTurns.$inferSelect;
 export type NewDaydreamTurn = typeof daydreamTurns.$inferInsert;
 export type DaydreamPreferences = typeof daydreamPreferences.$inferSelect;
+export type DaydreamPictureTiming = typeof daydreamPictureTimings.$inferSelect;
+export type NewDaydreamPictureTiming = typeof daydreamPictureTimings.$inferInsert;
 export type NewDaydreamPreferences = typeof daydreamPreferences.$inferInsert;
 export type DaydreamMark = typeof daydreamMarks.$inferSelect;
 export type NewDaydreamMark = typeof daydreamMarks.$inferInsert;

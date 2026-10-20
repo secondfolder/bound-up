@@ -129,7 +129,13 @@ by `DaydreamRawTurn.svelte`, not as the story:
   mark keeps (`sent`, `daydream-mark` v3), for an account granted debug
   mode only, like `raw`. Outside the raw log too, with debug mode on,
   tapping a picture opens the same in a dialog
-  (`DaydreamPicturePrompt.svelte`).
+  (`DaydreamPicturePrompt.svelte`): one field, toggled between the image
+  model's prompt, shown first, and the story model's description, closed
+  by a tap outside it. In the image model's prompt, whatever is not in the
+  description — the server's words round it, and anything reworded on the
+  way, such as "girl" to "woman" — is muted (`addedRuns` in
+  `src/lib/word-diff.ts`), and so is the negative prompt, all of it the
+  server's.
 - **What is stored**, as JSON, under a disclosure.
 - **Show prompt**: the system prompt and messages that would write this
   passage, from `POST /api/daydreams/[id]/prompt`. That endpoint takes what

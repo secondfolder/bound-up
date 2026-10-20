@@ -745,12 +745,40 @@ image model tuned for adult imagery, through Runware.
   deletes its pictures by prefix (`purgeDaydreamPictures`).
 - **On the page** (`DaydreamPicture.svelte`), under the passage's text and
   never in it, since quote offsets are measured against the text: a
-  skeleton the picture's shape while it is made or opened, then the
-  picture. It is shown from the plaintext the moment it comes, and stored
+  placeholder the picture's shape while it is made or opened, then the
+  picture, both at most 15rem wide and 22rem (or 60% of the
+  window) tall, the width worked out from the height cap so neither crops.
+  The placeholder is a skeleton's shimmer, or, when an earlier passage on
+  the same branch has a picture on screen, that picture blurred past
+  recognising under the skeleton's pulse
+  (`DaydreamStory.previousPictureUrl`): the next picture of a story tends
+  to share the last one's colours and light. It is shown from the plaintext the moment it comes, and stored
   quietly after (`kept`); one that could not be stored says so with **Keep
   it**, one that could not be made with **Try again**, and a daydream with
   pictures off offers **Picture this** on each passage that describes one.
   Nothing the story asked for is lost.
+- **Progress is an estimate, drawn as one.** Runware reports nothing until
+  the picture comes: its async delivery has a `progress` field, but
+  measured against image tasks it never appears, only `processing`. So the
+  ring is drawn against how long pictures usually take here. The server
+  times each picture that comes back (failures do not count: they are often
+  fast refusals) and folds it into a weighted moving average
+  (`daydream_picture_timings`, `server/daydream/picture-timings.ts`), one
+  row per **workload** — model, steps, guidance, size
+  (`pictureWorkload`) — so changing the model or recipe starts a fresh
+  average. No user, daydream or prompt is stored with it. The first runs are
+  averaged evenly, then each new one weighs a fifth, and a run counts for
+  at most three times the average so far, so a cold start cannot drag it.
+  The page asks for it (`GET /api/daydreams/[id]/image?style=…`) alongside
+  the picture, never before it, and until one has been made guesses 15
+  seconds. The ring (`pictureProgress`) fills steadily to
+  two thirds at the estimate, then closes the rest exponentially, leaving
+  the estimate at the speed it arrived so the slowing has no kink, and
+  never fills: a late picture slows the ring rather than leaving it full
+  and stuck. It sits in a circle in the middle of the placeholder with the
+  seconds so far inside it, and nothing else: the estimate shapes the ring
+  but is not said, and the stage ("Making the picture") is said only to a
+  screen reader, since it never changes while the ring is up.
 - **The disclosure covers it.** Pictures go to a third party on the same
   terms as passages, and the Daydreams disclosure says so; there is no
   separate question.
