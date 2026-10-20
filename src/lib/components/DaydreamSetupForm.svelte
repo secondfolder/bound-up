@@ -29,8 +29,8 @@
 	import { type CopyState, copyState } from '$lib/daydream/chips';
 	import { saveLibraryItem } from '$lib/daydream/client';
 	import { SCENE_SLIDERS } from '$lib/daydream/dial-words';
-	import { castNotes, setupSentence } from '$lib/daydream/sentence';
 	import { type SuggestContext, suggestCasting } from '$lib/daydream/suggest';
+	import { type MarkedSummary, setupSummary } from '$lib/daydream/summary';
 	import { type DaydreamSetupFormValues, daydreamSetupFormSchema } from '$lib/schemas/daydreamForm';
 	import { sealForSubmit } from '$lib/sealed-forms';
 	import { type DaydreamSetupContent, daydreamSetupKind } from '$lib/sealed-kinds/daydreams';
@@ -44,6 +44,7 @@
 	import DaydreamSceneDialog from './DaydreamSceneDialog.svelte';
 	import DaydreamVoicePicker from './DaydreamVoicePicker.svelte';
 	import { startOpen } from './details';
+	import SummaryBlank from './SummaryBlank.svelte';
 
 	/**
 	 * A daydream's setup: how it is told, the scene, who is in it, and what
@@ -53,12 +54,13 @@
 	 *
 	 * Two layouts of the same form. **Full** is every control: the scene, who
 	 * is in it, "More options" (who leads, the limits, the dials), and how it
-	 * is told last, as one line with a Change button. **Sentence** is for a
+	 * is told last, as one line with a Change button. **Summary** is for a
 	 * story that is already put together — a ready-made one, or one the model
-	 * wrote from a sentence (`draft`) — and shows it as a fill-in-the-blanks
-	 * sentence whose blanks open the same menus and dialogs; "Customise
-	 * everything" switches to the full layout with nothing lost, since it is
-	 * the one superform either way. See docs/daydreams.md, "Starting one".
+	 * wrote from a sentence (`draft`) — and shows it as a short summary with
+	 * blanks in it (`setupSummary`), which open the same menus and dialogs;
+	 * "Customise everything" switches to the full layout with nothing lost,
+	 * since it is the one superform either way. See docs/daydreams.md,
+	 * "Starting one".
 	 *
 	 * How it is told follows who is in it until the user picks it themselves
 	 * (`inferVoice`): nobody is a story told to you, anyone is talking with
@@ -84,13 +86,15 @@
 		setupForm,
 		daydream = null,
 		draft = null,
+		summary = null,
 		layout: startLayout = 'full',
 		onretry,
 		retrying = false,
 		library,
 		suggestionsOn,
 		picturesAvailable = false,
-		submitLabel
+		submitLabel,
+		debug = false
 	}: {
 		/** The empty form, as the load prepared it. */
 		setupForm: SuperValidated<DaydreamSetupFormValues>;
@@ -98,8 +102,14 @@
 		daydream?: { id: string; revision: number; setup: DaydreamSetupContent } | null;
 		/** A new daydream's setup to start from (a ready-made one, or the model's); null for an empty one. */
 		draft?: DaydreamSetup | null;
-		/** Which layout to show first. The sentence is for a setup that is already put together. */
-		layout?: 'sentence' | 'full';
+		/**
+		 * The model's summary of `draft`, its blanks marked; null to summarise
+		 * it from its premise (a ready-made story, or a summary that could not
+		 * be read).
+		 */
+		summary?: MarkedSummary | null;
+		/** Which layout to show first. The summary is for a setup that is already put together. */
+		layout?: 'summary' | 'full';
 		/**
 		 * "Try another": asks for the draft again, with the limits written so
 		 * far, so they are kept. Only for one the model wrote.
@@ -113,6 +123,11 @@
 		/** Whether this server makes pictures: only then is there a setting for them. */
 		picturesAvailable?: boolean;
 		submitLabel: string;
+		/**
+		 * Debug mode (docs/debug-mode.md): the summary shows the markers it
+		 * was written with, around the blanks they made.
+		 */
+		debug?: boolean;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -271,12 +286,15 @@
 
 	const voiceIssue = $derived(voiceProblem($form.voice, $form.characters.length));
 
-	// ── the sentence ─────────────────────────────────────────────────────────
+	// ── the summary ──────────────────────────────────────────────────────────
 
-	const sentence = $derived(setupSentence($form));
+	// svelte-ignore state_referenced_locally
+	// The draft it was written for, as it came: what it is compared with to
+	// tell whether it still describes the story.
+	const written = summary && draft ? { marked: summary, draft: structuredClone(initial.data) } : null;
+	const paragraphs = $derived(setupSummary($form, written));
 	// Captured once, as `startOpen` asks.
 	const limitsWritten = initial.data.limits.trim() !== '';
-	const notes = $derived(castNotes($form));
 	const HEAT_SCALE = SCENE_SLIDERS.find((slider) => slider.key === 'heat')?.scale;
 
 	function pickHeat(event: WaSelectEvent) {
@@ -679,53 +697,46 @@
 <form method="POST" use:superform.enhance class="panel">
 	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
 
-	{#if layout === 'sentence'}
-		<div class="sentence-view">
-			<!-- The blanks are native buttons, not wa-buttons: they sit inside a
-			     line of text, where a wa-button's box would break the sentence.
-			     Each either opens a dialog or is a wa-dropdown's trigger, which
-			     the dropdown keeps aria-expanded on (AGENTS.md). -->
+	{#if layout === 'summary'}
+		<div class="summary-view">
 			<!-- Written with no whitespace between the pieces: any there would
 			     render as a space, and put one before the full stop. The words
-			     between the blanks keep their own spaces (`.words`), which a
-			     space just after a wa-dropdown otherwise lost: "steamystory". -->
-			<p class="sentence">
-				{#each sentence as piece, at (at)}{#if piece.kind === 'text'}<span class="words">{piece.text}</span>{:else if piece.kind === 'heat'}<wa-dropdown onwa-select={pickHeat}
-						><button slot="trigger" type="button" class="blank" aria-label={`How sexual: ${piece.label}`}
-							>{piece.label}</button
-						><wa-dropdown-item value="any">Any kind</wa-dropdown-item
-						>{#if HEAT_SCALE}{#each [1, 2, 3, 4, 5] as const as level (level)}<wa-dropdown-item value={String(level)}
-									>{HEAT_SCALE[level].label}</wa-dropdown-item
-								>{/each}{/if}</wa-dropdown
-					>{:else if piece.kind === 'voice'}<wa-dropdown onwa-select={pickVoice}
-						><button slot="trigger" type="button" class="blank" aria-label={`How it's told: ${voiceLabel}`}
-							>{piece.label}</button
-						>{#each DAYDREAM_VOICE_PRESETS as preset (preset.id)}<wa-dropdown-item value={preset.id}
-								>{preset.label}</wa-dropdown-item
-							>{/each}</wa-dropdown
-					>{:else if piece.kind === 'character'}<button
-						type="button"
-						class="blank"
-						onclick={() => {
-							characterDialog = {
-								index: piece.index,
-								partId: $form.characters[piece.index]?.casting.partId ?? null
-							};
-						}}>{piece.name}</button
-					>{:else}<button
-						type="button"
-						class="blank"
-						onclick={() => {
-							sceneDialog = { surprise: false, edit: true };
-						}}>{piece.title}</button
-					>{/if}{/each}
-			</p>
-			<p class="premise">{$form.scene.premise}</p>
-			{#if notes.length > 0}
-				<ul class="notes">
-					{#each notes as note, at (at)}<li>{note}</li>{/each}
-				</ul>
-			{/if}
+			     between the blanks carry their own spaces (`.words`). Each blank
+			     is a `SummaryBlank`: words, with an invisible button over them,
+			     so a copy of the summary keeps them. In debug mode each blank
+			     from a marked summary is shown inside its marker, `[[key|…]]`,
+			     and a marker read as plain words is shown in full. -->
+			<div class="setup-summary">
+				{#each paragraphs as pieces, at (at)}<p>{#each pieces as piece, index (index)}{#if piece.kind === 'text'}{#if debug && piece.marker}<span class="marker">{piece.marker}</span>{:else}<span class="words">{piece.text}</span>{/if}{:else}{#if debug && piece.key}<span class="marker">[[{piece.key}|</span>{/if}{#if piece.kind === 'heat'}<SummaryBlank
+							label={piece.label}
+							name={`How sexual: ${piece.label}`}
+							onselect={pickHeat}
+							>{#snippet items()}<wa-dropdown-item value="any">Any kind</wa-dropdown-item
+								>{#if HEAT_SCALE}{#each [1, 2, 3, 4, 5] as const as level (level)}<wa-dropdown-item value={String(level)}
+											>{HEAT_SCALE[level].label}</wa-dropdown-item
+										>{/each}{/if}{/snippet}</SummaryBlank
+						>{:else if piece.kind === 'voice'}<SummaryBlank
+							label={piece.label}
+							name={`How it's told: ${voiceLabel}`}
+							onselect={pickVoice}
+							>{#snippet items()}{#each DAYDREAM_VOICE_PRESETS as preset (preset.id)}<wa-dropdown-item value={preset.id}
+										>{preset.label}</wa-dropdown-item
+									>{/each}{/snippet}</SummaryBlank
+						>{:else if piece.kind === 'character'}<SummaryBlank
+							label={piece.label}
+							onclick={() => {
+								characterDialog = {
+									index: piece.index,
+									partId: $form.characters[piece.index]?.casting.partId ?? null
+								};
+							}}
+						/>{:else}<SummaryBlank
+							label={piece.label}
+							onclick={() => {
+								sceneDialog = { surprise: false, edit: true };
+							}}
+						/>{/if}{#if debug && piece.key}<span class="marker">]]</span>{/if}{/if}{/each}</p>{/each}
+			</div>
 			{#if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
 				<div>{@render castPicker('Add someone', null)}</div>
 			{/if}
@@ -963,6 +974,7 @@
 	{const index = $derived(characterDialog.index)}
 	{const editing = $derived(index === null ? null : ($form.characters[index] ?? null))}
 	<DaydreamCharacterDialog
+		{debug}
 		character={editing}
 		libraryRevision={editing?.sourceId ? (characterRevisions.get(editing.sourceId)?.revision ?? null) : null}
 		casting={castingEdit(index, characterDialog.partId)}
@@ -977,6 +989,7 @@
 {#if sceneDialog}
 	{const editing = $derived(sceneDialog.edit ? $form.scene : null)}
 	<DaydreamSceneDialog
+		{debug}
 		scene={editing}
 		libraryRevision={editing?.sourceId ? (sceneRevisions.get(editing.sourceId)?.revision ?? null) : null}
 		surprise={sceneDialog.surprise}
@@ -1101,21 +1114,22 @@
 		}
 	}
 
-	/* The setup as a sentence with blanks in it. */
-	.sentence-view {
+	/* The setup as a summary with blanks in it. */
+	.summary-view {
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
 	}
 
-	.sentence {
-		margin: 0;
-		font-size: 1.375rem;
+	.setup-summary {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 1.125rem;
 		line-height: 1.8;
 
-		wa-dropdown {
-			display: inline;
-			font-size: inherit;
+		p {
+			margin: 0;
 		}
 
 		.words {
@@ -1123,46 +1137,12 @@
 		}
 	}
 
-	/* A blank to fill in: underlined like a field, and tappable. Undoes Web
-	   Awesome's native button styles, which make a <button> a one-line control
-	   of the form height rather than a word in a sentence. */
-	.blank {
-		display: inline;
-		block-size: auto;
-		margin: 0;
-		padding: 0 0.15em;
-		vertical-align: baseline;
-		white-space: normal;
-		font-size: inherit;
-		line-height: inherit;
-		border: 0;
-		border-block-end: 2px dashed var(--wa-color-brand-border-loud, currentColor);
-		border-radius: 0;
-		background: var(--wa-color-brand-fill-quiet);
-		color: inherit;
-		font-family: inherit;
-		font-weight: 600;
-		cursor: pointer;
-
-		&:focus-visible {
-			outline: var(--wa-focus-ring);
-			outline-offset: var(--wa-focus-ring-offset);
-		}
-	}
-
-	.premise {
-		margin: 0;
-
-		/* The starting points' premises are phrases, written to sit in a field. */
-		&::first-letter {
-			text-transform: uppercase;
-		}
-	}
-
-	.notes {
-		margin: 0;
-		padding-inline-start: 1.25rem;
+	/* A marker the summary was written with, shown in debug mode. */
+	.marker {
+		font-family: var(--wa-font-family-code, monospace);
+		font-size: 0.85em;
 		color: var(--wa-color-text-quiet);
+		white-space: pre-wrap;
 	}
 
 	.limits::part(content) {

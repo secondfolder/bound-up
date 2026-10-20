@@ -36,7 +36,8 @@
 // "The <scene title> story", so a spec knows what to expect, and a naming
 // request fails once like any other when the scene's title has `[fail]` in it.
 // A daydream described in a sentence is always "The stub night train", with
-// Vesper cast as its stranger. Generated ideas are one for each side and one
+// Vesper cast as its stranger, and a summary that marks the heat, the scene and
+// Vesper but leaves how it is told for the form to add. Generated ideas are one for each side and one
 // with nobody in charge, the first titled for the side the prompt asked for
 // ("Stub idea for the sub"), so a spec can see the side reach the model.
 // Asked for more, having been told what it already offered, each title ends
@@ -153,8 +154,10 @@ function replyFor(messages) {
 function suggestionFor(messages) {
 	const ask = messages.at(-1)?.content ?? '';
 	let content;
-	if (ask.includes('{"voice"')) {
+	if (ask.includes('{"summary"')) {
 		content = {
+			summary:
+				'[[scene|A stranger on the stub night train]]. [[Vesper|A watchful stranger called Vesper]] takes the seat across from you, and the journey turns [[heat|slow-burning]].',
 			voice: 'talk',
 			scene: {
 				title: 'The stub night train',

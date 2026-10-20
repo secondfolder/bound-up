@@ -38,17 +38,32 @@ const JSON_HEADERS = { 'content-type': 'application/json' };
 
 /** What a failed request says, in words for the page. */
 async function describeFailure(response: Response | null): Promise<string> {
+	return (await readFailure(response)).error;
+}
+
+/**
+ * Why a request failed, in words for a person, and any `detail` the endpoint
+ * added for an account holding debug mode (the suggest endpoint's provider
+ * failures; docs/debug-mode.md).
+ */
+async function readFailure(response: Response | null): Promise<{ error: string; detail?: string }> {
 	if (!response) {
-		return describeRequestFailure(null);
+		return { error: describeRequestFailure(null) };
 	}
 	// SvelteKit's `error()` answers carry a `message`, and the endpoints word
 	// theirs for a person — the 502 and 503 included. An unexpected 500's says
 	// "Internal Error", which tells nobody anything.
 	if (response.status === 500) {
-		return SERVER_FAILURE;
+		return { error: SERVER_FAILURE };
 	}
-	const body = (await response.json().catch(() => null)) as { message?: unknown } | null;
-	return typeof body?.message === 'string' ? body.message : describeRequestFailure(response);
+	const body = (await response.json().catch(() => null)) as {
+		message?: unknown;
+		detail?: unknown;
+	} | null;
+	return {
+		error: typeof body?.message === 'string' ? body.message : describeRequestFailure(response),
+		...(typeof body?.detail === 'string' ? { detail: body.detail } : {})
+	};
 }
 
 type Outcome<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -460,10 +475,16 @@ export async function deleteLibraryItem(kind: LibraryKind, id: string): Promise<
  * Asks the model for suggestions, answering the provider's response body
  * as-is for `suggestions.ts` to check. See `api/daydreams/suggest`.
  */
-export async function requestSuggestion(body: unknown): Promise<Outcome<{ value: unknown }>> {
-	const sent = await send('/api/daydreams/suggest', 'POST', body);
-	if (!sent.ok) {
-		return sent;
+export async function requestSuggestion(
+	body: unknown
+): Promise<{ ok: true; value: unknown } | { ok: false; error: string; detail?: string }> {
+	const response = await tryFetch('/api/daydreams/suggest', {
+		method: 'POST',
+		headers: JSON_HEADERS,
+		body: JSON.stringify(body)
+	});
+	if (!response?.ok) {
+		return { ok: false, ...(await readFailure(response)) };
 	}
-	return { ok: true, value: await sent.response.json().catch(() => null) };
+	return { ok: true, value: await response.json().catch(() => null) };
 }

@@ -26,7 +26,12 @@
 	} from '$lib/daydream/catalog';
 	import { saveLibraryItem } from '$lib/daydream/client';
 	import { CHARACTER_SLIDERS, CHARACTER_TONES, characterLevel } from '$lib/daydream/dial-words';
-	import { type SuggestContext, suggestChips, suggestFill } from '$lib/daydream/suggest';
+	import {
+		type SuggestContext,
+		type SuggestFailure,
+		suggestChips,
+		suggestFill
+	} from '$lib/daydream/suggest';
 	import {
 		type DaydreamCharacterFormValues,
 		daydreamCharacterFormSchema
@@ -36,6 +41,7 @@
 	import DaydreamChipField from './DaydreamChipField.svelte';
 	import { startOpen } from './details';
 	import OptionalSlider from './OptionalSlider.svelte';
+	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/** What the dialog needs to edit a character's casting: given only when opened from a daydream. */
 	export type CastingEdit = {
@@ -83,6 +89,7 @@
 		casting = null,
 		context,
 		suggestionsOn,
+		debug = false,
 		onsaved,
 		onclose
 	}: {
@@ -96,6 +103,8 @@
 		context: SuggestContext;
 		/** Whether the model may be asked for ideas (the disclosure has been accepted). */
 		suggestionsOn: boolean;
+		/** Debug mode: a failed suggestion shows what came back. */
+		debug?: boolean;
 		/**
 		 * The character as saved: a copy for a daydream, with where it came
 		 * from and their casting (empty from the library), and the sealed
@@ -131,7 +140,7 @@
 			}
 		: { ...EMPTY_CHARACTER, casting: castingEdit?.value ?? EMPTY_CASTING, saveToLibrary: true };
 
-	let problem: string | null = $state(null);
+	let problem: SuggestFailure | null = $state(null);
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();
 	let detail: (HTMLElement & { open: boolean }) | undefined = $state();
 
@@ -192,7 +201,7 @@
 				expectedRevision: inLibrary ? knownRevision : null
 			});
 			if (!saved.ok) {
-				problem = saved.error;
+				problem = { error: saved.error };
 				return;
 			}
 			onsaved(
@@ -249,7 +258,7 @@
 		const answer = await suggestFill({ target: 'character', draft, dials: $form.dials, context });
 		filling = false;
 		if (!answer.ok) {
-			problem = answer.error;
+			problem = answer;
 			return;
 		}
 		// Only the empty fields: never over what was written.
@@ -282,7 +291,7 @@
 		const answer = await castingEdit.write(actor, $form.casting.partId);
 		writing = false;
 		if (!answer.ok) {
-			problem = answer.error;
+			problem = answer;
 			return;
 		}
 		$form.casting = {
@@ -319,6 +328,7 @@
 
 {#snippet textField(field: CharacterTextField)}
 	<DaydreamChipField
+		{debug}
 		label={CHARACTER_FIELD_LABELS[field].label}
 		hint={CHARACTER_FIELD_LABELS[field].hint}
 		value={$form[field]}
@@ -377,6 +387,7 @@
 				{/if}
 				{#each ['relationship', 'part'] as const as field (field)}
 					<DaydreamChipField
+		{debug}
 						label={CASTING_FIELD_LABELS[field].label}
 						hint={CASTING_FIELD_LABELS[field].hint}
 						value={$form.casting[field]}
@@ -472,7 +483,7 @@
 			</p>
 		{/if}
 
-		{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
+		{#if problem}<SuggestionProblem {problem} {debug} />{/if}
 
 		<div class="buttons">
 			<wa-button appearance="plain" onclick={close}>Cancel</wa-button>

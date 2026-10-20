@@ -29,6 +29,7 @@ import {
 } from '../daydream';
 import { CHARACTER_TEMPLATES, SCENE_TEMPLATES } from './catalog';
 import type { SuggestedPart } from './suggestions';
+import { type MarkedSummary, parseMarkedSummary } from './summary';
 
 /** One person in a story described in pieces, and who they are in it. */
 export type StoryCast = {
@@ -46,6 +47,12 @@ export type StoryPieces = {
 	voice: DaydreamVoicePresetId | null;
 	scene: Omit<DaydreamScene, 'parts'> & { parts: readonly SuggestedPart[] };
 	cast: readonly StoryCast[];
+	/**
+	 * The model's summary of it, with its blanks marked; none for a
+	 * ready-made story, whose premise is shown instead. Only for showing the
+	 * draft: it is not part of the setup.
+	 */
+	summary?: MarkedSummary | null;
 };
 
 /**
@@ -116,6 +123,13 @@ export type DaydreamStarter = {
 	voice: DaydreamVoicePresetId;
 	/** A `SCENE_TEMPLATES` id. */
 	scene: string;
+	/**
+	 * What the setup form shows it as, written like the model's summary of a
+	 * daydream it put together (`parseMarkedSummary`): the first mention of
+	 * the scene, the heat, how it is told and each character marked as
+	 * `[[key|words]]`, each character by their template's name.
+	 */
+	summary: string;
 	cast: readonly {
 		/** A `CHARACTER_TEMPLATES` id. */
 		character: string;
@@ -134,6 +148,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['friends to lovers', 'slow burn', 'one bed'],
 		voice: 'talk',
 		scene: 'one-bed',
+		summary:
+			'[[scene|Snowed in at a lodge with your best friend, and only one bed]]. [[Robin|Robin]] insists the bed is fine, and is lying about why they booked it, after ten years of things neither of you has said: a [[heat|SFW]] slow burn. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'best-friend',
@@ -149,6 +165,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['strangers', 'masks', 'teasing'],
 		voice: 'talk',
 		scene: 'masquerade',
+		summary:
+			'[[scene|A masquerade, a dare, and a stranger with no name]]. [[Jules|The stranger in the mask]] has watched you all night and finally makes a move, for a [[heat|flirty]] evening behind the masks. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'tease',
@@ -164,6 +182,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['boss', 'office', 'punishment'],
 		voice: 'talk',
 		scene: 'after-hours',
+		summary:
+			'[[scene|Kept late in the empty office after you botched the presentation]]. [[Lady Vale|Lady Vale]], your boss, has a [[heat|steamy]] punishment in mind for you to make up for it. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'boss',
@@ -179,6 +199,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['training', 'rules', 'obedience', 'being watched'],
 		voice: 'rules',
 		scene: 'facility',
+		summary:
+			'[[scene|A test at a training facility, under rules you don’t know yet]]. [[Mara|Mara]], your instructor, runs it by the book: a [[heat|steamy]] trial of obedience, endurance and being watched. It’s told [[voice|as a system’s orders to you]].',
 		cast: [
 			{
 				character: 'mentor',
@@ -194,6 +216,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['training', 'rules', 'obedience', 'watching'],
 		voice: 'talk',
 		scene: 'your-assessment',
+		summary:
+			'[[scene|You run the assessment at a training facility]]. [[Remy|Remy]] is the trainee, standing at the line and not yet knowing the rules, and it is a [[heat|steamy]] test of obedience, endurance and being watched. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'eager-sub',
@@ -209,6 +233,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['boss', 'punishment', 'eager to please'],
 		voice: 'talk',
 		scene: 'your-office',
+		summary:
+			'[[scene|Your new hire, kept late in your office after botching the presentation]]. [[Remy|Remy]] stands in front of your desk, waiting to hear how they will make up for it, and you have a [[heat|steamy]] punishment in mind. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'eager-sub',
@@ -224,6 +250,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['enemies to lovers', 'hate sex'],
 		voice: 'talk',
 		scene: 'rivals',
+		summary:
+			'[[scene|Rivals forced to work together overnight in an empty office]]. [[Dex|Dex]], your nemesis at work, picks one fight too many, and it turns into [[heat|explicit]] hate sex. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'rival',
@@ -239,6 +267,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['brat', 'humiliation', 'losing a bet'],
 		voice: 'talk',
 		scene: 'lost-bet',
+		summary:
+			'[[scene|A bet you lost, and the evening you promised to give up]]. [[Kit|Kit]], your housemate, means to be insufferable about collecting, one [[heat|explicit]] demand at a time. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'brat',
@@ -254,6 +284,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['brat', 'humiliation', 'winning a bet'],
 		voice: 'talk',
 		scene: 'won-bet',
+		summary:
+			'[[scene|A bet you won, and the evening they promised to give up]]. [[Kit|Kit]], your housemate, is already arguing about the terms as you collect, one [[heat|explicit]] demand at a time. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'brat',
@@ -269,6 +301,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['yandere', 'stalker', 'possessive'],
 		voice: 'told',
 		scene: 'admirer',
+		summary:
+			'[[scene|Tonight the admirer who has been watching you finally lets you see them]]. [[Ivy|Ivy]] has noticed everything about you, and is waiting in the dark of your apartment for an [[heat|explicit]] first meeting. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'admirer',
@@ -284,6 +318,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['yandere', 'obsession', 'possessive'],
 		voice: 'told',
 		scene: 'your-obsession',
+		summary:
+			'[[scene|After months of notes, gifts and watching, tonight you let them see you]]. [[Ellis|Ellis]] is pretending to sleep in their apartment, waiting for an [[heat|explicit]] night. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'innocent',
@@ -299,6 +335,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['demon', 'corruption', 'a deal'],
 		voice: 'talk',
 		scene: 'summoning',
+		summary:
+			'[[scene|A deal with a demon: your wish granted, paid for with your body]]. [[Nyx|Nyx]] steps out of the candlelit circle to collect, and the price is [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'demon',
@@ -314,6 +352,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['demon', 'corruption', 'a deal'],
 		voice: 'talk',
 		scene: 'summoned',
+		summary:
+			'[[scene|Summoned by a mortal for a wish, and the price you name is their body]]. [[Ellis|Ellis]] trembles at the edge of the candlelit circle, wish already spoken, as you collect in [[heat|explicit]] detail. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'innocent',
@@ -329,6 +369,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['brat taming', 'spanking', 'discipline'],
 		voice: 'talk',
 		scene: 'brat-taming',
+		summary:
+			'[[scene|Your brat has pushed all week, and tonight you stop letting it slide]]. [[Kit|Kit]] rolls their eyes at your rules one more time, and every consequence is [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'brat',
@@ -344,6 +386,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['brat taming', 'spanking', 'discipline'],
 		voice: 'talk',
 		scene: 'tamed',
+		summary:
+			'[[scene|You have pushed your dom all week, and tonight they stop letting it slide]]. [[Mara|Mara]] calmly lists everything you did, and every consequence is [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'mentor',
@@ -359,6 +403,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['chastity', 'orgasm denial', 'begging'],
 		voice: 'talk',
 		scene: 'the-key',
+		summary:
+			'[[scene|Three weeks of keeping your partner locked in chastity, with the key around your neck]]. [[Vic|Vic]] kneels and asks very nicely, and you decide how [[heat|explicit]] tonight gets. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'masochist',
@@ -374,6 +420,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['pet play', 'collar and leash', 'training'],
 		voice: 'talk',
 		scene: 'new-pet',
+		summary:
+			'[[scene|A weekend with your partner as your pet: a collar, a leash, a bowl, and no words allowed]]. [[Remy|Remy]] waits by the door with the leash in their mouth, and the weekend ahead is [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'eager-sub',
@@ -389,6 +437,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['chastity', 'orgasm denial', 'begging'],
 		voice: 'talk',
 		scene: 'locked',
+		summary:
+			'[[scene|A month locked in chastity, and the keyholder decides when, if ever, you come]]. [[Sloane|Sloane]], your partner, checks the lock and asks how desperate you are, and the wait is [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'keyholder',
@@ -404,6 +454,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['pet play', 'collar and leash', 'no talking'],
 		voice: 'talk',
 		scene: 'good-pet',
+		summary:
+			'[[scene|A weekend as their pet: a collar, a leash, a bowl, and no words allowed]]. [[Marlowe|Marlowe]], your owner, clips on the leash, and the weekend ahead is [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'pet-owner',
@@ -419,6 +471,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['hypnosis', 'trigger words', 'mind control'],
 		voice: 'talk',
 		scene: 'trigger-words',
+		summary:
+			'[[scene|Months of conditioning you agreed to, and tonight the trigger words begin]]. [[Silas|Silas]], your partner, says the first one in a dim room, and you go under, into something [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'hypnotist',
@@ -434,6 +488,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['hypnosis', 'trigger words', 'mind control'],
 		voice: 'talk',
 		scene: 'your-subject',
+		summary:
+			'[[scene|Months of conditioning they asked for, and tonight you start using the trigger words]]. [[Remy|Remy]], your partner, settles into the chair and goes under, into something [[heat|explicit]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'eager-sub',
@@ -449,6 +505,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['hookup', 'no strings'],
 		voice: 'told',
 		scene: 'hotel-room',
+		summary:
+			'[[scene|A hookup in a hotel room, with no names and no pretending]]. [[Tess|Tess]], someone you met online, is already there when you arrive, and it gets [[heat|filthy]]. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'neighbour',
@@ -464,6 +522,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['breeding', 'werewolf', 'primal', 'size difference'],
 		voice: 'told',
 		scene: 'mating-season',
+		summary:
+			'[[scene|Their rut, a cabin in the woods, and a full moon]]. [[Rhys|Rhys]], your mate, has waited all day to breed you before morning, as many [[heat|filthy]] times as it takes. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'beast',
@@ -479,6 +539,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['breeding', 'werewolf', 'primal', 'size difference'],
 		voice: 'told',
 		scene: 'your-rut',
+		summary:
+			'[[scene|Your rut, a cabin in the woods, and a full moon]]. [[Remy|Remy]], your mate, waits on the bed, already shaking, and you mean to breed them before morning, as many [[heat|filthy]] times as it takes. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'eager-sub',
@@ -494,6 +556,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['threesome', 'sharing', 'praise'],
 		voice: 'talk',
 		scene: 'threesome',
+		summary:
+			'[[scene|The threesome you finally said yes to, at home]]. [[Sam|Sam]], your partner, set the night up and talks you through it, while [[Tess|Tess]], the guest Sam chose, cannot keep their hands off you: a [[heat|filthy]] night. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'gentle-dom',
@@ -515,6 +579,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['threesome', 'sharing', 'praise'],
 		voice: 'talk',
 		scene: 'sharing-them',
+		summary:
+			'[[scene|A guest for the night, there to be shared by you and your partner]]. [[Tess|Tess]] is already undressing [[Remy|Remy]], who cannot believe their luck, at the start of a [[heat|filthy]] night. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'neighbour',
@@ -536,6 +602,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['cuckolding', 'made to watch', 'humiliation'],
 		voice: 'talk',
 		scene: 'hotwife',
+		summary:
+			'[[scene|Your partner has brought someone home, and you are only allowed to watch]]. From the chair at the foot of the bed, you see [[Jules|Jules]] with [[Dex|Dex]], who makes sure you see every [[heat|filthy]] second. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'tease',
@@ -557,6 +625,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['cuckolding', 'the bull', 'humiliation'],
 		voice: 'talk',
 		scene: 'the-bull',
+		summary:
+			'[[scene|A couple’s invitation: one of them is yours, and the other only watches]]. [[Jules|Jules]] pulls you onto the bed, and [[Remy|Remy]], their partner, watches every [[heat|filthy]] second from the chair. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'tease',
@@ -578,6 +648,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['CNC', 'primal', 'chase'],
 		voice: 'told',
 		scene: 'hunt',
+		summary:
+			'[[scene|A chase through a moonlit forest, agreed beforehand, with a safeword to stop it]]. [[Rhys|Rhys]], your partner, counts down your head start, and once you are caught you are theirs, for something [[heat|filthy]]. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'beast',
@@ -593,6 +665,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['CNC', 'primal', 'chase'],
 		voice: 'told',
 		scene: 'your-hunt',
+		summary:
+			'[[scene|A chase through a moonlit forest, agreed beforehand, with a safeword to stop it]]. [[Sasha|Sasha]], your partner, is already running, and once you catch them they are yours, for something [[heat|filthy]]. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'struggler',
@@ -608,6 +682,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['free use', 'CNC', 'objectification'],
 		voice: 'told',
 		scene: 'free-use',
+		summary:
+			'[[scene|A shared house where you are free use, any time, anywhere, until your safeword]]. [[Tess|Tess]] bends you over the kitchen counter without a word, while [[Jules|Jules]] waits their turn, not patiently, for something [[heat|filthy]]. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'neighbour',
@@ -629,6 +705,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['anal only', 'plugs', 'anal training'],
 		voice: 'talk',
 		scene: 'anal-only',
+		summary:
+			'[[scene|An anal-only arrangement, with the rules on the fridge]]. [[Jax|Jax]], your partner, checks your plug and brings out the next size up, for a [[heat|filthy]] day of training. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'anal-trainer',
@@ -644,6 +722,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['gangbang', 'group', 'degradation'],
 		voice: 'told',
 		scene: 'gangbang',
+		summary:
+			'[[scene|A gangbang you signed up for: a room full of strangers and a count to reach]]. [[Tess|Tess]] keeps the count, and [[Rhys|Rhys]] is first in line, not waiting, for a [[heat|filthy]] night where nobody leaves early. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'neighbour',
@@ -665,6 +745,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['gangbang', 'group', 'degradation'],
 		voice: 'told',
 		scene: 'the-organiser',
+		summary:
+			'[[scene|A gangbang you organise: you booked the room, and you keep the count]]. [[Vic|Vic]] is on the bed, counting the people in the room, and [[Rhys|Rhys]] is first in line, for a [[heat|filthy]] night. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'masochist',
@@ -686,6 +768,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['CNC', 'home invasion', 'struggle', 'rough sex'],
 		voice: 'told',
 		scene: 'break-in',
+		summary:
+			'[[scene|A home invasion you scripted together weeks ago, with a safeword to stop it]]. [[Cole|Cole]], your partner playing a stranger, is already inside when you get home after dark, and you fight back, for something [[heat|filthy]]. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'intruder',
@@ -701,6 +785,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['captive', 'interrogation', 'forced orgasms', 'overstimulation'],
 		voice: 'talk',
 		scene: 'interrogation',
+		summary:
+			'[[scene|Captured behind enemy lines, and questioned in a holding cell]]. [[Hale|Hale]], the officer who caught you, pulls up a chair: they want a name, and have all night and [[heat|filthy]] means to get it. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'interrogator',
@@ -716,6 +802,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['free use', 'CNC', 'objectification'],
 		voice: 'talk',
 		scene: 'house-rules',
+		summary:
+			'[[scene|A shared house where your housemate is free use, any time, anywhere, until their safeword]]. [[Remy|Remy]] is washing up and pretending not to notice you come in, for something [[heat|filthy]]. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'eager-sub',
@@ -731,6 +819,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['anal only', 'plugs', 'anal training'],
 		voice: 'talk',
 		scene: 'training-them',
+		summary:
+			'[[scene|An anal-only arrangement you run, with your rules on the fridge]]. [[Kit|Kit]], your partner, complains about the next size up and bends over anyway, for a [[heat|filthy]] day of training. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'brat',
@@ -746,6 +836,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['CNC', 'home invasion', 'struggle', 'rough sex'],
 		voice: 'told',
 		scene: 'your-break-in',
+		summary:
+			'[[scene|A home invasion you scripted together weeks ago, with a safeword to stop it]]. You are already inside when [[Sasha|Sasha]], your partner, gets home after dark, and they fight back, for something [[heat|filthy]]. It’s told [[voice|to you by a narrator]].',
 		cast: [
 			{
 				character: 'struggler',
@@ -761,6 +853,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['captive', 'interrogation', 'pain', 'overstimulation'],
 		voice: 'talk',
 		scene: 'your-captive',
+		summary:
+			'[[scene|A spy caught behind your lines, chained in a holding cell]]. [[Vic|Vic]] spits at you: you want a name, and you have all night and [[heat|filthy]] means to get it. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'masochist',
@@ -776,6 +870,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['being used', 'impact play', 'sadism', 'group'],
 		voice: 'talk',
 		scene: 'dungeon',
+		summary:
+			'[[scene|A night of being used at a play party in a dungeon]]. [[Corin|Corin]], the host, presents you to the room, and [[Jules|Jules]] is first in line, for a [[heat|filthy]] night with nothing off the table but your limits. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'sadist',
@@ -797,6 +893,8 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		tags: ['being used', 'impact play', 'sadism', 'group'],
 		voice: 'talk',
 		scene: 'your-party',
+		summary:
+			'[[scene|A play party you host in a dungeon, with tonight’s toy yours to use and hand out]]. [[Vic|Vic]] kneels in the middle of the room, and [[Jules|Jules]] is first in line, for a [[heat|filthy]] night within their limits. It’s told [[voice|in the characters’ own words, with no narrator]].',
 		cast: [
 			{
 				character: 'masochist',
@@ -911,4 +1009,15 @@ export function starterSetup(starter: DaydreamStarter, newId?: () => string): Da
 		return { character: template.character, partName: part, relationship, doing };
 	});
 	return assembleSetup({ voice: starter.voice, scene: starterScene(starter).scene, cast }, newId);
+}
+
+/** A ready-made story's summary, read against the setup it makes (`starterSetup`). */
+export function starterSummary(
+	starter: DaydreamStarter,
+	setup: Pick<DaydreamSetup, 'characters'>
+): MarkedSummary | null {
+	return parseMarkedSummary(
+		starter.summary,
+		setup.characters.map((character) => character.name)
+	);
 }

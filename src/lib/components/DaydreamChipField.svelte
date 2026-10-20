@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { hasChip, mergeChips, toggleChip } from '$lib/daydream/chips';
+	import type { SuggestFailure } from '$lib/daydream/suggest';
+	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/**
 	 * A free-text field with suggestions under it. The text is the truth: a
@@ -16,7 +18,8 @@
 		chips,
 		rows = 2,
 		onchange,
-		onMoreIdeas
+		onMoreIdeas,
+		debug = false
 	}: {
 		label: string;
 		hint: string;
@@ -27,13 +30,15 @@
 		onchange: (text: string) => void;
 		/** Asks for more chips, answering them or why there are none; absent when suggestions are off. */
 		onMoreIdeas?:
-			| (() => Promise<{ ok: true; value: string[] } | { ok: false; error: string }>)
+			| (() => Promise<{ ok: true; value: string[] } | ({ ok: false } & SuggestFailure)>)
 			| undefined;
+		/** Debug mode: a failure shows what came back. */
+		debug?: boolean;
 	} = $props();
 
 	let extra: string[] = $state([]);
 	let asking = $state(false);
-	let problem: string | null = $state(null);
+	let problem: SuggestFailure | null = $state(null);
 
 	const shown = $derived(mergeChips(chips, extra));
 	const id = $props.id();
@@ -49,7 +54,7 @@
 		if (answer.ok) {
 			extra = mergeChips(extra, answer.value);
 		} else {
-			problem = answer.error;
+			problem = answer;
 		}
 	}
 </script>
@@ -88,7 +93,7 @@
 			{/if}
 		</div>
 	{/if}
-	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
+	{#if problem}<SuggestionProblem {problem} {debug} />{/if}
 </div>
 
 <style>
@@ -151,10 +156,5 @@
 			outline: var(--wa-focus-ring);
 			outline-offset: var(--wa-focus-ring-offset);
 		}
-	}
-
-	.invalid {
-		margin: 0;
-		color: var(--wa-color-text-danger);
 	}
 </style>

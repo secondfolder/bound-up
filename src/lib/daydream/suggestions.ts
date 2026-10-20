@@ -26,6 +26,7 @@ import {
 } from '../daydream';
 import { unfence } from './reply-format';
 import type { StarterSide, StoryCast, StoryPieces } from './starters';
+import { parseMarkedSummary } from './summary';
 
 export type SuggestTask =
 	| 'chips'
@@ -69,19 +70,45 @@ const envelopeSchema = z.object({
 	choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1)
 });
 
+/** The model's reply in a non-streamed completion, as it wrote it, or null for no completion. */
+export function completionText(body: unknown): string | null {
+	const envelope = envelopeSchema.safeParse(body);
+	return envelope.success ? (envelope.data.choices[0]?.message.content ?? null) : null;
+}
+
 /** The JSON inside a non-streamed completion, or null. Tolerates a code fence around it. */
 export function completionJson(body: unknown): unknown {
-	const envelope = envelopeSchema.safeParse(body);
-	if (!envelope.success) {
+	const content = completionText(body)?.trim();
+	if (content === undefined) {
 		return null;
 	}
-	const content = envelope.data.choices[0]?.message.content.trim() ?? '';
-	const unfenced = unfence(content);
 	try {
-		return JSON.parse(unfenced);
+		return JSON.parse(unfence(content));
 	} catch {
 		return null;
 	}
+}
+
+/** The most of a reply debug mode is shown: enough to see what went wrong. */
+export const MAX_REPLY_DETAIL = 8000;
+
+/**
+ * Why an answer with nothing usable in it had nothing, and what it was, for
+ * debug mode (docs/debug-mode.md): not a completion at all, a reply that was
+ * not JSON, or JSON in which nothing was what the prompt asked for. Users
+ * only ever see "No ideas came back"; this is for whoever is working out why.
+ */
+export function describeUnusable(body: unknown): string {
+	const content = completionText(body);
+	const cut = (text: string) =>
+		text.length > MAX_REPLY_DETAIL ? `${text.slice(0, MAX_REPLY_DETAIL)}\n… (cut)` : text;
+	if (content === null) {
+		return `The provider’s answer had no reply in it:\n${cut(JSON.stringify(body, null, 2) ?? String(body))}`;
+	}
+	if (completionJson(body) === null) {
+		return `The reply was not JSON:\n${cut(content)}`;
+	}
+	return `The reply was JSON, but nothing in it was what was asked for, or within its limits:\n${cut(content)}`;
 }
 
 /** More chips for one field: trimmed, capped, de-duplicated, empties dropped. */
@@ -252,8 +279,10 @@ const VOICE_IDS = ['talk', 'told', 'watch', 'rules'] as const;
 /**
  * A whole daydream from a `daydream` answer, written from a sentence the
  * user typed: its voice, its scene and who is in it, in pieces for
- * `assembleSetup` (`starters.ts`) to put together. Null without a scene that
- * has the two fields a scene must have.
+ * `assembleSetup` (`starters.ts`) to put together, and the summary the form
+ * shows it as (`parseMarkedSummary`). Null without a scene that has the two
+ * fields a scene must have; a summary that cannot be read is only none, and
+ * the scene's premise is shown in its place.
  *
  * Lenient like the rest: a voice that is not one of the four is left to
  * follow who is in it, a person with no name is dropped, and every field is
@@ -295,7 +324,12 @@ export function parseSuggestedDaydream(value: unknown): StoryPieces | null {
 			doing: capped(person.doing, DAYDREAM_LIMITS.castPart)
 		});
 	}
-	return { voice, scene, cast: cast.slice(0, MAX_DAYDREAM_CHARACTERS) };
+	const kept = cast.slice(0, MAX_DAYDREAM_CHARACTERS);
+	const summary = parseMarkedSummary(
+		answer.summary,
+		kept.map((person) => person.character.name)
+	);
+	return { voice, scene, cast: kept, summary };
 }
 
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();

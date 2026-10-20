@@ -249,6 +249,18 @@ describe('buildSuggestMessages, a whole daydream', () => {
 		expect(maxTokens).toBeGreaterThan(1000);
 	});
 
+	it('asks for a summary with its blanks marked, and none of them forced in', () => {
+		const ask = buildSuggestMessages(daydream).messages[1]?.content ?? '';
+		expect(ask).toContain('"summary"');
+		for (const marker of ['[[scene|', '[[heat|', '[[voice|', '[[Name|']) {
+			expect(ask).toContain(marker);
+		}
+		expect(ask).toContain('suggestions, not a template');
+		// The story as a whole first, and how it is told in the form's own words.
+		expect(ask).toContain('one tight sentence that gives the whole story');
+		expect(ask).toContain('"It’s told [[voice|in the characters’ own words, with no narrator]]."');
+	});
+
 	it('accepts a sentence within its cap, and refuses an empty or a long one', () => {
 		expect(suggestRequestSchema.safeParse(daydream).success).toBe(true);
 		expect(suggestRequestSchema.safeParse({ ...daydream, idea: '   ' }).success).toBe(false);

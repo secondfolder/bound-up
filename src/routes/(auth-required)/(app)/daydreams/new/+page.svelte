@@ -4,20 +4,23 @@
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import SuggestionProblem from '$lib/components/SuggestionProblem.svelte';
 	import type { DaydreamSetup } from '$lib/daydream';
 	import {
 		assembleSetup,
 		type StarterSide,
 		starterSetup,
+		starterSummary,
 		storedStarterSide
 	} from '$lib/daydream/starters';
-	import { suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
+	import { type SuggestFailure, suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
 	import {
 		addIdeas,
 		type GeneratedIdea,
 		ideaSentence,
 		MAX_OFFERED_IDEAS
 	} from '$lib/daydream/suggestions';
+	import type { MarkedSummary } from '$lib/daydream/summary';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -33,7 +36,9 @@
 		| {
 				kind: 'setup';
 				draft: DaydreamSetup | null;
-				layout: 'sentence' | 'full';
+				/** The model's summary of the draft; null for a ready-made one, or none to read. */
+				summary: MarkedSummary | null;
+				layout: 'summary' | 'full';
 				/** What the model wrote it from, so "Try another" can ask again; null for none. */
 				described: Described | null;
 				version: number;
@@ -50,10 +55,10 @@
 	const { starterOrder } = data;
 	let side: StarterSide | null = $state(null);
 	let asking = $state(false);
-	let problem: string | null = $state(null);
+	let problem: SuggestFailure | null = $state(null);
 	let generated: { request: string; ideas: readonly GeneratedIdea[] } | null = $state(null);
 	let writing: string | null = $state(null);
-	let ideaProblem: string | null = $state(null);
+	let ideaProblem: SuggestFailure | null = $state(null);
 	let versions = 0;
 	/** Counts draft requests, so only the latest one still wanted is applied. */
 	let requests = 0;
@@ -87,12 +92,17 @@
 
 	const suggestionsOn = $derived(data.accepted && data.available);
 
-	function setUp(draft: DaydreamSetup | null, described: Described | null) {
+	function setUp(
+		draft: DaydreamSetup | null,
+		described: Described | null,
+		summary: MarkedSummary | null = null
+	) {
 		versions += 1;
 		stage = {
 			kind: 'setup',
 			draft,
-			layout: draft ? 'sentence' : 'full',
+			summary,
+			layout: draft ? 'summary' : 'full',
 			described,
 			version: versions
 		};
@@ -108,8 +118,8 @@
 	async function writeDraft(
 		described: Described,
 		limits = '',
-		failed: (error: string) => void = (error) => {
-			problem = error;
+		failed: (failure: SuggestFailure) => void = (failure) => {
+			problem = failure;
 		}
 	) {
 		requests += 1;
@@ -127,10 +137,10 @@
 		asking = false;
 		writing = null;
 		if (!answer.ok) {
-			failed(answer.error);
+			failed(answer);
 			return;
 		}
-		setUp({ ...assembleSetup(answer.value), limits }, described);
+		setUp({ ...assembleSetup(answer.value), limits }, described, answer.value.summary ?? null);
 	}
 
 	/**
@@ -138,10 +148,10 @@
 	 * the side chosen under "You as". They replace the last ones, and are kept here so going
 	 * back to the ways in still shows them.
 	 */
-	async function generateIdeas(request: string): Promise<string | null> {
+	async function generateIdeas(request: string): Promise<SuggestFailure | null> {
 		const answer = await suggestIdeas({ request, side, limits: '' });
 		if (!answer.ok) {
-			return answer.error;
+			return answer;
 		}
 		generated = { request, ideas: answer.value };
 		ideaProblem = null;
@@ -153,7 +163,7 @@
 	 * after the ones shown. The model is told which it already offered; any it
 	 * repeats anyway are dropped, and only repeats is said as nothing new.
 	 */
-	async function moreIdeas(): Promise<string | null> {
+	async function moreIdeas(): Promise<SuggestFailure | null> {
 		if (!generated) {
 			return null;
 		}
@@ -169,11 +179,11 @@
 			return null;
 		}
 		if (!answer.ok) {
-			return answer.error;
+			return answer;
 		}
 		const added = addIdeas(shown.ideas, answer.value);
 		if (added.length === shown.ideas.length) {
-			return 'No new ideas came back that time. Try again.';
+			return { error: 'No new ideas came back that time. Try again.' };
 		}
 		generated = { request: shown.request, ideas: added };
 		return null;
@@ -183,8 +193,8 @@
 		writing = chosen.title;
 		// The idea's own side, which is the one it was asked for unless it
 		// has no one in charge.
-		writeDraft({ idea: ideaSentence(chosen), side: chosen.you }, '', (error) => {
-			ideaProblem = error;
+		writeDraft({ idea: ideaSentence(chosen), side: chosen.you }, '', (failure) => {
+			ideaProblem = failure;
 		});
 	}
 </script>
@@ -212,8 +222,12 @@
 				{generated}
 				{writing}
 				{ideaProblem}
+				debug={data.debug}
 				ondescribe={() => writeDraft({ idea, side })}
-				onstarter={(starter) => setUp(starterSetup(starter), null)}
+				onstarter={(starter) => {
+					const draft = starterSetup(starter);
+					setUp(draft, null, starterSummary(starter, draft));
+				}}
 				ongenerate={generateIdeas}
 				onmore={moreIdeas}
 				onclear={() => {
@@ -241,11 +255,12 @@
 				<wa-icon slot="start" name="arrow-left" variant="solid"></wa-icon>
 				Other ways to start
 			</wa-button>
-			{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
+			{#if problem}<SuggestionProblem {problem} debug={data.debug} />{/if}
 			{#key stage.version}
 				<DaydreamSetupForm
 					setupForm={data.setupForm}
 					draft={stage.draft}
+					summary={stage.summary}
 					layout={stage.layout}
 					onretry={stage.described
 						? (limits) => {
@@ -259,6 +274,7 @@
 					{suggestionsOn}
 					picturesAvailable={data.picturesAvailable}
 					submitLabel="Start daydreaming"
+					debug={data.debug}
 				/>
 			{/key}
 		{/if}
@@ -283,10 +299,5 @@
 
 	.back {
 		align-self: flex-start;
-	}
-
-	.invalid {
-		margin: 0;
-		color: var(--wa-color-text-danger);
 	}
 </style>

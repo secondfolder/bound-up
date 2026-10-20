@@ -20,6 +20,7 @@ import { requestSuggestion } from './client';
 import type { StarterSide, StoryPieces } from './starters';
 import {
 	completionJson,
+	describeUnusable,
 	type GeneratedIdea,
 	parseCasting,
 	parseChips,
@@ -41,14 +42,31 @@ export type SuggestContext = {
 	story?: StoryDials;
 };
 
-type Answer<T> = { ok: true; value: T } | { ok: false; error: string };
+/**
+ * Why a suggestion failed: words for the person who asked, and for debug mode
+ * what came back, when the model answered with nothing usable
+ * (`SuggestionProblem.svelte`).
+ */
+export type SuggestFailure = { error: string; detail?: string };
+
+type Answer<T> = { ok: true; value: T } | ({ ok: false } & SuggestFailure);
 
 const NOTHING = 'No ideas came back that time. Try again.';
 
-async function ask(body: unknown): Promise<Answer<unknown>> {
+/** The model's answer: the JSON in its reply, and the answer as it came, to describe if it is no use. */
+async function ask(
+	body: unknown
+): Promise<{ ok: true; value: unknown; body: unknown } | ({ ok: false } & SuggestFailure)> {
 	const answer = await requestSuggestion(body);
-	return answer.ok ? { ok: true, value: completionJson(answer.value) } : answer;
+	return answer.ok ? { ok: true, value: completionJson(answer.value), body: answer.value } : answer;
 }
+
+/** "No ideas came back", with what did come back for debug mode. */
+const nothing = (answer: { body: unknown }): { ok: false } & SuggestFailure => ({
+	ok: false,
+	error: NOTHING,
+	detail: describeUnusable(answer.body)
+});
 
 /** A scene's parts as a suggestion is told them: no ids, which mean nothing to the model. */
 type PartsDraft = Pick<ScenePart, 'name' | 'description'>[];
@@ -73,7 +91,7 @@ export async function suggestChips(input: {
 		return answer;
 	}
 	const chips = parseChips(answer.value);
-	return chips.length > 0 ? { ok: true, value: chips } : { ok: false, error: NOTHING };
+	return chips.length > 0 ? { ok: true, value: chips } : nothing(answer);
 }
 
 /**
@@ -104,7 +122,7 @@ export async function suggestFill(input: {
 		input.target === 'scene' ? parseSceneDials(answer.value) : { heat: null, kink: null };
 	return Object.keys(fields).length > 0 || parts.length > 0
 		? { ok: true, value: { fields, parts, sceneDials } }
-		: { ok: false, error: NOTHING };
+		: nothing(answer);
 }
 
 /** Who a character is in this story, written from them and the scene. */
@@ -121,7 +139,7 @@ export async function suggestCasting(input: {
 		return answer;
 	}
 	const casting = parseCasting(answer.value);
-	return casting ? { ok: true, value: casting } : { ok: false, error: NOTHING };
+	return casting ? { ok: true, value: casting } : nothing(answer);
 }
 
 /** A name for a daydream, from its scene and how it opened. */
@@ -136,7 +154,7 @@ export async function suggestName(input: {
 		return answer;
 	}
 	const name = parseName(answer.value);
-	return name ? { ok: true, value: name } : { ok: false, error: NOTHING };
+	return name ? { ok: true, value: name } : nothing(answer);
 }
 
 /** A whole scene, made up. `sceneDials` are any heat and kink already chosen, for it to fit. */
@@ -155,7 +173,7 @@ export async function surpriseScene(
 		return answer;
 	}
 	const scene = parseSurpriseScene(answer.value);
-	return scene ? { ok: true, value: scene } : { ok: false, error: NOTHING };
+	return scene ? { ok: true, value: scene } : nothing(answer);
 }
 
 /**
@@ -174,7 +192,7 @@ export async function suggestDaydream(input: {
 		return answer;
 	}
 	const pieces = parseSuggestedDaydream(answer.value);
-	return pieces ? { ok: true, value: pieces } : { ok: false, error: NOTHING };
+	return pieces ? { ok: true, value: pieces } : nothing(answer);
 }
 
 /**
@@ -196,5 +214,5 @@ export async function suggestIdeas(input: {
 		return answer;
 	}
 	const ideas = parseGeneratedIdeas(answer.value, input.side);
-	return ideas.length > 0 ? { ok: true, value: ideas } : { ok: false, error: NOTHING };
+	return ideas.length > 0 ? { ok: true, value: ideas } : nothing(answer);
 }

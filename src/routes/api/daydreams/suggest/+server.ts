@@ -3,6 +3,7 @@ import { readDaydreamConfig } from '$lib/server/daydream/config';
 import { daydreamGuard } from '$lib/server/daydream/guard';
 import { buildSuggestMessages, suggestRequestSchema } from '$lib/server/daydream/suggest-prompt';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
+import { userHasFeature } from '$lib/server/features';
 import { rateLimitMessage } from '$lib/server/rate-limit';
 import type { RequestHandler } from './$types';
 
@@ -71,20 +72,50 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 			}),
 			signal: request.signal
 		});
-	} catch {
+	} catch (cause) {
 		// Not the error itself, for the reason the reply endpoint gives.
 		console.error('[daydreams] the model provider could not be reached for a suggestion');
-		error(502, 'No suggestions just now. Try again in a moment.');
+		return unavailable(
+			locals.db,
+			userId,
+			`The model provider could not be reached: ${cause instanceof Error ? cause.message : String(cause)}`
+		);
 	}
 
 	if (!(upstream.ok && upstream.body)) {
 		// The status only. The body of an error can quote the request back.
 		console.error(`[daydreams] the model provider answered ${upstream.status} to a suggestion`);
-		await upstream.body?.cancel();
-		error(502, 'No suggestions just now. Try again in a moment.');
+		const body = await upstream.text().catch(() => '');
+		return unavailable(
+			locals.db,
+			userId,
+			`The model provider answered ${upstream.status}:\n${body.slice(0, MAX_FAILURE_DETAIL) || '(nothing)'}`
+		);
 	}
 
 	return new Response(upstream.body, {
 		headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
 	});
 };
+
+/** The most of a provider's error passed on to debug mode. */
+const MAX_FAILURE_DETAIL = 4000;
+
+/**
+ * "No suggestions just now", and for an account holding debug mode what went
+ * wrong with the provider, for `SuggestionProblem` to show (docs/debug-mode.md).
+ * Only to that account: the provider's error can quote the request back,
+ * which is the user's own text and theirs to see, but it is detail nobody
+ * else's page has any use for. The feature is what decides, not the device's
+ * debug switch, which only decides what is shown. Never logged.
+ */
+async function unavailable(db: App.Locals['db'], userId: string, detail: string) {
+	const debug = await userHasFeature(db, userId, 'debugMode');
+	return new Response(
+		JSON.stringify({
+			message: 'No suggestions just now. Try again in a moment.',
+			...(debug ? { detail } : {})
+		}),
+		{ status: 502, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } }
+	);
+}

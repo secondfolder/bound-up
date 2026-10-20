@@ -11,9 +11,11 @@
 		starterScene,
 		startersFor
 	} from '$lib/daydream/starters';
+	import type { SuggestFailure } from '$lib/daydream/suggest';
 	import type { GeneratedIdea } from '$lib/daydream/suggestions';
 	import DaydreamSidePicker from './DaydreamSidePicker.svelte';
 	import SearchField from './SearchField.svelte';
+	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/**
 	 * The ways into a new daydream, friendliest first: describe it in a
@@ -47,7 +49,8 @@
 		onmore,
 		onclear,
 		onidea,
-		onblank
+		onblank,
+		debug = false
 	}: {
 		/** What the user has written, kept by the page so it survives going back. */
 		idea: string;
@@ -59,29 +62,31 @@
 		starterOrder: readonly string[];
 		asking: boolean;
 		/** Why the last description came back with nothing, or null. */
-		problem: string | null;
+		problem: SuggestFailure | null;
 		/** The last ideas generated and what was asked for, kept by the page; null before any. */
 		generated: { request: string; ideas: readonly GeneratedIdea[] } | null;
 		/** The title of the generated idea being written out, while it is. */
 		writing: string | null;
 		/** Why a generated idea could not be written out, or null. */
-		ideaProblem: string | null;
+		ideaProblem: SuggestFailure | null;
 		ondescribe: () => void;
 		onstarter: (starter: DaydreamStarter) => void;
 		/** Asks for stories like the one described; answers why none came, or null. */
-		ongenerate: (request: string) => Promise<string | null>;
+		ongenerate: (request: string) => Promise<SuggestFailure | null>;
 		/** Asks for more of the same, added to the last; answers why none came, or null. */
-		onmore: () => Promise<string | null>;
+		onmore: () => Promise<SuggestFailure | null>;
 		/** Puts the generated ideas away, back to the ready-made stories. */
 		onclear: () => void;
 		onidea: (idea: GeneratedIdea) => void;
 		onblank: () => void;
+		/** Debug mode: a failed suggestion shows what came back. */
+		debug?: boolean;
 	} = $props();
 
 	let suggesting = $state(false);
-	let suggestProblem: string | null = $state(null);
+	let suggestProblem: SuggestFailure | null = $state(null);
 	let gettingMore = $state(false);
-	let moreProblem: string | null = $state(null);
+	let moreProblem: SuggestFailure | null = $state(null);
 
 	async function suggest() {
 		suggesting = true;
@@ -156,8 +161,8 @@
 					</wa-button>
 				</div>
 			</div>
-			{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
-			{#if suggestProblem}<p class="invalid" role="alert">{suggestProblem}</p>{/if}
+			{#if problem}<SuggestionProblem {problem} {debug} />{/if}
+			{#if suggestProblem}<SuggestionProblem problem={suggestProblem} {debug} />{/if}
 		</section>
 	{/if}
 
@@ -226,7 +231,7 @@
 						</li>
 					{/each}
 				</ul>
-				{#if ideaProblem}<p class="invalid" role="alert">{ideaProblem}</p>{/if}
+				{#if ideaProblem}<SuggestionProblem problem={ideaProblem} {debug} />{/if}
 				<wa-button
 					class="more"
 					appearance="outlined"
@@ -237,7 +242,7 @@
 					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
 					{gettingMore ? 'Thinking up more…' : 'More ideas'}
 				</wa-button>
-				{#if moreProblem}<p class="invalid" role="alert">{moreProblem}</p>{/if}
+				{#if moreProblem}<SuggestionProblem problem={moreProblem} {debug} />{/if}
 			</section>
 		{:else}
 			{#if starters.length === 0}
@@ -498,10 +503,5 @@
 	.hint {
 		font-size: 0.875rem;
 		color: var(--wa-color-text-quiet);
-	}
-
-	.invalid {
-		margin: 0;
-		color: var(--wa-color-text-danger);
 	}
 </style>

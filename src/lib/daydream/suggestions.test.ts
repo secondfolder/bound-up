@@ -3,10 +3,12 @@ import { DAYDREAM_LIMITS } from '../daydream';
 import {
 	addIdeas,
 	completionJson,
+	describeUnusable,
 	GENERATED_IDEAS,
 	ideaSentence,
 	MAX_IDEA_PREMISE,
 	MAX_IDEA_TAGS,
+	MAX_REPLY_DETAIL,
 	parseCasting,
 	parseChips,
 	parseFill,
@@ -30,6 +32,26 @@ describe('completionJson', () => {
 		expect(completionJson(completion('Sure! Here are some ideas'))).toBeNull();
 		expect(completionJson({ error: 'no' })).toBeNull();
 		expect(completionJson(null)).toBeNull();
+	});
+});
+
+describe('describeUnusable', () => {
+	it('says whether it was no completion, not JSON, or JSON with nothing asked for, and what it was', () => {
+		expect(describeUnusable({ error: 'quota' })).toBe(
+			'The provider’s answer had no reply in it:\n{\n  "error": "quota"\n}'
+		);
+		expect(describeUnusable(completion('Sorry, I cannot help'))).toBe(
+			'The reply was not JSON:\nSorry, I cannot help'
+		);
+		expect(describeUnusable(completion('{"chips": []}'))).toBe(
+			'The reply was JSON, but nothing in it was what was asked for, or within its limits:\n{"chips": []}'
+		);
+	});
+
+	it('cuts a long reply short', () => {
+		const said = describeUnusable(completion('x'.repeat(MAX_REPLY_DETAIL + 50)));
+		expect(said.endsWith('… (cut)')).toBe(true);
+		expect(said.length).toBeLessThan(MAX_REPLY_DETAIL + 100);
 	});
 });
 
@@ -225,6 +247,30 @@ describe('parseSuggestedDaydream', () => {
 			characters: [{ name: 'Ash', relationship: 'x'.repeat(301), part: 42 }]
 		})?.cast;
 		expect(cast?.[0]).toMatchObject({ relationship: '', partName: null });
+	});
+
+	it('reads the summary’s blanks against the characters it kept, and is fine without one', () => {
+		const pieces = parseSuggestedDaydream({
+			summary: '[[vesper|A stranger]] takes the seat across from you on [[scene|the train]].',
+			scene,
+			characters: [{ name: 'Vesper' }]
+		});
+		expect(pieces?.summary).toEqual([
+			{
+				kind: 'slot',
+				slot: { kind: 'character', name: 'Vesper' },
+				words: 'A stranger',
+				key: 'vesper'
+			},
+			{ kind: 'text', text: ' takes the seat across from you on ' },
+			{ kind: 'slot', slot: { kind: 'scene' }, words: 'the train', key: 'scene' },
+			{ kind: 'text', text: '.' }
+		]);
+		expect(parseSuggestedDaydream({ scene })?.summary).toBeNull();
+		expect(parseSuggestedDaydream({ summary: 'On [[scene the train', scene })).toMatchObject({
+			summary: null,
+			scene: { title: 'The night train' }
+		});
 	});
 
 	it('is nothing without a scene that has a title and what is going on', () => {

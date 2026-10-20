@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
 import {
@@ -50,6 +50,22 @@ async function grantDaydreams(email: string) {
 }
 
 const dialog = (page: Page) => page.locator('wa-dialog');
+
+/**
+ * The setup summary's text as a selection of it reads, which is what a copy
+ * of it takes: each blank's words in, its closed menu's items out. Not
+ * `innerText`, which breaks the line at every blank's invisible control.
+ */
+function selectedText(summary: Locator) {
+	return summary.evaluate((element) => {
+		const range = document.createRange();
+		range.selectNodeContents(element);
+		const selection = document.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+		return selection?.toString() ?? '';
+	});
+}
 
 /**
  * Makes a new character in the setup's dialog, with a dial and a chip, saved
@@ -506,7 +522,7 @@ test.describe('daydreams', () => {
 		await expect(page.getByText('Ash looks up as you come in.')).toBeVisible();
 	});
 
-	test('a ready-made story starts from its sentence, which can be changed or opened up', async ({
+	test('a ready-made story starts from its summary, which can be changed or opened up', async ({
 		page
 	}) => {
 		await signedUpDreamer(page);
@@ -514,15 +530,26 @@ test.describe('daydreams', () => {
 		// Shuffled, and only a few shown until asked for the rest.
 		await clickWaButton(page, 'More ideas');
 		await page.getByRole('button', { name: /^After hours/ }).click();
-		// Read as rendered: the blanks' menus are in the sentence, closed.
-		const sentence = page.locator('.sentence');
-		const reads = (text: string) => expect(sentence).toContainText(text, { useInnerText: true });
-		await reads('I want a steamy story where I talk with Lady Vale in After hours.');
+		// Read as rendered: the blanks' menus are in the summary, closed. A
+		// ready-made story's summary is written with every blank in it.
+		const summary = page.locator('.setup-summary');
+		const reads = (text: string) => expect.poll(() => selectedText(summary)).toContain(text);
+		const whole =
+			'Kept late in the empty office after you botched the presentation. Lady Vale, your boss, has a steamy punishment in mind for you to make up for it. It’s told in the characters’ own words, with no narrator.';
+		await reads(whole);
+		// And copied for real, exactly: the blanks' words used to be left out,
+		// as the text of buttons, and then each menu's blank broke the line.
+		await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+		await page.keyboard.press('ControlOrMeta+C');
+		expect((await page.evaluate(() => navigator.clipboard.readText())).trim()).toBe(whole);
 
 		// A blank is a menu: turned down to SFW here.
-		await page.getByRole('button', { name: 'How sexual: steamy' }).click();
+		// Pressed by its words, as a person would; the control assistive tech
+		// reaches is the button over them, named for what it changes.
+		await expect(page.getByRole('button', { name: 'How sexual: steamy' })).toBeAttached();
+		await summary.getByText('steamy', { exact: true }).click();
 		await page.getByRole('menuitem', { name: 'SFW' }).click();
-		await reads('I want a SFW story');
+		await reads('has a SFW punishment in mind');
 
 		// Every control, with nothing lost, and how it's told last.
 		await clickWaButton(page, 'Customise everything');
@@ -549,19 +576,26 @@ test.describe('daydreams', () => {
 			idea: 'a stranger on a night train',
 			side: 'sub'
 		});
-		const sentence = page.locator('.sentence');
-		await expect(sentence).toContainText('where I talk with Vesper in The stub night train.', {
-			useInnerText: true
-		});
-		await expect(page.locator('.notes')).toContainText(
-			'Vesper: the stranger, a stranger on the train'
-		);
+		// The model's summary with its blanks, then how it is told, which it
+		// left out, with Vesper by name since the summary already has them.
+		const summary = page.locator('.setup-summary');
+		await expect
+			.poll(() => selectedText(summary))
+			.toContain(
+				'A stranger on the stub night train. A watchful stranger called Vesper takes the seat across from you, and the journey turns slow-burning.'
+			);
+		await expect
+			.poll(() => selectedText(summary))
+			.toContain('It’s told in the characters’ own words, with no narrator.');
+		await expect(
+			page.getByRole('button', { name: 'a watchful stranger called Vesper' })
+		).toBeVisible();
 
 		await clickWaButton(page, 'Try another');
-		// The stub's second draft is its first again, so the sentence alone
+		// The stub's second draft is its first again, so the summary alone
 		// proves nothing has landed; the button's label is back once it has.
 		await expect(page.getByRole('button', { name: 'Try another' })).toBeVisible();
-		await expect(sentence).toContainText('Vesper');
+		await expect(summary).toContainText('Vesper');
 
 		// Back to the ways in, with what was written still there.
 		await clickWaButton(page, 'Other ways to start');
@@ -581,7 +615,7 @@ test.describe('daydreams', () => {
 		await openStart(page);
 		await page.getByRole('textbox').fill('a stranger on a night train');
 		await clickWaButton(page, 'Write this story');
-		await expect(page.locator('.sentence')).toContainText('Vesper');
+		await expect(page.locator('.setup-summary')).toContainText('Vesper');
 
 		// Hold the next draft back until the user has left.
 		let release: () => void = () => undefined;
@@ -605,7 +639,7 @@ test.describe('daydreams', () => {
 		await settle(page);
 
 		await expect(page.getByRole('button', { name: 'Write this story' })).toBeVisible();
-		await expect(page.locator('.sentence')).toHaveCount(0);
+		await expect(page.locator('.setup-summary')).toHaveCount(0);
 	});
 
 	test('stories like the one described are suggested for your side, and one opens as a daydream', async ({
@@ -640,10 +674,9 @@ test.describe('daydreams', () => {
 		]);
 
 		await generated.getByRole('button', { name: /^Stub idea for the sub A stub/ }).click();
-		const sentence = page.locator('.sentence');
-		await expect(sentence).toContainText('where I talk with Vesper in The stub night train.', {
-			useInnerText: true
-		});
+		await expect
+			.poll(() => selectedText(page.locator('.setup-summary')))
+			.toContain('It’s told in the characters’ own words, with no narrator.');
 
 		// Back to the ways in, with the ideas still there, until cleared.
 		await clickWaButton(page, 'Other ways to start');

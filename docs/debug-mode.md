@@ -35,7 +35,9 @@ in the first HTML, not flashed in after hydration.
 `debug` decides what is **shown**, never what is **allowed**, like the
 `features` list it is computed from. Anything debug mode reveals that the
 server has to serve checks `requireFeature(…, 'debugMode')` itself. The
-Daydreams prompt endpoint is the one case so far.
+Daydreams prompt endpoint is one case; the suggest endpoint's failure detail
+(below) is the other, and checks the feature with `userHasFeature` rather
+than refusing, since the request itself is for everyone.
 
 ## Switching it
 
@@ -92,6 +94,42 @@ timer" (see [playroom.md](playroom.md#testing-aid)). They were a feature of
 their own, `iqTestAnswerButton`, until debug mode existed. Migration
 `0035_fold_iq_answer_button_into_debug_mode` turned every grant of it into a
 `debugMode` grant.
+
+### A new daydream's summary markers
+
+The summary a new daydream is shown as is written with its blanks marked as
+`[[key|words]]` ([daydreams.md](daydreams.md#starting-one)). In debug mode
+`DaydreamSetupForm` shows those markers rather than stripping them: each
+blank from the written summary sits inside its marker, with the key as it was
+written (`[[mara|`[your boss]`]]`), and still works; a marker that was read as
+plain words — for nobody in the story, or a second for the same thing — is
+shown in full. The second paragraph, which the form writes itself, has no
+markers to show, so its blanks are plain. The page passes `data.debug` in.
+
+### Why a Daydreams suggestion failed
+
+"No ideas came back that time" and "No suggestions just now" say nothing
+about why. `SuggestionProblem.svelte`, which shows every suggestion failure
+on the new-daydream page and in the character and scene dialogs (the chips
+included), adds a "What came back" disclosure in debug mode. What it shows
+comes from one of two places:
+
+- **An answer with nothing usable in it** is described in the browser by
+  `describeUnusable` (`daydream/suggestions.ts`): no completion at all, a
+  reply that was not JSON, or JSON with nothing asked for in it, followed by
+  the reply as the model wrote it. Nothing new crosses the network for this:
+  the endpoint already passes the provider's answer back unread for the
+  browser to check.
+- **A provider failure** (an error status, or no connection) is described by
+  the suggest endpoint, as `detail` beside its `message`: the status and the
+  provider's error body, or why it could not be reached. That is sent only
+  to an account holding the `debugMode` feature, checked on the server for
+  each failure; anyone else's 502 is the message alone, as before. Still
+  never logged, since the body can quote the request back.
+
+`debug` is handed down to the component as a prop, from `data.debug`,
+rather than read from `page.data` inside it, so the dialogs' tests need no
+`$app/state` mock.
 
 ### Daydreams' raw log
 

@@ -12,9 +12,11 @@ import {
 	shuffledStarterIds,
 	starterScene,
 	starterSetup,
+	starterSummary,
 	startersFor,
 	storedStarterSide
 } from './starters';
+import { setupSummary, TOLD_AS } from './summary';
 
 /** Ids that say which part they are, so a test can read a casting. */
 function counter() {
@@ -86,6 +88,34 @@ describe('the ready-made stories', () => {
 		expect(one.scene).toMatchObject({ sourceId: null, sourceRevision: null });
 		expect(one.characters[0]).toMatchObject({ sourceId: null, sourceRevision: null });
 		expect(one.scene.parts[0]?.id).not.toBe(two.scene.parts[0]?.id);
+	});
+
+	it('each has a summary with every piece of it marked, so nothing is said after it', () => {
+		for (const starter of DAYDREAM_STARTERS) {
+			const setup = starterSetup(starter);
+			const marked = starterSummary(starter, setup);
+			expect(marked, starter.id).not.toBeNull();
+			// Every marker became a blank: none named someone who is not in it.
+			const slots = marked?.filter((piece) => piece.kind === 'slot') ?? [];
+			expect(slots, starter.id).toHaveLength(starter.summary.split('[[').length - 1);
+			expect(
+				setupSummary(setup, marked ? { marked, draft: setup } : null),
+				starter.id
+			).toHaveLength(1);
+		}
+	});
+
+	it('each opens with the story as a whole and closes by saying how it is told', () => {
+		for (const starter of DAYDREAM_STARTERS) {
+			const marked = starterSummary(starter, starterSetup(starter)) ?? [];
+			expect(marked[0], starter.id).toMatchObject({ kind: 'slot', slot: { kind: 'scene' } });
+			expect(marked.at(-2), starter.id).toEqual({
+				kind: 'slot',
+				slot: { kind: 'voice' },
+				words: TOLD_AS[starter.voice],
+				key: 'voice'
+			});
+		}
 	});
 
 	it('each carries a few short tags, none twice', () => {

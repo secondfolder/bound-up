@@ -8,6 +8,7 @@ import {
 	starterScene,
 	startersFor
 } from '$lib/daydream/starters';
+import type { SuggestFailure } from '$lib/daydream/suggest';
 import type { GeneratedIdea } from '$lib/daydream/suggestions';
 import { defined } from '$lib/testing/defined';
 import { waProp, waSettled } from '$lib/testing/web-awesome';
@@ -34,11 +35,11 @@ async function renderStarter(
 	props: {
 		suggestionsOn?: boolean;
 		idea?: string;
-		problem?: string;
+		problem?: SuggestFailure;
 		side?: StarterSide | null;
 		generated?: { request: string; ideas: GeneratedIdea[] } | null;
-		ongenerate?: (request: string) => Promise<string | null>;
-		onmore?: () => Promise<string | null>;
+		ongenerate?: (request: string) => Promise<SuggestFailure | null>;
+		onmore?: () => Promise<SuggestFailure | null>;
 		starterOrder?: readonly string[];
 	} = {}
 ) {
@@ -118,7 +119,7 @@ describe('DaydreamStarter', () => {
 	});
 
 	it('says why no similar stories came, beside the box', async () => {
-		let answer: (problem: string | null) => void = () => undefined;
+		let answer: (problem: SuggestFailure | null) => void = () => undefined;
 		const { container } = await renderStarter({
 			idea: 'teasing in public',
 			ongenerate: () =>
@@ -132,7 +133,7 @@ describe('DaydreamStarter', () => {
 		// Nothing else can be asked while they are thought up.
 		await waitFor(() => expect(section.textContent).toContain('Thinking up stories…'));
 		expect(waProp(write, 'disabled')).toBe(true);
-		answer('No ideas came back that time. Try again.');
+		answer({ error: 'No ideas came back that time. Try again.' });
 		await waitFor(() =>
 			expect(section.querySelector('[role="alert"]')?.textContent).toContain('No ideas came back')
 		);
@@ -191,7 +192,10 @@ describe('DaydreamStarter', () => {
 	});
 
 	it('says why a description came back with nothing', async () => {
-		const { container } = await renderStarter({ idea: 'x', problem: 'No ideas came back.' });
+		const { container } = await renderStarter({
+			idea: 'x',
+			problem: { error: 'No ideas came back.' }
+		});
 		expect(container.querySelector('[role="alert"]')?.textContent).toBe('No ideas came back.');
 	});
 
@@ -221,7 +225,7 @@ describe('DaydreamStarter', () => {
 	});
 
 	it('asks for more ideas from the end of the list, and says why none came', async () => {
-		let answer: (problem: string | null) => void = () => undefined;
+		let answer: (problem: SuggestFailure | null) => void = () => undefined;
 		const { container, onmore, onidea } = await renderStarter({
 			generated: { request: 'something filthy', ideas: generatedIdeas },
 			onmore: () =>
@@ -241,7 +245,7 @@ describe('DaydreamStarter', () => {
 		card?.click();
 		expect(onidea).toHaveBeenCalledWith(generatedIdeas[0]);
 
-		answer('No new ideas came back that time. Try again.');
+		answer({ error: 'No new ideas came back that time. Try again.' });
 		await waitFor(() =>
 			expect(group.querySelector('[role="alert"]')?.textContent).toContain('No new ideas')
 		);

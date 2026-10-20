@@ -24,6 +24,7 @@ import {
 	MAX_OFFERED_IDEAS,
 	MAX_SUGGESTED_CHIPS
 } from '$lib/daydream/suggestions';
+import { MAX_SUMMARY, TOLD_AS } from '$lib/daydream/summary';
 import type { ModelMessage } from './prompt';
 
 /**
@@ -465,6 +466,30 @@ function sideLine(side: 'dom' | 'sub' | null | undefined): string {
 	return side ? `\n\n${SIDE_LINES[side]}` : '';
 }
 
+/**
+ * The summary a whole daydream is shown as before it starts
+ * (`daydream/summary.ts`): the model's own paragraph, with the first mention
+ * of each piece the user can change marked as a blank. Each piece goes where
+ * it reads naturally in this summary, and none is required, because the form
+ * says whatever the paragraph leaves out after it. Hence guidance rather than
+ * a template: a good shape (the story as a whole first, mostly the scene's
+ * blank, since a place like "their bedroom" is a poor handle on a story) and
+ * one trap (how it is told worked in as "you talk with Jules", which makes
+ * talking sound like what the story is about), with the form's own words for
+ * saying it outright (`TOLD_AS`). It is asked for less than the most that is
+ * kept, since a model told a length tends to run over it.
+ */
+const SUMMARY_INSTRUCTION = `The summary: one short paragraph, at most ${MAX_SUMMARY - 200} characters, telling the user, as "you", what the story is. Some of its words become controls the user can change, so mark the first mention of each of these by wrapping the words that say it as [[key|words]]:
+- [[scene|…]] for the story's situation: what it is about as a whole, not just where it happens. Opening with one tight sentence that gives the whole story, most of it the marked scene, usually works well, like "[[scene|A couple’s invitation: one of them is yours, and the other only watches]]."
+- [[Name|…]] for each character, keyed by the name you give them, round whatever words first refer to them.
+- [[heat|…]] for how sexual it is, a word like "slow-burning" or "filthy", if it fits naturally into a sentence, like "watches every [[heat|filthy]] second".
+- [[voice|…]] for how it is told, only where it can be said without misleading. Worked into the story as "you talk with them", it makes talking sound like what the story is about, so it is usually better said plainly in a closing sentence of its own, in these words: ${Object.entries(
+	TOLD_AS
+)
+	.map(([voice, words]) => `for "${voice}", "It’s told [[voice|${words}]]."`)
+	.join('; ')}
+These are suggestions, not a template: write what reads best for this story. Mark only the first mention of each, and leave out any that would make the summary awkward; anything left out is shown after it. Use [[ and ]] nowhere else.`;
+
 function daydreamMessages(request: DaydreamRequest): ModelMessage[] {
 	return [
 		{
@@ -486,7 +511,9 @@ Choose "talk" unless what they wrote asks for another.
 The scene: a short title; where it happens, what is going on as it starts, who the user is in it, and its tone, a sentence or two each. ${PARTS_INSTRUCTION}${rateInstruction(['heat', 'kink'])} Rate it from what they wrote: a story that says nothing sexual is not sexual.
 
 Who is in it: one to ${MAX_DAYDREAM_CHARACTERS} characters, each playing one of the scene's parts, named exactly as the part is. For each, a name, and a phrase or two for their type, personality, how they talk, appearance and what they enjoy; who they are to the user in this story, in a few words; and what they are doing or want as the scene starts, in a sentence. With "rules", they are the system's functionaries. With "told", there may be none.
-Answer as: {"voice": "talk", "scene": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": 1-5, "kink": 1-5, ${PARTS_SHAPE}}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}]}`
+
+${SUMMARY_INSTRUCTION}
+Answer as: {"summary": "…", "voice": "talk", "scene": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": 1-5, "kink": 1-5, ${PARTS_SHAPE}}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}]}`
 		}
 	];
 }
@@ -529,7 +556,7 @@ export function buildSuggestMessages(request: SuggestRequest): {
 		return { messages: nameMessages(request), maxTokens: 100 };
 	}
 	if (request.task === 'daydream') {
-		return { messages: daydreamMessages(request), maxTokens: 1600 };
+		return { messages: daydreamMessages(request), maxTokens: 1900 };
 	}
 	if (request.task === 'ideas') {
 		return { messages: ideasMessages(request), maxTokens: 1300 };

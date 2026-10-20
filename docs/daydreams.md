@@ -104,13 +104,64 @@ who is in it — watching nobody — gives way to the one that follows them.
 Every copy is one with no library record, so each card offers **Save to my
 characters** (or scenes) as any such copy does.
 
-A draft opens in the form's **sentence** layout: the setup as one line with
-blanks in it — "I want a [steamy] story where I [talk with] [Lady Vale] in
-[After hours]." — built by `setupSentence` (`daydream/sentence.ts`), with the
-premise and who each character is underneath (`castNotes`). Each blank is the
-control for that part of it: the heat a menu of levels, the voice a menu of
-the four presets, a character's name their dialog, the scene's title the scene
+A draft opens in the form's **summary** layout: the setup as a short summary
+with blanks in it, built by `setupSummary` (`daydream/summary.ts`). Each blank
+is the control for that part of it: the heat a menu of levels, the voice a
+menu of the four presets, a character their dialog, the scene the scene
 dialog. "Add someone" and "Anything off the table?" (the limits) sit under it.
+
+The summary is two paragraphs:
+
+1. **The model's own**, for a daydream it wrote. The `daydream` answer carries
+   a short `summary` in which the model wrapped the first mention of each
+   piece as `[[key|words]]` — `scene`, `heat`, `voice`, or a character's name
+   — so the blank reads in its words: "[A stranger on the night train].
+   [A watchful stranger called Vesper] takes the seat across from you." The
+   prompt gives guidance, not a template, and the model decides what reads
+   best: the scene's blank is the story's situation as a whole rather than a
+   place, and opening with one tight sentence that is mostly that blank
+   usually works; the heat goes in where a word for it fits naturally; how it
+   is told is usually best said plainly in a closing sentence, "It's told
+   [in the characters' own words, with no narrator]", in the same words the
+   form uses (`TOLD_AS`), because worked into the story as "you talk with
+   them" it made talking sound like what the story was about. Nothing is to
+   be forced in. `parseMarkedSummary` reads it, leniently like any
+   suggestion: a marker for nothing in the story, or a second for the same
+   thing, keeps its words as plain text, while a summary with a broken
+   marker, or over `MAX_SUMMARY`, is dropped. Each ready-made story carries
+   one written by hand in that shape (`summary` in `starters.ts`, read by
+   `starterSummary`), with every piece marked, so it needs no second
+   paragraph; a test holds each to that. A draft whose summary was dropped
+   shows its premise in its place, with nothing marked. Debug mode shows the
+   markers instead of stripping them
+   ([debug-mode.md](debug-mode.md#a-new-daydreams-summary-markers)).
+2. **One written here**, holding every piece the first left out, so every
+   control is always on screen: a sentence for the heat, the scene and anyone
+   not mentioned yet — "It's a [steamy] story in [After hours], with [Mara]
+   (your boss)." — and one for how it is told, "It's told [to you by a
+   narrator]." A character not mentioned yet comes with their part and who
+   they are to the user in parentheses. With nothing left out there is no
+   second paragraph.
+
+Each blank is a `SummaryBlank`: the words, in a plain span hidden from
+assistive tech, with an invisible button laid over them that is named with
+the same words and is what the keyboard and screen readers reach. A tap on
+the words presses the button; a drag or a double click selects them instead.
+The words are not the button's own text because Chromium leaves a button's
+text out of a copied selection, so copying the summary lost every blank.
+
+A heat that changes after the summary was written swaps only its word, and an
+"a" or "an" just before the blank changes to agree. A character's note in the
+second paragraph leaves out their part's name when who they are already says
+it.
+
+The model's paragraph is only true of the draft it was written for, and the
+summary is not part of the setup (nothing of it is sealed or stored). It is
+shown for as long as the scene's title and premise and how it is told are the
+draft's, and everyone it names is still in it by that name; change any of
+those and the premise takes its place, with every piece in the second
+paragraph. Someone added is only someone it does not mention, so they join the
+second paragraph. A changed heat is just a word: its blank says the new one.
 **Customise everything** switches the same form to the full layout, so
 nothing is lost: it is one superform either way, sharing its dialogs, its
 sealing and its submit. For a described daydream, **Try another** asks again
@@ -1036,13 +1087,17 @@ own (`suggest-prompt.ts`):
 - for a whole daydream, from the new-daydream page: the sentence the user
   wrote (up to `DAYDREAM_LIMITS.idea`) with the side chosen under "You as",
   or a generated idea's title and premise with the side it was made for,
-  and any limits written on the draft;
+  and any limits written on the draft; it answers with a summary to show the
+  draft as, too (see "Starting one");
 - for generated ideas: what the user wrote in the box (up to
   `DAYDREAM_LIMITS.idea`), the side chosen under "You as", and for **More
   ideas** the titles of those already shown.
 
 The answer is a small JSON completion, not streamed, passed back unread for
-the browser to check (`daydream/suggestions.ts`).
+the browser to check (`daydream/suggestions.ts`). When the provider fails,
+the 502 says only "No suggestions just now" — except to an account holding
+debug mode, which also gets the provider's status and error body as `detail`
+([debug-mode.md](debug-mode.md#why-a-daydreams-suggestion-failed)).
 
 **In transit, for debug mode's "Show prompt":** the same body as a reply, to
 `POST /api/daydreams/[id]/prompt`, which answers with the messages
@@ -1367,7 +1422,9 @@ Noted so they are not lost; none is in the code.
   scene's parts, the voice guessed from the cast),
   `daydream/starters.test.ts` (every ready-made story is a setup the form
   would save, cast as written; assembling a draft),
-  `daydream/sentence.test.ts` (each voice in words, the blanks),
+  `daydream/summary.test.ts` (reading the model's markers; what the second
+  paragraph says for each voice and each piece left out; when the model's
+  paragraph gives way to the premise),
   `daydream/tree.test.ts`, `reply-format.test.ts` (the written-out turn,
   arriving and finished), `passage-format.test.ts` (paragraphs and breaks,
   emphasis pairing and what stays literal, dialogue, say tags,
@@ -1400,7 +1457,10 @@ Noted so they are not lost; none is in the code.
   cap, quotes across formatting, `storedOffset`), `scroll-parent.svelte.test.ts`
   (following, and holding at a passage's top),
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts,
-  the voice last and guessed, the sentence layout),
+  the voice last and guessed, the summary layout with and without the
+  model's paragraph), `SummaryBlank.svelte.test.ts` (one named button to
+  assistive tech, taps and drags, kept in a copied selection, the menu
+  opening from the words),
   `DaydreamVoicePicker.svelte.test.ts` (names only, the chosen one described),
   `DaydreamStarter.svelte.test.ts` (the ways in),
   `DaydreamSetupFormAdd.svelte.test.ts`,
@@ -1409,7 +1469,7 @@ Noted so they are not lost; none is in the code.
   `DaydreamBranchMap.svelte.test.ts` (the longest-path trunk, jumping,
   folding).
 - End to end: `e2e/daydreams.spec.ts` (a ready-made start through its
-  sentence, a described one, and the full form; the stub's opening has an
+  summary, a described one with the model's marked summary, and the full form; the stub's opening has an
   italic paragraph, so a quote is kept from inside drawn Markdown) and `e2e/daydream-heat.spec.ts`,
   against `e2e/model-stub.mjs`, a stand-in OpenRouter that `e2e/server.mjs`
   starts beside the app.

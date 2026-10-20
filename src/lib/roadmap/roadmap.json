@@ -169,7 +169,7 @@
 						{
 							"id": "daydreams-easy-start",
 							"title": "Start from a sentence or a ready-made story",
-							"summary": "Say what you feel like and have it put together, or pick a ready-made story, then change any part of it from one sentence.",
+							"summary": "Say what you feel like and have it put together, or pick a ready-made story, then change any part of it from its summary.",
 							"status": "shipped",
 							"shippedOn": "2026-10-19"
 						},

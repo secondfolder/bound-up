@@ -20,6 +20,7 @@
 	import { SCENE_SLIDERS, sceneLevel } from '$lib/daydream/dial-words';
 	import {
 		type SuggestContext,
+		type SuggestFailure,
 		suggestChips,
 		suggestFill,
 		surpriseScene
@@ -31,6 +32,7 @@
 	import DaydreamChipField from './DaydreamChipField.svelte';
 	import { startOpen } from './details';
 	import OptionalSlider from './OptionalSlider.svelte';
+	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/**
 	 * Making or changing a scene, in a dialog, the way
@@ -55,6 +57,7 @@
 		surprise = false,
 		context,
 		suggestionsOn,
+		debug = false,
 		onsaved,
 		onclose
 	}: {
@@ -64,6 +67,8 @@
 		surprise?: boolean;
 		context: SuggestContext;
 		suggestionsOn: boolean;
+		/** Debug mode: a failed suggestion shows what came back. */
+		debug?: boolean;
 		onsaved: (scene: DaydreamSceneCopy, sealed?: SealedRefView) => void;
 		onclose: () => void;
 	} = $props();
@@ -90,7 +95,7 @@
 			}
 		: { ...EMPTY_SCENE, saveToLibrary: true };
 
-	let problem: string | null = $state(null);
+	let problem: SuggestFailure | null = $state(null);
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();
 	let detail: (HTMLElement & { open: boolean }) | undefined = $state();
 
@@ -163,7 +168,7 @@
 				expectedRevision: inLibrary ? knownRevision : null
 			});
 			if (!saved.ok) {
-				problem = saved.error;
+				problem = { error: saved.error };
 				return;
 			}
 			onsaved({ ...content, sourceId: id, sourceRevision: saved.revision }, saved.sealed);
@@ -247,7 +252,7 @@
 			};
 			revealDetail();
 		} else {
-			problem = answer.error;
+			problem = answer;
 		}
 	}
 
@@ -269,7 +274,7 @@
 		});
 		thinking = false;
 		if (!answer.ok) {
-			problem = answer.error;
+			problem = answer;
 			return;
 		}
 		const next = { ...$form };
@@ -325,6 +330,7 @@
 
 {#snippet textField(field: SceneTextField)}
 	<DaydreamChipField
+		{debug}
 		label={SCENE_FIELD_LABELS[field].label}
 		hint={SCENE_FIELD_LABELS[field].hint}
 		value={$form[field]}
@@ -458,7 +464,7 @@
 			<p class="hint">This changes it in your library too.</p>
 		{/if}
 
-		{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
+		{#if problem}<SuggestionProblem {problem} {debug} />{/if}
 
 		<div class="buttons">
 			<wa-button appearance="plain" onclick={close}>Cancel</wa-button>
