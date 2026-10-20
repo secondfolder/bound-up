@@ -697,8 +697,15 @@ in `src/lib/sealed.ts`:
   comes out of a vault was written by a partner's device or forged, so it is
   parsed, never cast, and a schema that strips undeclared keys is also what
   keeps a record from carrying extra data.
-- **A new version's reader ships a release before its writer**, so a tab
-  still open on the previous build never meets data it cannot read.
+- **A new version's reader usually ships a release before its writer**, so a
+  tab still open on the previous build never meets data it cannot read. The
+  two may ship in one release when the cost is acceptable: a tab left open on
+  the previous build cannot open a record written at the new version until it
+  reloads, which the app prompts it to do
+  ([versions-and-updates.md](versions-and-updates.md)), and only a record made
+  after the deploy is affected. Daydreams' setup v4 (the monologue voice)
+  shipped this way, since a stale tab missing one new daydream costs nothing
+  but a reload.
 - **A record read at an older version is written back at the latest**,
   compare-and-swap on `revision`, so a background upgrade can never overwrite
   a newer edit from the other partner.

@@ -239,8 +239,8 @@ describe('buildSuggestMessages, a whole daydream', () => {
 		expect(messages[0]?.content).toContain('Nothing public.');
 		const ask = messages[1]?.content ?? '';
 		expect(ask).toContain('a stranger on a night train');
-		// The four voices, the scene with its parts and ratings, and the cast.
-		for (const voice of ['"talk"', '"told"', '"watch"', '"rules"']) {
+		// The five voices, the scene with its parts and ratings, and the cast.
+		for (const voice of ['"talk"', '"told"', '"watch"', '"rules"', '"monologue"']) {
 			expect(ask).toContain(voice);
 		}
 		expect(ask).toContain('"parts"');

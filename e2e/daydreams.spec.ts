@@ -522,6 +522,23 @@ test.describe('daydreams', () => {
 		await expect(page.getByText('Ash looks up as you come in.')).toBeVisible();
 	});
 
+	test('a ready-made monologue opens with its statement drawn as a standout line', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await openStart(page);
+		await clickWaButton(page, 'More ideas');
+		await page.getByRole('button', { name: /^Owned/ }).click();
+		await expect
+			.poll(() => selectedText(page.locator('.setup-summary')))
+			.toContain('It’s told as a monologue, one voice speaking its mind.');
+
+		await clickWaButton(page, 'Start daydreaming');
+		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
+		await expect(page.locator('.prose p.standout')).toHaveText('The stub voice says its piece.');
+		await expect(page.getByText('And then a little more.')).toBeVisible();
+	});
+
 	test('a ready-made story starts from its summary, which can be changed or opened up', async ({
 		page
 	}) => {

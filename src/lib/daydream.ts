@@ -29,8 +29,17 @@ export const DAYDREAM_LEADS: readonly { value: DaydreamLead; label: string }[] =
 
 // ── voice ────────────────────────────────────────────────────────────────────
 
-/** Who tells the story. `none` is the characters speaking for themselves. */
-export type DaydreamNarrator = 'none' | 'second-person' | 'third-person' | 'impersonal';
+/**
+ * Who tells the story. `none` is the characters speaking for themselves;
+ * `monologue` is one voice speaking its mind, a stand-in for the story's
+ * ideas rather than a character (docs/daydreams.md, "Voices").
+ */
+export type DaydreamNarrator =
+	| 'none'
+	| 'second-person'
+	| 'third-person'
+	| 'impersonal'
+	| 'monologue';
 
 /**
  * Where the user stands in it: as themselves, as someone they name, or
@@ -80,6 +89,13 @@ export const DAYDREAM_NARRATORS: readonly {
 		description:
 			'No narrator and no people: rules, notices and instructions, with what you do logged.',
 		example: '“Kneel at the line. Wait for the tone.”'
+	},
+	{
+		value: 'monologue',
+		label: 'A monologue',
+		description:
+			'One voice speaking its mind about what the story is about, statement after statement, rather than telling a story.',
+		example: '“**Being owned is a relief.** I mean it. Someone else decides, and I get to stop.”'
 	}
 ];
 
@@ -160,10 +176,21 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 			'“Rule 2 broken. Infraction logged.”'
 		],
 		voice: { narrator: 'impersonal', stance: 'self' }
+	},
+	{
+		id: 'monologue',
+		label: 'A monologue',
+		description:
+			'One voice speaking its mind, with little story around it: the ideas, tropes and sayings of what you are into, said statement by statement, each with a little more after it. The voice stands in for those ideas rather than being a character of its own.',
+		examples: [
+			'“**Being owned is a relief.** I mean it. Someone else decides, and I get to stop deciding.”',
+			'“**Good girls say thank you.** Every time. Even when it stings — especially then.”'
+		],
+		voice: { narrator: 'monologue', stance: 'self' }
 	}
 ];
 
-export type DaydreamVoicePresetId = 'talk' | 'told' | 'watch' | 'rules';
+export type DaydreamVoicePresetId = 'talk' | 'told' | 'watch' | 'rules' | 'monologue';
 
 /** The preset a voice is, or undefined for a combination no preset gives. */
 export function voicePreset(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>) {
@@ -175,8 +202,8 @@ export function voicePreset(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>) {
 /**
  * The voice a setup gets until the user picks one: whatever fits who is in
  * it. Nobody in it is a story told to you; anyone is talking with them.
- * Watching and a system are only ever chosen, never guessed, because both
- * change what the story is rather than just how it is told. What the story
+ * Watching, a system and a monologue are only ever chosen, never guessed,
+ * because each changes what the story is rather than just how it is told. What the story
  * calls the user is kept.
  */
 export function inferVoice(current: DaydreamVoice, characterCount: number): DaydreamVoice {
@@ -202,7 +229,8 @@ export function voiceProblem(voice: DaydreamVoice, characterCount: number): stri
 	if (voice.narrator === 'none' && voice.stance === 'absent') {
 		return 'With no narrator, the characters speak to you, so you have to be in the story.';
 	}
-	if (voice.stance === 'absent' && characterCount === 0) {
+	// A monologue can be overheard with nobody in it: the voice is enough.
+	if (voice.stance === 'absent' && characterCount === 0 && voice.narrator !== 'monologue') {
 		return 'To watch, add at least one character to watch.';
 	}
 	if (voice.narrator === 'second-person' && voice.stance === 'absent') {
@@ -225,9 +253,12 @@ export function voiceCanWork(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>):
 	return false;
 }
 
-/** Whether "who leads" means anything: there are characters, and the user is there to be led. */
+/**
+ * Whether "who leads" means anything: there are characters, and the user is
+ * there to be led. Nobody leads a monologue: one voice says its piece.
+ */
 export function leadApplies(voice: DaydreamVoice, characterCount: number): boolean {
-	return characterCount > 0 && voice.stance !== 'absent';
+	return characterCount > 0 && voice.stance !== 'absent' && voice.narrator !== 'monologue';
 }
 
 // ── characters ───────────────────────────────────────────────────────────────

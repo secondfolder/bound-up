@@ -35,6 +35,19 @@ describe('DaydreamProse', () => {
 		expect(container.textContent).not.toMatch(/[*]/);
 	});
 
+	it('draws a paragraph that is bold throughout as a standout line, larger than the rest', () => {
+		const { container } = render(DaydreamProse, {
+			text: '**Being owned is a relief.**\n\nI mean it.',
+			cast
+		});
+		const [statement, after] = [...container.querySelectorAll<HTMLElement>('.prose > p')];
+		expect(statement?.classList.contains('standout')).toBe(true);
+		expect(after?.classList.contains('standout')).toBe(false);
+		expect(Number.parseFloat(getComputedStyle(defined(statement)).fontSize)).toBeGreaterThan(
+			Number.parseFloat(getComputedStyle(defined(after)).fontSize)
+		);
+	});
+
 	it('colours each voice its own, without naming the speaker', () => {
 		const { container } = render(DaydreamProse, {
 			text: '<say who="Mara">"Sit."</say> She waits. <say who="Jo">"No."</say> "Who said that?"',

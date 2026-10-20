@@ -30,6 +30,7 @@ import {
 	type Reading
 } from '$lib/sealed-kinds/daydreams';
 import { impersonalGuide } from './impersonal-voice';
+import { monologueGuide } from './monologue-voice';
 import { writingGuide } from './writing-guide';
 
 /**
@@ -174,6 +175,9 @@ function describeNarrator(voice: DaydreamVoice, characterCount: number): string 
 		case 'impersonal':
 			// The full guide, with examples, comes later: `impersonalGuide`.
 			return `There is no narrator. You speak as the system that governs the user — its rules, its protocol, its procedures — addressing them as "you"${persona ? ` (they are ${name})` : ''}. ${characterCount === 0 ? 'No one is behind it.' : 'The characters below act for it, as its functionaries.'} See "Writing as the system" below.`;
+		case 'monologue':
+			// Who speaks, the form and examples come later: `monologueGuide`.
+			return 'You speak a monologue: one voice, in the first person, speaking its mind about what this daydream is about, rather than telling a story. See "Writing a monologue" below.';
 		default:
 			return assertNever(voice.narrator, 'narrator');
 	}
@@ -189,7 +193,12 @@ export function describeVoice(voice: DaydreamVoice, characterCount: number): str
 }
 
 function leadLine(setup: DaydreamSetupContent): string | null {
-	if (setup.characters.length === 0 || setup.voice.stance === 'absent') {
+	// Nobody leads a monologue: one voice says its piece (`leadApplies`).
+	if (
+		setup.characters.length === 0 ||
+		setup.voice.stance === 'absent' ||
+		setup.voice.narrator === 'monologue'
+	) {
 		return null;
 	}
 	if (setup.voice.narrator === 'impersonal') {
@@ -352,6 +361,13 @@ function steeringIdeas(
 		heat === null || heat >= 3
 			? '; and while there is sex on the page, what comes next in it — an act, a position, a toy or a piece of furniture ("Bent over", "On your knees", "The vibrator")'
 			: '';
+	if (voice.narrator === 'monologue') {
+		return {
+			suggestions:
+				'Vary them: one asking the voice to say more about something it said, one pushing it to go further, one turning it towards a related idea.',
+			directions: `Harsher, Softer, More like that, A mantra, Another idea, Slower${sex}`
+		};
+	}
 	return voice.narrator === 'impersonal'
 		? {
 				suggestions:
@@ -422,8 +438,14 @@ const IMAGE_INSTRUCTION = `- "image": include it in most replies. It is a pictur
  */
 function passageFormat(voice: DaydreamVoice): string {
 	const inStory = voice.stance !== 'absent';
+	// A monologue's statements are bold lines of their own, which the page
+	// draws larger (`standout`); elsewhere bold is for a single word.
+	const bold =
+		voice.narrator === 'monologue'
+			? "**bold** for each statement, on a line of its own, which is drawn larger — and, rarely, for a word that has to land; the voice's own words are the passage itself, never in quotation marks"
+			: '**bold**, rarely, for a word that has to land';
 	return `# Formatting the passage
-Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis and for a character's unspoken thoughts — thoughts always in italics, never in quotation marks; **bold**, rarely, for a word that has to land; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.
+Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis and for a character's unspoken thoughts — thoughts always in italics, never in quotation marks; ${bold}; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.
 Put every line someone speaks aloud in a say tag naming them, with its quotation marks inside: <say who="Charlie">"Sit down,"</say> she says. Name them as the story knows them${inStory ? '; for the user\'s own words, who="you"' : ''}.
 Put a sound someone or something makes — a moan, a gasp, a slap, a knock — in a sound tag, so it is drawn as one: <sound>Mmmph</sound>, a sharp <sound>crack</sound>. Inside someone's line too: <say who="Charlie">"<sound>Ah</sound> — don't stop."</say>
 Say and sound tags go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
@@ -554,12 +576,34 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
  * What the model is asked to write first: the story, before the user has
  * done anything. "Set the scene" asks for a narrator's description, so the
  * system voice is asked for its first notice instead: the opening is the
- * example every later passage copies.
+ * example every later passage copies. A monologue has no scene to set, so it
+ * is asked to begin with its first statements.
  */
 function openingRequest(voice: DaydreamVoice): string {
-	return voice.narrator === 'impersonal'
-		? '(Begin. Open with the first notice or rules the system issues to me — not a description of the scene — and end where I must respond.)'
-		: '(Begin the story. Set the scene, and end at a point where I can respond.)';
+	switch (voice.narrator) {
+		case 'impersonal':
+			return '(Begin. Open with the first notice or rules the system issues to me — not a description of the scene — and end where I must respond.)';
+		case 'monologue':
+			return '(Begin. Open straight into the monologue with its first statements — not a description of a scene.)';
+		default:
+			return '(Begin the story. Set the scene, and end at a point where I can respond.)';
+	}
+}
+
+/**
+ * The section for a voice that is not ordinary fiction, with examples of its
+ * form (`impersonal-voice.ts`, `monologue-voice.ts`), or null for one that is.
+ */
+function voiceGuide(setup: DaydreamSetupContent): string | null {
+	const { voice, characters, scene } = setup;
+	switch (voice.narrator) {
+		case 'impersonal':
+			return impersonalGuide(characters.length, scene.dials.heat);
+		case 'monologue':
+			return monologueGuide(voice, characters.length, scene.dials.heat);
+		default:
+			return null;
+	}
 }
 
 /** The direction buttons on screen now, for the model to prune and add to (`replyFormat`). */
@@ -610,9 +654,7 @@ export function buildMessages(
 			stopped ? null : writingGuide(request.setup.voice, request.setup.scene.dials.heat),
 			// Last before the format, nearest where the model starts writing,
 			// and not for a check-in, which is out of character.
-			!stopped && request.setup.voice.narrator === 'impersonal'
-				? impersonalGuide(request.setup.characters.length, request.setup.scene.dials.heat)
-				: null,
+			stopped ? null : voiceGuide(request.setup),
 			stopped
 				? CHECK_IN
 				: replyFormat(request.setup.voice, request.setup.scene.dials.heat, options.pictures)

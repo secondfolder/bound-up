@@ -15,8 +15,11 @@
  * - **Writers always write the latest version.**
  * - **Readers accept every version ever shipped** and upcast it, one step at a
  *   time, to the latest, validating against each version's schema on the way.
- * - **A new version's reader ships before its writer**, so a tab still open on
- *   the previous build never meets data it cannot read.
+ * - **A new version's reader usually ships before its writer**, so a tab still
+ *   open on the previous build never meets data it cannot read. They may ship
+ *   together where that tab failing to open a record made after the deploy is
+ *   acceptable until it reloads, which the app prompts it to do
+ *   (docs/encryption.md, "Sealed records").
  * - **A version is never edited once shipped.** Its frozen fixture in
  *   `sealed-fixtures/` would fail.
  *

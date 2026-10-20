@@ -1,0 +1,96 @@
+import type { DaydreamVoice, DialValue } from '$lib/daydream';
+
+/**
+ * The guide for the `monologue` voice ("A monologue"): one voice speaking its
+ * mind about what the daydream is about, statement after statement, rather
+ * than a story told scene by scene.
+ *
+ * Like the system voice (`impersonal-voice.ts`), it is not ordinary fiction,
+ * which the model writes well from a sentence: told only to speak "a
+ * monologue", a model writes a character's soliloquy in a room, with a plot.
+ * So it gets a section of its own, with examples of the form, placed after
+ * everything describing the scene (`buildMessages` in `prompt.ts`).
+ *
+ * The voice stands in for the story's ideas — the kinks, tropes and sayings
+ * of what the user is into — rather than being a character with a life of its
+ * own, which is why it speaks in short statements, each with a little in its
+ * own words after it, and why who speaks is left to the setup: an unnamed
+ * voice with the user listening unless the setup suggests a character, or
+ * the user's own inner voice.
+ *
+ * Each statement is bold on a line of its own, which the page draws larger
+ * (`standout` in `daydream/passage-format.ts`), so the statements read as
+ * what the passage is built on.
+ *
+ * The examples show the form, not the content, and are deliberately broad,
+ * since examples steer content too. Two sets, picked by heat like the
+ * system's: a tame scene shown sex would drift towards it, and an explicit
+ * one shown only rules and praise would stay timid.
+ */
+
+const TAME_EXAMPLES = [
+	`**Rules are a kindness.**
+
+People think they're a cage. They're not. When someone else sets the rules, I don't have to carry every little decision around all day. I just have to be good.`,
+	`**Asking permission is the point.**
+
+Not because I can't decide for myself. Because I like the moment where I ask, and wait, and the answer isn't mine to give.`,
+	`**Praise lands harder when it's earned.**
+
+One quiet *good* at the end of a long day does more for me than a hundred easy ones ever could.`
+];
+
+const ADULT_EXAMPLES = [
+	`**Being owned is a relief.**
+
+I mean it. Someone else decides when, and how, and how often, and all I have to do is be ready. Ready is easy. Ready is the best I've ever felt.`,
+	`**My body isn't mine on the nights I'm theirs.**
+
+They touch what they like and take what they like. I don't get a vote, and I've never once wanted one.`,
+	`**Begging is foreplay.**
+
+Not the polite kind. The kind where you've said *please* so many times it stops being a word, and you'd say anything at all to be let finish.`
+];
+
+/** Steamy and up: sex happens on the page, so the examples may show it. */
+const ADULT_FROM: DialValue = 3;
+
+export function monologueExamples(heat: DialValue | null): readonly string[] {
+	return heat !== null && heat >= ADULT_FROM ? ADULT_EXAMPLES : TAME_EXAMPLES;
+}
+
+/** Who speaks, and where the user stands: left to the setup, with a default for when it says nothing. */
+export function monologueSpeaker(voice: DaydreamVoice, characterCount: number): string {
+	const name = voice.protagonistName.trim();
+	const who =
+		characterCount === 0
+			? 'No speaker is set. Unless the scene suggests one, speak as an unnamed voice with the user listening. Where the setup suits it better, the voice can instead be the user’s own inner voice, in the first person as them.'
+			: 'The speaker is one of the characters below — the first, unless the scene says otherwise — or, where the setup suits it better, the user’s own inner voice; anyone else is someone the voice talks about or to.';
+	const user =
+		voice.stance === 'absent'
+			? 'The user is not spoken to: they overhear it.'
+			: `Speak to the user as "you" where it fits${voice.stance === 'persona' && name ? `, and know them as ${name}` : ''}.`;
+	return `${who} Whoever it is stands in for the story's ideas rather than being a character with a life of their own: give them a way of talking, and keep their own history to a touch. ${user}`;
+}
+
+/** The section that tells the model how to write the monologue, with examples of the form. */
+export function monologueGuide(
+	voice: DaydreamVoice,
+	characterCount: number,
+	heat: DialValue | null
+): string {
+	const examples = monologueExamples(heat)
+		.map((example) => `"""\n${example}\n"""`)
+		.join('\n');
+	return `# Writing a monologue
+This is not a story told scene by scene. It is one voice speaking its mind about what this daydream is about — the kinks, tropes and dynamics in the scene above — taking their ideas, the things people into them say and the sayings that go with them, and turning them into statements.
+- Write many short paragraphs. Most open with a statement on a line of its own, in bold — a belief, a rule, a mantra, a confession, something someone into this would say — followed by a few sentences in the voice's own words: what it means to them, why it gets to them, where it shows up in their day.
+- Keep each statement short enough to land: a sentence, rarely two.
+- Every statement says something new. Never repeat one or reword one already made; build on an idea, go deeper into it or turn it instead.
+- Write in the first person, in the voice's own way of talking.
+- Little or no scene: no description of a room, and of anyone only what the voice would mention in passing. There is no plot to move along.
+- When the user writes, the voice takes it up: what they ask about, it dwells on; what they push for, it goes further into; what they want less of, it drops.
+${monologueSpeaker(voice, characterCount)}
+These examples show the form only. Do not reuse any of their statements or sentences: take every idea from the scene above, and follow its heat and kink, not theirs.
+${examples}`;
+}

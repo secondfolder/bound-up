@@ -109,7 +109,7 @@ export const daydreamSetupFormSchema = z
 		// Optional: a new daydream is named by the model after its opening.
 		title: optional(DAYDREAM_LIMITS.title),
 		voice: z.object({
-			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal']),
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
 			stance: z.enum(['self', 'persona', 'absent']),
 			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
 		}),

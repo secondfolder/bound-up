@@ -17,7 +17,8 @@ import type { DaydreamVoice, DialValue } from '$lib/daydream';
  * Two halves. How to tell the story holds for every voice, the system's
  * included. How to write the prose does not hold for the system, whose
  * guide (`impersonal-voice.ts`) forbids narration of exactly this kind, so
- * it is left out there.
+ * it is left out there, and nor for a monologue (`monologue-voice.ts`),
+ * which has no scene to describe.
  *
  * Explicit sex has its own lines, on heat: clinical words and soft-focus
  * prose are the model's default, and at Explicit or Filthy they are what
@@ -65,6 +66,11 @@ function sexGuide(heat: DialValue | null): string | null {
 export function writingGuide(voice: DaydreamVoice, heat: DialValue | null): string {
 	if (voice.narrator === 'impersonal') {
 		return TELLING;
+	}
+	// A monologue has no scene to write prose about, but its sex is still
+	// written in plain, crude words.
+	if (voice.narrator === 'monologue') {
+		return [TELLING, sexGuide(heat)].filter((section) => section !== null).join('\n\n');
 	}
 	return [TELLING, PROSE, sexGuide(heat)].filter((section) => section !== null).join('\n\n');
 }

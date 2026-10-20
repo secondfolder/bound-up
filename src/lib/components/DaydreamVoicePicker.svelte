@@ -11,6 +11,7 @@
 		voicePreset,
 		voiceProblem
 	} from '$lib/daydream';
+	import { formatPassage, type Run } from '$lib/daydream/passage-format';
 	import { startOpen } from './details';
 
 	/**
@@ -23,7 +24,7 @@
 	 * with a line saying why.
 	 *
 	 * The options are names only, and the selected one is described beside
-	 * them, with examples of what the story will read like: four
+	 * them, with examples of what the story will read like: five
 	 * descriptions side by side were a wall of text to compare, where one at
 	 * a time can be tried on by choosing it.
 	 */
@@ -38,6 +39,21 @@
 	} = $props();
 
 	const problem = $derived(voiceProblem(value, characterCount));
+
+	/**
+	 * An example's words, with its bold and italics drawn as a passage draws
+	 * them (`formatPassage`) rather than shown as asterisks: an action in
+	 * italics, a monologue's statement in bold.
+	 */
+	const exampleRuns = (example: string): Run[] =>
+		formatPassage(example).flatMap((block) => (block.kind === 'paragraph' ? block.runs : []));
+
+	const runTag = (run: Run) => {
+		if (run.bold) {
+			return 'strong';
+		}
+		return run.italic ? 'em' : 'span';
+	};
 	const id = $props.id();
 
 	const preset = $derived(voicePreset(value));
@@ -72,6 +88,9 @@
 	}
 </script>
 
+<!-- One line on purpose: whitespace between the runs would draw as spaces. -->
+{#snippet exampleText(example: string)}{#each exampleRuns(example) as run (run.start)}<svelte:element this={runTag(run)} class:italic={run.italic}>{run.text}</svelte:element>{/each}{/snippet}
+
 <div class="voice">
 	<div class="choose">
 		<div class="options" role="radiogroup" aria-label="How it's told" aria-describedby={`${id}-about`}>
@@ -94,11 +113,11 @@
 			{#if preset}
 				<p class="description">{preset.description}</p>
 				<ul class="examples" aria-label="For example">
-					{#each preset.examples as example (example)}<li>{example}</li>{/each}
+					{#each preset.examples as example (example)}<li>{@render exampleText(example)}</li>{/each}
 				</ul>
 			{:else if narratorShown && stanceShown}
 				<p class="description">{narratorShown.description} {stanceShown.description}</p>
-				<ul class="examples" aria-label="For example"><li>{narratorShown.example}</li></ul>
+				<ul class="examples" aria-label="For example"><li>{@render exampleText(narratorShown.example)}</li></ul>
 			{/if}
 		</div>
 	</div>
@@ -219,6 +238,10 @@
 		}
 	}
 
+	.italic {
+		font-style: italic;
+	}
+
 	.examples {
 		margin: 0;
 		padding: 0;
@@ -227,11 +250,16 @@
 		flex-direction: column;
 		gap: 0.375rem;
 
+		/* Upright, set off by the rule and colour instead: italics inside an
+		   example mean an action, as they do in a passage. */
 		li {
 			padding-inline-start: 0.75rem;
 			border-inline-start: 2px solid var(--wa-color-surface-border);
-			font-style: italic;
 			color: var(--wa-color-text-quiet);
+		}
+
+		strong {
+			color: var(--wa-color-text-normal);
 		}
 	}
 

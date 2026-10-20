@@ -274,7 +274,7 @@ export function parseName(value: unknown): string | null {
 
 const QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;
 
-const VOICE_IDS = ['talk', 'told', 'watch', 'rules'] as const;
+const VOICE_IDS = ['talk', 'told', 'watch', 'rules', 'monologue'] as const;
 
 /**
  * A whole daydream from a `daydream` answer, written from a sentence the

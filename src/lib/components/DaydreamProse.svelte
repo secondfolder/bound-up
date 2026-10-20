@@ -64,7 +64,7 @@
 			<hr class="scene-break" />
 		{:else}
 			<!-- One line on purpose: see the comment at the top. -->
-			<p class:after-break={block.afterBreak}>{#each block.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</p>
+			<p class:after-break={block.afterBreak} class:standout={block.standout}>{#each block.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</p>
 		{/if}
 	{/each}
 </div>
@@ -127,6 +127,15 @@
 
 	.bold {
 		font-weight: var(--wa-font-weight-bold, 700);
+	}
+
+	/* A statement on a line of its own: what a monologue's paragraphs are
+	   built on (`standout` in passage-format.ts), set like a pull quote. */
+	.standout {
+		font-family: var(--wa-font-family-heading);
+		font-size: 1.35em;
+		line-height: 1.3;
+		color: var(--wa-color-brand-on-quiet);
 	}
 
 	.italic {

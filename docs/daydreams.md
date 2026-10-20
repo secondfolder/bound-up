@@ -107,7 +107,7 @@ characters** (or scenes) as any such copy does.
 A draft opens in the form's **summary** layout: the setup as a short summary
 with blanks in it, built by `setupSummary` (`daydream/summary.ts`). Each blank
 is the control for that part of it: the heat a menu of levels, the voice a
-menu of the four presets, a character their dialog, the scene the scene
+menu of the five presets, a character their dialog, the scene the scene
 dialog. "Add someone" and "Anything off the table?" (the limits) sit under it.
 
 The summary is two paragraphs:
@@ -197,9 +197,9 @@ The voice is two settings, separate from who is in the story
 
 - **Who tells it** (`narrator`): the characters themselves (`none`), a
   narrator talking to "you" (`second-person`), a narrator telling it about
-  others (`third-person`), or no narrator at all: a system — a house's rules,
+  others (`third-person`), no narrator at all but a system — a house's rules,
   a protocol, an institution — giving orders (`impersonal`, "A system" on the
-  page).
+  page), or one voice speaking its mind (`monologue`).
 - **Where the user is** (`stance`): in it as themselves (`self`), playing
   someone they name (`persona`), or outside it, watching and directing
   (`absent`).
@@ -212,12 +212,13 @@ Between them they make every shape of story:
 | A story told to you    | 0+         | second-person | self     |
 | Watch a story unfold   | 1+         | third-person  | absent   |
 | A system in charge     | 0+         | impersonal    | self     |
+| A monologue            | 0+         | monologue     | self     |
 
-Those four are the presets. **It is asked last, and guessed until then.**
+Those five are the presets. **It is asked last, and guessed until then.**
 Until the user picks one, the voice follows who is in the story
 (`inferVoice`): nobody in it is a story told to you, anyone is talking with
-them, and the one-line summary says "Picked from who's in it." Watching and a
-system are never guessed, because each changes what the story is rather than
+them, and the one-line summary says "Picked from who's in it." Watching, a
+system and a monologue are never guessed, because each changes what the story is rather than
 how it is told. Picking one — in the picker, or from the sentence's voice
 blank — stops the guessing for good. An edited daydream's voice counts as
 picked, and so does a draft's when it is not what the guess would have been
@@ -230,7 +231,9 @@ and beside them (below them, on a narrow screen) describes the chosen one,
 with two example lines of what the story will read like (`description` and
 `examples` on `DAYDREAM_VOICE_PRESETS`). Choosing another option is how its
 description is seen. Four descriptions side by side were a wall of text to
-compare; one at a time can be tried on. The two settings under "Fine-tune how
+compare; one at a time can be tried on. The examples are drawn with their
+bold and italics, as a passage would draw them (`formatPassage`): an action
+in italics, a monologue's statement in bold. The two settings under "Fine-tune how
 it's told" are names only in the same way, and for a combination no preset
 gives the panel describes the chosen narrator and stance instead, with the
 narrator's example.
@@ -240,12 +243,13 @@ in the one-line summary while the picker is closed, so nothing closed ever
 hides why the form will not save.
 `voiceProblem` refuses what cannot work — no narrator and no character
 (nobody speaks), no narrator while watching (the characters would be talking
-to no one), watching nothing, a narrator talking to a "you" who is absent, a
+to no one), watching nothing (except a monologue, which can be overheard
+with nobody in it), a narrator talking to a "you" who is absent, a
 persona with no name — and the form disables a choice that could never work
 with the other setting, saying why beside it. The setup kind runs the same
 check, so a stale page cannot store one. "Who leads" is shown only where it
-means something: with characters, and with the user there to be led
-(`leadApplies`).
+means something: with characters, with the user there to be led, and not in
+a monologue, which nobody leads (`leadApplies`).
 
 The three narrated voices are ordinary fiction, which the model writes well
 from a sentence. The system voice is not: told only to be "an impersonal
@@ -264,6 +268,33 @@ words. The system's opening request asks for its first notice rather than
 "Set the scene", who leads and the suggestion and button ideas are worded for
 a system (Stricter, New rule, Inspection), and its characters are its
 functionaries rather than people with decisions of their own.
+
+**A monologue** is less of a story still. One voice speaks its mind about
+what the daydream is about, taking the ideas, tropes and common sayings of
+its kinks and turning them into statements: many short paragraphs, most
+opening with a statement in bold on a line of its own, followed by a few
+sentences in the voice's own words. The voice stands in for those ideas
+rather than being a fleshed-out character. Who it is is left to the setup:
+an unnamed voice with the user listening unless the scene suggests a
+character, or the user's own inner voice where that suits it; watching, the
+user overhears it. Told only to "speak a monologue" a model writes a
+soliloquy in a room, with a plot, so it gets a guide of its own like the
+system's (`src/lib/server/daydream/monologue-voice.ts`), last before the
+format, with examples of the form in a tame and an adult set by heat, broad
+rather than anyone's particular kink. It gets the telling and sex sections of
+the writing guide but not the scene prose, which it has none of; its opening
+request asks it to start straight into its statements; its suggestion and
+button ideas are its own (More like that, A mantra, Another idea); and
+nobody leads it. Its bold statements are drawn as standout lines
+([Reading a passage](#reading-a-passage)).
+
+The monologue came with setup payload v4, which ships its reader and writer
+in one release (docs/encryption.md, "Sealed records"): a tab left open on the
+previous build cannot open a monologue daydream made after the deploy until
+it reloads.
+
+Two ready-made stories are monologues, one for each side ("Owned" and
+"Yours to use"), with no cast: an unnamed voice speaks.
 
 ### Characters and scenes, and the library
 
@@ -921,6 +952,11 @@ of this still point at the same words, and nothing was migrated.
   at, and emphasis never crosses a paragraph.
 - A line of `***`, `* * *`, `---`, `___` or `⁂` on its own is a scene
   break, drawn as a centred ⁂. Repeated breaks collapse to one.
+- A paragraph that is bold throughout is a **standout line** (`standout`),
+  drawn larger and in the brand colour, like a pull quote. A monologue opens
+  most of its paragraphs with one; any voice's is drawn the same way. It is
+  read from the bold already there, not from new markup, so nothing written
+  before it reads differently unless it was all bold already.
 - Anything else — headings, lists, links — is shown as written. The prompt
   asks for none of it.
 
@@ -1184,7 +1220,8 @@ to itself.
   reciting it; and get a stalled story moving. Passages are not told to end
   on a cue for the user, which suits someone only watching the story badly.
 - **Writing the prose**, for every voice but the system's, whose own guide
-  forbids exactly this kind of narration: spend the words on the people and
+  forbids exactly this kind of narration, and the monologue's, which has no
+  scene to describe: spend the words on the people and
   what they do, not on atmosphere that moves nothing; plain physical
   description over metaphor and simile; the senses.
 - **Writing sex**, at Explicit and Filthy only, since below that it would
@@ -1418,8 +1455,9 @@ Noted so they are not lost; none is in the code.
 
 ## Tests
 
-- Pure: `daydream.test.ts` (every voice combination, casting against a
-  scene's parts, the voice guessed from the cast),
+- Pure: `daydream.test.ts` (every voice combination, a monologue with any
+  cast and stance, casting against a scene's parts, the voice guessed from
+  the cast and never a monologue),
   `daydream/starters.test.ts` (every ready-made story is a setup the form
   would save, cast as written; assembling a draft),
   `daydream/summary.test.ts` (reading the model's markers; what the second
@@ -1427,7 +1465,7 @@ Noted so they are not lost; none is in the code.
   paragraph gives way to the premise),
   `daydream/tree.test.ts`, `reply-format.test.ts` (the written-out turn,
   arriving and finished), `passage-format.test.ts` (paragraphs and breaks,
-  emphasis pairing and what stays literal, dialogue, say tags,
+  emphasis pairing and what stays literal, standout lines, dialogue, say tags,
   what is hidden while it streams, quotes across formatting, every run
   verbatim), `reveal.test.ts` (the pace), `dice.test.ts`,
   `chips.test.ts`, `quotes.test.ts`, `ooc.test.ts`, `suggestions.test.ts`,
@@ -1435,7 +1473,8 @@ Noted so they are not lost; none is in the code.
   record, they run SFW to extreme in order, every chip is one phrase),
   `context.test.ts`, `server/daydream/prompt.test.ts` (the rules always come
   first; a stopped story gets a check-in in any mode; heat is the ceiling;
-  the system voice's guide, its place and its examples by heat; writing a
+  the system voice's and the monologue's guides, their place and their
+  examples by heat, who speaks a monologue; writing a
   turn out, never for a watcher; directions like a button; chosen readings
   as notes that settle it; the formatting asked for, never in a check-in),
   `suggest-prompt.test.ts`, `config.test.ts`, `daydream/image-prompt.test.ts`
@@ -1453,15 +1492,17 @@ Noted so they are not lost; none is in the code.
   as markers; Read it differently forking, mid-passage too, and its reading
   kept; a quote selected after hidden markup is stored offsets; a passage
   formatted as it arrives),
-  `DaydreamProse.svelte.test.ts` (what is drawn, voices without names, the drop
-  cap, quotes across formatting, `storedOffset`), `scroll-parent.svelte.test.ts`
+  `DaydreamProse.svelte.test.ts` (what is drawn, standout lines drawn larger,
+  voices without names, the drop cap, quotes across formatting,
+  `storedOffset`), `scroll-parent.svelte.test.ts`
   (following, and holding at a passage's top),
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts,
   the voice last and guessed, the summary layout with and without the
   model's paragraph), `SummaryBlank.svelte.test.ts` (one named button to
   assistive tech, taps and drags, kept in a copied selection, the menu
   opening from the words),
-  `DaydreamVoicePicker.svelte.test.ts` (names only, the chosen one described),
+  `DaydreamVoicePicker.svelte.test.ts` (names only, the chosen one described,
+  its examples' markup drawn, the monologue offered),
   `DaydreamStarter.svelte.test.ts` (the ways in),
   `DaydreamSetupFormAdd.svelte.test.ts`,
   `DaydreamCharacterDialog.svelte.test.ts` (the two halves),
@@ -1469,7 +1510,9 @@ Noted so they are not lost; none is in the code.
   `DaydreamBranchMap.svelte.test.ts` (the longest-path trunk, jumping,
   folding).
 - End to end: `e2e/daydreams.spec.ts` (a ready-made start through its
-  summary, a described one with the model's marked summary, and the full form; the stub's opening has an
+  summary, a described one with the model's marked summary, a ready-made
+  monologue whose bold statement is drawn as a standout line, and the full
+  form; the stub's opening has an
   italic paragraph, so a quote is kept from inside drawn Markdown) and `e2e/daydream-heat.spec.ts`,
   against `e2e/model-stub.mjs`, a stand-in OpenRouter that `e2e/server.mjs`
   starts beside the app.

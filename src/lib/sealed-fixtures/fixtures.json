@@ -392,6 +392,47 @@
 			}
 		},
 		{
+			"kind": "daydream-setup",
+			"version": 4,
+			"recordId": "00000000-0000-4000-8000-0000000000f1",
+			"ciphertext": "sb1.KGA95EIUn7ZyLR6ewH28kcRGt0A3D3DYYIYegsonB6WSkyuz_VgxCa6dH_L4WDe0K16t7d4Q0bseZWaXPTMiOUc11CD7Lr2WmK4up22-aOtZIl7-ohwZjQennj5b2w0DUlHtoo2wznHzVpMDBu85AIxtUFPAP-N0VmmuiGB151eO7-cmrCS6F7P8tk9LlkRwY-cKJUR09XflNecilUNZqjqofbyre1PkyXLXZ_HFJ6jJhsDIeQlcCT21ThLuQJVxf84PzDoj9fmLUOStSp3BjgDz--F8cP2XyS-vKiZMiFeyH7iuqkdrA97txf6HpbzBCziPGUUKEy1bk7XqNC8aZ5GFJbU6-b2-jnHkMj5jNzchByt6-odYEIHxfs54ATMH6bXz-2UMnXxtL9hr4iCUxRJmAm2g5FtDBoM0zjDOxbs6Y-Msbyfmk2ySYGhP65ajmxiKeJEgtCgGjw6wODNMBywnpi6syEI10sU2c8Omdx8wd4O_Obv_QNj8RdysuiCWUQXd0IO5kzmeyfV5fJBWlvjcKAYvCNJhsMBHkTQqYkyKUS4qgUyAXL6i9cbe5IRjSsDsag9cTrAOBZWBCpv443kZkerg66SaW3bm9KpINUuhj2Xnn_c4PiBEmK5X8x3HVxmYPHJi4O9HluIVW_e3oHbXPgHNsmUP8h4NEl_qj8EE_2pz8X97IGs",
+			"expected": {
+				"title": "",
+				"voice": {
+					"narrator": "monologue",
+					"stance": "persona",
+					"protagonistName": "Kit"
+				},
+				"characters": [],
+				"scene": {
+					"title": "Frozen mantras",
+					"setting": "Nowhere in particular.",
+					"premise": "A voice that says what belonging means.",
+					"yourRole": "The listener",
+					"tone": "devoted",
+					"notes": "",
+					"parts": [],
+					"sourceId": null,
+					"sourceRevision": null,
+					"dials": {
+						"heat": 4,
+						"kink": 4
+					}
+				},
+				"lead": "character",
+				"limits": "Nothing public.",
+				"dials": {
+					"intensity": 3,
+					"pace": 3,
+					"length": "medium"
+				},
+				"pictures": {
+					"on": true,
+					"style": "photo"
+				}
+			}
+		},
+		{
 			"kind": "daydream-turn",
 			"version": 2,
 			"recordId": "00000000-0000-4000-8000-0000000000d4",

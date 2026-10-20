@@ -703,6 +703,98 @@ describe('the system voice', () => {
 	});
 });
 
+describe('the monologue voice', () => {
+	const monologueSetup = (
+		overrides: { heat?: DialValue | null; characters?: number; stance?: DaydreamStance } = {}
+	) =>
+		testDaydreamSetup({
+			voice: { narrator: 'monologue', stance: overrides.stance ?? 'self', protagonistName: 'Kit' },
+			characters: Array.from({ length: overrides.characters ?? 0 }, () => testCharacter()),
+			scene: testScene({ dials: { heat: overrides.heat ?? null, kink: null } })
+		});
+	const monologueOf = (s: ReturnType<typeof monologueSetup>, turns: ContextTurn[] = []) =>
+		system(buildMessages(request({ mode: 'opening', setup: s, turns })));
+	const Tame = 'Rules are a kindness.';
+	const Adult = 'Being owned is a relief.';
+
+	it('gets its own guide, after how to read the user and before the reply format', () => {
+		const content = monologueOf(monologueSetup());
+		const guide = content.indexOf('# Writing a monologue');
+		expect(guide).toBeGreaterThan(content.indexOf("# Reading the user's turns"));
+		expect(guide).toBeLessThan(content.indexOf('# Reply format'));
+		expect(content).toContain('You speak a monologue');
+		expect(content).toContain('a statement on a line of its own, in bold');
+	});
+
+	it('shows the tame examples below Steamy, and the adult ones from it, as form only', () => {
+		for (const heat of [null, 1, 2] as const) {
+			const content = monologueOf(monologueSetup({ heat }));
+			expect(content).toContain(Tame);
+			expect(content).not.toContain(Adult);
+		}
+		for (const heat of [3, 4, 5] as const) {
+			const content = monologueOf(monologueSetup({ heat }));
+			expect(content).toContain(Adult);
+			expect(content).not.toContain(Tame);
+		}
+		expect(monologueOf(monologueSetup())).toContain('These examples show the form only');
+	});
+
+	it('leaves who speaks to the setup: an unnamed voice by default, or a character', () => {
+		const alone = monologueOf(monologueSetup());
+		expect(alone).toContain('speak as an unnamed voice with the user listening');
+		expect(alone).toContain('the user’s own inner voice');
+		expect(monologueOf(monologueSetup({ stance: 'persona' }))).toContain('know them as Kit');
+		expect(monologueOf(monologueSetup({ characters: 1 }))).toContain(
+			'The speaker is one of the characters below'
+		);
+		expect(monologueOf(monologueSetup({ stance: 'absent' }))).toContain('they overhear it');
+	});
+
+	it('is told how to tell it and write sex, but not the scene prose, and no one leads', () => {
+		const content = monologueOf(monologueSetup({ heat: 5, characters: 1 }));
+		expect(content).toContain('# Telling the story');
+		expect(content).toContain('# Writing sex');
+		expect(content).not.toContain('# Writing the prose');
+		expect(content).not.toContain('The characters lead');
+	});
+
+	it('asks for bold statement lines, and for none of it in quotation marks', () => {
+		const content = monologueOf(monologueSetup());
+		expect(content).toContain('**bold** for each statement, on a line of its own');
+		expect(content).toContain('never in quotation marks');
+		const other = system(buildMessages(request({ mode: 'opening' })));
+		expect(other).toContain('**bold**, rarely, for a word that has to land');
+	});
+
+	it('opens straight into its statements, and is steered by its own buttons', () => {
+		const opening = buildMessages(request({ mode: 'opening', setup: monologueSetup() })).at(-1);
+		expect(opening?.content).toContain('Open straight into the monologue');
+		expect(opening?.content).not.toContain('Set the scene');
+		const content = monologueOf(monologueSetup());
+		expect(content).toContain('one asking the voice to say more');
+		expect(content).toContain('More like that, A mantra');
+	});
+
+	it('is not given to any other voice, nor to a stopped scene’s check-in', () => {
+		for (const narrator of ['none', 'second-person', 'impersonal'] as const) {
+			const other = testDaydreamSetup({
+				voice: { narrator, stance: 'self', protagonistName: '' },
+				scene: testScene({ dials: { heat: 4, kink: null } })
+			});
+			const content = system(buildMessages(request({ mode: 'opening', setup: other })));
+			expect(content).not.toContain('# Writing a monologue');
+			expect(content).not.toContain(Adult);
+		}
+		const stopped = monologueOf(monologueSetup(), [
+			said('Being owned is a relief.', 'story'),
+			{ type: 'safety', signal: 'red' }
+		]);
+		expect(stopped).toContain('# The scene is stopped');
+		expect(stopped).not.toContain('# Writing a monologue');
+	});
+});
+
 describe('describeSetup', () => {
 	it('describes each character, with their dials in words and the description winning', () => {
 		const content = describeSetup(

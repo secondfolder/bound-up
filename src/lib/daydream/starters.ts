@@ -500,6 +500,26 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		]
 	},
 	{
+		id: 'owned',
+		you: 'sub',
+		tags: ['ownership', 'mantras', 'monologue'],
+		voice: 'monologue',
+		scene: 'owned',
+		summary:
+			'[[scene|A voice that knows exactly what being owned means to you, and says it]]. Statement after statement about belonging to someone, each more [[heat|explicit]] than the last. It’s told [[voice|as a monologue, one voice speaking its mind]].',
+		cast: []
+	},
+	{
+		id: 'yours-to-use',
+		you: 'dom',
+		tags: ['devotion', 'worship', 'monologue'],
+		voice: 'monologue',
+		scene: 'yours-to-use',
+		summary:
+			'[[scene|A devoted voice telling you everything it would let you do to it]]. Every statement is about needing you in charge, and they get more [[heat|explicit]] as it goes. It’s told [[voice|as a monologue, one voice speaking its mind]].',
+		cast: []
+	},
+	{
 		id: 'hotel-room',
 		you: null,
 		tags: ['hookup', 'no strings'],

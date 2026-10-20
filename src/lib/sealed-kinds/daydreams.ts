@@ -16,6 +16,7 @@ import {
 	castingProblem,
 	DAYDREAM_LIMITS,
 	type DaydreamSetup,
+	type DaydreamVoice,
 	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	MAX_DAYDREAM_CHARACTERS,
@@ -153,7 +154,7 @@ const setupV2Shape = {
  */
 function refineSetup(
 	value: {
-		voice: z.output<typeof setupV2Shape.voice>;
+		voice: Pick<DaydreamVoice, 'narrator' | 'stance' | 'protagonistName'>;
 		characters: z.output<typeof setupV2Shape.characters>;
 		scene: z.output<typeof setupV2Shape.scene>;
 	},
@@ -176,6 +177,21 @@ const setupV2 = z.object(setupV2Shape).superRefine(refineSetup);
 const setupV3 = z
 	.object({
 		...setupV2Shape,
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
+	})
+	.superRefine(refineSetup);
+
+// v4: a monologue, a fifth narrator (docs/daydreams.md, "Voices"). The
+// narrator list is written out again rather than shared, because a shipped
+// version's schema must never change under it.
+const setupV4 = z
+	.object({
+		...setupV2Shape,
+		voice: z.object({
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
+			stance: z.enum(['self', 'persona', 'absent']),
+			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
+		}),
 		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
 	})
 	.superRefine(refineSetup);
@@ -240,7 +256,13 @@ export const daydreamSetupKind = defineSealedKind({
 				pictures: DEFAULT_PICTURES
 			})
 		},
-		{ version: 3, schema: setupV3 }
+		{
+			version: 3,
+			schema: setupV3,
+			// Every v3 voice is a v4 voice: v4 only adds one.
+			upcast: (value: z.output<typeof setupV3>): z.output<typeof setupV4> => value
+		},
+		{ version: 4, schema: setupV4 }
 	]
 });
 

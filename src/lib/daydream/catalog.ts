@@ -1228,6 +1228,38 @@ export const SCENE_TEMPLATES: readonly {
 			dials: { heat: 4, kink: 4 }
 		}
 	},
+	// Monologues: one voice speaking its mind, so no one to cast. The setting
+	// is where the voice speaks from, which is nowhere in particular.
+	{
+		id: 'owned',
+		label: 'Owned',
+		scene: {
+			title: 'Owned',
+			setting: 'nowhere in particular: a voice, and you listening',
+			premise:
+				'a voice that knows exactly what being owned means to you, and says it, statement after statement',
+			yourRole: 'the one who wants to be owned',
+			tone: 'devoted, relentless, filthy',
+			notes: '',
+			parts: [],
+			dials: { heat: 4, kink: 4 }
+		}
+	},
+	{
+		id: 'yours-to-use',
+		label: 'Yours to use',
+		scene: {
+			title: 'Yours to use',
+			setting: 'nowhere in particular: a voice, and you listening',
+			premise:
+				'a devoted voice telling you everything it would let you do to it, and why it needs you in charge',
+			yourRole: 'the one in charge',
+			tone: 'eager, worshipful, filthy',
+			notes: '',
+			parts: [],
+			dials: { heat: 4, kink: 4 }
+		}
+	},
 	{
 		id: 'hotel-room',
 		label: 'The hotel room',

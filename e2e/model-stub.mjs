@@ -13,6 +13,9 @@
 //   then a second paragraph in italics, "*The door clicks shut behind you.*",
 //   so selecting and highlighting words is exercised across hidden markup
 //   (docs/daydreams.md, "Reading a passage");
+// - a monologue's opening, asked for in its own words: a bold statement on a
+//   line of its own, "**The stub voice says its piece.**", then "And then a
+//   little more.", so a spec sees the statement drawn as a standout line;
 // - a short out-of-character check-in after Stop the scene;
 // - "<character> rewrites it." for a rewrite;
 // - otherwise `<character> heard: "<the user's last turn>"`, with a take
@@ -128,6 +131,9 @@ function replyFor(messages) {
 		// A picture only when asked, so the other specs' pages stay as they were.
 		...(last.includes('[picture]') ? { image: 'A woman in her thirties at a desk' } : {})
 	};
+	if (users.length === 1 && last.startsWith('(Begin. Open straight into the monologue')) {
+		return withMeta(`**The stub voice says its piece.**\n\nAnd then a little more.${heat}`, meta);
+	}
 	if (users.length === 1 && last.startsWith('(Begin the story')) {
 		return withMeta(
 			`${name} looks up as you come in.${heat}\n\n*The door clicks shut behind you.*`,

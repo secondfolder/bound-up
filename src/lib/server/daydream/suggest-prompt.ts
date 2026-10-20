@@ -444,14 +444,15 @@ Answer as: {"title": "…"}`
 }
 
 /**
- * The four voices, in the terms of `DAYDREAM_VOICE_PRESETS`. "talk" is the
+ * The five voices, in the terms of `DAYDREAM_VOICE_PRESETS`. "talk" is the
  * default, as it is on the form, so a sentence that says nothing about how it
  * is told gets the shape most people mean.
  */
 const VOICES = `- "talk": the characters speak to the user directly, with no narrator.
 - "told": a narrator tells it to the user, as "you"; characters are optional.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
-- "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.`;
+- "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
+- "monologue": one voice speaking its mind about what the story is about, statement by statement, rather than telling a story.`;
 
 /**
  * Where the user stands, in the same terms as the ready-made stories' `you`.
@@ -510,7 +511,7 @@ Choose "talk" unless what they wrote asks for another.
 
 The scene: a short title; where it happens, what is going on as it starts, who the user is in it, and its tone, a sentence or two each. ${PARTS_INSTRUCTION}${rateInstruction(['heat', 'kink'])} Rate it from what they wrote: a story that says nothing sexual is not sexual.
 
-Who is in it: one to ${MAX_DAYDREAM_CHARACTERS} characters, each playing one of the scene's parts, named exactly as the part is. For each, a name, and a phrase or two for their type, personality, how they talk, appearance and what they enjoy; who they are to the user in this story, in a few words; and what they are doing or want as the scene starts, in a sentence. With "rules", they are the system's functionaries. With "told", there may be none.
+Who is in it: one to ${MAX_DAYDREAM_CHARACTERS} characters, each playing one of the scene's parts, named exactly as the part is. For each, a name, and a phrase or two for their type, personality, how they talk, appearance and what they enjoy; who they are to the user in this story, in a few words; and what they are doing or want as the scene starts, in a sentence. With "rules", they are the system's functionaries. With "told", there may be none. With "monologue", there is usually none: the voice can be unnamed, a character can be the one speaking, or it can be the user's own inner voice.
 
 ${SUMMARY_INSTRUCTION}
 Answer as: {"summary": "…", "voice": "talk", "scene": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": 1-5, "kink": 1-5, ${PARTS_SHAPE}}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}]}`

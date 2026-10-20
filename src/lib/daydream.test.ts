@@ -99,6 +99,30 @@ describe('inferVoice', () => {
 	it('keeps what the story calls the user', () => {
 		expect(inferVoice(voice('none', 'self', 'Kit'), 0).protagonistName).toBe('Kit');
 	});
+
+	it('never guesses a monologue, which is only ever chosen', () => {
+		for (let count = 0; count <= MAX_DAYDREAM_CHARACTERS; count += 1) {
+			expect(inferVoice(voice('monologue', 'self'), count).narrator).not.toBe('monologue');
+		}
+	});
+});
+
+describe('a monologue', () => {
+	it('works with or without characters, and wherever the user stands', () => {
+		for (let count = 0; count <= MAX_DAYDREAM_CHARACTERS; count += 1) {
+			for (const stance of ['self', 'persona', 'absent'] as const) {
+				expect(
+					voiceProblem(voice('monologue', stance, 'Kit'), count),
+					`${stance}, ${count}`
+				).toBeNull();
+			}
+		}
+	});
+
+	it('is a preset, and nobody leads it', () => {
+		expect(voicePreset(voice('monologue', 'self'))?.id).toBe('monologue');
+		expect(leadApplies(voice('monologue', 'self'), 2)).toBe(false);
+	});
 });
 
 describe('leadApplies', () => {

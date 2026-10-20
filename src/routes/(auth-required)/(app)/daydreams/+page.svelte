@@ -16,7 +16,14 @@
 		if (names.length > 0) {
 			return `with ${new Intl.ListFormat(undefined, { type: 'conjunction' }).format(names)}`;
 		}
-		return setup.voice.narrator === 'impersonal' ? 'under the rules' : 'told to you';
+		switch (setup.voice.narrator) {
+			case 'impersonal':
+				return 'under the rules';
+			case 'monologue':
+				return 'a monologue';
+			default:
+				return 'told to you';
+		}
 	}
 </script>
 

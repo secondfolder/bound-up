@@ -24,7 +24,12 @@
  * Pure and alias-free.
  */
 
-import { type DaydreamSetup, type DialValue, voicePreset } from '../daydream';
+import {
+	type DaydreamSetup,
+	type DaydreamVoicePresetId,
+	type DialValue,
+	voicePreset
+} from '../daydream';
 import { SCENE_SLIDERS } from './dial-words';
 
 /**
@@ -302,12 +307,13 @@ function listOf(people: SummaryPiece[][]): SummaryPiece[] {
  * only how the story reaches the user. Exported for the prompt, so the
  * model's closing sentence and this one say it alike.
  */
-export const TOLD_AS = {
+export const TOLD_AS: Readonly<Record<DaydreamVoicePresetId, string>> = {
 	talk: 'in the characters’ own words, with no narrator',
 	told: 'to you by a narrator',
 	watch: 'by a narrator, as you watch from outside',
-	rules: 'as a system’s orders to you'
-} as const;
+	rules: 'as a system’s orders to you',
+	monologue: 'as a monologue, one voice speaking its mind'
+};
 
 /** The sentence saying how it is told. */
 function toldSentence(setup: Setup): SummaryPiece[] {

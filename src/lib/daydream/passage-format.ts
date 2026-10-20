@@ -13,7 +13,9 @@
  *
  * Deliberately a small subset, because a story is prose: `*italic*` or
  * `_italic_`, `**bold**`, `***both***`, and a line of `* * *` (or `---`,
- * `___`, `⁂`) for a scene break. No headings, lists, links or tables. A
+ * `___`, `⁂`) for a scene break. A paragraph that is bold throughout is a
+ * standout line, drawn larger: no new markup, so nothing written before it
+ * existed reads differently unless it was all bold already. No headings, lists, links or tables. A
  * marker that does not pair up is shown as written rather than guessed at.
  *
  * Speech is set apart two ways. Anything in quotation marks is dialogue; and
@@ -51,6 +53,12 @@ export type Block =
 			runs: Run[];
 			/** Straight after a scene break: its first line is set in small caps. */
 			afterBreak: boolean;
+			/**
+			 * Every word in it is bold: a statement on a line of its own, drawn
+			 * larger. A monologue opens most paragraphs with one
+			 * (`monologue-voice.ts`); any voice's is drawn the same way.
+			 */
+			standout: boolean;
 	  }
 	| { kind: 'break' };
 
@@ -149,11 +157,17 @@ function format(
 		}
 		const runs = runsOf(text, piece, marks);
 		if (runs.length > 0) {
-			blocks.push({ kind: 'paragraph', runs, afterBreak });
+			blocks.push({ kind: 'paragraph', runs, afterBreak, standout: allBold(runs) });
 			afterBreak = false;
 		}
 	}
 	return blocks;
+}
+
+/** Whether every run with words in it is bold: whitespace between bold runs does not count. */
+function allBold(runs: readonly Run[]): boolean {
+	const worded = runs.filter((run) => run.text.trim() !== '');
+	return worded.length > 0 && worded.every((run) => run.bold);
 }
 
 /**
