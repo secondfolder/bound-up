@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
-import { pickIdeas } from '$lib/daydream/starters';
+import { shuffledStarterIds } from '$lib/daydream/starters';
 import {
 	daydreamSealedSubmitSchema,
 	daydreamSetupFormSchema,
@@ -36,8 +36,8 @@ export const load: PageServerLoad = async ({ locals: { db, user, settings }, pla
 		available: readDaydreamConfig(settings, platform) !== null,
 		picturesAvailable: readImageConfig(settings, platform) !== null,
 		// Drawn here rather than in the component so the server's render and
-		// hydration show the same few (`pickIdeas`).
-		ideas: pickIdeas()
+		// hydration show the stories in the same order (`shuffledStarterIds`).
+		starterOrder: shuffledStarterIds()
 	};
 };
 

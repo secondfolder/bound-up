@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GENERATED_IDEAS, MAX_NAMING_OPENING } from '$lib/daydream/suggestions';
+import { GENERATED_IDEAS, MAX_NAMING_OPENING, MAX_OFFERED_IDEAS } from '$lib/daydream/suggestions';
 import {
 	buildSuggestMessages,
 	SUGGEST_RULES,
@@ -286,7 +286,7 @@ describe('what makes a story worth starting', () => {
 
 	it('is asked of every task that invents a story', () => {
 		const inventing: SuggestRequest[] = [
-			{ task: 'ideas', request: 'something slow', side: null, limits: '' },
+			{ task: 'ideas', request: 'something slow', side: null, limits: '', offered: [] },
 			{ task: 'daydream', idea: 'a slow burn at work', limits: '' },
 			{ task: 'surprise-scene', target: 'scene', draft: {}, context }
 		];
@@ -313,7 +313,8 @@ describe('buildSuggestMessages, story ideas', () => {
 		task: 'ideas',
 		request: 'teasing and denial somewhere public',
 		side: 'dom',
-		limits: 'Nothing with strangers.'
+		limits: 'Nothing with strangers.',
+		offered: []
 	};
 
 	it('asks for a few ideas of the kind requested, with the rules and limits first', () => {
@@ -335,6 +336,15 @@ describe('buildSuggestMessages, story ideas', () => {
 		expect(ask).not.toContain('The user is the submissive one');
 	});
 
+	it('asks "More ideas" for new ones, naming those already offered', () => {
+		expect(buildSuggestMessages(ideas).messages[1]?.content).not.toContain('already been offered');
+		const ask =
+			buildSuggestMessages({ ...ideas, offered: ['Caught', 'Your rules'] }).messages[1]?.content ??
+			'';
+		expect(ask).toContain('already been offered');
+		expect(ask).toContain('"Caught", "Your rules"');
+	});
+
 	it('mixes the sides for "Either"', () => {
 		const ask = buildSuggestMessages({ ...ideas, side: null }).messages[1]?.content ?? '';
 		expect(ask).toContain('Mix them');
@@ -348,6 +358,13 @@ describe('buildSuggestMessages, story ideas', () => {
 			false
 		);
 		expect(suggestRequestSchema.safeParse({ ...ideas, side: 'switch' }).success).toBe(false);
+		expect(suggestRequestSchema.safeParse({ ...ideas, offered: ['Caught'] }).success).toBe(true);
+		expect(
+			suggestRequestSchema.safeParse({
+				...ideas,
+				offered: Array.from({ length: MAX_OFFERED_IDEAS + 1 }, (_, at) => `Idea ${at}`)
+			}).success
+		).toBe(false);
 	});
 });
 

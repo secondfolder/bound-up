@@ -241,6 +241,25 @@ export async function requestPicture(
 	};
 }
 
+const estimateSchema = z.object({ estimateMs: z.number().positive().nullable() });
+
+/**
+ * How long a picture in this style usually takes on this server, or null if
+ * none has been made or the answer did not come. Silent when it fails: the
+ * ring falls back to a guess, and the picture itself is unaffected.
+ */
+export async function estimatePicture(
+	daydreamId: string,
+	style: PictureStyle
+): Promise<number | null> {
+	const response = await tryFetch(`${base(daydreamId)}/image?style=${encodeURIComponent(style)}`);
+	if (!response?.ok) {
+		return null;
+	}
+	const parsed = estimateSchema.safeParse(await response.json().catch(() => null));
+	return parsed.success ? parsed.data.estimateMs : null;
+}
+
 const pictureRequestSchema = z.object({
 	model: z.string(),
 	positivePrompt: z.string(),

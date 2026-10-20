@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DAYDREAM_LIMITS } from '../daydream';
 import {
+	addIdeas,
 	completionJson,
 	GENERATED_IDEAS,
 	ideaSentence,
@@ -301,6 +302,21 @@ describe('parseGeneratedIdeas', () => {
 		expect(kept?.dials).toEqual({ heat: null, kink: null });
 		const many = { ideas: Array.from({ length: 9 }, (_, at) => idea({ title: `Idea ${at}` })) };
 		expect(parseGeneratedIdeas(many, null)).toHaveLength(GENERATED_IDEAS);
+	});
+
+	it('adds more ideas after the ones shown, dropping a title already there', () => {
+		const [caught, other, more] = parseGeneratedIdeas(
+			{ ideas: [idea({}), idea({ title: 'Other' }), idea({ title: 'More' })] },
+			null
+		);
+		const shown = [caught, other].filter((kept) => kept !== undefined);
+		const repeat = { ...(more as NonNullable<typeof more>), title: 'CAUGHT' };
+		expect(addIdeas(shown, [repeat, more as NonNullable<typeof more>])).toEqual([
+			caught,
+			other,
+			more
+		]);
+		expect(addIdeas(shown, [repeat])).toHaveLength(2);
 	});
 
 	it('is empty for anything that is not a list of ideas', () => {

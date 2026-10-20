@@ -4,12 +4,12 @@ import { daydreamSetupFormSchema } from '../schemas/daydreamForm';
 import { CHARACTER_TEMPLATES, SCENE_TEMPLATES } from './catalog';
 import {
 	assembleSetup,
-	DAYDREAM_IDEA_CHIPS,
 	DAYDREAM_STARTERS,
 	forSide,
-	pickIdeas,
-	SHOWN_IDEA_CHIPS,
+	inOrder,
+	matchesSearch,
 	type StoryPieces,
+	shuffledStarterIds,
 	starterScene,
 	starterSetup,
 	startersFor,
@@ -98,12 +98,50 @@ describe('the ready-made stories', () => {
 			}
 		}
 	});
+});
 
-	it('offers ideas that toggle as chips: short, and with no separator in them', () => {
-		for (const chip of DAYDREAM_IDEA_CHIPS) {
-			expect(chip.length).toBeLessThanOrEqual(60);
-			expect(chip).not.toMatch(/[,\n]/);
-		}
+describe('shuffledStarterIds', () => {
+	const ids = DAYDREAM_STARTERS.map((starter) => starter.id);
+
+	it('names every ready-made story once', () => {
+		expect([...shuffledStarterIds()].sort()).toEqual([...ids].sort());
+	});
+
+	it('draws a different order with different luck', () => {
+		const always = (value: number) => () => value;
+		expect(shuffledStarterIds(always(0))).not.toEqual(shuffledStarterIds(always(0.999)));
+	});
+});
+
+describe('inOrder', () => {
+	it('puts the stories in the order given, and any it does not name last', () => {
+		const stories = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+		expect(inOrder(stories, ['c', 'a', 'b']).map((story) => story.id)).toEqual(['c', 'a', 'b']);
+		expect(inOrder(stories, ['b']).map((story) => story.id)).toEqual(['b', 'a', 'c']);
+	});
+});
+
+describe('matchesSearch', () => {
+	const story = {
+		title: 'Late at the office',
+		premise: 'Your boss keeps you after everyone has gone.',
+		tags: ['brat', 'workplace']
+	};
+
+	it('finds every word somewhere in the title, premise or tags, ignoring case', () => {
+		expect(matchesSearch(story, 'OFFICE')).toBe(true);
+		expect(matchesSearch(story, 'boss')).toBe(true);
+		expect(matchesSearch(story, 'brat office')).toBe(true);
+		expect(matchesSearch(story, 'workpl')).toBe(true);
+	});
+
+	it('misses when any word is nowhere in it', () => {
+		expect(matchesSearch(story, 'brat dungeon')).toBe(false);
+	});
+
+	it('matches everything when nothing is typed', () => {
+		expect(matchesSearch(story, '')).toBe(true);
+		expect(matchesSearch(story, '   ')).toBe(true);
 	});
 });
 
@@ -163,36 +201,6 @@ describe('the two sides', () => {
 		const count = (side: 'dom' | 'sub') =>
 			DAYDREAM_STARTERS.filter((starter) => starter.you === side).length;
 		expect(count('dom')).toBe(count('sub'));
-	});
-});
-
-describe('pickIdeas', () => {
-	it('draws a few different ideas from the list', () => {
-		const picked = pickIdeas();
-		expect(picked).toHaveLength(SHOWN_IDEA_CHIPS);
-		expect(new Set(picked).size).toBe(SHOWN_IDEA_CHIPS);
-		for (const idea of picked) {
-			expect(DAYDREAM_IDEA_CHIPS).toContain(idea);
-		}
-		expect(DAYDREAM_IDEA_CHIPS.length).toBeGreaterThan(SHOWN_IDEA_CHIPS);
-	});
-
-	it('draws others than the ones on screen, and never fewer than asked for', () => {
-		const shown = pickIdeas();
-		for (let draw = 0; draw < 20; draw += 1) {
-			const next = pickIdeas(SHOWN_IDEA_CHIPS, Math.random, shown);
-			expect(next).toHaveLength(SHOWN_IDEA_CHIPS);
-			expect(next.filter((idea) => shown.includes(idea))).toEqual([]);
-		}
-		const almostAll = DAYDREAM_IDEA_CHIPS.slice(1);
-		expect(pickIdeas(SHOWN_IDEA_CHIPS, Math.random, almostAll)).toHaveLength(SHOWN_IDEA_CHIPS);
-	});
-
-	it('draws differently with different luck', () => {
-		const always = (value: number) => () => value;
-		expect(pickIdeas(SHOWN_IDEA_CHIPS, always(0))).not.toEqual(
-			pickIdeas(SHOWN_IDEA_CHIPS, always(0.999))
-		);
 	});
 });
 

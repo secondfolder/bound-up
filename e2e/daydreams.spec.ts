@@ -511,6 +511,8 @@ test.describe('daydreams', () => {
 	}) => {
 		await signedUpDreamer(page);
 		await openStart(page);
+		// Shuffled, and only a few shown until asked for the rest.
+		await clickWaButton(page, 'More ideas');
 		await page.getByRole('button', { name: /^After hours/ }).click();
 		// Read as rendered: the blanks' menus are in the sentence, closed.
 		const sentence = page.locator('.sentence');
@@ -538,7 +540,15 @@ test.describe('daydreams', () => {
 		await signedUpDreamer(page);
 		await openStart(page);
 		await page.getByRole('textbox').fill('a stranger on a night train');
-		await clickWaButton(page, 'Write it');
+		// The side chosen under "You as" goes with it.
+		await page.locator('label.side', { hasText: 'Sub' }).click();
+		const asked = page.waitForRequest('**/api/daydreams/suggest');
+		await clickWaButton(page, 'Write this story');
+		expect((await asked).postDataJSON()).toMatchObject({
+			task: 'daydream',
+			idea: 'a stranger on a night train',
+			side: 'sub'
+		});
 		const sentence = page.locator('.sentence');
 		await expect(sentence).toContainText('where I talk with Vesper in The stub night train.', {
 			useInnerText: true
@@ -556,7 +566,7 @@ test.describe('daydreams', () => {
 		// Back to the ways in, with what was written still there.
 		await clickWaButton(page, 'Other ways to start');
 		await expect(page.getByRole('textbox')).toHaveValue('a stranger on a night train');
-		await clickWaButton(page, 'Write it');
+		await clickWaButton(page, 'Write this story');
 		await clickWaButton(page, 'Start daydreaming');
 		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
 		await expect(page.getByText('Vesper looks up as you come in.')).toBeVisible();
@@ -570,7 +580,7 @@ test.describe('daydreams', () => {
 		await signedUpDreamer(page);
 		await openStart(page);
 		await page.getByRole('textbox').fill('a stranger on a night train');
-		await clickWaButton(page, 'Write it');
+		await clickWaButton(page, 'Write this story');
 		await expect(page.locator('.sentence')).toContainText('Vesper');
 
 		// Hold the next draft back until the user has left.
@@ -594,41 +604,53 @@ test.describe('daydreams', () => {
 		await settle(page);
 		await settle(page);
 
-		await expect(page.getByRole('button', { name: 'Write it' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Write this story' })).toBeVisible();
 		await expect(page.locator('.sentence')).toHaveCount(0);
 	});
 
-	test('ideas are generated for the side you chose, and one opens as a daydream', async ({
+	test('stories like the one described are suggested for your side, and one opens as a daydream', async ({
 		page
 	}) => {
 		await signedUpDreamer(page);
 		await openStart(page);
+		const readyMade = page.locator('.ready-made > .cards .card');
+		await expect(readyMade.first()).toBeVisible();
+
 		await page.locator('label.side', { hasText: 'Sub' }).click();
+		await page.getByRole('textbox').fill('something on a train');
+		await clickWaButton(page, 'Suggest stories for this');
 
-		await page.getByRole('button', { name: 'Generate', exact: true }).click();
-		const asking = dialog(page);
-		await expect(asking).toContainText('as the sub');
-		await asking.getByRole('textbox').fill('something on a train');
-		await asking.getByRole('button', { name: 'Generate', exact: true }).click();
-		await expect(asking).toBeHidden();
-
-		// The side reached the model, and the idea for the other side is left out.
+		// The side reached the model, and the idea for the other side is left
+		// out. Only the suggested ones show, not the ready-made ones.
 		const generated = page.locator('.generated');
 		await expect(generated).toContainText('For “something on a train”');
 		await expect(generated.locator('.card .title')).toHaveText([
 			'Stub idea for the sub',
 			'Stub idea for nobody'
 		]);
+		await expect(readyMade).toHaveCount(0);
 
-		await generated.getByRole('button', { name: /Stub idea for the sub/ }).click();
+		// More are added after them, told what was already offered.
+		await clickWaButton(page, 'More ideas');
+		await expect(generated.locator('.card .title')).toHaveText([
+			'Stub idea for the sub',
+			'Stub idea for nobody',
+			'Stub idea for the sub, again',
+			'Stub idea for nobody, again'
+		]);
+
+		await generated.getByRole('button', { name: /^Stub idea for the sub A stub/ }).click();
 		const sentence = page.locator('.sentence');
 		await expect(sentence).toContainText('where I talk with Vesper in The stub night train.', {
 			useInnerText: true
 		});
 
-		// Back to the ways in, with the ideas still there.
+		// Back to the ways in, with the ideas still there, until cleared.
 		await clickWaButton(page, 'Other ways to start');
-		await expect(generated.locator('.card .title')).toHaveCount(2);
+		await expect(generated.locator('.card .title')).toHaveCount(4);
+		await clickWaButton(page, /^Clear$/);
+		await expect(generated).toHaveCount(0);
+		await expect(readyMade.first()).toBeVisible();
 	});
 
 	test('a failed reply says so, and trying again answers', async ({ page }) => {

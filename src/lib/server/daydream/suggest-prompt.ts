@@ -21,6 +21,7 @@ import {
 	MAX_IDEA_PREMISE,
 	MAX_IDEA_TAGS,
 	MAX_NAMING_OPENING,
+	MAX_OFFERED_IDEAS,
 	MAX_SUGGESTED_CHIPS
 } from '$lib/daydream/suggestions';
 import type { ModelMessage } from './prompt';
@@ -125,12 +126,16 @@ const daydreamRequestSchema = z.object({
 		.string()
 		.max(DAYDREAM_LIMITS.idea)
 		.refine((value) => value.trim() !== '', 'Say what the story is about'),
-	/** Set when the sentence is a generated idea, which was made for that side. */
+	/** The side chosen under "You as", or the one a generated idea was made for. */
 	side: sideSchema.optional(),
 	limits: limitsSchema
 });
 
-/** `ideas`: a few story ideas of the kind asked for, from "Generate" on the new-daydream page. */
+/**
+ * `ideas`: a few story ideas like the one described, from "Suggest stories for this"
+ * on the new-daydream page; `offered` is the titles already shown, when it is
+ * "More ideas" asking.
+ */
 const ideasRequestSchema = z.object({
 	task: z.literal('ideas'),
 	request: z
@@ -138,7 +143,8 @@ const ideasRequestSchema = z.object({
 		.max(DAYDREAM_LIMITS.idea)
 		.refine((value) => value.trim() !== '', 'Say what kind of stories'),
 	side: sideSchema,
-	limits: limitsSchema
+	limits: limitsSchema,
+	offered: z.array(z.string().max(DAYDREAM_LIMITS.title)).max(MAX_OFFERED_IDEAS).default([])
 });
 
 const recordRequestSchema = z
@@ -489,6 +495,10 @@ function ideasMessages(request: IdeasRequest): ModelMessage[] {
 	const sides = request.side
 		? `${SIDE_LINES[request.side]} Every idea puts them on that side ("you": "${request.side}"), unless it is a story with no one in charge ("you": null).`
 		: 'Mix them: some with the user in charge ("you": "dom"), some with the user submitting ("you": "sub"), and any with no one in charge as "you": null.';
+	const offered =
+		request.offered.length > 0
+			? `\nThey have already been offered these, so make yours new ones, not these again or close to them: ${request.offered.map((title) => JSON.stringify(title)).join(', ')}.`
+			: '';
 	return [
 		{
 			role: 'system',
@@ -499,7 +509,7 @@ function ideasMessages(request: IdeasRequest): ModelMessage[] {
 			content: `The user wants ideas for stories like this, in their own words:
 ${request.request.trim()}
 
-Offer ${GENERATED_IDEAS} different ideas that fit what they asked for, as different from each other as it allows. ${sides}
+Offer ${GENERATED_IDEAS} different ideas that fit what they asked for, as different from each other as it allows. ${sides}${offered}
 ${STORY_CRAFT}
 
 For each: a short title, at most ${DAYDREAM_LIMITS.title} characters; a premise of a sentence or two, at most ${MAX_IDEA_PREMISE} characters, saying who they are with, where, and what is going on as it starts; up to ${MAX_IDEA_TAGS} tags of a word or two for its kinks and tropes; and ratings as whole numbers from 1 to 5: ${RATINGS.heat} and ${RATINGS.kink}.
@@ -522,7 +532,7 @@ export function buildSuggestMessages(request: SuggestRequest): {
 		return { messages: daydreamMessages(request), maxTokens: 1600 };
 	}
 	if (request.task === 'ideas') {
-		return { messages: ideasMessages(request), maxTokens: 900 };
+		return { messages: ideasMessages(request), maxTokens: 1300 };
 	}
 	const { instructions, maxTokens } = taskInstructions(request);
 	return {

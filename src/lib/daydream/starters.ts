@@ -822,6 +822,40 @@ export function startersFor(side: StarterSide | null): readonly DaydreamStarter[
 	return forSide(DAYDREAM_STARTERS, side);
 }
 
+/**
+ * The ready-made stories' ids in a fresh order, so the start page does not
+ * open on the same few every time. Drawn by the page's load, not the
+ * component: drawn during render, the server and the browser would each
+ * draw their own and hydration would disagree with what was shown.
+ */
+export function shuffledStarterIds(random: () => number = Math.random): string[] {
+	const ids = DAYDREAM_STARTERS.map((starter) => starter.id);
+	for (let at = ids.length - 1; at > 0; at -= 1) {
+		const other = Math.floor(random() * (at + 1));
+		[ids[at], ids[other]] = [ids[other] as string, ids[at] as string];
+	}
+	return ids;
+}
+
+/**
+ * How many ready-made stories the start page shows before "More ideas" shows
+ * the rest: a handful to choose from rather than a catalogue to read through,
+ * and as many as one round of suggested ones (`GENERATED_IDEAS`).
+ */
+export const SHOWN_STARTERS = 6;
+
+/** The stories in `order` (ids), any it does not name after the rest. */
+export function inOrder<T extends { id: string }>(
+	stories: readonly T[],
+	order: readonly string[]
+): T[] {
+	const at = (story: T) => {
+		const found = order.indexOf(story.id);
+		return found === -1 ? order.length : found;
+	};
+	return [...stories].sort((a, b) => at(a) - at(b));
+}
+
 /** `startersFor`'s rule for anything with a `you`: the generated ideas are filtered by it too. */
 export function forSide<T extends { you: StarterSide | null }>(
 	stories: readonly T[],
@@ -830,6 +864,23 @@ export function forSide<T extends { you: StarterSide | null }>(
 	return side === null
 		? stories
 		: stories.filter((story) => story.you === null || story.you === side);
+}
+
+/** What a story card says, for the start page's search to look through. */
+export type SearchableStory = { title: string; premise: string; tags: readonly string[] };
+
+/**
+ * Whether a story card matches what was typed in the start page's search:
+ * every word somewhere in its title, premise or tags, ignoring case, so
+ * "brat office" finds a story tagged "brat" set in an office. Nothing
+ * typed matches everything.
+ */
+const WORDS = /\s+/;
+
+export function matchesSearch(story: SearchableStory, query: string): boolean {
+	const words = query.toLocaleLowerCase().split(WORDS).filter(Boolean);
+	const text = [story.title, story.premise, ...story.tags].join('\n').toLocaleLowerCase();
+	return words.every((word) => text.includes(word));
 }
 
 /**
@@ -861,58 +912,3 @@ export function starterSetup(starter: DaydreamStarter, newId?: () => string): Da
 	});
 	return assembleSetup({ voice: starter.voice, scene: starterScene(starter).scene, cast }, newId);
 }
-
-/** How many of the ideas the start page shows at once. */
-export const SHOWN_IDEA_CHIPS = 3;
-
-/**
- * A few of the ideas, so the list reads as a nudge rather than a menu to
- * work through; the start page's shuffle draws another few, leaving out the
- * ones on screen (`exclude`). The first draw is the page's load, not the
- * component's: drawn during render, the server and the browser would each
- * draw their own and hydration would disagree with what was shown.
- */
-export function pickIdeas(
-	count: number = SHOWN_IDEA_CHIPS,
-	random: () => number = Math.random,
-	exclude: readonly string[] = []
-): string[] {
-	const fresh = DAYDREAM_IDEA_CHIPS.filter((idea) => !exclude.includes(idea));
-	// Never fewer than asked for: with too few left, any of them will do.
-	const pool = fresh.length >= count ? fresh : [...DAYDREAM_IDEA_CHIPS];
-	for (let at = pool.length - 1; at > 0; at -= 1) {
-		const other = Math.floor(random() * (at + 1));
-		[pool[at], pool[other]] = [pool[other] as string, pool[at] as string];
-	}
-	return pool.slice(0, count);
-}
-
-/**
- * Ideas to start the "describe it" box from. They toggle into it, like the
- * chips under a field, so they read as something a person might have typed.
- */
-export const DAYDREAM_IDEA_CHIPS: readonly string[] = [
-	'my best friend finally confesses',
-	'my strict boss keeps me late',
-	'a rival I end up in bed with',
-	'a dom who praises me through it',
-	'a brat who needs putting in their place',
-	'a possessive lover who gets jealous',
-	'a demon I summoned wants paying',
-	'a masked stranger chases me through the woods',
-	'a werewolf on the full moon',
-	'a threesome with my partner and a stranger',
-	'a partner set on breeding me',
-	'a house where I am trained to obey',
-	'a stranger on a crowded night train',
-	'being someone’s toy for the night',
-	'free use in my own house',
-	'my partner and I are anal only',
-	'locked in chastity by my keyholder',
-	'trained as someone’s pet',
-	'a hypnotist who knows my trigger words',
-	'a home invasion we planned together',
-	'a gangbang I signed up for',
-	'captured and interrogated',
-	'my partner makes me watch'
-];

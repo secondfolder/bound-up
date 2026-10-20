@@ -234,34 +234,50 @@ export const PICTURE_REQUEST_HEADER = 'x-picture-request';
 /** The most each of a `PictureRequest`'s prompts can be: the description, and the server's words round it. */
 export const MAX_PICTURE_REQUEST_PROMPT = DAYDREAM_LIMITS.imagePrompt + 400;
 
-/** The words round the description, the steps and the guidance, for one family. */
-function recipe(
+/**
+ * What decides how long a picture takes to make: the model, its steps and
+ * guidance, and the size. Not the words, nor whether it is SFW, which change
+ * what is drawn but not how much drawing there is. The key the server
+ * averages making times under (`picture-timings.ts`), so a change to any of
+ * these starts a fresh average rather than skewing an old one.
+ */
+export type PictureWorkload = {
+	model: string;
+	steps: number;
+	CFGScale: number;
+	width: number;
+	height: number;
+};
+
+/** The workload of one style's pictures with one model. */
+export function pictureWorkload(style: PictureStyle, model: PictureModel): PictureWorkload {
+	const schedule =
+		model.architecture === 'z-image-turbo'
+			? // Its distilled schedule: more steps cost time and buy nothing.
+				{ steps: 9, CFGScale: 1.5 }
+			: { steps: 30, CFGScale: style === 'photo' ? 4.5 : 6 };
+	return { model: model.runwareModelAir, ...schedule, ...PICTURE_SIZE };
+}
+
+/** The words round the description, for one family. */
+function positivePromptFor(
 	architecture: PictureArchitecture,
 	style: PictureStyle,
 	sfw: boolean,
 	description: string
-): { positivePrompt: string; steps: number; CFGScale: number } {
+): string {
 	if (architecture === 'z-image-turbo') {
 		const { open, close } = STYLE_SENTENCES[style];
-		return {
-			positivePrompt: [
-				open,
-				description,
-				ADULT_SENTENCE,
-				...(sfw ? [SFW_SENTENCE] : []),
-				close,
-				'No text, no watermark.'
-			].join(' '),
-			// Its distilled schedule: more steps cost time and buy nothing.
-			steps: 9,
-			CFGScale: 1.5
-		};
+		return [
+			open,
+			description,
+			ADULT_SENTENCE,
+			...(sfw ? [SFW_SENTENCE] : []),
+			close,
+			'No text, no watermark.'
+		].join(' ');
 	}
-	return {
-		positivePrompt: `${STYLE_TAGS[style]}, ${ADULT_ANCHOR[style]}. ${description}`,
-		steps: 30,
-		CFGScale: style === 'photo' ? 4.5 : 6
-	};
+	return `${STYLE_TAGS[style]}, ${ADULT_ANCHOR[style]}. ${description}`;
 }
 
 /** One Runware `imageInference` task for a description already passed by `imagePromptProblem`. */
@@ -271,24 +287,24 @@ export function runwareTask(
 	taskUUID: string
 ) {
 	const sfw = input.heat === 1;
-	const { positivePrompt, steps, CFGScale } = recipe(
-		model.architecture,
-		input.style,
-		sfw,
-		adultNouns(input.prompt.trim())
-	);
+	const { steps, CFGScale, width, height } = pictureWorkload(input.style, model);
 	return {
 		taskType: 'imageInference',
 		taskUUID,
 		model: model.runwareModelAir,
-		positivePrompt,
+		positivePrompt: positivePromptFor(
+			model.architecture,
+			input.style,
+			sfw,
+			adultNouns(input.prompt.trim())
+		),
 		negativePrompt: [
 			...NEGATIVE_ALWAYS,
 			...(input.style === 'illustrated' ? NEGATIVE_ILLUSTRATED : []),
 			...(sfw ? NEGATIVE_SFW : [])
 		].join(', '),
-		width: PICTURE_SIZE.width,
-		height: PICTURE_SIZE.height,
+		width,
+		height,
 		steps,
 		CFGScale,
 		numberResults: 1,

@@ -1,25 +1,30 @@
 <script lang="ts">
 	import { DAYDREAM_LIMITS, DAYDREAM_VOICE_PRESETS } from '$lib/daydream';
-	import { hasChip, toggleChip } from '$lib/daydream/chips';
 	import { sceneLevel } from '$lib/daydream/dial-words';
 	import {
 		type DaydreamStarter,
 		forSide,
-		pickIdeas,
-		SHOWN_IDEA_CHIPS,
+		inOrder,
+		matchesSearch,
+		SHOWN_STARTERS,
 		type StarterSide,
 		starterScene,
 		startersFor
 	} from '$lib/daydream/starters';
 	import type { GeneratedIdea } from '$lib/daydream/suggestions';
-	import DaydreamIdeasDialog from './DaydreamIdeasDialog.svelte';
+	import DaydreamSidePicker from './DaydreamSidePicker.svelte';
+	import SearchField from './SearchField.svelte';
 
 	/**
 	 * The ways into a new daydream, friendliest first: describe it in a
-	 * sentence and have the model put it together, pick a ready-made one, or
-	 * build it from scratch. "Generate" beside the ready-made ones asks the
-	 * model for a few more, of a kind the user describes, for their side.
-	 * All but the last land on the setup form's sentence,
+	 * sentence and have the model put it together ("Write this story") or
+	 * offer a few stories like it ("Suggest stories for this"), pick a
+	 * ready-made one (searchable by title, premise and tags),
+	 * or build it from scratch. Suggested stories take the ready-made ones'
+	 * place until cleared, and "More ideas" adds to them; under it, the
+	 * ready-made ones show a few at first and "More ideas" shows them all; both, and "Write
+	 * this story", are for the side chosen under "You as", which also filters
+	 * the ready-made ones. All but the last land on the setup form's sentence,
 	 * where every part of it can still be changed. See docs/daydreams.md,
 	 * "Starting one".
 	 *
@@ -28,9 +33,9 @@
 	 */
 	let {
 		idea = $bindable(),
-		ideas = $bindable(),
 		side = $bindable(),
 		suggestionsOn,
+		starterOrder,
 		asking,
 		problem,
 		generated,
@@ -39,20 +44,19 @@
 		ondescribe,
 		onstarter,
 		ongenerate,
+		onmore,
+		onclear,
 		onidea,
 		onblank
 	}: {
 		/** What the user has written, kept by the page so it survives going back. */
 		idea: string;
-		/**
-		 * The few ideas on offer (`pickIdeas`): first drawn by the page's load,
-		 * then by the shuffle. Kept by the page, so going back shows the same ones.
-		 */
-		ideas: string[];
-		/** Which side the ready-made stories are shown for, or null for either. Kept by the page. */
+		/** Which side the stories are for, or null for either. Kept by the page. */
 		side: StarterSide | null;
 		/** Whether the model may be asked: without it there is no "describe it". */
 		suggestionsOn: boolean;
+		/** The ready-made stories' ids in the order to show them, shuffled by the page's load. */
+		starterOrder: readonly string[];
 		asking: boolean;
 		/** Why the last description came back with nothing, or null. */
 		problem: string | null;
@@ -64,24 +68,58 @@
 		ideaProblem: string | null;
 		ondescribe: () => void;
 		onstarter: (starter: DaydreamStarter) => void;
-		/** Asks for ideas of the kind described; answers why none came, or null. */
+		/** Asks for stories like the one described; answers why none came, or null. */
 		ongenerate: (request: string) => Promise<string | null>;
+		/** Asks for more of the same, added to the last; answers why none came, or null. */
+		onmore: () => Promise<string | null>;
+		/** Puts the generated ideas away, back to the ready-made stories. */
+		onclear: () => void;
 		onidea: (idea: GeneratedIdea) => void;
 		onblank: () => void;
 	} = $props();
 
-	let generating = $state(false);
+	let suggesting = $state(false);
+	let suggestProblem: string | null = $state(null);
+	let gettingMore = $state(false);
+	let moreProblem: string | null = $state(null);
 
-	const SIDES: readonly { value: StarterSide | null; label: string }[] = [
-		{ value: null, label: 'Either' },
-		{ value: 'dom', label: 'Dom' },
-		{ value: 'sub', label: 'Sub' }
-	];
+	async function suggest() {
+		suggesting = true;
+		suggestProblem = null;
+		suggestProblem = await ongenerate(idea.trim());
+		suggesting = false;
+	}
 
-	const starters = $derived(startersFor(side));
-	const ideasShown = $derived(generated ? forSide(generated.ideas, side) : []);
+	async function more() {
+		gettingMore = true;
+		moreProblem = null;
+		moreProblem = await onmore();
+		gettingMore = false;
+	}
 
-	const canAsk = $derived(idea.trim() !== '' && !asking);
+	/** What is typed in the search beside "Story suggestions"; empty is no filter. */
+	let filter = $state('');
+
+	const starters = $derived(
+		inOrder(startersFor(side), starterOrder).filter((starter) =>
+			matchesSearch({ ...starterScene(starter).scene, tags: starter.tags }, filter)
+		)
+	);
+	/**
+	 * The ready-made stories show `SHOWN_STARTERS` until "More ideas" shows
+	 * the lot. A search looks through all of them, so what it finds is never
+	 * hidden behind the button.
+	 */
+	let allStarters = $state(false);
+	const searching = $derived(filter.trim() !== '');
+	const startersShown = $derived(
+		allStarters || searching ? starters : starters.slice(0, SHOWN_STARTERS)
+	);
+	const ideasForSide = $derived(generated ? forSide(generated.ideas, side) : []);
+	const ideasShown = $derived(ideasForSide.filter((shown) => matchesSearch(shown, filter)));
+
+	const busy = $derived(asking || suggesting || gettingMore);
+	const canAsk = $derived(idea.trim() !== '' && !busy);
 
 	const voiceLabel = (starter: DaydreamStarter) =>
 		DAYDREAM_VOICE_PRESETS.find((preset) => preset.id === starter.voice)?.label ?? '';
@@ -98,87 +136,67 @@
 					maxlength={DAYDREAM_LIMITS.idea}
 					placeholder="A stranger on a night train…"
 					bind:value={idea}
-					disabled={asking}></textarea>
+					disabled={asking || suggesting}></textarea>
 			</label>
-			<fieldset class="chips">
-				<legend class="hint">Or start from one of these</legend>
-				{#each ideas as chip (chip)}
-					<!-- A toggle: a native button with aria-pressed, which wa-button would not forward (AGENTS.md). -->
-					<button
-						type="button"
-						class="chip"
-						aria-pressed={hasChip(idea, chip)}
-						disabled={asking}
-						onclick={() => {
-							idea = toggleChip(idea, chip);
-						}}>{chip}</button>
-				{/each}
-				<wa-button
-					class="shuffle"
-					appearance="plain"
-					size="s"
-					pill
-					disabled={asking}
-					onclick={() => {
-						ideas = pickIdeas(SHOWN_IDEA_CHIPS, Math.random, ideas);
-					}}
-				>
-					<wa-icon name="shuffle" variant="solid" label="Other ideas"></wa-icon>
-				</wa-button>
-			</fieldset>
-			<wa-button
-				appearance={canAsk ? 'filled' : 'outlined'}
-				variant={canAsk ? 'brand' : 'neutral'}
-				disabled={!canAsk}
-				onclick={ondescribe}
-			>
-				<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
-				{asking ? 'Writing your daydream…' : 'Write it'}
-			</wa-button>
+			<div class="controls">
+				<DaydreamSidePicker bind:side />
+				<div class="actions">
+					<wa-button
+						appearance={canAsk ? 'filled' : 'outlined'}
+						variant={canAsk ? 'brand' : 'neutral'}
+						disabled={!canAsk}
+						onclick={ondescribe}
+					>
+						<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
+						{asking ? 'Writing your daydream…' : 'Write this story'}
+					</wa-button>
+					<wa-button appearance="outlined" disabled={!canAsk} onclick={suggest}>
+						<wa-icon slot="start" name="lightbulb" variant="solid"></wa-icon>
+						{suggesting ? 'Thinking up stories…' : 'Suggest stories for this'}
+					</wa-button>
+				</div>
+			</div>
 			{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
+			{#if suggestProblem}<p class="invalid" role="alert">{suggestProblem}</p>{/if}
 		</section>
 	{/if}
 
 	<section class="ready-made" aria-labelledby="ready-made-heading">
 		<div class="ready-made-head">
-			<div class="heading">
-				<h2 id="ready-made-heading">{suggestionsOn ? 'Or pick one' : 'Pick one'}</h2>
-				{#if suggestionsOn}
-					<wa-button
-						appearance="outlined"
-						size="s"
-						disabled={asking}
-						onclick={() => {
-							generating = true;
-						}}
-					>
-						<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
-						Generate
-					</wa-button>
-				{/if}
+			<h2 id="ready-made-heading">Story suggestions</h2>
+			<div class="search">
+				<SearchField
+					bind:value={filter}
+					label="Search stories"
+					placeholder="Title, premise or tag"
+					collapsible
+				/>
 			</div>
-			<fieldset class="sides">
-				<legend class="hint">You as</legend>
-				{#each SIDES as option (option.label)}
-					<label class="side">
-						<input
-							type="radio"
-							name="starter-side"
-							checked={side === option.value}
-							onchange={() => {
-								side = option.value;
-							}}
-						/>
-						{option.label}
-					</label>
-				{/each}
-			</fieldset>
 		</div>
+		<!-- With the box, "You as" sits beside its buttons instead, since it is
+		     what they ask for as well as what is shown here. -->
+		{#if !suggestionsOn}<DaydreamSidePicker bind:side />{/if}
 		{#if generated}
 			<section class="generated" aria-labelledby="generated-heading">
-				<h3 id="generated-heading">For “{generated.request}”</h3>
-				{#if ideasShown.length === 0}
-					<p class="hint">None of these have you as the {side}. Generate some that do.</p>
+				<div class="generated-head">
+					<h3 id="generated-heading">For “{generated.request}”</h3>
+					<wa-button
+						appearance="plain"
+						size="s"
+						disabled={busy}
+						onclick={() => {
+							moreProblem = null;
+							onclear();
+						}}
+					>
+						<wa-icon slot="start" name="xmark" variant="solid"></wa-icon>
+						Clear
+					</wa-button>
+				</div>
+				{#if ideasForSide.length === 0}
+					<p class="hint">None of these have you as the {side}. Ask for more that do.</p>
+				{:else if ideasShown.length === 0}
+					<p class="hint">None of these match “{filter.trim()}”.</p>
 				{/if}
 				<ul class="cards">
 					{#each ideasShown as idea (idea.title)}
@@ -196,58 +214,81 @@
 								<span class="tags">
 									{#each idea.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
 								</span>
+								<!-- "You’re the dom" says nothing once "You as" has chosen the side
+								     every card shown is for, so cards say it only under "Either". -->
 								<span class="meta">
 									{#if writing === idea.title}
 										<span class="level">Writing your daydream…</span>
 									{:else if level}<span class="level">{level}</span>{/if}
-									{#if idea.you}<span>You’re the {idea.you}</span>{/if}
+									{#if idea.you && side === null}<span>You’re the {idea.you}</span>{/if}
 								</span>
 							</button>
 						</li>
 					{/each}
 				</ul>
 				{#if ideaProblem}<p class="invalid" role="alert">{ideaProblem}</p>{/if}
+				<wa-button
+					class="more"
+					appearance="outlined"
+					size="s"
+					disabled={busy}
+					onclick={more}
+				>
+					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+					{gettingMore ? 'Thinking up more…' : 'More ideas'}
+				</wa-button>
+				{#if moreProblem}<p class="invalid" role="alert">{moreProblem}</p>{/if}
 			</section>
+		{:else}
+			{#if starters.length === 0}
+				<p class="hint none">No stories match “{filter.trim()}”.</p>
+			{/if}
+			<ul class="cards">
+				{#each startersShown as starter (starter.id)}
+					{const scene = $derived(starterScene(starter).scene)}
+					{const level = $derived(sceneLevel(scene.dials))}
+					<li>
+						<!-- A card: a title, a line and a level in a block, which
+						     wa-button's one-line control cannot lay out. -->
+						<button type="button" class="card" onclick={() => onstarter(starter)}>
+							<span class="title">{scene.title}</span>
+							<span class="premise">{scene.premise}</span>
+							<span class="tags">
+								{#each starter.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
+							</span>
+							<span class="meta">
+								{#if level}<span class="level">{level}</span>{/if}
+								<span>{voiceLabel(starter)}</span>
+								{#if starter.you && side === null}<span>You’re the {starter.you}</span>{/if}
+							</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+			{#if startersShown.length < starters.length}
+				<wa-button
+					class="more"
+					appearance="outlined"
+					size="s"
+					onclick={() => {
+						allStarters = true;
+					}}
+				>
+					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+					More ideas
+				</wa-button>
+			{/if}
 		{/if}
-		<ul class="cards">
-			{#each starters as starter (starter.id)}
-				{const scene = $derived(starterScene(starter).scene)}
-				{const level = $derived(sceneLevel(scene.dials))}
-				<li>
-					<!-- A card: a title, a line and a level in a block, which
-					     wa-button's one-line control cannot lay out. -->
-					<button type="button" class="card" onclick={() => onstarter(starter)}>
-						<span class="title">{scene.title}</span>
-						<span class="premise">{scene.premise}</span>
-						<span class="tags">
-							{#each starter.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
-						</span>
-						<span class="meta">
-							{#if level}<span class="level">{level}</span>{/if}
-							<span>{voiceLabel(starter)}</span>
-							{#if starter.you}<span>You’re the {starter.you}</span>{/if}
-						</span>
-					</button>
-				</li>
-			{/each}
-		</ul>
 	</section>
 
-	{#if generating}
-		<DaydreamIdeasDialog
-			request={generated?.request ?? ''}
-			{side}
-			{ongenerate}
-			onclose={() => {
-				generating = false;
-			}}
-		/>
-	{/if}
-
-	<p class="blank">
-		Rather choose every part yourself?
-		<wa-button appearance="plain" size="s" onclick={onblank}>Build it yourself</wa-button>
-	</p>
+	<section class="blank" aria-labelledby="blank-heading">
+		<h2 id="blank-heading">Build your own</h2>
+		<span class="hint">Rather choose every part yourself? Start from an empty form.</span>
+		<wa-button appearance="outlined" onclick={onblank}>
+			<wa-icon slot="start" name="pen-ruler" variant="solid"></wa-icon>
+			Build it yourself
+		</wa-button>
+	</section>
 </div>
 
 <style>
@@ -268,8 +309,21 @@
 		}
 	}
 
-	.describe > wa-button {
-		align-self: flex-start;
+	/* "You as" at the start, the buttons at the end, wrapping onto two rows
+	   where there is no room for both. */
+	.controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 1rem;
+	}
+
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-inline-start: auto;
 	}
 
 	.idea {
@@ -291,58 +345,6 @@
 		resize: vertical;
 	}
 
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.375rem;
-		margin: 0;
-		padding: 0;
-		border: 0;
-
-		.shuffle {
-			--wa-form-control-height: 1.9rem;
-		}
-
-		legend {
-			padding: 0;
-			margin-block-end: 0.375rem;
-		}
-	}
-
-	.chip {
-		block-size: auto;
-		max-inline-size: 100%;
-		margin: 0;
-		white-space: normal;
-		text-align: start;
-		font-weight: inherit;
-		padding: 0.25rem 0.7rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: transparent;
-		color: inherit;
-		font-family: inherit;
-		font-size: 0.875rem;
-		cursor: pointer;
-
-		&[aria-pressed='true'] {
-			border-color: var(--wa-color-brand-border-loud, var(--wa-color-surface-border));
-			background: var(--wa-color-brand-fill-quiet);
-		}
-
-		&:focus-visible {
-			outline: var(--wa-focus-ring);
-			outline-offset: var(--wa-focus-ring-offset);
-		}
-	}
-
-	.heading {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.5rem 0.75rem;
-	}
-
 	.generated {
 		display: flex;
 		flex-direction: column;
@@ -360,56 +362,40 @@
 		}
 	}
 
-	.ready-made-head {
+	/* After the suggested stories or the ready-made ones, a little apart from them. */
+	.more {
+		align-self: flex-start;
+		margin-block-start: 0.5rem;
+	}
+
+	.generated-head {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem 1rem;
+		gap: 0.25rem 0.5rem;
 	}
 
-	/* A segmented control: native radios, since it is one choice of three,
-	   visually hidden inside labels that look like the idea chips. */
-	.sides {
+	.ready-made-head {
 		display: flex;
 		align-items: center;
-		gap: 0.375rem;
-		margin: 0;
-		padding: 0;
-		border: 0;
-
-		legend {
-			float: inline-start;
-			padding: 0;
-			margin-inline-end: 0.25rem;
-		}
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		min-block-size: var(--wa-form-control-height);
 	}
 
-	.side {
-		padding: 0.25rem 0.7rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		font-size: 0.875rem;
-		cursor: pointer;
+	/* Room for the search to open into: the rest of the row from the heading.
+	   From a width of nothing rather than its own, since the native input
+	   inside wants about twenty characters, and as the row's minimum that
+	   widened the whole page past a phone's screen. */
+	.search {
+		flex: 1 1 0;
+		min-inline-size: 0;
+		max-inline-size: 24rem;
+		display: flex;
+	}
 
-		&:has(input:checked) {
-			border-color: var(--wa-color-brand-border-loud, var(--wa-color-surface-border));
-			background: var(--wa-color-brand-fill-quiet);
-		}
-
-		&:has(input:focus-visible) {
-			outline: var(--wa-focus-ring);
-			outline-offset: var(--wa-focus-ring-offset);
-		}
-
-		input {
-			position: absolute;
-			inline-size: 1px;
-			block-size: 1px;
-			margin: 0;
-			opacity: 0;
-			pointer-events: none;
-		}
+	.none {
+		margin: 0;
 	}
 
 	.cards {
@@ -421,6 +407,8 @@
 		gap: 0.5rem;
 
 		li {
+			/* Web Awesome's native styles indent every `li` by 1.125em. */
+			margin: 0;
 			display: flex;
 		}
 	}
@@ -503,13 +491,8 @@
 		}
 	}
 
-	.blank {
-		margin: 0;
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.25rem;
-		color: var(--wa-color-text-quiet);
+	.blank > wa-button {
+		align-self: flex-start;
 	}
 
 	.hint {

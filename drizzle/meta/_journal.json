@@ -274,6 +274,13 @@
       "when": 1792455542628,
       "tag": "0038_add_server_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1792473436573,
+      "tag": "0039_add_daydream_picture_timings",
+      "breakpoints": true
     }
   ]
 }

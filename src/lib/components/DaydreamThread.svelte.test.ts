@@ -96,6 +96,7 @@ const client = vi.hoisted(() => ({
 	requestSuggestion: vi.fn(),
 	readPrompt: vi.fn(),
 	requestPicture: vi.fn(),
+	estimatePicture: vi.fn(),
 	uploadPicture: vi.fn(),
 	downloadPicture: vi.fn()
 }));
@@ -170,6 +171,8 @@ beforeEach(() => {
 		});
 	});
 	client.setActiveTurn.mockResolvedValue({ ok: true });
+	// No picture made on this server yet, unless a test says otherwise.
+	client.estimatePicture.mockResolvedValue(null);
 	// Other branches' turns, opened on demand: whatever the test put in `opened`.
 	client.readTurns.mockImplementation((_id: string, ids: string[]) =>
 		Promise.resolve({
@@ -1915,9 +1918,36 @@ describe('DaydreamThread pictures', () => {
 			?.querySelector('[part~="indicator"]')
 			?.getBoundingClientRect();
 		// Its shimmer fills it: sized only by its host, it was there but 0px tall.
-		expect(box.width).toBeGreaterThan(300);
-		expect(box.height).toBeGreaterThan(box.width);
+		// The picture's shape, at no more than 15rem across.
+		expect(box.width).toBeGreaterThan(200);
+		expect(box.width).toBeLessThanOrEqual(240);
+		expect(box.height / box.width).toBeCloseTo(1216 / 832, 1);
 		expect(indicator?.height).toBeCloseTo(box.height, 0);
+		// Rounded like the picture that replaces it, not the skeleton's own
+		// pill, which made an oval of it.
+		const shimmer = skeleton.shadowRoot?.querySelector('[part~="indicator"]') as HTMLElement;
+		const corner = Number.parseFloat(getComputedStyle(shimmer).borderTopLeftRadius);
+		expect(corner).toBeGreaterThan(0);
+		expect(corner).toBeLessThan(box.width / 8);
+		// It says what it is doing, and how long it has been at it.
+		// Named for a screen reader only: on screen it never changed.
+		expect(frame(container)?.querySelector('.stage .wa-visually-hidden')?.textContent).toBe(
+			'Making the picture'
+		);
+		await waitFor(
+			() => expect(frame(container)?.querySelector('.waited')?.textContent?.trim()).toBe('1s'),
+			{
+				timeout: 3000
+			}
+		);
+		// Nothing before it to draw from, so the plain shimmer.
+		expect(frame(container)?.querySelector('img.echo')).toBeNull();
+		expect(client.estimatePicture).toHaveBeenCalledWith('d1', 'photo');
+		const ring = frame(container)?.querySelector('wa-progress-ring') as HTMLElement & {
+			value: number;
+		};
+		expect(ring.value).toBeGreaterThan(0);
+		expect(ring.value).toBeLessThan(100 * (2 / 3));
 		await waitFor(() =>
 			expect(client.requestPicture).toHaveBeenCalledWith('d1', {
 				prompt: Prompt,
@@ -1942,6 +1972,28 @@ describe('DaydreamThread pictures', () => {
 		const [, imageId, ciphertext] = client.uploadPicture.mock.calls[0] as [string, string, Blob];
 		expect(mark.content).toMatchObject({ imageId });
 		expect(await ciphertext.text()).toBe('sealed:webp-bytes');
+	});
+
+	it('draws the ring against how long pictures take here, two thirds full when that is up', async () => {
+		client.requestPicture.mockReturnValueOnce(pending());
+		client.estimatePicture.mockResolvedValueOnce(1000);
+		replyDescribing(Prompt);
+		const { container } = render(DaydreamThread, {
+			daydream: daydream(),
+			available: true,
+			picturesAvailable: true
+		});
+		await waitFor(() => expect(client.estimatePicture).toHaveBeenCalled());
+		const ring = () =>
+			defined(
+				frame(container)?.querySelector<HTMLElement & { value: number }>('wa-progress-ring'),
+				'the progress ring'
+			).value;
+		// Past the estimate: beyond two thirds, slowing, and never full. The
+		// 15-second guess would not get there in the time allowed, so this is
+		// the estimate's doing.
+		await waitFor(() => expect(ring()).toBeGreaterThan(100 * (2 / 3)), { timeout: 3000 });
+		expect(ring()).toBeLessThan(100);
 	});
 
 	it('makes none on a server without pictures', async () => {
@@ -2000,6 +2052,45 @@ describe('DaydreamThread pictures', () => {
 		expect(client.requestPicture).not.toHaveBeenCalled();
 	});
 
+	it('draws a picture in the making from the last one, blurred, under the skeleton’s pulse', async () => {
+		opened.set('m1', {
+			type: 'picture',
+			imageId: '00000000-0000-4000-8000-0000000000aa',
+			key: 'AGE-SECRET-KEY-1TESTKEY',
+			mimeType: 'image/webp',
+			width: 832,
+			height: 1216
+		});
+		client.downloadPicture.mockResolvedValue({
+			ok: true,
+			ciphertext: await new Blob(['sealed:', picture()]).arrayBuffer()
+		});
+		client.requestPicture.mockReturnValueOnce(pending());
+		const { container } = render(DaydreamThread, {
+			daydream: {
+				...daydream([
+					turn('t1', null, 'story', { type: 'text', text: 'Sit.', meta: meta({ image: Prompt }) }),
+					turn('u1', 't1', 'user', 'I sit.'),
+					turn('t2', 'u1', 'story', {
+						type: 'text',
+						text: 'Mara smiles.',
+						meta: meta({ image: Prompt })
+					})
+				]),
+				marks: [{ id: 'm1', turnId: 't1', revision: 0, sealed: ref('m1') }]
+			},
+			available: true,
+			picturesAvailable: true
+		});
+		const frames = () => [...container.querySelectorAll('.picture')];
+		await waitFor(() => expect(frames()[0]?.querySelector('img')).not.toBeNull());
+		const first = defined(frames()[0]?.querySelector('img'), 'the first picture').src;
+		await press(container, 'Picture this');
+		await waitFor(() => expect(frames()[1]?.querySelector('img.echo')).not.toBeNull());
+		expect(frames()[1]?.querySelector<HTMLImageElement>('img.echo')?.src).toBe(first);
+		expect(frames()[1]?.querySelector('wa-skeleton')?.getAttribute('effect')).toBe('pulse');
+	});
+
 	it('in debug mode, shows what a picture was made from when it is tapped', async () => {
 		opened.set('m1', {
 			type: 'picture',
@@ -2044,10 +2135,27 @@ describe('DaydreamThread pictures', () => {
 		);
 		frame(container)?.querySelector<HTMLButtonElement>('button.show-prompt')?.click();
 		await waitFor(() => expect(baseElement.querySelector('wa-dialog')).not.toBeNull());
-		const dialog = baseElement.querySelector('wa-dialog');
-		expect(dialog?.textContent).toContain(Prompt);
-		expect(dialog?.textContent).toContain('Sent to civitai:1@1');
-		expect(dialog?.textContent).toContain('child, minor');
+		const dialog = defined(baseElement.querySelector('wa-dialog'), 'the prompt dialog');
+		// A tap outside closes it.
+		expect(dialog.hasAttribute('light-dismiss')).toBe(true);
+		// One field, what the image model was sent first, with what the server
+		// put round the description muted and the description itself not…
+		expect(dialog.textContent).toContain('Sent to civitai:1@1');
+		expect(dialog.textContent).toContain(`photograph, adults only. ${Prompt}`);
+		const muted = [...dialog.querySelectorAll('pre .added')].map((each) => each.textContent);
+		expect(muted.join('')).toContain('photograph, adults only.');
+		expect(muted.join('')).not.toContain('desk');
+		// …the negative prompt muted throughout, all of it the server's…
+		expect(dialog.querySelector('pre.added')?.textContent).toBe('child, minor');
+		await waSettled(dialog);
+		// …and the story model's description a toggle away.
+		defined(
+			dialog.querySelector<HTMLElement>('wa-radio[value="story"]'),
+			'the story model toggle'
+		).click();
+		await waitFor(() => expect(dialog.textContent).toContain('Described by the story model'));
+		expect(dialog.textContent).toContain(Prompt);
+		expect(dialog.textContent).not.toContain('civitai:1@1');
 	});
 
 	it('says when a picture could not be kept, and keeps it on request', async () => {

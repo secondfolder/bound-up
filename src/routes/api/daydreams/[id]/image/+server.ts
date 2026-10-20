@@ -5,9 +5,12 @@ import {
 	imagePromptProblem,
 	PICTURE_REQUEST_HEADER,
 	type PictureRequest,
+	pictureWorkload,
 	runwareTask
 } from '$lib/daydream/image-prompt';
+import { inBackground } from '$lib/server/background';
 import { readImageConfig } from '$lib/server/daydream/image-config';
+import { estimatePictureMs, recordPictureTiming } from '$lib/server/daydream/picture-timings';
 import { hasAcceptedDisclosure, ownsDaydream } from '$lib/server/daydreams';
 import { requireFeature } from '$lib/server/features';
 import { rateLimitMessage } from '$lib/server/rate-limit';
@@ -81,6 +84,9 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 
 	const model = config.models[parsed.data.style];
 	const task = runwareTask(parsed.data, model, crypto.randomUUID());
+	// Timed from here: what the estimate is for is the wait on Runware, and
+	// the checks above take the same short time whatever is asked for.
+	const started = Date.now();
 	let upstream: Response;
 	try {
 		upstream = await fetch(config.baseUrl, {
@@ -110,6 +116,21 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		error(502, 'The picture could not be made just now. Try again in a moment.');
 	}
 
+	// Only a picture that came counts towards how long one takes: a failure
+	// is often a fast refusal, and would pull the average down.
+	inBackground(
+		platform,
+		recordPictureTiming(
+			locals.db,
+			pictureWorkload(parsed.data.style, model),
+			Date.now() - started
+		).catch(() => {
+			// One run missing from the average costs it almost nothing, so the
+			// picture goes out regardless.
+			console.error('[daydreams] a picture’s making time could not be recorded');
+		})
+	);
+
 	const [picture] = answer.data.data;
 	// `atob` rather than `Buffer`, which Workers has only with Node compatibility.
 	const bytes = Uint8Array.from(atob(picture?.imageBase64Data ?? ''), (char) => char.charCodeAt(0));
@@ -131,4 +152,36 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 			)
 		}
 	});
+};
+
+const estimateQuery = z.object({ style: z.enum(['photo', 'illustrated']) });
+
+/**
+ * How long a picture in this style usually takes here, for the progress ring
+ * (`picture-timings.ts`): `{ estimateMs }`, null until one has been made.
+ * Asked alongside the POST, never before it, so the picture waits on nothing.
+ *
+ * Not checked against the daydream's owner, as the POST is: the answer is
+ * about the server's model, not about this daydream, and the extra query
+ * would buy nothing.
+ */
+export const GET: RequestHandler = async ({ locals, platform, url }) => {
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
+	await requireFeature(locals.db, locals.user.id, 'daydreams');
+	const config = readImageConfig(locals.settings, platform);
+	if (!config) {
+		error(503, 'Pictures are not set up on this server.');
+	}
+	const parsed = estimateQuery.safeParse({ style: url.searchParams.get('style') });
+	if (!parsed.success) {
+		error(400, 'That could not be sent. Reload and try again.');
+	}
+	const { style } = parsed.data;
+	const estimateMs = await estimatePictureMs(
+		locals.db,
+		pictureWorkload(style, config.models[style])
+	);
+	return Response.json({ estimateMs });
 };

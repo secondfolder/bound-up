@@ -300,8 +300,15 @@ export function parseSuggestedDaydream(value: unknown): StoryPieces | null {
 
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
-/** How many ideas one "Generate" asks for. */
-export const GENERATED_IDEAS = 4;
+/** How many ideas one "Suggest stories for this" or "More ideas" asks for. */
+export const GENERATED_IDEAS = 6;
+
+/**
+ * The most titles "More ideas" tells the model it has already offered, the
+ * latest kept: enough for several rounds, without the prompt growing for as
+ * long as someone keeps asking.
+ */
+export const MAX_OFFERED_IDEAS = 60;
 
 /** A generated idea's tags: as few as a ready-made story's, and as short. */
 export const MAX_IDEA_TAGS = 4;
@@ -315,7 +322,7 @@ export const MAX_IDEA_TAG_LENGTH = 30;
 export const MAX_IDEA_PREMISE = DAYDREAM_LIMITS.idea - DAYDREAM_LIMITS.title - 2;
 
 /**
- * A story idea from "Generate": enough for a card like a ready-made story's,
+ * A story idea from "Suggest stories for this": enough for a card like a ready-made story's,
  * and nothing more — picking one asks for the whole daydream then, so
  * generating a handful stays quick and cheap.
  */
@@ -359,6 +366,24 @@ export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): G
 		ideas.push({ title, premise, tags: ideaTags(idea.tags), you, dials: parseSceneDials(idea) });
 	}
 	return ideas.slice(0, GENERATED_IDEAS);
+}
+
+/**
+ * "More ideas": the ones already shown, then any new ones. The model is told
+ * what it offered, but can still repeat itself, and a second card with the
+ * same title would be a second key in the list, so a repeat is dropped.
+ */
+export function addIdeas(
+	shown: readonly GeneratedIdea[],
+	more: readonly GeneratedIdea[]
+): GeneratedIdea[] {
+	const added: GeneratedIdea[] = [...shown];
+	for (const idea of more) {
+		if (!added.some((other) => same(other.title, idea.title))) {
+			added.push(idea);
+		}
+	}
+	return added;
 }
 
 function ideaTags(value: unknown): string[] {
