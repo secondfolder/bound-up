@@ -43,7 +43,13 @@
 		/** Display only: offers "Never" in the composer. The server enforces it. */
 		permanentMedia = false,
 		/** Display only: offers a choice of quality. The server enforces a byte budget. */
-		highQualityMedia = false
+		highQualityMedia = false,
+		/**
+		 * The oldest message the viewer had not read when the page loaded, which
+		 * the thread opens with at the top. Only its value on opening counts:
+		 * every load after, on a live event, has just moved the read mark.
+		 */
+		firstUnreadId = null
 	}: {
 		thread: ThreadView;
 		partnershipId: string;
@@ -52,6 +58,7 @@
 		canSend?: boolean;
 		permanentMedia?: boolean;
 		highQualityMedia?: boolean;
+		firstUnreadId?: string | null;
 	} = $props();
 
 	const keyring = $derived(currentKeyring());
@@ -141,6 +148,39 @@
 	 * either — the page swaps this whole view out for the unlock panel anyway.
 	 */
 	const threadId = $derived(thread.id);
+
+	/**
+	 * The message following the end stops at (`followEnd`'s `holdAt`): the
+	 * thread opens on the newest, but no further down than puts the oldest
+	 * unread at the top, so a reader coming back to several messages starts at
+	 * the first of them rather than below it. Let go as soon as anything newer
+	 * arrives — a reply, or one sent from here — which is followed as usual.
+	 */
+	// svelte-ignore state_referenced_locally
+	let heldId: string | null = $state(firstUnreadId);
+	const newestId = $derived(thread.messages.at(-1)?.id ?? null);
+	// svelte-ignore state_referenced_locally
+	let openedOn = { thread: threadId, newest: newestId };
+	$effect(() => {
+		const now = { thread: threadId, newest: newestId };
+		if (now.thread !== openedOn.thread) {
+			// The page component is reused across threads: another thread is
+			// another opening, at its own oldest unread.
+			heldId = untrack(() => firstUnreadId);
+		} else if (now.newest !== openedOn.newest) {
+			heldId = null;
+		}
+		openedOn = now;
+	});
+	/**
+	 * Untracked: `followEnd` asks for it as it attaches, and reading `heldId`
+	 * there would make the attachment depend on it, tearing following down
+	 * and starting it afresh (at the end, jumping) every time the hold lets go.
+	 */
+	function heldElement(list: HTMLElement): Element | null {
+		const id = untrack(() => heldId);
+		return id ? list.querySelector(`[data-message-id="${CSS.escape(id)}"]`) : null;
+	}
 	function draftFor(id: string) {
 		return openDraft({ kind: 'thread', threadId: id }, untrack(unlockedIdentity));
 	}
@@ -264,9 +304,10 @@
 	<div class="thread-tags">
 		<TagPicker {partnershipId} {tags} threadId={thread.id} bind:selectedIds={selectedTagIds} />
 	</div>
-	<!-- Opens on the newest message, and follows new ones only for a reader
-	     already at the end: one who has scrolled up to read is left there. -->
-	<ul class="messages" {@attach followEnd}>
+	<!-- Opens on the newest message, or with the oldest unread at the top
+	     (`heldId`), and follows new ones only for a reader already at the
+	     end: one who has scrolled up to read is left there. -->
+	<ul class="messages" {@attach (list) => followEnd(list, { holdAt: () => heldElement(list) })}>
 		{#each thread.messages as message (message.id)}
 			<MessageBubble
 				{message}

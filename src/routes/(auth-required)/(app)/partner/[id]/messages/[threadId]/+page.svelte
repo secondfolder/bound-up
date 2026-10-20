@@ -137,6 +137,7 @@
 		{/if}
 		<ThreadView
 			thread={data.thread}
+			firstUnreadId={data.firstUnreadId}
 			partnershipId={data.partner.id}
 			partner={{ name: partnerShown, image: data.partner.image }}
 			tags={data.tags}

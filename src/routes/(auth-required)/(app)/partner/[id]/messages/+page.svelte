@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { afterNavigate, goto, invalidate, replaceState } from '$app/navigation';
+	import { afterNavigate, goto, invalidate, pushState, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
@@ -154,7 +154,61 @@
 		}
 	});
 
-	let composing = $state(false);
+	/**
+	 * The new-message dialog is open while the URL ends in `/new`, so a reload
+	 * keeps it open. Opening it from here is shallow routing (`pushState`), so
+	 * the board stays mounted under it and Back closes it; loading `/new`
+	 * outright is a route of its own (`new/+page.svelte`) that renders this
+	 * same board, open from the start.
+	 *
+	 * Kept in this component's state, not read from `page.state`: an
+	 * `invalidate()` resets `page.state`, and the dialog invalidates the board
+	 * itself (a tag made in it), which closed it mid-compose. Back and Forward
+	 * between the board and `/new` are the browser's own, so `popstate` says
+	 * which one it is now.
+	 */
+	let composing = $state(page.route.id === '/(auth-required)/(app)/partner/[id]/messages/new');
+	/** Whether the board's own entry is behind `/new`, which it is only when this pushed it. */
+	let pushed = false;
+
+	$effect(() => {
+		const sync = () => {
+			composing = location.pathname.endsWith('/messages/new');
+			pushed = composing;
+		};
+		addEventListener('popstate', sync);
+		return () => removeEventListener('popstate', sync);
+	});
+
+	function startComposing() {
+		composing = true;
+		pushed = true;
+		pushState(resolve('/(auth-required)/(app)/partner/[id]/messages/new', { id: partnershipId }), {});
+	}
+
+	/** Closes the dialog and takes the URL back off `/new`, settled once the history has moved. */
+	async function stopComposing(): Promise<void> {
+		// Asked twice by one close (the button, then the dialog's own hide):
+		// a second Back would leave the board too.
+		if (!composing) {
+			return;
+		}
+		composing = false;
+		if (pushed) {
+			pushed = false;
+			// Back to the board's own entry, so Back afterwards leaves the board
+			// rather than reopening the dialog.
+			const landed = new Promise((done) => addEventListener('popstate', done, { once: true }));
+			history.back();
+			await landed;
+		} else {
+			// Landed on `/new` by a full load: there is no board entry behind it.
+			replaceState(
+				resolve('/(auth-required)/(app)/partner/[id]/messages', { id: partnershipId }),
+				{}
+			);
+		}
+	}
 
 	const vault = $derived(partnershipVault(data.partner.id));
 
@@ -175,7 +229,12 @@
 			return outcome.message;
 		}
 
-		composing = false;
+		// Off `/new` first, so Back from the thread goes to the board rather
+		// than to the dialog, empty again. Not `goto`'s `replaceState` over
+		// the `/new` entry instead: a shallow entry shares the board's
+		// navigation index, and so would the thread put in its place, so Back
+		// from the thread was taken as shallow and went nowhere.
+		await stopComposing();
 		await invalidate(`messages:board:${data.partner.id}`);
 		// Straight into the thread that was just started, which is where the
 		// reply will land.
@@ -251,7 +310,7 @@
 						pill
 						class="fab"
 						aria-label="Write something"
-						onclick={() => { composing = true; }}
+						onclick={startComposing}
 					>
 						<wa-icon name="paper-plane" variant="solid" label="Write something"></wa-icon>
 					</wa-button>
@@ -266,7 +325,7 @@
 					{send}
 					permanentMedia={hasFeature(data.features, 'permanentMedia')}
 					highQualityMedia={hasFeature(data.features, 'highQualityMedia')}
-					close={() => { composing = false; }}
+					close={stopComposing}
 				/>
 			{/if}
 		</div>

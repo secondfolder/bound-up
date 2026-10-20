@@ -94,7 +94,8 @@
 		Open it to confirm the address is yours, then log in.
 	</p>
 	<p class="quiet">
-		It can take a minute or two to arrive, and may land in spam. The link works for 24 hours.
+		It can take a minute or two to arrive. Not there? Check your Junk or Spam folder. The link works
+		for 24 hours.
 	</p>
 
 	<form method="POST" {action} use:superform.enhance data-ready={ready ? 'true' : undefined}>

@@ -71,7 +71,7 @@ cannot be cut at a character offset without corrupting it.
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `src/lib/richtext.ts`                             | The document type, its Zod schema, and the read helpers. **Imports no Lexical, and must not.** |
 | `src/lib/richtext-editor.ts`                      | The Lexical half: node set, typing shortcuts, the link matcher, `EmbedNode`.                   |
-| `src/lib/lexical/nodes/`                          | Editor-only nodes, one per file: the link classes and their shared "Add embed" button.         |
+| `src/lib/lexical/nodes/`                          | Editor-only nodes, one per file: the link classes and their shared "Show embed" button.         |
 | `src/lib/components/RichText.svelte`              | Renders a stored document. Walks JSON; no `{@html}`.                                           |
 | `src/lib/components/RichTextInline.svelte`        | The inline half of the renderer: text, breaks, links, embeds, the `Show` button.               |
 | `src/lib/components/ComposerEmbed.svelte`         | One embed inside the editor: the real `UrlEmbed` plus its remove button.                       |
@@ -126,7 +126,7 @@ is not part of the stored format at all.
 **The editor draws links with its own node classes, and never stores them.**
 `EditorLinkNode` and `EditorAutoLinkNode` subclass `LinkNode` and
 `AutoLinkNode` only to change their DOM. Each one wraps its `<a>` in a
-`span.link-with-embed-offer` that also holds the link's "Add embed" button (see
+`span.link-with-embed-offer` that also holds the link's "Show embed" button (see
 the way back from a removed embed, below), and points Lexical's `getDOMSlot` at
 the anchor, so the text is reconciled into the `<a>` and the button is left
 alone. They are swapped in through Lexical's node replacement in

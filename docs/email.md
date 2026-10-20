@@ -189,6 +189,14 @@ body, and the link appears in full in both.
 | Someone tried to sign up…             | Sign-up with an address that already has an account |
 | Confirm you are signing back in…      | A partner-assisted sign-in for an existing account |
 
+**Every screen that waits on an email says to check Junk.** The sign-up
+"Check your email" page, the message for signing in unconfirmed, and the
+partner-assisted sign-in's email step each end with "Not there? Check your Junk
+or Spam folder." A new mailer, a new domain or a self-hosted SMTP relay is
+exactly what a spam filter distrusts, and a link that never seems to come
+reads as the app being broken. The admin's test email needs none: whoever
+sends it is waiting for the result on the page.
+
 ## Files
 
 | Where                                       | What                                               |

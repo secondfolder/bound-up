@@ -10,7 +10,7 @@ import {
 } from 'lexical';
 
 /**
- * The DOM half of a link's "Add embed" button, shared by `EditorLinkNode` and
+ * The DOM half of a link's "Show embed" button, shared by `EditorLinkNode` and
  * `EditorAutoLinkNode`. They cannot share it through a common base class,
  * because each has to extend its own `@lexical/link` class to keep that
  * class's behaviour.
@@ -64,20 +64,12 @@ export function withEmbedOffer(
 	button.setAttribute('appearance', 'outlined');
 	button.setAttribute('pill', '');
 	button.contentEditable = 'false';
-	button.title = 'Add embed';
-	// A plus beside the embed icon: the icon alone says "embed", which reads as
-	// a state ("this has one") rather than as the action the button performs.
-	// The labelled icon is what names the button — `wa-button` takes its name
-	// from its content, not from an `aria-label` on the host.
-	const plus = document.createElement('wa-icon');
-	plus.setAttribute('slot', 'start');
-	plus.setAttribute('name', 'plus');
-	plus.setAttribute('variant', 'solid');
-	const image = document.createElement('wa-icon');
-	image.setAttribute('name', 'image');
-	image.setAttribute('variant', 'solid');
-	image.setAttribute('label', 'Add embed');
-	button.append(plus, image);
+	// Words rather than icons: a plus beside an embed icon was a puzzle to
+	// decode, and the icon alone read as a state ("this has one") rather than
+	// as the action the button performs. The text is also what names the
+	// button — `wa-button` takes its name from its content, not from an
+	// `aria-label` on the host.
+	button.textContent = 'Show embed';
 	// Keeps the caret where it was: a press inside the editor moves it, and the
 	// sweep treats "the caret is in this link" as "still typing".
 	button.addEventListener('pointerdown', (event) => event.preventDefault());

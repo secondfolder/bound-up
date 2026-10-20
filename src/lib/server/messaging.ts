@@ -1476,15 +1476,38 @@ export async function markThreadOpened(
 	viewerId: string,
 	now: Date = new Date()
 ): Promise<boolean> {
+	return (await openThread(db, threadId, viewerId, now)).moved;
+}
+
+/**
+ * `markThreadOpened`, also saying where the viewer's read mark stood before
+ * it moved: null when they had never opened the thread. The thread page opens
+ * at the oldest message after it (`firstUnreadMessageId`), and it has to be
+ * read here, in the same call as the write — read alongside it, the two race,
+ * and a mark already moved says nothing was unread.
+ */
+export async function openThread(
+	db: Db,
+	threadId: string,
+	viewerId: string,
+	now: Date = new Date()
+): Promise<{ moved: boolean; readUpTo: Date | null }> {
 	const rows = await db
-		.select({ lastMessageAt: messageThreads.lastMessageAt })
+		.select({
+			lastMessageAt: messageThreads.lastMessageAt,
+			readUpTo: threadReads.lastReadMessageAt
+		})
 		.from(messageThreads)
+		.leftJoin(
+			threadReads,
+			and(eq(threadReads.threadId, messageThreads.id), eq(threadReads.userId, viewerId))
+		)
 		.where(eq(messageThreads.id, threadId))
 		.limit(1);
 
 	const [row] = rows;
 	if (!row) {
-		return false;
+		return { moved: false, readUpTo: null };
 	}
 
 	// `returning` yields a row for an insert or an update and none when
@@ -1503,7 +1526,7 @@ export async function markThreadOpened(
 			setWhere: lt(threadReads.lastReadMessageAt, row.lastMessageAt)
 		})
 		.returning({ id: threadReads.id });
-	return written.length > 0;
+	return { moved: written.length > 0, readUpTo: row.readUpTo ?? null };
 }
 
 export type ReactionResult =

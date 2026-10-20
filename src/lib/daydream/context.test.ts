@@ -154,6 +154,26 @@ describe('toContextTurn', () => {
 		expect(passageAsSent('Charlie sighs.', null)).toBe('Charlie sighs.');
 	});
 
+	it('sends a passage back with the picture it described, and a user’s turn without one', () => {
+		const pictured = {
+			type: 'text' as const,
+			text: 'Charlie sighs.',
+			meta: {
+				suggestions: [],
+				directions: { add: [], remove: [] },
+				image: 'A man sighs by a window.'
+			}
+		};
+		expect(toContextTurn('story', pictured)).toEqual({
+			...said('Charlie sighs.', 'story'),
+			image: 'A man sighs by a window.'
+		});
+		expect(toContextTurn('user', pictured)).toEqual(said('Charlie sighs.'));
+		expect(passageAsSent('Charlie sighs.', null, 'A man sighs by a window.')).toBe(
+			'Charlie sighs.\n<meta>\n{"image":"A man sighs by a window."}\n</meta>'
+		);
+	});
+
 	it('sends a rewrite with what it rewrote, so its request goes back with it', () => {
 		const rewritten = {
 			type: 'text' as const,

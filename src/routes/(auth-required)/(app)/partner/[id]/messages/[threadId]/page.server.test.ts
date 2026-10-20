@@ -20,9 +20,9 @@ vi.mock('$lib/server/messaging', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/messaging')>();
 	return {
 		...actual,
-		markThreadOpened: async (...args: Parameters<typeof actual.markThreadOpened>) => {
+		openThread: async (...args: Parameters<typeof actual.openThread>) => {
 			await new Promise((done) => setTimeout(done, 50));
-			return actual.markThreadOpened(...args);
+			return actual.openThread(...args);
 		}
 	};
 });
@@ -79,6 +79,46 @@ describe('/partner/[id]/messages/[threadId]', () => {
 		);
 		const threads: { id: string; unread: boolean }[] = board.threads;
 		expect(threads.find((thread) => thread.id === threadId)?.unread).toBe(false);
+	});
+
+	/**
+	 * The thread opens at the oldest message the viewer has not read, which
+	 * only the read mark from before this load can say: the load moves it.
+	 */
+	it('says which message is the oldest unread, from the read mark as it was', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, ada, {
+			at: new Date(1000)
+		});
+		const open = async () => {
+			const data = await runLoad(
+				load(
+					fakeEvent({
+						db: harness.db,
+						user: bo,
+						params: { id: partnershipId, threadId },
+						path: `/partner/${partnershipId}/messages/${threadId}`
+					})
+				)
+			);
+			return {
+				firstUnreadId: data.firstUnreadId,
+				ids: data.thread.messages.map((message: { id: string }) => message.id)
+			};
+		};
+
+		// Never opened: everything the partner wrote is unread.
+		const first = await open();
+		expect(first.firstUnreadId).toBe(first.ids[0]);
+
+		// Read now, so nothing is.
+		expect((await open()).firstUnreadId).toBeNull();
+
+		// Bo's own reply is never unread to them; Ada's after it are.
+		await createTestMessage(harness.db, partnershipId, threadId, bo, { at: new Date(2000) });
+		await createTestMessage(harness.db, partnershipId, threadId, ada, { at: new Date(3000) });
+		await createTestMessage(harness.db, partnershipId, threadId, ada, { at: new Date(4000) });
+		const later = await open();
+		expect(later.firstUnreadId).toBe(later.ids[2]);
 	});
 
 	/**

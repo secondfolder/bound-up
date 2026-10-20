@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { followEnd, heldScrollTop } from './scroll-parent';
 
 /** A frame for the observers to report in: ResizeObserver delivers before the next paint. */
@@ -17,10 +17,12 @@ afterEach(() => {
  */
 function conversation({
 	heldRoot = false,
-	holdAt
+	holdAt,
+	smoothAfter
 }: {
 	heldRoot?: boolean;
 	holdAt?: () => Element | null;
+	smoothAfter?: number;
 } = {}) {
 	const scroller = document.createElement('div');
 	scroller.style.cssText = 'height: 200px; overflow-y: auto';
@@ -41,7 +43,10 @@ function conversation({
 		return item;
 	};
 	add(500);
-	cleanup = followEnd(list, holdAt ? { holdAt } : {});
+	cleanup = followEnd(list, {
+		...(holdAt ? { holdAt } : {}),
+		...(smoothAfter === undefined ? {} : { smoothAfter })
+	});
 	const atEnd = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 1;
 	return { scroller, add, atEnd };
 }
@@ -123,6 +128,37 @@ describe('followEnd', () => {
 		add(300);
 		await frame();
 		expect(scroller.scrollTop).toBe(492);
+	});
+
+	it('jumps while the conversation opens, and glides to what arrives after', async () => {
+		const opening = conversation();
+		const jumps = vi.spyOn(opening.scroller, 'scrollTo');
+		await frame();
+		opening.add(100);
+		await frame();
+		// Still opening: straight there, with no glide down the conversation.
+		expect(jumps).not.toHaveBeenCalled();
+		expect(opening.atEnd()).toBe(true);
+		cleanup?.();
+		document.body.replaceChildren();
+
+		const opened = conversation({ smoothAfter: 0 });
+		const glides = vi.spyOn(opened.scroller, 'scrollTo');
+		await frame();
+		opened.add(100);
+		await frame();
+		expect(glides).toHaveBeenLastCalledWith({ top: 400, behavior: 'smooth' });
+		await expect.poll(opened.atEnd).toBe(true);
+	});
+
+	it('jumps, rather than glides, further than a screen', async () => {
+		const { scroller, add, atEnd } = conversation({ smoothAfter: 0 });
+		const glides = vi.spyOn(scroller, 'scrollTo');
+		await frame();
+		add(1000);
+		await frame();
+		expect(glides).not.toHaveBeenCalled();
+		expect(atEnd()).toBe(true);
 	});
 
 	it('never moves a reader up to a held element they have scrolled past', async () => {

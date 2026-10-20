@@ -176,7 +176,7 @@ describe('buildMessages', () => {
 		const story: ContextTurn[] = [
 			passage('The door clicks shut.', []),
 			said('I sit.'),
-			passage('Mara looks up.', [slower]),
+			{ ...passage('Mara looks up.', [slower]), image: 'A woman at a desk looks up.' },
 			{ type: 'direction', label: 'Slower' },
 			passage('She takes her time.', [slower, deeper]),
 			{ type: 'roll', sides: 6, result: 4, outcome: 'You hold still' },
@@ -256,7 +256,7 @@ describe('buildMessages', () => {
 			for (const [at, each] of requests.entries()) {
 				const record = await recordSent(each.messages);
 				const turn = defined(passages[at], 'the passage');
-				const written = passageAsSent(turn.text, turn.expansion);
+				const written = passageAsSent(turn.text, turn.expansion, turn.image);
 				// The check-in is asked under a system prompt of its own, but its
 				// history still chains.
 				expect(record.system.includes('# The scene is stopped'), `request ${at}`).toBe(
@@ -296,6 +296,11 @@ describe('buildMessages', () => {
 			expect(sent).toContain(
 				'<yours>\n"Mara, the fox is safe."\n</yours>\nMara lets out a breath.'
 			);
+			// A passage's picture goes back with it, so the model knows what
+			// the last one showed.
+			expect(sent).toContain(
+				'Mara looks up.\n<meta>\n{"image":"A woman at a desk looks up."}\n</meta>'
+			);
 			// A rewrite goes back after what it was asked.
 			const rewritten = sent.indexOf('She leans in too.');
 			expect(sent[rewritten - 1]).toContain('(Rewrite the passage that comes next.');
@@ -327,7 +332,9 @@ describe('buildMessages', () => {
 		const withPictures = system(
 			buildMessages(request({ turns: [said('hi')] }), { pictures: true })
 		);
-		expect(withPictures).toContain('"image": include it in every reply');
+		expect(withPictures).toContain('"image": include it in most replies');
+		// No point drawing the same thing twice.
+		expect(withPictures).toContain('little a camera could see has changed since the last');
 		expect(withPictures).toContain('"image": "..."');
 		expect(withPictures).toContain('an adult age as a number');
 		// The image model has seen nothing else, so it is told nothing it cannot draw.

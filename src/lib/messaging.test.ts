@@ -4,6 +4,7 @@ import {
 	type BoardThread,
 	compareBoardThreads,
 	DEFAULT_THREAD_ICON,
+	firstUnreadMessageId,
 	formatTimeLeft,
 	isThreadIcon,
 	isUnreadFor,
@@ -141,6 +142,29 @@ describe('isUnreadFor', () => {
 		};
 		expect(isUnreadFor(thread, me)).toBe(true);
 		expect(isUnreadFor(thread, them)).toBe(false);
+	});
+});
+
+describe('firstUnreadMessageId', () => {
+	const mine = (id: string, ms: number) => ({ id, mine: true, createdAt: at(ms) });
+	const theirs = (id: string, ms: number) => ({ id, mine: false, createdAt: at(ms) });
+
+	it('is their first message when I have never opened the thread', () => {
+		expect(firstUnreadMessageId([mine('a', 100), theirs('b', 200)], null)).toBe('b');
+	});
+
+	// The read mark is set to exactly the newest message's time.
+	it('is the first of theirs after my read mark, not one at it', () => {
+		const messages = [theirs('a', 100), theirs('b', 200), theirs('c', 300)];
+		expect(firstUnreadMessageId(messages, at(200))).toBe('c');
+	});
+
+	it('never counts my own messages', () => {
+		expect(firstUnreadMessageId([theirs('a', 100), mine('b', 200)], at(100))).toBeNull();
+	});
+
+	it('is nothing when I have read everything', () => {
+		expect(firstUnreadMessageId([theirs('a', 100)], at(100))).toBeNull();
 	});
 });
 

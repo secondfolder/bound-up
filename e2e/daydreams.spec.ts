@@ -706,8 +706,8 @@ test.describe('daydreams', () => {
 		for (let turn = 0; turn < 4; turn += 1) {
 			await reply(page, unique(long));
 			await passageSaved(page);
-			// Followed as it arrived.
-			expect((await shellScroll(page)).fromEnd).toBeLessThan(2);
+			// Followed as it arrived: polled, because following glides there.
+			await expect.poll(async () => (await shellScroll(page)).fromEnd).toBeLessThan(2);
 		}
 
 		// Opened on the newest, not part-way down: the earlier turns opening one

@@ -299,6 +299,7 @@
 					Your email is confirmed.
 				{:else}
 					We've emailed a link to <strong>{stage.email}</strong>. Open it and confirm it's you.
+					Not there? Check your Junk or Spam folder.
 				{/if}
 			</li>
 		</ul>

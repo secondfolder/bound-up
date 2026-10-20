@@ -679,10 +679,15 @@ image model tuned for adult imagery, through Runware.
   so it gets no names, no "you", and nothing a camera could not see: a
   story's names and feelings only crowd out what it can draw, and a head
   count left unsaid grew a stranger in the frame. It is left out
-  only where a picture makes no sense, and never in a check-in. It is
-  constant per server, so the prompt stays cacheable ([Cost](#cost)), and
-  meta is never sent back, so the history is untouched. The description is
-  stored on the passage (`image`, `daydream-turn` v6).
+  where a picture makes no sense, never in a check-in, and when little a
+  camera could see has changed since the last passage that had one — a
+  second picture of the same moment costs a request and shows nothing new.
+  The instruction is constant per server, so the prompt stays cacheable
+  ([Cost](#cost)). The description is stored on the passage (`image`,
+  `daydream-turn` v6), and goes back to the model with it, as a `<meta>`
+  block holding only the image (`passageAsSent`): that is how the model
+  knows what the last picture showed. It is part of the passage from the
+  moment it is written, so the history still only adds to itself.
 - **The server wraps it.** `POST /api/daydreams/[id]/image` takes the
   description, the daydream's style and the scene's heat, and builds the
   request (`runwareTask`, `daydream/image-prompt.ts`): the style's model
@@ -915,9 +920,12 @@ metadata included, as `raw` (`daydream-turn` v4), for the raw log. What the
 page acts on is still the parsed passage and metadata; `raw` is only ever
 displayed. See [debug-mode.md](debug-mode.md#daydreams-raw-log).
 
-**Metadata is never sent back.** Past turns go to the model as their words
-alone (`toContextTurn`); what a passage offered next was for the screen, and
-would cost context on every request for nothing. Reactions are sent, because
+**Metadata is not sent back, but for the picture.** Past turns go to the
+model as their words (`toContextTurn`); what a passage offered next was for
+the screen, and would cost context on every request for nothing. The one
+exception is a passage's picture description, which goes back with it so the
+model can tell whether a new picture would show anything new
+([Pictures](#pictures)). Reactions are sent, because
 they say what the user enjoyed, each as a note where it was made: after the
 turn that was newest then, which the reaction records (`after`,
 `daydream-mark` v2), saying which passage it is on when that is not the one
@@ -1237,7 +1245,9 @@ followed only while the reader is at the end: one who has scrolled up to
 read is left where they are, and followed again once they scroll back down.
 Message threads do the same, through the same attachment (`followEnd` in
 `src/lib/scroll-parent.ts`, whose comment says why only a scroll _upwards_
-counts as leaving the end).
+counts as leaving the end). Once the story has opened, following glides — a
+smooth scroll — so what arrives visibly slides in; the opening itself, and
+anything further than a screen, jump.
 
 A daydream also keeps the reader's place in a long passage. Following stops
 once the passage arriving has its top at the top of the screen (`followEnd`'s

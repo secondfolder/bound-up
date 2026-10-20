@@ -724,6 +724,7 @@ record can only be made by someone holding the vault key.
 | ----------------------------------- | --------------------------------------------------------------------------- |
 | `/partner/[id]/messages`            | The board. The unopened-envelope state SSRs; previews decrypt after unlock. |
 | `/partner/[id]/messages?thread=…`   | Where a notification tap lands: a never-opened thread highlighted, else on. |
+| `/partner/[id]/messages/new`        | The board with its new-message dialog open, so a reload keeps it open.      |
 | `/partner/[id]/messages/[threadId]` | One thread. Its load also records the open, and publishes `read` if it moved. |
 | `/home`                             | A link per partner with something waiting.                                  |
 | `api/partnerships/[id]/threads`     | `POST` multipart: a thread and its first message.                           |
@@ -754,9 +755,37 @@ ciphertext is never rendered as text, even for a frame — there is a component
 test asserting exactly that, because it is the worst bug this feature could
 have.
 
-**A thread opens on its newest message**, and follows a new one only for a
-reader already at the end; one scrolled up to read is left there. That is
-`followEnd` in `src/lib/scroll-parent.ts`, shared with daydreams.
+**A thread opens on its newest message, with its oldest unread at the top**,
+and follows a new one only for a reader already at the end; one scrolled up to
+read is left there. That is `followEnd` in `src/lib/scroll-parent.ts`, shared
+with daydreams. Coming back to several messages, the thread is scrolled to the
+end but no further than puts the first of them at the top of the screen
+(`followEnd`'s `holdAt`), so nothing unread is carried off the top unread. The
+oldest unread is the partner's first message after the viewer's read mark
+(`firstUnreadMessageId` in `src/lib/messaging.ts`), and the mark is the one
+from *before* this open: `openThread` reads it in the same call that moves it,
+because read beside the write the two race, and a mark already moved says
+nothing was unread. Only the first load's answer counts — every later one, on
+a live event, has just moved the mark — and the hold lets go as soon as a
+newer message arrives, which is followed as usual.
+
+**Following glides once the thread is open.** A new message slides in with a
+smooth scroll; the opening, anything further than a screen, and a reader who
+asks for reduced motion jump instead (`followEnd` says why).
+
+**The new-message dialog is in the URL.** "Write something" shallow-routes to
+`/partner/[id]/messages/new` (`pushState`), so the board stays mounted under
+the dialog and Back closes it. Loaded in full, `/new` is a route of its own
+that renders the same board component with the same load (`board.server.ts`),
+which opens the dialog because of the route; closed there, it `replaceState`s
+back to the board's URL. Whether it is open is the board's own state, synced
+from `popstate`, not `page.state`: an `invalidate()` resets `page.state`, and
+making a tag in the dialog invalidates the board, which closed it.
+Sending steps back off `/new` before going to the new thread, so Back from the
+thread goes to the board rather than to an empty dialog — and not by
+`goto(…, { replaceState: true })` over `/new`, which left the thread sharing
+the shallow entry's navigation index, so Back from it was taken as shallow and
+went nowhere.
 
 **This feature does not use superforms**, and that is the marker rather than an
 omission: superforms exists to bind a `SuperValidated` to a `<form>` and

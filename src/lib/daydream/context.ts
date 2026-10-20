@@ -28,7 +28,9 @@ import {
  * roll — and the server turns that into words for the model. What a passage
  * offered next (its buttons, suggestions and roll card) is never sent back:
  * it was for the screen, and would cost context on every request for
- * nothing. A reaction is, because it says what the user enjoyed.
+ * nothing. A reaction is, because it says what the user enjoyed, and so is
+ * the picture a passage described, so the model can tell whether a new one
+ * would show anything new (`passageAsSent`).
  *
  * The history is sent as it was sent the first time, so each request only
  * adds to the one before (docs/daydreams.md, "Cost"): a passage carries the
@@ -47,10 +49,23 @@ const REACTION_EXCERPT = 60;
 /**
  * A passage as the model is shown it later: as it wrote it, the user's turn
  * written out first in its `<yours>` block when it wrote one out, then the
- * passage. The tags it opened with and the metadata after are left off.
+ * passage, then the picture it described, as metadata of the shape it wrote
+ * it in. The tags it opened with and the rest of the metadata are left off.
+ *
+ * The picture goes back so the model can tell whether a new one would show
+ * anything the last did not (`IMAGE_INSTRUCTION`): it cannot judge "little
+ * has changed since the last picture" without knowing what that picture was.
+ * It is part of the passage from the moment it is written, so the history
+ * still only ever adds to itself (docs/daydreams.md, "Cost"). A rewrite's
+ * quote of the passage it rewrites leaves it off: that asks for prose.
  */
-export function passageAsSent(text: string, expansion: string | null | undefined): string {
-	return expansion ? `<yours>\n${expansion}\n</yours>\n${text}` : text;
+export function passageAsSent(
+	text: string,
+	expansion: string | null | undefined,
+	image?: string | null
+): string {
+	const passage = expansion ? `<yours>\n${expansion}\n</yours>\n${text}` : text;
+	return image ? `${passage}\n<meta>\n${JSON.stringify({ image })}\n</meta>` : passage;
 }
 
 /** The start of a passage, to say which one a reaction is on. */
@@ -73,6 +88,8 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 		 * staying as they sent it.
 		 */
 		expansion: z.string().min(1).max(DAYDREAM_LIMITS.turn).optional(),
+		/** A passage's: the picture it described, which goes back with it (`passageAsSent`). */
+		image: z.string().min(1).max(DAYDREAM_LIMITS.imagePrompt).optional(),
 		/**
 		 * A passage's that rewrote another: what its request asked
 		 * (`rewriteRequest` in `server/daydream/prompt.ts`), which goes back in
@@ -134,6 +151,7 @@ export function contextSize(turn: ContextTurn): number {
 			return (
 				turn.text.length +
 				(turn.expansion?.length ?? 0) +
+				(turn.image?.length ?? 0) +
 				(turn.rewrite
 					? turn.rewrite.targetText.length +
 						(turn.rewrite.quote?.length ?? 0) +
@@ -206,6 +224,7 @@ export function toContextTurn(
 		case 'text': {
 			const expansion = asUser ? null : (content.meta?.expansion ?? null);
 			const rewriteOf = asUser ? null : (content.meta?.rewriteOf ?? null);
+			const image = asUser ? null : (content.meta?.image ?? null);
 			return {
 				type: 'text',
 				role,
@@ -213,6 +232,7 @@ export function toContextTurn(
 				...(content.meta?.ooc ? { ooc: true } : {}),
 				...(readAs && asUser ? { readAs } : {}),
 				...(expansion ? { expansion: expansion.slice(0, DAYDREAM_LIMITS.turn) } : {}),
+				...(image ? { image } : {}),
 				...(rewriteOf && rewrote
 					? {
 							rewrite: {

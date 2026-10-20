@@ -15,6 +15,7 @@
 	import type { SignupFormSchema } from '$lib/schemas/signupForm';
 	import { superForm } from '$lib/superform';
 	import { currentTimeZoneOrUtc } from '$lib/timezone';
+	import AuthBox from './AuthBox.svelte';
 	import InputField from './InputField.svelte';
 	import PasswordField from './PasswordField.svelte';
 
@@ -136,72 +137,70 @@
 			}
 		}
 	});
-	const { errors } = superform;
+	const { errors, submitting } = superform;
+
+	/** The box's loading bar: the keys being made, then the request. */
+	const busy = $derived(working || $submitting);
 </script>
 
-<form method="POST" use:superform.enhance data-ready={hydrated ? 'true' : null}>
-	<noscript>
-		<p class="invalid">
-			Signing up needs JavaScript. Your encryption keys are generated in this browser, and your
-			password never reaches the server.
+<AuthBox {busy} busyLabel="Creating your account">
+	<form method="POST" use:superform.enhance data-ready={hydrated ? 'true' : null}>
+		<noscript>
+			<p class="invalid">
+				Signing up needs JavaScript. Your encryption keys are generated in this browser, and your
+				password never reaches the server.
+			</p>
+		</noscript>
+
+		<InputField {superform} field="name" title="Name" type="text" autocomplete="name" />
+		<InputField {superform} field="email" title="Email" type="email" autocomplete="username" />
+
+		<PasswordField
+			bind:value={password}
+			field="password"
+			label="Password"
+			autocomplete="new-password"
+			strength
+			errors={passwordError ?? $errors.authSecret}
+		/>
+		<PasswordField
+			bind:value={passwordConfirm}
+			field="passwordConfirm"
+			label="Confirm password"
+			autocomplete="new-password"
+			errors={confirmError}
+		/>
+
+		<!--
+			Calm and brief, on purpose. The full "if you lose this, your message
+			history is gone" warning belongs on the messaging page, where the user is
+			about to have a history worth losing — putting it here would be alarming
+			about something they have not started using yet.
+		-->
+		<p class="note">
+			This password also encrypts your private messages, so pick a strong one and write it down
+			somewhere safe.
 		</p>
-	</noscript>
 
-	<InputField {superform} field="name" title="Name" type="text" autocomplete="name" />
-	<InputField {superform} field="email" title="Email" type="email" autocomplete="username" />
+		<input type="hidden" name="authSecret" value="" />
+		<input type="hidden" name="recipient" value="" />
+		<input type="hidden" name="wrapParams" value="" />
+		<input type="hidden" name="wrapBlob" value="" />
+		<input type="hidden" name="timezone" value="" />
 
-	<PasswordField
-		bind:value={password}
-		field="password"
-		label="Password"
-		autocomplete="new-password"
-		strength
-		errors={passwordError ?? $errors.authSecret}
-	/>
-	<PasswordField
-		bind:value={passwordConfirm}
-		field="passwordConfirm"
-		label="Confirm password"
-		autocomplete="new-password"
-		errors={confirmError}
-	/>
-
-	<!--
-		Calm and brief, on purpose. The full "if you lose this, your message
-		history is gone" warning belongs on the messaging page, where the user is
-		about to have a history worth losing — putting it here would be alarming
-		about something they have not started using yet.
-	-->
-	<p class="note">
-		This password also encrypts your private messages, so pick a strong one and write it down
-		somewhere safe.
-	</p>
-
-	<input type="hidden" name="authSecret" value="" />
-	<input type="hidden" name="recipient" value="" />
-	<input type="hidden" name="wrapParams" value="" />
-	<input type="hidden" name="wrapBlob" value="" />
-	<input type="hidden" name="timezone" value="" />
-
-	<wa-button type="submit" variant="brand" appearance="outlined" disabled={!hydrated || working}
-		>Sign Up</wa-button
-	>
-	{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
-	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
-</form>
+		<wa-button type="submit" variant="brand" appearance="outlined" disabled={!hydrated || working}
+			>Sign Up</wa-button
+		>
+		{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
+		{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
+	</form>
+</AuthBox>
 
 <style>
 	form {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		max-width: 300px;
-		margin: 0 auto;
-		border-color: var(--border-color, var(--wa-color-surface-border));
-		border-radius: var(--wa-panel-border-radius);
-		border-style: var(--wa-panel-border-style);
-		border-width: var(--wa-panel-border-width);
-		padding: var(--wa-space-l);
 
 		.invalid {
 			color: var(--wa-color-text-danger);

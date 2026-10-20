@@ -170,6 +170,60 @@ test.describe('a thread', () => {
 	});
 });
 
+test.describe('opening a thread', () => {
+	// Coming back to several messages starts at the first of them, not below
+	// it: the thread is scrolled to its end, but no further than puts the
+	// oldest unread at the top.
+	test('opens with the oldest unread message at the top, and at the end once read', async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			const long = 'Something long enough to wrap over several lines of the thread. '.repeat(5);
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await writeThread(ada.page, `The oldest unread. ${long}`);
+			for (let at = 0; at < 5; at += 1) {
+				await reply(ada.page, `Unread ${at}. ${long}`);
+			}
+
+			await jun.page.setViewportSize({ width: 400, height: 600 });
+			await jun.page.goto('/home');
+			await openBoard(jun.page, 'Ada');
+			await jun.page.getByRole('list', { name: 'Unread' }).getByRole('link').first().click();
+			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
+			const oldest = jun.page.locator('[data-message-id]').first();
+			await expect(oldest).toContainText('The oldest unread.');
+			const topOf = (message: Locator) =>
+				message.evaluate((element) => {
+					const main = document.querySelector('main');
+					return Math.round(
+						element.getBoundingClientRect().top - (main?.getBoundingClientRect().top ?? 0)
+					);
+				});
+			// At the top of the screen, give or take the hold's small gap...
+			await expect.poll(() => topOf(oldest)).toBeGreaterThanOrEqual(0);
+			await expect.poll(() => topOf(oldest)).toBeLessThan(20);
+			// ...which is short of the end: the rest is below, to be read.
+			expect((await shellScroll(jun.page)).fromEnd).toBeGreaterThan(100);
+
+			// Read now, so the next open is on the newest.
+			await jun.page.reload();
+			await expect(oldest).toContainText('The oldest unread.');
+			await expect.poll(async () => (await shellScroll(jun.page)).fromEnd).toBeLessThan(2);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+});
+
 test.describe('the board', () => {
 	test('puts unread first and moves a thread below the seam once read', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
@@ -1227,6 +1281,46 @@ test.describe('thread tags', () => {
 			await jun.close();
 		}
 	});
+
+	// The dialog is in the URL, so a reload (or iOS discarding the tab) comes
+	// back to it rather than to the board.
+	test('the new-message dialog is at /new, and a reload keeps it open', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			const board = new URL(ada.page.url()).pathname;
+			const composer = ada.page.getByLabel('Message to Jun');
+
+			await clickWaButton(ada.page, 'Write something');
+			await expect(composer).toBeVisible();
+			await expect(ada.page).toHaveURL(`${board}/new`);
+
+			// Back closes it, and goes no further than the board.
+			await ada.page.goBack();
+			await expect(composer).toBeHidden();
+			await expect(ada.page).toHaveURL(board);
+
+			await clickWaButton(ada.page, 'Write something');
+			await expect(ada.page).toHaveURL(`${board}/new`);
+			await ada.page.reload();
+			await expect(composer).toBeVisible();
+
+			// Closed on the route a reload landed on: back to the board's URL.
+			await clickWaButton(ada.page, 'Close');
+			await expect(composer).toBeHidden();
+			await expect(ada.page).toHaveURL(board);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
 });
 test.describe('embeds', () => {
 	/**
@@ -1574,7 +1668,7 @@ test.describe('embeds', () => {
 			const composerLink = ada.page.locator('.richtext-editor .surface a').first();
 			await expect(embed).toHaveCount(0);
 			await composerLink.hover({ position: { x: 4, y: 4 } });
-			await expect(ada.page.getByRole('button', { name: 'Add embed' })).toHaveCount(0);
+			await expect(ada.page.getByRole('button', { name: 'Show embed' })).toHaveCount(0);
 
 			// A space finishes the link, which is what moves the caret off it and
 			// puts the embed at the start of that line.
@@ -1751,7 +1845,7 @@ test.describe('embeds', () => {
 			// the `<a>`: the button is drawn over the anchor's centre as its
 			// sibling, and Playwright refuses a hover that lands on anything but
 			// the target or its descendants.
-			const addEmbed = ada.page.getByRole('button', { name: 'Add embed' });
+			const addEmbed = ada.page.getByRole('button', { name: 'Show embed' });
 			await expect(addEmbed).toBeHidden();
 			await ada.page.locator('.richtext-editor .surface .link-with-embed-offer').first().hover();
 			await addEmbed.click();
@@ -1828,7 +1922,7 @@ test.describe('embeds', () => {
 	 * The composer's embed lifecycle for a URL typed mid-sentence, one
 	 * requirement per step:
 	 *
-	 * 1. finishing the URL embeds it on its own, with no "Add embed" offer;
+	 * 1. finishing the URL embeds it on its own, with no "Show embed" offer;
 	 * 2. removing the embed makes the offer appear on hover;
 	 * 3. moving the caret onto the URL and off again does not re-embed it;
 	 * 4. editing the URL does, because it is a different URL now.
@@ -1853,7 +1947,7 @@ test.describe('embeds', () => {
 			const url = 'https://www.youtube.com/watch?v=GTx1UYV9Y-o';
 			const embed = ada.page.locator('.richtext-editor .composer-embed');
 			const link = ada.page.locator('.richtext-editor .surface .link-with-embed-offer').first();
-			const addEmbed = ada.page.getByRole('button', { name: 'Add embed' });
+			const addEmbed = ada.page.getByRole('button', { name: 'Show embed' });
 
 			// 1. Typed mid-sentence, the URL embeds as soon as the caret leaves
 			// it, and there is nothing to offer while the embed is there.
@@ -2099,9 +2193,9 @@ test.describe('drafts', () => {
 			await expect(surface(dialog)).toHaveText('a thought about the weekend');
 			await expect(chip).toBeVisible();
 
-			// 3. And across a reload.
+			// 3. And across a reload, which comes back to the dialog still open:
+			// it is in the URL.
 			await ada.page.reload();
-			await openDialog();
 			await expect(surface(dialog)).toHaveText('a thought about the weekend');
 			await expect(chip).toBeVisible();
 

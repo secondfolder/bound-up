@@ -1,11 +1,7 @@
 import { error } from '@sveltejs/kit';
+import { firstUnreadMessageId } from '$lib/messaging';
 import { getRecipientsForPartnership } from '$lib/server/keys';
-import {
-	getThread,
-	listTags,
-	markThreadOpened,
-	requireThreadMembership
-} from '$lib/server/messaging';
+import { getThread, listTags, openThread, requireThreadMembership } from '$lib/server/messaging';
 import { createNotifier } from '$lib/server/realtime/backend';
 import type { PageServerLoad } from './$types';
 
@@ -43,17 +39,23 @@ export const load: PageServerLoad = async ({ locals, params, depends, platform }
 	 * Node server always let it finish, so only the deployed app showed it.
 	 *
 	 * A failure is logged rather than failing the page: the thread stays
-	 * unread, which opening it again fixes.
+	 * unread, which opening it again fixes, and opens at its end.
+	 *
+	 * The mark as it stood before is what says where the thread opens: at the
+	 * oldest message after it. That is only true of the first load — every
+	 * later one, after a live event, finds the mark just moved — so the page
+	 * reads it once, when it opens (`ThreadView`'s `firstUnreadId`).
 	 */
-	const [thread, recipients, tags, readMoved] = await Promise.all([
+	const [thread, recipients, tags, opened] = await Promise.all([
 		getThread(locals.db, params.threadId, membership.icon, locals.user.id),
 		getRecipientsForPartnership(locals.db, params.id, locals.user.id),
 		listTags(locals.db, params.id, locals.user.id),
-		markThreadOpened(locals.db, params.threadId, locals.user.id).catch((cause: unknown) => {
+		openThread(locals.db, params.threadId, locals.user.id).catch((cause: unknown) => {
 			console.error('could not mark thread read', cause);
-			return false;
+			return null;
 		})
 	]);
+	const readMoved = opened?.moved ?? false;
 
 	// Tells a partner with this thread open that their read receipt moved.
 	// Only when it did: this load re-runs on every event about the thread,
@@ -78,6 +80,7 @@ export const load: PageServerLoad = async ({ locals, params, depends, platform }
 			image: membership.partnership.counterpart?.image ?? null
 		},
 		thread,
+		firstUnreadId: opened ? firstUnreadMessageId(thread.messages, opened.readUpTo) : null,
 		tags: tags ?? [],
 		recipients
 	};

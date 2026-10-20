@@ -81,6 +81,9 @@ export function heldScrollTop(current: number, end: number, holdTop: number): nu
 	return Math.max(current, Math.min(end, holdTop - HOLD_GAP));
 }
 
+/** How long after a conversation opens following still jumps rather than glides (`followEnd`). */
+const SMOOTH_AFTER_MS = 1500;
+
 /** How near the end still counts as at it: a reader a few pixels short has not scrolled away. */
 const END_SLACK = 48;
 
@@ -113,14 +116,26 @@ const END_SLACK = 48;
  * passage longer than the screen is not scrolled past before it is read
  * (docs/daydreams.md, "Following the story"). Holding never moves the
  * scrollport up, so a reader who has already scrolled past that point stays
- * where they are.
+ * where they are. A message thread holds at its oldest unread message, so it
+ * opens with that at the top rather than scrolled past it.
+ *
+ * Following glides (a smooth scroll) once the conversation has opened, so a
+ * new message or a passage arriving visibly slides in rather than appearing
+ * with a jump that loses the reader's place. It jumps while opening, for
+ * `smoothAfter` (the time it takes bodies to decrypt and pictures to load),
+ * because a glide down a whole conversation on every page load is motion
+ * for nothing. It also jumps further than a screen (catching up after a
+ * burst, which a glide would scroll past too fast to read), and always for a
+ * reader who asks for reduced motion.
  */
 export function followEnd(
 	from: HTMLElement,
-	options: { holdAt?: () => Element | null } = {}
+	options: { holdAt?: () => Element | null; smoothAfter?: number } = {}
 ): () => void {
 	const scroller = scrollParentOf(from);
 	const scrollEvents = scroller === document.scrollingElement ? globalThis : scroller;
+	const openedAt = performance.now();
+	const smoothAfter = options.smoothAfter ?? SMOOTH_AFTER_MS;
 	let atEnd = true;
 	let lastTop = scroller.scrollTop;
 	const measure = () => {
@@ -135,10 +150,24 @@ export function followEnd(
 	const follow = () => {
 		if (atEnd) {
 			const hold = options.holdAt?.();
-			scroller.scrollTop = hold
-				? heldScrollTop(scroller.scrollTop, scroller.scrollHeight, topWithin(hold, scroller))
-				: scroller.scrollHeight;
-			lastTop = scroller.scrollTop;
+			const end = scroller.scrollHeight - scroller.clientHeight;
+			const top = hold ? heldScrollTop(scroller.scrollTop, end, topWithin(hold, scroller)) : end;
+			const distance = Math.abs(top - scroller.scrollTop);
+			if (distance < 1) {
+				return;
+			}
+			const glide =
+				performance.now() - openedAt >= smoothAfter &&
+				distance <= scroller.clientHeight &&
+				!matchMedia('(prefers-reduced-motion: reduce)').matches;
+			if (glide) {
+				// `lastTop` stays where the glide starts: every scroll event on the
+				// way is further down, which `measure` never reads as leaving.
+				scroller.scrollTo({ top, behavior: 'smooth' });
+			} else {
+				scroller.scrollTop = top;
+				lastTop = scroller.scrollTop;
+			}
 		}
 	};
 	const resizes = new ResizeObserver(follow);

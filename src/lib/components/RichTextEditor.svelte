@@ -320,7 +320,7 @@
 		);
 
 		/**
-		 * A link's own "Add embed" button — see `ADD_EMBED_COMMAND`. Handled
+		 * A link's own "Show embed" button — see `ADD_EMBED_COMMAND`. Handled
 		 * here rather than in `richtext-editor.ts` because putting the embed back
 		 * also lifts the dismissal, and `dismissedEmbeds` lives in this component.
 		 * Command listeners already run inside an update.
@@ -490,7 +490,7 @@
 		text-decoration: underline;
 	}
 
-	/* A link's own "Add embed" button, built in `richtext-editor.ts` — see
+	/* A link's own "Show embed" button, built in `richtext-editor.ts` — see
 	   `ADD_EMBED_COMMAND` there. Hidden until the link is both hovered and
 	   marked as having an embed to offer, so what decides whether it shows is
 	   the link's class and the pointer, with no script watching either.
@@ -517,11 +517,7 @@
 		white-space: nowrap;
 	}
 
-	/* Two icons and no text makes this an "icon button" to Web Awesome, which
-	   squares it off to the control's height. It is a pill holding both. */
 	.surface :global(.embed-again::part(base)) {
-		width: auto;
-		aspect-ratio: auto;
 		background: var(--wa-color-surface-raised, white);
 		box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 22%);
 	}

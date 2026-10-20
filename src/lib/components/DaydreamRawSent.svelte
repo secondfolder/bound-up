@@ -48,7 +48,11 @@
 				? {
 						record: previousContent.sent,
 						// As the model was shown it in the history after it.
-						passage: passageAsSent(previousContent.text, previousContent.meta?.expansion)
+						passage: passageAsSent(
+							previousContent.text,
+							previousContent.meta?.expansion,
+							previousContent.meta?.image
+						)
 					}
 				: null;
 		if (!recorded || (previous && !before)) {

@@ -18,6 +18,7 @@
 	import { type LoginFormSchema, loginFormSchema } from '$lib/schemas/loginForm';
 	import { takeSignInEmail } from '$lib/sign-in-again';
 	import { superForm } from '$lib/superform';
+	import AuthBox from './AuthBox.svelte';
 	import InputField from './InputField.svelte';
 	import PasswordField from './PasswordField.svelte';
 
@@ -140,7 +141,7 @@
 			}
 		}
 	});
-	const { errors, form: formValues } = superform;
+	const { errors, form: formValues, submitting } = superform;
 
 	/**
 	 * Whether there is something to sign in with, for the Login button's style:
@@ -159,6 +160,11 @@
 	);
 
 	let passkeyError: string | null = $state(null);
+	/** From a passkey ceremony's answer until the next page: it never submits the form. */
+	let finishingPasskey = $state(false);
+
+	/** The box's loading bar: from the press until the next page is up, by either way in. */
+	const busy = $derived(deriving || $submitting || finishingPasskey);
 
 	async function afterPasskeySignIn(secrets: PasskeySecrets) {
 		// The password path gets `redirectTo` back from the action's 303; the
@@ -177,15 +183,20 @@
 		// Signing in with a passkey unlocks too: the same ceremony returned the
 		// secret that opens this passkey's wrap. See `passkey-ceremony.ts`.
 		stashUnlock({ kind: 'passkey', ...secrets, ...(reason ? { reason } : {}) });
-		// The ceremony set the session cookie client-side, so server load data is
-		// now stale — refetch before navigating.
-		await invalidateAll();
-		// The navigation-through-resolve plugin wants a resolve() call, but this
-		// is a runtime path from a query string, not a known route id — there is
-		// nothing to resolve against. It is safe because the server ran it
-		// through `safeRedirect` in the load before it ever reached this prop.
-		// biome-ignore lint/plugin: see above — a validated runtime path, not a route id.
-		await goto(destination, { invalidateAll: true });
+		finishingPasskey = true;
+		try {
+			// The ceremony set the session cookie client-side, so server load data
+			// is now stale — refetch before navigating.
+			await invalidateAll();
+			// The navigation-through-resolve plugin wants a resolve() call, but
+			// this is a runtime path from a query string, not a known route id —
+			// there is nothing to resolve against. It is safe because the server
+			// ran it through `safeRedirect` in the load before it reached this prop.
+			// biome-ignore lint/plugin: see above — a validated runtime path, not a route id.
+			await goto(destination, { invalidateAll: true });
+		} finally {
+			finishingPasskey = false;
+		}
 	}
 
 	async function signInWithPasskey() {
@@ -230,71 +241,66 @@
 	});
 </script>
 
-<form method="POST" use:superform.enhance data-ready={hydrated ? 'true' : null}>
-	<noscript>
-		<!-- Said before a wasted round trip, not after it. Signing in genuinely
-		     cannot work without JavaScript now: the server has nothing to check,
-		     because it never receives a password. -->
-		<p class="invalid">
-			Signing in needs JavaScript. Your password is turned into a key in this browser and never sent
-			to the server, so there is nothing for the server to check without it.
-		</p>
-	</noscript>
+<AuthBox {busy} busyLabel="Signing in">
+	<form method="POST" use:superform.enhance data-ready={hydrated ? 'true' : null}>
+		<noscript>
+			<!-- Said before a wasted round trip, not after it. Signing in genuinely
+			     cannot work without JavaScript now: the server has nothing to check,
+			     because it never receives a password. -->
+			<p class="invalid">
+				Signing in needs JavaScript. Your password is turned into a key in this browser and never sent
+				to the server, so there is nothing for the server to check without it.
+			</p>
+		</noscript>
 
-	<!-- First, and solid from the start: a passkey is the one-tap way in, needs
-	     nothing typed, and unlocks messages in the same touch. `type="button"`
-	     so Enter in the password box still submits the password. -->
-	<wa-button type="button" variant="brand" onclick={signInWithPasskey}
-		>Sign in with a passkey</wa-button
-	>
-	{#if passkeyError}<span class="invalid">{passkeyError}</span>{/if}
+		<!-- First, and solid from the start: a passkey is the one-tap way in, needs
+		     nothing typed, and unlocks messages in the same touch. `type="button"`
+		     so Enter in the password box still submits the password. -->
+		<wa-button type="button" variant="brand" onclick={signInWithPasskey}
+			>Sign in with a passkey</wa-button
+		>
+		{#if passkeyError}<span class="invalid">{passkeyError}</span>{/if}
 
-	<div class="divider">or</div>
+		<div class="divider">or</div>
 
-	<InputField
-		{superform}
-		field="email"
-		title="Email"
-		type="email"
-		autocomplete="username webauthn"
-	/>
-	<PasswordField
-		bind:value={password}
-		field="password"
-		label="Password"
-		autocomplete="current-password"
-		errors={$errors.authSecret}
-	/>
-	<!-- Empty in the HTML and filled by onSubmit. With no JavaScript it posts
-	     blank, which the Zod field rejects with a message naming the real cause. -->
-	<input type="hidden" name="authSecret" value="" />
+		<InputField
+			{superform}
+			field="email"
+			title="Email"
+			type="email"
+			autocomplete="username webauthn"
+		/>
+		<PasswordField
+			bind:value={password}
+			field="password"
+			label="Password"
+			autocomplete="current-password"
+			errors={$errors.authSecret}
+		/>
+		<!-- Empty in the HTML and filled by onSubmit. With no JavaScript it posts
+		     blank, which the Zod field rejects with a message naming the real cause. -->
+		<input type="hidden" name="authSecret" value="" />
 
-	<wa-button
-		type="submit"
-		variant="brand"
-		appearance={canSignIn ? 'accent' : 'outlined'}
-		disabled={!hydrated || deriving}>Login</wa-button
-	>
-	{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
-	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
+		<wa-button
+			type="submit"
+			variant="brand"
+			appearance={canSignIn ? 'accent' : 'outlined'}
+			disabled={!hydrated || deriving}>Login</wa-button
+		>
+		{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
+		{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 
-	<hr />
-	<!-- For someone who has lost every way in. See docs/account-recovery.md. -->
-	<a class="recover" href={resolve('/(public)/login/recover')}>Forgot password</a>
-</form>
+		<hr />
+		<!-- For someone who has lost every way in. See docs/account-recovery.md. -->
+		<a class="recover" href={resolve('/(public)/login/recover')}>Forgot password</a>
+	</form>
+</AuthBox>
 
 <style>
 	form {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		max-width: 300px;
-		margin: 0 auto;
-		border-color: var(--border-color, var(--wa-color-surface-border));
-		border-radius: var(--wa-panel-border-radius);
-		border-style: var(--wa-panel-border-style);
-		border-width: var(--wa-panel-border-width);
-		padding: var(--wa-space-l);
 
 		.invalid {
 			color: var(--wa-color-text-danger);

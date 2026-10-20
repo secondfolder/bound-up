@@ -488,7 +488,10 @@ async function readyRichText(scope: Page | Locator): Promise<Locator> {
 export async function fillRichText(scope: Page | Locator, value: string): Promise<void> {
 	const surface = await readyRichText(scope);
 	await surface.fill(value);
-	await expect(surface).toContainText(value);
+	// Rendered text, not `textContent`: a link's "Show embed" button sits
+	// inside the surface, hidden until hovered, and its words are not the
+	// document's.
+	await expect(surface).toContainText(value, { useInnerText: true });
 }
 
 /**

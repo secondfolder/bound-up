@@ -89,7 +89,7 @@ export const actions: Actions = {
 					return setError(
 						loginForm,
 						'',
-						"Confirm your email address first. We've just sent you a new link — open it, then sign in.",
+						"Confirm your email address first. We've just sent you a new link — open it, then sign in. Not there? Check your Junk or Spam folder.",
 						{ status: 403 }
 					);
 				}

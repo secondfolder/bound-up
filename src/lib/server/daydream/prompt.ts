@@ -395,8 +395,13 @@ function steeringIdeas(
  * every common name; a person only implied by the act goes undrawn unless
  * described; a word with two meanings ("gear") is drawn as the wrong one;
  * and light said exactly does more for a picture than any adjective.
+ *
+ * A picture is skipped when little has visibly changed since the last one:
+ * a second picture of the same moment costs a request and shows nothing
+ * new. The model can judge that because each past passage goes back with
+ * the description it wrote (`passageAsSent`).
  */
-const IMAGE_INSTRUCTION = `- "image": include it in every reply. It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the scene is sexual, the hottest. Leave it out only when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. A passage that is mostly talk still has people in a place, and gets one.
+const IMAGE_INSTRUCTION = `- "image": include it in most replies. It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the scene is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. Leave it out, too, when little a camera could see has changed since the last passage that had one (its "image" is in that passage's metadata): the same people, in the same place and much the same pose, doing much the same thing — another picture of it would show nothing new. A new act, position, place, person or outfit is a change worth one. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.
   It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it as plain, literal sentences in the present tense, about 80 to 150 words and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
   1. The framing: close-up, medium shot or wide shot, and from where.
   2. How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don't). Count and describe anyone the moment implies, too: if someone is being fucked, whoever is fucking them is in the picture. Keep each person's look the same from picture to picture, from the setup where it says.
@@ -501,7 +506,9 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 	switch (turn.type) {
 		case 'text': {
 			if (turn.role === 'story') {
-				return [{ role: 'assistant', content: passageAsSent(turn.text, turn.expansion) }];
+				return [
+					{ role: 'assistant', content: passageAsSent(turn.text, turn.expansion, turn.image) }
+				];
 			}
 			return [{ role: 'user', content: userText(turn) }];
 		}

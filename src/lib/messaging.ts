@@ -367,6 +367,25 @@ export function seenMessageId(
 }
 
 /**
+ * The oldest message the viewer has not read, which the thread opens at: the
+ * first of the partner's after the viewer's read mark (`openThread`'s
+ * `readUpTo`), or their first at all when the viewer has never opened it.
+ * Null when there is none, and the thread opens at its end. The viewer's own
+ * messages are never unread to them.
+ *
+ * `messages` must be in thread order, as `getThread` returns them.
+ */
+export function firstUnreadMessageId(
+	messages: readonly { id: string; mine: boolean; createdAt: Date }[],
+	readUpTo: Date | null
+): string | null {
+	const readAt = readUpTo?.getTime() ?? Number.NEGATIVE_INFINITY;
+	return (
+		messages.find((message) => !message.mine && message.createdAt.getTime() > readAt)?.id ?? null
+	);
+}
+
+/**
  * The thread a live refresh brought a new message to, if any, for the board
  * to highlight.
  *

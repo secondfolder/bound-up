@@ -4,7 +4,7 @@ import type { EditorNodeDefinition } from './index';
 import { innerLink, withEmbedOffer } from './shared/embed-offer';
 
 /**
- * Lexical's `AutoLinkNode`, extended with an "Add embed" button.
+ * Lexical's `AutoLinkNode`, extended with an "Show embed" button.
  *
  * Nothing else changes: this subclass only wraps the link's `<a>` together
  * with the button (see `shared/embed-offer.ts`). The editor uses it wherever

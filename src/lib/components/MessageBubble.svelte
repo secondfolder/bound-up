@@ -55,7 +55,7 @@
 	const cachedEmbedsPending = $derived(message.metadataCiphertext !== null && metadata === undefined);
 </script>
 
-<li class:mine class:theirs={!mine}>
+<li class:mine class:theirs={!mine} data-message-id={message.id}>
 	<div class="bubble">
 		{#if payload === undefined}
 			<span class="pending" role="img" aria-label="Decrypting">···</span>
