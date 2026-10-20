@@ -998,15 +998,20 @@ export class DaydreamStory {
 	 * passage is left as it was; the limit applies from here on.
 	 */
 	async notThis(turnId: string, quote: Quote, line: string): Promise<string | null> {
-		const { setup } = this;
-		if (!setup) {
-			return NOT_READY;
-		}
-		const limits = setup.limits.trim() ? `${setup.limits.trim()}\n${line}` : line;
-		if (limits.length > 1000) {
+		// Added to the limits as they are by the save's turn, so a limit saved
+		// meanwhile is kept rather than written over.
+		let full = false;
+		const saved = await this.saveSetup((setup) => {
+			const limits = setup.limits.trim() ? `${setup.limits.trim()}\n${line}` : line;
+			if (limits.length > 1000) {
+				full = true;
+				return null;
+			}
+			return { ...setup, limits };
+		});
+		if (full) {
 			return 'Your limits are full. Make room for this one on the setup page.';
 		}
-		const saved = await this.saveSetup({ ...setup, limits });
 		if (saved) {
 			return saved;
 		}
@@ -1060,13 +1065,14 @@ export class DaydreamStory {
 	/** Ease off: the story carries on, gentler, and the intensity dial comes down a notch. */
 	async easeOff(): Promise<void> {
 		await this.#interrupt();
-		const { setup } = this;
-		if (setup && setup.dials.intensity > 1) {
-			await this.saveSetup({
-				...setup,
-				dials: { ...setup.dials, intensity: (setup.dials.intensity - 1) as DialValue }
-			});
-		}
+		await this.saveSetup((setup) =>
+			setup.dials.intensity > 1
+				? {
+						...setup,
+						dials: { ...setup.dials, intensity: (setup.dials.intensity - 1) as DialValue }
+					}
+				: null
+		);
 		const id = await this.#append(this.activeTurnId, 'user', { type: 'safety', signal: 'yellow' });
 		if (id) {
 			void this.#start({ parentId: id, mode: 'reply' });
@@ -1084,20 +1090,47 @@ export class DaydreamStory {
 
 	// ── the setup, from here ─────────────────────────────────────────────────
 
-	/** Saves a changed setup (the dials, a limit). Answers why not, or null. */
-	async saveSetup(setup: DaydreamSetup): Promise<string | null> {
-		const saved = await saveSetupRecord(this.id, setup, this.setupRevision);
-		if (!saved.ok) {
-			return saved.error;
-		}
-		this.#knownSetup = setup;
-		this.setupRevision = saved.revision;
-		return null;
+	/** The setup saves under way, in order: each starts once the one before has answered. */
+	#setupWrites: Promise<unknown> = Promise.resolve();
+
+	/**
+	 * Saves a change to the setup (the dials, a limit, its name). Answers why
+	 * not, or null.
+	 *
+	 * Takes the change rather than the setup it makes, and saves one at a time,
+	 * because more than one can be under way at once: naming a story writes its
+	 * title in the background just as its opening arrives, which is just when
+	 * someone reaches for the heat. Each save is compare-and-swap on the
+	 * revision, so two sent together carried the same one and the second was
+	 * refused — the heat change silently did not apply. Queued, each one runs
+	 * after the last has answered, on the setup and revision that left, so
+	 * neither is refused and neither undoes the other. `change` answers null to
+	 * save nothing, for a change that no longer makes sense by its turn.
+	 */
+	saveSetup(change: (setup: DaydreamSetup) => DaydreamSetup | null): Promise<string | null> {
+		const write = this.#setupWrites.then(async () => {
+			const { setup } = this;
+			if (!setup) {
+				return NOT_READY;
+			}
+			const next = change(setup);
+			if (!next) {
+				return null;
+			}
+			const saved = await saveSetupRecord(this.id, next, this.setupRevision);
+			if (!saved.ok) {
+				return saved.error;
+			}
+			this.#knownSetup = next;
+			this.setupRevision = saved.revision;
+			return null;
+		});
+		this.#setupWrites = write.catch(() => undefined);
+		return write;
 	}
 
 	async setDials(dials: StoryDials): Promise<string | null> {
-		const { setup } = this;
-		return setup ? await this.saveSetup({ ...setup, dials }) : NOT_READY;
+		return await this.saveSetup((setup) => ({ ...setup, dials }));
 	}
 
 	/**
@@ -1106,8 +1139,7 @@ export class DaydreamStory {
 	 * edit to a setup, it applies from the next passage on.
 	 */
 	async setSceneDials(dials: SceneDials): Promise<string | null> {
-		const { setup } = this;
-		return setup ? await this.saveSetup({ ...setup, scene: { ...setup.scene, dials } }) : NOT_READY;
+		return await this.saveSetup((setup) => ({ ...setup, scene: { ...setup.scene, dials } }));
 	}
 
 	/**
@@ -1116,8 +1148,7 @@ export class DaydreamStory {
 	 * "Pictures"), so neither costs it its cache.
 	 */
 	async setPictures(pictures: DaydreamPictures): Promise<string | null> {
-		const { setup } = this;
-		return setup ? await this.saveSetup({ ...setup, pictures }) : NOT_READY;
+		return await this.saveSetup((setup) => ({ ...setup, pictures }));
 	}
 
 	async setPicturesOn(on: boolean): Promise<string | null> {
@@ -1158,13 +1189,21 @@ export class DaydreamStory {
 			opening: opening.slice(0, MAX_NAMING_OPENING),
 			limits: setup.limits
 		});
-		// The setup again, as it is now: it may have changed while the model thought.
-		const now = this.setup;
-		if (!(answer.ok && now) || now.title.trim() !== '') {
+		if (!answer.ok) {
 			return null;
 		}
-		const failed = await this.saveSetup({ ...now, title: answer.value });
-		return failed === null ? answer.value : null;
+		// Applied to the setup as it is by its turn, which may have changed
+		// while the model thought — and is not applied at all if, meanwhile,
+		// someone named it themselves.
+		let named = false;
+		const failed = await this.saveSetup((now) => {
+			if (now.title.trim() !== '') {
+				return null;
+			}
+			named = true;
+			return { ...now, title: answer.value };
+		});
+		return failed === null && named ? answer.value : null;
 	}
 
 	// ── marks ────────────────────────────────────────────────────────────────

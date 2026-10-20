@@ -432,6 +432,14 @@ again, and an answer that arrives after the setup gained a name some other
 way is dropped. Renaming is the edit page's Name field; clearing it hands the
 naming back to the model.
 
+**Setup saves from the story page go one at a time** (`DaydreamStory.saveSetup`
+takes a change, not a whole setup). Naming lands just as the opening does,
+which is just when someone reaches for the heat, and each save is
+compare-and-swap on the setup's revision: sent together, both carried the
+same revision and the second was refused, so the heat change quietly did not
+apply. Queued, each runs after the last has answered, on the setup and
+revision it left, so the name and the dial both stick.
+
 ## The story is a tree
 
 Every branch of a story is kept in one daydream. `daydream_turns` has a

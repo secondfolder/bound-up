@@ -1361,6 +1361,48 @@ describe('DaydreamThread', () => {
 			expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ title: 'After the meeting' });
 		});
 
+		/**
+		 * Naming saves the setup in the background just as the opening arrives,
+		 * which is just when someone turns the heat. Both used to go out at once
+		 * on the same revision, and the second was refused, so the heat change
+		 * silently did not apply.
+		 */
+		it('turns the heat while naming is saving, keeping both, one save after the other', async () => {
+			client.requestSuggestion.mockResolvedValue(completion({ title: 'After the meeting' }));
+			let finishNaming: (value: { ok: true; revision: number }) => void = () => undefined;
+			client.saveSetup
+				.mockImplementationOnce(
+					() =>
+						new Promise((resolve) => {
+							finishNaming = resolve;
+						})
+				)
+				.mockResolvedValueOnce({ ok: true, revision: 2 });
+			const { container } = render(DaydreamThread, { daydream: unnamed(), available: true });
+			await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
+
+			await waitFor(() =>
+				expect(waByProp(container, 'wa-slider', 'label', 'Heat')).toHaveLength(1)
+			);
+			await waSettled(container);
+			const heat = waByProp(container, 'wa-slider', 'label', 'Heat')[0] as HTMLElement & {
+				value: number;
+			};
+			heat.value = 4;
+			heat.dispatchEvent(new Event('change'));
+			await waSettled(container);
+			// Waits its turn rather than racing the naming save.
+			expect(client.saveSetup).toHaveBeenCalledOnce();
+
+			finishNaming({ ok: true, revision: 1 });
+			await waitFor(() => expect(client.saveSetup).toHaveBeenCalledTimes(2));
+			const [, second, revision] = client.saveSetup.mock.calls[1] ?? [];
+			// On the revision naming left, with the name naming gave it.
+			expect(revision).toBe(1);
+			expect(second).toMatchObject({ title: 'After the meeting', scene: { dials: { heat: 4 } } });
+			expect(container.querySelector('[role="alert"]')).toBeNull();
+		});
+
 		it('leaves a daydream that has a name alone', async () => {
 			render(DaydreamThread, {
 				daydream: daydream([turn('t1', null, 'story', 'Sit down.')]),
