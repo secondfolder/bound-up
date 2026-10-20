@@ -160,6 +160,20 @@
 		--kink-level-love: oklch(76% 0.25 145);
 		/* What sits on a filled dot: the check mark. */
 		--kink-level-ink: oklch(18% 0.03 40);
+
+		/* A daydream passage's speech (docs/daydreams.md, "Reading a
+		   passage"). Dialogue is a warmer, brighter cream than narration's
+		   text colour, enough to find the next line by eye without shouting.
+		   Each voice — the user's own, then the cast in setup order — is a
+		   light tint of its own hue, all at a lightness that reads on a
+		   raised surface, apart in hue rather than in lightness so none of
+		   them looks like emphasis. */
+		--daydream-dialogue: oklch(90% 0.075 80);
+		--daydream-voice-you: oklch(89% 0.1 95);
+		--daydream-voice-1: oklch(84% 0.09 20);
+		--daydream-voice-2: oklch(86% 0.075 205);
+		--daydream-voice-3: oklch(87% 0.09 145);
+		--daydream-voice-4: oklch(84% 0.08 300);
 	}
 }
 

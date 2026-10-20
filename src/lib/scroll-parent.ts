@@ -62,6 +62,25 @@ export function scrollIntoViewWithin(
 	scroller.scrollTo({ top, behavior: options.behavior ?? 'smooth' });
 }
 
+/** Room left above an element followed to the top of the scrollport (`followEnd`'s `holdAt`). */
+const HOLD_GAP = 8;
+
+/** Where `target`'s top is in `scroller`'s content, as a `scrollTop` would put it at the top. */
+function topWithin(target: Element, scroller: HTMLElement): number {
+	const scrollerTop =
+		scroller === document.scrollingElement ? 0 : scroller.getBoundingClientRect().top;
+	return target.getBoundingClientRect().top - scrollerTop + scroller.scrollTop;
+}
+
+/**
+ * Where following the end goes while it holds at an element whose top is at
+ * `holdTop`: towards the end, but no further than puts that top a little
+ * below the top of the scrollport — and never back up from where it is.
+ */
+export function heldScrollTop(current: number, end: number, holdTop: number): number {
+	return Math.max(current, Math.min(end, holdTop - HOLD_GAP));
+}
+
 /** How near the end still counts as at it: a reader a few pixels short has not scrolled away. */
 const END_SLACK = 48;
 
@@ -87,8 +106,19 @@ const END_SLACK = 48;
  * stopped the following — a daydream opened part-way down its story and
  * stayed there as passages arrived. Neither ever moves it up, and a reader
  * scrolling away from the newest always does.
+ *
+ * `holdAt` names an element following stops at: the scrollport goes no
+ * further than puts its top at the top of the scrollport, and the rest waits
+ * for the reader to scroll. A daydream holds at the passage arriving, so a
+ * passage longer than the screen is not scrolled past before it is read
+ * (docs/daydreams.md, "Following the story"). Holding never moves the
+ * scrollport up, so a reader who has already scrolled past that point stays
+ * where they are.
  */
-export function followEnd(from: HTMLElement): () => void {
+export function followEnd(
+	from: HTMLElement,
+	options: { holdAt?: () => Element | null } = {}
+): () => void {
 	const scroller = scrollParentOf(from);
 	const scrollEvents = scroller === document.scrollingElement ? globalThis : scroller;
 	let atEnd = true;
@@ -104,7 +134,10 @@ export function followEnd(from: HTMLElement): () => void {
 	};
 	const follow = () => {
 		if (atEnd) {
-			scroller.scrollTop = scroller.scrollHeight;
+			const hold = options.holdAt?.();
+			scroller.scrollTop = hold
+				? heldScrollTop(scroller.scrollTop, scroller.scrollHeight, topWithin(hold, scroller))
+				: scroller.scrollHeight;
 			lastTop = scroller.scrollTop;
 		}
 	};

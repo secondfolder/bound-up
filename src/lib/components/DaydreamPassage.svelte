@@ -1,12 +1,12 @@
 <script lang="ts">
 	import type { WaSelectEvent } from '@awesome.me/webawesome/dist/events/select.js';
 	import type { Reaction } from '$lib/daydream/context';
-	import { highlightSegments } from '$lib/daydream/quotes';
 	import type { DaydreamStory } from '$lib/daydream/story.svelte';
 	import type { Quote } from '$lib/sealed-kinds/daydreams';
 	import { PENDING_TEXT, UNREADABLE_TEXT } from '$lib/sealed-views.svelte';
 	import type { DaydreamTreeNodeView } from '$lib/types';
 	import DaydreamPicture from './DaydreamPicture.svelte';
+	import DaydreamProse from './DaydreamProse.svelte';
 	import DaydreamSiblings from './DaydreamSiblings.svelte';
 
 	/**
@@ -19,6 +19,9 @@
 		story,
 		node,
 		speaker,
+		cast,
+		opening = false,
+		held = false,
 		selected,
 		onBookmark,
 		onNotThis,
@@ -28,6 +31,12 @@
 		node: DaydreamTreeNodeView;
 		/** Whose voice this is, when one character tells the whole story; null otherwise. */
 		speaker: string | null;
+		/** Who has a colour of their own in the passage's dialogue (`DaydreamProse`). */
+		cast: { you: readonly string[]; characters: readonly string[] };
+		/** The story's opening passage. */
+		opening?: boolean;
+		/** The passage that last arrived, where following the end stops (`DaydreamThread`'s `heldId`). */
+		held?: boolean;
 		/** The stretch of this passage that is selected, if any. */
 		selected: Quote | null;
 		onBookmark: (turnId: string, quote: Quote | null) => void;
@@ -46,7 +55,6 @@
 				mark.content?.type === 'bookmark' && mark.content.quote ? [mark.content.quote] : []
 			)
 	);
-	const segments = $derived(passage ? highlightSegments(passage.text, quotes) : []);
 	const reaction = $derived(story.reactionFor(node.id)?.reaction ?? null);
 	const bookmarked = $derived(
 		story
@@ -85,12 +93,14 @@
 	}
 </script>
 
-<li class="passage" class:ooc data-turn-id={node.id}>
+<li class="passage" class:ooc data-turn-id={node.id} data-hold-scroll={held || undefined}>
 	{#if speaker && !ooc}<span class="who">{speaker}</span>{/if}
 	{#if ooc}<span class="who">Out of the story</span>{/if}
-	<p class="text" data-passage-text={node.id}>
-		{#if content === undefined}{PENDING_TEXT}{:else if !passage}{UNREADABLE_TEXT}{:else}{#each segments as segment, index (index)}{#if segment.marked}<mark>{segment.text}</mark>{:else}{segment.text}{/if}{/each}{/if}
-	</p>
+	<div class="text">
+		{#if content === undefined}{PENDING_TEXT}{:else if !passage}{UNREADABLE_TEXT}{:else}
+			<DaydreamProse text={passage.text} {cast} {quotes} {opening} turnId={node.id} />
+		{/if}
+	</div>
 
 	{#if selected && passage && !story.busy}
 		<div class="selection" role="toolbar" aria-label="With the selected words">
@@ -185,15 +195,7 @@
 			border-end-start-radius: 0.25rem;
 			background: var(--wa-color-surface-raised, var(--wa-color-surface-default));
 			border: 1px solid var(--wa-color-surface-border);
-			/* A passage's paragraphs are line breaks in its text. */
-			white-space: pre-wrap;
 			overflow-wrap: anywhere;
-		}
-
-		mark {
-			background: var(--wa-color-brand-fill-quiet);
-			color: inherit;
-			border-radius: 0.2rem;
 		}
 
 		&.ooc .text {

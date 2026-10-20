@@ -383,13 +383,31 @@ const IMAGE_INSTRUCTION = `- "image": include it in every reply. It is a picture
   Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors.
   Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the scene's heat allows: at SFW, everyone clothed and nothing sexual. Never a style, a medium or camera settings — those are chosen for you.`;
 
+/**
+ * How a passage is written so the page can draw it (`daydream/passage-format.ts`,
+ * docs/daydreams.md, "Reading a passage"): the small Markdown subset it
+ * reads, the scene break, and say tags, which are how a line of dialogue is
+ * given its speaker's colour. Thoughts in italics is the convention the page
+ * relies on to tell them from speech, which quotation marks mark out.
+ * A watcher has no words of their own and no written-out turn, so neither
+ * is mentioned to them.
+ */
+function passageFormat(voice: DaydreamVoice): string {
+	const inStory = voice.stance !== 'absent';
+	return `# Formatting the passage
+Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis and for a character's unspoken thoughts — thoughts always in italics, never in quotation marks; **bold**, rarely, for a word that has to land; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.
+Put every line someone speaks aloud in a say tag naming them, with its quotation marks inside: <say who="Charlie">"Sit down,"</say> she says. Name them as the story knows them${inStory ? '; for the user\'s own words, who="you"' : ''}. Say tags go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
+}
+
 function replyFormat(voice: DaydreamVoice, pictures: boolean): string {
 	const ideas = steeringIdeas(voice);
 	const inStory = voice.stance !== 'absent';
 	const readings = inStory
 		? '"action" (something they say or do), "instruction" (an instruction for their own turn, which you then write out), "direction" (where the story goes or how it feels), "cowrite" or "ooc"'
 		: '"direction", "cowrite" or "ooc"';
-	return `# Reply format
+	return `${passageFormat(voice)}
+
+# Reply format
 When the user's last turn is words they wrote — not a button, a roll or a request to continue — open your reply by deciding how you read it, before writing anything else, on a line of its own: <reading>direction</reading>. One of ${readings}. Then answer it as that.
 Write the passage next${inStory ? " (after the <yours> block, when you wrote out the user's turn)" : ''}. Then, on a new line, end every reply with a metadata block, and write nothing after it:
 <meta>

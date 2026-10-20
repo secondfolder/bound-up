@@ -652,8 +652,10 @@ the next passage is told to honour it.
 
 Marks (`daydream_marks`, the `daydream-mark` kind) are sealed, on a turn: a
 bookmark — a save point, or a highlighted quote when it has offsets — or a
-reaction. The server knows only which turn. Quotes are highlighted in the
-passage (`highlightSegments`); the bookmarks drawer
+reaction. The server knows only which turn. A quote's offsets are into the
+passage as stored, markup included, and are highlighted across whatever
+formatting they span (`quoteRanges`, then `withQuotes`; see
+[Reading a passage](#reading-a-passage)); the bookmarks drawer
 (`DaydreamBookmarks.svelte`) lists every bookmark in the tree, and picking
 one moves to the branch through it and scrolls there.
 
@@ -773,6 +775,80 @@ Pictures have guards of their own against anything youthful
 Typed safewords went because a button does not depend on the model noticing
 a word, and is there before anything has to be typed. Setups from v1 had an
 optional custom safeword; the v2 upcaster drops it.
+
+## Reading a passage
+
+A passage is drawn to be read rather than shown as the model wrote it:
+paragraphs with space between them, a little Markdown, scene breaks, and
+speech set apart, with each voice in a colour of its own.
+
+**The stored text is never rewritten.** A passage is kept exactly as it
+arrived, markup and all, and drawn by `formatPassage`
+(`src/lib/daydream/passage-format.ts`), which returns runs, each a verbatim,
+contiguous slice of the stored text with its offsets. Markup is just the
+characters no run covers. That is what keeps quotes working: a quote is
+offsets into the stored text ([Bookmarks and reactions](#bookmarks-and-reactions)),
+and `DaydreamProse.svelte` draws each run as one element carrying
+`data-start`, so a selection is turned back into stored offsets from the run
+it lands in (`storedOffset` in `passage-selection.ts`), never by measuring the
+drawn text, which is shorter by every hidden marker. Quotes saved before any
+of this still point at the same words, and nothing was migrated.
+
+**What it reads**, deliberately little, because a story is prose:
+
+- Paragraphs, split on blank lines; a single line break stays inside its
+  paragraph and is drawn as one.
+- `*italic*` or `_italic_`, `**bold**`, `***both***`, by CommonMark's
+  flanking rules cut down: an opener has a word after it, a closer a word
+  before it, and `_` must sit outside a word, so snake_case is left alone.
+  A marker that does not pair up is shown as written rather than guessed
+  at, and emphasis never crosses a paragraph.
+- A line of `***`, `* * *`, `---`, `___` or `⁂` on its own is a scene
+  break, drawn as a centred ⁂. Repeated breaks collapse to one.
+- Anything else — headings, lists, links — is shown as written. The prompt
+  asks for none of it.
+
+**Dialogue.** Text in quotation marks, straight or curly, is drawn in the
+dialogue colour, quote marks included. Speech carried on into the next
+paragraph leaves its opening mark unclosed, as fiction does, so an unclosed
+mark is dialogue to the end of its paragraph and no further. Apostrophes are
+never read as quotes.
+
+**Who is speaking.** The prompt asks for every spoken line to be wrapped in a
+say tag, `<say who="Charlie">"Sit down,"</say> she says` ("Formatting the
+passage" in `server/daydream/prompt.ts`). The tags are never drawn. A line
+with a speaker is drawn in that voice's colour (`voiceOf`): the user's own,
+named "you" or the name they play under, then the setup's characters in
+order, matched by whole name or first name. Anyone else — a passing figure
+the model invented — gets the plain dialogue colour rather than a guessed
+one that might collide. The colours are the `--daydream-*` tokens in
+`theme.css`, apart in hue rather than lightness so none reads as emphasis.
+The speaker's name is never drawn beside the line: who is talking is clear
+from the story itself, and the colour is enough to follow a conversation by
+eye. A tag never closed ends with its
+paragraph, and a stray closing tag is hidden. Say tags go back to the model
+with the passage like the rest of its words, so the history shows it its
+own format. A written-out turn, a quote in a bookmark, and "Not this"'s
+limit are shown without markup (`plainPassage`).
+
+**Thoughts** go in italics, never in quotation marks, which the prompt says
+outright: quotation marks are how the page tells speech.
+
+**Typography.** A line is capped at about 65 characters, with looser leading
+than the app's. The story's opening passage starts with a drop cap, and the first
+line after a scene break is set in small caps, as a book starts a section.
+
+**While it arrives**, the passage is formatted as it goes, through the same
+component, with `streaming` set: anything only half there is hidden rather
+than shown and then snatched away — a say tag being written, a last line
+that may be becoming a scene break, a marker at the very end — and an
+opening marker whose partner has not come yet formats what follows it as if
+it had. It is also shown at a steady pace rather than in the provider's
+bursts (`SmoothReveal`, `daydream/reveal.ts`): the further behind the text
+on screen is, the faster it catches up, never slower than 90 characters a
+second, so it smooths without holding the story back. Reduced motion shows it
+as it arrives. The arriving bubble is `DaydreamArriving.svelte`; once saved,
+the passage is a `DaydreamPassage` like any other.
 
 ## The reply format
 
@@ -923,8 +999,8 @@ budget.
 server's `RULES` first, then the setup (`describeSetup`: how it is told,
 each character with their dials in words, the scene with its heat and kink,
 the limits, the dials), then how to read the user's turns, then — for the
-system voice only — its guide and examples, then either the reply format or,
-for a stopped scene, the check-in. The guide goes last before the format
+system voice only — its guide and examples, then either how to format the
+passage and the reply format or, for a stopped scene, the check-in. The guide goes last before the format
 because it is about how to write, and the most recent thing the model reads
 is what it acts on; a stopped scene leaves it out, as the check-in is out of
 character. The rules are never sent by a browser, so
@@ -1100,10 +1176,23 @@ Message threads do the same, through the same attachment (`followEnd` in
 `src/lib/scroll-parent.ts`, whose comment says why only a scroll _upwards_
 counts as leaving the end).
 
+A daydream also keeps the reader's place in a long passage. Following stops
+once the passage arriving has its top at the top of the screen (`followEnd`'s
+`holdAt`, on the `data-hold-scroll` element): the rest waits for the reader
+to scroll, rather than the start being carried off the top before it has
+been read. After it has arrived, the hold stays on that passage while it is
+the newest thing in the story — so the suggestions and picture that come
+after it do not pull the page on either — and a turn sent after it is
+followed to as usual. Holding never moves the page up, and a daydream opened
+afresh holds nowhere, opening at its end.
+
 ## Ideas, not built
 
 Noted so they are not lost; none is in the code.
 
+- **Read aloud.** A passage spoken, with the browser's speech synthesis or a
+  model voice; it would pair with auto-continue below. Say tags already say
+  who speaks each line, which a voice per character would need.
 - **Auto-continue.** A read-to-me toggle that keeps asking for the next
   passage at a chosen pace until the user interrupts, for the barely
   interacting end of the range.
@@ -1151,7 +1240,10 @@ Noted so they are not lost; none is in the code.
   would save, cast as written; assembling a draft),
   `daydream/sentence.test.ts` (each voice in words, the blanks),
   `daydream/tree.test.ts`, `reply-format.test.ts` (the written-out turn,
-  arriving and finished), `dice.test.ts`,
+  arriving and finished), `passage-format.test.ts` (paragraphs and breaks,
+  emphasis pairing and what stays literal, dialogue, say tags,
+  what is hidden while it streams, quotes across formatting, every run
+  verbatim), `reveal.test.ts` (the pace), `dice.test.ts`,
   `chips.test.ts`, `quotes.test.ts`, `ooc.test.ts`, `suggestions.test.ts`,
   `dial-words.test.ts`, `catalog.test.ts` (every starting point is a valid
   record, they run SFW to extreme in order, every chip is one phrase),
@@ -1159,7 +1251,7 @@ Noted so they are not lost; none is in the code.
   first; a stopped story gets a check-in in any mode; heat is the ceiling;
   the system voice's guide, its place and its examples by heat; writing a
   turn out, never for a watcher; directions like a button; chosen readings
-  as notes that settle it),
+  as notes that settle it; the formatting asked for, never in a check-in),
   `suggest-prompt.test.ts`, `config.test.ts`, `daydream/image-prompt.test.ts`
   (the refusal list, the request per style and heat), the sealed fixtures,
   and the
@@ -1173,7 +1265,11 @@ Noted so they are not lost; none is in the code.
   included: shown and switched, filled in as they arrive, sent written out
   afterwards, fresh for another take and kept by a rewrite; directions drawn
   as markers; Read it differently forking, mid-passage too, and its reading
-  kept),
+  kept; a quote selected after hidden markup is stored offsets; a passage
+  formatted as it arrives),
+  `DaydreamProse.svelte.test.ts` (what is drawn, voices without names, the drop
+  cap, quotes across formatting, `storedOffset`), `scroll-parent.svelte.test.ts`
+  (following, and holding at a passage's top),
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts,
   the voice last and guessed, the sentence layout),
   `DaydreamVoicePicker.svelte.test.ts` (names only, the chosen one described),
@@ -1184,6 +1280,7 @@ Noted so they are not lost; none is in the code.
   `DaydreamBranchMap.svelte.test.ts` (the longest-path trunk, jumping,
   folding).
 - End to end: `e2e/daydreams.spec.ts` (a ready-made start through its
-  sentence, a described one, and the full form) and `e2e/daydream-heat.spec.ts`,
+  sentence, a described one, and the full form; the stub's opening has an
+  italic paragraph, so a quote is kept from inside drawn Markdown) and `e2e/daydream-heat.spec.ts`,
   against `e2e/model-stub.mjs`, a stand-in OpenRouter that `e2e/server.mjs`
   starts beside the app.

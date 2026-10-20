@@ -9,7 +9,10 @@
 //
 // What it writes, as a passage followed by the `<meta>` block the prompt asks
 // for (`src/lib/server/daydream/prompt.ts`, "Reply format"):
-// - the opening, when asked to begin: "<character> looks up as you come in.";
+// - the opening, when asked to begin: "<character> looks up as you come in.",
+//   then a second paragraph in italics, "*The door clicks shut behind you.*",
+//   so selecting and highlighting words is exercised across hidden markup
+//   (docs/daydreams.md, "Reading a passage");
 // - a short out-of-character check-in after Stop the scene;
 // - "<character> rewrites it." for a rewrite;
 // - otherwise `<character> heard: "<the user's last turn>"`, with a take
@@ -124,7 +127,7 @@ function replyFor(messages) {
 	};
 	if (users.length === 1 && last.startsWith('(Begin the story')) {
 		return withMeta(
-			`${name} looks up as you come in.${heat}\n\nThe door clicks shut behind you.`,
+			`${name} looks up as you come in.${heat}\n\n*The door clicks shut behind you.*`,
 			meta
 		);
 	}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plainPassage } from '$lib/daydream/passage-format';
 	import type { DaydreamStory } from '$lib/daydream/story.svelte';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 
@@ -68,7 +69,7 @@
 					<button type="button" class="open" disabled={story.busy} onclick={() => jump(mark.turnId)}>
 						{#if mark.bookmark.label}<strong>{mark.bookmark.label}</strong>{/if}
 						{#if mark.bookmark.quote}
-							<q>{mark.bookmark.quote.text}</q>
+							<q>{plainPassage(mark.bookmark.quote.text)}</q>
 						{:else}
 							<span class="preview">{preview(mark.turnId)}</span>
 						{/if}

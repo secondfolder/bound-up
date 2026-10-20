@@ -2,8 +2,10 @@
  * Quotes: stretches of a passage, by offset, for highlighted bookmarks and
  * for "more of this", "rewrite this" and "not this".
  *
- * Offsets into the passage's text, which never changes once written, so a
- * quote saved today still points at the same words next year. A quote whose
+ * Offsets into the passage's text as stored, markup included, which never
+ * changes once written, so a quote saved today still points at the same
+ * words next year (`passage-format.ts` draws the passage without ever
+ * changing it, for this). A quote whose
  * offsets no longer match its text (which only a corrupt record could make)
  * is not highlighted rather than highlighting the wrong words.
  *
@@ -14,10 +16,12 @@ import type { Quote } from '../sealed-kinds/daydreams';
 
 const SPACE = /\s/;
 
-export type Segment = { text: string; marked: boolean };
-
-/** The passage cut into marked and unmarked runs, overlapping quotes merged. */
-export function highlightSegments(text: string, quotes: readonly Quote[]): Segment[] {
+/**
+ * The stretches of the passage to highlight, as `[start, end)` offsets,
+ * sorted, with overlapping quotes merged. The passage is cut into runs
+ * where they begin and end (`withQuotes` in `passage-format.ts`).
+ */
+export function quoteRanges(text: string, quotes: readonly Quote[]): [number, number][] {
 	const ranges = quotes
 		.filter((quote) => text.slice(quote.start, quote.end) === quote.text)
 		.map((quote) => [quote.start, quote.end] as const)
@@ -31,19 +35,7 @@ export function highlightSegments(text: string, quotes: readonly Quote[]): Segme
 			merged.push([start, end]);
 		}
 	}
-	const segments: Segment[] = [];
-	let at = 0;
-	for (const [start, end] of merged) {
-		if (start > at) {
-			segments.push({ text: text.slice(at, start), marked: false });
-		}
-		segments.push({ text: text.slice(start, end), marked: true });
-		at = end;
-	}
-	if (at < text.length || segments.length === 0) {
-		segments.push({ text: text.slice(at), marked: false });
-	}
-	return segments;
+	return merged;
 }
 
 /**

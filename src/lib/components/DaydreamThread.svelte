@@ -2,6 +2,7 @@
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
+	import { storedOffset } from '$lib/daydream/passage-selection';
 	import { quoteAt } from '$lib/daydream/quotes';
 	import { RawConversation } from '$lib/daydream/raw-conversation.svelte';
 	import { DaydreamStory } from '$lib/daydream/story.svelte';
@@ -12,6 +13,7 @@
 	import type { Quote, Reading } from '$lib/sealed-kinds/daydreams';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 	import type { DaydreamTreeNodeView, DaydreamView } from '$lib/types';
+	import DaydreamArriving from './DaydreamArriving.svelte';
 	import DaydreamBookmarkDialog from './DaydreamBookmarkDialog.svelte';
 	import DaydreamBookmarks from './DaydreamBookmarks.svelte';
 	import DaydreamBranchMap from './DaydreamBranchMap.svelte';
@@ -157,6 +159,19 @@
 			: null;
 	});
 
+	/**
+	 * Who has a colour of their own in a passage's dialogue: the user, by
+	 * "you" or the name they play under, unless they are not in the story;
+	 * then the cast, in the setup's order (`voiceOf`).
+	 */
+	const cast = $derived({
+		you: setup && setup.voice.stance !== 'absent' ? ['you', setup.voice.protagonistName] : [],
+		characters: setup?.characters.map((character) => character.name) ?? []
+	});
+
+	/** The story's first passage on this branch, which opens with a drop cap. */
+	const openingId = $derived(story.path.find((node) => node.role === 'story')?.id ?? null);
+
 	type Answered = { readAs: Reading | null; expansion: string | null; chosen: boolean };
 
 	/**
@@ -238,6 +253,37 @@
 
 	let listElement: HTMLElement | undefined = $state();
 
+	/**
+	 * The passage that last arrived, which following the end stops at
+	 * (`followEnd`'s `holdAt`): once its top reaches the top of the screen,
+	 * the rest waits for the reader to scroll, so a long passage is not
+	 * scrolled away before it has been read. Set when a passage finishes
+	 * arriving, and cleared when the next starts, whose own bubble holds
+	 * meanwhile. Never set on opening a daydream, which opens at its end.
+	 */
+	let heldId: string | null = $state(null);
+	let wasStreaming = false;
+	$effect(() => {
+		const streaming = story.streaming !== null;
+		untrack(() => {
+			if (streaming) {
+				heldId = null;
+			} else if (wasStreaming) {
+				heldId = story.leafPassage?.id ?? null;
+			}
+			wasStreaming = streaming;
+		});
+	});
+
+	/**
+	 * The held passage, while it is still the newest thing in the story: a
+	 * turn sent after it is followed to as usual, before its reply starts.
+	 */
+	function heldElement(list: HTMLElement): Element | null {
+		const held = list.querySelector('[data-hold-scroll]');
+		return held && held === list.lastElementChild ? held : null;
+	}
+
 	/** Scrolls a turn into view: after a jump from the branch map or the bookmarks. */
 	async function scrollToTurn(turnId: string) {
 		await tick();
@@ -281,11 +327,14 @@
 		if (content?.type !== 'text') {
 			return;
 		}
-		const before = document.createRange();
-		before.selectNodeContents(start);
-		before.setEnd(range.startContainer, range.startOffset);
-		const from = before.toString().length;
-		const quote = quoteAt(content.text, from, from + range.toString().length);
+		// Offsets into the passage as stored, not into what is drawn: the
+		// markup that is not drawn would otherwise shift every quote
+		// (`storedOffset`).
+		const quote = quoteAt(
+			content.text,
+			storedOffset(start, range.startContainer, range.startOffset),
+			storedOffset(start, range.endContainer, range.endOffset)
+		);
 		selection = quote ? { turnId, quote } : null;
 	}
 
@@ -420,8 +469,14 @@
 	</div>
 
 	<!-- Follows a passage as it arrives only for a reader already at the end:
-	     one who has scrolled up to read is left where they are. -->
-	<ol class="turns" bind:this={listElement} aria-live="polite" {@attach followEnd}>
+	     one who has scrolled up to read is left where they are. And only until
+	     the passage's top reaches the top of the screen (`heldId`). -->
+	<ol
+		class="turns"
+		bind:this={listElement}
+		aria-live="polite"
+		{@attach (list) => followEnd(list, { holdAt: () => heldElement(list) })}
+	>
 		{#if rawLog && newestPassage}
 			<DaydreamRawSystem {story} {conversation} turnId={newestPassage.id} />
 		{/if}
@@ -442,7 +497,10 @@
 					{story}
 					{node}
 					{speaker}
+					{cast}
 					{debug}
+					opening={node.id === openingId}
+					held={node.id === heldId}
 					selected={selection?.turnId === node.id ? selection.quote : null}
 					onBookmark={(turnId, quote) => {
 						bookmarking = { turnId, quote };
@@ -464,13 +522,12 @@
 			{/if}
 		{/each}
 		{#if story.streaming}
-			<li class="streaming">
-				{#if speaker}<span class="who">{speaker}</span>{/if}
-				<p class="text">
-					{#if story.streaming.text}{story.streaming.text}{:else}<wa-spinner></wa-spinner>
-						<span class="wa-visually-hidden">Writing</span>{/if}
-				</p>
-			</li>
+			<DaydreamArriving
+				text={story.streaming.text}
+				{speaker}
+				{cast}
+				opening={openingId === null}
+			/>
 		{/if}
 	</ol>
 
@@ -611,31 +668,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-	}
-
-	.streaming {
-		align-self: flex-start;
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		max-inline-size: 90%;
-
-		.who {
-			font-size: 0.8125rem;
-			color: var(--wa-color-text-quiet);
-			padding-inline: 0.25rem;
-		}
-
-		.text {
-			margin: 0;
-			padding: 0.625rem 0.875rem;
-			border-radius: 1rem;
-			border-end-start-radius: 0.25rem;
-			background: var(--wa-color-surface-raised, var(--wa-color-surface-default));
-			border: 1px solid var(--wa-color-surface-border);
-			white-space: pre-wrap;
-			overflow-wrap: anywhere;
-		}
 	}
 
 	.problem {

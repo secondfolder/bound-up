@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DAYDREAM_LIMITS } from '$lib/daydream';
+	import { plainPassage } from '$lib/daydream/passage-format';
 	import type { Quote } from '$lib/sealed-kinds/daydreams';
 
 	/**
@@ -21,7 +22,7 @@
 
 	// svelte-ignore state_referenced_locally
 	// Prefilled once; from then on it is what the user is writing.
-	let line = $state(`Avoid: “${quote.text.slice(0, 200)}”`);
+	let line = $state(`Avoid: “${plainPassage(quote.text).slice(0, 200)}”`);
 	let problem: string | null = $state(null);
 	let saving = $state(false);
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();

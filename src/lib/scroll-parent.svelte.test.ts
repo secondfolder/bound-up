@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { followEnd } from './scroll-parent';
+import { followEnd, heldScrollTop } from './scroll-parent';
 
 /** A frame for the observers to report in: ResizeObserver delivers before the next paint. */
 const frame = () => new Promise((done) => requestAnimationFrame(() => setTimeout(done)));
@@ -15,7 +15,13 @@ afterEach(() => {
  * With `heldRoot`, the list sits in a page root held to the scrollport's height,
  * which the list overflows, as the daydream page's does.
  */
-function conversation({ heldRoot = false } = {}) {
+function conversation({
+	heldRoot = false,
+	holdAt
+}: {
+	heldRoot?: boolean;
+	holdAt?: () => Element | null;
+} = {}) {
 	const scroller = document.createElement('div');
 	scroller.style.cssText = 'height: 200px; overflow-y: auto';
 	const list = document.createElement('ul');
@@ -35,7 +41,7 @@ function conversation({ heldRoot = false } = {}) {
 		return item;
 	};
 	add(500);
-	cleanup = followEnd(list);
+	cleanup = followEnd(list, holdAt ? { holdAt } : {});
 	const atEnd = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 1;
 	return { scroller, add, atEnd };
 }
@@ -99,5 +105,44 @@ describe('followEnd', () => {
 		add(300);
 		await frame();
 		expect(atEnd()).toBe(true);
+	});
+
+	it('stops following once a held element reaches the top, and goes on to the end while it is short', async () => {
+		let held: HTMLElement | null = null;
+		const { scroller, add, atEnd } = conversation({ holdAt: () => held });
+		await frame();
+		held = add(100);
+		await frame();
+		// Shorter than the scrollport: followed to the end as usual.
+		expect(atEnd()).toBe(true);
+		held.style.height = '600px';
+		await frame();
+		// Its top (500px down) is held a little below the top of the scrollport.
+		expect(scroller.scrollTop).toBe(492);
+		expect(atEnd()).toBe(false);
+		add(300);
+		await frame();
+		expect(scroller.scrollTop).toBe(492);
+	});
+
+	it('never moves a reader up to a held element they have scrolled past', async () => {
+		let held: HTMLElement | null = null;
+		const { scroller, add } = conversation({ holdAt: () => held });
+		await frame();
+		held = add(600);
+		await frame();
+		scroller.scrollTop = 800;
+		await frame();
+		add(100);
+		await frame();
+		expect(scroller.scrollTop).toBe(800);
+	});
+});
+
+describe('heldScrollTop', () => {
+	it('goes towards the end, no further than a little above the held top, never up', () => {
+		expect(heldScrollTop(0, 300, 1000)).toBe(300);
+		expect(heldScrollTop(0, 1000, 500)).toBe(492);
+		expect(heldScrollTop(700, 1000, 500)).toBe(700);
 	});
 });

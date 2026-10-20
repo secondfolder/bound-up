@@ -364,6 +364,10 @@ test.describe('daydreams', () => {
 		const id = await startDaydream(page);
 		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
 		await passageSaved(page);
+		// The passage's Markdown is drawn, not shown: the quote below is
+		// selected inside the italics, so its offsets skip the hidden `*`.
+		await expect(page.locator('li.passage em')).toHaveText('The door clicks shut behind you.');
+		await expect(page.locator('[data-passage-text]')).not.toContainText('*');
 
 		await page.getByRole('button', { name: 'Loved it' }).click();
 		await expect(page.getByRole('button', { name: 'Loved it' })).toHaveAttribute(

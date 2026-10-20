@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DAYDREAM_LIMITS } from '$lib/daydream';
+	import { plainPassage } from '$lib/daydream/passage-format';
 	import type { Quote } from '$lib/sealed-kinds/daydreams';
 
 	/**
@@ -46,7 +47,7 @@
 	open
 	onwa-after-hide={(event: Event) => event.target === dialog && onclose()}
 >
-	{#if quote}<blockquote>{quote.text}</blockquote>{/if}
+	{#if quote}<blockquote>{plainPassage(quote.text)}</blockquote>{/if}
 	<wa-input {@attach field} label="A label (optional)" value={label} maxlength={DAYDREAM_LIMITS.bookmarkLabel}></wa-input>
 	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
 	<wa-button slot="footer" appearance="filled" variant="brand" disabled={saving} onclick={save}>

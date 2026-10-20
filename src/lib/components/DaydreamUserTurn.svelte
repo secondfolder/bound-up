@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { WaSelectEvent } from '@awesome.me/webawesome/dist/events/select.js';
 	import { explicitOoc } from '$lib/daydream/ooc';
+	import { plainPassage } from '$lib/daydream/passage-format';
 	import type { DaydreamStory } from '$lib/daydream/story.svelte';
 	import { type Reading, readingSchema } from '$lib/sealed-kinds/daydreams';
 	import { PENDING_TEXT, UNREADABLE_TEXT } from '$lib/sealed-views.svelte';
@@ -153,7 +154,8 @@
 {:else if content.type === 'text'}
 	<li class="said" data-turn-id={node.id}>
 		{#if expansion && !showSent}
-			<p class="text">{expansion}</p>
+			<!-- Written by the model, so without any markup it slipped in. -->
+			<p class="text">{plainPassage(expansion)}</p>
 		{:else}
 			<!-- What was sent, set apart as a note when it is not what the story answered. -->
 			<p class="text" class:note={expansion !== null}>{content.text}</p>
@@ -178,7 +180,7 @@
 		{:else if content.type === 'steer'}
 			<wa-icon name="arrow-right" variant="solid"></wa-icon>
 			{STEER_WORDS[content.action]}:
-			<q>{content.quote.text}</q>
+			<q>{plainPassage(content.quote.text)}</q>
 		{:else if content.type === 'roll'}
 			<wa-icon name="dice" variant="solid"></wa-icon> Rolled {content.result} — {content.outcome}
 		{:else if content.type === 'safety'}

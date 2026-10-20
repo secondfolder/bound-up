@@ -428,9 +428,27 @@ describe('buildMessages', () => {
 			const content = system(messages);
 			expect(content).toContain('# The scene is stopped');
 			expect(content).not.toContain('# Reply format');
+			expect(content).not.toContain('# Formatting the passage');
 			expect(messages.at(-1)?.content).toContain('Stop the scene');
 			expect(messages.at(-1)?.content).not.toContain('Rewrite');
 		}
+	});
+
+	it('asks for the formatting the page draws, just before the reply format', () => {
+		const content = system(buildMessages(request()));
+		const formatting = content.indexOf('# Formatting the passage');
+		expect(formatting).toBeGreaterThan(-1);
+		expect(formatting).toBeLessThan(content.indexOf('# Reply format'));
+		const section = content.slice(formatting, content.indexOf('# Reply format'));
+		// What `passage-format.ts` reads, and nothing it does not.
+		expect(section).toContain('*italics*');
+		expect(section).toContain('unspoken thoughts');
+		expect(section).toContain('**bold**');
+		expect(section).toContain('* * *');
+		expect(section).toContain('<say who="Charlie">"Sit down,"</say>');
+		expect(section).toContain('who="you"');
+		expect(section).toContain('No headings, lists, tables or links');
+		expect(section).toContain('never in a <yours> block or in the metadata');
 	});
 
 	it('carries on once the user resumes or eases off', () => {

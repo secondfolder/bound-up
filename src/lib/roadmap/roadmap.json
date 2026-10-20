@@ -188,6 +188,13 @@
 							"shippedOn": "2026-10-20"
 						},
 						{
+							"id": "daydreams-readable",
+							"title": "Passages made to be read",
+							"summary": "Paragraphs, scene breaks and emphasis, each character's lines in a colour of their own, and new passages that arrive smoothly without scrolling away from you.",
+							"status": "shipped",
+							"shippedOn": "2026-10-20"
+						},
+						{
 							"id": "daydreams-kink-list",
 							"title": "Daydreams from your kink list",
 							"summary": "Scenes that start from what you're into, and stay clear of your hard limits.",

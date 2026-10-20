@@ -1,37 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { highlightSegments, quoteAt } from './quotes';
+import { quoteAt, quoteRanges } from './quotes';
 
 const text = 'She waits. You hold still. Nothing moves.';
 const quote = (start: number, end: number) => ({ start, end, text: text.slice(start, end) });
 
-describe('highlightSegments', () => {
-	it('marks each quoted stretch', () => {
-		expect(highlightSegments(text, [quote(11, 26)])).toEqual([
-			{ text: 'She waits. ', marked: false },
-			{ text: 'You hold still.', marked: true },
-			{ text: ' Nothing moves.', marked: false }
-		]);
+describe('quoteRanges', () => {
+	it('gives each quoted stretch', () => {
+		expect(quoteRanges(text, [quote(11, 26)])).toEqual([[11, 26]]);
 	});
 
 	it('merges overlapping quotes, in any order', () => {
-		expect(highlightSegments(text, [quote(15, 26), quote(11, 20)]).filter((s) => s.marked)).toEqual(
-			[{ text: 'You hold still.', marked: true }]
-		);
-	});
-
-	it('ignores a quote whose offsets no longer match its words', () => {
-		expect(highlightSegments(text, [{ start: 0, end: 3, text: 'You' }])).toEqual([
-			{ text, marked: false }
+		expect(quoteRanges(text, [quote(15, 26), quote(11, 20), quote(0, 3)])).toEqual([
+			[0, 3],
+			[11, 26]
 		]);
 	});
 
-	it('handles a quote at either end, and no quotes', () => {
-		expect(highlightSegments(text, [quote(0, 10)])[0]).toEqual({
-			text: 'She waits.',
-			marked: true
-		});
-		expect(highlightSegments(text, [])).toEqual([{ text, marked: false }]);
-		expect(highlightSegments('', [])).toEqual([{ text: '', marked: false }]);
+	it('ignores a quote whose offsets no longer match its words', () => {
+		expect(quoteRanges(text, [{ start: 0, end: 3, text: 'You' }])).toEqual([]);
+	});
+
+	it('is empty with no quotes', () => {
+		expect(quoteRanges(text, [])).toEqual([]);
 	});
 });
 

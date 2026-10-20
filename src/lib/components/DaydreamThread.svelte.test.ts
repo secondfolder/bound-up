@@ -897,6 +897,66 @@ describe('DaydreamThread', () => {
 		);
 	});
 
+	it('quotes the passage as stored when the words selected come after markup', async () => {
+		const stored = 'She **waits**. <say who="Mara">"You hold still."</say>';
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', stored)]),
+			available: true
+		});
+		const text = container.querySelector('[data-passage-text="t1"]') as HTMLElement;
+		// Drawn without its markup.
+		expect(text.textContent).toBe('She waits. "You hold still."');
+		const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+		const nodes: Text[] = [];
+		for (let each = walker.nextNode(); each; each = walker.nextNode()) {
+			nodes.push(each as Text);
+		}
+		const from = defined(
+			nodes.find((each) => each.data === 'waits'),
+			'the bold run'
+		);
+		const to = defined(
+			nodes.find((each) => each.data.includes('You hold')),
+			'the line'
+		);
+		const range = document.createRange();
+		range.setStart(from, 0);
+		range.setEnd(to, to.data.indexOf(' still'));
+		document.getSelection()?.removeAllRanges();
+		document.getSelection()?.addRange(range);
+		document.dispatchEvent(new Event('selectionchange'));
+
+		await press(container, 'More of this');
+		const start = stored.indexOf('waits');
+		const end = stored.indexOf(' still');
+		await waitFor(() =>
+			expect(saved(0)?.content).toMatchObject({
+				type: 'steer',
+				quote: { start, end, text: stored.slice(start, end) }
+			})
+		);
+	});
+
+	it('formats a passage as it arrives, hiding markup only half there', async () => {
+		client.writeReply.mockImplementationOnce(
+			(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) => {
+				options.onText({
+					passage: 'Rain. **Hard** rain. <say who="Ma',
+					expansion: null,
+					reading: null
+				});
+				return pending();
+			}
+		);
+		const { container } = render(DaydreamThread, { daydream: daydream([]), available: true });
+		await waitFor(() =>
+			expect(container.querySelector('li.streaming .prose')?.textContent?.trim()).toBe(
+				'Rain. Hard rain.'
+			)
+		);
+		expect(container.querySelector('li.streaming strong')?.textContent).toBe('Hard');
+	});
+
 	it('says when a passage fails, and tries again on request', async () => {
 		client.writeReply.mockResolvedValueOnce({
 			ok: false,
