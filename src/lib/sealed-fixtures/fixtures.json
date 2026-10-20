@@ -147,7 +147,7 @@
 						}
 					}
 				],
-				"scene": {
+				"idea": {
 					"title": "Frozen evening",
 					"setting": "",
 					"premise": "A late meeting that runs over.",
@@ -249,7 +249,7 @@
 						}
 					}
 				],
-				"scene": {
+				"idea": {
 					"title": "Frozen evening",
 					"setting": "An empty office.",
 					"premise": "A late meeting that runs over.",
@@ -352,7 +352,7 @@
 						}
 					}
 				],
-				"scene": {
+				"idea": {
 					"title": "Frozen evening",
 					"setting": "An empty office.",
 					"premise": "A late meeting that runs over.",
@@ -395,7 +395,7 @@
 			"kind": "daydream-setup",
 			"version": 4,
 			"recordId": "00000000-0000-4000-8000-0000000000f1",
-			"ciphertext": "sb1.KGA95EIUn7ZyLR6ewH28kcRGt0A3D3DYYIYegsonB6WSkyuz_VgxCa6dH_L4WDe0K16t7d4Q0bseZWaXPTMiOUc11CD7Lr2WmK4up22-aOtZIl7-ohwZjQennj5b2w0DUlHtoo2wznHzVpMDBu85AIxtUFPAP-N0VmmuiGB151eO7-cmrCS6F7P8tk9LlkRwY-cKJUR09XflNecilUNZqjqofbyre1PkyXLXZ_HFJ6jJhsDIeQlcCT21ThLuQJVxf84PzDoj9fmLUOStSp3BjgDz--F8cP2XyS-vKiZMiFeyH7iuqkdrA97txf6HpbzBCziPGUUKEy1bk7XqNC8aZ5GFJbU6-b2-jnHkMj5jNzchByt6-odYEIHxfs54ATMH6bXz-2UMnXxtL9hr4iCUxRJmAm2g5FtDBoM0zjDOxbs6Y-Msbyfmk2ySYGhP65ajmxiKeJEgtCgGjw6wODNMBywnpi6syEI10sU2c8Omdx8wd4O_Obv_QNj8RdysuiCWUQXd0IO5kzmeyfV5fJBWlvjcKAYvCNJhsMBHkTQqYkyKUS4qgUyAXL6i9cbe5IRjSsDsag9cTrAOBZWBCpv443kZkerg66SaW3bm9KpINUuhj2Xnn_c4PiBEmK5X8x3HVxmYPHJi4O9HluIVW_e3oHbXPgHNsmUP8h4NEl_qj8EE_2pz8X97IGs",
+			"ciphertext": "sb1.eAFyq87ytBcaDXRRcYRizJa2iHYW7yqjsyt_WFarNWfqR2tHULmDAT62CItOgATJyn9Jwe3cuvIFjLYaN-EhdG1FRQ3Drqb6QY0IvVOLmHnqDfWTRQ_SWwP8o4kuccueUjM6aC1avpwKDB1PsY7BXcsAgTDaeitm3M_gq2QmLiERAUZxSVMeT1EK8CPnZd6arjK71inRYI5tkEX8H8QcGNX4cvfWfRmb9StWNA1AkvwfQK7FBeEnClUCQLBjM-vxuDTED9ZCSdPHYUSfsPB9bTQm0gvNnAWxmNJuiYPPn3f7H5KD8eGJFAfURS4cXpUxtOA1LkU0meJnPxhommP6HsmfBspxC16bGy3GwrK8LAb6QfEAgKED-Q-RF_VumTWUYOvW8k_nrV_TubGVkkvuUlzvnwgDuty9cyso9nlwZu0wyMwtzNOgZ2TYr73u8IlwpdTgHjYWniwB1oaLVSYCSw5bMPK9u-J7GScruVn1FkJiqIhD3u2YBpMcNkSiJCcIsi7UYTJOmp5_vrUnaKpcGNQ0o_7LuilVfENcQxEHaoJK7YL-H8qNI1v_FwdyefkioxB1M77c7nZBwsbf2Jyepi_SN_va1xzshR9rdk-CM7XC8-8Ld1CmjgycrIuMedesf0gcrIY2VRNE3DtaGZFO3Pk-w_4-tEqjidgHIMASswIoQnt45OvkBw",
 			"expected": {
 				"title": "",
 				"voice": {
@@ -404,7 +404,7 @@
 					"protagonistName": "Kit"
 				},
 				"characters": [],
-				"scene": {
+				"idea": {
 					"title": "Frozen mantras",
 					"setting": "Nowhere in particular.",
 					"premise": "A voice that says what belonging means.",

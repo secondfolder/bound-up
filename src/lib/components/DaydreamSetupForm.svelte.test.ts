@@ -18,7 +18,7 @@ const opened = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('$lib/sealed-views.svelte', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/sealed-views.svelte')>()),
 	openedDaydreamCharacter: (sealed: SealedRefView) => opened.get(sealed.recordId),
-	openedDaydreamScene: (sealed: SealedRefView) => opened.get(sealed.recordId)
+	openedDaydreamIdea: (sealed: SealedRefView) => opened.get(sealed.recordId)
 }));
 
 const client = vi.hoisted(() => ({ saveLibraryItem: vi.fn(), requestSuggestion: vi.fn() }));
@@ -26,7 +26,7 @@ vi.mock('$lib/daydream/client', () => client);
 
 const { default: DaydreamSetupForm } = await import('./DaydreamSetupForm.svelte');
 
-const EMPTY_LIBRARY: DaydreamLibraryView = { characters: [], scenes: [] };
+const EMPTY_LIBRARY: DaydreamLibraryView = { characters: [], ideas: [] };
 const ref = (recordId: string): SealedRefView => ({
 	recordId,
 	vaultId: 'v',
@@ -111,7 +111,7 @@ async function changeVoice(container: HTMLElement) {
 	await waSettled(container);
 }
 
-/** The rows under "Who's in it" for the scene's parts. */
+/** The rows under "Who's in it" for the idea's parts. */
 const partRows = (container: HTMLElement) => [...container.querySelectorAll<HTMLElement>('.part')];
 
 const PARTS = [
@@ -235,7 +235,7 @@ describe('DaydreamSetupForm', () => {
 		const draft = () =>
 			testDaydreamSetup({
 				title: '',
-				scene: { ...testDaydreamSetup().scene, dials: { heat: 3, kink: null } }
+				idea: { ...testDaydreamSetup().idea, dials: { heat: 3, kink: null } }
 			});
 		/** The summary's paragraphs as they read, without the menus' items. */
 		const summary = (container: HTMLElement) =>
@@ -252,7 +252,7 @@ describe('DaydreamSetupForm', () => {
 			const { container } = await renderForm({ draft: draft(), layout: 'summary' });
 			expect(summary(container)).toEqual([
 				'The office has emptied out.',
-				'It’s a steamy story in Late meeting, with Mara. It’s told in the characters’ own words, with no narrator.'
+				'It’s a steamy daydream: Late meeting, with Mara. It’s told in the characters’ own words, with no narrator.'
 			]);
 			expect(container.querySelectorAll('.setup-summary .blank')).toHaveLength(4);
 			expect(container.querySelector('fieldset.told')).toBeNull();
@@ -261,12 +261,12 @@ describe('DaydreamSetupForm', () => {
 		it('shows the model’s summary with its blanks, and says what it left out after it', async () => {
 			const { container } = await renderForm({
 				draft: draft(),
-				summary: marked('[[Mara|Your boss]] keeps you behind in [[scene|the empty office]].'),
+				summary: marked('[[Mara|Your boss]] keeps you behind in [[idea|the empty office]].'),
 				layout: 'summary'
 			});
 			expect(summary(container)).toEqual([
 				'Your boss keeps you behind in the empty office.',
-				'It’s a steamy story. It’s told in the characters’ own words, with no narrator.'
+				'It’s a steamy daydream. It’s told in the characters’ own words, with no narrator.'
 			]);
 			expect(
 				[...container.querySelectorAll('.setup-summary .blank .words')].map(
@@ -296,7 +296,7 @@ describe('DaydreamSetupForm', () => {
 			// the story is shown as it was written.
 			expect(summary(container)).toEqual([
 				'[[Mara|Your boss]] keeps [[Bel|Bel]] and you behind.',
-				'It’s a steamy story in Late meeting. It’s told in the characters’ own words, with no narrator.'
+				'It’s a steamy daydream: Late meeting. It’s told in the characters’ own words, with no narrator.'
 			]);
 			expect(container.querySelectorAll('.setup-summary .blank')).toHaveLength(4);
 		});
@@ -315,7 +315,7 @@ describe('DaydreamSetupForm', () => {
 			await waitFor(() =>
 				expect(summary(container)).toEqual([
 					'The office has emptied out.',
-					'It’s a steamy story in Late meeting, with Mara. It’s told to you by a narrator.'
+					'It’s a steamy daydream: Late meeting, with Mara. It’s told to you by a narrator.'
 				])
 			);
 		});
@@ -332,11 +332,11 @@ describe('DaydreamSetupForm', () => {
 				dropdown?.dispatchEvent(new CustomEvent('wa-select', { detail: { item } }));
 			};
 			pick(heat, '4');
-			await waitFor(() => expect(summary(container)[1]).toMatch(/^It’s an explicit story/));
+			await waitFor(() => expect(summary(container)[1]).toMatch(/^It’s an explicit daydream/));
 			pick(voice, 'told');
 			await waitFor(() =>
 				expect(summary(container)[1]).toBe(
-					'It’s an explicit story in Late meeting, with Mara. It’s told to you by a narrator.'
+					'It’s an explicit daydream: Late meeting, with Mara. It’s told to you by a narrator.'
 				)
 			);
 		});
@@ -380,7 +380,7 @@ describe('DaydreamSetupForm', () => {
 			setup,
 			library: {
 				characters: [{ id: 'c1', revision: 2, updatedAt: new Date(), sealed: ref('c1') }],
-				scenes: []
+				ideas: []
 			}
 		});
 		expect(container.textContent).toContain('Updated in your library since.');
@@ -459,9 +459,9 @@ describe('DaydreamSetupForm', () => {
 	});
 
 	describe('casting', () => {
-		it('gives each of the scene’s parts a row, with who plays it or a way to cast it', async () => {
+		it('gives each of the idea’s parts a row, with who plays it or a way to cast it', async () => {
 			const setup = testDaydreamSetup({
-				scene: { ...testDaydreamSetup().scene, parts: PARTS },
+				idea: { ...testDaydreamSetup().idea, parts: PARTS },
 				characters: [
 					testCharacter({
 						name: 'Mara',
@@ -490,12 +490,12 @@ describe('DaydreamSetupForm', () => {
 			);
 			const { container } = await renderForm({
 				setup: testDaydreamSetup({
-					scene: { ...testDaydreamSetup().scene, parts: PARTS },
+					idea: { ...testDaydreamSetup().idea, parts: PARTS },
 					characters: []
 				}),
 				library: {
 					characters: [{ id: 'c1', revision: 0, updatedAt: new Date(), sealed: ref('c1') }],
-					scenes: []
+					ideas: []
 				},
 				suggestionsOn: true
 			});
@@ -531,12 +531,12 @@ describe('DaydreamSetupForm', () => {
 			opened.set('c1', testCharacter({ name: 'Mara' }));
 			const { container } = await renderForm({
 				setup: testDaydreamSetup({
-					scene: { ...testDaydreamSetup().scene, parts: PARTS },
+					idea: { ...testDaydreamSetup().idea, parts: PARTS },
 					characters: []
 				}),
 				library: {
 					characters: [{ id: 'c1', revision: 0, updatedAt: new Date(), sealed: ref('c1') }],
-					scenes: []
+					ideas: []
 				}
 			});
 			const picker = partRows(container)[0]?.querySelector('wa-dropdown') as HTMLElement;
@@ -548,10 +548,10 @@ describe('DaydreamSetupForm', () => {
 			expect(client.requestSuggestion).not.toHaveBeenCalled();
 		});
 
-		it('lets go of a part the new scene does not have, and keeps the words', async () => {
-			opened.set('s2', { ...testDaydreamSetup().scene, title: 'Elsewhere', parts: [] });
+		it('lets go of a part the new idea does not have, and keeps the words', async () => {
+			opened.set('s2', { ...testDaydreamSetup().idea, title: 'Elsewhere', parts: [] });
 			const setup = testDaydreamSetup({
-				scene: { ...testDaydreamSetup().scene, parts: PARTS },
+				idea: { ...testDaydreamSetup().idea, parts: PARTS },
 				characters: [
 					testCharacter({
 						name: 'Mara',
@@ -563,11 +563,11 @@ describe('DaydreamSetupForm', () => {
 				setup,
 				library: {
 					characters: [],
-					scenes: [{ id: 's2', revision: 0, updatedAt: new Date(), sealed: ref('s2') }]
+					ideas: [{ id: 's2', revision: 0, updatedAt: new Date(), sealed: ref('s2') }]
 				}
 			});
 			const picker = [...container.querySelectorAll('wa-dropdown')].find((dropdown) =>
-				dropdown.textContent?.includes('Choose a saved scene')
+				dropdown.textContent?.includes('Choose a saved idea')
 			) as HTMLElement;
 			const item = picker.querySelector(
 				'wa-dropdown-item[value="s2"], wa-dropdown-item'
@@ -584,7 +584,7 @@ describe('DaydreamSetupForm', () => {
 		it('keeps their part when taking the library’s newer version of them', async () => {
 			opened.set('c1', { ...testCharacter({ name: 'Mara', archetype: 'stricter now' }) });
 			const setup = testDaydreamSetup({
-				scene: { ...testDaydreamSetup().scene, parts: PARTS },
+				idea: { ...testDaydreamSetup().idea, parts: PARTS },
 				characters: [
 					testCharacter({
 						name: 'Mara',
@@ -598,7 +598,7 @@ describe('DaydreamSetupForm', () => {
 				setup,
 				library: {
 					characters: [{ id: 'c1', revision: 2, updatedAt: new Date(), sealed: ref('c1') }],
-					scenes: []
+					ideas: []
 				}
 			});
 			button(container, 'Use the latest')?.click();

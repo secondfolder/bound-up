@@ -4,7 +4,7 @@ import { hasAcceptedDisclosure, type LibraryKind, listLibrary } from '$lib/serve
 import { requireFeature } from '$lib/server/features';
 
 /**
- * The load behind `/daydreams/characters` and `/daydreams/scenes`, which differ
+ * The load behind `/daydreams/characters` and `/daydreams/ideas`, which differ
  * only in which library they list. Edits and deletions go through the JSON
  * endpoints (`library-routes.ts`), from the same dialogs the setup form uses.
  */

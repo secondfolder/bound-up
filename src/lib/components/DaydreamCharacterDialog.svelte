@@ -15,7 +15,7 @@
 		type DialValue,
 		EMPTY_CASTING,
 		EMPTY_CHARACTER,
-		type ScenePart
+		type IdeaPart
 	} from '$lib/daydream';
 	import {
 		CASTING_CHIPS,
@@ -46,8 +46,8 @@
 	/** What the dialog needs to edit a character's casting: given only when opened from a daydream. */
 	export type CastingEdit = {
 		value: DaydreamCasting;
-		/** The scene's parts, with who else plays each, so a part cannot be given twice. */
-		parts: (ScenePart & { takenBy: string | null })[];
+		/** The idea's parts, with who else plays each, so a part cannot be given twice. */
+		parts: (IdeaPart & { takenBy: string | null })[];
 		/** Asks the model who this character is in the story; absent when suggestions are off. */
 		write?:
 			| ((
@@ -369,7 +369,7 @@
 
 		{#if castingEdit}
 			<fieldset class="section">
-				<legend>In this story</legend>
+				<legend>In this daydream</legend>
 				<p class="hint">Only for this daydream: the same character can be someone else in the next.</p>
 				{#if castingEdit.parts.length > 0}
 					<wa-select
@@ -479,7 +479,7 @@
 		</label>
 		{#if inLibrary && $form.saveToLibrary}
 			<p class="hint">
-				This changes them in your library too{castingEdit ? ', though not their part in this story' : ''}.
+				This changes them in your library too{castingEdit ? ', though not their part in this daydream' : ''}.
 			</p>
 		{/if}
 

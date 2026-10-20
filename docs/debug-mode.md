@@ -110,7 +110,7 @@ markers to show, so its blanks are plain. The page passes `data.debug` in.
 
 "No ideas came back that time" and "No suggestions just now" say nothing
 about why. `SuggestionProblem.svelte`, which shows every suggestion failure
-on the new-daydream page and in the character and scene dialogs (the chips
+on the new-daydream page and in the character and idea dialogs (the chips
 included), adds a "What came back" disclosure in debug mode. What it shows
 comes from one of two places:
 

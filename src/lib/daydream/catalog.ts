@@ -1,5 +1,5 @@
 /**
- * The curated suggestions for making characters and scenes: chips for each
+ * The curated suggestions for making characters and ideas: chips for each
  * field, and starter templates to begin from.
  *
  * Built in rather than asked of the model, so the common choices are instant,
@@ -14,7 +14,7 @@
  * (docs/daydreams.md, "What the presets are drawn from"). It still runs the
  * whole range, with a few tame entries kept beside the explicit ones so a
  * story can start slow, and the starting points are ordered by heat and say
- * theirs on their buttons (`sceneLevel`, `characterLevel`), so nobody has to
+ * theirs on their buttons (`ideaLevel`, `characterLevel`), so nobody has to
  * guess what they are picking. Every character is an adult, and nothing here
  * is built on blood relations. Pure and alias-free.
  */
@@ -23,8 +23,9 @@ import type {
 	CharacterTextField,
 	DaydreamCasting,
 	DaydreamCharacter,
-	DaydreamScene,
-	SceneTextField
+	DaydreamIdea,
+	DaydreamNarrator,
+	IdeaTextField
 } from '../daydream';
 
 export const CHARACTER_FIELD_LABELS: Readonly<
@@ -34,7 +35,7 @@ export const CHARACTER_FIELD_LABELS: Readonly<
 	personality: { label: 'Personality', hint: 'How they think and behave' },
 	speech: { label: 'How they talk', hint: 'Their voice, their words, their habits' },
 	appearance: { label: 'Appearance', hint: 'What you notice about them' },
-	likes: { label: 'What they enjoy', hint: 'What they want from a scene' },
+	likes: { label: 'What they enjoy', hint: 'What they want, given the chance' },
 	notes: { label: 'Anything else', hint: 'Whatever the rest leaves out' }
 };
 
@@ -204,7 +205,7 @@ export const CHARACTER_CHIPS: Readonly<Record<CharacterTextField, readonly strin
 export const CASTING_FIELD_LABELS: Readonly<
 	Record<Exclude<keyof DaydreamCasting, 'partId'>, { label: string; hint: string }>
 > = {
-	relationship: { label: 'Who they are to you', hint: 'In this story: how you know each other' },
+	relationship: { label: 'Who they are to you', hint: 'In this daydream: how you know each other' },
 	part: { label: 'Their part in this', hint: 'What they are doing, or want, as it starts' }
 };
 
@@ -251,16 +252,38 @@ export const CASTING_CHIPS: Readonly<
 	]
 };
 
-export const SCENE_FIELD_LABELS: Readonly<Record<SceneTextField, { label: string; hint: string }>> =
-	{
-		setting: { label: 'Where', hint: 'The place it happens' },
-		premise: { label: 'What’s going on', hint: 'How it starts' },
-		yourRole: { label: 'Your part', hint: 'Who you are in it, if you are in it' },
-		tone: { label: 'Tone', hint: 'How it should feel' },
-		notes: { label: 'Anything else', hint: 'Whatever the rest leaves out' }
-	};
+type FieldLabels = Readonly<Record<IdeaTextField, { label: string; hint: string }>>;
 
-export const SCENE_CHIPS: Readonly<Record<SceneTextField, readonly string[]>> = {
+export const IDEA_FIELD_LABELS: FieldLabels = {
+	setting: { label: 'Where', hint: 'The place it happens' },
+	premise: { label: 'What it’s about', hint: 'What’s going on as it starts' },
+	yourRole: { label: 'Your part', hint: 'Who you are in it, if you are in it' },
+	tone: { label: 'Tone', hint: 'How it should feel' },
+	notes: { label: 'Anything else', hint: 'Whatever the rest leaves out' }
+};
+
+/**
+ * The same fields as a monologue reads them (docs/daydreams.md, "Ideas"): it
+ * has no plot for "what's going on as it starts" to describe, and its notes
+ * are the sayings it is built from, which the reply prompt sends as written.
+ */
+const MONOLOGUE_FIELD_LABELS: FieldLabels = {
+	setting: { label: 'Where', hint: 'Where it is said, if anywhere' },
+	premise: { label: 'What it’s about', hint: 'What the voice believes, and keeps coming back to' },
+	yourRole: { label: 'Who you are to it', hint: 'Who it speaks to, or whose inner voice it is' },
+	tone: { label: 'Tone', hint: 'How it sounds' },
+	notes: {
+		label: 'Sayings to build on',
+		hint: 'Lines it starts from, one to a line, and anything else'
+	}
+};
+
+/** The idea's field labels for how the daydream is told: a monologue's own, or the usual. */
+export function ideaFieldLabels(narrator: DaydreamNarrator | undefined): FieldLabels {
+	return narrator === 'monologue' ? MONOLOGUE_FIELD_LABELS : IDEA_FIELD_LABELS;
+}
+
+export const IDEA_CHIPS: Readonly<Record<IdeaTextField, readonly string[]>> = {
 	setting: [
 		'a snowed-in lodge',
 		'an empty office after hours',
@@ -848,19 +871,19 @@ export const CHARACTER_TEMPLATES: readonly {
 ];
 
 /**
- * Starting points for a new scene, ordered by heat, from SFW to filthy. Their
- * parts have no ids: each use gives them fresh ones (`DaydreamSceneDialog`),
+ * Starting points for a new idea, ordered by heat, from SFW to filthy. Their
+ * parts have no ids: each use gives them fresh ones (`DaydreamIdeaDialog`),
  * as a part made by hand gets.
  */
-export const SCENE_TEMPLATES: readonly {
+export const IDEA_TEMPLATES: readonly {
 	id: string;
 	label: string;
-	scene: Omit<DaydreamScene, 'parts'> & { parts: { name: string; description: string }[] };
+	idea: Omit<DaydreamIdea, 'parts'> & { parts: { name: string; description: string }[] };
 }[] = [
 	{
 		id: 'one-bed',
 		label: 'Only one bed',
-		scene: {
+		idea: {
 			title: 'Only one bed',
 			setting: 'a snowed-in lodge',
 			premise:
@@ -877,7 +900,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'masquerade',
 		label: 'The masquerade',
-		scene: {
+		idea: {
 			title: 'The masquerade',
 			setting: 'a masquerade party',
 			premise: 'a masked stranger, a dare, and no names',
@@ -891,7 +914,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'after-hours',
 		label: 'After hours',
-		scene: {
+		idea: {
 			title: 'After hours',
 			setting: 'an empty office after hours',
 			premise: 'kept late after the presentation you botched, to make it up to your boss',
@@ -907,7 +930,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'facility',
 		label: 'The facility',
-		scene: {
+		idea: {
 			title: 'The facility',
 			setting: 'a training facility',
 			premise:
@@ -925,7 +948,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-assessment',
 		label: 'The assessment',
-		scene: {
+		idea: {
 			title: 'The assessment',
 			setting: 'a training facility',
 			premise:
@@ -943,7 +966,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-office',
 		label: 'Your office',
-		scene: {
+		idea: {
 			title: 'Your office',
 			setting: 'your office after hours',
 			premise:
@@ -963,7 +986,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'rivals',
 		label: 'Rivals',
-		scene: {
+		idea: {
 			title: 'Rivals',
 			setting: 'an empty office after hours',
 			premise: 'rivals forced to work together overnight, and one argument too many',
@@ -982,7 +1005,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'lost-bet',
 		label: 'The lost bet',
-		scene: {
+		idea: {
 			title: 'The lost bet',
 			setting: 'home, on a quiet evening',
 			premise: 'a bet you lost, and the evening you promised to give up',
@@ -996,7 +1019,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'won-bet',
 		label: 'The won bet',
-		scene: {
+		idea: {
 			title: 'The won bet',
 			setting: 'home, on a quiet evening',
 			premise: 'a bet you won, and the evening they promised to give up',
@@ -1015,7 +1038,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'admirer',
 		label: 'The admirer',
-		scene: {
+		idea: {
 			title: 'The admirer',
 			setting: 'your apartment, late at night',
 			premise:
@@ -1032,7 +1055,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-obsession',
 		label: 'Your obsession',
-		scene: {
+		idea: {
 			title: 'Your obsession',
 			setting: 'their apartment, late at night',
 			premise: 'months of notes, gifts and watching: tonight you finally let them see you',
@@ -1051,7 +1074,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'summoning',
 		label: 'The summoning',
-		scene: {
+		idea: {
 			title: 'The summoning',
 			setting: 'a summoning circle in candlelight',
 			premise: 'a deal with a demon: your wish granted, paid for with your body',
@@ -1065,7 +1088,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'summoned',
 		label: 'Summoned',
-		scene: {
+		idea: {
 			title: 'Summoned',
 			setting: 'a summoning circle in candlelight',
 			premise: 'a mortal has summoned you for a wish, and you name the price: their body',
@@ -1081,7 +1104,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'contract',
 		label: 'The contract',
-		scene: {
+		idea: {
 			title: 'The contract',
 			setting: 'a private library',
 			premise:
@@ -1096,7 +1119,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'brat-taming',
 		label: 'Brat taming',
-		scene: {
+		idea: {
 			title: 'Brat taming',
 			setting: 'home, on a quiet evening',
 			premise: 'your brat has pushed all week, and tonight you stop letting it slide',
@@ -1115,7 +1138,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'tamed',
 		label: 'Tamed',
-		scene: {
+		idea: {
 			title: 'Tamed',
 			setting: 'home, on a quiet evening',
 			premise: 'you have pushed all week, and tonight your dom stops letting it slide',
@@ -1129,7 +1152,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'the-key',
 		label: 'The key',
-		scene: {
+		idea: {
 			title: 'The key',
 			setting: 'home, with the key around your neck',
 			premise:
@@ -1146,7 +1169,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'new-pet',
 		label: 'Your new pet',
-		scene: {
+		idea: {
 			title: 'Your new pet',
 			setting: 'your apartment, set up for a pet',
 			premise:
@@ -1161,7 +1184,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'locked',
 		label: 'Locked',
-		scene: {
+		idea: {
 			title: 'Locked',
 			setting: 'home, on a quiet evening',
 			premise: 'locked in chastity for a month, and the keyholder decides when, if ever, you come',
@@ -1177,7 +1200,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'good-pet',
 		label: 'Good pet',
-		scene: {
+		idea: {
 			title: 'Good pet',
 			setting: 'their apartment, set up for a pet',
 			premise:
@@ -1194,7 +1217,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'trigger-words',
 		label: 'Trigger words',
-		scene: {
+		idea: {
 			title: 'Trigger words',
 			setting: 'a dim room with a comfortable chair',
 			premise:
@@ -1214,7 +1237,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-subject',
 		label: 'Your subject',
-		scene: {
+		idea: {
 			title: 'Your subject',
 			setting: 'a dim room with a comfortable chair',
 			premise:
@@ -1233,7 +1256,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'owned',
 		label: 'Owned',
-		scene: {
+		idea: {
 			title: 'Owned',
 			setting: 'nowhere in particular: a voice, and you listening',
 			premise:
@@ -1248,7 +1271,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'yours-to-use',
 		label: 'Yours to use',
-		scene: {
+		idea: {
 			title: 'Yours to use',
 			setting: 'nowhere in particular: a voice, and you listening',
 			premise:
@@ -1263,7 +1286,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'hotel-room',
 		label: 'The hotel room',
-		scene: {
+		idea: {
 			title: 'The hotel room',
 			setting: 'a hotel room',
 			premise: 'a hookup with no names: no pretending, you both know why you are here',
@@ -1282,7 +1305,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'mating-season',
 		label: 'Mating season',
-		scene: {
+		idea: {
 			title: 'Mating season',
 			setting: 'a cabin in the woods on the full moon',
 			premise:
@@ -1297,7 +1320,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-rut',
 		label: 'Your rut',
-		scene: {
+		idea: {
 			title: 'Your rut',
 			setting: 'a cabin in the woods on the full moon',
 			premise:
@@ -1314,7 +1337,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'threesome',
 		label: 'Three of us',
-		scene: {
+		idea: {
 			title: 'Three of us',
 			setting: 'home, on a quiet evening',
 			premise: 'the threesome you finally said yes to, and the guest your partner chose',
@@ -1331,7 +1354,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'sharing-them',
 		label: 'Sharing them',
-		scene: {
+		idea: {
 			title: 'Sharing them',
 			setting: 'home, on a quiet evening',
 			premise:
@@ -1349,7 +1372,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'hotwife',
 		label: 'Made to watch',
-		scene: {
+		idea: {
 			title: 'Made to watch',
 			setting: 'your bedroom, with a chair at the foot of the bed',
 			premise: 'your partner has brought someone home, and you are only allowed to watch',
@@ -1366,7 +1389,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'the-bull',
 		label: 'The bull',
-		scene: {
+		idea: {
 			title: 'The bull',
 			setting: 'a couple’s bedroom, with a chair at the foot of the bed',
 			premise:
@@ -1384,7 +1407,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'hunt',
 		label: 'The hunt',
-		scene: {
+		idea: {
 			title: 'The hunt',
 			setting: 'a forest at night, under a full moon',
 			premise:
@@ -1401,7 +1424,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-hunt',
 		label: 'Your hunt',
-		scene: {
+		idea: {
 			title: 'Your hunt',
 			setting: 'a forest at night, under a full moon',
 			premise:
@@ -1416,7 +1439,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'free-use',
 		label: 'Free use',
-		scene: {
+		idea: {
 			title: 'Free use',
 			setting: 'a shared house with one rule',
 			premise:
@@ -1434,7 +1457,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'anal-only',
 		label: 'Back door only',
-		scene: {
+		idea: {
 			title: 'Back door only',
 			setting: 'home, where the rules are on the fridge',
 			premise:
@@ -1451,7 +1474,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'gangbang',
 		label: 'The gangbang',
-		scene: {
+		idea: {
 			title: 'The gangbang',
 			setting: 'a room booked for a gangbang',
 			premise:
@@ -1472,7 +1495,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'the-organiser',
 		label: 'The organiser',
-		scene: {
+		idea: {
 			title: 'The organiser',
 			setting: 'a room booked for a gangbang',
 			premise:
@@ -1493,7 +1516,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'break-in',
 		label: 'The break-in',
-		scene: {
+		idea: {
 			title: 'The break-in',
 			setting: 'your home, after dark',
 			premise:
@@ -1510,7 +1533,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'interrogation',
 		label: 'The interrogation',
-		scene: {
+		idea: {
 			title: 'The interrogation',
 			setting: 'a holding cell',
 			premise:
@@ -1530,7 +1553,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'house-rules',
 		label: 'House rules',
-		scene: {
+		idea: {
 			title: 'House rules',
 			setting: 'your shared house',
 			premise:
@@ -1545,7 +1568,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'training-them',
 		label: 'Training them',
-		scene: {
+		idea: {
 			title: 'Training them',
 			setting: 'home, where your rules are on the fridge',
 			premise:
@@ -1562,7 +1585,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-break-in',
 		label: 'Your break-in',
-		scene: {
+		idea: {
 			title: 'Your break-in',
 			setting: 'their home, after dark',
 			premise:
@@ -1582,7 +1605,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-captive',
 		label: 'Your captive',
-		scene: {
+		idea: {
 			title: 'Your captive',
 			setting: 'a holding cell',
 			premise:
@@ -1597,7 +1620,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'dungeon',
 		label: 'The dungeon',
-		scene: {
+		idea: {
 			title: 'The dungeon',
 			setting: 'a play party in a dungeon',
 			premise: 'a night of being used, with nothing off the table but your limits',
@@ -1614,7 +1637,7 @@ export const SCENE_TEMPLATES: readonly {
 	{
 		id: 'your-party',
 		label: 'Your party',
-		scene: {
+		idea: {
 			title: 'Your party',
 			setting: 'a play party in a dungeon',
 			premise:

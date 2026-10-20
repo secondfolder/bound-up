@@ -5,7 +5,7 @@
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SuggestionProblem from '$lib/components/SuggestionProblem.svelte';
-	import type { DaydreamSetup } from '$lib/daydream';
+	import type { DaydreamSetup, DaydreamVoicePresetId } from '$lib/daydream';
 	import {
 		assembleSetup,
 		type StarterSide,
@@ -17,7 +17,7 @@
 	import {
 		addIdeas,
 		type GeneratedIdea,
-		ideaSentence,
+		ideaBrief,
 		MAX_OFFERED_IDEAS
 	} from '$lib/daydream/suggestions';
 	import type { MarkedSummary } from '$lib/daydream/summary';
@@ -44,11 +44,19 @@
 				version: number;
 		  };
 
-	/** A sentence a draft is written from, and the side it was asked for (or a generated idea made for). */
-	type Described = { idea: string; side: StarterSide | null };
+	/**
+	 * The brief a draft is written from, the side it was asked for (or a
+	 * generated idea made for), and the voice a generated idea was made for,
+	 * if any, so the draft is told the way the idea was.
+	 */
+	type Described = {
+		brief: string;
+		side: StarterSide | null;
+		voice?: DaydreamVoicePresetId | null;
+	};
 
 	let stage: Stage = $state({ kind: 'start' });
-	let idea = $state('');
+	let brief = $state('');
 	// The load's order, captured once: going back to the ways in shows the
 	// stories as they were, and a re-run load must not reshuffle them.
 	// svelte-ignore state_referenced_locally
@@ -56,7 +64,7 @@
 	let side: StarterSide | null = $state(null);
 	let asking = $state(false);
 	let problem: SuggestFailure | null = $state(null);
-	let generated: { request: string; ideas: readonly GeneratedIdea[] } | null = $state(null);
+	let generated: { brief: string; ideas: readonly GeneratedIdea[] } | null = $state(null);
 	let writing: string | null = $state(null);
 	let ideaProblem: SuggestFailure | null = $state(null);
 	let versions = 0;
@@ -109,7 +117,7 @@
 	}
 
 	/**
-	 * Asks the model to put a daydream together from a sentence: what was
+	 * Asks the model to put a daydream together from a brief: what was
 	 * written in the box, or a generated idea. `limits` are any the user has
 	 * written on the setup since, kept on the new draft and told to the
 	 * model, so "Try another" never loses them. A failure is said where it
@@ -144,22 +152,22 @@
 	}
 
 	/**
-	 * "Suggest stories for this": a few stories like the one described in the box, for
+	 * "Suggest daydreams for this": a few like the one described in the box, for
 	 * the side chosen under "You as". They replace the last ones, and are kept here so going
 	 * back to the ways in still shows them.
 	 */
-	async function generateIdeas(request: string): Promise<SuggestFailure | null> {
-		const answer = await suggestIdeas({ request, side, limits: '' });
+	async function generateIdeas(asked: string): Promise<SuggestFailure | null> {
+		const answer = await suggestIdeas({ brief: asked, side, limits: '' });
 		if (!answer.ok) {
 			return answer;
 		}
-		generated = { request, ideas: answer.value };
+		generated = { brief: asked, ideas: answer.value };
 		ideaProblem = null;
 		return null;
 	}
 
 	/**
-	 * "More ideas": more of the same request, for the side chosen now, added
+	 * "More ideas": more for the same brief, for the side chosen now, added
 	 * after the ones shown. The model is told which it already offered; any it
 	 * repeats anyway are dropped, and only repeats is said as nothing new.
 	 */
@@ -169,7 +177,7 @@
 		}
 		const shown = generated;
 		const answer = await suggestIdeas({
-			request: shown.request,
+			brief: shown.brief,
 			side,
 			limits: '',
 			offered: shown.ideas.map((offered) => offered.title).slice(-MAX_OFFERED_IDEAS)
@@ -185,7 +193,7 @@
 		if (added.length === shown.ideas.length) {
 			return { error: 'No new ideas came back that time. Try again.' };
 		}
-		generated = { request: shown.request, ideas: added };
+		generated = { brief: shown.brief, ideas: added };
 		return null;
 	}
 
@@ -193,7 +201,7 @@
 		writing = chosen.title;
 		// The idea's own side, which is the one it was asked for unless it
 		// has no one in charge.
-		writeDraft({ idea: ideaSentence(chosen), side: chosen.you }, '', (failure) => {
+		writeDraft({ brief: ideaBrief(chosen), side: chosen.you, voice: chosen.voice }, '', (failure) => {
 			ideaProblem = failure;
 		});
 	}
@@ -213,7 +221,7 @@
 	<div class="content">
 		{#if stage.kind === 'start'}
 			<DaydreamStarter
-				bind:idea
+				bind:brief
 				bind:side={() => side, chooseSide}
 				{suggestionsOn}
 				{starterOrder}
@@ -223,7 +231,7 @@
 				{writing}
 				{ideaProblem}
 				debug={data.debug}
-				ondescribe={() => writeDraft({ idea, side })}
+				ondescribe={() => writeDraft({ brief, side })}
 				onstarter={(starter) => {
 					const draft = starterSetup(starter);
 					setUp(draft, null, starterSummary(starter, draft));

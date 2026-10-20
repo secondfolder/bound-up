@@ -136,19 +136,19 @@
 				{
 					"id": "generated-roleplay",
 					"title": "Daydreams",
-					"summary": "Play out a story you make up, with characters who write back or a narrator who tells it to you.",
+					"summary": "Play out a daydream you make up, with characters who write back, a narrator who tells it to you, or one voice speaking its mind.",
 					"status": "in-progress",
 					"icon": "cloud-moon",
 					"notes": [
-						"Say what you feel like, or pick a ready-made story; every part is there to change",
+						"Say what you feel like, or pick a ready-made daydream; every part is there to change",
 						"The story opens on its own, then you take turns",
 						"Stop the scene and Ease off are always there"
 					],
 					"children": [
 						{
 							"id": "daydreams-voices-library",
-							"title": "Characters, scenes and narrators",
-							"summary": "A library of characters and scenes to reuse, cast into each scene's parts with who they are to you written for the story, and stories told by a narrator or the rules with no character at all.",
+							"title": "Characters, ideas and narrators",
+							"summary": "A library of characters and ideas to reuse, cast into each idea's parts with who they are to you written for the daydream, and daydreams told by a narrator or the rules with no character at all.",
 							"status": "shipped",
 							"shippedOn": "2026-10-16"
 						},
@@ -162,21 +162,21 @@
 						{
 							"id": "daydreams-heat-kink",
 							"title": "From SFW to filthy",
-							"summary": "Say how sexual and how kinky a scene is, and how slutty or kinky each character is, with starting points across the whole range.",
+							"summary": "Say how sexual and how kinky a daydream is, and how slutty or kinky each character is, with starting points across the whole range.",
 							"status": "shipped",
 							"shippedOn": "2026-10-17"
 						},
 						{
 							"id": "daydreams-easy-start",
-							"title": "Start from a sentence or a ready-made story",
-							"summary": "Say what you feel like and have it put together, or pick a ready-made story, then change any part of it from its summary.",
+							"title": "Start from a sentence or a ready-made daydream",
+							"summary": "Say what you feel like and have it put together, or pick a ready-made daydream, then change any part of it from its summary.",
 							"status": "shipped",
 							"shippedOn": "2026-10-19"
 						},
 						{
 							"id": "daydreams-monologue",
 							"title": "A monologue",
-							"summary": "Have a daydream told as one voice speaking its mind about what you are into, statement after statement, with the key lines drawn large.",
+							"summary": "Have a daydream told as one voice speaking its mind about what you are into, statement after statement, with the key lines drawn large. Ask for the sayings you want built on and it is set up as one.",
 							"status": "shipped",
 							"shippedOn": "2026-10-20"
 						},
@@ -189,8 +189,8 @@
 						},
 						{
 							"id": "daydreams-generated-ideas",
-							"title": "Story ideas made to order",
-							"summary": "Say what kind of stories you're after and get a few fresh ideas to pick from, with you on the side you chose.",
+							"title": "Daydream ideas made to order",
+							"summary": "Say what kind of daydream you're after and get a few fresh ideas to pick from, with you on the side you chose.",
 							"status": "shipped",
 							"shippedOn": "2026-10-20"
 						},
@@ -204,14 +204,14 @@
 						{
 							"id": "daydreams-kink-list",
 							"title": "Daydreams from your kink list",
-							"summary": "Scenes that start from what you're into, and stay clear of your hard limits.",
+							"summary": "Daydreams that start from what you're into, and stay clear of your hard limits.",
 							"status": "planned",
 							"dependsOn": ["kink-list"]
 						},
 						{
 							"id": "daydreams-tasks-points",
 							"title": "Characters set tasks and give points",
-							"summary": "A character can set you tasks during a scene, and award points for them.",
+							"summary": "A character can set you tasks during a daydream, and award points for them.",
 							"status": "exploring",
 							"dependsOn": ["self-partner-rewards"]
 						},

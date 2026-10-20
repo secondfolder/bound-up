@@ -2,7 +2,7 @@
 	import type { CopyState } from '$lib/daydream/chips';
 
 	/**
-	 * A character or scene as a daydream has it: its own copy, so editing or
+	 * A character or idea as a daydream has it: its own copy, so editing or
 	 * deleting the library's never changes a story under way. When the
 	 * library's has been edited since, it says so and offers the newer
 	 * version, or to keep this one; a copy with no library record can be saved
@@ -23,7 +23,7 @@
 		title: string;
 		summary: string;
 		state: CopyState;
-		/** "characters" or "scenes", for the save button's words. */
+		/** "characters" or "ideas", for the save button's words. */
 		kindName: string;
 		onedit: () => void;
 		onremove?: (() => void) | undefined;

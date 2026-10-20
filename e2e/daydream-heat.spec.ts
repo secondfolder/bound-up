@@ -5,7 +5,7 @@ import { test } from './fixtures';
 import { account, clickWaButton, reply, signUp, waitForHydration } from './helpers';
 
 /**
- * How sexual and how kinky a daydream is: a scene's heat, from a starting
+ * How sexual and how kinky a daydream is: an idea's heat, from a starting
  * point, reaching the prompt, and turned up mid-story. The stand-in model
  * (`e2e/model-stub.mjs`) ends each passage with "(Heat: <level>.)" when the
  * prompt names one, which is how this sees what the model was told.
@@ -45,7 +45,7 @@ test('a SFW starting point keeps the story SFW, and the heat can be turned up mi
 	await openSetup(page);
 
 	// The starting points say their level on them, SFW first.
-	await clickWaButton(page, 'New scene');
+	await clickWaButton(page, 'New idea');
 	// The host, not its role: `getByRole` lands on the inner button, which
 	// holds the slotted label but not as its own text (AGENTS.md).
 	const template = (name: string) => dialog(page).locator('wa-button').filter({ hasText: name });
@@ -54,7 +54,7 @@ test('a SFW starting point keeps the story SFW, and the heat can be turned up mi
 	await expect(template('The dungeon').locator('.level')).toHaveText('Filthy · kinky');
 	await oneBed.click();
 	await expect(dialog(page).getByRole('button', { name: 'Clear heat' })).toBeVisible();
-	await dialog(page).getByRole('button', { name: 'Use this scene' }).click();
+	await dialog(page).getByRole('button', { name: 'Use this idea' }).click();
 	await expect(dialog(page)).toHaveCount(0);
 
 	await clickWaButton(page, 'Cast the best friend');

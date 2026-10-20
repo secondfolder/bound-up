@@ -8,7 +8,7 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 const suggest = vi.hoisted(() => ({
 	suggestChips: vi.fn(),
 	suggestFill: vi.fn(),
-	surpriseScene: vi.fn()
+	surpriseIdea: vi.fn()
 }));
 vi.mock('$lib/daydream/suggest', () => suggest);
 
@@ -236,11 +236,11 @@ describe('DaydreamCharacterDialog', () => {
 				props: { context, suggestionsOn: false, onsaved: () => undefined, onclose: () => undefined }
 			});
 			await waSettled(baseElement);
-			expect(baseElement.textContent).not.toContain('In this story');
+			expect(baseElement.textContent).not.toContain('In this daydream');
 			expect(baseElement.textContent).not.toContain('Who they are to you');
 		});
 
-		it('offers the scene’s parts, but not one someone else plays', async () => {
+		it('offers the idea’s parts, but not one someone else plays', async () => {
 			const { baseElement } = render(DaydreamCharacterDialog, {
 				props: {
 					character: testCharacter(),
@@ -252,7 +252,7 @@ describe('DaydreamCharacterDialog', () => {
 				}
 			});
 			await waSettled(baseElement);
-			expect(baseElement.textContent).toContain('In this story');
+			expect(baseElement.textContent).toContain('In this daydream');
 			const options = [
 				...baseElement.querySelectorAll<HTMLElement & { disabled: boolean }>('wa-option')
 			];

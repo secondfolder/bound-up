@@ -13,7 +13,7 @@ import { listLibrary } from '../daydreams';
 import { createHandler, deleteHandler, updateHandler } from './library-routes';
 
 /**
- * The library endpoints (`api/daydreams/characters`, `…/scenes`), through the
+ * The library endpoints (`api/daydreams/characters`, `…/ideas`), through the
  * handlers both routes are made of.
  */
 
@@ -41,7 +41,7 @@ async function sealedBy(user: TestUser) {
 	};
 }
 
-describe.each(['characters', 'scenes'] as const)('/api/daydreams/%s', (kind) => {
+describe.each(['characters', 'ideas'] as const)('/api/daydreams/%s', (kind) => {
 	const create = (user: TestUser | null, json: unknown) =>
 		runAndCatch(() => createHandler(kind)(fakeEvent({ db, user, json })));
 	const update = (user: TestUser | null, itemId: string, json: unknown) =>

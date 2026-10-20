@@ -10,7 +10,7 @@ import {
 	grantTestDaydreams,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { load as loadScenes } from '../scenes/+page.server';
+import { load as loadIdeas } from '../ideas/+page.server';
 import { load } from './+page.server';
 
 let harness: TestDb;
@@ -29,7 +29,7 @@ afterEach(() => harness.close());
 const at = (user: TestUser | null, path: string) => fakeEvent({ db, user, path });
 
 describe('the library pages', () => {
-	it('list the owner’s characters, and scenes, each on its own page', async () => {
+	it('list the owner’s characters, and ideas, each on its own page', async () => {
 		const content = {
 			vaultId: await ensureTestSelfVault(db, ada.id),
 			ciphertext: fakeSealed('item'),
@@ -40,8 +40,8 @@ describe('the library pages', () => {
 		const characters = await runLoad(load(at(ada, '/daydreams/characters')));
 		expect(characters.items.map((item: { id: string }) => item.id)).toEqual([id]);
 		expect(characters).toMatchObject({ accepted: false });
-		const scenes = await runLoad(loadScenes(at(ada, '/daydreams/scenes')));
-		expect(scenes.items).toEqual([]);
+		const ideas = await runLoad(loadIdeas(at(ada, '/daydreams/ideas')));
+		expect(ideas.items).toEqual([]);
 	});
 
 	it('refuse an account without the feature', async () => {
@@ -49,7 +49,7 @@ describe('the library pages', () => {
 		expect(await runAndCatch(() => load(at(bo, '/daydreams/characters')))).toMatchObject({
 			status: 403
 		});
-		expect(await runAndCatch(() => loadScenes(at(bo, '/daydreams/scenes')))).toMatchObject({
+		expect(await runAndCatch(() => loadIdeas(at(bo, '/daydreams/ideas')))).toMatchObject({
 			status: 403
 		});
 	});

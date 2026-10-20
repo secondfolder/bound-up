@@ -649,7 +649,7 @@ export type DaydreamView = {
 	marks: DaydreamMarkView[];
 };
 
-/** A character or scene in the user's library. `revision` is what a daydream's copy is compared with. */
+/** A character or idea in the user's library. `revision` is what a daydream's copy is compared with. */
 export type DaydreamLibraryItemView = {
 	id: string;
 	revision: number;
@@ -659,7 +659,7 @@ export type DaydreamLibraryItemView = {
 
 export type DaydreamLibraryView = {
 	characters: DaydreamLibraryItemView[];
-	scenes: DaydreamLibraryItemView[];
+	ideas: DaydreamLibraryItemView[];
 };
 
 /**

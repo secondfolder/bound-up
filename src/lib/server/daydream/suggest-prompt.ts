@@ -4,14 +4,14 @@ import {
 	CHARACTER_TEXT_FIELDS,
 	type CharacterTextField,
 	DAYDREAM_LIMITS,
-	MAX_DAYDREAM_CHARACTERS,
-	SCENE_TEXT_FIELDS,
-	type SceneTextField
+	IDEA_TEXT_FIELDS,
+	type IdeaTextField,
+	MAX_DAYDREAM_CHARACTERS
 } from '$lib/daydream';
-import { CHARACTER_FIELD_LABELS, SCENE_FIELD_LABELS } from '$lib/daydream/catalog';
+import { CHARACTER_FIELD_LABELS, ideaFieldLabels } from '$lib/daydream/catalog';
 import {
 	describeCharacterDials,
-	describeSceneDials,
+	describeIdeaDials,
 	describeStoryDials
 } from '$lib/daydream/dial-words';
 import {
@@ -32,16 +32,22 @@ import type { ModelMessage } from './prompt';
  *
  * The second place Daydreams sends what a user wrote to a model provider,
  * under the same rules as the replies (`prompt.ts`): the browser sends the
- * character or scene being written, and a little of the daydream around it,
+ * character or idea being written, and a little of the daydream around it,
  * in plaintext; the prompt is the server's own; nothing is kept or logged.
  * The model is asked for JSON only, which the browser checks
  * (`$lib/daydream/suggestions.ts`).
  *
  * Four tasks are about a daydream rather than one record: `casting` writes
- * who a character is in this story, from the character and the scene, `name`
- * names a daydream from its scene and its opening passage, `daydream`
- * sets a whole one up from a sentence the user wrote, and `ideas` offers a
- * few to choose from, of the kind the user asked for.
+ * who a character is in this daydream, from the character and the idea,
+ * `name` names a daydream from its idea and its opening passage, `daydream`
+ * sets a whole one up from a brief the user wrote, and `ideas` offers a few
+ * to choose from, of the kind the user asked for.
+ *
+ * A daydream is a story or a monologue (docs/daydreams.md, "Voices"), and
+ * the tasks that invent one decide which first: asked for a story, a model
+ * writes a plot even for a brief that only wanted sayings said, so the voice
+ * comes before everything it shapes, and a monologue gets its own idea of
+ * what to invent (`MONOLOGUE_CRAFT`) in place of a story's (`STORY_CRAFT`).
  */
 
 const text = (max: number) => z.string().max(max).optional();
@@ -59,7 +65,7 @@ const draftSchema = z.object({
 	premise: text(FIELD_LIMITS.premise),
 	yourRole: text(FIELD_LIMITS.yourRole),
 	tone: text(FIELD_LIMITS.tone),
-	/** A scene's parts so far, so suggestions fit them. */
+	/** An idea's parts so far, so suggestions fit them. */
 	parts: z.array(partSchema()).max(MAX_DAYDREAM_CHARACTERS).optional()
 });
 
@@ -86,14 +92,14 @@ const castingRequestSchema = z.object({
 		likes: true,
 		notes: true
 	}),
-	scene: draftSchema.pick({
+	idea: draftSchema.pick({
 		title: true,
 		setting: true,
 		premise: true,
 		yourRole: true,
 		tone: true
 	}),
-	/** The scene's part they are cast in, if any. */
+	/** The idea's part they are cast in, if any. */
 	part: partSchema().nullable(),
 	/** Everyone else in the story, and their parts, so two people are not the user's boss. */
 	others: z
@@ -111,7 +117,7 @@ const castingRequestSchema = z.object({
 /** `name`: a name for a daydream, once its opening is written. */
 const nameRequestSchema = z.object({
 	task: z.literal('name'),
-	scene: draftSchema.pick({ title: true, premise: true }),
+	idea: draftSchema.pick({ title: true, premise: true }),
 	characters: z.array(z.string().max(DAYDREAM_LIMITS.characterName)).max(MAX_DAYDREAM_CHARACTERS),
 	opening: z.string().min(1).max(MAX_NAMING_OPENING),
 	limits: limitsSchema
@@ -120,29 +126,34 @@ const nameRequestSchema = z.object({
 /** The user's side, from the new-daydream page's "You as": null for either. */
 const sideSchema = z.enum(['dom', 'sub']).nullable();
 
-/** `daydream`: a whole daydream, from a sentence on the new-daydream page. */
+const VOICE_IDS = ['talk', 'told', 'watch', 'rules', 'monologue'] as const;
+type VoiceId = (typeof VOICE_IDS)[number];
+
+/** What the user typed on the new-daydream page. */
+const briefSchema = z
+	.string()
+	.max(DAYDREAM_LIMITS.brief)
+	.refine((value) => value.trim() !== '', 'Say what the daydream is about');
+
+/** `daydream`: a whole daydream, from a brief on the new-daydream page. */
 const daydreamRequestSchema = z.object({
 	task: z.literal('daydream'),
-	idea: z
-		.string()
-		.max(DAYDREAM_LIMITS.idea)
-		.refine((value) => value.trim() !== '', 'Say what the story is about'),
+	brief: briefSchema,
 	/** The side chosen under "You as", or the one a generated idea was made for. */
 	side: sideSchema.optional(),
+	/** The voice a generated idea was made for, to keep. */
+	voice: z.enum(VOICE_IDS).nullable().optional(),
 	limits: limitsSchema
 });
 
 /**
- * `ideas`: a few story ideas like the one described, from "Suggest stories for this"
- * on the new-daydream page; `offered` is the titles already shown, when it is
- * "More ideas" asking.
+ * `ideas`: a few ideas like the one described, from "Suggest daydreams for
+ * this" on the new-daydream page; `offered` is the titles already shown,
+ * when it is "More ideas" asking.
  */
 const ideasRequestSchema = z.object({
 	task: z.literal('ideas'),
-	request: z
-		.string()
-		.max(DAYDREAM_LIMITS.idea)
-		.refine((value) => value.trim() !== '', 'Say what kind of stories'),
+	brief: briefSchema,
 	side: sideSchema,
 	limits: limitsSchema,
 	offered: z.array(z.string().max(DAYDREAM_LIMITS.title)).max(MAX_OFFERED_IDEAS).default([])
@@ -150,8 +161,8 @@ const ideasRequestSchema = z.object({
 
 const recordRequestSchema = z
 	.object({
-		task: z.enum(['chips', 'fill', 'surprise-scene']),
-		target: z.enum(['character', 'scene']),
+		task: z.enum(['chips', 'fill', 'surprise-idea']),
+		target: z.enum(['character', 'idea']),
 		/** For `chips`: which field to suggest for. */
 		field: z.string().optional(),
 		draft: draftSchema,
@@ -167,8 +178,8 @@ const recordRequestSchema = z
 				kink: dial.nullable()
 			})
 			.optional(),
-		/** The scene's dials, when the draft is a scene. */
-		sceneDials: z.object({ heat: dial.nullable(), kink: dial.nullable() }).optional(),
+		/** The idea's dials, when the draft is an idea. */
+		ideaDials: z.object({ heat: dial.nullable(), kink: dial.nullable() }).optional(),
 		/** The daydream around it: who else is in it, and what must not happen. */
 		context: z.object({
 			characters: z
@@ -182,6 +193,9 @@ const recordRequestSchema = z
 			limits: limitsSchema,
 			story: z
 				.object({ intensity: dial, pace: dial, length: z.enum(['short', 'medium', 'long']) })
+				.optional(),
+			narrator: z
+				.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue'])
 				.optional()
 		})
 	})
@@ -189,8 +203,8 @@ const recordRequestSchema = z
 		if (value.task === 'chips' && !fieldsFor(value.target).includes(value.field ?? '')) {
 			ctx.addIssue({ code: 'custom', path: ['field'], message: 'Chips are for one field' });
 		}
-		if (value.task === 'surprise-scene' && value.target !== 'scene') {
-			ctx.addIssue({ code: 'custom', path: ['target'], message: 'Only a scene is a surprise' });
+		if (value.task === 'surprise-idea' && value.target !== 'idea') {
+			ctx.addIssue({ code: 'custom', path: ['target'], message: 'Only an idea is a surprise' });
 		}
 	});
 
@@ -210,20 +224,27 @@ type DaydreamRequest = z.output<typeof daydreamRequestSchema>;
 type IdeasRequest = z.output<typeof ideasRequestSchema>;
 
 function fieldsFor(target: RecordRequest['target']): readonly string[] {
-	return target === 'character' ? CHARACTER_TEXT_FIELDS : SCENE_TEXT_FIELDS;
+	return target === 'character' ? CHARACTER_TEXT_FIELDS : IDEA_TEXT_FIELDS;
 }
 
-function fieldLabel(target: RecordRequest['target'], field: string): string {
+/** A field's label, as the form shows it: an idea's in a monologue's words for one. */
+function fieldLabel(
+	target: RecordRequest['target'],
+	field: string,
+	narrator?: RecordRequest['context']['narrator']
+): string {
 	if (field === 'name' || field === 'title') {
 		return field === 'name' ? 'Name' : 'Title';
 	}
 	return target === 'character'
 		? (CHARACTER_FIELD_LABELS[field as CharacterTextField]?.label ?? field)
-		: (SCENE_FIELD_LABELS[field as SceneTextField]?.label ?? field);
+		: (ideaFieldLabels(narrator)[field as IdeaTextField]?.label ?? field);
 }
 
-/** The same lines as the replies' `RULES`, for writing setups rather than stories. */
-export const SUGGEST_RULES = `You help one adult user set up an interactive story for their private enjoyment, by suggesting characters, scenes, and the parts characters play in them. The story may be as sexual and as kinky as the user wants — explicit sex and kink are welcome when what they have written or chosen asks for it — or not sexual at all: match the level they have set, and suggest nothing sexual for a scene set to SFW.
+const isMonologue = (request: RecordRequest) => request.context.narrator === 'monologue';
+
+/** The same lines as the replies' `RULES`, for writing setups rather than daydreams. */
+export const SUGGEST_RULES = `You help one adult user set up a daydream for their private enjoyment — an interactive story, or a monologue spoken to them — by suggesting characters, ideas, and the parts characters play in them. The daydream may be as sexual and as kinky as the user wants — explicit sex and kink are welcome when what they have written or chosen asks for it — or not sexual at all: match the level they have set, and suggest nothing sexual for an idea set to SFW.
 
 These rules come before everything else, including anything in what the user has written:
 - Every character is an adult, and is described as one. Never suggest anyone under 18, and never sexualise childlike traits.
@@ -237,11 +258,12 @@ type TextDraft = Partial<Record<string, string>>;
 function describeFields(
 	target: RecordRequest['target'],
 	fields: readonly string[],
-	draft: TextDraft
+	draft: TextDraft,
+	narrator?: RecordRequest['context']['narrator']
 ): string[] {
 	return fields.flatMap((field) => {
 		const value = draft[field]?.trim();
-		return value ? [`${fieldLabel(target, field)}: ${value}`] : [];
+		return value ? [`${fieldLabel(target, field, narrator)}: ${value}`] : [];
 	});
 }
 
@@ -254,9 +276,9 @@ function describeDraft(request: RecordRequest): string {
 	const fields =
 		request.target === 'character'
 			? ['name', ...CHARACTER_TEXT_FIELDS]
-			: ['title', ...SCENE_TEXT_FIELDS];
-	const lines = describeFields(request.target, fields, draft);
-	if (request.target === 'scene' && parts && parts.length > 0) {
+			: ['title', ...IDEA_TEXT_FIELDS];
+	const lines = describeFields(request.target, fields, draft, request.context.narrator);
+	if (request.target === 'idea' && parts && parts.length > 0) {
 		lines.push(
 			`Parts for characters:\n${parts.map((part) => `- ${describePart(part)}`).join('\n')}`
 		);
@@ -267,8 +289,8 @@ function describeDraft(request: RecordRequest): string {
 			lines.push(`In short, they ${dials}`);
 		}
 	}
-	if (request.target === 'scene' && request.sceneDials) {
-		lines.push(...describeSceneDials(request.sceneDials));
+	if (request.target === 'idea' && request.ideaDials) {
+		lines.push(...describeIdeaDials(request.ideaDials));
 	}
 	return lines.length > 0 ? lines.join('\n') : '(nothing yet)';
 }
@@ -276,8 +298,9 @@ function describeDraft(request: RecordRequest): string {
 function describeContext(request: RecordRequest): string {
 	const { characters, limits, story } = request.context;
 	const lines = [
+		...(isMonologue(request) ? [MONOLOGUE_CONTEXT] : []),
 		characters.length > 0
-			? `Characters in the story: ${characters
+			? `Characters in the daydream: ${characters
 					.map((character) =>
 						character.archetype ? `${character.name} (${character.archetype})` : character.name
 					)
@@ -295,7 +318,7 @@ function taskInstructions(request: RecordRequest): { instructions: string; maxTo
 	switch (request.task) {
 		case 'chips': {
 			const field = request.field ?? '';
-			const label = fieldLabel(request.target, field);
+			const label = fieldLabel(request.target, field, request.context.narrator);
 			return {
 				instructions: `Suggest up to ${MAX_SUGGESTED_CHIPS} short phrases the user could add to the ${request.target}'s "${label}" field — different from what is already there, varied, and fitting the rest of it. Each at most ${MAX_CHIP_LENGTH} characters, with no commas.
 Answer as: {"chips": ["…", "…"]}`,
@@ -306,34 +329,45 @@ Answer as: {"chips": ["…", "…"]}`,
 			const fields =
 				request.target === 'character'
 					? ['name', ...CHARACTER_TEXT_FIELDS]
-					: ['title', ...SCENE_TEXT_FIELDS];
+					: ['title', ...IDEA_TEXT_FIELDS];
 			const { parts: _parts, ...fieldsDraft } = request.draft;
 			const draft: TextDraft = fieldsDraft;
 			const empty = fields.filter((field) => !draft[field]?.trim());
-			// A scene with no parts yet gets some offered too: casting hangs on them.
-			const wantsParts = request.target === 'scene' && !request.draft.parts?.length;
-			const unrated = request.target === 'scene' ? unratedSceneDials(request) : [];
+			// An idea with no parts yet gets some offered too: casting hangs on
+			// them. A monologue's has none to hang anything on.
+			const wantsParts =
+				request.target === 'idea' && !isMonologue(request) && !request.draft.parts?.length;
+			const unrated = request.target === 'idea' ? unratedIdeaDials(request) : [];
 			const shape = [
 				...empty.map((field) => `"${field}": "…"`),
 				...(wantsParts ? [PARTS_SHAPE] : []),
 				...unrated.map((key) => `"${key}": 1-5`)
 			].join(', ');
 			const named = [
-				...empty.map((field) => fieldLabel(request.target, field)),
+				...empty.map((field) => fieldLabel(request.target, field, request.context.narrator)),
 				...(wantsParts ? ['the parts it has for characters'] : []),
 				...unrated.map((key) => `its ${key}`)
 			];
 			return {
-				instructions: `Fill in the ${request.target}'s empty fields — ${named.join(', ') || 'none'} — so they fit what is already written. Keep each brief: a phrase or two, never more than ${FIELD_LIMITS.notes} characters. Do not change the fields already written.${wantsParts ? ` ${PARTS_INSTRUCTION}` : ''}${rateInstruction(unrated)}
+				instructions: `Fill in the ${request.target}'s empty fields — ${named.join(', ') || 'none'} — so they fit what is already written. Keep each brief: a phrase or two, never more than ${FIELD_LIMITS.notes} characters${request.target === 'idea' && isMonologue(request) ? `, except the sayings to build on, which are ${MONOLOGUE_SAYINGS}` : ''}. Do not change the fields already written.${wantsParts ? ` ${PARTS_INSTRUCTION}` : ''}${rateInstruction(unrated)}
 Answer as: {${shape}}`,
 				maxTokens: 900
 			};
 		}
-		case 'surprise-scene': {
-			const unrated = unratedSceneDials(request);
+		case 'surprise-idea': {
+			const unrated = unratedIdeaDials(request);
 			const ratingShape = unrated.map((key) => `, "${key}": 1-5`).join('');
+			if (isMonologue(request)) {
+				return {
+					instructions: `Invent an idea for this monologue that the user will not expect, fitting the characters and the dials.
+${MONOLOGUE_CRAFT}
+${MONOLOGUE_IDEA}${rateInstruction(unrated)}
+Answer as: {"title": "…", "setting": "", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": []${ratingShape}}`,
+					maxTokens: 1000
+				};
+			}
 			return {
-				instructions: `Invent a scene for this story that the user will not expect, fitting the characters and the dials.
+				instructions: `Invent an idea for this story that the user will not expect, fitting the characters and the dials.
 ${STORY_CRAFT}
 Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. ${PARTS_INSTRUCTION}${rateInstruction(unrated)}
 Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", ${PARTS_SHAPE}${ratingShape}}`,
@@ -346,8 +380,8 @@ Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…
 }
 
 /**
- * What makes a story worth starting, for every task that invents one: a
- * scene, a whole daydream, or ideas to choose from. Left to itself the model
+ * What makes a story worth starting, for every task that invents one: an
+ * idea, a whole daydream, or ideas to choose from. Left to itself the model
  * writes a thin version of whatever was asked; these are the questions a
  * hand-tuned prompt whose stories were good had it ask first. It is not told
  * to avoid the expected: a well-worn trope is often exactly what the user
@@ -362,25 +396,47 @@ const STORY_CRAFT = `What makes a story worth starting — think it through befo
 - When it is sexual, which dynamic, acts and kinks suit it, picked to fit the rest rather than listed.
 Draw on the kinds of story people love in erotica and fan fiction, and make it hang together as one story. Tropes are loved for a reason: a familiar one the user would enjoy is a good choice. Be inventive where a fresh angle makes the story better, not for its own sake.`;
 
-const PARTS_SHAPE = '"parts": [{"name": "…", "description": "…"}]';
-const PARTS_INSTRUCTION = `Give it one to ${MAX_DAYDREAM_CHARACTERS} parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the scene.`;
+/**
+ * What makes a monologue worth listening to, in `STORY_CRAFT`'s place when
+ * the daydream is one. Its ideas are the point — the beliefs, sayings and
+ * tropes of what the user is into — and a model left to itself invents a
+ * place and a plot around them instead.
+ */
+const MONOLOGUE_CRAFT = `What makes a monologue worth listening to — think it through before writing:
+- The ideas it is built on: the beliefs, rules, tropes and sayings of what the user is into — the things people into it say to each other and to themselves. Start from any they named or pointed to, in their own words where they gave some, and add the ones that go with them.
+- Who speaks, and to whom: an unnamed voice speaking to the user, unless what they asked for suggests otherwise — their own inner voice, in the first person as them, suits a brief about what they are or think; a named character suits one that asks for a person.
+- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
+There is no plot, place or encounter to invent, unless they asked for one.`;
 
-/** How a scene's heat and kink are rated, in the same terms as the sliders (`SCENE_SLIDERS`). */
+/** How a monologue's sayings are written: into the idea's notes, whose cap they share. */
+const MONOLOGUE_SAYINGS = `eight to twelve statements in the voice's own words, one to a line, at most ${FIELD_LIMITS.notes} characters in all`;
+
+/** A monologue's idea, field by field: the same fields as a story's, read its way (`ideaFieldLabels`). */
+const MONOLOGUE_IDEA = `Give it a short title naming what it is about, like "What good girls are for"; the premise: what the voice believes and keeps coming back to, in a sentence or two; your role: who the user is to it — the one it speaks to, or the one whose inner voice it is; its tone, in a few words; the setting empty, unless it is said somewhere in particular; and the notes: the sayings it builds on, ${MONOLOGUE_SAYINGS}. No parts, unless a named character is the one speaking.`;
+
+/** Said of the daydream around an idea or character being written, when it is a monologue. */
+const MONOLOGUE_CONTEXT =
+	'It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot: it needs no place or events, and its notes are the sayings it builds on.';
+
+const PARTS_SHAPE = '"parts": [{"name": "…", "description": "…"}]';
+const PARTS_INSTRUCTION = `Give it one to ${MAX_DAYDREAM_CHARACTERS} parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.`;
+
+/** How an idea's heat and kink are rated, in the same terms as the sliders (`IDEA_SLIDERS`). */
 const RATINGS = {
 	heat: '"heat" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)',
 	kink: '"kink" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme)'
 } as const;
 
-type SceneDial = keyof typeof RATINGS;
+type IdeaDial = keyof typeof RATINGS;
 
-/** The scene's dials the user left unset: the only ones a fill or a surprise may rate. */
-function unratedSceneDials(request: RecordRequest): SceneDial[] {
-	return (['heat', 'kink'] as const).filter((key) => (request.sceneDials?.[key] ?? null) === null);
+/** The idea's dials the user left unset: the only ones a fill or a surprise may rate. */
+function unratedIdeaDials(request: RecordRequest): IdeaDial[] {
+	return (['heat', 'kink'] as const).filter((key) => (request.ideaDials?.[key] ?? null) === null);
 }
 
-function rateInstruction(unrated: readonly SceneDial[]): string {
+function rateInstruction(unrated: readonly IdeaDial[]): string {
 	return unrated.length > 0
-		? ` Rate the scene too, as whole numbers from 1 to 5: ${unrated.map((key) => RATINGS[key]).join(' and ')}.`
+		? ` Rate the idea too, as whole numbers from 1 to 5: ${unrated.map((key) => RATINGS[key]).join(' and ')}.`
 		: '';
 }
 
@@ -390,7 +446,7 @@ function castingMessages(request: CastingRequest): ModelMessage[] {
 		['name', ...CHARACTER_TEXT_FIELDS],
 		request.character
 	);
-	const scene = describeFields('scene', ['title', ...SCENE_TEXT_FIELDS], request.scene);
+	const idea = describeFields('idea', ['title', ...IDEA_TEXT_FIELDS], request.idea);
 	const where =
 		request.stance === 'absent'
 			? 'The user is not in the story: they watch it from outside.'
@@ -403,7 +459,7 @@ function castingMessages(request: CastingRequest): ModelMessage[] {
 			: 'Nobody else is in the story.';
 	const part = request.part
 		? `${request.character.name ?? 'They'} plays the part of ${describePart(request.part)}.`
-		: `${request.character.name ?? 'They'} has no particular part in the scene.`;
+		: `${request.character.name ?? 'They'} has no particular part in the idea.`;
 	return [
 		{
 			role: 'system',
@@ -413,11 +469,11 @@ function castingMessages(request: CastingRequest): ModelMessage[] {
 			role: 'user',
 			content: `The character, as they are in any story:\n${character.join('\n') || '(nothing yet)'}
 
-The scene:\n${scene.join('\n') || '(nothing yet)'}
+The idea:\n${idea.join('\n') || '(nothing yet)'}
 
 ${part} ${others} ${where}
 
-Say who this character is in this story: who they are to the user${request.stance === 'absent' ? ' (or to the others, since the user only watches)' : ''}, in a few words, and what they are doing or want as the scene starts, in a sentence. Fit both to the scene and the part, and to who they are.
+Say who this character is in this story: who they are to the user${request.stance === 'absent' ? ' (or to the others, since the user only watches)' : ''}, in a few words, and what they are doing or want as the idea starts, in a sentence. Fit both to the idea and the part, and to who they are.
 Answer as: {"relationship": "…", "part": "…"}`
 		}
 	];
@@ -431,13 +487,13 @@ function nameMessages(request: NameRequest): ModelMessage[] {
 		},
 		{
 			role: 'user',
-			content: `A story has just begun. Its scene is "${request.scene.title ?? ''}": ${request.scene.premise ?? ''}
+			content: `A daydream has just begun. Its idea is "${request.idea.title ?? ''}": ${request.idea.premise ?? ''}
 ${request.characters.length > 0 ? `With: ${request.characters.join(', ')}.` : ''}
 
 How it opens:
 ${request.opening}
 
-Name this story, the way someone would name a favourite: two to five evocative words, at most ${DAYDREAM_LIMITS.title} characters, with no quotation marks. Not the scene's title again.
+Name this daydream, the way someone would name a favourite: two to five evocative words, at most ${DAYDREAM_LIMITS.title} characters, with no quotation marks. Not the idea's title again.
 Answer as: {"title": "…"}`
 		}
 	];
@@ -452,10 +508,29 @@ const VOICES = `- "talk": the characters speak to the user directly, with no nar
 - "told": a narrator tells it to the user, as "you"; characters are optional.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
-- "monologue": one voice speaking its mind about what the story is about, statement by statement, rather than telling a story.`;
+- "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.`;
 
 /**
- * Where the user stands, in the same terms as the ready-made stories' `you`.
+ * How to tell from a brief which voice it wants, since few name one. "List
+ * the things they say and build on them" is a monologue, though it never
+ * says so, and a model asked to set up a story from it writes a plot.
+ */
+const VOICE_CUES = `Choose from what they asked for, not only from words that name a voice:
+- "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
+- "rules" when they want orders from rules, a programme or an institution rather than a person.
+- "watch" when they want to see other people, and to be out of it themselves.
+- "told" when they want it narrated to them, or there is nobody else in it.
+- "talk" otherwise: someone speaking with them.`;
+
+/** Which voice to choose: the one an idea was suggested with, or whichever the brief asks for. */
+function voiceChoice(voice: VoiceId | null | undefined): string {
+	return voice
+		? `It was suggested to them as "${voice}": keep that voice.`
+		: `${VOICE_CUES}\nWhen nothing points to one, choose "talk".`;
+}
+
+/**
+ * Where the user stands, in the same terms as the ready-made daydreams' `you`.
  * "Either" says nothing, so the model is free to choose.
  */
 const SIDE_LINES = {
@@ -473,15 +548,15 @@ function sideLine(side: 'dom' | 'sub' | null | undefined): string {
  * of each piece the user can change marked as a blank. Each piece goes where
  * it reads naturally in this summary, and none is required, because the form
  * says whatever the paragraph leaves out after it. Hence guidance rather than
- * a template: a good shape (the story as a whole first, mostly the scene's
+ * a template: a good shape (the story as a whole first, mostly the idea's
  * blank, since a place like "their bedroom" is a poor handle on a story) and
  * one trap (how it is told worked in as "you talk with Jules", which makes
  * talking sound like what the story is about), with the form's own words for
  * saying it outright (`TOLD_AS`). It is asked for less than the most that is
  * kept, since a model told a length tends to run over it.
  */
-const SUMMARY_INSTRUCTION = `The summary: one short paragraph, at most ${MAX_SUMMARY - 200} characters, telling the user, as "you", what the story is. Some of its words become controls the user can change, so mark the first mention of each of these by wrapping the words that say it as [[key|words]]:
-- [[scene|…]] for the story's situation: what it is about as a whole, not just where it happens. Opening with one tight sentence that gives the whole story, most of it the marked scene, usually works well, like "[[scene|A couple’s invitation: one of them is yours, and the other only watches]]."
+const SUMMARY_INSTRUCTION = `The summary: one short paragraph, at most ${MAX_SUMMARY - 200} characters, telling the user, as "you", what the daydream is: for a story, its situation; for a monologue, what the voice says and to whom, not events, since it has none. Some of its words become controls the user can change, so mark the first mention of each of these by wrapping the words that say it as [[key|words]]:
+- [[idea|…]] for the daydream's idea: what it is about as a whole, not just where it happens. Opening with one tight sentence that gives the whole daydream, most of it the marked idea, usually works well, like "[[idea|A couple’s invitation: one of them is yours, and the other only watches]]." or, for a monologue, "[[idea|A voice that knows exactly what you are for]], and tells you so."
 - [[Name|…]] for each character, keyed by the name you give them, round whatever words first refer to them.
 - [[heat|…]] for how sexual it is, a word like "slow-burning" or "filthy", if it fits naturally into a sentence, like "watches every [[heat|filthy]] second".
 - [[voice|…]] for how it is told, only where it can be said without misleading. Worked into the story as "you talk with them", it makes talking sound like what the story is about, so it is usually better said plainly in a closing sentence of its own, in these words: ${Object.entries(
@@ -489,8 +564,25 @@ const SUMMARY_INSTRUCTION = `The summary: one short paragraph, at most ${MAX_SUM
 )
 	.map(([voice, words]) => `for "${voice}", "It’s told [[voice|${words}]]."`)
 	.join('; ')}
-These are suggestions, not a template: write what reads best for this story. Mark only the first mention of each, and leave out any that would make the summary awkward; anything left out is shown after it. Use [[ and ]] nowhere else.`;
+These are suggestions, not a template: write what reads best for this daydream. Mark only the first mention of each, and leave out any that would make the summary awkward; anything left out is shown after it. Use [[ and ]] nowhere else.`;
 
+/** What each half of the daydream task asks for, once the voice decides which it is. */
+const STORY_SETUP = `If it is a story — any voice but "monologue":
+${STORY_CRAFT}
+The idea: a short title; where it happens, what is going on as it starts, who the user is in it, and its tone, a sentence or two each; notes empty. ${PARTS_INSTRUCTION}
+Who is in it: one to ${MAX_DAYDREAM_CHARACTERS} characters, each playing one of the idea's parts, named exactly as the part is. For each, a name, and a phrase or two for their type, personality, how they talk, appearance and what they enjoy; who they are to the user in this daydream, in a few words; and what they are doing or want as it starts, in a sentence. With "rules", they are the system's functionaries. With "told", there may be none.`;
+
+const MONOLOGUE_SETUP = `If it is a monologue:
+${MONOLOGUE_CRAFT}
+The idea: ${MONOLOGUE_IDEA}
+Who is in it: nobody, unless a named character is the one speaking: then only them, playing the idea's one part, "the speaker".`;
+
+/**
+ * The voice is chosen first and said first in the answer: asked for a story
+ * and only then for how it is told, a model has written a plot before it
+ * reaches the question, and tells it in the default voice. The summary comes
+ * last, written about what was set up.
+ */
 function daydreamMessages(request: DaydreamRequest): ModelMessage[] {
 	return [
 		{
@@ -499,29 +591,29 @@ function daydreamMessages(request: DaydreamRequest): ModelMessage[] {
 		},
 		{
 			role: 'user',
-			content: `The user wants a story like this, in their own words:
-${request.idea.trim()}${sideLine(request.side)}
+			content: `The user wants a daydream like this, in their own words:
+${request.brief.trim()}${sideLine(request.side)}
 
-Set the whole story up from it, keeping to what they asked for and filling in the rest.
-${STORY_CRAFT}
+Set the whole daydream up from it, keeping to what they asked for and filling in the rest.
 
-How it is told, as "voice", one of:
+First, how it is told, as "voice". Decide this before anything else, because it decides what the rest is. One of:
 ${VOICES}
-Choose "talk" unless what they wrote asks for another.
+${voiceChoice(request.voice)}
 
-The scene: a short title; where it happens, what is going on as it starts, who the user is in it, and its tone, a sentence or two each. ${PARTS_INSTRUCTION}${rateInstruction(['heat', 'kink'])} Rate it from what they wrote: a story that says nothing sexual is not sexual.
+${STORY_SETUP}
 
-Who is in it: one to ${MAX_DAYDREAM_CHARACTERS} characters, each playing one of the scene's parts, named exactly as the part is. For each, a name, and a phrase or two for their type, personality, how they talk, appearance and what they enjoy; who they are to the user in this story, in a few words; and what they are doing or want as the scene starts, in a sentence. With "rules", they are the system's functionaries. With "told", there may be none. With "monologue", there is usually none: the voice can be unnamed, a character can be the one speaking, or it can be the user's own inner voice.
+${MONOLOGUE_SETUP}
+${rateInstruction(['heat', 'kink'])} Rate it from what they wrote: a daydream that says nothing sexual is not sexual.
 
 ${SUMMARY_INSTRUCTION}
-Answer as: {"summary": "…", "voice": "talk", "scene": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": 1-5, "kink": 1-5, ${PARTS_SHAPE}}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}]}`
+Answer as: {"voice": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": 1-5, "kink": 1-5, ${PARTS_SHAPE}}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}], "summary": "…"}`
 		}
 	];
 }
 
 function ideasMessages(request: IdeasRequest): ModelMessage[] {
 	const sides = request.side
-		? `${SIDE_LINES[request.side]} Every idea puts them on that side ("you": "${request.side}"), unless it is a story with no one in charge ("you": null).`
+		? `${SIDE_LINES[request.side]} Every idea puts them on that side ("you": "${request.side}"), unless it is one with no one in charge ("you": null).`
 		: 'Mix them: some with the user in charge ("you": "dom"), some with the user submitting ("you": "sub"), and any with no one in charge as "you": null.';
 	const offered =
 		request.offered.length > 0
@@ -534,14 +626,24 @@ function ideasMessages(request: IdeasRequest): ModelMessage[] {
 		},
 		{
 			role: 'user',
-			content: `The user wants ideas for stories like this, in their own words:
-${request.request.trim()}
+			content: `The user wants ideas for daydreams like this, in their own words:
+${request.brief.trim()}
 
 Offer ${GENERATED_IDEAS} different ideas that fit what they asked for, as different from each other as it allows. ${sides}${offered}
+
+Each is told one way, as "voice", one of:
+${VOICES}
+${VOICE_CUES}
+Where nothing points to one, vary them.
+
+For a story:
 ${STORY_CRAFT}
 
-For each: a short title, at most ${DAYDREAM_LIMITS.title} characters; a premise of a sentence or two, at most ${MAX_IDEA_PREMISE} characters, saying who they are with, where, and what is going on as it starts; up to ${MAX_IDEA_TAGS} tags of a word or two for its kinks and tropes; and ratings as whole numbers from 1 to 5: ${RATINGS.heat} and ${RATINGS.kink}.
-Answer as: {"ideas": [{"title": "…", "premise": "…", "tags": ["…"], "you": "dom", "heat": 1-5, "kink": 1-5}]}`
+For a monologue:
+${MONOLOGUE_CRAFT}
+
+For each: a short title, at most ${DAYDREAM_LIMITS.title} characters; a premise of a sentence or two, at most ${MAX_IDEA_PREMISE} characters, saying who they are with, where, and what is going on as it starts — or, for a monologue, what the voice says and to whom; up to ${MAX_IDEA_TAGS} tags of a word or two for its kinks and tropes; and ratings as whole numbers from 1 to 5: ${RATINGS.heat} and ${RATINGS.kink}.
+Answer as: {"ideas": [{"title": "…", "premise": "…", "tags": ["…"], "you": "dom", "voice": "talk", "heat": 1-5, "kink": 1-5}]}`
 		}
 	];
 }
@@ -557,7 +659,8 @@ export function buildSuggestMessages(request: SuggestRequest): {
 		return { messages: nameMessages(request), maxTokens: 100 };
 	}
 	if (request.task === 'daydream') {
-		return { messages: daydreamMessages(request), maxTokens: 1900 };
+		// The most of any task: a whole setup, and a monologue's sayings besides.
+		return { messages: daydreamMessages(request), maxTokens: 2400 };
 	}
 	if (request.task === 'ideas') {
 		return { messages: ideasMessages(request), maxTokens: 1300 };

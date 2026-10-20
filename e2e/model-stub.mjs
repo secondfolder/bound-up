@@ -29,22 +29,25 @@
 //   `<reading>instruction</reading>`; and for one containing `[direction]`,
 //   `<reading>direction</reading>`. Every other turn is read, in the
 //   metadata, as an action.
-// A scene with its heat set says so after each passage, as "(Heat: SFW.)", so a
+// An idea with its heat set says so after each passage, as "(Heat: SFW.)", so a
 // spec can see which level the prompt carried; one without says nothing extra.
 // Every passage offers two directions ("Slower", "Surprise me") and two
 // suggestions, and proposes a roll for a turn containing `[roll]`.
 //
 // A request that is not streamed is a setup suggestion (`api/daydreams/suggest`),
 // answered with fixed JSON for whichever task it asks for. A daydream is named
-// "The <scene title> story", so a spec knows what to expect, and a naming
-// request fails once like any other when the scene's title has `[fail]` in it.
+// "The <idea title> story", so a spec knows what to expect, and a naming
+// request fails once like any other when the idea's title has `[fail]` in it.
 // A daydream described in a sentence is always "The stub night train", with
-// Vesper cast as its stranger, and a summary that marks the heat, the scene and
-// Vesper but leaves how it is told for the form to add. Generated ideas are one for each side and one
+// Vesper cast as its stranger, and a summary that marks the heat, the idea and
+// Vesper but leaves how it is told for the form to add — unless the brief asks
+// for sayings, or it is an idea suggested as a monologue, when it is "The stub
+// sayings", a monologue with nobody in it and its sayings in the notes.
+// Generated ideas are one for each side and one
 // with nobody in charge, the first titled for the side the prompt asked for
 // ("Stub idea for the sub"), so a spec can see the side reach the model.
 // Asked for more, having been told what it already offered, each title ends
-// ", again", so "More ideas" has something new to add.
+// ", again", so "More ideas" has something new to add. The one with nobody in charge is a monologue.
 import { createServer } from 'node:http';
 
 const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1' } = process.env;
@@ -88,7 +91,7 @@ const ROLL = {
 	]
 };
 
-/** "(Heat: SFW.)" for a scene whose heat is set (`describeSceneDials`), or nothing. */
+/** "(Heat: SFW.)" for an idea whose heat is set (`describeIdeaDials`), or nothing. */
 function heatNote(system) {
 	const level = system.match(/^Heat: (?<level>[^:]+):/m)?.groups?.level;
 	return level ? ` (Heat: ${level}.)` : '';
@@ -160,12 +163,34 @@ function replyFor(messages) {
 function suggestionFor(messages) {
 	const ask = messages.at(-1)?.content ?? '';
 	let content;
-	if (ask.includes('{"summary"')) {
+	const brief = ask.split('in their own words:\n')[1]?.split('\n')[0] ?? '';
+	if (
+		ask.includes('Answer as: {"voice"') &&
+		(brief.includes('sayings') || ask.includes('suggested to them as "monologue"'))
+	) {
+		content = {
+			voice: 'monologue',
+			idea: {
+				title: 'The stub sayings',
+				setting: '',
+				premise: 'A voice sure of what you are for.',
+				yourRole: 'the one it speaks to',
+				tone: 'certain',
+				notes: 'Good stubs say thank you.\nAsking is the point.',
+				heat: 3,
+				kink: 3,
+				parts: []
+			},
+			characters: [],
+			summary:
+				'[[idea|A voice that knows exactly what a stub is for]], and tells you so. It’s told [[voice|as a monologue, one voice speaking its mind]].'
+		};
+	} else if (ask.includes('Answer as: {"voice"')) {
 		content = {
 			summary:
-				'[[scene|A stranger on the stub night train]]. [[Vesper|A watchful stranger called Vesper]] takes the seat across from you, and the journey turns [[heat|slow-burning]].',
+				'[[idea|A stranger on the stub night train]]. [[Vesper|A watchful stranger called Vesper]] takes the seat across from you, and the journey turns [[heat|slow-burning]].',
 			voice: 'talk',
-			scene: {
+			idea: {
 				title: 'The stub night train',
 				setting: 'a sleeper carriage',
 				premise: 'A stranger takes the seat across from you.',
@@ -207,12 +232,19 @@ function suggestionFor(messages) {
 					heat: 4,
 					kink: 4
 				},
-				{ title: `Stub idea for nobody${again}`, premise: 'Even.', you: null, heat: 2, kink: 1 }
+				{
+					title: `Stub idea for nobody${again}`,
+					premise: 'Even.',
+					you: null,
+					voice: 'monologue',
+					heat: 2,
+					kink: 1
+				}
 			]
 		};
 	} else if (ask.includes('{"chips"')) {
 		content = { chips: ['stub idea', 'another stub idea'] };
-	} else if (ask.includes('Invent a scene')) {
+	} else if (ask.includes('Invent an idea')) {
 		content = {
 			title: 'The stub surprise',
 			setting: 'A room nobody expected',
@@ -224,8 +256,8 @@ function suggestionFor(messages) {
 	} else if (ask.includes('{"relationship"')) {
 		content = { relationship: 'your stub boss', part: 'stub-testing you' };
 	} else if (ask.includes('{"title": "…"}')) {
-		const scene = ask.split('Its scene is "')[1]?.split('"')[0] ?? 'stub';
-		content = { title: `The ${scene} story` };
+		const idea = ask.split('Its idea is "')[1]?.split('"')[0] ?? 'stub';
+		content = { title: `The ${idea} story` };
 	} else {
 		content = { archetype: 'stub archetype', speech: 'Speaks in stubs.' };
 	}

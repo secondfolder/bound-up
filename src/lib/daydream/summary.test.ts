@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DaydreamNarrator, DaydreamStance, DialValue } from '../daydream';
-import { testCharacter, testScene } from '../testing/daydream-setup';
+import { testCharacter, testIdea } from '../testing/daydream-setup';
 import {
 	MAX_SUMMARY,
 	type MarkedSummary,
@@ -28,7 +28,7 @@ function setup(
 				}
 			})
 		),
-		scene: testScene({
+		idea: testIdea({
 			title: 'After hours',
 			premise: 'kept late after the presentation you botched',
 			parts: [{ id: 'p1', name: 'the interviewer', description: '' }],
@@ -56,14 +56,14 @@ describe('parseMarkedSummary', () => {
 	it('makes each marked first mention a blank, with the words the model used', () => {
 		expect(
 			parseMarkedSummary(
-				'A [[heat|slow-burning]] night in [[scene|the empty office]], where [[mara|your boss]] asks you to stay. [[voice|She talks to you]].',
+				'A [[heat|slow-burning]] night in [[idea|the empty office]], where [[mara|your boss]] asks you to stay. [[voice|She talks to you]].',
 				['Mara']
 			)
 		).toEqual([
 			{ kind: 'text', text: 'A ' },
 			{ kind: 'slot', slot: { kind: 'heat' }, words: 'slow-burning', key: 'heat' },
 			{ kind: 'text', text: ' night in ' },
-			{ kind: 'slot', slot: { kind: 'scene' }, words: 'the empty office', key: 'scene' },
+			{ kind: 'slot', slot: { kind: 'idea' }, words: 'the empty office', key: 'idea' },
 			{ kind: 'text', text: ', where ' },
 			{
 				kind: 'slot',
@@ -100,8 +100,8 @@ describe('parseMarkedSummary', () => {
 		expect(parseMarkedSummary(undefined, [])).toBeNull();
 		expect(parseMarkedSummary('   ', [])).toBeNull();
 		expect(parseMarkedSummary('x'.repeat(MAX_SUMMARY + 1), [])).toBeNull();
-		expect(parseMarkedSummary('On [[scene the train]].', [])).toBeNull();
-		expect(parseMarkedSummary('On [[scene|the [[train]].', [])).toBeNull();
+		expect(parseMarkedSummary('On [[idea the train]].', [])).toBeNull();
+		expect(parseMarkedSummary('On [[idea|the [[train]].', [])).toBeNull();
 	});
 });
 
@@ -109,7 +109,7 @@ describe('setupSummary, without the model’s', () => {
 	it('starts from the premise, and says every piece of the setup after it', () => {
 		expect(read(setupSummary(setup('none', 'self', ['Mara']), null))).toEqual([
 			'Kept late after the presentation you botched.',
-			'It’s a [steamy] story in [After hours], with [Mara] (the interviewer, your boss). It’s told [in the characters’ own words, with no narrator].'
+			'It’s a [steamy] daydream: [After hours], with [Mara] (the interviewer, your boss). It’s told [in the characters’ own words, with no narrator].'
 		]);
 	});
 
@@ -117,10 +117,10 @@ describe('setupSummary, without the model’s', () => {
 		const second = (narrator: DaydreamNarrator, stance: DaydreamStance, names: string[]) =>
 			read(setupSummary(setup(narrator, stance, names), null))[1];
 		expect(second('second-person', 'self', [])).toBe(
-			'It’s a [steamy] story in [After hours]. It’s told [to you by a narrator].'
+			'It’s a [steamy] daydream: [After hours]. It’s told [to you by a narrator].'
 		);
 		expect(second('third-person', 'absent', ['Ash', 'Bel', 'Cy'])).toBe(
-			'It’s a [steamy] story in [After hours], with [Ash] (the interviewer, your boss), [Bel] and [Cy]. It’s told [by a narrator, as you watch from outside].'
+			'It’s a [steamy] daydream: [After hours], with [Ash] (the interviewer, your boss), [Bel] and [Cy]. It’s told [by a narrator, as you watch from outside].'
 		);
 		expect(second('impersonal', 'self', ['Mara'])).toMatch(
 			/\. It’s told \[as a system’s orders to you\]\.$/
@@ -130,14 +130,14 @@ describe('setupSummary, without the model’s', () => {
 	it('takes “an” before a vowel, keeps SFW as it is, and has a blank for no heat at all', () => {
 		const second = (heat: DialValue | null) =>
 			read(setupSummary(setup('none', 'self', ['Mara'], heat), null))[1];
-		expect(second(4)).toMatch(/^It’s an \[explicit\] story/);
-		expect(second(1)).toMatch(/^It’s a \[SFW\] story/);
-		expect(second(null)).toMatch(/^It’s \[any kind of\] story/);
+		expect(second(4)).toMatch(/^It’s an \[explicit\] daydream/);
+		expect(second(1)).toMatch(/^It’s a \[SFW\] daydream/);
+		expect(second(null)).toMatch(/^It’s \[any kind of\] daydream/);
 	});
 
 	it('names a voice no preset gives, with whoever the user is playing', () => {
 		expect(read(setupSummary(setup('third-person', 'persona', ['Mara'], 3, 'Kit'), null))[1]).toBe(
-			'It’s a [steamy] story in [After hours], with [Mara] (the interviewer, your boss). It’s told [your own way], as Kit.'
+			'It’s a [steamy] daydream: [After hours], with [Mara] (the interviewer, your boss). It’s told [your own way], as Kit.'
 		);
 	});
 
@@ -154,9 +154,9 @@ describe('setupSummary, without the model’s', () => {
 
 	it('leaves a premise that ends its sentence as it is, and has no paragraph for none', () => {
 		const ended = setup('none', 'self', ['Mara']);
-		ended.scene.premise = 'Is this a test?';
+		ended.idea.premise = 'Is this a test?';
 		expect(read(setupSummary(ended, null))[0]).toBe('Is this a test?');
-		ended.scene.premise = '';
+		ended.idea.premise = '';
 		expect(read(setupSummary(ended, null))).toHaveLength(1);
 	});
 });
@@ -175,7 +175,7 @@ describe('setupSummary, with the model’s', () => {
 			)
 		).toEqual([
 			'A [slow-burning] evening: [your boss] keeps you late.',
-			'It’s set in [After hours], with [Bel]. It’s told [in the characters’ own words, with no narrator].'
+			'The idea is [After hours], with [Bel]. It’s told [in the characters’ own words, with no narrator].'
 		]);
 	});
 
@@ -187,13 +187,13 @@ describe('setupSummary, with the model’s', () => {
 					written('A [[heat|hot]] night where you [[voice|in their own words]] Mara.')
 				)
 			)[1]
-		).toBe('It’s set in [After hours], with [Mara] (the interviewer, your boss) and [Bel].');
+		).toBe('The idea is [After hours], with [Mara] (the interviewer, your boss) and [Bel].');
 		expect(
 			read(
 				setupSummary(
 					story,
 					written(
-						'A [[heat|hot]] night in [[scene|the office]] where you [[voice|in their own words]] [[Mara|Mara]].'
+						'A [[heat|hot]] night in [[idea|the office]] where you [[voice|in their own words]] [[Mara|Mara]].'
 					)
 				)
 			)[1]
@@ -203,7 +203,7 @@ describe('setupSummary, with the model’s', () => {
 				setupSummary(
 					story,
 					written(
-						'A [[heat|hot]] night in [[scene|the office]] where you [[voice|in their own words]] [[Mara|Mara]] and [[Bel|Bel]].'
+						'A [[heat|hot]] night in [[idea|the office]] where you [[voice|in their own words]] [[Mara|Mara]] and [[Bel|Bel]].'
 					)
 				)
 			)
@@ -220,11 +220,11 @@ describe('setupSummary, with the model’s', () => {
 
 	it('says a heat changed since in its own word, with the article before it agreeing', () => {
 		const changed = structuredClone(story);
-		changed.scene.dials.heat = 5;
+		changed.idea.dials.heat = 5;
 		expect(read(setupSummary(changed, written('A [[heat|slow-burning]] evening.')))[0]).toBe(
 			'A [filthy] evening.'
 		);
-		changed.scene.dials.heat = 4;
+		changed.idea.dials.heat = 4;
 		expect(
 			read(
 				setupSummary(changed, written('It is a [[heat|slow-burning]] evening. A [[Mara|Mara]].'))
@@ -233,14 +233,14 @@ describe('setupSummary, with the model’s', () => {
 		expect(read(setupSummary(changed, written('An [[heat|explicit]] evening.')))[0]).toBe(
 			'An [explicit] evening.'
 		);
-		changed.scene.dials.heat = 2;
+		changed.idea.dials.heat = 2;
 		expect(read(setupSummary(changed, written('An [[heat|explicit]] evening.')))[0]).toBe(
 			'A [flirty] evening.'
 		);
 	});
 
 	it('gives way to the premise once it no longer describes the setup', () => {
-		const paragraph = written('[[Mara|Mara]] keeps you late in [[scene|the office]].');
+		const paragraph = written('[[Mara|Mara]] keeps you late in [[idea|the office]].');
 		const premise = 'Kept late after the presentation you botched.';
 
 		const renamed = structuredClone(story);
@@ -254,9 +254,9 @@ describe('setupSummary, with the model’s', () => {
 		toldNow.voice = { ...story.voice, narrator: 'second-person' };
 		expect(read(setupSummary(toldNow, paragraph))[0]).toBe(premise);
 
-		const otherScene = structuredClone(story);
-		otherScene.scene.title = 'Elsewhere';
-		expect(read(setupSummary(otherScene, paragraph))[0]).toBe(premise);
+		const otherIdea = structuredClone(story);
+		otherIdea.idea.title = 'Elsewhere';
+		expect(read(setupSummary(otherIdea, paragraph))[0]).toBe(premise);
 
 		// Someone added is only someone it does not mention yet.
 		const more = structuredClone(story);

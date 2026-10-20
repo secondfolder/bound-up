@@ -4,7 +4,7 @@
  * BROWSER ONLY — it seals with `crypto/sealed.ts`, through `sealed-forms.ts`.
  *
  * Two kinds of request. Saving anything — a turn, a mark, a setup, a library
- * character or scene — seals it in the user's own vault first, like every
+ * character or idea — seals it in the user's own vault first, like every
  * other thing a user writes. Asking for a passage or a suggestion is the
  * exception docs/daydreams.md is about: it sends text the model has to read.
  */
@@ -19,8 +19,8 @@ import {
 	type DaydreamTurnContent,
 	type Direction,
 	daydreamCharacterKind,
+	daydreamIdeaKind,
 	daydreamMarkKind,
-	daydreamSceneKind,
 	daydreamSetupKind,
 	daydreamTurnKind,
 	type PassageMeta,
@@ -435,10 +435,10 @@ export async function deleteMark(daydreamId: string, markId: string): Promise<Ou
 
 // ── the libraries ────────────────────────────────────────────────────────────
 
-export type LibraryKind = 'characters' | 'scenes';
+export type LibraryKind = 'characters' | 'ideas';
 
 /**
- * Seals and saves a library character or scene: a new one when
+ * Seals and saves a library character or idea: a new one when
  * `expectedRevision` is null, an edit otherwise. Answers the revision it now
  * has, which is what a daydream's copy records.
  */
@@ -446,7 +446,7 @@ export async function saveLibraryItem(
 	kind: LibraryKind,
 	item: { id: string; content: unknown; expectedRevision: number | null }
 ): Promise<Outcome<{ revision: number; sealed: SealedRefView }>> {
-	const sealedKind = kind === 'characters' ? daydreamCharacterKind : daydreamSceneKind;
+	const sealedKind = kind === 'characters' ? daydreamCharacterKind : daydreamIdeaKind;
 	const sealed = await seal(sealedKind as SealedKind<unknown>, item.id, item.content);
 	if (!sealed.ok) {
 		return { ok: false, error: sealed.error };

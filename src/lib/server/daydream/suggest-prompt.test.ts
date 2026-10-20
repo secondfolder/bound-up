@@ -10,7 +10,7 @@ import {
 const casting: SuggestRequest = {
 	task: 'casting',
 	character: { name: 'Mara', archetype: 'strict mentor', personality: 'calm' },
-	scene: {
+	idea: {
 		title: 'After hours',
 		premise: 'an interview that goes off script',
 		yourRole: 'the new hire'
@@ -23,7 +23,7 @@ const casting: SuggestRequest = {
 
 const naming: SuggestRequest = {
 	task: 'name',
-	scene: { title: 'After hours', premise: 'an interview that goes off script' },
+	idea: { title: 'After hours', premise: 'an interview that goes off script' },
 	characters: ['Mara'],
 	opening: 'The door clicks shut behind you.',
 	limits: 'Nothing public.'
@@ -66,10 +66,10 @@ describe('buildSuggestMessages', () => {
 		expect(ask).toContain('Do not change the fields already written');
 	});
 
-	it('writes a whole scene from the characters for Surprise me', () => {
+	it('writes a whole idea from the characters for Surprise me', () => {
 		const { messages } = buildSuggestMessages({
-			task: 'surprise-scene',
-			target: 'scene',
+			task: 'surprise-idea',
+			target: 'idea',
 			draft: {},
 			context: {
 				characters: [{ name: 'Mara', archetype: 'strict mentor' }],
@@ -102,32 +102,32 @@ describe('buildSuggestMessages', () => {
 });
 
 describe('buildSuggestMessages, heat and kink', () => {
-	const scene = {
+	const idea = {
 		task: 'fill' as const,
-		target: 'scene' as const,
+		target: 'idea' as const,
 		draft: { title: 'Late', premise: 'A meeting.' },
 		context: { characters: [], limits: '' }
 	};
 
-	it('matches the level set, and suggests nothing sexual for a SFW scene', () => {
+	it('matches the level set, and suggests nothing sexual for a SFW idea', () => {
 		expect(SUGGEST_RULES).not.toContain('erotic story');
-		expect(SUGGEST_RULES).toContain('suggest nothing sexual for a scene set to SFW');
+		expect(SUGGEST_RULES).toContain('suggest nothing sexual for an idea set to SFW');
 		const ask =
-			buildSuggestMessages({ ...scene, sceneDials: { heat: 1, kink: 4 } }).messages.at(-1)
-				?.content ?? '';
+			buildSuggestMessages({ ...idea, ideaDials: { heat: 1, kink: 4 } }).messages.at(-1)?.content ??
+			'';
 		expect(ask).toContain('Heat: SFW');
 		expect(ask).toContain('Kink: heavy');
 	});
 
 	it('asks the model to rate only the dials left unset', () => {
 		const ask =
-			buildSuggestMessages({ ...scene, sceneDials: { heat: 3, kink: null } }).messages.at(-1)
+			buildSuggestMessages({ ...idea, ideaDials: { heat: 3, kink: null } }).messages.at(-1)
 				?.content ?? '';
 		expect(ask).toContain('"kink": 1-5');
 		expect(ask).not.toContain('"heat": 1-5');
 
 		const surprise =
-			buildSuggestMessages({ ...scene, task: 'surprise-scene', draft: {} }).messages.at(-1)
+			buildSuggestMessages({ ...idea, task: 'surprise-idea', draft: {} }).messages.at(-1)
 				?.content ?? '';
 		expect(surprise).toContain('"heat": 1-5');
 		expect(surprise).toContain('"kink": 1-5');
@@ -153,43 +153,43 @@ describe('buildSuggestMessages, heat and kink', () => {
 
 	it('holds the dials to 1 to 5', () => {
 		expect(
-			suggestRequestSchema.safeParse({ ...scene, sceneDials: { heat: 6, kink: null } }).success
+			suggestRequestSchema.safeParse({ ...idea, ideaDials: { heat: 6, kink: null } }).success
 		).toBe(false);
 		expect(
-			suggestRequestSchema.safeParse({ ...scene, sceneDials: { heat: 5, kink: null } }).success
+			suggestRequestSchema.safeParse({ ...idea, ideaDials: { heat: 5, kink: null } }).success
 		).toBe(true);
 	});
 });
 
-describe('buildSuggestMessages, for scene parts', () => {
-	it('asks for parts with a surprise scene', () => {
+describe('buildSuggestMessages, for idea parts', () => {
+	it('asks for parts with a surprise idea', () => {
 		const ask =
 			buildSuggestMessages({
-				task: 'surprise-scene',
-				target: 'scene',
+				task: 'surprise-idea',
+				target: 'idea',
 				draft: {},
 				context: { characters: [], limits: '' }
 			}).messages.at(-1)?.content ?? '';
 		expect(ask).toContain('"parts": [{"name"');
 	});
 
-	it('asks for parts when filling in a scene with none, and not over ones it has', () => {
-		const scene = (parts?: { name: string; description: string }[]) =>
+	it('asks for parts when filling in an idea with none, and not over ones it has', () => {
+		const idea = (parts?: { name: string; description: string }[]) =>
 			buildSuggestMessages({
 				task: 'fill',
-				target: 'scene',
+				target: 'idea',
 				draft: { title: 'Late', ...(parts ? { parts } : {}) },
 				context: { characters: [], limits: '' }
 			}).messages.at(-1)?.content ?? '';
-		expect(scene()).toContain('"parts"');
-		const withParts = scene([{ name: 'the boss', description: 'runs it' }]);
+		expect(idea()).toContain('"parts"');
+		const withParts = idea([{ name: 'the boss', description: 'runs it' }]);
 		expect(withParts).not.toContain('"parts": [');
 		expect(withParts).toContain('- the boss: runs it');
 	});
 });
 
 describe('buildSuggestMessages, casting', () => {
-	it('writes who a character is in this scene, from both, with the rules and limits first', () => {
+	it('writes who a character is in this idea, from both, with the rules and limits first', () => {
 		const { messages, maxTokens } = buildSuggestMessages(casting);
 		expect(messages[0]?.content.startsWith(SUGGEST_RULES)).toBe(true);
 		expect(messages[0]?.content).toContain('Nothing public.');
@@ -214,7 +214,7 @@ describe('buildSuggestMessages, casting', () => {
 });
 
 describe('buildSuggestMessages, naming', () => {
-	it('names the story from its scene and its opening', () => {
+	it('names the story from its idea and its opening', () => {
 		const { messages, maxTokens } = buildSuggestMessages(naming);
 		expect(messages[0]?.content.startsWith(SUGGEST_RULES)).toBe(true);
 		const ask = messages.at(-1)?.content ?? '';
@@ -229,7 +229,7 @@ describe('buildSuggestMessages, naming', () => {
 describe('buildSuggestMessages, a whole daydream', () => {
 	const daydream: SuggestRequest = {
 		task: 'daydream',
-		idea: 'a stranger on a night train',
+		brief: 'a stranger on a night train',
 		limits: 'Nothing public.'
 	};
 
@@ -239,7 +239,7 @@ describe('buildSuggestMessages, a whole daydream', () => {
 		expect(messages[0]?.content).toContain('Nothing public.');
 		const ask = messages[1]?.content ?? '';
 		expect(ask).toContain('a stranger on a night train');
-		// The five voices, the scene with its parts and ratings, and the cast.
+		// The five voices, the idea with its parts and ratings, and the cast.
 		for (const voice of ['"talk"', '"told"', '"watch"', '"rules"', '"monologue"']) {
 			expect(ask).toContain(voice);
 		}
@@ -252,19 +252,19 @@ describe('buildSuggestMessages, a whole daydream', () => {
 	it('asks for a summary with its blanks marked, and none of them forced in', () => {
 		const ask = buildSuggestMessages(daydream).messages[1]?.content ?? '';
 		expect(ask).toContain('"summary"');
-		for (const marker of ['[[scene|', '[[heat|', '[[voice|', '[[Name|']) {
+		for (const marker of ['[[idea|', '[[heat|', '[[voice|', '[[Name|']) {
 			expect(ask).toContain(marker);
 		}
 		expect(ask).toContain('suggestions, not a template');
 		// The story as a whole first, and how it is told in the form's own words.
-		expect(ask).toContain('one tight sentence that gives the whole story');
+		expect(ask).toContain('one tight sentence that gives the whole daydream');
 		expect(ask).toContain('"It’s told [[voice|in the characters’ own words, with no narrator]]."');
 	});
 
 	it('accepts a sentence within its cap, and refuses an empty or a long one', () => {
 		expect(suggestRequestSchema.safeParse(daydream).success).toBe(true);
-		expect(suggestRequestSchema.safeParse({ ...daydream, idea: '   ' }).success).toBe(false);
-		expect(suggestRequestSchema.safeParse({ ...daydream, idea: 'x'.repeat(501) }).success).toBe(
+		expect(suggestRequestSchema.safeParse({ ...daydream, brief: '   ' }).success).toBe(false);
+		expect(suggestRequestSchema.safeParse({ ...daydream, brief: 'x'.repeat(501) }).success).toBe(
 			false
 		);
 	});
@@ -274,7 +274,7 @@ describe('buildSuggestMessages, the side a daydream is for', () => {
 	it('tells the model which side a generated idea put the user on', () => {
 		const { messages } = buildSuggestMessages({
 			task: 'daydream',
-			idea: 'Caught: your neighbour saw everything.',
+			brief: 'Caught: your neighbour saw everything.',
 			side: 'sub',
 			limits: ''
 		});
@@ -284,7 +284,7 @@ describe('buildSuggestMessages, the side a daydream is for', () => {
 	it('says nothing about a side when none was given', () => {
 		const { messages } = buildSuggestMessages({
 			task: 'daydream',
-			idea: 'a stranger on a night train',
+			brief: 'a stranger on a night train',
 			limits: ''
 		});
 		expect(messages[1]?.content).not.toContain('The user is the');
@@ -298,9 +298,9 @@ describe('what makes a story worth starting', () => {
 
 	it('is asked of every task that invents a story', () => {
 		const inventing: SuggestRequest[] = [
-			{ task: 'ideas', request: 'something slow', side: null, limits: '', offered: [] },
-			{ task: 'daydream', idea: 'a slow burn at work', limits: '' },
-			{ task: 'surprise-scene', target: 'scene', draft: {}, context }
+			{ task: 'ideas', brief: 'something slow', side: null, limits: '', offered: [] },
+			{ task: 'daydream', brief: 'a slow burn at work', limits: '' },
+			{ task: 'surprise-idea', target: 'idea', draft: {}, context }
 		];
 		for (const request of inventing) {
 			const ask = asks(request);
@@ -315,7 +315,7 @@ describe('what makes a story worth starting', () => {
 
 	it('is not asked of one that only fills in a field', () => {
 		expect(
-			asks({ task: 'chips', target: 'scene', field: 'setting', draft: {}, context })
+			asks({ task: 'chips', target: 'idea', field: 'setting', draft: {}, context })
 		).not.toContain('What makes a story worth starting');
 	});
 });
@@ -323,7 +323,7 @@ describe('what makes a story worth starting', () => {
 describe('buildSuggestMessages, story ideas', () => {
 	const ideas: SuggestRequest = {
 		task: 'ideas',
-		request: 'teasing and denial somewhere public',
+		brief: 'teasing and denial somewhere public',
 		side: 'dom',
 		limits: 'Nothing with strangers.',
 		offered: []
@@ -365,8 +365,8 @@ describe('buildSuggestMessages, story ideas', () => {
 
 	it('accepts a request within its cap, and refuses an empty or long one, or a side that is not one', () => {
 		expect(suggestRequestSchema.safeParse(ideas).success).toBe(true);
-		expect(suggestRequestSchema.safeParse({ ...ideas, request: '  ' }).success).toBe(false);
-		expect(suggestRequestSchema.safeParse({ ...ideas, request: 'x'.repeat(501) }).success).toBe(
+		expect(suggestRequestSchema.safeParse({ ...ideas, brief: '  ' }).success).toBe(false);
+		expect(suggestRequestSchema.safeParse({ ...ideas, brief: 'x'.repeat(501) }).success).toBe(
 			false
 		);
 		expect(suggestRequestSchema.safeParse({ ...ideas, side: 'switch' }).success).toBe(false);
@@ -413,15 +413,116 @@ describe('suggestRequestSchema', () => {
 		expect(suggestRequestSchema.safeParse(base).success).toBe(true);
 	});
 
-	it('needs a field of the target’s own for chips, and a scene for a surprise', () => {
+	it('needs a field of the target’s own for chips, and an idea for a surprise', () => {
 		expect(suggestRequestSchema.safeParse({ ...base, field: 'premise' }).success).toBe(false);
 		expect(suggestRequestSchema.safeParse({ ...base, field: undefined }).success).toBe(false);
-		expect(suggestRequestSchema.safeParse({ ...base, task: 'surprise-scene' }).success).toBe(false);
+		expect(suggestRequestSchema.safeParse({ ...base, task: 'surprise-idea' }).success).toBe(false);
 	});
 
 	it('holds each field to its cap', () => {
 		expect(
 			suggestRequestSchema.safeParse({ ...base, draft: { name: 'x'.repeat(61) } }).success
 		).toBe(false);
+	});
+});
+
+describe('buildSuggestMessages, a monologue', () => {
+	const asks = (request: SuggestRequest) =>
+		buildSuggestMessages(request).messages.at(-1)?.content ?? '';
+	const brief: SuggestRequest = {
+		task: 'daydream',
+		brief: 'list the things people into this say, and build on them',
+		limits: ''
+	};
+
+	it('decides the voice before anything it shapes, and answers it first', () => {
+		const ask = asks(brief);
+		const voice = ask.indexOf('First, how it is told');
+		expect(voice).toBeGreaterThan(-1);
+		expect(voice).toBeLessThan(ask.indexOf('What makes a story worth starting'));
+		expect(voice).toBeLessThan(ask.indexOf('What makes a monologue worth listening to'));
+		expect(ask).toContain('Answer as: {"voice": "…", "idea": {');
+		// Written last, about what was set up.
+		expect(ask.trimEnd()).toMatch(/"summary": "…"\}$/);
+	});
+
+	it('says what a brief that wants a monologue looks like, since few name one', () => {
+		const ask = asks(brief);
+		expect(ask).toContain('sayings, beliefs, mantras, slogans, captions or themes');
+		expect(ask).toContain('When nothing points to one, choose "talk".');
+	});
+
+	it('keeps the voice a generated idea was suggested with, rather than choosing again', () => {
+		const ask = asks({ ...brief, voice: 'monologue' });
+		expect(ask).toContain('It was suggested to them as "monologue": keep that voice.');
+		expect(ask).not.toContain('When nothing points to one');
+	});
+
+	it('asks a monologue for its sayings in the notes, and for no plot, parts or cast', () => {
+		const ask = asks(brief);
+		expect(ask).toContain('If it is a monologue:');
+		expect(ask).toContain('the notes: the sayings it builds on, eight to twelve statements');
+		expect(ask).toContain('There is no plot, place or encounter to invent');
+		expect(ask).toContain('Who is in it: nobody, unless a named character is the one speaking');
+		expect(ask).toContain('"notes": "…"');
+		// A story still gets its own, with the notes left for nothing.
+		expect(ask).toContain('If it is a story — any voice but "monologue":');
+	});
+
+	it('refuses a voice that is not one', () => {
+		expect(suggestRequestSchema.safeParse({ ...brief, voice: 'monologue' }).success).toBe(true);
+		expect(suggestRequestSchema.safeParse({ ...brief, voice: 'poem' }).success).toBe(false);
+	});
+
+	it('gives every generated idea a voice, and says how both kinds are made', () => {
+		const ask = asks({ task: 'ideas', brief: 'mantras', side: null, limits: '', offered: [] });
+		expect(ask).toContain('"voice": "talk"');
+		expect(ask).toContain('What makes a story worth starting');
+		expect(ask).toContain('What makes a monologue worth listening to');
+		expect(ask).toContain('or, for a monologue, what the voice says and to whom');
+	});
+
+	const monologueContext = { characters: [], limits: '', narrator: 'monologue' as const };
+	const everything = (request: SuggestRequest) =>
+		buildSuggestMessages(request)
+			.messages.map((message) => message.content)
+			.join('\n\n');
+
+	it('makes a surprise idea a monologue’s for one, with sayings and no parts', () => {
+		const ask = asks({
+			task: 'surprise-idea',
+			target: 'idea',
+			draft: {},
+			context: monologueContext
+		});
+		expect(ask).toContain('Invent an idea for this monologue');
+		expect(ask).toContain('What makes a monologue worth listening to');
+		expect(ask).not.toContain('What makes a story worth starting');
+		expect(ask).toContain('"notes": "…", "parts": []');
+	});
+
+	it('fills a monologue’s idea in its own words, with its sayings and no parts', () => {
+		const ask = everything({
+			task: 'fill',
+			target: 'idea',
+			draft: { title: 'What good girls are for' },
+			context: monologueContext
+		});
+		expect(ask).toContain('It is told as a monologue');
+		expect(ask).toContain('Sayings to build on');
+		expect(ask).toContain('except the sayings to build on, which are eight to twelve statements');
+		expect(ask).not.toContain('"parts"');
+	});
+
+	it('fills a story’s idea as before, offering parts', () => {
+		const ask = everything({
+			task: 'fill',
+			target: 'idea',
+			draft: { title: 'After hours' },
+			context: { characters: [], limits: '' }
+		});
+		expect(ask).not.toContain('It is told as a monologue');
+		expect(ask).toContain('Anything else');
+		expect(ask).toContain('"parts"');
 	});
 });

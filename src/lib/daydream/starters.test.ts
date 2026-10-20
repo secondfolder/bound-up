@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { DAYDREAM_VOICE_PRESETS, UNSET_CHARACTER_DIALS } from '../daydream';
 import { daydreamSetupFormSchema } from '../schemas/daydreamForm';
-import { CHARACTER_TEMPLATES, SCENE_TEMPLATES } from './catalog';
+import { CHARACTER_TEMPLATES, IDEA_TEMPLATES } from './catalog';
 import {
 	assembleSetup,
 	DAYDREAM_STARTERS,
+	type DaydreamPieces,
 	forSide,
 	inOrder,
 	matchesSearch,
-	type StoryPieces,
 	shuffledStarterIds,
-	starterScene,
+	starterIdea,
 	starterSetup,
 	starterSummary,
 	startersFor,
@@ -29,9 +29,9 @@ function counter() {
 
 const character = (name: string) => ({ ...CHARACTER_TEMPLATES[0].character, name });
 
-const pieces = (overrides: Partial<StoryPieces> = {}): StoryPieces => ({
+const pieces = (overrides: Partial<DaydreamPieces> = {}): DaydreamPieces => ({
 	voice: 'talk',
-	scene: {
+	idea: {
 		title: 'The night train',
 		setting: 'a sleeper carriage',
 		premise: 'A stranger takes the seat across from you.',
@@ -50,7 +50,7 @@ const pieces = (overrides: Partial<StoryPieces> = {}): StoryPieces => ({
 	...overrides
 });
 
-describe('the ready-made stories', () => {
+describe('the ready-made daydreams', () => {
 	it('each builds a setup the form would save', () => {
 		for (const starter of DAYDREAM_STARTERS) {
 			const setup = starterSetup(starter);
@@ -68,13 +68,13 @@ describe('the ready-made stories', () => {
 		}
 	});
 
-	it('keep the voice they were made with, and the scene’s order by heat', () => {
+	it('keep the voice they were made with, and the idea’s order by heat', () => {
 		for (const starter of DAYDREAM_STARTERS) {
 			const preset = DAYDREAM_VOICE_PRESETS.find((candidate) => candidate.id === starter.voice);
 			expect(starterSetup(starter).voice, starter.id).toMatchObject(preset?.voice ?? {});
 		}
-		const order = SCENE_TEMPLATES.map((template) => template.id);
-		const used = DAYDREAM_STARTERS.map((starter) => order.indexOf(starterScene(starter).id));
+		const order = IDEA_TEMPLATES.map((template) => template.id);
+		const used = DAYDREAM_STARTERS.map((starter) => order.indexOf(starterIdea(starter).id));
 		expect(used).toEqual([...used].sort((a, b) => a - b));
 	});
 
@@ -85,9 +85,9 @@ describe('the ready-made stories', () => {
 		}
 		const one = starterSetup(first);
 		const two = starterSetup(first);
-		expect(one.scene).toMatchObject({ sourceId: null, sourceRevision: null });
+		expect(one.idea).toMatchObject({ sourceId: null, sourceRevision: null });
 		expect(one.characters[0]).toMatchObject({ sourceId: null, sourceRevision: null });
-		expect(one.scene.parts[0]?.id).not.toBe(two.scene.parts[0]?.id);
+		expect(one.idea.parts[0]?.id).not.toBe(two.idea.parts[0]?.id);
 	});
 
 	it('each has a summary with every piece of it marked, so nothing is said after it', () => {
@@ -108,7 +108,7 @@ describe('the ready-made stories', () => {
 	it('each opens with the story as a whole and closes by saying how it is told', () => {
 		for (const starter of DAYDREAM_STARTERS) {
 			const marked = starterSummary(starter, starterSetup(starter)) ?? [];
-			expect(marked[0], starter.id).toMatchObject({ kind: 'slot', slot: { kind: 'scene' } });
+			expect(marked[0], starter.id).toMatchObject({ kind: 'slot', slot: { kind: 'idea' } });
 			expect(marked.at(-2), starter.id).toEqual({
 				kind: 'slot',
 				slot: { kind: 'voice' },
@@ -133,7 +133,7 @@ describe('the ready-made stories', () => {
 describe('shuffledStarterIds', () => {
 	const ids = DAYDREAM_STARTERS.map((starter) => starter.id);
 
-	it('names every ready-made story once', () => {
+	it('names every ready-made daydream once', () => {
 		expect([...shuffledStarterIds()].sort()).toEqual([...ids].sort());
 	});
 
@@ -189,7 +189,7 @@ describe('storedStarterSide', () => {
 });
 
 describe('forSide', () => {
-	it('filters anything with a side the way the ready-made stories are', () => {
+	it('filters anything with a side the way the ready-made daydreams are', () => {
 		const ideas = [
 			{ title: 'a', you: 'dom' },
 			{ title: 'b', you: 'sub' },
@@ -237,7 +237,7 @@ describe('the two sides', () => {
 describe('assembleSetup', () => {
 	it('gives the parts ids and casts each person into the one named for them, ignoring case', () => {
 		const setup = assembleSetup(pieces(), counter());
-		expect(setup.scene.parts.map((part) => part.id)).toEqual(['id-1', 'id-2']);
+		expect(setup.idea.parts.map((part) => part.id)).toEqual(['id-1', 'id-2']);
 		expect(setup.characters[0]?.casting).toEqual({ partId: 'id-1', relationship: 'r', part: 'd' });
 		expect(setup).toMatchObject({ title: '', lead: 'character', limits: '' });
 	});

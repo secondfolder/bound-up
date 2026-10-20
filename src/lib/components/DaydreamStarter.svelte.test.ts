@@ -5,7 +5,7 @@ import {
 	matchesSearch,
 	SHOWN_STARTERS,
 	type StarterSide,
-	starterScene,
+	starterIdea,
 	startersFor
 } from '$lib/daydream/starters';
 import type { SuggestFailure } from '$lib/daydream/suggest';
@@ -20,6 +20,7 @@ const generatedIdeas: GeneratedIdea[] = [
 		premise: 'Your neighbour saw everything.',
 		tags: ['exhibition'],
 		you: 'sub',
+		voice: null,
 		dials: { heat: 4, kink: 3 }
 	},
 	{
@@ -27,6 +28,7 @@ const generatedIdeas: GeneratedIdea[] = [
 		premise: 'They signed up to obey.',
 		tags: ['protocol'],
 		you: 'dom',
+		voice: null,
 		dials: { heat: 4, kink: 4 }
 	}
 ];
@@ -34,11 +36,11 @@ const generatedIdeas: GeneratedIdea[] = [
 async function renderStarter(
 	props: {
 		suggestionsOn?: boolean;
-		idea?: string;
+		brief?: string;
 		problem?: SuggestFailure;
 		side?: StarterSide | null;
-		generated?: { request: string; ideas: GeneratedIdea[] } | null;
-		ongenerate?: (request: string) => Promise<SuggestFailure | null>;
+		generated?: { brief: string; ideas: GeneratedIdea[] } | null;
+		ongenerate?: (brief: string) => Promise<SuggestFailure | null>;
 		onmore?: () => Promise<SuggestFailure | null>;
 		starterOrder?: readonly string[];
 	} = {}
@@ -53,7 +55,7 @@ async function renderStarter(
 		onclear: vi.fn()
 	};
 	const rendered = render(DaydreamStarter, {
-		idea: props.idea ?? '',
+		brief: props.brief ?? '',
 		side: props.side ?? null,
 		suggestionsOn: props.suggestionsOn ?? true,
 		// The catalog's own order unless a test says otherwise, so a test can name the first.
@@ -76,7 +78,7 @@ function button(container: HTMLElement, text: string): HTMLElement | undefined {
 }
 
 describe('DaydreamStarter', () => {
-	it('offers a few ready-made stories, with their level and how they are told', async () => {
+	it('offers a few ready-made daydreams, with their level and how they are told', async () => {
 		const { container, onstarter } = await renderStarter();
 		const cards = [...container.querySelectorAll<HTMLElement>('.card')];
 		expect(cards).toHaveLength(SHOWN_STARTERS);
@@ -89,7 +91,7 @@ describe('DaydreamStarter', () => {
 		expect(onstarter).toHaveBeenCalledWith(DAYDREAM_STARTERS[0]);
 	});
 
-	it('shows every ready-made story from "More ideas", and the button goes', async () => {
+	it('shows every ready-made daydream from "More ideas", and the button goes', async () => {
 		const { container } = await renderStarter();
 		const cards = () => container.querySelectorAll('.ready-made > .cards .card');
 		expect(cards()).toHaveLength(SHOWN_STARTERS);
@@ -99,11 +101,11 @@ describe('DaydreamStarter', () => {
 		expect(button(container, 'More ideas')).toBeUndefined();
 	});
 
-	it('writes the story described, or suggests similar ones, once there is something to ask', async () => {
+	it('writes the daydream described, or suggests similar ones, once there is something to ask', async () => {
 		const { container, ondescribe, ongenerate } = await renderStarter();
 		const section = container.querySelector('.describe') as HTMLElement;
-		const write = button(section, 'Write this story');
-		const suggest = button(section, 'Suggest stories for this');
+		const write = button(section, 'Write this daydream');
+		const suggest = button(section, 'Suggest daydreams for this');
 		expect(waProp(write, 'disabled')).toBe(true);
 		expect(waProp(suggest, 'disabled')).toBe(true);
 
@@ -118,20 +120,20 @@ describe('DaydreamStarter', () => {
 		await waitFor(() => expect(ongenerate).toHaveBeenCalledWith('teasing in public'));
 	});
 
-	it('says why no similar stories came, beside the box', async () => {
+	it('says why no similar daydreams came, beside the box', async () => {
 		let answer: (problem: SuggestFailure | null) => void = () => undefined;
 		const { container } = await renderStarter({
-			idea: 'teasing in public',
+			brief: 'teasing in public',
 			ongenerate: () =>
 				new Promise((resolve) => {
 					answer = resolve;
 				})
 		});
 		const section = container.querySelector('.describe') as HTMLElement;
-		const write = button(section, 'Write this story');
-		button(section, 'Suggest stories for this')?.click();
+		const write = button(section, 'Write this daydream');
+		button(section, 'Suggest daydreams for this')?.click();
 		// Nothing else can be asked while they are thought up.
-		await waitFor(() => expect(section.textContent).toContain('Thinking up stories…'));
+		await waitFor(() => expect(section.textContent).toContain('Thinking up daydreams…'));
 		expect(waProp(write, 'disabled')).toBe(true);
 		answer({ error: 'No ideas came back that time. Try again.' });
 		await waitFor(() =>
@@ -140,7 +142,7 @@ describe('DaydreamStarter', () => {
 		expect(waProp(write, 'disabled')).toBe(false);
 	});
 
-	it('asks "You as" in a row with the box\'s buttons, not beside the ready-made stories', async () => {
+	it('asks "You as" in a row with the box\'s buttons, not beside the ready-made daydreams', async () => {
 		const { container } = await renderStarter({ side: 'sub' });
 		const row = container.querySelector('.describe .controls');
 		expect(row?.firstElementChild?.matches('.sides')).toBe(true);
@@ -177,7 +179,7 @@ describe('DaydreamStarter', () => {
 		expect(container.textContent).toContain('You’re the sub');
 	});
 
-	it('shows the ready-made stories in the order the page drew', async () => {
+	it('shows the ready-made daydreams in the order the page drew', async () => {
 		const reversed = DAYDREAM_STARTERS.map((starter) => starter.id).reverse();
 		const { container } = await renderStarter({ starterOrder: reversed });
 		const titles = [...container.querySelectorAll('.ready-made .card .title')].map(
@@ -187,13 +189,13 @@ describe('DaydreamStarter', () => {
 			[...DAYDREAM_STARTERS]
 				.reverse()
 				.slice(0, SHOWN_STARTERS)
-				.map((starter) => starterScene(starter).scene.title)
+				.map((starter) => starterIdea(starter).idea.title)
 		);
 	});
 
 	it('says why a description came back with nothing', async () => {
 		const { container } = await renderStarter({
-			idea: 'x',
+			brief: 'x',
 			problem: { error: 'No ideas came back.' }
 		});
 		expect(container.querySelector('[role="alert"]')?.textContent).toBe('No ideas came back.');
@@ -202,7 +204,7 @@ describe('DaydreamStarter', () => {
 	it('shows the generated ideas for the side chosen, and picks one', async () => {
 		const { container, onidea } = await renderStarter({
 			side: 'sub',
-			generated: { request: 'something filthy', ideas: generatedIdeas }
+			generated: { brief: 'something filthy', ideas: generatedIdeas }
 		});
 		const group = container.querySelector('.generated');
 		expect(group?.textContent).toContain('For “something filthy”');
@@ -216,9 +218,20 @@ describe('DaydreamStarter', () => {
 		expect(container.querySelectorAll('.card')).toHaveLength(1);
 	});
 
+	it('says how a generated idea is told, when it came with a voice', async () => {
+		const { container } = await renderStarter({
+			generated: {
+				brief: 'mantras',
+				ideas: [{ ...(generatedIdeas[0] as GeneratedIdea), voice: 'monologue' }]
+			}
+		});
+		const card = container.querySelector('.generated .card');
+		expect(card?.querySelector('.meta')?.textContent).toContain('A monologue');
+	});
+
 	it('clears the generated ideas', async () => {
 		const { container, onclear } = await renderStarter({
-			generated: { request: 'something filthy', ideas: generatedIdeas }
+			generated: { brief: 'something filthy', ideas: generatedIdeas }
 		});
 		button(container.querySelector('.generated') as HTMLElement, 'Clear')?.click();
 		expect(onclear).toHaveBeenCalled();
@@ -227,7 +240,7 @@ describe('DaydreamStarter', () => {
 	it('asks for more ideas from the end of the list, and says why none came', async () => {
 		let answer: (problem: SuggestFailure | null) => void = () => undefined;
 		const { container, onmore, onidea } = await renderStarter({
-			generated: { request: 'something filthy', ideas: generatedIdeas },
+			generated: { brief: 'something filthy', ideas: generatedIdeas },
 			onmore: () =>
 				new Promise((resolve) => {
 					answer = resolve;
@@ -254,7 +267,7 @@ describe('DaydreamStarter', () => {
 	it('says so when none of the generated ideas are for the side now chosen', async () => {
 		const { container } = await renderStarter({
 			side: 'dom',
-			generated: { request: 'something filthy', ideas: [generatedIdeas[0] as GeneratedIdea] }
+			generated: { brief: 'something filthy', ideas: [generatedIdeas[0] as GeneratedIdea] }
 		});
 		expect(container.querySelector('.generated')?.textContent).toContain(
 			'None of these have you as the dom'
@@ -272,13 +285,13 @@ describe('DaydreamStarter', () => {
 		await waSettled(container);
 	}
 
-	it('searches the stories by title, premise and tags', async () => {
+	it('searches the daydreams by title, premise and tags', async () => {
 		const { container } = await renderStarter();
 		const cards = () => container.querySelectorAll('.ready-made .card');
 
 		// A tag no title or premise says, so only the tags can find it.
 		const tagsOnly = (each: (typeof DAYDREAM_STARTERS)[number]) => {
-			const { title, premise } = starterScene(each).scene;
+			const { title, premise } = starterIdea(each).idea;
 			const said = `${title} ${premise}`.toLocaleLowerCase();
 			return each.tags.filter((candidate) => !said.includes(candidate.toLocaleLowerCase()));
 		};
@@ -288,7 +301,7 @@ describe('DaydreamStarter', () => {
 		);
 		const tag = defined(tagsOnly(starter)[0], 'that tag');
 		const byTag = DAYDREAM_STARTERS.filter((each) =>
-			matchesSearch({ ...starterScene(each).scene, tags: each.tags }, tag.toUpperCase())
+			matchesSearch({ ...starterIdea(each).idea, tags: each.tags }, tag.toUpperCase())
 		);
 		await search(container, tag.toUpperCase());
 		await waitFor(() => expect(cards()).toHaveLength(byTag.length));
@@ -296,17 +309,17 @@ describe('DaydreamStarter', () => {
 
 		await search(container, 'nothing could possibly match this');
 		await waitFor(() => expect(cards()).toHaveLength(0));
-		expect(container.querySelector('.ready-made')?.textContent).toContain('No stories match');
+		expect(container.querySelector('.ready-made')?.textContent).toContain('No daydreams match');
 
 		// Emptied, it is back to the first few.
 		await search(container, '');
 		await waitFor(() => expect(cards()).toHaveLength(SHOWN_STARTERS));
 	});
 
-	it('searches every ready-made story, not just the few shown', async () => {
+	it('searches every ready-made daydream, not just the few shown', async () => {
 		const { container } = await renderStarter();
 		const last = defined(DAYDREAM_STARTERS.at(-1), 'the last story');
-		const { title } = starterScene(last).scene;
+		const { title } = starterIdea(last).idea;
 		await search(container, title);
 		const titles = () =>
 			[...container.querySelectorAll('.ready-made > .cards .card .title')].map(
@@ -318,7 +331,7 @@ describe('DaydreamStarter', () => {
 
 	it('searches the suggested stories too', async () => {
 		const { container } = await renderStarter({
-			generated: { request: 'something filthy', ideas: generatedIdeas }
+			generated: { brief: 'something filthy', ideas: generatedIdeas }
 		});
 		await search(container, 'protocol');
 		const titles = () =>
@@ -326,14 +339,14 @@ describe('DaydreamStarter', () => {
 		await waitFor(() => expect(titles()).toEqual(['Your rules']));
 	});
 
-	it('without suggestions, offers the ready-made stories and building one, and nothing to describe', async () => {
+	it('without suggestions, offers the ready-made daydreams and building one, and nothing to describe', async () => {
 		const { container, onblank } = await renderStarter({ suggestionsOn: false });
 		expect(container.querySelector('textarea')).toBeNull();
-		expect(button(container, 'Write this story')).toBeUndefined();
-		expect(button(container, 'Suggest stories for this')).toBeUndefined();
+		expect(button(container, 'Write this daydream')).toBeUndefined();
+		expect(button(container, 'Suggest daydreams for this')).toBeUndefined();
 		// "You as" still filters them, beside the heading.
 		expect(container.querySelector('.ready-made .sides')).not.toBeNull();
-		expect(container.textContent).toContain('Story suggestions');
+		expect(container.textContent).toContain('Daydream suggestions');
 		expect(container.querySelectorAll('.card')).toHaveLength(SHOWN_STARTERS);
 		button(container, 'Build it yourself')?.click();
 		expect(onblank).toHaveBeenCalled();

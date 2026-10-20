@@ -5,8 +5,8 @@ import { indexTree, pathTo } from '../daydream/tree';
 import type { SealedKind } from '../sealed';
 import {
 	daydreamCharacterKind,
+	daydreamIdeaKind,
 	daydreamMarkKind,
-	daydreamSceneKind,
 	daydreamSetupKind,
 	daydreamTurnKind
 } from '../sealed-kinds/daydreams';
@@ -23,9 +23,9 @@ import type {
 import type { Db } from './db';
 import {
 	daydreamCharacters,
+	daydreamIdeas,
 	daydreamMarks,
 	daydreamPreferences,
-	daydreamScenes,
 	daydreams,
 	daydreamTurns
 } from './db/schema';
@@ -624,9 +624,9 @@ export async function deleteMark(
 	return rows.length > 0;
 }
 
-// ── the character and scene libraries ────────────────────────────────────────
+// ── the character and idea libraries ────────────────────────────────────────
 
-export type LibraryKind = 'characters' | 'scenes';
+export type LibraryKind = 'characters' | 'ideas';
 
 /**
  * The two library tables have exactly the same columns, so one set of
@@ -635,11 +635,11 @@ export type LibraryKind = 'characters' | 'scenes';
  * the schemas are identical, which `daydreams.test.ts` exercises for both.
  */
 function libraryTable(kind: LibraryKind): typeof daydreamCharacters {
-	return (kind === 'characters' ? daydreamCharacters : daydreamScenes) as typeof daydreamCharacters;
+	return (kind === 'characters' ? daydreamCharacters : daydreamIdeas) as typeof daydreamCharacters;
 }
 
 function librarySealedKind(kind: LibraryKind): SealedKind<unknown> {
-	return kind === 'characters' ? daydreamCharacterKind : daydreamSceneKind;
+	return kind === 'characters' ? daydreamCharacterKind : daydreamIdeaKind;
 }
 
 /** The most library items listed. A library is a person's own; this is a guard, not a page size. */
@@ -679,14 +679,14 @@ export async function listLibrary(
 
 /** Both libraries, for the setup pages. */
 export async function getLibrary(db: Db, userId: string): Promise<DaydreamLibraryView> {
-	const [characters, scenes] = await Promise.all([
+	const [characters, ideas] = await Promise.all([
 		listLibrary(db, userId, 'characters'),
-		listLibrary(db, userId, 'scenes')
+		listLibrary(db, userId, 'ideas')
 	]);
-	return { characters, scenes };
+	return { characters, ideas };
 }
 
-/** Adds a character or scene under the id the browser chose and sealed it to. */
+/** Adds a character or idea under the id the browser chose and sealed it to. */
 export async function createLibraryItem(
 	db: Db,
 	userId: string,
@@ -714,7 +714,7 @@ export async function createLibraryItem(
 }
 
 /**
- * Replaces a character or scene, compare-and-swap on `revision`. The new
+ * Replaces a character or idea, compare-and-swap on `revision`. The new
  * revision is what daydreams' copies are then compared with, so every copy
  * made before this edit shows as "Updated in your library".
  */
@@ -759,7 +759,7 @@ export async function updateLibraryItem(
 	return { ok: false, reason: existing ? 'conflict' : 'not-found' };
 }
 
-/** Deletes a character or scene. Always safe: daydreams hold copies. False when it was not the user's. */
+/** Deletes a character or idea. Always safe: daydreams hold copies. False when it was not the user's. */
 export async function deleteLibraryItem(
 	db: Db,
 	userId: string,

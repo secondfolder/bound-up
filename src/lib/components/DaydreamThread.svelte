@@ -448,9 +448,9 @@
 						onchange={async (dials) => {
 							dialsProblem = await story.setDials(dials);
 						}}
-						scene={setup.scene.dials}
-						onscenechange={async (dials) => {
-							dialsProblem = await story.setSceneDials(dials);
+						idea={setup.idea.dials}
+						onideachange={async (dials) => {
+							dialsProblem = await story.setIdeaDials(dials);
 						}}
 					/>
 					{#if story.picturesAvailable}
@@ -589,7 +589,7 @@
 		</div>
 	{:else}
 		<wa-callout variant="neutral">
-			Daydreams aren't set up on this server any more, so the story can't go on. It is still here to
+			Daydreams aren't set up on this server any more, so this daydream can't go on. It is still here to
 			read.
 		</wa-callout>
 	{/if}

@@ -1,4 +1,8 @@
-import { loadLibraryPage } from '$lib/server/daydream/library-page';
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = (event) => loadLibraryPage(event, 'scenes');
+// The library's ideas were "scenes" until a monologue, which has no scene,
+// made the word wrong (docs/daydreams.md, "Ideas"); an old link still lands.
+export const load: PageServerLoad = () => {
+	redirect(308, '/daydreams/ideas');
+};

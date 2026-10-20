@@ -4,7 +4,7 @@
 
 	/**
 	 * A stepped slider that may be left unset: a daydream character's control
-	 * or libido, a scene's heat or kink (1–5, words from
+	 * or libido, an idea's heat or kink (1–5, words from
 	 * `daydream/dial-words.ts`, which the prompt reads too), or a kink list's
 	 * detailed answer (0–4). Unset means "not said", rather than "middling".
 	 *

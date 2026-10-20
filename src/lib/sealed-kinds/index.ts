@@ -12,8 +12,8 @@
 import type { SealedKind } from '../sealed';
 import {
 	daydreamCharacterKind,
+	daydreamIdeaKind,
 	daydreamMarkKind,
-	daydreamSceneKind,
 	daydreamSetupKind,
 	daydreamTurnKind
 } from './daydreams';
@@ -36,7 +36,7 @@ export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
 	daydreamTurnKind,
 	daydreamMarkKind,
 	daydreamCharacterKind,
-	daydreamSceneKind,
+	daydreamIdeaKind,
 	kinkListKind,
 	kinkListPartnerKind
 ];

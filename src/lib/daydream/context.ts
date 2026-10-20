@@ -19,7 +19,7 @@ import {
  * Which turns go with a reply request, and in what shape.
  *
  * The model reads the setup and as much of the branch being read as fits,
- * newest first: a scene's recent turns matter most, and the setup carries
+ * newest first: a daydream's recent turns matter most, and the setup carries
  * what must never be forgotten (who is in it, the limits). The server refuses
  * a request over the same budget (`replyRequestSchema`), so trimming here is
  * what keeps a long daydream working rather than an optimisation.

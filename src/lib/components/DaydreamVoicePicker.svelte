@@ -78,7 +78,7 @@
 	function stanceBlocked(stance: DaydreamStance): string | null {
 		return voiceCanWork({ narrator: value.narrator, stance })
 			? null
-			: 'This narrator needs you in the story';
+			: 'This narrator needs you in the daydream';
 	}
 
 	function nameField(node: HTMLElement & { value: string }) {
@@ -171,7 +171,7 @@
 		{#if value.stance !== 'absent'}
 			<wa-input
 				{@attach nameField}
-				label={value.stance === 'persona' ? 'Who you are playing' : 'What the story calls you (optional)'}
+				label={value.stance === 'persona' ? 'Who you are playing' : 'What the daydream calls you (optional)'}
 				value={value.protagonistName}
 				maxlength={DAYDREAM_LIMITS.protagonistName}
 			></wa-input>

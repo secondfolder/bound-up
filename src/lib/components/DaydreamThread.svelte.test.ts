@@ -816,10 +816,10 @@ describe('DaydreamThread', () => {
 		const thumb = defined(heat.shadowRoot?.querySelector('[part~="thumb"]'), 'the knob');
 		await userEvent.click(thumb);
 		await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
-		expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ scene: { dials: { heat: 3 } } });
+		expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ idea: { dials: { heat: 3 } } });
 	});
 
-	it('turns the scene’s heat up mid-story, in this daydream’s copy of the scene', async () => {
+	it('turns the idea’s heat up mid-story, in this daydream’s copy of the idea', async () => {
 		client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
 		const { container } = render(DaydreamThread, {
 			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
@@ -835,7 +835,7 @@ describe('DaydreamThread', () => {
 		heat.dispatchEvent(new Event('change'));
 		await waitFor(() => expect(client.saveSetup).toHaveBeenCalledOnce());
 		expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({
-			scene: { title: SETUP.scene.title, dials: { heat: 4, kink: null } },
+			idea: { title: SETUP.idea.title, dials: { heat: 4, kink: null } },
 			dials: SETUP.dials
 		});
 	});
@@ -1462,7 +1462,7 @@ describe('DaydreamThread', () => {
 			const [, second, revision] = client.saveSetup.mock.calls[1] ?? [];
 			// On the revision naming left, with the name naming gave it.
 			expect(revision).toBe(1);
-			expect(second).toMatchObject({ title: 'After the meeting', scene: { dials: { heat: 4 } } });
+			expect(second).toMatchObject({ title: 'After the meeting', idea: { dials: { heat: 4 } } });
 			expect(container.querySelector('[role="alert"]')).toBeNull();
 		});
 
@@ -1952,7 +1952,7 @@ describe('DaydreamThread pictures', () => {
 			expect(client.requestPicture).toHaveBeenCalledWith('d1', {
 				prompt: Prompt,
 				style: 'photo',
-				heat: SETUP.scene.dials.heat
+				heat: SETUP.idea.dials.heat
 			})
 		);
 

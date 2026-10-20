@@ -44,7 +44,7 @@
 		</wa-button>
 		<nav class="libraries" aria-label="Your library">
 			<a href={resolve('/(auth-required)/(app)/daydreams/characters')}>Your characters</a>
-			<a href={resolve('/(auth-required)/(app)/daydreams/scenes')}>Your scenes</a>
+			<a href={resolve('/(auth-required)/(app)/daydreams/ideas')}>Your ideas</a>
 		</nav>
 
 		{#if data.daydreams.length > 0}

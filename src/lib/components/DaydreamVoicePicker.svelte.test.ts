@@ -64,7 +64,7 @@ describe('DaydreamVoicePicker', () => {
 		const { container } = await renderPicker(voice('third-person', 'self'));
 		expect(container.querySelector<HTMLInputElement>('.options input:checked')).toBeNull();
 		expect(about(container)).toContain('A narrator tells the story about the people in it.');
-		expect(about(container)).toContain('You are in the story, as yourself.');
+		expect(about(container)).toContain('You are in the daydream, as yourself.');
 	});
 
 	it('names the fine-tune options only, but says why one is blocked', async () => {

@@ -2,22 +2,22 @@
  * A daydream's setup as a short summary with blanks in it — "[A stranger on
  * the night train]. [Vesper] takes the seat across from you, and the journey
  * turns [slow-burning]. It's told [in the characters' own words, with no
- * narrator]." — which is how the setup form shows a story that is already
+ * narrator]." — which is how the setup form shows a daydream that is already
  * put together (`DaydreamSetupForm.svelte`, its summary layout). Each blank
  * is a piece the form makes into a control: the heat, the voice, each
- * character and the scene.
+ * character and the idea.
  *
  * The summary comes in two halves. The first is written with its blanks
  * marked as `[[key|words]]` (`parseMarkedSummary`): by the model, for a
- * draft it put together, or by hand, for a ready-made story. It opens with a
- * sentence on the story as a whole, nearly all of it the scene's blank, and
+ * draft it put together, or by hand, for a ready-made daydream. It opens with a
+ * sentence on the daydream as a whole, nearly all of it the idea's blank, and
  * ends by saying how it is told. The model may leave a piece out rather than
  * force it in. The second half is written here, and holds every piece the
  * first left out, so every control is always on screen somewhere; without a
  * first half (a summary that could not be read), the premise stands in.
  *
  * The first half is only true of the setup it was written for. It is shown
- * for as long as the scene and how it is told are that setup's, and everyone
+ * for as long as the idea and how it is told are that setup's, and everyone
  * it names is still in it by that name; otherwise the premise takes its
  * place. A changed heat is only a word, so its blank just says the new one.
  *
@@ -30,7 +30,7 @@ import {
 	type DialValue,
 	voicePreset
 } from '../daydream';
-import { SCENE_SLIDERS } from './dial-words';
+import { IDEA_SLIDERS } from './dial-words';
 
 /**
  * What debug mode shows of the marked summary a piece came from
@@ -42,19 +42,19 @@ type FromMarker = { key?: string };
 
 export type SummaryPiece =
 	| { kind: 'text'; text: string; marker?: string }
-	/** The scene's heat; `null` heat says "any kind of". */
+	/** The idea's heat; `null` heat says "any kind of". */
 	| ({ kind: 'heat'; label: string; heat: DialValue | null } & FromMarker)
 	/** How it is told. */
 	| ({ kind: 'voice'; label: string } & FromMarker)
 	/** A character, by their index in the setup's list. */
 	| ({ kind: 'character'; index: number; label: string } & FromMarker)
-	| ({ kind: 'scene'; label: string } & FromMarker);
+	| ({ kind: 'idea'; label: string } & FromMarker);
 
 /** What a marked blank in the model's summary stands for. A character is named, as the model named them. */
 export type SummarySlot =
 	| { kind: 'heat' }
 	| { kind: 'voice' }
-	| { kind: 'scene' }
+	| { kind: 'idea' }
 	| { kind: 'character'; name: string };
 
 /**
@@ -70,7 +70,7 @@ export type MarkedSummary = readonly MarkedPiece[];
 /** The model's summary and the setup it was written for. */
 export type WrittenSummary = {
 	marked: MarkedSummary;
-	draft: Pick<DaydreamSetup, 'voice' | 'scene'>;
+	draft: Pick<DaydreamSetup, 'voice' | 'idea'>;
 };
 
 /** The longest summary kept, in visible characters: a paragraph, not a story. */
@@ -99,7 +99,7 @@ const tidy = (value: string) => value.replace(/\s+/g, ' ');
 
 function slotFor(key: string, names: readonly string[]): SummarySlot | null {
 	const word = key.trim().toLocaleLowerCase();
-	if (word === 'heat' || word === 'voice' || word === 'scene') {
+	if (word === 'heat' || word === 'voice' || word === 'idea') {
 		return { kind: word };
 	}
 	const name = names.find((candidate) => same(candidate, key));
@@ -171,26 +171,26 @@ export function parseMarkedSummary(raw: unknown, names: readonly string[]): Mark
 
 /** The heat as a word: "steamy", but "SFW" kept as it is. */
 function heatWord(heat: DialValue): string {
-	const label = SCENE_SLIDERS.find((slider) => slider.key === 'heat')?.scale[heat].label ?? '';
+	const label = IDEA_SLIDERS.find((slider) => slider.key === 'heat')?.scale[heat].label ?? '';
 	return label === 'SFW' ? label : label.toLocaleLowerCase();
 }
 
 const heatLabel = (heat: DialValue | null) => (heat === null ? 'any kind of' : heatWord(heat));
 
-type Setup = Pick<DaydreamSetup, 'voice' | 'characters' | 'scene'>;
+type Setup = Pick<DaydreamSetup, 'voice' | 'characters' | 'idea'>;
 
 /** Which pieces of the setup already have their blank. */
-type Mentioned = { heat: boolean; voice: boolean; scene: boolean; characters: Set<number> };
+type Mentioned = { heat: boolean; voice: boolean; idea: boolean; characters: Set<number> };
 
 const characterIndex = (setup: Setup, name: string) =>
 	setup.characters.findIndex((character) => same(character.name, name));
 
 /** Whether the model's summary is still about this setup (see the module comment). */
 function stillDescribes({ marked, draft }: WrittenSummary, setup: Setup): boolean {
-	const { voice, scene } = setup;
+	const { voice, idea } = setup;
 	return (
-		scene.title === draft.scene.title &&
-		scene.premise === draft.scene.premise &&
+		idea.title === draft.idea.title &&
+		idea.premise === draft.idea.premise &&
 		voice.narrator === draft.voice.narrator &&
 		voice.stance === draft.voice.stance &&
 		voice.protagonistName === draft.voice.protagonistName &&
@@ -208,7 +208,7 @@ function fromMarked(
 	setup: Setup,
 	mentioned: Mentioned
 ): SummaryPiece[] {
-	const { heat } = setup.scene.dials;
+	const { heat } = setup.idea.dials;
 	const pieces = marked.map((piece): SummaryPiece => {
 		if (piece.kind === 'text') {
 			return piece;
@@ -221,15 +221,15 @@ function fromMarked(
 				return {
 					kind: 'heat',
 					heat,
-					label: heat === draft.scene.dials.heat ? words : heatLabel(heat),
+					label: heat === draft.idea.dials.heat ? words : heatLabel(heat),
 					key
 				};
 			case 'voice':
 				mentioned.voice = true;
 				return { kind: 'voice', label: words, key };
-			case 'scene':
-				mentioned.scene = true;
-				return { kind: 'scene', label: words, key };
+			case 'idea':
+				mentioned.idea = true;
+				return { kind: 'idea', label: words, key };
 			default: {
 				const index = characterIndex(setup, slot.name);
 				mentioned.characters.add(index);
@@ -265,7 +265,7 @@ function withArticles(pieces: SummaryPiece[]): SummaryPiece[] {
 
 /** The premise as a paragraph: capitalised and finished, since a starting point's is a phrase. */
 function fromPremise(setup: Setup): SummaryPiece[] {
-	const premise = tidy(setup.scene.premise).trim();
+	const premise = tidy(setup.idea.premise).trim();
 	if (!premise) {
 		return [];
 	}
@@ -283,7 +283,7 @@ function castNote(setup: Setup, index: number): string {
 	if (!character) {
 		return '';
 	}
-	const part = setup.scene.parts.find((candidate) => candidate.id === character.casting.partId);
+	const part = setup.idea.parts.find((candidate) => candidate.id === character.casting.partId);
 	const relationship = character.casting.relationship.trim();
 	const said =
 		part && relationship.toLocaleLowerCase().includes(part.name.trim().toLocaleLowerCase());
@@ -333,7 +333,7 @@ function toldSentence(setup: Setup): SummaryPiece[] {
 
 /**
  * The second paragraph, holding every piece the first left out, each as its
- * blank: one sentence for the heat, the scene and whoever is not mentioned
+ * blank: one sentence for the heat, the idea and whoever is not mentioned
  * yet, and one for how it is told. A character not yet mentioned comes with
  * who they are in parentheses, which the first paragraph would otherwise have
  * said. Empty when nothing is left out.
@@ -348,21 +348,21 @@ function remainder(setup: Setup, mentioned: Mentioned): SummaryPiece[] {
 		return [[piece, ...(note ? [text(` (${note})`)] : [])]];
 	});
 	const withMissing = missing.length > 0 ? [text(', with '), ...listOf(missing)] : [];
-	const scene: SummaryPiece = { kind: 'scene', label: setup.scene.title };
-	const { heat } = setup.scene.dials;
+	const idea: SummaryPiece = { kind: 'idea', label: setup.idea.title };
+	const { heat } = setup.idea.dials;
 
 	let about: SummaryPiece[] = [];
 	if (!mentioned.heat) {
 		about = [
 			text(heat === null ? 'It’s ' : `It’s ${VOWEL.test(heatWord(heat)) ? 'an' : 'a'} `),
 			{ kind: 'heat', label: heatLabel(heat), heat },
-			text(' story'),
-			...(mentioned.scene ? [] : [text(' in '), scene]),
+			text(' daydream'),
+			...(mentioned.idea ? [] : [text(': '), idea]),
 			...withMissing,
 			text('.')
 		];
-	} else if (!mentioned.scene) {
-		about = [text('It’s set in '), scene, ...withMissing, text('.')];
+	} else if (!mentioned.idea) {
+		about = [text('The idea is '), idea, ...withMissing, text('.')];
 	} else if (missing.length > 0) {
 		about = [...listOf(missing), text(missing.length === 1 ? ' is in it too.' : ' are in it too.')];
 	}
@@ -376,7 +376,7 @@ function remainder(setup: Setup, mentioned: Mentioned): SummaryPiece[] {
  * Empty paragraphs are left out.
  */
 export function setupSummary(setup: Setup, written: WrittenSummary | null): SummaryPiece[][] {
-	const mentioned: Mentioned = { heat: false, voice: false, scene: false, characters: new Set() };
+	const mentioned: Mentioned = { heat: false, voice: false, idea: false, characters: new Set() };
 	const first =
 		written && stillDescribes(written, setup)
 			? fromMarked(written, setup, mentioned)

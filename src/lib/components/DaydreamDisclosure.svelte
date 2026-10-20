@@ -8,7 +8,7 @@
 	 *
 	 * Everything else they write in Bound Up stays private to them and the
 	 * people they share it with. A daydream cannot: the character's replies are
-	 * written by a language model, which has to read the scene to write them.
+	 * written by a language model, which has to read the daydream to write them.
 	 * So this says plainly where the words go, before any do. Accepting is
 	 * recorded on the server, which refuses to ask for a reply until it is.
 	 *
@@ -26,8 +26,8 @@
 <wa-card class="disclosure" appearance="outlined">
 	<h2>Before you start</h2>
 	<p>
-		A daydream is a scene you play with a character you make up. Their replies are written by an
-		AI language model, which means it has to read the scene.
+		A daydream is a story or a monologue made up for you, from an idea and the characters you choose. Their replies are written by an
+		AI language model, which means it has to read the daydream.
 	</p>
 	<ul>
 		<li>
@@ -36,7 +36,7 @@
 			model provider that writes each reply.
 		</li>
 		<li>
-			For a picture of a passage, a description of the scene goes through Bound Up to
+			For a picture of a passage, a description of the moment goes through Bound Up to
 			<a href="https://runware.ai" rel="noreferrer" target="_blank">Runware</a>, which makes it.
 			The picture comes back through Bound Up and is kept encrypted, so only you can see it.
 		</li>

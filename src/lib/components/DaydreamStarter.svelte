@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { DAYDREAM_LIMITS, DAYDREAM_VOICE_PRESETS } from '$lib/daydream';
-	import { sceneLevel } from '$lib/daydream/dial-words';
+	import { DAYDREAM_LIMITS, DAYDREAM_VOICE_PRESETS, type DaydreamVoicePresetId } from '$lib/daydream';
+	import { ideaLevel } from '$lib/daydream/dial-words';
 	import {
 		type DaydreamStarter,
 		forSide,
@@ -8,7 +8,7 @@
 		matchesSearch,
 		SHOWN_STARTERS,
 		type StarterSide,
-		starterScene,
+		starterIdea,
 		startersFor
 	} from '$lib/daydream/starters';
 	import type { SuggestFailure } from '$lib/daydream/suggest';
@@ -34,7 +34,7 @@
 	 * setup can ask again with the same words.
 	 */
 	let {
-		idea = $bindable(),
+		brief = $bindable(),
 		side = $bindable(),
 		suggestionsOn,
 		starterOrder,
@@ -53,18 +53,18 @@
 		debug = false
 	}: {
 		/** What the user has written, kept by the page so it survives going back. */
-		idea: string;
+		brief: string;
 		/** Which side the stories are for, or null for either. Kept by the page. */
 		side: StarterSide | null;
 		/** Whether the model may be asked: without it there is no "describe it". */
 		suggestionsOn: boolean;
-		/** The ready-made stories' ids in the order to show them, shuffled by the page's load. */
+		/** The ready-made daydreams' ids in the order to show them, shuffled by the page's load. */
 		starterOrder: readonly string[];
 		asking: boolean;
 		/** Why the last description came back with nothing, or null. */
 		problem: SuggestFailure | null;
 		/** The last ideas generated and what was asked for, kept by the page; null before any. */
-		generated: { request: string; ideas: readonly GeneratedIdea[] } | null;
+		generated: { brief: string; ideas: readonly GeneratedIdea[] } | null;
 		/** The title of the generated idea being written out, while it is. */
 		writing: string | null;
 		/** Why a generated idea could not be written out, or null. */
@@ -72,10 +72,10 @@
 		ondescribe: () => void;
 		onstarter: (starter: DaydreamStarter) => void;
 		/** Asks for stories like the one described; answers why none came, or null. */
-		ongenerate: (request: string) => Promise<SuggestFailure | null>;
+		ongenerate: (brief: string) => Promise<SuggestFailure | null>;
 		/** Asks for more of the same, added to the last; answers why none came, or null. */
 		onmore: () => Promise<SuggestFailure | null>;
-		/** Puts the generated ideas away, back to the ready-made stories. */
+		/** Puts the generated ideas away, back to the ready-made daydreams. */
 		onclear: () => void;
 		onidea: (idea: GeneratedIdea) => void;
 		onblank: () => void;
@@ -91,7 +91,7 @@
 	async function suggest() {
 		suggesting = true;
 		suggestProblem = null;
-		suggestProblem = await ongenerate(idea.trim());
+		suggestProblem = await ongenerate(brief.trim());
 		suggesting = false;
 	}
 
@@ -107,11 +107,11 @@
 
 	const starters = $derived(
 		inOrder(startersFor(side), starterOrder).filter((starter) =>
-			matchesSearch({ ...starterScene(starter).scene, tags: starter.tags }, filter)
+			matchesSearch({ ...starterIdea(starter).idea, tags: starter.tags }, filter)
 		)
 	);
 	/**
-	 * The ready-made stories show `SHOWN_STARTERS` until "More ideas" shows
+	 * The ready-made daydreams show `SHOWN_STARTERS` until "More ideas" shows
 	 * the lot. A search looks through all of them, so what it finds is never
 	 * hidden behind the button.
 	 */
@@ -124,23 +124,23 @@
 	const ideasShown = $derived(ideasForSide.filter((shown) => matchesSearch(shown, filter)));
 
 	const busy = $derived(asking || suggesting || gettingMore);
-	const canAsk = $derived(idea.trim() !== '' && !busy);
+	const canAsk = $derived(brief.trim() !== '' && !busy);
 
-	const voiceLabel = (starter: DaydreamStarter) =>
-		DAYDREAM_VOICE_PRESETS.find((preset) => preset.id === starter.voice)?.label ?? '';
+	const voiceLabel = (voice: DaydreamVoicePresetId) =>
+		DAYDREAM_VOICE_PRESETS.find((preset) => preset.id === voice)?.label ?? '';
 </script>
 
 <div class="starter">
 	{#if suggestionsOn}
 		<section class="describe" aria-labelledby="describe-heading">
 			<h2 id="describe-heading">What do you feel like?</h2>
-			<label class="idea">
-				<span class="hint">A few words is enough: who, where, or what happens.</span>
+			<label class="brief">
+				<span class="hint">A few words is enough: who, where, what happens, or what it should say.</span>
 				<textarea
 					rows="3"
-					maxlength={DAYDREAM_LIMITS.idea}
+					maxlength={DAYDREAM_LIMITS.brief}
 					placeholder="A stranger on a night train…"
-					bind:value={idea}
+					bind:value={brief}
 					disabled={asking || suggesting}></textarea>
 			</label>
 			<div class="controls">
@@ -153,11 +153,11 @@
 						onclick={ondescribe}
 					>
 						<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
-						{asking ? 'Writing your daydream…' : 'Write this story'}
+						{asking ? 'Writing your daydream…' : 'Write this daydream'}
 					</wa-button>
 					<wa-button appearance="outlined" disabled={!canAsk} onclick={suggest}>
 						<wa-icon slot="start" name="lightbulb" variant="solid"></wa-icon>
-						{suggesting ? 'Thinking up stories…' : 'Suggest stories for this'}
+						{suggesting ? 'Thinking up daydreams…' : 'Suggest daydreams for this'}
 					</wa-button>
 				</div>
 			</div>
@@ -168,11 +168,11 @@
 
 	<section class="ready-made" aria-labelledby="ready-made-heading">
 		<div class="ready-made-head">
-			<h2 id="ready-made-heading">Story suggestions</h2>
+			<h2 id="ready-made-heading">Daydream suggestions</h2>
 			<div class="search">
 				<SearchField
 					bind:value={filter}
-					label="Search stories"
+					label="Search daydreams"
 					placeholder="Title, premise or tag"
 					collapsible
 				/>
@@ -184,7 +184,7 @@
 		{#if generated}
 			<section class="generated" aria-labelledby="generated-heading">
 				<div class="generated-head">
-					<h3 id="generated-heading">For “{generated.request}”</h3>
+					<h3 id="generated-heading">For “{generated.brief}”</h3>
 					<wa-button
 						appearance="plain"
 						size="s"
@@ -205,7 +205,7 @@
 				{/if}
 				<ul class="cards">
 					{#each ideasShown as idea (idea.title)}
-						{const level = $derived(sceneLevel(idea.dials))}
+						{const level = $derived(ideaLevel(idea.dials))}
 						<li>
 							<!-- A card, as the ready-made ones are. -->
 							<button
@@ -225,6 +225,7 @@
 									{#if writing === idea.title}
 										<span class="level">Writing your daydream…</span>
 									{:else if level}<span class="level">{level}</span>{/if}
+									{#if idea.voice}<span>{voiceLabel(idea.voice)}</span>{/if}
 									{#if idea.you && side === null}<span>You’re the {idea.you}</span>{/if}
 								</span>
 							</button>
@@ -246,24 +247,24 @@
 			</section>
 		{:else}
 			{#if starters.length === 0}
-				<p class="hint none">No stories match “{filter.trim()}”.</p>
+				<p class="hint none">No daydreams match “{filter.trim()}”.</p>
 			{/if}
 			<ul class="cards">
 				{#each startersShown as starter (starter.id)}
-					{const scene = $derived(starterScene(starter).scene)}
-					{const level = $derived(sceneLevel(scene.dials))}
+					{const idea = $derived(starterIdea(starter).idea)}
+					{const level = $derived(ideaLevel(idea.dials))}
 					<li>
 						<!-- A card: a title, a line and a level in a block, which
 						     wa-button's one-line control cannot lay out. -->
 						<button type="button" class="card" onclick={() => onstarter(starter)}>
-							<span class="title">{scene.title}</span>
-							<span class="premise">{scene.premise}</span>
+							<span class="title">{idea.title}</span>
+							<span class="premise">{idea.premise}</span>
 							<span class="tags">
 								{#each starter.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
 							</span>
 							<span class="meta">
 								{#if level}<span class="level">{level}</span>{/if}
-								<span>{voiceLabel(starter)}</span>
+								<span>{voiceLabel(starter.voice)}</span>
 								{#if starter.you && side === null}<span>You’re the {starter.you}</span>{/if}
 							</span>
 						</button>
@@ -331,7 +332,7 @@
 		margin-inline-start: auto;
 	}
 
-	.idea {
+	.brief {
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
@@ -367,7 +368,7 @@
 		}
 	}
 
-	/* After the suggested stories or the ready-made ones, a little apart from them. */
+	/* After the suggested daydreams or the ready-made ones, a little apart from them. */
 	.more {
 		align-self: flex-start;
 		margin-block-start: 0.5rem;

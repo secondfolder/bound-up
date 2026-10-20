@@ -31,7 +31,7 @@ test('keeps a character made in the dialog in the daydream being set up', async 
 	const { container, baseElement } = render(DaydreamSetupForm, {
 		props: {
 			setupForm,
-			library: { characters: [], scenes: [] },
+			library: { characters: [], ideas: [] },
 			suggestionsOn: false,
 			submitLabel: 'Go'
 		}

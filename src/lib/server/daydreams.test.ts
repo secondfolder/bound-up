@@ -418,55 +418,52 @@ describe('marks', () => {
 });
 
 describe('the libraries', () => {
-	describe.each(['characters', 'scenes'] as const satisfies readonly LibraryKind[])(
-		'%s',
-		(kind) => {
-			it('adds, lists, edits at a revision, and deletes', async () => {
-				const itemId = crypto.randomUUID();
-				expect(
-					await createLibraryItem(db, ada.id, kind, { id: itemId, content: await sealed(ada.id) })
-				).toEqual({
-					ok: true,
-					revision: 0
-				});
-				expect((await listLibrary(db, ada.id, kind)).map((item) => item.id)).toEqual([itemId]);
-				expect(
-					await updateLibraryItem(db, ada.id, kind, itemId, {
-						content: await sealed(ada.id, 'edited'),
-						expectedRevision: 0
-					})
-				).toEqual({ ok: true, revision: 1 });
-				expect(
-					await updateLibraryItem(db, ada.id, kind, itemId, {
-						content: await sealed(ada.id),
-						expectedRevision: 0
-					})
-				).toEqual({ ok: false, reason: 'conflict' });
-				expect((await listLibrary(db, ada.id, kind))[0]).toMatchObject({ revision: 1 });
-				expect(await deleteLibraryItem(db, ada.id, kind, itemId)).toBe(true);
-				expect(await listLibrary(db, ada.id, kind)).toEqual([]);
+	describe.each(['characters', 'ideas'] as const satisfies readonly LibraryKind[])('%s', (kind) => {
+		it('adds, lists, edits at a revision, and deletes', async () => {
+			const itemId = crypto.randomUUID();
+			expect(
+				await createLibraryItem(db, ada.id, kind, { id: itemId, content: await sealed(ada.id) })
+			).toEqual({
+				ok: true,
+				revision: 0
 			});
+			expect((await listLibrary(db, ada.id, kind)).map((item) => item.id)).toEqual([itemId]);
+			expect(
+				await updateLibraryItem(db, ada.id, kind, itemId, {
+					content: await sealed(ada.id, 'edited'),
+					expectedRevision: 0
+				})
+			).toEqual({ ok: true, revision: 1 });
+			expect(
+				await updateLibraryItem(db, ada.id, kind, itemId, {
+					content: await sealed(ada.id),
+					expectedRevision: 0
+				})
+			).toEqual({ ok: false, reason: 'conflict' });
+			expect((await listLibrary(db, ada.id, kind))[0]).toMatchObject({ revision: 1 });
+			expect(await deleteLibraryItem(db, ada.id, kind, itemId)).toBe(true);
+			expect(await listLibrary(db, ada.id, kind)).toEqual([]);
+		});
 
-			it('is the owner’s alone', async () => {
-				const itemId = crypto.randomUUID();
-				await createLibraryItem(db, ada.id, kind, { id: itemId, content: await sealed(ada.id) });
-				expect(await listLibrary(db, jun.id, kind)).toEqual([]);
-				expect(
-					await updateLibraryItem(db, jun.id, kind, itemId, {
-						content: await sealed(jun.id),
-						expectedRevision: 0
-					})
-				).toEqual({ ok: false, reason: 'not-found' });
-				expect(await deleteLibraryItem(db, jun.id, kind, itemId)).toBe(false);
-				expect(
-					await createLibraryItem(db, ada.id, kind, {
-						id: crypto.randomUUID(),
-						content: await sealed(jun.id)
-					})
-				).toEqual({ ok: false, reason: 'wrong-vault' });
-			});
-		}
-	);
+		it('is the owner’s alone', async () => {
+			const itemId = crypto.randomUUID();
+			await createLibraryItem(db, ada.id, kind, { id: itemId, content: await sealed(ada.id) });
+			expect(await listLibrary(db, jun.id, kind)).toEqual([]);
+			expect(
+				await updateLibraryItem(db, jun.id, kind, itemId, {
+					content: await sealed(jun.id),
+					expectedRevision: 0
+				})
+			).toEqual({ ok: false, reason: 'not-found' });
+			expect(await deleteLibraryItem(db, jun.id, kind, itemId)).toBe(false);
+			expect(
+				await createLibraryItem(db, ada.id, kind, {
+					id: crypto.randomUUID(),
+					content: await sealed(jun.id)
+				})
+			).toEqual({ ok: false, reason: 'wrong-vault' });
+		});
+	});
 
 	it('keeps the two libraries apart, and a deletion leaves daydreams alone', async () => {
 		const itemId = crypto.randomUUID();
@@ -477,7 +474,7 @@ describe('the libraries', () => {
 		const { id } = await createTestDaydream(db, ada.id, ['story']);
 		expect(await getLibrary(db, ada.id)).toMatchObject({
 			characters: [expect.objectContaining({ id: itemId })],
-			scenes: []
+			ideas: []
 		});
 		await deleteLibraryItem(db, ada.id, 'characters', itemId);
 		expect(await getDaydream(db, ada.id, id)).not.toBeNull();

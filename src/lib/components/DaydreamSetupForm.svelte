@@ -13,13 +13,13 @@
 		DAYDREAM_VOICE_PRESETS,
 		type DaydreamCharacter,
 		type DaydreamCharacterCopy,
-		type DaydreamSceneCopy,
+		type DaydreamIdeaCopy,
 		type DaydreamSetup,
 		type DaydreamVoice,
 		DEFAULT_STORY_DIALS,
 		type DialValue,
 		EMPTY_CASTING,
-		fitCastingToScene,
+		fitCastingToIdea,
 		inferVoice,
 		leadApplies,
 		MAX_DAYDREAM_CHARACTERS,
@@ -28,31 +28,31 @@
 	} from '$lib/daydream';
 	import { type CopyState, copyState } from '$lib/daydream/chips';
 	import { saveLibraryItem } from '$lib/daydream/client';
-	import { SCENE_SLIDERS } from '$lib/daydream/dial-words';
+	import { IDEA_SLIDERS } from '$lib/daydream/dial-words';
 	import { type SuggestContext, suggestCasting } from '$lib/daydream/suggest';
 	import { type MarkedSummary, setupSummary } from '$lib/daydream/summary';
 	import { type DaydreamSetupFormValues, daydreamSetupFormSchema } from '$lib/schemas/daydreamForm';
 	import { sealForSubmit } from '$lib/sealed-forms';
 	import { type DaydreamSetupContent, daydreamSetupKind } from '$lib/sealed-kinds/daydreams';
-	import { openedDaydreamCharacter, openedDaydreamScene } from '$lib/sealed-views.svelte';
+	import { openedDaydreamCharacter, openedDaydreamIdea } from '$lib/sealed-views.svelte';
 	import { superForm } from '$lib/superform';
 	import type { DaydreamLibraryItemView, DaydreamLibraryView, SealedRefView } from '$lib/types';
 	import DaydreamCharacterDialog, { type CastingEdit } from './DaydreamCharacterDialog.svelte';
 	import DaydreamCopyCard from './DaydreamCopyCard.svelte';
 	import DaydreamDials from './DaydreamDials.svelte';
+	import DaydreamIdeaDialog from './DaydreamIdeaDialog.svelte';
 	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
-	import DaydreamSceneDialog from './DaydreamSceneDialog.svelte';
 	import DaydreamVoicePicker from './DaydreamVoicePicker.svelte';
 	import { startOpen } from './details';
 	import SummaryBlank from './SummaryBlank.svelte';
 
 	/**
-	 * A daydream's setup: how it is told, the scene, who is in it, and what
-	 * must not happen. Characters and scenes come from the user's library, or
+	 * A daydream's setup: how it is told, the idea, who is in it, and what
+	 * must not happen. Characters and ideas come from the user's library, or
 	 * are made new in a dialog; the daydream keeps a copy of each, and offers
 	 * the newer version when the library's has changed.
 	 *
-	 * Two layouts of the same form. **Full** is every control: the scene, who
+	 * Two layouts of the same form. **Full** is every control: the idea, who
 	 * is in it, "More options" (who leads, the limits, the dials), and how it
 	 * is told last, as one line with a Change button. **Summary** is for a
 	 * story that is already put together — a ready-made one, or one the model
@@ -72,10 +72,10 @@
 	 * There is no name to give it: the model names it after its opening
 	 * (`DaydreamStory.nameIfUnnamed`), and it can be renamed here afterwards.
 	 *
-	 * Characters are cast into the scene's parts. Who a character is in this
+	 * Characters are cast into the idea's parts. Who a character is in this
 	 * story — their part, who they are to the user, what they are doing — is
 	 * their casting, kept on this daydream's copy and never in the library;
-	 * see docs/daydreams.md, "Characters, scenes and casting".
+	 * see docs/daydreams.md, "Characters, ideas and casting".
 	 *
 	 * Sealed in the user's own vault before it is posted, like a self task
 	 * (`SealedTaskEditor.svelte`); the action only ever sees the sealed record.
@@ -104,7 +104,7 @@
 		draft?: DaydreamSetup | null;
 		/**
 		 * The model's summary of `draft`, its blanks marked; null to summarise
-		 * it from its premise (a ready-made story, or a summary that could not
+		 * it from its premise (a ready-made daydream, or a summary that could not
 		 * be read).
 		 */
 		summary?: MarkedSummary | null;
@@ -295,12 +295,12 @@
 	const paragraphs = $derived(setupSummary($form, written));
 	// Captured once, as `startOpen` asks.
 	const limitsWritten = initial.data.limits.trim() !== '';
-	const HEAT_SCALE = SCENE_SLIDERS.find((slider) => slider.key === 'heat')?.scale;
+	const HEAT_SCALE = IDEA_SLIDERS.find((slider) => slider.key === 'heat')?.scale;
 
 	function pickHeat(event: WaSelectEvent) {
 		const value = selectedValue(event);
 		const heat = value === 'any' ? null : (Number(value) as DialValue);
-		$form.scene = { ...$form.scene, dials: { ...$form.scene.dials, heat } };
+		$form.idea = { ...$form.idea, dials: { ...$form.idea.dials, heat } };
 	}
 
 	function pickVoice(event: WaSelectEvent) {
@@ -322,9 +322,9 @@
 	// offered at once rather than after a reload.
 	let characters = $state([...library.characters]);
 	// svelte-ignore state_referenced_locally
-	let scenes = $state([...library.scenes]);
+	let ideas = $state([...library.ideas]);
 	const characterRevisions = $derived(new Map(characters.map((item) => [item.id, item])));
-	const sceneRevisions = $derived(new Map(scenes.map((item) => [item.id, item])));
+	const ideaRevisions = $derived(new Map(ideas.map((item) => [item.id, item])));
 
 	/** Library characters not already in this daydream, opened. */
 	const pickable = $derived(
@@ -343,7 +343,8 @@
 			archetype: character.archetype
 		})),
 		limits: $form.limits,
-		story: $form.dials
+		story: $form.dials,
+		narrator: $form.voice.narrator
 	});
 
 	function characterSummary(character: DaydreamCharacterCopy): string {
@@ -357,7 +358,7 @@
 	 * list), or a new one, and for a new one the part it is cast in.
 	 */
 	let characterDialog: { index: number | null; partId: string | null } | null = $state(null);
-	let sceneDialog: { surprise: boolean; edit: boolean } | null = $state(null);
+	let ideaDialog: { surprise: boolean; edit: boolean } | null = $state(null);
 
 	function putCharacter(
 		index: number | null,
@@ -376,13 +377,13 @@
 	}
 
 	/**
-	 * A new or changed scene. Castings in a part it no longer has let go of
+	 * A new or changed idea. Castings in a part it no longer has let go of
 	 * the part and keep their words, which are still the user's to reuse.
 	 */
-	function putScene(scene: DaydreamSceneCopy, sealed?: SealedRefView) {
-		$form.scene = scene;
-		$form.characters = fitCastingToScene($form.characters, scene.parts);
-		rememberLibrary('scenes', scene, sealed);
+	function putIdea(idea: DaydreamIdeaCopy, sealed?: SealedRefView) {
+		$form.idea = idea;
+		$form.characters = fitCastingToIdea($form.characters, idea.parts);
+		rememberLibrary('ideas', idea, sealed);
 	}
 
 	/**
@@ -390,8 +391,8 @@
 	 * here without a reload: offered in the pickers, and compared against.
 	 */
 	function rememberLibrary(
-		kind: 'characters' | 'scenes',
-		copy: DaydreamCharacterCopy | DaydreamSceneCopy,
+		kind: 'characters' | 'ideas',
+		copy: DaydreamCharacterCopy | DaydreamIdeaCopy,
 		sealed: SealedRefView | undefined
 	) {
 		if (!sealed || copy.sourceId === null || copy.sourceRevision === null) {
@@ -403,12 +404,12 @@
 			updatedAt: new Date(),
 			sealed
 		};
-		const list = kind === 'characters' ? characters : scenes;
+		const list = kind === 'characters' ? characters : ideas;
 		const next = [row, ...list.filter((item) => item.id !== row.id)];
 		if (kind === 'characters') {
 			characters = next;
 		} else {
-			scenes = next;
+			ideas = next;
 		}
 	}
 
@@ -435,12 +436,12 @@
 		}
 	}
 
-	function pickScene(event: WaSelectEvent) {
+	function pickIdea(event: WaSelectEvent) {
 		const id = selectedValue(event);
-		const item = scenes.find((candidate) => candidate.id === id);
-		const opened = item ? openedDaydreamScene(item.sealed) : null;
+		const item = ideas.find((candidate) => candidate.id === id);
+		const opened = item ? openedDaydreamIdea(item.sealed) : null;
 		if (item && opened) {
-			putScene({ ...opened, sourceId: item.id, sourceRevision: item.revision });
+			putIdea({ ...opened, sourceId: item.id, sourceRevision: item.revision });
 		}
 	}
 
@@ -468,8 +469,8 @@
 	}
 
 	async function saveCopy(
-		kind: 'characters' | 'scenes',
-		copy: DaydreamCharacterCopy | DaydreamSceneCopy
+		kind: 'characters' | 'ideas',
+		copy: DaydreamCharacterCopy | DaydreamIdeaCopy
 	) {
 		// A character's casting is this daydream's, never the library's.
 		const { sourceId: _id, sourceRevision: _revision, ...rest } = copy;
@@ -493,16 +494,16 @@
 		return Boolean(item && open(item.sealed));
 	}
 
-	function sceneState(): CopyState {
-		return copyState($form.scene, sceneRevisions);
+	function ideaState(): CopyState {
+		return copyState($form.idea, ideaRevisions);
 	}
 
-	const sceneChosen = $derived($form.scene.title.trim() !== '' && $form.scene.premise.trim() !== '');
+	const ideaChosen = $derived($form.idea.title.trim() !== '' && $form.idea.premise.trim() !== '');
 
 	// ── casting ──────────────────────────────────────────────────────────────
 
 	const partName = (partId: string | null) =>
-		$form.scene.parts.find((part) => part.id === partId)?.name ?? null;
+		$form.idea.parts.find((part) => part.id === partId)?.name ?? null;
 
 	/** The characters in no part, by their index in the list. */
 	const uncast = $derived(
@@ -530,11 +531,11 @@
 		partId: string | null,
 		selfIndex: number | null
 	) {
-		const part = $form.scene.parts.find((candidate) => candidate.id === partId);
-		const { title, setting, premise, yourRole, tone } = $form.scene;
+		const part = $form.idea.parts.find((candidate) => candidate.id === partId);
+		const { title, setting, premise, yourRole, tone } = $form.idea;
 		return suggestCasting({
 			character,
-			scene: { title, setting, premise, yourRole, tone },
+			idea: { title, setting, premise, yourRole, tone },
 			part: part ? { name: part.name, description: part.description } : null,
 			others: $form.characters
 				.filter((_, at) => at !== selfIndex)
@@ -546,7 +547,7 @@
 
 	/**
 	 * Writes the casting of a character just cast from the library, when the
-	 * model may be asked and there is a scene to write it for. Background
+	 * model may be asked and there is an idea to write it for. Background
 	 * work nobody waits on, so a failure leaves the fields empty and says
 	 * nothing; the dialog's "Write their part" is there to ask again. Only
 	 * fills what is still empty when the answer comes, so a casting edited in
@@ -555,7 +556,7 @@
 	async function draftCasting(sourceId: string) {
 		const cast = $form.characters.findIndex((candidate) => candidate.sourceId === sourceId);
 		const character = $form.characters[cast];
-		if (!(suggestionsOn && sceneChosen && character)) {
+		if (!(suggestionsOn && ideaChosen && character)) {
 			return;
 		}
 		drafting.add(sourceId);
@@ -588,7 +589,7 @@
 				index === null
 					? { ...EMPTY_CASTING, partId }
 					: ($form.characters[index]?.casting ?? EMPTY_CASTING),
-			parts: $form.scene.parts.map((part) => ({
+			parts: $form.idea.parts.map((part) => ({
 				...part,
 				takenBy:
 					$form.characters.find(
@@ -596,7 +597,7 @@
 					)?.name ?? null
 			})),
 			write:
-				suggestionsOn && sceneChosen
+				suggestionsOn && ideaChosen
 					? (character, chosen) => writeCasting(character, chosen, index)
 					: undefined
 		};
@@ -604,7 +605,7 @@
 	const showLead = $derived(leadApplies($form.voice, $form.characters.length));
 	const charactersNote = $derived.by(() => {
 		if (!voiceChosen) {
-			return 'Who is in the story. With nobody, it is told to you.';
+			return 'Who is in the daydream. With nobody, it is told to you.';
 		}
 		if ($form.voice.narrator === 'none') {
 			return 'Who you are talking with. At least one.';
@@ -733,7 +734,7 @@
 						/>{:else}<SummaryBlank
 							label={piece.label}
 							onclick={() => {
-								sceneDialog = { surprise: false, edit: true };
+								ideaDialog = { surprise: false, edit: true };
 							}}
 						/>{/if}{#if debug && piece.key}<span class="marker">]]</span>{/if}{/if}{/each}</p>{/each}
 			</div>
@@ -783,46 +784,46 @@
 		{/if}
 
 		<fieldset>
-			<legend>The scene</legend>
-			{#if sceneChosen}
+			<legend>The idea</legend>
+			{#if ideaChosen}
 				<DaydreamCopyCard
-					title={$form.scene.title}
-					summary={$form.scene.premise.slice(0, 160)}
-					state={sceneState()}
-					kindName="scenes"
+					title={$form.idea.title}
+					summary={$form.idea.premise.slice(0, 160)}
+					state={ideaState()}
+					kindName="ideas"
 					onedit={() => {
-						sceneDialog = { surprise: false, edit: true };
+						ideaDialog = { surprise: false, edit: true };
 					}}
 					onuselatest={() => {
-						const item = $form.scene.sourceId ? sceneRevisions.get($form.scene.sourceId) : undefined;
-						const opened = item ? openedDaydreamScene(item.sealed) : null;
+						const item = $form.idea.sourceId ? ideaRevisions.get($form.idea.sourceId) : undefined;
+						const opened = item ? openedDaydreamIdea(item.sealed) : null;
 						if (item && opened) {
-							putScene({ ...opened, sourceId: item.id, sourceRevision: item.revision });
+							putIdea({ ...opened, sourceId: item.id, sourceRevision: item.revision });
 						}
 					}}
-					latestReady={latestOpened(sceneRevisions, $form.scene.sourceId, openedDaydreamScene)}
+					latestReady={latestOpened(ideaRevisions, $form.idea.sourceId, openedDaydreamIdea)}
 					onkeep={() => {
-						const item = $form.scene.sourceId ? sceneRevisions.get($form.scene.sourceId) : undefined;
+						const item = $form.idea.sourceId ? ideaRevisions.get($form.idea.sourceId) : undefined;
 						if (item) {
-							putScene({ ...$form.scene, sourceRevision: item.revision });
+							putIdea({ ...$form.idea, sourceRevision: item.revision });
 						}
 					}}
 					onsave={async () => {
-						const saved = await saveCopy('scenes', $form.scene);
+						const saved = await saveCopy('ideas', $form.idea);
 						if (saved) {
-							putScene(saved.copy as DaydreamSceneCopy, saved.sealed);
+							putIdea(saved.copy as DaydreamIdeaCopy, saved.sealed);
 						}
 					}}
 				/>
 			{:else}
 				<p class="hint">Where it happens and what is going on.</p>
 			{/if}
-			<div class="scene-choices">
-				{#if scenes.length > 0}
-					<wa-dropdown onwa-select={pickScene}>
-						<wa-button slot="trigger" size="s" appearance="outlined" with-caret>Choose a saved scene</wa-button>
-						{#each scenes as item (item.id)}
-							{const opened = $derived(openedDaydreamScene(item.sealed))}
+			<div class="idea-choices">
+				{#if ideas.length > 0}
+					<wa-dropdown onwa-select={pickIdea}>
+						<wa-button slot="trigger" size="s" appearance="outlined" with-caret>Choose a saved idea</wa-button>
+						{#each ideas as item (item.id)}
+							{const opened = $derived(openedDaydreamIdea(item.sealed))}
 							<wa-dropdown-item value={item.id} disabled={!opened}>
 								{opened?.title ?? notShown(opened)}
 							</wa-dropdown-item>
@@ -830,29 +831,29 @@
 					</wa-dropdown>
 				{/if}
 				<wa-button size="s" appearance="outlined" onclick={() => {
-					sceneDialog = { surprise: false, edit: false };
+					ideaDialog = { surprise: false, edit: false };
 				}}>
 					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
-					New scene
+					New idea
 				</wa-button>
 				{#if suggestionsOn}
 					<wa-button size="s" appearance="outlined" onclick={() => {
-						sceneDialog = { surprise: true, edit: false };
+						ideaDialog = { surprise: true, edit: false };
 					}}>
 						<wa-icon slot="start" name="wand-magic-sparkles" variant="solid"></wa-icon>
 						Surprise me
 					</wa-button>
 				{/if}
 			</div>
-			{#if $errors.scene?.premise || $errors.scene?.title}
-				<span class="invalid">Choose a scene, or make one.</span>
+			{#if $errors.idea?.premise || $errors.idea?.title}
+				<span class="invalid">Choose an idea, or make one.</span>
 			{/if}
 		</fieldset>
 
 		<fieldset>
 			<legend>Who's in it</legend>
 			<p class="hint">{charactersNote}</p>
-			{#each $form.scene.parts as part (part.id)}
+			{#each $form.idea.parts as part (part.id)}
 				{const index = $derived($form.characters.findIndex((character) => character.casting.partId === part.id))}
 				{const player = $derived($form.characters[index])}
 				<div class="part">
@@ -872,7 +873,7 @@
 			{/each}
 			{#if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
 				{@render castPicker(
-					$form.scene.parts.length > 0 ? 'Add someone else' : 'Add a character',
+					$form.idea.parts.length > 0 ? 'Add someone else' : 'Add a character',
 					null
 				)}
 			{/if}
@@ -986,18 +987,18 @@
 		}}
 	/>
 {/if}
-{#if sceneDialog}
-	{const editing = $derived(sceneDialog.edit ? $form.scene : null)}
-	<DaydreamSceneDialog
+{#if ideaDialog}
+	{const editing = $derived(ideaDialog.edit ? $form.idea : null)}
+	<DaydreamIdeaDialog
 		{debug}
-		scene={editing}
-		libraryRevision={editing?.sourceId ? (sceneRevisions.get(editing.sourceId)?.revision ?? null) : null}
-		surprise={sceneDialog.surprise}
+		idea={editing}
+		libraryRevision={editing?.sourceId ? (ideaRevisions.get(editing.sourceId)?.revision ?? null) : null}
+		surprise={ideaDialog.surprise}
 		{context}
 		{suggestionsOn}
-		onsaved={putScene}
+		onsaved={putIdea}
 		onclose={() => {
-			sceneDialog = null;
+			ideaDialog = null;
 		}}
 	/>
 {/if}
@@ -1046,7 +1047,7 @@
 		margin-block-start: -0.75rem;
 	}
 
-	/* A scene part, and who plays it. */
+	/* An idea part, and who plays it. */
 	.part {
 		display: flex;
 		flex-direction: column;
@@ -1064,7 +1065,7 @@
 		gap: 1rem;
 	}
 
-	.scene-choices {
+	.idea-choices {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.375rem;

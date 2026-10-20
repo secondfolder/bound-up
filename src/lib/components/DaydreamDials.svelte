@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { DialValue, PassageLength, SceneDials, StoryDials } from '$lib/daydream';
-	import { PASSAGE_LENGTHS, SCENE_SLIDERS, STORY_SLIDERS } from '$lib/daydream/dial-words';
+	import type { DialValue, IdeaDials, PassageLength, StoryDials } from '$lib/daydream';
+	import { IDEA_SLIDERS, PASSAGE_LENGTHS, STORY_SLIDERS } from '$lib/daydream/dial-words';
 	import OptionalSlider from './OptionalSlider.svelte';
 	import Slider from './Slider.svelte';
 
@@ -16,18 +16,18 @@
 	let {
 		value,
 		onchange,
-		scene,
-		onscenechange
+		idea,
+		onideachange
 	}: {
 		value: StoryDials;
 		onchange: (dials: StoryDials) => void;
 		/**
-		 * The scene's heat and kink, shown above the rest when given: in the
+		 * The idea's heat and kink, shown above the rest when given: in the
 		 * story's popover, so they can be turned up or down mid-story. The
-		 * setup form leaves them out, as its scene dialog sets them.
+		 * setup form leaves them out, as its idea dialog sets them.
 		 */
-		scene?: SceneDials;
-		onscenechange?: (dials: SceneDials) => void;
+		idea?: IdeaDials;
+		onideachange?: (dials: IdeaDials) => void;
 	} = $props();
 
 	/**
@@ -52,15 +52,15 @@
 </script>
 
 <div class="dials">
-	{#if scene && onscenechange}
-		{#each SCENE_SLIDERS as entry (entry.key)}
+	{#if idea && onideachange}
+		{#each IDEA_SLIDERS as entry (entry.key)}
 			<OptionalSlider
 				label={entry.label}
 				low={entry.low}
 				high={entry.high}
 				scale={entry.scale}
-				value={scene[entry.key]}
-				onchange={(level) => onscenechange({ ...scene, [entry.key]: level })}
+				value={idea[entry.key]}
+				onchange={(level) => onideachange({ ...idea, [entry.key]: level })}
 			/>
 		{/each}
 	{/if}

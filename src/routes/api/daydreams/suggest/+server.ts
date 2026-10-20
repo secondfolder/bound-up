@@ -8,8 +8,8 @@ import { rateLimitMessage } from '$lib/server/rate-limit';
 import type { RequestHandler } from './$types';
 
 /**
- * Asks the model for suggestions while a character or scene is being set
- * up: more chips for a field, the empty fields filled in, or a whole scene
+ * Asks the model for suggestions while a character or idea is being set
+ * up: more chips for a field, the empty fields filled in, or a whole idea
  * for "Surprise me"; and, for a daydream, who a character is in it, its
  * name, or the whole of it from a sentence on the new-daydream page.
  *

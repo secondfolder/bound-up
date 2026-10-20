@@ -135,7 +135,7 @@ describe('POST /api/daydreams/suggest', () => {
 		const casting = {
 			task: 'casting',
 			character: { name: 'Mara', notes: SECRET_WORDS },
-			scene: { title: 'After hours', premise: 'an interview' },
+			idea: { title: 'After hours', premise: 'an interview' },
 			part: { name: 'the interviewer', description: '' },
 			others: [],
 			stance: 'self',
@@ -143,12 +143,12 @@ describe('POST /api/daydreams/suggest', () => {
 		};
 		const naming = {
 			task: 'name',
-			scene: { title: 'After hours', premise: 'an interview' },
+			idea: { title: 'After hours', premise: 'an interview' },
 			characters: ['Mara'],
 			opening: SECRET_WORDS,
 			limits: ''
 		};
-		const ideas = { task: 'ideas', request: SECRET_WORDS, side: 'sub', limits: '' };
+		const ideas = { task: 'ideas', brief: SECRET_WORDS, side: 'sub', limits: '' };
 		for (const json of [casting, naming, ideas]) {
 			expect(await post(ada, json)).toMatchObject({ type: 'ok' });
 		}
@@ -166,7 +166,7 @@ describe('POST /api/daydreams/suggest', () => {
 		const limit = vi.fn(async (): Promise<RateLimitResult> => ({ allowed: true }));
 		const naming = {
 			task: 'name',
-			scene: { title: 'After hours', premise: 'an interview' },
+			idea: { title: 'After hours', premise: 'an interview' },
 			characters: [],
 			opening: 'x'.repeat(2001),
 			limits: ''
