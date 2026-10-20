@@ -849,9 +849,18 @@ image model tuned for adult imagery, through Runware.
   setup says, what they wear, anyone the moment only implies included —
   then what they are doing, with a sex act spelt out and given all its
   common names, the place and the light (its quality, direction and
-  colour), in literal sentences of 80 to 150 words, in words with one
-  meaning, and only as explicit as the idea's heat, which when it allows
-  frames the sex plainly in view. The image model has seen nothing else and draws what the words say,
+  colour), in literal English sentences, in words with one meaning,
+  concrete nouns rather than adjectives, saying what is there rather than
+  what is not ("bare-chested", never "without a shirt": a word for
+  something absent gets drawn), with any writing quoted exactly and named
+  on what it is on, and only as explicit as the idea's heat, which when it
+  allows frames the sex plainly in view. The user's own character, when
+  they have a cock and nothing says its size, gets a thick, long one.
+  How long it is and in what order follow the model that draws the
+  daydream's style (`IMAGE_RECIPES`): 80 to 150 words with the framing
+  first for Z-Image Turbo and the SDXL family; 30 to 80 for FLUX.2 Klein,
+  more only when the moment needs it, subject first and framing last,
+  because FLUX weighs words by where they come. The image model has seen nothing else and draws what the words say,
   so it gets no names, no "you", and nothing a camera could not see: a
   story's names and feelings only crowd out what it can draw, and a head
   count left unsaid grew a stranger in the frame. It is left out
@@ -879,10 +888,17 @@ image model tuned for adult imagery, through Runware.
   prompt that keeps it away from anything youthful — and, at SFW, from
   nudity. How it says those follows the model's architecture
   (`PictureArchitecture`), because what suits one family is poor for the
-  other: an SDXL-family model gets tags, ~30 steps and real guidance; a
+  others: an SDXL-family model gets tags, ~30 steps and real guidance; a
   Z-Image Turbo model gets sentences, its distilled 9 steps and `CFGScale`
   1.5. Not Z-Image's usual 1: there Runware drops the negative prompt, and
-  Dark Beast drew a woman described as 35 barely out of her teens. The
+  Dark Beast drew a woman described as 35 barely out of her teens. A
+  FLUX.2 Klein model gets the description first and the style sentences
+  after it, 4 steps and `CFGScale` 1.5: at 1 it garbled a quoted sign and
+  lost who sat where, and 1.5 and 3.5 drew the same picture. Every
+  sentence round a description says what is wanted, never what is not
+  ("fully clothed, in an everyday, non-sexual moment"), and the photo
+  style is a candid personal photograph by a skilled amateur on a good
+  phone, not a studio shoot. The
   architecture comes from the model's base model, which is stored with the
   model in the server settings (see [Configuration](#configuration)), so
   nothing has to be looked up when a picture is made. It answers with the
@@ -893,7 +909,10 @@ image model tuned for adult imagery, through Runware.
   v3) with whether each passage gets one by itself, which is on by default.
   Both are in the setup form's "More options" and the story's Dials
   popover (`DaydreamPicturesControl.svelte`). Neither reaches the story
-  model, so changing either mid-story costs no cache miss. Which model draws
+  model as such, but the style decides which recipe its descriptions follow,
+  so switching to a style drawn by a model of another family changes the
+  system prompt and costs one uncached request; switching between two of
+  the same family costs nothing. Which model draws
   each style is a server setting; the defaults are Runware AIRs pinned to a
   version (`RUNWARE_PICTURE_MODEL_PRESETS` in `src/lib/server-settings.ts`).
 - **Kept encrypted, like an attachment.** Turns never change, and a picture
@@ -1436,17 +1455,20 @@ by its id — `{"preset":"hermes"}` — and mapped to the provider's model in co
 `src/lib/server-settings.ts`), so a preset can move to a newer version of its
 model without anyone touching a setting. The story presets are Hermes (the
 default), a larger Hermes, Euryale and Cydonia; the picture presets are Dark
-Beast (a Z-Image Turbo fine-tune, the photo default), Lustify (SDXL), and
-WAI-illustrious (Illustrious, the illustrated default).
+Beast (a Z-Image Turbo fine-tune, the photo default), Lustify (SDXL),
+FLUX.2 Klein 9B (Black Forest Labs' distilled model, which Runware lists for
+commercial use though BFL publish its weights under a non-commercial licence),
+and WAI-illustrious (Illustrious, the illustrated default).
 
 - **A custom story model** is any OpenRouter id, `{"openrouterModelId":
   "vendor/id"}`, found on the admin page by searching OpenRouter's public
   model list (`GET /api/admin/models/openrouter?q=`).
 - **A custom picture model** is a Runware AIR and the base model it was
   trained from, `{"runwareModelAir":"…","base":"pony"}`, where the base is one
-  of SDXL, Illustrious, Pony, NoobAI or Z-Image Turbo. The base decides the
-  prompt recipe (`PictureArchitecture` in `daydream/image-prompt.ts`): the
-  SDXL family all take tags, Z-Image Turbo takes sentences. It is found by
+  of SDXL, Illustrious, Pony, NoobAI, Z-Image Turbo or FLUX.2 Klein. The
+  base decides the prompt recipe (`PictureArchitecture` in
+  `daydream/image-prompt.ts`): the SDXL family all take tags, Z-Image Turbo
+  and FLUX.2 Klein take sentences, in a different order and length. It is found by
   searching Runware's checkpoints with the saved key
   (`GET /api/admin/models/runware?q=`, 409 until a key is saved), which fills
   in the base from Runware's own architecture for that model. The search is

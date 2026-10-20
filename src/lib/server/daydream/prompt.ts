@@ -21,6 +21,7 @@ import {
 	describeIdeaDials,
 	describeStoryDials
 } from '$lib/daydream/dial-words';
+import type { PictureArchitecture } from '$lib/daydream/image-prompt';
 import { explicitOoc } from '$lib/daydream/ooc';
 import {
 	type DaydreamSetupContent,
@@ -401,8 +402,10 @@ function steeringIdeas(
  */
 /**
  * What the model is told about describing a picture (docs/daydreams.md,
- * "Pictures"): only on a server that makes them, which is the same for every
- * request, so the prompt stays one a provider can cache. The description is
+ * "Pictures"): only on a server that makes them, and in the recipe of the
+ * model that draws the daydream's style (`IMAGE_RECIPES`). That is the same
+ * for every request until the style is switched to a model of another family,
+ * so the prompt stays one a provider can cache. The description is
  * checked again before it is sent anywhere (`imagePromptProblem`) and wrapped
  * in the server's own style and safety words (`runwareTask`); this is the
  * first of those guards, not the only one.
@@ -420,13 +423,56 @@ function steeringIdeas(
  * act ("being fucked") is drawn as anything, so it is spelt out and given
  * every common name; a person only implied by the act goes undrawn unless
  * described; a word with two meanings ("gear") is drawn as the wrong one;
- * and light said exactly does more for a picture than any adjective.
+ * and light said exactly does more for a picture than any adjective. From a
+ * second one, written for FLUX.2 Klein: a concrete noun does more than an
+ * adjective; a thing named as absent ("without a shirt") gets drawn, since an
+ * image model has no way to read "without"; writing that is not quoted comes
+ * out as gibberish; and what a picture is about is made prominent in words,
+ * since none of these models take weight syntax. The last line about the
+ * user's cock is the user's own preference, from that prompt.
  *
  * A picture is skipped when little has visibly changed since the last one:
  * a second picture of the same moment costs a request and shows nothing
  * new. The model can judge that because each past passage goes back with
  * the description it wrote (`passageAsSent`).
  */
+/**
+ * How long a description is, and in what order, for the model that draws it.
+ * Z-Image (and the SDXL models, which get the same sentences after their
+ * tags) follows a long description closely and is given one, framing first.
+ * FLUX weighs words by where they come and does best on a short description:
+ * subject and action first, composition last — so its framing moves to the
+ * end, and its length to BFL's own guidance, with room for two people
+ * described in full, which is what keeps them the same from picture to
+ * picture.
+ */
+const IMAGE_PARTS = {
+	framing: 'The framing: close-up, medium shot or wide shot, and from where.',
+	people:
+		'How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don\'t). Count and describe anyone the moment implies, too: if someone is being fucked, whoever is fucking them is in the picture. Keep each person\'s look the same from picture to picture, from the setup where it says.',
+	action:
+		'What each is doing at that instant, specifically: pose, where their hands are, where they look, their expression ("eyes squeezed shut and mouth open, mid-orgasm"). Spell out a sex act — the position, who is doing what to whom, where their hands are — and name it by its most common, plain name, adding its other common names ("face fucking, also called a reverse blowjob"; "giving a blowjob", not "throating").',
+	place:
+		'The place, a few concrete things in it, and the light: its quality, direction and colour ("warm lamplight from the left", "direct on-camera flash", "overcast daylight through a window").'
+} as const;
+
+type ImageRecipe = { length: string; order: readonly (keyof typeof IMAGE_PARTS)[] };
+
+const LONG_RECIPE: ImageRecipe = {
+	length: 'about 80 to 150 words',
+	order: ['framing', 'people', 'action', 'place']
+};
+
+const IMAGE_RECIPES: Readonly<Record<PictureArchitecture, ImageRecipe>> = {
+	'z-image-turbo': LONG_RECIPE,
+	sdxl: LONG_RECIPE,
+	'flux-2': {
+		length:
+			'about 30 to 80 words for a simple moment, and more only when the moment needs it — two people, each described in full, usually does — never padded with adjectives',
+		order: ['people', 'action', 'place', 'framing']
+	}
+};
+
 /**
  * When a passage gets a picture. In a story, most do: there are people
  * somewhere, doing something. A monologue has no moment of its own — asked
@@ -442,14 +488,15 @@ const IMAGE_WHEN = {
 		"include it when a picture would be of real interest to the user, and leave it out when it would not. A monologue has no moment of its own, but its ideas can still be pictured: draw what the passage is about rather than who is saying it — someone doing what the voice says they are for, a scene it pictures or describes, an image that embodies one of its ideas. A picture is most worth making when it carries the passage's kink and sexual themes, as explicit as the passage is and the idea's heat allows, never toned down. The speaker sitting somewhere, thinking, looking out of a window or going about their day is not worth a picture, however the passage places them."
 } as const;
 
-function imageInstruction(voice: DaydreamVoice): string {
+function imageInstruction(voice: DaydreamVoice, architecture: PictureArchitecture): string {
+	const recipe = IMAGE_RECIPES[architecture];
+	const steps = recipe.order
+		.map((part, index) => `  ${index + 1}. ${IMAGE_PARTS[part]}`)
+		.join('\n');
 	return `- "image": ${voice.narrator === 'monologue' ? IMAGE_WHEN.monologue : IMAGE_WHEN.story} It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the passage is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the passage to see. Leave it out, too, when little a camera could see has changed since the last passage that had one (its "image" is in that passage's metadata): the same people, in the same place and much the same pose, doing much the same thing — another picture of it would show nothing new. A new act, position, place, person or outfit is a change worth one. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.
-  It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it as plain, literal sentences in the present tense, about 80 to 150 words and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
-  1. The framing: close-up, medium shot or wide shot, and from where.
-  2. How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don't). Count and describe anyone the moment implies, too: if someone is being fucked, whoever is fucking them is in the picture. Keep each person's look the same from picture to picture, from the setup where it says.
-  3. What each is doing at that instant, specifically: pose, where their hands are, where they look, their expression ("eyes squeezed shut and mouth open, mid-orgasm"). Spell out a sex act — the position, who is doing what to whom, where their hands are — and name it by its most common, plain name, adding its other common names ("face fucking, also called a reverse blowjob"; "giving a blowjob", not "throating").
-  4. The place, a few concrete things in it, and the light: its quality, direction and colour ("warm lamplight from the left", "direct on-camera flash", "overcast daylight through a window").
-  Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
+  It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it in English, as plain, literal sentences in the present tense, ${recipe.length}, and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
+${steps}
+  Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". Concrete nouns, materials and textures, not adjectives: "a black leather harness across her chest", not "a sexy outfit". Say what is there, never what is not: "bare-chested", not "without a shirt"; "alone on the bed", not "no one else there" — a word for something absent gets drawn. Make what the picture is about prominent in plain words ("with particular attention to her face"). Writing appears only when the moment has some, quoted exactly with what it is on: a collar tag reads "PET". When the user's own character has a penis and nothing says how big, it is thick and long. When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
   Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the idea's heat allows: at SFW, everyone clothed and nothing sexual. Never a style, a medium or camera settings — those are chosen for you.`;
 }
 
@@ -478,7 +525,11 @@ Put a sound someone or something makes — a moan, a gasp, a slap, a knock — i
 Say and sound tags go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
 }
 
-function replyFormat(voice: DaydreamVoice, heat: DialValue | null, pictures: boolean): string {
+function replyFormat(
+	voice: DaydreamVoice,
+	heat: DialValue | null,
+	pictures: PictureArchitecture | null
+): string {
 	const ideas = steeringIdeas(voice, heat);
 	const inStory = voice.stance !== 'absent';
 	const readings = inStory
@@ -490,12 +541,12 @@ function replyFormat(voice: DaydreamVoice, heat: DialValue | null, pictures: boo
 When the user's last turn is words they wrote — not a button, a roll or a request to continue — open your reply by deciding how you read it, before writing anything else, on a line of its own: <reading>direction</reading>. One of ${readings}. Then answer it as that.
 Write the passage next${inStory ? " (after the <yours> block, when you wrote out the user's turn)" : ''}. Then, on a new line, end every reply with a metadata block, and write nothing after it:
 <meta>
-{"suggestions": [...], "directions": {"add": [...], "remove": [...]}${pictures ? ', "image": "..."' : ''}}
+{"suggestions": [...], "directions": {"add": [...], "remove": [...]}${pictures === null ? '' : ', "image": "..."'}}
 </meta>
 - "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. ${ideas.suggestions}
 - "directions": buttons for steering the story. The ones on screen now are listed at the end of the last message. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} in all. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
-- "ooc": true, only when the passage is out of character.${pictures ? `\n${imageInstruction(voice)}` : ''}`;
+- "ooc": true, only when the passage is out of character.${pictures === null ? '' : `\n${imageInstruction(voice, pictures)}`}`;
 }
 
 const CHECK_IN = `# The scene is stopped
@@ -663,12 +714,14 @@ function rewriteRequest(rewrite: NonNullable<ReplyRequest['rewrite']>): string {
 }
 
 /**
- * The messages for one reply. `pictures` is whether this server makes them
- * (`readImageConfig`): only then is the model asked to describe one.
+ * The messages for one reply. `pictures` is how the model that draws this
+ * daydream's style is prompted, or null when this server makes no pictures
+ * (`readImageConfig`): only then is the model asked to describe one, and in
+ * that model's recipe.
  */
 export function buildMessages(
 	request: ReplyRequest,
-	options: { pictures: boolean } = { pictures: false }
+	options: { pictures: PictureArchitecture | null } = { pictures: null }
 ): ModelMessage[] {
 	const stopped = isStopped(request.turns);
 	const system: ModelMessage = {

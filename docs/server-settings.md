@@ -212,10 +212,13 @@ OpenRouter id may have a `:variant` and an `@` suffix with slashes in it, and
 a Runware AIR's version may have letters (`persona:242173@2788849L`).
 
 **A picture model's base model decides how it is prompted.** The choices are
-`PICTURE_BASE_MODELS`: SDXL, Illustrious, Pony, NoobAI and Z-Image Turbo, each
-mapped to one of `image-prompt.ts`'s recipes (`PictureArchitecture`: tags,
-negative prompt and real guidance for the SDXL family; sentences and light
-guidance for Z-Image Turbo). They are kept finer than the recipes so the
+`PICTURE_BASE_MODELS`: SDXL, Illustrious, Pony, NoobAI, Z-Image Turbo and
+FLUX.2 Klein, each mapped to one of `image-prompt.ts`'s recipes
+(`PictureArchitecture`: tags, negative prompt and real guidance for the SDXL
+family; sentences and light guidance for Z-Image Turbo; sentences, subject
+first, in 4 steps for FLUX.2 Klein). Only Klein's distilled models map to it:
+Runware's `flux2klein_base_*` are undistilled and want ~28 steps, so they map
+to nothing and the admin chooses. They are kept finer than the recipes so the
 stored choice says what the model is, and a recipe can be split for one
 family later without asking anyone again. A Runware search result fills the
 base model in when its architecture maps to one

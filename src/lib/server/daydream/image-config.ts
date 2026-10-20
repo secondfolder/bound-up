@@ -1,5 +1,6 @@
 import { env as privateEnv } from '$env/dynamic/private';
 import type { PictureStyle } from '$lib/daydream';
+import type { PictureArchitecture } from '$lib/daydream/image-prompt';
 import {
 	parseRunwarePictureModel,
 	RUNWARE_PICTURE_MODEL_SETTING,
@@ -76,4 +77,16 @@ export function readImageConfig(
 	platform: App.Platform | undefined
 ): ImageConfig | null {
 	return parseImageConfig(settings, runwareBaseUrl(platform));
+}
+
+/**
+ * How the story model is told to describe a picture for a daydream in this
+ * style: the recipe of the model that draws it, or null on a server that
+ * makes no pictures, where it is not asked for one at all.
+ */
+export function pictureArchitectureFor(
+	config: ImageConfig | null,
+	style: PictureStyle
+): PictureArchitecture | null {
+	return config?.models[style].architecture ?? null;
 }

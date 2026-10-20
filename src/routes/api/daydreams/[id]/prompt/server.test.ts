@@ -11,6 +11,7 @@ import {
 	grantTestDaydreams,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { testSettings } from '$lib/testing/settings';
 import { POST } from './+server';
 
 /**
@@ -54,8 +55,16 @@ afterEach(() => {
 const grantDebug = (user: TestUser) =>
 	grantFeature(db, { userId: user.id, feature: 'debugMode', grantedByUserId: user.id });
 
-function post(user: TestUser, id = daydreamId, json: unknown = body) {
-	return runAndCatch(() => POST(fakeEvent({ db, user, json, params: { id } })));
+function post(user: TestUser, id = daydreamId, json: unknown = body, settings = testSettings()) {
+	return runAndCatch(() => POST(fakeEvent({ db, user, json, params: { id }, settings })));
+}
+
+async function systemPrompt(result: Awaited<ReturnType<typeof post>>): Promise<string> {
+	if (result.type !== 'ok') {
+		throw new Error(JSON.stringify(result));
+	}
+	const { messages } = (await result.value.json()) as { messages: { content: string }[] };
+	return messages[0]?.content ?? '';
 }
 
 describe('POST /api/daydreams/[id]/prompt', () => {
@@ -74,6 +83,27 @@ describe('POST /api/daydreams/[id]/prompt', () => {
 			messages.at(-1)?.content.startsWith(`${SECRET_WORDS}\n\n(Direction buttons on screen now:`)
 		).toBe(true);
 		expect(upstream).not.toHaveBeenCalled();
+	});
+
+	it("asks for pictures in the recipe of the model that draws the daydream's style", async () => {
+		await grantDebug(ada);
+		const settings = testSettings({
+			runwareApiKey: 'rw-key',
+			runwarePhotoModel: JSON.stringify({ preset: 'flux-2-klein-9b' })
+		});
+		const withStyle = (style: 'photo' | 'illustrated') => ({
+			...body,
+			setup: { ...body.setup, pictures: { on: true, style } }
+		});
+		const photo = await systemPrompt(await post(ada, daydreamId, withStyle('photo'), settings));
+		expect(photo).toContain('about 30 to 80 words');
+		// The illustrated style is still drawn by an SDXL model, which gets the long recipe.
+		const drawn = await systemPrompt(
+			await post(ada, daydreamId, withStyle('illustrated'), settings)
+		);
+		expect(drawn).toContain('about 80 to 150 words');
+		// Without a Runware key, no pictures at all.
+		expect(await systemPrompt(await post(ada))).not.toContain('"image"');
 	});
 
 	it('is refused without debug mode, even with Daydreams', async () => {

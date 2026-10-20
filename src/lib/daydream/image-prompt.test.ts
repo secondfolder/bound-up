@@ -10,6 +10,8 @@ import {
 
 const sdxl: PictureModel = { runwareModelAir: 'civitai:1@1', architecture: 'sdxl' };
 const zImage: PictureModel = { runwareModelAir: 'persona:2@2', architecture: 'z-image-turbo' };
+const flux: PictureModel = { runwareModelAir: 'runware:400@2', architecture: 'flux-2' };
+const allModels = [sdxl, zImage, flux];
 
 describe('imagePromptProblem', () => {
 	it('lets an adult idea through', () => {
@@ -81,7 +83,9 @@ describe('runwareTask', () => {
 
 	it('prompts a Z-Image Turbo model in sentences, on its short schedule', () => {
 		const task = runwareTask({ prompt: 'A man in a suit.', style: 'photo', heat: 4 }, zImage, 't');
-		expect(task.positivePrompt).toMatch(/^A candid, realistic photograph\. A man in a suit\. /);
+		expect(task.positivePrompt).toMatch(
+			/^A candid, realistic personal photograph by a skilled amateur .*\. A man in a suit\. /
+		);
 		expect(task.positivePrompt).toContain('at least 20 years old');
 		expect(task.positivePrompt).not.toContain('masterpiece');
 		expect(task.steps).toBeLessThanOrEqual(12);
@@ -92,8 +96,31 @@ describe('runwareTask', () => {
 		expect(drawn.positivePrompt).toMatch(/^A detailed digital illustration/);
 	});
 
+	it('prompts a FLUX.2 Klein model subject first, on its 4-step schedule', () => {
+		const task = runwareTask({ prompt: 'A man in a suit.', style: 'photo', heat: 4 }, flux, 't');
+		// FLUX weighs words by where they come: the subject before the style.
+		expect(task.positivePrompt).toMatch(
+			/^A man in a suit\. A candid, realistic personal photograph/
+		);
+		expect(task.positivePrompt).toContain('at least 20 years old');
+		expect(task).toMatchObject({ steps: 4, CFGScale: 1.5 });
+		const sfw = runwareTask({ prompt: 'x', style: 'photo', heat: 1 }, flux, 't');
+		expect(sfw.positivePrompt).toContain('fully clothed, in an everyday, non-sexual moment');
+	});
+
+	it('names nothing it wants left out where a model would read it as wanted', () => {
+		for (const model of [zImage, flux]) {
+			const task = runwareTask({ prompt: 'x', style: 'photo', heat: 1 }, model, 't');
+			expect(task.positivePrompt).not.toMatch(/\bno text\b|\bwatermark\b|\bnothing\b/i);
+		}
+		// A description may quote a sign or a collar tag, so text is not refused.
+		const task = runwareTask({ prompt: 'x', style: 'photo', heat: 4 }, zImage, 't');
+		expect(task.negativePrompt.split(', ')).not.toContain('text');
+		expect(task.negativePrompt).toContain('watermark');
+	});
+
 	it('keeps the image model away from anything youthful, and from nudity at SFW', () => {
-		for (const model of [sdxl, zImage]) {
+		for (const model of allModels) {
 			const explicit = runwareTask({ prompt: 'x', style: 'photo', heat: 5 }, model, 't');
 			expect(explicit.negativePrompt).toContain('child');
 			expect(explicit.negativePrompt).toContain('baby face');
@@ -113,7 +140,7 @@ describe('runwareTask', () => {
 	});
 
 	it('says woman and man where the description says girl and boy', () => {
-		for (const model of [sdxl, zImage]) {
+		for (const model of allModels) {
 			const task = runwareTask(
 				{ prompt: 'Two girls kiss a boy', style: 'photo', heat: 4 },
 				model,
@@ -125,7 +152,7 @@ describe('runwareTask', () => {
 
 	it('fits the longest description in what debug mode keeps of a request', () => {
 		const prompt = 'x'.repeat(DAYDREAM_LIMITS.imagePrompt);
-		for (const model of [sdxl, zImage]) {
+		for (const model of allModels) {
 			for (const style of ['photo', 'illustrated'] as const) {
 				const task = runwareTask({ prompt, style, heat: 1 }, model, 't');
 				expect(task.positivePrompt.length).toBeLessThanOrEqual(MAX_PICTURE_REQUEST_PROMPT);

@@ -14,6 +14,7 @@
  * checks a description before asking.
  */
 
+import { assertNever } from '../assert-never';
 import { DAYDREAM_LIMITS, type DialValue, type PictureStyle } from '../daydream';
 
 export const PICTURE_STYLES: readonly { value: PictureStyle; label: string }[] = [
@@ -143,26 +144,37 @@ function adultNouns(prompt: string): string {
  *   way, it drew a woman described as 35 looking barely out of her teens. A
  *   little guidance (`CFGScale` 1.5) brings the negative prompt back and
  *   her age with it, without the burnt look Z-Image gets past ~2.5.
+ * - `flux-2` (FLUX.2 Klein, the distilled 4B and 9B): read through a language
+ *   model too, and distilled to 4 steps. FLUX has no negative prompts in its
+ *   own terms, so everything it is told is said as what is wanted, and word
+ *   order weighs: the description comes first, the style after it. Runware
+ *   still honours a negative prompt above CFG 1, so one is sent anyway.
  */
-export type PictureArchitecture = 'sdxl' | 'z-image-turbo';
+export type PictureArchitecture = 'sdxl' | 'z-image-turbo' | 'flux-2';
 
 /** A Runware model, and how it is prompted. */
 export type PictureModel = { runwareModelAir: string; architecture: PictureArchitecture };
 
+/**
+ * The photo style is a candid personal photograph, not a studio shoot: the
+ * hand-tuned prompt whose pictures were good asked for that, and the
+ * description says the light itself, which "cinematic lighting" overrode.
+ */
 const STYLE_TAGS: Readonly<Record<PictureStyle, string>> = {
-	photo: 'photograph, realistic, natural skin texture, cinematic lighting, shallow depth of field',
+	photo:
+		'photograph, realistic, candid amateur photo, natural light, natural skin texture, shallow depth of field',
 	illustrated: 'masterpiece, best quality, detailed illustration, expressive, soft shading'
 };
 
 /**
- * The style in Z-Image's terms: an opening that sets the medium, and a close
- * that asks for the finish. The description itself starts with the framing
- * (`imageInstruction` in `server/daydream/prompt.ts`), so these say nothing
- * about the shot.
+ * The style as sentences, for the models that read them: an opening that sets
+ * the medium, and a close that asks for the finish. The description itself
+ * says the framing (`imageInstruction` in `server/daydream/prompt.ts`), so
+ * these say nothing about the shot.
  */
 const STYLE_SENTENCES: Readonly<Record<PictureStyle, { open: string; close: string }>> = {
 	photo: {
-		open: 'A candid, realistic photograph.',
+		open: 'A candid, realistic personal photograph by a skilled amateur on a high-quality smartphone: natural, unposed and lightly processed.',
 		close:
 			'Realistic skin texture, natural adult proportions, sharp focus on the faces, soft shallow depth of field.'
 	},
@@ -189,9 +201,11 @@ const ADULT_SENTENCE =
 
 /**
  * Nothing sexual at SFW heat, as a sentence. The negative prompt says it too,
- * but a sentence is what Z-Image weighs most.
+ * but a sentence is what Z-Image weighs most, and the only thing FLUX reads.
+ * Said as what is there rather than what is not: naming what to leave out
+ * puts the word in front of a model that has no way to read it as absent.
  */
-const SFW_SENTENCE = 'Everyone is fully clothed, and nothing in it is sexual.';
+const SFW_SENTENCE = 'Everyone is fully clothed, in an everyday, non-sexual moment.';
 
 const NEGATIVE_ALWAYS = [
 	'child',
@@ -206,7 +220,8 @@ const NEGATIVE_ALWAYS = [
 	'extra limbs',
 	'bad hands',
 	'bad anatomy',
-	'text',
+	// Not "text": the description quotes any writing the moment has, a sign or
+	// a collar tag, and asking for none would fight it.
 	'watermark',
 	'signature',
 	'logo'
@@ -251,12 +266,33 @@ export type PictureWorkload = {
 
 /** The workload of one style's pictures with one model. */
 export function pictureWorkload(style: PictureStyle, model: PictureModel): PictureWorkload {
-	const schedule =
-		model.architecture === 'z-image-turbo'
-			? // Its distilled schedule: more steps cost time and buy nothing.
-				{ steps: 9, CFGScale: 1.5 }
-			: { steps: 30, CFGScale: style === 'photo' ? 4.5 : 6 };
-	return { model: model.runwareModelAir, ...schedule, ...PICTURE_SIZE };
+	return {
+		model: model.runwareModelAir,
+		...scheduleFor(style, model.architecture),
+		...PICTURE_SIZE
+	};
+}
+
+function scheduleFor(
+	style: PictureStyle,
+	architecture: PictureArchitecture
+): Pick<PictureWorkload, 'steps' | 'CFGScale'> {
+	switch (architecture) {
+		case 'z-image-turbo':
+			// Its distilled schedule: more steps cost time and buy nothing.
+			return { steps: 9, CFGScale: 1.5 };
+		case 'flux-2':
+			// Klein is distilled to 4 steps, Runware's default for it. Some
+			// guidance, because Runware drops the negative prompt at CFG 1; and
+			// measured on Klein 9B (2026-10-20, one seed), CFG 1 garbled a quoted
+			// sign ("Open 24 Hour Hours") and left out where people were, while
+			// 1.5 and 3.5 drew the same picture to the pixel, both right.
+			return { steps: 4, CFGScale: 1.5 };
+		case 'sdxl':
+			return { steps: 30, CFGScale: style === 'photo' ? 4.5 : 6 };
+		default:
+			return assertNever(architecture, 'picture architecture');
+	}
 }
 
 /** The words round the description, for one family. */
@@ -266,18 +302,25 @@ function positivePromptFor(
 	sfw: boolean,
 	description: string
 ): string {
-	if (architecture === 'z-image-turbo') {
-		const { open, close } = STYLE_SENTENCES[style];
-		return [
-			open,
-			description,
-			ADULT_SENTENCE,
-			...(sfw ? [SFW_SENTENCE] : []),
-			close,
-			'No text, no watermark.'
-		].join(' ');
+	const sfwSentences = sfw ? [SFW_SENTENCE] : [];
+	switch (architecture) {
+		case 'z-image-turbo': {
+			const { open, close } = STYLE_SENTENCES[style];
+			// Not "No text, no watermark" any more: the negative prompt says the
+			// latter at this CFG, and the description may quote text it wants.
+			return [open, description, ADULT_SENTENCE, ...sfwSentences, close].join(' ');
+		}
+		case 'flux-2': {
+			// FLUX weighs words by where they come: the subject and what it is
+			// doing first, which the description opens with, then the style.
+			const { open, close } = STYLE_SENTENCES[style];
+			return [description, open, ADULT_SENTENCE, ...sfwSentences, close].join(' ');
+		}
+		case 'sdxl':
+			return `${STYLE_TAGS[style]}, ${ADULT_ANCHOR[style]}. ${description}`;
+		default:
+			return assertNever(architecture, 'picture architecture');
 	}
-	return `${STYLE_TAGS[style]}, ${ADULT_ANCHOR[style]}. ${description}`;
 }
 
 /** One Runware `imageInference` task for a description already passed by `imagePromptProblem`. */

@@ -130,7 +130,8 @@ export const PICTURE_BASE_MODELS = [
 	{ id: 'illustrious', label: 'Illustrious (SDXL)', architecture: 'sdxl' },
 	{ id: 'pony', label: 'Pony (SDXL)', architecture: 'sdxl' },
 	{ id: 'noobai', label: 'NoobAI (SDXL)', architecture: 'sdxl' },
-	{ id: 'z-image-turbo', label: 'Z-Image Turbo', architecture: 'z-image-turbo' }
+	{ id: 'z-image-turbo', label: 'Z-Image Turbo', architecture: 'z-image-turbo' },
+	{ id: 'flux-2-klein', label: 'FLUX.2 Klein', architecture: 'flux-2' }
 ] as const satisfies readonly { id: string; label: string; architecture: PictureArchitecture }[];
 
 export type PictureBaseModel = (typeof PICTURE_BASE_MODELS)[number]['id'];
@@ -147,6 +148,11 @@ export function isPictureBaseModel(value: string): value is PictureBaseModel {
 export function pictureBaseModelForRunware(runware: string): PictureBaseModel | null {
 	if (runware.startsWith('z_image')) {
 		return 'z-image-turbo';
+	}
+	// `flux2klein_9b` and `flux2klein_4b`, the distilled models. Not the
+	// `flux2klein_base_*` ones: undistilled, they want ~28 steps, not 4.
+	if (runware.startsWith('flux2klein') && !runware.startsWith('flux2klein_base')) {
+		return 'flux-2-klein';
 	}
 	if (
 		runware === 'sdxl' ||
@@ -179,6 +185,11 @@ type PicturePreset = {
  *   2026-10-20). Against LUSTIFY! it follows a long description far more
  *   closely — who is where, how many people — and looks less waxy. It draws
  *   only photographs: asked for an illustration, it still made one.
+ * - FLUX.2 Klein 9B, Black Forest Labs' distilled model as Runware hosts it
+ *   (added 2026-10-20): a hand-tuned prompt for it made pictures that were
+ *   good, and it draws quoted text legibly. Runware lists it for commercial
+ *   use; BFL publish the 9B weights under their non-commercial licence, which
+ *   binds anyone running them elsewhere.
  * - WAI Illustrious v17.0, as a Runware user mirrored it; Civitai's own
  *   namespace on Runware does not have it.
  */
@@ -197,6 +208,13 @@ export const RUNWARE_PICTURE_MODEL_PRESETS = {
 			description: 'An SDXL checkpoint. Looser with the description, softer skin.',
 			runwareModelAir: 'civitai:573152@1094291',
 			base: 'sdxl'
+		},
+		{
+			id: 'flux-2-klein-9b',
+			label: 'FLUX.2 Klein 9B',
+			description: 'Black Forest Labs, distilled to 4 steps. Fast, and draws quoted text.',
+			runwareModelAir: 'runware:400@2',
+			base: 'flux-2-klein'
 		}
 	],
 	illustrated: [

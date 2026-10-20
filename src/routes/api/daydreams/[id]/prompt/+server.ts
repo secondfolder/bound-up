@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { daydreamGuard } from '$lib/server/daydream/guard';
-import { readImageConfig } from '$lib/server/daydream/image-config';
+import { pictureArchitectureFor, readImageConfig } from '$lib/server/daydream/image-config';
 import { buildMessages, replyRequestSchema } from '$lib/server/daydream/prompt';
 import { ownsDaydream } from '$lib/server/daydreams';
 import { requireFeature } from '$lib/server/features';
@@ -35,7 +35,10 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 	}
 	return json({
 		messages: buildMessages(parsed.data, {
-			pictures: readImageConfig(locals.settings, platform) !== null
+			pictures: pictureArchitectureFor(
+				readImageConfig(locals.settings, platform),
+				parsed.data.setup.pictures.style
+			)
 		})
 	});
 };

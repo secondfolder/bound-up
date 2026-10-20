@@ -124,7 +124,7 @@ describe('POST /api/daydreams/[id]/image', () => {
 		expect(upstream).toHaveBeenCalledTimes(1);
 		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
 		const [task] = JSON.parse(String(init.body));
-		expect(task.positivePrompt).toMatch(/^A candid, realistic photograph\./);
+		expect(task.positivePrompt).toMatch(/^A candid, realistic personal photograph by/);
 		expect(task.steps).toBe(9);
 	});
 

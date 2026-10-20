@@ -476,7 +476,9 @@ export type PictureStyle = 'photo' | 'illustrated';
 /**
  * A daydream's pictures (docs/daydreams.md, "Pictures"): whether each passage
  * gets one made by itself, and in which style. Neither is sent to the story
- * model, so changing either mid-story leaves its prompt as it was.
+ * model as such; the style only decides which recipe its picture
+ * descriptions follow, so switching it to a model of another family
+ * (`PictureArchitecture`) changes its prompt, and costs one uncached request.
  */
 export type DaydreamPictures = { on: boolean; style: PictureStyle };
 

@@ -55,6 +55,11 @@ describe('stored choices', () => {
 	});
 
 	it('prompts a picture model by the recipe its base model calls for', () => {
+		expect(runwarePictureModelFor('photo', { preset: 'flux-2-klein-9b' })).toEqual({
+			runwareModelAir: 'runware:400@2',
+			base: 'flux-2-klein',
+			architecture: 'flux-2'
+		});
 		expect(runwarePictureModelFor('photo', { preset: 'dark-beast' })).toMatchObject({
 			architecture: 'z-image-turbo'
 		});
@@ -67,6 +72,10 @@ describe('stored choices', () => {
 		expect(pictureBaseModelForRunware('z_image_turbo')).toBe('z-image-turbo');
 		expect(pictureBaseModelForRunware('illustrious')).toBe('illustrious');
 		expect(pictureBaseModelForRunware('flux1d')).toBeNull();
+		expect(pictureBaseModelForRunware('flux2klein_9b')).toBe('flux-2-klein');
+		expect(pictureBaseModelForRunware('flux2klein_4b')).toBe('flux-2-klein');
+		// Undistilled: it wants ~28 steps, not the recipe's 4.
+		expect(pictureBaseModelForRunware('flux2klein_base_9b')).toBeNull();
 	});
 });
 

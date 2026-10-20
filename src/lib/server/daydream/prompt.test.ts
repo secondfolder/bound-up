@@ -338,7 +338,7 @@ describe('buildMessages', () => {
 						characters: []
 					})
 				}),
-				{ pictures: true }
+				{ pictures: 'z-image-turbo' }
 			)
 		);
 		expect(monologue).toContain('"image": include it when a picture would be of real interest');
@@ -352,7 +352,7 @@ describe('buildMessages', () => {
 
 	it('asks for a picture of each passage only on a server that makes them', () => {
 		const withPictures = system(
-			buildMessages(request({ turns: [said('hi')] }), { pictures: true })
+			buildMessages(request({ turns: [said('hi')] }), { pictures: 'z-image-turbo' })
 		);
 		expect(withPictures).toContain('"image": include it in most replies');
 		// No point drawing the same thing twice.
@@ -367,7 +367,7 @@ describe('buildMessages', () => {
 		// A check-in after Stop the scene never has one.
 		const stopped = system(
 			buildMessages(request({ turns: [said('hi'), { type: 'safety', signal: 'red' }] }), {
-				pictures: true
+				pictures: 'z-image-turbo'
 			})
 		);
 		expect(stopped).not.toContain('"image"');
@@ -614,11 +614,40 @@ describe('how a passage is written', () => {
 	});
 
 	it('has a picture spell out its act, its implied people and its light', () => {
-		const content = system(buildMessages(request({ turns: [said('hi')] }), { pictures: true }));
+		const content = system(
+			buildMessages(request({ turns: [said('hi')] }), { pictures: 'z-image-turbo' })
+		);
 		expect(content).toContain('Count and describe anyone the moment implies');
 		expect(content).toContain('Spell out a sex act');
 		expect(content).toContain('its quality, direction and colour');
 		expect(content).toContain('"harness", not "gear"');
+	});
+
+	it("describes a picture in the recipe of the model that draws the daydream's style", () => {
+		const imageOf = (pictures: 'z-image-turbo' | 'sdxl' | 'flux-2') =>
+			system(buildMessages(request({ turns: [said('hi')] }), { pictures }));
+		const zImage = imageOf('z-image-turbo');
+		expect(zImage).toContain('about 80 to 150 words');
+		expect(zImage).toContain('  1. The framing:');
+		expect(imageOf('sdxl')).toBe(zImage);
+		// FLUX weighs words by where they come: the subject first, the framing last.
+		const flux = imageOf('flux-2');
+		expect(flux).toContain('about 30 to 80 words');
+		expect(flux).toContain('  1. How many people are in it');
+		expect(flux).toContain('  4. The framing:');
+		expect(flux).not.toContain('  1. The framing:');
+	});
+
+	it('has every picture said concretely, positively and in English', () => {
+		for (const pictures of ['z-image-turbo', 'flux-2'] as const) {
+			const content = system(buildMessages(request({ turns: [said('hi')] }), { pictures }));
+			expect(content).toContain('write it in English');
+			expect(content).toContain('Concrete nouns, materials and textures, not adjectives');
+			expect(content).toContain('"bare-chested", not "without a shirt"');
+			expect(content).toContain('quoted exactly with what it is on');
+			expect(content).toContain('with particular attention to');
+			expect(content).toContain('nothing says how big, it is thick and long');
+		}
 	});
 });
 
