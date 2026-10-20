@@ -17,6 +17,8 @@ export type OpenRouterModelResult = {
 	contextLength: number | null;
 	promptPerMillion: number | null;
 	completionPerMillion: number | null;
+	/** Whether it calls tools, which is what lets it read the links in a daydream's brief. */
+	tools: boolean;
 };
 
 /**

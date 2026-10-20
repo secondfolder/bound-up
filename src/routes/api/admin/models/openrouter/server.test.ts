@@ -18,7 +18,8 @@ const MODELS = {
 			name: 'Nous: Hermes 4 70B',
 			description: 'Hermes 4 is   a hybrid reasoning model.',
 			context_length: 131_072,
-			pricing: { prompt: '0.0000001', completion: '0.0000004' }
+			pricing: { prompt: '0.0000001', completion: '0.0000004' },
+			supported_parameters: ['max_tokens', 'tools']
 		},
 		{ id: 'sao10k/l3.1-euryale-70b', name: 'Sao10K: Euryale 70B' }
 	]
@@ -64,7 +65,8 @@ describe('GET /api/admin/models/openrouter', () => {
 				description: 'Hermes 4 is a hybrid reasoning model.',
 				contextLength: 131_072,
 				promptPerMillion: expect.closeTo(0.1),
-				completionPerMillion: expect.closeTo(0.4)
+				completionPerMillion: expect.closeTo(0.4),
+				tools: true
 			}
 		]);
 		expect(upstream.mock.calls[0]?.[0]).toBe(`${env.OPENROUTER_BASE_URL}/models`);

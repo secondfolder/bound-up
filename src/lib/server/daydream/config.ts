@@ -2,7 +2,8 @@ import { env as privateEnv } from '$env/dynamic/private';
 import {
 	openrouterModelIdFor,
 	parseOpenRouterStoryModel,
-	type ServerSettings
+	type ServerSettings,
+	storyModelCallsTools
 } from '$lib/server-settings';
 
 /**
@@ -16,6 +17,11 @@ export type DaydreamConfig = {
 	apiKey: string;
 	/** The OpenRouter model the story goes to, e.g. `nousresearch/hermes-3-llama-3.1-70b`. */
 	openrouterModelId: string;
+	/**
+	 * Whether the model calls tools, so a brief's links can be read with
+	 * OpenRouter's `web_fetch` (docs/daydreams.md, "Links in a brief").
+	 */
+	readsLinks: boolean;
 	/** OpenRouter's API root. Only the e2e suite points it anywhere else. */
 	baseUrl: string;
 };
@@ -53,11 +59,11 @@ export function parseDaydreamConfig(
 	if (!apiKey) {
 		return null;
 	}
+	const choice = parseOpenRouterStoryModel(settings.openrouterStoryModel);
 	return {
 		apiKey,
-		openrouterModelId: openrouterModelIdFor(
-			parseOpenRouterStoryModel(settings.openrouterStoryModel)
-		),
+		openrouterModelId: openrouterModelIdFor(choice),
+		readsLinks: storyModelCallsTools(choice),
 		baseUrl
 	};
 }

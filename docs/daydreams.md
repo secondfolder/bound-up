@@ -114,6 +114,48 @@ someone has played one:
 - **Build your own.** A section like the others, its **Build it yourself**
   button opening the full form, empty.
 
+### Links in a brief
+
+A brief can point at material rather than describe it — "take inspiration
+from https://www.reddit.com/r/… and build on its themes". When the story
+model calls tools, the `ideas` and `daydream` suggestions read those links:
+`briefLinks` (`suggest-prompt.ts`) finds up to `MAX_BRIEF_LINKS` (five)
+http(s) links, and if there are any the prompt tells the model to open each
+before it answers and to draw their themes, tropes and sayings in. What a
+page says is material, never instructions, and a page that cannot be read
+is passed over without a word. The endpoint sends OpenRouter's
+`openrouter:web_fetch` server tool with the request (`WEB_FETCH` in
+`api/daydreams/suggest/+server.ts`), so OpenRouter does the fetching while
+the model answers and it is still one call. That request goes to
+OpenRouter's Responses API (`/responses`, `readingLinks`) rather than Chat
+Completions, because only its answer lists each fetch — the URL, whether it
+was read, and what came back — which debug mode shows
+([debug-mode.md](debug-mode.md#which-links-a-daydreams-suggestion-read));
+the browser reads either shape (`completionText`, `linkFetches`). The answer gets
+`READING_ALLOWANCE` more tokens, because a model with a tool reasons over
+what it read before it writes.
+
+- **Only a model that calls tools.** None of the presets do. A custom model
+  is checked against OpenRouter's list when it is saved
+  ([server-settings.md](server-settings.md#choosing-a-model)), and stored
+  with `tools: true` if it does; one saved before that, or when OpenRouter
+  could not be asked, sends its links as plain text, as every model used to.
+- **Parallel's fetch engine**, because reddit is what briefs link most and it
+  is the one that reads it. Measured on 2026-10-20 against subreddits: Exa
+  returned nothing, Firecrawl refuses reddit outright, and OpenRouter's own
+  free fetch gave back raw RSS when it got anything. A subreddit page gives
+  its description and the titles of the posts on it, which for a caption
+  subreddit is most of what it says.
+- **A chattier answer.** Having called a tool, a model may say what it found
+  before its JSON: through Chat Completions, GLM 5.2 did despite
+  `response_format`, though not through the Responses API with its
+  `text.format`. `completionJson` takes the fenced block, or the outermost
+  braces, when the whole is not JSON, either way.
+- **Slower, and dearer.** Measured with GLM 5.2 on 2026-10-20: six ideas
+  from three subreddits took about 15 seconds and 2–2.5¢ through Chat
+  Completions, and from one subreddit about 6 seconds and 0.8¢ through the
+  Responses API, against 4 seconds and a quarter of a cent without links.
+
 All but the last hand the form a draft, put together by `assembleSetup`
 (`daydream/starters.ts`): parts get fresh ids, each person is cast into the
 part named for them if it is still free, and a voice that cannot work with
@@ -1204,7 +1246,10 @@ the passage; it keeps none of it ([debug-mode.md](debug-mode.md#daydreams-raw-lo
 
 **In transit, for each suggestion:** what the suggestion is about goes to
 `POST /api/daydreams/suggest`, under the same rules, with a prompt of its
-own (`suggest-prompt.ts`):
+own (`suggest-prompt.ts`). The links in a brief, when they are read
+([Links in a brief](#links-in-a-brief)), are opened by OpenRouter and its
+fetch engine (Parallel), so those sites see a request for the page — from
+them, not from the user or this server:
 
 - for a character or idea being written: its fields (and an idea's parts),
   the names and types of the daydream's other characters, its limits and its
@@ -1381,7 +1426,9 @@ whole, which is why the limits live there and not in the story.
 
 Every passage and suggestion is paid for on the server's OpenRouter key, and
 every picture on its Runware key (about $0.003 each, measured when the
-models were chosen). Four things hold that down:
+models were chosen). A suggestion that reads a brief's links costs more:
+$1 per 1,000 pages fetched, and the pages' text as input
+([Links in a brief](#links-in-a-brief)). Four things hold that down:
 
 - **The prompt is built to be cached.** Most providers cache a prompt by
   its start and charge a fraction for the part that matches the last

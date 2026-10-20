@@ -12,8 +12,9 @@
 		startersFor
 	} from '$lib/daydream/starters';
 	import type { SuggestFailure } from '$lib/daydream/suggest';
-	import type { GeneratedIdea } from '$lib/daydream/suggestions';
+	import type { GeneratedIdea, LinkFetch } from '$lib/daydream/suggestions';
 	import DaydreamSidePicker from './DaydreamSidePicker.svelte';
+	import LinkFetches from './LinkFetches.svelte';
 	import SearchField from './SearchField.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
 
@@ -64,7 +65,12 @@
 		/** Why the last description came back with nothing, or null. */
 		problem: SuggestFailure | null;
 		/** The last ideas generated and what was asked for, kept by the page; null before any. */
-		generated: { brief: string; ideas: readonly GeneratedIdea[] } | null;
+		generated: {
+			brief: string;
+			ideas: readonly GeneratedIdea[];
+			/** The links in the brief the latest ask read, for debug mode. */
+			fetches?: readonly LinkFetch[];
+		} | null;
 		/** The title of the generated idea being written out, while it is. */
 		writing: string | null;
 		/** Why a generated idea could not be written out, or null. */
@@ -198,6 +204,7 @@
 						Clear
 					</wa-button>
 				</div>
+				{#if debug && generated.fetches?.length}<LinkFetches fetches={generated.fetches} />{/if}
 				{#if ideasForSide.length === 0}
 					<p class="hint">None of these have you as the {side}. Ask for more that do.</p>
 				{:else if ideasShown.length === 0}

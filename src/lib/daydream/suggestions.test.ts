@@ -3,9 +3,12 @@ import { DAYDREAM_LIMITS } from '../daydream';
 import {
 	addIdeas,
 	completionJson,
+	completionText,
 	describeUnusable,
 	GENERATED_IDEAS,
 	ideaBrief,
+	LINK_EXCERPT,
+	linkFetches,
 	MAX_IDEA_PREMISE,
 	MAX_IDEA_TAGS,
 	MAX_REPLY_DETAIL,
@@ -28,10 +31,83 @@ describe('completionJson', () => {
 		expect(completionJson(completion('```json\n{"chips": []}\n```'))).toEqual({ chips: [] });
 	});
 
+	it('finds the JSON among words around it, as a model that read links writes', () => {
+		expect(
+			completionJson(
+				completion(
+					'Now the themes I found:\n- one\n\n```json\n{"ideas": [{"a": "}"}]}\n```\nEnjoy.'
+				)
+			)
+		).toEqual({ ideas: [{ a: '}' }] });
+		expect(completionJson(completion('Here you go: {"chips": ["a"]} — hope that helps'))).toEqual({
+			chips: ['a']
+		});
+	});
+
 	it('is null for anything else', () => {
 		expect(completionJson(completion('Sure! Here are some ideas'))).toBeNull();
 		expect(completionJson({ error: 'no' })).toBeNull();
 		expect(completionJson(null)).toBeNull();
+	});
+});
+
+/** A Responses API answer, as a suggestion that read a brief's links gets. */
+const responses = (...output: unknown[]) => ({ output });
+const message = (text: string) => ({ type: 'message', content: [{ type: 'output_text', text }] });
+
+describe('a Responses answer', () => {
+	const read = {
+		type: 'openrouter:web_fetch',
+		status: 'completed',
+		url: 'https://www.reddit.com/r/Example/',
+		title: 'r/Example',
+		httpStatus: 200,
+		content: 'y'.repeat(LINK_EXCERPT + 10)
+	};
+	const unread = {
+		type: 'openrouter:web_fetch',
+		status: 'incomplete',
+		url: 'https://example.invalid/x',
+		error: 'Extract failed: connect_error'
+	};
+
+	it('reads the reply out of its message, past the reasoning and fetches before it', () => {
+		const body = responses(
+			{ type: 'reasoning', content: [{ type: 'reasoning_text', text: 'thinking' }] },
+			read,
+			message('{"ideas": []}')
+		);
+		expect(completionText(body)).toBe('{"ideas": []}');
+		expect(completionJson(body)).toEqual({ ideas: [] });
+		expect(completionText(responses(read))).toBeNull();
+	});
+
+	it('lists each link fetched, read or not, with the start of what came back', () => {
+		expect(linkFetches(responses(read, unread, message('{}'), { type: 'something new' }))).toEqual([
+			{
+				url: read.url,
+				read: true,
+				httpStatus: 200,
+				title: 'r/Example',
+				error: '',
+				length: LINK_EXCERPT + 10,
+				excerpt: 'y'.repeat(LINK_EXCERPT)
+			},
+			{
+				url: unread.url,
+				read: false,
+				httpStatus: null,
+				title: '',
+				error: 'Extract failed: connect_error',
+				length: 0,
+				excerpt: ''
+			}
+		]);
+	});
+
+	it('lists none for a Chat Completions answer, or anything else', () => {
+		expect(linkFetches(completion('{}'))).toEqual([]);
+		expect(linkFetches(null)).toEqual([]);
 	});
 });
 
@@ -46,6 +122,31 @@ describe('describeUnusable', () => {
 		expect(describeUnusable(completion('{"chips": []}'))).toBe(
 			'The reply was JSON, but nothing in it was what was asked for, or within its limits:\n{"chips": []}'
 		);
+	});
+
+	it('outlines a Responses answer with no reply: how it ended, each item, and the last whole', () => {
+		const said = describeUnusable({
+			status: 'completed',
+			incomplete_details: null,
+			usage: { output_tokens: 7300 },
+			model: 'not shown',
+			output: [
+				{ type: 'reasoning', content: [{ type: 'reasoning_text', text: 'Let me fetch' }] },
+				{ type: 'openrouter:web_fetch', url: 'https://example.com', content: 'x'.repeat(30_000) },
+				{ type: 'reasoning', content: [{ type: 'reasoning_text', text: 'Now the ideas' }] }
+			]
+		});
+		expect(said).toContain(
+			'had no reply in it.\nstatus: "completed"\nusage: {\n  "output_tokens": 7300\n}'
+		);
+		expect(said).not.toContain('incomplete_details');
+		expect(said).not.toContain('not shown');
+		expect(said).toMatch(
+			/output: 3 items\n1\. reasoning, \d+ characters\n2\. openrouter:web_fetch, 30,\d{3} characters\n3\. reasoning/
+		);
+		expect(said).toContain('The last item:\n{\n  "type": "reasoning"');
+		expect(said).toContain('Now the ideas');
+		expect(said).not.toContain('xxxx');
 	});
 
 	it('cuts a long reply short', () => {

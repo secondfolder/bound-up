@@ -7,7 +7,8 @@ import {
 	pictureBaseModelForRunware,
 	RUNWARE_MODEL_AIR,
 	runwarePictureModelFor,
-	secretTail
+	secretTail,
+	storyModelCallsTools
 } from './server-settings';
 
 describe('model ids', () => {
@@ -44,6 +45,17 @@ describe('stored choices', () => {
 				parseOpenRouterStoryModel('{"openrouterModelId":"z-ai/glm-5.2@preset/nsfw-compatible"}')
 			)
 		).toBe('z-ai/glm-5.2@preset/nsfw-compatible');
+	});
+
+	it('calls tools only for a custom model saved as able to', () => {
+		const glm = '{"openrouterModelId":"z-ai/glm-5.2@preset/nsfw-compatible"';
+		expect(storyModelCallsTools(parseOpenRouterStoryModel(`${glm},"tools":true}`))).toBe(true);
+		// Saved before tools were asked about, or with something odd in their place.
+		expect(storyModelCallsTools(parseOpenRouterStoryModel(`${glm}}`))).toBe(false);
+		expect(storyModelCallsTools(parseOpenRouterStoryModel(`${glm},"tools":"yes"}`))).toBe(false);
+		expect(
+			storyModelCallsTools(parseOpenRouterStoryModel('{"preset":"hermes","tools":true}'))
+		).toBe(false);
 	});
 
 	it('reads a choice it cannot understand as the default, rather than failing', () => {

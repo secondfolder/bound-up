@@ -1,7 +1,12 @@
 import { error } from '@sveltejs/kit';
 import { readDaydreamConfig } from '$lib/server/daydream/config';
 import { daydreamGuard } from '$lib/server/daydream/guard';
-import { buildSuggestMessages, suggestRequestSchema } from '$lib/server/daydream/suggest-prompt';
+import type { ModelMessage } from '$lib/server/daydream/prompt';
+import {
+	buildSuggestMessages,
+	MAX_BRIEF_LINKS,
+	suggestRequestSchema
+} from '$lib/server/daydream/suggest-prompt';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
 import { userHasFeature } from '$lib/server/features';
 import { rateLimitMessage } from '$lib/server/rate-limit';
@@ -18,6 +23,13 @@ import type { RequestHandler } from './$types';
  * accepted, the text is forwarded and the answer passed straight back,
  * nothing is stored, and nothing but a status code is ever logged. See
  * docs/daydreams.md, "What the server sees".
+ *
+ * A brief's links are read when the story model calls tools: OpenRouter's
+ * `web_fetch` server tool is sent with the request (`readingLinks`), and
+ * OpenRouter fetches them while the model answers, so this is still the one
+ * call. The links go
+ * to OpenRouter and its fetch engine, and nowhere else from here. See
+ * docs/daydreams.md, "Links in a brief".
  *
  * Not streamed: a suggestion is a small JSON answer, useless until it is
  * whole. The provider's response is passed through unread; the browser
@@ -51,25 +63,31 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		});
 	}
 
-	const { messages, maxTokens } = buildSuggestMessages(parsed.data);
+	const { messages, maxTokens, readLinks } = buildSuggestMessages(parsed.data, {
+		canReadLinks: config.readsLinks
+	});
 	let upstream: Response;
 	try {
-		upstream = await fetch(`${config.baseUrl}/chat/completions`, {
+		upstream = await fetch(`${config.baseUrl}/${readLinks ? 'responses' : 'chat/completions'}`, {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${config.apiKey}`,
 				'content-type': 'application/json'
 			},
-			body: JSON.stringify({
-				model: config.openrouterModelId,
-				messages,
-				max_tokens: maxTokens,
-				temperature: 1,
-				// Ignored by a provider that does not support it; the browser
-				// copes with a fenced or chatty answer either way.
-				response_format: { type: 'json_object' },
-				provider: { data_collection: 'deny' }
-			}),
+			body: JSON.stringify(
+				readLinks
+					? readingLinks(config.openrouterModelId, messages, maxTokens)
+					: {
+							model: config.openrouterModelId,
+							messages,
+							max_tokens: maxTokens,
+							temperature: 1,
+							// Ignored by a provider that does not support it; the browser
+							// copes with a fenced or chatty answer either way.
+							response_format: { type: 'json_object' },
+							provider: { data_collection: 'deny' }
+						}
+			),
 			signal: request.signal
 		});
 	} catch (cause) {
@@ -97,6 +115,39 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
 	});
 };
+
+/**
+ * OpenRouter's fetch tool, for the links in a brief. Parallel's engine
+ * because it is the one that reads reddit, which briefs link most: measured
+ * 2026-10-20, Exa answered nothing for a subreddit, Firecrawl refuses reddit
+ * outright, and OpenRouter's own fetch hands back raw RSS when it gets
+ * anything. $1 per 1,000 fetches, on top of the tokens. One fetch a link, and
+ * each page cut short, so a brief cannot fill the context.
+ */
+const WEB_FETCH = {
+	type: 'openrouter:web_fetch',
+	parameters: { engine: 'parallel', max_uses: MAX_BRIEF_LINKS, max_content_tokens: 6000 }
+} as const;
+
+/**
+ * The request for a suggestion that reads a brief's links: the same one, sent
+ * to OpenRouter's Responses API rather than Chat Completions, because only
+ * its answer lists each fetch — the URL, whether it was read, and what came
+ * back or why not — for debug mode to show (`linkFetches`); Chat Completions
+ * says only how many there were. The browser reads both shapes, so the
+ * answer is still passed back unread.
+ */
+function readingLinks(model: string, messages: ModelMessage[], maxTokens: number) {
+	return {
+		model,
+		input: messages,
+		max_output_tokens: maxTokens,
+		temperature: 1,
+		text: { format: { type: 'json_object' } },
+		provider: { data_collection: 'deny' },
+		tools: [WEB_FETCH]
+	};
+}
 
 /** The most of a provider's error passed on to debug mode. */
 const MAX_FAILURE_DETAIL = 4000;

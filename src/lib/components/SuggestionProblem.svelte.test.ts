@@ -26,4 +26,29 @@ describe('SuggestionProblem', () => {
 		await waSettled(bare.container);
 		expect(bare.container.querySelector('wa-details')).toBeNull();
 	});
+
+	it('shows the links it read, in debug mode only', async () => {
+		const withFetches = {
+			...problem,
+			fetches: [
+				{
+					url: 'https://example.invalid/x',
+					read: false,
+					httpStatus: null,
+					title: '',
+					error: 'Extract failed: connect_error',
+					length: 0,
+					excerpt: ''
+				}
+			]
+		};
+		const shown = render(SuggestionProblem, { problem: withFetches, debug: true });
+		await waSettled(shown.container);
+		expect(shown.container.textContent).toContain('Extract failed: connect_error');
+		shown.unmount();
+
+		const hidden = render(SuggestionProblem, { problem: withFetches });
+		await waSettled(hidden.container);
+		expect(hidden.container.textContent).not.toContain('example.invalid');
+	});
 });

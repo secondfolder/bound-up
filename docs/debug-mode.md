@@ -117,7 +117,12 @@ comes from one of two places:
 - **An answer with nothing usable in it** is described in the browser by
   `describeUnusable` (`daydream/suggestions.ts`): no completion at all, a
   reply that was not JSON, or JSON with nothing asked for in it, followed by
-  the reply as the model wrote it. Nothing new crosses the network for this:
+  the reply as the model wrote it. A Responses answer (one that read a
+  brief's links) with no reply is outlined instead of dumped: its `status`,
+  `incomplete_details`, `error` and `usage`, each output item's type and
+  size, and the last item whole. Dumped, the first fetched page filled the
+  cut and hid the end, which is where the reason is; the pages themselves
+  are under the links read. Nothing new crosses the network for this:
   the endpoint already passes the provider's answer back unread for the
   browser to check.
 - **A provider failure** (an error status, or no connection) is described by
@@ -130,6 +135,29 @@ comes from one of two places:
 `debug` is handed down to the component as a prop, from `data.debug`,
 rather than read from `page.data` inside it, so the dialogs' tests need no
 `$app/state` mock.
+
+### Which links a Daydreams suggestion read
+
+When a brief's links are read ([daydreams.md](daydreams.md#links-in-a-brief)),
+the new-daydream page shows what each fetch got, in debug mode: a "Links read:
+2 of 3" disclosure (`LinkFetches.svelte`) under the suggested ideas, above a
+draft written out from a brief, and beside a suggestion that failed
+(`SuggestionProblem`). Each link has its URL (shown, not linked), whether it
+was read, the site's HTTP status, how many characters the model was given and
+the page's title, or the fetch engine's error, and the first
+`LINK_EXCERPT` (600) characters of what came back, which is enough to tell a
+page from a login wall.
+
+It is not in the raw log, which is a daydream's passages: links are read while
+setting one up, before there is a daydream to keep anything in, and nothing
+about a suggestion is stored. It is read from the answer itself
+(`linkFetches`, `daydream/suggestions.ts`): a suggestion that reads links is
+sent to OpenRouter's Responses API, whose answer lists each fetch as an
+`openrouter:web_fetch` item, where Chat Completions only counts them. The
+endpoint passes it back unread, as it does every answer, so the page text
+reaches the browser whether or not debug mode is on; debug mode only decides
+whether it is shown. It is public pages the user linked, not anything of
+anyone else's.
 
 ### Daydreams' raw log
 

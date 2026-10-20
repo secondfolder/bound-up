@@ -207,6 +207,14 @@ words, and the steps and CFG its author recommends, since ~8 steps at CFG 1
 marks a distilled model like Z-Image Turbo whatever its name says. A typed AIR
 Runware recognises fills in the base model only if none is chosen yet.
 
+**Saving a custom story model asks OpenRouter whether it calls tools**,
+from the same cached list, and stores `"tools":true` beside the id when it
+does (`storyModelCallsTools`). That is what lets a daydream brief's links be
+read ([daydreams.md](daydreams.md#links-in-a-brief)). It is asked once, when
+the model is saved, not on every suggestion; if OpenRouter cannot be reached
+the model is saved without it, and saving it again asks again. The panel
+says which the saved model is. The presets never call tools.
+
 Ids are matched loosely enough for what the providers really use: an
 OpenRouter id may have a `:variant` and an `@` suffix with slashes in it, and
 a Runware AIR's version may have letters (`persona:242173@2788849L`).

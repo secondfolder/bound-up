@@ -104,7 +104,16 @@ export type OpenRouterStoryModelPresetId = (typeof OPENROUTER_STORY_MODEL_PRESET
 /** What `openrouterStoryModel` holds, as JSON. */
 export type OpenRouterStoryModelChoice =
 	| { preset: OpenRouterStoryModelPresetId }
-	| { openrouterModelId: string };
+	| {
+			openrouterModelId: string;
+			/**
+			 * Whether OpenRouter lists the model as calling tools, looked up when it
+			 * was saved; what lets a brief's links be read (docs/daydreams.md,
+			 * "Links in a brief"). Absent for a choice saved before it was asked,
+			 * which is read as no. None of the presets do.
+			 */
+			tools?: boolean;
+	  };
 
 export const DEFAULT_OPENROUTER_STORY_MODEL: OpenRouterStoryModelChoice = { preset: 'hermes' };
 
@@ -279,10 +288,15 @@ export function parseOpenRouterStoryModel(raw: string): OpenRouterStoryModelChoi
 			return { preset: preset as OpenRouterStoryModelPresetId };
 		}
 		if (typeof openrouterModelId === 'string' && OPENROUTER_MODEL_ID.test(openrouterModelId)) {
-			return { openrouterModelId };
+			return value.tools === true ? { openrouterModelId, tools: true } : { openrouterModelId };
 		}
 	}
 	return DEFAULT_OPENROUTER_STORY_MODEL;
+}
+
+/** Whether a choice's model can call tools: only a custom one OpenRouter said could. */
+export function storyModelCallsTools(choice: OpenRouterStoryModelChoice): boolean {
+	return 'openrouterModelId' in choice && choice.tools === true;
 }
 
 /** The OpenRouter model id a choice is sent to. */

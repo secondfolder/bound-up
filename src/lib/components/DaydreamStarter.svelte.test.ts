@@ -9,7 +9,7 @@ import {
 	startersFor
 } from '$lib/daydream/starters';
 import type { SuggestFailure } from '$lib/daydream/suggest';
-import type { GeneratedIdea } from '$lib/daydream/suggestions';
+import type { GeneratedIdea, LinkFetch } from '$lib/daydream/suggestions';
 import { defined } from '$lib/testing/defined';
 import { waProp, waSettled } from '$lib/testing/web-awesome';
 import DaydreamStarter from './DaydreamStarter.svelte';
@@ -39,7 +39,8 @@ async function renderStarter(
 		brief?: string;
 		problem?: SuggestFailure;
 		side?: StarterSide | null;
-		generated?: { brief: string; ideas: GeneratedIdea[] } | null;
+		generated?: { brief: string; ideas: GeneratedIdea[]; fetches?: LinkFetch[] } | null;
+		debug?: boolean;
 		ongenerate?: (brief: string) => Promise<SuggestFailure | null>;
 		onmore?: () => Promise<SuggestFailure | null>;
 		starterOrder?: readonly string[];
@@ -65,6 +66,7 @@ async function renderStarter(
 		generated: props.generated ?? null,
 		writing: null,
 		ideaProblem: null,
+		debug: props.debug ?? false,
 		...handlers
 	});
 	await waSettled(rendered.container);
@@ -78,6 +80,32 @@ function button(container: HTMLElement, text: string): HTMLElement | undefined {
 }
 
 describe('DaydreamStarter', () => {
+	it('shows the links generated ideas read, in debug mode only', async () => {
+		const generated = {
+			brief: 'from https://www.reddit.com/r/Example/',
+			ideas: generatedIdeas,
+			fetches: [
+				{
+					url: 'https://www.reddit.com/r/Example/',
+					read: true,
+					httpStatus: 200,
+					title: '',
+					error: '',
+					length: 20,
+					excerpt: 'A place for examples'
+				}
+			]
+		};
+		const debugging = await renderStarter({ generated, debug: true });
+		expect(waProp(debugging.container.querySelector('.generated wa-details'), 'summary')).toBe(
+			'Links read: 1 of 1'
+		);
+		debugging.unmount();
+
+		const plain = await renderStarter({ generated });
+		expect(plain.container.querySelector('.generated wa-details')).toBeNull();
+	});
+
 	it('offers a few ready-made daydreams, with their level and how they are told', async () => {
 		const { container, onstarter } = await renderStarter();
 		const cards = [...container.querySelectorAll<HTMLElement>('.card')];

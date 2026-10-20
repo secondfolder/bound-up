@@ -341,6 +341,18 @@
 					legend="Daydreams story model"
 					presets={storyPresets}
 				/>
+				<!-- What is stored, not what is picked: OpenRouter is asked whether
+				     the model calls tools when it is saved. Worded without "saved",
+				     which the panel's stored-credential badge is found by. -->
+				<p class="env-note">
+					{#if data.storyModelReadsLinks}
+						The story model calls tools, so it reads the links in a daydream’s brief.
+					{:else}
+						The story model isn’t known to call tools, so links in a daydream’s brief go as text.
+						A custom model reads them if OpenRouter lists it as calling tools; it is checked as
+						it is stored.
+					{/if}
+				</p>
 				{#if stillInEnv('openrouterApiKey', 'openrouterStoryModel').length}
 					{@render envNote(stillInEnv('openrouterApiKey', 'openrouterStoryModel'))}
 				{/if}

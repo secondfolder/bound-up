@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { message, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { dev } from '$app/environment';
+import { splitOpenRouterModelId } from '$lib/model-search';
 import {
 	type ImageModelSettingsForm,
 	imageModelSettingsFormSchema,
@@ -12,8 +13,10 @@ import {
 	serverActionFormSchema
 } from '$lib/schemas/serverSettingsForms';
 import { requireAdmin } from '$lib/server/admin';
+import { openrouterBaseUrl } from '$lib/server/daydream/config';
 import { createMailer } from '$lib/server/mail';
 import { MAIL_NODE_TARGET, MailNotSetUpError, readMailConfig } from '$lib/server/mail/config';
+import { loadOpenRouterCatalogue } from '$lib/server/openrouter-models';
 import { defaultVapidSubject } from '$lib/server/push';
 import {
 	loadServerSettingRows,
@@ -25,6 +28,8 @@ import {
 import { legacyEnvStillSet } from '$lib/server/settings/legacy-env';
 import { serverSettingsStatus } from '$lib/server/settings/status';
 import {
+	type OpenRouterStoryModelChoice,
+	type OpenRouterStoryModelPresetId,
 	parseOpenRouterStoryModel,
 	parseRunwarePictureModel,
 	RUNWARE_PICTURE_MODEL_SETTING,
@@ -32,7 +37,8 @@ import {
 	SECRET_SETTING_KEYS,
 	type ServerSettingKey,
 	type ServerSettings,
-	secretTail
+	secretTail,
+	storyModelCallsTools
 } from '$lib/server-settings';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -51,6 +57,42 @@ export type StoredSecret = { set: boolean; tail: string };
 function stored(settings: ServerSettings, key: ServerSettingKey): StoredSecret {
 	const value = settings[key].trim();
 	return { set: value !== '', tail: secretTail(value) };
+}
+
+/**
+ * Whether OpenRouter lists a model as calling tools, for a story model being
+ * saved: what decides whether a daydream brief's links are read
+ * (docs/daydreams.md, "Links in a brief"). Asked once, when it is saved,
+ * rather than on every suggestion. When OpenRouter cannot say, no: the model
+ * still works, and saving it again later asks again.
+ */
+async function callsTools(
+	openrouterModelId: string,
+	platform: App.Platform | undefined,
+	signal: AbortSignal
+): Promise<boolean> {
+	const { listed } = splitOpenRouterModelId(openrouterModelId);
+	try {
+		const models = await loadOpenRouterCatalogue(openrouterBaseUrl(platform), signal);
+		return models.some((model) => model.openrouterModelId === listed && model.tools);
+	} catch {
+		return false;
+	}
+}
+
+/** The story model as saved: a preset by name, a custom one with whether it calls tools. */
+async function storyModelChoice(
+	data: { storyModel: string; openrouterModelId: string },
+	platform: App.Platform | undefined,
+	signal: AbortSignal
+): Promise<OpenRouterStoryModelChoice> {
+	if (data.storyModel !== 'custom') {
+		return { preset: data.storyModel as OpenRouterStoryModelPresetId };
+	}
+	const { openrouterModelId } = data;
+	return (await callsTools(openrouterModelId, platform, signal))
+		? { openrouterModelId, tools: true }
+		: { openrouterModelId };
 }
 
 function pictureFields(settings: ServerSettings, style: 'photo' | 'illustrated') {
@@ -76,6 +118,8 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	return {
 		adminEmail: admin.email,
 		status: serverSettingsStatus(settings),
+		/** Whether the story model can read the links in a daydream's brief. */
+		storyModelReadsLinks: storyModelCallsTools(story),
 		/** Whether SMTP and the outbox can work here: not on Workers. */
 		nodeTarget: MAIL_NODE_TARGET,
 		dev,
@@ -238,7 +282,7 @@ export const actions: Actions = {
 		return message(testEmailForm, `Sent to ${admin.email}.`);
 	},
 
-	saveLanguageModels: async ({ locals, request }) => {
+	saveLanguageModels: async ({ locals, platform, request }) => {
 		requireAdmin(locals);
 		const languageModelForm = await superValidate(request, zod4(languageModelSettingsFormSchema), {
 			id: LANGUAGE_MODEL_FORM
@@ -253,11 +297,7 @@ export const actions: Actions = {
 				data.openrouterApiKeyChange,
 				data.openrouterApiKey
 			),
-			openrouterStoryModel: JSON.stringify(
-				data.storyModel === 'custom'
-					? { openrouterModelId: data.openrouterModelId }
-					: { preset: data.storyModel }
-			)
+			openrouterStoryModel: JSON.stringify(await storyModelChoice(data, platform, request.signal))
 		});
 		languageModelForm.data = { ...data, openrouterApiKey: '', openrouterApiKeyChange: 'keep' };
 		return message(languageModelForm, SAVED);

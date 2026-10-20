@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
+	import LinkFetches from '$lib/components/LinkFetches.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SuggestionProblem from '$lib/components/SuggestionProblem.svelte';
 	import type { DaydreamSetup, DaydreamVoicePresetId } from '$lib/daydream';
@@ -18,6 +19,7 @@
 		addIdeas,
 		type GeneratedIdea,
 		ideaBrief,
+		type LinkFetch,
 		MAX_OFFERED_IDEAS
 	} from '$lib/daydream/suggestions';
 	import type { MarkedSummary } from '$lib/daydream/summary';
@@ -41,6 +43,8 @@
 				layout: 'summary' | 'full';
 				/** What the model wrote it from, so "Try another" can ask again; null for none. */
 				described: Described | null;
+				/** The links in the brief it read, for debug mode; none for a draft that read none. */
+				fetches: readonly LinkFetch[];
 				version: number;
 		  };
 
@@ -64,7 +68,11 @@
 	let side: StarterSide | null = $state(null);
 	let asking = $state(false);
 	let problem: SuggestFailure | null = $state(null);
-	let generated: { brief: string; ideas: readonly GeneratedIdea[] } | null = $state(null);
+	let generated: {
+		brief: string;
+		ideas: readonly GeneratedIdea[];
+		fetches?: readonly LinkFetch[];
+	} | null = $state(null);
 	let writing: string | null = $state(null);
 	let ideaProblem: SuggestFailure | null = $state(null);
 	let versions = 0;
@@ -103,7 +111,8 @@
 	function setUp(
 		draft: DaydreamSetup | null,
 		described: Described | null,
-		summary: MarkedSummary | null = null
+		summary: MarkedSummary | null = null,
+		fetches: readonly LinkFetch[] = []
 	) {
 		versions += 1;
 		stage = {
@@ -112,6 +121,7 @@
 			summary,
 			layout: draft ? 'summary' : 'full',
 			described,
+			fetches,
 			version: versions
 		};
 	}
@@ -148,7 +158,12 @@
 			failed(answer);
 			return;
 		}
-		setUp({ ...assembleSetup(answer.value), limits }, described, answer.value.summary ?? null);
+		setUp(
+			{ ...assembleSetup(answer.value), limits },
+			described,
+			answer.value.summary ?? null,
+			answer.fetches
+		);
 	}
 
 	/**
@@ -161,7 +176,7 @@
 		if (!answer.ok) {
 			return answer;
 		}
-		generated = { brief: asked, ideas: answer.value };
+		generated = { brief: asked, ideas: answer.value, fetches: answer.fetches };
 		ideaProblem = null;
 		return null;
 	}
@@ -193,7 +208,7 @@
 		if (added.length === shown.ideas.length) {
 			return { error: 'No new ideas came back that time. Try again.' };
 		}
-		generated = { brief: shown.brief, ideas: added };
+		generated = { brief: shown.brief, ideas: added, fetches: answer.fetches ?? shown.fetches };
 		return null;
 	}
 
@@ -264,6 +279,7 @@
 				Other ways to start
 			</wa-button>
 			{#if problem}<SuggestionProblem {problem} debug={data.debug} />{/if}
+			{#if data.debug && stage.fetches.length > 0}<LinkFetches fetches={stage.fetches} />{/if}
 			{#key stage.version}
 				<DaydreamSetupForm
 					setupForm={data.setupForm}

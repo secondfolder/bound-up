@@ -9,7 +9,8 @@ import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events'
 import { createTestUser, type TestUser } from '$lib/testing/fixtures';
 import { actions, load } from './+page.server';
 
-vi.mock('$env/dynamic/private', () => ({ env: {} }));
+const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
+vi.mock('$env/dynamic/private', () => ({ env }));
 
 let harness: TestDb;
 let db: Db;
@@ -21,6 +22,21 @@ beforeEach(async () => {
 	({ db } = harness);
 	admin = await createTestUser(db, { name: 'Admin', role: 'admin' });
 	ada = await createTestUser(db, { name: 'Ada', role: 'user' });
+	// A base URL per test, since OpenRouter's list is cached per URL, and
+	// nothing reaching the real one: saving a custom story model asks it
+	// whether the model calls tools.
+	env.OPENROUTER_BASE_URL = `https://models-${crypto.randomUUID()}.test/v1`;
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () =>
+			Response.json({
+				data: [
+					{ id: 'vendor/x' },
+					{ id: 'z-ai/glm-5.2', supported_parameters: ['max_tokens', 'tools'] }
+				]
+			})
+		)
+	);
 });
 
 afterEach(() => {
@@ -171,12 +187,45 @@ describe('actions', () => {
 			openrouterModelId: 'vendor/x'
 		});
 
+		await runAction(
+			actions,
+			'saveLanguageModels',
+			await event(admin, {
+				...daydreams,
+				storyModel: 'custom',
+				openrouterModelId: 'z-ai/glm-5.2@preset/nsfw-compatible'
+			})
+		);
+		expect(JSON.parse(await stored('openrouterStoryModel'))).toEqual({
+			openrouterModelId: 'z-ai/glm-5.2@preset/nsfw-compatible',
+			tools: true
+		});
+		expect(await runLoad(load(await event(admin)))).toMatchObject({ storyModelReadsLinks: true });
+
 		const refused = await runAction(
 			actions,
 			'saveLanguageModels',
 			await event(admin, { ...daydreams, storyModel: 'custom', openrouterModelId: 'no slash' })
 		);
 		expect(refused).toMatchObject({ status: 400 });
+	});
+
+	it('saves a custom story model without tools when OpenRouter cannot be asked', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+		const saved = await runAction(
+			actions,
+			'saveLanguageModels',
+			await event(admin, {
+				openrouterApiKey: '',
+				openrouterApiKeyChange: 'keep',
+				storyModel: 'custom',
+				openrouterModelId: 'z-ai/glm-5.2'
+			})
+		);
+		expect(saved).not.toMatchObject({ status: 400 });
+		expect(JSON.parse(await stored('openrouterStoryModel'))).toEqual({
+			openrouterModelId: 'z-ai/glm-5.2'
+		});
 	});
 
 	it('saves a custom picture model with its base model, and refuses one without', async () => {

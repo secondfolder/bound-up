@@ -162,6 +162,76 @@ describe('POST /api/daydreams/suggest', () => {
 		}
 	});
 
+	it('reads a brief’s links through the Responses API, only with a model that calls tools', async () => {
+		const brief = `inspired by https://www.reddit.com/r/example/ and ${SECRET_WORDS}`;
+		const ideas = { task: 'ideas', brief, side: 'sub', limits: '' };
+		const daydream = { task: 'daydream', brief, side: 'sub', limits: '' };
+		const sent = (call: number) => {
+			const [url, init] = upstream.mock.calls[call] as [string, RequestInit];
+			return { url, body: JSON.parse(String(init.body)) };
+		};
+
+		// Saved before tools were asked about: the links go as text.
+		await post(ada, ideas);
+		expect(sent(0).url).toBe('https://models.test/api/v1/chat/completions');
+		expect(sent(0).body.tools).toBeUndefined();
+
+		configured.openrouterStoryModel = JSON.stringify({
+			openrouterModelId: 'test/model',
+			tools: true
+		});
+		await post(ada, ideas);
+		await post(ada, daydream);
+		for (const call of [1, 2]) {
+			const { url, body: reading } = sent(call);
+			// Only the Responses API says what each fetch got, for debug mode.
+			expect(url).toBe('https://models.test/api/v1/responses');
+			expect(reading).toMatchObject({
+				model: 'test/model',
+				tools: [{ type: 'openrouter:web_fetch', parameters: { engine: 'parallel' } }],
+				text: { format: { type: 'json_object' } },
+				provider: { data_collection: 'deny' }
+			});
+			expect(reading.messages).toBeUndefined();
+			expect(reading.input[0].content.startsWith(SUGGEST_RULES)).toBe(true);
+			expect(reading.input.at(-1).content).toContain(SECRET_WORDS);
+			expect(reading.input.at(-1).content).toContain('web_fetch');
+		}
+		expect(sent(1).body.max_output_tokens).toBeGreaterThan(sent(0).body.max_tokens);
+
+		// Nothing to read, or a task that takes no brief: Chat Completions, no tool.
+		await post(ada, { ...ideas, brief: SECRET_WORDS });
+		await post(ada);
+		for (const call of [3, 4]) {
+			expect(sent(call).url).toBe('https://models.test/api/v1/chat/completions');
+			expect(sent(call).body.tools).toBeUndefined();
+		}
+	});
+
+	it('passes a Responses answer back unread, fetches and all', async () => {
+		configured.openrouterStoryModel = JSON.stringify({
+			openrouterModelId: 'test/model',
+			tools: true
+		});
+		const answer = {
+			output: [
+				{ type: 'openrouter:web_fetch', status: 'completed', url: 'https://a.test/', content: 'x' },
+				{ type: 'message', content: [{ type: 'output_text', text: '{"ideas":[]}' }] }
+			]
+		};
+		upstream.mockResolvedValueOnce(Response.json(answer));
+		const result = await post(ada, {
+			task: 'ideas',
+			brief: 'from https://a.test/',
+			side: null,
+			limits: ''
+		});
+		if (result.type !== 'ok') {
+			throw new Error(JSON.stringify(result));
+		}
+		expect(await result.value.json()).toEqual(answer);
+	});
+
 	it('refuses an opening too long to name from, without counting it', async () => {
 		const limit = vi.fn(async (): Promise<RateLimitResult> => ({ allowed: true }));
 		const naming = {

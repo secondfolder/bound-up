@@ -71,23 +71,126 @@ const envelopeSchema = z.object({
 	choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1)
 });
 
+/**
+ * A Responses API answer, which is what a suggestion that read a brief's
+ * links comes back as (docs/daydreams.md, "Links in a brief"): a list of
+ * items, the reply among them as a `message`, each fetch as an
+ * `openrouter:web_fetch`. Read loosely, item by item, so one item of a shape
+ * not known here costs only itself.
+ */
+const responsesSchema = z.object({ output: z.array(z.unknown()) });
+
+const outputMessageSchema = z.object({
+	type: z.literal('message'),
+	content: z.array(z.object({ type: z.string(), text: z.string().optional() }))
+});
+
 /** The model's reply in a non-streamed completion, as it wrote it, or null for no completion. */
 export function completionText(body: unknown): string | null {
 	const envelope = envelopeSchema.safeParse(body);
-	return envelope.success ? (envelope.data.choices[0]?.message.content ?? null) : null;
+	if (envelope.success) {
+		return envelope.data.choices[0]?.message.content ?? null;
+	}
+	const responses = responsesSchema.safeParse(body);
+	if (!responses.success) {
+		return null;
+	}
+	const texts = responses.data.output.flatMap((item) => {
+		const message = outputMessageSchema.safeParse(item);
+		return message.success
+			? message.data.content.flatMap((part) =>
+					part.type === 'output_text' && part.text !== undefined ? [part.text] : []
+				)
+			: [];
+	});
+	return texts.length > 0 ? texts.join('') : null;
 }
 
-/** The JSON inside a non-streamed completion, or null. Tolerates a code fence around it. */
+/** One link a suggestion read, as debug mode shows it (`LinkFetches.svelte`). */
+export type LinkFetch = {
+	url: string;
+	/** Whether the fetch engine came back with the page. */
+	read: boolean;
+	/** The site's own status, when the engine said. */
+	httpStatus: number | null;
+	title: string;
+	/** Why it could not be read, as the engine put it; `''` when it was. */
+	error: string;
+	/** How much of the page the model was given, in characters. */
+	length: number;
+	/** The start of it, enough to see whether it was the page or a login wall. */
+	excerpt: string;
+};
+
+/** How much of a page `LinkFetch.excerpt` keeps. */
+export const LINK_EXCERPT = 600;
+
+const fetchItemSchema = z.object({
+	type: z.literal('openrouter:web_fetch'),
+	url: z.string(),
+	status: z.string().optional(),
+	httpStatus: z.number().optional(),
+	title: z.string().optional(),
+	content: z.string().optional(),
+	error: z.string().optional()
+});
+
+/** The links a suggestion read, in the order they were fetched; none for an answer that read none. */
+export function linkFetches(body: unknown): LinkFetch[] {
+	const responses = responsesSchema.safeParse(body);
+	if (!responses.success) {
+		return [];
+	}
+	return responses.data.output.flatMap((item) => {
+		const parsed = fetchItemSchema.safeParse(item);
+		if (!parsed.success) {
+			return [];
+		}
+		const { url, status, httpStatus, title, content = '', error = '' } = parsed.data;
+		return [
+			{
+				url,
+				read: status === 'completed',
+				httpStatus: httpStatus ?? null,
+				title: title ?? '',
+				error,
+				length: content.length,
+				excerpt: content.slice(0, LINK_EXCERPT)
+			}
+		];
+	});
+}
+
+const FENCED_BLOCK = /```(?:json)?\s*(?<json>[\s\S]*?)\s*```/i;
+
+/**
+ * The JSON inside a non-streamed completion, or null. Tolerates a code fence
+ * around it, and words before or after it: a model that has read the links in
+ * a brief (`web_fetch`) tends to say what it found first, and `response_format`
+ * no longer holds it to bare JSON once it has called a tool.
+ */
 export function completionJson(body: unknown): unknown {
 	const content = completionText(body)?.trim();
 	if (content === undefined) {
 		return null;
 	}
-	try {
-		return JSON.parse(unfence(content));
-	} catch {
-		return null;
+	const fenced: RegExpExecArray | null = FENCED_BLOCK.exec(content);
+	const candidates = [
+		unfence(content),
+		fenced?.groups?.json,
+		content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)
+	];
+	for (const candidate of candidates) {
+		if (!candidate) {
+			continue;
+		}
+		try {
+			return JSON.parse(candidate);
+		} catch {
+			// The next way of finding it.
+		}
 	}
+	return null;
 }
 
 /** The most of a reply debug mode is shown: enough to see what went wrong. */
@@ -104,12 +207,54 @@ export function describeUnusable(body: unknown): string {
 	const cut = (text: string) =>
 		text.length > MAX_REPLY_DETAIL ? `${text.slice(0, MAX_REPLY_DETAIL)}\n… (cut)` : text;
 	if (content === null) {
-		return `The provider’s answer had no reply in it:\n${cut(JSON.stringify(body, null, 2) ?? String(body))}`;
+		const outline = responsesOutline(body);
+		return outline === null
+			? `The provider’s answer had no reply in it:\n${cut(JSON.stringify(body, null, 2) ?? String(body))}`
+			: `The provider’s answer had no reply in it.\n${cut(outline)}`;
 	}
 	if (completionJson(body) === null) {
 		return `The reply was not JSON:\n${cut(content)}`;
 	}
 	return `The reply was JSON, but nothing in it was what was asked for, or within its limits:\n${cut(content)}`;
+}
+
+/** What a Responses answer says about how it ended, beside its output. */
+const RESPONSES_ENDING = ['status', 'incomplete_details', 'error', 'usage'] as const;
+
+/**
+ * A Responses answer with no reply in it, outlined rather than dumped: how it
+ * ended, each output item's type and size, and the last item whole. Dumped,
+ * the first fetched page alone outran `MAX_REPLY_DETAIL`, so the cut fell
+ * inside it and hid the end of the answer, which is where the reason is: a
+ * token budget spent on reasoning (`usage`), a turn that stopped after its
+ * fetches, or a reply in a shape `completionText` does not read. The pages
+ * themselves are in `LinkFetches`. Null for anything that is not a Responses
+ * answer.
+ */
+function responsesOutline(body: unknown): string | null {
+	const responses = responsesSchema.safeParse(body);
+	if (!responses.success) {
+		return null;
+	}
+	const fields = body as Record<string, unknown>;
+	const ending = RESPONSES_ENDING.flatMap((key) =>
+		fields[key] === undefined || fields[key] === null
+			? []
+			: [`${key}: ${JSON.stringify(fields[key], null, 2)}`]
+	);
+	const { output } = responses.data;
+	const items = output.map((item, index) => {
+		const type = z.object({ type: z.string() }).safeParse(item);
+		const size = (JSON.stringify(item) ?? '').length;
+		return `${index + 1}. ${type.success ? type.data.type : '(no type)'}, ${size.toLocaleString('en')} characters`;
+	});
+	const last = output.at(-1);
+	return [
+		...ending,
+		`output: ${output.length} ${output.length === 1 ? 'item' : 'items'}`,
+		...items,
+		...(last === undefined ? [] : [`The last item:\n${JSON.stringify(last, null, 2)}`])
+	].join('\n');
 }
 
 /** More chips for one field: trimmed, capped, de-duplicated, empties dropped. */

@@ -33,7 +33,8 @@
 		<li>
 			While you play, the character's setup and what you write are sent through Bound Up to
 			<a href="https://openrouter.ai" rel="noreferrer" target="_blank">OpenRouter</a>, and on to the
-			model provider that writes each reply.
+			model provider that writes each reply. Links you put in a description of a daydream may be
+			opened by OpenRouter, so it can read the pages for ideas.
 		</li>
 		<li>
 			For a picture of a passage, a description of the moment goes through Bound Up to

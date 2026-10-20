@@ -24,6 +24,8 @@ import {
 	completionJson,
 	describeUnusable,
 	type GeneratedIdea,
+	type LinkFetch,
+	linkFetches,
 	parseCasting,
 	parseChips,
 	parseFill,
@@ -51,7 +53,12 @@ export type SuggestContext = {
  * what came back, when the model answered with nothing usable
  * (`SuggestionProblem.svelte`).
  */
-export type SuggestFailure = { error: string; detail?: string };
+export type SuggestFailure = {
+	error: string;
+	detail?: string;
+	/** The links in the brief it read, for debug mode to show beside the failure. */
+	fetches?: LinkFetch[];
+};
 
 type Answer<T> = { ok: true; value: T } | ({ ok: false } & SuggestFailure);
 
@@ -192,13 +199,24 @@ export async function suggestDaydream(input: {
 	/** The voice a generated idea was made for, so the daydream is told that way. */
 	voice?: DaydreamVoicePresetId | null;
 	limits: string;
-}): Promise<Answer<DaydreamPieces>> {
+}): Promise<WithFetches<DaydreamPieces>> {
 	const answer = await ask({ task: 'daydream', ...input });
 	if (!answer.ok) {
 		return answer;
 	}
 	const pieces = parseSuggestedDaydream(answer.value);
-	return pieces ? { ok: true, value: pieces } : nothing(answer);
+	return withFetches(answer, pieces ? { ok: true, value: pieces } : nothing(answer));
+}
+
+/**
+ * What a suggestion that took a brief came back with, and the links it read
+ * (`linkFetches`), for debug mode to show either way: a link that could not be
+ * read is half of why ideas can come back thin.
+ */
+export type WithFetches<T> = Answer<T> & { fetches?: LinkFetch[] };
+
+function withFetches<T>(answer: { body: unknown }, result: Answer<T>): WithFetches<T> {
+	return { ...result, fetches: linkFetches(answer.body) };
 }
 
 /**
@@ -214,11 +232,11 @@ export async function suggestIdeas(input: {
 	limits: string;
 	/** Titles already shown, for "More ideas" not to offer them again. */
 	offered?: readonly string[];
-}): Promise<Answer<GeneratedIdea[]>> {
+}): Promise<WithFetches<GeneratedIdea[]>> {
 	const answer = await ask({ task: 'ideas', ...input });
 	if (!answer.ok) {
 		return answer;
 	}
 	const ideas = parseGeneratedIdeas(answer.value, input.side);
-	return ideas.length > 0 ? { ok: true, value: ideas } : nothing(answer);
+	return withFetches(answer, ideas.length > 0 ? { ok: true, value: ideas } : nothing(answer));
 }

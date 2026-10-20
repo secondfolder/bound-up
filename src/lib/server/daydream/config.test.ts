@@ -23,6 +23,7 @@ describe('parseDaydreamConfig', () => {
 		).toEqual({
 			apiKey: 'sk-or-1',
 			openrouterModelId: OPENROUTER_STORY_MODEL_PRESETS[0].openrouterModelId,
+			readsLinks: false,
 			baseUrl: DEFAULT_OPENROUTER_BASE_URL
 		});
 	});
@@ -35,6 +36,19 @@ describe('parseDaydreamConfig', () => {
 			)?.openrouterModelId;
 		expect(read(JSON.stringify({ preset: 'euryale' }))).toBe('sao10k/l3.1-euryale-70b');
 		expect(read(JSON.stringify({ openrouterModelId: 'some/model' }))).toBe('some/model');
+	});
+
+	it('reads links only with a model saved as calling tools', () => {
+		const readsLinks = (openrouterStoryModel: string) =>
+			parseDaydreamConfig(
+				testSettings({ openrouterApiKey: 'k', openrouterStoryModel }),
+				DEFAULT_OPENROUTER_BASE_URL
+			)?.readsLinks;
+		expect(readsLinks(JSON.stringify({ openrouterModelId: 'z-ai/glm-5.2', tools: true }))).toBe(
+			true
+		);
+		expect(readsLinks(JSON.stringify({ openrouterModelId: 'z-ai/glm-5.2' }))).toBe(false);
+		expect(readsLinks(JSON.stringify({ preset: 'hermes' }))).toBe(false);
 	});
 });
 

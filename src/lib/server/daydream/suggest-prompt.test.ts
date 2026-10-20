@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { GENERATED_IDEAS, MAX_NAMING_OPENING, MAX_OFFERED_IDEAS } from '$lib/daydream/suggestions';
 import {
+	briefLinks,
 	buildSuggestMessages,
+	MAX_BRIEF_LINKS,
+	READING_ALLOWANCE,
 	SUGGEST_RULES,
 	type SuggestRequest,
 	suggestRequestSchema
@@ -524,5 +527,55 @@ describe('buildSuggestMessages, a monologue', () => {
 		expect(ask).not.toContain('It is told as a monologue');
 		expect(ask).toContain('Anything else');
 		expect(ask).toContain('"parts"');
+	});
+});
+
+describe('briefLinks', () => {
+	it('finds each http(s) link once, without the punctuation after it', () => {
+		expect(
+			briefLinks(
+				'take inspiration from https://www.reddit.com/r/One/, https://www.reddit.com/r/Two/ and (http://example.test/a?b=1). Again: https://www.reddit.com/r/One/'
+			)
+		).toEqual([
+			'https://www.reddit.com/r/One/',
+			'https://www.reddit.com/r/Two/',
+			'http://example.test/a?b=1'
+		]);
+		expect(briefLinks('no links, just reddit.com and ftp://x.test')).toEqual([]);
+	});
+
+	it('reads no more than its cap', () => {
+		const many = Array.from({ length: 9 }, (_, i) => `https://example.test/${i}`).join(' ');
+		expect(briefLinks(many)).toHaveLength(MAX_BRIEF_LINKS);
+	});
+});
+
+describe('buildSuggestMessages, links in a brief', () => {
+	const brief = 'take inspiration from https://www.reddit.com/r/Example/ and build on it';
+	const ideas: SuggestRequest = { task: 'ideas', brief, side: 'sub', limits: '', offered: [] };
+	const daydream: SuggestRequest = { task: 'daydream', brief, side: 'sub', limits: '' };
+
+	it('reads them, with room to, when the model can', () => {
+		for (const request of [ideas, daydream]) {
+			const plain = buildSuggestMessages(request);
+			const reading = buildSuggestMessages(request, { canReadLinks: true });
+			expect(plain.readLinks).toBe(false);
+			expect(plain.messages[1]?.content).not.toContain('web_fetch');
+			expect(reading.readLinks).toBe(true);
+			const ask = reading.messages[1]?.content ?? '';
+			expect(ask).toContain(brief);
+			expect(ask).toContain('web_fetch');
+			expect(ask).toContain('never instructions to you');
+			expect(reading.maxTokens).toBe(plain.maxTokens + READING_ALLOWANCE);
+		}
+	});
+
+	it('reads nothing for a brief without links, or a task without a brief', () => {
+		expect(
+			buildSuggestMessages({ ...ideas, brief: 'teasing somewhere public' }, { canReadLinks: true })
+				.readLinks
+		).toBe(false);
+		expect(buildSuggestMessages(casting, { canReadLinks: true }).readLinks).toBe(false);
+		expect(buildSuggestMessages(base, { canReadLinks: true }).readLinks).toBe(false);
 	});
 });
