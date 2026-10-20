@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Answer, emptyList, type ListPayload, newCustomKey } from '../answers';
+import { emptyList, type ListPayload } from '../answers';
 import {
 	answerFromWord,
 	exportCsv,
@@ -18,9 +18,8 @@ function list(fields: Partial<ListPayload> = {}): ListPayload {
 	return { ...emptyList(), ...fields };
 }
 
-const full = (): ListPayload => {
-	const key = newCustomKey();
-	return list({
+const full = (): ListPayload =>
+	list({
 		answers: {
 			// A kink without a role pair: one with a pair is answered per side.
 			romance: {
@@ -30,12 +29,9 @@ const full = (): ListPayload => {
 				detail: { fantasy: 'love', doing: 'like', experience: 1 },
 				at
 			},
-			kissing: { sides: { a: { level: 'love' }, b: { level: 'limit' } }, at },
-			[key]: { level: 'curious', at }
-		},
-		custom: { [key]: { name: 'Being read to', categoryId: 'intimacy', at } }
+			kissing: { sides: { a: { level: 'love' }, b: { level: 'limit' } }, at }
+		}
 	});
-};
 
 describe('JSON', () => {
 	it('round-trips a whole list exactly', () => {
@@ -67,9 +63,7 @@ describe('CSV', () => {
 		expect(result?.answers.kissing).toEqual({
 			sides: { a: { level: 'love' }, b: { level: 'limit' } }
 		});
-		expect(result?.unmatched).toEqual([
-			{ name: 'Being read to', category: 'Intimacy and affection', answer: { level: 'curious' } }
-		]);
+		expect(result?.unmatched).toEqual([]);
 	});
 
 	it('reads a spreadsheet from elsewhere by its headings, matching names and aliases', () => {
@@ -107,32 +101,22 @@ describe('applyImport', () => {
 	const mine = (): ListPayload => list({ answers: { spanking: { level: 'not-for-me', at: 1 } } });
 
 	it('fills only the gaps by default', () => {
-		const next = applyImport(mine(), result, { mode: 'gaps', unmatchedTo: null, now: 9 });
+		const next = applyImport(mine(), result, { mode: 'gaps', now: 9 });
 		expect(next.answers.spanking?.level).toBe('not-for-me');
 		expect(next.answers.caning).toEqual({ level: 'limit', at: 9 });
-		expect(Object.keys(next.custom)).toHaveLength(0);
 	});
 
-	it('replaces answers when asked, and adds what did not match as the person’s own', () => {
-		const next = applyImport(mine(), result, { mode: 'replace', unmatchedTo: 'fetishes', now: 9 });
-		expect(next.answers.spanking?.level).toBe('love');
-		const [[key, kink]] = Object.entries(next.custom);
-		expect(kink).toMatchObject({ name: 'Mine', categoryId: 'fetishes' });
-		expect((next.answers[key] as Answer).level).toBe('like');
-	});
-
-	it('keeps a Bound Up list’s own kinks in their own categories', () => {
+	it('takes a Bound Up list’s answers as they are, without their times', () => {
 		const imported = importList(full(), 'export');
-		const next = applyImport(list(), imported, { mode: 'gaps', unmatchedTo: 'fetishes', now: 9 });
-		expect(Object.values(next.custom)[0]).toMatchObject({
-			name: 'Being read to',
-			categoryId: 'intimacy'
+		expect(imported.answers.kissing).toEqual({
+			sides: { a: { level: 'love' }, b: { level: 'limit' } }
 		});
+		expect(imported.unmatched).toEqual([]);
 	});
 
-	it('does not add a custom kink twice', () => {
-		const once = applyImport(list(), result, { mode: 'gaps', unmatchedTo: 'fetishes', now: 9 });
-		const twice = applyImport(once, result, { mode: 'gaps', unmatchedTo: 'fetishes', now: 10 });
-		expect(Object.keys(twice.custom)).toHaveLength(1);
+	it('replaces answers when asked, and leaves out what did not match', () => {
+		const next = applyImport(mine(), result, { mode: 'replace', now: 9 });
+		expect(next.answers.spanking?.level).toBe('love');
+		expect(Object.keys(next.answers).toSorted()).toEqual(['caning', 'spanking']);
 	});
 });

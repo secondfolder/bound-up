@@ -68,17 +68,111 @@ the review behind the categories are kept outside the repo, in
 `.local/kinks/`. **Descriptions are original**: one source list is CC BY-SA,
 and copying its wording would put its share-alike licence on ours.
 
-**`share-ids.json` is append-only from the first deploy.** Share links and
-exports refer to kinks by their position in it, so once a list has been
-shared, an existing id never moves. A new kink goes on the end, and a removed
-one stays as a tombstone. The loader fails if a catalogue id is missing from
-it. Until the kink list is deployed anywhere, ids may still be renamed in
-place, as three were when the one-sided kinks were rewritten.
+**Every item has a `share` number, and it never changes.** Share links refer
+to kinks by number to stay short, and a link is a snapshot nobody can update.
+- Numbers run from 0 with no gaps, one per item, and the loader fails
+  otherwise. A new kink takes the next number.
+- [`share-numbers.fixture.json`](../src/lib/kink-list/share-numbers.fixture.json)
+  is every number given out. A test fails if one is renumbered or its item
+  deleted, and asks for a new item to be added to it. From the first deploy
+  it only grows.
+- Until the kink list is deployed anywhere, ids may still be renamed in place,
+  as three were when the one-sided kinks were rewritten.
 
-**Changing a kink's pair, or swapping its sides, flips saved answers.**
-Answers are stored as `a` and `b`, so after the first deploy a pair may only
-change where `a` keeps its meaning, and the import snapshots in
-`import/lists/` have to follow.
+### Retiring a kink
+
+**Kinks are retired, never deleted.** `retiredOn` (`YYYY-MM-DD`) takes a kink
+or specific off the list while keeping it in the catalogue. Changing what a
+kink means — splitting it in two, say — is retiring it and adding new kinks
+with the next numbers.
+
+- **Saved answers to it are kept, unseen.** Nothing that shows, answers,
+  counts, compares, searches, exports or shares a list includes it, and a
+  partner's copy leaves it out. `liveItems`, `childrenOf`, `categories` and
+  `liveKinkById` are the live views; `kinkById` still finds it.
+- **Why not delete it:** an answer whose kink is unknown is read as having no
+  role pair, which dropped one side of it on the next save. A retired kink is
+  still known, so its answers keep their shape.
+- **Version history still shows it**, marked "No longer on the list since …",
+  for changes made before it was retired. A change between versions edited
+  after that date is left out, since only an older build could make one.
+- **An old export or share link** that answers it: a share link drops it; a
+  JSON or CSV import lists it under what didn't match, under its old name,
+  rather than writing an answer nothing shows.
+- **A category can be retired**, with every kink in it: nothing live may sit
+  under a retired category or kink, and no live kink may list a retired
+  category in `alsoUnder`. Its wholesale limit is kept in the list but, like
+  its kinks, shown and shared nowhere.
+- An import list in `import/lists/` may not map to a retired kink.
+
+### Changing the catalogue
+
+Saved answers, partner copies, share links and exports all refer to a kink by
+its `id` (lists) or its `share` number (links), never by its name, position or
+parent. So most edits are safe for lists already filled in, and the ones that
+aren't are below. `npm test` runs every rule the loader checks, plus the
+frozen share numbers; `catalog.json` is edited by hand
+(`.local/kinks/tools/export.py` predates share numbers and retiring, and must
+not be run over it).
+
+- **Adding a kink:** give it the next `share` number (the item count before
+  it) and add it to `share-numbers.fixture.json` with that number. It can go
+  anywhere in the file. It needs `commonness`, and a specific needs `adds`.
+- **Rewording** (`name`, `description`, `aliases`, `tags`, `safety`): answers
+  are untouched, and still read as answers to the new wording.
+  - If the meaning changes rather than the phrasing, retire the kink and add
+    a new one instead, or old answers silently become answers to a question
+    nobody was asked.
+  - A spreadsheet from elsewhere is matched by name and alias, so keep a
+    renamed kink's old name as an alias. Bound Up's own CSV matches by id, and
+    the `import/lists/` snapshots by id, so neither cares.
+  - Side labels belong to the pair in `roles`; see role pairs below.
+- **Reordering** within `catalog.json` changes only the order the list, quick
+  fill and the review show kinks in. Share numbers don't follow the order, so
+  nothing else moves.
+- **Moving a kink** to another parent (another category, or under another
+  kink as a specific):
+  - Its answers go with it, wherever it is listed.
+  - **Wholesale limits follow the primary category.** A kink moved into a
+    category someone limited with "Hard limit everything here" shows an
+    inherited hard limit there, to them and in their partner's compare; one
+    moved out loses it. Its own answer always wins over either.
+  - **Quick fill deals a specific only after its kink gets a yes,** so a
+    specific moved under a kink someone answered no won't come up for them.
+    A specific never inherits its kink's answer, so the move changes nothing
+    it shows on the list.
+  - Version history compares only answers given, so a kink that gains or
+    loses an inherited limit by moving isn't listed as a change.
+  - Becoming a specific means gaining `adds` and being no more common than
+    its new kink; becoming a kink means losing `adds`. The loader says which.
+- **`alsoUnder`** only changes where a kink is also shown. It is one item, so
+  the answer stays one answer.
+- **`commonness` and `adds`** change the level of detail a kink shows from.
+  Raising it may hide a kink someone answered; the answer is kept and counted
+  in "N more kinks are hidden by your level of detail".
+- **`intensity`** is not shown or used anywhere, so it changes nothing.
+- **`domSide` and `lean`** change only what the "Answer as" filter hides.
+- **Role pairs** (`roles`, and the labels in the top-level `roles`): answers
+  are stored per side as `a` and `b`, so a change here can change what
+  someone said.
+  - **Swapping a pair's sides, or relabelling it so `a` means something
+    else, flips every saved answer on it.** After the first deploy a pair may
+    only change where `a` keeps its meaning, and the `import/lists/`
+    snapshots have to follow.
+  - **Giving a kink a pair** turns a saved whole answer into the same answer
+    on each side, which is safe.
+  - **Taking a kink's pair away** keeps only side `a`'s answer (`a`'s, or
+    `b`'s if only `b` was answered), and the other side is gone on the next
+    save. Prefer retiring it and adding a kink without a pair.
+- **Splitting or merging kinks, or changing what one means:** retire the old
+  kink and add the new ones. Old answers stay with the old kink, unseen and
+  in history, rather than being guessed onto the new ones. There is no
+  mapping of answers from a retired kink to its replacements.
+- **Deleting:** never. Retire it (above). The loader fails on a gap in the
+  share numbers, and the fixture test names the deleted id.
+- **Renaming an `id`:** only before the first deploy. After it, an id is
+  as permanent as its share number: retire it and add a new kink.
+- **Renumbering:** never. The fixture test fails on any number that moved.
 
 ## Answers
 
@@ -113,11 +207,12 @@ An answer can also have:
 - **a note**, free text up to 1000 characters, on any kink, answered or not.
   Notes are for conditions ("only with a condom") and anything else.
 
-**Custom kinks** sit in a category beside the catalogue's, under
-`custom:<random>` keys. They come from an import's unmatched rows; the list
-no longer has an "Add your own", since a way to suggest a kink for the
-catalogue is to replace it. One already in a list still shows, and can be
-removed.
+**Every kink on a list is the catalogue's.** There are no kinks of one's own:
+they once came from an import's unmatched rows, and were removed so that
+everything on a list can be shown, compared, shared and retired by the same
+rules. A way to suggest a kink for the catalogue is to come instead. Lists
+saved in development may still hold some (`custom:<random>` keys); they are
+dropped as a list is read (docs/temporary-code.md).
 
 ### What an unanswered kink shows
 
@@ -143,7 +238,7 @@ are never inherited.
 
 ### Merging
 
-Every answer, triage choice, custom kink and the settings carries `at`, the
+Every answer, triage choice and the settings carries `at`, the
 time it last changed. `mergeLists` keeps the newer one per key, so two copies
 of a list merge without losing either device's work. A cleared answer is kept
 as an empty one, so the clearing merges too.
@@ -227,7 +322,7 @@ enough to fill in without a click per category:
 - Quick fill, Share (a dialog that makes a link), Import or export, and
   History, on one row
 - pinned above the list as it scrolls, under that row: search over names
-  and aliases (`searchKinks`) and custom kinks, which narrows the list in
+  and aliases (`searchKinks`), which narrows the list in
   place (see [Search](#search)), the level of detail
   ([`ListFilters`](../src/lib/components/kink-list/ListFilters.svelte)), the key to the answer colours
   ([`LevelKey`](../src/lib/components/kink-list/LevelKey.svelte)), "Your
@@ -238,8 +333,8 @@ enough to fill in without a click per category:
   with an `IntersectionObserver`, says when it has stuck.
 - every category by section, each a `wa-details`
   ([`KinkCategory`](../src/lib/components/kink-list/KinkCategory.svelte))
-  that starts open and folds away, with how much of it is answered, its
-  custom kinks, and "N related kinks". Folding is not
+  that starts open and folds away, with how much of it is answered, and
+  "N related kinks". Folding is not
   stored. A category has no page of its own: `id="category-<id>"` is the
   anchor.
 
@@ -313,7 +408,7 @@ It sits beside the search when the page is wide enough, at a fixed width
 rather than one taken from the content, since the reading beside its title
 changes width as the slider moves.
 
-Custom kinks are never hidden. A category says how many of its kinks the
+A category says how many of its kinks the
 level of detail hides. A category it hides every kink of is left out
 altogether rather than shown as an empty heading, and the foot of the list
 says how many categories went and how many kinks were in them. While
@@ -346,7 +441,7 @@ Categories and sections with nothing left are dropped; the rest are opened, so
 no match sits in one folded earlier. While searching, a category leaves out
 its related kinks (each is shown in its own category) and its own count of
 hidden kinks (the page gives one for the search). Its "3 of 12" is still of
-everything the level of detail shows. Custom kinks match by name.
+everything the level of detail shows.
 
 ### Answer as
 
@@ -403,8 +498,7 @@ list, so a reload loses nothing and lands back on triage.
 [`deck.ts`](../src/lib/kink-list/deck.ts) is the pure part. `deckCards`
 lists the cards still to go:
 
-- included categories in catalogue order, each category's kinks, then the
-  person's own kinks
+- included categories in catalogue order, each category's kinks
 - a kink's specifics only once it has a yes
 - nothing past the level of detail, and nothing answered or skipped
 
@@ -451,9 +545,8 @@ panel works signed in and signed out.
 - **The answers are in the fragment**, which a browser never sends to a
   server, so a shared list never reaches this one, or a log on the way.
 - **`<data>`** is the answers, deflated (`deflate-raw`) and base64url'd. They
-  are keyed by `share-ids.json` number with short keys, and include notes
+  are keyed by `share` number with short keys, and include notes
   unless the person unticks them. Also included:
-  - custom kinks
   - categories limited wholesale (they change what other kinks show)
   - an optional name
 
@@ -496,8 +589,6 @@ using effective answers.
   group.
 - **Specifics** count only when either person answered them.
 - **"Where you overlap most"** counts kinks, not pairings, per category.
-- **Custom kinks are not compared:** two people's own kinks have nothing in
-  common to match on.
 
 **Signed in**, a shared link's "Compare with mine" opens
 `/playroom/kink-list/compare#k1.…`, against the person's sealed list. **Signed
@@ -512,16 +603,15 @@ apply it.
 
 - **Keep my answers** (the default) fills only kinks with no answer yet.
 - **Use the imported ones** replaces answers.
-- **What didn't match** can be added as the person's own kinks, in a category
-  they choose. A Bound Up export's own kinks keep their own category.
+- **What didn't match** is listed in the preview, and left out.
 
 [`applyImport`](../src/lib/kink-list/import/result.ts) is the one place an
 import joins a list. Every importer produces the same `ImportResult`.
 
 **Export** ([`import/files.ts`](../src/lib/kink-list/import/files.ts)):
 
-- **JSON** is everything, exactly: `{ format: 'bound-up-kink-list', version:
-  1, list }`, read back by `readExportJson`.
+- **JSON** is everything but retired kinks' answers, exactly: `{ format:
+  'bound-up-kink-list', version: 1, list }`, read back by `readExportJson`.
 - **CSV** is one row per kink with an answer or a note. It has an `Id` column,
   so a re-import matches by id, plus words for the sides, fantasy and
   reality (filled in only once they part from the answer), experience and the
@@ -609,7 +699,7 @@ store).
   - When it has none, the answer **goes on your own list**, and the copy
     follows it. So a list filled in from a partner's view is still yours
     everywhere.
-  - Custom kinks, triage and settings are always your own list's.
+  - Triage and settings are always your own list's.
 - **Your partner can't open your own list**, which is in your own vault. So
   the copy also carries `resolved`: your own list, with the overrides
   applied, minus anything held back, plus wholesale limits, without
@@ -687,22 +777,28 @@ visit shows the button from the next load.
 ## Tests
 
 - **`kink-list/catalog.test.ts`:** the catalogue's checks (commonness,
-  `adds`, `domSide` and `lean` included), each item's level of detail
-  (`detailOf`), search, and the tree.
+  `adds`, `domSide`, `lean`, share numbers and retiring included), the frozen
+  share numbers, each item's level of detail (`detailOf`), search, and the
+  tree.
+- **`kink-list/retired.test.ts`:** one real kink retired by a mock
+  (`$lib/testing/retired-kink`): gone from browsing, search, counts, the
+  review, share links, exports and a partner's copy; both sides of its answer
+  kept; an old export listing it as not matched; history before and after;
+  and a whole category retired with its kinks and wholesale limit.
 - **`kink-list/answers.test.ts`:** the effective answer (sides, specifics,
   category limits, related kinks), merging, the stored shape, normalising an
   answer to its kink's shape, fantasy and reality parting and folding back,
   defaulted settings, and the filters
   (`isShown`, `shownSides`), and what a search leaves (`searchView`).
 - **`kink-list/deck.test.ts`:** the deck's order, drill-down after yes,
-  triage, the level of detail, custom kinks, and the review.
+  triage, the level of detail, and the review.
 - **`kink-list/share-link.test.ts`:** the round trip (sides, detail, notes,
-  custom kinks, wholesale limits, a name), notes left out, the length of a
+  wholesale limits, a name), notes left out, the length of a
   full list, broken links, and unknown kink numbers.
 - **`kink-list/compare.test.ts`:** the groups, role-aware pairing, limits,
   overlap, and pairing by your side (`pairingsFor`).
 - **`kink-list/partner.test.ts`:** following your own list, overrides taken
-  back, what the partner sees (held back, custom kinks, limits), where an
+  back, what the partner sees (held back, limits), where an
   answer goes, differences, merging, and the side who is in control starts
   you on.
 - **`kink-list/import/*.test.ts`:**

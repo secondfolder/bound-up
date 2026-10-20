@@ -11,7 +11,8 @@
 		type Change,
 		changeCount,
 		changesBetween,
-		kinkTimeline
+		kinkTimeline,
+		startOfDay
 	} from '$lib/kink-list/history';
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 	import type { PageData } from './$types';
@@ -25,7 +26,7 @@
 	const { store, paths } = kinkListContext();
 
 	/** `now` is the list as it stands, from the store, rather than a version. */
-	type Point = { id: string; label: string; list: ListPayload };
+	type Point = { id: string; label: string; list: ListPayload; editedTo: Date };
 
 	// The versions open once: they are frozen, and the page's own list is the store's.
 	let opened = $state<Point[] | null | undefined>(undefined);
@@ -39,13 +40,14 @@
 		opened = versions.map((version, index) => ({
 			id: version.id,
 			label: dateLabel(version.editedTo),
-			list: lists[index] as ListPayload
+			list: lists[index] as ListPayload,
+			editedTo: version.editedTo
 		}));
 	});
 
 	const points = $derived<Point[]>([
 		...(opened ?? []),
-		{ id: 'now', label: 'Now', list: store.list }
+		{ id: 'now', label: 'Now', list: store.list, editedTo: new Date() }
 	]);
 
 	// Defaults to what changed since the last version kept.
@@ -53,7 +55,7 @@
 	let toId = $state('now');
 	const from = $derived(points.find((point) => point.id === fromId) ?? points.at(-2));
 	const to = $derived(points.find((point) => point.id === toId) ?? points.at(-1));
-	const changes = $derived(from && to ? changesBetween(from.list, to.list) : null);
+	const changes = $derived(from && to ? changesBetween(from.list, to.list, from.editedTo) : null);
 
 	const expanded = new SvelteSet<string>();
 
@@ -62,7 +64,13 @@
 	}
 
 	function nameOf(key: string): string {
-		return store.list.custom[key as `custom:${string}`]?.name ?? kinkById(key)?.name ?? key;
+		return kinkById(key)?.name ?? key;
+	}
+
+	/** "No longer on the list since 3 Nov 2026" for a retired kink, so its change is not read as a current one. */
+	function retiredLabel(key: string): string {
+		const retiredOn = kinkById(key)?.retiredOn;
+		return retiredOn ? `No longer on the list since ${dateLabel(startOfDay(retiredOn))}` : '';
 	}
 
 	function partLabel(change: Change): string {
@@ -206,6 +214,7 @@
 									<span class="name">
 										{nameOf(change.key)}
 										{#if partLabel(change)}<span class="part">({partLabel(change)})</span>{/if}
+										{#if retiredLabel(change.key)}<span class="retired">{retiredLabel(change.key)}</span>{/if}
 									</span>
 									<!-- A disclosure trigger: wa-button does not forward aria-expanded (AGENTS.md). -->
 									<button
@@ -309,10 +318,16 @@
 	}
 
 	.part,
+	.retired,
 	.levels,
 	.timeline {
 		font-size: 0.875rem;
 		color: var(--wa-color-text-quiet);
+	}
+
+	.retired {
+		display: block;
+		font-weight: var(--wa-font-weight-normal);
 	}
 
 	.toggle {

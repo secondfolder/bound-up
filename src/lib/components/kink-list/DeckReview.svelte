@@ -17,7 +17,7 @@
 	const review = $derived(deckReview(store.list));
 
 	function nameOf(key: string): string {
-		return kinkById(key)?.name ?? store.list.custom[key as `custom:${string}`]?.name ?? key;
+		return kinkById(key)?.name ?? key;
 	}
 
 	function goThroughSkipped() {

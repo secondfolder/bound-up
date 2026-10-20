@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Answer, emptyList, type ListPayload, newCustomKey } from './answers';
+import { type Answer, emptyList, type ListPayload } from './answers';
 import {
 	answerTarget,
 	differences,
@@ -38,15 +38,13 @@ describe('a partner copy', () => {
 	});
 
 	it('shows the partner neither what is held back nor quick-fill skips, and keeps wholesale limits', () => {
-		const key = newCustomKey();
 		const own = solo(
 			{
 				spanking: { level: 'like', at },
 				caning: { level: 'limit', at },
-				[key]: { level: 'love', at }
+				kissing: { level: 'love', at }
 			},
 			{
-				custom: { [key]: { name: 'Mine', categoryId: 'intimacy', at } },
 				triage: { extreme: { value: 'limit', at }, media: { value: 'skip', at } },
 				skipped: { tickling: { skipped: true, at } }
 			}
@@ -54,13 +52,12 @@ describe('a partner copy', () => {
 		const partner = copy({
 			heldBack: {
 				caning: { held: true, at },
-				[key]: { held: true, at },
+				kissing: { held: true, at },
 				spanking: { held: false, at }
 			}
 		});
 		const resolved = resolvedFor(own, partner);
 		expect(Object.keys(resolved.answers)).toEqual(['spanking']);
-		expect(resolved.custom).toEqual({});
 		expect(resolved.triage).toEqual({ extreme: { value: 'limit', at } });
 	});
 

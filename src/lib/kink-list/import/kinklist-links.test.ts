@@ -90,10 +90,8 @@ describe('importFromList', () => {
 		});
 		expect(result.answers.romance).toEqual({ level: 'dont-mind' });
 		expect(result.answers.rimming).toEqual({ sides: { b: { level: 'curious' } } });
-		// Answered but unknown here: offered as the person's own.
-		expect(result.unmatched).toEqual([
-			{ name: 'Something new', category: 'Pain', answer: { level: 'like' } }
-		]);
+		// Answered but unknown here: listed in the preview, and left out.
+		expect(result.unmatched).toEqual([{ name: 'Something new', answer: { level: 'like' } }]);
 	});
 
 	it('leaves out a role-play admin category', () => {

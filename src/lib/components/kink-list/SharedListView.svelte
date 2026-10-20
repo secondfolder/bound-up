@@ -36,11 +36,6 @@
 				add(specific.id, `${kink.name}: ${specific.name}`, sidesOf(specific));
 			}
 		}
-		for (const [key, kink] of Object.entries(list.custom)) {
-			if (!kink.removed && kink.categoryId === categoryId) {
-				add(key, kink.name, null);
-			}
-		}
 		return rows;
 	}
 

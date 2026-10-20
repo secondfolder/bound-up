@@ -691,7 +691,7 @@
 			"kind": "kink-list",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000c1",
-			"ciphertext": "sb1.J-69rT8QfUEmQbm_9szda-5nWlF4LstOVSPdHe0HaZFkOxOff1pRJtn_DKH_BJWSiCQkTGTrQ1RgQfIdOiBVgWFBna8fpH108kVlIHhnzfaV-90s6XDa5xpz84cgWwhdhOq5jl5_Sigb-Je327foXBCQCKIg8u9qSV0212054b1LBknI5p6sdmZ6VYKgFaX872Ncdfz_7uVV3L_Im8heVz-OPVpUJlw_L_vNhNjCp0N3J8whDvB6u40nIwebrnLzH_Q4Aiacmr_lzQ7Cp7vmUbdkUkuhaRE32ZNJEfSc8-qvFqcmhZ4WiRDozptOdMFC6fs1y-JYQnGoHX0vrp8pp2Ti1CBCj4M8ZAnkixf4QelnBO0dHcCu1y_kMPGoUliaGvVn-lIPDizgNjNR9XQAgST1Rp9nN-5m68lbLC7zUYS-vn7UvD4Fo3KnRfDxAORdzQLHg_yu1_4fnbvWEhrCiLN2MqfhKCWTw-XRsoeR-vL5yiutk7GzaFEPyfFhVl9V-VmB0I21L5WtS11ra5obhKyAEWzPL8IltbBH7mDttKCAKJBTJCzV-RdY6Zmw0ll4K3iRkN1hMZMOWf1rI5wNeRvqgm1h9w6UKigncdDU2S6mCeATul-OQwpSwIXMy0CXkq00eE2qcgJAMUj4d6xFstUigpkh55vDt_jLtSK6fKs8vMKeGd7LPdjdq5S5iL5Affz-wLnfVTUj7Mqhs9oSdNDlJr5B8C8Ur8IuD39bvE6gJo8YXz_I9amLVDWyWV4cScb05aYT5USG7RRL5NfkJ7ItRTeXZz-22VlW1HTnXR6--1BfK4nK86Uw0qsN6Ri6ERL_JP-mXj-KxgNY0TI2ofU6Q28xojSTXeDi2XnL4p6sThefLal8g5IYOEMXG5pQsR-Ki5zV8Xp__gvmLN3KBuV5kgaZstBPWhrv-0dvb5qO2LmTCkUGOu6CavHeU9jmEYHb6hF1QE1xF2fN7euJ0by_mzZ4dE7kGSC_gEDbJJO0sezeQdg2f9ooDoogKweI2qBUpbuzBoxSiwCKYoiTlEmlV7YV_MmHpOlbtuFVDi1hBAUhAH5n8ZSGwOMNnccbzZy2HBed",
+			"ciphertext": "sb1.p5lOpQRv5lHmle6DcxMevko_QEpcZuyh0yfs3RCl2qycIuRBo2ttCGLVEtOnAd-y6busXNAY1guo8BcnC5sSqBqRaCVCnQgkpAKx2TNsXc6Bwj2KHUW1fMSFFhmeyLr8TsC9AfX2CgZGLpWF19DPWlnhKlJY45h83sGur31z6K5e-rJAKlUf_d8X-Mflb8sPT29XWE5auyp4ss8eWSX0RLAp6pPufrrh4iUkCN6nT8H1AA50uNNM0GfTfKsOjUr54x0LECiHsCtMOjcKCGnwvseHxGwEB4hmzCWRraOA3unxivvRpG-bqzCMjeCZnbsNniZwnAb0sXx5rIuiMibdZcKLVt__9aXXaaxjsa7Ikru1qNSrLXxz_7fnrTP-w0SMghdvprueKruNj625-iKNmUEAqbp5vs47tdBBKUt6HPkDb5Geves9EqjhirW09j-j09Q8b5TOIwEkNLxiKDE2KxNxBKVMfAuAFzoSoE1qkdVb70N3oN3M12gNOo7y1TV5MB8CMxbYCig-yA1oa24W5cX1eUqC4Ryyhgtz4iyFFFxExq5bUSYhRI18rVrsMBam9KiWBSz5lRA67HGsx-DRy5l73MIkIj79wnmsvGx0AgL2k6erpS2W_uRn0Dsbgtfhc22qP4jdk9F0oq69aTYUDl13c06wVQLsHL_fsDJ82mgJqbIwXua75o6RrQnduDT_DwqocbvG7WLT6lxuGjfKs2VBtBpBeytHGKLGlkzzvWtFvnlu",
 			"expected": {
 				"answers": {
 					"spanking": {
@@ -733,14 +733,6 @@
 							}
 						}
 					},
-					"custom:0123456789abcdef": {
-						"level": "conditional",
-						"note": "Only on weekends",
-						"detail": {
-							"experience": 2
-						},
-						"at": 1792000000003
-					},
 					"caning": {
 						"at": 1792000000004
 					}
@@ -753,14 +745,6 @@
 					"media": {
 						"value": "skip",
 						"at": 1792000000006
-					}
-				},
-				"custom": {
-					"custom:0123456789abcdef": {
-						"name": "Being read to",
-						"categoryId": "intimacy",
-						"description": "Bedtime stories",
-						"at": 1792000000007
 					}
 				},
 				"settings": {
@@ -780,7 +764,7 @@
 			"kind": "kink-list-partner",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000c2",
-			"ciphertext": "sb1.GHivMvdBb1wqB9sO7HM4RFQXpDpx-BD99ovjBJ9uL5rJNy019aqyoOZcAbqGqfWO0rjlUN6lswNHzZJcFpLqBYdw8gG0b83lIH74HMR7YLCqJrzYFWZR8VmRx0eZTc3XUVIrZkIdGExq5e5PQD-OmPCDmp136w7DWhQV0emr82pZ1KTmXV4y4DXNbA7h7QedtjKjDA-Wb8jLLc_Z5DpCPGwrP4WvNHTY7dqqwVPtZhQkXPbs8lTQ-39EehZ51pdZT85nJ_c94Vur271KbUQ_pAbu1QpQW5iHN71X4Lvj9CuA_jEaBXEr9xIsIvY-c61bt1pnRTcxUZGi7knPJSxu17f2yu7YextfE36UttMZXx2wsAHVyThJWRPQSamOyJenVXM3w4uVwj2MfBy_GNZKuMVkcR1nk_vnJyd1T3YsgiPiCmnOMa4u2Zp2WQDwRJob1g5zZLDL3GlCwFmEaPr7rZY3fdImDztPwI515k8P4HDm8KR2ooG3G7VrqzCiFb76ecUYiLtVSaMR2QUG8VDCZb1nMSzqbj_aomLQFNR-me3-xZZJjaeAaaIySDcRtFAQCdoPbglnkj5mZfHVrobYqiWuU5UGLu16zoIfzkp8O978oguq9MfbwqWu1bbfHCJFMEOQIt2GrSkknS24NbZ2G8aFCtW-NvXXJpIM1XCKPCsEzTRG5CqW807vtvjy67fAuPKjsPkB-4bkQOid_GaVmiasdRnoHMDVH0qzdyKA4aw303VkYWJluDLk33ThAUk831BbOOM",
+			"ciphertext": "sb1.z2H9chfRtYWCBhsRloV1lxLXO64NnYZfHE_nmCSnDeOm1cYljkmp-kzoq0NM6kLLLegRlHIywhi1e-cR9LWONSyYj28ZI35tA_1hUCu0owl1HkczfavoJ2L8tyON6fOn0wNubycYS5hMuR-oTexpdYx0bLDAOmDhwSxaX8yURRjgrPfAobtjZWrxj3riKhbqAhCoNSMAbsutrMYW6P4siivqMz30abzdECrzIqI4EK5xGIoAbS1siUa14XuNVCO4-1RE41tluJDsyCw3OMS2Fd5WRE4yB7Y-CPFemiHBDA3nMETuhu1S3gc8Ch1w1dTmd2M30_1mxxTx9n3sZXDR2xtLfSSX4cq06CS8BxDPqy0Q8H0Ix-o6Nxnt70K_4zu30aKvDi6hRy0zWz59IW7r-30NpIFyMg_QUAh_0OMOQVNplYpxFBuiydT8w9ZwUffr_ai083UxADmqzfIRHDyPsSHPHl0ppMMCAOvbZEQy731yQ4VZZ3art0UyzOzUeySN_kztKwY_S0WZlY18PjlE4FFyKq1BiLJbQHapKzcrd4spk4QDk-iSwC_eJnHVqyObM7Yg4s2kopKDgogNCnS9yJVFUoru59picng57H01jFm8twWnDBTBOb3rszY",
 			"expected": {
 				"overrides": {
 					"spanking": {
@@ -830,13 +814,6 @@
 								}
 							},
 							"at": 1792000000001
-						}
-					},
-					"custom": {
-						"custom:0123456789abcdef": {
-							"name": "Being read to",
-							"categoryId": "intimacy",
-							"at": 1792000000007
 						}
 					},
 					"triage": {

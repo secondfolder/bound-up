@@ -16,7 +16,6 @@
 
 import {
 	type Answer,
-	type CustomKink,
 	emptyList,
 	type Filters,
 	filtersOf,
@@ -186,23 +185,5 @@ export abstract class KinkListStore {
 			...this.list,
 			skipped: { ...this.list.skipped, [key]: { skipped, at: Date.now() } }
 		});
-	}
-
-	removeCustom(key: `custom:${string}`): void {
-		const current = this.list.custom[key];
-		if (!current) {
-			return;
-		}
-		this.change({
-			...this.list,
-			custom: { ...this.list.custom, [key]: { ...current, removed: true, at: Date.now() } }
-		});
-	}
-
-	/** The custom kinks still in the list, for one category or all of them. */
-	customKinks(categoryId?: string): [`custom:${string}`, CustomKink][] {
-		return (Object.entries(this.list.custom) as [`custom:${string}`, CustomKink][]).filter(
-			([, kink]) => !kink.removed && (categoryId === undefined || kink.categoryId === categoryId)
-		);
 	}
 }

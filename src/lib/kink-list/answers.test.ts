@@ -14,7 +14,6 @@ import {
 	type ListPayload,
 	listPayloadSchema,
 	mergeLists,
-	newCustomKey,
 	normaliseAnswer,
 	searchView,
 	settleSide,
@@ -85,13 +84,6 @@ describe('effectiveAnswer', () => {
 		const answers = { 'anal-sex': { level: 'curious', at } } satisfies Record<string, Answer>;
 		expect(effectiveAnswer(list({ triage, answers }), 'anal-sex').level).toBe('curious');
 	});
-
-	it('applies a category’s hard limit to custom kinks added to it', () => {
-		const key = newCustomKey();
-		const custom = { [key]: { name: 'Mine', categoryId: 'anal', at } };
-		const triage = { anal: { value: 'limit' as const, at } };
-		expect(effectiveAnswer(list({ custom, triage }), key).level).toBe('limit');
-	});
 });
 
 describe('mergeLists', () => {
@@ -115,7 +107,7 @@ describe('mergeLists', () => {
 		expect(hasContent(merged.answers.spanking)).toBe(false);
 	});
 
-	it('merges custom kinks, triage and settings the same way', () => {
+	it('merges triage and settings the same way', () => {
 		const a = list({
 			triage: { media: { value: 'skip', at: 1 } },
 			settings: { detail: 5, side: 'both', at: 9 }
@@ -132,7 +124,6 @@ describe('mergeLists', () => {
 
 describe('the stored shape', () => {
 	it('accepts a list with every kind of answer', () => {
-		const key = newCustomKey();
 		const parsed = listPayloadSchema.safeParse({
 			answers: {
 				spanking: { level: 'like', note: 'Over the knee', at },
@@ -140,17 +131,31 @@ describe('the stored shape', () => {
 					sides: { a: { level: 'curious', detail: { doing: 'like', experience: 2 } } },
 					at
 				},
-				[key]: { level: 'conditional', at }
+				kissing: { level: 'conditional', at }
 			},
 			triage: { extreme: { value: 'limit', at } },
-			custom: { [key]: { name: 'Being read to', categoryId: 'intimacy', at } },
 			settings: { detail: 3, side: 'both', at },
 			skipped: { tickling: { skipped: true, at } }
 		});
 		expect(parsed.success).toBe(true);
 	});
 
-	it('refuses a key that is neither a catalogue id nor a custom kink', () => {
+	it('drops the own kinks a list saved in development may still hold', () => {
+		const parsed = listPayloadSchema.parse({
+			...emptyList(),
+			answers: {
+				spanking: { level: 'like', at },
+				'custom:0123456789abcdef': { level: 'love', at }
+			},
+			custom: { 'custom:0123456789abcdef': { name: 'Being read to', categoryId: 'intimacy', at } },
+			skipped: { 'custom:0123456789abcdef': { skipped: true, at } }
+		});
+		expect(Object.keys(parsed.answers)).toEqual(['spanking']);
+		expect(parsed.skipped).toEqual({});
+		expect(parsed).not.toHaveProperty('custom');
+	});
+
+	it('refuses a key that is not a catalogue id', () => {
 		const parsed = listPayloadSchema.safeParse({
 			...emptyList(),
 			answers: { 'Not An Id': { level: 'like', at } }
@@ -181,11 +186,6 @@ describe('small rules', () => {
 		};
 		expect(answeredCount(list({ answers }))).toBe(1);
 		expect(hasContent(answers.spanking)).toBe(true);
-	});
-
-	it('makes custom keys that the schema accepts', () => {
-		const key = newCustomKey();
-		expect(key).toMatch(/^custom:[0-9a-f]{24}$/);
 	});
 });
 

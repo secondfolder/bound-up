@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Answer, emptyList, type ListPayload, newCustomKey } from './answers';
+import { type Answer, emptyList, type ListPayload } from './answers';
 import { childrenOf } from './catalog';
 import { deckCards, deckReview, isInDeck, narrows } from './deck';
 
@@ -64,45 +64,25 @@ describe('deckCards', () => {
 		expect(cards).toContain('spanking');
 		expect(cards).not.toContain('caning');
 	});
-
-	it('includes a custom kink after its category’s own', () => {
-		const key = newCustomKey();
-		const custom = { [key]: { name: 'Being read to', categoryId: 'intimacy', at } };
-		const cards = deckCards(list({ custom }));
-		expect(cards.indexOf(key)).toBe(childrenOf('intimacy').length);
-	});
 });
 
 describe('deckReview', () => {
 	it('lists own limits, wholesale categories, conditions and what was skipped', () => {
-		const key = newCustomKey();
 		const review = deckReview(
 			list({
 				answers: {
 					caning: { level: 'limit', at },
 					kissing: { sides: { b: { level: 'conditional' } }, at },
-					[key]: { level: 'limit', at }
+					spanking: { level: 'limit', at }
 				},
-				custom: { [key]: { name: 'Mine', categoryId: 'intimacy', at } },
 				triage: { extreme: { value: 'limit', at } },
 				skipped: { tickling: { skipped: true, at }, flogging: { skipped: false, at } }
 			})
 		);
-		expect(review.limits).toEqual(['caning', key]);
+		expect(review.limits).toEqual(['spanking', 'caning']);
 		expect(review.limitCategories).toEqual(['extreme']);
 		expect(review.conditional).toEqual(['kissing']);
 		expect(review.skipped).toEqual(['tickling']);
-	});
-
-	it('forgets a removed custom kink', () => {
-		const key = newCustomKey();
-		const review = deckReview(
-			list({
-				answers: { [key]: { level: 'limit', at } },
-				custom: { [key]: { name: 'Mine', categoryId: 'intimacy', removed: true, at } }
-			})
-		);
-		expect(review.limits).toEqual([]);
 	});
 });
 

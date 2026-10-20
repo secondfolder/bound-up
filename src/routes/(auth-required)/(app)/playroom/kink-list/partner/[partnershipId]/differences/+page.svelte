@@ -17,7 +17,7 @@
 	const rows = $derived(differences(store.solo.list, store.partner));
 
 	function nameOf(key: string): string {
-		return kinkById(key)?.name ?? store.solo.list.custom[key as `custom:${string}`]?.name ?? key;
+		return kinkById(key)?.name ?? key;
 	}
 
 	function words(answer: Answer | undefined): string {

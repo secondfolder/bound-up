@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import data from './catalog.json' with { type: 'json' };
-import shareIdsData from './share-ids.json' with { type: 'json' };
 
 /**
  * The kink list's catalogue: every kink a person can answer, in a tree of at
@@ -27,6 +26,24 @@ const id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'ids are kebab-case');
 
 const itemSchema = z.strictObject({
 	id,
+	/**
+	 * The item's number in share links, which refer to items by number to stay
+	 * short. A link is a snapshot nobody can update, so a number never moves
+	 * and is never reused: `share-numbers.fixture.json` holds every number
+	 * given out, and a test fails if one changes.
+	 */
+	share: z.number().int().nonnegative(),
+	/**
+	 * The day an item left the list, as `YYYY-MM-DD`. Items are retired rather
+	 * than deleted: a deleted id orphans every saved answer to it, and an
+	 * answer whose kink is unknown is read as having no role pair, which
+	 * dropped one side of it on the next save. A retired item stays in the
+	 * catalogue, so answers to it keep their shape and version history can
+	 * still name it, but nothing that shows, answers, compares, imports,
+	 * exports or shares a list includes it. Changing what a kink means is
+	 * retiring it and adding new ones.
+	 */
+	retiredOn: z.iso.date().optional(),
 	name: z.string().min(1),
 	/** Absent on a category; a category's id or a kink's id otherwise. */
 	parent: id.optional(),
@@ -98,7 +115,7 @@ export const catalogSchema = z
 		items: z.array(itemSchema).min(1)
 	})
 	.superRefine((parsed, ctx) => {
-		for (const problem of catalogProblems(parsed, shareIdsData)) {
+		for (const problem of catalogProblems(parsed)) {
 			ctx.addIssue({ code: 'custom', message: problem });
 		}
 	});
@@ -126,8 +143,7 @@ function depthIn(items: Map<string, KinkItem>, item: KinkItem): number {
  * hand-made broken catalogues.
  */
 export function catalogProblems(
-	parsed: Pick<Catalog, 'items' | 'sections' | 'roles' | 'tags'>,
-	shareIds: readonly string[]
+	parsed: Pick<Catalog, 'items' | 'sections' | 'roles' | 'tags'>
 ): string[] {
 	const problems: string[] = [];
 	const byId = new Map<string, KinkItem>();
@@ -193,31 +209,65 @@ export function catalogProblems(
 			const category = byId.get(other);
 			if (!category || category.parent !== undefined) {
 				problems.push(`"${item.id}" is also under "${other}", which is not a category`);
+			} else if (!item.retiredOn && category.retiredOn) {
+				// A retired category is never shown, so this would list it nowhere.
+				problems.push(`"${item.id}" is also under "${other}", which is retired`);
 			}
 		}
-	}
-	// Share links and exports refer to items by their place in share-ids.json,
-	// so every item needs one; removed items stay there as tombstones.
-	const shared = new Set(shareIds);
-	for (const item of parsed.items) {
-		if (!shared.has(item.id)) {
-			problems.push(`"${item.id}" is missing from share-ids.json`);
+		// A live item under a retired one could never be reached: the list is
+		// browsed from the categories down, and retired items are left out.
+		if (!item.retiredOn && parent?.retiredOn) {
+			problems.push(`"${item.id}" is under "${parent.id}", which is retired`);
 		}
 	}
-	if (shared.size !== shareIds.length) {
-		problems.push('share-ids.json lists an id twice');
+	// Numbers must run from 0 with no gaps: a gap is a number given out to an
+	// item that has since been deleted, which is what retiring is for.
+	const numbers = new Map<number, string>();
+	for (const item of parsed.items) {
+		const other = numbers.get(item.share);
+		if (other !== undefined) {
+			problems.push(`"${item.id}" and "${other}" share the share number ${item.share}`);
+		}
+		numbers.set(item.share, item.id);
+	}
+	for (let share = 0; share < parsed.items.length; share += 1) {
+		if (!numbers.has(share)) {
+			problems.push(`no item has share number ${share}; retire items rather than deleting them`);
+		}
 	}
 	return problems;
 }
 
 export const catalog: Catalog = catalogSchema.parse(data);
 
-/** The append-only order items are numbered in for share links and exports. */
-export const SHARE_IDS: readonly string[] = shareIdsData;
+/** Whether an item has left the list (see `retiredOn`). */
+export function isRetired(item: KinkItem): boolean {
+	return item.retiredOn !== undefined;
+}
+
+/** Every item still on the list, in file order: what the list, search and exports go through. */
+export const liveItems: readonly KinkItem[] = catalog.items.filter((item) => !isRetired(item));
 
 const byId = new Map(catalog.items.map((item) => [item.id, item]));
+const byShare = new Map(catalog.items.map((item) => [item.share, item]));
+
+/**
+ * A live catalogue item by id, for anything a list shows or sends on.
+ * `kinkById` finds retired items too, for answers' shapes and history.
+ */
+export function liveKinkById(itemId: string): KinkItem | undefined {
+	const item = byId.get(itemId);
+	return item && !isRetired(item) ? item : undefined;
+}
+
+/** A live item by its share-link number; retired and unknown numbers find nothing. */
+export function kinkByShare(share: number): KinkItem | undefined {
+	const item = byShare.get(share);
+	return item && !isRetired(item) ? item : undefined;
+}
+
 const childrenById = new Map<string | undefined, KinkItem[]>();
-for (const item of catalog.items) {
+for (const item of liveItems) {
 	const siblings = childrenById.get(item.parent) ?? [];
 	siblings.push(item);
 	childrenById.set(item.parent, siblings);
@@ -227,7 +277,7 @@ export function kinkById(itemId: string): KinkItem | undefined {
 	return byId.get(itemId);
 }
 
-/** An item's children, in file order. `undefined` for the categories. */
+/** An item's live children, in file order. `undefined` for the categories. */
 export function childrenOf(parentId: string | undefined): readonly KinkItem[] {
 	return childrenById.get(parentId) ?? [];
 }
@@ -255,7 +305,7 @@ export function primaryCategoryOf(item: KinkItem): KinkItem {
 
 /** Kinks whose primary category is elsewhere but which list `categoryId` in `alsoUnder`. */
 export function relatedKinks(categoryId: string): KinkItem[] {
-	return catalog.items.filter((item) => item.alsoUnder?.includes(categoryId));
+	return liveItems.filter((item) => item.alsoUnder?.includes(categoryId));
 }
 
 /** The pair of side labels for an item's role pair, or null for an item answered as one. */
@@ -334,7 +384,7 @@ export function normaliseSearch(text: string): string {
 		.trim();
 }
 
-const searchIndex = catalog.items
+const searchIndex = liveItems
 	.filter((item) => item.parent !== undefined)
 	.map((item) => ({
 		item,

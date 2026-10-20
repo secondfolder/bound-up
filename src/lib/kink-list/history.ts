@@ -87,8 +87,30 @@ function partsOf(key: ItemKey): readonly Part[] {
 	return item && sidesOf(item) ? ['whole', 'a', 'b'] : ['whole'];
 }
 
-/** Everything that moved from `before` to `after`, grouped, in catalogue-key order. */
-export function changesBetween(before: ListPayload, after: ListPayload): Changes {
+/**
+ * Whether a retired kink's change is one nobody could have made: the earlier
+ * list was last edited on or after the day it was retired, so the change came
+ * after it left the list. Only a device still running an older build could
+ * write one, and it would read as a choice made on a kink nobody can see.
+ * Changes from before retirement still show, so nothing anyone did vanishes
+ * from their history.
+ */
+function afterRetirement(key: ItemKey, since: Date | undefined): boolean {
+	const retiredOn = kinkById(key)?.retiredOn;
+	return since !== undefined && retiredOn !== undefined && since >= startOfDay(retiredOn);
+}
+
+/** A catalogue date (`YYYY-MM-DD`) as the start of that day, here. */
+export function startOfDay(date: string): Date {
+	return new Date(`${date}T00:00:00`);
+}
+
+/**
+ * Everything that moved from `before` to `after`, grouped, in catalogue-key
+ * order. `since` is when `before` was last edited, which retired kinks are
+ * judged by (`afterRetirement`).
+ */
+export function changesBetween(before: ListPayload, after: ListPayload, since?: Date): Changes {
 	const changes: Changes = {
 		'new-limits': [],
 		'more-into': [],
@@ -99,6 +121,9 @@ export function changesBetween(before: ListPayload, after: ListPayload): Changes
 	};
 	const keys = [...new Set([...Object.keys(before.answers), ...Object.keys(after.answers)])].sort();
 	for (const key of keys) {
+		if (afterRetirement(key, since)) {
+			continue;
+		}
 		const was = before.answers[key];
 		const is = after.answers[key];
 		for (const part of partsOf(key)) {

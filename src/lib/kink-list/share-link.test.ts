@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { toBase64Url } from '../encryption';
-import { type Answer, emptyList, type ListPayload, newCustomKey } from './answers';
-import { catalog } from './catalog';
+import { type Answer, emptyList, LEVELS, type ListPayload } from './answers';
+import { catalog, sidesOf } from './catalog';
 import { decodeShareLink, encodeShareLink, SHARE_PREFIX } from './share-link';
 
 const at = 5;
@@ -56,12 +56,10 @@ describe('share links', () => {
 		expect(decoded.answers.spanking?.level).toBe('like');
 	});
 
-	it('carry custom kinks, wholesale limits and a name, but not quick-fill skips', async () => {
-		const key = newCustomKey();
+	it('carry wholesale limits and a name, but not quick-fill skips', async () => {
 		const { list: decoded, name } = await roundTrip(
 			list({
-				answers: { [key]: { level: 'love', at } },
-				custom: { [key]: { name: 'Being read to', categoryId: 'intimacy', at } },
+				answers: { kissing: { level: 'love', at } },
 				triage: { extreme: { value: 'limit', at }, media: { value: 'skip', at } },
 				skipped: { tickling: { skipped: true, at } }
 			}),
@@ -69,22 +67,31 @@ describe('share links', () => {
 			'Ada'
 		);
 		expect(name).toBe('Ada');
-		const [newKey, kink] = Object.entries(decoded.custom)[0] ?? [];
-		expect(kink).toMatchObject({ name: 'Being read to', categoryId: 'intimacy' });
-		expect(newKey && decoded.answers[newKey]?.level).toBe('love');
+		expect(decoded.answers.kissing?.level).toBe('love');
 		expect(decoded.triage).toEqual({ extreme: { value: 'limit', at: 0 } });
 		expect(decoded.skipped).toEqual({});
 	});
 
 	it('stay short enough to paste, even for a list answered all the way through', async () => {
+		// Varied answers, each side of a role pair its own: a repeating pattern
+		// deflates far better than anyone's real list, and made the bound meaningless.
+		let seed = 7;
+		const level = () => {
+			seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31;
+			return LEVELS[seed % LEVELS.length];
+		};
 		const answers = Object.fromEntries(
-			catalog.items.map((item, index) => [
-				item.id,
-				{ level: index % 2 ? 'like' : 'limit', at } as Answer
-			])
+			catalog.items
+				.filter((item) => item.parent !== undefined)
+				.map((item) => [
+					item.id,
+					(sidesOf(item)
+						? { sides: { a: { level: level() }, b: { level: level() } }, at }
+						: { level: level(), at }) as Answer
+				])
 		);
 		const fragment = await encodeShareLink(list({ answers }), { withNotes: true });
-		expect(fragment.length).toBeLessThan(4000);
+		expect(fragment.length).toBeLessThan(3000);
 	});
 
 	it('refuse anything that is not one, rather than throwing', async () => {

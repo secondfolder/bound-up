@@ -43,9 +43,8 @@
 	 * (`settleSide` in answers.ts). Once they do, the line shows the two in
 	 * place of the one, and goes back to one when they agree again.
 	 *
-	 * The same row serves a catalogue kink and one the person added
-	 * themselves (`custom:…`), and the same answer shows wherever the kink
-	 * appears: in its own category, under "related kinks", or in search.
+	 * The same answer shows wherever the kink appears: in its own category,
+	 * under "related kinks", or in search.
 	 */
 	let { itemKey, nested = false }: { itemKey: string; nested?: boolean } = $props();
 
@@ -53,9 +52,8 @@
 	const id = $props.id();
 
 	const item = $derived<KinkItem | undefined>(kinkById(itemKey));
-	const custom = $derived(item ? undefined : store.list.custom[itemKey as `custom:${string}`]);
-	const name = $derived(item?.name ?? custom?.name ?? '');
-	const description = $derived(item?.description ?? custom?.description);
+	const name = $derived(item?.name ?? '');
+	const description = $derived(item?.description);
 	const sides = $derived(item ? sidesOf(item) : null);
 	/** The contexts on screen: both, or only yours when "Answer as" is set and the kink leans. */
 	const contexts = $derived(shownSides(item, store.filters.side));

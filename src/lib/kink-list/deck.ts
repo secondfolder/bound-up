@@ -3,12 +3,13 @@ import {
 	filtersOf,
 	type ItemKey,
 	isAnswered,
+	isListed,
 	isPositive,
 	isShown,
 	type Level,
 	type ListPayload
 } from './answers';
-import { catalog, categories, childrenOf, type KinkItem, kinkById } from './catalog';
+import { categories, childrenOf, type KinkItem, kinkById, liveItems } from './catalog';
 
 /**
  * Quick fill's deck: which kinks to show, in what order, and what to review
@@ -40,7 +41,7 @@ function saidYes(list: ListPayload, key: ItemKey): boolean {
 
 /**
  * The cards still to go, in order: each included category's kinks in
- * catalogue order, then the person's own kinks in it.
+ * catalogue order.
  *
  * **Drill down only after yes.** A kink's specifics are dealt in straight
  * after it, but only once it has been answered with a yes of some kind. After
@@ -76,16 +77,6 @@ export function deckCards(list: ListPayload, filters: Filters = filtersOf(list))
 				}
 			}
 		}
-		for (const [key, kink] of Object.entries(list.custom)) {
-			if (
-				!kink.removed &&
-				kink.categoryId === category.id &&
-				!isAnswered(list.answers[key]) &&
-				!skipped(list, key)
-			) {
-				cards.push(key);
-			}
-		}
 	}
 	return cards;
 }
@@ -105,12 +96,7 @@ export type DeckReview = {
 	skipped: ItemKey[];
 };
 
-function isLiveCustom(list: ListPayload, key: ItemKey): boolean {
-	const kink = list.custom[key];
-	return kink !== undefined && !kink.removed;
-}
-
-const ORDER = new Map(catalog.items.map((item, index) => [item.id, index]));
+const ORDER = new Map(liveItems.map((item, index) => [item.id, index]));
 
 function catalogOrder(key: ItemKey): number {
 	return ORDER.get(key) ?? Number.MAX_SAFE_INTEGER;
@@ -126,9 +112,9 @@ function hasLevel(list: ListPayload, key: ItemKey, level: Level): boolean {
 }
 
 export function deckReview(list: ListPayload): DeckReview {
-	// Catalogue order, then the person's own kinks, so the review reads like the list.
+	// Catalogue order, so the review reads like the list.
 	const answered = Object.keys(list.answers)
-		.filter((key) => kinkById(key) !== undefined || isLiveCustom(list, key))
+		.filter(isListed)
 		.toSorted((x, y) => catalogOrder(x) - catalogOrder(y));
 	return {
 		limits: answered.filter((key) => hasLevel(list, key, 'limit')),
@@ -137,7 +123,7 @@ export function deckReview(list: ListPayload): DeckReview {
 			.map((category) => category.id),
 		conditional: answered.filter((key) => hasLevel(list, key, 'conditional')),
 		skipped: Object.entries(list.skipped)
-			.filter(([key, entry]) => entry.skipped && !isAnswered(list.answers[key]))
+			.filter(([key, entry]) => entry.skipped && !isAnswered(list.answers[key]) && isListed(key))
 			.map(([key]) => key)
 	};
 }

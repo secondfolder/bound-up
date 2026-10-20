@@ -26,7 +26,7 @@
 	 * would show no matches as though you had none; so until your own list
 	 * has something in it, this page starts you on it instead.
 	 */
-	const hasOwnList = $derived(answeredCount(store.solo.list) > 0 || store.customKinks().length > 0);
+	const hasOwnList = $derived(answeredCount(store.solo.list) > 0);
 	const name = $derived(partnerName(data.names));
 	const changed = $derived(differences(store.solo.list, store.partner).length);
 	const base = $derived(

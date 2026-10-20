@@ -8,6 +8,7 @@ import {
 	type KinkItem,
 	kinkById,
 	leanOf,
+	liveKinkById,
 	MAX_DETAIL,
 	MIN_DETAIL,
 	normaliseSearch,
@@ -103,37 +104,28 @@ export const DETAIL_MAX = EXPERIENCE_STEPS.length - 1;
 
 /** The longest note on a kink, in characters. */
 export const MAX_NOTE_LENGTH = 1000;
-export const MAX_CUSTOM_NAME_LENGTH = 80;
-export const MAX_CUSTOM_DESCRIPTION_LENGTH = 300;
-export const MAX_CUSTOM_ITEMS = 200;
 
-const CUSTOM_KEY = /^custom:[A-Za-z0-9_-]{8,32}$/;
 const CATALOG_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** A catalogue id, or `custom:<random>` for a kink someone added themselves. */
+/** A catalogue id. */
 export type ItemKey = string;
-export function isCustomKey(key: string): key is `custom:${string}` {
-	return CUSTOM_KEY.test(key);
-}
+
+const itemKey = z.string().regex(CATALOG_ID, 'Malformed key');
 
 /**
- * A key for a new custom kink. `getRandomValues` rather than `randomUUID`,
- * which browsers only provide on a secure origin, and the list without an
- * account is also reached over plain HTTP (docs/playroom.md has the IQ test's
- * version of the same trap).
+ * Lists saved in development may still hold people's own kinks, which were
+ * removed: answers under `custom:<random>` keys and a `custom` record. They
+ * are dropped as a list is read rather than refused, which would leave the
+ * whole list unopenable (`custom` itself goes because the schema does not
+ * name it). Temporary: nothing deployed ever wrote one, so this goes before
+ * the kink list first ships (docs/temporary-code.md).
  */
-export function newCustomKey(): `custom:${string}` {
-	const bytes = crypto.getRandomValues(new Uint8Array(12));
-	let text = '';
-	for (const byte of bytes) {
-		text += byte.toString(16).padStart(2, '0');
+function withoutOwnKinks(value: unknown): unknown {
+	if (typeof value !== 'object' || value === null) {
+		return value;
 	}
-	return `custom:${text}`;
+	return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith('custom:')));
 }
-
-const itemKey = z
-	.string()
-	.refine((key) => CATALOG_ID.test(key) || isCustomKey(key), 'Malformed key');
 const at = z.number().int().nonnegative();
 const step = z.number().int().min(0).max(DETAIL_MAX);
 
@@ -180,16 +172,6 @@ export type Detail = z.output<typeof detailSchema>;
 export type Side = z.output<typeof sideSchema>;
 export type Answer = z.output<typeof answerSchema>;
 export type SideKey = 'a' | 'b';
-
-const customSchema = z.object({
-	name: z.string().trim().min(1).max(MAX_CUSTOM_NAME_LENGTH),
-	categoryId: z.string().regex(CATALOG_ID),
-	description: z.string().trim().max(MAX_CUSTOM_DESCRIPTION_LENGTH).optional(),
-	/** A removed custom kink, kept so the removal merges like any other change. */
-	removed: z.boolean().optional(),
-	at
-});
-export type CustomKink = z.output<typeof customSchema>;
 
 /**
  * A category's quick-fill triage: skipped in the deck, or a hard limit for
@@ -326,9 +308,10 @@ export function normaliseAnswers<A extends Answer>(answers: Record<string, A>): 
 }
 
 export const listPayloadSchema = z.object({
-	answers: z.record(itemKey, answerSchema).transform(normaliseAnswers),
+	answers: z
+		.preprocess(withoutOwnKinks, z.record(itemKey, answerSchema))
+		.transform(normaliseAnswers),
 	triage: z.record(z.string().regex(CATALOG_ID), triageSchema),
-	custom: z.record(z.string().regex(CUSTOM_KEY), customSchema),
 	settings: z.object({
 		/**
 		 * The level of detail: kinks shown from a higher level (`detailOf`)
@@ -341,7 +324,7 @@ export const listPayloadSchema = z.object({
 		at
 	}),
 	/** Cards skipped in the quick-fill deck, and when; `false` puts one back. */
-	skipped: z.record(itemKey, z.object({ skipped: z.boolean(), at }))
+	skipped: z.preprocess(withoutOwnKinks, z.record(itemKey, z.object({ skipped: z.boolean(), at })))
 });
 export type ListPayload = z.output<typeof listPayloadSchema>;
 
@@ -349,7 +332,6 @@ export function emptyList(): ListPayload {
 	return {
 		answers: {},
 		triage: {},
-		custom: {},
 		settings: {
 			detail: catalog.detail.default,
 			side: 'both',
@@ -426,7 +408,7 @@ export function effectiveAnswer(list: ListPayload, key: ItemKey, side?: SideKey)
 		return own;
 	}
 	const item = kinkById(key);
-	const categoryId = item ? primaryCategoryOf(item).id : list.custom[key]?.categoryId;
+	const categoryId = item ? primaryCategoryOf(item).id : undefined;
 	if (categoryId && list.triage[categoryId]?.value === 'limit') {
 		return {
 			level: 'limit',
@@ -454,8 +436,7 @@ export function filtersOf(list: ListPayload): Filters {
 /**
  * Whether a catalogue item is shown: within the level of detail, and not a
  * one-sided kink for the other side. A role kink is shown whatever the side —
- * it is its contexts that are filtered (`shownSides`). Custom kinks are not
- * catalogue items, and nothing hides them.
+ * it is its contexts that are filtered (`shownSides`).
  */
 export function isShown(item: KinkItem, filters: Filters): boolean {
 	const fits = filters.exactDetail
@@ -531,12 +512,6 @@ export function searchView(query: string, filters: Filters): SearchView | null {
 	return { shown, hidden };
 }
 
-/** Whether a custom kink's name matches a search, as a catalogue kink's would. */
-export function customMatches(name: string, query: string): boolean {
-	const needle = normaliseSearch(query);
-	return needle !== '' && normaliseSearch(name).includes(needle);
-}
-
 // ── merging ──────────────────────────────────────────────────────────────────
 
 function newer<T extends { at: number }>(a: T | undefined, b: T | undefined): T | undefined {
@@ -564,7 +539,7 @@ function mergeRecords<T extends { at: number }>(
 }
 
 /**
- * Two copies of one list as one: per kink, per category and per custom kink,
+ * Two copies of one list as one: per kink and per category,
  * whichever changed last. This is how a save that lost a race with another
  * device is retried, and how a device's list joins an account's.
  */
@@ -572,13 +547,31 @@ export function mergeLists(a: ListPayload, b: ListPayload): ListPayload {
 	return {
 		answers: mergeRecords(a.answers, b.answers),
 		triage: mergeRecords(a.triage, b.triage),
-		custom: mergeRecords(a.custom, b.custom),
 		settings: newer(a.settings, b.settings) ?? a.settings,
 		skipped: mergeRecords(a.skipped, b.skipped)
 	};
 }
 
-/** How many kinks, custom ones included, have an answer of their own. */
+/**
+ * How many kinks have an answer of their own. Only kinks the list shows
+ * count: a retired kink's answer is kept, but nobody can see it.
+ */
 export function answeredCount(list: ListPayload): number {
-	return Object.values(list.answers).filter(isAnswered).length;
+	return Object.entries(list.answers).filter(([key, answer]) => isAnswered(answer) && isListed(key))
+		.length;
+}
+
+/**
+ * The list without what it keeps for retired kinks, for anything that sends a
+ * list on (the JSON export).
+ */
+export function withoutRetired(list: ListPayload): ListPayload {
+	const answers = Object.fromEntries(Object.entries(list.answers).filter(([key]) => isListed(key)));
+	const skipped = Object.fromEntries(Object.entries(list.skipped).filter(([key]) => isListed(key)));
+	return { ...list, answers, skipped };
+}
+
+/** Whether an answer's kink is one the list shows: in the catalogue, and not retired. */
+export function isListed(key: ItemKey): boolean {
+	return liveKinkById(key) !== undefined;
 }

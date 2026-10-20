@@ -4,6 +4,7 @@ import {
 	answerSchema,
 	hasContent,
 	type ItemKey,
+	isListed,
 	type ListPayload,
 	listPayloadSchema,
 	normaliseAnswers,
@@ -36,8 +37,8 @@ export const partnerPayloadSchema = z.object({
 	heldBack: z.record(itemKey, z.object({ held: z.boolean(), at })),
 	/** Comparing shows only what you both want, and limits, if either of you turns this on. */
 	blind: z.object({ on: z.boolean(), at }),
-	/** What the partner sees: answers, custom kinks and wholesale limits. */
-	resolved: listPayloadSchema.pick({ answers: true, custom: true, triage: true }),
+	/** What the partner sees: answers and wholesale limits. */
+	resolved: listPayloadSchema.pick({ answers: true, triage: true }),
 	/** Your own list's revision when `resolved` was worked out, to know when it is stale. */
 	soloRevision: z.number().int().nullable()
 });
@@ -49,7 +50,7 @@ export function emptyPartnerPayload(): PartnerPayload {
 		overrides: {},
 		heldBack: {},
 		blind: { on: false, at: 0 },
-		resolved: { answers: {}, custom: {}, triage: {} },
+		resolved: { answers: {}, triage: {} },
 		soloRevision: null
 	};
 }
@@ -78,24 +79,21 @@ export function resolvedFor(solo: ListPayload, partner: PartnerPayload): Resolve
 	const effective = effectiveList(solo, partner);
 	const answers: Record<string, Answer> = {};
 	for (const [key, answer] of Object.entries(effective.answers)) {
-		if (!isHeld(partner, key) && hasContent(answer)) {
+		// Only what your list shows: a retired kink's answer stays yours, unseen.
+		if (!isHeld(partner, key) && hasContent(answer) && isListed(key)) {
 			answers[key] = answer;
 		}
 	}
-	const custom = Object.fromEntries(
-		Object.entries(solo.custom).filter(([key, kink]) => !(kink.removed || isHeld(partner, key)))
-	);
 	const triage = Object.fromEntries(
 		Object.entries(solo.triage).filter(([, entry]) => entry.value === 'limit')
 	);
-	return { answers, custom, triage };
+	return { answers, triage };
 }
 
 /** A partner's resolved list, as a list the comparison and the read-only view take. */
 export function asList(resolved: ResolvedList): ListPayload {
 	return {
 		answers: resolved.answers,
-		custom: resolved.custom,
 		triage: resolved.triage,
 		// Nothing of theirs is hidden from a comparison: filters are a view on
 		// your own list, not a choice about theirs.
@@ -127,13 +125,13 @@ export function answerTarget(solo: ListPayload, key: ItemKey): 'own' | 'override
 	return hasContent(solo.answers[key]) ? 'override' : 'own';
 }
 
-/** Every kink whose answer differs for this partner, with both answers. */
+/** Every kink whose answer differs for this partner, with both answers. Retired kinks are left out. */
 export function differences(
 	solo: ListPayload,
 	partner: PartnerPayload
 ): { key: ItemKey; own: Answer | undefined; override: Answer }[] {
 	return Object.entries(partner.overrides)
-		.filter(([, answer]) => hasContent(answer))
+		.filter(([key, answer]) => hasContent(answer) && isListed(key))
 		.map(([key, override]) => ({ key, own: solo.answers[key], override }));
 }
 

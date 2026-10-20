@@ -38,18 +38,10 @@
 	const current = $derived(holding ?? cards[0] ?? null);
 
 	const item = $derived(current ? kinkById(current) : undefined);
-	const custom = $derived(
-		current && !item ? store.list.custom[current as `custom:${string}`] : undefined
-	);
-	const name = $derived(item?.name ?? custom?.name ?? '');
-	const description = $derived(item?.description ?? custom?.description);
+	const name = $derived(item?.name ?? '');
+	const description = $derived(item?.description);
 	const sides = $derived(item ? sidesOf(item) : null);
-	const category = $derived.by(() => {
-		if (item) {
-			return primaryCategoryOf(item);
-		}
-		return custom ? kinkById(custom.categoryId) : undefined;
-	});
+	const category = $derived(item ? primaryCategoryOf(item) : undefined);
 	const broader = $derived(current ? narrows(current) : undefined);
 
 	/**

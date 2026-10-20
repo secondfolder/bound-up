@@ -152,6 +152,7 @@
 	"items": [
 		{
 			"id": "intimacy",
+			"share": 0,
 			"name": "Intimacy and affection",
 			"section": "kinks",
 			"intensity": 0,
@@ -160,6 +161,7 @@
 		},
 		{
 			"id": "romance",
+			"share": 1,
 			"name": "Romance and affection",
 			"parent": "intimacy",
 			"intensity": 0,
@@ -169,6 +171,7 @@
 		},
 		{
 			"id": "kissing",
+			"share": 2,
 			"name": "Kissing",
 			"parent": "intimacy",
 			"roles": "give-receive",
@@ -179,6 +182,7 @@
 		},
 		{
 			"id": "kissing-mouth",
+			"share": 3,
 			"name": "Kissing on the mouth",
 			"parent": "kissing",
 			"roles": "give-receive",
@@ -189,6 +193,7 @@
 		},
 		{
 			"id": "kissing-body",
+			"share": 4,
 			"name": "Kissing the body",
 			"parent": "kissing",
 			"roles": "give-receive",
@@ -200,6 +205,7 @@
 		},
 		{
 			"id": "licking",
+			"share": 5,
 			"name": "Licking",
 			"parent": "intimacy",
 			"roles": "give-receive",
@@ -209,6 +215,7 @@
 		},
 		{
 			"id": "cuddling",
+			"share": 6,
 			"name": "Cuddling",
 			"parent": "intimacy",
 			"intensity": 0,
@@ -218,6 +225,7 @@
 		},
 		{
 			"id": "pet-names",
+			"share": 7,
 			"name": "Pet names",
 			"parent": "intimacy",
 			"intensity": 0,
@@ -228,6 +236,7 @@
 		},
 		{
 			"id": "gentle-sex",
+			"share": 8,
 			"name": "Gentle sex",
 			"parent": "intimacy",
 			"intensity": 1,
@@ -237,6 +246,7 @@
 		},
 		{
 			"id": "massage",
+			"share": 9,
 			"name": "Massage",
 			"parent": "intimacy",
 			"roles": "give-receive",
@@ -247,6 +257,7 @@
 		},
 		{
 			"id": "grooming-care",
+			"share": 10,
 			"name": "Pampering",
 			"parent": "intimacy",
 			"roles": "give-receive",
@@ -257,6 +268,7 @@
 		},
 		{
 			"id": "oral",
+			"share": 11,
 			"name": "Oral",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -266,6 +278,7 @@
 		},
 		{
 			"id": "blowjobs",
+			"share": 12,
 			"name": "Blowjobs",
 			"parent": "oral",
 			"roles": "give-receive",
@@ -284,6 +297,7 @@
 		},
 		{
 			"id": "deepthroat",
+			"share": 13,
 			"name": "Deepthroating",
 			"parent": "blowjobs",
 			"roles": "give-receive",
@@ -295,6 +309,7 @@
 		},
 		{
 			"id": "face-fucking",
+			"share": 14,
 			"name": "Face fucking",
 			"parent": "blowjobs",
 			"roles": "give-receive",
@@ -308,6 +323,7 @@
 		},
 		{
 			"id": "teabagging",
+			"share": 16,
 			"name": "Teabagging",
 			"parent": "oral",
 			"roles": "give-receive",
@@ -318,6 +334,7 @@
 		},
 		{
 			"id": "cunnilingus",
+			"share": 17,
 			"name": "Cunnilingus",
 			"parent": "oral",
 			"roles": "give-receive",
@@ -334,6 +351,7 @@
 		},
 		{
 			"id": "face-sitting",
+			"share": 18,
 			"name": "Face-sitting",
 			"parent": "oral",
 			"roles": "give-receive",
@@ -347,6 +365,7 @@
 		},
 		{
 			"id": "rimming",
+			"share": 19,
 			"name": "Rimming",
 			"parent": "oral",
 			"roles": "give-receive",
@@ -358,6 +377,7 @@
 		},
 		{
 			"id": "sixty-nine",
+			"share": 20,
 			"name": "69",
 			"parent": "oral",
 			"intensity": 1,
@@ -367,6 +387,7 @@
 		},
 		{
 			"id": "oral-fixation",
+			"share": 21,
 			"name": "Oral fixation",
 			"parent": "oral",
 			"roles": "self-partner",
@@ -377,6 +398,7 @@
 		},
 		{
 			"id": "hands",
+			"share": 22,
 			"name": "Hands and touch",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -385,6 +407,7 @@
 		},
 		{
 			"id": "handjobs",
+			"share": 23,
 			"name": "Handjobs",
 			"parent": "hands",
 			"roles": "give-receive",
@@ -395,6 +418,7 @@
 		},
 		{
 			"id": "fingering",
+			"share": 24,
 			"name": "Fingering",
 			"parent": "hands",
 			"roles": "give-receive",
@@ -405,6 +429,7 @@
 		},
 		{
 			"id": "clit-play",
+			"share": 25,
 			"name": "Clit stimulation",
 			"parent": "hands",
 			"roles": "give-receive",
@@ -415,6 +440,7 @@
 		},
 		{
 			"id": "nipple-play",
+			"share": 26,
 			"name": "Nipple play",
 			"parent": "hands",
 			"roles": "give-receive",
@@ -426,6 +452,7 @@
 		},
 		{
 			"id": "masturbation",
+			"share": 27,
 			"name": "Masturbation",
 			"parent": "hands",
 			"intensity": 1,
@@ -442,6 +469,7 @@
 		},
 		{
 			"id": "mutual-masturbation",
+			"share": 28,
 			"name": "Mutual masturbation",
 			"parent": "masturbation",
 			"intensity": 1,
@@ -452,6 +480,7 @@
 		},
 		{
 			"id": "masturbation-on-command",
+			"share": 29,
 			"name": "Masturbation on command",
 			"parent": "masturbation",
 			"roles": "dom-sub",
@@ -464,6 +493,7 @@
 		},
 		{
 			"id": "frottage",
+			"share": 30,
 			"name": "Grinding",
 			"parent": "hands",
 			"roles": "give-receive",
@@ -474,6 +504,7 @@
 		},
 		{
 			"id": "titfuck",
+			"share": 31,
 			"name": "Titty fucking",
 			"parent": "frottage",
 			"roles": "give-receive",
@@ -493,6 +524,7 @@
 		},
 		{
 			"id": "thigh-sex",
+			"share": 32,
 			"name": "Between the thighs",
 			"parent": "frottage",
 			"roles": "give-receive",
@@ -504,6 +536,7 @@
 		},
 		{
 			"id": "footjob",
+			"share": 33,
 			"name": "Footjobs",
 			"parent": "hands",
 			"roles": "give-receive",
@@ -515,6 +548,7 @@
 		},
 		{
 			"id": "penetration",
+			"share": 34,
 			"name": "Penetration",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -524,6 +558,7 @@
 		},
 		{
 			"id": "vaginal-sex",
+			"share": 35,
 			"name": "Vaginal sex",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -534,6 +569,7 @@
 		},
 		{
 			"id": "strap-on",
+			"share": 36,
 			"name": "Strap-ons",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -544,6 +580,7 @@
 		},
 		{
 			"id": "barebacking",
+			"share": 37,
 			"name": "Without a condom",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -555,6 +592,7 @@
 		},
 		{
 			"id": "double-penetration",
+			"share": 38,
 			"name": "Double penetration",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -566,6 +604,7 @@
 		},
 		{
 			"id": "double-vaginal",
+			"share": 39,
 			"name": "Double vaginal",
 			"parent": "double-penetration",
 			"roles": "give-receive",
@@ -577,6 +616,7 @@
 		},
 		{
 			"id": "triple-penetration",
+			"share": 40,
 			"name": "Triple penetration",
 			"parent": "double-penetration",
 			"roles": "give-receive",
@@ -588,6 +628,7 @@
 		},
 		{
 			"id": "fisting",
+			"share": 41,
 			"name": "Fisting",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -600,6 +641,7 @@
 		},
 		{
 			"id": "stretching",
+			"share": 42,
 			"name": "Stretching",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -610,6 +652,7 @@
 		},
 		{
 			"id": "object-insertion",
+			"share": 43,
 			"name": "Object insertion",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -621,6 +664,7 @@
 		},
 		{
 			"id": "tantric",
+			"share": 44,
 			"name": "Tantric and slow touch",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -631,6 +675,7 @@
 		},
 		{
 			"id": "stealth-penetration",
+			"share": 45,
 			"name": "Surprise penetration",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -643,6 +688,7 @@
 		},
 		{
 			"id": "rhaphanidosis",
+			"share": 46,
 			"name": "Rhaphanidosis",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -654,6 +700,7 @@
 		},
 		{
 			"id": "cock-warming",
+			"share": 15,
 			"name": "Cock warming",
 			"parent": "penetration",
 			"roles": "give-receive",
@@ -665,6 +712,7 @@
 		},
 		{
 			"id": "anal",
+			"share": 47,
 			"name": "Anal",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -674,6 +722,7 @@
 		},
 		{
 			"id": "anal-sex",
+			"share": 48,
 			"name": "Anal sex",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -684,6 +733,7 @@
 		},
 		{
 			"id": "pegging",
+			"share": 49,
 			"name": "Pegging",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -694,6 +744,7 @@
 		},
 		{
 			"id": "anal-fingering",
+			"share": 50,
 			"name": "Anal fingering",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -704,6 +755,7 @@
 		},
 		{
 			"id": "anal-toys",
+			"share": 51,
 			"name": "Anal toys",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -715,6 +767,7 @@
 		},
 		{
 			"id": "butt-plugs",
+			"share": 52,
 			"name": "Butt plugs",
 			"parent": "anal-toys",
 			"roles": "give-receive",
@@ -726,6 +779,7 @@
 		},
 		{
 			"id": "anal-beads",
+			"share": 53,
 			"name": "Anal beads",
 			"parent": "anal-toys",
 			"roles": "give-receive",
@@ -737,6 +791,7 @@
 		},
 		{
 			"id": "plug-in-public",
+			"share": 54,
 			"name": "Plugged in public",
 			"parent": "anal-toys",
 			"roles": "self-partner",
@@ -750,6 +805,7 @@
 		},
 		{
 			"id": "hollow-plugs",
+			"share": 55,
 			"name": "Hollow plugs",
 			"parent": "anal-toys",
 			"roles": "give-receive",
@@ -761,6 +817,7 @@
 		},
 		{
 			"id": "prostate-play",
+			"share": 56,
 			"name": "Prostate play",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -771,6 +828,7 @@
 		},
 		{
 			"id": "anal-fisting",
+			"share": 57,
 			"name": "Anal fisting",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -783,6 +841,7 @@
 		},
 		{
 			"id": "anal-training",
+			"share": 58,
 			"name": "Anal training",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -793,6 +852,7 @@
 		},
 		{
 			"id": "gaping",
+			"share": 59,
 			"name": "Gaping",
 			"parent": "anal-training",
 			"roles": "give-receive",
@@ -804,6 +864,7 @@
 		},
 		{
 			"id": "double-anal",
+			"share": 60,
 			"name": "Double anal",
 			"parent": "anal-training",
 			"roles": "give-receive",
@@ -815,6 +876,7 @@
 		},
 		{
 			"id": "prolapse",
+			"share": 61,
 			"name": "Prolapse",
 			"parent": "anal-training",
 			"roles": "give-receive",
@@ -828,6 +890,7 @@
 		},
 		{
 			"id": "anal-hooks",
+			"share": 62,
 			"name": "Anal hooks",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -839,6 +902,7 @@
 		},
 		{
 			"id": "enemas",
+			"share": 63,
 			"name": "Enemas",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -850,6 +914,7 @@
 		},
 		{
 			"id": "inflation",
+			"share": 64,
 			"name": "Inflation",
 			"parent": "anal",
 			"roles": "give-receive",
@@ -861,6 +926,7 @@
 		},
 		{
 			"id": "toys",
+			"share": 65,
 			"name": "Toys and machines",
 			"section": "kinks",
 			"roles": "self-partner",
@@ -870,6 +936,7 @@
 		},
 		{
 			"id": "dildos",
+			"share": 66,
 			"name": "Dildos",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -880,6 +947,7 @@
 		},
 		{
 			"id": "fantasy-dildos",
+			"share": 67,
 			"name": "Fantasy dildos",
 			"parent": "dildos",
 			"roles": "self-partner",
@@ -898,6 +966,7 @@
 		},
 		{
 			"id": "vaginal-plugs",
+			"share": 68,
 			"name": "Vaginal plugs",
 			"parent": "dildos",
 			"roles": "self-partner",
@@ -909,6 +978,7 @@
 		},
 		{
 			"id": "vaginal-plugs-public",
+			"share": 69,
 			"name": "Vaginal plugs in public",
 			"parent": "dildos",
 			"roles": "self-partner",
@@ -921,6 +991,7 @@
 		},
 		{
 			"id": "vibrators",
+			"share": 70,
 			"name": "Vibrators",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -931,6 +1002,7 @@
 		},
 		{
 			"id": "magic-wand",
+			"share": 71,
 			"name": "Wand vibrators",
 			"parent": "vibrators",
 			"roles": "self-partner",
@@ -942,6 +1014,7 @@
 		},
 		{
 			"id": "remote-vibrator",
+			"share": 72,
 			"name": "Remote-controlled vibrators",
 			"parent": "vibrators",
 			"roles": "self-partner",
@@ -956,6 +1029,7 @@
 		},
 		{
 			"id": "sybian",
+			"share": 73,
 			"name": "Sybian",
 			"parent": "vibrators",
 			"roles": "self-partner",
@@ -967,6 +1041,7 @@
 		},
 		{
 			"id": "sex-machines",
+			"share": 74,
 			"name": "Sex machines",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -977,6 +1052,7 @@
 		},
 		{
 			"id": "strokers",
+			"share": 75,
 			"name": "Strokers",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -987,6 +1063,7 @@
 		},
 		{
 			"id": "pumps",
+			"share": 76,
 			"name": "Pumps and suckers",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -997,6 +1074,7 @@
 		},
 		{
 			"id": "cock-rings",
+			"share": 77,
 			"name": "Cock rings",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -1007,6 +1085,7 @@
 		},
 		{
 			"id": "sounding",
+			"share": 78,
 			"name": "Sounding",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -1020,6 +1099,7 @@
 		},
 		{
 			"id": "ovipositor",
+			"share": 79,
 			"name": "Ovipositors",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -1031,6 +1111,7 @@
 		},
 		{
 			"id": "speculum",
+			"share": 80,
 			"name": "Speculums",
 			"parent": "toys",
 			"roles": "self-partner",
@@ -1042,6 +1123,7 @@
 		},
 		{
 			"id": "orgasm-control",
+			"share": 81,
 			"name": "Orgasm control",
 			"section": "kinks",
 			"roles": "dom-sub",
@@ -1051,6 +1133,7 @@
 		},
 		{
 			"id": "edging",
+			"share": 82,
 			"name": "Edging",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1061,6 +1144,7 @@
 		},
 		{
 			"id": "orgasm-denial",
+			"share": 83,
 			"name": "Orgasm denial",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1071,6 +1155,7 @@
 		},
 		{
 			"id": "ruined-orgasms",
+			"share": 84,
 			"name": "Ruined orgasms",
 			"parent": "orgasm-denial",
 			"roles": "dom-sub",
@@ -1082,6 +1167,7 @@
 		},
 		{
 			"id": "forced-orgasm",
+			"share": 85,
 			"name": "Forced orgasms",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1092,6 +1178,7 @@
 		},
 		{
 			"id": "overstimulation",
+			"share": 86,
 			"name": "Overstimulation",
 			"parent": "forced-orgasm",
 			"roles": "dom-sub",
@@ -1103,6 +1190,7 @@
 		},
 		{
 			"id": "multiple-orgasms",
+			"share": 87,
 			"name": "Multiple orgasms",
 			"parent": "forced-orgasm",
 			"roles": "dom-sub",
@@ -1114,6 +1202,7 @@
 		},
 		{
 			"id": "coming-on-command",
+			"share": 88,
 			"name": "Coming on command",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1124,6 +1213,7 @@
 		},
 		{
 			"id": "chastity",
+			"share": 89,
 			"name": "Chastity",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1135,6 +1225,7 @@
 		},
 		{
 			"id": "anti-erection",
+			"share": 90,
 			"name": "Spiked cages",
 			"parent": "chastity",
 			"roles": "dom-sub",
@@ -1146,6 +1237,7 @@
 		},
 		{
 			"id": "permission-to-come",
+			"share": 91,
 			"name": "Permission to come",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1156,6 +1248,7 @@
 		},
 		{
 			"id": "jerk-off-instructions",
+			"share": 92,
 			"name": "Jerk-off instructions",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1168,6 +1261,7 @@
 		},
 		{
 			"id": "teasing",
+			"share": 93,
 			"name": "Teasing",
 			"parent": "orgasm-control",
 			"roles": "dom-sub",
@@ -1179,6 +1273,7 @@
 		},
 		{
 			"id": "cum",
+			"share": 94,
 			"name": "Cum",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -1189,6 +1284,7 @@
 		},
 		{
 			"id": "facials",
+			"share": 95,
 			"name": "Facials",
 			"parent": "cum",
 			"roles": "give-receive",
@@ -1200,6 +1296,7 @@
 		},
 		{
 			"id": "swallowing",
+			"share": 96,
 			"name": "Swallowing",
 			"parent": "cum",
 			"roles": "give-receive",
@@ -1211,6 +1308,7 @@
 		},
 		{
 			"id": "cum-on-body",
+			"share": 97,
 			"name": "Cum on the body",
 			"parent": "cum",
 			"roles": "give-receive",
@@ -1222,6 +1320,7 @@
 		},
 		{
 			"id": "creampie",
+			"share": 98,
 			"name": "Creampies",
 			"parent": "cum",
 			"roles": "give-receive",
@@ -1233,6 +1332,7 @@
 		},
 		{
 			"id": "anal-creampie",
+			"share": 99,
 			"name": "Anal creampies",
 			"parent": "creampie",
 			"roles": "give-receive",
@@ -1245,6 +1345,7 @@
 		},
 		{
 			"id": "felching",
+			"share": 100,
 			"name": "Felching",
 			"parent": "creampie",
 			"roles": "give-receive",
@@ -1256,6 +1357,7 @@
 		},
 		{
 			"id": "cum-eating",
+			"share": 101,
 			"name": "Eating cum",
 			"parent": "cum",
 			"roles": "give-receive",
@@ -1267,6 +1369,7 @@
 		},
 		{
 			"id": "bukkake",
+			"share": 102,
 			"name": "Bukkake",
 			"parent": "cum",
 			"roles": "give-receive",
@@ -1278,6 +1381,7 @@
 		},
 		{
 			"id": "breeding",
+			"share": 103,
 			"name": "Breeding",
 			"parent": "cum",
 			"roles": "give-receive",
@@ -1290,6 +1394,7 @@
 		},
 		{
 			"id": "fluids",
+			"share": 104,
 			"name": "Fluids and bodily functions",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -1300,6 +1405,7 @@
 		},
 		{
 			"id": "squirting",
+			"share": 105,
 			"name": "Squirting",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1311,6 +1417,7 @@
 		},
 		{
 			"id": "spit",
+			"share": 106,
 			"name": "Spit",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1324,6 +1431,7 @@
 		},
 		{
 			"id": "watersports",
+			"share": 107,
 			"name": "Watersports",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1336,6 +1444,7 @@
 		},
 		{
 			"id": "piss-drinking",
+			"share": 108,
 			"name": "Drinking pee",
 			"parent": "watersports",
 			"roles": "give-receive",
@@ -1348,6 +1457,7 @@
 		},
 		{
 			"id": "internal-urination",
+			"share": 109,
 			"name": "Peeing inside",
 			"parent": "watersports",
 			"roles": "give-receive",
@@ -1360,6 +1470,7 @@
 		},
 		{
 			"id": "lactation",
+			"share": 110,
 			"name": "Lactation",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1371,6 +1482,7 @@
 		},
 		{
 			"id": "tears",
+			"share": 111,
 			"name": "Tears",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1384,6 +1496,7 @@
 		},
 		{
 			"id": "period-play",
+			"share": 112,
 			"name": "Period play",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1395,6 +1508,7 @@
 		},
 		{
 			"id": "smegma",
+			"share": 113,
 			"name": "Smegma",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1405,6 +1519,7 @@
 		},
 		{
 			"id": "scat",
+			"share": 114,
 			"name": "Scat",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1417,6 +1532,7 @@
 		},
 		{
 			"id": "snot",
+			"share": 115,
 			"name": "Snot",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1428,6 +1544,7 @@
 		},
 		{
 			"id": "vomit",
+			"share": 116,
 			"name": "Vomit",
 			"parent": "fluids",
 			"roles": "give-receive",
@@ -1439,6 +1556,7 @@
 		},
 		{
 			"id": "bondage",
+			"share": 117,
 			"name": "Bondage and restraint",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -1449,6 +1567,7 @@
 		},
 		{
 			"id": "light-bondage",
+			"share": 118,
 			"name": "Light bondage",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1460,6 +1579,7 @@
 		},
 		{
 			"id": "heavy-bondage",
+			"share": 119,
 			"name": "Heavy bondage",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1471,6 +1591,7 @@
 		},
 		{
 			"id": "manual-restraint",
+			"share": 120,
 			"name": "Pinning down",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1482,6 +1603,7 @@
 		},
 		{
 			"id": "rope",
+			"share": 121,
 			"name": "Rope bondage",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1493,6 +1615,7 @@
 		},
 		{
 			"id": "shibari",
+			"share": 122,
 			"name": "Shibari",
 			"parent": "rope",
 			"roles": "give-receive",
@@ -1504,6 +1627,7 @@
 		},
 		{
 			"id": "hogtie",
+			"share": 123,
 			"name": "Hogtie",
 			"parent": "rope",
 			"roles": "give-receive",
@@ -1515,6 +1639,7 @@
 		},
 		{
 			"id": "breast-bondage",
+			"share": 124,
 			"name": "Breast bondage",
 			"parent": "rope",
 			"roles": "give-receive",
@@ -1526,6 +1651,7 @@
 		},
 		{
 			"id": "suspension",
+			"share": 125,
 			"name": "Suspension",
 			"parent": "rope",
 			"roles": "give-receive",
@@ -1539,6 +1665,7 @@
 		},
 		{
 			"id": "cuffs",
+			"share": 126,
 			"name": "Cuffs and chains",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1550,6 +1677,7 @@
 		},
 		{
 			"id": "gags",
+			"share": 127,
 			"name": "Gags",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1562,6 +1690,7 @@
 		},
 		{
 			"id": "ball-gag",
+			"share": 128,
 			"name": "Ball gags",
 			"parent": "gags",
 			"roles": "give-receive",
@@ -1573,6 +1702,7 @@
 		},
 		{
 			"id": "ring-gag",
+			"share": 129,
 			"name": "Ring and spider gags",
 			"parent": "gags",
 			"roles": "give-receive",
@@ -1584,6 +1714,7 @@
 		},
 		{
 			"id": "bit-gag",
+			"share": 130,
 			"name": "Bit gags",
 			"parent": "gags",
 			"roles": "give-receive",
@@ -1594,6 +1725,7 @@
 		},
 		{
 			"id": "tape-gag",
+			"share": 131,
 			"name": "Tape gags",
 			"parent": "gags",
 			"roles": "give-receive",
@@ -1605,6 +1737,7 @@
 		},
 		{
 			"id": "phallic-gag",
+			"share": 132,
 			"name": "Phallic gags",
 			"parent": "gags",
 			"roles": "give-receive",
@@ -1616,6 +1749,7 @@
 		},
 		{
 			"id": "hoods-masks",
+			"share": 133,
 			"name": "Hoods and muzzles",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1627,6 +1761,7 @@
 		},
 		{
 			"id": "spreader-bars",
+			"share": 134,
 			"name": "Spreader bars",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1638,6 +1773,7 @@
 		},
 		{
 			"id": "armbinders",
+			"share": 135,
 			"name": "Armbinders and mitts",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1649,6 +1785,7 @@
 		},
 		{
 			"id": "straitjacket",
+			"share": 136,
 			"name": "Straitjackets",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1660,6 +1797,7 @@
 		},
 		{
 			"id": "encasement",
+			"share": 137,
 			"name": "Encasement and mummification",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1680,6 +1818,7 @@
 		},
 		{
 			"id": "bondage-furniture",
+			"share": 138,
 			"name": "Bondage furniture",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1698,6 +1837,7 @@
 		},
 		{
 			"id": "cages",
+			"share": 139,
 			"name": "Cages",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1709,6 +1849,7 @@
 		},
 		{
 			"id": "predicament-bondage",
+			"share": 140,
 			"name": "Predicament bondage",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1720,6 +1861,7 @@
 		},
 		{
 			"id": "nose-hook",
+			"share": 141,
 			"name": "Nose hooks",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1733,6 +1875,7 @@
 		},
 		{
 			"id": "public-bondage",
+			"share": 142,
 			"name": "Bondage under clothes",
 			"parent": "bondage",
 			"roles": "give-receive",
@@ -1745,6 +1888,7 @@
 		},
 		{
 			"id": "sensation",
+			"share": 143,
 			"name": "Sensation and sensory play",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -1754,6 +1898,7 @@
 		},
 		{
 			"id": "light-touch",
+			"share": 144,
 			"name": "Light touch",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1764,6 +1909,7 @@
 		},
 		{
 			"id": "tickling",
+			"share": 145,
 			"name": "Tickling",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1774,6 +1920,7 @@
 		},
 		{
 			"id": "temperature",
+			"share": 146,
 			"name": "Temperature play",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1784,6 +1931,7 @@
 		},
 		{
 			"id": "wax",
+			"share": 147,
 			"name": "Wax play",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1797,6 +1945,7 @@
 		},
 		{
 			"id": "sensory-deprivation",
+			"share": 148,
 			"name": "Sensory deprivation",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1808,6 +1957,7 @@
 		},
 		{
 			"id": "blindfolds",
+			"share": 149,
 			"name": "Blindfolds",
 			"parent": "sensory-deprivation",
 			"roles": "give-receive",
@@ -1820,6 +1970,7 @@
 		},
 		{
 			"id": "sensation-toys",
+			"share": 150,
 			"name": "Sensation toys",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1830,6 +1981,7 @@
 		},
 		{
 			"id": "electro",
+			"share": 151,
 			"name": "Electrostimulation",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1852,6 +2004,7 @@
 		},
 		{
 			"id": "figging",
+			"share": 152,
 			"name": "Figging",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1864,6 +2017,7 @@
 		},
 		{
 			"id": "hickies",
+			"share": 153,
 			"name": "Hickies",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1874,6 +2028,7 @@
 		},
 		{
 			"id": "sensory-overload",
+			"share": 154,
 			"name": "Endurance",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1885,6 +2040,7 @@
 		},
 		{
 			"id": "fire-play",
+			"share": 155,
 			"name": "Fire play",
 			"parent": "sensation",
 			"roles": "give-receive",
@@ -1897,6 +2053,7 @@
 		},
 		{
 			"id": "impact",
+			"share": 156,
 			"name": "Impact play",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -1907,6 +2064,7 @@
 		},
 		{
 			"id": "spanking",
+			"share": 157,
 			"name": "Spanking",
 			"parent": "impact",
 			"roles": "give-receive",
@@ -1919,6 +2077,7 @@
 		},
 		{
 			"id": "spanking-implements",
+			"share": 158,
 			"name": "Spanking with an implement",
 			"parent": "spanking",
 			"roles": "give-receive",
@@ -1931,6 +2090,7 @@
 		},
 		{
 			"id": "slapping",
+			"share": 159,
 			"name": "Slapping",
 			"parent": "impact",
 			"roles": "give-receive",
@@ -1943,6 +2103,7 @@
 		},
 		{
 			"id": "face-slapping",
+			"share": 160,
 			"name": "Face slapping",
 			"parent": "slapping",
 			"roles": "give-receive",
@@ -1956,6 +2117,7 @@
 		},
 		{
 			"id": "genital-slapping",
+			"share": 161,
 			"name": "Genital slapping",
 			"parent": "slapping",
 			"roles": "give-receive",
@@ -1968,6 +2130,7 @@
 		},
 		{
 			"id": "flogging",
+			"share": 162,
 			"name": "Flogging",
 			"parent": "impact",
 			"roles": "give-receive",
@@ -1980,6 +2143,7 @@
 		},
 		{
 			"id": "caning",
+			"share": 163,
 			"name": "Caning",
 			"parent": "impact",
 			"roles": "give-receive",
@@ -1992,6 +2156,7 @@
 		},
 		{
 			"id": "riding-crops",
+			"share": 164,
 			"name": "Riding crops",
 			"parent": "impact",
 			"roles": "give-receive",
@@ -2004,6 +2169,7 @@
 		},
 		{
 			"id": "whipping",
+			"share": 165,
 			"name": "Whips",
 			"parent": "impact",
 			"roles": "give-receive",
@@ -2016,6 +2182,7 @@
 		},
 		{
 			"id": "beating",
+			"share": 166,
 			"name": "Beating",
 			"parent": "impact",
 			"roles": "give-receive",
@@ -2028,6 +2195,7 @@
 		},
 		{
 			"id": "punching",
+			"share": 167,
 			"name": "Punching and kicking",
 			"parent": "beating",
 			"roles": "give-receive",
@@ -2040,6 +2208,7 @@
 		},
 		{
 			"id": "pain",
+			"share": 168,
 			"name": "Pain and torment",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -2050,6 +2219,7 @@
 		},
 		{
 			"id": "light-pain",
+			"share": 169,
 			"name": "Light pain",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2061,6 +2231,7 @@
 		},
 		{
 			"id": "heavy-pain",
+			"share": 170,
 			"name": "Heavy pain",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2072,6 +2243,7 @@
 		},
 		{
 			"id": "pinching",
+			"share": 171,
 			"name": "Pinching, biting and scratching",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2083,6 +2255,7 @@
 		},
 		{
 			"id": "biting",
+			"share": 172,
 			"name": "Biting",
 			"parent": "pinching",
 			"roles": "give-receive",
@@ -2095,6 +2268,7 @@
 		},
 		{
 			"id": "scratching",
+			"share": 173,
 			"name": "Scratching",
 			"parent": "pinching",
 			"roles": "give-receive",
@@ -2107,6 +2281,7 @@
 		},
 		{
 			"id": "abrasion",
+			"share": 174,
 			"name": "Abrasion",
 			"parent": "pinching",
 			"roles": "give-receive",
@@ -2120,6 +2295,7 @@
 		},
 		{
 			"id": "clamps",
+			"share": 175,
 			"name": "Clamps and pegs",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2140,6 +2316,7 @@
 		},
 		{
 			"id": "nipple-torture",
+			"share": 176,
 			"name": "Nipple and breast torment",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2152,6 +2329,7 @@
 		},
 		{
 			"id": "cbt",
+			"share": 177,
 			"name": "Cock and ball torment",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2171,6 +2349,7 @@
 		},
 		{
 			"id": "pussy-torment",
+			"share": 178,
 			"name": "Pussy torment",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2183,6 +2362,7 @@
 		},
 		{
 			"id": "genital-torment",
+			"share": 179,
 			"name": "Genital torment",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2195,6 +2375,7 @@
 		},
 		{
 			"id": "bruising",
+			"share": 180,
 			"name": "Bruises and marks",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2207,6 +2388,7 @@
 		},
 		{
 			"id": "trampling",
+			"share": 181,
 			"name": "Trampling",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2219,6 +2401,7 @@
 		},
 		{
 			"id": "knife-play",
+			"share": 182,
 			"name": "Knife play",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2232,6 +2415,7 @@
 		},
 		{
 			"id": "blood-play",
+			"share": 183,
 			"name": "Blood play",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2246,6 +2430,7 @@
 		},
 		{
 			"id": "blood-loss",
+			"share": 184,
 			"name": "Blood loss",
 			"parent": "blood-play",
 			"roles": "give-receive",
@@ -2257,6 +2442,7 @@
 		},
 		{
 			"id": "needle-play",
+			"share": 185,
 			"name": "Needle play",
 			"parent": "pain",
 			"roles": "give-receive",
@@ -2270,6 +2456,7 @@
 		},
 		{
 			"id": "breath-play",
+			"share": 186,
 			"name": "Breath play",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -2289,6 +2476,7 @@
 		},
 		{
 			"id": "choking",
+			"share": 187,
 			"name": "Choking",
 			"parent": "breath-play",
 			"roles": "give-receive",
@@ -2301,6 +2489,7 @@
 		},
 		{
 			"id": "smothering",
+			"share": 188,
 			"name": "Smothering",
 			"parent": "breath-play",
 			"roles": "give-receive",
@@ -2313,6 +2502,7 @@
 		},
 		{
 			"id": "water-torture",
+			"share": 189,
 			"name": "Water play",
 			"parent": "breath-play",
 			"roles": "give-receive",
@@ -2325,6 +2515,7 @@
 		},
 		{
 			"id": "body-mod",
+			"share": 190,
 			"name": "Marks and body modification",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -2335,6 +2526,7 @@
 		},
 		{
 			"id": "shaving",
+			"share": 191,
 			"name": "Shaving",
 			"parent": "body-mod",
 			"roles": "give-receive",
@@ -2345,6 +2537,7 @@
 		},
 		{
 			"id": "head-shaving",
+			"share": 192,
 			"name": "Head shaving",
 			"parent": "shaving",
 			"roles": "give-receive",
@@ -2357,6 +2550,7 @@
 		},
 		{
 			"id": "piercing",
+			"share": 193,
 			"name": "Piercings",
 			"parent": "body-mod",
 			"roles": "self-partner",
@@ -2368,6 +2562,7 @@
 		},
 		{
 			"id": "tattoos",
+			"share": 194,
 			"name": "Tattoos",
 			"parent": "body-mod",
 			"roles": "self-partner",
@@ -2379,6 +2574,7 @@
 		},
 		{
 			"id": "scarification",
+			"share": 195,
 			"name": "Scarring",
 			"parent": "body-mod",
 			"roles": "give-receive",
@@ -2391,6 +2587,7 @@
 		},
 		{
 			"id": "branding",
+			"share": 196,
 			"name": "Branding",
 			"parent": "body-mod",
 			"roles": "give-receive",
@@ -2403,6 +2600,7 @@
 		},
 		{
 			"id": "nullification",
+			"share": 197,
 			"name": "Nullification and castration",
 			"parent": "body-mod",
 			"roles": "give-receive",
@@ -2415,6 +2613,7 @@
 		},
 		{
 			"id": "forced-body-mod",
+			"share": 198,
 			"name": "Body changes without asking",
 			"parent": "body-mod",
 			"roles": "give-receive",
@@ -2427,6 +2626,7 @@
 		},
 		{
 			"id": "power",
+			"share": 199,
 			"name": "Power exchange and protocol",
 			"section": "kinks",
 			"roles": "dom-sub",
@@ -2443,6 +2643,7 @@
 		},
 		{
 			"id": "desperation",
+			"share": 200,
 			"name": "Desperation",
 			"parent": "power",
 			"roles": "give-receive",
@@ -2456,6 +2657,7 @@
 		},
 		{
 			"id": "sleep-deprivation",
+			"share": 201,
 			"name": "Sleep deprivation",
 			"parent": "power",
 			"roles": "give-receive",
@@ -2468,6 +2670,7 @@
 		},
 		{
 			"id": "weight-control",
+			"share": 202,
 			"name": "Body control",
 			"parent": "power",
 			"roles": "give-receive",
@@ -2480,6 +2683,7 @@
 		},
 		{
 			"id": "orders",
+			"share": 203,
 			"name": "Orders",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2490,6 +2694,7 @@
 		},
 		{
 			"id": "rules",
+			"share": 204,
 			"name": "Rules",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2500,6 +2705,7 @@
 		},
 		{
 			"id": "discipline",
+			"share": 205,
 			"name": "Discipline and punishment",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2510,6 +2716,7 @@
 		},
 		{
 			"id": "protocol",
+			"share": 206,
 			"name": "Protocol and rituals",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2520,6 +2727,7 @@
 		},
 		{
 			"id": "kneeling",
+			"share": 207,
 			"name": "Kneeling",
 			"parent": "protocol",
 			"roles": "dom-sub",
@@ -2531,6 +2739,7 @@
 		},
 		{
 			"id": "positions",
+			"share": 208,
 			"name": "Held positions",
 			"parent": "protocol",
 			"roles": "dom-sub",
@@ -2542,6 +2751,7 @@
 		},
 		{
 			"id": "speech-rules",
+			"share": 209,
 			"name": "Speech rules",
 			"parent": "protocol",
 			"roles": "dom-sub",
@@ -2553,6 +2763,7 @@
 		},
 		{
 			"id": "eye-contact",
+			"share": 210,
 			"name": "Eye contact rules",
 			"parent": "protocol",
 			"roles": "dom-sub",
@@ -2564,6 +2775,7 @@
 		},
 		{
 			"id": "training",
+			"share": 211,
 			"name": "Training",
 			"parent": "protocol",
 			"roles": "dom-sub",
@@ -2575,6 +2787,7 @@
 		},
 		{
 			"id": "begging",
+			"share": 212,
 			"name": "Begging",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2585,6 +2798,7 @@
 		},
 		{
 			"id": "collaring",
+			"share": 213,
 			"name": "Collaring",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2595,6 +2809,7 @@
 		},
 		{
 			"id": "collar-leash",
+			"share": 214,
 			"name": "Collar and leash",
 			"parent": "collaring",
 			"roles": "give-receive",
@@ -2608,6 +2823,7 @@
 		},
 		{
 			"id": "total-power-exchange",
+			"share": 215,
 			"name": "Total power exchange",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2618,6 +2834,7 @@
 		},
 		{
 			"id": "slavery",
+			"share": 216,
 			"name": "Slave dynamic",
 			"parent": "total-power-exchange",
 			"roles": "dom-sub",
@@ -2629,6 +2846,7 @@
 		},
 		{
 			"id": "control-choices",
+			"share": 217,
 			"name": "Control over choices",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2639,6 +2857,7 @@
 		},
 		{
 			"id": "brat-taming",
+			"share": 218,
 			"name": "Bratting and brat taming",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2649,6 +2868,7 @@
 		},
 		{
 			"id": "praise",
+			"share": 219,
 			"name": "Praise",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2660,6 +2880,7 @@
 		},
 		{
 			"id": "ignoring",
+			"share": 220,
 			"name": "Ignoring",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2670,6 +2891,7 @@
 		},
 		{
 			"id": "role-reversal",
+			"share": 221,
 			"name": "Switching",
 			"parent": "power",
 			"intensity": 2,
@@ -2679,6 +2901,7 @@
 		},
 		{
 			"id": "lending",
+			"share": 222,
 			"name": "Lending out",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2691,6 +2914,7 @@
 		},
 		{
 			"id": "auctions",
+			"share": 223,
 			"name": "Auctions",
 			"parent": "lending",
 			"roles": "dom-sub",
@@ -2703,6 +2927,7 @@
 		},
 		{
 			"id": "long-distance-control",
+			"share": 224,
 			"name": "Control from a distance",
 			"parent": "power",
 			"roles": "dom-sub",
@@ -2715,6 +2940,7 @@
 		},
 		{
 			"id": "free-use",
+			"share": 225,
 			"name": "Free use",
 			"parent": "power",
 			"roles": "aggressor-target",
@@ -2727,6 +2953,7 @@
 		},
 		{
 			"id": "service",
+			"share": 226,
 			"name": "Service",
 			"section": "kinks",
 			"roles": "dom-sub",
@@ -2736,6 +2963,7 @@
 		},
 		{
 			"id": "domestic-service",
+			"share": 227,
 			"name": "Domestic service",
 			"parent": "service",
 			"roles": "dom-sub",
@@ -2746,6 +2974,7 @@
 		},
 		{
 			"id": "human-furniture",
+			"share": 228,
 			"name": "Human furniture",
 			"parent": "service",
 			"roles": "dom-sub",
@@ -2758,6 +2987,7 @@
 		},
 		{
 			"id": "personal-service",
+			"share": 229,
 			"name": "Personal service",
 			"parent": "service",
 			"roles": "dom-sub",
@@ -2768,6 +2998,7 @@
 		},
 		{
 			"id": "worship",
+			"share": 230,
 			"name": "Worship",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -2777,6 +3008,7 @@
 		},
 		{
 			"id": "genital-worship",
+			"share": 231,
 			"name": "Cock and pussy worship",
 			"parent": "worship",
 			"roles": "give-receive",
@@ -2788,6 +3020,7 @@
 		},
 		{
 			"id": "ass-worship",
+			"share": 232,
 			"name": "Ass worship",
 			"parent": "worship",
 			"roles": "give-receive",
@@ -2799,6 +3032,7 @@
 		},
 		{
 			"id": "breast-worship",
+			"share": 233,
 			"name": "Breast worship",
 			"parent": "worship",
 			"roles": "give-receive",
@@ -2810,6 +3044,7 @@
 		},
 		{
 			"id": "foot-worship",
+			"share": 234,
 			"name": "Feet",
 			"parent": "worship",
 			"roles": "give-receive",
@@ -2820,6 +3055,7 @@
 		},
 		{
 			"id": "boot-worship",
+			"share": 235,
 			"name": "Boot and heel worship",
 			"parent": "worship",
 			"roles": "give-receive",
@@ -2831,6 +3067,7 @@
 		},
 		{
 			"id": "muscle-worship",
+			"share": 236,
 			"name": "Muscle worship",
 			"parent": "worship",
 			"roles": "give-receive",
@@ -2841,6 +3078,7 @@
 		},
 		{
 			"id": "pussy-juice",
+			"share": 237,
 			"name": "Tasting arousal",
 			"parent": "worship",
 			"roles": "give-receive",
@@ -2851,6 +3089,7 @@
 		},
 		{
 			"id": "humiliation",
+			"share": 238,
 			"name": "Humiliation and degradation",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -2861,6 +3100,7 @@
 		},
 		{
 			"id": "body-writing",
+			"share": 239,
 			"name": "Body writing",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2873,6 +3113,7 @@
 		},
 		{
 			"id": "verbal-humiliation",
+			"share": 240,
 			"name": "Verbal humiliation",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2885,6 +3126,7 @@
 		},
 		{
 			"id": "private-humiliation",
+			"share": 241,
 			"name": "Humiliation in private",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2896,6 +3138,7 @@
 		},
 		{
 			"id": "public-humiliation",
+			"share": 242,
 			"name": "Humiliation in public",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2907,6 +3150,7 @@
 		},
 		{
 			"id": "objectification",
+			"share": 243,
 			"name": "Objectification",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2919,6 +3163,7 @@
 		},
 		{
 			"id": "dehumanisation",
+			"share": 244,
 			"name": "Dehumanisation",
 			"parent": "objectification",
 			"roles": "give-receive",
@@ -2931,6 +3176,7 @@
 		},
 		{
 			"id": "soap",
+			"share": 245,
 			"name": "Mouth soaping",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2943,6 +3189,7 @@
 		},
 		{
 			"id": "small-penis",
+			"share": 246,
 			"name": "Size humiliation",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2955,6 +3202,7 @@
 		},
 		{
 			"id": "degrading-tasks",
+			"share": 247,
 			"name": "Degrading tasks",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2967,6 +3215,7 @@
 		},
 		{
 			"id": "cnc-humiliation",
+			"share": 248,
 			"name": "Forced exposure",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2980,6 +3229,7 @@
 		},
 		{
 			"id": "slurs",
+			"share": 249,
 			"name": "Slurs",
 			"parent": "humiliation",
 			"roles": "give-receive",
@@ -2992,6 +3242,7 @@
 		},
 		{
 			"id": "mind",
+			"share": 250,
 			"name": "Mind play",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -3001,6 +3252,7 @@
 		},
 		{
 			"id": "fear-play",
+			"share": 251,
 			"name": "Fear play",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3013,6 +3265,7 @@
 		},
 		{
 			"id": "gunplay",
+			"share": 252,
 			"name": "Gun play",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3026,6 +3279,7 @@
 		},
 		{
 			"id": "dirty-talk",
+			"share": 253,
 			"name": "Dirty talk",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3036,6 +3290,7 @@
 		},
 		{
 			"id": "hypnosis",
+			"share": 254,
 			"name": "Erotic hypnosis",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3047,6 +3302,7 @@
 		},
 		{
 			"id": "triggers",
+			"share": 255,
 			"name": "Trigger words",
 			"parent": "hypnosis",
 			"roles": "give-receive",
@@ -3058,6 +3314,7 @@
 		},
 		{
 			"id": "brainwashing",
+			"share": 256,
 			"name": "Brainwashing",
 			"parent": "hypnosis",
 			"roles": "give-receive",
@@ -3069,6 +3326,7 @@
 		},
 		{
 			"id": "mind-games",
+			"share": 257,
 			"name": "Mind games",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3080,6 +3338,7 @@
 		},
 		{
 			"id": "corruption",
+			"share": 258,
 			"name": "Corruption",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3091,6 +3350,7 @@
 		},
 		{
 			"id": "emotional-catharsis",
+			"share": 259,
 			"name": "Emotional release",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3101,6 +3361,7 @@
 		},
 		{
 			"id": "abandonment",
+			"share": 260,
 			"name": "Abandonment fantasy",
 			"parent": "mind",
 			"roles": "give-receive",
@@ -3112,6 +3373,7 @@
 		},
 		{
 			"id": "consent",
+			"share": 261,
 			"name": "Consent play",
 			"section": "kinks",
 			"roles": "aggressor-target",
@@ -3123,6 +3385,7 @@
 		},
 		{
 			"id": "cnc",
+			"share": 262,
 			"name": "Consensual non-consent",
 			"parent": "consent",
 			"roles": "aggressor-target",
@@ -3134,6 +3397,7 @@
 		},
 		{
 			"id": "gang-cnc",
+			"share": 263,
 			"name": "Group CNC fantasy",
 			"parent": "cnc",
 			"roles": "aggressor-target",
@@ -3147,6 +3411,7 @@
 		},
 		{
 			"id": "sleep-play",
+			"share": 264,
 			"name": "Sleep play",
 			"parent": "consent",
 			"roles": "aggressor-target",
@@ -3158,6 +3423,7 @@
 		},
 		{
 			"id": "kidnapping",
+			"share": 265,
 			"name": "Abduction play",
 			"parent": "consent",
 			"roles": "aggressor-target",
@@ -3169,6 +3435,7 @@
 		},
 		{
 			"id": "blackmail",
+			"share": 266,
 			"name": "Blackmail fantasy",
 			"parent": "consent",
 			"roles": "aggressor-target",
@@ -3180,6 +3447,7 @@
 		},
 		{
 			"id": "drugging-fantasy",
+			"share": 267,
 			"name": "Drugged fantasy",
 			"parent": "consent",
 			"roles": "aggressor-target",
@@ -3192,6 +3460,7 @@
 		},
 		{
 			"id": "hate-sex",
+			"share": 268,
 			"name": "Hate sex",
 			"parent": "consent",
 			"roles": "aggressor-target",
@@ -3203,6 +3472,7 @@
 		},
 		{
 			"id": "personas",
+			"share": 269,
 			"name": "Pet, age and persona play",
 			"section": "kinks",
 			"roles": "dom-sub",
@@ -3212,6 +3482,7 @@
 		},
 		{
 			"id": "primal",
+			"share": 270,
 			"name": "Primal play",
 			"parent": "personas",
 			"roles": "aggressor-target",
@@ -3224,6 +3495,7 @@
 		},
 		{
 			"id": "pup-play",
+			"share": 271,
 			"name": "Pup play",
 			"parent": "personas",
 			"roles": "dom-sub",
@@ -3234,6 +3506,7 @@
 		},
 		{
 			"id": "kitten-play",
+			"share": 272,
 			"name": "Kitten play",
 			"parent": "personas",
 			"roles": "dom-sub",
@@ -3244,6 +3517,7 @@
 		},
 		{
 			"id": "pony-play",
+			"share": 273,
 			"name": "Pony play",
 			"parent": "personas",
 			"roles": "dom-sub",
@@ -3254,6 +3528,7 @@
 		},
 		{
 			"id": "hucow",
+			"share": 274,
 			"name": "Hucow",
 			"parent": "personas",
 			"roles": "dom-sub",
@@ -3265,6 +3540,7 @@
 		},
 		{
 			"id": "age-play",
+			"share": 275,
 			"name": "Age play",
 			"parent": "personas",
 			"roles": "dom-sub",
@@ -3276,6 +3552,7 @@
 		},
 		{
 			"id": "caregiver",
+			"share": 276,
 			"name": "Daddy or mummy dynamic",
 			"parent": "age-play",
 			"roles": "dom-sub",
@@ -3288,6 +3565,7 @@
 		},
 		{
 			"id": "abdl",
+			"share": 277,
 			"name": "ABDL and diapers",
 			"parent": "age-play",
 			"roles": "dom-sub",
@@ -3300,6 +3578,7 @@
 		},
 		{
 			"id": "furry",
+			"share": 278,
 			"name": "Furries",
 			"parent": "personas",
 			"roles": "self-partner",
@@ -3311,6 +3590,7 @@
 		},
 		{
 			"id": "gender",
+			"share": 279,
 			"name": "Gender play",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -3321,6 +3601,7 @@
 		},
 		{
 			"id": "feminisation",
+			"share": 280,
 			"name": "Feminisation",
 			"parent": "gender",
 			"roles": "give-receive",
@@ -3333,6 +3614,7 @@
 		},
 		{
 			"id": "sissy",
+			"share": 281,
 			"name": "Sissification",
 			"parent": "feminisation",
 			"roles": "give-receive",
@@ -3345,6 +3627,7 @@
 		},
 		{
 			"id": "bimbo",
+			"share": 282,
 			"name": "Bimbofication",
 			"parent": "feminisation",
 			"roles": "give-receive",
@@ -3357,6 +3640,7 @@
 		},
 		{
 			"id": "crossdressing",
+			"share": 283,
 			"name": "Crossdressing",
 			"parent": "gender",
 			"roles": "self-partner",
@@ -3368,6 +3652,7 @@
 		},
 		{
 			"id": "masculinisation",
+			"share": 284,
 			"name": "Masculinisation",
 			"parent": "gender",
 			"roles": "give-receive",
@@ -3380,6 +3665,7 @@
 		},
 		{
 			"id": "emasculation",
+			"share": 285,
 			"name": "Emasculation",
 			"parent": "gender",
 			"roles": "give-receive",
@@ -3393,6 +3679,7 @@
 		},
 		{
 			"id": "makeup",
+			"share": 286,
 			"name": "Makeup",
 			"parent": "gender",
 			"roles": "self-partner",
@@ -3404,6 +3691,7 @@
 		},
 		{
 			"id": "orientation-play",
+			"share": 287,
 			"name": "Orientation play",
 			"parent": "gender",
 			"roles": "give-receive",
@@ -3416,6 +3704,7 @@
 		},
 		{
 			"id": "clothing",
+			"share": 288,
 			"name": "Clothing and materials",
 			"section": "kinks",
 			"roles": "self-partner",
@@ -3424,6 +3713,7 @@
 		},
 		{
 			"id": "lingerie",
+			"share": 289,
 			"name": "Lingerie",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3434,6 +3724,7 @@
 		},
 		{
 			"id": "stockings",
+			"share": 290,
 			"name": "Stockings and socks",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3452,6 +3743,7 @@
 		},
 		{
 			"id": "heels-boots",
+			"share": 291,
 			"name": "Heels and boots",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3462,6 +3754,7 @@
 		},
 		{
 			"id": "corsets",
+			"share": 292,
 			"name": "Corsets",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3472,6 +3765,7 @@
 		},
 		{
 			"id": "latex",
+			"share": 293,
 			"name": "Latex and rubber",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3482,6 +3776,7 @@
 		},
 		{
 			"id": "leather",
+			"share": 294,
 			"name": "Leather",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3492,6 +3787,7 @@
 		},
 		{
 			"id": "uniforms",
+			"share": 295,
 			"name": "Uniforms and costumes",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3503,6 +3799,7 @@
 		},
 		{
 			"id": "cosplay",
+			"share": 296,
 			"name": "Cosplay",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3513,6 +3810,7 @@
 		},
 		{
 			"id": "formal",
+			"share": 297,
 			"name": "Formal clothes",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3523,6 +3821,7 @@
 		},
 		{
 			"id": "slutty-clothes",
+			"share": 298,
 			"name": "Slutty clothes",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3533,6 +3832,7 @@
 		},
 		{
 			"id": "clothed-sex",
+			"share": 299,
 			"name": "Clothed sex",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3543,6 +3843,7 @@
 		},
 		{
 			"id": "cfnm",
+			"share": 300,
 			"name": "Clothed and naked",
 			"parent": "clothing",
 			"roles": "clothed-naked",
@@ -3554,6 +3855,7 @@
 		},
 		{
 			"id": "gloves",
+			"share": 301,
 			"name": "Gloves",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3563,6 +3865,7 @@
 		},
 		{
 			"id": "jewellery",
+			"share": 302,
 			"name": "Jewellery and chokers",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3573,6 +3876,7 @@
 		},
 		{
 			"id": "masks",
+			"share": 303,
 			"name": "Masks",
 			"parent": "clothing",
 			"roles": "self-partner",
@@ -3582,6 +3886,7 @@
 		},
 		{
 			"id": "exhibition",
+			"share": 304,
 			"name": "Showing off and watching",
 			"section": "kinks",
 			"roles": "seen-watch",
@@ -3592,6 +3897,7 @@
 		},
 		{
 			"id": "nudity-around-others",
+			"share": 305,
 			"name": "Naked around others",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3603,6 +3909,7 @@
 		},
 		{
 			"id": "public-sex",
+			"share": 306,
 			"name": "Sex in public",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3615,6 +3922,7 @@
 		},
 		{
 			"id": "play-around-others",
+			"share": 307,
 			"name": "Play in front of others",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3626,6 +3934,7 @@
 		},
 		{
 			"id": "watching-others",
+			"share": 308,
 			"name": "Watching others",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3637,6 +3946,7 @@
 		},
 		{
 			"id": "photos-video",
+			"share": 309,
 			"name": "Photos and video",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3649,6 +3959,7 @@
 		},
 		{
 			"id": "posting-online",
+			"share": 310,
 			"name": "Posting online",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3660,6 +3971,7 @@
 		},
 		{
 			"id": "mirror-sex",
+			"share": 311,
 			"name": "Mirror sex",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3671,6 +3983,7 @@
 		},
 		{
 			"id": "stripping",
+			"share": 312,
 			"name": "Stripping and dancing",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3682,6 +3995,7 @@
 		},
 		{
 			"id": "anonymity",
+			"share": 313,
 			"name": "Anonymity",
 			"parent": "exhibition",
 			"roles": "seen-watch",
@@ -3693,6 +4007,7 @@
 		},
 		{
 			"id": "glory-hole",
+			"share": 314,
 			"name": "Glory holes",
 			"parent": "anonymity",
 			"roles": "give-receive",
@@ -3705,6 +4020,7 @@
 		},
 		{
 			"id": "through-a-wall",
+			"share": 315,
 			"name": "Stuck in a wall",
 			"parent": "anonymity",
 			"roles": "dom-sub",
@@ -3717,6 +4033,7 @@
 		},
 		{
 			"id": "remote",
+			"share": 316,
 			"name": "Remote and online",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -3726,6 +4043,7 @@
 		},
 		{
 			"id": "sexting",
+			"share": 317,
 			"name": "Sexting",
 			"parent": "remote",
 			"roles": "give-receive",
@@ -3736,6 +4054,7 @@
 		},
 		{
 			"id": "phone-sex",
+			"share": 318,
 			"name": "Phone and video calls",
 			"parent": "remote",
 			"roles": "give-receive",
@@ -3746,6 +4065,7 @@
 		},
 		{
 			"id": "remote-tasks",
+			"share": 319,
 			"name": "Tasks from a distance",
 			"parent": "remote",
 			"roles": "give-receive",
@@ -3757,6 +4077,7 @@
 		},
 		{
 			"id": "porn-together",
+			"share": 320,
 			"name": "Watching porn together",
 			"parent": "remote",
 			"roles": "give-receive",
@@ -3767,6 +4088,7 @@
 		},
 		{
 			"id": "group",
+			"share": 321,
 			"name": "More people",
 			"section": "kinks",
 			"intensity": 3,
@@ -3776,6 +4098,7 @@
 		},
 		{
 			"id": "threesome",
+			"share": 322,
 			"name": "Threesomes",
 			"parent": "group",
 			"intensity": 3,
@@ -3786,6 +4109,7 @@
 		},
 		{
 			"id": "orgy",
+			"share": 323,
 			"name": "Orgies",
 			"parent": "group",
 			"intensity": 3,
@@ -3796,6 +4120,7 @@
 		},
 		{
 			"id": "gangbang",
+			"share": 324,
 			"name": "Gangbangs",
 			"parent": "group",
 			"intensity": 4,
@@ -3807,6 +4132,7 @@
 		},
 		{
 			"id": "spitroast",
+			"share": 325,
 			"name": "Spitroasting",
 			"parent": "group",
 			"intensity": 3,
@@ -3818,6 +4144,7 @@
 		},
 		{
 			"id": "swinging",
+			"share": 326,
 			"name": "Swinging",
 			"parent": "group",
 			"intensity": 3,
@@ -3829,6 +4156,7 @@
 		},
 		{
 			"id": "cuckolding",
+			"share": 327,
 			"name": "Cuckolding",
 			"parent": "group",
 			"intensity": 4,
@@ -3841,6 +4169,7 @@
 		},
 		{
 			"id": "harem",
+			"share": 328,
 			"name": "Harems",
 			"parent": "group",
 			"intensity": 3,
@@ -3852,6 +4181,7 @@
 		},
 		{
 			"id": "roleplay",
+			"share": 329,
 			"name": "Roleplay and scenes",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -3861,6 +4191,7 @@
 		},
 		{
 			"id": "interrogation",
+			"share": 330,
 			"name": "Interrogation",
 			"parent": "roleplay",
 			"roles": "aggressor-target",
@@ -3873,6 +4204,7 @@
 		},
 		{
 			"id": "teacher-student",
+			"share": 331,
 			"name": "Teacher and student",
 			"parent": "roleplay",
 			"roles": "teacher-student",
@@ -3884,6 +4216,7 @@
 		},
 		{
 			"id": "medical-play",
+			"share": 332,
 			"name": "Medical play",
 			"parent": "roleplay",
 			"roles": "doctor-patient",
@@ -3896,6 +4229,7 @@
 		},
 		{
 			"id": "prison",
+			"share": 333,
 			"name": "Prison",
 			"parent": "roleplay",
 			"roles": "guard-prisoner",
@@ -3907,6 +4241,7 @@
 		},
 		{
 			"id": "religious",
+			"share": 334,
 			"name": "Religious scenes",
 			"parent": "roleplay",
 			"roles": "dom-sub",
@@ -3918,6 +4253,7 @@
 		},
 		{
 			"id": "boss-employee",
+			"share": 335,
 			"name": "Boss and employee",
 			"parent": "roleplay",
 			"roles": "boss-employee",
@@ -3929,6 +4265,7 @@
 		},
 		{
 			"id": "stranger",
+			"share": 336,
 			"name": "Strangers meeting",
 			"parent": "roleplay",
 			"roles": "pickup",
@@ -3939,6 +4276,7 @@
 		},
 		{
 			"id": "sex-work-fantasy",
+			"share": 337,
 			"name": "Sex work fantasy",
 			"parent": "roleplay",
 			"roles": "client-worker",
@@ -3949,6 +4287,7 @@
 		},
 		{
 			"id": "family-roleplay",
+			"share": 338,
 			"name": "Family roleplay",
 			"parent": "roleplay",
 			"roles": "dom-sub",
@@ -3960,6 +4299,7 @@
 		},
 		{
 			"id": "cheating-fantasy",
+			"share": 339,
 			"name": "Cheating fantasy",
 			"parent": "roleplay",
 			"roles": "cheating",
@@ -3971,6 +4311,7 @@
 		},
 		{
 			"id": "royalty",
+			"share": 340,
 			"name": "Royalty and servants",
 			"parent": "roleplay",
 			"roles": "royalty-servant",
@@ -3982,6 +4323,7 @@
 		},
 		{
 			"id": "war-roleplay",
+			"share": 341,
 			"name": "Nazi and war roleplay",
 			"parent": "roleplay",
 			"roles": "dom-sub",
@@ -3993,6 +4335,7 @@
 		},
 		{
 			"id": "fantasy",
+			"share": 342,
 			"name": "Fantasy and the impossible",
 			"section": "stories",
 			"intensity": 3,
@@ -4001,6 +4344,7 @@
 		},
 		{
 			"id": "tentacles",
+			"share": 343,
 			"name": "Tentacles",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4010,6 +4354,7 @@
 		},
 		{
 			"id": "monsters",
+			"share": 344,
 			"name": "Monsters",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4027,6 +4372,7 @@
 		},
 		{
 			"id": "aliens",
+			"share": 345,
 			"name": "Aliens",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4036,6 +4382,7 @@
 		},
 		{
 			"id": "robots",
+			"share": 346,
 			"name": "Robots",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4045,6 +4392,7 @@
 		},
 		{
 			"id": "transformation",
+			"share": 347,
 			"name": "Transformation",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4054,6 +4402,7 @@
 		},
 		{
 			"id": "futanari",
+			"share": 348,
 			"name": "Futanari",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4063,6 +4412,7 @@
 		},
 		{
 			"id": "size-difference",
+			"share": 349,
 			"name": "Size difference",
 			"parent": "fantasy",
 			"intensity": 2,
@@ -4073,6 +4423,7 @@
 		},
 		{
 			"id": "vore",
+			"share": 350,
 			"name": "Vore",
 			"parent": "fantasy",
 			"intensity": 5,
@@ -4083,6 +4434,7 @@
 		},
 		{
 			"id": "cumflation",
+			"share": 351,
 			"name": "Cumflation",
 			"parent": "fantasy",
 			"intensity": 4,
@@ -4092,6 +4444,7 @@
 		},
 		{
 			"id": "x-ray",
+			"share": 352,
 			"name": "X-ray views",
 			"parent": "fantasy",
 			"intensity": 2,
@@ -4101,6 +4454,7 @@
 		},
 		{
 			"id": "time-stop",
+			"share": 353,
 			"name": "Time stop",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4110,6 +4464,7 @@
 		},
 		{
 			"id": "impossible-penetration",
+			"share": 354,
 			"name": "Impossible penetration",
 			"parent": "fantasy",
 			"intensity": 4,
@@ -4119,6 +4474,7 @@
 		},
 		{
 			"id": "omegaverse",
+			"share": 355,
 			"name": "Omegaverse",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4128,6 +4484,7 @@
 		},
 		{
 			"id": "bestiality",
+			"share": 356,
 			"name": "Bestiality fantasy",
 			"parent": "fantasy",
 			"intensity": 6,
@@ -4138,6 +4495,7 @@
 		},
 		{
 			"id": "selfcest",
+			"share": 357,
 			"name": "Sex with yourself",
 			"parent": "fantasy",
 			"intensity": 3,
@@ -4147,6 +4505,7 @@
 		},
 		{
 			"id": "time-travel",
+			"share": 358,
 			"name": "Time travel",
 			"parent": "fantasy",
 			"intensity": 2,
@@ -4155,6 +4514,7 @@
 		},
 		{
 			"id": "tropes",
+			"share": 359,
 			"name": "Story tropes",
 			"section": "stories",
 			"intensity": 1,
@@ -4164,6 +4524,7 @@
 		},
 		{
 			"id": "enemies-to-lovers",
+			"share": 360,
 			"name": "Enemies to lovers",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4174,6 +4535,7 @@
 		},
 		{
 			"id": "friends-to-lovers",
+			"share": 361,
 			"name": "Friends to lovers",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4184,6 +4546,7 @@
 		},
 		{
 			"id": "only-one-bed",
+			"share": 362,
 			"name": "Only one bed",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4194,6 +4557,7 @@
 		},
 		{
 			"id": "forbidden",
+			"share": 363,
 			"name": "Forbidden",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4204,6 +4568,7 @@
 		},
 		{
 			"id": "fake-relationship",
+			"share": 364,
 			"name": "Fake relationship",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4214,6 +4579,7 @@
 		},
 		{
 			"id": "possessive",
+			"share": 365,
 			"name": "Possessive partner",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4226,6 +4592,7 @@
 		},
 		{
 			"id": "domestic",
+			"share": 366,
 			"name": "Domestic",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4236,6 +4603,7 @@
 		},
 		{
 			"id": "captive",
+			"share": 367,
 			"name": "Captive",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4248,6 +4616,7 @@
 		},
 		{
 			"id": "soulmates",
+			"share": 368,
 			"name": "Soulmates",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4258,6 +4627,7 @@
 		},
 		{
 			"id": "dystopia",
+			"share": 369,
 			"name": "Dystopia",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4268,6 +4638,7 @@
 		},
 		{
 			"id": "amnesia",
+			"share": 370,
 			"name": "Amnesia",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4277,6 +4648,7 @@
 		},
 		{
 			"id": "mistaken-identity",
+			"share": 371,
 			"name": "Mistaken identity",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4286,6 +4658,7 @@
 		},
 		{
 			"id": "love-triangle",
+			"share": 372,
 			"name": "Love triangles",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4295,6 +4668,7 @@
 		},
 		{
 			"id": "sick-care",
+			"share": 373,
 			"name": "Caring for someone sick",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4305,6 +4679,7 @@
 		},
 		{
 			"id": "trauma",
+			"share": 374,
 			"name": "Trauma and struggles",
 			"parent": "tropes",
 			"intensity": 3,
@@ -4314,6 +4689,7 @@
 		},
 		{
 			"id": "fuck-or-die",
+			"share": 375,
 			"name": "Have sex or else",
 			"parent": "tropes",
 			"intensity": 4,
@@ -4324,6 +4700,7 @@
 		},
 		{
 			"id": "magical-healing",
+			"share": 376,
 			"name": "Healing through sex",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4333,6 +4710,7 @@
 		},
 		{
 			"id": "awkward-sex",
+			"share": 377,
 			"name": "Awkward sex",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4342,6 +4720,7 @@
 		},
 		{
 			"id": "wet-dreams",
+			"share": 378,
 			"name": "Wet dreams",
 			"parent": "tropes",
 			"intensity": 1,
@@ -4351,6 +4730,7 @@
 		},
 		{
 			"id": "bodies",
+			"share": 379,
 			"name": "Partners and looks",
 			"section": "partners",
 			"intensity": 1,
@@ -4360,6 +4740,7 @@
 		},
 		{
 			"id": "build",
+			"share": 380,
 			"name": "Build",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4370,6 +4751,7 @@
 		},
 		{
 			"id": "body-hair",
+			"share": 381,
 			"name": "Body hair",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4380,6 +4762,7 @@
 		},
 		{
 			"id": "hair",
+			"share": 382,
 			"name": "Hair",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4390,6 +4773,7 @@
 		},
 		{
 			"id": "breasts",
+			"share": 383,
 			"name": "Breasts",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4400,6 +4784,7 @@
 		},
 		{
 			"id": "cocks",
+			"share": 384,
 			"name": "Cocks",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4410,6 +4795,7 @@
 		},
 		{
 			"id": "skin",
+			"share": 385,
 			"name": "Skin and markings",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4420,6 +4806,7 @@
 		},
 		{
 			"id": "pregnancy",
+			"share": 386,
 			"name": "Pregnancy",
 			"parent": "bodies",
 			"intensity": 2,
@@ -4430,6 +4817,7 @@
 		},
 		{
 			"id": "archetypes",
+			"share": 387,
 			"name": "Types",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4440,6 +4828,7 @@
 		},
 		{
 			"id": "partner-gender",
+			"share": 388,
 			"name": "Gender",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4450,6 +4839,7 @@
 		},
 		{
 			"id": "partner-age",
+			"share": 389,
 			"name": "Age",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4460,6 +4850,7 @@
 		},
 		{
 			"id": "ethnicity",
+			"share": 390,
 			"name": "Ethnicity",
 			"parent": "bodies",
 			"intensity": 1,
@@ -4470,6 +4861,7 @@
 		},
 		{
 			"id": "sex-styles",
+			"share": 391,
 			"name": "Sex styles and places",
 			"section": "kinks",
 			"intensity": 1,
@@ -4478,6 +4870,7 @@
 		},
 		{
 			"id": "rough-sex",
+			"share": 392,
 			"name": "Rough sex",
 			"parent": "sex-styles",
 			"roles": "give-receive",
@@ -4489,6 +4882,7 @@
 		},
 		{
 			"id": "hair-pulling",
+			"share": 393,
 			"name": "Hair pulling",
 			"parent": "rough-sex",
 			"roles": "give-receive",
@@ -4500,6 +4894,7 @@
 		},
 		{
 			"id": "positions-list",
+			"share": 394,
 			"name": "Sex positions",
 			"parent": "sex-styles",
 			"intensity": 1,
@@ -4517,6 +4912,7 @@
 		},
 		{
 			"id": "piledriver",
+			"share": 395,
 			"name": "Piledriver and mating press",
 			"parent": "positions-list",
 			"intensity": 2,
@@ -4527,6 +4923,7 @@
 		},
 		{
 			"id": "places",
+			"share": 396,
 			"name": "Places",
 			"parent": "sex-styles",
 			"intensity": 1,
@@ -4536,6 +4933,7 @@
 		},
 		{
 			"id": "marathon-sex",
+			"share": 397,
 			"name": "Marathon sessions",
 			"parent": "sex-styles",
 			"intensity": 1,
@@ -4545,6 +4943,7 @@
 		},
 		{
 			"id": "quickies",
+			"share": 398,
 			"name": "Quickies",
 			"parent": "sex-styles",
 			"intensity": 1,
@@ -4554,6 +4953,7 @@
 		},
 		{
 			"id": "scissoring",
+			"share": 399,
 			"name": "Scissoring",
 			"parent": "sex-styles",
 			"intensity": 1,
@@ -4563,6 +4963,7 @@
 		},
 		{
 			"id": "safe-sex",
+			"share": 400,
 			"name": "Safer sex",
 			"parent": "sex-styles",
 			"intensity": 1,
@@ -4572,6 +4973,7 @@
 		},
 		{
 			"id": "substances",
+			"share": 401,
 			"name": "Sex on substances",
 			"parent": "sex-styles",
 			"intensity": 4,
@@ -4582,6 +4984,7 @@
 		},
 		{
 			"id": "money",
+			"share": 402,
 			"name": "Money and gifts",
 			"section": "kinks",
 			"roles": "dom-sub",
@@ -4592,6 +4995,7 @@
 		},
 		{
 			"id": "findom",
+			"share": 403,
 			"name": "Financial domination",
 			"parent": "money",
 			"roles": "dom-sub",
@@ -4603,6 +5007,7 @@
 		},
 		{
 			"id": "tributes",
+			"share": 404,
 			"name": "Tributes and gifts",
 			"parent": "money",
 			"roles": "dom-sub",
@@ -4614,6 +5019,7 @@
 		},
 		{
 			"id": "spending-control",
+			"share": 405,
 			"name": "Control over spending",
 			"parent": "money",
 			"roles": "dom-sub",
@@ -4625,6 +5031,7 @@
 		},
 		{
 			"id": "relationships",
+			"share": 406,
 			"name": "Relationship styles",
 			"section": "scene",
 			"intensity": 1,
@@ -4633,6 +5040,7 @@
 		},
 		{
 			"id": "monogamous",
+			"share": 407,
 			"name": "Monogamous",
 			"parent": "relationships",
 			"intensity": 1,
@@ -4642,6 +5050,7 @@
 		},
 		{
 			"id": "open",
+			"share": 408,
 			"name": "Open relationships",
 			"parent": "relationships",
 			"intensity": 1,
@@ -4658,6 +5067,7 @@
 		},
 		{
 			"id": "long-distance",
+			"share": 409,
 			"name": "Long distance",
 			"parent": "relationships",
 			"intensity": 1,
@@ -4668,6 +5078,7 @@
 		},
 		{
 			"id": "solo-kink",
+			"share": 410,
 			"name": "Solo kink",
 			"parent": "relationships",
 			"intensity": 1,
@@ -4677,6 +5088,7 @@
 		},
 		{
 			"id": "non-sexual-kink",
+			"share": 411,
 			"name": "Non-sexual kink",
 			"parent": "relationships",
 			"intensity": 1,
@@ -4686,6 +5098,7 @@
 		},
 		{
 			"id": "care",
+			"share": 412,
 			"name": "Care and aftercare",
 			"section": "kinks",
 			"roles": "give-receive",
@@ -4696,6 +5109,7 @@
 		},
 		{
 			"id": "aftercare",
+			"share": 413,
 			"name": "Aftercare",
 			"parent": "care",
 			"roles": "give-receive",
@@ -4707,6 +5121,7 @@
 		},
 		{
 			"id": "check-ins",
+			"share": 414,
 			"name": "Check-ins and safewords",
 			"parent": "care",
 			"roles": "give-receive",
@@ -4718,6 +5133,7 @@
 		},
 		{
 			"id": "negotiation",
+			"share": 415,
 			"name": "Negotiation",
 			"parent": "care",
 			"roles": "give-receive",
@@ -4729,6 +5145,7 @@
 		},
 		{
 			"id": "drop-care",
+			"share": 416,
 			"name": "Drop care",
 			"parent": "care",
 			"roles": "give-receive",
@@ -4740,6 +5157,7 @@
 		},
 		{
 			"id": "subspace",
+			"share": 417,
 			"name": "Subspace and domspace",
 			"parent": "care",
 			"roles": "headspace",
@@ -4752,6 +5170,7 @@
 		},
 		{
 			"id": "nurturing",
+			"share": 418,
 			"name": "Comfort",
 			"parent": "care",
 			"roles": "give-receive",
@@ -4763,6 +5182,7 @@
 		},
 		{
 			"id": "media",
+			"share": 419,
 			"name": "Erotica",
 			"section": "stories",
 			"intensity": 1,
@@ -4772,6 +5192,7 @@
 		},
 		{
 			"id": "text-erotica",
+			"share": 420,
 			"name": "Written erotica",
 			"parent": "media",
 			"intensity": 1,
@@ -4782,6 +5203,7 @@
 		},
 		{
 			"id": "porn",
+			"share": 421,
 			"name": "Porn",
 			"parent": "media",
 			"intensity": 1,
@@ -4792,6 +5214,7 @@
 		},
 		{
 			"id": "drawn",
+			"share": 422,
 			"name": "Drawn and animated",
 			"parent": "media",
 			"intensity": 1,
@@ -4802,6 +5225,7 @@
 		},
 		{
 			"id": "audio",
+			"share": 423,
 			"name": "Audio and hypno files",
 			"parent": "media",
 			"intensity": 1,
@@ -4812,6 +5236,7 @@
 		},
 		{
 			"id": "fetishes",
+			"share": 424,
 			"name": "Other fetishes",
 			"section": "kinks",
 			"roles": "self-partner",
@@ -4820,6 +5245,7 @@
 		},
 		{
 			"id": "sweat-musk",
+			"share": 425,
 			"name": "Sweat and scent",
 			"parent": "fetishes",
 			"roles": "give-receive",
@@ -4832,6 +5258,7 @@
 		},
 		{
 			"id": "wet-and-messy",
+			"share": 426,
 			"name": "Wet and messy",
 			"parent": "fetishes",
 			"roles": "give-receive",
@@ -4844,6 +5271,7 @@
 		},
 		{
 			"id": "food-play",
+			"share": 427,
 			"name": "Food play",
 			"parent": "fetishes",
 			"roles": "give-receive",
@@ -4854,6 +5282,7 @@
 		},
 		{
 			"id": "feeding",
+			"share": 428,
 			"name": "Feeding and stuffing",
 			"parent": "food-play",
 			"roles": "give-receive",
@@ -4865,6 +5294,7 @@
 		},
 		{
 			"id": "smoking",
+			"share": 429,
 			"name": "Smoking",
 			"parent": "fetishes",
 			"roles": "self-partner",
@@ -4875,6 +5305,7 @@
 		},
 		{
 			"id": "extreme",
+			"share": 430,
 			"name": "Gore and extreme fantasy",
 			"section": "stories",
 			"roles": "give-receive",
@@ -4885,6 +5316,7 @@
 		},
 		{
 			"id": "gore",
+			"share": 431,
 			"name": "Gore",
 			"parent": "extreme",
 			"roles": "give-receive",
@@ -4897,6 +5329,7 @@
 		},
 		{
 			"id": "wounds",
+			"share": 432,
 			"name": "Wounds",
 			"parent": "gore",
 			"roles": "give-receive",
@@ -4909,6 +5342,7 @@
 		},
 		{
 			"id": "amputation",
+			"share": 433,
 			"name": "Amputation",
 			"parent": "gore",
 			"roles": "give-receive",
@@ -4922,6 +5356,7 @@
 		},
 		{
 			"id": "torture",
+			"share": 434,
 			"name": "Torture",
 			"parent": "extreme",
 			"roles": "give-receive",
@@ -4934,6 +5369,7 @@
 		},
 		{
 			"id": "genital-mutilation",
+			"share": 435,
 			"name": "Genital mutilation",
 			"parent": "torture",
 			"roles": "give-receive",
@@ -4945,6 +5381,7 @@
 		},
 		{
 			"id": "poisoning",
+			"share": 436,
 			"name": "Poisoning and starvation",
 			"parent": "torture",
 			"roles": "give-receive",
@@ -4956,6 +5393,7 @@
 		},
 		{
 			"id": "body-horror",
+			"share": 437,
 			"name": "Body horror",
 			"parent": "extreme",
 			"roles": "self-partner",
@@ -4966,6 +5404,7 @@
 		},
 		{
 			"id": "death",
+			"share": 438,
 			"name": "Death",
 			"parent": "extreme",
 			"roles": "give-receive",
@@ -4977,6 +5416,7 @@
 		},
 		{
 			"id": "snuff",
+			"share": 439,
 			"name": "Snuff",
 			"parent": "death",
 			"roles": "give-receive",
@@ -4989,6 +5429,7 @@
 		},
 		{
 			"id": "necrophilia",
+			"share": 440,
 			"name": "Necrophilia",
 			"parent": "death",
 			"roles": "give-receive",
@@ -5001,6 +5442,7 @@
 		},
 		{
 			"id": "cannibalism",
+			"share": 441,
 			"name": "Cannibalism",
 			"parent": "extreme",
 			"roles": "give-receive",
@@ -5013,6 +5455,7 @@
 		},
 		{
 			"id": "self-harm",
+			"share": 442,
 			"name": "Self-harm",
 			"parent": "extreme",
 			"roles": "self-partner",
@@ -5025,6 +5468,7 @@
 		},
 		{
 			"id": "suicide-themes",
+			"share": 443,
 			"name": "Suicide themes",
 			"parent": "extreme",
 			"roles": "give-receive",
@@ -5035,6 +5479,7 @@
 		},
 		{
 			"id": "abuse-themes",
+			"share": 444,
 			"name": "Abusive relationships",
 			"parent": "extreme",
 			"roles": "give-receive",
@@ -5047,6 +5492,7 @@
 		},
 		{
 			"id": "community",
+			"share": 445,
 			"name": "Kink community",
 			"section": "scene",
 			"intensity": 0,
@@ -5056,6 +5502,7 @@
 		},
 		{
 			"id": "munches",
+			"share": 446,
 			"name": "Munches",
 			"parent": "community",
 			"intensity": 0,
@@ -5066,6 +5513,7 @@
 		},
 		{
 			"id": "play-parties",
+			"share": 447,
 			"name": "Play parties",
 			"parent": "community",
 			"intensity": 0,
@@ -5076,6 +5524,7 @@
 		},
 		{
 			"id": "fetish-clubs",
+			"share": 448,
 			"name": "Fetish clubs",
 			"parent": "community",
 			"intensity": 0,
@@ -5086,6 +5535,7 @@
 		},
 		{
 			"id": "workshops",
+			"share": 449,
 			"name": "Workshops and classes",
 			"parent": "community",
 			"intensity": 0,
@@ -5096,6 +5546,7 @@
 		},
 		{
 			"id": "conventions",
+			"share": 450,
 			"name": "Conventions and festivals",
 			"parent": "community",
 			"intensity": 0,
@@ -5106,6 +5557,7 @@
 		},
 		{
 			"id": "online-communities",
+			"share": 451,
 			"name": "Online communities",
 			"parent": "community",
 			"intensity": 0,
@@ -5116,6 +5568,7 @@
 		},
 		{
 			"id": "mentorship",
+			"share": 452,
 			"name": "Mentorship",
 			"parent": "community",
 			"intensity": 0,
@@ -5127,6 +5580,7 @@
 		},
 		{
 			"id": "hanky-code",
+			"share": 453,
 			"name": "Hanky code",
 			"parent": "community",
 			"intensity": 0,

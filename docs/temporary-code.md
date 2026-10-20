@@ -309,6 +309,35 @@ The preprocess and `OLD_INTEREST_STEPS`; `fantasy` and `doing` go back to
 
 The schema refusing anything that is not a level.
 
+## Kink list own kinks
+
+Kink lists once held kinks of the person's own, from an import's unmatched
+rows: answers under `custom:<random>` keys and a `custom` record. They were
+removed (docs/kink-list.md), and lists saved in development may still hold
+some.
+
+### Current temporary code
+
+- `withoutOwnKinks` and the `z.preprocess` on `answers` and `skipped` in
+  `listPayloadSchema`, in `src/lib/kink-list/answers.ts`, which drop those
+  keys as a list is read. `custom` itself needs nothing: the schema does not
+  name it, so Zod drops it.
+
+### What removes the need for it
+
+The kink list has never been deployed, so only development databases and
+devices hold one. Once every list there has been saved again, or before the
+first deploy at the latest, nothing does.
+
+### What to remove
+
+`withoutOwnKinks` and both preprocesses, and the test that reads a list
+with own kinks in it.
+
+### What should stay
+
+The schema refusing a key that is not a catalogue id.
+
 ## Server settings from the environment
 
 The server's secrets, email and model providers moved from environment

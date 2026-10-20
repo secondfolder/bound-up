@@ -28,7 +28,9 @@ data would simply stop showing. So:
   v1 (the library's ideas, then called scenes) were changed this way
   (castings and scene parts, then the libido, kink and heat dials) before
   Daydreams first shipped, and setup v4 (a monologue, and the scene renamed
-  the idea) before it was deployed. Once a version has been
+  the idea) before it was deployed. The kink list's v1 and its partner copy's
+  v1 were re-sealed without people's own kinks when those were removed,
+  before the kink list was first deployed. Once a version has been
   deployed, it is frozen like the rest.
 - **All fixtures share one vault**: the key is bytes 0–31, and the vault id is
   the one at the top of `fixtures.json`.

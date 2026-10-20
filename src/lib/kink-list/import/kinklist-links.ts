@@ -210,11 +210,7 @@ export function importFromList(list: SourceList, values: readonly number[]): Imp
 			if (item.id) {
 				byKink.set(item.id, [...(byKink.get(item.id) ?? []), ...collected]);
 			} else {
-				unmatched.push({
-					name: item.name,
-					category: category.name,
-					answer: combine(null, collected)
-				});
+				unmatched.push({ name: item.name, answer: combine(null, collected) });
 			}
 		}
 	}

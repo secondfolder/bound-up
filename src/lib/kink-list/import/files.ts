@@ -7,9 +7,17 @@ import {
 	LEVELS,
 	type Level,
 	type ListPayload,
-	listPayloadSchema
+	listPayloadSchema,
+	withoutRetired
 } from '../answers';
-import { catalog, normaliseSearch, sidesOf } from '../catalog';
+import {
+	kinkById,
+	liveItems,
+	liveKinkById,
+	normaliseSearch,
+	primaryCategoryOf,
+	sidesOf
+} from '../catalog';
 import type { ImportedAnswer, ImportResult } from './result';
 
 /**
@@ -30,7 +38,13 @@ const exportSchema = z.object({
 });
 
 export function exportJson(list: ListPayload, now = new Date()): string {
-	return `${JSON.stringify({ format: EXPORT_FORMAT, version: 1, exportedAt: now.toISOString(), list }, null, 2)}\n`;
+	const body = {
+		format: EXPORT_FORMAT,
+		version: 1,
+		exportedAt: now.toISOString(),
+		list: withoutRetired(list)
+	};
+	return `${JSON.stringify(body, null, 2)}\n`;
 }
 
 /** A Bound Up export, or null for anything else. Untrusted input: parsed, never cast. */
@@ -52,7 +66,6 @@ const TRAILING_ASIDE = /\s*\(.*\)$/;
 const NAME_HEADING = /^(?:kink|activity|item|name|act|fetish|title)s?$/i;
 const ANSWER_HEADING = /answer|response|rating|choice|interest|status|selection|your/i;
 const NOTE_HEADING = /note|comment|condition/i;
-const CATEGORY_HEADING = /^(?:category|section|group)$/i;
 
 const CSV_HEADINGS = [
 	'Id',
@@ -78,10 +91,9 @@ function experienceWord(detail: Detail | undefined): string {
 	return step === undefined ? '' : (EXPERIENCE_STEPS[step] ?? '');
 }
 
-/** Every kink with an answer or a note, one row each, catalogue order then custom kinks. */
+/** Every kink with an answer or a note, one row each, in catalogue order. */
 export function exportCsv(list: ListPayload): string {
 	const rows: string[][] = [[...CSV_HEADINGS]];
-	const categoryName = (id: string) => catalog.items.find((item) => item.id === id)?.name ?? '';
 	const row = (
 		id: string,
 		category: string,
@@ -110,20 +122,9 @@ export function exportCsv(list: ListPayload): string {
 			answer.note ?? ''
 		]);
 	};
-	const byId = new Map(catalog.items.map((item) => [item.id, item]));
-	for (const item of catalog.items) {
-		if (item.parent === undefined) {
-			continue;
-		}
-		let category = item;
-		while (category.parent) {
-			category = byId.get(category.parent) ?? category;
-		}
-		row(item.id, category.name, item.name, sidesOf(item));
-	}
-	for (const [key, kink] of Object.entries(list.custom)) {
-		if (!kink.removed) {
-			row(key, categoryName(kink.categoryId), kink.name, null);
+	for (const item of liveItems) {
+		if (item.parent !== undefined) {
+			row(item.id, primaryCategoryOf(item).name, item.name, sidesOf(item));
 		}
 	}
 	return `${rows.map((cells) => cells.map(csvCell).join(',')).join('\r\n')}\r\n`;
@@ -229,7 +230,7 @@ export function answerFromWord(word: string): Level | undefined {
 /** Catalogue kinks by name and every alias, for matching a spreadsheet's names. */
 const NAME_INDEX = (() => {
 	const index = new Map<string, string>();
-	for (const item of catalog.items) {
+	for (const item of liveItems) {
 		if (item.parent === undefined) {
 			continue;
 		}
@@ -289,11 +290,13 @@ function readOwnCsv(rows: string[][]): ImportResult {
 		if (cell('Note')) {
 			answer.note = cell('Note');
 		}
+		// A retired kink's row falls through to unmatched, so the preview says
+		// it was left out rather than writing an answer nothing shows.
 		const id = cell('Id');
-		if (catalog.items.some((item) => item.id === id)) {
+		if (liveKinkById(id)) {
 			result.answers[id] = answer;
 		} else if (cell('Kink')) {
-			result.unmatched.push({ name: cell('Kink'), category: cell('Category'), answer });
+			result.unmatched.push({ name: cell('Kink'), answer });
 		}
 	}
 	return result;
@@ -320,7 +323,6 @@ export function importCsv(text: string): ImportResult | null {
 	const firstOther = nameColumn === 0 ? 1 : 0;
 	const answerColumn = found === -1 ? firstOther : found;
 	const noteColumn = column(headings, NOTE_HEADING);
-	const categoryColumn = column(headings, CATEGORY_HEADING);
 	const result: ImportResult = { source: 'a spreadsheet', answers: {}, unmatched: [] };
 	for (const cells of rows.slice(1)) {
 		const name = cells[nameColumn]?.trim() ?? '';
@@ -334,11 +336,7 @@ export function importCsv(text: string): ImportResult | null {
 		if (id) {
 			result.answers[id] = answer;
 		} else {
-			result.unmatched.push({
-				name,
-				category: categoryColumn === -1 ? undefined : cells[categoryColumn],
-				answer
-			});
+			result.unmatched.push({ name, answer });
 		}
 	}
 	return Object.keys(result.answers).length + result.unmatched.length > 0 ? result : null;
@@ -349,13 +347,13 @@ export function importList(list: ListPayload, source: string): ImportResult {
 	const result: ImportResult = { source, answers: {}, unmatched: [] };
 	for (const [key, answer] of Object.entries(list.answers)) {
 		const { at: _at, ...rest } = answer;
-		const custom = list.custom[key];
-		if (custom) {
-			if (!custom.removed) {
-				result.unmatched.push({ name: custom.name, category: custom.categoryId, answer: rest });
-			}
-		} else {
+		const item = kinkById(key);
+		if (item && liveKinkById(key)) {
 			result.answers[key] = rest;
+		} else if (item) {
+			// Retired since the list was saved: listed as not matching, so the
+			// preview says it was left out, rather than written where nothing shows it.
+			result.unmatched.push({ name: item.name, answer: rest });
 		}
 	}
 	return result;

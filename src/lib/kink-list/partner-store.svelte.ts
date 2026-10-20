@@ -11,7 +11,7 @@
  * - An answer changed here is an **override**, unless your own list has no
  *   answer for that kink yet — then it goes on your own list, and this view
  *   follows it (`answerTarget`).
- * - Everything else (custom kinks, triage, settings) is your own list's, and
+ * - Everything else (triage, settings) is your own list's, and
  *   is changed there.
  * - It saves the partner copy, with `resolved` worked out again from your
  *   own list each time; your own list saves itself.
@@ -196,11 +196,6 @@ export class PartnerKinkList extends KinkListStore {
 
 	override setSkipped(key: ItemKey, skipped: boolean): void {
 		this.solo.setSkipped(key, skipped);
-		this.#followOwn();
-	}
-
-	override removeCustom(key: `custom:${string}`): void {
-		this.solo.removeCustom(key);
 		this.#followOwn();
 	}
 

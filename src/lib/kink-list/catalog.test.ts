@@ -7,11 +7,12 @@ import {
 	depthOf,
 	detailOf,
 	kinkById,
+	liveKinkById,
 	primaryCategoryOf,
 	relatedKinks,
-	SHARE_IDS,
 	searchKinks
 } from './catalog';
+import shareNumbers from './share-numbers.fixture.json' with { type: 'json' };
 
 describe('the catalogue', () => {
 	it('parses, with every item reachable from a category', () => {
@@ -29,11 +30,36 @@ describe('the catalogue', () => {
 		expect(total).toBe(categories().length);
 	});
 
-	it('numbers every item for share links, once each', () => {
-		expect(new Set(SHARE_IDS).size).toBe(SHARE_IDS.length);
-		for (const item of catalog.items) {
-			expect(SHARE_IDS).toContain(item.id);
+	it('numbers every item for share links, once each, from 0 with no gaps', () => {
+		const numbers = catalog.items.map((item) => item.share).toSorted((a, b) => a - b);
+		expect(numbers).toEqual(catalog.items.map((_, index) => index));
+	});
+
+	// Share links are snapshots nobody can update, so once given out a number
+	// means that kink for good. The fixture is every number given out: it only
+	// ever grows, and from the first deploy nothing in it may change.
+	it('never renumbers or deletes a kink a share link may name', () => {
+		const recorded: Record<string, number> = shareNumbers;
+		for (const [id, share] of Object.entries(recorded)) {
+			const item = kinkById(id);
+			expect(item, `"${id}" was deleted; retire it with retiredOn instead`).toBeDefined();
+			expect(item?.share, `"${id}" was renumbered; give it back ${share}`).toBe(share);
 		}
+		for (const item of catalog.items) {
+			expect(
+				recorded[item.id],
+				`"${item.id}" is new: add it to share-numbers.fixture.json as ${item.share}`
+			).toBe(item.share);
+		}
+	});
+
+	it('maps no other site’s list to a retired kink', () => {
+		const lists = import.meta.glob<{ default: unknown }>('./import/lists/*.json', { eager: true });
+		const ids = new Set(JSON.stringify(Object.values(lists)).match(/"id":"[a-z0-9-]+"/g) ?? []);
+		const retired = [...ids]
+			.map((match) => match.slice('"id":"'.length, -1))
+			.filter((id) => kinkById(id) && !liveKinkById(id));
+		expect(retired, 'an import list maps to a retired kink').toEqual([]);
 	});
 
 	it('reports what one item cannot check about itself', () => {
@@ -50,45 +76,28 @@ describe('the catalogue', () => {
 			...fields
 		});
 		expect(
-			catalogProblems(
-				{
-					...base,
-					items: [
-						item({ id: 'cat', section: 'kinks' }),
-						item({ id: 'cat', section: 'kinks' }),
-						item({ id: 'orphan', parent: 'nowhere' }),
-						item({ id: 'nosection' }),
-						item({ id: 'tagged', parent: 'cat', tags: ['mystery'], roles: 'who' }),
-						item({ id: 'also', parent: 'cat', alsoUnder: ['tagged'] }),
-						item({ id: 'k1', parent: 'cat' }),
-						item({ id: 'k2', parent: 'k1', adds: 'some' }),
-						item({ id: 'k3', parent: 'k2', adds: 'some' }),
-						item({ id: 'rated', section: 'kinks', commonness: 2 }),
-						item({ id: 'unrated', parent: 'cat', commonness: undefined }),
-						item({ id: 'narrower', parent: 'k1', commonness: 3, adds: 'some' }),
-						item({ id: 'lopsided', parent: 'cat', domSide: 'a' }),
-						item({ id: 'both-ways', parent: 'cat', roles: 'pair', lean: 'dom' }),
-						item({ id: 'adds-on-kink', parent: 'cat', adds: 'little' }),
-						item({ id: 'no-adds', parent: 'k1' })
-					]
-				} as never,
-				[
-					'cat',
-					'orphan',
-					'nosection',
-					'tagged',
-					'also',
-					'k1',
-					'k2',
-					'rated',
-					'unrated',
-					'narrower',
-					'lopsided',
-					'both-ways',
-					'adds-on-kink',
-					'no-adds'
-				]
-			)
+			catalogProblems({
+				...base,
+				items: [
+					item({ id: 'cat', section: 'kinks' }),
+					item({ id: 'cat', section: 'kinks' }),
+					item({ id: 'orphan', parent: 'nowhere' }),
+					item({ id: 'nosection' }),
+					item({ id: 'tagged', parent: 'cat', tags: ['mystery'], roles: 'who' }),
+					item({ id: 'also', parent: 'cat', alsoUnder: ['tagged'] }),
+					item({ id: 'k1', parent: 'cat' }),
+					item({ id: 'k2', parent: 'k1', adds: 'some' }),
+					item({ id: 'k3', parent: 'k2', adds: 'some' }),
+					item({ id: 'rated', section: 'kinks', commonness: 2 }),
+					item({ id: 'unrated', parent: 'cat', commonness: undefined }),
+					item({ id: 'narrower', parent: 'k1', commonness: 3, adds: 'some' }),
+					item({ id: 'lopsided', parent: 'cat', domSide: 'a' }),
+					item({ id: 'both-ways', parent: 'cat', roles: 'pair', lean: 'dom' }),
+					item({ id: 'adds-on-kink', parent: 'cat', adds: 'little' }),
+					item({ id: 'no-adds', parent: 'k1' })
+					// Numbered in order, so only the rules under test fail.
+				].map((entry, share) => ({ ...entry, share }))
+			} as never)
 		).toEqual([
 			'duplicate id "cat"',
 			'"orphan" has an unknown parent "nowhere"',
@@ -104,8 +113,38 @@ describe('the catalogue', () => {
 			'"lopsided" has a domSide but no role pair',
 			'"both-ways" has a lean and a role pair; a pair takes domSide',
 			'"adds-on-kink" has "adds", which only a specific has',
-			'"no-adds" is a specific with no "adds"',
-			'"k3" is missing from share-ids.json'
+			'"no-adds" is a specific with no "adds"'
+		]);
+	});
+
+	it('reports share numbers that repeat or leave a gap, and live items left under retired ones', () => {
+		const item = (fields: Record<string, unknown>) => ({
+			name: 'x',
+			intensity: 1,
+			description: 'x',
+			...(fields.parent ? { commonness: 2 } : {}),
+			...fields
+		});
+		expect(
+			catalogProblems({
+				sections: { kinks: 'Kinks' },
+				roles: {},
+				tags: {},
+				items: [
+					item({ id: 'cat', section: 'kinks', share: 0 }),
+					item({ id: 'gone', section: 'kinks', share: 1, retiredOn: '2026-11-01' }),
+					item({ id: 'old', parent: 'cat', share: 1, retiredOn: '2026-11-01' }),
+					item({ id: 'went-with-it', parent: 'gone', share: 6, retiredOn: '2026-11-01' }),
+					item({ id: 'newer', parent: 'old', share: 4, adds: 'some' }),
+					item({ id: 'fine', parent: 'cat', share: 5, alsoUnder: ['gone'] })
+				]
+			} as never)
+		).toEqual([
+			'"newer" is under "old", which is retired',
+			'"fine" is also under "gone", which is retired',
+			'"old" and "gone" share the share number 1',
+			'no item has share number 2; retire items rather than deleting them',
+			'no item has share number 3; retire items rather than deleting them'
 		]);
 	});
 });

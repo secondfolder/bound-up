@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { answeredCount, LEVEL_LABELS, type Level } from '$lib/kink-list/answers';
-	import { categories, kinkById } from '$lib/kink-list/catalog';
+	import { kinkById } from '$lib/kink-list/catalog';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import {
 		exportCsv,
@@ -44,8 +44,6 @@
 		options: ListSourceId[];
 	} | null = $state(null);
 	let mode: 'gaps' | 'replace' = $state('gaps');
-	let addUnmatched = $state(true);
-	let unmatchedTo = $state('fetishes');
 	let done = $state('');
 
 	const NOT_READABLE =
@@ -118,9 +116,7 @@
 		}
 		const result = preview;
 		const before = answeredCount(store.list);
-		store.transform((list) =>
-			applyImport(list, result, { mode, unmatchedTo: addUnmatched ? unmatchedTo : null })
-		);
+		store.transform((list) => applyImport(list, result, { mode }));
 		const added = answeredCount(store.list) - before;
 		done =
 			mode === 'replace'
@@ -151,14 +147,6 @@
 		};
 		node.addEventListener('input', onInput);
 		return () => node.removeEventListener('input', onInput);
-	}
-
-	function categoryField(node: WaSelect) {
-		const onChange = () => {
-			unmatchedTo = String(node.value);
-		};
-		node.addEventListener('change', onChange);
-		return () => node.removeEventListener('change', onChange);
 	}
 
 	function presetField(node: WaSelect) {
@@ -264,7 +252,7 @@
 				</wa-details>
 			{/if}
 			{#if preview.unmatched.length > 0}
-				<wa-details summary="What didn't match">
+				<wa-details summary="What didn't match, which is left out">
 					<ul>
 						{#each preview.unmatched as item, index (`${item.name}-${index}`)}
 							<li>{item.name}: {levelOf(item.answer)}</li>
@@ -278,20 +266,6 @@
 				<label><input type="radio" name="import-mode" value="gaps" bind:group={mode} /> Keep my answers</label>
 				<label><input type="radio" name="import-mode" value="replace" bind:group={mode} /> Use the imported ones</label>
 			</fieldset>
-
-			{#if preview.unmatched.length > 0}
-				<label class="check">
-					<input type="checkbox" bind:checked={addUnmatched} />
-					Add the ones that didn't match as kinks of my own
-				</label>
-				{#if addUnmatched}
-					<wa-select label="In which category" value={unmatchedTo} {@attach categoryField}>
-						{#each categories('kinks') as category (category.id)}
-							<wa-option value={category.id}>{category.name}</wa-option>
-						{/each}
-					</wa-select>
-				{/if}
-			{/if}
 
 			<div class="row">
 				<wa-button variant="brand" appearance="accent" onclick={apply}>Import</wa-button>

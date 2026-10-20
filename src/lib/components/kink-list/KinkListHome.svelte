@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { tick } from 'svelte';
 	import { adopted } from '$lib/kink-list/adopted.svelte';
-	import { customMatches, isShown, searchView } from '$lib/kink-list/answers';
+	import { isShown, searchView } from '$lib/kink-list/answers';
 	import { catalog, categories, childrenOf, type KinkItem } from '$lib/kink-list/catalog';
 	import { kinkListContext, setKinkListSearch } from '$lib/kink-list/context';
 	import KinkCategory from './KinkCategory.svelte';
@@ -55,10 +55,7 @@
 		if (!view) {
 			return true;
 		}
-		return (
-			childrenOf(category.id).some((kink) => view.shown.has(kink.id)) ||
-			store.customKinks(category.id).some(([, kink]) => customMatches(kink.name, query))
-		);
+		return childrenOf(category.id).some((kink) => view.shown.has(kink.id));
 	}
 
 	/**
@@ -67,10 +64,7 @@
 	 * once at the foot of the list instead (`emptied`).
 	 */
 	function hasShown(category: KinkItem): boolean {
-		return (
-			childrenOf(category.id).some((kink) => isShown(kink, store.filters)) ||
-			store.customKinks(category.id).length > 0
-		);
+		return childrenOf(category.id).some((kink) => isShown(kink, store.filters));
 	}
 
 	const sections = $derived(

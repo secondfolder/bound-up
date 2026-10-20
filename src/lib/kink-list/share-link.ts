@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { fromBase64Url, toBase64Url } from '../encryption';
 import {
 	type Answer,
-	type CustomKink,
 	DETAIL_KEYS,
 	DETAIL_MAX,
 	type Detail,
@@ -10,13 +9,10 @@ import {
 	LEVELS,
 	type Level,
 	type ListPayload,
-	MAX_CUSTOM_DESCRIPTION_LENGTH,
-	MAX_CUSTOM_NAME_LENGTH,
 	MAX_NOTE_LENGTH,
-	newCustomKey,
 	type Side
 } from './answers';
-import { kinkById, SHARE_IDS } from './catalog';
+import { kinkByShare, liveKinkById } from './catalog';
 
 /**
  * A kink list as a link: `/kink-list/shared#k1.<data>`. See docs/kink-list.md,
@@ -24,14 +20,15 @@ import { kinkById, SHARE_IDS } from './catalog';
  *
  * The answers ride in the URL's fragment, which a browser never sends to a
  * server, so a shared list is never seen by this one, or written to a log on
- * the way. `<data>` is the list, compacted to share-ids.json's numbering and
- * short keys, deflated and base64url'd.
+ * the way. `<data>` is the list, compacted to the catalogue's share numbers
+ * and short keys, deflated and base64url'd.
  *
  * - **`k1`** is the format. A change to the shape gets `k2`, and readers keep
  *   reading every format ever written, as they do for sealed records.
- * - **Kinks are numbered by `share-ids.json`**, which is append-only, so a link
- *   made today still decodes after kinks are added. A number this build does
- *   not know is dropped rather than failing the whole link.
+ * - **Kinks are numbered by their `share`** in the catalogue, which never
+ *   changes, so a link made today still decodes after kinks are added. A
+ *   number this build does not know, or a retired kink's, is dropped rather
+ *   than failing the whole link.
  * - **Only answers travel**, with their notes when the person chooses, plus
  *   custom kinks and categories limited wholesale (which change what other
  *   kinks show). Quick-fill skips, the filters and your side stay on the device.
@@ -62,28 +59,16 @@ const shared = z.object({
 });
 
 const shareSchema = z.object({
-	/** Answers by share-ids.json number. */
+	/** Answers by share number. */
 	a: z.record(z.string().regex(/^\d+$/), shared).optional(),
-	/** Custom kinks: name, category id, optional description, and their answer. */
-	c: z
-		.array(
-			z.tuple([
-				z.string().min(1).max(MAX_CUSTOM_NAME_LENGTH),
-				z.string(),
-				z.string().max(MAX_CUSTOM_DESCRIPTION_LENGTH),
-				shared
-			])
-		)
-		.max(200)
-		.optional(),
-	/** Categories limited wholesale, by share-ids.json number. */
+	// `c`, people's own kinks, is no longer written or read: they were
+	// removed. Zod drops it from a link that still has one.
+	/** Categories limited wholesale, by share number. */
 	t: z.array(z.number().int().nonnegative()).optional(),
 	/** The name the list is shared under, if any. */
 	w: z.string().max(60).optional()
 });
 type Shared = z.output<typeof shared>;
-
-const INDEX = new Map(SHARE_IDS.map((id, index) => [id, index]));
 
 function packDetail(value: Detail | undefined): z.output<typeof detail> | undefined {
 	if (!value || DETAIL_KEYS.every((key) => value[key] === undefined)) {
@@ -171,28 +156,19 @@ export async function encodeShareLink(
 	options: { withNotes: boolean; name?: string }
 ): Promise<string> {
 	const answers: Record<string, Shared> = {};
-	const custom: z.output<typeof shareSchema>['c'] = [];
 	for (const [key, answer] of Object.entries(list.answers)) {
-		const index = INDEX.get(key);
+		const share = liveKinkById(key)?.share;
 		const packed = pack(answer, options.withNotes);
-		if (index !== undefined && packed) {
-			answers[String(index)] = packed;
-		}
-	}
-	for (const [key, kink] of Object.entries(list.custom) as [string, CustomKink][]) {
-		const answer = list.answers[key];
-		const packed = answer ? pack(answer, options.withNotes) : null;
-		if (!kink.removed && packed) {
-			custom.push([kink.name, kink.categoryId, kink.description ?? '', packed]);
+		if (share !== undefined && packed) {
+			answers[String(share)] = packed;
 		}
 	}
 	const limits = Object.entries(list.triage)
 		.filter(([, entry]) => entry.value === 'limit')
-		.map(([id]) => INDEX.get(id))
-		.filter((index): index is number => index !== undefined);
+		.map(([id]) => liveKinkById(id)?.share)
+		.filter((share): share is number => share !== undefined);
 	const body: z.input<typeof shareSchema> = {
 		a: answers,
-		...(custom.length > 0 ? { c: custom } : {}),
 		...(limits.length > 0 ? { t: limits } : {}),
 		...(options.name?.trim() ? { w: options.name.trim().slice(0, 60) } : {})
 	};
@@ -223,25 +199,16 @@ export async function decodeShareLink(fragment: string): Promise<SharedList | nu
 		return null;
 	}
 	const list = emptyList();
-	for (const [index, value] of Object.entries(parsed.a ?? {})) {
-		const id = SHARE_IDS[Number(index)];
-		if (id && kinkById(id)) {
-			list.answers[id] = unpack(value);
+	for (const [share, value] of Object.entries(parsed.a ?? {})) {
+		const item = kinkByShare(Number(share));
+		if (item) {
+			list.answers[item.id] = unpack(value);
 		}
 	}
-	for (const [name, categoryId, description, value] of parsed.c ?? []) {
-		const category = kinkById(categoryId);
-		if (!category || category.parent !== undefined) {
-			continue;
-		}
-		const key = newCustomKey();
-		list.custom[key] = { name, categoryId, description: description || undefined, at: 0 };
-		list.answers[key] = unpack(value);
-	}
-	for (const index of parsed.t ?? []) {
-		const id = SHARE_IDS[index];
-		if (id && kinkById(id)?.parent === undefined) {
-			list.triage[id] = { value: 'limit', at: 0 };
+	for (const share of parsed.t ?? []) {
+		const category = kinkByShare(share);
+		if (category && category.parent === undefined) {
+			list.triage[category.id] = { value: 'limit', at: 0 };
 		}
 	}
 	return { list, name: parsed.w };
