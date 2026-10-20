@@ -80,6 +80,15 @@ defaults — build command `npm run build`, deploy command `npx wrangler deploy`
 > with `EUNSUPPORTEDPROTOCOL`. The override redirects that nested self-dependency
 > back at the top-level spec, which is the only way the package installs under
 > npm. Delete it if the package ever ships a fixed release.
+>
+> The `@lit-labs/ssr` override is for Cloudflare's build image, which runs
+> `npm ci` with npm 10. Web Awesome's nested `@lit-labs/ssr` declares an
+> optional peer `@types/node: >=20 <25`, which our `@types/node@^26` does not
+> satisfy. npm 11 leaves an unmet optional peer out of the lockfile; npm 10's
+> `npm ci` then reports the lockfile out of sync (`Missing: @types/node@24…`)
+> and the build fails before it starts. Pointing that peer at our own
+> `@types/node` makes both versions agree. It is types only, so nothing runs
+> differently. Delete it once `@lit-labs/ssr`'s peer range admits our version.
 
 ## Secrets
 

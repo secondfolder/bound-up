@@ -111,6 +111,9 @@
 	"overrides": {
 		"sveltekit-cloudflare-do": {
 			"sveltekit-cloudflare-do": "$sveltekit-cloudflare-do"
+		},
+		"@lit-labs/ssr": {
+			"@types/node": "$@types/node"
 		}
 	},
 	"engines": {
