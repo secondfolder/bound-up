@@ -39,6 +39,8 @@
 // Vesper cast as its stranger. Generated ideas are one for each side and one
 // with nobody in charge, the first titled for the side the prompt asked for
 // ("Stub idea for the sub"), so a spec can see the side reach the model.
+// Asked for more, having been told what it already offered, each title ends
+// ", again", so "More ideas" has something new to add.
 import { createServer } from 'node:http';
 
 const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1' } = process.env;
@@ -178,18 +180,25 @@ function suggestionFor(messages) {
 	} else if (ask.includes('{"ideas"')) {
 		const side = ask.match(/The user is the (?<side>dominant|submissive) one/)?.groups?.side;
 		const asked = { dominant: 'dom', submissive: 'sub' }[side] ?? 'either';
+		const again = ask.includes('already been offered') ? ', again' : '';
 		content = {
 			ideas: [
 				{
-					title: `Stub idea for the ${asked}`,
+					title: `Stub idea for the ${asked}${again}`,
 					premise: 'A stub premise.',
 					tags: ['stub'],
 					you: asked === 'either' ? 'sub' : asked,
 					heat: 3,
 					kink: 2
 				},
-				{ title: 'Stub idea for the dom', premise: 'In charge.', you: 'dom', heat: 4, kink: 4 },
-				{ title: 'Stub idea for nobody', premise: 'Even.', you: null, heat: 2, kink: 1 }
+				{
+					title: `Stub idea for the dom${again}`,
+					premise: 'In charge.',
+					you: 'dom',
+					heat: 4,
+					kink: 4
+				},
+				{ title: `Stub idea for nobody${again}`, premise: 'Even.', you: null, heat: 2, kink: 1 }
 			]
 		};
 	} else if (ask.includes('{"chips"')) {

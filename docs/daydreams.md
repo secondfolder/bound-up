@@ -21,54 +21,81 @@ scene with another person.
 things — a voice, a scene with parts, a cast — that mean nothing until
 someone has played one:
 
-- **What do you feel like?** One box, with ideas that toggle into it like a
-  field's chips: `SHOWN_IDEA_CHIPS` (three) of `DAYDREAM_IDEA_CHIPS` at a
-  time, so they read as a nudge rather than a list to work through, with a
-  shuffle button for three others. The page's load makes the first draw
-  (`pickIdeas`); drawn while rendering, the server and the browser would
-  each draw their own and hydration would disagree. The page keeps the
-  current few, so "Other ways to start" comes back to the same ones. **Write it** asks the model for a
-  whole daydream (the `daydream` suggestion): a voice, a scene with its parts
-  and its heat and kink, and up to `MAX_DAYDREAM_CHARACTERS` characters, each
-  cast into a part with who they are in it. Only with suggestions on; without
-  them the box is not shown.
-- **Pick one.** Ready-made stories (`DAYDREAM_STARTERS` in
+- **What do you feel like?** One box, and under it a row with "You as" at
+  the start and two buttons at the end, both working from what is in the
+  box, for the side chosen. **Write this
+  story** asks the model for a whole daydream (the `daydream` suggestion): a
+  voice, a scene with its parts and its heat and kink, and up to
+  `MAX_DAYDREAM_CHARACTERS` characters, each cast into a part with who they
+  are in it, with the user on the side chosen if there is one. **Suggest
+  stories for this** asks for a few stories like it instead, shown in place
+  of the ready-made ones (below). Only with suggestions on; without them the
+  box and its buttons are not shown, and "You as" sits under "Story
+  suggestions". There
+  used to be idea chips under the box; the ready-made and suggested stories
+  do that job now.
+- **Story suggestions.** Ready-made stories (`DAYDREAM_STARTERS` in
   `daydream/starters.ts`), each a scene starting point, a voice preset and
   character starting points cast into the scene's parts, with the casting
-  written for that story. In order of heat, each card saying its level, how
-  it is told, its kinks and tropes as tags (`tags`), so the harder ones
-  can be told apart at a glance, and which side the user is on.
+  written for that story. Each card says its level, how it is told, and its
+  kinks and tropes as tags (`tags`), so the harder ones can be told apart
+  at a glance; under "Either" it also says which side the user is on in it,
+  which with a side chosen would only repeat the filter. They come in a
+  fresh order on each visit (`shuffledStarterIds`, `inOrder`), so the page
+  does not always open on the same few. The page's load draws it: drawn
+  while rendering, the server and the browser would each draw their own and
+  hydration would disagree. The page keeps it, so going back to the ways in
+  shows them as they were. Only the first `SHOWN_STARTERS` (six) show at
+  first, a handful to choose from rather than a catalogue to read; **More
+  ideas** under them shows the rest, all at once (unlike the suggested
+  stories' button of the same name, which asks the model for more).
 
-  **You as: Either / Dom / Sub** filters them (`startersFor`). Each story says
+  **Search**, the magnifying glass at the end of the heading's row, is
+  `SearchField.svelte` with `collapsible`: a search box that rests as its
+  icon alone and, on focus, opens out towards the start into the rest of
+  the row, the icon sliding across with it to sit in the open field. It
+  filters the cards, ready-made or suggested, to those with every word
+  typed somewhere in their title, premise or tags, ignoring case
+  (`matchesSearch`), and looks through every ready-made story, not only the
+  six shown. Focus leaving it while it is empty folds it away; Escape
+  empties it, and a second Escape folds it away too.
+
+  **You as: Either / Dom / Sub** (`DaydreamSidePicker.svelte`) filters them
+  (`startersFor`). Each story says
   whether the user is the dom, the sub, or neither (`you`); a side's filter
   shows its own stories and the ones with no one in charge. Every story with
   a side has a version from the other side — "Locked" and "The key", "The
   hunt" and "Your hunt" — so both filters have the full range, and the
   catalog keeps sub characters (the eager sub, the pain slut, the fighter,
   the innocent) to cast opposite a dom user. The choice is the page's state,
-  like the box and the ideas, so going back keeps it, and it is also
+  like the box, so going back keeps it, and it is also
   remembered on the device (`localStorage`, `storedStarterSide`) so the next
   visit opens on the same side. They are built from the catalog rather than written out again,
   and need no model, so nothing leaves the device.
 
-  **Generate**, beside the heading (only with suggestions on), opens a dialog
-  (`DaydreamIdeasDialog.svelte`) asking what kind of stories, and asks the
-  model for `GENERATED_IDEAS` (four) of them: the `ideas` suggestion, sent
-  the request and the side chosen under "You as". With a side, the prompt
-  puts the user on it in every idea, or on neither for a story with no one
-  in charge; with "Either", a mix. Each idea is only what a card shows — a
-  title, a premise, tags, the user's side and a heat and kink — so a handful
-  comes back quickly; `parseGeneratedIdeas` drops any that put the user on
-  the other side from the one asked for. They show as cards above the
-  ready-made ones, under the request, and are filtered by "You as" the same
-  way (`forSide`). The dialog stays open until they arrive, so a failure is
-  said beside what was asked; the page keeps the ideas and the request, so
-  going back shows them and asking again starts from the same words.
-  Picking one asks for the whole daydream as **Write it** does, from the
+  **Suggest stories for this**, under the box, asks the model for
+  `GENERATED_IDEAS` (six) stories like the one described: the `ideas`
+  suggestion, sent what is in the box and the side. With a side, the prompt puts the user on it in every idea,
+  or on neither for a story with no one in charge; with "Either", a mix.
+  Each idea is only what a card shows — a title, a premise, tags, the
+  user's side and a heat and kink — so a handful comes back quickly;
+  `parseGeneratedIdeas` drops any that put the user on the other side from
+  the one asked for. They take the ready-made ones' place, under the
+  request, and are filtered by "You as" the same way (`forSide`); **Clear**
+  beside the request puts them away and brings the ready-made ones back.
+  **More ideas**, at the end of the list, asks again with the same request
+  and the side chosen now, sending the titles already shown (the latest
+  `MAX_OFFERED_IDEAS`) as `offered` so the model makes new ones, and adds
+  them after the rest (`addIdeas`, which drops a repeated title anyway). A
+  failure is said under the box for **Suggest stories for this** and under its
+  button for **More ideas**; the page keeps the ideas and the request, so
+  going back shows them. Picking one asks for the whole daydream as
+  **Write this story** does, from the
   idea's title and premise (`ideaSentence`, which fits the `idea` cap) and
   with the idea's side, so the cast are written to suit it; **Try another**
   on the setup asks again from the same idea.
-- **Build it yourself.** The full form, empty.
+- **Build your own.** A section like the others, its **Build it yourself**
+  button opening the full form, empty.
 
 All but the last hand the form a draft, put together by `assembleSetup`
 (`daydream/starters.ts`): parts get fresh ids, each person is cast into the
@@ -971,11 +998,12 @@ own (`suggest-prompt.ts`):
 - for a name: the scene's title and premise, the cast's names, the limits,
   and the first `MAX_NAMING_OPENING` characters of the opening passage;
 - for a whole daydream, from the new-daydream page: the sentence the user
-  wrote (up to `DAYDREAM_LIMITS.idea`), or a generated idea's title and
-  premise with the side it was made for, and any limits written on the
-  draft;
-- for generated ideas: what the user typed in the dialog (up to
-  `DAYDREAM_LIMITS.idea`) and the side chosen under "You as".
+  wrote (up to `DAYDREAM_LIMITS.idea`) with the side chosen under "You as",
+  or a generated idea's title and premise with the side it was made for,
+  and any limits written on the draft;
+- for generated ideas: what the user wrote in the box (up to
+  `DAYDREAM_LIMITS.idea`), the side chosen under "You as", and for **More
+  ideas** the titles of those already shown.
 
 The answer is a small JSON completion, not streamed, passed back unread for
 the browser to check (`daydream/suggestions.ts`).

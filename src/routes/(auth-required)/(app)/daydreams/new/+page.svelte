@@ -12,7 +12,12 @@
 		storedStarterSide
 	} from '$lib/daydream/starters';
 	import { suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
-	import { type GeneratedIdea, ideaSentence } from '$lib/daydream/suggestions';
+	import {
+		addIdeas,
+		type GeneratedIdea,
+		ideaSentence,
+		MAX_OFFERED_IDEAS
+	} from '$lib/daydream/suggestions';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -34,15 +39,15 @@
 				version: number;
 		  };
 
-	/** A sentence a draft is written from, and the side a generated idea was made for. */
+	/** A sentence a draft is written from, and the side it was asked for (or a generated idea made for). */
 	type Described = { idea: string; side: StarterSide | null };
 
 	let stage: Stage = $state({ kind: 'start' });
 	let idea = $state('');
-	// The load's first draw, captured once: the shuffle replaces them from
-	// here, and a re-run load drawing again must not swap them underneath.
+	// The load's order, captured once: going back to the ways in shows the
+	// stories as they were, and a re-run load must not reshuffle them.
 	// svelte-ignore state_referenced_locally
-	let ideas = $state(data.ideas);
+	const { starterOrder } = data;
 	let side: StarterSide | null = $state(null);
 	let asking = $state(false);
 	let problem: string | null = $state(null);
@@ -129,8 +134,8 @@
 	}
 
 	/**
-	 * "Generate": a few ideas of the kind asked for, for the side chosen
-	 * under "You as". They replace the last ones, and are kept here so going
+	 * "Suggest stories for this": a few stories like the one described in the box, for
+	 * the side chosen under "You as". They replace the last ones, and are kept here so going
 	 * back to the ways in still shows them.
 	 */
 	async function generateIdeas(request: string): Promise<string | null> {
@@ -140,6 +145,37 @@
 		}
 		generated = { request, ideas: answer.value };
 		ideaProblem = null;
+		return null;
+	}
+
+	/**
+	 * "More ideas": more of the same request, for the side chosen now, added
+	 * after the ones shown. The model is told which it already offered; any it
+	 * repeats anyway are dropped, and only repeats is said as nothing new.
+	 */
+	async function moreIdeas(): Promise<string | null> {
+		if (!generated) {
+			return null;
+		}
+		const shown = generated;
+		const answer = await suggestIdeas({
+			request: shown.request,
+			side,
+			limits: '',
+			offered: shown.ideas.map((offered) => offered.title).slice(-MAX_OFFERED_IDEAS)
+		});
+		// Cleared or replaced while this was out: these were for the old ones.
+		if (generated !== shown) {
+			return null;
+		}
+		if (!answer.ok) {
+			return answer.error;
+		}
+		const added = addIdeas(shown.ideas, answer.value);
+		if (added.length === shown.ideas.length) {
+			return 'No new ideas came back that time. Try again.';
+		}
+		generated = { request: shown.request, ideas: added };
 		return null;
 	}
 
@@ -168,17 +204,22 @@
 		{#if stage.kind === 'start'}
 			<DaydreamStarter
 				bind:idea
-				bind:ideas
 				bind:side={() => side, chooseSide}
 				{suggestionsOn}
+				{starterOrder}
 				{asking}
 				{problem}
 				{generated}
 				{writing}
 				{ideaProblem}
-				ondescribe={() => writeDraft({ idea, side: null })}
+				ondescribe={() => writeDraft({ idea, side })}
 				onstarter={(starter) => setUp(starterSetup(starter), null)}
 				ongenerate={generateIdeas}
+				onmore={moreIdeas}
+				onclear={() => {
+					generated = null;
+					ideaProblem = null;
+				}}
 				onidea={writeIdea}
 				onblank={() => setUp(null, null)}
 			/>

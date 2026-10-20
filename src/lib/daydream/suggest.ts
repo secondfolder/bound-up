@@ -165,7 +165,7 @@ export async function surpriseScene(
  */
 export async function suggestDaydream(input: {
 	idea: string;
-	/** The side a generated idea was made for, so the whole daydream keeps the user on it. */
+	/** The side chosen, or a generated idea was made for, so the whole daydream keeps the user on it. */
 	side?: StarterSide | null;
 	limits: string;
 }): Promise<Answer<StoryPieces>> {
@@ -181,12 +181,15 @@ export async function suggestDaydream(input: {
  * A few story ideas of the kind the user asked for, for the side they chose
  * under "You as" (null for either). Ideas only — a title, a premise, tags,
  * a level — so asking for a handful stays quick; the one picked is then
- * written out by `suggestDaydream`.
+ * written out by `suggestDaydream`. With `offered`, they are more of the
+ * same, other than those.
  */
 export async function suggestIdeas(input: {
 	request: string;
 	side: StarterSide | null;
 	limits: string;
+	/** Titles already shown, for "More ideas" not to offer them again. */
+	offered?: readonly string[];
 }): Promise<Answer<GeneratedIdea[]>> {
 	const answer = await ask({ task: 'ideas', ...input });
 	if (!answer.ok) {
