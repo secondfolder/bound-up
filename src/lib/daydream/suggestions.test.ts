@@ -3,19 +3,21 @@ import { DAYDREAM_LIMITS } from '../daydream';
 import {
 	addIdeas,
 	completionJson,
+	describeUnusable,
 	GENERATED_IDEAS,
-	ideaSentence,
+	ideaBrief,
 	MAX_IDEA_PREMISE,
 	MAX_IDEA_TAGS,
+	MAX_REPLY_DETAIL,
 	parseCasting,
 	parseChips,
 	parseFill,
 	parseGeneratedIdeas,
+	parseIdeaDials,
 	parseName,
 	parseParts,
-	parseSceneDials,
 	parseSuggestedDaydream,
-	parseSurpriseScene
+	parseSurpriseIdea
 } from './suggestions';
 
 const completion = (content: string) => ({ choices: [{ message: { content } }] });
@@ -30,6 +32,26 @@ describe('completionJson', () => {
 		expect(completionJson(completion('Sure! Here are some ideas'))).toBeNull();
 		expect(completionJson({ error: 'no' })).toBeNull();
 		expect(completionJson(null)).toBeNull();
+	});
+});
+
+describe('describeUnusable', () => {
+	it('says whether it was no completion, not JSON, or JSON with nothing asked for, and what it was', () => {
+		expect(describeUnusable({ error: 'quota' })).toBe(
+			'The provider’s answer had no reply in it:\n{\n  "error": "quota"\n}'
+		);
+		expect(describeUnusable(completion('Sorry, I cannot help'))).toBe(
+			'The reply was not JSON:\nSorry, I cannot help'
+		);
+		expect(describeUnusable(completion('{"chips": []}'))).toBe(
+			'The reply was JSON, but nothing in it was what was asked for, or within its limits:\n{"chips": []}'
+		);
+	});
+
+	it('cuts a long reply short', () => {
+		const said = describeUnusable(completion('x'.repeat(MAX_REPLY_DETAIL + 50)));
+		expect(said.endsWith('… (cut)')).toBe(true);
+		expect(said.length).toBeLessThan(MAX_REPLY_DETAIL + 100);
 	});
 });
 
@@ -62,13 +84,13 @@ describe('parseFill', () => {
 				appearance: 'x'.repeat(501)
 			})
 		).toEqual({ name: 'Mara', personality: 'calm' });
-		expect(parseFill('scene', { premise: 'A bet', setting: '' })).toEqual({ premise: 'A bet' });
+		expect(parseFill('idea', { premise: 'A bet', setting: '' })).toEqual({ premise: 'A bet' });
 	});
 });
 
-describe('parseSurpriseScene', () => {
+describe('parseSurpriseIdea', () => {
 	it('needs a title and a premise', () => {
-		expect(parseSurpriseScene({ title: 'T', premise: 'P', tone: 'tense' })).toEqual({
+		expect(parseSurpriseIdea({ title: 'T', premise: 'P', tone: 'tense' })).toEqual({
 			title: 'T',
 			setting: '',
 			premise: 'P',
@@ -78,15 +100,15 @@ describe('parseSurpriseScene', () => {
 			parts: [],
 			dials: { heat: null, kink: null }
 		});
-		expect(parseSurpriseScene({ title: 'T' })).toBeNull();
+		expect(parseSurpriseIdea({ title: 'T' })).toBeNull();
 	});
 
 	it('keeps a heat and kink it rated, and leaves out what is not a dial', () => {
-		expect(parseSurpriseScene({ title: 'T', premise: 'P', heat: 5, kink: 2 })?.dials).toEqual({
+		expect(parseSurpriseIdea({ title: 'T', premise: 'P', heat: 5, kink: 2 })?.dials).toEqual({
 			heat: 5,
 			kink: 2
 		});
-		expect(parseSurpriseScene({ title: 'T', premise: 'P', heat: 9, kink: 2.5 })?.dials).toEqual({
+		expect(parseSurpriseIdea({ title: 'T', premise: 'P', heat: 9, kink: 2.5 })?.dials).toEqual({
 			heat: null,
 			kink: null
 		});
@@ -94,16 +116,16 @@ describe('parseSurpriseScene', () => {
 
 	it('keeps the parts it came with', () => {
 		expect(
-			parseSurpriseScene({ title: 'T', premise: 'P', parts: [{ name: 'the host' }] })?.parts
+			parseSurpriseIdea({ title: 'T', premise: 'P', parts: [{ name: 'the host' }] })?.parts
 		).toEqual([{ name: 'the host', description: '' }]);
 	});
 });
 
-describe('parseSceneDials', () => {
+describe('parseIdeaDials', () => {
 	it('takes whole numbers from 1 to 5, and nothing else', () => {
-		expect(parseSceneDials({ heat: 1, kink: 5 })).toEqual({ heat: 1, kink: 5 });
-		expect(parseSceneDials({ heat: 0, kink: '3' })).toEqual({ heat: null, kink: null });
-		expect(parseSceneDials(null)).toEqual({ heat: null, kink: null });
+		expect(parseIdeaDials({ heat: 1, kink: 5 })).toEqual({ heat: 1, kink: 5 });
+		expect(parseIdeaDials({ heat: 0, kink: '3' })).toEqual({ heat: null, kink: null });
+		expect(parseIdeaDials(null)).toEqual({ heat: null, kink: null });
 	});
 });
 
@@ -167,7 +189,7 @@ describe('parseName', () => {
 });
 
 describe('parseSuggestedDaydream', () => {
-	const scene = {
+	const idea = {
 		title: 'The night train',
 		premise: 'A stranger takes the seat across from you.',
 		heat: 2,
@@ -175,10 +197,42 @@ describe('parseSuggestedDaydream', () => {
 		parts: [{ name: 'the stranger', description: 'boarded late' }]
 	};
 
-	it('reads the voice, the scene and who is in it', () => {
+	it('reads a monologue with nobody in it, and its sayings in the notes', () => {
+		const pieces = parseSuggestedDaydream({
+			voice: 'monologue',
+			idea: {
+				title: 'What good girls are for',
+				premise: 'A voice sure of what you are for.',
+				notes: 'Good girls say thank you.\nAsking is the point.',
+				parts: []
+			},
+			characters: []
+		});
+		expect(pieces?.voice).toBe('monologue');
+		expect(pieces?.cast).toEqual([]);
+		expect(pieces?.idea.parts).toEqual([]);
+		expect(pieces?.idea.notes).toBe('Good girls say thank you.\nAsking is the point.');
+	});
+
+	it('keeps as many whole sayings as fit when they run over, where any other field is dropped', () => {
+		const line = 'x'.repeat(300);
+		const pieces = parseSuggestedDaydream({
+			voice: 'monologue',
+			idea: {
+				title: 'Sayings',
+				premise: 'A voice.',
+				notes: [line, line, line, line].join('\n'),
+				tone: 'y'.repeat(DAYDREAM_LIMITS.tone + 1)
+			}
+		});
+		expect(pieces?.idea.notes).toBe([line, line, line].join('\n'));
+		expect(pieces?.idea.tone).toBe('');
+	});
+
+	it('reads the voice, the idea and who is in it', () => {
 		const pieces = parseSuggestedDaydream({
 			voice: 'watch',
-			scene,
+			idea,
 			characters: [
 				{
 					name: ' Vesper ',
@@ -191,7 +245,7 @@ describe('parseSuggestedDaydream', () => {
 		});
 		expect(pieces).toMatchObject({
 			voice: 'watch',
-			scene: { title: 'The night train', dials: { heat: 2, kink: null } },
+			idea: { title: 'The night train', dials: { heat: 2, kink: null } },
 			cast: [
 				{
 					character: { name: 'Vesper', archetype: 'mysterious stranger', personality: '' },
@@ -205,7 +259,7 @@ describe('parseSuggestedDaydream', () => {
 	});
 
 	it('leaves a voice it does not know to follow who is in it', () => {
-		expect(parseSuggestedDaydream({ voice: 'chat', scene })?.voice).toBeNull();
+		expect(parseSuggestedDaydream({ voice: 'chat', idea })?.voice).toBeNull();
 	});
 
 	it('drops anyone with no name, or a name already taken, and keeps at most four', () => {
@@ -215,20 +269,44 @@ describe('parseSuggestedDaydream', () => {
 			{ name: 'ash' },
 			...['Bel', 'Cy', 'Dee', 'Eve'].map((name) => ({ name }))
 		];
-		const cast = parseSuggestedDaydream({ scene, characters: people })?.cast ?? [];
+		const cast = parseSuggestedDaydream({ idea, characters: people })?.cast ?? [];
 		expect(cast.map((person) => person.character.name)).toEqual(['Ash', 'Bel', 'Cy', 'Dee']);
 	});
 
 	it('holds a casting to its caps, empty where it does not fit', () => {
 		const cast = parseSuggestedDaydream({
-			scene,
+			idea,
 			characters: [{ name: 'Ash', relationship: 'x'.repeat(301), part: 42 }]
 		})?.cast;
 		expect(cast?.[0]).toMatchObject({ relationship: '', partName: null });
 	});
 
-	it('is nothing without a scene that has a title and what is going on', () => {
-		expect(parseSuggestedDaydream({ voice: 'talk', scene: { title: 'Only a title' } })).toBeNull();
+	it('reads the summary’s blanks against the characters it kept, and is fine without one', () => {
+		const pieces = parseSuggestedDaydream({
+			summary: '[[vesper|A stranger]] takes the seat across from you on [[idea|the train]].',
+			idea,
+			characters: [{ name: 'Vesper' }]
+		});
+		expect(pieces?.summary).toEqual([
+			{
+				kind: 'slot',
+				slot: { kind: 'character', name: 'Vesper' },
+				words: 'A stranger',
+				key: 'vesper'
+			},
+			{ kind: 'text', text: ' takes the seat across from you on ' },
+			{ kind: 'slot', slot: { kind: 'idea' }, words: 'the train', key: 'idea' },
+			{ kind: 'text', text: '.' }
+		]);
+		expect(parseSuggestedDaydream({ idea })?.summary).toBeNull();
+		expect(parseSuggestedDaydream({ summary: 'On [[idea the train', idea })).toMatchObject({
+			summary: null,
+			idea: { title: 'The night train' }
+		});
+	});
+
+	it('is nothing without an idea that has a title and what is going on', () => {
+		expect(parseSuggestedDaydream({ voice: 'talk', idea: { title: 'Only a title' } })).toBeNull();
 		expect(parseSuggestedDaydream(null)).toBeNull();
 	});
 });
@@ -251,9 +329,17 @@ describe('parseGeneratedIdeas', () => {
 				premise: 'Your neighbour saw everything.',
 				tags: ['exhibition'],
 				you: 'sub',
+				voice: null,
 				dials: { heat: 4, kink: 3 }
 			}
 		]);
+	});
+
+	it('keeps the voice an idea was suggested with, and only a voice that is one', () => {
+		expect(parseGeneratedIdeas({ ideas: [idea({ voice: 'monologue' })] }, null)[0]?.voice).toBe(
+			'monologue'
+		);
+		expect(parseGeneratedIdeas({ ideas: [idea({ voice: 'poem' })] }, null)[0]?.voice).toBeNull();
 	});
 
 	it('drops an idea that puts the user on the other side, but keeps one with nobody in charge', () => {
@@ -325,11 +411,11 @@ describe('parseGeneratedIdeas', () => {
 		expect(parseGeneratedIdeas({ ideas: [null, 'Caught'] }, null)).toEqual([]);
 	});
 
-	it('makes a sentence that fits the box a daydream is described in', () => {
-		const sentence = ideaSentence({
+	it('makes a brief that fits the box a daydream is described in', () => {
+		const brief = ideaBrief({
 			title: 'x'.repeat(DAYDREAM_LIMITS.title),
 			premise: 'y'.repeat(MAX_IDEA_PREMISE)
 		});
-		expect(sentence.length).toBeLessThanOrEqual(DAYDREAM_LIMITS.idea);
+		expect(brief.length).toBeLessThanOrEqual(DAYDREAM_LIMITS.brief);
 	});
 });

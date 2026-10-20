@@ -5,4 +5,4 @@
 	let { data }: { data: PageData } = $props();
 </script>
 
-<DaydreamLibrary kind="scenes" items={data.items} suggestionsOn={data.accepted && data.available} />
+<DaydreamLibrary kind="ideas" items={data.items} suggestionsOn={data.accepted && data.available} />

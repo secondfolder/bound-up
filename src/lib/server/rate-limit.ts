@@ -268,7 +268,7 @@ export function daydreamRateLimiter(db: Db, secret: string): DaydreamRateLimiter
 
 /**
  * Suggestions a Daydreams account can ask for while setting up: more chips,
- * filling in a character or scene, "Surprise me".
+ * filling in a character or idea, "Surprise me".
  *
  * A scope of its own, so that filling in forms never uses up someone's story
  * replies, and on everywhere for the same reason as the replies'. Each is a

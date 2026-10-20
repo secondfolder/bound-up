@@ -1,5 +1,5 @@
 /**
- * Reading what the model suggests for a character or scene.
+ * Reading what the model suggests for a character or idea.
  *
  * The suggest endpoint (`api/daydreams/suggest`) passes the provider's answer
  * through unread, like the reply endpoint, so the browser is what checks it:
@@ -16,26 +16,28 @@ import {
 	CHARACTER_TEXT_FIELDS,
 	type CharacterTextField,
 	DAYDREAM_LIMITS,
-	type DaydreamScene,
+	type DaydreamIdea,
+	type DaydreamVoicePresetId,
 	type DialValue,
+	IDEA_TEXT_FIELDS,
+	type IdeaDials,
+	type IdeaTextField,
 	MAX_DAYDREAM_CHARACTERS,
-	SCENE_TEXT_FIELDS,
-	type SceneDials,
-	type SceneTextField,
 	UNSET_CHARACTER_DIALS
 } from '../daydream';
 import { unfence } from './reply-format';
-import type { StarterSide, StoryCast, StoryPieces } from './starters';
+import type { DaydreamCast, DaydreamPieces, StarterSide } from './starters';
+import { parseMarkedSummary } from './summary';
 
 export type SuggestTask =
 	| 'chips'
 	| 'fill'
-	| 'surprise-scene'
+	| 'surprise-idea'
 	| 'casting'
 	| 'name'
 	| 'daydream'
 	| 'ideas';
-export type SuggestTarget = 'character' | 'scene';
+export type SuggestTarget = 'character' | 'idea';
 
 /** The longest stretch of the opening passage sent to name a daydream: its start says enough. */
 export const MAX_NAMING_OPENING = 2000;
@@ -49,7 +51,7 @@ export const MAX_SUGGESTED_CHIPS = 12;
 
 /** Each field's cap, by name, for both kinds of record. */
 export const FIELD_LIMITS: Readonly<
-	Record<CharacterTextField | SceneTextField | 'name' | 'title', number>
+	Record<CharacterTextField | IdeaTextField | 'name' | 'title', number>
 > = {
 	name: DAYDREAM_LIMITS.characterName,
 	archetype: DAYDREAM_LIMITS.archetype,
@@ -69,19 +71,45 @@ const envelopeSchema = z.object({
 	choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1)
 });
 
+/** The model's reply in a non-streamed completion, as it wrote it, or null for no completion. */
+export function completionText(body: unknown): string | null {
+	const envelope = envelopeSchema.safeParse(body);
+	return envelope.success ? (envelope.data.choices[0]?.message.content ?? null) : null;
+}
+
 /** The JSON inside a non-streamed completion, or null. Tolerates a code fence around it. */
 export function completionJson(body: unknown): unknown {
-	const envelope = envelopeSchema.safeParse(body);
-	if (!envelope.success) {
+	const content = completionText(body)?.trim();
+	if (content === undefined) {
 		return null;
 	}
-	const content = envelope.data.choices[0]?.message.content.trim() ?? '';
-	const unfenced = unfence(content);
 	try {
-		return JSON.parse(unfenced);
+		return JSON.parse(unfence(content));
 	} catch {
 		return null;
 	}
+}
+
+/** The most of a reply debug mode is shown: enough to see what went wrong. */
+export const MAX_REPLY_DETAIL = 8000;
+
+/**
+ * Why an answer with nothing usable in it had nothing, and what it was, for
+ * debug mode (docs/debug-mode.md): not a completion at all, a reply that was
+ * not JSON, or JSON in which nothing was what the prompt asked for. Users
+ * only ever see "No ideas came back"; this is for whoever is working out why.
+ */
+export function describeUnusable(body: unknown): string {
+	const content = completionText(body);
+	const cut = (text: string) =>
+		text.length > MAX_REPLY_DETAIL ? `${text.slice(0, MAX_REPLY_DETAIL)}\n… (cut)` : text;
+	if (content === null) {
+		return `The provider’s answer had no reply in it:\n${cut(JSON.stringify(body, null, 2) ?? String(body))}`;
+	}
+	if (completionJson(body) === null) {
+		return `The reply was not JSON:\n${cut(content)}`;
+	}
+	return `The reply was JSON, but nothing in it was what was asked for, or within its limits:\n${cut(content)}`;
 }
 
 /** More chips for one field: trimmed, capped, de-duplicated, empties dropped. */
@@ -118,19 +146,45 @@ export function parseFill(target: SuggestTarget, value: unknown): Partial<Record
 		return {};
 	}
 	const fields: readonly string[] =
-		target === 'character' ? ['name', ...CHARACTER_TEXT_FIELDS] : ['title', ...SCENE_TEXT_FIELDS];
+		target === 'character' ? ['name', ...CHARACTER_TEXT_FIELDS] : ['title', ...IDEA_TEXT_FIELDS];
 	const filled: Partial<Record<string, string>> = {};
 	for (const field of fields) {
 		const text = (value as Record<string, unknown>)[field];
 		const limit = FIELD_LIMITS[field as keyof typeof FIELD_LIMITS];
-		if (typeof text === 'string' && text.trim() && text.trim().length <= limit) {
-			filled[field] = text.trim();
+		if (typeof text !== 'string' || !text.trim()) {
+			continue;
+		}
+		const kept =
+			target === 'idea' && field === 'notes' ? wholeLines(text.trim(), limit) : text.trim();
+		if (kept.length <= limit) {
+			filled[field] = kept;
 		}
 	}
 	return filled;
 }
 
-/** A scene part as the model suggests it: no id yet, which the dialog gives it. */
+/**
+ * As many whole lines as fit in `limit`. An idea's notes are a monologue's
+ * sayings, one to a line, and a list that runs over is still worth its
+ * first few, where any other field over its cap is dropped. A first line
+ * that does not fit by itself is returned whole, for the caller to drop.
+ */
+function wholeLines(text: string, limit: number): string {
+	if (text.length <= limit) {
+		return text;
+	}
+	const lines = text.split('\n');
+	let kept = lines[0] ?? '';
+	for (const line of lines.slice(1)) {
+		if (kept.length + 1 + line.length > limit) {
+			break;
+		}
+		kept = `${kept}\n${line}`;
+	}
+	return kept;
+}
+
+/** An idea part as the model suggests it: no id yet, which the dialog gives it. */
 export type SuggestedPart = { name: string; description: string };
 
 /**
@@ -178,11 +232,11 @@ function dialOf(value: unknown): DialValue | null {
 }
 
 /**
- * A scene's heat and kink from an answer. Lenient, like the rest: a missing or
+ * An idea's heat and kink from an answer. Lenient, like the rest: a missing or
  * out-of-range value is unset rather than the answer failing, since the
  * dials are optional anyway.
  */
-export function parseSceneDials(value: unknown): SceneDials {
+export function parseIdeaDials(value: unknown): IdeaDials {
 	if (!value || typeof value !== 'object') {
 		return { heat: null, kink: null };
 	}
@@ -190,11 +244,11 @@ export function parseSceneDials(value: unknown): SceneDials {
 	return { heat: dialOf(answer.heat), kink: dialOf(answer.kink) };
 }
 
-/** A whole scene from "Surprise me", or null when it lacks the two fields a scene must have. */
-export function parseSurpriseScene(
+/** A whole idea from "Surprise me", or null when it lacks the two fields an idea must have. */
+export function parseSurpriseIdea(
 	value: unknown
-): (Omit<DaydreamScene, 'parts'> & { parts: SuggestedPart[] }) | null {
-	const fields = parseFill('scene', value);
+): (Omit<DaydreamIdea, 'parts'> & { parts: SuggestedPart[] }) | null {
+	const fields = parseFill('idea', value);
 	if (!(fields.title && fields.premise)) {
 		return null;
 	}
@@ -206,7 +260,7 @@ export function parseSurpriseScene(
 		tone: fields.tone ?? '',
 		notes: fields.notes ?? '',
 		parts: parseParts(value),
-		dials: parseSceneDials(value)
+		dials: parseIdeaDials(value)
 	};
 }
 
@@ -216,7 +270,7 @@ function capped(value: unknown, limit: number): string {
 }
 
 /**
- * Who a character is in this story, from a `casting` answer: the fields that
+ * Who a character is in this daydream, from a `casting` answer: the fields that
  * fit, empty where one did not. Null when neither came back.
  */
 export function parseCasting(value: unknown): { relationship: string; part: string } | null {
@@ -247,31 +301,37 @@ export function parseName(value: unknown): string | null {
 
 const QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;
 
-const VOICE_IDS = ['talk', 'told', 'watch', 'rules'] as const;
+const VOICE_IDS = ['talk', 'told', 'watch', 'rules', 'monologue'] as const;
+
+/** A voice preset's id from an answer, or null for anything else. */
+const voiceOf = (value: unknown): DaydreamVoicePresetId | null =>
+	VOICE_IDS.find((id) => id === value) ?? null;
 
 /**
- * A whole daydream from a `daydream` answer, written from a sentence the
- * user typed: its voice, its scene and who is in it, in pieces for
- * `assembleSetup` (`starters.ts`) to put together. Null without a scene that
- * has the two fields a scene must have.
+ * A whole daydream from a `daydream` answer, written from a brief the
+ * user typed: its voice, its idea and who is in it, in pieces for
+ * `assembleSetup` (`starters.ts`) to put together, and the summary the form
+ * shows it as (`parseMarkedSummary`). Null without an idea that has the two
+ * fields an idea must have; a summary that cannot be read is only none, and
+ * the idea's premise is shown in its place.
  *
- * Lenient like the rest: a voice that is not one of the four is left to
+ * Lenient like the rest: a voice that is not one of the five is left to
  * follow who is in it, a person with no name is dropped, and every field is
  * held to its cap. Characters' dials stay unset, as a person who skipped
- * them would leave them; the scene's are rated.
+ * them would leave them; the idea's are rated.
  */
-export function parseSuggestedDaydream(value: unknown): StoryPieces | null {
+export function parseSuggestedDaydream(value: unknown): DaydreamPieces | null {
 	if (!value || typeof value !== 'object') {
 		return null;
 	}
 	const answer = value as Record<string, unknown>;
-	const scene = parseSurpriseScene(answer.scene);
-	if (!scene) {
+	const idea = parseSurpriseIdea(answer.idea);
+	if (!idea) {
 		return null;
 	}
-	const voice = VOICE_IDS.find((id) => id === answer.voice) ?? null;
+	const voice = voiceOf(answer.voice);
 	const list = Array.isArray(answer.characters) ? answer.characters : [];
-	const cast: StoryCast[] = [];
+	const cast: DaydreamCast[] = [];
 	for (const entry of list) {
 		const fields = parseFill('character', entry);
 		if (!fields.name || cast.some((other) => same(other.character.name, fields.name ?? ''))) {
@@ -295,12 +355,17 @@ export function parseSuggestedDaydream(value: unknown): StoryPieces | null {
 			doing: capped(person.doing, DAYDREAM_LIMITS.castPart)
 		});
 	}
-	return { voice, scene, cast: cast.slice(0, MAX_DAYDREAM_CHARACTERS) };
+	const kept = cast.slice(0, MAX_DAYDREAM_CHARACTERS);
+	const summary = parseMarkedSummary(
+		answer.summary,
+		kept.map((person) => person.character.name)
+	);
+	return { voice, idea, cast: kept, summary };
 }
 
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
-/** How many ideas one "Suggest stories for this" or "More ideas" asks for. */
+/** How many ideas one "Suggest daydreams for this" or "More ideas" asks for. */
 export const GENERATED_IDEAS = 6;
 
 /**
@@ -310,19 +375,19 @@ export const GENERATED_IDEAS = 6;
  */
 export const MAX_OFFERED_IDEAS = 60;
 
-/** A generated idea's tags: as few as a ready-made story's, and as short. */
+/** A generated idea's tags: as few as a ready-made daydream's, and as short. */
 export const MAX_IDEA_TAGS = 4;
 export const MAX_IDEA_TAG_LENGTH = 30;
 
 /**
  * The longest premise kept for a generated idea: short enough that its title
- * and premise together fit the `idea` cap, since picking one sends them on as
- * the sentence a whole daydream is written from (`ideaSentence`).
+ * and premise together fit the `brief` cap, since picking one sends them on as
+ * the brief a whole daydream is written from (`ideaBrief`).
  */
-export const MAX_IDEA_PREMISE = DAYDREAM_LIMITS.idea - DAYDREAM_LIMITS.title - 2;
+export const MAX_IDEA_PREMISE = DAYDREAM_LIMITS.brief - DAYDREAM_LIMITS.title - 2;
 
 /**
- * A story idea from "Suggest stories for this": enough for a card like a ready-made story's,
+ * An idea for a daydream from "Suggest daydreams for this": enough for a card like a ready-made one,
  * and nothing more — picking one asks for the whole daydream then, so
  * generating a handful stays quick and cheap.
  */
@@ -330,9 +395,15 @@ export type GeneratedIdea = {
 	title: string;
 	premise: string;
 	tags: readonly string[];
-	/** The user's side in it, as a ready-made story's `you`. */
+	/** The user's side in it, as a ready-made daydream's `you`. */
 	you: StarterSide | null;
-	dials: SceneDials;
+	/**
+	 * How it is told, as a ready-made daydream's `voice`, or null for the
+	 * model to choose when it is written out: an idea for a monologue stays
+	 * one, rather than being written out as a story about its theme.
+	 */
+	voice: DaydreamVoicePresetId | null;
+	dials: IdeaDials;
 };
 
 /**
@@ -363,7 +434,14 @@ export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): G
 		) {
 			continue;
 		}
-		ideas.push({ title, premise, tags: ideaTags(idea.tags), you, dials: parseSceneDials(idea) });
+		ideas.push({
+			title,
+			premise,
+			tags: ideaTags(idea.tags),
+			you,
+			voice: voiceOf(idea.voice),
+			dials: parseIdeaDials(idea)
+		});
 	}
 	return ideas.slice(0, GENERATED_IDEAS);
 }
@@ -406,6 +484,6 @@ function ideaTags(value: unknown): string[] {
 }
 
 /** What a picked idea is written from, as if the user had typed it in the box. */
-export function ideaSentence(idea: Pick<GeneratedIdea, 'title' | 'premise'>): string {
+export function ideaBrief(idea: Pick<GeneratedIdea, 'title' | 'premise'>): string {
 	return `${idea.title}: ${idea.premise}`;
 }

@@ -1,12 +1,12 @@
 import {
 	type DaydreamCharacterCopy,
-	type DaydreamSceneCopy,
+	type DaydreamIdeaCopy,
 	type DaydreamSetup,
 	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
 	UNSET_CHARACTER_DIALS,
-	UNSET_SCENE_DIALS
+	UNSET_IDEA_DIALS
 } from '../daydream';
 
 /**
@@ -33,7 +33,7 @@ export function testCharacter(
 	};
 }
 
-export function testScene(overrides: Partial<DaydreamSceneCopy> = {}): DaydreamSceneCopy {
+export function testIdea(overrides: Partial<DaydreamIdeaCopy> = {}): DaydreamIdeaCopy {
 	return {
 		sourceId: null,
 		sourceRevision: null,
@@ -44,7 +44,7 @@ export function testScene(overrides: Partial<DaydreamSceneCopy> = {}): DaydreamS
 		tone: '',
 		notes: '',
 		parts: [],
-		dials: UNSET_SCENE_DIALS,
+		dials: UNSET_IDEA_DIALS,
 		...overrides
 	};
 }
@@ -55,7 +55,7 @@ export function testDaydreamSetup(overrides: Partial<DaydreamSetup> = {}): Daydr
 		title: 'Late meeting',
 		voice: { narrator: 'none', stance: 'self', protagonistName: '' },
 		characters: [testCharacter()],
-		scene: testScene(),
+		idea: testIdea(),
 		lead: 'character',
 		limits: '',
 		dials: DEFAULT_STORY_DIALS,

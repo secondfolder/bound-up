@@ -43,10 +43,10 @@ describe('load', () => {
 	it('starts from an empty setup, with the library to pick from', async () => {
 		const data = await runLoad(load(at(ada)));
 		expect(data.setupForm.data).toMatchObject({ title: '', lead: 'character', characters: [] });
-		expect(data).toMatchObject({ library: { characters: [], scenes: [] }, accepted: false });
+		expect(data).toMatchObject({ library: { characters: [], ideas: [] }, accepted: false });
 	});
 
-	it('draws the ready-made stories in an order of their own', async () => {
+	it('draws the ready-made daydreams in an order of their own', async () => {
 		const data = await runLoad(load(at(ada)));
 		expect([...data.starterOrder].sort()).toEqual(
 			DAYDREAM_STARTERS.map((starter) => starter.id).sort()

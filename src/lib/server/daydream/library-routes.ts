@@ -10,7 +10,7 @@ import {
 import { daydreamGuard } from './guard';
 
 /**
- * The handlers behind `api/daydreams/characters` and `api/daydreams/scenes`,
+ * The handlers behind `api/daydreams/characters` and `api/daydreams/ideas`,
  * which differ only in which library they touch. Each record is sealed in the
  * user's own vault; the server checks the envelope, the vault and the owner.
  */

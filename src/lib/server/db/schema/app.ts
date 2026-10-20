@@ -1602,8 +1602,12 @@ export const daydreamCharacters = sqliteTable(
 	(table) => [index('daydream_characters_owner_updated_idx').on(table.ownerId, table.updatedAt)]
 );
 
-/** A scene in the user's library. Copied into a daydream exactly as a character is. */
-export const daydreamScenes = sqliteTable(
+/**
+ * An idea in the user's library. Copied into a daydream exactly as a
+ * character is. The table keeps the name ideas shipped under, "scenes":
+ * renaming it buys nothing but a migration (docs/daydreams.md, "Ideas").
+ */
+export const daydreamIdeas = sqliteTable(
 	'daydream_scenes',
 	{
 		id: text('id').primaryKey(),
@@ -1686,8 +1690,8 @@ export type DaydreamMark = typeof daydreamMarks.$inferSelect;
 export type NewDaydreamMark = typeof daydreamMarks.$inferInsert;
 export type DaydreamCharacterRow = typeof daydreamCharacters.$inferSelect;
 export type NewDaydreamCharacterRow = typeof daydreamCharacters.$inferInsert;
-export type DaydreamSceneRow = typeof daydreamScenes.$inferSelect;
-export type NewDaydreamSceneRow = typeof daydreamScenes.$inferInsert;
+export type DaydreamIdeaRow = typeof daydreamIdeas.$inferSelect;
+export type NewDaydreamIdeaRow = typeof daydreamIdeas.$inferInsert;
 
 /**
  * A kink list: one sealed record per person per scope. `scope` is `'self'` for

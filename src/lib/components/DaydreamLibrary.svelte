@@ -3,24 +3,24 @@
 	import { resolve } from '$app/paths';
 	import {
 		type DaydreamCharacterCopy,
-		type DaydreamSceneCopy,
+		type DaydreamIdeaCopy,
 		DEFAULT_STORY_DIALS,
 		EMPTY_CASTING
 	} from '$lib/daydream';
 	import { deleteLibraryItem } from '$lib/daydream/client';
 	import {
 		openedDaydreamCharacter,
-		openedDaydreamScene,
+		openedDaydreamIdea,
 		PENDING_TEXT,
 		UNREADABLE_TEXT
 	} from '$lib/sealed-views.svelte';
 	import type { DaydreamLibraryItemView } from '$lib/types';
 	import DaydreamCharacterDialog from './DaydreamCharacterDialog.svelte';
-	import DaydreamSceneDialog from './DaydreamSceneDialog.svelte';
+	import DaydreamIdeaDialog from './DaydreamIdeaDialog.svelte';
 	import NestedPageHeader from './NestedPageHeader.svelte';
 
 	/**
-	 * The user's characters or scenes, to pick for any daydream. Edited in the
+	 * The user's characters or ideas, to pick for any daydream. Edited in the
 	 * same dialogs the setup form opens; deleting one never touches a
 	 * daydream, which keeps its own copy.
 	 */
@@ -29,25 +29,25 @@
 		items,
 		suggestionsOn
 	}: {
-		kind: 'characters' | 'scenes';
+		kind: 'characters' | 'ideas';
 		items: DaydreamLibraryItemView[];
 		suggestionsOn: boolean;
 	} = $props();
 
-	const noun = $derived(kind === 'characters' ? 'character' : 'scene');
+	const noun = $derived(kind === 'characters' ? 'character' : 'idea');
 	let problem: string | null = $state(null);
 	/** What the dialog edits: an item and its opened content, or a new one. */
 	let editing: {
 		item: DaydreamLibraryItemView | null;
 		character?: DaydreamCharacterCopy;
-		scene?: DaydreamSceneCopy;
+		idea?: DaydreamIdeaCopy;
 	} | null = $state(null);
 
 	type Opened = {
 		name: string;
 		detail: string;
 		character?: DaydreamCharacterCopy;
-		scene?: DaydreamSceneCopy;
+		idea?: DaydreamIdeaCopy;
 	};
 
 	function opened(item: DaydreamLibraryItemView): Opened | null | undefined {
@@ -63,10 +63,10 @@
 					}
 				: character;
 		}
-		const scene = openedDaydreamScene(item.sealed);
-		return scene
-			? { name: scene.title, detail: scene.premise.slice(0, 120), scene: { ...scene, ...source } }
-			: scene;
+		const idea = openedDaydreamIdea(item.sealed);
+		return idea
+			? { name: idea.title, detail: idea.premise.slice(0, 120), idea: { ...idea, ...source } }
+			: idea;
 	}
 
 	async function remove(item: DaydreamLibraryItemView, name: string) {
@@ -89,7 +89,7 @@
 		backHref={resolve('/(auth-required)/(app)/daydreams')}
 		backLabel="Back to daydreams"
 		backText="Daydreams"
-		title={kind === 'characters' ? 'Your characters' : 'Your scenes'}
+		title={kind === 'characters' ? 'Your characters' : 'Your ideas'}
 		description={'Ready to pick for any daydream. A daydream keeps its own copy, and offers to update it when you change one here.'}
 	/>
 
@@ -118,7 +118,7 @@
 								size="s"
 								appearance="outlined"
 								onclick={() => {
-			editing = { item, character: shown.character, scene: shown.scene };
+			editing = { item, character: shown.character, idea: shown.idea };
 		}}
 							>
 								Edit {shown.name}
@@ -146,8 +146,8 @@
 		}}
 	/>
 {:else if editing}
-	<DaydreamSceneDialog
-		scene={editing.scene ?? null}
+	<DaydreamIdeaDialog
+		idea={editing.idea ?? null}
 		libraryRevision={editing.item?.revision ?? null}
 		{context}
 		{suggestionsOn}

@@ -107,10 +107,10 @@ describe('openDraft', () => {
 		const daydream: DraftScope = { kind: 'daydream', daydreamId: 'thread-a' };
 
 		const thread = await openDraft(threadA, ada, storage);
-		const scene = await openDraft(daydream, ada, storage);
+		const dreamDraft = await openDraft(daydream, ada, storage);
 		thread.save({ text: 'to my partner', tagIds: [] });
-		scene.save({ text: 'to the character', tagIds: [] });
-		await Promise.all([thread.settled(), scene.settled()]);
+		dreamDraft.save({ text: 'to the character', tagIds: [] });
+		await Promise.all([thread.settled(), dreamDraft.settled()]);
 
 		expect(draftStorageKey(ada, daydream)).not.toBe(draftStorageKey(ada, threadA));
 		expect((await openDraft(threadA, ada, storage)).initial?.text).toBe('to my partner');

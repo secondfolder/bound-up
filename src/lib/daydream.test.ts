@@ -6,7 +6,7 @@ import {
 	type DaydreamStance,
 	daydreamTitle,
 	EMPTY_CASTING,
-	fitCastingToScene,
+	fitCastingToIdea,
 	inferVoice,
 	leadApplies,
 	MAX_DAYDREAM_CHARACTERS,
@@ -37,7 +37,7 @@ describe('voiceProblem', () => {
 
 	it('needs someone to speak when there is no narrator', () => {
 		expect(voiceProblem(voice('none', 'self'), 0)).toMatch(/add a character/);
-		expect(voiceProblem(voice('none', 'absent'), 2)).toMatch(/have to be in the story/);
+		expect(voiceProblem(voice('none', 'absent'), 2)).toMatch(/have to be in the daydream/);
 	});
 
 	it('needs something to watch, and someone for “you” to be', () => {
@@ -99,6 +99,30 @@ describe('inferVoice', () => {
 	it('keeps what the story calls the user', () => {
 		expect(inferVoice(voice('none', 'self', 'Kit'), 0).protagonistName).toBe('Kit');
 	});
+
+	it('never guesses a monologue, which is only ever chosen', () => {
+		for (let count = 0; count <= MAX_DAYDREAM_CHARACTERS; count += 1) {
+			expect(inferVoice(voice('monologue', 'self'), count).narrator).not.toBe('monologue');
+		}
+	});
+});
+
+describe('a monologue', () => {
+	it('works with or without characters, and wherever the user stands', () => {
+		for (let count = 0; count <= MAX_DAYDREAM_CHARACTERS; count += 1) {
+			for (const stance of ['self', 'persona', 'absent'] as const) {
+				expect(
+					voiceProblem(voice('monologue', stance, 'Kit'), count),
+					`${stance}, ${count}`
+				).toBeNull();
+			}
+		}
+	});
+
+	it('is a preset, and nobody leads it', () => {
+		expect(voicePreset(voice('monologue', 'self'))?.id).toBe('monologue');
+		expect(leadApplies(voice('monologue', 'self'), 2)).toBe(false);
+	});
 });
 
 describe('leadApplies', () => {
@@ -110,10 +134,10 @@ describe('leadApplies', () => {
 });
 
 describe('daydreamTitle', () => {
-	it('is the daydream’s own name, or its scene’s until it has one', () => {
-		const scene = { title: 'After hours' };
-		expect(daydreamTitle({ title: 'Late', scene })).toBe('Late');
-		expect(daydreamTitle({ title: '  ', scene })).toBe('After hours');
+	it('is the daydream’s own name, or its idea’s until it has one', () => {
+		const idea = { title: 'After hours' };
+		expect(daydreamTitle({ title: 'Late', idea })).toBe('Late');
+		expect(daydreamTitle({ title: '  ', idea })).toBe('After hours');
 	});
 });
 
@@ -123,15 +147,15 @@ describe('casting', () => {
 		casting: { ...EMPTY_CASTING, partId, relationship }
 	});
 
-	it('fits a scene when every part cast is one it has, played once', () => {
+	it('fits an idea when every part cast is one it has, played once', () => {
 		expect(castingProblem([cast('p1'), cast('p2'), cast(null), cast(null)], parts)).toBeNull();
 		expect(castingProblem([cast('p3')], parts)).toContain('no longer has');
 		expect(castingProblem([cast('p1'), cast('p1')], parts)).toContain('only be played by one');
 	});
 
-	it('lets go of the parts a new scene does not have, and keeps the words', () => {
+	it('lets go of the parts a new idea does not have, and keeps the words', () => {
 		expect(
-			fitCastingToScene([cast('p1', 'your boss'), cast('p3', 'your rival')], [{ id: 'p1' }])
+			fitCastingToIdea([cast('p1', 'your boss'), cast('p3', 'your rival')], [{ id: 'p1' }])
 		).toEqual([cast('p1', 'your boss'), cast(null, 'your rival')]);
 	});
 });

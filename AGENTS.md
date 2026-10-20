@@ -45,7 +45,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
 | `src/lib/media/`              | Browser-only media transcoding. See [docs/messaging.md](docs/messaging.md#transcoding)       |
-| `src/lib/daydream/`           | Daydreams: the story tree, reply format, dice, chips, catalog, ready-made stories and the setup sentence (pure, alias-free), and the page's `DaydreamStory` and calls (browser). See [docs/daydreams.md](docs/daydreams.md) |
+| `src/lib/daydream/`           | Daydreams: the story tree, reply format, dice, chips, catalog, ready-made stories and the setup summary (pure, alias-free), and the page's `DaydreamStory` and calls (browser). See [docs/daydreams.md](docs/daydreams.md) |
 | `src/lib/testing/`            | Test-only helpers: in-memory DB, fixtures, a fake `RequestEvent`. Never imported by app code |
 | `src/lib/server/mail/`        | The mailer: Resend, SMTP or an outbox, and every email's copy. See [docs/email.md](docs/email.md) |
 | `src/lib/server-settings.ts`, `src/lib/server/settings/` | Server settings: the keys and model presets (pure, alias-free), and loading, generating and saving them. See [docs/server-settings.md](docs/server-settings.md) |

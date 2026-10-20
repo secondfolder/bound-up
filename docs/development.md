@@ -29,6 +29,11 @@ the first time the server needs them (see [Secrets](#secrets)). Email goes to
 holds your sign-up link. The first account you create is the admin, and
 Settings → Admin → Server settings is where everything else is configured.
 
+To click through the app while code is changing underneath it, start the dev
+server with `NO_HMR=1 npm run dev`. Open pages then never hot-update or reload
+on their own, so state on the page survives an edit; reload by hand to pick up
+the latest code.
+
 ## Deploy setup (only when you actually deploy)
 
 ```sh

@@ -25,8 +25,10 @@ data would simply stop showing. So:
 - **The one exception is a version no deployed build has ever written.** No
   stored record can be holding it, so it may still be changed in place, and
   its fixture re-sealed with it. Daydreams' setup v2, character v1 and scene
-  v1 were changed this way (castings and scene parts, then the libido, kink
-  and heat dials) before Daydreams first shipped. Once a version has been
+  v1 (the library's ideas, then called scenes) were changed this way
+  (castings and scene parts, then the libido, kink and heat dials) before
+  Daydreams first shipped, and setup v4 (a monologue, and the scene renamed
+  the idea) before it was deployed. Once a version has been
   deployed, it is frozen like the rest.
 - **All fixtures share one vault**: the key is bytes 0–31, and the vault id is
   the one at the top of `fixtures.json`.

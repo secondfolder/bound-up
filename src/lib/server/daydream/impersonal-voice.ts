@@ -10,14 +10,14 @@ import type { DialValue } from '$lib/daydream';
  * describing a hallway and a woman in a grey blouse, with the rules
  * mentioned in passing, and every later passage copied that opening. So this
  * voice gets a section of its own, with examples, placed after everything
- * describing the scene (`buildMessages` in `prompt.ts`), so it is the last
+ * describing the idea (`buildMessages` in `prompt.ts`), so it is the last
  * thing the model reads about how to write rather than the first.
  *
  * The examples show the form, not the content. There are two sets because
- * examples steer content too: a SFW scene shown clothing surrendered at the
+ * examples steer content too: a SFW daydream shown clothing surrendered at the
  * door would drift towards it, and an explicit one shown nothing but hand
  * raising would stay timid. The heat dial picks; unset falls back to the
- * tame set, and the scene's own words decide.
+ * tame set, and the idea's own words decide.
  */
 
 // The openings differ in form, and neither has a stock phrase to lift: the
@@ -77,6 +77,6 @@ Never write as a storyteller: no description of rooms, light or smells, no "you 
 When the user acts, answer as procedure: acknowledge it, record it, rule on it under the rules already issued — by number — and give the next instruction or consequence. Keep every rule you issue; add new ones as numbered amendments.
 ${cast}
 Begin passages in different ways — a heading, a time, a ruling, a single order — and never twice in the same words.
-These examples show the form only. Do not reuse any of their sentences, headings, rules, numbers or setting, and do not open the way they open: give this system its own name, its own rules and its own way of speaking, all taken from the scene above, and follow the scene's heat and kink, not theirs.
+These examples show the form only. Do not reuse any of their sentences, headings, rules, numbers or setting, and do not open the way they open: give this system its own name, its own rules and its own way of speaking, all taken from the idea above, and follow the idea's heat and kink, not theirs.
 ${examples}`;
 }

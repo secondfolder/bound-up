@@ -16,7 +16,14 @@
 		if (names.length > 0) {
 			return `with ${new Intl.ListFormat(undefined, { type: 'conjunction' }).format(names)}`;
 		}
-		return setup.voice.narrator === 'impersonal' ? 'under the rules' : 'told to you';
+		switch (setup.voice.narrator) {
+			case 'impersonal':
+				return 'under the rules';
+			case 'monologue':
+				return 'a monologue';
+			default:
+				return 'told to you';
+		}
 	}
 </script>
 
@@ -37,7 +44,7 @@
 		</wa-button>
 		<nav class="libraries" aria-label="Your library">
 			<a href={resolve('/(auth-required)/(app)/daydreams/characters')}>Your characters</a>
-			<a href={resolve('/(auth-required)/(app)/daydreams/scenes')}>Your scenes</a>
+			<a href={resolve('/(auth-required)/(app)/daydreams/ideas')}>Your ideas</a>
 		</nav>
 
 		{#if data.daydreams.length > 0}

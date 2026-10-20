@@ -147,7 +147,7 @@
 						}
 					}
 				],
-				"scene": {
+				"idea": {
 					"title": "Frozen evening",
 					"setting": "",
 					"premise": "A late meeting that runs over.",
@@ -249,7 +249,7 @@
 						}
 					}
 				],
-				"scene": {
+				"idea": {
 					"title": "Frozen evening",
 					"setting": "An empty office.",
 					"premise": "A late meeting that runs over.",
@@ -352,7 +352,7 @@
 						}
 					}
 				],
-				"scene": {
+				"idea": {
 					"title": "Frozen evening",
 					"setting": "An empty office.",
 					"premise": "A late meeting that runs over.",
@@ -388,6 +388,47 @@
 				"pictures": {
 					"on": false,
 					"style": "illustrated"
+				}
+			}
+		},
+		{
+			"kind": "daydream-setup",
+			"version": 4,
+			"recordId": "00000000-0000-4000-8000-0000000000f1",
+			"ciphertext": "sb1.eAFyq87ytBcaDXRRcYRizJa2iHYW7yqjsyt_WFarNWfqR2tHULmDAT62CItOgATJyn9Jwe3cuvIFjLYaN-EhdG1FRQ3Drqb6QY0IvVOLmHnqDfWTRQ_SWwP8o4kuccueUjM6aC1avpwKDB1PsY7BXcsAgTDaeitm3M_gq2QmLiERAUZxSVMeT1EK8CPnZd6arjK71inRYI5tkEX8H8QcGNX4cvfWfRmb9StWNA1AkvwfQK7FBeEnClUCQLBjM-vxuDTED9ZCSdPHYUSfsPB9bTQm0gvNnAWxmNJuiYPPn3f7H5KD8eGJFAfURS4cXpUxtOA1LkU0meJnPxhommP6HsmfBspxC16bGy3GwrK8LAb6QfEAgKED-Q-RF_VumTWUYOvW8k_nrV_TubGVkkvuUlzvnwgDuty9cyso9nlwZu0wyMwtzNOgZ2TYr73u8IlwpdTgHjYWniwB1oaLVSYCSw5bMPK9u-J7GScruVn1FkJiqIhD3u2YBpMcNkSiJCcIsi7UYTJOmp5_vrUnaKpcGNQ0o_7LuilVfENcQxEHaoJK7YL-H8qNI1v_FwdyefkioxB1M77c7nZBwsbf2Jyepi_SN_va1xzshR9rdk-CM7XC8-8Ld1CmjgycrIuMedesf0gcrIY2VRNE3DtaGZFO3Pk-w_4-tEqjidgHIMASswIoQnt45OvkBw",
+			"expected": {
+				"title": "",
+				"voice": {
+					"narrator": "monologue",
+					"stance": "persona",
+					"protagonistName": "Kit"
+				},
+				"characters": [],
+				"idea": {
+					"title": "Frozen mantras",
+					"setting": "Nowhere in particular.",
+					"premise": "A voice that says what belonging means.",
+					"yourRole": "The listener",
+					"tone": "devoted",
+					"notes": "",
+					"parts": [],
+					"sourceId": null,
+					"sourceRevision": null,
+					"dials": {
+						"heat": 4,
+						"kink": 4
+					}
+				},
+				"lead": "character",
+				"limits": "Nothing public.",
+				"dials": {
+					"intensity": 3,
+					"pace": 3,
+					"length": "medium"
+				},
+				"pictures": {
+					"on": true,
+					"style": "photo"
 				}
 			}
 		},

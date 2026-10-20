@@ -1,7 +1,7 @@
 /**
  * The sealed kinds behind Daydreams: a daydream's setup, each turn of its
  * story, the marks on its turns (bookmarks and reactions), and the user's
- * library of characters and scenes. All sealed in the writer's own vault. See
+ * library of characters and ideas. All sealed in the writer's own vault. See
  * `../sealed.ts` for what a kind is and the rules every version follows, and
  * docs/daydreams.md for what the server sees beside them, and the moments it
  * sees more.
@@ -15,14 +15,14 @@ import { z } from 'zod';
 import {
 	castingProblem,
 	DAYDREAM_LIMITS,
-	type DaydreamSetup,
+	type DaydreamVoice,
 	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	MAX_DAYDREAM_CHARACTERS,
 	MAX_DIRECTIONS,
 	MAX_SUGGESTIONS,
 	UNSET_CHARACTER_DIALS,
-	UNSET_SCENE_DIALS,
+	UNSET_IDEA_DIALS,
 	voiceProblem
 } from '../daydream';
 import { coversEveryFace, MAX_SIDES, MIN_SIDES } from '../daydream/dice';
@@ -35,7 +35,7 @@ const optional = (max: number) => z.string().trim().max(max);
 const clientId = z.string().refine(isClientId, 'Malformed id');
 const dial = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]);
 
-// ── characters and scenes ────────────────────────────────────────────────────
+// ── characters and ideas ────────────────────────────────────────────────────
 
 const characterDialsSchema = z.object({
 	tone: z.enum(['warm', 'teasing', 'cold', 'clinical']).nullable(),
@@ -47,7 +47,7 @@ const characterDialsSchema = z.object({
 	kink: dial.nullable()
 });
 
-const sceneDialsSchema = z.object({ heat: dial.nullable(), kink: dial.nullable() });
+const ideaDialsSchema = z.object({ heat: dial.nullable(), kink: dial.nullable() });
 
 const characterShape = {
 	name: required(DAYDREAM_LIMITS.characterName),
@@ -66,13 +66,13 @@ const partSchema = z.object({
 	description: optional(DAYDREAM_LIMITS.partDescription)
 });
 
-const sceneShape = {
+const ideaShape = {
 	title: required(DAYDREAM_LIMITS.title),
 	setting: optional(DAYDREAM_LIMITS.setting),
 	premise: required(DAYDREAM_LIMITS.premise),
 	yourRole: optional(DAYDREAM_LIMITS.yourRole),
 	tone: optional(DAYDREAM_LIMITS.tone),
-	notes: optional(DAYDREAM_LIMITS.sceneNotes),
+	notes: optional(DAYDREAM_LIMITS.ideaNotes),
 	parts: z
 		.array(partSchema)
 		.max(MAX_DAYDREAM_CHARACTERS)
@@ -80,7 +80,7 @@ const sceneShape = {
 			(parts) => new Set(parts.map((part) => part.id)).size === parts.length,
 			'Duplicate part'
 		),
-	dials: sceneDialsSchema
+	dials: ideaDialsSchema
 };
 
 /** Who a character is in one daydream (`DaydreamCasting`). Only ever in a setup, never the library. */
@@ -104,13 +104,15 @@ export const daydreamCharacterKind = defineSealedKind({
 
 export type DaydreamCharacterContent = z.output<typeof daydreamCharacterKind.latest>;
 
-export const daydreamSceneKind = defineSealedKind({
+// Named for what an idea was called when it shipped: the name is in every
+// stored envelope, so it cannot follow the rename (docs/daydreams.md, "Ideas").
+export const daydreamIdeaKind = defineSealedKind({
 	name: 'daydream-scene',
 	maxCiphertextLength: 16 * 1024,
-	versions: [{ version: 1, schema: z.object(sceneShape) }]
+	versions: [{ version: 1, schema: z.object(ideaShape) }]
 });
 
-export type DaydreamSceneContent = z.output<typeof daydreamSceneKind.latest>;
+export type DaydreamIdeaContent = z.output<typeof daydreamIdeaKind.latest>;
 
 // ── setup ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +138,8 @@ const setupV2Shape = {
 	characters: z
 		.array(z.object({ ...characterShape, ...sourceShape, casting: castingSchema }))
 		.max(MAX_DAYDREAM_CHARACTERS),
-	scene: z.object({ ...sceneShape, ...sourceShape }),
+	// What v4 calls the idea: its key until then, which is stored.
+	scene: z.object({ ...ideaShape, ...sourceShape }),
 	lead: z.enum(['character', 'me', 'shared']),
 	limits: optional(DAYDREAM_LIMITS.limits),
 	dials: z.object({
@@ -153,17 +156,20 @@ const setupV2Shape = {
  */
 function refineSetup(
 	value: {
-		voice: z.output<typeof setupV2Shape.voice>;
+		voice: Pick<DaydreamVoice, 'narrator' | 'stance' | 'protagonistName'>;
 		characters: z.output<typeof setupV2Shape.characters>;
-		scene: z.output<typeof setupV2Shape.scene>;
-	},
+	} & (
+		| { scene: z.output<typeof setupV2Shape.scene> }
+		| { idea: z.output<typeof setupV2Shape.scene> }
+	),
 	ctx: z.RefinementCtx
 ) {
 	const problem = voiceProblem(value.voice, value.characters.length);
 	if (problem) {
 		ctx.addIssue({ code: 'custom', path: ['voice'], message: problem });
 	}
-	const miscast = castingProblem(value.characters, value.scene.parts);
+	const { parts } = 'idea' in value ? value.idea : value.scene;
+	const miscast = castingProblem(value.characters, parts);
 	if (miscast) {
 		ctx.addIssue({ code: 'custom', path: ['characters'], message: miscast });
 	}
@@ -180,9 +186,27 @@ const setupV3 = z
 	})
 	.superRefine(refineSetup);
 
+// v4: a monologue, a fifth narrator (docs/daydreams.md, "Voices"), and the
+// scene renamed the idea, since a monologue has no scene ("Ideas"). The
+// narrator list is written out again rather than shared, because a shipped
+// version's schema must never change under it.
+const { scene: _scene, ...setupV2Rest } = setupV2Shape;
+const setupV4 = z
+	.object({
+		...setupV2Rest,
+		idea: setupV2Shape.scene,
+		voice: z.object({
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
+			stance: z.enum(['self', 'persona', 'absent']),
+			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
+		}),
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
+	})
+	.superRefine(refineSetup);
+
 export const daydreamSetupKind = defineSealedKind({
 	name: 'daydream-setup',
-	// Four characters with every field at its cap, a scene likewise, JSON-escaped,
+	// Four characters with every field at its cap, an idea likewise, JSON-escaped,
 	// sealed and base64url'd, fit inside.
 	maxCiphertextLength: 96 * 1024,
 	versions: [
@@ -223,7 +247,7 @@ export const daydreamSetupKind = defineSealedKind({
 					tone: value.tone,
 					notes: '',
 					parts: [],
-					dials: UNSET_SCENE_DIALS
+					dials: UNSET_IDEA_DIALS
 				},
 				lead: value.lead,
 				limits: value.limits,
@@ -235,12 +259,21 @@ export const daydreamSetupKind = defineSealedKind({
 			schema: setupV2,
 			// Pictures came with v3: a daydream from before has them on, in the
 			// default style, like a new one.
-			upcast: (value: z.output<typeof setupV2>): DaydreamSetup => ({
+			upcast: (value: z.output<typeof setupV2>): z.output<typeof setupV3> => ({
 				...value,
 				pictures: DEFAULT_PICTURES
 			})
 		},
-		{ version: 3, schema: setupV3 }
+		{
+			version: 3,
+			schema: setupV3,
+			// Every v3 voice is a v4 voice, since v4 only adds one; its scene is v4's idea.
+			upcast: ({ scene, ...rest }: z.output<typeof setupV3>): z.output<typeof setupV4> => ({
+				...rest,
+				idea: scene
+			})
+		},
+		{ version: 4, schema: setupV4 }
 	]
 });
 

@@ -9,7 +9,7 @@ import type { ContextTurn } from '$lib/daydream/context';
 import { passageAsSent } from '$lib/daydream/context';
 import { appendedToPrevious, recordSent, type SentRecord } from '$lib/daydream/sent-record';
 import { type Direction, daydreamSetupKind, type Reading } from '$lib/sealed-kinds/daydreams';
-import { testCharacter, testDaydreamSetup, testScene } from '$lib/testing/daydream-setup';
+import { testCharacter, testDaydreamSetup, testIdea } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
 import {
 	buildMessages,
@@ -505,7 +505,7 @@ describe('how a passage is written', () => {
 		testDaydreamSetup({
 			voice: { narrator, stance: 'self', protagonistName: '' },
 			characters: [testCharacter()],
-			scene: testScene({ dials: { heat, kink: null } })
+			idea: testIdea({ dials: { heat, kink: null } })
 		});
 	const systemAt = (heat: DialValue | null, narrator: DaydreamNarrator = 'none') =>
 		system(buildMessages(request({ setup: atHeat(heat, narrator), turns: [said('hi')] })));
@@ -612,7 +612,7 @@ describe('the system voice', () => {
 			voice: { narrator: 'impersonal', stance: 'self', protagonistName: '' },
 			characters: Array.from({ length: overrides.characters ?? 0 }, () => testCharacter()),
 			lead: overrides.lead ?? 'character',
-			scene: testScene({ dials: { heat: overrides.heat ?? null, kink: null } })
+			idea: testIdea({ dials: { heat: overrides.heat ?? null, kink: null } })
 		});
 	const systemOf = (s: ReturnType<typeof systemSetup>, turns: ContextTurn[] = []) =>
 		system(buildMessages(request({ mode: 'opening', setup: s, turns })));
@@ -657,7 +657,7 @@ describe('the system voice', () => {
 					stance: narrator === 'third-person' ? 'absent' : 'self',
 					protagonistName: ''
 				},
-				scene: testScene({ dials: { heat: 4, kink: null } })
+				idea: testIdea({ dials: { heat: 4, kink: null } })
 			});
 			const content = system(buildMessages(request({ mode: 'opening', setup: other })));
 			expect(content).not.toContain('# Writing as the system');
@@ -703,6 +703,129 @@ describe('the system voice', () => {
 	});
 });
 
+describe('the monologue voice', () => {
+	const monologueSetup = (
+		overrides: { heat?: DialValue | null; characters?: number; stance?: DaydreamStance } = {}
+	) =>
+		testDaydreamSetup({
+			voice: { narrator: 'monologue', stance: overrides.stance ?? 'self', protagonistName: 'Kit' },
+			characters: Array.from({ length: overrides.characters ?? 0 }, () => testCharacter()),
+			idea: testIdea({ dials: { heat: overrides.heat ?? null, kink: null } })
+		});
+	const monologueOf = (s: ReturnType<typeof monologueSetup>, turns: ContextTurn[] = []) =>
+		system(buildMessages(request({ mode: 'opening', setup: s, turns })));
+	const Tame = 'Rules are a kindness.';
+	const Adult = 'Being owned is a relief.';
+
+	it('gets its own guide, after how to read the user and before the reply format', () => {
+		const content = monologueOf(monologueSetup());
+		const guide = content.indexOf('# Writing a monologue');
+		expect(guide).toBeGreaterThan(content.indexOf("# Reading the user's turns"));
+		expect(guide).toBeLessThan(content.indexOf('# Reply format'));
+		expect(content).toContain('You speak a monologue');
+		expect(content).toContain('a statement on a line of its own, in bold');
+	});
+
+	it('shows the tame examples below Steamy, and the adult ones from it, as form only', () => {
+		for (const heat of [null, 1, 2] as const) {
+			const content = monologueOf(monologueSetup({ heat }));
+			expect(content).toContain(Tame);
+			expect(content).not.toContain(Adult);
+		}
+		for (const heat of [3, 4, 5] as const) {
+			const content = monologueOf(monologueSetup({ heat }));
+			expect(content).toContain(Adult);
+			expect(content).not.toContain(Tame);
+		}
+		expect(monologueOf(monologueSetup())).toContain('These examples show the form only');
+	});
+
+	it('describes its idea as what the voice says, with its sayings on lines of their own', () => {
+		const content = monologueOf(
+			testDaydreamSetup({
+				voice: { narrator: 'monologue', stance: 'self', protagonistName: '' },
+				characters: [],
+				idea: testIdea({
+					premise: 'You are for using.',
+					yourRole: 'The one it speaks to',
+					notes: 'Good girls say thank you.\nAsking is the point.'
+				})
+			})
+		);
+		expect(content).toContain('What the voice believes: You are for using.');
+		expect(content).toContain('Who the user is to it: The one it speaks to');
+		expect(content).toContain(
+			'Sayings to build on, and anything else:\nGood girls say thank you.\nAsking is the point.'
+		);
+		expect(content).not.toContain('What is going on:');
+		// A story's are what they were.
+		const story = system(buildMessages(request({ mode: 'opening', turns: [] })));
+		expect(story).toContain('What is going on:');
+	});
+
+	it('shows a longer inner-voice example, caught in an ordinary day', () => {
+		expect(monologueOf(monologueSetup({ heat: 4 }))).toContain('I was made to be used.');
+		expect(monologueOf(monologueSetup({ heat: 1 }))).toContain('Being told what to do is restful.');
+		expect(monologueOf(monologueSetup())).toContain('Ground it in everyday life where it fits');
+	});
+
+	it('leaves who speaks to the setup: an unnamed voice by default, or a character', () => {
+		const alone = monologueOf(monologueSetup());
+		expect(alone).toContain('speak as an unnamed voice with the user listening');
+		expect(alone).toContain('the user’s own inner voice');
+		expect(monologueOf(monologueSetup({ stance: 'persona' }))).toContain('know them as Kit');
+		expect(monologueOf(monologueSetup({ characters: 1 }))).toContain(
+			'The speaker is one of the characters below'
+		);
+		expect(monologueOf(monologueSetup({ stance: 'absent' }))).toContain('they overhear it');
+	});
+
+	it('is told how to keep it going and write sex, but not the story or its prose, and no one leads', () => {
+		const content = monologueOf(monologueSetup({ heat: 5, characters: 1 }));
+		expect(content).toContain('# Keeping the monologue going');
+		expect(content).toContain('not a list to work through in order');
+		expect(content).not.toContain('# Telling the story');
+		expect(content).toContain('# Writing sex');
+		expect(content).not.toContain('# Writing the prose');
+		expect(content).not.toContain('The characters lead');
+	});
+
+	it('asks for bold statement lines, and for none of it in quotation marks', () => {
+		const content = monologueOf(monologueSetup());
+		expect(content).toContain('**bold** for each statement, on a line of its own');
+		expect(content).toContain('never in quotation marks');
+		const other = system(buildMessages(request({ mode: 'opening' })));
+		expect(other).toContain('**bold**, rarely, for a word that has to land');
+	});
+
+	it('opens straight into its statements, and is steered by its own buttons', () => {
+		const opening = buildMessages(request({ mode: 'opening', setup: monologueSetup() })).at(-1);
+		expect(opening?.content).toContain('Open straight into the monologue');
+		expect(opening?.content).not.toContain('Set the scene');
+		const content = monologueOf(monologueSetup());
+		expect(content).toContain('one asking the voice to say more');
+		expect(content).toContain('More like that, A mantra');
+	});
+
+	it('is not given to any other voice, nor to a stopped scene’s check-in', () => {
+		for (const narrator of ['none', 'second-person', 'impersonal'] as const) {
+			const other = testDaydreamSetup({
+				voice: { narrator, stance: 'self', protagonistName: '' },
+				idea: testIdea({ dials: { heat: 4, kink: null } })
+			});
+			const content = system(buildMessages(request({ mode: 'opening', setup: other })));
+			expect(content).not.toContain('# Writing a monologue');
+			expect(content).not.toContain(Adult);
+		}
+		const stopped = monologueOf(monologueSetup(), [
+			said('Being owned is a relief.', 'story'),
+			{ type: 'safety', signal: 'red' }
+		]);
+		expect(stopped).toContain('# The scene is stopped');
+		expect(stopped).not.toContain('# Writing a monologue');
+	});
+});
+
 describe('describeSetup', () => {
 	it('describes each character, with their dials in words and the description winning', () => {
 		const content = describeSetup(
@@ -738,7 +861,7 @@ describe('describeSetup', () => {
 	it('introduces a cast character by their part, with who they are in this story first', () => {
 		const content = describeSetup(
 			testDaydreamSetup({
-				scene: testScene({
+				idea: testIdea({
 					parts: [
 						{ id: PART_A, name: 'the interviewer', description: 'runs the interview' },
 						{ id: PART_B, name: 'the observer', description: '' }
@@ -755,11 +878,11 @@ describe('describeSetup', () => {
 			})
 		);
 		expect(content).toContain(
-			'## Mara, the interviewer\nWho they are to the user: your new boss\nTheir part in this scene: testing you\nType: strict mentor'
+			'## Mara, the interviewer\nWho they are to the user: your new boss\nTheir part in this daydream: testing you\nType: strict mentor'
 		);
 		expect(content).toContain('## Jun');
 		expect(content).not.toContain('## Jun,');
-		// The scene lists the parts someone plays, and not the one nobody was cast in.
+		// The idea lists the parts someone plays, and not the one nobody was cast in.
 		expect(content).toContain(
 			'The parts in it:\n- the interviewer, played by Mara: runs the interview'
 		);
@@ -777,11 +900,11 @@ describe('describeSetup', () => {
 		expect(describeSetup(setup)).toContain('None stated beyond the rules above.');
 	});
 
-	it('says how sexual and how kinky the scene is, with heat as the ceiling', () => {
+	it('says how sexual and how kinky the idea is, with heat as the ceiling', () => {
 		const sfw = describeSetup(
 			testDaydreamSetup({
 				characters: [testCharacter({ dials: { ...UNSET_CHARACTER_DIALS, libido: 5, kink: 5 } })],
-				scene: testScene({ dials: { heat: 1, kink: null } })
+				idea: testIdea({ dials: { heat: 1, kink: null } })
 			})
 		);
 		expect(sfw).toContain('Heat: SFW: nothing sexual at all');
@@ -792,7 +915,7 @@ describe('describeSetup', () => {
 		expect(sfw).not.toContain('Kink:');
 
 		const filthy = describeSetup(
-			testDaydreamSetup({ scene: testScene({ dials: { heat: 5, kink: 5 } }) })
+			testDaydreamSetup({ idea: testIdea({ dials: { heat: 5, kink: 5 } }) })
 		);
 		expect(filthy).toContain('Heat: filthy');
 		expect(filthy).toContain('Kink: extreme');
@@ -917,11 +1040,11 @@ describe('replyRequestSchema', () => {
 		);
 	});
 
-	it('refuses a part the scene does not have, or one played twice', () => {
+	it('refuses a part the idea does not have, or one played twice', () => {
 		const parts = [{ id: PART_A, name: 'the interviewer', description: '' }];
 		const cast = (...partIds: (string | null)[]) =>
 			testDaydreamSetup({
-				scene: testScene({ parts }),
+				idea: testIdea({ parts }),
 				characters: partIds.map((partId, index) =>
 					testCharacter({ name: `C${index}`, casting: { partId, relationship: '', part: '' } })
 				)
@@ -944,7 +1067,7 @@ describe('replyRequestSchema', () => {
 		expect(
 			replyRequestSchema.safeParse({
 				...valid,
-				setup: { ...setup, scene: testScene({ premise: '' }) }
+				setup: { ...setup, idea: testIdea({ premise: '' }) }
 			}).success
 		).toBe(false);
 	});

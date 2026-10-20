@@ -4,15 +4,15 @@ import {
 	CHARACTER_SLIDERS,
 	characterLevel,
 	describeCharacterDials,
-	describeSceneDials,
-	SCENE_SLIDERS,
-	STORY_SLIDERS,
-	sceneLevel
+	describeIdeaDials,
+	IDEA_SLIDERS,
+	ideaLevel,
+	STORY_SLIDERS
 } from './dial-words';
 
 describe('the dial words', () => {
 	it('gives every step of every slider a label and a phrase', () => {
-		for (const slider of [...CHARACTER_SLIDERS, ...SCENE_SLIDERS, ...STORY_SLIDERS]) {
+		for (const slider of [...CHARACTER_SLIDERS, ...IDEA_SLIDERS, ...STORY_SLIDERS]) {
 			for (const step of [1, 2, 3, 4, 5] as const) {
 				expect(slider.scale[step].label, `${slider.key} ${step}`).not.toBe('');
 				expect(slider.scale[step].phrase, `${slider.key} ${step}`).not.toBe('');
@@ -27,23 +27,23 @@ describe('the dial words', () => {
 		expect(describeCharacterDials(UNSET_CHARACTER_DIALS)).toBeNull();
 	});
 
-	it('says nothing of a scene dial left unset', () => {
-		expect(describeSceneDials({ heat: null, kink: null })).toEqual([]);
-		expect(describeSceneDials({ heat: null, kink: 3 })).toEqual([
+	it('says nothing of an idea dial left unset', () => {
+		expect(describeIdeaDials({ heat: null, kink: null })).toEqual([]);
+		expect(describeIdeaDials({ heat: null, kink: 3 })).toEqual([
 			'Kink: kinky: BDSM and power exchange.'
 		]);
 	});
 
 	it('makes heat the ceiling whenever it is set', () => {
-		const lines = describeSceneDials({ heat: 1, kink: null });
+		const lines = describeIdeaDials({ heat: 1, kink: null });
 		expect(lines[0]).toContain('SFW: nothing sexual at all');
 		expect(lines.at(-1)).toContain('Heat is the ceiling');
 	});
 
 	it('names a starting point’s level, kinky from 3 up', () => {
-		expect(sceneLevel({ heat: 1, kink: 1 })).toBe('SFW');
-		expect(sceneLevel({ heat: 4, kink: 3 })).toBe('Explicit · kinky');
-		expect(sceneLevel({ heat: null, kink: 5 })).toBeNull();
+		expect(ideaLevel({ heat: 1, kink: 1 })).toBe('SFW');
+		expect(ideaLevel({ heat: 4, kink: 3 })).toBe('Explicit · kinky');
+		expect(ideaLevel({ heat: null, kink: 5 })).toBeNull();
 		expect(characterLevel({ ...UNSET_CHARACTER_DIALS, libido: 5, kink: 2 })).toBe('Slutty');
 		expect(characterLevel(UNSET_CHARACTER_DIALS)).toBeNull();
 	});

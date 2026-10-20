@@ -1,14 +1,14 @@
 # Daydreams
 
 A daydream is a story a user makes up and plays. They choose how it is told,
-who is in it, the scene and their limits; the story opens by itself; then
+who is in it, the idea and their limits; the story opens by itself; then
 they move it on — by writing, by pressing a button, by rolling a die — and
 it answers. The passages are written by a hosted language model, reached
 through OpenRouter.
 
 The name is deliberate. Not "bot" or "AI", and not anything that suggests the
-characters stand in for a partner: it is more than solo play and less than a
-scene with another person.
+characters stand in for a partner: it is more than solo play and less than an
+idea with another person.
 
 ## Setting it up
 
@@ -18,25 +18,40 @@ scene with another person.
 
 `/daydreams/new` opens on the ways in rather than the form
 (`DaydreamStarter.svelte`), friendliest first, because the form asks for
-things — a voice, a scene with parts, a cast — that mean nothing until
+things — a voice, an idea with parts, a cast — that mean nothing until
 someone has played one:
 
 - **What do you feel like?** One box, and under it a row with "You as" at
   the start and two buttons at the end, both working from what is in the
-  box, for the side chosen. **Write this
-  story** asks the model for a whole daydream (the `daydream` suggestion): a
-  voice, a scene with its parts and its heat and kink, and up to
+  box — the *brief* — for the side chosen. **Write this
+  daydream** asks the model for a whole daydream (the `daydream` suggestion): a
+  voice, an idea with its parts and its heat and kink, and up to
   `MAX_DAYDREAM_CHARACTERS` characters, each cast into a part with who they
   are in it, with the user on the side chosen if there is one. **Suggest
-  stories for this** asks for a few stories like it instead, shown in place
+  daydreams for this** asks for a few like it instead, shown in place
   of the ready-made ones (below). Only with suggestions on; without them the
-  box and its buttons are not shown, and "You as" sits under "Story
+  box and its buttons are not shown, and "You as" sits under "Daydream
   suggestions". There
-  used to be idea chips under the box; the ready-made and suggested stories
+  used to be idea chips under the box; the ready-made and suggested daydreams
   do that job now.
-- **Story suggestions.** Ready-made stories (`DAYDREAM_STARTERS` in
-  `daydream/starters.ts`), each a scene starting point, a voice preset and
-  character starting points cast into the scene's parts, with the casting
+
+  **The voice is decided first.** A brief rarely names a voice, and one
+  like "list the things people into this say, and build on them" never says
+  "monologue" — but asked to set up a story and only then how it is told, a
+  model had already written a plot (an estate, a new arrival, a handler) and
+  told it in the default voice. So the `daydream` prompt asks for the voice
+  before anything it shapes, with cues for each (`VOICE_CUES`: sayings,
+  beliefs, mantras or themes to be said and built on, with no plot asked
+  for, are a monologue), and the answer gives `voice` first and the summary
+  last. Then a story gets `STORY_CRAFT` (who the people are to each other,
+  where, why now) and a monologue `MONOLOGUE_CRAFT` (the beliefs and sayings
+  it is built on, who speaks to whom, where the ideas go), each with its own
+  idea fields and cast: a monologue has no parts and nobody in it unless a
+  named character is the one speaking, and its sayings go in the idea's
+  notes ([Ideas](#ideas)).
+- **Daydream suggestions.** Ready-made daydreams (`DAYDREAM_STARTERS` in
+  `daydream/starters.ts`), each an idea starting point, a voice preset and
+  character starting points cast into the idea's parts, with the casting
   written for that story. Each card says its level, how it is told, and its
   kinks and tropes as tags (`tags`), so the harder ones can be told apart
   at a glance; under "Either" it also says which side the user is on in it,
@@ -48,7 +63,7 @@ someone has played one:
   shows them as they were. Only the first `SHOWN_STARTERS` (six) show at
   first, a handful to choose from rather than a catalogue to read; **More
   ideas** under them shows the rest, all at once (unlike the suggested
-  stories' button of the same name, which asks the model for more).
+  ones' button of the same name, which asks the model for more).
 
   **Search**, the magnifying glass at the end of the heading's row, is
   `SearchField.svelte` with `collapsible`: a search box that rests as its
@@ -56,7 +71,7 @@ someone has played one:
   the row, the icon sliding across with it to sit in the open field. It
   filters the cards, ready-made or suggested, to those with every word
   typed somewhere in their title, premise or tags, ignoring case
-  (`matchesSearch`), and looks through every ready-made story, not only the
+  (`matchesSearch`), and looks through every ready-made daydream, not only the
   six shown. Focus leaving it while it is empty folds it away; Escape
   empties it, and a second Escape folds it away too.
 
@@ -73,12 +88,13 @@ someone has played one:
   visit opens on the same side. They are built from the catalog rather than written out again,
   and need no model, so nothing leaves the device.
 
-  **Suggest stories for this**, under the box, asks the model for
-  `GENERATED_IDEAS` (six) stories like the one described: the `ideas`
-  suggestion, sent what is in the box and the side. With a side, the prompt puts the user on it in every idea,
-  or on neither for a story with no one in charge; with "Either", a mix.
+  **Suggest daydreams for this**, under the box, asks the model for
+  `GENERATED_IDEAS` (six) ideas like the one described: the `ideas`
+  suggestion, sent the brief and the side. With a side, the prompt puts the user on it in every idea,
+  or on neither for one with no one in charge; with "Either", a mix.
   Each idea is only what a card shows — a title, a premise, tags, the
-  user's side and a heat and kink — so a handful comes back quickly;
+  user's side, how it is told (`voice`, chosen with the same cues as a
+  whole daydream's) and a heat and kink — so a handful comes back quickly;
   `parseGeneratedIdeas` drops any that put the user on the other side from
   the one asked for. They take the ready-made ones' place, under the
   request, and are filtered by "You as" the same way (`forSide`); **Clear**
@@ -87,13 +103,14 @@ someone has played one:
   and the side chosen now, sending the titles already shown (the latest
   `MAX_OFFERED_IDEAS`) as `offered` so the model makes new ones, and adds
   them after the rest (`addIdeas`, which drops a repeated title anyway). A
-  failure is said under the box for **Suggest stories for this** and under its
-  button for **More ideas**; the page keeps the ideas and the request, so
+  failure is said under the box for **Suggest daydreams for this** and under its
+  button for **More ideas**; the page keeps the ideas and the brief, so
   going back shows them. Picking one asks for the whole daydream as
-  **Write this story** does, from the
-  idea's title and premise (`ideaSentence`, which fits the `idea` cap) and
-  with the idea's side, so the cast are written to suit it; **Try another**
-  on the setup asks again from the same idea.
+  **Write this daydream** does, from the
+  idea's title and premise (`ideaBrief`, which fits the `brief` cap) and
+  with the idea's side and voice, so the cast are written to suit it and an
+  idea for a monologue is written out as one, not as a story about its
+  theme; **Try another** on the setup asks again from the same idea.
 - **Build your own.** A section like the others, its **Build it yourself**
   button opening the full form, empty.
 
@@ -102,15 +119,69 @@ All but the last hand the form a draft, put together by `assembleSetup`
 part named for them if it is still free, and a voice that cannot work with
 who is in it — watching nobody — gives way to the one that follows them.
 Every copy is one with no library record, so each card offers **Save to my
-characters** (or scenes) as any such copy does.
+characters** (or ideas) as any such copy does.
 
-A draft opens in the form's **sentence** layout: the setup as one line with
-blanks in it — "I want a [steamy] story where I [talk with] [Lady Vale] in
-[After hours]." — built by `setupSentence` (`daydream/sentence.ts`), with the
-premise and who each character is underneath (`castNotes`). Each blank is the
-control for that part of it: the heat a menu of levels, the voice a menu of
-the four presets, a character's name their dialog, the scene's title the scene
+A draft opens in the form's **summary** layout: the setup as a short summary
+with blanks in it, built by `setupSummary` (`daydream/summary.ts`). Each blank
+is the control for that part of it: the heat a menu of levels, the voice a
+menu of the five presets, a character their dialog, the idea the idea
 dialog. "Add someone" and "Anything off the table?" (the limits) sit under it.
+
+The summary is two paragraphs:
+
+1. **The model's own**, for a daydream it wrote. The `daydream` answer carries
+   a short `summary` in which the model wrapped the first mention of each
+   piece as `[[key|words]]` — `idea`, `heat`, `voice`, or a character's name
+   — so the blank reads in its words: "[A stranger on the night train].
+   [A watchful stranger called Vesper] takes the seat across from you." The
+   prompt gives guidance, not a template, and the model decides what reads
+   best: the idea's blank is the daydream as a whole rather than a
+   place — a story's situation, or what a monologue's voice says and to
+   whom, since it has no events — and opening with one tight sentence that is mostly that blank
+   usually works; the heat goes in where a word for it fits naturally; how it
+   is told is usually best said plainly in a closing sentence, "It's told
+   [in the characters' own words, with no narrator]", in the same words the
+   form uses (`TOLD_AS`), because worked into the story as "you talk with
+   them" it made talking sound like what the story was about. Nothing is to
+   be forced in. `parseMarkedSummary` reads it, leniently like any
+   suggestion: a marker for nothing in the story, or a second for the same
+   thing, keeps its words as plain text, while a summary with a broken
+   marker, or over `MAX_SUMMARY`, is dropped. Each ready-made daydream carries
+   one written by hand in that shape (`summary` in `starters.ts`, read by
+   `starterSummary`), with every piece marked, so it needs no second
+   paragraph; a test holds each to that. A draft whose summary was dropped
+   shows its premise in its place, with nothing marked. Debug mode shows the
+   markers instead of stripping them
+   ([debug-mode.md](debug-mode.md#a-new-daydreams-summary-markers)).
+2. **One written here**, holding every piece the first left out, so every
+   control is always on screen: a sentence for the heat, the idea and anyone
+   not mentioned yet — "It's a [steamy] daydream: [After hours], with [Mara]
+   (your boss)." or, with the heat already said, "The idea is [After
+   hours]." — and one for how it is told, "It's told [to you by a
+   narrator]." It once said "a story in [After hours]", which made every
+   idea's title a place, and a monologue a story. A character not mentioned yet comes with their part and who
+   they are to the user in parentheses. With nothing left out there is no
+   second paragraph.
+
+Each blank is a `SummaryBlank`: the words, in a plain span hidden from
+assistive tech, with an invisible button laid over them that is named with
+the same words and is what the keyboard and screen readers reach. A tap on
+the words presses the button; a drag or a double click selects them instead.
+The words are not the button's own text because Chromium leaves a button's
+text out of a copied selection, so copying the summary lost every blank.
+
+A heat that changes after the summary was written swaps only its word, and an
+"a" or "an" just before the blank changes to agree. A character's note in the
+second paragraph leaves out their part's name when who they are already says
+it.
+
+The model's paragraph is only true of the draft it was written for, and the
+summary is not part of the setup (nothing of it is sealed or stored). It is
+shown for as long as the idea's title and premise and how it is told are the
+draft's, and everyone it names is still in it by that name; change any of
+those and the premise takes its place, with every piece in the second
+paragraph. Someone added is only someone it does not mention, so they join the
+second paragraph. A changed heat is just a word: its blank says the new one.
 **Customise everything** switches the same form to the full layout, so
 nothing is lost: it is one superform either way, sharing its dialogs, its
 sealing and its submit. For a described daydream, **Try another** asks again
@@ -121,14 +192,14 @@ in the box still there.
 The stage is the page's own state, not the URL: a draft is something being
 made, and has no business in the browser's history.
 
-**Short by default.** The full layout shows the scene, who is in it, "More
+**Short by default.** The full layout shows the idea, who is in it, "More
 options" (who leads, the limits and the dials) and, last, how it is told, as
 one line with **Change**. Nothing is taken away — the same controls are a tap
 further in — and on the edit page each disclosure starts open when what it
 holds differs from the default (limits written, dials moved, a lead other than
 "They lead"), and the voice's picker starts open for a voice no preset gives
 or one with a name for the user, so nothing a user customised is ever out of
-sight. The character and scene dialogs do the same with "More detail".
+sight. The character and idea dialogs do the same with "More detail".
 
 The disclosures are `wa-details`, opened from the start with the `startOpen`
 attachment (`components/details.ts`) rather than `open={…}` in markup: the
@@ -146,9 +217,9 @@ The voice is two settings, separate from who is in the story
 
 - **Who tells it** (`narrator`): the characters themselves (`none`), a
   narrator talking to "you" (`second-person`), a narrator telling it about
-  others (`third-person`), or no narrator at all: a system — a house's rules,
+  others (`third-person`), no narrator at all but a system — a house's rules,
   a protocol, an institution — giving orders (`impersonal`, "A system" on the
-  page).
+  page), or one voice speaking its mind (`monologue`).
 - **Where the user is** (`stance`): in it as themselves (`self`), playing
   someone they name (`persona`), or outside it, watching and directing
   (`absent`).
@@ -161,12 +232,13 @@ Between them they make every shape of story:
 | A story told to you    | 0+         | second-person | self     |
 | Watch a story unfold   | 1+         | third-person  | absent   |
 | A system in charge     | 0+         | impersonal    | self     |
+| A monologue            | 0+         | monologue     | self     |
 
-Those four are the presets. **It is asked last, and guessed until then.**
+Those five are the presets. **It is asked last, and guessed until then.**
 Until the user picks one, the voice follows who is in the story
 (`inferVoice`): nobody in it is a story told to you, anyone is talking with
-them, and the one-line summary says "Picked from who's in it." Watching and a
-system are never guessed, because each changes what the story is rather than
+them, and the one-line summary says "Picked from who's in it." Watching, a
+system and a monologue are never guessed, because each changes what the story is rather than
 how it is told. Picking one — in the picker, or from the sentence's voice
 blank — stops the guessing for good. An edited daydream's voice counts as
 picked, and so does a draft's when it is not what the guess would have been
@@ -179,7 +251,9 @@ and beside them (below them, on a narrow screen) describes the chosen one,
 with two example lines of what the story will read like (`description` and
 `examples` on `DAYDREAM_VOICE_PRESETS`). Choosing another option is how its
 description is seen. Four descriptions side by side were a wall of text to
-compare; one at a time can be tried on. The two settings under "Fine-tune how
+compare; one at a time can be tried on. The examples are drawn with their
+bold and italics, as a passage would draw them (`formatPassage`): an action
+in italics, a monologue's statement in bold. The two settings under "Fine-tune how
 it's told" are names only in the same way, and for a combination no preset
 gives the panel describes the chosen narrator and stance instead, with the
 narrator's example.
@@ -189,12 +263,13 @@ in the one-line summary while the picker is closed, so nothing closed ever
 hides why the form will not save.
 `voiceProblem` refuses what cannot work — no narrator and no character
 (nobody speaks), no narrator while watching (the characters would be talking
-to no one), watching nothing, a narrator talking to a "you" who is absent, a
+to no one), watching nothing (except a monologue, which can be overheard
+with nobody in it), a narrator talking to a "you" who is absent, a
 persona with no name — and the form disables a choice that could never work
 with the other setting, saying why beside it. The setup kind runs the same
 check, so a stale page cannot store one. "Who leads" is shown only where it
-means something: with characters, and with the user there to be led
-(`leadApplies`).
+means something: with characters, with the user there to be led, and not in
+a monologue, which nobody leads (`leadApplies`).
 
 The three narrated voices are ordinary fiction, which the model writes well
 from a sentence. The system voice is not: told only to be "an impersonal
@@ -204,7 +279,7 @@ a guide of its own (`src/lib/server/daydream/impersonal-voice.ts`): what the
 system writes in — notices, numbered rules and amendments, exact
 instructions, logged compliance and infractions — what it never does
 (describe, feel, praise), and four short examples of the form. The examples
-are chosen by the scene's heat: up to Warm (or unset) a tame set, from Steamy
+are chosen by the idea's heat: up to Warm (or unset) a tame set, from Steamy
 an adult one, because examples steer content as well as form. They are
 deliberately unlike each other in how they open, and the guide forbids
 reusing their sentences: an earlier set that both began "The following
@@ -214,10 +289,84 @@ words. The system's opening request asks for its first notice rather than
 a system (Stricter, New rule, Inspection), and its characters are its
 functionaries rather than people with decisions of their own.
 
-### Characters and scenes, and the library
+**A monologue** is not a story at all. One voice speaks its mind about
+what the daydream is about, taking the ideas, tropes and common sayings of
+its kinks and turning them into statements: many short paragraphs, most
+opening with a statement in bold on a line of its own, followed by the
+voice's own words on it — a few sentences, or a longer run caught in an
+ordinary day (on the bus, at a café table), which each example set shows
+one of, since shown only short ones a model never writes it. The voice stands in for those ideas
+rather than being a fleshed-out character. Who it is is left to the setup:
+an unnamed voice with the user listening unless the idea suggests a
+character, or the user's own inner voice where that suits it; watching, the
+user overhears it. Told only to "speak a monologue" a model writes a
+soliloquy in a room, with a plot, so it gets a guide of its own like the
+system's (`src/lib/server/daydream/monologue-voice.ts`), last before the
+format, with examples of the form in a tame and an adult set by heat, broad
+rather than anyone's particular kink. It gets the sex section of the
+writing guide and its own in place of telling the story (`MONOLOGUE_TELLING`:
+keep the voice consistent, build on what has been said, use the setup's
+sayings as starting points rather than a list to work through), but not the
+prose, since it has no scene; its idea is described to the model as what the
+voice believes and who the user is to it, with its sayings on lines of
+their own ([Ideas](#ideas)); its opening
+request asks it to start straight into its statements; its suggestion and
+button ideas are its own (More like that, A mantra, Another idea); and
+nobody leads it. Its bold statements are drawn as standout lines
+([Reading a passage](#reading-a-passage)).
 
-Characters and scenes are kept in a per-user library (`daydream_characters`,
-`daydream_scenes`, `/daydreams/characters`, `/daydreams/scenes`) and picked
+The monologue came with setup payload v4, which also renames the setup's
+`scene` to `idea` ([Ideas](#ideas)) and ships its reader and writer
+in one release (docs/encryption.md, "Sealed records"): a tab left open on the
+previous build cannot open a daydream set up after the deploy until it
+reloads.
+
+Two ready-made daydreams are monologues, one for each side ("Owned" and
+"Yours to use"), with no cast: an unnamed voice speaks.
+
+### Ideas
+
+What a daydream is about is its **idea**: a title, what it is about
+(`premise`), where (`setting`), the user's part (`yourRole`), a tone, notes,
+the parts it has for characters, and its heat and kink. It was called the
+*scene* until the monologue, which has no scene: the word, and the fields
+it named ("What's going on: how it starts"), made the model and the form
+alike treat every daydream as a plot. "Idea" fits a story and a monologue
+equally, and matches the generated ideas, which become one when picked.
+
+The fields are the same for both, read differently for a monologue
+(`ideaFieldLabels` in `daydream/catalog.ts`): what it is about is what the
+voice believes and keeps coming back to, the user's part is who they are to
+it — the one it speaks to, or the one whose inner voice it is — and the
+notes are **Sayings to build on**, one to a line, shown up front in the idea
+dialog beside what it is about (`ideaPrimaryFields`) rather than under "More
+detail". The reply prompt sends them on lines of their own, named as what
+they are (`describeSetup`), and a model that sets one up writes eight to
+twelve of them there (`MONOLOGUE_SAYINGS`); a list that runs over the notes
+cap keeps as many whole lines as fit (`parseFill`), where any other field
+over its cap is dropped. The setup form tells the idea dialog's suggestions
+how the daydream is told (`narrator` in `SuggestContext`), so Fill in the
+rest and Surprise me write a monologue's idea, sayings and all, with no
+parts; the library's own dialog has no daydream around it, so it uses the
+usual words.
+
+**Words.** A *daydream* is the whole thing; a *story* is what the narrated
+voices tell, and the text the model writes (the story model, the story tree,
+a passage's `story` role); an *idea* is what a daydream is about. Two
+phrases keep "scene" in their own senses: **Stop the scene**, the kink
+term for stopping play, and a *scene break* in a passage.
+
+**Stored names keep the old word**, since renaming them buys nothing but a
+migration: the library's table is `daydream_scenes` (the schema's
+`daydreamIdeas`), its sealed kind is `daydream-scene` — the name is in every
+stored envelope — and setups up to v3 store the idea under `scene`, which
+the v3 upcast moves to v4's `idea`. `/daydreams/scenes` redirects to
+`/daydreams/ideas`.
+
+### Characters and ideas, and the library
+
+Characters and ideas are kept in a per-user library (`daydream_characters`,
+`daydream_scenes`, `/daydreams/characters`, `/daydreams/ideas`) and picked
 for a daydream, or made new for it in a dialog.
 
 **A daydream holds a copy, not a reference.** Picking a character copies it
@@ -233,7 +382,7 @@ opening anything:
   library's over this one; **Keep this version** records the library's
   revision as seen, so it stops asking.
 - **Only in this daydream.** / **No longer in your library.** — **Save to my
-  characters** (or scenes) makes a library record from the copy. Setups from
+  characters** (or ideas) makes a library record from the copy. Setups from
   before the library existed upcast to copies with no source, and land here.
 
 Editing a copied character from a daydream's setup edits the library's too
@@ -242,9 +391,9 @@ daydreams then see "Updated". Unticking "Save to my characters" keeps the
 edit in this daydream only, as a copy with no source — it never claims to
 match a record it no longer matches.
 
-### Characters, scenes and casting
+### Characters, ideas and casting
 
-A character and a scene are reusable on their own, but who a character is
+A character and an idea are reusable on their own, but who a character is
 *in a story* depends on the story. So the two are joined in the daydream, not
 in the library:
 
@@ -252,10 +401,10 @@ in the library:
   personality, how they talk, appearance, what they enjoy, notes, dials. It
   has no relationship to the user, because that changes from one story to the
   next.
-- **A scene can list parts** (`ScenePart`: a name like "the interviewer" and
-  a few words on it), up to `MAX_DAYDREAM_CHARACTERS`. Parts make a scene a
-  plot any fitting character can step into. They are optional: a scene with
-  none is cast freely. The user's own part stays the scene's `yourRole`
+- **An idea can list parts** (`IdeaPart`: a name like "the interviewer" and
+  a few words on it), up to `MAX_DAYDREAM_CHARACTERS`. Parts make an idea a
+  plot any fitting character can step into. They are optional: an idea with
+  none is cast freely. The user's own part stays the idea's `yourRole`
   ("Your part").
 - **The daydream's copy of each character carries a casting**
   (`DaydreamCasting`): the part they play (`partId`, or none), who they are
@@ -276,20 +425,20 @@ The rules that keep this sound:
   casting someone differently never makes them look changed, and catching up
   with the library never loses their part.
 - **A part is played once, and must exist.** `castingProblem` refuses a part
-  the scene does not have or one cast twice; the form schema and the setup
+  the idea does not have or one cast twice; the form schema and the setup
   kind both run it.
-- **Changing the scene lets go of parts, not words.** Swapping the scene, or
+- **Changing the idea lets go of parts, not words.** Swapping the idea, or
   taking the library's newer version of it, sets the `partId` of anyone in a
   part it no longer has to null and keeps their relationship and part text
-  (`fitCastingToScene`). Part ids are stable across a scene's edits, so an
-  edited scene keeps its castings.
+  (`fitCastingToIdea`). Part ids are stable across an idea's edits, so an
+  edited idea keeps its castings.
 - **Parts nobody plays are left out of the prompt.** Told about an empty
   part, the model would invent someone to fill it, which the user chose not
   to.
 
-**The model writes the link.** With suggestions on and a scene chosen,
+**The model writes the link.** With suggestions on and an idea chosen,
 casting a library character from a part's menu asks the model who they are
-in this story (the `casting` suggestion, from the actor's fields, the scene,
+in this story (the `casting` suggestion, from the actor's fields, the idea,
 the part, the others cast and where the user stands), and fills the
 casting's empty fields with the answer; the card says "Writing their part…"
 meanwhile. That is background work: a failure leaves the fields empty and
@@ -298,25 +447,25 @@ writes over something already written.
 
 ### Guided, over free text
 
-The character and scene dialogs (`DaydreamCharacterDialog.svelte`,
-`DaydreamSceneDialog.svelte`) are guided rather than blank:
+The character and idea dialogs (`DaydreamCharacterDialog.svelte`,
+`DaydreamIdeaDialog.svelte`) are guided rather than blank:
 
-- **Starting points** (`CHARACTER_TEMPLATES`, `SCENE_TEMPLATES` in
+- **Starting points** (`CHARACTER_TEMPLATES`, `IDEA_TEMPLATES` in
   `daydream/catalog.ts`), from SFW to filthy and extreme, in that order, each
-  saying its level on its button (below). A scene template comes with its
+  saying its level on its button (below). An idea template comes with its
   parts, which get fresh ids each time one is used.
 - **Character dials**: a tone (warm, teasing, cold, clinical) and six
   sliders — control, strictness, edge, talk, libido, kink — each of which can
   be left unset. The words for each value are in `daydream/dial-words.ts`,
   shared by the sliders and the prompt, so the screen and the model read the
   same thing.
-- **Scene dials**: heat and kink, up front in the scene dialog (below).
+- **Idea dials**: heat and kink, up front in the idea dialog (below).
 - **Chips under every field**: phrases that toggle in the field's text
   (`toggleChip`), leaving whatever else was written exactly as it was. The
   casting's two fields have their own (`CASTING_CHIPS`).
 - **Up front, and under "More detail".** A character shows its name, type and
-  personality; a scene its title, what is going on and its parts. The rest —
-  a character's dials and other fields, a scene's setting, your part, tone
+  personality; an idea its title, what is going on and its parts. The rest —
+  a character's dials and other fields, an idea's setting, your part, tone
   and notes — is under "More detail", which starts open when any of it is
   filled, and opens when a template, Fill in the rest or Surprise me writes
   into it, so what changed is in view.
@@ -327,29 +476,29 @@ Daydreams are for SFW stories and filthy ones alike, and nothing pretends
 otherwise: the prompt does not call every story erotic, and it does not shy
 away when one is.
 
-- **A scene has heat** (SFW → Flirty → Steamy → Explicit → Filthy) **and
+- **An idea has heat** (SFW → Flirty → Steamy → Explicit → Filthy) **and
   kink** (Vanilla → Light → Kinky → Heavy → Extreme). They are saved with a
-  library scene, set by its starting point, and shown above the other
+  library idea, set by its starting point, and shown above the other
   dials in the story's Dials popover (the caret of the Settings split
   button, right of Bookmarks; its main half goes to the settings page), so
-  they can be turned up or down mid-story. That changes the daydream's copy of the scene only, never the
+  they can be turned up or down mid-story. That changes the daydream's copy of the idea only, never the
   library's.
 - **A character has libido** (Chaste → Shy → Interested → Horny → Slutty)
   **and kink** (Vanilla → Curious → Kinky → Very kinky → Depraved).
 - **Heat is the ceiling.** At SFW nobody acts sexually, whatever their
   libido: a character's libido and kink say how eager they are within the
-  scene's heat, never past it (`describeSceneDials`). The user's limits
+  idea's heat, never past it (`describeIdeaDials`). The user's limits
   outrank all of it, as they outrank everything.
 - **Unset says nothing.** With no heat set, the prompt is silent on it and the
   model follows the words, as with every other dial. Setting heat to SFW is
   how a story is made strictly SFW.
-- **The starting points say their level** (`sceneLevel`, `characterLevel`):
+- **The starting points say their level** (`ideaLevel`, `characterLevel`):
   "SFW", "Explicit · kinky". Nobody has to guess what they are picking, and
   the range is plain to see, from the snowed-in slow burn to the dungeon.
 - **Suggestions match it.** The suggest prompt is given the dials, so chips
-  for a SFW scene stay SFW, and Fill in the rest and Surprise me rate a
-  scene's heat and kink where the user left them unset — never over ones
-  they set (`parseSceneDials` reads the answer leniently, dropping anything
+  for a SFW idea stay SFW, and Fill in the rest and Surprise me rate an
+  idea's heat and kink where the user left them unset — never over ones
+  they set (`parseIdeaDials` reads the answer leniently, dropping anything
   that is not 1 to 5).
 
 **The free text is the truth.** Every field is plain text the user can
@@ -359,8 +508,8 @@ disagree the prompt tells the model to follow the description.
 With suggestions on — the disclosure accepted and a key configured — the
 model can be asked too: **More ideas** for more chips on one field, **Fill
 in the rest** for the empty fields (never over written ones, and parts only
-for a scene with none), and **Surprise me** for a whole scene, parts
-included, which opens in the scene dialog to read, change, or **Try
+for an idea with none), and **Surprise me** for a whole idea, parts
+included, which opens in the idea dialog to read, change, or **Try
 another** before it is used. The new-daydream page asks for a whole daydream
 the same way (see [Starting one](#starting-one)). Without them, the curated chips and
 templates still work, and nothing leaves the device.
@@ -377,7 +526,7 @@ nested), and `onSubmit` replaces the whole post with the sealed record.
 
 ### What the presets are drawn from
 
-The idea chips, the ready-made stories, the starting points and the field
+The idea chips, the ready-made daydreams, the starting points and the field
 chips are weighted towards sex and kink, because that is what people open a
 kink app's daydreams for. Which themes they cover was decided from what
 recurs most, in October 2026, across NSFW roleplay character cards (Chub,
@@ -443,18 +592,18 @@ Three lines are kept on purpose:
 
 A daydream's `title` is empty until it has a name. Everywhere one is shown
 — the list, the story's heading, the home card — goes through
-`daydreamTitle`, which falls back to the scene's title, so an unnamed
+`daydreamTitle`, which falls back to the idea's title, so an unnamed
 daydream is never blank.
 
 Once the story page has an opening passage and nothing is being written,
-`DaydreamStory.nameIfUnnamed` sends the scene's title and premise, the cast's
+`DaydreamStory.nameIfUnnamed` sends the idea's title and premise, the cast's
 names, the user's limits and the start of the opening (`MAX_NAMING_OPENING`)
 as the `name` suggestion, and saves the answer into the setup through the
 same path as the dials. The page's heading is told the new name directly
 rather than reloading, which would read every turn again.
 
 It is asked at most once per visit, and never retried: a failure says
-nothing (the scene's title is still standing in) and the next visit asks
+nothing (the idea's title is still standing in) and the next visit asks
 again, and an answer that arrives after the setup gained a name some other
 way is dropped. Renaming is the edit page's Name field; clearing it hands the
 naming back to the model.
@@ -695,13 +844,13 @@ image model tuned for adult imagery, through Runware.
   reply format asks for an `"image"` in every passage's metadata
   (`IMAGE_INSTRUCTION` in `prompt.ts`) of one moment in the passage —
   usually the one it ends on, but the most striking one, and when the
-  scene is sexual the hottest, if that came earlier: the framing, how many
+  idea is sexual the hottest, if that came earlier: the framing, how many
   people, each one in full — an adult age as a number, their look as the
   setup says, what they wear, anyone the moment only implies included —
   then what they are doing, with a sex act spelt out and given all its
   common names, the place and the light (its quality, direction and
   colour), in literal sentences of 80 to 150 words, in words with one
-  meaning, and only as explicit as the scene's heat, which when it allows
+  meaning, and only as explicit as the idea's heat, which when it allows
   frames the sex plainly in view. The image model has seen nothing else and draws what the words say,
   so it gets no names, no "you", and nothing a camera could not see: a
   story's names and feelings only crowd out what it can draw, and a head
@@ -716,7 +865,7 @@ image model tuned for adult imagery, through Runware.
   knows what the last picture showed. It is part of the passage from the
   moment it is written, so the history still only adds to itself.
 - **The server wraps it.** `POST /api/daydreams/[id]/image` takes the
-  description, the daydream's style and the scene's heat, and builds the
+  description, the daydream's style and the idea's heat, and builds the
   request (`runwareTask`, `daydream/image-prompt.ts`): the style's model
   and words, an adult floor in the image model's own terms, and a negative
   prompt that keeps it away from anything youthful — and, at SFW, from
@@ -870,6 +1019,11 @@ of this still point at the same words, and nothing was migrated.
   at, and emphasis never crosses a paragraph.
 - A line of `***`, `* * *`, `---`, `___` or `⁂` on its own is a scene
   break, drawn as a centred ⁂. Repeated breaks collapse to one.
+- A paragraph that is bold throughout is a **standout line** (`standout`),
+  drawn larger and in the brand colour, like a pull quote. A monologue opens
+  most of its paragraphs with one; any voice's is drawn the same way. It is
+  read from the bold already there, not from new markup, so nothing written
+  before it reads differently unless it was all bold already.
 - Anything else — headings, lists, links — is shown as written. The prompt
   asks for none of it.
 
@@ -994,7 +1148,7 @@ the boundary is stated exactly.
 
 **Stored:** sealed records only, in the owner's self vault — the setup
 (`daydream-setup`), each turn (`daydream-turn`), each mark
-(`daydream-mark`), and each library character and scene
+(`daydream-mark`), and each library character and idea
 (`daydream-character`, `daydream-scene`), with frozen fixtures. Beside them,
 in plaintext:
 
@@ -1012,7 +1166,7 @@ prompt and forwards them to OpenRouter, and the provider that writes the
 reply. The reply streams back through the server unread.
 
 **In transit, for each picture:** the passage's description, the
-daydream's picture style and the scene's heat go to
+daydream's picture style and the idea's heat go to
 `POST /api/daydreams/[id]/image`, which wraps them ([Pictures](#pictures))
 and sends them to Runware; the picture comes back through the server to the
 browser. Stored: only the picture's ciphertext, under a key the server
@@ -1025,24 +1179,28 @@ the passage; it keeps none of it ([debug-mode.md](debug-mode.md#daydreams-raw-lo
 `POST /api/daydreams/suggest`, under the same rules, with a prompt of its
 own (`suggest-prompt.ts`):
 
-- for a character or scene being written: its fields (and a scene's parts),
+- for a character or idea being written: its fields (and an idea's parts),
   the names and types of the daydream's other characters, its limits and its
   dials;
-- for a casting: the character's own fields, the scene's, the part they are
+- for a casting: the character's own fields, the idea's, the part they are
   cast in, the others' names and parts, where the user stands, and the
   limits;
-- for a name: the scene's title and premise, the cast's names, the limits,
+- for a name: the idea's title and premise, the cast's names, the limits,
   and the first `MAX_NAMING_OPENING` characters of the opening passage;
-- for a whole daydream, from the new-daydream page: the sentence the user
-  wrote (up to `DAYDREAM_LIMITS.idea`) with the side chosen under "You as",
-  or a generated idea's title and premise with the side it was made for,
-  and any limits written on the draft;
-- for generated ideas: what the user wrote in the box (up to
-  `DAYDREAM_LIMITS.idea`), the side chosen under "You as", and for **More
-  ideas** the titles of those already shown.
+- for a whole daydream, from the new-daydream page: the brief the user
+  wrote (up to `DAYDREAM_LIMITS.brief`) with the side chosen under "You as",
+  or a generated idea's title and premise with the side and voice it was
+  made for, and any limits written on the draft; it answers with a summary
+  to show the draft as, too (see "Starting one");
+- for generated ideas: the brief (up to `DAYDREAM_LIMITS.brief`), the side
+  chosen under "You as", and for **More ideas** the titles of those already
+  shown.
 
 The answer is a small JSON completion, not streamed, passed back unread for
-the browser to check (`daydream/suggestions.ts`).
+the browser to check (`daydream/suggestions.ts`). When the provider fails,
+the 502 says only "No suggestions just now" — except to an account holding
+debug mode, which also gets the provider's status and error body as `detail`
+([debug-mode.md](debug-mode.md#why-a-daydreams-suggestion-failed)).
 
 **In transit, for debug mode's "Show prompt":** the same body as a reply, to
 `POST /api/daydreams/[id]/prompt`, which answers with the messages
@@ -1074,7 +1232,7 @@ budget.
 
 `src/lib/server/daydream/prompt.ts` builds what the model reads: the
 server's `RULES` first, then the setup (`describeSetup`: how it is told,
-each character with their dials in words, the scene with its heat and kink,
+each character with their dials in words, the idea with its heat and kink,
 the limits, the dials), then how to read the user's turns, then how a
 passage is written (see below), then — for the
 system voice only — its guide and examples, then either how to format the
@@ -1097,17 +1255,18 @@ not sexual at all, rather than calling every story erotic:
   outside.
 
 Consent is taken as settled, so the story never stops to establish it unless
-the scene is about it, and a fantasy of being taken against someone's will is
+the daydream is about it, and a fantasy of being taken against someone's will is
 played as the consensual fantasy it is.
 
 Owning the prompt also keeps the endpoints a daydream's writer rather than a
 general-purpose uncensored model anyone with the feature could aim at
 anything. The suggest prompt (`SUGGEST_RULES`) holds the same rules for
-characters and scenes, and asks for JSON only. Every suggestion that invents
-a story — Surprise me's scene, a whole daydream from a sentence, generated
+characters and ideas, and asks for JSON only. Every suggestion that invents
+a story — Surprise me's idea, a whole daydream from a brief, generated
 ideas — is also asked to think it through first (`STORY_CRAFT`): who the
 people are to each other, where it happens, why now, and, when it is
-sexual, which dynamic and acts suit it. Familiar tropes are welcome when
+sexual, which dynamic and acts suit it. One that invents a monologue gets
+`MONOLOGUE_CRAFT` in its place ([Starting one](#starting-one)). Familiar tropes are welcome when
 the user would enjoy them; invention is asked for only where it makes the
 story better. Its examples are deliberately broad
 rather than anyone's favourite kinks, because examples steer what comes
@@ -1120,7 +1279,8 @@ drawn from a hand-tuned character prompt whose output read well, keeping
 what holds for any story; each line answers something the model does left
 to itself.
 
-- **Telling the story**, for every voice: carry on from where the last
+- **Telling the story**, for every voice but a monologue, which has its own
+  lines on keeping its ideas moving (`MONOLOGUE_TELLING`): carry on from where the last
   passage ended without retelling it; keep strict continuity; match the
   build-up to what the user wants — a slow or less sexual story has room
   for quiet moments, a fast, hot or kinky one, or a user pushing for it,
@@ -1129,15 +1289,16 @@ to itself.
   reciting it; and get a stalled story moving. Passages are not told to end
   on a cue for the user, which suits someone only watching the story badly.
 - **Writing the prose**, for every voice but the system's, whose own guide
-  forbids exactly this kind of narration: spend the words on the people and
+  forbids exactly this kind of narration, and the monologue's, which has no
+  scene to describe: spend the words on the people and
   what they do, not on atmosphere that moves nothing; plain physical
   description over metaphor and simile; the senses.
 - **Writing sex**, at Explicit and Filthy only, since below that it would
-  push a scene past the heat the user chose: the point is to turn the user
+  push a daydream past the heat the user chose: the point is to turn the user
   on; a preference for crude words over clinical ones ("cock" rather than
   "penis"), above all from a character who would talk that way, but never
   from one who would not; bodies described in detail; moans and dirty talk;
-  a degradation scene cruder still, where it suits the characters and the
+  a degradation idea cruder still, where it suits the characters and the
   story. Filthy adds "hold nothing back". Unset heat gets
   the same lines as a conditional, for if the story turns explicit.
 
@@ -1349,7 +1510,7 @@ Noted so they are not lost; none is in the code.
   every way into their account loses their daydreams and library with it.
 - **Edited setups apply forward.** Changing the setup, the dials or a limit
   changes the next passage, not what has already been written.
-- **Heat and kink turned mid-story are this daydream's.** The scene in the
+- **Heat and kink turned mid-story are this daydream's.** The idea in the
   library keeps its own, and the setup page does not show the copy as
   changed, since its library revision has not moved.
 - **A stopped passage is kept as it stood**, mid-sentence (Stop writing, not
@@ -1363,14 +1524,17 @@ Noted so they are not lost; none is in the code.
 
 ## Tests
 
-- Pure: `daydream.test.ts` (every voice combination, casting against a
-  scene's parts, the voice guessed from the cast),
-  `daydream/starters.test.ts` (every ready-made story is a setup the form
+- Pure: `daydream.test.ts` (every voice combination, a monologue with any
+  cast and stance, casting against an idea's parts, the voice guessed from
+  the cast and never a monologue),
+  `daydream/starters.test.ts` (every ready-made daydream is a setup the form
   would save, cast as written; assembling a draft),
-  `daydream/sentence.test.ts` (each voice in words, the blanks),
+  `daydream/summary.test.ts` (reading the model's markers; what the second
+  paragraph says for each voice and each piece left out; when the model's
+  paragraph gives way to the premise),
   `daydream/tree.test.ts`, `reply-format.test.ts` (the written-out turn,
   arriving and finished), `passage-format.test.ts` (paragraphs and breaks,
-  emphasis pairing and what stays literal, dialogue, say tags,
+  emphasis pairing and what stays literal, standout lines, dialogue, say tags,
   what is hidden while it streams, quotes across formatting, every run
   verbatim), `reveal.test.ts` (the pace), `dice.test.ts`,
   `chips.test.ts`, `quotes.test.ts`, `ooc.test.ts`, `suggestions.test.ts`,
@@ -1378,7 +1542,8 @@ Noted so they are not lost; none is in the code.
   record, they run SFW to extreme in order, every chip is one phrase),
   `context.test.ts`, `server/daydream/prompt.test.ts` (the rules always come
   first; a stopped story gets a check-in in any mode; heat is the ceiling;
-  the system voice's guide, its place and its examples by heat; writing a
+  the system voice's and the monologue's guides, their place and their
+  examples by heat, who speaks a monologue; writing a
   turn out, never for a watcher; directions like a button; chosen readings
   as notes that settle it; the formatting asked for, never in a check-in),
   `suggest-prompt.test.ts`, `config.test.ts`, `daydream/image-prompt.test.ts`
@@ -1396,20 +1561,29 @@ Noted so they are not lost; none is in the code.
   as markers; Read it differently forking, mid-passage too, and its reading
   kept; a quote selected after hidden markup is stored offsets; a passage
   formatted as it arrives),
-  `DaydreamProse.svelte.test.ts` (what is drawn, voices without names, the drop
-  cap, quotes across formatting, `storedOffset`), `scroll-parent.svelte.test.ts`
+  `DaydreamProse.svelte.test.ts` (what is drawn, standout lines drawn larger,
+  voices without names, the drop cap, quotes across formatting,
+  `storedOffset`), `scroll-parent.svelte.test.ts`
   (following, and holding at a passage's top),
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts,
-  the voice last and guessed, the sentence layout),
-  `DaydreamVoicePicker.svelte.test.ts` (names only, the chosen one described),
+  the voice last and guessed, the summary layout with and without the
+  model's paragraph), `SummaryBlank.svelte.test.ts` (one named button to
+  assistive tech, taps and drags, kept in a copied selection, the menu
+  opening from the words),
+  `DaydreamVoicePicker.svelte.test.ts` (names only, the chosen one described,
+  its examples' markup drawn, the monologue offered),
   `DaydreamStarter.svelte.test.ts` (the ways in),
   `DaydreamSetupFormAdd.svelte.test.ts`,
   `DaydreamCharacterDialog.svelte.test.ts` (the two halves),
-  `DaydreamSceneDialog.svelte.test.ts` (the parts editor, heat and kink),
+  `DaydreamIdeaDialog.svelte.test.ts` (the parts editor, heat and kink, a
+  monologue's fields),
   `DaydreamBranchMap.svelte.test.ts` (the longest-path trunk, jumping,
   folding).
 - End to end: `e2e/daydreams.spec.ts` (a ready-made start through its
-  sentence, a described one, and the full form; the stub's opening has an
+  summary, a described one with the model's marked summary, a ready-made
+  monologue whose bold statement is drawn as a standout line, a brief for
+  sayings set up as a monologue, a generated monologue idea kept one, and
+  the full form; the stub's opening has an
   italic paragraph, so a quote is kept from inside drawn Markdown) and `e2e/daydream-heat.spec.ts`,
   against `e2e/model-stub.mjs`, a stand-in OpenRouter that `e2e/server.mjs`
   starts beside the app.

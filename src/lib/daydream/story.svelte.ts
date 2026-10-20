@@ -27,7 +27,7 @@ import {
 	type DaydreamSetup,
 	type DaydreamTurnRole,
 	type DialValue,
-	type SceneDials,
+	type IdeaDials,
 	type StoryDials
 } from '../daydream';
 import { reportRequestFailure } from '../request-failure.svelte';
@@ -1137,12 +1137,12 @@ export class DaydreamStory {
 	}
 
 	/**
-	 * The scene's heat and kink, turned up or down mid-story. Only this
-	 * daydream's copy of the scene changes, never the library's: like any
+	 * The idea's heat and kink, turned up or down mid-story. Only this
+	 * daydream's copy of the idea changes, never the library's: like any
 	 * edit to a setup, it applies from the next passage on.
 	 */
-	async setSceneDials(dials: SceneDials): Promise<string | null> {
-		return await this.saveSetup((setup) => ({ ...setup, scene: { ...setup.scene, dials } }));
+	async setIdeaDials(dials: IdeaDials): Promise<string | null> {
+		return await this.saveSetup((setup) => ({ ...setup, idea: { ...setup.idea, dials } }));
 	}
 
 	/**
@@ -1168,7 +1168,7 @@ export class DaydreamStory {
 	 * have started (docs/daydreams.md, "Naming").
 	 *
 	 * Answers the name once it is saved, or null. Background work nobody
-	 * waits on, so it never says why it did not: the scene's title stands in
+	 * waits on, so it never says why it did not: the idea's title stands in
 	 * meanwhile (`daydreamTitle`), and the next visit asks again. Never
 	 * retried on a revision conflict either — something else just changed the
 	 * setup, and naming is not worth overwriting it.
@@ -1187,7 +1187,7 @@ export class DaydreamStory {
 
 	async #name(setup: DaydreamSetup, opening: string): Promise<string | null> {
 		const answer = await suggestName({
-			scene: { title: setup.scene.title, premise: setup.scene.premise },
+			idea: { title: setup.idea.title, premise: setup.idea.premise },
 			characters: setup.characters.map((character) => character.name),
 			opening: opening.slice(0, MAX_NAMING_OPENING),
 			limits: setup.limits
@@ -1374,7 +1374,7 @@ export class DaydreamStory {
 		const made = await requestPicture(this.id, {
 			prompt,
 			style: setup.pictures.style,
-			heat: setup.scene.dials.heat
+			heat: setup.idea.dials.heat
 		});
 		if (!made.ok) {
 			this.#pictures.set(turnId, {

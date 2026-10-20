@@ -12,7 +12,7 @@ const sdxl: PictureModel = { runwareModelAir: 'civitai:1@1', architecture: 'sdxl
 const zImage: PictureModel = { runwareModelAir: 'persona:2@2', architecture: 'z-image-turbo' };
 
 describe('imagePromptProblem', () => {
-	it('lets an adult scene through', () => {
+	it('lets an adult idea through', () => {
 		expect(
 			imagePromptProblem(
 				'A woman in her thirties, kneeling and bound with red rope, in a candlelit bedroom'

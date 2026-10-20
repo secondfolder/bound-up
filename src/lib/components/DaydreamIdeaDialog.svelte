@@ -5,38 +5,40 @@
 	import InputField from '$lib/components/InputField.svelte';
 	import {
 		DAYDREAM_LIMITS,
-		type DaydreamSceneCopy,
+		type DaydreamIdeaCopy,
 		type DialValue,
-		EMPTY_SCENE,
-		MAX_DAYDREAM_CHARACTERS,
-		SCENE_PRIMARY_FIELDS,
-		SCENE_TEXT_FIELDS,
-		type SceneDials,
-		type ScenePart,
-		type SceneTextField
+		EMPTY_IDEA,
+		IDEA_TEXT_FIELDS,
+		type IdeaDials,
+		type IdeaPart,
+		type IdeaTextField,
+		ideaPrimaryFields,
+		MAX_DAYDREAM_CHARACTERS
 	} from '$lib/daydream';
-	import { SCENE_CHIPS, SCENE_FIELD_LABELS, SCENE_TEMPLATES } from '$lib/daydream/catalog';
+	import { IDEA_CHIPS, IDEA_TEMPLATES, ideaFieldLabels } from '$lib/daydream/catalog';
 	import { saveLibraryItem } from '$lib/daydream/client';
-	import { SCENE_SLIDERS, sceneLevel } from '$lib/daydream/dial-words';
+	import { IDEA_SLIDERS, ideaLevel } from '$lib/daydream/dial-words';
 	import {
 		type SuggestContext,
+		type SuggestFailure,
 		suggestChips,
 		suggestFill,
-		surpriseScene
+		surpriseIdea
 	} from '$lib/daydream/suggest';
 	import type { SuggestedPart } from '$lib/daydream/suggestions';
-	import { type DaydreamSceneFormValues, daydreamSceneFormSchema } from '$lib/schemas/daydreamForm';
+	import { type DaydreamIdeaFormValues, daydreamIdeaFormSchema } from '$lib/schemas/daydreamForm';
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
 	import { startOpen } from './details';
 	import OptionalSlider from './OptionalSlider.svelte';
+	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/**
-	 * Making or changing a scene, in a dialog, the way
+	 * Making or changing an idea, in a dialog, the way
 	 * `DaydreamCharacterDialog` makes a character: starting points, chips
 	 * under every field, the model's ideas when suggestions are on, and the
-	 * free text the truth. With `surprise`, the model writes the whole scene
+	 * free text the truth. With `surprise`, the model writes the whole idea
 	 * first — from the characters, the limits and the dials — and it opens
 	 * here to read, change, or try again before it is used.
 	 *
@@ -46,37 +48,40 @@
 	 * story it is — SFW or filthy — more than any other field. The rest is
 	 * under "More detail", which starts open when any of it is filled.
 	 *
-	 * An SPA superform saving through `api/daydreams/scenes`, for the reason
+	 * An SPA superform saving through `api/daydreams/ideas`, for the reason
 	 * the character dialog gives.
 	 */
 	let {
-		scene = null,
+		idea = null,
 		libraryRevision = null,
 		surprise = false,
 		context,
 		suggestionsOn,
+		debug = false,
 		onsaved,
 		onclose
 	}: {
-		scene?: DaydreamSceneCopy | null;
+		idea?: DaydreamIdeaCopy | null;
 		libraryRevision?: number | null;
-		/** Start with a scene the model makes up ("Surprise me"). */
+		/** Start with an idea the model makes up ("Surprise me"). */
 		surprise?: boolean;
 		context: SuggestContext;
 		suggestionsOn: boolean;
-		onsaved: (scene: DaydreamSceneCopy, sealed?: SealedRefView) => void;
+		/** Debug mode: a failed suggestion shows what came back. */
+		debug?: boolean;
+		onsaved: (idea: DaydreamIdeaCopy, sealed?: SealedRefView) => void;
 		onclose: () => void;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
-	const existing = scene;
+	const existing = idea;
 	// svelte-ignore state_referenced_locally
 	const knownRevision = libraryRevision;
 	// svelte-ignore state_referenced_locally
 	const surprising = surprise;
 	const inLibrary = existing?.sourceId !== null && knownRevision !== null;
 
-	const start: DaydreamSceneFormValues = existing
+	const start: DaydreamIdeaFormValues = existing
 		? {
 				title: existing.title,
 				setting: existing.setting,
@@ -88,16 +93,20 @@
 				dials: { ...existing.dials },
 				saveToLibrary: inLibrary
 			}
-		: { ...EMPTY_SCENE, saveToLibrary: true };
+		: { ...EMPTY_IDEA, saveToLibrary: true };
 
-	let problem: string | null = $state(null);
+	let problem: SuggestFailure | null = $state(null);
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();
 	let detail: (HTMLElement & { open: boolean }) | undefined = $state();
 
-	const DETAIL_FIELDS = SCENE_TEXT_FIELDS.filter(
-		(field) => !(SCENE_PRIMARY_FIELDS as readonly SceneTextField[]).includes(field)
-	);
-	const detailFilled = (values: Pick<DaydreamSceneFormValues, SceneTextField>) =>
+	// How the daydream around it is told, as it was when the dialog opened: a
+	// monologue's idea asks for its sayings up front, in words of its own.
+	// svelte-ignore state_referenced_locally
+	const { narrator } = context;
+	const labels = ideaFieldLabels(narrator);
+	const PRIMARY_FIELDS = ideaPrimaryFields(narrator);
+	const DETAIL_FIELDS = IDEA_TEXT_FIELDS.filter((field) => !PRIMARY_FIELDS.includes(field));
+	const detailFilled = (values: Pick<DaydreamIdeaFormValues, IdeaTextField>) =>
 		DETAIL_FIELDS.some((field) => values[field].trim() !== '');
 	const startsDetailed = detailFilled(start);
 
@@ -109,20 +118,20 @@
 	}
 
 	/** The dials the user has set, with the model's ideas only where they left one unset. */
-	const keepSetDials = (suggested: SceneDials): SceneDials => ({
+	const keepSetDials = (suggested: IdeaDials): IdeaDials => ({
 		heat: $form.dials.heat ?? suggested.heat,
 		kink: $form.dials.kink ?? suggested.kink
 	});
 
-	function setDial(key: keyof SceneDials, level: DialValue | null) {
+	function setDial(key: keyof IdeaDials, level: DialValue | null) {
 		$form.dials = { ...$form.dials, [key]: level };
 	}
 
 	/** Parts from a template or the model, with ids of their own. */
-	const withIds = (parts: readonly SuggestedPart[]): ScenePart[] =>
+	const withIds = (parts: readonly SuggestedPart[]): IdeaPart[] =>
 		parts.map((part) => ({ ...part, id: crypto.randomUUID() }));
 
-	const superform = superForm(defaults(start, zod4Client(daydreamSceneFormSchema)), {
+	const superform = superForm(defaults(start, zod4Client(daydreamIdeaFormSchema)), {
 		SPA: true,
 		// Nothing for the page to apply or reload: the dialog saves through the
 		// API and hands the result back. Left on, superforms re-runs the page's
@@ -134,7 +143,7 @@
 		// The heat and kink dials are a nested object, which superforms only allows as JSON.
 		dataType: 'json',
 		resetForm: false,
-		validators: zod4Client(daydreamSceneFormSchema),
+		validators: zod4Client(daydreamIdeaFormSchema),
 		async onUpdate({ form: submitted }) {
 			problem = null;
 			if (!submitted.valid) {
@@ -157,13 +166,13 @@
 				return;
 			}
 			const id = inLibrary && existing?.sourceId ? existing.sourceId : crypto.randomUUID();
-			const saved = await saveLibraryItem('scenes', {
+			const saved = await saveLibraryItem('ideas', {
 				id,
 				content,
 				expectedRevision: inLibrary ? knownRevision : null
 			});
 			if (!saved.ok) {
-				problem = saved.error;
+				problem = { error: saved.error };
 				return;
 			}
 			onsaved({ ...content, sourceId: id, sourceRevision: saved.revision }, saved.sealed);
@@ -180,25 +189,25 @@
 	}
 
 	const canSave = $derived(
-		(existing === null || isTainted($tainted)) && daydreamSceneFormSchema.safeParse($form).success
+		(existing === null || isTainted($tainted)) && daydreamIdeaFormSchema.safeParse($form).success
 	);
 
 	const draft = $derived(
 		Object.fromEntries(
-			(['title', ...SCENE_TEXT_FIELDS] as const).map((field) => [field, $form[field]])
+			(['title', ...IDEA_TEXT_FIELDS] as const).map((field) => [field, $form[field]])
 		) as Record<string, string>
 	);
 
 	const empty = $derived(
 		$form.title.trim() === '' &&
-			SCENE_TEXT_FIELDS.every((field) => $form[field].trim() === '') &&
+			IDEA_TEXT_FIELDS.every((field) => $form[field].trim() === '') &&
 			$form.parts.length === 0
 	);
 
 	function useTemplate(id: string) {
-		const template = SCENE_TEMPLATES.find((entry) => entry.id === id);
+		const template = IDEA_TEMPLATES.find((entry) => entry.id === id);
 		if (template) {
-			$form = { ...$form, ...template.scene, parts: withIds(template.scene.parts) };
+			$form = { ...$form, ...template.idea, parts: withIds(template.idea.parts) };
 			revealDetail();
 		}
 	}
@@ -209,7 +218,7 @@
 		$form.parts = [...$form.parts, { id: crypto.randomUUID(), name: '', description: '' }];
 	}
 
-	function setPart(index: number, patch: Partial<ScenePart>) {
+	function setPart(index: number, patch: Partial<IdeaPart>) {
 		$form.parts = $form.parts.map((part, at) => (at === index ? { ...part, ...patch } : part));
 	}
 
@@ -232,11 +241,11 @@
 
 	let thinking = $state(false);
 
-	/** A whole scene from the model, in place of what is in the form. */
+	/** A whole idea from the model, in place of what is in the form. */
 	async function makeOneUp() {
 		thinking = true;
 		problem = null;
-		const answer = await surpriseScene(context, $form.dials);
+		const answer = await surpriseIdea(context, $form.dials);
 		thinking = false;
 		if (answer.ok) {
 			$form = {
@@ -247,7 +256,7 @@
 			};
 			revealDetail();
 		} else {
-			problem = answer.error;
+			problem = answer;
 		}
 	}
 
@@ -261,29 +270,29 @@
 		thinking = true;
 		problem = null;
 		const answer = await suggestFill({
-			target: 'scene',
+			target: 'idea',
 			draft,
 			parts: namedParts(),
-			sceneDials: $form.dials,
+			ideaDials: $form.dials,
 			context
 		});
 		thinking = false;
 		if (!answer.ok) {
-			problem = answer.error;
+			problem = answer;
 			return;
 		}
 		const next = { ...$form };
-		for (const field of ['title', ...SCENE_TEXT_FIELDS] as const) {
+		for (const field of ['title', ...IDEA_TEXT_FIELDS] as const) {
 			const text = answer.value.fields[field];
 			if (text && next[field].trim() === '') {
 				next[field] = text;
 			}
 		}
-		// Parts only for a scene that had none: never over the ones written.
+		// Parts only for an idea that had none: never over the ones written.
 		if (next.parts.length === 0) {
 			next.parts = withIds(answer.value.parts);
 		}
-		next.dials = keepSetDials(answer.value.sceneDials);
+		next.dials = keepSetDials(answer.value.ideaDials);
 		$form = next;
 		revealDetail();
 	}
@@ -294,14 +303,14 @@
 			.filter((part) => part.name.trim() !== '')
 			.map(({ name, description }) => ({ name, description }));
 
-	function moreIdeas(field: SceneTextField) {
+	function moreIdeas(field: IdeaTextField) {
 		return () =>
 			suggestChips({
-				target: 'scene',
+				target: 'idea',
 				field,
 				draft,
 				parts: namedParts(),
-				sceneDials: $form.dials,
+				ideaDials: $form.dials,
 				context
 			});
 	}
@@ -310,27 +319,28 @@
 		if (surprising) {
 			return 'A surprise';
 		}
-		return existing ? `Change “${existing.title}”` : 'A new scene';
+		return existing ? `Change “${existing.title}”` : 'A new idea';
 	}
 	const dialogLabel = labelFor();
 
-	const LIMIT_OF: Record<SceneTextField, number> = {
+	const LIMIT_OF: Record<IdeaTextField, number> = {
 		setting: DAYDREAM_LIMITS.setting,
 		premise: DAYDREAM_LIMITS.premise,
 		yourRole: DAYDREAM_LIMITS.yourRole,
 		tone: DAYDREAM_LIMITS.tone,
-		notes: DAYDREAM_LIMITS.sceneNotes
+		notes: DAYDREAM_LIMITS.ideaNotes
 	};
 </script>
 
-{#snippet textField(field: SceneTextField)}
+{#snippet textField(field: IdeaTextField)}
 	<DaydreamChipField
-		label={SCENE_FIELD_LABELS[field].label}
-		hint={SCENE_FIELD_LABELS[field].hint}
+		{debug}
+		label={labels[field].label}
+		hint={labels[field].hint}
 		value={$form[field]}
 		limit={LIMIT_OF[field]}
-		chips={SCENE_CHIPS[field]}
-		rows={field === 'premise' ? 4 : 2}
+		chips={IDEA_CHIPS[field]}
+		rows={field === 'premise' || (field === 'notes' && narrator === 'monologue') ? 4 : 2}
 		onchange={(text) => {
 			$form[field] = text;
 		}}
@@ -341,7 +351,7 @@
 
 <wa-dialog
 	bind:this={dialog}
-	class="scene-dialog"
+	class="idea-dialog"
 	label={dialogLabel}
 	open
 	onwa-after-hide={(event: Event) => event.target === dialog && onclose()}
@@ -361,8 +371,8 @@
 			<section aria-label="Start from">
 				<p class="hint">Start from one of these, or from nothing.</p>
 				<div class="template-list">
-					{#each SCENE_TEMPLATES as template (template.id)}
-						{const level = $derived(sceneLevel(template.scene.dials))}
+					{#each IDEA_TEMPLATES as template (template.id)}
+						{const level = $derived(ideaLevel(template.idea.dials))}
 						<wa-button size="s" appearance="outlined" onclick={() => useTemplate(template.id)}>
 							{template.label}
 							{#if level}<span class="level">{level}</span>{/if}
@@ -381,14 +391,14 @@
 			required
 		/>
 
-		{#each SCENE_PRIMARY_FIELDS as field (field)}
+		{#each PRIMARY_FIELDS as field (field)}
 			{@render textField(field)}
 		{/each}
 
 		<fieldset class="heat">
 			<legend>Heat and kink</legend>
-			<p class="hint">How sexual and how kinky it is, from SFW to filthy. Optional: left unset, the story follows what you wrote.</p>
-			{#each SCENE_SLIDERS as entry (entry.key)}
+			<p class="hint">How sexual and how kinky it is, from SFW to filthy. Optional: left unset, the daydream follows what you wrote.</p>
+			{#each IDEA_SLIDERS as entry (entry.key)}
 				<OptionalSlider
 					label={entry.label}
 					low={entry.low}
@@ -403,7 +413,7 @@
 		<fieldset class="parts">
 			<legend>Parts for characters</legend>
 			<p class="hint">
-				Who else the scene needs, like “the interviewer”. Characters are cast into these when you
+				Who else the idea needs, like “the interviewer”. Characters are cast into these when you
 				set up a daydream. Optional.
 			</p>
 			{#each $form.parts as part, index (part.id)}
@@ -452,13 +462,13 @@
 
 		<label class="save-to-library">
 			<input type="checkbox" bind:checked={$form.saveToLibrary} />
-			<span>Save to my scenes, to use in other daydreams</span>
+			<span>Save to my ideas, to use in other daydreams</span>
 		</label>
 		{#if inLibrary && $form.saveToLibrary}
 			<p class="hint">This changes it in your library too.</p>
 		{/if}
 
-		{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
+		{#if problem}<SuggestionProblem {problem} {debug} />{/if}
 
 		<div class="buttons">
 			<wa-button appearance="plain" onclick={close}>Cancel</wa-button>
@@ -468,14 +478,14 @@
 				variant={canSave ? 'brand' : 'neutral'}
 				disabled={$submitting || thinking}
 			>
-				{existing ? 'Save changes' : 'Use this scene'}
+				{existing ? 'Save changes' : 'Use this idea'}
 			</wa-button>
 		</div>
 	</form>
 </wa-dialog>
 
 <style>
-	.scene-dialog {
+	.idea-dialog {
 		--width: min(40rem, 100vw);
 	}
 

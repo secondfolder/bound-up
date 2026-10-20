@@ -15,16 +15,19 @@ import type { DaydreamVoice, DialValue } from '$lib/daydream';
  * dials to skip, or escalating a slow one until there is nowhere left to go.
  *
  * Two halves. How to tell the story holds for every voice, the system's
- * included. How to write the prose does not hold for the system, whose
- * guide (`impersonal-voice.ts`) forbids narration of exactly this kind, so
- * it is left out there.
+ * included, except a monologue, which has no story to keep straight — no
+ * one's clothes, no room, no plot to stall — and gets its own lines on
+ * keeping its ideas moving instead (`MONOLOGUE_TELLING`). How to write the
+ * prose does not hold for the system, whose guide (`impersonal-voice.ts`)
+ * forbids narration of exactly this kind, so it is left out there, and nor
+ * for a monologue (`monologue-voice.ts`), which has no scene to describe.
  *
  * Explicit sex has its own lines, on heat: clinical words and soft-focus
  * prose are the model's default, and at Explicit or Filthy they are what
  * the user set the dial to get away from. The crude words are a preference,
  * not a rule: a shy or formal character saying "cunt" breaks the character,
  * which matters more. Below that they would push a
- * steamy scene past what the user chose, so they are not sent. Unset heat
+ * steamy daydream past what the user chose, so they are not sent. Unset heat
  * gets them conditionally, as the words of the setup decide everything
  * else about it.
  */
@@ -36,6 +39,13 @@ const TELLING = `# Telling the story
 - Follow the user's lead on what the story is about, and vary it: do not fixate on one theme, act or kink when the setup offers more.
 - A character's description is who they are, not lines to recite. Bring in their background, tastes and history only where they fit the moment.
 - If the story stalls, bring in a detail, a question or a change that gets it moving.`;
+
+const MONOLOGUE_TELLING = `# Keeping the monologue going
+- Carry on from exactly where the last passage ended. Never repeat or sum up what the voice already said.
+- Keep the voice consistent: who is speaking, who to, and how they talk, from the first passage to the last.
+- Build on what has been said: go further into an idea, take it somewhere new, or turn to one that goes with it, so each passage says more than the last.
+- Follow the user's lead on what it dwells on, and vary it: do not fixate on one idea when the setup offers more.
+- Use the sayings in the setup as starting points to build on, not a list to work through in order.`;
 
 const PROSE = `# Writing the prose
 - Spend the words on what matters to the scene: the people, what they do, what they say. A line of setting is enough; never pad with atmosphere that moves nothing, like "The neon sign buzzes like a dying firefly, casting the wet car park in stuttering pink."
@@ -65,6 +75,11 @@ function sexGuide(heat: DialValue | null): string | null {
 export function writingGuide(voice: DaydreamVoice, heat: DialValue | null): string {
 	if (voice.narrator === 'impersonal') {
 		return TELLING;
+	}
+	// A monologue has no scene to write prose about, but its sex is still
+	// written in plain, crude words.
+	if (voice.narrator === 'monologue') {
+		return [MONOLOGUE_TELLING, sexGuide(heat)].filter((section) => section !== null).join('\n\n');
 	}
 	return [TELLING, PROSE, sexGuide(heat)].filter((section) => section !== null).join('\n\n');
 }

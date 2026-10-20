@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SUGGEST_RULES } from '$lib/server/daydream/suggest-prompt';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
+import { grantFeature } from '$lib/server/features';
 import type { RateLimitResult } from '$lib/server/rate-limit';
 import type { ServerSettingKey } from '$lib/server-settings';
 import { createTestDb, type TestDb } from '$lib/testing/db';
@@ -75,6 +76,15 @@ function post(
 	);
 }
 
+/** A failed request's status and JSON body. */
+async function failure() {
+	const result = await post(ada);
+	if (result.type !== 'ok') {
+		throw new Error(`expected a response, not ${JSON.stringify(result)}`);
+	}
+	return { status: result.value.status, body: await result.value.json() };
+}
+
 describe('POST /api/daydreams/suggest', () => {
 	it('passes the provider’s answer straight back', async () => {
 		const result = await post(ada);
@@ -125,7 +135,7 @@ describe('POST /api/daydreams/suggest', () => {
 		const casting = {
 			task: 'casting',
 			character: { name: 'Mara', notes: SECRET_WORDS },
-			scene: { title: 'After hours', premise: 'an interview' },
+			idea: { title: 'After hours', premise: 'an interview' },
 			part: { name: 'the interviewer', description: '' },
 			others: [],
 			stance: 'self',
@@ -133,12 +143,12 @@ describe('POST /api/daydreams/suggest', () => {
 		};
 		const naming = {
 			task: 'name',
-			scene: { title: 'After hours', premise: 'an interview' },
+			idea: { title: 'After hours', premise: 'an interview' },
 			characters: ['Mara'],
 			opening: SECRET_WORDS,
 			limits: ''
 		};
-		const ideas = { task: 'ideas', request: SECRET_WORDS, side: 'sub', limits: '' };
+		const ideas = { task: 'ideas', brief: SECRET_WORDS, side: 'sub', limits: '' };
 		for (const json of [casting, naming, ideas]) {
 			expect(await post(ada, json)).toMatchObject({ type: 'ok' });
 		}
@@ -156,7 +166,7 @@ describe('POST /api/daydreams/suggest', () => {
 		const limit = vi.fn(async (): Promise<RateLimitResult> => ({ allowed: true }));
 		const naming = {
 			task: 'name',
-			scene: { title: 'After hours', premise: 'an interview' },
+			idea: { title: 'After hours', premise: 'an interview' },
 			characters: [],
 			opening: 'x'.repeat(2001),
 			limits: ''
@@ -180,12 +190,34 @@ describe('POST /api/daydreams/suggest', () => {
 			vi.spyOn(console, method).mockImplementation(() => undefined)
 		);
 		upstream.mockResolvedValueOnce(new Response(`echo: ${SECRET_WORDS}`, { status: 500 }));
-		expect(await post(ada)).toMatchObject({ status: 502 });
+		expect(await failure()).toEqual({
+			status: 502,
+			body: { message: 'No suggestions just now. Try again in a moment.' }
+		});
 		upstream.mockRejectedValueOnce(new TypeError(`failed for ${SECRET_WORDS}`));
-		expect(await post(ada)).toMatchObject({ status: 502 });
-		await post(ada);
+		expect((await failure()).status).toBe(502);
+		await grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: ada.id });
+		upstream.mockResolvedValueOnce(new Response(`echo: ${SECRET_WORDS}`, { status: 500 }));
+		await failure();
 		for (const spy of spies) {
 			expect(JSON.stringify(spy.mock.calls)).not.toContain(SECRET_WORDS);
 		}
+	});
+
+	it('says what went wrong with the provider only to an account holding debug mode', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		upstream.mockResolvedValueOnce(new Response('{"error":"model overloaded"}', { status: 503 }));
+		expect((await failure()).body).not.toHaveProperty('detail');
+
+		await grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: ada.id });
+		upstream.mockResolvedValueOnce(new Response('{"error":"model overloaded"}', { status: 503 }));
+		expect((await failure()).body).toEqual({
+			message: 'No suggestions just now. Try again in a moment.',
+			detail: 'The model provider answered 503:\n{"error":"model overloaded"}'
+		});
+		upstream.mockRejectedValueOnce(new TypeError('fetch failed'));
+		expect((await failure()).body).toMatchObject({
+			detail: 'The model provider could not be reached: fetch failed'
+		});
 	});
 });

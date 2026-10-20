@@ -12,7 +12,7 @@ their partnership's vault;
 tasks, rewards, and their completions and claims in the owner's or the
 partnership's vault ([docs/tasks.md](tasks.md#what-the-server-can-see),
 [docs/rewards.md](rewards.md#what-the-server-can-see)); a daydream's setup,
-every turn and mark of it, and the user's library of characters and scenes in
+every turn and mark of it, and the user's library of characters and ideas in
 the owner's own vault ([docs/daydreams.md](daydreams.md)). Moving the remaining
 kinds of user data onto vaults is in progress, and until a kind has moved, it
 is stored as it was.
@@ -31,7 +31,7 @@ behaviour lives in [docs/embeds.md](embeds.md).
 A third, wider exception is Daydreams. Their passages are written by a hosted
 language model, so while a daydream is being played the browser sends its
 setup and recent turns as plaintext to `/api/daydreams/[id]/reply`, and while
-one is being set up, the character or scene being written to
+one is being set up, the character or idea being written to
 `/api/daydreams/suggest` when the user asks for ideas; both forward them to
 OpenRouter and a model provider. The server neither stores nor logs them, and
 what is saved is sealed like everything else, but the words do leave the
@@ -697,8 +697,15 @@ in `src/lib/sealed.ts`:
   comes out of a vault was written by a partner's device or forged, so it is
   parsed, never cast, and a schema that strips undeclared keys is also what
   keeps a record from carrying extra data.
-- **A new version's reader ships a release before its writer**, so a tab
-  still open on the previous build never meets data it cannot read.
+- **A new version's reader usually ships a release before its writer**, so a
+  tab still open on the previous build never meets data it cannot read. The
+  two may ship in one release when the cost is acceptable: a tab left open on
+  the previous build cannot open a record written at the new version until it
+  reloads, which the app prompts it to do
+  ([versions-and-updates.md](versions-and-updates.md)), and only a record made
+  after the deploy is affected. Daydreams' setup v4 (the monologue voice,
+  and the scene renamed the idea) shipped this way, since a stale tab
+  missing one new daydream costs nothing but a reload.
 - **A record read at an older version is written back at the latest**,
   compare-and-swap on `revision`, so a background upgrade can never overwrite
   a newer edit from the other partner.

@@ -133,7 +133,7 @@ refused reply answers 429 with `Retry-After` and the usual "Try again in …"
 wording, which the page shows beside the conversation. A malformed request is
 refused before it is counted. See [daydreams.md](daydreams.md#cost).
 
-Setup suggestions — more chips, filling in a character or scene, "Surprise
+Setup suggestions — more chips, filling in a character or idea, "Surprise
 me" — go to the model through `/api/daydreams/suggest`, counted the same way
 in a scope of their own (`daydream-suggest|user|<id>`,
 `DAYDREAM_SUGGEST_LIMITS`, `locals.daydreamSuggestRateLimit`): 30 a minute

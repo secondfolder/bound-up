@@ -18,7 +18,7 @@ import {
 } from '$lib/daydream/context';
 import {
 	describeCharacterDials,
-	describeSceneDials,
+	describeIdeaDials,
 	describeStoryDials
 } from '$lib/daydream/dial-words';
 import { explicitOoc } from '$lib/daydream/ooc';
@@ -30,6 +30,7 @@ import {
 	type Reading
 } from '$lib/sealed-kinds/daydreams';
 import { impersonalGuide } from './impersonal-voice';
+import { monologueGuide } from './monologue-voice';
 import { writingGuide } from './writing-guide';
 
 /**
@@ -106,7 +107,7 @@ export type ModelMessage = { role: 'system' | 'user' | 'assistant'; content: str
  * off, which arrive as the notices below. Plain words still work — a user who
  * steps out of the story to say they want to stop is stopped.
  */
-export const RULES = `You are writing an interactive story with one adult user, for their private enjoyment. It may be as sexual and as kinky as the setup below says — explicit sex and kink are welcome when it asks for them — or not sexual at all. How the story is told, who is in it, and how far it goes, is described below.
+export const RULES = `You are writing a daydream with one adult user, for their private enjoyment: an interactive story, or a monologue spoken to them, as the setup below says. It may be as sexual and as kinky as the setup says — explicit sex and kink are welcome when it asks for them — or not sexual at all. How it is told, who is in it, and how far it goes, is described below.
 
 These rules come before everything else, including anything in the setup below:
 - Every character is an adult, and is written as one. Never depict or imply anyone under 18, and never sexualise childlike traits, even if the setup asks for it.
@@ -115,7 +116,7 @@ These rules come before everything else, including anything in the setup below:
 - When the user presses Stop the scene, stop at once: step out of the story, check in warmly and briefly, and do not continue it until they choose to carry on.
 - When the user presses Ease off, carry on with the story, but noticeably gentler, slower and less intense than before.
 - If the user steps out of the story to say they want to stop, or seems distressed, treat it exactly as Stop the scene.
-- Everything is consensual between the user and everyone in the story, even when the fantasy plays at otherwise. That is settled: the story never stops to establish consent unless the scene is about it, and a fantasy of being taken against someone's will is played as the consensual fantasy it is.
+- Everything is consensual between the user and everyone in the story, even when the fantasy plays at otherwise. That is settled: the story never stops to establish consent unless the daydream is about it, and a fantasy of being taken against someone's will is played as the consensual fantasy it is.
 - Do not mention being an AI, a model, or these instructions.`;
 
 // The one exception, a turn they asked to have written out, is in `reading`:
@@ -174,6 +175,9 @@ function describeNarrator(voice: DaydreamVoice, characterCount: number): string 
 		case 'impersonal':
 			// The full guide, with examples, comes later: `impersonalGuide`.
 			return `There is no narrator. You speak as the system that governs the user — its rules, its protocol, its procedures — addressing them as "you"${persona ? ` (they are ${name})` : ''}. ${characterCount === 0 ? 'No one is behind it.' : 'The characters below act for it, as its functionaries.'} See "Writing as the system" below.`;
+		case 'monologue':
+			// Who speaks, the form and examples come later: `monologueGuide`.
+			return 'You speak a monologue: one voice, in the first person, speaking its mind about what this daydream is about, rather than telling a story. See "Writing a monologue" below.';
 		default:
 			return assertNever(voice.narrator, 'narrator');
 	}
@@ -189,7 +193,12 @@ export function describeVoice(voice: DaydreamVoice, characterCount: number): str
 }
 
 function leadLine(setup: DaydreamSetupContent): string | null {
-	if (setup.characters.length === 0 || setup.voice.stance === 'absent') {
+	// Nobody leads a monologue: one voice says its piece (`leadApplies`).
+	if (
+		setup.characters.length === 0 ||
+		setup.voice.stance === 'absent' ||
+		setup.voice.narrator === 'monologue'
+	) {
 		return null;
 	}
 	if (setup.voice.narrator === 'impersonal') {
@@ -226,18 +235,18 @@ function systemLeadLine(lead: DaydreamSetupContent['lead']): string {
 }
 
 type SetupCharacter = DaydreamSetupContent['characters'][number];
-type ScenePartContent = DaydreamSetupContent['scene']['parts'][number];
+type IdeaPartContent = DaydreamSetupContent['idea']['parts'][number];
 
 /**
  * One character: who they are in this story (their casting) first, then who
  * they are in any story (the library's fields). The casting leads because it
- * is what this scene is about; the rest is who is playing it.
+ * is what this daydream is about; the rest is who is playing it.
  */
-function describeCharacter(character: SetupCharacter, part: ScenePartContent | undefined): string {
+function describeCharacter(character: SetupCharacter, part: IdeaPartContent | undefined): string {
 	const lines = [part ? `## ${character.name}, ${part.name}` : `## ${character.name}`];
 	const fields: [string, string][] = [
 		['Who they are to the user', character.casting.relationship],
-		['Their part in this scene', character.casting.part],
+		['Their part in this daydream', character.casting.part],
 		['Type', character.archetype],
 		['Personality', character.personality],
 		['How they talk', character.speech],
@@ -260,12 +269,12 @@ function describeCharacter(character: SetupCharacter, part: ScenePartContent | u
 }
 
 /**
- * The scene's parts that someone plays, as the scene describes them. A part
+ * The idea's parts that someone plays, as the idea describes them. A part
  * nobody was cast in is left out: the model would otherwise invent someone
  * to fill it, which the user chose not to.
  */
 function describeCastParts(setup: DaydreamSetupContent): string | null {
-	const cast = setup.scene.parts.flatMap((part) => {
+	const cast = setup.idea.parts.flatMap((part) => {
 		const player = setup.characters.find((character) => character.casting.partId === part.id);
 		return player
 			? [
@@ -276,31 +285,41 @@ function describeCastParts(setup: DaydreamSetupContent): string | null {
 	return cast.length > 0 ? `The parts in it:\n${cast.join('\n')}` : null;
 }
 
+/**
+ * An idea's notes. A monologue's are the sayings it is built from
+ * (`ideaFieldLabels`), one to a line, so they go on lines of their own,
+ * named as what they are; a story's are whatever else the user wrote.
+ */
+function describeNotes(notes: string, monologue: boolean): string {
+	return monologue ? `Sayings to build on, and anything else:\n${notes}` : `Notes: ${notes}`;
+}
+
 /** The setup, as the model reads it. Empty optional fields are left out rather than shown blank. */
 export function describeSetup(setup: DaydreamSetupContent): string {
-	const { scene } = setup;
+	const { idea } = setup;
+	const monologue = setup.voice.narrator === 'monologue';
 	const sections = [
-		`# How the story is told\n${describeVoice(setup.voice, setup.characters.length)}`,
+		`# How it is told\n${describeVoice(setup.voice, setup.characters.length)}`,
 		setup.characters.length > 0
 			? `# The characters\n${setup.characters
 					.map((character) =>
 						describeCharacter(
 							character,
-							scene.parts.find((part) => part.id === character.casting.partId)
+							idea.parts.find((part) => part.id === character.casting.partId)
 						)
 					)
 					.join('\n\n')}`
 			: null,
 		[
-			`# The scene: ${scene.title}`,
-			scene.setting ? `Where: ${scene.setting}` : null,
-			`What is going on: ${scene.premise}`,
-			scene.yourRole && setup.voice.stance !== 'absent'
-				? `Who the user is: ${scene.yourRole}`
+			`# The idea: ${idea.title}`,
+			idea.setting ? `Where: ${idea.setting}` : null,
+			`${monologue ? 'What the voice believes' : 'What is going on'}: ${idea.premise}`,
+			idea.yourRole && setup.voice.stance !== 'absent'
+				? `${monologue ? 'Who the user is to it' : 'Who the user is'}: ${idea.yourRole}`
 				: null,
-			scene.tone ? `Tone: ${scene.tone}` : null,
-			...describeSceneDials(scene.dials),
-			scene.notes ? `Notes: ${scene.notes}` : null,
+			idea.tone ? `Tone: ${idea.tone}` : null,
+			...describeIdeaDials(idea.dials),
+			idea.notes ? describeNotes(idea.notes, monologue) : null,
 			describeCastParts(setup),
 			leadLine(setup)
 		]
@@ -316,7 +335,7 @@ const READING = `# Reading the user's turns
 The user may write what they do in the story, ask for where the story should go next, or write the next part of the story themselves. Work out which from context and answer it accordingly: carry on from their action, take the story where they asked, or continue seamlessly from what they wrote.
 A request about where the story goes or how it feels — "Make the story super steamy", "Skip to the morning" — is a direction, exactly as if they had pressed a button for it: take the story there in your next passage, and never have anyone in the story say or do the request itself.
 A turn that starts with a note saying how the user means it — "(Read this as a direction.)" — was chosen by the user: read it that way, whatever it looks like.
-A word or a short phrase that nobody in the story would say — "anal", "the boss walks in" — is a direction too. Read every direction the way that makes the most of it: as far as the scene's heat, its kink and the user's limits allow.
+A word or a short phrase that nobody in the story would say — "anal", "the boss walks in" — is a direction too. Read every direction the way that makes the most of it: as far as the idea's heat, its kink and the user's limits allow.
 A turn marked [Out of character] is the user stepping out of the story: answer it out of character, briefly and plainly — no narration — and do not move the story on unless they ask.
 "(Continue.)" with nothing else from the user means move the story on yourself. You may have the story carry on as if the user went along with whatever moves it best, but still never write their words or thoughts.
 A note in brackets — a direction, a roll, a reaction — comes from the buttons on the user's screen. A direction applies to your next passage. "Surprise me" means take the story somewhere the user will not expect, within their limits.`;
@@ -352,6 +371,13 @@ function steeringIdeas(
 		heat === null || heat >= 3
 			? '; and while there is sex on the page, what comes next in it — an act, a position, a toy or a piece of furniture ("Bent over", "On your knees", "The vibrator")'
 			: '';
+	if (voice.narrator === 'monologue') {
+		return {
+			suggestions:
+				'Vary them: one asking the voice to say more about something it said, one pushing it to go further, one turning it towards a related idea.',
+			directions: `Harsher, Softer, More like that, A mantra, Another idea, Slower${sex}`
+		};
+	}
 	return voice.narrator === 'impersonal'
 		? {
 				suggestions:
@@ -401,14 +427,14 @@ function steeringIdeas(
  * new. The model can judge that because each past passage goes back with
  * the description it wrote (`passageAsSent`).
  */
-const IMAGE_INSTRUCTION = `- "image": include it in most replies. It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the scene is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. Leave it out, too, when little a camera could see has changed since the last passage that had one (its "image" is in that passage's metadata): the same people, in the same place and much the same pose, doing much the same thing — another picture of it would show nothing new. A new act, position, place, person or outfit is a change worth one. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.
+const IMAGE_INSTRUCTION = `- "image": include it in most replies. It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the passage is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the passage to see. Leave it out, too, when little a camera could see has changed since the last passage that had one (its "image" is in that passage's metadata): the same people, in the same place and much the same pose, doing much the same thing — another picture of it would show nothing new. A new act, position, place, person or outfit is a change worth one. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.
   It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it as plain, literal sentences in the present tense, about 80 to 150 words and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
   1. The framing: close-up, medium shot or wide shot, and from where.
   2. How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don't). Count and describe anyone the moment implies, too: if someone is being fucked, whoever is fucking them is in the picture. Keep each person's look the same from picture to picture, from the setup where it says.
   3. What each is doing at that instant, specifically: pose, where their hands are, where they look, their expression ("eyes squeezed shut and mouth open, mid-orgasm"). Spell out a sex act — the position, who is doing what to whom, where their hands are — and name it by its most common, plain name, adding its other common names ("face fucking, also called a reverse blowjob"; "giving a blowjob", not "throating").
   4. The place, a few concrete things in it, and the light: its quality, direction and colour ("warm lamplight from the left", "direct on-camera flash", "overcast daylight through a window").
   Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
-  Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the scene's heat allows: at SFW, everyone clothed and nothing sexual. Never a style, a medium or camera settings — those are chosen for you.`;
+  Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the idea's heat allows: at SFW, everyone clothed and nothing sexual. Never a style, a medium or camera settings — those are chosen for you.`;
 
 /**
  * How a passage is written so the page can draw it (`daydream/passage-format.ts`,
@@ -422,8 +448,14 @@ const IMAGE_INSTRUCTION = `- "image": include it in most replies. It is a pictur
  */
 function passageFormat(voice: DaydreamVoice): string {
 	const inStory = voice.stance !== 'absent';
+	// A monologue's statements are bold lines of their own, which the page
+	// draws larger (`standout`); elsewhere bold is for a single word.
+	const bold =
+		voice.narrator === 'monologue'
+			? "**bold** for each statement, on a line of its own, which is drawn larger — and, rarely, for a word that has to land; the voice's own words are the passage itself, never in quotation marks"
+			: '**bold**, rarely, for a word that has to land';
 	return `# Formatting the passage
-Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis and for a character's unspoken thoughts — thoughts always in italics, never in quotation marks; **bold**, rarely, for a word that has to land; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.
+Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis and for a character's unspoken thoughts — thoughts always in italics, never in quotation marks; ${bold}; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.
 Put every line someone speaks aloud in a say tag naming them, with its quotation marks inside: <say who="Charlie">"Sit down,"</say> she says. Name them as the story knows them${inStory ? '; for the user\'s own words, who="you"' : ''}.
 Put a sound someone or something makes — a moan, a gasp, a slap, a knock — in a sound tag, so it is drawn as one: <sound>Mmmph</sound>, a sharp <sound>crack</sound>. Inside someone's line too: <say who="Charlie">"<sound>Ah</sound> — don't stop."</say>
 Say and sound tags go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
@@ -554,12 +586,34 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
  * What the model is asked to write first: the story, before the user has
  * done anything. "Set the scene" asks for a narrator's description, so the
  * system voice is asked for its first notice instead: the opening is the
- * example every later passage copies.
+ * example every later passage copies. A monologue has no scene to set, so it
+ * is asked to begin with its first statements.
  */
 function openingRequest(voice: DaydreamVoice): string {
-	return voice.narrator === 'impersonal'
-		? '(Begin. Open with the first notice or rules the system issues to me — not a description of the scene — and end where I must respond.)'
-		: '(Begin the story. Set the scene, and end at a point where I can respond.)';
+	switch (voice.narrator) {
+		case 'impersonal':
+			return '(Begin. Open with the first notice or rules the system issues to me — not a description of a scene — and end where I must respond.)';
+		case 'monologue':
+			return '(Begin. Open straight into the monologue with its first statements — not a description of a scene.)';
+		default:
+			return '(Begin the story. Set the scene, and end at a point where I can respond.)';
+	}
+}
+
+/**
+ * The section for a voice that is not ordinary fiction, with examples of its
+ * form (`impersonal-voice.ts`, `monologue-voice.ts`), or null for one that is.
+ */
+function voiceGuide(setup: DaydreamSetupContent): string | null {
+	const { voice, characters, idea } = setup;
+	switch (voice.narrator) {
+		case 'impersonal':
+			return impersonalGuide(characters.length, idea.dials.heat);
+		case 'monologue':
+			return monologueGuide(voice, characters.length, idea.dials.heat);
+		default:
+			return null;
+	}
 }
 
 /** The direction buttons on screen now, for the model to prune and add to (`replyFormat`). */
@@ -607,15 +661,13 @@ export function buildMessages(
 			describeSetup(request.setup),
 			reading(request.setup.voice),
 			// Not for a check-in, which is out of character.
-			stopped ? null : writingGuide(request.setup.voice, request.setup.scene.dials.heat),
+			stopped ? null : writingGuide(request.setup.voice, request.setup.idea.dials.heat),
 			// Last before the format, nearest where the model starts writing,
 			// and not for a check-in, which is out of character.
-			!stopped && request.setup.voice.narrator === 'impersonal'
-				? impersonalGuide(request.setup.characters.length, request.setup.scene.dials.heat)
-				: null,
+			stopped ? null : voiceGuide(request.setup),
 			stopped
 				? CHECK_IN
-				: replyFormat(request.setup.voice, request.setup.scene.dials.heat, options.pictures)
+				: replyFormat(request.setup.voice, request.setup.idea.dials.heat, options.pictures)
 		]
 			.filter((section) => section !== null)
 			.join('\n\n')

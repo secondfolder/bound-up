@@ -12,8 +12,8 @@ import type {
 	CharacterDials,
 	CharacterTone,
 	DialValue,
+	IdeaDials,
 	PassageLength,
-	SceneDials,
 	StoryDials
 } from '../daydream';
 
@@ -169,8 +169,8 @@ export const STORY_SLIDERS: readonly {
 	}
 ];
 
-export const SCENE_SLIDERS: readonly {
-	key: keyof SceneDials;
+export const IDEA_SLIDERS: readonly {
+	key: keyof IdeaDials;
 	label: string;
 	low: string;
 	high: string;
@@ -212,12 +212,12 @@ export const SCENE_SLIDERS: readonly {
 ];
 
 /**
- * The scene's dials as lines for the model, none for a dial left unset. Heat
- * says it is the ceiling, so a SFW scene stays SFW with a slutty character
+ * The idea's dials as lines for the model, none for a dial left unset. Heat
+ * says it is the ceiling, so a SFW idea stays SFW with a slutty character
  * in it: each character's libido and kink say how eager they are within it.
  */
-export function describeSceneDials(dials: SceneDials): string[] {
-	const lines = SCENE_SLIDERS.flatMap((slider) => {
+export function describeIdeaDials(dials: IdeaDials): string[] {
+	const lines = IDEA_SLIDERS.flatMap((slider) => {
 		const value = dials[slider.key];
 		return value === null ? [] : [`${slider.label}: ${slider.scale[value].phrase}.`];
 	});
@@ -242,9 +242,9 @@ function level(word: string, kink: DialValue | null): string {
 	return kink !== null && kink >= 3 ? `${word} · kinky` : word;
 }
 
-/** A scene starting point's level in a few words, or null when its heat is unset. */
-export function sceneLevel(dials: SceneDials): string | null {
-	return dials.heat === null ? null : level(labelOf(SCENE_SLIDERS, 'heat', dials.heat), dials.kink);
+/** An idea starting point's level in a few words, or null when its heat is unset. */
+export function ideaLevel(dials: IdeaDials): string | null {
+	return dials.heat === null ? null : level(labelOf(IDEA_SLIDERS, 'heat', dials.heat), dials.kink);
 }
 
 /** A character starting point's level in a few words, or null when their libido is unset. */

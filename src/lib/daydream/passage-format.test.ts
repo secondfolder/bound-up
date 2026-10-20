@@ -70,6 +70,21 @@ describe('paragraphs and scene breaks', () => {
 		expect(blocks[2]).toMatchObject({ afterBreak: true });
 	});
 
+	it('marks a paragraph that is bold throughout as a standout line, and no other', () => {
+		const blocks = formatPassage(
+			'**Being owned is a relief.**\n\nI mean it. **Someone** decides.\n\n**Twice.** **Always.**\n\nPlain.'
+		);
+		expect(blocks.map((block) => block.kind === 'paragraph' && block.standout)).toEqual([
+			true,
+			false,
+			true,
+			false
+		]);
+		expect(paragraphs(blocks)[0]).toBe('Being owned is a relief.');
+		// A bold marker that never closes is shown as written, so is not a standout.
+		expect(formatPassage('**Never closed.')[0]).toMatchObject({ standout: false });
+	});
+
 	it('is nothing for an empty passage', () => {
 		expect(formatPassage('')).toEqual([]);
 		expect(formatPassage('\n\n  \n')).toEqual([]);

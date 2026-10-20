@@ -18,7 +18,7 @@
  */
 export type DaydreamTurnRole = 'user' | 'story';
 
-/** Who leads the scene. Steers the characters' voices; nothing else reads it. */
+/** Who leads the idea. Steers the characters' voices; nothing else reads it. */
 export type DaydreamLead = 'character' | 'me' | 'shared';
 
 export const DAYDREAM_LEADS: readonly { value: DaydreamLead; label: string }[] = [
@@ -29,8 +29,17 @@ export const DAYDREAM_LEADS: readonly { value: DaydreamLead; label: string }[] =
 
 // ── voice ────────────────────────────────────────────────────────────────────
 
-/** Who tells the story. `none` is the characters speaking for themselves. */
-export type DaydreamNarrator = 'none' | 'second-person' | 'third-person' | 'impersonal';
+/**
+ * Who tells the story. `none` is the characters speaking for themselves;
+ * `monologue` is one voice speaking its mind, a stand-in for the story's
+ * ideas rather than a character (docs/daydreams.md, "Voices").
+ */
+export type DaydreamNarrator =
+	| 'none'
+	| 'second-person'
+	| 'third-person'
+	| 'impersonal'
+	| 'monologue';
 
 /**
  * Where the user stands in it: as themselves, as someone they name, or
@@ -80,6 +89,13 @@ export const DAYDREAM_NARRATORS: readonly {
 		description:
 			'No narrator and no people: rules, notices and instructions, with what you do logged.',
 		example: '“Kneel at the line. Wait for the tone.”'
+	},
+	{
+		value: 'monologue',
+		label: 'A monologue',
+		description:
+			'One voice speaking its mind about what the daydream is about, statement after statement, rather than telling a story.',
+		example: '“**Being owned is a relief.** I mean it. Someone else decides, and I get to stop.”'
 	}
 ];
 
@@ -88,16 +104,16 @@ export const DAYDREAM_STANCES: readonly {
 	label: string;
 	description: string;
 }[] = [
-	{ value: 'self', label: 'As myself', description: 'You are in the story, as yourself.' },
+	{ value: 'self', label: 'As myself', description: 'You are in the daydream, as yourself.' },
 	{
 		value: 'persona',
 		label: 'As someone else',
-		description: 'You are in the story, playing a character you name.'
+		description: 'You are in the daydream, playing a character you name.'
 	},
 	{
 		value: 'absent',
 		label: 'Watching',
-		description: 'You are not in the story: you watch it, and steer it from outside.'
+		description: 'You are not in the daydream: you watch it, and steer it from outside.'
 	}
 ];
 
@@ -107,7 +123,7 @@ export const DAYDREAM_STANCES: readonly {
  * with the character count it describes.
  *
  * The list shows only `label`; the selected one's `description` and
- * `examples` are shown beside it, so the choice is made from what the story
+ * `examples` are shown beside it, so the choice is made from what the daydream
  * will read like rather than from a definition.
  */
 export const DAYDREAM_VOICE_PRESETS: readonly {
@@ -160,10 +176,21 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 			'“Rule 2 broken. Infraction logged.”'
 		],
 		voice: { narrator: 'impersonal', stance: 'self' }
+	},
+	{
+		id: 'monologue',
+		label: 'A monologue',
+		description:
+			'One voice speaking its mind, with little story around it: the ideas, tropes and sayings of what you are into, said statement by statement, each with a little more after it. The voice stands in for those ideas rather than being a character of its own.',
+		examples: [
+			'“**Being owned is a relief.** I mean it. Someone else decides, and I get to stop deciding.”',
+			'“**Good girls say thank you.** Every time. Even when it stings — especially then.”'
+		],
+		voice: { narrator: 'monologue', stance: 'self' }
 	}
 ];
 
-export type DaydreamVoicePresetId = 'talk' | 'told' | 'watch' | 'rules';
+export type DaydreamVoicePresetId = 'talk' | 'told' | 'watch' | 'rules' | 'monologue';
 
 /** The preset a voice is, or undefined for a combination no preset gives. */
 export function voicePreset(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>) {
@@ -175,9 +202,9 @@ export function voicePreset(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>) {
 /**
  * The voice a setup gets until the user picks one: whatever fits who is in
  * it. Nobody in it is a story told to you; anyone is talking with them.
- * Watching and a system are only ever chosen, never guessed, because both
- * change what the story is rather than just how it is told. What the story
- * calls the user is kept.
+ * Watching, a system and a monologue are only ever chosen, never guessed,
+ * because each changes what the daydream is rather than just how it is told.
+ * What it calls the user is kept.
  */
 export function inferVoice(current: DaydreamVoice, characterCount: number): DaydreamVoice {
 	const preset = characterCount === 0 ? 'told' : 'talk';
@@ -200,13 +227,14 @@ export function voiceProblem(voice: DaydreamVoice, characterCount: number): stri
 		return 'With no narrator, someone has to speak: add a character, or choose a narrator.';
 	}
 	if (voice.narrator === 'none' && voice.stance === 'absent') {
-		return 'With no narrator, the characters speak to you, so you have to be in the story.';
+		return 'With no narrator, the characters speak to you, so you have to be in the daydream.';
 	}
-	if (voice.stance === 'absent' && characterCount === 0) {
+	// A monologue can be overheard with nobody in it: the voice is enough.
+	if (voice.stance === 'absent' && characterCount === 0 && voice.narrator !== 'monologue') {
 		return 'To watch, add at least one character to watch.';
 	}
 	if (voice.narrator === 'second-person' && voice.stance === 'absent') {
-		return 'A narrator talking to “you” needs you in the story.';
+		return 'A narrator talking to “you” needs you in the daydream.';
 	}
 	if (voice.stance === 'persona' && voice.protagonistName.trim() === '') {
 		return 'Give the person you are playing a name.';
@@ -225,9 +253,12 @@ export function voiceCanWork(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>):
 	return false;
 }
 
-/** Whether "who leads" means anything: there are characters, and the user is there to be led. */
+/**
+ * Whether "who leads" means anything: there are characters, and the user is
+ * there to be led. Nobody leads a monologue: one voice says its piece.
+ */
 export function leadApplies(voice: DaydreamVoice, characterCount: number): boolean {
-	return characterCount > 0 && voice.stance !== 'absent';
+	return characterCount > 0 && voice.stance !== 'absent' && voice.narrator !== 'monologue';
 }
 
 // ── characters ───────────────────────────────────────────────────────────────
@@ -271,10 +302,10 @@ export const UNSET_CHARACTER_DIALS: CharacterDials = {
  * A character as the library holds it and a daydream copies it: who they
  * are in any story. Free text is the truth.
  *
- * Nothing here depends on the scene. Who they are to the user, and what they
+ * Nothing here depends on the idea. Who they are to the user, and what they
  * are doing, change from one story to the next, so they live on the
  * daydream's casting (`DaydreamCasting`) instead — which is what lets one
- * character be reused across scenes without being rewritten for each.
+ * character be reused across ideas without being rewritten for each.
  */
 export type DaydreamCharacter = {
 	name: string;
@@ -317,36 +348,36 @@ export const EMPTY_CHARACTER: DaydreamCharacter = {
 	dials: UNSET_CHARACTER_DIALS
 };
 
-// ── scenes ───────────────────────────────────────────────────────────────────
+// ── ideas ───────────────────────────────────────────────────────────────────
 
 /**
- * A part a scene has for a character to play: "the interviewer", "the one
- * who won the bet". Characters are cast into parts, so a scene reads as a
+ * A part an idea has for a character to play: "the interviewer", "the one
+ * who won the bet". Characters are cast into parts, so an idea reads as a
  * plot any fitting character can step into.
  */
-export type ScenePart = {
-	/** Stable across edits, so a daydream's castings survive the scene changing. */
+export type IdeaPart = {
+	/** Stable across edits, so a daydream's castings survive the idea changing. */
 	id: string;
 	name: string;
 	description: string;
 };
 
 /**
- * How sexual and how kinky a scene is. Each is optional, like a character's
- * dials: unset says nothing, and the model follows the scene's words. Heat is
+ * How sexual and how kinky an idea is. Each is optional, like a character's
+ * dials: unset says nothing, and the model follows the idea's words. Heat is
  * the ceiling for everyone in it — at its lowest the story is not sexual at
  * all, whatever a character's libido — which is how a daydream is made SFW.
  */
-export type SceneDials = {
+export type IdeaDials = {
 	/** SFW ↔ filthy. */
 	heat: DialValue | null;
 	/** Vanilla ↔ extreme. */
 	kink: DialValue | null;
 };
 
-export const UNSET_SCENE_DIALS: SceneDials = { heat: null, kink: null };
+export const UNSET_IDEA_DIALS: IdeaDials = { heat: null, kink: null };
 
-export type DaydreamScene = {
+export type DaydreamIdea = {
 	title: string;
 	/** Where it happens. */
 	setting: string;
@@ -357,25 +388,33 @@ export type DaydreamScene = {
 	/** A few words: playful, strict, slow-burn. */
 	tone: string;
 	notes: string;
-	/** The parts it has for characters. Optional: a scene with none is cast freely. */
-	parts: ScenePart[];
-	dials: SceneDials;
+	/** The parts it has for characters. Optional: an idea with none is cast freely. */
+	parts: IdeaPart[];
+	dials: IdeaDials;
 };
 
-export const SCENE_TEXT_FIELDS = [
+export const IDEA_TEXT_FIELDS = [
 	'setting',
 	'premise',
 	'yourRole',
 	'tone',
 	'notes'
-] as const satisfies readonly (keyof DaydreamScene)[];
+] as const satisfies readonly (keyof DaydreamIdea)[];
 
-export type SceneTextField = (typeof SCENE_TEXT_FIELDS)[number];
+export type IdeaTextField = (typeof IDEA_TEXT_FIELDS)[number];
 
-/** The ones the dialog shows before "More detail", besides the title and the parts. */
-export const SCENE_PRIMARY_FIELDS = ['premise'] as const satisfies readonly SceneTextField[];
+/**
+ * The ones the dialog shows before "More detail", besides the title and the
+ * parts. A monologue's sayings are what it is built from, so for one they
+ * are up front too, where a story keeps its notes for whatever is left over.
+ */
+export function ideaPrimaryFields(
+	narrator: DaydreamNarrator | undefined
+): readonly IdeaTextField[] {
+	return narrator === 'monologue' ? ['premise', 'notes'] : ['premise'];
+}
 
-export const EMPTY_SCENE: DaydreamScene = {
+export const EMPTY_IDEA: DaydreamIdea = {
 	title: '',
 	setting: '',
 	premise: '',
@@ -383,13 +422,13 @@ export const EMPTY_SCENE: DaydreamScene = {
 	tone: '',
 	notes: '',
 	parts: [],
-	dials: UNSET_SCENE_DIALS
+	dials: UNSET_IDEA_DIALS
 };
 
 // ── a daydream's setup ───────────────────────────────────────────────────────
 
 /**
- * Where a daydream's copy of a character or scene came from: the library
+ * Where a daydream's copy of a character or idea came from: the library
  * record and the revision it was copied at. Both null for a copy with no
  * library record — one made from a v1 setup, or created without saving.
  *
@@ -406,11 +445,11 @@ export type CopySource = { sourceId: string | null; sourceRevision: number | nul
  * and catching up with the library never loses their part.
  */
 export type DaydreamCasting = {
-	/** The scene part they play (`ScenePart.id`), or null for someone cast without one. */
+	/** The idea part they play (`IdeaPart.id`), or null for someone cast without one. */
 	partId: string | null;
 	/** Who they are to the user, in this story. */
 	relationship: string;
-	/** What they are doing, or want, in this scene. */
+	/** What they are doing, or want, in this idea. */
 	part: string;
 };
 
@@ -418,7 +457,7 @@ export const EMPTY_CASTING: DaydreamCasting = { partId: null, relationship: '', 
 
 /** A character as a daydream holds it: the library's copy, and their casting in this story. */
 export type DaydreamCharacterCopy = DaydreamCharacter & CopySource & { casting: DaydreamCasting };
-export type DaydreamSceneCopy = DaydreamScene & CopySource;
+export type DaydreamIdeaCopy = DaydreamIdea & CopySource;
 
 export type PassageLength = 'short' | 'medium' | 'long';
 
@@ -449,7 +488,7 @@ export type DaydreamSetup = {
 	title: string;
 	voice: DaydreamVoice;
 	characters: DaydreamCharacterCopy[];
-	scene: DaydreamSceneCopy;
+	idea: DaydreamIdeaCopy;
 	lead: DaydreamLead;
 	/** What must not happen, in the user's words. */
 	limits: string;
@@ -457,35 +496,35 @@ export type DaydreamSetup = {
 	pictures: DaydreamPictures;
 };
 
-/** What a daydream is called on screen: its own name, or its scene's until it has one. */
-export function daydreamTitle(setup: { title: string; scene: { title: string } }): string {
-	return setup.title.trim() || setup.scene.title;
+/** What a daydream is called on screen: its own name, or its idea's until it has one. */
+export function daydreamTitle(setup: { title: string; idea: { title: string } }): string {
+	return setup.title.trim() || setup.idea.title;
 }
 
 /**
- * Why the casting does not fit the scene, or null when it does: every part
- * cast is one the scene has, and none is cast twice. The setup kind refuses
+ * Why the casting does not fit the idea, or null when it does: every part
+ * cast is one the idea has, and none is cast twice. The setup kind refuses
  * the same, so a stale page cannot store one.
  */
 export function castingProblem(
 	characters: readonly { casting: Pick<DaydreamCasting, 'partId'> }[],
-	parts: readonly Pick<ScenePart, 'id'>[]
+	parts: readonly Pick<IdeaPart, 'id'>[]
 ): string | null {
 	const cast = characters.flatMap(({ casting }) =>
 		casting.partId === null ? [] : [casting.partId]
 	);
 	if (cast.some((id) => !parts.some((part) => part.id === id))) {
-		return 'Someone is cast in a part the scene no longer has.';
+		return 'Someone is cast in a part the idea no longer has.';
 	}
 	return new Set(cast).size === cast.length
 		? null
 		: 'Each part can only be played by one character.';
 }
 
-/** The castings again, with any part the scene no longer has let go. Their words are kept. */
-export function fitCastingToScene<T extends { casting: DaydreamCasting }>(
+/** The castings again, with any part the idea no longer has let go. Their words are kept. */
+export function fitCastingToIdea<T extends { casting: DaydreamCasting }>(
 	characters: readonly T[],
-	parts: readonly Pick<ScenePart, 'id'>[]
+	parts: readonly Pick<IdeaPart, 'id'>[]
 ): T[] {
 	return characters.map((character) =>
 		character.casting.partId === null || parts.some((part) => part.id === character.casting.partId)
@@ -522,12 +561,12 @@ export const DAYDREAM_LIMITS = {
 	premise: 2000,
 	yourRole: 300,
 	tone: 200,
-	sceneNotes: 1000,
+	ideaNotes: 1000,
 	partName: 60,
 	partDescription: 300,
 	limits: 1000,
-	/** The sentence a daydream is described from on the new-daydream page. */
-	idea: 500,
+	/** The brief a daydream is written from on the new-daydream page: what the user typed. */
+	brief: 500,
 	turn: 8000,
 	/**
 	 * A reply exactly as the model wrote it, kept for debug mode's raw log
@@ -563,7 +602,7 @@ export const DAYDREAM_LIMITS = {
  * The most conversation one reply request may carry, in characters of turn
  * text. The browser trims to it (`daydream/context.ts`), keeping the newest
  * turns, and the server refuses anything over it. Roughly 15k tokens: enough
- * memory for a long scene, small enough that a reply stays cheap and fast.
+ * memory for a long idea, small enough that a reply stays cheap and fast.
  */
 export const MAX_CONTEXT_CHARS = 60_000;
 

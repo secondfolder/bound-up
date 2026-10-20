@@ -22,13 +22,13 @@ import type { SealedKind } from './sealed';
 import { sealedReader } from './sealed-cache.svelte';
 import {
 	type DaydreamCharacterContent,
+	type DaydreamIdeaContent,
 	type DaydreamMarkContent,
-	type DaydreamSceneContent,
 	type DaydreamSetupContent,
 	type DaydreamTurnContent,
 	daydreamCharacterKind,
+	daydreamIdeaKind,
 	daydreamMarkKind,
-	daydreamSceneKind,
 	daydreamSetupKind,
 	daydreamTurnKind
 } from './sealed-kinds/daydreams';
@@ -131,7 +131,7 @@ export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
 	}
 }
 
-/** A daydream's setup: its title, voice, characters, scene, limits and dials. Always sealed. */
+/** A daydream's setup: its title, voice, characters, idea, limits and dials. Always sealed. */
 export function openedDaydreamSetup(ref: SealedRefView): Opened<DaydreamSetupContent> {
 	return open(daydreamSetupKind, ref);
 }
@@ -151,9 +151,9 @@ export function openedDaydreamCharacter(ref: SealedRefView): Opened<DaydreamChar
 	return open(daydreamCharacterKind, ref);
 }
 
-/** A scene in the user's library. Always sealed. */
-export function openedDaydreamScene(ref: SealedRefView): Opened<DaydreamSceneContent> {
-	return open(daydreamSceneKind, ref);
+/** An idea in the user's library. Always sealed. */
+export function openedDaydreamIdea(ref: SealedRefView): Opened<DaydreamIdeaContent> {
+	return open(daydreamIdeaKind, ref);
 }
 
 /** A message tag's name. */

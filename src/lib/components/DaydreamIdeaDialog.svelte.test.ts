@@ -2,7 +2,7 @@ import { render, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 import { MAX_DAYDREAM_CHARACTERS } from '$lib/daydream';
-import { testScene } from '$lib/testing/daydream-setup';
+import { testIdea } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
 import { waSettled } from '$lib/testing/web-awesome';
 import { isClientId } from '$lib/vault';
@@ -12,14 +12,14 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 const suggest = vi.hoisted(() => ({
 	suggestChips: vi.fn(),
 	suggestFill: vi.fn(),
-	surpriseScene: vi.fn()
+	surpriseIdea: vi.fn()
 }));
 vi.mock('$lib/daydream/suggest', () => suggest);
 
 const client = vi.hoisted(() => ({ saveLibraryItem: vi.fn() }));
 vi.mock('$lib/daydream/client', () => client);
 
-const { default: DaydreamSceneDialog } = await import('./DaydreamSceneDialog.svelte');
+const { default: DaydreamIdeaDialog } = await import('./DaydreamIdeaDialog.svelte');
 
 const context = { characters: [], limits: '' };
 const SEALED = { recordId: 'x', vaultId: 'v', ciphertext: 'sb1.x', payloadVersion: 1 };
@@ -28,7 +28,7 @@ type Details = HTMLElement & { open: boolean; summary: string };
 
 beforeEach(() => {
 	suggest.suggestFill.mockReset();
-	suggest.surpriseScene.mockReset();
+	suggest.surpriseIdea.mockReset();
 	client.saveLibraryItem.mockReset();
 });
 
@@ -52,7 +52,7 @@ function moreDetail(container: ParentNode): Details {
 const partRows = (container: ParentNode) => [...container.querySelectorAll('.part')];
 
 function renderDialog(props: Record<string, unknown> = {}) {
-	return render(DaydreamSceneDialog, {
+	return render(DaydreamIdeaDialog, {
 		// Under `props`: a top-level `context` is read as Svelte's mount option.
 		props: {
 			context,
@@ -64,8 +64,8 @@ function renderDialog(props: Record<string, unknown> = {}) {
 	});
 }
 
-describe('DaydreamSceneDialog', () => {
-	it('keeps the title, what is going on and the parts up front, and the rest closed', async () => {
+describe('DaydreamIdeaDialog', () => {
+	it('keeps the title, what it is about and the parts up front, and the rest closed', async () => {
 		const { baseElement } = renderDialog();
 		await waSettled(baseElement);
 		expect(moreDetail(baseElement).open).toBe(false);
@@ -76,8 +76,22 @@ describe('DaydreamSceneDialog', () => {
 		expect(baseElement.textContent).toContain('Parts for characters');
 	});
 
-	it('starts with more detail open for a scene that has some', async () => {
-		const { baseElement } = renderDialog({ scene: testScene({ setting: 'An empty office.' }) });
+	it('asks a monologue for its sayings up front, in its own words for each field', async () => {
+		const { baseElement } = renderDialog({ context: { ...context, narrator: 'monologue' } });
+		await waSettled(baseElement);
+		const all = [...baseElement.querySelectorAll('.chip-field .label')].map((label) =>
+			label.textContent?.trim()
+		);
+		const detail = [...moreDetail(baseElement).querySelectorAll('.chip-field .label')].map(
+			(label) => label.textContent?.trim()
+		);
+		expect(all.slice(0, 2)).toEqual(['What it’s about', 'Sayings to build on']);
+		expect(detail).toEqual(['Where', 'Who you are to it', 'Tone']);
+		expect(baseElement.textContent).toContain('What the voice believes, and keeps coming back to');
+	});
+
+	it('starts with more detail open for an idea that has some', async () => {
+		const { baseElement } = renderDialog({ idea: testIdea({ setting: 'An empty office.' }) });
 		await waSettled(baseElement);
 		expect(moreDetail(baseElement).open).toBe(true);
 	});
@@ -108,9 +122,9 @@ describe('DaydreamSceneDialog', () => {
 		expect(moreDetail(baseElement).open).toBe(true);
 
 		await waSettled(baseElement);
-		button(baseElement, 'Use this scene')?.click();
+		button(baseElement, 'Use this idea')?.click();
 		await waitFor(() => expect(onsaved).toHaveBeenCalled());
-		const saved = defined(onsaved.mock.calls[0], 'the saved scene') as [
+		const saved = defined(onsaved.mock.calls[0], 'the saved idea') as [
 			{ parts: { id: string; name: string }[] }
 		];
 		const [{ parts }] = saved;
@@ -122,7 +136,7 @@ describe('DaydreamSceneDialog', () => {
 	it('saves a part as it was typed, trimmed', async () => {
 		const onsaved = vi.fn();
 		const { baseElement } = renderDialog({
-			scene: testScene({ title: 'Late', premise: 'A meeting.' }),
+			idea: testIdea({ title: 'Late', premise: 'A meeting.' }),
 			onsaved
 		});
 		await waSettled(baseElement);
@@ -142,17 +156,17 @@ describe('DaydreamSceneDialog', () => {
 		});
 	});
 
-	it('takes the model’s parts only for a scene that had none', async () => {
+	it('takes the model’s parts only for an idea that had none', async () => {
 		suggest.suggestFill.mockResolvedValue({
 			ok: true,
 			value: {
 				fields: { setting: 'A hotel bar.' },
 				parts: [{ name: 'the stranger', description: '' }],
-				sceneDials: { heat: null, kink: null }
+				ideaDials: { heat: null, kink: null }
 			}
 		});
 		const { baseElement } = renderDialog({
-			scene: testScene({ title: 'Late', premise: 'A meeting.' }),
+			idea: testIdea({ title: 'Late', premise: 'A meeting.' }),
 			suggestionsOn: true
 		});
 		await waSettled(baseElement);
@@ -190,7 +204,7 @@ describe('DaydreamSceneDialog', () => {
 		);
 		save.click();
 		await waSettled(baseElement);
-		button(baseElement, 'Use this scene')?.click();
+		button(baseElement, 'Use this idea')?.click();
 		await waitFor(() => expect(onsaved).toHaveBeenCalled());
 		expect(onsaved.mock.calls[0]?.[0]).toMatchObject({ dials: { heat: 5, kink: null } });
 	});
@@ -198,11 +212,11 @@ describe('DaydreamSceneDialog', () => {
 	it('takes the model’s heat and kink only where they were unset', async () => {
 		suggest.suggestFill.mockResolvedValue({
 			ok: true,
-			value: { fields: { setting: 'A hotel bar.' }, parts: [], sceneDials: { heat: 4, kink: 5 } }
+			value: { fields: { setting: 'A hotel bar.' }, parts: [], ideaDials: { heat: 4, kink: 5 } }
 		});
 		const onsaved = vi.fn();
 		const { baseElement } = renderDialog({
-			scene: testScene({ title: 'Late', premise: 'A meeting.', dials: { heat: null, kink: 2 } }),
+			idea: testIdea({ title: 'Late', premise: 'A meeting.', dials: { heat: null, kink: 2 } }),
 			suggestionsOn: true,
 			onsaved
 		});
@@ -210,7 +224,7 @@ describe('DaydreamSceneDialog', () => {
 		button(baseElement, 'Fill in the rest')?.click();
 		await waitFor(() => expect(button(baseElement, 'Clear heat')).toBeDefined());
 		expect(suggest.suggestFill.mock.calls[0]?.[0]).toMatchObject({
-			sceneDials: { heat: null, kink: 2 }
+			ideaDials: { heat: null, kink: 2 }
 		});
 		await waSettled(baseElement);
 		button(baseElement, 'Save changes')?.click();

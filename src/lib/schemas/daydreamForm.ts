@@ -6,7 +6,7 @@ import {
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
 	EMPTY_CHARACTER,
-	EMPTY_SCENE,
+	EMPTY_IDEA,
 	MAX_DAYDREAM_CHARACTERS,
 	voiceProblem
 } from '$lib/daydream';
@@ -51,7 +51,7 @@ const characterDials = z.object({
 	kink: dial.nullable()
 });
 
-const sceneDials = z.object({ heat: dial.nullable(), kink: dial.nullable() });
+const ideaDials = z.object({ heat: dial.nullable(), kink: dial.nullable() });
 
 const characterFields = {
 	name: required(DAYDREAM_LIMITS.characterName, 'them a name'),
@@ -70,15 +70,15 @@ const partFields = z.object({
 	description: optional(DAYDREAM_LIMITS.partDescription)
 });
 
-const sceneFields = {
+const ideaFields = {
 	title: required(DAYDREAM_LIMITS.title, 'it a title'),
 	setting: optional(DAYDREAM_LIMITS.setting),
 	premise: required(DAYDREAM_LIMITS.premise, 'what is going on'),
 	yourRole: optional(DAYDREAM_LIMITS.yourRole),
 	tone: optional(DAYDREAM_LIMITS.tone),
-	notes: optional(DAYDREAM_LIMITS.sceneNotes),
+	notes: optional(DAYDREAM_LIMITS.ideaNotes),
 	parts: z.array(partFields).max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} parts`),
-	dials: sceneDials
+	dials: ideaDials
 };
 
 /** Who a character is in this daydream. Edited in the character dialog's "In this story". */
@@ -100,7 +100,7 @@ const storyDials = z.object({
 });
 
 /**
- * The setup form. Nested — a voice, a list of characters, a scene, the dials
+ * The setup form. Nested — a voice, a list of characters, an idea, the dials
  * — so it is posted as JSON (`dataType: 'json'`), and then only as the sealed
  * record: `DaydreamSetupForm.svelte` replaces the whole post.
  */
@@ -109,14 +109,14 @@ export const daydreamSetupFormSchema = z
 		// Optional: a new daydream is named by the model after its opening.
 		title: optional(DAYDREAM_LIMITS.title),
 		voice: z.object({
-			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal']),
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
 			stance: z.enum(['self', 'persona', 'absent']),
 			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
 		}),
 		characters: z
 			.array(z.object({ ...characterFields, ...source, casting: castingFields }))
 			.max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} characters`),
-		scene: z.object({ ...sceneFields, ...source }),
+		idea: z.object({ ...ideaFields, ...source }),
 		lead: z.enum(['character', 'me', 'shared']),
 		limits: optional(DAYDREAM_LIMITS.limits),
 		dials: storyDials,
@@ -127,7 +127,7 @@ export const daydreamSetupFormSchema = z
 		if (problem) {
 			ctx.addIssue({ code: 'custom', path: ['voice'], message: problem });
 		}
-		const miscast = castingProblem(value.characters, value.scene.parts);
+		const miscast = castingProblem(value.characters, value.idea.parts);
 		if (miscast) {
 			ctx.addIssue({ code: 'custom', path: ['characters'], message: miscast });
 		}
@@ -141,7 +141,7 @@ export const EMPTY_DAYDREAM_SETUP: DaydreamSetupFormValues = {
 	title: '',
 	voice: { narrator: 'none', stance: 'self', protagonistName: '' },
 	characters: [],
-	scene: { ...EMPTY_SCENE, sourceId: null, sourceRevision: null },
+	idea: { ...EMPTY_IDEA, sourceId: null, sourceRevision: null },
 	lead: 'character',
 	limits: '',
 	dials: DEFAULT_STORY_DIALS,
@@ -169,11 +169,11 @@ export const EMPTY_CHARACTER_FORM: DaydreamCharacterFormValues = {
 	saveToLibrary: true
 };
 
-export const daydreamSceneFormSchema = z.object({ ...sceneFields, saveToLibrary: z.boolean() });
+export const daydreamIdeaFormSchema = z.object({ ...ideaFields, saveToLibrary: z.boolean() });
 
-export type DaydreamSceneFormValues = z.output<typeof daydreamSceneFormSchema>;
+export type DaydreamIdeaFormValues = z.output<typeof daydreamIdeaFormSchema>;
 
-export const EMPTY_SCENE_FORM: DaydreamSceneFormValues = { ...EMPTY_SCENE, saveToLibrary: true };
+export const EMPTY_IDEA_FORM: DaydreamIdeaFormValues = { ...EMPTY_IDEA, saveToLibrary: true };
 
 const sealedFields = {
 	vaultId: z.string().refine(isClientId, 'Malformed id'),
@@ -226,10 +226,10 @@ export const createMarkSchema = z.object({
 	...sealedFields
 });
 
-/** `POST /api/daydreams/characters` and `…/scenes`: a new library item, sealed. */
+/** `POST /api/daydreams/characters` and `…/ideas`: a new library item, sealed. */
 export const createLibraryItemSchema = z.object({ id: clientId, ...sealedFields });
 
-/** `PUT /api/daydreams/characters/[id]` and `…/scenes/[id]`. */
+/** `PUT /api/daydreams/characters/[id]` and `…/ideas/[id]`. */
 export const updateLibraryItemSchema = z.object({
 	...sealedFields,
 	expectedRevision: z.number().int().min(0)

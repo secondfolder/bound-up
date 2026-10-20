@@ -1,7 +1,7 @@
 /**
  * Chips: suggestions that edit free text rather than replacing it.
  *
- * Every character and scene field is free text, because that is what the
+ * Every character and idea field is free text, because that is what the
  * model reads and what a person can always rewrite. A chip is a phrase that
  * toggles in that text: tapping "patient" adds it to the personality field,
  * tapping it again takes it out, and whatever else the person wrote there
@@ -83,7 +83,7 @@ export function mergeChips(curated: readonly string[], extra: readonly string[])
 }
 
 /**
- * How a daydream's copy of a character or scene stands against the library.
+ * How a daydream's copy of a character or idea stands against the library.
  *
  * Compared by the library row's plaintext `revision`, which every edit
  * bumps, so a page can tell the library has moved on without opening
