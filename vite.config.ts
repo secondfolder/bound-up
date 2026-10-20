@@ -310,6 +310,11 @@ export default defineConfig(({ command, mode }) => {
 			// its modules and never hydrates.
 			origin: process.env.VITE_DEV_ORIGIN,
 			allowedHosts: true,
+			// Opt-out of HMR for testing by hand while files are being edited: an
+			// update or full reload can land mid-flow and throw away page state (a
+			// sign-in's key stash, a half-written form). The watcher still runs, so a
+			// manual reload picks up the latest code.
+			hmr: process.env.NO_HMR ? false : undefined,
 			// Agents' worktrees live in `.claude/worktrees/`, each a whole checkout.
 			// Watched, a `svelte-kit sync` in one rewrote its `.svelte-kit/tsconfig.json`,
 			// which this server took as its own: it cleared its cache and force-reloaded
