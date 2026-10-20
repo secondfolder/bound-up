@@ -1561,12 +1561,50 @@ describe('DaydreamThread in debug mode', () => {
 		expect(saved(0)?.content).toMatchObject({ sent: record });
 	});
 
+	it('keeps what else the stream carried on the passage: reasoning, model, ending, usage', async () => {
+		client.writeReply.mockImplementationOnce(
+			(_id: string, _request: unknown, options: { onEvent?: (event: unknown) => void }) => {
+				options.onEvent?.({
+					id: 'gen-1',
+					model: 'z-ai/glm-4.6',
+					provider: 'Chutes',
+					choices: [{ delta: { reasoning: 'Keep it ' } }]
+				});
+				options.onEvent?.({ choices: [{ delta: { reasoning: 'slow.' } }] });
+				options.onEvent?.({ choices: [{ delta: {}, finish_reason: 'stop' }] });
+				options.onEvent?.({ choices: [], usage: { total_tokens: 12 } });
+				return Promise.resolve({
+					ok: true,
+					passage: 'Mara looks up.',
+					meta: meta(),
+					expansion: null,
+					reading: null,
+					raw: Raw
+				} satisfies ReplyOutcome);
+			}
+		);
+		render(DaydreamThread, { daydream: daydream(), available: true, keepRawReplies: true });
+		await waitFor(() => expect(saved(0)?.role).toBe('story'));
+		expect(saved(0)?.content).toMatchObject({
+			raw: Raw,
+			received: {
+				reasoning: 'Keep it slow.',
+				model: 'z-ai/glm-4.6',
+				provider: 'Chutes',
+				generationId: 'gen-1',
+				finishReason: 'stop',
+				usage: JSON.stringify({ total_tokens: 12 }, null, 2)
+			}
+		});
+	});
+
 	it('asks for no record, and keeps none, for an account without it', async () => {
 		replyWith(Raw, 'Mara looks up.');
 		render(DaydreamThread, { daydream: daydream(), available: true });
 		await waitFor(() => expect(saved(0)?.role).toBe('story'));
 		expect(asked(0)).not.toHaveProperty('record');
 		expect(saved(0)?.content).not.toHaveProperty('sent');
+		expect(saved(0)?.content).not.toHaveProperty('received');
 	});
 
 	it('keeps nothing raw for an account without it', async () => {
@@ -1708,6 +1746,43 @@ describe('DaydreamThread in debug mode', () => {
 		// Before the passage it led to, and only before passages.
 		expect(sent('t1')?.nextElementSibling?.getAttribute('data-turn-id')).toBe('t1');
 		expect(container.querySelectorAll('[data-sent-before]')).toHaveLength(2);
+	});
+
+	it('shows a passage’s reasoning and how it ended in the raw log, and says when neither was kept', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		promptsBy({ opening: 'THE RULES', reply: 'THE RULES' });
+		const received = {
+			reasoning: 'Keep it slow.',
+			model: 'z-ai/glm-4.6',
+			provider: 'Chutes',
+			finishReason: 'stop',
+			usage: '{ "total_tokens": 12 }'
+		};
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', { type: 'text', text: 'Sit.', raw: Raw, received }),
+				turn('t2', 't1', 'user', 'I sit.'),
+				turn('t3', 't2', 'story', { type: 'text', text: 'Mara looks up.', meta: meta(), raw: Raw })
+			]),
+			available: true,
+			debug: true
+		});
+		const raw = (id: string) => container.querySelector(`[data-turn-id="${id}"]`);
+		await waitFor(() => expect(raw('t1')?.textContent).toContain('Keep it slow.'));
+		await waSettled(container);
+		const summaries = [...(raw('t1')?.querySelectorAll('wa-details') ?? [])].map((details) =>
+			waProp(details, 'summary')
+		);
+		expect(summaries).toContain('Reasoning');
+		expect(summaries).toContain('How it ended: Stopped: stop · z-ai/glm-4.6 · via Chutes');
+		expect(raw('t1')?.textContent).toContain('"total_tokens": 12');
+		// Not in "Stored" again.
+		expect(
+			[...(raw('t1')?.querySelectorAll('pre') ?? [])].filter((pre) =>
+				pre.textContent?.includes('Keep it slow.')
+			)
+		).toHaveLength(1);
+		expect(raw('t3')?.textContent).toContain('How it ended was not recorded.');
 	});
 
 	/** Two passages, each with the record its request would have made, the second's history as given. */

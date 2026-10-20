@@ -7,8 +7,6 @@ import {
 	describeUnusable,
 	GENERATED_IDEAS,
 	ideaBrief,
-	LINK_EXCERPT,
-	linkFetches,
 	MAX_IDEA_PREMISE,
 	MAX_IDEA_TAGS,
 	MAX_REPLY_DETAIL,
@@ -62,13 +60,7 @@ describe('a Responses answer', () => {
 		url: 'https://www.reddit.com/r/Example/',
 		title: 'r/Example',
 		httpStatus: 200,
-		content: 'y'.repeat(LINK_EXCERPT + 10)
-	};
-	const unread = {
-		type: 'openrouter:web_fetch',
-		status: 'incomplete',
-		url: 'https://example.invalid/x',
-		error: 'Extract failed: connect_error'
+		content: 'y'.repeat(610)
 	};
 
 	it('reads the reply out of its message, past the reasoning and fetches before it', () => {
@@ -80,34 +72,6 @@ describe('a Responses answer', () => {
 		expect(completionText(body)).toBe('{"ideas": []}');
 		expect(completionJson(body)).toEqual({ ideas: [] });
 		expect(completionText(responses(read))).toBeNull();
-	});
-
-	it('lists each link fetched, read or not, with the start of what came back', () => {
-		expect(linkFetches(responses(read, unread, message('{}'), { type: 'something new' }))).toEqual([
-			{
-				url: read.url,
-				read: true,
-				httpStatus: 200,
-				title: 'r/Example',
-				error: '',
-				length: LINK_EXCERPT + 10,
-				excerpt: 'y'.repeat(LINK_EXCERPT)
-			},
-			{
-				url: unread.url,
-				read: false,
-				httpStatus: null,
-				title: '',
-				error: 'Extract failed: connect_error',
-				length: 0,
-				excerpt: ''
-			}
-		]);
-	});
-
-	it('lists none for a Chat Completions answer, or anything else', () => {
-		expect(linkFetches(completion('{}'))).toEqual([]);
-		expect(linkFetches(null)).toEqual([]);
 	});
 });
 

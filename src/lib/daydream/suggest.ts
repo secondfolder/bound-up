@@ -20,12 +20,11 @@ import type {
 } from '../daydream';
 import { requestSuggestion } from './client';
 import type { DaydreamPieces, StarterSide } from './starters';
+import { type SuggestChatLog, suggestChatLog } from './suggest-chat-log';
 import {
 	completionJson,
 	describeUnusable,
 	type GeneratedIdea,
-	type LinkFetch,
-	linkFetches,
 	parseCasting,
 	parseChips,
 	parseFill,
@@ -56,8 +55,8 @@ export type SuggestContext = {
 export type SuggestFailure = {
 	error: string;
 	detail?: string;
-	/** The links in the brief it read, for debug mode to show beside the failure. */
-	fetches?: LinkFetch[];
+	/** The whole exchange, links read and all, for debug mode, when the request asked for it. */
+	log?: SuggestChatLog;
 };
 
 type Answer<T> = { ok: true; value: T } | ({ ok: false } & SuggestFailure);
@@ -199,24 +198,28 @@ export async function suggestDaydream(input: {
 	/** The voice a generated idea was made for, so the daydream is told that way. */
 	voice?: DaydreamVoicePresetId | null;
 	limits: string;
-}): Promise<WithFetches<DaydreamPieces>> {
+	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestChatLog`). */
+	debugLog?: boolean;
+}): Promise<WithLog<DaydreamPieces>> {
 	const answer = await ask({ task: 'daydream', ...input });
 	if (!answer.ok) {
 		return answer;
 	}
 	const pieces = parseSuggestedDaydream(answer.value);
-	return withFetches(answer, pieces ? { ok: true, value: pieces } : nothing(answer));
+	return withLog(answer, pieces ? { ok: true, value: pieces } : nothing(answer));
 }
 
 /**
- * What a suggestion that took a brief came back with, and the links it read
- * (`linkFetches`), for debug mode to show either way: a link that could not be
- * read is half of why ideas can come back thin.
+ * What a suggestion that took a brief came back with, and the whole exchange
+ * where the request asked for it (`suggestChatLog`), for debug mode to show
+ * either way: the links it read are in it, and a link that could not be read
+ * is half of why ideas can come back thin.
  */
-export type WithFetches<T> = Answer<T> & { fetches?: LinkFetch[] };
+export type WithLog<T> = Answer<T> & { log?: SuggestChatLog };
 
-function withFetches<T>(answer: { body: unknown }, result: Answer<T>): WithFetches<T> {
-	return { ...result, fetches: linkFetches(answer.body) };
+function withLog<T>(answer: { body: unknown }, result: Answer<T>): WithLog<T> {
+	const log = suggestChatLog(answer.body);
+	return log ? { ...result, log } : result;
 }
 
 /**
@@ -232,11 +235,13 @@ export async function suggestIdeas(input: {
 	limits: string;
 	/** Titles already shown, for "More ideas" not to offer them again. */
 	offered?: readonly string[];
-}): Promise<WithFetches<GeneratedIdea[]>> {
+	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestChatLog`). */
+	debugLog?: boolean;
+}): Promise<WithLog<GeneratedIdea[]>> {
 	const answer = await ask({ task: 'ideas', ...input });
 	if (!answer.ok) {
 		return answer;
 	}
 	const ideas = parseGeneratedIdeas(answer.value, input.side);
-	return withFetches(answer, ideas.length > 0 ? { ok: true, value: ideas } : nothing(answer));
+	return withLog(answer, ideas.length > 0 ? { ok: true, value: ideas } : nothing(answer));
 }

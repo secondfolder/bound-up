@@ -78,6 +78,7 @@ import {
 import { outcomeFor, type RollProposal, roll } from './dice';
 import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
 import { explicitOoc } from './ooc';
+import { type ReceivedLog, type ReceivedRecord, ReplyReceipt } from './received-record';
 import type { SentRecord } from './sent-record';
 import { suggestName } from './suggest';
 import { MAX_NAMING_OPENING } from './suggestions';
@@ -201,6 +202,11 @@ export class DaydreamStory {
 	 * arrived, or the last problem was not a reply's.
 	 */
 	problemRaw: string = $state('');
+	/**
+	 * What else the failed reply's stream carried — reasoning, the model that
+	 * answered, the error it ended on — for the same log. Never saved either.
+	 */
+	problemReceived: ReceivedLog | null = $state(null);
 	setupRevision: number = $state(0);
 
 	readonly #setupRef: SealedRefView;
@@ -646,6 +652,7 @@ export class DaydreamStory {
 		);
 		this.problem = null;
 		this.problemRaw = '';
+		this.problemReceived = null;
 		this.retry = null;
 		this.streaming = {
 			parentId: request.parentId,
@@ -665,12 +672,15 @@ export class DaydreamStory {
 		let raw = '';
 		// What the request sent the model, for the same raw log, also kept through a Stop.
 		let sent: SentRecord | null = null;
+		// What else the stream carried, for the same raw log, also kept through a Stop.
+		const receipt = new ReplyReceipt();
 		try {
 			const outcome = await writeReply(this.id, this.#replyBody(request, setup, context), {
 				signal,
 				onSent: (record) => {
 					sent = record;
 				},
+				onEvent: (event) => receipt.take(event),
 				onText: (soFar, arrived) => {
 					raw = arrived;
 					if (this.streaming) {
@@ -687,6 +697,7 @@ export class DaydreamStory {
 				this.streaming = null;
 				this.problem = outcome.error;
 				this.problemRaw = outcome.raw;
+				this.problemReceived = receipt.log;
 				this.retry = () => void this.#start(request);
 				return;
 			}
@@ -746,7 +757,7 @@ export class DaydreamStory {
 			type: 'text',
 			text: passage.slice(0, 8000),
 			...(finalMeta ? { meta: finalMeta } : {}),
-			...(this.#keepRawReplies ? rawReply(raw) : {}),
+			...(this.#keepRawReplies ? keptReply(raw, receipt) : {}),
 			...(this.#keepRawReplies && sent ? { sent } : {})
 		};
 		const saved = await this.#append(request.parentId, 'story', content);
@@ -1480,4 +1491,18 @@ export function rawReply(raw: string): { raw?: string; rawTruncated?: true } {
 	return raw.length > DAYDREAM_LIMITS.rawReply
 		? { raw: raw.slice(0, DAYDREAM_LIMITS.rawReply), rawTruncated: true }
 		: { raw };
+}
+
+/**
+ * Everything a passage keeps of how its reply arrived: the reply itself
+ * (`rawReply`), and what else its stream carried (`received`), whose
+ * reasoning gets what room the reply leaves in `rawReply`.
+ */
+function keptReply(
+	raw: string,
+	receipt: ReplyReceipt
+): { raw?: string; rawTruncated?: true; received?: ReceivedRecord } {
+	const kept = rawReply(raw);
+	const received = receipt.record(kept.raw ?? '');
+	return received ? { ...kept, received } : kept;
 }

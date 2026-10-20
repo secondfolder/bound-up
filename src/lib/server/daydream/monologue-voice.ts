@@ -16,7 +16,9 @@ import type { DaydreamVoice, DialValue } from '$lib/daydream';
  * own, which is why it speaks in short statements, each with a little in its
  * own words after it, and why who speaks is left to the setup: an unnamed
  * voice with the user listening unless the setup suggests a character, or
- * the user's own inner voice.
+ * the user's own inner voice where the idea says so or reads better as their
+ * thoughts — but not for an idea merely about what someone is, which a
+ * model left freer took as reason enough.
  *
  * Each statement is bold on a line of its own, which the page draws larger
  * (`standout` in `daydream/passage-format.ts`), so the statements read as
@@ -73,8 +75,8 @@ export function monologueSpeaker(voice: DaydreamVoice, characterCount: number): 
 	const name = voice.protagonistName.trim();
 	const who =
 		characterCount === 0
-			? 'No speaker is set. Unless the idea suggests one, speak as an unnamed voice with the user listening. Where the setup suits it better, the voice can instead be the user’s own inner voice, in the first person as them.'
-			: 'The speaker is one of the characters below — the first, unless the idea says otherwise — or, where the setup suits it better, the user’s own inner voice; anyone else is someone the voice talks about or to.';
+			? 'No speaker is set. Unless the idea suggests one, speak as an unnamed voice with the user listening. Where the idea says so, or would work better as the user’s own thoughts, the voice is instead their own inner voice, in the first person as them — but an idea about what someone is or what people believe is no reason on its own.'
+			: 'The speaker is one of the characters below — the first, unless the idea says otherwise — or, where the idea says so or would work better as their own thoughts, the user’s own inner voice; anyone else is someone the voice talks about or to.';
 	const user =
 		voice.stance === 'absent'
 			? 'The user is not spoken to: they overhear it.'

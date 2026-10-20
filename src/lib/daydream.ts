@@ -574,7 +574,9 @@ export const DAYDREAM_LIMITS = {
 	 * A reply exactly as the model wrote it, kept for debug mode's raw log
 	 * (docs/debug-mode.md). Replies are asked for at 1200 tokens, a few
 	 * thousand characters, so this is a ceiling a runaway reply hits rather
-	 * than one a normal one comes near.
+	 * than one a normal one comes near. The model's reasoning, kept beside it
+	 * (`received`, turn v7), shares this budget, since it counts towards the
+	 * same 1200 tokens.
 	 */
 	rawReply: 16_000,
 	/**

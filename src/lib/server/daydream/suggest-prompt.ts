@@ -136,6 +136,12 @@ const briefSchema = z
 	.refine((value) => value.trim() !== '', 'Say what the daydream is about');
 
 /** `daydream`: a whole daydream, from a brief on the new-daydream page. */
+/**
+ * Asks for what was sent to come back with the answer, for debug mode's chat
+ * log (docs/debug-mode.md). Honoured only for an account holding the feature.
+ */
+const debugLogSchema = z.boolean().optional();
+
 const daydreamRequestSchema = z.object({
 	task: z.literal('daydream'),
 	brief: briefSchema,
@@ -143,7 +149,8 @@ const daydreamRequestSchema = z.object({
 	side: sideSchema.optional(),
 	/** The voice a generated idea was made for, to keep. */
 	voice: z.enum(VOICE_IDS).nullable().optional(),
-	limits: limitsSchema
+	limits: limitsSchema,
+	debugLog: debugLogSchema
 });
 
 /**
@@ -156,7 +163,8 @@ const ideasRequestSchema = z.object({
 	brief: briefSchema,
 	side: sideSchema,
 	limits: limitsSchema,
-	offered: z.array(z.string().max(DAYDREAM_LIMITS.title)).max(MAX_OFFERED_IDEAS).default([])
+	offered: z.array(z.string().max(DAYDREAM_LIMITS.title)).max(MAX_OFFERED_IDEAS).default([]),
+	debugLog: debugLogSchema
 });
 
 const recordRequestSchema = z
@@ -400,11 +408,17 @@ Draw on the kinds of story people love in erotica and fan fiction, and make it h
  * What makes a monologue worth listening to, in `STORY_CRAFT`'s place when
  * the daydream is one. Its ideas are the point — the beliefs, sayings and
  * tropes of what the user is into — and a model left to itself invents a
- * place and a plot around them instead.
+ * place and a plot around them instead. Who speaks defaults to a voice of
+ * its own: told only that the user's inner voice "suits a brief about what
+ * they are or think", a model read a brief about what women are for as the
+ * user's own beliefs and wrote "Your own inner voice, laying out what you
+ * believe" for one that only wanted the sayings said. So the inner voice
+ * is still the model's to choose, but as a departure from the default that
+ * a brief's subject alone does not justify.
  */
 const MONOLOGUE_CRAFT = `What makes a monologue worth listening to — think it through before writing:
 - The ideas it is built on: the beliefs, rules, tropes and sayings of what the user is into — the things people into it say to each other and to themselves. Start from any they named or pointed to, in their own words where they gave some, and add the ones that go with them.
-- Who speaks, and to whom: an unnamed voice speaking to the user, unless what they asked for suggests otherwise — their own inner voice, in the first person as them, suits a brief about what they are or think; a named character suits one that asks for a person.
+- Who speaks, and to whom: a voice of its own, speaking to the user — unnamed, or a named character where they asked for a person. That is the default, and a brief being about what someone is or is for, what people believe, or the sayings of a kink or a community is no reason to leave it: a separate voice can say all of those to the user. Make it the user's own inner voice, in the first person as them, when you judge the idea would work better as their own thoughts — they need not ask for it.
 - Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
 There is no plot, place or encounter to invent, unless they asked for one.`;
 
@@ -412,7 +426,7 @@ There is no plot, place or encounter to invent, unless they asked for one.`;
 const MONOLOGUE_SAYINGS = `eight to twelve statements in the voice's own words, one to a line, at most ${FIELD_LIMITS.notes} characters in all`;
 
 /** A monologue's idea, field by field: the same fields as a story's, read its way (`ideaFieldLabels`). */
-const MONOLOGUE_IDEA = `Give it a short title naming what it is about, like "What good girls are for"; the premise: what the voice believes and keeps coming back to, in a sentence or two; your role: who the user is to it — the one it speaks to, or the one whose inner voice it is; its tone, in a few words; the setting empty, unless it is said somewhere in particular; and the notes: the sayings it builds on, ${MONOLOGUE_SAYINGS}. No parts, unless a named character is the one speaking.`;
+const MONOLOGUE_IDEA = `Give it a short title naming what it is about, like "What good girls are for"; the premise: what the voice believes and keeps coming back to, in a sentence or two; your role: who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose inner voice it is; its tone, in a few words; the setting empty, unless it is said somewhere in particular; and the notes: the sayings it builds on, ${MONOLOGUE_SAYINGS}. No parts, unless a named character is the one speaking.`;
 
 /** Said of the daydream around an idea or character being written, when it is a monologue. */
 const MONOLOGUE_CONTEXT =

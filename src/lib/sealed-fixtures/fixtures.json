@@ -589,6 +589,43 @@
 			}
 		},
 		{
+			"kind": "daydream-turn",
+			"version": 7,
+			"recordId": "00000000-0000-4000-8000-0000000000e0",
+			"ciphertext": "sb1.2Tzd0k7wIYf1frI5jVPDeRSl4Ki35zUpT4yP5gdFtqzAO7uy5YhcM-wp4lRDI4jmZTxniZqsL5MV9Yz79qkoidDKcldpIdRfqthU1k5XYZ66dgL0Zgg959qTS4ew4m74nsrvAoveBeNgnTXRuhdtweaBWT4ku5PvKsFsRuykH64r9QcB931TlqCLLUDAsrxLqpqgMebkc_UJ4skew8_anfg2Ek0WxRYBRRgu15HQ60Y7VWbjW6DAswjkshEye4BL0teDCT2LrimAbPdIfOViidfpgawURE0x50TyaFZK2-sRp1Hzxg6BQXZhJdCs7nJzCNRT136Z686HtiXUW57uqhQxcBxjfyQuvtXEmqwtJA3F8zZ60DE6Q0NOlGHFMqbHaP51pLi2OWdbfd08B5ZJ3uBKKBsDeMpIBL5c4yhKQE2cSTDrpc1UCcJa3jePsJ1zhZWA6-rFjyuCnZowNXNA_iT2fdwWlKgqA3bwIWmKwJxbXEL8FMwRVinh30fsACFEGjq89s-vBA5k8g4waTVUqRsGR1VcMJeB-VzH3eqE3eC77HiloSMIOPnqhpYZpnoWTMVv66Ghv5AXW_HQ9rPLXrmoZk485ze1F5hl3iK3OFWiZSHY8TaxVbDSdLL7__U5FR5uveVkGrb3dU2jnqpfps2jZAst2bfJ3XAI1dQq8ljPZRqQjLGqMej5-vcFfYpYwyCy0RyJ-huLqbETXDLPVZ7qVgbE79BZfZuwKEyKXOo2VaVOis0cc41R1xDbxoPKUCnqCKqDqJNM3bh1Ij8naImdUddUIVYIKEypUdmIKVgZPjipMhYyDb8ny-qlZyjnc_5OimfswHBxhnKI5lIDiXVQ3yy-I9mZWBVDaAQ3Mfr6_Bcf0_cvWd3-4IUsuBT6f4BhF2T3y3Vbm-xp0hGTKuxyfniYpG5PYteTmC1Aot643k2aqCu4rghKK-xYSysV6taEOC0TEDGgcEqJ0Q4ekg4ufHVWBzkoVNZGzb4GPCHlGRhDYaIsyxQz1EF_bF8Q7dyeAE3kwdUVWEoZJKqA9ZBDMvGGH7pxZXvq1LWH5l2ZClXJ2sXTSnjNoRpJeHWN-oHbYJOOkD56T_kqR25kh6mm5dUgm8LSk8ERV0U337MoaHaHjvFe5ub2DX0lFce-O5zCIpFpRBnkY1wUpJqJVBfcnybcYLh_A_FlPjzBaw",
+			"expected": {
+				"type": "text",
+				"text": "Charlie lets out a breath.",
+				"meta": {
+					"suggestions": ["Hold out a hand."],
+					"directions": {
+						"add": [],
+						"remove": []
+					},
+					"readAs": "action",
+					"image": "A woman in her thirties lets out a breath, in a dim kitchen"
+				},
+				"raw": "<reading>action</reading>\nCharlie lets out a breath.\n\n<meta>\n{\"suggestions\": [\"Hold out a hand.\"]}\n</meta>",
+				"sent": {
+					"system": "You are writing an interactive story.",
+					"added": ["I sit.\n\n(Direction buttons on screen now: none yet.)"],
+					"history": {
+						"messages": 2,
+						"chain": "8a2f4c3b1e0d9f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a"
+					},
+					"truncated": true
+				},
+				"received": {
+					"reasoning": "They asked for a breath, so the scene holds still.",
+					"model": "z-ai/glm-4.6",
+					"provider": "Chutes",
+					"generationId": "gen-1760000000-frozen",
+					"finishReason": "stop",
+					"usage": "{\n  \"prompt_tokens\": 4210,\n  \"completion_tokens\": 180,\n  \"total_tokens\": 4390\n}"
+				}
+			}
+		},
+		{
 			"kind": "daydream-mark",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000d5",

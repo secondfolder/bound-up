@@ -136,28 +136,41 @@ comes from one of two places:
 rather than read from `page.data` inside it, so the dialogs' tests need no
 `$app/state` mock.
 
-### Which links a Daydreams suggestion read
+### How a daydream draft or ideas were written
 
-When a brief's links are read ([daydreams.md](daydreams.md#links-in-a-brief)),
-the new-daydream page shows what each fetch got, in debug mode: a "Links read:
-2 of 3" disclosure (`LinkFetches.svelte`) under the suggested ideas, above a
-draft written out from a brief, and beside a suggestion that failed
-(`SuggestionProblem`). Each link has its URL (shown, not linked), whether it
-was read, the site's HTTP status, how many characters the model was given and
-the page's title, or the fetch engine's error, and the first
-`LINK_EXCERPT` (600) characters of what came back, which is enough to tell a
-page from a login wall.
+A draft written from a brief or a generated idea, and the generated ideas
+themselves, show in debug mode a "Chat log" disclosure on the new-daydream
+page (`SuggestChatLog.svelte`): above the draft, under the ideas, or beside
+the failure when nothing usable came back (`SuggestionProblem`). It is the whole exchange, one closed disclosure per
+bubble: the system prompt, the message the request sent (the brief, the
+side, the voice and the instructions), then everything the model answered
+with — its reasoning where the provider shows it, each page it fetched in
+full (its URL, the engine's status, the site's HTTP status and the page's
+title in the heading, or the engine's error), its reply as written — and how it ended (`finish_reason` or `status`,
+and `usage`). Its heading names the model and which of OpenRouter's APIs it
+went to.
 
-It is not in the raw log, which is a daydream's passages: links are read while
-setting one up, before there is a daydream to keep anything in, and nothing
-about a suggestion is stored. It is read from the answer itself
-(`linkFetches`, `daydream/suggestions.ts`): a suggestion that reads links is
-sent to OpenRouter's Responses API, whose answer lists each fetch as an
-`openrouter:web_fetch` item, where Chat Completions only counts them. The
-endpoint passes it back unread, as it does every answer, so the page text
-reaches the browser whether or not debug mode is on; debug mode only decides
-whether it is shown. It is public pages the user linked, not anything of
-anyone else's.
+What was sent is not in the provider's answer, so the page asks for it: with
+debug mode on, `suggestDaydream` and `suggestIdeas` send `debugLog: true`, and the suggest
+endpoint, for an account holding the feature, reads the answer and adds
+`{ model, api, messages }` to it as `boundUpSent` before passing it back
+(`withSent`). Added to the answer rather than wrapped round it, so every
+other reader of it is unchanged. The flag from an account without the
+feature is ignored, and only the `daydream` and `ideas` tasks take it. The messages are
+the server's prompt and the user's own brief going back to them; nothing is
+kept or logged. `suggestChatLog` (`daydream/suggest-chat-log.ts`) turns the
+answer into the bubbles, reading Chat Completions and Responses answers
+alike, and showing an output item of a shape it does not know whole.
+
+The links a brief pointed at are read ([daydreams.md](daydreams.md#links-in-a-brief))
+by OpenRouter's Responses API rather than Chat Completions because only its
+answer lists each fetch, as an `openrouter:web_fetch` item, which is where
+the log's fetched pages come from. It is not in a daydream's raw log: links
+are read while setting one up, before there is a daydream to keep anything
+in, and nothing about a suggestion is stored.
+
+Not a raw log for suggestions generally: chips, fills, castings and names do
+not ask, so they show only what failed (above).
 
 ### Daydreams' raw log
 
@@ -188,6 +201,18 @@ by `DaydreamRawTurn.svelte`, not as the story:
   (below), one passage at a time (`RawConversation`), and says it was.
 - **A passage's reply exactly as the model wrote it**: tags, `<meta>` block,
   code fences and all (`raw`, `daydream-turn` v4).
+- **What else its stream carried** (`received`, `daydream-turn` v7,
+  `daydream/received-record.ts`), the same as the suggestions' chat log
+  shows for an answer that was not streamed: the model's reasoning, above
+  the reply, where the provider streamed it; and under it "How it ended" —
+  why it stopped (`finish_reason`), which model and provider answered (a
+  fallback can differ from the model asked for), OpenRouter's generation
+  id, and the usage. The stream hands every event on (`onEvent` in
+  `stream.ts`) to a `ReplyReceipt`, which gathers them as they arrive and so
+  keeps what it had through a Stop, like `raw`. The usage is only in the
+  stream because a recording request asks for it (`usage: { include: true }`
+  on the reply endpoint's request). A passage from before v7 says "How it
+  ended was not recorded".
 - **A passage's picture with what made it** ([daydreams.md](daydreams.md#pictures)):
   the picture, the story model's description, and exactly what the image
   model was asked — its model, prompt and negative prompt — which the
@@ -209,8 +234,9 @@ by `DaydreamRawTurn.svelte`, not as the story:
   It is a **rebuild from the story as it stands now**, today's setup
   included, which is what the bubbles above are checked against when no
   record was kept.
-- **A failed reply** as it arrived, under the error. It is never saved, since
-  a failed reply is not a turn.
+- **A failed reply** as it arrived, under the error, with its reasoning and
+  how it ended — the error it ended on included. It is never saved, since a
+  failed reply is not a turn.
 
 Beside the switch, **Export** saves the whole daydream to the device as JSON
 (`DaydreamStory.exportHistory`): the setup, every turn on every branch in the
@@ -239,7 +265,13 @@ off can still be inspected once it is on.
 - A turn written without the grant, or before v4, says "Raw reply not
   recorded".
 - `raw` is capped at `DAYDREAM_LIMITS.rawReply` (16,000 characters). A
-  longer reply keeps its start, with `rawTruncated`. Replies are asked for at
+  longer reply keeps its start, with `rawTruncated`. The reasoning shares
+  that cap: it gets what room the reply leaves, and says so with
+  `reasoningTruncated` when it ran past it. Reasoning counts towards the
+  same 1200 tokens a reply is asked for, so together they still only reach
+  the cap when something has run away, and the turn's 96 KB ciphertext cap
+  has no room for a second budget that size. `received`'s other fields are
+  short (`RECEIVED_LIMITS`), and a usage too long to keep is dropped. Replies are asked for at
   1200 tokens, so this is a ceiling for a runaway reply, not one a normal one
   approaches.
 - `raw` repeats the passage and any written-out turn. Storing the parsed
@@ -248,7 +280,8 @@ off can still be inspected once it is on.
   displayed. For v4, the turn kind's ciphertext cap went from 48 KB to 96 KB,
   which is the most the daydream endpoints take.
 - `sent` brought v5, whose worst case — every field and both caps full —
-  still fits the 96 KB cap (`sealed-kinds/daydreams.test.ts`).
+  still fits the 96 KB cap (`sealed-kinds/daydreams.test.ts`), and v7's,
+  with `received` full too, does as well.
 - v4's and v5's readers and writers shipped together, as v3's did. A turn is read only by
   its owner, so the only reader that can meet one early is the owner's own
   tab still open on the previous build.
@@ -287,7 +320,10 @@ spread across levels. Never saved. See
 
 - **Pure:**
   - `src/lib/debug.test.ts`: the rule;
-  - `sealed-kinds/daydreams.test.ts`: a worst-case v4 turn fits its cap;
+  - `sealed-kinds/daydreams.test.ts`: a worst-case turn fits its cap, and the
+    reply and its reasoning share theirs;
+  - `daydream/received-record.test.ts`: what a stream's events are gathered
+    into;
   - the v4 sealed fixture;
   - the migration in `server/db/migrations.test.ts`.
 - **Server:**
@@ -297,14 +333,19 @@ spread across levels. Never saved. See
   - the IQ test's load;
   - `api/daydreams/[id]/prompt/server.test.ts`: both features, ownership, no
     model call, no console.
+  - `api/daydreams/suggest/server.test.ts`: what was sent added to a draft's
+    answer only when asked and only for the feature, never the key.
 - **Component:**
   - `AppNav.svelte.test.ts`: centred tabs, the toggle hidden while off and
     shown while on;
   - `DebugInfo.svelte.test.ts`;
+  - `SuggestChatLog.svelte.test.ts`, and `daydream/suggest-chat-log.test.ts`
+    for reading both kinds of answer;
   - the settings page;
-  - `DaydreamThread.svelte.test.ts`, "in debug mode": raw kept with the grant
-    and not without, kept through a Stop, cut when long; the log; the prompt;
-    a failed reply.
+  - `DaydreamThread.svelte.test.ts`, "in debug mode": raw and received kept
+    with the grant and not without, kept through a Stop, cut when long; the
+    log, with a passage's reasoning and how it ended; the prompt; a failed
+    reply.
 - **End to end:**
   - `e2e/debug-mode.spec.ts`: the toggle, the panel, the switch, a revoke;
   - the debug test in `e2e/daydreams.spec.ts`;

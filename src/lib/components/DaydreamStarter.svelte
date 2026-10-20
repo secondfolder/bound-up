@@ -12,10 +12,11 @@
 		startersFor
 	} from '$lib/daydream/starters';
 	import type { SuggestFailure } from '$lib/daydream/suggest';
-	import type { GeneratedIdea, LinkFetch } from '$lib/daydream/suggestions';
+	import type { SuggestChatLog as ChatLog } from '$lib/daydream/suggest-chat-log';
+	import type { GeneratedIdea } from '$lib/daydream/suggestions';
 	import DaydreamSidePicker from './DaydreamSidePicker.svelte';
-	import LinkFetches from './LinkFetches.svelte';
 	import SearchField from './SearchField.svelte';
+	import SuggestChatLog from './SuggestChatLog.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/**
@@ -68,8 +69,8 @@
 		generated: {
 			brief: string;
 			ideas: readonly GeneratedIdea[];
-			/** The links in the brief the latest ask read, for debug mode. */
-			fetches?: readonly LinkFetch[];
+			/** How the model wrote the latest ones, links read and all, for debug mode. */
+			log?: ChatLog;
 		} | null;
 		/** The title of the generated idea being written out, while it is. */
 		writing: string | null;
@@ -204,7 +205,7 @@
 						Clear
 					</wa-button>
 				</div>
-				{#if debug && generated.fetches?.length}<LinkFetches fetches={generated.fetches} />{/if}
+				{#if debug && generated.log}<SuggestChatLog log={generated.log} />{/if}
 				{#if ideasForSide.length === 0}
 					<p class="hint">None of these have you as the {side}. Ask for more that do.</p>
 				{:else if ideasShown.length === 0}

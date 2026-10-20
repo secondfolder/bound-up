@@ -86,6 +86,23 @@ describe('readReplyStream', () => {
 		expect(outcome).toEqual({ kind: 'done' });
 	});
 
+	it('hands every provider event on whole, the one that ends it in error included', async () => {
+		const events: unknown[] = [];
+		const reasoning = { choices: [{ delta: { reasoning: 'Hm.' } }], model: 'm' };
+		const failure = { error: { message: 'overloaded' } };
+		await readReplyStream(
+			body(
+				`data: ${JSON.stringify(reasoning)}\n\n`,
+				event('Sit.'),
+				`data: ${JSON.stringify(failure)}\n\n`
+			),
+			() => undefined,
+			() => undefined,
+			(value) => events.push(value)
+		);
+		expect(events).toEqual([reasoning, { choices: [{ delta: { content: 'Sit.' } }] }, failure]);
+	});
+
 	it('treats a stream that just ends as done', async () => {
 		expect((await read(body(event('No DONE'), event(' marker')))).outcome).toEqual({
 			kind: 'done'

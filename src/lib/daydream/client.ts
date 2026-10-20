@@ -132,6 +132,8 @@ export async function writeReply(
 		onText: (soFar: ReplySoFar, raw: string) => void;
 		/** Given what the endpoint sent the model, before the reply, when `record` asked for it. */
 		onSent?: (record: SentRecord) => void;
+		/** Given every event from the provider, for debug mode's raw log (`ReplyReceipt`). */
+		onEvent?: (event: unknown) => void;
 	}
 ): Promise<ReplyOutcome> {
 	const response = await tryFetch(`${base(daydreamId)}/reply`, {
@@ -158,7 +160,8 @@ export async function writeReply(
 				if (record) {
 					options.onSent?.(record);
 				}
-			}
+			},
+			options.onEvent
 		);
 	} catch (problem) {
 		if (problem instanceof DOMException && problem.name === 'AbortError') {

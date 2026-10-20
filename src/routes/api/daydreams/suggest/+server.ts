@@ -33,7 +33,8 @@ import type { RequestHandler } from './$types';
  *
  * Not streamed: a suggestion is a small JSON answer, useless until it is
  * whole. The provider's response is passed through unread; the browser
- * checks it (`$lib/daydream/suggestions.ts`).
+ * checks it (`$lib/daydream/suggestions.ts`). The one exception is debug
+ * mode's chat log, which has what was sent added to it (`withSent`).
  */
 export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	const userId = await daydreamGuard(locals);
@@ -111,10 +112,48 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		);
 	}
 
+	if (
+		(parsed.data.task === 'daydream' || parsed.data.task === 'ideas') &&
+		parsed.data.debugLog &&
+		(await userHasFeature(locals.db, userId, 'debugMode'))
+	) {
+		return withSent(await upstream.text(), {
+			model: config.openrouterModelId,
+			api: readLinks ? 'responses' : 'chat/completions',
+			messages
+		});
+	}
+
 	return new Response(upstream.body, {
 		headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
 	});
 };
+
+/** What a suggestion sent the model, as debug mode's chat log shows it (`suggestChatLog`). */
+type Sent = { model: string; api: 'responses' | 'chat/completions'; messages: ModelMessage[] };
+
+/**
+ * The provider's answer with what was sent added to it as `boundUpSent`, for
+ * debug mode's chat log of how a draft or ideas were written (docs/debug-mode.md). Like
+ * the reply endpoint's record, it is the server's prompt and the user's own
+ * brief going back to the user who sent them, and nothing is kept or logged.
+ * Added to the answer rather than wrapped round it, so every reader of an
+ * answer reads this one unchanged; an answer that is not a JSON object has
+ * nowhere to put it and goes back as it came.
+ */
+function withSent(answer: string, sent: Sent): Response {
+	const headers = { 'content-type': 'application/json', 'cache-control': 'no-store' };
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(answer);
+	} catch {
+		return new Response(answer, { headers });
+	}
+	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+		return new Response(answer, { headers });
+	}
+	return new Response(JSON.stringify({ ...parsed, boundUpSent: sent }), { headers });
+}
 
 /**
  * OpenRouter's fetch tool, for the links in a brief. Parallel's engine
@@ -133,7 +172,7 @@ const WEB_FETCH = {
  * The request for a suggestion that reads a brief's links: the same one, sent
  * to OpenRouter's Responses API rather than Chat Completions, because only
  * its answer lists each fetch — the URL, whether it was read, and what came
- * back or why not — for debug mode to show (`linkFetches`); Chat Completions
+ * back or why not — for debug mode's chat log (`suggestChatLog`); Chat Completions
  * says only how many there were. The browser reads both shapes, so the
  * answer is still passed back unread.
  */

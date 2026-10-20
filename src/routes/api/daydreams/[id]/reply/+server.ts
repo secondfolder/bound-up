@@ -94,7 +94,11 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 				max_tokens: 1200,
 				temperature: 0.9,
 				// Only route to providers that do not keep or train on prompts.
-				provider: { data_collection: 'deny' }
+				provider: { data_collection: 'deny' },
+				// For debug mode's raw log: the token counts and cost, in the
+				// stream's last event (`received-record.ts`). Not otherwise,
+				// since nothing else reads them.
+				...(parsed.data.record ? { usage: { include: true } } : {})
 			}),
 			// The user pressing Stop, or leaving, ends the request upstream too,
 			// so a reply nobody will read is not paid for to the end.

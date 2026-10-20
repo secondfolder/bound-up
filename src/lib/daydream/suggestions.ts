@@ -106,61 +106,6 @@ export function completionText(body: unknown): string | null {
 	return texts.length > 0 ? texts.join('') : null;
 }
 
-/** One link a suggestion read, as debug mode shows it (`LinkFetches.svelte`). */
-export type LinkFetch = {
-	url: string;
-	/** Whether the fetch engine came back with the page. */
-	read: boolean;
-	/** The site's own status, when the engine said. */
-	httpStatus: number | null;
-	title: string;
-	/** Why it could not be read, as the engine put it; `''` when it was. */
-	error: string;
-	/** How much of the page the model was given, in characters. */
-	length: number;
-	/** The start of it, enough to see whether it was the page or a login wall. */
-	excerpt: string;
-};
-
-/** How much of a page `LinkFetch.excerpt` keeps. */
-export const LINK_EXCERPT = 600;
-
-const fetchItemSchema = z.object({
-	type: z.literal('openrouter:web_fetch'),
-	url: z.string(),
-	status: z.string().optional(),
-	httpStatus: z.number().optional(),
-	title: z.string().optional(),
-	content: z.string().optional(),
-	error: z.string().optional()
-});
-
-/** The links a suggestion read, in the order they were fetched; none for an answer that read none. */
-export function linkFetches(body: unknown): LinkFetch[] {
-	const responses = responsesSchema.safeParse(body);
-	if (!responses.success) {
-		return [];
-	}
-	return responses.data.output.flatMap((item) => {
-		const parsed = fetchItemSchema.safeParse(item);
-		if (!parsed.success) {
-			return [];
-		}
-		const { url, status, httpStatus, title, content = '', error = '' } = parsed.data;
-		return [
-			{
-				url,
-				read: status === 'completed',
-				httpStatus: httpStatus ?? null,
-				title: title ?? '',
-				error,
-				length: content.length,
-				excerpt: content.slice(0, LINK_EXCERPT)
-			}
-		];
-	});
-}
-
 const FENCED_BLOCK = /```(?:json)?\s*(?<json>[\s\S]*?)\s*```/i;
 
 /**
@@ -228,7 +173,7 @@ const RESPONSES_ENDING = ['status', 'incomplete_details', 'error', 'usage'] as c
  * inside it and hid the end of the answer, which is where the reason is: a
  * token budget spent on reasoning (`usage`), a turn that stopped after its
  * fetches, or a reply in a shape `completionText` does not read. The pages
- * themselves are in `LinkFetches`. Null for anything that is not a Responses
+ * themselves are in the chat log (`suggestChatLog`). Null for anything that is not a Responses
  * answer.
  */
 function responsesOutline(body: unknown): string | null {

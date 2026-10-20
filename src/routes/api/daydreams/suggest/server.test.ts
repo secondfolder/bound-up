@@ -232,6 +232,47 @@ describe('POST /api/daydreams/suggest', () => {
 		expect(await result.value.json()).toEqual(answer);
 	});
 
+	it('adds what it sent to a draft’s or ideas’ answer, only when asked and only for debug mode', async () => {
+		const daydream = { task: 'daydream', brief: SECRET_WORDS, limits: '', debugLog: true };
+		const answer = { choices: [{ message: { content: '{"voice":"talk"}' } }] };
+		const read = async (json: unknown) => {
+			const result = await post(ada, json);
+			if (result.type !== 'ok') {
+				throw new Error(JSON.stringify(result));
+			}
+			return result.value.json();
+		};
+
+		// Without the feature, the flag is ignored.
+		upstream.mockResolvedValueOnce(Response.json(answer));
+		expect(await read(daydream)).toEqual(answer);
+
+		await grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: ada.id });
+		upstream.mockResolvedValueOnce(Response.json(answer));
+		const logged = await read(daydream);
+		expect(logged.choices).toEqual(answer.choices);
+		expect(logged.boundUpSent).toMatchObject({ model: 'test/model', api: 'chat/completions' });
+		expect(logged.boundUpSent.messages[0].content.startsWith(SUGGEST_RULES)).toBe(true);
+		expect(logged.boundUpSent.messages.at(-1).content).toContain(SECRET_WORDS);
+		// Never the key.
+		expect(JSON.stringify(logged)).not.toContain('sk-or-test');
+
+		// Not asked, or another task: passed back as it came.
+		upstream.mockResolvedValueOnce(Response.json(answer));
+		expect(await read({ ...daydream, debugLog: false })).toEqual(answer);
+		upstream.mockResolvedValueOnce(Response.json(answer));
+		expect(await read({ ...body, debugLog: true })).toEqual(answer);
+		// Generated ideas take it too.
+		upstream.mockResolvedValueOnce(Response.json(answer));
+		expect(
+			await read({ task: 'ideas', brief: SECRET_WORDS, side: null, limits: '', debugLog: true })
+		).toHaveProperty('boundUpSent.model', 'test/model');
+		// An answer with nowhere to put it goes back as it came.
+		upstream.mockResolvedValueOnce(new Response('not json'));
+		const result = await post(ada, daydream);
+		expect(result.type === 'ok' && (await result.value.text())).toBe('not json');
+	});
+
 	it('refuses an opening too long to name from, without counting it', async () => {
 		const limit = vi.fn(async (): Promise<RateLimitResult> => ({ allowed: true }));
 		const naming = {

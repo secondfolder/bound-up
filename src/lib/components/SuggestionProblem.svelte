@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { SuggestFailure } from '$lib/daydream/suggest';
-	import LinkFetches from './LinkFetches.svelte';
+	import SuggestChatLog from './SuggestChatLog.svelte';
 
 	/**
 	 * Why a suggestion failed, said where it was asked for. In debug mode
@@ -20,7 +20,7 @@
 		<pre>{problem.detail}</pre>
 	</wa-details>
 {/if}
-{#if debug && problem.fetches?.length}<LinkFetches fetches={problem.fetches} />{/if}
+{#if debug && problem.log}<SuggestChatLog log={problem.log} />{/if}
 
 <style>
 	.invalid {

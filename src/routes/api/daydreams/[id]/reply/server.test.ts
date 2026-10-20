@@ -127,6 +127,8 @@ describe('POST /api/daydreams/[id]/reply', () => {
 			`${USER_TURN}\n\n(Direction buttons on screen now: "Slower" (id "slower").)`
 		]);
 		expect(rest.join('\n\n')).toContain('smiles.');
+		// The usage, for the raw log's "How it ended".
+		expect(JSON.parse(String(init.body)).usage).toEqual({ include: true });
 	});
 
 	it('sends nothing of its own unless asked to record', async () => {
@@ -136,6 +138,8 @@ describe('POST /api/daydreams/[id]/reply', () => {
 			throw new Error(`expected a reply, got ${result.type}`);
 		}
 		expect(await result.value.text()).not.toContain('boundUpSent');
+		const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
+		expect(JSON.parse(String(init.body)).usage).toBeUndefined();
 	});
 
 	it('sends the server’s own rules first, and asks only for providers that keep nothing', async () => {

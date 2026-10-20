@@ -48,7 +48,13 @@ someone has played one:
   it is built on, who speaks to whom, where the ideas go), each with its own
   idea fields and cast: a monologue has no parts and nobody in it unless a
   named character is the one speaking, and its sayings go in the idea's
-  notes ([Ideas](#ideas)).
+  notes ([Ideas](#ideas)). Who speaks is a voice of its own, talking to the
+  user, by default; the user's own inner voice is the model's to choose where
+  it judges the idea works better as their thoughts, but not merely because
+  the brief is about what someone is or what people believe. Told that the
+  inner voice "suits a brief about what they are or think", a model read a
+  brief listing what a community says women are for as the user's own
+  beliefs, and spoke it as their inner voice.
 - **Daydream suggestions.** Ready-made daydreams (`DAYDREAM_STARTERS` in
   `daydream/starters.ts`), each an idea starting point, a voice preset and
   character starting points cast into the idea's parts, with the casting
@@ -129,9 +135,9 @@ is passed over without a word. The endpoint sends OpenRouter's
 the model answers and it is still one call. That request goes to
 OpenRouter's Responses API (`/responses`, `readingLinks`) rather than Chat
 Completions, because only its answer lists each fetch — the URL, whether it
-was read, and what came back — which debug mode shows
-([debug-mode.md](debug-mode.md#which-links-a-daydreams-suggestion-read));
-the browser reads either shape (`completionText`, `linkFetches`). The answer gets
+was read, and what came back — which debug mode's chat log shows
+([debug-mode.md](debug-mode.md#how-a-daydream-draft-or-ideas-were-written));
+the browser reads either shape (`completionText`, `suggestChatLog`). The answer gets
 `READING_ALLOWANCE` more tokens, because a model with a tool reasons over
 what it read before it writes.
 
@@ -340,8 +346,9 @@ ordinary day (on the bus, at a café table), which each example set shows
 one of, since shown only short ones a model never writes it. The voice stands in for those ideas
 rather than being a fleshed-out character. Who it is is left to the setup:
 an unnamed voice with the user listening unless the idea suggests a
-character, or the user's own inner voice where that suits it; watching, the
-user overhears it. Told only to "speak a monologue" a model writes a
+character, or the user's own inner voice where the idea says so or reads
+better as their thoughts;
+watching, the user overhears it. Told only to "speak a monologue" a model writes a
 soliloquy in a room, with a plot, so it gets a guide of its own like the
 system's (`src/lib/server/daydream/monologue-voice.ts`), last before the
 format, with examples of the form in a tame and an adult set by heat, broad
@@ -1194,9 +1201,11 @@ not one of the five is no reading.
 
 **The reply as it arrived is kept only for debug mode.** For an account
 granted debug mode, a passage also seals the model's reply verbatim, tags and
-metadata included, as `raw` (`daydream-turn` v4), for the raw log. What the
-page acts on is still the parsed passage and metadata; `raw` is only ever
-displayed. See [debug-mode.md](debug-mode.md#daydreams-raw-log).
+metadata included, as `raw` (`daydream-turn` v4), and what else its stream
+carried — the model's reasoning, who answered, why it stopped, its usage —
+as `received` (v7), for the raw log. What the page acts on is still the
+parsed passage and metadata; `raw` and `received` are only ever displayed.
+See [debug-mode.md](debug-mode.md#daydreams-raw-log).
 
 **Metadata is not sent back, but for the picture.** Past turns go to the
 model as their words (`toContextTurn`); what a passage offered next was for
@@ -1272,7 +1281,11 @@ The answer is a small JSON completion, not streamed, passed back unread for
 the browser to check (`daydream/suggestions.ts`). When the provider fails,
 the 502 says only "No suggestions just now" — except to an account holding
 debug mode, which also gets the provider's status and error body as `detail`
-([debug-mode.md](debug-mode.md#why-a-daydreams-suggestion-failed)).
+([debug-mode.md](debug-mode.md#why-a-daydreams-suggestion-failed)). A whole
+daydream's or generated ideas' request that asks for `debugLog`, from an account holding debug
+mode, gets what was sent the model added to the answer as `boundUpSent`
+([debug-mode.md](debug-mode.md#how-a-daydream-draft-or-ideas-were-written)); nothing
+of it is kept or logged.
 
 **In transit, for debug mode's "Show prompt":** the same body as a reply, to
 `POST /api/daydreams/[id]/prompt`, which answers with the messages

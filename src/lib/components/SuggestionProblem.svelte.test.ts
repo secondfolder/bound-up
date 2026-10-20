@@ -27,28 +27,28 @@ describe('SuggestionProblem', () => {
 		expect(bare.container.querySelector('wa-details')).toBeNull();
 	});
 
-	it('shows the links it read, in debug mode only', async () => {
-		const withFetches = {
+	it('shows the chat log, in debug mode only', async () => {
+		const withLog = {
 			...problem,
-			fetches: [
-				{
-					url: 'https://example.invalid/x',
-					read: false,
-					httpStatus: null,
-					title: '',
-					error: 'Extract failed: connect_error',
-					length: 0,
-					excerpt: ''
-				}
-			]
+			log: {
+				model: 'test/model',
+				api: 'responses',
+				entries: [
+					{
+						who: 'model' as const,
+						label: 'Fetched https://example.invalid/x (failed)',
+						text: 'Extract failed: connect_error'
+					}
+				]
+			}
 		};
-		const shown = render(SuggestionProblem, { problem: withFetches, debug: true });
+		const shown = render(SuggestionProblem, { problem: withLog, debug: true });
 		await waSettled(shown.container);
 		expect(shown.container.textContent).toContain('Extract failed: connect_error');
 		shown.unmount();
 
-		const hidden = render(SuggestionProblem, { problem: withFetches });
+		const hidden = render(SuggestionProblem, { problem: withLog });
 		await waSettled(hidden.container);
-		expect(hidden.container.textContent).not.toContain('example.invalid');
+		expect(hidden.container.textContent).not.toContain('connect_error');
 	});
 });

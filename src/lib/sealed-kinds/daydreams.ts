@@ -27,6 +27,7 @@ import {
 } from '../daydream';
 import { coversEveryFace, MAX_SIDES, MIN_SIDES } from '../daydream/dice';
 import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
+import { RECEIVED_LIMITS } from '../daydream/received-record';
 import { defineSealedKind } from '../sealed';
 import { isClientId } from '../vault';
 
@@ -491,6 +492,39 @@ const turnV6 = z.discriminatedUnion('type', [
 	...turnTypesV2
 ]);
 
+// v7: a passage may carry what its reply's stream carried besides the text
+// (`received`, `daydream/received-record.ts`): the model's reasoning, which
+// model and provider answered, the generation's id, why it stopped, and its
+// usage. For debug mode's raw log, beside `raw` and `sent`, under the same
+// rule. The reasoning shares `rawReply` with `raw`, so the worst case still
+// fits the ciphertext cap below.
+const receivedRecordSchema = z.object({
+	reasoning: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+	reasoningTruncated: z.literal(true).optional(),
+	model: z.string().min(1).max(RECEIVED_LIMITS.name).optional(),
+	provider: z.string().min(1).max(RECEIVED_LIMITS.name).optional(),
+	generationId: z.string().min(1).max(RECEIVED_LIMITS.name).optional(),
+	finishReason: z.string().min(1).max(RECEIVED_LIMITS.finishReason).optional(),
+	usage: z.string().min(1).max(RECEIVED_LIMITS.usage).optional()
+});
+
+const turnV7 = z.discriminatedUnion('type', [
+	textTurn(passageMetaV6)
+		.extend({
+			raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+			rawTruncated: z.literal(true).optional(),
+			sent: sentRecordSchema.optional(),
+			received: receivedRecordSchema.optional()
+		})
+		.refine(
+			(turn) =>
+				(turn.raw?.length ?? 0) + (turn.received?.reasoning?.length ?? 0) <=
+				DAYDREAM_LIMITS.rawReply,
+			'The reply and its reasoning are too long to keep'
+		),
+	...turnTypesV2
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
@@ -527,7 +561,13 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v5 could say, v6 says the same way.
 			upcast: (value: z.output<typeof turnV5>) => value
 		},
-		{ version: 6, schema: turnV6 }
+		{
+			version: 6,
+			schema: turnV6,
+			// Everything v6 could say, v7 says the same way.
+			upcast: (value: z.output<typeof turnV6>) => value
+		},
+		{ version: 7, schema: turnV7 }
 	]
 });
 

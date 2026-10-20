@@ -9,6 +9,10 @@
  * happens mid-reply arrives as an event with an `error` field rather than as
  * an HTTP status, because the status was sent long before.
  *
+ * Every other event is handed on whole too (`onEvent`), for debug mode's raw
+ * log to gather what else it carried: reasoning, the model and provider that
+ * answered, why it stopped, and its usage (`received-record.ts`).
+ *
  * Pure: it takes bytes and calls back with text, so it is tested without a
  * network. `EventSource` cannot be used, because it can only send a GET.
  */
@@ -37,7 +41,9 @@ export async function readReplyStream(
 	body: ReadableStream<Uint8Array>,
 	onText: (piece: string) => void,
 	/** Given the endpoint's record of what it sent, when it was asked for one. */
-	onSent: (record: unknown) => void = () => undefined
+	onSent: (record: unknown) => void = () => undefined,
+	/** Given every event from the provider, parsed, the error that ends a reply included. */
+	onEvent: (event: unknown) => void = () => undefined
 ): Promise<StreamOutcome> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
@@ -51,7 +57,7 @@ export async function readReplyStream(
 			const lines = buffered.split(LINE_BREAK);
 			buffered = done ? '' : (lines.pop() ?? '');
 			for (const line of lines) {
-				const outcome = handleLine(line, onText, onSent);
+				const outcome = handleLine(line, { onText, onSent, onEvent });
 				if (outcome) {
 					return outcome;
 				}
@@ -67,8 +73,15 @@ export async function readReplyStream(
 
 function handleLine(
 	line: string,
-	onText: (piece: string) => void,
-	onSent: (record: unknown) => void
+	{
+		onText,
+		onSent,
+		onEvent
+	}: {
+		onText: (piece: string) => void;
+		onSent: (record: unknown) => void;
+		onEvent: (event: unknown) => void;
+	}
 ): StreamOutcome | null {
 	if (!line.startsWith('data:')) {
 		// Blank separators, `: keep-alive` comments, `event:` and `id:` fields.
@@ -89,6 +102,7 @@ function handleLine(
 		onSent(event.boundUpSent);
 		return null;
 	}
+	onEvent(event);
 	if (event.error) {
 		return { kind: 'error' };
 	}

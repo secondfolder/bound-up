@@ -823,7 +823,9 @@ describe('the monologue voice', () => {
 	it('leaves who speaks to the setup: an unnamed voice by default, or a character', () => {
 		const alone = monologueOf(monologueSetup());
 		expect(alone).toContain('speak as an unnamed voice with the user listening');
-		expect(alone).toContain('the user’s own inner voice');
+		expect(alone).toContain(
+			'or would work better as the user’s own thoughts, the voice is instead their own inner voice'
+		);
 		expect(monologueOf(monologueSetup({ stance: 'persona' }))).toContain('know them as Kit');
 		expect(monologueOf(monologueSetup({ characters: 1 }))).toContain(
 			'The speaker is one of the characters below'

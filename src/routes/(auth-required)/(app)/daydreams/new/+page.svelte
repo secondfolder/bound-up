@@ -3,8 +3,8 @@
 	import { resolve } from '$app/paths';
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
-	import LinkFetches from '$lib/components/LinkFetches.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import SuggestChatLog from '$lib/components/SuggestChatLog.svelte';
 	import SuggestionProblem from '$lib/components/SuggestionProblem.svelte';
 	import type { DaydreamSetup, DaydreamVoicePresetId } from '$lib/daydream';
 	import {
@@ -15,11 +15,11 @@
 		storedStarterSide
 	} from '$lib/daydream/starters';
 	import { type SuggestFailure, suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
+	import type { SuggestChatLog as ChatLog } from '$lib/daydream/suggest-chat-log';
 	import {
 		addIdeas,
 		type GeneratedIdea,
 		ideaBrief,
-		type LinkFetch,
 		MAX_OFFERED_IDEAS
 	} from '$lib/daydream/suggestions';
 	import type { MarkedSummary } from '$lib/daydream/summary';
@@ -43,8 +43,8 @@
 				layout: 'summary' | 'full';
 				/** What the model wrote it from, so "Try another" can ask again; null for none. */
 				described: Described | null;
-				/** The links in the brief it read, for debug mode; none for a draft that read none. */
-				fetches: readonly LinkFetch[];
+				/** How the model wrote it, links read and all, for debug mode; null when not asked for. */
+				log: ChatLog | null;
 				version: number;
 		  };
 
@@ -71,7 +71,7 @@
 	let generated: {
 		brief: string;
 		ideas: readonly GeneratedIdea[];
-		fetches?: readonly LinkFetch[];
+		log?: ChatLog;
 	} | null = $state(null);
 	let writing: string | null = $state(null);
 	let ideaProblem: SuggestFailure | null = $state(null);
@@ -112,7 +112,7 @@
 		draft: DaydreamSetup | null,
 		described: Described | null,
 		summary: MarkedSummary | null = null,
-		fetches: readonly LinkFetch[] = []
+		log: ChatLog | null = null
 	) {
 		versions += 1;
 		stage = {
@@ -121,7 +121,7 @@
 			summary,
 			layout: draft ? 'summary' : 'full',
 			described,
-			fetches,
+			log,
 			version: versions
 		};
 	}
@@ -145,7 +145,7 @@
 		asking = true;
 		problem = null;
 		ideaProblem = null;
-		const answer = await suggestDaydream({ ...described, limits });
+		const answer = await suggestDaydream({ ...described, limits, debugLog: data.debug });
 		// Left behind: the user went back to the start, or asked again, while
 		// this was out. Applying it anyway pulled someone who had pressed "Other
 		// ways to start" straight back into a draft they had walked away from.
@@ -162,7 +162,7 @@
 			{ ...assembleSetup(answer.value), limits },
 			described,
 			answer.value.summary ?? null,
-			answer.fetches
+			answer.log ?? null
 		);
 	}
 
@@ -172,11 +172,11 @@
 	 * back to the ways in still shows them.
 	 */
 	async function generateIdeas(asked: string): Promise<SuggestFailure | null> {
-		const answer = await suggestIdeas({ brief: asked, side, limits: '' });
+		const answer = await suggestIdeas({ brief: asked, side, limits: '', debugLog: data.debug });
 		if (!answer.ok) {
 			return answer;
 		}
-		generated = { brief: asked, ideas: answer.value, fetches: answer.fetches };
+		generated = { brief: asked, ideas: answer.value, log: answer.log };
 		ideaProblem = null;
 		return null;
 	}
@@ -195,7 +195,8 @@
 			brief: shown.brief,
 			side,
 			limits: '',
-			offered: shown.ideas.map((offered) => offered.title).slice(-MAX_OFFERED_IDEAS)
+			offered: shown.ideas.map((offered) => offered.title).slice(-MAX_OFFERED_IDEAS),
+			debugLog: data.debug
 		});
 		// Cleared or replaced while this was out: these were for the old ones.
 		if (generated !== shown) {
@@ -208,7 +209,7 @@
 		if (added.length === shown.ideas.length) {
 			return { error: 'No new ideas came back that time. Try again.' };
 		}
-		generated = { brief: shown.brief, ideas: added, fetches: answer.fetches ?? shown.fetches };
+		generated = { brief: shown.brief, ideas: added, log: answer.log ?? shown.log };
 		return null;
 	}
 
@@ -279,7 +280,7 @@
 				Other ways to start
 			</wa-button>
 			{#if problem}<SuggestionProblem {problem} debug={data.debug} />{/if}
-			{#if data.debug && stage.fetches.length > 0}<LinkFetches fetches={stage.fetches} />{/if}
+			{#if data.debug && stage.log}<SuggestChatLog log={stage.log} />{/if}
 			{#key stage.version}
 				<DaydreamSetupForm
 					setupForm={data.setupForm}

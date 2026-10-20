@@ -4,12 +4,14 @@
 	import { PENDING_TEXT } from '$lib/sealed-views.svelte';
 	import type { DaydreamTreeNodeView } from '$lib/types';
 	import DaydreamPicture from './DaydreamPicture.svelte';
+	import DaydreamRawEnding from './DaydreamRawEnding.svelte';
 	import { startOpen } from './details';
 
 	/**
 	 * One turn of the story as debug mode's raw log shows it
-	 * (docs/debug-mode.md): for a passage, the model's reply exactly as it
-	 * arrived, when it was kept (`raw`, turn v4), and its picture with the
+	 * (docs/debug-mode.md): for a passage, the model's reasoning and its reply
+	 * exactly as they arrived, when they were kept (`raw`, turn v4;
+	 * `received`, turn v7), how the reply ended, and its picture with the
 	 * prompts it was made from; for any turn, what is stored,
 	 * as JSON; and for a passage, the prompt that would write it, rebuilt by
 	 * the server on request. Nothing here acts on the story.
@@ -18,6 +20,7 @@
 
 	const content = $derived(story.content(node.id));
 	const pictureRequest = $derived(story.pictureRequest(node.id));
+	const received = $derived(content?.type === 'text' ? (content.received ?? null) : null);
 
 	/** What is stored, less the raw reply shown above it. */
 	const stored = $derived.by(() => {
@@ -27,7 +30,7 @@
 		if (content.type !== 'text') {
 			return JSON.stringify(content, null, 2);
 		}
-		const { raw: _raw, rawTruncated: _truncated, ...rest } = content;
+		const { raw: _raw, rawTruncated: _truncated, received: _received, ...rest } = content;
 		return JSON.stringify(rest, null, 2);
 	});
 
@@ -48,6 +51,14 @@
 		<p>This turn will not open here.</p>
 	{:else}
 		{#if node.role === 'story'}
+			{#if received?.reasoning || received?.reasoningTruncated}
+				<wa-details summary="Reasoning" appearance="plain">
+					{#if received.reasoning}<pre>{received.reasoning}</pre>{/if}
+					{#if received.reasoningTruncated}
+						<p class="note">The reasoning ran on past this, and only its start was kept.</p>
+					{/if}
+				</wa-details>
+			{/if}
 			{#if content.type === 'text' && content.raw}
 				<pre class="reply">{content.raw}</pre>
 				{#if content.rawTruncated}
@@ -56,6 +67,7 @@
 			{:else}
 				<p class="note">Raw reply not recorded.</p>
 			{/if}
+			<DaydreamRawEnding {received} />
 			{#if content.type === 'text' && content.meta?.image}
 				<!-- The passage's picture, beside what it was made from: the story
 				     model's description, and what the image model was asked. -->

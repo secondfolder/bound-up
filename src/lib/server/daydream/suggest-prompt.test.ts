@@ -472,6 +472,14 @@ describe('buildSuggestMessages, a monologue', () => {
 		expect(ask).toContain('If it is a story — any voice but "monologue":');
 	});
 
+	it('has a voice of its own speak, leaving the user’s inner voice to the model’s judgement', () => {
+		const ask = asks(brief);
+		expect(ask).toContain('Who speaks, and to whom: a voice of its own, speaking to the user');
+		expect(ask).toContain('is no reason to leave it: a separate voice can say all of those');
+		expect(ask).toContain('when you judge the idea would work better as their own thoughts');
+		expect(ask).not.toContain('suits a brief about what they are or think');
+	});
+
 	it('refuses a voice that is not one', () => {
 		expect(suggestRequestSchema.safeParse({ ...brief, voice: 'monologue' }).success).toBe(true);
 		expect(suggestRequestSchema.safeParse({ ...brief, voice: 'poem' }).success).toBe(false);

@@ -22,6 +22,7 @@
 	import DaydreamNotThisDialog from './DaydreamNotThisDialog.svelte';
 	import DaydreamPassage from './DaydreamPassage.svelte';
 	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
+	import DaydreamRawEnding from './DaydreamRawEnding.svelte';
 	import DaydreamRawSent from './DaydreamRawSent.svelte';
 	import DaydreamRawSystem from './DaydreamRawSystem.svelte';
 	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
@@ -551,9 +552,16 @@
 				<wa-button size="s" appearance="outlined" onclick={() => story.retry?.()}>Try again</wa-button>
 			{/if}
 		</wa-callout>
-		{#if rawLog && story.problemRaw}
-			<!-- A failed reply is never saved, so this is the only place its text shows. -->
-			<pre class="problem-raw">{story.problemRaw}</pre>
+		{#if rawLog && (story.problemRaw || story.problemReceived)}
+			<!-- A failed reply is never saved, so this is the only place its text,
+			     its reasoning and how it ended show. -->
+			{#if story.problemReceived?.reasoning}
+				<wa-details summary="Reasoning" appearance="plain">
+					<pre class="problem-raw">{story.problemReceived.reasoning}</pre>
+				</wa-details>
+			{/if}
+			{#if story.problemRaw}<pre class="problem-raw">{story.problemRaw}</pre>{/if}
+			{#if story.problemReceived}<DaydreamRawEnding received={story.problemReceived} />{/if}
 		{/if}
 	{/if}
 

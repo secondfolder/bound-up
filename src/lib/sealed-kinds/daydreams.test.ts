@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DAYDREAM_LIMITS, MAX_SUGGESTIONS } from '../daydream';
 import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
+import { RECEIVED_LIMITS } from '../daydream/received-record';
 import { daydreamMarkKind, daydreamTurnKind } from './daydreams';
 
 /**
@@ -25,8 +26,18 @@ describe('daydreamTurnKind', () => {
 				directions: { add: [], remove: [] },
 				expansion: 'z'.repeat(DAYDREAM_LIMITS.turn)
 			},
-			raw: 'r'.repeat(DAYDREAM_LIMITS.rawReply),
+			// The reasoning shares `rawReply` with `raw`, so all of it is the worst case.
+			raw: 'r'.repeat(DAYDREAM_LIMITS.rawReply / 2),
 			rawTruncated: true as const,
+			received: {
+				reasoning: 'q'.repeat(DAYDREAM_LIMITS.rawReply / 2),
+				reasoningTruncated: true as const,
+				model: 'm'.repeat(RECEIVED_LIMITS.name),
+				provider: 'p'.repeat(RECEIVED_LIMITS.name),
+				generationId: 'g'.repeat(RECEIVED_LIMITS.name),
+				finishReason: 'f'.repeat(RECEIVED_LIMITS.finishReason),
+				usage: 'u'.repeat(RECEIVED_LIMITS.usage)
+			},
 			sent: {
 				system: 's'.repeat(DAYDREAM_LIMITS.sentSystem),
 				added: ['a'.repeat(DAYDREAM_LIMITS.sentAdded)],
@@ -50,6 +61,18 @@ describe('daydreamTurnKind', () => {
 		expect(sent(DAYDREAM_LIMITS.sentSystem + 1, [])).toBe(false);
 		const half = 'a'.repeat(DAYDREAM_LIMITS.sentAdded / 2 + 1);
 		expect(sent(0, [half, half])).toBe(false);
+	});
+
+	it('refuses a reply and its reasoning past the cap they share', () => {
+		const kept = (raw: number, reasoning: number) =>
+			daydreamTurnKind.latest.safeParse({
+				type: 'text',
+				text: 'x',
+				raw: 'r'.repeat(raw),
+				received: { reasoning: 'q'.repeat(reasoning) }
+			}).success;
+		expect(kept(DAYDREAM_LIMITS.rawReply - 10, 10)).toBe(true);
+		expect(kept(DAYDREAM_LIMITS.rawReply - 10, 11)).toBe(false);
 	});
 
 	it('refuses a raw reply past its cap', () => {
