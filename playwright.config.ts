@@ -86,6 +86,13 @@ export default defineConfig({
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.
 			VITE_DEV_ORIGIN: E2E_BASE_URL,
+			// So that editing a file mid-run does not hot-update or reload every
+			// open test page: a reload during sign-in throws away the key stash and
+			// one mid-flow loses a half-filled form, and the failures that left
+			// looked like flakiness in whichever flow it landed on. Server-side code
+			// still picks up the edit, so a run is only fully isolated from them in
+			// a worktree of its own.
+			NO_HMR: '1',
 			// Set to a Docker image to run the suite against it instead of
 			// `vite dev` (`npm run test:e2e:image`; CI does this for every build).
 			...(process.env.E2E_IMAGE ? { E2E_IMAGE: process.env.E2E_IMAGE } : {})

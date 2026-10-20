@@ -899,6 +899,15 @@ Notes that cost a debugging round each:
   a test stuck on `/login?reason=device`, or on `/signup` navigated to twice.
   The server log names it: `page reload .svelte-kit/generated/…`. Use another
   worktree.
+- **The suite's `vite dev` runs with `NO_HMR=1`** (`webServer.env` in
+  `playwright.config.ts`), so editing a source file mid-run no longer
+  hot-updates or reloads every open test page. It only stops the reloads that
+  come from file changes. SvelteKit's own `full-reload`s (a route added, or
+  `app.html` edited) and Vite's reload on a changed `tsconfig.json` still go
+  out over the websocket. The server also starts serving the edited code
+  straight away, so a test that runs during an edit can see new server code
+  under an old client. For a run that your edits cannot touch, use another
+  worktree.
 - **A `<wa-button href=…>` renders an anchor**, so `getByRole('button')` finds
   nothing. And `getByRole('button')` on a `<wa-button>` resolves to the _inner_
   `<button>` inside its shadow root, which is why `wa-button[type=submit]` as a
