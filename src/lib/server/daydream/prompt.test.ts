@@ -448,6 +448,8 @@ describe('buildMessages', () => {
 		expect(section).toContain('<say who="Charlie">"Sit down,"</say>');
 		expect(section).toContain('who="you"');
 		expect(section).toContain('No headings, lists, tables or links');
+		expect(section).toContain('<sound>Mmmph</sound>');
+		expect(section).toContain('Say and sound tags go in the passage only');
 		expect(section).toContain('never in a <yours> block or in the metadata');
 	});
 
@@ -488,6 +490,106 @@ describe('buildMessages', () => {
 		expect(content.toLowerCase()).not.toContain('safeword');
 		expect(content).toContain('Stop the scene');
 		expect(content).toContain('Ease off');
+	});
+});
+
+describe('how a passage is written', () => {
+	const atHeat = (heat: DialValue | null, narrator: DaydreamNarrator = 'none') =>
+		testDaydreamSetup({
+			voice: { narrator, stance: 'self', protagonistName: '' },
+			characters: [testCharacter()],
+			scene: testScene({ dials: { heat, kink: null } })
+		});
+	const systemAt = (heat: DialValue | null, narrator: DaydreamNarrator = 'none') =>
+		system(buildMessages(request({ setup: atHeat(heat, narrator), turns: [said('hi')] })));
+
+	it('says how to tell the story and write the prose, after reading the user and before the format', () => {
+		const content = systemAt(null);
+		const telling = content.indexOf('# Telling the story');
+		const prose = content.indexOf('# Writing the prose');
+		expect(telling).toBeGreaterThan(content.indexOf("# Reading the user's turns"));
+		expect(prose).toBeGreaterThan(telling);
+		expect(prose).toBeLessThan(content.indexOf('# Formatting the passage'));
+		expect(content).toContain('Never retell or summarise');
+		expect(content).toContain('Keep strict continuity');
+		expect(content).toContain('Match the build-up to what the user wants');
+		// Fast or hot gets there quickly; slow has room to breathe.
+		expect(content).toContain('getting to it quickly');
+		expect(content).toContain('not every passage has to escalate');
+		// A user only watching has nothing to answer, so passages are not made to end on a cue.
+		expect(content).not.toContain('End every passage');
+		expect(content).toContain('never pad with atmosphere');
+		expect(content).toContain('prefer plain physical description to metaphor and simile');
+	});
+
+	// The system's own guide forbids narration of the kind the prose lines ask for.
+	it('gives the system voice how to tell the story, but not the narrator’s prose or sex lines', () => {
+		const content = systemAt(5, 'impersonal');
+		expect(content).toContain('# Telling the story');
+		expect(content).not.toContain('# Writing the prose');
+		expect(content).not.toContain('# Writing sex');
+	});
+
+	it('writes sex crudely and in detail from Explicit, and not below it', () => {
+		for (const heat of [1, 2, 3] as const) {
+			expect(systemAt(heat), `heat ${heat}`).not.toContain('# Writing sex');
+		}
+		for (const heat of [4, 5] as const) {
+			const content = systemAt(heat);
+			expect(content).toContain('# Writing sex');
+			expect(content).toContain('Prefer crude, everyday words');
+			// A preference that gives way to who is speaking, never a rule.
+			expect(content).toContain('someone who would not talk crudely does not');
+			expect(content).toContain('where that suits the characters and the story');
+			expect(content).toContain('<sound>gluck</sound>');
+			expect(content).toContain('dirty talk');
+		}
+		expect(systemAt(4)).not.toContain('Hold nothing back');
+		expect(systemAt(5)).toContain('Hold nothing back');
+	});
+
+	it('leaves explicit sex to the setup’s words when heat is unset', () => {
+		expect(systemAt(null)).toContain('If the story turns sexual and is written explicitly');
+	});
+
+	it('leaves all of it out of a stopped scene’s check-in', () => {
+		const content = system(
+			buildMessages(
+				request({ setup: atHeat(5), turns: [said('hi'), { type: 'safety', signal: 'red' }] })
+			)
+		);
+		expect(content).not.toContain('# Telling the story');
+		expect(content).not.toContain('# Writing sex');
+	});
+
+	it('offers buttons for the next act, position or toy only once sex can be on the page', () => {
+		for (const heat of [1, 2] as const) {
+			expect(systemAt(heat), `heat ${heat}`).not.toContain('a position, a toy');
+		}
+		for (const heat of [null, 3, 5] as const) {
+			expect(systemAt(heat), `heat ${heat}`).toContain('a position, a toy');
+		}
+	});
+
+	it('reads a bare word as a direction, and Continue as leave to move the story on', () => {
+		const content = systemAt(null);
+		expect(content).toContain('A word or a short phrase that nobody in the story would say');
+		expect(content).toContain(
+			'"(Continue.)" with nothing else from the user means move the story on yourself'
+		);
+		expect(content).toContain('still never write their words or thoughts');
+	});
+
+	it('never stops the story to establish consent', () => {
+		expect(RULES).toContain('never stops to establish consent');
+	});
+
+	it('has a picture spell out its act, its implied people and its light', () => {
+		const content = system(buildMessages(request({ turns: [said('hi')] }), { pictures: true }));
+		expect(content).toContain('Count and describe anyone the moment implies');
+		expect(content).toContain('Spell out a sex act');
+		expect(content).toContain('its quality, direction and colour');
+		expect(content).toContain('"harness", not "gear"');
 	});
 });
 

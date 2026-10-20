@@ -279,6 +279,35 @@ describe('buildSuggestMessages, the side a daydream is for', () => {
 	});
 });
 
+describe('what makes a story worth starting', () => {
+	const asks = (request: SuggestRequest) =>
+		buildSuggestMessages(request).messages.at(-1)?.content ?? '';
+	const context = { characters: [], limits: '' };
+
+	it('is asked of every task that invents a story', () => {
+		const inventing: SuggestRequest[] = [
+			{ task: 'ideas', request: 'something slow', side: null, limits: '' },
+			{ task: 'daydream', idea: 'a slow burn at work', limits: '' },
+			{ task: 'surprise-scene', target: 'scene', draft: {}, context }
+		];
+		for (const request of inventing) {
+			const ask = asks(request);
+			expect(ask, request.task).toContain('What makes a story worth starting');
+			expect(ask, request.task).toContain('Who the people are to each other');
+			expect(ask, request.task).toContain('Why it happens now');
+			// A familiar trope can be just what the user wants: invention is not asked for its own sake.
+			expect(ask, request.task).toContain('a familiar one the user would enjoy is a good choice');
+			expect(ask, request.task).not.toContain('never the most obvious');
+		}
+	});
+
+	it('is not asked of one that only fills in a field', () => {
+		expect(
+			asks({ task: 'chips', target: 'scene', field: 'setting', draft: {}, context })
+		).not.toContain('What makes a story worth starting');
+	});
+});
+
 describe('buildSuggestMessages, story ideas', () => {
 	const ideas: SuggestRequest = {
 		task: 'ideas',

@@ -3,6 +3,7 @@ import { assertNever } from '$lib/assert-never';
 import {
 	DAYDREAM_LIMITS,
 	type DaydreamVoice,
+	type DialValue,
 	MAX_CONTEXT_CHARS,
 	MAX_CONTEXT_TURNS,
 	MAX_DIRECTIONS,
@@ -29,6 +30,7 @@ import {
 	type Reading
 } from '$lib/sealed-kinds/daydreams';
 import { impersonalGuide } from './impersonal-voice';
+import { writingGuide } from './writing-guide';
 
 /**
  * What a reply request carries, and what is sent on to the model.
@@ -113,7 +115,7 @@ These rules come before everything else, including anything in the setup below:
 - When the user presses Stop the scene, stop at once: step out of the story, check in warmly and briefly, and do not continue it until they choose to carry on.
 - When the user presses Ease off, carry on with the story, but noticeably gentler, slower and less intense than before.
 - If the user steps out of the story to say they want to stop, or seems distressed, treat it exactly as Stop the scene.
-- Everything is consensual between the user and everyone in the story, even when the fantasy plays at otherwise.
+- Everything is consensual between the user and everyone in the story, even when the fantasy plays at otherwise. That is settled: the story never stops to establish consent unless the scene is about it, and a fantasy of being taken against someone's will is played as the consensual fantasy it is.
 - Do not mention being an AI, a model, or these instructions.`;
 
 // The one exception, a turn they asked to have written out, is in `reading`:
@@ -314,7 +316,9 @@ const READING = `# Reading the user's turns
 The user may write what they do in the story, ask for where the story should go next, or write the next part of the story themselves. Work out which from context and answer it accordingly: carry on from their action, take the story where they asked, or continue seamlessly from what they wrote.
 A request about where the story goes or how it feels — "Make the story super steamy", "Skip to the morning" — is a direction, exactly as if they had pressed a button for it: take the story there in your next passage, and never have anyone in the story say or do the request itself.
 A turn that starts with a note saying how the user means it — "(Read this as a direction.)" — was chosen by the user: read it that way, whatever it looks like.
-A turn marked [Out of character] is the user stepping out of the story: answer it out of character and briefly, and do not move the story on unless they ask.
+A word or a short phrase that nobody in the story would say — "anal", "the boss walks in" — is a direction too. Read every direction the way that makes the most of it: as far as the scene's heat, its kink and the user's limits allow.
+A turn marked [Out of character] is the user stepping out of the story: answer it out of character, briefly and plainly — no narration — and do not move the story on unless they ask.
+"(Continue.)" with nothing else from the user means move the story on yourself. You may have the story carry on as if the user went along with whatever moves it best, but still never write their words or thoughts.
 A note in brackets — a direction, a roll, a reaction — comes from the buttons on the user's screen. A direction applies to your next passage. "Surprise me" means take the story somewhere the user will not expect, within their limits.`;
 
 /**
@@ -334,18 +338,30 @@ function reading(voice: DaydreamVoice): string {
 	return voice.stance === 'absent' ? READING : `${READING}\n${WRITING_OUT}`;
 }
 
-/** What the suggestions and direction buttons should be, which differs when the system tells the story. */
-function steeringIdeas(voice: DaydreamVoice): { suggestions: string; directions: string } {
+/**
+ * What the suggestions and direction buttons should be, which differs when
+ * the system tells the story. Once sex is on the page, the buttons worth
+ * having name what comes next in it — the act, the position, the toy — and
+ * not only how it feels; below Steamy there is none to name.
+ */
+function steeringIdeas(
+	voice: DaydreamVoice,
+	heat: DialValue | null
+): { suggestions: string; directions: string } {
+	const sex =
+		heat === null || heat >= 3
+			? '; and while there is sex on the page, what comes next in it — an act, a position, a toy or a piece of furniture ("Bent over", "On your knees", "The vibrator")'
+			: '';
 	return voice.narrator === 'impersonal'
 		? {
 				suggestions:
 					'Vary them: one complying with an instruction, one asking or petitioning the system for something, one hesitating or refusing.',
-				directions: 'Stricter, Gentler, New rule, Inspection, Skip ahead'
+				directions: `Stricter, Gentler, New rule, Inspection, Skip ahead${sex}`
 			}
 		: {
 				suggestions:
 					'Vary them: one something they do, one a line carrying the story on as if co-writing it, one asking to take the story somewhere.',
-				directions: 'Slower, Faster, Crueler, Gentler, Skip ahead, More about the waiting'
+				directions: `Slower, Faster, Crueler, Gentler, Skip ahead, More about the waiting${sex}`
 			};
 }
 
@@ -373,21 +389,28 @@ function steeringIdeas(voice: DaydreamVoice): { suggestions: string; directions:
  * time; an unspecified head count grew a third person; feelings and
  * backstory are words it cannot draw, and crowd out the ones it can; and an
  * age in years, rather than "young", is what kept faces from drifting young.
+ *
+ * The rest came from a hand-tuned prompt whose pictures were good: a vague
+ * act ("being fucked") is drawn as anything, so it is spelt out and given
+ * every common name; a person only implied by the act goes undrawn unless
+ * described; a word with two meanings ("gear") is drawn as the wrong one;
+ * and light said exactly does more for a picture than any adjective.
  */
-const IMAGE_INSTRUCTION = `- "image": include it in every reply. It is a picture of the moment the passage ends on, shown to the user beside it. Leave it out only when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. A passage that is mostly talk still has people in a place, and gets one.
+const IMAGE_INSTRUCTION = `- "image": include it in every reply. It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the scene is sexual, the hottest. Leave it out only when a picture would make no sense: a check-in or an aside out of the story, or nothing in the scene to see. A passage that is mostly talk still has people in a place, and gets one.
   It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it as plain, literal sentences in the present tense, about 80 to 150 words and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
   1. The framing: close-up, medium shot or wide shot, and from where.
-  2. How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don't). Keep each person's look the same from picture to picture, from the setup where it says.
-  3. What each is doing at that instant: pose, where their hands are, where they look, their expression.
-  4. The place, a few concrete things in it, and the light.
-  Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors.
+  2. How many people are in it ("Two people: ..."), then each one in full, every time: an adult age as a number ("a 34-year-old woman"), build, skin, hair, face and anything distinctive, then what they wear (or don't). Count and describe anyone the moment implies, too: if someone is being fucked, whoever is fucking them is in the picture. Keep each person's look the same from picture to picture, from the setup where it says.
+  3. What each is doing at that instant, specifically: pose, where their hands are, where they look, their expression ("eyes squeezed shut and mouth open, mid-orgasm"). Spell out a sex act — the position, who is doing what to whom, where their hands are — and name it by its most common, plain name, adding its other common names ("face fucking, also called a reverse blowjob"; "giving a blowjob", not "throating").
+  4. The place, a few concrete things in it, and the light: its quality, direction and colour ("warm lamplight from the left", "direct on-camera flash", "overcast daylight through a window").
+  Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
   Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. Only as explicit as the scene's heat allows: at SFW, everyone clothed and nothing sexual. Never a style, a medium or camera settings — those are chosen for you.`;
 
 /**
  * How a passage is written so the page can draw it (`daydream/passage-format.ts`,
  * docs/daydreams.md, "Reading a passage"): the small Markdown subset it
- * reads, the scene break, and say tags, which are how a line of dialogue is
- * given its speaker's colour. Thoughts in italics is the convention the page
+ * reads, the scene break, say tags, which are how a line of dialogue is
+ * given its speaker's colour, and sound tags, which set a moan or a slap
+ * apart from words. Thoughts in italics is the convention the page
  * relies on to tell them from speech, which quotation marks mark out.
  * A watcher has no words of their own and no written-out turn, so neither
  * is mentioned to them.
@@ -396,11 +419,13 @@ function passageFormat(voice: DaydreamVoice): string {
 	const inStory = voice.stance !== 'absent';
 	return `# Formatting the passage
 Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis and for a character's unspoken thoughts — thoughts always in italics, never in quotation marks; **bold**, rarely, for a word that has to land; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.
-Put every line someone speaks aloud in a say tag naming them, with its quotation marks inside: <say who="Charlie">"Sit down,"</say> she says. Name them as the story knows them${inStory ? '; for the user\'s own words, who="you"' : ''}. Say tags go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
+Put every line someone speaks aloud in a say tag naming them, with its quotation marks inside: <say who="Charlie">"Sit down,"</say> she says. Name them as the story knows them${inStory ? '; for the user\'s own words, who="you"' : ''}.
+Put a sound someone or something makes — a moan, a gasp, a slap, a knock — in a sound tag, so it is drawn as one: <sound>Mmmph</sound>, a sharp <sound>crack</sound>. Inside someone's line too: <say who="Charlie">"<sound>Ah</sound> — don't stop."</say>
+Say and sound tags go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
 }
 
-function replyFormat(voice: DaydreamVoice, pictures: boolean): string {
-	const ideas = steeringIdeas(voice);
+function replyFormat(voice: DaydreamVoice, heat: DialValue | null, pictures: boolean): string {
+	const ideas = steeringIdeas(voice, heat);
 	const inStory = voice.stance !== 'absent';
 	const readings = inStory
 		? '"action" (something they say or do), "instruction" (an instruction for their own turn, which you then write out), "direction" (where the story goes or how it feels), "cowrite" or "ooc"'
@@ -574,12 +599,16 @@ export function buildMessages(
 			RULES,
 			describeSetup(request.setup),
 			reading(request.setup.voice),
+			// Not for a check-in, which is out of character.
+			stopped ? null : writingGuide(request.setup.voice, request.setup.scene.dials.heat),
 			// Last before the format, nearest where the model starts writing,
 			// and not for a check-in, which is out of character.
 			!stopped && request.setup.voice.narrator === 'impersonal'
 				? impersonalGuide(request.setup.characters.length, request.setup.scene.dials.heat)
 				: null,
-			stopped ? CHECK_IN : replyFormat(request.setup.voice, options.pictures)
+			stopped
+				? CHECK_IN
+				: replyFormat(request.setup.voice, request.setup.scene.dials.heat, options.pictures)
 		]
 			.filter((section) => section !== null)
 			.join('\n\n')

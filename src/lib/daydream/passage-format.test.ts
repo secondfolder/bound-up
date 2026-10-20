@@ -25,6 +25,7 @@ const shape = (list: Run[]) =>
 			run.italic ? 'i' : '',
 			run.dialogue ? 'd' : '',
 			run.speaker ? `@${run.speaker}` : '',
+			run.sound ? 's' : '',
 			run.marked ? 'm' : ''
 		]
 			.filter(Boolean)
@@ -163,11 +164,48 @@ describe('say tags', () => {
 	});
 });
 
+describe('sound tags', () => {
+	it('hides the tags and marks what is between them a sound', () => {
+		expect(shape(runs('A <sound>crack</sound>, then quiet.'))).toEqual([
+			'A ',
+			'crack s',
+			', then quiet.'
+		]);
+	});
+
+	it('keeps the speaker of a sound inside their line', () => {
+		expect(shape(runs('<say who="Mara">"<sound>Ah</sound> — more."</say>'))).toEqual([
+			'" d @Mara',
+			'Ah d @Mara s',
+			' — more." d @Mara'
+		]);
+	});
+
+	it('ends an unclosed sound with its paragraph, and hides a stray closing tag', () => {
+		expect(paragraphs(formatPassage('<sound>Mmmph\n\nNext</sound>'))).toEqual(['Mmmph', 'Next']);
+		expect(shape(runs('<sound>Mmmph\n\nNext</sound>'))).toEqual(['Mmmph s', 'Next']);
+	});
+
+	it('is left out of the plain words', () => {
+		expect(plainPassage('A <sound>crack</sound>.')).toBe('A crack.');
+	});
+});
+
 describe('while it streams', () => {
 	const streaming = { streaming: true };
 
-	it('hides a say tag still arriving', () => {
-		for (const tail of ['<', '<s', '<sa', '<say', '<say who="Ma', '</sa']) {
+	it('hides a say or sound tag still arriving', () => {
+		for (const tail of [
+			'<',
+			'<s',
+			'<sa',
+			'<say',
+			'<say who="Ma',
+			'</sa',
+			'<so',
+			'<sound',
+			'</soun'
+		]) {
 			expect(paragraphs(formatPassage(`She says ${tail}`, streaming))).toEqual(['She says ']);
 		}
 	});

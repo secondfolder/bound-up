@@ -326,7 +326,9 @@ Answer as: {${shape}}`,
 			const unrated = unratedSceneDials(request);
 			const ratingShape = unrated.map((key) => `, "${key}": 1-5`).join('');
 			return {
-				instructions: `Invent a scene for this story that the user will not expect, fitting the characters and the dials. Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. ${PARTS_INSTRUCTION}${rateInstruction(unrated)}
+				instructions: `Invent a scene for this story that the user will not expect, fitting the characters and the dials.
+${STORY_CRAFT}
+Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. ${PARTS_INSTRUCTION}${rateInstruction(unrated)}
 Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", ${PARTS_SHAPE}${ratingShape}}`,
 				maxTokens: 800
 			};
@@ -335,6 +337,23 @@ Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…
 			return assertNever(request.task, 'suggest task');
 	}
 }
+
+/**
+ * What makes a story worth starting, for every task that invents one: a
+ * scene, a whole daydream, or ideas to choose from. Left to itself the model
+ * writes a thin version of whatever was asked; these are the questions a
+ * hand-tuned prompt whose stories were good had it ask first. It is not told
+ * to avoid the expected: a well-worn trope is often exactly what the user
+ * wants, so freshness is for where it makes the story better.
+ * The examples are deliberately broad, not anyone's favourite kinks, since
+ * examples steer what comes back.
+ */
+const STORY_CRAFT = `What makes a story worth starting — think it through before writing:
+- Who the people are to each other: strangers thrown together by chance, people who have known each other a while without being close (co-workers from different departments, a neighbour, the courier who always delivers), or people already intimate, together for years or still discovering each other.
+- Where it happens: somewhere with a charge of its own, like the back room at work, deep in an old library, a late train, a mansion with a dungeon in the basement.
+- Why it happens now: a dare, a debt, a bet, blackmail, a job, money, a craving someone finally admits.
+- When it is sexual, which dynamic, acts and kinks suit it, picked to fit the rest rather than listed.
+Draw on the kinds of story people love in erotica and fan fiction, and make it hang together as one story. Tropes are loved for a reason: a familiar one the user would enjoy is a good choice. Be inventive where a fresh angle makes the story better, not for its own sake.`;
 
 const PARTS_SHAPE = '"parts": [{"name": "…", "description": "…"}]';
 const PARTS_INSTRUCTION = `Give it one to ${MAX_DAYDREAM_CHARACTERS} parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the scene.`;
@@ -452,6 +471,7 @@ function daydreamMessages(request: DaydreamRequest): ModelMessage[] {
 ${request.idea.trim()}${sideLine(request.side)}
 
 Set the whole story up from it, keeping to what they asked for and filling in the rest.
+${STORY_CRAFT}
 
 How it is told, as "voice", one of:
 ${VOICES}
@@ -480,6 +500,7 @@ function ideasMessages(request: IdeasRequest): ModelMessage[] {
 ${request.request.trim()}
 
 Offer ${GENERATED_IDEAS} different ideas that fit what they asked for, as different from each other as it allows. ${sides}
+${STORY_CRAFT}
 
 For each: a short title, at most ${DAYDREAM_LIMITS.title} characters; a premise of a sentence or two, at most ${MAX_IDEA_PREMISE} characters, saying who they are with, where, and what is going on as it starts; up to ${MAX_IDEA_TAGS} tags of a word or two for its kinks and tropes; and ratings as whole numbers from 1 to 5: ${RATINGS.heat} and ${RATINGS.kink}.
 Answer as: {"ideas": [{"title": "…", "premise": "…", "tags": ["…"], "you": "dom", "heat": 1-5, "kink": 1-5}]}`

@@ -58,6 +58,21 @@ describe('DaydreamProse', () => {
 		expect(container.textContent).not.toContain('<say');
 	});
 
+	it('sets sounds apart, in their own colour outside a line and the speaker’s inside one', () => {
+		const { container } = render(DaydreamProse, {
+			text: 'A <sound>crack</sound>. <say who="Mara">"<sound>Ah</sound> — more."</say>',
+			cast
+		});
+		container.style.setProperty('--daydream-sound', 'rgb(4, 5, 6)');
+		const sounds = [...container.querySelectorAll<HTMLElement>('.sound')];
+		expect(sounds.map((sound) => sound.textContent)).toEqual(['crack', 'Ah']);
+		expect(getComputedStyle(defined(sounds[0])).fontVariantCaps).toBe('all-small-caps');
+		expect(getComputedStyle(defined(sounds[0])).color).toBe('rgb(4, 5, 6)');
+		expect(defined(sounds[1]).style.getPropertyValue('--voice')).toBe('var(--daydream-voice-1)');
+		expect(getComputedStyle(defined(sounds[1])).color).not.toBe('rgb(4, 5, 6)');
+		expect(container.textContent).not.toContain('<sound');
+	});
+
 	it('starts the opening passage with a drop cap, and no other', () => {
 		const opening = render(DaydreamProse, { text: 'Rain.', cast, opening: true });
 		expect(opening.container.querySelector('.prose')?.classList.contains('drop-cap')).toBe(true);

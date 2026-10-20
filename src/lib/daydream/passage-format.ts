@@ -21,6 +21,10 @@
  * `<say who="Mara">"…"</say>`, which says whose it is, so each voice can have
  * a colour of its own.
  *
+ * Sounds are set apart too: a moan, a gasp, a slap, in `<sound>…</sound>`,
+ * drawn so they read as sounds rather than words. Inside a say tag a sound
+ * keeps its speaker's colour; only its type changes.
+ *
  * Pure and alias-free.
  */
 
@@ -35,6 +39,8 @@ export type Run = {
 	dialogue: boolean;
 	/** Who says it, as the say tag named them; null for narration and unattributed speech. */
 	speaker: string | null;
+	/** A sound someone makes, in a sound tag. */
+	sound: boolean;
 	/** Inside a highlighted quote (`withQuotes`). */
 	marked: boolean;
 };
@@ -64,8 +70,12 @@ const SCENE_BREAK = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|⁂)$/
 const MAYBE_SCENE_BREAK = /^[*_\-⁂][*_\-⁂ \t]*$/;
 const SAY_TAG = /<(?<close>\/)?say\b[^<>]*>/gi;
 const WHO = /\bwho\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|(?<bare>[^\s"'>]+))/i;
-/** A say tag cut off by the end of what has arrived: `<`, `<sa`, `</say`, `<say who="Ma`. */
-const PARTIAL_SAY_TAG = /<(?:\/?(?:s(?:a(?:y(?:\b[^<>]*)?)?)?)?)$/i;
+const SOUND_TAG = /<(?<close>\/)?sound\b[^<>]*>/gi;
+/**
+ * A say or sound tag cut off by the end of what has arrived: `<`, `<sa`,
+ * `</say`, `<say who="Ma`, `<sou`.
+ */
+const PARTIAL_TAG = /<(?:\/?(?:s(?:a(?:y(?:\b[^<>]*)?)?|o(?:u(?:n(?:d(?:\b[^<>]*)?)?)?)?)?)?)$/i;
 const SPACE = /\s/;
 const SPACES = /\s+/;
 const WORD = /[\p{L}\p{N}]/u;
@@ -76,6 +86,7 @@ type Marks = {
 	bold: Uint8Array;
 	italic: Uint8Array;
 	dialogue: Uint8Array;
+	sound: Uint8Array;
 	/** Which say tag a character is inside, numbered from 1; 0 for none. */
 	say: Uint32Array;
 	speakers: (string | null)[];
@@ -112,6 +123,7 @@ function format(
 		bold: new Uint8Array(text.length),
 		italic: new Uint8Array(text.length),
 		dialogue: new Uint8Array(text.length),
+		sound: new Uint8Array(text.length),
 		say: new Uint32Array(text.length),
 		speakers: [null]
 	};
@@ -120,7 +132,9 @@ function format(
 	for (const piece of layout) {
 		if (piece.kind === 'paragraph') {
 			const tail = streaming && piece === last;
-			sayTags(text, piece, marks, tail);
+			const end = tagsEnd(text, piece, marks, tail);
+			sayTags(text, piece, marks, end);
+			soundTags(text, piece, marks, end);
 			quotationMarks(text, piece, marks);
 			emphasis(text, piece, marks, { tail, strays });
 		}
@@ -197,13 +211,32 @@ function hide(marks: Marks, start: number, end: number) {
 }
 
 /**
+ * Where a paragraph's tags may be read up to: its end, or, in the last
+ * paragraph of a passage still arriving, the start of a tag cut off part way,
+ * which is hidden until the rest of it comes.
+ */
+function tagsEnd(text: string, paragraph: Span, marks: Marks, tail: boolean): number {
+	if (tail) {
+		const partial: RegExpExecArray | null = PARTIAL_TAG.exec(
+			text.slice(paragraph.start, paragraph.end)
+		);
+		if (partial) {
+			const end = paragraph.start + partial.index;
+			hide(marks, end, paragraph.end);
+			return end;
+		}
+	}
+	return paragraph.end;
+}
+
+/**
  * `<say who="…">` and `</say>`: the tags hidden, what is between them
  * dialogue, spoken by whoever they name. A tag never closed lasts to the end
  * of its paragraph, so a forgotten `</say>` colours one paragraph rather than
  * the rest of the passage; a closing tag with nothing open is just hidden.
  */
-function sayTags(text: string, paragraph: Span, marks: Marks, tail: boolean) {
-	const body = text.slice(paragraph.start, paragraph.end);
+function sayTags(text: string, paragraph: Span, marks: Marks, end: number) {
+	const body = text.slice(paragraph.start, end);
 	let open: { from: number; id: number } | null = null;
 	const finish = (to: number) => {
 		if (open) {
@@ -212,15 +245,7 @@ function sayTags(text: string, paragraph: Span, marks: Marks, tail: boolean) {
 			open = null;
 		}
 	};
-	let { end } = paragraph;
-	if (tail) {
-		const partial: RegExpExecArray | null = PARTIAL_SAY_TAG.exec(body);
-		if (partial) {
-			end = paragraph.start + partial.index;
-			hide(marks, end, paragraph.end);
-		}
-	}
-	for (const match of body.slice(0, end - paragraph.start).matchAll(SAY_TAG)) {
+	for (const match of body.matchAll(SAY_TAG)) {
 		const start = paragraph.start + match.index;
 		const after = start + match[0].length;
 		hide(marks, start, after);
@@ -233,6 +258,30 @@ function sayTags(text: string, paragraph: Span, marks: Marks, tail: boolean) {
 		}
 	}
 	finish(end);
+}
+
+/**
+ * `<sound>` and `</sound>`: the tags hidden, what is between them a sound.
+ * Unclosed, like a say tag, it lasts to the end of its paragraph. Sounds do
+ * not nest, so a second opening tag is just hidden.
+ */
+function soundTags(text: string, paragraph: Span, marks: Marks, end: number) {
+	let from = -1;
+	for (const match of text.slice(paragraph.start, end).matchAll(SOUND_TAG)) {
+		const start = paragraph.start + match.index;
+		hide(marks, start, start + match[0].length);
+		if (match.groups?.close) {
+			if (from !== -1) {
+				marks.sound.fill(1, from, start);
+				from = -1;
+			}
+		} else if (from === -1) {
+			from = start + match[0].length;
+		}
+	}
+	if (from !== -1) {
+		marks.sound.fill(1, from, end);
+	}
 }
 
 /**
@@ -365,6 +414,7 @@ function runsOf(text: string, paragraph: Span, marks: Marks): Run[] {
 		const bold = marks.bold[index] === 1;
 		const italic = marks.italic[index] === 1;
 		const dialogue = marks.dialogue[index] === 1;
+		const sound = marks.sound[index] === 1;
 		const speaker = marks.speakers[marks.say[index] ?? 0] ?? null;
 		const last = runs.at(-1);
 		if (
@@ -373,6 +423,7 @@ function runsOf(text: string, paragraph: Span, marks: Marks): Run[] {
 			last.bold === bold &&
 			last.italic === italic &&
 			last.dialogue === dialogue &&
+			last.sound === sound &&
 			last.speaker === speaker
 		) {
 			last.end = index + 1;
@@ -386,6 +437,7 @@ function runsOf(text: string, paragraph: Span, marks: Marks): Run[] {
 			italic,
 			dialogue,
 			speaker,
+			sound,
 			marked: false
 		};
 		runs.push(run);

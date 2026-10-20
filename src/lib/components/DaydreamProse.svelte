@@ -5,7 +5,7 @@
 
 	/**
 	 * A passage's words, drawn to be read: paragraphs, scene breaks, emphasis,
-	 * dialogue in its speaker's colour, and highlighted quotes
+	 * dialogue in its speaker's colour, sounds, and highlighted quotes
 	 * (docs/daydreams.md, "Reading a passage"). The formatting itself is
 	 * `formatPassage`'s; this only draws its runs.
 	 *
@@ -64,7 +64,7 @@
 			<hr class="scene-break" />
 		{:else}
 			<!-- One line on purpose: see the comment at the top. -->
-			<p class:after-break={block.afterBreak}>{#each block.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</p>
+			<p class:after-break={block.afterBreak}>{#each block.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</p>
 		{/if}
 	{/each}
 </div>
@@ -141,5 +141,18 @@
 
 	.dialogue {
 		color: var(--voice, var(--daydream-dialogue));
+	}
+
+	/* A moan or a slap reads as a sound, not a word: small caps, spaced, and
+	   in a colour of its own unless it is in someone's line, where it keeps
+	   their voice's. Not italics, which are thoughts. */
+	.sound {
+		font-variant-caps: all-small-caps;
+		letter-spacing: 0.06em;
+		font-weight: var(--wa-font-weight-semibold, 600);
+
+		&:not(.dialogue) {
+			color: var(--daydream-sound);
+		}
 	}
 </style>

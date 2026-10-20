@@ -661,16 +661,21 @@ one moves to the branch through it and scrolls there.
 
 ## Pictures
 
-A passage can come with a picture of the moment it ends on, made by an
+A passage can come with a picture of one moment in it, made by an
 image model tuned for adult imagery, through Runware.
 
 - **The story model describes it.** On a server with a Runware key, the
   reply format asks for an `"image"` in every passage's metadata
-  (`IMAGE_INSTRUCTION` in `prompt.ts`): the framing, how many people, each
-  one in full — an adult age as a number, their look as the setup says,
-  what they wear — then what they are doing, the place and the light, in
-  literal sentences of 80 to 150 words, and only as explicit as the scene's
-  heat. The image model has seen nothing else and draws what the words say,
+  (`IMAGE_INSTRUCTION` in `prompt.ts`) of one moment in the passage —
+  usually the one it ends on, but the most striking one, and when the
+  scene is sexual the hottest, if that came earlier: the framing, how many
+  people, each one in full — an adult age as a number, their look as the
+  setup says, what they wear, anyone the moment only implies included —
+  then what they are doing, with a sex act spelt out and given all its
+  common names, the place and the light (its quality, direction and
+  colour), in literal sentences of 80 to 150 words, in words with one
+  meaning, and only as explicit as the scene's heat, which when it allows
+  frames the sex plainly in view. The image model has seen nothing else and draws what the words say,
   so it gets no names, no "you", and nothing a camera could not see: a
   story's names and feelings only crowd out what it can draw, and a head
   count left unsaid grew a stranger in the frame. It is left out
@@ -831,6 +836,14 @@ with the passage like the rest of its words, so the history shows it its
 own format. A written-out turn, a quote in a bookmark, and "Not this"'s
 limit are shown without markup (`plainPassage`).
 
+**Sounds** — a moan, a gasp, a slap, a knock — go in a sound tag,
+`<sound>Mmmph</sound>`, inside a line of dialogue or out of one. The tags
+are never drawn; the sound is set in spaced small caps, so it reads as a
+sound rather than a word. Out of anyone's line it takes `--daydream-sound`, a
+hue the voices leave free; inside one it keeps the speaker's colour, so a
+moan still says whose it is. An unclosed tag ends with its paragraph, as a
+say tag does, and a tag still arriving is hidden like one.
+
 **Thoughts** go in italics, never in quotation marks, which the prompt says
 outright: quotation marks are how the page tells speech.
 
@@ -840,7 +853,7 @@ line after a scene break is set in small caps, as a book starts a section.
 
 **While it arrives**, the passage is formatted as it goes, through the same
 component, with `streaming` set: anything only half there is hidden rather
-than shown and then snatched away — a say tag being written, a last line
+than shown and then snatched away — a say or sound tag being written, a last line
 that may be becoming a scene break, a marker at the very end — and an
 opening marker whose partner has not come yet formats what follows it as if
 it had. It is also shown at a steady pace rather than in the provider's
@@ -998,7 +1011,8 @@ budget.
 `src/lib/server/daydream/prompt.ts` builds what the model reads: the
 server's `RULES` first, then the setup (`describeSetup`: how it is told,
 each character with their dials in words, the scene with its heat and kink,
-the limits, the dials), then how to read the user's turns, then — for the
+the limits, the dials), then how to read the user's turns, then how a
+passage is written (see below), then — for the
 system voice only — its guide and examples, then either how to format the
 passage and the reply format or, for a stopped scene, the check-in. The guide goes last before the format
 because it is about how to write, and the most recent thing the model reads
@@ -1018,10 +1032,59 @@ not sexual at all, rather than calling every story erotic:
 - the user's own words and choices are theirs, unless they are watching from
   outside.
 
+Consent is taken as settled, so the story never stops to establish it unless
+the scene is about it, and a fantasy of being taken against someone's will is
+played as the consensual fantasy it is.
+
 Owning the prompt also keeps the endpoints a daydream's writer rather than a
 general-purpose uncensored model anyone with the feature could aim at
 anything. The suggest prompt (`SUGGEST_RULES`) holds the same rules for
-characters and scenes, and asks for JSON only.
+characters and scenes, and asks for JSON only. Every suggestion that invents
+a story — Surprise me's scene, a whole daydream from a sentence, generated
+ideas — is also asked to think it through first (`STORY_CRAFT`): who the
+people are to each other, where it happens, why now, and, when it is
+sexual, which dynamic and acts suit it. Familiar tropes are welcome when
+the user would enjoy them; invention is asked for only where it makes the
+story better. Its examples are deliberately broad
+rather than anyone's favourite kinks, because examples steer what comes
+back.
+
+### How a passage is written
+
+`writing-guide.ts` holds the craft, as distinct from the content. It is
+drawn from a hand-tuned character prompt whose output read well, keeping
+what holds for any story; each line answers something the model does left
+to itself.
+
+- **Telling the story**, for every voice: carry on from where the last
+  passage ended without retelling it; keep strict continuity; match the
+  build-up to what the user wants — a slow or less sexual story has room
+  for quiet moments, a fast, hot or kinky one, or a user pushing for it,
+  gets there quickly; follow the user's lead and vary the themes rather
+  than fixating on one; let a character's description show rather than
+  reciting it; and get a stalled story moving. Passages are not told to end
+  on a cue for the user, which suits someone only watching the story badly.
+- **Writing the prose**, for every voice but the system's, whose own guide
+  forbids exactly this kind of narration: spend the words on the people and
+  what they do, not on atmosphere that moves nothing; plain physical
+  description over metaphor and simile; the senses.
+- **Writing sex**, at Explicit and Filthy only, since below that it would
+  push a scene past the heat the user chose: the point is to turn the user
+  on; a preference for crude words over clinical ones ("cock" rather than
+  "penis"), above all from a character who would talk that way, but never
+  from one who would not; bodies described in detail; moans and dirty talk;
+  a degradation scene cruder still, where it suits the characters and the
+  story. Filthy adds "hold nothing back". Unset heat gets
+  the same lines as a conditional, for if the story turns explicit.
+
+How the user's turns are read gained three lines from the same source: a
+bare word or phrase nobody in the story would say ("anal") is a direction,
+and every direction is read for as much as the heat, kink and limits allow;
+an out-of-character answer is plain, with no narration; and a Continue with
+nothing from the user lets the story carry on as if they went along with
+whatever moves it best, still without writing their words or thoughts. And
+once sex can be on the page (Steamy and up, or unset), the direction buttons
+the model offers include the next act, position or toy.
 
 User-side turns go to the model as words: what was written (marked
 `[Out of character]` when explicit), and notes in brackets for a direction,

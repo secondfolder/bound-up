@@ -167,8 +167,10 @@
 		   Each voice — the user's own, then the cast in setup order — is a
 		   light tint of its own hue, all at a lightness that reads on a
 		   raised surface, apart in hue rather than in lightness so none of
-		   them looks like emphasis. */
+		   them looks like emphasis. A sound outside anyone's line has a hue
+		   of its own, in the widest gap the voices leave. */
 		--daydream-dialogue: oklch(90% 0.075 80);
+		--daydream-sound: oklch(84% 0.09 340);
 		--daydream-voice-you: oklch(89% 0.1 95);
 		--daydream-voice-1: oklch(84% 0.09 20);
 		--daydream-voice-2: oklch(86% 0.075 205);
