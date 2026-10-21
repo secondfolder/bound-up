@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_REQUESTS_PER_EMAIL } from '$lib/server/recovery';
+import { RECOVERY_START_RESPONSE_FLOOR_MS } from '$lib/server/response-floor';
 import { ADA_RECIPIENT, FAKE_WRAP_BLOB, PASSWORD_WRAP_PARAMS } from '$lib/testing/crypto';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
@@ -9,6 +10,17 @@ import { capturingMailer, linkIn } from '$lib/testing/mail';
 import { POST as start } from './+server';
 import { POST as complete } from './complete/+server';
 import { POST as status } from './status/+server';
+
+// The floor is real time; these tests check that it is waited on, not wait it
+// out. `response-floor.test.ts` covers the waiting itself.
+const holdUntilFloor = vi.hoisted(() =>
+	vi.fn((_startedAt: number, _floorMs: number) => Promise.resolve())
+);
+vi.mock('$lib/server/response-floor', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/response-floor')>()),
+	startTimer: () => 0,
+	holdUntilFloor
+}));
 
 /**
  * The three partner-assisted sign-in endpoints, at the HTTP edge: what they
@@ -40,6 +52,28 @@ function post(handler: (event: never) => Response | Promise<Response>, json: unk
 }
 
 describe('POST /api/account-recovery', () => {
+	/** An address with an account costs one more read, which must not show in the timing. */
+	it('waits out the same floor whether or not the account exists', async () => {
+		const ada = await createTestUser(harness.db);
+		const { mailer } = capturingMailer();
+		holdUntilFloor.mockClear();
+		for (const email of [validStart.email, ada.email]) {
+			await start(
+				fakeEvent({
+					db: harness.db,
+					json: { ...validStart, email },
+					authContext,
+					clientAddress: '203.0.113.9',
+					mailer
+				})
+			);
+		}
+		expect(holdUntilFloor.mock.calls).toEqual([
+			[0, RECOVERY_START_RESPONSE_FLOOR_MS],
+			[0, RECOVERY_START_RESPONSE_FLOOR_MS]
+		]);
+	});
+
 	it('hands back a token, with no session needed', async () => {
 		const response = await post(start, validStart);
 		expect(response.status).toBe(200);

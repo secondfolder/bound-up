@@ -4,6 +4,11 @@ import { startRecoverySchema } from '$lib/schemas/accountRecovery';
 import { sendInBackground } from '$lib/server/mail';
 import { recoveryConfirmEmail } from '$lib/server/mail/templates';
 import { startAccountRecovery } from '$lib/server/recovery';
+import {
+	holdUntilFloor,
+	RECOVERY_START_RESPONSE_FLOOR_MS,
+	startTimer
+} from '$lib/server/response-floor';
 import type { RequestHandler } from './$types';
 
 /**
@@ -15,7 +20,8 @@ import type { RequestHandler } from './$types';
  * that matters more than anything else in this endpoint. The only other answer
  * is 429, and an unknown email reaches it at exactly the same rate. An account
  * that exists is also emailed a link, which the requester has to follow before
- * the request can finish.
+ * the request can finish. And every answer waits out the same floor, since an
+ * account that exists costs one more read to find (`response-floor.ts`).
  */
 export const POST: RequestHandler = async ({
 	locals,
@@ -41,6 +47,7 @@ export const POST: RequestHandler = async ({
 		// limit still applies.
 	}
 
+	const started = startTimer();
 	const result = await startAccountRecovery(locals.db, {
 		email: parsed.data.email,
 		recipient: parsed.data.recipient,
@@ -48,6 +55,7 @@ export const POST: RequestHandler = async ({
 		ip,
 		secret: (await locals.auth.$context).secret
 	});
+	await holdUntilFloor(started, RECOVERY_START_RESPONSE_FLOOR_MS);
 	if (!result.ok) {
 		error(429, 'Too many requests — wait an hour and try again.');
 	}

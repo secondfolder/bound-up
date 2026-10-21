@@ -2,7 +2,7 @@
  * Holding a response back until a fixed time has passed since it started.
  *
  * For actions whose work differs with something the caller must not learn.
- * Sign-up is the one: an address that already has an account skips the
+ * Sign-up is the first: an address that already has an account skips the
  * account and key writes a new one makes, so it answered measurably faster —
  * enough to tell, by timing alone, which addresses have accounts, though the
  * page that follows is identical. Waiting both out to the same floor hides
@@ -22,6 +22,14 @@
  * the names SvelteKit knows, and refuses to load with any other.
  */
 export const SIGN_UP_RESPONSE_FLOOR_MS = 1500;
+
+/**
+ * How long starting a partner-assisted sign-in takes, at least. Its answer is
+ * the same for every address, but an address with an account costs a lookup
+ * of its partnerships that an unknown one skips. One read rather than
+ * sign-up's writes, so a lower floor still sits well above it.
+ */
+export const RECOVERY_START_RESPONSE_FLOOR_MS = 1000;
 
 /** A point to measure from: when the work whose length must not show began. */
 export function startTimer(): number {

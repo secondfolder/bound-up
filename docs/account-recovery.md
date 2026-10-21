@@ -144,7 +144,10 @@ only at completion, and only as the hash Better Auth stores.
 **Rate limits.** Three requests per email and ten per client address, per
 hour (`MAX_REQUESTS_PER_EMAIL`, `MAX_REQUESTS_PER_IP` in `server/recovery.ts`).
 A 429 is the only other answer the start endpoint gives, and an unknown email
-reaches it at exactly the same rate.
+reaches it at exactly the same rate. Every answer also waits out
+`RECOVERY_START_RESPONSE_FLOOR_MS` (`server/response-floor.ts`), because an
+address with an account costs one more read — its partnerships — than an
+unknown one, and that would otherwise show in how fast it answers.
 
 **One request at a time.** A new request supersedes the requester's pending
 one, and its restore requests go with it, so a partner is never shown two codes
