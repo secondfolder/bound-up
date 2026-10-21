@@ -63,6 +63,7 @@ import {
 	readPrompt,
 	readTurns,
 	requestPicture,
+	type SuggestionWatch,
 	saveExchange,
 	saveSetup as saveSetupRecord,
 	saveTurn,
@@ -85,6 +86,7 @@ import { driftOffer } from './drift';
 import { type ExchangeEnding, MAX_READ_EXCHANGE_TURNS } from './exchange';
 import { ExchangeRecorder } from './exchange-recorder';
 import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
+import { ModelWatch } from './model-watch.svelte';
 import { explicitOoc } from './ooc';
 import { type OpenedSetupExchange, openSetupExchanges } from './raw-setup-exchanges.svelte';
 import {
@@ -225,7 +227,8 @@ export class DaydreamStory {
 	 * `expansion` is the user's turn (`parentId`) as the model is writing it
 	 * out, when it is (`PassageMeta.expansion`); `readAs`, the reading the
 	 * user chose for it, if they did (Read as…); `reading`, how the reply says
-	 * it read it, once it has.
+	 * it read it, once it has; `watch`, how it is going before any of it shows
+	 * (`ModelProgress`), with the reasoning for debug mode.
 	 */
 	streaming: {
 		parentId: string | null;
@@ -233,6 +236,7 @@ export class DaydreamStory {
 		expansion: string | null;
 		readAs: Reading | null;
 		reading: Reading | null;
+		watch: ModelWatch;
 	} | null = $state(null);
 	/** What went wrong with the last request, shown with a way to try again. */
 	problem: string | null = $state(null);
@@ -316,6 +320,25 @@ export class DaydreamStory {
 
 	/** The branch being read, root first. */
 	readonly path = $derived(pathTo(this.index, this.activeTurnId));
+
+	/**
+	 * The branch as the thread draws it: the path, cut short at the turn a
+	 * passage is arriving after. "Write again" and a rewrite leave the old
+	 * passage active until the new one is saved, so without this the new take
+	 * arrived as an extra bubble under the one it replaces, which only went
+	 * once the new one was done.
+	 */
+	readonly shownPath = $derived.by(() => {
+		if (this.streaming === null) {
+			return this.path;
+		}
+		const { parentId } = this.streaming;
+		if (parentId === null) {
+			return [];
+		}
+		const at = this.path.findIndex((node) => node.id === parentId);
+		return at === -1 ? this.path : this.path.slice(0, at + 1);
+	});
 
 	get setup(): DaydreamSetup | null | undefined {
 		return this.#knownSetup ?? openedDaydreamSetup(this.#setupRef);
@@ -737,13 +760,19 @@ export class DaydreamStory {
 		this.problem = null;
 		this.problemRaw = '';
 		this.retry = null;
+		// The reasoning kept for the live chat only for an account holding
+		// debug mode, as the raw log is; the page shows it only with the switch on.
+		const watch = new ModelWatch(this.#keepRawReplies);
 		this.streaming = {
 			parentId: request.parentId,
 			text: '',
 			expansion: carried ?? null,
 			readAs: forced ?? null,
-			reading: null
+			reading: null,
+			watch
 		};
+		// How much of the reply the progress line has been told of.
+		let counted = 0;
 		this.#controller = new AbortController();
 		const { signal } = this.#controller;
 
@@ -760,7 +789,10 @@ export class DaydreamStory {
 			const outcome = await writeReply(this.id, this.#replyBody(request, setup, context), {
 				signal,
 				...(recorder ? { recorder } : {}),
-				onText: (soFar) => {
+				onReasoning: (piece) => watch.feed({ kind: 'reasoning', text: piece }),
+				onText: (soFar, raw) => {
+					watch.feed({ kind: 'text', text: raw.slice(counted) });
+					counted = raw.length;
 					if (this.streaming) {
 						this.streaming = {
 							...this.streaming,
@@ -930,7 +962,10 @@ export class DaydreamStory {
 	 * that said it had moved on: the latest passages up to it, as many as fit,
 	 * and the setup's idea and cast as they stand.
 	 */
-	async catchUp(turnId: string): Promise<Awaited<ReturnType<typeof suggestCatchUp>>> {
+	async catchUp(
+		turnId: string,
+		watch?: SuggestionWatch
+	): Promise<Awaited<ReturnType<typeof suggestCatchUp>>> {
 		const { setup } = this;
 		const content = this.content(turnId);
 		const drifted = content?.type === 'text' ? content.meta?.drifted : undefined;
@@ -952,19 +987,22 @@ export class DaydreamStory {
 			size += passage.text.length;
 		}
 		const { title, setting, premise, yourRole, tone, notes } = setup.idea;
-		return await suggestCatchUp({
-			idea: { title, setting, premise, yourRole, tone, notes },
-			narrator: setup.voice.narrator,
-			characters: setup.characters.map((character) => ({
-				name: character.name,
-				personality: character.personality,
-				relationship: character.casting.relationship,
-				doing: character.casting.part
-			})),
-			story,
-			drifted,
-			limits: setup.limits
-		});
+		return await suggestCatchUp(
+			{
+				idea: { title, setting, premise, yourRole, tone, notes },
+				narrator: setup.voice.narrator,
+				characters: setup.characters.map((character) => ({
+					name: character.name,
+					personality: character.personality,
+					relationship: character.casting.relationship,
+					doing: character.casting.part
+				})),
+				story,
+				drifted,
+				limits: setup.limits
+			},
+			watch
+		);
 	}
 
 	/**

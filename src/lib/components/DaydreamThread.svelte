@@ -192,7 +192,7 @@
 	});
 
 	/** The story's first passage on this branch, which opens with a drop cap. */
-	const openingId = $derived(story.path.find((node) => node.role === 'story')?.id ?? null);
+	const openingId = $derived(story.shownPath.find((node) => node.role === 'story')?.id ?? null);
 
 	type Answered = { readAs: Reading | null; expansion: string | null; chosen: boolean };
 
@@ -512,7 +512,8 @@
 				<DaydreamRawExchange exchange={failed} previous={null} />
 			{/each}
 		{/if}
-		{#each story.path as node (node.id)}
+		<!-- `shownPath`: a passage written again arrives in the old one's place. -->
+		{#each story.shownPath as node (node.id)}
 			{#if rawLog}
 				{#if node.role === 'story'}
 					{const exchange = $derived(exchanges.forTurn(node.id))}
@@ -578,6 +579,9 @@
 		{#if story.streaming}
 			<DaydreamArriving
 				text={story.streaming.text}
+				watch={story.streaming.watch}
+				versions={{ story, parentId: story.streaming.parentId }}
+				{debug}
 				{speaker}
 				{cast}
 				opening={openingId === null}

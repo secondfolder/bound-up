@@ -39,8 +39,10 @@ import type { ContextTurn } from './context';
 import type { Exchange } from './exchange';
 import type { ExchangeRecorder } from './exchange-recorder';
 import { PICTURE_REQUEST_HEADER, type PictureRequest } from './image-prompt';
+import type { LiveDelta, ModelProgress } from './progress';
 import { parseReply, type ReplySoFar, visibleReply } from './reply-format';
 import type { SetupExchange } from './setup-exchange';
+import { readSseEvents, type SseEvent } from './sse';
 import { readReplyStream } from './stream';
 
 const base = (daydreamId: string) => `/api/daydreams/${encodeURIComponent(daydreamId)}`;
@@ -154,6 +156,8 @@ export async function writeReply(
 	options: {
 		signal: AbortSignal;
 		onText: (soFar: ReplySoFar, raw: string) => void;
+		/** Given each piece of reasoning before the passage, for the progress line. */
+		onReasoning?: (piece: string) => void;
 		/**
 		 * Keeps the exchange, when `record` asked for it: given the request the
 		 * endpoint sent, and a copy of the stream taken before it is read.
@@ -195,7 +199,8 @@ export async function writeReply(
 				text += piece;
 				options.onText(visibleReply(text), text);
 			},
-			(body) => recorder?.request(body)
+			(body) => recorder?.request(body),
+			options.onReasoning
 		);
 	} catch (problem) {
 		if (problem instanceof DOMException && problem.name === 'AbortError') {
@@ -689,20 +694,116 @@ export async function deleteLibraryItem(kind: LibraryKind, id: string): Promise<
 
 // ── suggestions ──────────────────────────────────────────────────────────────
 
+/** What a suggestion's caller is told while it waits (`progress.ts`). */
+export type SuggestionWatch = {
+	/** How far along it is: everyone's progress line. */
+	onProgress?: (progress: ModelProgress) => void;
+	/**
+	 * Debug mode's live chat: the request sent, then every piece as it comes.
+	 * Passing it asks for them; the endpoint sends them only to an account
+	 * holding debug mode.
+	 */
+	onLive?: (event: LiveEvent) => void;
+};
+
+/** One thing for the live chat: the request, or a piece of the answer. */
+export type LiveEvent = { kind: 'request'; body: string } | LiveDelta;
+
 /**
- * Asks the model for suggestions, answering the provider's response body
- * as-is for `suggestions.ts` to check. See `api/daydreams/suggest`.
+ * Asks the model for suggestions, answering the provider's response body,
+ * put back together by the endpoint, for `suggestions.ts` to check. The
+ * endpoint streams it (`SuggestStreamEvents`), telling `watch` how it is
+ * going. See `api/daydreams/suggest`.
  */
 export async function requestSuggestion(
-	body: unknown
+	body: object,
+	watch: SuggestionWatch = {}
 ): Promise<{ ok: true; value: unknown } | { ok: false; error: string; detail?: string }> {
 	const response = await tryFetch('/api/daydreams/suggest', {
 		method: 'POST',
 		headers: JSON_HEADERS,
-		body: JSON.stringify(body)
+		body: JSON.stringify(watch.onLive ? { ...body, live: 'full' } : body)
 	});
-	if (!response?.ok) {
+	if (!(response?.ok && response.body)) {
 		return { ok: false, ...(await readFailure(response)) };
 	}
-	return { ok: true, value: await response.json().catch(() => null) };
+	try {
+		for await (const event of readSseEvents(response.body)) {
+			const outcome = suggestionEvent(event, watch);
+			if (outcome) {
+				return outcome;
+			}
+		}
+	} catch (cause) {
+		if (cause instanceof DOMException && cause.name === 'AbortError') {
+			throw cause;
+		}
+		// The connection dropped partway: `tryFetch` only covers the request.
+		return { ok: false, error: describeRequestFailure(null) };
+	}
+	return { ok: false, error: 'No suggestions just now. Try again in a moment.' };
 }
+
+/** One of the endpoint's events, passed to `watch`, or the outcome when it is the last. */
+function suggestionEvent(
+	{ event, data }: SseEvent,
+	watch: SuggestionWatch
+): { ok: true; value: unknown } | { ok: false; error: string; detail?: string } | null {
+	let value: unknown;
+	try {
+		value = JSON.parse(data);
+	} catch {
+		return null;
+	}
+	switch (event) {
+		case 'progress': {
+			const progress = progressSchema.safeParse(value);
+			if (progress.success) {
+				watch.onProgress?.(progress.data);
+			}
+			return null;
+		}
+		case 'request': {
+			const request = z.object({ body: z.string() }).safeParse(value);
+			if (request.success) {
+				watch.onLive?.({ kind: 'request', body: request.data.body });
+			}
+			return null;
+		}
+		case 'delta': {
+			const delta = deltaSchema.safeParse(value);
+			if (delta.success) {
+				watch.onLive?.(delta.data);
+			}
+			return null;
+		}
+		case 'done':
+			return { ok: true, value };
+		case 'failed': {
+			const failed = z
+				.object({ message: z.string(), detail: z.string().optional() })
+				.safeParse(value);
+			return failed.success
+				? {
+						ok: false,
+						error: failed.data.message,
+						...(failed.data.detail === undefined ? {} : { detail: failed.data.detail })
+					}
+				: { ok: false, error: 'No suggestions just now. Try again in a moment.' };
+		}
+		default:
+			return null;
+	}
+}
+
+const progressSchema = z.object({
+	stage: z.enum(['waiting', 'thinking', 'reading', 'writing']),
+	chars: z.number(),
+	reasoningChars: z.number(),
+	pagesRead: z.number()
+});
+
+const deltaSchema = z.union([
+	z.object({ kind: z.enum(['text', 'reasoning']), text: z.string() }),
+	z.object({ kind: z.literal('fetch'), url: z.string(), status: z.string() })
+]);

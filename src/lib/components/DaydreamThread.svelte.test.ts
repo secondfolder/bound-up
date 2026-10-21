@@ -306,9 +306,13 @@ describe('DaydreamThread', () => {
 	it('opens a new daydream by itself, then offers what the passage offered', async () => {
 		let finish: (outcome: ReplyOutcome) => void = () => undefined;
 		client.writeReply.mockImplementationOnce(
-			(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) =>
+			(
+				_id: string,
+				_request: unknown,
+				options: { onText: (soFar: ReplySoFar, raw: string) => void }
+			) =>
 				new Promise((resolve) => {
-					options.onText({ passage: 'Mara looks', expansion: null, reading: null });
+					options.onText({ passage: 'Mara looks', expansion: null, reading: null }, '');
 					finish = resolve;
 				})
 		);
@@ -668,16 +672,43 @@ describe('DaydreamThread', () => {
 		expect(container.textContent).toContain('2/2');
 	});
 
+	/**
+	 * A regression test: the new take used to arrive as an extra bubble under
+	 * the passage it replaces, which stayed until the new one was saved, and
+	 * the `‹ 2/2 ›` only appeared then.
+	 */
+	it('writes a passage again in the old one’s place, with its version count, while it arrives', async () => {
+		client.writeReply.mockImplementationOnce(() => pending());
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', 'First opening.'),
+				turn('t2', 't1', 'user', 'Hello.'),
+				turn('t3', 't2', 'story', 'Mara answers.')
+			]),
+			available: true
+		});
+		await waSettled(container);
+		const menu = container.querySelector('li.passage wa-dropdown') as HTMLElement;
+		const [again] = waByProp(menu, 'wa-dropdown-item', 'value', 'again');
+		menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: again } }));
+
+		await waitFor(() => expect(container.querySelector('li.streaming')).not.toBeNull());
+		// The old opening, and everything after it on the branch, gives way to the new one.
+		expect(container.textContent).not.toContain('First opening.');
+		expect(container.textContent).not.toContain('Mara answers.');
+		expect(container.querySelector('li.streaming')?.textContent).toContain('2/2');
+	});
+
 	it('stops the scene: drops what was arriving, asks for a check-in, and offers to carry on', async () => {
 		let signal: AbortSignal | undefined;
 		client.writeReply.mockImplementationOnce(
 			(
 				_id: string,
 				_request: unknown,
-				options: { signal: AbortSignal; onText: (soFar: ReplySoFar) => void }
+				options: { signal: AbortSignal; onText: (soFar: ReplySoFar, raw: string) => void }
 			) => {
 				({ signal } = options);
-				options.onText({ passage: 'Something unwanted', expansion: null, reading: null });
+				options.onText({ passage: 'Something unwanted', expansion: null, reading: null }, '');
 				return new Promise((_resolve, reject) => {
 					options.signal.addEventListener('abort', () =>
 						reject(new DOMException('stopped', 'AbortError'))
@@ -966,12 +997,19 @@ describe('DaydreamThread', () => {
 
 	it('formats a passage as it arrives, hiding markup only half there', async () => {
 		client.writeReply.mockImplementationOnce(
-			(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) => {
-				options.onText({
-					passage: 'Rain. **Hard** rain. <say who="Ma',
-					expansion: null,
-					reading: null
-				});
+			(
+				_id: string,
+				_request: unknown,
+				options: { onText: (soFar: ReplySoFar, raw: string) => void }
+			) => {
+				options.onText(
+					{
+						passage: 'Rain. **Hard** rain. <say who="Ma',
+						expansion: null,
+						reading: null
+					},
+					'Rain. **Hard** rain. <say who="Ma'
+				);
 				return pending();
 			}
 		);
@@ -1069,9 +1107,13 @@ describe('DaydreamThread', () => {
 			draftText.value = Instruction;
 			let finish: (outcome: ReplyOutcome) => void = () => undefined;
 			client.writeReply.mockImplementationOnce(
-				(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) =>
+				(
+					_id: string,
+					_request: unknown,
+					options: { onText: (soFar: ReplySoFar, raw: string) => void }
+				) =>
 					new Promise((resolve) => {
-						options.onText({ passage: '', expansion: '"Mara, the fox', reading: null });
+						options.onText({ passage: '', expansion: '"Mara, the fox', reading: null }, '');
 						finish = resolve;
 					})
 			);
@@ -1257,9 +1299,13 @@ describe('DaydreamThread', () => {
 		it('draws a turn as a direction as soon as the reply says it read it as one', async () => {
 			let finish: (outcome: ReplyOutcome) => void = () => undefined;
 			client.writeReply.mockImplementationOnce(
-				(_id: string, _request: unknown, options: { onText: (soFar: ReplySoFar) => void }) =>
+				(
+					_id: string,
+					_request: unknown,
+					options: { onText: (soFar: ReplySoFar, raw: string) => void }
+				) =>
 					new Promise((resolve) => {
-						options.onText({ passage: '', expansion: null, reading: 'direction' });
+						options.onText({ passage: '', expansion: null, reading: 'direction' }, '');
 						finish = resolve;
 					})
 			);
@@ -1339,10 +1385,10 @@ describe('DaydreamThread', () => {
 				(
 					_id: string,
 					_request: unknown,
-					options: { signal: AbortSignal; onText: (soFar: ReplySoFar) => void }
+					options: { signal: AbortSignal; onText: (soFar: ReplySoFar, raw: string) => void }
 				) => {
 					({ signal } = options);
-					options.onText({ passage: 'Mara starts to', expansion: null, reading: null });
+					options.onText({ passage: 'Mara starts to', expansion: null, reading: null }, '');
 					return new Promise((_resolve, reject) => {
 						options.signal.addEventListener('abort', () =>
 							reject(new DOMException('stopped', 'AbortError'))

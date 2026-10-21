@@ -13,6 +13,8 @@
  * network. `EventSource` cannot be used, because it can only send a GET.
  */
 
+import { reasoningIn } from './exchange-log';
+
 export type StreamOutcome =
 	/**
 	 * The stream said it was done, or simply ended. `outOfRoom` when the
@@ -27,7 +29,7 @@ export type StreamOutcome =
 const LINE_BREAK = /\r?\n/;
 
 type StreamEvent = {
-	choices?: { delta?: { content?: unknown }; finish_reason?: unknown }[];
+	choices?: { delta?: Record<string, unknown>; finish_reason?: unknown }[];
 	error?: unknown;
 	/** The reply endpoint's own event, first, for debug mode: the request body it sent the model. */
 	boundUpRequest?: unknown;
@@ -42,7 +44,9 @@ export async function readReplyStream(
 	body: ReadableStream<Uint8Array>,
 	onText: (piece: string) => void,
 	/** Given the request body the endpoint sent the model, when it was asked to record it. */
-	onRequest: (body: string) => void = () => undefined
+	onRequest: (body: string) => void = () => undefined,
+	/** Given each piece of the model's reasoning, where the provider shows it, for the progress line. */
+	onReasoning: (piece: string) => void = () => undefined
 ): Promise<StreamOutcome> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
@@ -60,7 +64,7 @@ export async function readReplyStream(
 			const lines = buffered.split(LINE_BREAK);
 			buffered = finished ? '' : (lines.pop() ?? '');
 			for (const line of lines) {
-				const outcome = handleLine(line, onText, onRequest, ending);
+				const outcome = handleLine(line, { onText, onRequest, onReasoning }, ending);
 				if (outcome === 'done') {
 					return done();
 				}
@@ -79,8 +83,15 @@ export async function readReplyStream(
 
 function handleLine(
 	line: string,
-	onText: (piece: string) => void,
-	onRequest: (body: string) => void,
+	{
+		onText,
+		onRequest,
+		onReasoning
+	}: {
+		onText: (piece: string) => void;
+		onRequest: (body: string) => void;
+		onReasoning: (piece: string) => void;
+	},
 	ending: { outOfRoom: boolean }
 ): { kind: 'error' } | 'done' | null {
 	if (!line.startsWith('data:')) {
@@ -110,7 +121,15 @@ function handleLine(
 	if (event.choices?.[0]?.finish_reason === 'length') {
 		ending.outOfRoom = true;
 	}
-	const piece = event.choices?.[0]?.delta?.content;
+	const delta = event.choices?.[0]?.delta;
+	if (!delta) {
+		return null;
+	}
+	const thought = reasoningIn(delta).text;
+	if (thought) {
+		onReasoning(thought);
+	}
+	const piece = delta.content;
 	if (typeof piece === 'string' && piece !== '') {
 		onText(piece);
 	}

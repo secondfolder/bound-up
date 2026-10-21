@@ -715,6 +715,36 @@ test.describe('daydreams', () => {
 		await expect(page.locator('.setup-summary')).toHaveCount(0);
 	});
 
+	test('a draft says how it is going while it is written, and debug mode shows the chat live', async ({
+		page
+	}) => {
+		const who = await signedUpDreamer(page);
+		await openStart(page);
+		// The stub writes a `[slow]` brief's answer slowly enough to watch.
+		await page.getByRole('textbox').fill('a slow night train [slow]');
+		await clickWaButton(page, 'Write this daydream');
+		const progress = page.locator('.model-progress');
+		await expect(progress).toContainText(/Writing… \d+ characters/);
+		// Without debug mode, how much and never what.
+		await expect(progress.locator('wa-details.live')).toHaveCount(0);
+		await expect(progress).not.toContainText('Vesper');
+		await expect(page.locator('.setup-summary')).toContainText('Vesper');
+		await expect(progress).toHaveCount(0);
+
+		await grantFeature(who.email, 'debugMode');
+		await switchOnDebugCookie(page);
+		await page.reload();
+		await waitForHydration(page);
+		await page.getByRole('textbox').fill('a slow night train [slow]');
+		await clickWaButton(page, 'Write this daydream');
+		const live = progress.locator('wa-details.live');
+		// What was sent, then the reasoning and the answer as they come.
+		await expect(live).toContainText('a slow night train [slow]');
+		await expect(live).toContainText('The stub weighs the brief.');
+		await expect(live).toContainText('"voice"');
+		await expect(page.locator('.setup-summary')).toContainText('Vesper');
+	});
+
 	test('stories like the one described are suggested for your side, and one opens as a daydream', async ({
 		page
 	}) => {

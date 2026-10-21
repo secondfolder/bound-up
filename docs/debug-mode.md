@@ -123,11 +123,13 @@ comes from one of two places:
   size, and the last item whole. Dumped, the first fetched page filled the
   cut and hid the end, which is where the reason is; the pages themselves
   are under the links read. Nothing new crosses the network for this:
-  the endpoint already passes the provider's answer back unread for the
-  browser to check.
-- **A provider failure** (an error status, or no connection) is described by
-  the suggest endpoint, as `detail` beside its `message`: the status and the
-  provider's error body, or why it could not be reached. That is sent only
+  the endpoint already passes the provider's answer back, put together from
+  its stream, for the browser to check.
+- **A provider failure** (an error status, no connection, or a stream that
+  failed or broke off partway) is described by the suggest endpoint, as
+  `detail` beside its `message` — in the 502, or in the stream's `failed`
+  event once it has started: the status and the provider's error body, or
+  why it could not be reached or finished. That is sent only
   to an account holding the `debugMode` feature, checked on the server for
   each failure; anyone else's 502 is the message alone, as before. Still
   never logged, since the body can quote the request back.
@@ -177,6 +179,33 @@ again from its raw log (below, "Setup exchanges").
 
 Not a log for suggestions generally: chips, fills, castings and names do not
 ask, so they show only what failed (above).
+
+### The live chat
+
+While a slow model call is out, everyone sees how it is going
+([daydreams.md](daydreams.md#progress-while-it-writes)). With debug mode on,
+`ModelProgress` also shows a "Live chat": the chat log above, filled in as it
+happens — what was sent, then the reasoning, each link read and the answer,
+a piece at a time, each bubble following its own end unless it has been
+scrolled up to read. It is gone once the answer lands, which is what the
+chat log (above) is for.
+
+- **Suggestions.** With the device's switch on, the page passes `onLive`
+  (`ModelWatch`, `daydream/model-watch.svelte.ts`), which sends `live:
+  'full'`; the suggest endpoint, for an account holding the feature, then
+  sends the request body first (`request`) and every piece as it reads it
+  from the provider (`delta`). For anyone else the flag is ignored and only
+  `progress` is sent, so the words do not reach a page that is not meant to
+  show them. Any suggestion may ask; the new-daydream page and "Update the
+  idea" do.
+- **Passages** show the model's reasoning before the passage begins, as
+  plain text in the arriving bubble under the progress line
+  (`DaydreamArriving`) rather than as a live chat: it is the one thing worth
+  reading while it waits, and the request is the raw log's to show. Nothing
+  more is sent for it: a passage's stream has
+  always reached the browser whole, reasoning included. The story keeps it
+  only for an account holding the feature (`keepRawReplies`), and the thread
+  shows it only with the switch on.
 
 ### Daydreams' raw log
 

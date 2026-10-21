@@ -135,8 +135,12 @@ export function historyAgainst(
 
 // ── a streamed answer ────────────────────────────────────────────────────────
 
-/** The reasoning in one streamed delta: `reasoning`, or failing that its typed pieces. */
-function reasoningIn(delta: Record<string, unknown>): { text: string; hidden: number } {
+/**
+ * The reasoning in one streamed delta: `reasoning`, or failing that its typed
+ * pieces. Also how a stream being read says the model is thinking, for the
+ * progress line (`stream.ts`, `server/daydream/suggest-stream.ts`).
+ */
+export function reasoningIn(delta: Record<string, unknown>): { text: string; hidden: number } {
 	if (typeof delta.reasoning === 'string') {
 		// OpenRouter sends the same again in `reasoning_details`: read once.
 		return { text: delta.reasoning, hidden: 0 };

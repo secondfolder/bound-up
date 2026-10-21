@@ -2,6 +2,7 @@
 	import { DAYDREAM_LIMITS, DAYDREAM_VOICE_PRESETS, type DaydreamVoicePresetId } from '$lib/daydream';
 	import { ideaLevel } from '$lib/daydream/dial-words';
 	import type { ExchangeLogView as ChatLog } from '$lib/daydream/exchange-log';
+	import type { ModelWatch } from '$lib/daydream/model-watch.svelte';
 	import {
 		type DaydreamStarter,
 		forSide,
@@ -16,6 +17,7 @@
 	import type { GeneratedIdea } from '$lib/daydream/suggestions';
 	import DaydreamSidePicker from './DaydreamSidePicker.svelte';
 	import ExchangeLog from './ExchangeLog.svelte';
+	import ModelProgress from './ModelProgress.svelte';
 	import SearchField from './SearchField.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
 
@@ -41,6 +43,7 @@
 		suggestionsOn,
 		starterOrder,
 		asking,
+		watching = null,
 		problem,
 		generated,
 		writing,
@@ -63,6 +66,11 @@
 		/** The ready-made daydreams' ids in the order to show them, shuffled by the page's load. */
 		starterOrder: readonly string[];
 		asking: boolean;
+		/**
+		 * The suggestion being waited on, whichever button asked: shown beside
+		 * that button, for how it is going (`ModelProgress`).
+		 */
+		watching?: ModelWatch | null;
 		/** Why the last description came back with nothing, or null. */
 		problem: SuggestFailure | null;
 		/** The last ideas generated and what was asked for, kept by the page; null before any. */
@@ -174,6 +182,7 @@
 					</wa-button>
 				</div>
 			</div>
+			{#if watching && (suggesting || (asking && writing === null))}<ModelProgress watch={watching} />{/if}
 			{#if problem}<SuggestionProblem {problem} {debug} />{/if}
 			{#if suggestProblem}<SuggestionProblem problem={suggestProblem} {debug} />{/if}
 		</section>
@@ -247,6 +256,7 @@
 						</li>
 					{/each}
 				</ul>
+				{#if watching && asking && writing !== null}<ModelProgress watch={watching} />{/if}
 				{#if ideaProblem}<SuggestionProblem problem={ideaProblem} {debug} />{/if}
 				<wa-button
 					class="more"
@@ -258,6 +268,7 @@
 					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
 					{gettingMore ? 'Thinking up more…' : 'More ideas'}
 				</wa-button>
+				{#if watching && gettingMore}<ModelProgress watch={watching} />{/if}
 				{#if moreProblem}<SuggestionProblem problem={moreProblem} {debug} />{/if}
 			</section>
 		{:else}

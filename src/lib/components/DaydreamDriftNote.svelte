@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { ModelWatch } from '$lib/daydream/model-watch.svelte';
 	import type { DaydreamStory } from '$lib/daydream/story.svelte';
 	import type { SuggestFailure } from '$lib/daydream/suggest';
 	import type { CatchUp } from '$lib/daydream/suggestions';
 	import DaydreamCatchUpDialog from './DaydreamCatchUpDialog.svelte';
+	import ModelProgress from './ModelProgress.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
 
 	/**
@@ -19,14 +21,19 @@
 	}: { story: DaydreamStory; turnId: string; debug?: boolean } = $props();
 
 	let asking = $state(false);
+	/** How the ask is going, while it is out (`ModelProgress`). */
+	let watching: ModelWatch | null = $state(null);
 	let problem: SuggestFailure | null = $state(null);
 	let proposed: CatchUp | null = $state(null);
 
 	async function ask() {
 		asking = true;
 		problem = null;
-		const answer = await story.catchUp(turnId);
+		const watch = new ModelWatch(debug);
+		watching = watch;
+		const answer = await story.catchUp(turnId, watch.watch);
 		asking = false;
+		watching = null;
 		if (answer.ok) {
 			proposed = answer.value;
 		} else {
@@ -43,6 +50,7 @@
 	<wa-button size="s" appearance="plain" disabled={asking} onclick={() => story.answerDrift(turnId)}>
 		Not now
 	</wa-button>
+	{#if watching}<div class="progress"><ModelProgress watch={watching} /></div>{/if}
 	{#if problem}<SuggestionProblem {problem} {debug} />{/if}
 	{#if proposed && story.setup}
 		<DaydreamCatchUpDialog
@@ -69,6 +77,12 @@
 		wa-button {
 			--wa-form-control-height: 1.75rem;
 
+			font-style: normal;
+		}
+
+		/* A line of its own under the buttons, the live chat full width. */
+		.progress {
+			flex-basis: 100%;
 			font-style: normal;
 		}
 	}

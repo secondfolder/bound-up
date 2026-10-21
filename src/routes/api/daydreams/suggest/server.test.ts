@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readSseEvents } from '$lib/daydream/sse';
 import { SUGGEST_RULES } from '$lib/server/daydream/suggest-prompt';
 import { acceptDisclosure } from '$lib/server/daydreams';
 import type { Db } from '$lib/server/db';
@@ -6,6 +7,7 @@ import { grantFeature } from '$lib/server/features';
 import type { RateLimitResult } from '$lib/server/rate-limit';
 import type { ServerSettingKey } from '$lib/server-settings';
 import { createTestDb, type TestDb } from '$lib/testing/db';
+import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
 import { createTestUser, grantTestDaydreams, type TestUser } from '$lib/testing/fixtures';
 import { testSettings } from '$lib/testing/settings';
@@ -76,6 +78,40 @@ function post(
 	);
 }
 
+/** The events of a streamed answer, by name, with their data parsed. */
+async function eventsOf(response: Response): Promise<{ event: string | null; data: unknown }[]> {
+	const type = response.headers.get('content-type');
+	if (type !== 'text/event-stream') {
+		throw new Error(`expected a stream of events, not ${type}`);
+	}
+	const events: { event: string | null; data: unknown }[] = [];
+	for await (const { event, data } of readSseEvents(defined(response.body, 'a body'))) {
+		events.push({ event, data: JSON.parse(data) });
+	}
+	return events;
+}
+
+/** The events of the answer to `json`. */
+async function streamed(json: unknown = body) {
+	const result = await post(ada, json);
+	if (result.type !== 'ok') {
+		throw new Error(JSON.stringify(result));
+	}
+	return eventsOf(result.value);
+}
+
+/** What the `done` event carried: the answer, whole. */
+async function answerTo(json: unknown = body) {
+	const done = (await streamed(json)).find((each) => each.event === 'done');
+	return defined(done, 'a done event').data;
+}
+
+/** A provider's stream of these events, as `text/event-stream`. */
+function sse(...events: string[]) {
+	return new Response(events.join(''), { headers: { 'content-type': 'text/event-stream' } });
+}
+const chunk = (fields: Record<string, unknown>) => `data: ${JSON.stringify(fields)}\n\n`;
+
 /** A failed request's status and JSON body. */
 async function failure() {
 	const result = await post(ada);
@@ -86,14 +122,106 @@ async function failure() {
 }
 
 describe('POST /api/daydreams/suggest', () => {
-	it('passes the provider’s answer straight back', async () => {
-		const result = await post(ada);
-		if (result.type !== 'ok') {
-			throw new Error(JSON.stringify(result));
-		}
-		expect(await result.value.json()).toEqual({
+	it('passes back a provider’s whole answer as it came, when it did not stream', async () => {
+		expect(await answerTo()).toEqual({
 			choices: [{ message: { content: '{"chips":["praise"]}' } }]
 		});
+	});
+
+	it('streams how it is going, and ends with the answer put back together', async () => {
+		upstream.mockResolvedValueOnce(
+			sse(
+				': OPENROUTER PROCESSING\n\n',
+				chunk({ choices: [{ delta: { reasoning: SECRET_WORDS } }] }),
+				chunk({ choices: [{ delta: { content: '{"chips":' } }] }),
+				chunk({ choices: [{ delta: { content: '["praise"]}' }, finish_reason: 'stop' }] }),
+				'data: [DONE]\n\n'
+			)
+		);
+		const events = await streamed();
+		expect(events[0]).toEqual({
+			event: 'progress',
+			data: { stage: 'waiting', chars: 0, reasoningChars: 0, pagesRead: 0 }
+		});
+		expect(events.map((each) => each.event)).toContain('progress');
+		expect(events.at(-2)).toEqual({
+			event: 'progress',
+			data: {
+				stage: 'writing',
+				chars: '{"chips":["praise"]}'.length,
+				reasoningChars: SECRET_WORDS.length,
+				pagesRead: 0
+			}
+		});
+		expect(events.at(-1)).toEqual({
+			event: 'done',
+			data: {
+				choices: [
+					{
+						message: {
+							role: 'assistant',
+							content: '{"chips":["praise"]}',
+							reasoning: SECRET_WORDS
+						},
+						finish_reason: 'stop'
+					}
+				]
+			}
+		});
+		// Nothing of what was written goes anywhere but the answer, without debug mode.
+		expect(events.some((each) => each.event === 'delta' || each.event === 'request')).toBe(false);
+	});
+
+	it('sends the request and every piece as it comes only to debug mode, and only when asked', async () => {
+		const stream = () =>
+			sse(
+				chunk({ choices: [{ delta: { reasoning: 'Hmm.' } }] }),
+				chunk({ choices: [{ delta: { content: '{}' }, finish_reason: 'stop' }] }),
+				'data: [DONE]\n\n'
+			);
+		const live = { ...body, live: 'full' };
+
+		// Asked, without the feature: progress only.
+		upstream.mockResolvedValueOnce(stream());
+		const refused = await streamed(live);
+		expect(refused.map((each) => each.event)).not.toContain('delta');
+		expect(refused.map((each) => each.event)).not.toContain('request');
+
+		await grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: ada.id });
+		upstream.mockResolvedValueOnce(stream());
+		const events = await streamed(live);
+		const [, init] = upstream.mock.calls.at(-1) as [string, RequestInit];
+		expect(events[0]).toEqual({ event: 'request', data: { body: init.body } });
+		expect(events.filter((each) => each.event === 'delta').map((each) => each.data)).toEqual([
+			{ kind: 'reasoning', text: 'Hmm.' },
+			{ kind: 'text', text: '{}' }
+		]);
+		// Never the key.
+		expect(JSON.stringify(events)).not.toContain('sk-or-test');
+
+		// Not asked: progress only, even for debug mode.
+		upstream.mockResolvedValueOnce(stream());
+		expect((await streamed()).map((each) => each.event)).not.toContain('delta');
+	});
+
+	it('says a stream that failed partway failed, with what went wrong for debug mode', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const broken = () =>
+			sse(
+				chunk({ choices: [{ delta: { content: '{"ch' } }] }),
+				chunk({ error: { message: 'overloaded' } })
+			);
+		upstream.mockResolvedValueOnce(broken());
+		expect((await streamed()).at(-1)).toEqual({
+			event: 'failed',
+			data: { message: 'No suggestions just now. Try again in a moment.' }
+		});
+
+		await grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: ada.id });
+		upstream.mockResolvedValueOnce(broken());
+		const failed = (await streamed()).at(-1);
+		expect(failed?.event).toBe('failed');
+		expect(JSON.stringify(failed?.data)).toContain('overloaded');
 	});
 
 	it('sends the server’s own rules, asks for JSON, and only from providers that keep nothing', async () => {
@@ -106,7 +234,7 @@ describe('POST /api/daydreams/suggest', () => {
 			response_format: { type: 'json_object' },
 			provider: { data_collection: 'deny' }
 		});
-		expect(sent.stream).toBeUndefined();
+		expect(sent.stream).toBe(true);
 		expect(sent.messages[0].content.startsWith(SUGGEST_RULES)).toBe(true);
 	});
 
@@ -200,7 +328,8 @@ describe('POST /api/daydreams/suggest', () => {
 					}
 				],
 				text: { format: { type: 'json_object' } },
-				provider: { data_collection: 'deny' }
+				provider: { data_collection: 'deny' },
+				stream: true
 			});
 			expect(reading.messages).toBeUndefined();
 			expect(reading.input[0].content.startsWith(SUGGEST_RULES)).toBe(true);
@@ -221,7 +350,7 @@ describe('POST /api/daydreams/suggest', () => {
 		}
 	});
 
-	it('passes a Responses answer back unread, fetches and all', async () => {
+	it('passes a Responses answer back whole, fetches and all', async () => {
 		configured.openrouterStoryModel = JSON.stringify({
 			openrouterModelId: 'test/model',
 			tools: true
@@ -232,29 +361,37 @@ describe('POST /api/daydreams/suggest', () => {
 				{ type: 'message', content: [{ type: 'output_text', text: '{"ideas":[]}' }] }
 			]
 		};
+		const ideas = { task: 'ideas', brief: 'from https://a.test/', side: null, limits: '' };
 		upstream.mockResolvedValueOnce(Response.json(answer));
-		const result = await post(ada, {
-			task: 'ideas',
-			brief: 'from https://a.test/',
-			side: null,
-			limits: ''
+		expect(await answerTo(ideas)).toEqual(answer);
+
+		// Streamed, it is the completed response, and the fetch is progress of its own.
+		const typed = (type: string, fields: Record<string, unknown>) =>
+			`event: ${type}\ndata: ${JSON.stringify({ type, ...fields })}\n\n`;
+		upstream.mockResolvedValueOnce(
+			sse(
+				typed('response.output_item.added', {
+					item: { ...answer.output[0], status: 'in_progress' }
+				}),
+				typed('response.output_item.done', { item: answer.output[0] }),
+				typed('response.output_text.delta', { delta: '{"ideas":[]}' }),
+				typed('response.completed', { response: answer })
+			)
+		);
+		const events = await streamed(ideas);
+		expect(events.at(-1)).toEqual({ event: 'done', data: answer });
+		expect(events.map((each) => each.data)).toContainEqual({
+			stage: 'reading',
+			chars: 0,
+			reasoningChars: 0,
+			pagesRead: 0
 		});
-		if (result.type !== 'ok') {
-			throw new Error(JSON.stringify(result));
-		}
-		expect(await result.value.json()).toEqual(answer);
 	});
 
 	it('adds what it sent to a draft’s or ideas’ answer, only when asked and only for debug mode', async () => {
 		const daydream = { task: 'daydream', brief: SECRET_WORDS, limits: '', debugLog: true };
 		const answer = { choices: [{ message: { content: '{"voice":"talk"}' } }] };
-		const read = async (json: unknown) => {
-			const result = await post(ada, json);
-			if (result.type !== 'ok') {
-				throw new Error(JSON.stringify(result));
-			}
-			return result.value.json();
-		};
+		const read = (json: unknown) => answerTo(json) as Promise<Record<string, unknown>>;
 
 		// Without the feature, the flag is ignored.
 		upstream.mockResolvedValueOnce(Response.json(answer));
@@ -267,7 +404,7 @@ describe('POST /api/daydreams/suggest', () => {
 		// The very body that went to the provider, as text.
 		const [, init] = upstream.mock.calls.at(-1) as [string, RequestInit];
 		expect(logged.boundUpRequest).toBe(init.body);
-		const sent = JSON.parse(logged.boundUpRequest);
+		const sent = JSON.parse(String(logged.boundUpRequest));
 		expect(sent.model).toBe('test/model');
 		expect(sent.messages[0].content.startsWith(SUGGEST_RULES)).toBe(true);
 		expect(sent.messages.at(-1).content).toContain(SECRET_WORDS);
@@ -286,8 +423,7 @@ describe('POST /api/daydreams/suggest', () => {
 		).toHaveProperty('boundUpRequest');
 		// An answer with nowhere to put it goes back as it came.
 		upstream.mockResolvedValueOnce(new Response('not json'));
-		const result = await post(ada, daydream);
-		expect(result.type === 'ok' && (await result.value.text())).toBe('not json');
+		expect(await answerTo(daydream)).toBe('not json');
 	});
 
 	it('refuses an opening too long to name from, without counting it', async () => {

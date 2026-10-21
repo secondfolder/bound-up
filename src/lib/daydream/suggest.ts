@@ -19,7 +19,7 @@ import type {
 	IdeaWithoutOrigin,
 	StoryDials
 } from '../daydream';
-import { requestSuggestion } from './client';
+import { requestSuggestion, type SuggestionWatch } from './client';
 import { type ExchangeLogView, suggestionLog } from './exchange-log';
 import { type SetupExchange, type SetupExchangeTask, setupExchangeFrom } from './setup-exchange';
 import type { DaydreamPieces, StarterSide } from './starters';
@@ -74,15 +74,19 @@ type Timing = { startedAt: number; endedAt: number };
 
 /**
  * The model's answer: the JSON in its reply, the answer as it came, to
- * describe if it is no use, and when it was asked and answered.
+ * describe if it is no use, and when it was asked and answered. `watch` is
+ * told how it is going meanwhile (`SuggestionWatch`); the long ones — a whole
+ * daydream, ideas, catching the idea up — take one, for the page to show
+ * progress while it waits (`ModelProgress.svelte`).
  */
 async function ask(
-	body: unknown
+	body: object,
+	watch: SuggestionWatch = {}
 ): Promise<
 	{ ok: true; value: unknown; body: unknown; timing: Timing } | ({ ok: false } & SuggestFailure)
 > {
 	const startedAt = Date.now();
-	const answer = await requestSuggestion(body);
+	const answer = await requestSuggestion(body, watch);
 	return answer.ok
 		? {
 				ok: true,
@@ -179,15 +183,18 @@ export async function suggestCasting(input: {
  * "Update the idea": the setup's fields brought up to date with the story,
  * only those that changed (`parseCatchUp`), or why there are none.
  */
-export async function suggestCatchUp(input: {
-	idea: Pick<DaydreamIdea, 'title' | 'setting' | 'premise' | 'yourRole' | 'tone' | 'notes'>;
-	narrator: DaydreamNarrator;
-	characters: { name: string; personality: string; relationship: string; doing: string }[];
-	story: string[];
-	drifted: string;
-	limits: string;
-}): Promise<Answer<CatchUp>> {
-	const answer = await ask({ task: 'catch-up', ...input });
+export async function suggestCatchUp(
+	input: {
+		idea: Pick<DaydreamIdea, 'title' | 'setting' | 'premise' | 'yourRole' | 'tone' | 'notes'>;
+		narrator: DaydreamNarrator;
+		characters: { name: string; personality: string; relationship: string; doing: string }[];
+		story: string[];
+		drifted: string;
+		limits: string;
+	},
+	watch?: SuggestionWatch
+): Promise<Answer<CatchUp>> {
+	const answer = await ask({ task: 'catch-up', ...input }, watch);
 	if (!answer.ok) {
 		return answer;
 	}
@@ -237,21 +244,24 @@ export async function surpriseIdea(
  * train", "the things a good girl says"): its voice, its idea and who is in
  * it, for `assembleSetup` to put together.
  */
-export async function suggestDaydream(input: {
-	brief: string;
-	/** The side chosen, or a generated idea was made for, so the whole daydream keeps the user on it. */
-	side?: StarterSide | null;
-	/** The voice a generated idea was made for, so the daydream is told that way. */
-	voice?: DaydreamVoicePresetId | null;
-	/** The generated idea picked, when it is one; `brief` is then what the ideas were asked for with. */
-	chosen?: { title: string; premise: string };
-	/** The research the generated ideas were written with, to build on rather than read again. */
-	research?: string;
-	limits: string;
-	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestionLog`). */
-	debugLog?: boolean;
-}): Promise<WithLog<DaydreamPieces>> {
-	const answer = await ask({ task: 'daydream', ...input });
+export async function suggestDaydream(
+	input: {
+		brief: string;
+		/** The side chosen, or a generated idea was made for, so the whole daydream keeps the user on it. */
+		side?: StarterSide | null;
+		/** The voice a generated idea was made for, so the daydream is told that way. */
+		voice?: DaydreamVoicePresetId | null;
+		/** The generated idea picked, when it is one; `brief` is then what the ideas were asked for with. */
+		chosen?: { title: string; premise: string };
+		/** The research the generated ideas were written with, to build on rather than read again. */
+		research?: string;
+		limits: string;
+		/** Debug mode is on: ask for what was sent too, for the chat log (`suggestionLog`). */
+		debugLog?: boolean;
+	},
+	watch?: SuggestionWatch
+): Promise<WithLog<DaydreamPieces>> {
+	const answer = await ask({ task: 'daydream', ...input }, watch);
 	if (!answer.ok) {
 		return answer;
 	}
@@ -304,16 +314,19 @@ function withLog<T>(
  * written out by `suggestDaydream`. With `offered`, they are more of the
  * same, other than those.
  */
-export async function suggestIdeas(input: {
-	brief: string;
-	side: StarterSide | null;
-	limits: string;
-	/** Titles already shown, for "More ideas" not to offer them again. */
-	offered?: readonly string[];
-	/** Debug mode is on: ask for what was sent too, for the chat log (`suggestionLog`). */
-	debugLog?: boolean;
-}): Promise<WithLog<GeneratedIdea[]>> {
-	const answer = await ask({ task: 'ideas', ...input });
+export async function suggestIdeas(
+	input: {
+		brief: string;
+		side: StarterSide | null;
+		limits: string;
+		/** Titles already shown, for "More ideas" not to offer them again. */
+		offered?: readonly string[];
+		/** Debug mode is on: ask for what was sent too, for the chat log (`suggestionLog`). */
+		debugLog?: boolean;
+	},
+	watch?: SuggestionWatch
+): Promise<WithLog<GeneratedIdea[]>> {
+	const answer = await ask({ task: 'ideas', ...input }, watch);
 	if (!answer.ok) {
 		return answer;
 	}

@@ -4,10 +4,12 @@
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
 	import ExchangeLog from '$lib/components/ExchangeLog.svelte';
+	import ModelProgress from '$lib/components/ModelProgress.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import SuggestionProblem from '$lib/components/SuggestionProblem.svelte';
 	import type { DaydreamSetup, DaydreamVoicePresetId } from '$lib/daydream';
 	import type { ExchangeLogView as ChatLog } from '$lib/daydream/exchange-log';
+	import { ModelWatch } from '$lib/daydream/model-watch.svelte';
 	import type { SetupExchange } from '$lib/daydream/setup-exchange';
 	import {
 		assembleSetup,
@@ -75,6 +77,27 @@
 	const { starterOrder } = data;
 	let side: StarterSide | null = $state(null);
 	let asking = $state(false);
+	/**
+	 * The suggestion being waited on, for the page to say how it is going
+	 * (`ModelProgress`): one at a time, since each disables the others.
+	 */
+	let watching: ModelWatch | null = $state(null);
+
+	/** A fresh watch for a call, shown until `done` puts it away. */
+	function watchCall(): { watch: ModelWatch; done: () => void } {
+		// The live chat only with the device's debug switch on; the server
+		// sends it only to an account holding the feature besides.
+		const watch = new ModelWatch(data.debug);
+		watching = watch;
+		return {
+			watch,
+			done: () => {
+				if (watching === watch) {
+					watching = null;
+				}
+			}
+		};
+	}
 	let problem: SuggestFailure | null = $state(null);
 	let generated: {
 		brief: string;
@@ -162,7 +185,12 @@
 		asking = true;
 		problem = null;
 		ideaProblem = null;
-		const answer = await suggestDaydream({ ...described, limits, debugLog: data.debug });
+		const call = watchCall();
+		const answer = await suggestDaydream(
+			{ ...described, limits, debugLog: data.debug },
+			call.watch.watch
+		);
+		call.done();
 		// Left behind: the user went back to the start, or asked again, while
 		// this was out. Applying it anyway pulled someone who had pressed "Other
 		// ways to start" straight back into a draft they had walked away from.
@@ -190,7 +218,12 @@
 	 * back to the ways in still shows them.
 	 */
 	async function generateIdeas(asked: string): Promise<SuggestFailure | null> {
-		const answer = await suggestIdeas({ brief: asked, side, limits: '', debugLog: data.debug });
+		const call = watchCall();
+		const answer = await suggestIdeas(
+			{ brief: asked, side, limits: '', debugLog: data.debug },
+			call.watch.watch
+		);
+		call.done();
 		if (!answer.ok) {
 			return answer;
 		}
@@ -211,13 +244,18 @@
 			return null;
 		}
 		const shown = generated;
-		const answer = await suggestIdeas({
-			brief: shown.brief,
-			side,
-			limits: '',
-			offered: shown.ideas.map((offered) => offered.title).slice(-MAX_OFFERED_IDEAS),
-			debugLog: data.debug
-		});
+		const call = watchCall();
+		const answer = await suggestIdeas(
+			{
+				brief: shown.brief,
+				side,
+				limits: '',
+				offered: shown.ideas.map((offered) => offered.title).slice(-MAX_OFFERED_IDEAS),
+				debugLog: data.debug
+			},
+			call.watch.watch
+		);
+		call.done();
 		// Cleared or replaced while this was out: these were for the old ones.
 		if (generated !== shown) {
 			return null;
@@ -285,6 +323,7 @@
 				{suggestionsOn}
 				{starterOrder}
 				{asking}
+				{watching}
 				{problem}
 				{generated}
 				{writing}
@@ -315,6 +354,7 @@
 					// here and leave the start saying it was writing one.
 					requests += 1;
 					asking = false;
+					watching = null;
 					problem = null;
 					ideaProblem = null;
 					stage = { kind: 'start' };
@@ -323,6 +363,7 @@
 				<wa-icon slot="start" name="arrow-left" variant="solid"></wa-icon>
 				Other ways to start
 			</wa-button>
+			{#if asking && watching}<ModelProgress watch={watching} />{/if}
 			{#if problem}<SuggestionProblem {problem} debug={data.debug} />{/if}
 			{#if data.debug && stage.log}<ExchangeLog log={stage.log} />{/if}
 			{#key stage.version}

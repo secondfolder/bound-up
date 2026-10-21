@@ -1,8 +1,8 @@
 /**
  * Reading what the model suggests for a character or idea.
  *
- * The suggest endpoint (`api/daydreams/suggest`) passes the provider's answer
- * through unread, like the reply endpoint, so the browser is what checks it:
+ * The suggest endpoint (`api/daydreams/suggest`) puts the provider's answer
+ * back together from its stream without checking it, so the browser is what checks it:
  * the OpenAI-compatible envelope, the JSON the prompt asked for inside it,
  * and every field held to the same caps as a field the person typed. Anything
  * that does not fit is dropped — a suggestion is a convenience, and a bad one

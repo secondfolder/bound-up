@@ -163,7 +163,8 @@ OpenRouter's Responses API (`/responses`, `readingLinks`) rather than Chat
 Completions, because only its answer lists each fetch — the URL, whether it
 was read, and what came back — which debug mode's chat log shows
 ([debug-mode.md](debug-mode.md#how-a-daydream-draft-or-ideas-were-written));
-the browser reads either shape (`completionText`, `suggestionLog`). The answer gets
+the browser reads either shape (`completionText`, `suggestionLog`), and the
+endpoint reads either stream (`SuggestStream`). The answer gets
 `READING_ALLOWANCE` more tokens, because a model with a tool reasons over
 what it read before it writes.
 
@@ -862,7 +863,11 @@ would otherwise send every take of every passage on every visit.
 
 - **`‹ 2/3 ›`** under any turn with others beside it (`DaydreamSiblings`).
   Moving to one shows the branch through it where it was last left
-  (`latestLeafUnder`), not its first turn.
+  (`latestLeafUnder`), not its first turn. A take still arriving counts as
+  the newest, with its count under it from the start, and is drawn in the
+  place of the one it was written again from: the thread draws the branch
+  only up to the turn it follows (`shownPath`), since the old take stays
+  the active turn until the new one is saved.
 - **The branch map** (`DaydreamBranchMap.svelte`), drawn with the generic
   [Tree](tree.md). Its trunk is the story's **longest path**: at each fork
   the child with the most generations under it carries the line on, a tie
@@ -1513,10 +1518,14 @@ them, not from the user or this server:
 An idea's brief and research are part of the setup, so each passage's
 request carries them too, like the rest of the idea.
 
-The answer is a small JSON completion, not streamed, passed back unread for
-the browser to check (`daydream/suggestions.ts`). When the provider fails,
-the 502 says only "No suggestions just now" — except to an account holding
-debug mode, which also gets the provider's status and error body as `detail`
+The answer is a JSON completion, streamed from the provider and read by the
+endpoint, which sends the browser how far along it is and then the whole
+answer in the shape an answer that was not streamed has, for the browser to
+check (`daydream/suggestions.ts`). See [Progress while it
+writes](#progress-while-it-writes). When the provider fails, the 502 (or, once
+the stream has started, its `failed` event) says only "No suggestions just
+now" — except to an account holding debug mode, which also gets the
+provider's status and error body as `detail`
 ([debug-mode.md](debug-mode.md#why-a-daydreams-suggestion-failed)). A whole
 daydream's or generated ideas' request that asks for `debugLog`, from an account holding debug
 mode, gets the request body it sent added to the answer as `boundUpRequest`
@@ -1698,11 +1707,53 @@ cap is set per task in `suggest-prompt.ts`, from 100 tokens for a name to
 5,200 for a whole setup, and more when it reads links.
 
 The browser reads OpenRouter's stream itself (`src/lib/daydream/stream.ts`):
-`data:` events carrying `choices[0].delta.content`, keep-alive comments, a
+`data:` events carrying `choices[0].delta.content` (and `reasoning`, for the
+progress line), keep-alive comments, a
 mid-stream `error` event, a `finish_reason`, and `[DONE]`. The reply endpoint passes the
 upstream body through untouched rather than parsing and re-encoding it, so
 the worker spends no CPU on a reply it has no reason to read. `EventSource`
 cannot be used, because it can only send a GET.
+
+### Progress while it writes
+
+A model call can be slow: a whole daydream from a brief that reads links
+takes most of a minute, and a reasoning model can think for a while before a
+passage's first word. A page that says nothing for that long looks broken, so
+every slow call says how it is going (`ModelProgress.svelte`): what the model
+is doing — waiting, thinking, reading links, writing — and how many
+characters it has written (`stageLabel` in `src/lib/daydream/progress.ts`).
+A screen reader is told the stage alone, since the count changes several
+times a second.
+
+- **Suggestions** stream. The suggest endpoint asks the provider for a stream
+  and reads it (`SuggestStream`, `server/daydream/suggest-stream.ts`) rather
+  than passing it on, and sends the browser events of its own
+  (`SuggestStreamEvents`): `progress`, at most four times a second and
+  whenever the stage changes (`ProgressGate`); then `done` with the answer
+  put back together as the provider answers a call that was not streamed, or
+  `failed`. Keeping that shape is why the endpoint reads the stream at all:
+  the browser's checks, the chat log and the setup exchanges a daydream keeps
+  sealed all read it, and those kept earlier are in it. A provider that
+  ignores `stream` and answers whole is passed on as `done` the same.
+  A Responses API stream (a brief with links) says which items are fetches,
+  so reading links is a stage of its own, with a count; OpenRouter's
+  documentation names some of its events differently from OpenAI's, and both
+  names are read.
+- **Where it shows.** The long ones: "Write this daydream" and a generated
+  idea written out, "Suggest daydreams for this", "More ideas", "Try
+  another", and "Update the idea". The quick ones (chips, fill, casting,
+  name, surprise) stream the same way but keep their button's label, since
+  they finish in a few seconds.
+- **Passages** already stream their text, so they only say how it is going
+  until the first of it shows (`DaydreamArriving`). The browser works it out
+  from the provider's stream (`ModelWatch.feed`): reasoning means thinking,
+  anything else writing.
+- **Everyone gets how much, never what.** A suggestion's words reach the
+  browser only once the answer is whole, as before. The words as they come
+  are debug mode's live chat ([debug-mode.md](debug-mode.md#the-live-chat)),
+  sent only to an account holding debug mode whose device has it switched
+  on. A passage's stream has always gone to the browser whole, reasoning
+  included; only debug mode shows the reasoning.
 
 ## Context
 

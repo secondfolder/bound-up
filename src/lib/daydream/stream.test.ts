@@ -124,3 +124,23 @@ describe('readReplyStream', () => {
 		expect(result.outcome).toEqual({ kind: 'done' });
 	});
 });
+
+describe('readReplyStream, reasoning', () => {
+	it('hands each piece of reasoning to its own callback, apart from the reply', async () => {
+		const thoughts: string[] = [];
+		const pieces: string[] = [];
+		await readReplyStream(
+			body(
+				`data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'Weighing ' } }] })}\n\n`,
+				`data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'it up.' } }] })}\n\n`,
+				event('Mara looks up.'),
+				'data: [DONE]\n\n'
+			),
+			(piece) => pieces.push(piece),
+			() => undefined,
+			(piece) => thoughts.push(piece)
+		);
+		expect(thoughts.join('')).toBe('Weighing it up.');
+		expect(pieces.join('')).toBe('Mara looks up.');
+	});
+});

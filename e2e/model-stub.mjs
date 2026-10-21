@@ -38,8 +38,14 @@
 // Every passage offers two directions ("Slower", "Surprise me") and two
 // suggestions, and proposes a roll for a turn containing `[roll]`.
 //
-// A request that is not streamed is a setup suggestion (`api/daydreams/suggest`),
-// answered with fixed JSON for whichever task it asks for. A daydream is named
+// A request that asks for a JSON object (`response_format`) is a setup
+// suggestion (`api/daydreams/suggest`), answered with fixed JSON for whichever
+// task it asks for: streamed when asked to be, as the endpoint does — a first
+// event of reasoning ("The stub weighs the brief."), then the JSON in pieces —
+// and whole when not. A brief containing `[slow]` streams slowly, so a spec
+// can watch the progress line count up before the answer lands. The Responses
+// API (`POST /v1/responses`, for a model that reads a brief's links) answers
+// the same JSON streamed its way, after a fetch of the first link it was given. A daydream is named
 // "The <idea title> story", so a spec knows what to expect, and a naming
 // request fails once like any other when the idea's title has `[fail]` in it.
 // A daydream described in a sentence is always "The stub night train", with
@@ -276,6 +282,82 @@ function suggestionFor(messages) {
 	return { choices: [{ message: { role: 'assistant', content: JSON.stringify(content) } }] };
 }
 
+/** How long between pieces of a suggestion: long for a brief that asks for `[slow]`. */
+function suggestionPace(messages) {
+	return (messages.at(-1)?.content ?? '').includes('[slow]') ? 60 : 5;
+}
+
+/** A setup suggestion, streamed as Chat Completions streams one. */
+async function streamSuggestion(body, response) {
+	response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+	response.write(': OPENROUTER PROCESSING\n\n');
+	const event = (fields) =>
+		`data: ${JSON.stringify({ id: 'gen-stub', model: body.model, provider: 'Stub', ...fields })}\n\n`;
+	response.write(event({ choices: [{ delta: { reasoning: 'The stub weighs the brief.' } }] }));
+	const pace = suggestionPace(body.messages);
+	for (const piece of chunks(suggestionFor(body.messages).choices[0].message.content)) {
+		if (response.destroyed) {
+			return;
+		}
+		response.write(event({ choices: [{ delta: { content: piece } }] }));
+		await sleep(pace);
+	}
+	response.write(event({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
+	response.end('data: [DONE]\n\n');
+}
+
+/**
+ * A suggestion that reads links, streamed as OpenRouter's Responses API
+ * streams one: a fetch of the first link in the brief, then the answer.
+ */
+async function streamResponses(body, response) {
+	response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+	const event = (type, fields) =>
+		`event: ${type}\ndata: ${JSON.stringify({ type, ...fields })}\n\n`;
+	const messages = body.input;
+	const url =
+		(messages.at(-1)?.content ?? '').match(/https?:\/\/\S+/)?.[0] ?? 'https://example.test/';
+	const fetched = {
+		type: 'openrouter:web_fetch',
+		id: 'fetch-stub',
+		status: 'completed',
+		url,
+		title: 'A stub page',
+		content: 'What the stub page says.'
+	};
+	const text = suggestionFor(messages).choices[0].message.content;
+	const message = {
+		type: 'message',
+		id: 'msg-stub',
+		role: 'assistant',
+		status: 'completed',
+		content: [{ type: 'output_text', text }]
+	};
+	response.write(
+		event('response.created', { response: { id: 'resp-stub', status: 'in_progress' } })
+	);
+	response.write(
+		event('response.output_item.added', { item: { ...fetched, status: 'in_progress' } })
+	);
+	await sleep(suggestionPace(messages));
+	response.write(event('response.output_item.done', { item: fetched }));
+	response.write(event('response.output_item.added', { item: { ...message, content: [] } }));
+	for (const piece of chunks(text)) {
+		if (response.destroyed) {
+			return;
+		}
+		response.write(event('response.output_text.delta', { delta: piece }));
+		await sleep(suggestionPace(messages));
+	}
+	response.write(event('response.output_item.done', { item: message }));
+	response.write(
+		event('response.completed', {
+			response: { id: 'resp-stub', status: 'completed', output: [fetched, message] }
+		})
+	);
+	response.end('data: [DONE]\n\n');
+}
+
 /** The reply in small pieces, so the page really does show it arriving. */
 function chunks(text) {
 	const pieces = [];
@@ -383,7 +465,8 @@ const server = createServer(async (request, response) => {
 		response.end(JSON.stringify(MODELS));
 		return;
 	}
-	if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {
+	const responses = request.method === 'POST' && request.url === '/v1/responses';
+	if (!responses && (request.method !== 'POST' || request.url !== '/v1/chat/completions')) {
 		response.writeHead(404).end();
 		return;
 	}
@@ -397,6 +480,10 @@ const server = createServer(async (request, response) => {
 		raw += piece;
 	}
 	const body = JSON.parse(raw);
+	if (responses) {
+		await streamResponses(body, response);
+		return;
+	}
 	const last = lastUserMessage(body.messages);
 	if (last.includes('[fail]') && !failed.has(last)) {
 		failed.add(last);
@@ -405,9 +492,13 @@ const server = createServer(async (request, response) => {
 		return;
 	}
 
-	if (!body.stream) {
+	if (body.response_format && !body.stream) {
 		response.writeHead(200, { 'content-type': 'application/json' });
 		response.end(JSON.stringify(suggestionFor(body.messages)));
+		return;
+	}
+	if (body.response_format) {
+		await streamSuggestion(body, response);
 		return;
 	}
 

@@ -7,11 +7,30 @@
 	 * shows the branch through it, where it was last left (`showBranch`). The
 	 * whole story stays one daydream; this is how its branches are reached
 	 * without leaving the page.
+	 *
+	 * Also under a passage still arriving (`arrivingAfter`, the turn it
+	 * follows), which counts as the newest of its takes: the controls are
+	 * there from the moment it starts, rather than appearing once it is saved.
 	 */
-	let { story, turnId }: { story: DaydreamStory; turnId: string } = $props();
+	let {
+		story,
+		turnId = null,
+		arrivingAfter
+	}: {
+		story: DaydreamStory;
+		/** The turn this is under; null for a passage still arriving. */
+		turnId?: string | null;
+		/** For a passage still arriving: the turn it follows, null for an opening. */
+		arrivingAfter?: string | null;
+	} = $props();
 
-	const siblings = $derived(story.siblings(turnId));
-	const index = $derived(siblings.findIndex((node) => node.id === turnId));
+	/** The takes, in order, by id; the one still arriving is null, and last. */
+	const siblings = $derived(
+		turnId === null
+			? [...story.children(arrivingAfter ?? null).map((node) => node.id), null]
+			: story.siblings(turnId).map((node) => node.id)
+	);
+	const index = $derived(siblings.indexOf(turnId));
 </script>
 
 {#if siblings.length > 1}
@@ -24,7 +43,7 @@
 			onclick={() => {
 				const previous = siblings[index - 1];
 				if (previous) {
-					void story.showBranch(previous.id);
+					void story.showBranch(previous);
 				}
 			}}
 		>
@@ -39,7 +58,7 @@
 			onclick={() => {
 				const next = siblings[index + 1];
 				if (next) {
-					void story.showBranch(next.id);
+					void story.showBranch(next);
 				}
 			}}
 		>
