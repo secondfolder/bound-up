@@ -135,10 +135,20 @@ test.describe('rewards', () => {
 			await clickWaButton(ada.page, 'Claim');
 			await expect(ada.page.locator('.partner .title-row').first()).toContainText('Credits: 2');
 
+			/**
+			 * Both waits name the partner's route, as tasks.spec.ts does. A bare
+			 * `/\/rewards$/` already matches /home/rewards, so it returned before
+			 * the client-side navigation had loaded anything, and the click below
+			 * found /home/rewards' own "Claim history" — the self one — whenever
+			 * the partner page's load was slower than the click (four workers,
+			 * now and then). Ada then landed on /home/rewards/history, which
+			 * `/\/rewards\/history$/` matched too, and "Claimed by you" never
+			 * came, because her self history is empty.
+			 */
 			await ada.page.getByRole('link', { name: 'Open full rewards' }).click();
-			await ada.page.waitForURL(/\/rewards$/);
+			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards$/);
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
-			await ada.page.waitForURL(/\/rewards\/history$/);
+			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards\/history$/);
 			await expect(ada.page.getByText('Claimed by you')).toBeVisible();
 		} finally {
 			await ada.close();
