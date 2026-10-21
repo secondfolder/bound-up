@@ -145,6 +145,15 @@
 	const ideasShown = $derived(ideasForSide.filter((shown) => matchesSearch(shown, filter)));
 
 	const busy = $derived(asking || suggesting || gettingMore);
+	/**
+	 * Either button above is waiting on the model: how it is going is laid
+	 * over the box it was asked from, which cannot be changed meanwhile
+	 * anyway, rather than pushing everything under it down a row.
+	 */
+	const overBox = $derived(
+		watching !== null && (suggesting || (asking && writing === null)) ? watching : null
+	);
+	const briefId = $props.id();
 	const canAsk = $derived(brief.trim() !== '' && !busy);
 
 	const voiceLabel = (voice: DaydreamVoicePresetId) =>
@@ -155,15 +164,24 @@
 	{#if suggestionsOn}
 		<section class="describe" aria-labelledby="describe-heading">
 			<h2 id="describe-heading">What do you feel like?</h2>
-			<label class="brief">
-				<span class="hint">A few words is enough: who, where, what happens, or what it should say.</span>
-				<textarea
-					rows="3"
-					maxlength={DAYDREAM_LIMITS.brief}
-					placeholder="A stranger on a night train…"
-					bind:value={brief}
-					disabled={asking || suggesting}></textarea>
-			</label>
+			<div class="brief">
+				<!-- A label for the box alone: the progress laid over it is not its name. -->
+				<label class="hint" for={briefId}>
+					A few words is enough: who, where, what happens, or what it should say.
+				</label>
+				<div class="box">
+					<textarea
+						id={briefId}
+						rows="3"
+						maxlength={DAYDREAM_LIMITS.brief}
+						placeholder="A stranger on a night train…"
+						bind:value={brief}
+						disabled={asking || suggesting}></textarea>
+					{#if overBox}
+						<div class="over-box"><ModelProgress watch={overBox} showLive={false} /></div>
+					{/if}
+				</div>
+			</div>
 			<div class="controls">
 				<DaydreamSidePicker bind:side />
 				<div class="actions">
@@ -182,7 +200,9 @@
 					</wa-button>
 				</div>
 			</div>
-			{#if watching && (suggesting || (asking && writing === null))}<ModelProgress watch={watching} />{/if}
+			<!-- Debug mode's live chat has no room over the box, so it goes here: the
+			     chat alone, since how it is going is already on the box. -->
+			{#if overBox?.live}<ModelProgress watch={overBox} showStage={false} />{/if}
 			{#if problem}<SuggestionProblem {problem} {debug} />{/if}
 			{#if suggestProblem}<SuggestionProblem problem={suggestProblem} {debug} />{/if}
 		</section>
@@ -362,6 +382,28 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
+	}
+
+	/* The box and what is laid over it, sized by the box (which can be resized). */
+	.box {
+		position: relative;
+		display: flex;
+	}
+
+	.over-box {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		padding: 0.5rem;
+		border-radius: 0.6rem;
+		background: var(--wa-color-overlay-modal);
+		text-align: center;
+
+		/* Quiet text on the darkened box is too faint to read. */
+		:global(.stage) {
+			color: var(--wa-color-text-normal);
+		}
 	}
 
 	textarea {

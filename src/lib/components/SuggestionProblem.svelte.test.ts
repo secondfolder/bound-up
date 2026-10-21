@@ -33,6 +33,7 @@ describe('SuggestionProblem', () => {
 			log: {
 				model: 'test/model',
 				api: 'responses',
+				cost: null,
 				entries: [
 					{
 						who: 'model' as const,

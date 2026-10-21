@@ -1843,9 +1843,13 @@ times a second.
   names are read.
 - **Where it shows.** The long ones: "Write this daydream" and a generated
   idea written out, "Suggest daydreams for this", "More ideas", "Try
-  another", and "Update the idea". The quick ones (chips, fill, casting,
-  name, surprise) stream the same way but keep their button's label, since
-  they finish in a few seconds.
+  another", and "Update the idea". The two asked from the box ("Write this
+  daydream", "Suggest daydreams for this") lay it centred over the box, on
+  a darkened layer, rather than a row of its own that pushes everything
+  under it down: the box cannot be changed meanwhile anyway. Debug mode's
+  live chat has no room there, so it goes under the buttons. The quick ones
+  (chips, fill, casting, name, surprise) stream the same way but keep their
+  button's label, since they finish in a few seconds.
 - **Passages** already stream their text, so they only say how it is going
   until the first of it shows (`DaydreamArriving`). The browser works it out
   from the provider's stream (`ModelWatch.feed`): reasoning means thinking,

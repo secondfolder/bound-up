@@ -3,7 +3,7 @@ import { tick } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import { ModelWatch } from '$lib/daydream/model-watch.svelte';
 import { WAITING } from '$lib/daydream/progress';
-import { waProp, waSettled } from '$lib/testing/web-awesome';
+import { detailsTitle, waProp, waSettled } from '$lib/testing/web-awesome';
 import DaydreamArriving from './DaydreamArriving.svelte';
 import ModelProgress from './ModelProgress.svelte';
 
@@ -51,7 +51,7 @@ describe('ModelProgress', () => {
 		const details = container.querySelector('wa-details.live');
 		expect(waProp(details, 'summary')).toBe('Live chat: test/model, chat/completions');
 		const entries = [...container.querySelectorAll('ol > li')].map((entry) => ({
-			label: waProp(entry.querySelector('wa-details'), 'summary'),
+			label: detailsTitle(entry.querySelector('wa-details'))?.split(' · ')[0],
 			text: entry.querySelector('pre')?.textContent
 		}));
 		expect(entries).toEqual([

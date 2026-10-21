@@ -1,6 +1,7 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import type { ExchangeLogView } from '$lib/daydream/exchange-log';
+import { ModelWatch } from '$lib/daydream/model-watch.svelte';
 import {
 	DAYDREAM_STARTERS,
 	matchesSearch,
@@ -49,6 +50,7 @@ async function renderStarter(
 		ongenerate?: (brief: string) => Promise<SuggestFailure | null>;
 		onmore?: () => Promise<SuggestFailure | null>;
 		starterOrder?: readonly string[];
+		watching?: ModelWatch | null;
 	} = {}
 ) {
 	const handlers = {
@@ -72,6 +74,7 @@ async function renderStarter(
 		writing: null,
 		ideaProblem: null,
 		debug: props.debug ?? false,
+		watching: props.watching ?? null,
 		...handlers
 	});
 	await waSettled(rendered.container);
@@ -92,6 +95,7 @@ describe('DaydreamStarter', () => {
 			log: {
 				model: 'test/model',
 				api: 'responses',
+				cost: null,
 				entries: [{ who: 'model' as const, label: 'Reply', text: '{"ideas":[]}' }]
 			}
 		};
@@ -145,6 +149,36 @@ describe('DaydreamStarter', () => {
 		expect(ondescribe).toHaveBeenCalled();
 		suggest?.click();
 		await waitFor(() => expect(ongenerate).toHaveBeenCalledWith('teasing in public'));
+	});
+
+	it('lays how a suggestion is going over the box it was asked from, and the live chat under it', async () => {
+		let answer: (problem: SuggestFailure | null) => void = () => undefined;
+		const watching = new ModelWatch(true);
+		watching.watch.onLive?.({
+			kind: 'request',
+			body: JSON.stringify({ model: 'test/model', messages: [{ role: 'user', content: 'Hi' }] })
+		});
+		const { container } = await renderStarter({
+			brief: 'teasing in public',
+			watching,
+			ongenerate: () =>
+				new Promise((resolve) => {
+					answer = resolve;
+				})
+		});
+		const section = container.querySelector('.describe') as HTMLElement;
+		expect(section.querySelector('.over-box')).toBeNull();
+		button(section, 'Suggest daydreams for this')?.click();
+		await waitFor(() => expect(section.querySelector('.box .over-box')).not.toBeNull());
+		const over = section.querySelector('.over-box') as HTMLElement;
+		expect(over.textContent).toContain('Waiting for the model');
+		// The live chat has no room over the box, so it is not drawn there.
+		expect(over.querySelector('wa-details')).toBeNull();
+		expect(section.querySelector(':scope > .model-progress wa-details.live')).not.toBeNull();
+		// The progress is not part of what the box is called.
+		expect(section.querySelector('textarea')?.labels?.[0]?.textContent).not.toContain('Waiting');
+		answer(null);
+		await waitFor(() => expect(section.querySelector('.over-box')).toBeNull());
 	});
 
 	it('says why no similar daydreams came, beside the box', async () => {

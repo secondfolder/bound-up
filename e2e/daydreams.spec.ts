@@ -735,7 +735,11 @@ test.describe('daydreams', () => {
 		await page.getByRole('textbox').fill('a slow night train [slow]');
 		await clickWaButton(page, 'Write this daydream');
 		const progress = page.locator('.model-progress');
-		await expect(progress).toContainText(/Writing… \d+ characters/);
+		// Over the box it was asked from, and only there.
+		await expect(page.locator('.describe .box .over-box .stage')).toContainText(
+			/Writing… \d+ characters/
+		);
+		await expect(page.locator('.describe .stage')).toHaveCount(1);
 		// Without debug mode, how much and never what.
 		await expect(progress.locator('wa-details.live')).toHaveCount(0);
 		await expect(progress).not.toContainText('Vesper');
@@ -749,6 +753,9 @@ test.describe('daydreams', () => {
 		await page.getByRole('textbox').fill('a slow night train [slow]');
 		await clickWaButton(page, 'Write this daydream');
 		const live = progress.locator('wa-details.live');
+		// The chat goes under the buttons, and how it is going still only on the box.
+		await expect(page.locator('.describe .over-box wa-details.live')).toHaveCount(0);
+		await expect(page.locator('.describe .stage')).toHaveCount(1);
 		// What was sent, then the reasoning and the answer as they come.
 		await expect(live).toContainText('a slow night train [slow]');
 		await expect(live).toContainText('The stub weighs the brief.');

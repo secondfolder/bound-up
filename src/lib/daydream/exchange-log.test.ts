@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+	answerEntries,
+	entryCount,
+	formatCost,
 	historyAgainst,
 	parseRequest,
+	readUsage,
 	sentEntry,
 	streamEntries,
-	suggestionLog
+	streamUsage,
+	suggestionLog,
+	usageLine
 } from './exchange-log';
 
 const event = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`;
@@ -168,7 +174,7 @@ describe('suggestionLog', () => {
 			['settings', 'Settings'],
 			['model', 'Reasoning'],
 			['model', 'Reply'],
-			['end', 'How it ended']
+			['end', 'How it ended: stopped: stop']
 		]);
 		expect(log?.entries[4]?.text).toBe('{"voice":"talk"}');
 		expect(log?.entries[5]?.text).toContain('"total_tokens": 10');
@@ -216,5 +222,86 @@ describe('suggestionLog', () => {
 		expect(entries[1]?.text).toBe(page);
 		expect(entries[2]?.text).toBe('blocked');
 		expect(entries[3]?.text).toBe('(not shown by the provider)');
+	});
+});
+
+describe('usage and cost', () => {
+	const chatUsage = {
+		prompt_tokens: 12_345,
+		prompt_tokens_details: { cached_tokens: 9000 },
+		completion_tokens: 456,
+		completion_tokens_details: { reasoning_tokens: 300 },
+		cost: 0.000_312_4
+	};
+
+	it('reads either API’s names, and leaves out what is not given', () => {
+		expect(readUsage(chatUsage)).toEqual({
+			cost: 0.000_312_4,
+			input: 12_345,
+			cached: 9000,
+			output: 456,
+			reasoning: 300
+		});
+		expect(
+			readUsage({
+				input_tokens: 10,
+				output_tokens: 4,
+				output_tokens_details: { reasoning_tokens: 1 }
+			})
+		).toEqual({ input: 10, output: 4, reasoning: 1 });
+		expect(readUsage({ total_tokens: 9 })).toBeNull();
+		expect(readUsage(null)).toBeNull();
+	});
+
+	it('says a cost to three significant figures, since most are fractions of a cent', () => {
+		expect(formatCost(0.000_312_4)).toBe('$0.000312');
+		expect(formatCost(1.234_56)).toBe('$1.23');
+		expect(
+			usageLine({ cost: 0.000_312_4, input: 12_345, cached: 9000, output: 456, reasoning: 300 })
+		).toBe('$0.000312 · 12,345 in (9,000 cached) · 456 out (300 reasoning)');
+	});
+
+	it('puts the cost in how a stream ended, and the exact token counts on the reasoning and reply', () => {
+		const body = [
+			delta({ reasoning: 'Hm.' }),
+			delta({ content: 'Sit.' }),
+			event({ choices: [{ delta: {}, finish_reason: 'stop' }] }),
+			event({ choices: [], usage: chatUsage })
+		].join('');
+		const entries = streamEntries(body);
+		expect(entries.at(-1)?.label).toBe(
+			'How it ended: stopped: stop · $0.000312 · 12,345 in (9,000 cached) · 456 out (300 reasoning)'
+		);
+		expect(entries[0]).toMatchObject({ label: 'Reasoning', tokens: 300 });
+		expect(entries[1]).toMatchObject({ label: 'Reply', tokens: 156 });
+		expect(streamUsage(body)?.cost).toBe(0.000_312_4);
+		expect(streamUsage(delta({ content: 'x' }))).toBeNull();
+	});
+
+	it('reads a whole answer’s usage the same way, and a suggestion log carries its cost', () => {
+		const answer = {
+			choices: [{ message: { content: '{}' }, finish_reason: 'stop' }],
+			usage: { prompt_tokens: 5, completion_tokens: 2, cost: 0.01 }
+		};
+		const entries = answerEntries(answer);
+		expect(entries.at(-1)?.label).toBe('How it ended: stopped: stop · $0.01 · 5 in · 2 out');
+		expect(entries[0]).toMatchObject({ label: 'Reply', tokens: 2 });
+		const log = suggestionLog({
+			...answer,
+			boundUpRequest: request([{ role: 'user', content: 'Hi' }])
+		});
+		expect(log?.cost).toBe(0.01);
+		expect(suggestionLog({ boundUpRequest: request([]) })?.cost).toBeNull();
+	});
+
+	it('counts an entry’s characters and tokens, estimating where the usage did not say', () => {
+		expect(entryCount({ who: 'user', label: 'Sent', text: 'x'.repeat(1001) })).toBe(
+			'1,001 characters · ~251 tokens'
+		);
+		expect(entryCount({ who: 'model', label: 'Reply', text: 'a', tokens: 1 })).toBe(
+			'1 character · 1 token'
+		);
+		expect(entryCount({ who: 'end', label: 'How it ended', text: '{}' })).toBeNull();
+		expect(entryCount({ who: 'settings', label: 'Settings', text: '{}' })).toBeNull();
 	});
 });

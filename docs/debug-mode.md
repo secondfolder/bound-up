@@ -151,7 +151,21 @@ reasoning where the provider shows it, each page it fetched in full (its
 URL, the engine's status, the site's HTTP status and the page's title in the
 heading, or the engine's error), its reply as written — and how it ended
 (`finish_reason` or `status`, and `usage`). Its heading names the model and
-which of OpenRouter's APIs it went to.
+which of OpenRouter's APIs it went to, and what the request cost.
+
+**Lengths and cost.** Every bubble's title says how long it is, in
+characters and tokens (`entryCount`), so the part of a request that costs
+the most can be found without opening each one. The tokens are exact for the
+reasoning and the reply, which the answer's `usage` counts (the reply as the
+output less the reasoning), and estimated at four characters a token for
+everything else, marked "~": the usage counts the prompt only as a whole.
+The settings and how it ended get no count, being this page's reading of
+the exchange rather than text the model read or wrote. The cost is
+OpenRouter's `usage.cost`, in US dollars, which it now returns on every
+answer without being asked (`readUsage`); "How it ended" says it beside the
+tokens in and out, how many of those were read from the cache, and how many
+of the out were reasoning. The same goes for a daydream's raw log (below),
+whose exchange line says the cost as well. A picture's cost is not shown.
 
 The request is not in the provider's answer, so the page asks for it: with
 debug mode on, `suggestDaydream` and `suggestIdeas` send `debugLog: true`,
@@ -250,8 +264,9 @@ The log draws each passage's exchange above it (`DaydreamRawExchange`):
   whole;
 - an error the stream ended on, and "How it ended": why it stopped, which
   model and provider answered (a fallback can differ from the model asked
-  for), OpenRouter's generation id, the usage, how many events and
-  keep-alive comments came, and whether it said it was done;
+  for), what it cost and the tokens in and out (above, "Lengths and cost"),
+  OpenRouter's generation id, the usage, how many events and keep-alive
+  comments came, and whether it said it was done;
 - under it all, **the request and the response exactly as they went**.
 
 A request that wrote no passage — it failed, came back empty, or was

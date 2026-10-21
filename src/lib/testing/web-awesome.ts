@@ -23,6 +23,20 @@ export function waProp(element: Element | null | undefined, name: string): unkno
 	return (element as unknown as Record<string, unknown>)[name];
 }
 
+/**
+ * A `wa-details`' title as it reads: its `summary` property, or the text of
+ * a slotted summary where the title is markup (a chat log bubble's, which has
+ * its length beside it).
+ */
+export function detailsTitle(details: Element | null | undefined): string | undefined {
+	const slotted = details?.querySelector(':scope > [slot="summary"]');
+	if (slotted) {
+		return slotted.textContent?.replace(/\s+/g, ' ').trim();
+	}
+	const summary = waProp(details, 'summary');
+	return typeof summary === 'string' ? summary : undefined;
+}
+
 /** Every element under `root` matching `selector` whose property `name` equals `value`. */
 export function waByProp(
 	root: ParentNode,

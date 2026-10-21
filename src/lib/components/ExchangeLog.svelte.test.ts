@@ -9,23 +9,27 @@ describe('ExchangeLog', () => {
 			log: {
 				model: 'test/model',
 				api: 'responses',
+				cost: 0.000_312,
 				entries: [
 					{ who: 'system', label: 'System prompt', text: 'The rules' },
 					{ who: 'user', label: 'Sent', text: 'A brief' },
-					{ who: 'model', label: 'Reply', text: '{"voice":"talk"}' }
+					{ who: 'model', label: 'Reply', text: '{"voice":"talk"}', tokens: 6 }
 				]
 			}
 		});
 		await waSettled(container);
 		expect(waProp(container.querySelector('wa-details'), 'summary')).toBe(
-			'Chat log: test/model, responses'
+			'Chat log: test/model, responses · $0.000312'
 		);
 		const items = [...container.querySelectorAll('li')];
 		expect(items.map((item) => item.classList[0])).toEqual(['system', 'user', 'model']);
-		expect(items.map((item) => waProp(item.querySelector('wa-details'), 'summary'))).toEqual([
-			'System prompt',
-			'Sent',
-			'Reply'
+		// Each titled with how long it is: estimated, or exact where the usage said.
+		expect(
+			items.map((item) => item.querySelector('[slot="summary"]')?.textContent?.trim())
+		).toEqual([
+			'System prompt · 9 characters · ~3 tokens',
+			'Sent · 7 characters · ~2 tokens',
+			'Reply · 16 characters · 6 tokens'
 		]);
 		expect(items[2]?.querySelector('pre')?.textContent).toBe('{"voice":"talk"}');
 	});

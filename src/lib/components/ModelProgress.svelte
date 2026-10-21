@@ -16,9 +16,16 @@
 	 */
 	let {
 		watch,
+		showStage = true,
 		showLive = true
 	}: {
 		watch: ModelWatch;
+		/**
+		 * Whether to draw the stage line. Off where a page lays it over what is
+		 * waiting (the new-daydream box) and draws the live chat apart from it,
+		 * where it has room.
+		 */
+		showStage?: boolean;
 		/** Whether to draw the live chat the watch keeps: the device's debug switch, where it is not the watch's own. */
 		showLive?: boolean;
 	} = $props();
@@ -32,11 +39,13 @@
 </script>
 
 <div class="model-progress">
-	<p class="stage">
-		<wa-spinner></wa-spinner>
-		<span aria-hidden="true">{stageLabel(watch.progress)}</span>
-		<span class="wa-visually-hidden" role="status">{STAGE_WORDS[watch.progress.stage]}</span>
-	</p>
+	{#if showStage}
+		<p class="stage">
+			<wa-spinner></wa-spinner>
+			<span aria-hidden="true">{stageLabel(watch.progress)}</span>
+			<span class="wa-visually-hidden" role="status">{STAGE_WORDS[watch.progress.stage]}</span>
+		</p>
+	{/if}
 	{#if showLive && watch.live && watch.entries.length > 0}
 		<wa-details
 			class="live"

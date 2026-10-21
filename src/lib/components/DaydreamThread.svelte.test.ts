@@ -11,7 +11,7 @@ import type { DaydreamTurnContent, PassageMeta, StorySettings } from '$lib/seale
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
 import { pending } from '$lib/testing/pending';
-import { waByProp, waProp, waSettled } from '$lib/testing/web-awesome';
+import { detailsTitle, waByProp, waProp, waSettled } from '$lib/testing/web-awesome';
 import type {
 	DaydreamTreeNodeView,
 	DaydreamTurnView,
@@ -2054,8 +2054,9 @@ describe('DaydreamThread in debug mode', () => {
 		await waitFor(() => expect(drawn('t3')).not.toBeNull());
 		await waSettled(container);
 		const summaries = (id: string) =>
-			[...(drawn(id)?.querySelectorAll('wa-details') ?? [])].map((details) =>
-				waProp(details, 'summary')
+			[...(drawn(id)?.querySelectorAll('wa-details') ?? [])].map(
+				// Without each bubble's length, which follows its title.
+				(details) => detailsTitle(details)?.split(' · ')[0]
 			);
 		// The second request's history is the first's, said once; what it added is its own.
 		expect(summaries('t3')).toEqual([

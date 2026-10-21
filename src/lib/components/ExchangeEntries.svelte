@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import type { LogEntry } from '$lib/daydream/exchange-log';
+	import { entryCount, type LogEntry } from '$lib/daydream/exchange-log';
 	import { startOpen } from './details';
 
 	/**
 	 * An exchange with the model as bubbles (`exchange-log.ts`), for debug
 	 * mode: the suggestions' chat log and a daydream's raw log both draw them
 	 * here. Each is a disclosure, closed unless `open` says, because a system
-	 * prompt or a fetched page is longer than the screen.
+	 * prompt or a fetched page is longer than the screen. Its title says how
+	 * long it is (`entryCount`), so the part of a request that is costing the
+	 * most can be found without opening every one.
 	 */
 	let {
 		entries,
@@ -44,7 +46,11 @@
 <ol>
 	{#each entries as entry, index (index)}
 		<li class={entry.who}>
-			<wa-details summary={entry.label} appearance="plain" {@attach startOpen(open(entry, index))}>
+			{const length = $derived(entryCount(entry))}
+			<wa-details appearance="plain" {@attach startOpen(open(entry, index))}>
+				<span slot="summary">
+					{entry.label}{#if length}<span class="count">{` · ${length}`}</span>{/if}
+				</span>
 				<pre {@attach follow ? followEnd(entry) : undefined}>{entry.text}</pre>
 			</wa-details>
 		</li>
@@ -86,6 +92,11 @@
 			overflow-wrap: anywhere;
 			color: var(--wa-color-text-quiet);
 		}
+	}
+
+	.count {
+		font-variant-numeric: tabular-nums;
+		opacity: 0.75;
 	}
 
 	pre {

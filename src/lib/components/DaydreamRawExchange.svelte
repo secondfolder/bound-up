@@ -1,11 +1,13 @@
 <script lang="ts">
 	import {
+		formatCost,
 		historyAgainst,
 		type LogEntry,
 		parseRequest,
 		sentEntry,
 		settingsEntry,
-		streamEntries
+		streamEntries,
+		streamUsage
 	} from '$lib/daydream/exchange-log';
 	import type { OpenedExchange } from '$lib/daydream/story.svelte';
 	import ExchangeEntries from './ExchangeEntries.svelte';
@@ -64,6 +66,9 @@
 		return entry.label === 'Reply' || entry.label === 'Reasoning';
 	}
 
+	/** What the request cost, as OpenRouter said in the stream's last event; null where it did not. */
+	const cost = $derived(content ? (streamUsage(content.response.body)?.cost ?? null) : null);
+
 	const seconds = $derived(
 		content ? Math.max(0, (content.endedAt - content.startedAt) / 1000).toFixed(1) : null
 	);
@@ -80,7 +85,9 @@
 		<p class="note">This exchange will not open here.</p>
 	{:else}
 		<span class="who">
-			Exchange · {ENDED[content.ended]} · {seconds}s · HTTP {content.response.status}{exchange.turnId
+			Exchange · {ENDED[content.ended]} · {seconds}s · HTTP {content.response.status}{cost === null
+				? ''
+				: ` · ${formatCost(cost)}`}{exchange.turnId
 				? ''
 				: ' · wrote no passage'}
 		</span>
