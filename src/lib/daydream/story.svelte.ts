@@ -110,6 +110,13 @@ import {
 	MAX_TAKEN_TITLES
 } from './suggestions';
 import {
+	applyTrackerChanges,
+	type TrackerMove,
+	type TrackerValues,
+	trackerMoves,
+	trackersAt
+} from './trackers';
+import {
 	childrenOf,
 	currentDirections,
 	indexTree,
@@ -381,6 +388,26 @@ export class DaydreamStory {
 	/** The direction buttons on offer now, besides Continue. */
 	readonly directions = $derived(currentDirections(this.#pathOpened));
 
+	/** What the idea's trackers hold now, at the end of the path read (docs/daydreams.md, "Trackers"). */
+	readonly trackers = $derived(trackersAt(this.#pathOpened, this.setup?.idea.trackers ?? []));
+
+	/**
+	 * The trackers a passage moved, from what they held before it to after:
+	 * none for one that moved nothing, or for any other turn.
+	 */
+	trackerMovesAt(turnId: string): TrackerMove[] {
+		const trackers = this.setup?.idea.trackers ?? [];
+		const content = this.content(turnId);
+		const after = content?.type === 'text' ? content.meta?.trackers : undefined;
+		if (trackers.length === 0 || !after) {
+			return [];
+		}
+		const before = pathTo(this.index, this.index.byId.get(turnId)?.parentId ?? null).map(
+			(node) => ({ content: this.content(node.id) ?? null })
+		);
+		return trackerMoves(trackers, trackersAt(before, trackers), after);
+	}
+
 	readonly busy = $derived(this.streaming !== null);
 
 	/** The turn the user is on, if it is a passage: where suggestions and a roll card show. */
@@ -569,12 +596,13 @@ export class DaydreamStory {
 			if (rewrote === undefined) {
 				return null;
 			}
+			const listed = node.role === 'story' && !isHalted(before);
+			const trackers = listed ? this.#trackersFor(before) : undefined;
 			const turn = toContextTurn(node.role, content, {
 				readAs: next ? chosenReadingIn(after) : last.readAs,
 				...(rewrote === null ? {} : { rewrote }),
-				...(node.role === 'story' && !isHalted(before)
-					? { buttons: currentDirections(before) }
-					: {})
+				...(listed ? { buttons: currentDirections(before) } : {}),
+				...(trackers ? { trackers } : {})
 			});
 			if (turn) {
 				context.push(turn);
@@ -582,6 +610,36 @@ export class DaydreamStory {
 			context.push(...(reactions.get(node.id) ?? []));
 		}
 		return trimContext(context);
+	}
+
+	/**
+	 * Every tracker's value after the passage `request` writes, or null when
+	 * it moved none (docs/daydreams.md, "Trackers"). What the reply moved,
+	 * read against the values where it follows on; a rewrite that moved
+	 * nothing keeps what the passage it rewrites moved, since it tells the
+	 * same events in other words.
+	 */
+	#trackersMoved(
+		request: Generate,
+		pathBefore: readonly OpenedTurn[],
+		changes: unknown
+	): TrackerValues | null {
+		const trackers = this.setup?.idea.trackers ?? [];
+		if (trackers.length === 0) {
+			return null;
+		}
+		const moved = applyTrackerChanges(trackers, trackersAt(pathBefore, trackers), changes);
+		if (moved || !request.rewrite || request.rewrite.again) {
+			return moved;
+		}
+		const target = this.content(request.rewrite.target.id);
+		return target?.type === 'text' ? (target.meta?.trackers ?? null) : null;
+	}
+
+	/** What the idea's trackers held at the end of `path`, or undefined for an idea with none. */
+	#trackersFor(path: readonly OpenedTurn[]): TrackerValues | undefined {
+		const trackers = this.setup?.idea.trackers ?? [];
+		return trackers.length > 0 ? trackersAt(path, trackers) : undefined;
 	}
 
 	/**
@@ -666,11 +724,13 @@ export class DaydreamStory {
 		const before = pathTo(this.index, request.parentId).map((node) => ({
 			content: this.content(node.id) ?? null
 		}));
+		const trackers = this.#trackersFor(before);
 		return {
 			mode: request.mode,
 			setup,
 			turns: context,
 			currentDirections: currentDirections(before),
+			...(trackers ? { currentTrackers: trackers } : {}),
 			...(this.#keepRawReplies ? { record: true } : {}),
 			...(request.opening ? { opening: request.opening } : {}),
 			...(request.rewrite
@@ -771,11 +831,10 @@ export class DaydreamStory {
 			this.retry = () => void this.#start(request);
 			return;
 		}
-		const stopped = isHalted(
-			pathTo(this.index, request.parentId).map((node) => ({
-				content: this.content(node.id) ?? null
-			}))
-		);
+		const pathBefore = pathTo(this.index, request.parentId).map((node) => ({
+			content: this.content(node.id) ?? null
+		}));
+		const stopped = isHalted(pathBefore);
 		this.problem = null;
 		this.problemRaw = '';
 		this.retry = null;
@@ -801,6 +860,8 @@ export class DaydreamStory {
 		let meta: PassageMeta | null = null;
 		let expansion: string | null = null;
 		let reading: Reading | null = null;
+		// What the reply moved of the idea's trackers, by name, as written.
+		let trackerChanges: unknown;
 		// The request and its answer exactly as they went, for the raw log, kept
 		// through a Stop and a failure too.
 		const recorder = this.#keepRawReplies ? new ExchangeRecorder() : undefined;
@@ -833,6 +894,7 @@ export class DaydreamStory {
 				return;
 			}
 			({ passage, meta, expansion, reading } = outcome);
+			trackerChanges = outcome.trackers;
 		} catch {
 			// Stopped. What had arrived stays, like a sentence cut off: it is
 			// what was on screen, and writing it again is one press away. A Stop
@@ -879,8 +941,16 @@ export class DaydreamStory {
 						setup,
 						ownWords ? meta?.settings : withoutDaydreamSettings(meta?.settings)
 					);
+		const trackers = stopped ? null : this.#trackersMoved(request, pathBefore, trackerChanges);
 		const finalMeta: PassageMeta | undefined =
-			meta || stopped || request.rewrite || writtenOut || forced || reading || request.opening
+			meta ||
+			stopped ||
+			request.rewrite ||
+			writtenOut ||
+			forced ||
+			reading ||
+			request.opening ||
+			trackers
 				? {
 						suggestions: stopped ? [] : (meta?.suggestions ?? []),
 						directions: stopped
@@ -899,6 +969,8 @@ export class DaydreamStory {
 						...(meta?.drifted && !stopped ? { drifted: meta.drifted } : {}),
 						// Where a first passage started, so its request can be sent again as it was.
 						...(request.opening ? { opening: request.opening } : {}),
+						// Every tracker's value after it, when it moved one.
+						...(trackers ? { trackers } : {}),
 						...(request.rewrite
 							? {
 									rewriteOf: {

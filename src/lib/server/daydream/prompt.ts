@@ -28,12 +28,14 @@ import {
 } from '$lib/daydream/dial-words';
 import type { PictureArchitecture } from '$lib/daydream/image-prompt';
 import { explicitOoc } from '$lib/daydream/ooc';
+import { completeValues, METER_MAX, METER_MIN, type TrackerValues } from '$lib/daydream/trackers';
 import {
 	type DaydreamSetupContent,
 	type Direction,
 	daydreamSetupKind,
 	directionSchema,
-	type Reading
+	type Reading,
+	trackerValuesSchema
 } from '$lib/sealed-kinds/daydreams';
 import { impersonalGuide } from './impersonal-voice';
 import { monologueGuide } from './monologue-voice';
@@ -74,6 +76,11 @@ export const replyRequestSchema = z
 		record: z.boolean().optional(),
 		/** The direction buttons on screen now, for the model to add to or prune. */
 		currentDirections: z.array(directionSchema).max(MAX_DIRECTIONS).default([]),
+		/**
+		 * What the idea's trackers hold now, by id, for the model to move
+		 * (docs/daydreams.md, "Trackers"). One missing holds its start.
+		 */
+		currentTrackers: trackerValuesSchema.optional(),
 		// The passage being rewritten as it was sent (`passageAsSent`), and
 		// what to change, or that it is another take (`again`).
 		rewrite: rewriteSchema.optional(),
@@ -407,6 +414,89 @@ function describeOrigin(idea: DaydreamSetupContent['idea']): string | null {
 		: null;
 }
 
+type Tracker = DaydreamSetupContent['idea']['trackers'][number];
+
+const TRACKER_KIND_WORDS: Record<Tracker['kind'], string> = {
+	meter: `a meter from ${METER_MIN} to ${METER_MAX}`,
+	count: 'a count',
+	list: 'a list',
+	text: 'a line of text'
+};
+
+const STARTING: Record<Tracker['kind'], string> = {
+	meter: 'starting at',
+	count: 'starting at',
+	list: 'starting with',
+	text: 'starting as'
+};
+
+/** How a tracker reads in the setup: what it is, where it starts, and what moves it. */
+function describeTracker(tracker: Tracker): string {
+	const start = completeValues([tracker], {})[tracker.id];
+	const starts =
+		start === undefined || (Array.isArray(start) && start.length === 0) || start === ''
+			? 'starting empty'
+			: `${STARTING[tracker.kind]} ${trackerValue(tracker, start)}`;
+	return `- ${tracker.name}: ${TRACKER_KIND_WORDS[tracker.kind]}, ${starts}.${tracker.about ? ` ${tracker.about}` : ''}`;
+}
+
+/** A tracker's value as the model reads it, in its setup and in the note at the end (`trackersNote`). */
+function trackerValue(tracker: Tracker, value: TrackerValues[string]): string {
+	if (Array.isArray(value)) {
+		return value.length > 0 ? value.map((item) => `"${item}"`).join(', ') : 'nothing';
+	}
+	if (tracker.kind === 'meter') {
+		return `${value} out of ${METER_MAX}`;
+	}
+	if (typeof value === 'number') {
+		return `${value}`;
+	}
+	return value ? `"${value}"` : 'nothing';
+}
+
+/** A number for the example in `describeTrackers`: one step on from where a tracker starts. */
+function exampleMove(tracker: Tracker): number {
+	const from = Number(completeValues([tracker], {})[tracker.id]);
+	if (tracker.kind !== 'meter') {
+		return from + 1;
+	}
+	return from + 5 > METER_MAX ? from - 5 : from + 5;
+}
+
+/**
+ * The idea's trackers (docs/daydreams.md, "Trackers"), or null for an idea
+ * with none: what each is, and how the model moves them. In this daydream's
+ * half of the prompt, since an idea's trackers are its own, so the general
+ * half stays one every daydream told the same way shares. Told to move them
+ * a step at a time, earned in the passage: state the user can see move is
+ * what holds the longest sessions on the character-card sites, and a meter
+ * that leaps or creeps every passage regardless says nothing. The example is
+ * the idea's own first number, since a placeholder in a format gets copied
+ * back (`replyFormat`).
+ */
+function describeTrackers(setup: DaydreamSetupContent): string | null {
+	const { trackers } = setup.idea;
+	if (trackers.length === 0) {
+		return null;
+	}
+	const numeric = trackers.find((tracker) => tracker.kind !== 'list' && tracker.kind !== 'text');
+	const example = numeric
+		? ` — like {"trackers": {${JSON.stringify(numeric.name)}: ${exampleMove(numeric)}}}`
+		: '';
+	// The system voice issues rules; a list it keeps is where they are seen.
+	const rules =
+		setup.voice.narrator === 'impersonal' && trackers.some((tracker) => tracker.kind === 'list')
+			? 'A rule the system issues or lifts goes on or comes off the list that holds its rules, the moment it does.'
+			: null;
+	return joinLines(
+		'# What the story keeps track of',
+		'The user sees these beside the story, and watches them move:',
+		tagged('trackers', trackers.map(describeTracker).join('\n')),
+		`When the story moves one, say so in the reply's metadata as "trackers", by name, with only what changed${example}: a meter as a whole number from ${METER_MIN} to ${METER_MAX}, a count as a whole number, a list as every item it holds now, a line of text as its new line. Move them a step at a time, as the passage earns it — not every passage for the sake of it, and never past what happened. What each holds now is at the end of the last message. When one reaches an end its description gives, let the story turn on it.`,
+		rules
+	);
+}
+
 /** The words the model has always read an idea's known fields under (`describeSetup`). */
 const KNOWN_IDEA_LABELS: Partial<Record<string, string>> = { setting: 'Where', tone: 'Tone' };
 
@@ -480,6 +570,7 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 			describeParts(setup),
 			leadLine(setup)
 		),
+		describeTrackers(setup),
 		describeOrigin(idea),
 		`# The user's limits, which must never be crossed\n${setup.limits.trim() ? tagged('limits', setup.limits) : 'None stated beyond the rules above.'}`,
 		joinLines('# Dials', ...describeStoryDials(setup.dials))
@@ -996,6 +1087,25 @@ function buttonsNote(current: readonly Direction[]): string {
 	return `(Direction buttons on screen now: ${shown}.)`;
 }
 
+/**
+ * What the idea's trackers hold now (`describeTrackers`), or null for an
+ * idea with none. Beside the buttons note at the end of the last message,
+ * and for the same reason (`replyFormat`): it changes from one request to the
+ * next, so listed in the system prompt it would cost every request the story
+ * so far. Each passage's request goes back with the note it was sent with.
+ */
+function trackersNote(setup: DaydreamSetupContent, values: TrackerValues): string | null {
+	const { trackers } = setup.idea;
+	if (trackers.length === 0) {
+		return null;
+	}
+	const now = completeValues(trackers, values);
+	const shown = trackers
+		.map((tracker) => `${tracker.name}: ${trackerValue(tracker, now[tracker.id] ?? '')}`)
+		.join('; ');
+	return `(What the story keeps track of now: ${shown}.)`;
+}
+
 /** Where a trimmed story starts (`trimContext`): the model is not told it is the beginning. */
 const OMITTED_NOTE = '(The story so far is long, so it starts partway through here.)';
 
@@ -1122,6 +1232,10 @@ export function buildMessages(
 			if (turn.buttons) {
 				add({ role: 'user', content: buttonsNote(turn.buttons) });
 			}
+			const kept = turn.trackers ? trackersNote(request.setup, turn.trackers) : null;
+			if (kept) {
+				add({ role: 'user', content: kept });
+			}
 		}
 		for (const message of render(turn)) {
 			add(message);
@@ -1148,6 +1262,10 @@ export function buildMessages(
 	// (`replyFormat` says why). A check-in offers no buttons.
 	if (!stopped) {
 		add({ role: 'user', content: buttonsNote(request.currentDirections) });
+		const kept = trackersNote(request.setup, request.currentTrackers ?? {});
+		if (kept) {
+			add({ role: 'user', content: kept });
+		}
 	}
 	return [system, ...conversation];
 }

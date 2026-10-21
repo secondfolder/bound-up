@@ -19,6 +19,7 @@ import {
 	type IdeaFieldKind,
 	type IdeaOpening,
 	type IdeaPart,
+	type IdeaTracker,
 	knownValues,
 	namedFields,
 	type StoryDials
@@ -129,24 +130,30 @@ const withParts = ({
 	parts,
 	named,
 	openings,
+	trackers,
 	...input
 }: {
 	draft: Record<string, string>;
 	parts?: PartsDraft;
 	named?: NamedFieldDraft[];
 	openings?: OpeningsDraft;
+	trackers?: TrackersDraft;
 }) => ({
 	...input,
 	draft: {
 		...input.draft,
 		...(parts ? { parts } : {}),
 		...(named && named.length > 0 ? { fields: named } : {}),
-		...(openings && openings.length > 0 ? { openings } : {})
+		...(openings && openings.length > 0 ? { openings } : {}),
+		...(trackers && trackers.length > 0 ? { trackers } : {})
 	}
 });
 
 /** An idea's openings as a suggestion is told them: no ids, which mean nothing to the model. */
 type OpeningsDraft = Pick<IdeaOpening, 'label' | 'situation'>[];
+
+/** An idea's trackers as a suggestion is told them, likewise without ids. */
+type TrackersDraft = Omit<IdeaTracker, 'id'>[];
 
 /**
  * Chips for one field: a core or known one by name (`field`), or one the user
@@ -192,6 +199,7 @@ export async function suggestFill(input: {
 	parts?: PartsDraft;
 	named?: NamedFieldDraft[];
 	openings?: OpeningsDraft;
+	trackers?: TrackersDraft;
 	dials?: CharacterDials;
 	ideaDials?: IdeaDials;
 	context: SuggestContext;

@@ -301,3 +301,23 @@ describe('parseReply, drift', () => {
 		expect(block('x'.repeat(201))?.drifted).toBeUndefined();
 	});
 });
+
+describe('parseReply, trackers', () => {
+	it('hands back what the reply moved, by name and as written, and never as stored metadata', () => {
+		const parsed = parseReply(
+			`She kneels.\n<meta>\n${JSON.stringify({ suggestions: ['x'], directions: { add: [], remove: [] }, trackers: { Submission: 25 } })}\n</meta>`
+		);
+		expect(parsed.trackers).toEqual({ Submission: 25 });
+		expect(parsed.meta).not.toHaveProperty('trackers');
+	});
+
+	it('keeps them from a block the schema refused, and has none for a reply that moved none', () => {
+		const salvaged = parseReply(
+			`x\n<meta>\n${JSON.stringify({ suggestions: [7], trackers: { Rules: ['Kneel'] } })}\n</meta>`
+		);
+		expect(salvaged.trackers).toEqual({ Rules: ['Kneel'] });
+		expect(salvaged.meta).not.toHaveProperty('trackers');
+		expect(parseReply('x\n<meta>\n{"suggestions": []}\n</meta>')).not.toHaveProperty('trackers');
+		expect(parseReply('x')).not.toHaveProperty('trackers');
+	});
+});

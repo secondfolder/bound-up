@@ -12,8 +12,10 @@ import {
 	type Direction,
 	directionSchema,
 	type Reading,
-	readingSchema
+	readingSchema,
+	trackerValuesSchema
 } from '../sealed-kinds/daydreams';
+import type { TrackerValues } from './trackers';
 
 /**
  * Which turns go with a reply request, and in what shape.
@@ -136,7 +138,13 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 		 * which that request listed (`buttonsNote`). Absent for one written
 		 * while the scene was stopped, whose request listed none.
 		 */
-		buttons: z.array(directionSchema).max(MAX_DIRECTIONS).optional()
+		buttons: z.array(directionSchema).max(MAX_DIRECTIONS).optional(),
+		/**
+		 * A passage's: what the story kept track of when it was asked for,
+		 * which that request listed (`trackersNote`). Absent for an idea with
+		 * no trackers, and for one written while the scene was stopped.
+		 */
+		trackers: trackerValuesSchema.optional()
 	}),
 	/** The story before this was trimmed off (`trimContext`). Only ever first. */
 	z.object({ type: z.literal('omitted') }),
@@ -187,7 +195,8 @@ export function contextSize(turn: ContextTurn): number {
 						(turn.rewrite.quote?.length ?? 0) +
 						(turn.rewrite.instruction?.length ?? 0)
 					: 0) +
-				(turn.buttons ? JSON.stringify(turn.buttons).length : 0)
+				(turn.buttons ? JSON.stringify(turn.buttons).length : 0) +
+				(turn.trackers ? JSON.stringify(turn.trackers).length : 0)
 			);
 		case 'reaction':
 			return (turn.of?.length ?? 0) + 8;
@@ -246,9 +255,11 @@ export function toContextTurn(
 		buttons?: Direction[];
 		/** For a passage that rewrote another: the passage it rewrote, as it was sent. */
 		rewrote?: string;
+		/** A passage's trackers' values when it was asked for; undefined when none were listed. */
+		trackers?: TrackerValues;
 	} = {}
 ): ContextTurn | null {
-	const { readAs, buttons, rewrote } = about;
+	const { readAs, buttons, rewrote, trackers } = about;
 	const asUser = role === 'user';
 	switch (content.type) {
 		case 'text': {
@@ -275,7 +286,8 @@ export function toContextTurn(
 							}
 						}
 					: {}),
-				...(buttons && !asUser ? { buttons } : {})
+				...(buttons && !asUser ? { buttons } : {}),
+				...(trackers && !asUser ? { trackers } : {})
 			};
 		}
 		case 'direction':

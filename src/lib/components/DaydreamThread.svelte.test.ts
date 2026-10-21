@@ -2802,6 +2802,110 @@ describe('DaydreamThread openings', () => {
 	});
 });
 
+describe('DaydreamThread trackers', () => {
+	const Meter = '00000000-0000-4000-8000-0000000000f1';
+	const Rules = '00000000-0000-4000-8000-0000000000f2';
+	const tracking = testDaydreamSetup({
+		idea: testIdea({
+			trackers: [
+				{ id: Meter, name: 'Submission', kind: 'meter', start: '10', about: '' },
+				{ id: Rules, name: 'Rules in force', kind: 'list', start: 'Kneel', about: '' }
+			]
+		})
+	});
+	const readout = (container: HTMLElement) =>
+		container.querySelector('ul[aria-label="What the story keeps track of"]');
+	const passageMeta = (trackers?: Record<string, number | string[]>) => ({
+		suggestions: [],
+		directions: { add: [], remove: [] },
+		...(trackers ? { trackers } : {})
+	});
+
+	it('shows where they start, moves them as a reply says, and says what moved under the passage', async () => {
+		client.writeReply.mockResolvedValueOnce({
+			ok: true,
+			raw: '',
+			expansion: null,
+			reading: null,
+			passage: 'You kneel, and she nods.',
+			meta: passageMeta(),
+			trackers: { submission: 25, 'Rules in force': ['Kneel', 'Eyes down'], Trust: 9 }
+		});
+		opened.set('d1', tracking);
+		const { container } = render(DaydreamThread, {
+			daydream: daydreamKeeping([turn('t1', null, 'story', 'Kneel.')]),
+			available: true
+		});
+		await waitFor(() => expect(readout(container)?.textContent).toContain('10/100'));
+		expect(readout(container)?.textContent).toContain('Kneel');
+		await press(container, 'Continue');
+		await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't1', role: 'story' }));
+		// What it held, asked with; what it holds after, kept by id.
+		expect(asked(0)).toMatchObject({ currentTrackers: { [Meter]: 10, [Rules]: ['Kneel'] } });
+		expect(saved(0)?.content).toMatchObject({
+			meta: { trackers: { [Meter]: 25, [Rules]: ['Kneel', 'Eyes down'] } }
+		});
+		await waitFor(() => expect(readout(container)?.textContent).toContain('25/100'));
+		expect(readout(container)?.textContent).toContain('Eyes down');
+		await waitFor(() =>
+			expect(container.querySelector('li.tracker-note')?.textContent).toContain(
+				'Submission 10 → 25 · Rules in force: + Eyes down'
+			)
+		);
+	});
+
+	it('sends each passage with what they held when it was asked for, and what they hold now', async () => {
+		client.writeReply.mockResolvedValueOnce({
+			ok: true,
+			raw: '',
+			expansion: null,
+			reading: null,
+			passage: 'Again.',
+			meta: null
+		});
+		opened.set('d1', tracking);
+		const { container } = render(DaydreamThread, {
+			daydream: daydreamKeeping([
+				turn('t1', null, 'story', { type: 'text', text: 'Kneel.', meta: passageMeta() }),
+				turn('t2', 't1', 'story', {
+					type: 'text',
+					text: 'Lower.',
+					meta: passageMeta({ [Meter]: 30, [Rules]: ['Kneel'] })
+				})
+			]),
+			available: true
+		});
+		await press(container, 'Continue');
+		await waitFor(() => expect(asked(0)).toBeDefined());
+		const turns = (asked(0)?.turns ?? []) as { trackers?: unknown }[];
+		const start = { [Meter]: 10, [Rules]: ['Kneel'] };
+		expect(turns.map((each) => each.trackers)).toEqual([start, start]);
+		expect(asked(0)).toMatchObject({ currentTrackers: { [Meter]: 30, [Rules]: ['Kneel'] } });
+		// A reply that moved nothing keeps no values of its own.
+		await waitFor(() => expect(saved(0)).toBeDefined());
+		expect(saved(0)?.content).not.toHaveProperty('meta.trackers');
+	});
+
+	it('shows nothing, and sends nothing, for an idea that keeps track of nothing', async () => {
+		client.writeReply.mockResolvedValueOnce({
+			ok: true,
+			raw: '',
+			expansion: null,
+			reading: null,
+			passage: 'Again.',
+			meta: null
+		});
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Kneel.')]),
+			available: true
+		});
+		await press(container, 'Continue');
+		await waitFor(() => expect(asked(0)).toBeDefined());
+		expect(readout(container)).toBeNull();
+		expect(asked(0)).not.toHaveProperty('currentTrackers');
+	});
+});
+
 /** A daydream whose setup is whatever the test put in `opened` for it. */
 function daydreamKeeping(turns: DaydreamTurnView[]): DaydreamView {
 	const setup = opened.get('d1');

@@ -27,16 +27,18 @@ One value changed at a time; see baseline.md for the prompt itself.
 -
  # The user's limits
  
-@@ -34,16 +32,30 @@
+@@ -34,16 +32,37 @@
  # What to do
  
 -Fill in the character's empty fields — Type, Personality, How they talk, Appearance — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
-+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
++Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
  
 -Where it would make the character better, add a field or two it does not have yet, each named in a few words — like what they hide, what they won't do, how they are won over, a habit — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
 +Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
  
 +Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
++
++Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.
 +
 +Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
 +
@@ -60,16 +62,21 @@ One value changed at a time; see baseline.md for the prompt itself.
 +- "openings": other places its story can start; an empty list for a monologue
 +  - "label": a short name for where it starts
 +  - "situation": where the story picks up, in a sentence or two
++- "trackers": what the story keeps track of; an empty list for none
++  - "name": a short name
++  - "kind": one of "meter", "count", "list", "text"
++  - "start": where it starts: a number, a list's items separated by semicolons, or a line
++  - "about": what moves it, and what happens at either end
 +- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 +- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  - "fields": fields to add or fill, if any; an empty list for none
    - "label": the field's name, in a few words
-@@ -51,3 +63,3 @@
+@@ -51,3 +70,3 @@
    - "spoiler": true for a twist kept from the user, otherwise false
  
 -{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
-+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
++{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
 ~~~~
 

@@ -6,7 +6,9 @@ import {
 	type IdeaTextField,
 	MAX_DAYDREAM_CHARACTERS,
 	MAX_FIELDS,
-	MAX_OPENINGS
+	MAX_OPENINGS,
+	MAX_TRACKERS,
+	TRACKER_KINDS
 } from '$lib/daydream';
 import { CHARACTER_FIELD_LABELS, ideaFieldLabels } from '$lib/daydream/catalog';
 import {
@@ -134,6 +136,18 @@ const draftSchema = z.object({
 			})
 		)
 		.max(MAX_OPENINGS)
+		.optional(),
+	/** An idea's trackers so far (docs/daydreams.md, "Trackers"): only offered when it has none. */
+	trackers: z
+		.array(
+			z.object({
+				name: z.string().max(DAYDREAM_LIMITS.trackerName),
+				kind: z.enum(TRACKER_KINDS),
+				start: z.string().max(DAYDREAM_LIMITS.trackerStart),
+				about: z.string().max(DAYDREAM_LIMITS.trackerAbout)
+			})
+		)
+		.max(MAX_TRACKERS)
 		.optional()
 });
 
@@ -522,7 +536,7 @@ function describePart(part: { name: string; description: string }): string {
 
 /** What is written of the draft, tagged; its dials, which the form set, after it untagged. */
 function describeDraft(request: RecordRequest): string {
-	const { parts, fields: named, openings, ...draft } = request.draft;
+	const { parts, fields: named, openings, trackers, ...draft } = request.draft;
 	const written = [
 		...describeFields(request.target, keysFor(request.target), draft, request.context.narrator),
 		...describeNamed(named)
@@ -535,6 +549,11 @@ function describeDraft(request: RecordRequest): string {
 	if (request.target === 'idea' && openings && openings.length > 0) {
 		written.push(
 			`Where it can start:\n${openings.map((opening) => `- ${opening.label}: ${opening.situation}`).join('\n')}`
+		);
+	}
+	if (request.target === 'idea' && trackers && trackers.length > 0) {
+		written.push(
+			`What the story keeps track of:\n${trackers.map((tracker) => `- ${tracker.name} (${tracker.kind}${tracker.start ? `, starting at ${tracker.start}` : ''})${tracker.about ? `: ${tracker.about}` : ''}`).join('\n')}`
 		);
 	}
 	const dials: string[] = [];
@@ -631,6 +650,35 @@ const OPENINGS_KEY: AnswerKey = {
 	}
 };
 
+/**
+ * An idea's trackers (docs/daydreams.md, "Trackers"): what the user watches
+ * move as the story goes. Visible state that moves — a submission meter, the
+ * days kept, the rules in force — is what held the longest sessions on the
+ * character-card sites, but only where the idea is a progression: a tracker
+ * on a one-night idea is a number nothing moves, so none is the default.
+ */
+const TRACKERS_INSTRUCTION = `Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to ${MAX_TRACKERS} trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.`;
+
+const TRACKERS_KEY: AnswerKey = {
+	key: 'trackers',
+	says: 'what the story keeps track of; an empty list for none',
+	shape: {
+		each: [
+			textKey('name', 'a short name'),
+			{
+				key: 'kind',
+				says: `one of ${TRACKER_KINDS.map((kind) => `"${kind}"`).join(', ')}`,
+				shape: 'choice'
+			},
+			textKey(
+				'start',
+				"where it starts: a number, a list's items separated by semicolons, or a line"
+			),
+			textKey('about', 'what moves it, and what happens at either end')
+		]
+	}
+};
+
 const NEW_FIELDS_KEY: AnswerKey = {
 	key: 'fields',
 	says: 'fields to add or fill, if any; an empty list for none',
@@ -719,7 +767,13 @@ function chipsInstructions(request: RecordRequest): TaskInstructions {
 
 function fillInstructions(request: RecordRequest): TaskInstructions {
 	const monologue = request.target === 'idea' && isMonologue(request);
-	const { parts: _parts, fields: _named, openings: _openings, ...fieldsDraft } = request.draft;
+	const {
+		parts: _parts,
+		fields: _named,
+		openings: _openings,
+		trackers: _trackers,
+		...fieldsDraft
+	} = request.draft;
 	const draft: TextDraft = fieldsDraft;
 	// Only the fields the record has, besides its core: a known kind the user
 	// removed is not brought back, and one not added yet is the model's to
@@ -733,11 +787,14 @@ function fillInstructions(request: RecordRequest): TaskInstructions {
 	const wantsParts = request.target === 'idea' && !monologue && !request.draft.parts?.length;
 	// Likewise its openings, which a monologue, with no story to start, has none of.
 	const wantsOpenings = request.target === 'idea' && !monologue && !request.draft.openings?.length;
+	// And its trackers, for a story that is a progression (`TRACKERS_INSTRUCTION`).
+	const wantsTrackers = request.target === 'idea' && !monologue && !request.draft.trackers?.length;
 	const unrated = request.target === 'idea' ? unratedIdeaDials(request) : [];
 	const named = [
 		...empty.map((field) => fieldLabel(request.target, field, request.context.narrator)),
 		...(wantsParts ? ['the parts it has for characters'] : []),
 		...(wantsOpenings ? ['where its story can start'] : []),
+		...(wantsTrackers ? ['what its story keeps track of, if anything'] : []),
 		...unrated.map((key) => `its ${key}`)
 	];
 	return {
@@ -748,6 +805,7 @@ function fillInstructions(request: RecordRequest): TaskInstructions {
 				'Leave "setting" empty unless it is set somewhere in particular.',
 			wantsParts && PARTS_INSTRUCTION,
 			wantsOpenings && OPENINGS_INSTRUCTION,
+			wantsTrackers && TRACKERS_INSTRUCTION,
 			rateInstruction(unrated),
 			newFieldsInstruction(request.target)
 		),
@@ -757,6 +815,7 @@ function fillInstructions(request: RecordRequest): TaskInstructions {
 				: ideaFieldKeys(empty, monologue)),
 			...(wantsParts ? [PARTS_KEY] : []),
 			...(wantsOpenings ? [OPENINGS_KEY] : []),
+			...(wantsTrackers ? [TRACKERS_KEY] : []),
 			...unrated.map(ratingKey),
 			NEW_FIELDS_KEY
 		],
@@ -803,6 +862,7 @@ function surpriseInstructions(request: RecordRequest): TaskInstructions {
 			STORY_CRAFT,
 			`Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. ${PARTS_INSTRUCTION}`,
 			OPENINGS_INSTRUCTION,
+			TRACKERS_INSTRUCTION,
 			rateInstruction(unrated),
 			newFieldsInstruction('idea')
 		),
@@ -813,6 +873,7 @@ function surpriseInstructions(request: RecordRequest): TaskInstructions {
 			),
 			PARTS_KEY,
 			OPENINGS_KEY,
+			TRACKERS_KEY,
 			...unrated.map(ratingKey),
 			NEW_FIELDS_KEY
 		],
@@ -1406,6 +1467,7 @@ function daydreamAnswer(side: Side): AnswerKey[] {
 				ratingKey('kink'),
 				PARTS_KEY,
 				OPENINGS_KEY,
+				TRACKERS_KEY,
 				NEW_FIELDS_KEY
 			]
 		},
@@ -1453,6 +1515,7 @@ function daydreamInstructions(side: Side, keptVoice: boolean): string {
 			STORY_CRAFT,
 			STORY_IDEA,
 			OPENINGS_INSTRUCTION,
+			TRACKERS_INSTRUCTION,
 			STORY_CAST
 		),
 		section('If it is a monologue', monologueCraft(true), MONOLOGUE_IDEA, MONOLOGUE_CAST),

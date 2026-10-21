@@ -1548,6 +1548,50 @@
 			}
 		},
 		{
+			"id": "036d1890d6fb60",
+			"text": "# What the story keeps track of\nThe user sees these beside the story, and watches them move:\n<trackers>\n- ⟦tracker1.name⟧: a meter from 0 to 100, starting at 10 out of 100. ⟦tracker1.about⟧\n- ⟦tracker2.name⟧: a list, starting with \"⟦tracker2.start⟧\".\n</trackers>\nWhen the story moves one, say so in the reply's metadata as \"trackers\", by name, with only what changed — like {\"trackers\": {\"⟦tracker1.name⟧\": 15}}: a meter as a whole number from 0 to 100, a count as a whole number, a list as every item it holds now, a line of text as its new line. Move them a step at a time, as the passage earns it — not every passage for the sake of it, and never past what happened. What each holds now is at the end of the last message. When one reaches an end its description gives, let the story turn on it.",
+			"roles": [
+				"system"
+			],
+			"count": 5328,
+			"conditions": {
+				"narrator": [
+					"none",
+					"second-person",
+					"third-person",
+					"monologue"
+				],
+				"state": [
+					"opening-from"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"narrator": "none",
+				"stance": "self",
+				"characters": "1",
+				"lead": "character",
+				"heat": "unset",
+				"pictures": "none",
+				"state": "opening-from",
+				"kink": "unset",
+				"intensity": "3",
+				"pace": "3",
+				"length": "medium",
+				"text": "all",
+				"named": "none",
+				"origin": "none",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
 			"id": "1edbc24a483523",
 			"text": "(Begin the story. Open just before the moment it turns on — an arrival, a discovery, the moment itself, not a wind-up — and end on something the user must answer: a question put to them, an offer, a choice, a move made on them. Never end on a pose with nothing in it for them.)\nStart it here, where the user chose to begin — the premise is the idea's, this is where its story picks up:\n<opening>\n⟦opening.label⟧: ⟦opening.situation⟧\n</opening>",
 			"roles": [
@@ -1564,6 +1608,44 @@
 					"self",
 					"persona"
 				],
+				"state": [
+					"opening-from"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"narrator": "none",
+				"stance": "self",
+				"characters": "1",
+				"lead": "character",
+				"heat": "unset",
+				"pictures": "none",
+				"state": "opening-from",
+				"kink": "unset",
+				"intensity": "3",
+				"pace": "3",
+				"length": "medium",
+				"text": "all",
+				"named": "none",
+				"origin": "none",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "196c6e02be841a",
+			"text": "(What the story keeps track of now: ⟦tracker1.name⟧: 10 out of 100; ⟦tracker2.name⟧: \"⟦tracker2.start⟧\".)",
+			"roles": [
+				"user"
+			],
+			"count": 8208,
+			"conditions": {
 				"state": [
 					"opening-from"
 				]
@@ -13668,6 +13750,48 @@
 				"heat": "unset",
 				"pictures": "none",
 				"state": "opening",
+				"kink": "unset",
+				"intensity": "3",
+				"pace": "3",
+				"length": "medium",
+				"text": "all",
+				"named": "none",
+				"origin": "none",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "169fffe7dc6716",
+			"text": "# What the story keeps track of\nThe user sees these beside the story, and watches them move:\n<trackers>\n- ⟦tracker1.name⟧: a meter from 0 to 100, starting at 10 out of 100. ⟦tracker1.about⟧\n- ⟦tracker2.name⟧: a list, starting with \"⟦tracker2.start⟧\".\n</trackers>\nWhen the story moves one, say so in the reply's metadata as \"trackers\", by name, with only what changed — like {\"trackers\": {\"⟦tracker1.name⟧\": 15}}: a meter as a whole number from 0 to 100, a count as a whole number, a list as every item it holds now, a line of text as its new line. Move them a step at a time, as the passage earns it — not every passage for the sake of it, and never past what happened. What each holds now is at the end of the last message. When one reaches an end its description gives, let the story turn on it.\nA rule the system issues or lifts goes on or comes off the list that holds its rules, the moment it does.",
+			"roles": [
+				"system"
+			],
+			"count": 2880,
+			"conditions": {
+				"narrator": [
+					"impersonal",
+					"impersonal-governs"
+				],
+				"state": [
+					"opening-from"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"narrator": "impersonal",
+				"stance": "self",
+				"characters": "0",
+				"lead": "character",
+				"heat": "unset",
+				"pictures": "none",
+				"state": "opening-from",
 				"kink": "unset",
 				"intensity": "3",
 				"pace": "3",

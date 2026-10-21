@@ -30,7 +30,7 @@ No change.
 +
  No characters chosen yet.
  
-@@ -32,17 +34,14 @@
+@@ -32,19 +34,14 @@
  # What to do
  
 -Invent an idea for this story that the user will not expect.
@@ -53,9 +53,11 @@ No change.
  
 -Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
 -
+-Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.
+-
  Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
  
-@@ -53,15 +52,13 @@
+@@ -55,20 +52,13 @@
  Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
  
 -- "title": a short title
@@ -75,12 +77,17 @@ No change.
 -- "openings": other places its story can start; an empty list for a monologue
 -  - "label": a short name for where it starts
 -  - "situation": where the story picks up, in a sentence or two
+-- "trackers": what the story keeps track of; an empty list for none
+-  - "name": a short name
+-  - "kind": one of "meter", "count", "list", "text"
+-  - "start": where it starts: a number, a list's items separated by semicolons, or a line
+-  - "about": what moves it, and what happens at either end
  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
-@@ -71,3 +68,3 @@
+@@ -78,3 +68,3 @@
    - "spoiler": true for a twist kept from the user, otherwise false
  
--{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
 +{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
@@ -106,25 +113,25 @@ No change.
 +Invent an idea for this story that the user will not expect, fitting the idea's heat and kink set above.
  
  What makes a story worth starting — weigh these before you answer, without writing the weighing out:
-@@ -45,5 +48,5 @@
- Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
+@@ -47,5 +50,5 @@
+ Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.
  
 -Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
 +Rate the idea's kink too, from what is written: an idea that says nothing sexual is not sexual.
  
  Where it would make the idea better, add a field or two it does not have yet, each named in a few words — like a secret at its heart, a rule everyone follows, a twist — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
-@@ -64,5 +67,4 @@
-   - "label": a short name for where it starts
-   - "situation": where the story picks up, in a sentence or two
+@@ -71,5 +74,4 @@
+   - "start": where it starts: a number, a list's items separated by semicolons, or a line
+   - "about": what moves it, and what happens at either end
 -- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  - "fields": fields to add or fill, if any; an empty list for none
-@@ -71,3 +73,3 @@
+@@ -78,3 +80,3 @@
    - "spoiler": true for a twist kept from the user, otherwise false
  
--{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
-+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
++{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
 ~~~~
 
@@ -145,25 +152,25 @@ No change.
 +Invent an idea for this story that the user will not expect, fitting the idea's heat and kink set above.
  
  What makes a story worth starting — weigh these before you answer, without writing the weighing out:
-@@ -45,5 +47,5 @@
- Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
+@@ -47,5 +49,5 @@
+ Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.
  
 -Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
 +Rate the idea's heat too, from what is written: an idea that says nothing sexual is not sexual.
  
  Where it would make the idea better, add a field or two it does not have yet, each named in a few words — like a secret at its heart, a rule everyone follows, a twist — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
-@@ -65,5 +67,4 @@
-   - "situation": where the story picks up, in a sentence or two
+@@ -72,5 +74,4 @@
+   - "about": what moves it, and what happens at either end
  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 -- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  - "fields": fields to add or fill, if any; an empty list for none
    - "label": the field's name, in a few words
-@@ -71,3 +72,3 @@
+@@ -78,3 +79,3 @@
    - "spoiler": true for a twist kept from the user, otherwise false
  
--{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
-+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
++{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
 ~~~~
 
@@ -186,26 +193,26 @@ No change.
 +Invent an idea for this story that the user will not expect, fitting the idea's heat and kink set above.
  
  What makes a story worth starting — weigh these before you answer, without writing the weighing out:
-@@ -45,6 +49,4 @@
- Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
+@@ -47,6 +51,4 @@
+ Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.
  
 -Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
 -
  Where it would make the idea better, add a field or two it does not have yet, each named in a few words — like a secret at its heart, a rule everyone follows, a twist — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
  
-@@ -64,6 +66,4 @@
-   - "label": a short name for where it starts
-   - "situation": where the story picks up, in a sentence or two
+@@ -71,6 +73,4 @@
+   - "start": where it starts: a number, a list's items separated by semicolons, or a line
+   - "about": what moves it, and what happens at either end
 -- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 -- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  - "fields": fields to add or fill, if any; an empty list for none
    - "label": the field's name, in a few words
-@@ -71,3 +71,3 @@
+@@ -78,3 +78,3 @@
    - "spoiler": true for a twist kept from the user, otherwise false
  
--{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
-+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
++{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
 ~~~~
 

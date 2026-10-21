@@ -17,11 +17,14 @@
 		type IdeaOpening,
 		type IdeaOriginField,
 		type IdeaPart,
+		type IdeaTracker,
 		knownField,
 		MAX_DAYDREAM_CHARACTERS,
 		MAX_OPENINGS,
+		MAX_TRACKERS,
 		namedFields,
-		newIdeaFields
+		newIdeaFields,
+		TRACKER_KINDS
 	} from '$lib/daydream';
 	import {
 		IDEA_CHIPS,
@@ -305,6 +308,59 @@
 		};
 	}
 
+	// ── trackers ─────────────────────────────────────────────────────────────
+
+	/** Each kind as the picker names it, and what its start box asks for. */
+	const TRACKER_KIND_LABELS: Record<
+		IdeaTracker['kind'],
+		{ label: string; start: string; placeholder: string }
+	> = {
+		meter: { label: 'A meter, 0 to 100', start: 'Starts at', placeholder: '0' },
+		count: { label: 'A count', start: 'Starts at', placeholder: '0' },
+		list: { label: 'A list', start: 'Starts with', placeholder: 'Kneel when spoken to; Eyes down' },
+		text: { label: 'A line of text', start: 'Starts as', placeholder: 'Wary' }
+	};
+
+	function addTracker() {
+		$form.trackers = [
+			...$form.trackers,
+			{ id: crypto.randomUUID(), name: '', kind: 'meter', start: '', about: '' }
+		];
+	}
+
+	function setTracker(index: number, patch: Partial<IdeaTracker>) {
+		$form.trackers = $form.trackers.map((tracker, at) =>
+			at === index ? { ...tracker, ...patch } : tracker
+		);
+	}
+
+	function removeTracker(index: number) {
+		$form.trackers = $form.trackers.filter((_, at) => at !== index);
+	}
+
+	/** A tracker's text box, wired by hand for the reason `partField` gives. */
+	function trackerField(index: number, key: 'name' | 'start' | 'about') {
+		return (node: HTMLElement & { value: string }) => {
+			const update = () => setTracker(index, { [key]: node.value });
+			node.addEventListener('input', update);
+			return () => node.removeEventListener('input', update);
+		};
+	}
+
+	/** A tracker's kind, from its picker, which says so with `change`. */
+	function trackerKind(index: number) {
+		return (node: HTMLElement & { value: string }) => {
+			const update = () => {
+				const kind = TRACKER_KINDS.find((candidate) => candidate === node.value);
+				if (kind) {
+					setTracker(index, { kind });
+				}
+			};
+			node.addEventListener('change', update);
+			return () => node.removeEventListener('change', update);
+		};
+	}
+
 	let thinking = $state(false);
 
 	/** A whole idea from the model, in place of what is in the form. */
@@ -345,6 +401,9 @@
 			openings: $form.openings
 				.filter((opening) => opening.label.trim() && opening.situation.trim())
 				.map(({ label, situation }) => ({ label, situation })),
+			trackers: $form.trackers
+				.filter((tracker) => tracker.name.trim())
+				.map(({ id: _id, ...tracker }) => tracker),
 			ideaDials: $form.dials,
 			context
 		});
@@ -607,6 +666,57 @@
 			{/if}
 		</fieldset>
 
+		<fieldset class="parts">
+			<legend>What the story keeps track of</legend>
+			<p class="hint">
+				Things you watch move as it goes — how far she’s given in, the days kept, the rules in force —
+				shown above the buttons. Optional: the story moves them, and you can ask it to.
+			</p>
+			{#each $form.trackers as tracker, index (tracker.id)}
+				{const kind = $derived(TRACKER_KIND_LABELS[tracker.kind])}
+				<div class="tracker">
+					<wa-input
+						{@attach trackerField(index, 'name')}
+						label={`Tracker ${index + 1}`}
+						placeholder="Submission"
+						value={tracker.name}
+						maxlength={DAYDREAM_LIMITS.trackerName}
+					></wa-input>
+					<wa-select {@attach trackerKind(index)} label="Kind" value={tracker.kind}>
+						{#each Object.entries(TRACKER_KIND_LABELS) as [value, about] (value)}
+							<wa-option {value}>{about.label}</wa-option>
+						{/each}
+					</wa-select>
+					<wa-input
+						{@attach trackerField(index, 'start')}
+						label={kind.start}
+						placeholder={kind.placeholder}
+						value={tracker.start}
+						maxlength={DAYDREAM_LIMITS.trackerStart}
+					></wa-input>
+					<wa-button size="s" appearance="plain" onclick={() => removeTracker(index)}>
+						<wa-icon name="xmark" variant="solid" label={`Remove ${tracker.name || `tracker ${index + 1}`}`}></wa-icon>
+					</wa-button>
+					<wa-textarea
+						{@attach trackerField(index, 'about')}
+						class="about"
+						label="What moves it"
+						placeholder="Rises each time she obeys. At 100 she’s yours."
+						rows="2"
+						value={tracker.about}
+						maxlength={DAYDREAM_LIMITS.trackerAbout}
+					></wa-textarea>
+				</div>
+				{#if $errors.trackers?.[index]?.name}<span class="invalid">{$errors.trackers[index].name}</span>{/if}
+			{/each}
+			{#if $form.trackers.length < MAX_TRACKERS}
+				<wa-button class="add-part" size="s" appearance="outlined" onclick={addTracker}>
+					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+					Add something to keep track of
+				</wa-button>
+			{/if}
+		</fieldset>
+
 		<wa-details bind:this={detail} summary="More detail" class="detail" {@attach startOpen(startsDetailed)}>
 			{@render textField('yourRole')}
 			<!-- No chips: these are what was asked for and found, not ideas to pick from. -->
@@ -747,6 +857,23 @@
 
 		wa-textarea {
 			flex: 2 1 14rem;
+		}
+	}
+
+	/* A tracker: its name, kind and start on a row, and what moves it under them. */
+	.tracker {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: end;
+		gap: 0.5rem;
+
+		wa-input,
+		wa-select {
+			flex: 1 1 7rem;
+		}
+
+		.about {
+			flex: 1 1 100%;
 		}
 	}
 

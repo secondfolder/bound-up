@@ -283,6 +283,30 @@ describe('buildSuggestMessages, for idea parts', () => {
 		expect(withParts).toContain('- the boss: runs it');
 	});
 
+	it('asks for trackers with a surprise idea, and when filling one with none, never over ones it has', () => {
+		expect(
+			asks({
+				task: 'surprise-idea',
+				target: 'idea',
+				draft: {},
+				context: { characters: [], limits: '' }
+			})
+		).toContain('"trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …]');
+		const idea = (trackers?: { name: string; kind: 'meter'; start: string; about: string }[]) =>
+			asks({
+				task: 'fill',
+				target: 'idea',
+				draft: { title: 'Kept', ...(trackers ? { trackers } : {}) },
+				context: { characters: [], limits: '' }
+			});
+		expect(idea()).toContain('Where the idea is a progression');
+		const kept = idea([
+			{ name: 'Submission', kind: 'meter', start: '10', about: 'Rises as she obeys' }
+		]);
+		expect(kept).not.toContain('"trackers"');
+		expect(kept).toContain('- Submission (meter, starting at 10): Rises as she obeys');
+	});
+
 	it('calls the user’s part in a story their role, apart from the parts characters play', () => {
 		const ask = asks({
 			task: 'fill',

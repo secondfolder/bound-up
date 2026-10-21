@@ -781,6 +781,11 @@ export const trackerValueSchema = z.union([
 	z.array(z.string().trim().min(1).max(DAYDREAM_LIMITS.trackerItem)).max(20)
 ]);
 
+/** Every tracker's value at one point in the story, by tracker id (`TrackerValues`). */
+export const trackerValuesSchema = z
+	.record(clientId, trackerValueSchema)
+	.refine((values) => Object.keys(values).length <= MAX_TRACKERS, 'Too many trackers');
+
 /**
  * v9's: an opening passage says which of the idea's openings it was written
  * from, as it read then (`opening`), so the history sends its request again
@@ -796,10 +801,7 @@ export const passageMetaV9 = passageMetaV8.extend({
 			situation: required(DAYDREAM_LIMITS.openingSituation)
 		})
 		.optional(),
-	trackers: z
-		.record(clientId, trackerValueSchema)
-		.refine((values) => Object.keys(values).length <= MAX_TRACKERS, 'Too many trackers')
-		.optional()
+	trackers: trackerValuesSchema.optional()
 });
 
 /** A passage's meta as the latest turn version stores it (`passageMetaV9`). */

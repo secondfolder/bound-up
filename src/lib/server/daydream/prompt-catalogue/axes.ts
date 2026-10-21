@@ -119,7 +119,8 @@ export const BUILDERS: readonly Builder[] = [
 				'state',
 				'Request',
 				'structural',
-				// "opening-from": the first passage from one of the idea's openings.
+				// "opening-from": the first passage from one of the idea's openings,
+				// for an idea with trackers too.
 				values('opening', 'opening-from', 'reply', 'rewrite', 'again', 'stopped'),
 				'reply'
 			),

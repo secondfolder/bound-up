@@ -163,6 +163,14 @@ export type ParsedReply = {
 	meta: PassageMeta | null;
 	expansion: string | null;
 	reading: Reading | null;
+	/**
+	 * What the reply moved of what the story keeps track of, by tracker name,
+	 * exactly as the model wrote it; absent when it moved nothing. The page
+	 * reads it against the idea's trackers (`applyTrackerChanges`) and stores
+	 * the result on the passage by tracker id, which is not this shape, so it
+	 * is kept out of `meta`.
+	 */
+	trackers?: unknown;
 };
 
 /**
@@ -182,11 +190,26 @@ export function parseReply(full: string): ParsedReply {
 	const after = rest.slice(at + OPEN.length);
 	const end = after.indexOf(CLOSE);
 	const body = (end === -1 ? after : after.slice(0, end)).trim();
-	return { passage, meta: parseMeta(body), expansion, reading };
+	const value = parseJsonLeniently(unfence(body));
+	const trackers =
+		value && typeof value === 'object' && !Array.isArray(value) && 'trackers' in value
+			? value.trackers
+			: undefined;
+	return {
+		passage,
+		meta: parseMeta(value),
+		expansion,
+		reading,
+		...(trackers === undefined ? {} : { trackers })
+	};
 }
 
-function parseMeta(body: string): PassageMeta | null {
-	const value = parseJsonLeniently(unfence(body));
+/**
+ * The block's metadata. Read with v8's schema, which strips what it does not
+ * know: a v9 passage's `opening` and `trackers` are the page's to write,
+ * never the model's.
+ */
+function parseMeta(value: unknown): PassageMeta | null {
 	if (value === undefined) {
 		return null;
 	}

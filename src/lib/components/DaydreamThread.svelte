@@ -34,6 +34,8 @@
 	import DaydreamSafety from './DaydreamSafety.svelte';
 	import DaydreamSettingsNote from './DaydreamSettingsNote.svelte';
 	import DaydreamSuggestions from './DaydreamSuggestions.svelte';
+	import DaydreamTrackerNote from './DaydreamTrackerNote.svelte';
+	import DaydreamTrackers from './DaydreamTrackers.svelte';
 	import DaydreamUserTurn from './DaydreamUserTurn.svelte';
 	import MessageComposer from './MessageComposer.svelte';
 
@@ -545,6 +547,7 @@
 					}}
 				/>
 				<DaydreamSettingsNote {story} turnId={node.id} />
+				<DaydreamTrackerNote {story} turnId={node.id} />
 				{#if story.driftOfferId === node.id && available && !busy}
 					<DaydreamDriftNote {story} turnId={node.id} {debug} />
 				{/if}
@@ -598,6 +601,7 @@
 
 	{#if available}
 		<div class="compose">
+			<DaydreamTrackers {story} />
 			<DaydreamSafety {story}>
 				{#if busy}
 					<wa-button size="s" appearance="outlined" onclick={() => story.stop()}>

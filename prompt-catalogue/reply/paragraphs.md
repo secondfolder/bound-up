@@ -1,6 +1,6 @@
 # Story reply: every paragraph
 
-584 distinct paragraphs, from 29430 distinct prompts
+587 distinct paragraphs, from 29430 distinct prompts
 over 49248 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -276,6 +276,20 @@ The parts in it:
 The characters lead: they set the pace, give instructions and make the decisions.
 ~~~~
 
+## ¶ 036d1890d6fb60 · system · in 5328 of 49248
+
+Only when narrator ∈ {none, second-person, third-person, monologue}; state ∈ {opening-from}.
+
+~~~~text
+# What the story keeps track of
+The user sees these beside the story, and watches them move:
+<trackers>
+- ⟦tracker1.name⟧: a meter from 0 to 100, starting at 10 out of 100. ⟦tracker1.about⟧
+- ⟦tracker2.name⟧: a list, starting with "⟦tracker2.start⟧".
+</trackers>
+When the story moves one, say so in the reply's metadata as "trackers", by name, with only what changed — like {"trackers": {"⟦tracker1.name⟧": 15}}: a meter as a whole number from 0 to 100, a count as a whole number, a list as every item it holds now, a line of text as its new line. Move them a step at a time, as the passage earns it — not every passage for the sake of it, and never past what happened. What each holds now is at the end of the last message. When one reaches an end its description gives, let the story turn on it.
+~~~~
+
 ## ¶ 1edbc24a483523 · user · in 3168 of 49248
 
 Only when narrator ∈ {none, second-person, third-person}; stance ∈ {self, persona}; state ∈ {opening-from}.
@@ -286,6 +300,14 @@ Start it here, where the user chose to begin — the premise is the idea's, this
 <opening>
 ⟦opening.label⟧: ⟦opening.situation⟧
 </opening>
+~~~~
+
+## ¶ 196c6e02be841a · user · in 8208 of 49248
+
+Only when state ∈ {opening-from}.
+
+~~~~text
+(What the story keeps track of now: ⟦tracker1.name⟧: 10 out of 100; ⟦tracker2.name⟧: "⟦tracker2.start⟧".)
 ~~~~
 
 ## ¶ 08f4880f821923 · user · in 32832 of 49248
@@ -4559,6 +4581,21 @@ Only when narrator ∈ {impersonal}; stance ∈ {self, persona}; state ∈ {open
 
 ~~~~text
 (Begin. Open with the first notice or rules the system issues — not a description of a scene — and end where the user must respond.)
+~~~~
+
+## ¶ 169fffe7dc6716 · system · in 2880 of 49248
+
+Only when narrator ∈ {impersonal, impersonal-governs}; state ∈ {opening-from}.
+
+~~~~text
+# What the story keeps track of
+The user sees these beside the story, and watches them move:
+<trackers>
+- ⟦tracker1.name⟧: a meter from 0 to 100, starting at 10 out of 100. ⟦tracker1.about⟧
+- ⟦tracker2.name⟧: a list, starting with "⟦tracker2.start⟧".
+</trackers>
+When the story moves one, say so in the reply's metadata as "trackers", by name, with only what changed — like {"trackers": {"⟦tracker1.name⟧": 15}}: a meter as a whole number from 0 to 100, a count as a whole number, a list as every item it holds now, a line of text as its new line. Move them a step at a time, as the passage earns it — not every passage for the sake of it, and never past what happened. What each holds now is at the end of the last message. When one reaches an end its description gives, let the story turn on it.
+A rule the system issues or lifts goes on or comes off the list that holds its rules, the moment it does.
 ~~~~
 
 ## ¶ 05f8e060961e91 · user · in 1152 of 49248

@@ -93,6 +93,29 @@ const STORY_PART_ID = '00000000-0000-4000-8000-0000000000a9';
 /** The idea's field the user named (the `named` axis). */
 const NAMED_FIELD_ID = '00000000-0000-4000-8000-0000000000b1';
 
+/** The trackers an idea has in the `opening-from` state: a meter and a list, which read differently. */
+const METER_ID = '00000000-0000-4000-8000-0000000000c1';
+const LIST_ID = '00000000-0000-4000-8000-0000000000c2';
+
+function trackers(text: TextSource): DaydreamIdeaCopy['trackers'] {
+	return [
+		{
+			id: METER_ID,
+			name: text('tracker1.name'),
+			kind: 'meter',
+			start: '10',
+			about: text('tracker1.about')
+		},
+		{
+			id: LIST_ID,
+			name: text('tracker2.name'),
+			kind: 'list',
+			start: text('tracker2.start'),
+			about: ''
+		}
+	];
+}
+
 const dial = (value: string | undefined): DialValue | null =>
 	value === undefined || value === 'unset' ? null : (Number(value) as DialValue);
 
@@ -188,7 +211,10 @@ function idea(text: TextSource, combo: Combo, characterCount: number): DaydreamI
 				: [])
 		],
 		openings: [],
-		trackers: [],
+		// What the story keeps track of, in the request state that shows it:
+		// with an opening, since a state of its own for them doubled the
+		// reply prompts and the export ran out of memory.
+		trackers: combo.state === 'opening-from' ? trackers(text) : [],
 		dials: { heat: dial(combo.heat), kink: dial(combo.kink) }
 	};
 }
@@ -299,14 +325,16 @@ export function replyInput(combo: Combo, text: TextSource): ReplyInput {
 	switch (combo.state) {
 		case 'opening':
 			return { request: { ...base, mode: 'opening', turns: [] }, pictures };
-		// The first passage from one of the idea's openings, rather than its premise.
+		// The first passage from one of the idea's openings, rather than its
+		// premise, for an idea with trackers too (`trackers`).
 		case 'opening-from':
 			return {
 				request: {
 					...base,
 					mode: 'opening',
 					turns: [],
-					opening: { label: text('opening.label'), situation: text('opening.situation') }
+					opening: { label: text('opening.label'), situation: text('opening.situation') },
+					currentTrackers: { [METER_ID]: 10, [LIST_ID]: [text('tracker2.start')] }
 				},
 				pictures
 			};

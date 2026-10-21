@@ -1288,8 +1288,8 @@
 			}
 		},
 		{
-			"id": "0d084425f70daa",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "17e21464054fb2",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -1414,6 +1414,44 @@
 			}
 		},
 		{
+			"id": "0e65f851f236f4",
+			"text": "Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind (\"meter\" from 0 to 100, \"count\", \"list\" or \"text\"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.",
+			"roles": [
+				"user"
+			],
+			"count": 160,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
 			"id": "0d8a5339d99fe0",
 			"text": "Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.",
 			"roles": [
@@ -1479,8 +1517,8 @@
 			}
 		},
 		{
-			"id": "1f80d9bca575f7",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "13c024d79b7574",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -1526,8 +1564,8 @@
 			}
 		},
 		{
-			"id": "1c4c39cedc6de4",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1717e763cbe966",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -1607,8 +1645,8 @@
 			}
 		},
 		{
-			"id": "161c093dd0be85",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "1e42a5c504fd80",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -1688,8 +1726,8 @@
 			}
 		},
 		{
-			"id": "0a981f3749c0db",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "0bb63942325296",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -1735,8 +1773,8 @@
 			}
 		},
 		{
-			"id": "0d851f608b6f36",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1a87e5bcc0e702",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -1816,8 +1854,8 @@
 			}
 		},
 		{
-			"id": "061a7912fda37e",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "07cdd3f09e42cf",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -1897,8 +1935,8 @@
 			}
 		},
 		{
-			"id": "19b976a3d58fb3",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "06ec7e68a4e407",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -1944,8 +1982,8 @@
 			}
 		},
 		{
-			"id": "00baaad53816e1",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "0bda3d5f5f6ff2",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -1991,8 +2029,8 @@
 			}
 		},
 		{
-			"id": "0d614340ef63dc",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "0f5b19d8afdb07",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -2038,8 +2076,8 @@
 			}
 		},
 		{
-			"id": "116a29600f9ac8",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "10d5c9955d80c9",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -2085,8 +2123,8 @@
 			}
 		},
 		{
-			"id": "0dce518d097a4e",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1b85a80fc1c8bf",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -2169,8 +2207,8 @@
 			}
 		},
 		{
-			"id": "07685ad76e57e8",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "02c2ba374d7ebd",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, what its story keeps track of, if anything, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -2216,8 +2254,8 @@
 			}
 		},
 		{
-			"id": "1589a619597a36",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "0d13a2bbbb67ff",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -2263,8 +2301,8 @@
 			}
 		},
 		{
-			"id": "0850e575f05b44",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1c446e1a473cae",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -2310,8 +2348,8 @@
 			}
 		},
 		{
-			"id": "11e84ba5ea4f1f",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "1e1966e33c0158",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, what its story keeps track of, if anything, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -2357,8 +2395,8 @@
 			}
 		},
 		{
-			"id": "0dc8761abd10aa",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "0156488975f973",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -2404,8 +2442,8 @@
 			}
 		},
 		{
-			"id": "14654b421dac2f",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "01973d0523299d",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -2451,8 +2489,8 @@
 			}
 		},
 		{
-			"id": "079222257edf50",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "0d676c418b4859",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, what its story keeps track of, if anything, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -2498,8 +2536,8 @@
 			}
 		},
 		{
-			"id": "0db44e8604e29e",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "06e9d95cce0aa5",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -2545,8 +2583,8 @@
 			}
 		},
 		{
-			"id": "1800ad43692293",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "18d24c7fb37cd6",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -2592,8 +2630,8 @@
 			}
 		},
 		{
-			"id": "17a625f1c58ba6",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "14a43e1621fd6c",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, what its story keeps track of, if anything — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -2639,8 +2677,8 @@
 			}
 		},
 		{
-			"id": "1baf7d04060155",
-			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "17f3844c9985aa",
+			"text": "- \"setting\": where it happens\n- \"premise\": what is going on as it starts\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -2686,8 +2724,8 @@
 			}
 		},
 		{
-			"id": "00523422e7e121",
-			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "0847ea7b63aa31",
+			"text": "{\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -2770,8 +2808,8 @@
 			}
 		},
 		{
-			"id": "09b52743d27e8e",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "05e27b9ca15b76",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -2817,8 +2855,8 @@
 			}
 		},
 		{
-			"id": "04f4f4ad781ce1",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "1f5b5a7eb957c9",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -2864,8 +2902,8 @@
 			}
 		},
 		{
-			"id": "041bb13ea0bbf3",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "0c6663d67bc6ef",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -2911,8 +2949,8 @@
 			}
 		},
 		{
-			"id": "1c5c6bccbcee78",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "00623e3fa410bc",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -2958,8 +2996,8 @@
 			}
 		},
 		{
-			"id": "1b30c2ed41ef84",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "058a284fa89076",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -3005,8 +3043,8 @@
 			}
 		},
 		{
-			"id": "09f4c57d524e57",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1c0baade75ad67",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -3052,8 +3090,8 @@
 			}
 		},
 		{
-			"id": "18ce73fac23ebf",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "1f0c62d64fba37",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3099,8 +3137,8 @@
 			}
 		},
 		{
-			"id": "13c7e3f7e03ba4",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "076c10154088ff",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -3146,8 +3184,8 @@
 			}
 		},
 		{
-			"id": "01de3c854b8410",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1c1c93f0d88f19",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -3193,8 +3231,8 @@
 			}
 		},
 		{
-			"id": "1fd2c41e127b81",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "0003a64f4257d9",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, what its story keeps track of, if anything — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3240,8 +3278,8 @@
 			}
 		},
 		{
-			"id": "157b3d6d4137cd",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "0d3b1bb284ac89",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -3287,8 +3325,8 @@
 			}
 		},
 		{
-			"id": "13226da2db497b",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "186bf14ef35148",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}, …], \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -3371,8 +3409,8 @@
 			}
 		},
 		{
-			"id": "04023b04f8ddb5",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "092f1f10bad659",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, what its story keeps track of, if anything, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3418,8 +3456,8 @@
 			}
 		},
 		{
-			"id": "0d334283da3aa6",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "02a7b9b2e4d4c4",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -3465,8 +3503,8 @@
 			}
 		},
 		{
-			"id": "0f8963bb417f62",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "02515587d91612",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -3512,8 +3550,8 @@
 			}
 		},
 		{
-			"id": "0213688cd23795",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "1b04d492f788f7",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, what its story keeps track of, if anything, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3559,8 +3597,8 @@
 			}
 		},
 		{
-			"id": "09aec02adf7730",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "13f197a16f362a",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -3606,8 +3644,8 @@
 			}
 		},
 		{
-			"id": "0fde2665e5d5b0",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1c19e38330f004",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"kink\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -3653,8 +3691,8 @@
 			}
 		},
 		{
-			"id": "1f186251af964c",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "0efc1c8a818ab5",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, what its story keeps track of, if anything, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3700,8 +3738,8 @@
 			}
 		},
 		{
-			"id": "0d1788c41a4b0f",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "058d10bc576621",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -3747,8 +3785,8 @@
 			}
 		},
 		{
-			"id": "140d8aced5f409",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1f589df7973d84",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"heat\": …, \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],
@@ -3794,8 +3832,8 @@
 			}
 		},
 		{
-			"id": "1d1aaf34ec8983",
-			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
+			"id": "17b96eac57be02",
+			"text": "Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, what its story keeps track of, if anything — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3841,8 +3879,8 @@
 			}
 		},
 		{
-			"id": "1fc4d509a3c1d6",
-			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
+			"id": "0cf27ca396dc3c",
+			"text": "- \"setting\": where it happens\n- \"yourRole\": who the user is in it\n- \"tone\": how it should feel\n- \"openings\": other places its story can start; an empty list for a monologue\n  - \"label\": a short name for where it starts\n  - \"situation\": where the story picks up, in a sentence or two\n- \"trackers\": what the story keeps track of; an empty list for none\n  - \"name\": a short name\n  - \"kind\": one of \"meter\", \"count\", \"list\", \"text\"\n  - \"start\": where it starts: a number, a list's items separated by semicolons, or a line\n  - \"about\": what moves it, and what happens at either end\n- \"fields\": fields to add or fill, if any; an empty list for none\n  - \"label\": the field's name, in a few words\n  - \"value\": what it says\n  - \"spoiler\": true for a twist kept from the user, otherwise false",
 			"roles": [
 				"user"
 			],
@@ -3888,8 +3926,8 @@
 			}
 		},
 		{
-			"id": "1a954476aad477",
-			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
+			"id": "1b7dde049312e5",
+			"text": "{\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"openings\": [{\"label\": \"…\", \"situation\": \"…\"}, …], \"trackers\": [{\"name\": \"…\", \"kind\": \"…\", \"start\": \"…\", \"about\": \"…\"}, …], \"fields\": [{\"label\": \"…\", \"value\": \"…\", \"spoiler\": …}, …]}",
 			"roles": [
 				"user"
 			],

@@ -4,7 +4,7 @@ import { userEvent } from 'vitest/browser';
 import { MAX_DAYDREAM_CHARACTERS } from '$lib/daydream';
 import { testIdea } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
-import { waSettled } from '$lib/testing/web-awesome';
+import { waProp, waSettled } from '$lib/testing/web-awesome';
 import { isClientId } from '$lib/vault';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
@@ -221,6 +221,53 @@ describe('DaydreamIdeaDialog', () => {
 		const [opening] = saved[0].openings;
 		expect(opening).toMatchObject({ label: 'Three weeks in', situation: 'The door is locked.' });
 		expect(isClientId(opening?.id)).toBe(true);
+	});
+
+	it('writes what its story keeps track of, of the kind chosen, and saves it', async () => {
+		const onsaved = vi.fn();
+		const { baseElement } = renderDialog({
+			idea: testIdea({ title: 'Kept', premise: 'A training.' }),
+			onsaved
+		});
+		await waSettled(baseElement);
+		button(baseElement, 'Add something to keep track of')?.click();
+		await waitFor(() => expect(baseElement.querySelector('.tracker')).not.toBeNull());
+		await waSettled(baseElement);
+		const row = baseElement.querySelector('.tracker') as HTMLElement;
+		const [name, start] = [...row.querySelectorAll('wa-input')].map((input) =>
+			input.shadowRoot?.querySelector('input')
+		);
+		const about = row.querySelector('wa-textarea')?.shadowRoot?.querySelector('textarea');
+		await userEvent.type(defined(name, 'its name'), 'Rules in force');
+		const kind = defined(row.querySelector('wa-select'), 'its kind') as HTMLElement & {
+			value: string;
+		};
+		kind.value = 'list';
+		kind.dispatchEvent(new Event('change'));
+		await waSettled(baseElement);
+		// The start asks for what a list starts with.
+		await waitFor(() =>
+			expect(waProp(row.querySelectorAll('wa-input')[1] as HTMLElement, 'label')).toBe(
+				'Starts with'
+			)
+		);
+		await userEvent.type(defined(start, 'where it starts'), 'Kneel');
+		await userEvent.type(defined(about, 'what moves it'), 'A rule for every slip.');
+		await waSettled(baseElement);
+		button(baseElement, 'Save changes')?.click();
+
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		const saved = defined(onsaved.mock.calls[0], 'the saved idea') as [
+			{ trackers: { id: string }[] }
+		];
+		const [tracker] = saved[0].trackers;
+		expect(tracker).toMatchObject({
+			name: 'Rules in force',
+			kind: 'list',
+			start: 'Kneel',
+			about: 'A rule for every slip.'
+		});
+		expect(isClientId(tracker?.id)).toBe(true);
 	});
 
 	it('takes the model’s parts only for an idea that had none', async () => {

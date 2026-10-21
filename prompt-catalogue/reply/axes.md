@@ -708,7 +708,20 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 ### state = opening-from
 
 ~~~~diff
-@@ -128,116 +128,9 @@
+@@ -119,4 +119,12 @@
+ The characters lead: they set the pace, give instructions and make the decisions.
+ 
++# What the story keeps track of
++The user sees these beside the story, and watches them move:
++<trackers>
++- ⟦tracker1.name⟧: a meter from 0 to 100, starting at 10 out of 100. ⟦tracker1.about⟧
++- ⟦tracker2.name⟧: a list, starting with "⟦tracker2.start⟧".
++</trackers>
++When the story moves one, say so in the reply's metadata as "trackers", by name, with only what changed — like {"trackers": {"⟦tracker1.name⟧": 15}}: a meter as a whole number from 0 to 100, a count as a whole number, a list as every item it holds now, a line of text as its new line. Move them a step at a time, as the passage earns it — not every passage for the sake of it, and never past what happened. What each holds now is at the end of the last message. When one reaches an end its description gives, let the story turn on it.
++
+ # The user's limits, which must never be crossed
+ None stated beyond the rules above.
+@@ -128,116 +136,11 @@
  
  ===== 2. user =====
 -(The story so far is long, so it starts partway through here.)
@@ -718,8 +731,8 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 +⟦opening.label⟧: ⟦opening.situation⟧
 +</opening>
  
--(Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
--
+ (Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
+ 
 -===== 3. assistant =====
 -⟦turn.story1⟧
 -<meta>
@@ -829,7 +842,9 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 -===== 30. user =====
 -⟦turn.user7⟧
 -
- (Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
+-(Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
+\ No newline at end of file
++(What the story keeps track of now: ⟦tracker1.name⟧: 10 out of 100; ⟦tracker2.name⟧: "⟦tracker2.start⟧".)
 \ No newline at end of file
 ~~~~
 

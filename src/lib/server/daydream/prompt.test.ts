@@ -328,6 +328,119 @@ describe('buildMessages', () => {
 		expect(messages.some((message) => message.content.includes('on screen now'))).toBe(false);
 	});
 
+	describe('trackers', () => {
+		const Meter = '00000000-0000-4000-8000-0000000000f1';
+		const RulesList = '00000000-0000-4000-8000-0000000000f2';
+		const tracked = testDaydreamSetup({
+			characters: [testCharacter()],
+			idea: testIdea({
+				trackers: [
+					{
+						id: Meter,
+						name: 'Submission',
+						kind: 'meter',
+						start: '10',
+						about: 'Rises each time she obeys.'
+					},
+					{ id: RulesList, name: 'Rules in force', kind: 'list', start: 'Kneel', about: '' }
+				]
+			})
+		});
+		const held = (meter: number, rules: string[]) => ({ [Meter]: meter, [RulesList]: rules });
+		const Note = 'What the story keeps track of now';
+
+		it('describes them in the setup, with how to move them, and says what they hold now at the end', () => {
+			const messages = buildMessages(
+				request({
+					setup: tracked,
+					turns: [said('I kneel.')],
+					currentTrackers: held(25, ['Kneel', 'Eyes down'])
+				})
+			);
+			const content = system(messages);
+			expect(content).toContain(
+				'<trackers>\n- Submission: a meter from 0 to 100, starting at 10 out of 100. Rises each time she obeys.\n- Rules in force: a list, starting with "Kneel".\n</trackers>'
+			);
+			expect(content).toContain('{"trackers": {"Submission": 15}}');
+			// After the setup's own line, so the general half stays shared.
+			expect(content.indexOf('# What the story keeps track of')).toBeGreaterThan(
+				content.indexOf('# This daydream')
+			);
+			expect(messages.at(-1)?.content).toMatch(
+				/\(Direction buttons on screen now: none yet\.\)\n\n\(What the story keeps track of now: Submission: 25 out of 100; Rules in force: "Kneel", "Eyes down"\.\)$/
+			);
+		});
+
+		it('says nothing of them for an idea with none, or a stopped scene', () => {
+			const none = buildMessages(request({ turns: [said('hi')] }));
+			expect(none.some((message) => message.content.includes('keeps track of'))).toBe(false);
+			const stopped = buildMessages(
+				request({
+					setup: tracked,
+					turns: [said('Sit.', 'story'), { type: 'safety', signal: 'red' }]
+				})
+			);
+			expect(stopped.some((message) => message.content.includes(Note))).toBe(false);
+		});
+
+		it('holds a tracker the request leaves out at its start', () => {
+			const messages = buildMessages(request({ setup: tracked, turns: [said('hi')] }));
+			expect(messages.at(-1)?.content).toContain(
+				'(What the story keeps track of now: Submission: 10 out of 100; Rules in force: "Kneel".)'
+			);
+		});
+
+		it('says the system’s rules go on its list, for the system voice only', () => {
+			const ruled = { ...tracked, voice: { ...tracked.voice, narrator: 'impersonal' as const } };
+			expect(system(buildMessages(request({ setup: ruled, mode: 'opening' })))).toContain(
+				'goes on or comes off the list that holds its rules'
+			);
+			expect(system(buildMessages(request({ setup: tracked, mode: 'opening' })))).not.toContain(
+				'the list that holds its rules'
+			);
+		});
+
+		// The note goes back with each passage, as the buttons do, so each
+		// request only adds to the one before (docs/daydreams.md, "Cost").
+		it('replays the note each passage was asked with, so each request only adds to the one before', () => {
+			const passage = (text: string, trackers: ReturnType<typeof held>): ContextTurn => ({
+				type: 'text',
+				role: 'story',
+				text,
+				buttons: [],
+				trackers
+			});
+			const story: ContextTurn[] = [
+				passage('She waits.', held(10, ['Kneel'])),
+				said('I kneel.'),
+				passage('Good.', held(10, ['Kneel'])),
+				said('I keep my eyes down.'),
+				passage('Better.', held(25, ['Kneel', 'Eyes down']))
+			];
+			const requests = story.flatMap((turn, at) =>
+				turn.type === 'text' && turn.role === 'story' && turn.trackers
+					? [
+							buildMessages(
+								request({
+									setup: tracked,
+									mode: at === 0 ? 'opening' : 'reply',
+									turns: story.slice(0, at),
+									currentTrackers: turn.trackers
+								})
+							)
+						]
+					: []
+			);
+			for (const [at, next] of requests.slice(1).entries()) {
+				const before = defined(requests[at], 'the request before');
+				expect(next.slice(0, before.length), `request ${at + 1}`).toEqual(before);
+			}
+			const last = defined(requests.at(-1), 'the last request').map((message) => message.content);
+			expect(last.filter((content) => content.includes(Note))).toHaveLength(3);
+			expect(last.at(-1)).toContain('Submission: 25 out of 100');
+		});
+	});
+
 	it('asks a monologue for a picture of its ideas when worth having, never its speaker idling', () => {
 		const monologue = system(
 			buildMessages(

@@ -1,6 +1,6 @@
 # Surprise idea: every paragraph
 
-49 distinct paragraphs, from 18 distinct prompts
+50 distinct paragraphs, from 18 distinct prompts
 over 48 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -125,6 +125,14 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}.
 Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
 ~~~~
 
+## ¶ 0e65f851f236f4 · user · in 40 of 48
+
+Only when narrator ∈ {unset, none, second-person, third-person, impersonal}.
+
+~~~~text
+Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.
+~~~~
+
 ## ¶ 0d8a5339d99fe0 · user · in 12 of 48
 
 Only when rated ∈ {none}.
@@ -157,7 +165,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 0ac319828f3153 · user · in 10 of 48
+## ¶ 17324089c5bca3 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {none}.
 
@@ -173,6 +181,11 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "openings": other places its story can start; an empty list for a monologue
   - "label": a short name for where it starts
   - "situation": where the story picks up, in a sentence or two
+- "trackers": what the story keeps track of; an empty list for none
+  - "name": a short name
+  - "kind": one of "meter", "count", "list", "text"
+  - "start": where it starts: a number, a list's items separated by semicolons, or a line
+  - "about": what moves it, and what happens at either end
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
@@ -181,12 +194,12 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 123ee0e80a54d1 · user · in 10 of 48
+## ¶ 01193b8fd15b11 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {none}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 1c0c90ea8c7d02 · user · in 24 of 48
@@ -234,7 +247,7 @@ Only when rated ∈ {heat}.
 Rate the idea's kink too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 0d16e90c95d372 · user · in 10 of 48
+## ¶ 08b62bc6d438f2 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {heat}.
 
@@ -250,6 +263,11 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "openings": other places its story can start; an empty list for a monologue
   - "label": a short name for where it starts
   - "situation": where the story picks up, in a sentence or two
+- "trackers": what the story keeps track of; an empty list for none
+  - "name": a short name
+  - "kind": one of "meter", "count", "list", "text"
+  - "start": where it starts: a number, a list's items separated by semicolons, or a line
+  - "about": what moves it, and what happens at either end
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -257,12 +275,12 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1e61049d94eb74 · user · in 10 of 48
+## ¶ 1b1961608ae82a · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {heat}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 04694588140888 · user · in 15 of 48
@@ -289,7 +307,7 @@ Only when rated ∈ {kink}.
 Rate the idea's heat too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 03246d103695d8 · user · in 10 of 48
+## ¶ 11f7c07dc850ef · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {kink}.
 
@@ -305,6 +323,11 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "openings": other places its story can start; an empty list for a monologue
   - "label": a short name for where it starts
   - "situation": where the story picks up, in a sentence or two
+- "trackers": what the story keeps track of; an empty list for none
+  - "name": a short name
+  - "kind": one of "meter", "count", "list", "text"
+  - "start": where it starts: a number, a list's items separated by semicolons, or a line
+  - "about": what moves it, and what happens at either end
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -312,12 +335,12 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 0ffd841e491d48 · user · in 10 of 48
+## ¶ 00710e17ae41c3 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {kink}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 085cb66696fa78 · user · in 12 of 48
@@ -330,7 +353,7 @@ The idea's kink: kinky: BDSM and power exchange.
 The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
-## ¶ 14571b5e5d042f · user · in 10 of 48
+## ¶ 09c4a18910abb6 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {both}.
 
@@ -346,18 +369,23 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "openings": other places its story can start; an empty list for a monologue
   - "label": a short name for where it starts
   - "situation": where the story picks up, in a sentence or two
+- "trackers": what the story keeps track of; an empty list for none
+  - "name": a short name
+  - "kind": one of "meter", "count", "list", "text"
+  - "start": where it starts: a number, a list's items separated by semicolons, or a line
+  - "about": what moves it, and what happens at either end
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
   - "value": what it says
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1477f438d91738 · user · in 10 of 48
+## ¶ 0fdd7b593dc2fd · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {both}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 0a166e365ceb8a · user · in 8 of 48

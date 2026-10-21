@@ -44,6 +44,7 @@ import { parseReply, type ReplySoFar, visibleReply } from './reply-format';
 import type { SetupExchange } from './setup-exchange';
 import { readSseEvents, type SseEvent } from './sse';
 import { readReplyStream } from './stream';
+import type { TrackerValues } from './trackers';
 
 const base = (daydreamId: string) => `/api/daydreams/${encodeURIComponent(daydreamId)}`;
 const JSON_HEADERS = { 'content-type': 'application/json' };
@@ -87,6 +88,8 @@ export type ReplyRequestBody = {
 	setup: DaydreamSetup;
 	turns: ContextTurn[];
 	currentDirections: Direction[];
+	/** The idea's trackers' values now, for the model to move (docs/daydreams.md, "Trackers"). */
+	currentTrackers?: TrackerValues;
 	rewrite?: RewriteRequest;
 	/** For a first passage: the idea's opening it starts from (docs/daydreams.md, "Openings"). */
 	opening?: OpeningSnapshot;
@@ -102,6 +105,8 @@ export type ReplyOutcome =
 			expansion: string | null;
 			/** How the reply said, before anything else, it read the user's turn. */
 			reading: Reading | null;
+			/** What it moved of the idea's trackers, by name, as written (`ParsedReply.trackers`). */
+			trackers?: unknown;
 			/** The reply exactly as it arrived, for debug mode's raw log. */
 			raw: string;
 	  }
@@ -234,6 +239,7 @@ export async function writeReply(
 				meta: parsed.meta,
 				expansion: parsed.expansion,
 				reading: parsed.reading,
+				...(parsed.trackers === undefined ? {} : { trackers: parsed.trackers }),
 				raw: text
 			}
 		: {

@@ -1,6 +1,6 @@
 # Daydream from a brief: every paragraph
 
-62 distinct paragraphs, from 181 distinct prompts
+63 distinct paragraphs, from 181 distinct prompts
 over 216 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -126,6 +126,14 @@ Always.
 
 ~~~~text
 Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
+~~~~
+
+## ¶ 0e65f851f236f4 · system · in 216 of 216
+
+Always.
+
+~~~~text
+Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to 4 trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.
 ~~~~
 
 ## ¶ 0d75d7aa6b76c2 · system · in 216 of 216
@@ -316,7 +324,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 1274c40b41a891 · user · in 72 of 216
+## ¶ 178b5abb6834e9 · user · in 72 of 216
 
 Only when side ∈ {either}.
 
@@ -338,6 +346,11 @@ Only when side ∈ {either}.
   - "openings": other places its story can start; an empty list for a monologue
     - "label": a short name for where it starts
     - "situation": where the story picks up, in a sentence or two
+  - "trackers": what the story keeps track of; an empty list for none
+    - "name": a short name
+    - "kind": one of "meter", "count", "list", "text"
+    - "start": where it starts: a number, a list's items separated by semicolons, or a line
+    - "about": what moves it, and what happens at either end
   - "fields": fields to add or fill, if any; an empty list for none
     - "label": the field's name, in a few words
     - "value": what it says
@@ -359,12 +372,12 @@ Only when side ∈ {either}.
 - "summary": the summary, with its marks
 ~~~~
 
-## ¶ 17a84a8d50c8ba · user · in 216 of 216
+## ¶ 01b61dd518dab9 · user · in 216 of 216
 
 Always.
 
 ~~~~text
-{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
+{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "trackers": [{"name": "…", "kind": "…", "start": "…", "about": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
 ~~~~
 
 ## ¶ 1615353ec8ec67 · user · in 144 of 216
@@ -501,7 +514,7 @@ With "watch" they are not in it: the story follows its dominant one, whose side 
 In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
-## ¶ 0b600672b14afe · user · in 72 of 216
+## ¶ 0ab52aa3ff20ff · user · in 72 of 216
 
 Only when side ∈ {dom}.
 
@@ -523,6 +536,11 @@ Only when side ∈ {dom}.
   - "openings": other places its story can start; an empty list for a monologue
     - "label": a short name for where it starts
     - "situation": where the story picks up, in a sentence or two
+  - "trackers": what the story keeps track of; an empty list for none
+    - "name": a short name
+    - "kind": one of "meter", "count", "list", "text"
+    - "start": where it starts: a number, a list's items separated by semicolons, or a line
+    - "about": what moves it, and what happens at either end
   - "fields": fields to add or fill, if any; an empty list for none
     - "label": the field's name, in a few words
     - "value": what it says
@@ -605,7 +623,7 @@ With "watch" they are not in it: the story follows its submissive one, whose sid
 In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
 ~~~~
 
-## ¶ 1ca0390a8e394b · user · in 72 of 216
+## ¶ 0c0dc21e0f35d4 · user · in 72 of 216
 
 Only when side ∈ {sub}.
 
@@ -627,6 +645,11 @@ Only when side ∈ {sub}.
   - "openings": other places its story can start; an empty list for a monologue
     - "label": a short name for where it starts
     - "situation": where the story picks up, in a sentence or two
+  - "trackers": what the story keeps track of; an empty list for none
+    - "name": a short name
+    - "kind": one of "meter", "count", "list", "text"
+    - "start": where it starts: a number, a list's items separated by semicolons, or a line
+    - "about": what moves it, and what happens at either end
   - "fields": fields to add or fill, if any; an empty list for none
     - "label": the field's name, in a few words
     - "value": what it says
