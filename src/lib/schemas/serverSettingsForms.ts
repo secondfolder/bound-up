@@ -1,10 +1,16 @@
 import { z } from 'zod';
+import type { PictureStyle } from '$lib/daydream';
 import {
+	IMAGE_PROVIDERS,
+	type ImageProviderId,
+	LANGUAGE_PROVIDERS,
+	MODEL_PROVIDER_IDS,
+	type ModelProviderId,
 	OPENROUTER_MODEL_ID,
-	OPENROUTER_STORY_MODEL_PRESETS,
 	PICTURE_BASE_MODELS,
+	PICTURE_MODEL_PRESETS,
 	RUNWARE_MODEL_AIR,
-	RUNWARE_PICTURE_MODEL_PRESETS
+	STORY_MODEL_PRESETS
 } from '$lib/server-settings';
 
 /**
@@ -69,16 +75,47 @@ export const mailSettingsFormSchema = z
 
 export type MailSettingsForm = z.output<typeof mailSettingsFormSchema>;
 
-const storyPresetIds = OPENROUTER_STORY_MODEL_PRESETS.map((preset) => preset.id);
+/**
+ * One provider's credential, saved on its own: every model setting that
+ * chooses the provider uses it. One form per provider, told apart by id.
+ */
+export const modelProviderFormSchema = z.object({
+	provider: z.enum(MODEL_PROVIDER_IDS as [ModelProviderId, ...ModelProviderId[]]),
+	apiKey: z.string().trim().max(500),
+	apiKeyChange: secretChange
+});
+
+export type ModelProviderForm = z.output<typeof modelProviderFormSchema>;
+
+/** A model choice: Custom, or a preset that provider offers. Presets are per provider. */
+function requirePresetOf(
+	choice: string,
+	presets: readonly { id: string }[],
+	path: string,
+	context: z.RefinementCtx
+) {
+	if (choice !== 'custom' && !presets.some((preset) => preset.id === choice)) {
+		context.addIssue({
+			code: 'custom',
+			path: [path],
+			message: 'Choose one of this provider’s models, or Custom.'
+		});
+	}
+}
 
 export const languageModelSettingsFormSchema = z
 	.object({
-		openrouterApiKey: z.string().trim().max(500),
-		openrouterApiKeyChange: secretChange,
-		storyModel: z.enum(['custom', ...storyPresetIds] as const),
+		storyProvider: z.enum(LANGUAGE_PROVIDERS),
+		storyModel: z.string().max(100),
 		openrouterModelId: z.string().trim().max(200)
 	})
 	.superRefine((data, context) => {
+		requirePresetOf(
+			data.storyModel,
+			STORY_MODEL_PRESETS[data.storyProvider],
+			'storyModel',
+			context
+		);
 		if (data.storyModel === 'custom' && !OPENROUTER_MODEL_ID.test(data.openrouterModelId)) {
 			context.addIssue({
 				code: 'custom',
@@ -91,16 +128,16 @@ export const languageModelSettingsFormSchema = z
 export type LanguageModelSettingsForm = z.output<typeof languageModelSettingsFormSchema>;
 
 const baseIds = PICTURE_BASE_MODELS.map((base) => base.id);
-const photoPresetIds = RUNWARE_PICTURE_MODEL_PRESETS.photo.map((preset) => preset.id);
-const illustratedPresetIds = RUNWARE_PICTURE_MODEL_PRESETS.illustrated.map((preset) => preset.id);
 
-function requireCustomPicture(
+function requirePicture(
+	provider: ImageProviderId,
 	choice: string,
 	air: string,
 	base: string,
-	prefix: 'photo' | 'illustrated',
+	prefix: PictureStyle,
 	context: z.RefinementCtx
 ) {
+	requirePresetOf(choice, PICTURE_MODEL_PRESETS[provider][prefix], `${prefix}Model`, context);
 	if (choice !== 'custom') {
 		return;
 	}
@@ -122,24 +159,26 @@ function requireCustomPicture(
 
 export const imageModelSettingsFormSchema = z
 	.object({
-		runwareApiKey: z.string().trim().max(500),
-		runwareApiKeyChange: secretChange,
-		photoModel: z.enum(['custom', ...photoPresetIds] as const),
+		photoProvider: z.enum(IMAGE_PROVIDERS),
+		photoModel: z.string().max(100),
 		photoRunwareModelAir: z.string().trim().max(200),
 		photoBase: z.enum(['', ...baseIds]),
-		illustratedModel: z.enum(['custom', ...illustratedPresetIds] as const),
+		illustratedProvider: z.enum(IMAGE_PROVIDERS),
+		illustratedModel: z.string().max(100),
 		illustratedRunwareModelAir: z.string().trim().max(200),
 		illustratedBase: z.enum(['', ...baseIds])
 	})
 	.superRefine((data, context) => {
-		requireCustomPicture(
+		requirePicture(
+			data.photoProvider,
 			data.photoModel,
 			data.photoRunwareModelAir,
 			data.photoBase,
 			'photo',
 			context
 		);
-		requireCustomPicture(
+		requirePicture(
+			data.illustratedProvider,
 			data.illustratedModel,
 			data.illustratedRunwareModelAir,
 			data.illustratedBase,

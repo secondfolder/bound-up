@@ -4,10 +4,10 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import { dev } from '$app/environment';
 import { splitOpenRouterModelId } from '$lib/model-search';
 import {
-	type ImageModelSettingsForm,
 	imageModelSettingsFormSchema,
 	languageModelSettingsFormSchema,
 	mailSettingsFormSchema,
+	modelProviderFormSchema,
 	pushSettingsFormSchema,
 	type SecretChange,
 	serverActionFormSchema
@@ -28,15 +28,18 @@ import {
 import { legacyEnvStillSet } from '$lib/server/settings/legacy-env';
 import { serverSettingsStatus } from '$lib/server/settings/status';
 import {
-	type OpenRouterStoryModelChoice,
+	MODEL_PROVIDER_IDS,
+	MODEL_PROVIDERS,
+	type ModelProviderId,
 	type OpenRouterStoryModelPresetId,
-	parseOpenRouterStoryModel,
-	parseRunwarePictureModel,
-	RUNWARE_PICTURE_MODEL_SETTING,
-	type RunwarePictureModelChoice,
+	PICTURE_MODEL_SETTING,
+	type PictureModelChoice,
+	parsePictureModel,
+	parseStoryModel,
 	SECRET_SETTING_KEYS,
 	type ServerSettingKey,
 	type ServerSettings,
+	type StoryModelChoice,
 	secretTail,
 	storyModelCallsTools
 } from '$lib/server-settings';
@@ -50,6 +53,8 @@ const IMAGE_MODEL_FORM = 'image-models';
 const PUSH_FORM = 'push';
 const VAPID_FORM = 'vapid';
 const SERVER_SECRET_FORM = 'server-secret';
+/** One form per model provider, for its key. */
+const providerFormId = (provider: ModelProviderId) => `provider-${provider}`;
 
 /** A credential as the browser may see it: whether it is set, and its last few characters. */
 export type StoredSecret = { set: boolean; tail: string };
@@ -82,24 +87,34 @@ async function callsTools(
 
 /** The story model as saved: a preset by name, a custom one with whether it calls tools. */
 async function storyModelChoice(
-	data: { storyModel: string; openrouterModelId: string },
+	data: { storyProvider: 'openrouter'; storyModel: string; openrouterModelId: string },
 	platform: App.Platform | undefined,
 	signal: AbortSignal
-): Promise<OpenRouterStoryModelChoice> {
+): Promise<StoryModelChoice> {
+	const provider = data.storyProvider;
 	if (data.storyModel !== 'custom') {
-		return { preset: data.storyModel as OpenRouterStoryModelPresetId };
+		return { provider, preset: data.storyModel as OpenRouterStoryModelPresetId };
 	}
 	const { openrouterModelId } = data;
 	return (await callsTools(openrouterModelId, platform, signal))
-		? { openrouterModelId, tools: true }
-		: { openrouterModelId };
+		? { provider, openrouterModelId, tools: true }
+		: { provider, openrouterModelId };
 }
 
 function pictureFields(settings: ServerSettings, style: 'photo' | 'illustrated') {
-	const choice = parseRunwarePictureModel(style, settings[RUNWARE_PICTURE_MODEL_SETTING[style]]);
+	const choice = parsePictureModel(style, settings[PICTURE_MODEL_SETTING[style]]);
 	return 'runwareModelAir' in choice
-		? { model: 'custom', air: choice.runwareModelAir, base: choice.base }
-		: { model: choice.preset, air: '', base: '' as const };
+		? { provider: choice.provider, model: 'custom', air: choice.runwareModelAir, base: choice.base }
+		: { provider: choice.provider, model: choice.preset, air: '', base: '' as const };
+}
+
+/** A provider's key form, empty: the stored key is never sent. */
+function emptyProviderForm(provider: ModelProviderId) {
+	return superValidate(
+		{ provider, apiKey: '', apiKeyChange: 'keep' as const },
+		zod4(modelProviderFormSchema),
+		{ id: providerFormId(provider), errors: false }
+	);
 }
 
 export const load: PageServerLoad = async ({ locals, platform }) => {
@@ -111,7 +126,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	// environment — which only the rows know.
 	const rows = await loadServerSettingRows(locals.db, platform);
 	const settings = settingsFromRows(rows);
-	const story = parseOpenRouterStoryModel(settings.openrouterStoryModel);
+	const story = parseStoryModel(settings.storyModel);
 	const photo = pictureFields(settings, 'photo');
 	const illustrated = pictureFields(settings, 'illustrated');
 
@@ -152,10 +167,14 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			{ id: MAIL_FORM, errors: false }
 		),
 		testEmailForm: await superValidate(zod4(serverActionFormSchema), { id: TEST_EMAIL_FORM }),
+		providerForms: Object.fromEntries(
+			await Promise.all(
+				MODEL_PROVIDER_IDS.map(async (provider) => [provider, await emptyProviderForm(provider)])
+			)
+		) as Record<ModelProviderId, Awaited<ReturnType<typeof emptyProviderForm>>>,
 		languageModelForm: await superValidate(
 			{
-				openrouterApiKey: '',
-				openrouterApiKeyChange: 'keep',
+				storyProvider: story.provider,
 				storyModel: 'preset' in story ? story.preset : 'custom',
 				openrouterModelId: 'openrouterModelId' in story ? story.openrouterModelId : ''
 			},
@@ -164,12 +183,12 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		),
 		imageModelForm: await superValidate(
 			{
-				runwareApiKey: '',
-				runwareApiKeyChange: 'keep',
-				photoModel: photo.model as ImageModelSettingsForm['photoModel'],
+				photoProvider: photo.provider,
+				photoModel: photo.model,
 				photoRunwareModelAir: photo.air,
 				photoBase: photo.base,
-				illustratedModel: illustrated.model as ImageModelSettingsForm['illustratedModel'],
+				illustratedProvider: illustrated.provider,
+				illustratedModel: illustrated.model,
 				illustratedRunwareModelAir: illustrated.air,
 				illustratedBase: illustrated.base
 			},
@@ -282,6 +301,26 @@ export const actions: Actions = {
 		return message(testEmailForm, `Sent to ${admin.email}.`);
 	},
 
+	/**
+	 * One provider's key, which every model setting choosing that provider
+	 * uses. Which provider is in the form; the key it is stored under comes
+	 * from the registry, never from the browser.
+	 */
+	saveModelProvider: async ({ locals, request }) => {
+		requireAdmin(locals);
+		const providerForm = await superValidate(request, zod4(modelProviderFormSchema));
+		if (!providerForm.valid) {
+			return fail(400, { providerForm });
+		}
+		const { data } = providerForm;
+		const key = MODEL_PROVIDERS[data.provider].credentialKey;
+		await saveServerSettings(locals.db, {
+			[key]: secretAfter(locals.settings[key], data.apiKeyChange, data.apiKey)
+		});
+		providerForm.data = { ...data, apiKey: '', apiKeyChange: 'keep' };
+		return message(providerForm, SAVED);
+	},
+
 	saveLanguageModels: async ({ locals, platform, request }) => {
 		requireAdmin(locals);
 		const languageModelForm = await superValidate(request, zod4(languageModelSettingsFormSchema), {
@@ -292,14 +331,8 @@ export const actions: Actions = {
 		}
 		const { data } = languageModelForm;
 		await saveServerSettings(locals.db, {
-			openrouterApiKey: secretAfter(
-				locals.settings.openrouterApiKey,
-				data.openrouterApiKeyChange,
-				data.openrouterApiKey
-			),
-			openrouterStoryModel: JSON.stringify(await storyModelChoice(data, platform, request.signal))
+			storyModel: JSON.stringify(await storyModelChoice(data, platform, request.signal))
 		});
-		languageModelForm.data = { ...data, openrouterApiKey: '', openrouterApiKeyChange: 'keep' };
 		return message(languageModelForm, SAVED);
 	},
 
@@ -312,24 +345,28 @@ export const actions: Actions = {
 			return fail(400, { imageModelForm });
 		}
 		const { data } = imageModelForm;
-		const choice = (model: string, air: string, base: string): RunwarePictureModelChoice =>
+		const choice = (
+			provider: typeof data.photoProvider,
+			model: string,
+			air: string,
+			base: string
+		): PictureModelChoice =>
 			model === 'custom'
-				? { runwareModelAir: air, base: base as Exclude<typeof data.photoBase, ''> }
-				: { preset: model };
+				? { provider, runwareModelAir: air, base: base as Exclude<typeof data.photoBase, ''> }
+				: { provider, preset: model };
 		await saveServerSettings(locals.db, {
-			runwareApiKey: secretAfter(
-				locals.settings.runwareApiKey,
-				data.runwareApiKeyChange,
-				data.runwareApiKey
+			photoModel: JSON.stringify(
+				choice(data.photoProvider, data.photoModel, data.photoRunwareModelAir, data.photoBase)
 			),
-			runwarePhotoModel: JSON.stringify(
-				choice(data.photoModel, data.photoRunwareModelAir, data.photoBase)
-			),
-			runwareIllustratedModel: JSON.stringify(
-				choice(data.illustratedModel, data.illustratedRunwareModelAir, data.illustratedBase)
+			illustratedModel: JSON.stringify(
+				choice(
+					data.illustratedProvider,
+					data.illustratedModel,
+					data.illustratedRunwareModelAir,
+					data.illustratedBase
+				)
 			)
 		});
-		imageModelForm.data = { ...data, runwareApiKey: '', runwareApiKeyChange: 'keep' };
 		return message(imageModelForm, SAVED);
 	},
 

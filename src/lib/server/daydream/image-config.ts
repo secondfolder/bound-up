@@ -2,8 +2,10 @@ import { env as privateEnv } from '$env/dynamic/private';
 import type { PictureStyle } from '$lib/daydream';
 import type { PictureArchitecture } from '$lib/daydream/image-prompt';
 import {
-	parseRunwarePictureModel,
-	RUNWARE_PICTURE_MODEL_SETTING,
+	PICTURE_MODEL_SETTING,
+	type ProviderCredentialKey,
+	parsePictureModel,
+	providerCredential,
 	type RunwarePictureModel,
 	runwarePictureModelFor,
 	type ServerSettings
@@ -27,7 +29,7 @@ export type ImageConfig = {
 
 export type ImageSettings = Pick<
 	ServerSettings,
-	'runwareApiKey' | (typeof RUNWARE_PICTURE_MODEL_SETTING)[PictureStyle]
+	ProviderCredentialKey | (typeof PICTURE_MODEL_SETTING)[PictureStyle]
 >;
 
 export const DEFAULT_RUNWARE_BASE_URL = 'https://api.runware.ai/v1';
@@ -51,7 +53,11 @@ export function runwareBaseUrl(platform: App.Platform | undefined): string {
 }
 
 /**
- * Null when no key is set, which turns pictures off on this server.
+ * Null when a style's model's provider has no key, which turns pictures off
+ * on this server.
+ *
+ * Runware is the only image provider so far, so every style shares its key
+ * and API root. A second one makes both per style.
  *
  * Each model's base model is part of the setting, chosen with it, rather than
  * asked of Runware when it is first used: a model Runware misreports, or one
@@ -59,16 +65,20 @@ export function runwareBaseUrl(platform: App.Platform | undefined): string {
  * not a failed picture.
  */
 export function parseImageConfig(settings: ImageSettings, baseUrl: string): ImageConfig | null {
-	const apiKey = settings.runwareApiKey.trim();
-	if (!apiKey) {
+	const photo = parsePictureModel('photo', settings[PICTURE_MODEL_SETTING.photo]);
+	const illustrated = parsePictureModel('illustrated', settings[PICTURE_MODEL_SETTING.illustrated]);
+	const apiKey = providerCredential(settings, photo.provider);
+	if (!(apiKey && providerCredential(settings, illustrated.provider))) {
 		return null;
 	}
-	const model = (style: PictureStyle) =>
-		runwarePictureModelFor(
-			style,
-			parseRunwarePictureModel(style, settings[RUNWARE_PICTURE_MODEL_SETTING[style]])
-		);
-	return { apiKey, baseUrl, models: { photo: model('photo'), illustrated: model('illustrated') } };
+	return {
+		apiKey,
+		baseUrl,
+		models: {
+			photo: runwarePictureModelFor('photo', photo),
+			illustrated: runwarePictureModelFor('illustrated', illustrated)
+		}
+	};
 }
 
 /** This request's config, from `locals.settings`. */

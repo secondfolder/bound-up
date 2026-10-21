@@ -1,4 +1,10 @@
-import type { ServerSettings } from '$lib/server-settings';
+import {
+	PICTURE_MODEL_SETTING,
+	parsePictureModel,
+	parseStoryModel,
+	providerCredential,
+	type ServerSettings
+} from '$lib/server-settings';
 import { mailProblem } from '../mail/config';
 import { readVapidConfig } from '../push';
 
@@ -9,9 +15,9 @@ export type ServerSettingsStatus = {
 	/** Mail is going to the local outbox only because this is `vite dev` and nothing is set. */
 	mailDevDefault: boolean;
 	push: boolean;
-	/** An OpenRouter key: chat models are available, which Daydreams need. */
+	/** The story model's provider has a key: Daydreams can be written. */
 	languageModels: boolean;
-	/** A Runware key: image models are available, which Daydreams draw pictures with. */
+	/** Every picture model's provider has a key: Daydreams can be drawn. */
 	imageModels: boolean;
 };
 
@@ -20,7 +26,14 @@ export function serverSettingsStatus(settings: ServerSettings): ServerSettingsSt
 		mailProblem: mailProblem(settings),
 		mailDevDefault: mailProblem(settings) === null && settings.mailTransport === '',
 		push: readVapidConfig(settings) !== null,
-		languageModels: settings.openrouterApiKey.trim() !== '',
-		imageModels: settings.runwareApiKey.trim() !== ''
+		languageModels:
+			providerCredential(settings, parseStoryModel(settings.storyModel).provider) !== '',
+		imageModels: (['photo', 'illustrated'] as const).every(
+			(style) =>
+				providerCredential(
+					settings,
+					parsePictureModel(style, settings[PICTURE_MODEL_SETTING[style]]).provider
+				) !== ''
+		)
 	};
 }

@@ -65,7 +65,7 @@ beforeEach(async () => {
 	await grantTestDaydreams(db, jun.id);
 	await acceptDisclosure(db, ada.id);
 	configured.openrouterApiKey = 'sk-or-test';
-	configured.openrouterStoryModel = JSON.stringify({ openrouterModelId: 'test/model' });
+	configured.storyModel = JSON.stringify({ openrouterModelId: 'test/model' });
 	env.OPENROUTER_BASE_URL = 'https://models.test/api/v1';
 	upstream = vi.fn(async () => sse('Mara ', 'smiles.'));
 	vi.stubGlobal('fetch', upstream);

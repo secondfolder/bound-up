@@ -131,7 +131,7 @@ describe('POST /api/daydreams/[id]/image', () => {
 	it('prompts a custom model by the base model it was saved with, without asking Runware', async () => {
 		settings = testSettings({
 			runwareApiKey: 'rw-test',
-			runwarePhotoModel: JSON.stringify({ runwareModelAir: 'civitai:9@9', base: 'pony' })
+			photoModel: JSON.stringify({ runwareModelAir: 'civitai:9@9', base: 'pony' })
 		});
 		const { id } = await createTestDaydream(db, ada.id);
 		await post(ada, id);
@@ -145,7 +145,7 @@ describe('POST /api/daydreams/[id]/image', () => {
 	it('uses a preset other than the default by its pinned AIR and base model', async () => {
 		settings = testSettings({
 			runwareApiKey: 'rw-test',
-			runwarePhotoModel: JSON.stringify({ preset: 'lustify' })
+			photoModel: JSON.stringify({ preset: 'lustify' })
 		});
 		const { id } = await createTestDaydream(db, ada.id);
 		await post(ada, id);

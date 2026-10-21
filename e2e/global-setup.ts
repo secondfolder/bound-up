@@ -31,10 +31,10 @@ const SETTINGS: Record<string, string> = {
 	// these keys. It is reached through `OPENROUTER_BASE_URL` and
 	// `RUNWARE_BASE_URL`, which stay test seams in the environment.
 	openrouterApiKey: 'e2e-openrouter-key',
-	openrouterStoryModel: JSON.stringify({ openrouterModelId: 'e2e/stub' }),
+	storyModel: JSON.stringify({ provider: 'openrouter', openrouterModelId: 'e2e/stub' }),
 	runwareApiKey: 'e2e-runware-key',
-	runwarePhotoModel: JSON.stringify({ preset: 'dark-beast' }),
-	runwareIllustratedModel: JSON.stringify({ preset: 'wai-illustrious' })
+	photoModel: JSON.stringify({ provider: 'runware', preset: 'dark-beast' }),
+	illustratedModel: JSON.stringify({ provider: 'runware', preset: 'wai-illustrious' })
 };
 
 // biome-ignore lint/style/noDefaultExport: Playwright loads a globalSetup by its default export.

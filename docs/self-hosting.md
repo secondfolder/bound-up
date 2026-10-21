@@ -34,9 +34,10 @@ Settings → Admin → Server settings:
   button.
 - **Notifications** — optional: the contact address push services are given
   defaults to the email sender's.
-- **Language models** and **Image models** — optional: an OpenRouter key and
-  a Runware key, each paid for per use, and which models to use. Daydreams
-  need the first for their stories and the second for their pictures.
+- **Model providers**, **Language models** and **Image models** — optional:
+  an OpenRouter key and a Runware key, each paid for per use and set once
+  under Model providers, and which models to use. Daydreams need the first
+  for their stories and the second for their pictures.
 
 **Upgrading from a version that took these as environment variables**
 (`BETTER_AUTH_SECRET`, `VAPID_*`, `MAIL_FROM`, `RESEND_API_KEY`, `SMTP_URL`,

@@ -127,7 +127,9 @@ describe('GET /api/admin/models/runware', () => {
 			throw new Error(`expected an answer, got ${result.type}`);
 		}
 		expect(result.value.status).toBe(409);
-		expect((await result.value.json()).message).toMatch(/Save a Runware API key first/);
+		expect((await result.value.json()).message).toMatch(
+			/Save a Runware API key under Model providers first/
+		);
 		expect(upstream).not.toHaveBeenCalled();
 	});
 

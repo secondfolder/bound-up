@@ -4,7 +4,11 @@ import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
-import { imageModelSettingsFormSchema } from '$lib/schemas/serverSettingsForms';
+import {
+	imageModelSettingsFormSchema,
+	modelProviderFormSchema
+} from '$lib/schemas/serverSettingsForms';
+import type { ModelProviderId } from '$lib/server-settings';
 import ServerSettingsFieldsHarness from '$lib/testing/ServerSettingsFieldsHarness.svelte';
 import { waProp, waSettled } from '$lib/testing/web-awesome';
 import ModelDetails from './ModelDetails.svelte';
@@ -21,14 +25,20 @@ const presets = [
 	}
 ];
 
-async function renderFields(stored = { set: true, tail: 'abcd' }) {
+async function renderFields(
+	stored = { set: true, tail: 'abcd' },
+	provider: {
+		keySet?: (provider: ModelProviderId) => boolean;
+		onaddkey?: (provider: ModelProviderId) => void;
+	} = {}
+) {
 	const data = await superValidate(
 		{
-			runwareApiKey: '',
-			runwareApiKeyChange: 'keep',
+			photoProvider: 'runware',
 			photoModel: 'dark-beast',
 			photoRunwareModelAir: '',
 			photoBase: '',
+			illustratedProvider: 'runware',
 			illustratedModel: 'wai-illustrious',
 			illustratedRunwareModelAir: '',
 			illustratedBase: ''
@@ -36,7 +46,18 @@ async function renderFields(stored = { set: true, tail: 'abcd' }) {
 		zod4(imageModelSettingsFormSchema),
 		{ errors: false }
 	);
-	const view = render(ServerSettingsFieldsHarness, { data, stored, presets });
+	const keyData = await superValidate(
+		{ provider: 'runware', apiKey: '', apiKeyChange: 'keep' },
+		zod4(modelProviderFormSchema),
+		{ errors: false }
+	);
+	const view = render(ServerSettingsFieldsHarness, {
+		data,
+		keyData,
+		stored,
+		presets,
+		...provider
+	});
 	await waSettled(view.container);
 	return view;
 }
@@ -86,18 +107,16 @@ describe('SecretSettingField', () => {
 		const { container } = await renderFields();
 		expect(screen.getByText(/Saved, ending/)).toBeInTheDocument();
 		expect(container.textContent).toContain('…abcd');
-		expect(container.querySelector('wa-input[name="runwareApiKey"]')).toBeNull();
+		expect(container.querySelector('wa-input[name="apiKey"]')).toBeNull();
 
 		screen.getByText('Replace').click();
-		await waitFor(() =>
-			expect(container.querySelector('wa-input[name="runwareApiKey"]')).not.toBeNull()
-		);
+		await waitFor(() => expect(container.querySelector('wa-input[name="apiKey"]')).not.toBeNull());
 	});
 
 	it('says Remove in the hidden change field, and Undo takes it back', async () => {
 		const { container } = await renderFields();
 		const change = () =>
-			container.querySelector<HTMLInputElement>('input[name="runwareApiKeyChange"]')?.value;
+			container.querySelector<HTMLInputElement>('input[name="apiKeyChange"]')?.value;
 		expect(change()).toBe('keep');
 		screen.getByText('Remove').click();
 		await waitFor(() => expect(change()).toBe('remove'));
@@ -108,8 +127,31 @@ describe('SecretSettingField', () => {
 
 	it('shows the field straight away when nothing is saved', async () => {
 		const { container } = await renderFields({ set: false, tail: '' });
-		expect(container.querySelector('wa-input[name="runwareApiKey"]')).not.toBeNull();
+		expect(container.querySelector('wa-input[name="apiKey"]')).not.toBeNull();
 		expect(screen.queryByText('Replace')).toBeNull();
+	});
+});
+
+describe('ModelProviderField', () => {
+	it('chooses from the providers of its kind, and is quiet when the chosen one has a key', async () => {
+		const { container } = await renderFields(undefined, { keySet: () => true });
+		const select = container.querySelector('wa-select[name="photoProvider"]');
+		expect(select).not.toBeNull();
+		expect(waProp(select as Element, 'value')).toBe('runware');
+		expect(container.querySelectorAll('wa-select[name="photoProvider"] wa-option')).toHaveLength(1);
+		expect(screen.queryByText(/has no API key yet/)).toBeNull();
+	});
+
+	it('says when the chosen provider has no key, and offers to add one', async () => {
+		const onaddkey = vi.fn();
+		const { container } = await renderFields(undefined, { keySet: () => false, onaddkey });
+		expect(screen.getByText(/Runware has no API key yet/)).toBeInTheDocument();
+		const add = Array.from(container.querySelectorAll('wa-button')).find((button) =>
+			button.textContent?.includes('Add Runware key')
+		);
+		expect(add).toBeDefined();
+		(add as HTMLElement).click();
+		expect(onaddkey).toHaveBeenCalledWith('runware');
 	});
 });
 

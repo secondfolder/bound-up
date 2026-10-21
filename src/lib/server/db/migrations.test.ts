@@ -185,3 +185,73 @@ test('the IQ test answer button folds into debug mode, once per account', async 
 		['kit', 'guides']
 	]);
 });
+
+test('model settings are copied to keys that name no provider, each given its provider', async () => {
+	client = createClient({ url: ':memory:' });
+	const [before, after] = await migrationsSplitAt(
+		'0042_copy_model_settings_to_provider_neutral_keys.sql'
+	);
+	for (const sql of before) {
+		await client.executeMultiple(sql);
+	}
+	await client.executeMultiple(`
+		INSERT INTO server_settings (key, value, source, created_at, updated_at) VALUES
+			('openrouterStoryModel', '{"openrouterModelId":"v/m","tools":true}', 'admin', 1, 2),
+			('runwarePhotoModel', '{"preset":"lustify"}', 'imported', 3, 4),
+			('runwareIllustratedModel', '', 'admin', 5, 6),
+			('openrouterApiKey', 'sk-or-1', 'admin', 7, 8);
+	`);
+
+	for (const sql of after) {
+		await client.executeMultiple(sql);
+	}
+
+	const rows = await client.execute(
+		'select key, value, source, created_at, updated_at from server_settings order by key'
+	);
+	const byKey = Object.fromEntries(rows.rows.map((row) => [String(row.key), { ...row }]));
+	expect(JSON.parse(String(byKey.storyModel?.value))).toEqual({
+		openrouterModelId: 'v/m',
+		tools: true,
+		provider: 'openrouter'
+	});
+	expect(byKey.storyModel).toMatchObject({ source: 'admin', created_at: 1, updated_at: 2 });
+	expect(JSON.parse(String(byKey.photoModel?.value))).toEqual({
+		preset: 'lustify',
+		provider: 'runware'
+	});
+	expect(byKey.photoModel?.source).toBe('imported');
+	// Cleared stays cleared, so the import from the environment cannot bring it back.
+	expect(byKey.illustratedModel?.value).toBe('');
+	// The old rows stay, for a rollback; the keys are untouched.
+	expect(byKey.openrouterStoryModel).toBeDefined();
+	expect(byKey.openrouterApiKey?.value).toBe('sk-or-1');
+});
+
+test('copying the model settings leaves a newer row, and a value that is not JSON, alone', async () => {
+	client = createClient({ url: ':memory:' });
+	const [before, after] = await migrationsSplitAt(
+		'0042_copy_model_settings_to_provider_neutral_keys.sql'
+	);
+	for (const sql of before) {
+		await client.executeMultiple(sql);
+	}
+	await client.executeMultiple(`
+		INSERT INTO server_settings (key, value, source) VALUES
+			('openrouterStoryModel', 'not json', 'admin'),
+			('runwarePhotoModel', '{"preset":"lustify"}', 'admin'),
+			('photoModel', '{"provider":"runware","preset":"dark-beast"}', 'admin');
+	`);
+
+	for (const sql of after) {
+		await client.executeMultiple(sql);
+	}
+
+	const rows = await client.execute(
+		"select key, value from server_settings where key in ('storyModel', 'photoModel') order by key"
+	);
+	expect(rows.rows.map((row) => [row.key, row.value])).toEqual([
+		['photoModel', '{"provider":"runware","preset":"dark-beast"}'],
+		['storyModel', 'not json']
+	]);
+});

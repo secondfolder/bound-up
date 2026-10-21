@@ -46,7 +46,7 @@ beforeEach(async () => {
 	await grantTestDaydreams(db, ada.id);
 	await acceptDisclosure(db, ada.id);
 	configured.openrouterApiKey = 'sk-or-test';
-	configured.openrouterStoryModel = JSON.stringify({ openrouterModelId: 'test/model' });
+	configured.storyModel = JSON.stringify({ openrouterModelId: 'test/model' });
 	env.OPENROUTER_BASE_URL = 'https://models.test/api/v1';
 	upstream = vi.fn(async () =>
 		Response.json({ choices: [{ message: { content: '{"chips":["praise"]}' } }] })
@@ -308,7 +308,7 @@ describe('POST /api/daydreams/suggest', () => {
 		expect(sent(0).url).toBe('https://models.test/api/v1/chat/completions');
 		expect(sent(0).body.tools).toBeUndefined();
 
-		configured.openrouterStoryModel = JSON.stringify({
+		configured.storyModel = JSON.stringify({
 			openrouterModelId: 'test/model',
 			tools: true
 		});
@@ -351,7 +351,7 @@ describe('POST /api/daydreams/suggest', () => {
 	});
 
 	it('passes a Responses answer back whole, fetches and all', async () => {
-		configured.openrouterStoryModel = JSON.stringify({
+		configured.storyModel = JSON.stringify({
 			openrouterModelId: 'test/model',
 			tools: true
 		});

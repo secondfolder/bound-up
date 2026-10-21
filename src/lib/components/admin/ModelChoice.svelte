@@ -14,12 +14,13 @@
 </script>
 
 <script lang="ts" generics="T extends Record<string, unknown>">
+	import type { Snippet } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import { get } from 'svelte/store';
 	import { type FormPathLeaves, formFieldProxy, type SuperForm } from 'sveltekit-superforms';
 	import InputField from '$lib/components/InputField.svelte';
 	import type { OpenRouterModelResult, RunwareModelResult } from '$lib/model-search';
-	import { PICTURE_BASE_MODELS } from '$lib/server-settings';
+	import { MODEL_PROVIDERS, type ModelProviderId, PICTURE_BASE_MODELS } from '$lib/server-settings';
 	import ModelDetails from './ModelDetails.svelte';
 	import ModelSearch from './ModelSearch.svelte';
 
@@ -34,6 +35,9 @@
 	 * architecture maps to one, and the admin can change it; whatever the AIR
 	 * came from, what Runware says about it is shown beside it
 	 * (`ModelDetails`) to help choose.
+	 *
+	 * `providerField` is drawn first in the fieldset: the `ModelProviderField`
+	 * that picks which provider `provider` is.
 	 */
 	let {
 		superform,
@@ -42,15 +46,17 @@
 		baseField = null,
 		provider,
 		legend,
-		presets
+		presets,
+		providerField
 	}: {
 		superform: SuperForm<T>;
 		choiceField: FormPathLeaves<T>;
 		idField: FormPathLeaves<T>;
 		baseField?: FormPathLeaves<T> | null;
-		provider: 'openrouter' | 'runware';
+		provider: ModelProviderId;
 		legend: string;
 		presets: readonly ModelPresetOption[];
+		providerField?: Snippet;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -63,7 +69,7 @@
 	const baseValue = base?.value;
 	const baseErrors = base?.errors;
 
-	const providerName = $derived(provider === 'openrouter' ? 'OpenRouter' : 'Runware');
+	const providerName = $derived(MODEL_PROVIDERS[provider].label);
 	const idLabel = $derived(provider === 'openrouter' ? 'OpenRouter model ID' : 'Runware model AIR');
 
 	function choose(id: string) {
@@ -117,6 +123,7 @@
 
 <fieldset class="choice">
 	<legend>{legend}</legend>
+	{@render providerField?.()}
 	{#each presets as preset (preset.id)}
 		<label class="option">
 			<input

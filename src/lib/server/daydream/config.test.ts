@@ -21,6 +21,7 @@ describe('parseDaydreamConfig', () => {
 				DEFAULT_OPENROUTER_BASE_URL
 			)
 		).toEqual({
+			provider: 'openrouter',
 			apiKey: 'sk-or-1',
 			openrouterModelId: OPENROUTER_STORY_MODEL_PRESETS[0].openrouterModelId,
 			readsLinks: false,
@@ -29,9 +30,9 @@ describe('parseDaydreamConfig', () => {
 	});
 
 	it('sends a preset to its current model, and a custom choice as given', () => {
-		const read = (openrouterStoryModel: string) =>
+		const read = (storyModel: string) =>
 			parseDaydreamConfig(
-				testSettings({ openrouterApiKey: 'k', openrouterStoryModel }),
+				testSettings({ openrouterApiKey: 'k', storyModel }),
 				DEFAULT_OPENROUTER_BASE_URL
 			)?.openrouterModelId;
 		expect(read(JSON.stringify({ preset: 'euryale' }))).toBe('sao10k/l3.1-euryale-70b');
@@ -39,9 +40,9 @@ describe('parseDaydreamConfig', () => {
 	});
 
 	it('reads links only with a model saved as calling tools', () => {
-		const readsLinks = (openrouterStoryModel: string) =>
+		const readsLinks = (storyModel: string) =>
 			parseDaydreamConfig(
-				testSettings({ openrouterApiKey: 'k', openrouterStoryModel }),
+				testSettings({ openrouterApiKey: 'k', storyModel }),
 				DEFAULT_OPENROUTER_BASE_URL
 			)?.readsLinks;
 		expect(readsLinks(JSON.stringify({ openrouterModelId: 'z-ai/glm-5.2', tools: true }))).toBe(

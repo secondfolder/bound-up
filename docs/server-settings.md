@@ -19,16 +19,16 @@ places to get a key wrong, and changing a model meant a redeploy. In the
 database, a new server needs nothing set before it starts, and each database
 — production, previews, a self-hosted volume — carries its own.
 
-| File                                              | What it holds                                                              |
-| ------------------------------------------------- | -------------------------------------------------------------------------- |
-| `src/lib/server-settings.ts`                      | The keys, the model presets and base models, parsing a stored choice. Pure |
-| `src/lib/server/settings/index.ts`                | Loading (and filling in), saving, regenerating, the Workers cache          |
-| `src/lib/server/settings/legacy-env.ts`           | **Temporary**: the one-time import from the old environment variables      |
-| `src/lib/server/settings/status.ts`               | What is set up, for the admin hub and the settings page's badges           |
-| `src/lib/schemas/serverSettingsForms.ts`          | One Zod schema per card on the page                                        |
-| `src/routes/(auth-required)/(app)/admin/server/`  | The page and its actions                                                   |
-| `src/routes/api/admin/models/{openrouter,runware}` | The model searches behind Custom                                           |
-| `src/lib/components/admin/`                       | `SecretSettingField`, `ModelChoice`, `ModelSearch`                         |
+| File                                               | What it holds                                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `src/lib/server-settings.ts`                       | The keys, the model providers, presets and base models, parsing a choice. Pure                |
+| `src/lib/server/settings/index.ts`                 | Loading (and filling in), saving, regenerating, the Workers cache                             |
+| `src/lib/server/settings/legacy-env.ts`            | **Temporary**: the one-time import from the old environment variables                         |
+| `src/lib/server/settings/status.ts`                | What is set up, for the admin hub and the settings page's badges                              |
+| `src/lib/schemas/serverSettingsForms.ts`           | One Zod schema per card on the page                                                           |
+| `src/routes/(auth-required)/(app)/admin/server/`   | The page and its actions                                                                      |
+| `src/routes/api/admin/models/{openrouter,runware}` | The model searches behind Custom                                                              |
+| `src/lib/components/admin/`                        | `SecretSettingField`, `ProviderKeyDialog`, `ModelProviderField`, `ModelChoice`, `ModelSearch` |
 
 ## Storage
 
@@ -121,8 +121,8 @@ costs:
 
 ## The page
 
-Five cards, each its own superform and action, each with a save button that
-stays outlined until it has something valid to save:
+Six cards, each with its own superform and action, each with a save button
+that stays outlined until it has something valid to save:
 
 1. **Email** — the sender (`mailFrom`), how it is sent (`mailTransport`:
    Resend, an SMTP server, or files on this server), and that transport's
@@ -132,17 +132,19 @@ stays outlined until it has something valid to save:
    every other email is handed to `sendInBackground` so a response time cannot
    say whether an address has an account (docs/email.md), which cannot apply to
    the address of the admin pressing the button.
-2. **Language models** — the OpenRouter API key and the Daydreams story
-   model. Named for the provider's job rather than for Daydreams, its first
-   user, so a later feature that writes text adds its own model setting here
-   and shares the key.
-3. **Image models** — the Runware API key and a Daydreams model for each
-   picture style, named the same way.
-4. **Notifications** — the contact address push services are given
+2. **Model providers** — a row per provider: what it runs, whether its key
+   is saved and how it ends, and a button that opens its key in a dialog
+   (`ProviderKeyDialog`, the `saveModelProvider` action). See below.
+3. **Language models** — the Daydreams story model, with its provider.
+   Named for the job rather than for Daydreams, its first user, so a later
+   feature that writes text adds its own model setting here.
+4. **Image models** — a Daydreams model for each picture style, each with
+   its provider, named the same way.
+5. **Notifications** — the contact address push services are given
    (`vapidSubject`), the public key, and Regenerate. The address is optional:
    empty, it is `mailto:` the sender's address (`defaultVapidSubject`), and
    push is off only with neither.
-5. **Server secret** — never shown, where it came from, and Regenerate.
+6. **Server secret** — never shown, where it came from, and Regenerate.
 
 **A credential never reaches the browser** (`SECRET_SETTING_KEYS`: the auth
 secret, the private push key, the Resend key, the SMTP URL with its password,
@@ -163,13 +165,47 @@ admin hub (`/admin`) shows a line per area — Email, Language models, Image mod
 Notifications — and a warning when email is not set up, since nobody can
 confirm a new account until it is.
 
+## Model providers
+
+**Credentials belong to providers, not to models.** A provider —
+OpenRouter, Runware — is a service models run on, and it needs one key: the
+account the requests are billed to. `MODEL_PROVIDERS` in `server-settings.ts`
+is the registry: each provider's label, the setting its key is stored under
+(`openrouterApiKey`, `runwareApiKey`), and the hint and placeholder its key
+field shows. `LANGUAGE_PROVIDERS` and `IMAGE_PROVIDERS` say which kinds of
+model each runs — lists rather than a kind per provider, so one that runs both
+is simply in both. Every model setting that chooses a provider uses its key,
+read with `providerCredential`, so a key is set once however many models use
+it.
+
+**Each model setting chooses its provider**, in a `wa-select` drawn inside
+its fieldset (`ModelProviderField`). There is one provider of each kind so
+far, so each list has one entry; the choice is per setting rather than per
+card, so photos and illustrations could come from different providers.
+Changing provider starts the choice again from that provider's first preset,
+because a preset or a custom id means nothing to any other provider.
+
+**A model whose provider has no key says so where it is chosen**: a callout
+under the provider, with an *Add … key* button. It opens the same dialog as
+the provider's row under Model providers — one form per provider (`id:
+provider-<id>`), however the admin came to it — and the dialog closes once
+the key is saved. Which provider's key is being saved comes from the form;
+the setting it is stored under comes from the registry, never from the
+browser, so a forged `provider` is refused rather than written anywhere.
+
+Whether Daydreams are on (`readDaydreamConfig`) and whether they have
+pictures (`readImageConfig`), and the admin hub's On/Off badges
+(`serverSettingsStatus`), all ask the same question: does the chosen model's
+provider have a key.
+
 ## Choosing a model
 
-A model setting is a **preset** or **Custom**.
+A model setting is a provider, then a **preset** of that provider's or
+**Custom**.
 
-**A preset is named for a family, not a version**, and stored by its name —
-`{"preset":"hermes"}`. What it sends to is in code
-(`OPENROUTER_STORY_MODEL_PRESETS`, `RUNWARE_PICTURE_MODEL_PRESETS`), so moving
+**A preset is named for a family, not a version**, and stored by its name,
+with its provider — `{"provider":"openrouter","preset":"hermes"}`. What it sends to is in code
+(`STORY_MODEL_PRESETS`, `PICTURE_MODEL_PRESETS`, per provider), so moving
 a preset to a newer release is a change to `server-settings.ts` that moves
 every server that chose it. Every story preset is an open-weights model whose
 terms, and whose providers' terms on OpenRouter, allow adult fiction. The
@@ -178,8 +214,10 @@ model.
 
 **Custom stores a provider's id exactly**, and every key, field and label that
 holds one names its provider, because an id means nothing to the other:
-`{"openrouterModelId":"vendor/model"}` for the story,
-`{"runwareModelAir":"civitai:123@456","base":"pony"}` for a picture. The
+`{"provider":"openrouter","openrouterModelId":"vendor/model"}` for the story,
+`{"provider":"runware","runwareModelAir":"civitai:123@456","base":"pony"}` for
+a picture, under the settings `storyModel`, `photoModel` and
+`illustratedModel`. The
 picker (`ModelChoice`) finds one by searching:
 
 - **OpenRouter** — `GET /api/admin/models/openrouter?q=`, every word of the
@@ -238,9 +276,18 @@ picture is made, as it used to be: a model Runware misreports, or one of a
 family no recipe suits, is then the admin's choice to make knowingly, not a
 failed picture.
 
-A stored choice that no longer parses — a preset since removed, say — reads as
-the default (`parseOpenRouterStoryModel`, `parseRunwarePictureModel`), so a
-bad row cannot take Daydreams down with it.
+A stored choice that no longer parses — a preset since removed, or a
+provider this build does not know, say — reads as the default
+(`parseStoryModel`, `parsePictureModel`), so a bad row cannot take Daydreams
+down with it. One with no `provider` at all reads as the kind's first
+provider, which is what every choice was before there was a choice of them.
+
+**The settings used to be named for their provider** —
+`openrouterStoryModel`, `runwarePhotoModel`, `runwareIllustratedModel`.
+Migration 0042 copied each into its new key with its provider added, leaving
+a cleared one cleared and the old rows where they were, so a rollback to an
+older build still finds them; this build ignores them, like any key it does
+not know.
 
 ## Email on a new server
 
@@ -283,15 +330,19 @@ copy a real key into the run.
 
 ## Testing
 
+- `src/lib/server-settings.test.ts` — parsing a choice, its provider
+  included, and the provider registry.
 - `src/lib/server/settings/index.test.ts` — generating once, concurrent
   loads agreeing, the import and its rules, regenerating.
+- `src/lib/server/db/migrations.test.ts` — migration 0042's copy.
 - `src/routes/(auth-required)/(app)/admin/server/page.server.test.ts` — every
   action, admin-only, credentials never in the load data.
 - `src/routes/api/admin/models/*/server.test.ts` — the searches.
 - `src/routes/(public)/signup/first-account.server.test.ts` — the bootstrap,
   with `dev` mocked off (under vitest the dev outbox makes email always work).
 - `src/lib/components/admin/ServerSettingsFields.svelte.test.ts` — the
-  credential field and the picker.
+  credential field, the provider field and its missing-key callout, and the
+  picker.
 - `e2e/admin-settings.spec.ts` — the page in a browser. The settings are
   shared by every worker in a run, so it regenerates nothing and puts back
   what it saves.

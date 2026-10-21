@@ -44,10 +44,9 @@ test('an admin sees what is set up, and sends themselves a test email', async ({
 
 	const email = page.getByRole('article', { name: 'Email' });
 	await expect(email.getByText('Working')).toBeVisible();
-	// A saved credential is never shown, only that there is one.
-	await expect(
-		page.getByRole('article', { name: 'Language models' }).getByText('Saved')
-	).toBeVisible();
+	// A saved credential is never shown, only that there is one and how it ends.
+	const providers = page.getByRole('article', { name: 'Model providers' });
+	await expect(providers.getByText(/Key saved, ending …-key/)).toHaveCount(2);
 	await expect(page.getByText('e2e-openrouter-key')).toHaveCount(0);
 
 	await clickWaButton(page, 'Send a test email');
@@ -74,15 +73,14 @@ test('an admin finds a story model on OpenRouter and saves it', async ({ page })
 	try {
 		await clickWaButton(page, 'Save language model settings');
 		await expect(daydreams.getByText('Saved.')).toBeVisible();
-		const { rows } = await sql(
-			"select value from server_settings where key = 'openrouterStoryModel'"
-		);
+		const { rows } = await sql("select value from server_settings where key = 'storyModel'");
 		expect(JSON.parse(String(rows[0]?.value))).toEqual({
+			provider: 'openrouter',
 			openrouterModelId: 'stubvendor/stub-storyteller-70b'
 		});
 	} finally {
-		await sql("update server_settings set value = ? where key = 'openrouterStoryModel'", [
-			JSON.stringify({ openrouterModelId: 'e2e/stub' })
+		await sql("update server_settings set value = ? where key = 'storyModel'", [
+			JSON.stringify({ provider: 'openrouter', openrouterModelId: 'e2e/stub' })
 		]);
 	}
 });
@@ -112,6 +110,35 @@ test('a custom picture model found on Runware fills in its base model', async ({
 	await photo.getByRole('searchbox', { name: 'Search Runware' }).fill('');
 	await expect(photo.getByRole('button', { name: /Stub Pony Checkpoint/ })).toHaveCount(0);
 	// Not saved: every picture in the run would be drawn with it.
+});
+
+test('each model chooses a provider, whose key is set once under Model providers', async ({
+	page
+}) => {
+	const root = account('Root');
+	await signUp(page, root);
+	await becomeAdmin(page, root);
+	await openServerSettings(page);
+
+	const story = page
+		.getByRole('article', { name: 'Language models' })
+		.getByRole('group', { name: 'Daydreams story model' });
+	await expect(story.locator('wa-select[name="storyProvider"]')).toHaveJSProperty(
+		'value',
+		'openrouter'
+	);
+	// The suite's providers both have keys, so no model asks for one.
+	await expect(page.getByText(/has no API key yet/)).toHaveCount(0);
+
+	// The key is managed in a dialog of the provider's own. Nothing is saved:
+	// every other spec in the run uses this key.
+	const providers = page.getByRole('article', { name: 'Model providers' });
+	await providers.locator('wa-button', { hasText: 'Change OpenRouter key' }).click();
+	const dialog = page.locator('wa-dialog[open]');
+	await expect(dialog.getByText(/Saved, ending/)).toBeVisible();
+	await expect(dialog.locator('wa-button', { hasText: 'Save OpenRouter key' })).toBeVisible();
+	await dialog.locator('wa-button', { hasText: 'Cancel' }).click();
+	await expect(page.locator('wa-dialog[open]')).toHaveCount(0);
 });
 
 test('the server settings are a 404 for anyone but an admin', async ({ page }) => {

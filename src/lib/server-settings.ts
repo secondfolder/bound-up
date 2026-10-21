@@ -26,10 +26,10 @@ export const SERVER_SETTING_KEYS = [
 	'smtpUrl',
 	'mailOutboxDir',
 	'openrouterApiKey',
-	'openrouterStoryModel',
 	'runwareApiKey',
-	'runwarePhotoModel',
-	'runwareIllustratedModel'
+	'storyModel',
+	'photoModel',
+	'illustratedModel'
 ] as const;
 
 export type ServerSettingKey = (typeof SERVER_SETTING_KEYS)[number];
@@ -59,6 +59,84 @@ export const MAIL_TRANSPORTS: readonly MailTransportKind[] = ['resend', 'smtp', 
 
 export function isMailTransport(value: string): value is MailTransportKind {
 	return (MAIL_TRANSPORTS as readonly string[]).includes(value);
+}
+
+// ── model providers ──────────────────────────────────────────────────────────
+
+/**
+ * The services models are run on, and the one credential each needs. A
+ * provider's key is set once, on its own, and every model setting that
+ * chooses the provider uses it: the key belongs to the account with the
+ * provider, not to any one model. See docs/server-settings.md, "Model
+ * providers".
+ */
+export const MODEL_PROVIDERS = {
+	openrouter: {
+		label: 'OpenRouter',
+		credentialKey: 'openrouterApiKey',
+		keyLabel: 'OpenRouter API key',
+		keyHint: 'From openrouter.ai → Keys. Setting a credit limit on it is a good idea.',
+		keyPlaceholder: 'sk-or-…'
+	},
+	runware: {
+		label: 'Runware',
+		credentialKey: 'runwareApiKey',
+		keyLabel: 'Runware API key',
+		keyHint: 'From runware.ai → API Keys. Searching for a custom model needs it saved first.',
+		keyPlaceholder: null
+	}
+} as const satisfies Record<
+	string,
+	{
+		label: string;
+		credentialKey: ServerSettingKey;
+		keyLabel: string;
+		keyHint: string;
+		keyPlaceholder: string | null;
+	}
+>;
+
+export type ModelProviderId = keyof typeof MODEL_PROVIDERS;
+
+export const MODEL_PROVIDER_IDS = Object.keys(MODEL_PROVIDERS) as ModelProviderId[];
+
+/**
+ * The providers a model of each kind can be chosen from. Lists rather than a
+ * kind on each provider, so a provider that runs both is simply in both.
+ */
+export const LANGUAGE_PROVIDERS = ['openrouter'] as const satisfies readonly ModelProviderId[];
+export const IMAGE_PROVIDERS = ['runware'] as const satisfies readonly ModelProviderId[];
+
+export type LanguageProviderId = (typeof LANGUAGE_PROVIDERS)[number];
+export type ImageProviderId = (typeof IMAGE_PROVIDERS)[number];
+
+export type ModelKind = 'language' | 'image';
+
+/** What a provider runs, for the providers card. */
+export function modelKindsOf(provider: ModelProviderId): ModelKind[] {
+	const kinds: ModelKind[] = [];
+	if ((LANGUAGE_PROVIDERS as readonly string[]).includes(provider)) {
+		kinds.push('language');
+	}
+	if ((IMAGE_PROVIDERS as readonly string[]).includes(provider)) {
+		kinds.push('image');
+	}
+	return kinds;
+}
+
+export function isModelProvider(value: unknown): value is ModelProviderId {
+	return typeof value === 'string' && Object.hasOwn(MODEL_PROVIDERS, value);
+}
+
+/** The settings that hold a provider's credential. */
+export type ProviderCredentialKey = (typeof MODEL_PROVIDERS)[ModelProviderId]['credentialKey'];
+
+/** A provider's key, trimmed, or `''` when it has none. */
+export function providerCredential(
+	settings: Pick<ServerSettings, ProviderCredentialKey>,
+	provider: ModelProviderId
+): string {
+	return settings[MODEL_PROVIDERS[provider].credentialKey].trim();
 }
 
 // ── story model (OpenRouter) ─────────────────────────────────────────────────
@@ -101,8 +179,16 @@ export const OPENROUTER_STORY_MODEL_PRESETS = [
 
 export type OpenRouterStoryModelPresetId = (typeof OPENROUTER_STORY_MODEL_PRESETS)[number]['id'];
 
-/** What `openrouterStoryModel` holds, as JSON. */
-export type OpenRouterStoryModelChoice =
+/** The story presets on offer from each provider. */
+export const STORY_MODEL_PRESETS = {
+	openrouter: OPENROUTER_STORY_MODEL_PRESETS
+} as const satisfies Record<LanguageProviderId, readonly { id: string }[]>;
+
+/**
+ * What `storyModel` holds, as JSON: the provider, then a preset of its or a
+ * custom id in its own terms.
+ */
+export type StoryModelChoice = { provider: 'openrouter' } & (
 	| { preset: OpenRouterStoryModelPresetId }
 	| {
 			openrouterModelId: string;
@@ -113,9 +199,10 @@ export type OpenRouterStoryModelChoice =
 			 * which is read as no. None of the presets do.
 			 */
 			tools?: boolean;
-	  };
+	  }
+);
 
-export const DEFAULT_OPENROUTER_STORY_MODEL: OpenRouterStoryModelChoice = { preset: 'hermes' };
+export const DEFAULT_STORY_MODEL: StoryModelChoice = { provider: 'openrouter', preset: 'hermes' };
 
 /**
  * An OpenRouter model id: `vendor/model`, optionally with a `:variant`, and
@@ -237,22 +324,29 @@ export const RUNWARE_PICTURE_MODEL_PRESETS = {
 	]
 } as const satisfies Record<PictureStyle, readonly PicturePreset[]>;
 
-/** What `runwarePhotoModel` and `runwareIllustratedModel` hold, as JSON. */
-export type RunwarePictureModelChoice =
-	| { preset: string }
-	| { runwareModelAir: string; base: PictureBaseModel };
+/** The picture presets on offer from each provider, per style. */
+export const PICTURE_MODEL_PRESETS = {
+	runware: RUNWARE_PICTURE_MODEL_PRESETS
+} as const satisfies Record<ImageProviderId, Record<PictureStyle, readonly { id: string }[]>>;
 
-export const DEFAULT_RUNWARE_PICTURE_MODELS: Readonly<
-	Record<PictureStyle, RunwarePictureModelChoice>
-> = {
-	photo: { preset: 'dark-beast' },
-	illustrated: { preset: 'wai-illustrious' }
+/**
+ * What `photoModel` and `illustratedModel` hold, as JSON: the provider, then
+ * a preset of its or a custom model in its own terms.
+ */
+export type PictureModelChoice = { provider: 'runware' } & (
+	| { preset: string }
+	| { runwareModelAir: string; base: PictureBaseModel }
+);
+
+export const DEFAULT_PICTURE_MODELS: Readonly<Record<PictureStyle, PictureModelChoice>> = {
+	photo: { provider: 'runware', preset: 'dark-beast' },
+	illustrated: { provider: 'runware', preset: 'wai-illustrious' }
 };
 
 /** The setting that holds each style's model. */
-export const RUNWARE_PICTURE_MODEL_SETTING = {
-	photo: 'runwarePhotoModel',
-	illustrated: 'runwareIllustratedModel'
+export const PICTURE_MODEL_SETTING = {
+	photo: 'photoModel',
+	illustrated: 'illustratedModel'
 } as const satisfies Record<PictureStyle, ServerSettingKey>;
 
 /**
@@ -276,31 +370,48 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * A stored story model choice, or the default for one that is unset or not
- * one this build understands — a preset since removed, say. Never throws: a
- * bad row must not take Daydreams down with it.
+ * The provider a stored choice names. One without any is read as the kind's
+ * first provider, which every choice was before there was a choice of them;
+ * one this build does not know is null, and the choice reads as the default.
  */
-export function parseOpenRouterStoryModel(raw: string): OpenRouterStoryModelChoice {
+function providerOf<P extends string>(
+	value: Record<string, unknown>,
+	known: readonly P[]
+): P | null {
+	if (value.provider === undefined) {
+		return known[0] ?? null;
+	}
+	return known.find((id) => id === value.provider) ?? null;
+}
+
+/**
+ * A stored story model choice, or the default for one that is unset or not
+ * one this build understands — a preset since removed, or a provider, say.
+ * Never throws: a bad row must not take Daydreams down with it.
+ */
+export function parseStoryModel(raw: string): StoryModelChoice {
 	const value = parseJson(raw);
-	if (isRecord(value)) {
+	if (isRecord(value) && providerOf(value, LANGUAGE_PROVIDERS) === 'openrouter') {
 		const { preset, openrouterModelId } = value;
 		if (OPENROUTER_STORY_MODEL_PRESETS.some((entry) => entry.id === preset)) {
-			return { preset: preset as OpenRouterStoryModelPresetId };
+			return { provider: 'openrouter', preset: preset as OpenRouterStoryModelPresetId };
 		}
 		if (typeof openrouterModelId === 'string' && OPENROUTER_MODEL_ID.test(openrouterModelId)) {
-			return value.tools === true ? { openrouterModelId, tools: true } : { openrouterModelId };
+			return value.tools === true
+				? { provider: 'openrouter', openrouterModelId, tools: true }
+				: { provider: 'openrouter', openrouterModelId };
 		}
 	}
-	return DEFAULT_OPENROUTER_STORY_MODEL;
+	return DEFAULT_STORY_MODEL;
 }
 
 /** Whether a choice's model can call tools: only a custom one OpenRouter said could. */
-export function storyModelCallsTools(choice: OpenRouterStoryModelChoice): boolean {
+export function storyModelCallsTools(choice: StoryModelChoice): boolean {
 	return 'openrouterModelId' in choice && choice.tools === true;
 }
 
 /** The OpenRouter model id a choice is sent to. */
-export function openrouterModelIdFor(choice: OpenRouterStoryModelChoice): string {
+export function openrouterModelIdFor(choice: StoryModelChoice): string {
 	if ('openrouterModelId' in choice) {
 		return choice.openrouterModelId;
 	}
@@ -309,15 +420,12 @@ export function openrouterModelIdFor(choice: OpenRouterStoryModelChoice): string
 }
 
 /** A stored picture model choice for a style, or that style's default; as above, never throws. */
-export function parseRunwarePictureModel(
-	style: PictureStyle,
-	raw: string
-): RunwarePictureModelChoice {
+export function parsePictureModel(style: PictureStyle, raw: string): PictureModelChoice {
 	const value = parseJson(raw);
-	if (isRecord(value)) {
+	if (isRecord(value) && providerOf(value, IMAGE_PROVIDERS) === 'runware') {
 		const { preset, runwareModelAir, base } = value;
 		if (RUNWARE_PICTURE_MODEL_PRESETS[style].some((entry) => entry.id === preset)) {
-			return { preset: preset as string };
+			return { provider: 'runware', preset: preset as string };
 		}
 		if (
 			typeof runwareModelAir === 'string' &&
@@ -325,10 +433,10 @@ export function parseRunwarePictureModel(
 			typeof base === 'string' &&
 			isPictureBaseModel(base)
 		) {
-			return { runwareModelAir, base };
+			return { provider: 'runware', runwareModelAir, base };
 		}
 	}
-	return DEFAULT_RUNWARE_PICTURE_MODELS[style];
+	return DEFAULT_PICTURE_MODELS[style];
 }
 
 /** A Runware model and how it is prompted. */
@@ -341,11 +449,11 @@ export type RunwarePictureModel = {
 /** The model a style's choice draws with, and the recipe its base model calls for. */
 export function runwarePictureModelFor(
 	style: PictureStyle,
-	choice: RunwarePictureModelChoice
+	choice: PictureModelChoice
 ): RunwarePictureModel {
 	let picked: { runwareModelAir: string; base: PictureBaseModel };
 	if ('runwareModelAir' in choice) {
-		picked = choice;
+		picked = { runwareModelAir: choice.runwareModelAir, base: choice.base };
 	} else {
 		const presets: readonly PicturePreset[] = RUNWARE_PICTURE_MODEL_PRESETS[style];
 		picked = presets.find((entry) => entry.id === choice.preset) ?? (presets[0] as PicturePreset);

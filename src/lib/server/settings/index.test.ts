@@ -115,16 +115,17 @@ describe('the one-time import from the environment', () => {
 		env.RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED = 'civitai:999@999';
 		const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 		const settings = await loadServerSettings(db, undefined);
-		expect(JSON.parse(settings.openrouterStoryModel)).toEqual({ preset: 'hermes' });
-		expect(JSON.parse(settings.runwarePhotoModel)).toEqual({ preset: 'lustify' });
+		expect(JSON.parse(settings.storyModel)).toEqual({ provider: 'openrouter', preset: 'hermes' });
+		expect(JSON.parse(settings.photoModel)).toEqual({ provider: 'runware', preset: 'lustify' });
 		// Its base model cannot be known, so it is not imported, and says so.
-		expect(settings.runwareIllustratedModel).toBe('');
+		expect(settings.illustratedModel).toBe('');
 		expect(String(warned.mock.calls[0]?.[0])).toContain('RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED');
 		warned.mockRestore();
 
 		await harness.db.delete(serverSettings);
 		env.DAYDREAM_MODEL = 'some/model';
-		expect(JSON.parse((await loadServerSettings(db, undefined)).openrouterStoryModel)).toEqual({
+		expect(JSON.parse((await loadServerSettings(db, undefined)).storyModel)).toEqual({
+			provider: 'openrouter',
 			openrouterModelId: 'some/model'
 		});
 	});

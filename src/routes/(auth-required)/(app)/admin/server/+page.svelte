@@ -2,6 +2,8 @@
 	import type { Attachment } from 'svelte/attachments';
 	import { resolve } from '$app/paths';
 	import ModelChoice, { type ModelPresetOption } from '$lib/components/admin/ModelChoice.svelte';
+	import ModelProviderField from '$lib/components/admin/ModelProviderField.svelte';
+	import ProviderKeyDialog from '$lib/components/admin/ProviderKeyDialog.svelte';
 	import SecretSettingField from '$lib/components/admin/SecretSettingField.svelte';
 	import InputField from '$lib/components/InputField.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
@@ -12,10 +14,16 @@
 		pushSettingsFormSchema
 	} from '$lib/schemas/serverSettingsForms';
 	import {
-		OPENROUTER_STORY_MODEL_PRESETS,
+		IMAGE_PROVIDERS,
+		LANGUAGE_PROVIDERS,
+		MODEL_PROVIDER_IDS,
+		MODEL_PROVIDERS,
+		type ModelProviderId,
+		modelKindsOf,
 		PICTURE_BASE_MODELS,
-		RUNWARE_PICTURE_MODEL_PRESETS,
-		type ServerSettingKey
+		PICTURE_MODEL_PRESETS,
+		type ServerSettingKey,
+		STORY_MODEL_PRESETS
 	} from '$lib/server-settings';
 	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
@@ -92,19 +100,57 @@
 		pushIsTainted($pushTainted) && pushSettingsFormSchema.safeParse($push).success
 	);
 
-	const storyPresets: ModelPresetOption[] = OPENROUTER_STORY_MODEL_PRESETS.map((preset) => ({
-		...preset,
-		modelId: preset.openrouterModelId
-	}));
-	const baseLabel = (id: string) => PICTURE_BASE_MODELS.find((base) => base.id === id)?.label ?? id;
-	const photoPresets: ModelPresetOption[] = RUNWARE_PICTURE_MODEL_PRESETS.photo.map((preset) => ({
-		...preset,
-		modelId: preset.runwareModelAir,
-		baseLabel: baseLabel(preset.base)
-	}));
-	const illustratedPresets: ModelPresetOption[] = RUNWARE_PICTURE_MODEL_PRESETS.illustrated.map(
-		(preset) => ({ ...preset, modelId: preset.runwareModelAir, baseLabel: baseLabel(preset.base) })
+	// Each model setting's presets are those of the provider it has chosen.
+	const storyPresets: ModelPresetOption[] = $derived(
+		STORY_MODEL_PRESETS[$languageModels.storyProvider].map((preset) => ({
+			...preset,
+			modelId: preset.openrouterModelId
+		}))
 	);
+	const baseLabel = (id: string) => PICTURE_BASE_MODELS.find((base) => base.id === id)?.label ?? id;
+	const picturePresets = (
+		provider: (typeof IMAGE_PROVIDERS)[number],
+		style: 'photo' | 'illustrated'
+	): ModelPresetOption[] =>
+		PICTURE_MODEL_PRESETS[provider][style].map((preset) => ({
+			...preset,
+			modelId: preset.runwareModelAir,
+			baseLabel: baseLabel(preset.base)
+		}));
+	const photoPresets = $derived(picturePresets($imageModels.photoProvider, 'photo'));
+	const illustratedPresets = $derived(
+		picturePresets($imageModels.illustratedProvider, 'illustrated')
+	);
+
+	// ── model providers ──
+	// One key per provider, in a dialog of its own, opened from the provider's
+	// row or from a model setting whose provider has none yet.
+	const providerDialogs: Partial<Record<ModelProviderId, { show: () => void }>> = $state({});
+
+	function openProviderKey(provider: ModelProviderId) {
+		providerDialogs[provider]?.show();
+	}
+
+	function providerKey(provider: ModelProviderId) {
+		return data.secrets[MODEL_PROVIDERS[provider].credentialKey];
+	}
+
+	const keySet = (provider: ModelProviderId) => providerKey(provider).set;
+
+	const KIND_LABELS = { language: 'Language models', image: 'Image models' } as const;
+
+	function kindsLabel(provider: ModelProviderId): string {
+		return modelKindsOf(provider)
+			.map((kind) => KIND_LABELS[kind])
+			.join(' and ');
+	}
+
+	const firstStoryPreset = (provider: ModelProviderId) =>
+		STORY_MODEL_PRESETS[provider as (typeof LANGUAGE_PROVIDERS)[number]][0]?.id ?? 'custom';
+	const firstPicturePreset = (style: 'photo' | 'illustrated') => (provider: ModelProviderId) =>
+		PICTURE_MODEL_PRESETS[provider as (typeof IMAGE_PROVIDERS)[number]][style][0]?.id ?? 'custom';
+
+	const credentialKeys = MODEL_PROVIDER_IDS.map((id) => MODEL_PROVIDERS[id].credentialKey);
 
 	const TRANSPORTS = [
 		{
@@ -306,6 +352,45 @@
 			</form>
 		</article>
 
+		<!-- ── Model providers ───────────────────────────────────────────── -->
+		<!-- Credentials apart from models: a provider's key is the account with
+		     it, shared by every model setting that chooses it. -->
+		<article class="panel" aria-labelledby="providers-heading">
+			<header>
+				<h2 id="providers-heading">Model providers</h2>
+			</header>
+			<p class="lead">
+				The services the language and image models below run on. Each has one API key, used by
+				every model that runs there, and every request is billed to it.
+			</p>
+			<ul class="providers">
+				{#each MODEL_PROVIDER_IDS as provider (provider)}
+					{const stored = $derived(providerKey(provider))}
+					<li class="generated">
+						<div class="value">
+							<span class="label">{MODEL_PROVIDERS[provider].label}</span>
+							<small>{kindsLabel(provider)}</small>
+							<small class="key-state">
+								{#if stored.set}
+									<wa-icon name="key" variant="solid"></wa-icon>
+									Key saved{#if stored.tail}, ending <code>…{stored.tail}</code>{/if}
+								{:else}
+									No key yet
+								{/if}
+							</small>
+						</div>
+						<wa-button size="s" appearance="outlined" onclick={() => openProviderKey(provider)}>
+							{stored.set ? 'Change' : 'Add'}
+							{MODEL_PROVIDERS[provider].label} key
+						</wa-button>
+					</li>
+				{/each}
+			</ul>
+			{#if stillInEnv(...credentialKeys).length}
+				{@render envNote(stillInEnv(...credentialKeys))}
+			{/if}
+		</article>
+
 		<!-- ── Language models ───────────────────────────────────────────── -->
 		<!-- Named for what the provider does rather than for Daydreams, its
 		     first user: a later feature that writes text uses the same key,
@@ -320,27 +405,31 @@
 				{/if}
 			</header>
 			<p class="lead">
-				Text is written by chat models on OpenRouter, and every request is billed to this key.
-				Daydreams use them for their stories; without a key, Daydreams are off on this server.
+				Text is written by chat models. Daydreams use them for their stories; without a key for
+				the story model’s provider, Daydreams are off on this server.
 			</p>
 			<form method="POST" action="?/saveLanguageModels" use:languageModelForm.enhance>
-				<SecretSettingField
-					superform={languageModelForm}
-					field="openrouterApiKey"
-					changeField="openrouterApiKeyChange"
-					label="OpenRouter API key"
-					stored={data.secrets.openrouterApiKey}
-					hint="From openrouter.ai → Keys. Setting a credit limit on it is a good idea."
-					placeholder="sk-or-…"
-				/>
 				<ModelChoice
 					superform={languageModelForm}
 					choiceField="storyModel"
 					idField="openrouterModelId"
-					provider="openrouter"
+					provider={$languageModels.storyProvider}
 					legend="Daydreams story model"
 					presets={storyPresets}
-				/>
+				>
+					{#snippet providerField()}
+						<ModelProviderField
+							superform={languageModelForm}
+							field="storyProvider"
+							choiceField="storyModel"
+							idField="openrouterModelId"
+							providers={LANGUAGE_PROVIDERS}
+							firstPreset={firstStoryPreset}
+							{keySet}
+							onaddkey={openProviderKey}
+						/>
+					{/snippet}
+				</ModelChoice>
 				<!-- What is stored, not what is picked: OpenRouter is asked whether
 				     the model calls tools when it is saved. Worded without "saved",
 				     which the panel's stored-credential badge is found by. -->
@@ -353,8 +442,8 @@
 						it is stored.
 					{/if}
 				</p>
-				{#if stillInEnv('openrouterApiKey', 'openrouterStoryModel').length}
-					{@render envNote(stillInEnv('openrouterApiKey', 'openrouterStoryModel'))}
+				{#if stillInEnv('storyModel').length}
+					{@render envNote(stillInEnv('storyModel'))}
 				{/if}
 				<div class="actions">
 					{#if $languageModelMessage}<span class="saved" role="status">{$languageModelMessage}</span>{/if}
@@ -382,40 +471,58 @@
 				{/if}
 			</header>
 			<p class="lead">
-				Images are generated by models on Runware, and every one is billed to this key. Daydreams
-				use them for a picture beside each passage; without a key, there are none.
+				Images are generated by image models. Daydreams use them for a picture beside each
+				passage; without a key for each picture model’s provider, there are none.
 			</p>
 			<form method="POST" action="?/saveImageModels" use:imageModelForm.enhance>
-				<SecretSettingField
-					superform={imageModelForm}
-					field="runwareApiKey"
-					changeField="runwareApiKeyChange"
-					label="Runware API key"
-					stored={data.secrets.runwareApiKey}
-					hint="From runware.ai → API Keys. Searching for a custom model needs it saved first."
-				/>
 				<ModelChoice
 					superform={imageModelForm}
 					choiceField="photoModel"
 					idField="photoRunwareModelAir"
 					baseField="photoBase"
-					provider="runware"
+					provider={$imageModels.photoProvider}
 					legend="Daydreams photo model"
 					presets={photoPresets}
-				/>
+				>
+					{#snippet providerField()}
+						<ModelProviderField
+							superform={imageModelForm}
+							field="photoProvider"
+							choiceField="photoModel"
+							idField="photoRunwareModelAir"
+							baseField="photoBase"
+							providers={IMAGE_PROVIDERS}
+							firstPreset={firstPicturePreset('photo')}
+							{keySet}
+							onaddkey={openProviderKey}
+						/>
+					{/snippet}
+				</ModelChoice>
 				<ModelChoice
 					superform={imageModelForm}
 					choiceField="illustratedModel"
 					idField="illustratedRunwareModelAir"
 					baseField="illustratedBase"
-					provider="runware"
+					provider={$imageModels.illustratedProvider}
 					legend="Daydreams illustration model"
 					presets={illustratedPresets}
-				/>
-				{#if stillInEnv('runwareApiKey', 'runwarePhotoModel', 'runwareIllustratedModel').length}
-					{@render envNote(
-						stillInEnv('runwareApiKey', 'runwarePhotoModel', 'runwareIllustratedModel')
-					)}
+				>
+					{#snippet providerField()}
+						<ModelProviderField
+							superform={imageModelForm}
+							field="illustratedProvider"
+							choiceField="illustratedModel"
+							idField="illustratedRunwareModelAir"
+							baseField="illustratedBase"
+							providers={IMAGE_PROVIDERS}
+							firstPreset={firstPicturePreset('illustrated')}
+							{keySet}
+							onaddkey={openProviderKey}
+						/>
+					{/snippet}
+				</ModelChoice>
+				{#if stillInEnv('photoModel', 'illustratedModel').length}
+					{@render envNote(stillInEnv('photoModel', 'illustratedModel'))}
 				{/if}
 				<div class="actions">
 					{#if $imageModelMessage}<span class="saved" role="status">{$imageModelMessage}</span>{/if}
@@ -522,6 +629,15 @@
 		</article>
 	</div>
 </section>
+
+{#each MODEL_PROVIDER_IDS as provider (provider)}
+	<ProviderKeyDialog
+		bind:this={providerDialogs[provider]}
+		data={data.providerForms[provider]}
+		{provider}
+		stored={providerKey(provider)}
+	/>
+{/each}
 
 <wa-dialog bind:this={vapidDialog} label="Regenerate the notification keys?">
 	<p>
@@ -724,6 +840,21 @@
 
 		small {
 			color: var(--wa-color-text-quiet);
+		}
+	}
+
+	.providers {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+
+		.key-state {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4rem;
 		}
 	}
 

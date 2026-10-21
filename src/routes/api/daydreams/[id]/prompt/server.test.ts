@@ -89,7 +89,7 @@ describe('POST /api/daydreams/[id]/prompt', () => {
 		await grantDebug(ada);
 		const settings = testSettings({
 			runwareApiKey: 'rw-key',
-			runwarePhotoModel: JSON.stringify({ preset: 'flux-2-klein-9b' })
+			photoModel: JSON.stringify({ preset: 'flux-2-klein-9b' })
 		});
 		const withStyle = (style: 'photo' | 'illustrated') => ({
 			...body,

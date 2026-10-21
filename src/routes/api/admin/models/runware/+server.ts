@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { MODEL_SEARCH_LIMIT, type RunwareModelResult } from '$lib/model-search';
 import { requireAdmin } from '$lib/server/admin';
 import { runwareBaseUrl } from '$lib/server/daydream/image-config';
-import { pictureBaseModelForRunware } from '$lib/server-settings';
+import { pictureBaseModelForRunware, providerCredential } from '$lib/server-settings';
 import type { RequestHandler } from './$types';
 
 /** What Runware's `modelSearch` answers, as far as this reads it. */
@@ -66,10 +66,12 @@ function plainText(html: string | null | undefined): string {
  */
 export const GET: RequestHandler = async ({ locals, platform, request, url }) => {
 	requireAdmin(locals);
-	const apiKey = locals.settings.runwareApiKey.trim();
+	const apiKey = providerCredential(locals.settings, 'runware');
 	if (!apiKey) {
 		return json(
-			{ message: 'Save a Runware API key first: searching Runware needs one.' },
+			{
+				message: 'Save a Runware API key under Model providers first: searching Runware needs one.'
+			},
 			{ status: 409 }
 		);
 	}

@@ -4,9 +4,10 @@ import { env as privateEnv } from '$env/dynamic/private';
 import {
 	OPENROUTER_MODEL_ID,
 	OPENROUTER_STORY_MODEL_PRESETS,
+	type PictureModelChoice,
 	RUNWARE_PICTURE_MODEL_PRESETS,
-	type RunwarePictureModelChoice,
-	type ServerSettingKey
+	type ServerSettingKey,
+	type StoryModelChoice
 } from '$lib/server-settings';
 import type { ServerSettingRows } from '.';
 
@@ -43,9 +44,9 @@ export const LEGACY_ENV_VARIABLES: Readonly<Partial<Record<ServerSettingKey, rea
 		vapidPublicKey: ['VAPID_PUBLIC_KEY'],
 		vapidPrivateKey: ['VAPID_PRIVATE_KEY'],
 		mailTransport: ['RESEND_API_KEY', 'SMTP_URL', 'MAIL_OUTBOX_DIR'],
-		openrouterStoryModel: ['DAYDREAM_MODEL'],
-		runwarePhotoModel: ['RUNWARE_AI_IMAGE_MODEL'],
-		runwareIllustratedModel: ['RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED']
+		storyModel: ['DAYDREAM_MODEL'],
+		photoModel: ['RUNWARE_AI_IMAGE_MODEL'],
+		illustratedModel: ['RUNWARE_AI_IMAGE_MODEL_ILLUSTRATED']
 	};
 
 /** Architectures of the models these variables have ever defaulted to, so one can be imported. */
@@ -72,9 +73,11 @@ function storyModel(read: Reader): string | null {
 	}
 	const preset = OPENROUTER_STORY_MODEL_PRESETS.find((entry) => entry.openrouterModelId === id);
 	if (preset) {
-		return JSON.stringify({ preset: preset.id });
+		return JSON.stringify({ provider: 'openrouter', preset: preset.id } satisfies StoryModelChoice);
 	}
-	return OPENROUTER_MODEL_ID.test(id) ? JSON.stringify({ openrouterModelId: id }) : null;
+	return OPENROUTER_MODEL_ID.test(id)
+		? JSON.stringify({ provider: 'openrouter', openrouterModelId: id } satisfies StoryModelChoice)
+		: null;
 }
 
 function pictureModel(read: Reader, style: 'photo' | 'illustrated'): string | null {
@@ -87,7 +90,7 @@ function pictureModel(read: Reader, style: 'photo' | 'illustrated'): string | nu
 		(entry) => entry.runwareModelAir === air
 	);
 	if (preset) {
-		return JSON.stringify({ preset: preset.id } satisfies RunwarePictureModelChoice);
+		return JSON.stringify({ provider: 'runware', preset: preset.id } satisfies PictureModelChoice);
 	}
 	const base = KNOWN_BASES[air];
 	if (!base) {
@@ -98,7 +101,11 @@ function pictureModel(read: Reader, style: 'photo' | 'illustrated'): string | nu
 		);
 		return null;
 	}
-	return JSON.stringify({ runwareModelAir: air, base } satisfies RunwarePictureModelChoice);
+	return JSON.stringify({
+		provider: 'runware',
+		runwareModelAir: air,
+		base
+	} satisfies PictureModelChoice);
 }
 
 /** The settings with no row whose old variable is set, and the value each should take. */
@@ -135,9 +142,9 @@ export function legacyEnvSettings(
 	if (transports.length === 1) {
 		add('mailTransport', transports[0]?.[0] ?? null);
 	}
-	add('openrouterStoryModel', storyModel(read));
-	add('runwarePhotoModel', pictureModel(read, 'photo'));
-	add('runwareIllustratedModel', pictureModel(read, 'illustrated'));
+	add('storyModel', storyModel(read));
+	add('photoModel', pictureModel(read, 'photo'));
+	add('illustratedModel', pictureModel(read, 'illustrated'));
 	return found;
 }
 

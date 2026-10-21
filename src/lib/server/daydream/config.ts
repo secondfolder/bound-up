@@ -1,7 +1,10 @@
 import { env as privateEnv } from '$env/dynamic/private';
 import {
+	type LanguageProviderId,
 	openrouterModelIdFor,
-	parseOpenRouterStoryModel,
+	type ProviderCredentialKey,
+	parseStoryModel,
+	providerCredential,
 	type ServerSettings,
 	storyModelCallsTools
 } from '$lib/server-settings';
@@ -14,6 +17,9 @@ import {
  * key simply has no Daydreams, and its pages say so.
  */
 export type DaydreamConfig = {
+	/** Who runs the story model. Only OpenRouter can, so far. */
+	provider: LanguageProviderId;
+	/** That provider's key (Admin → Server settings → Model providers). */
 	apiKey: string;
 	/** The OpenRouter model the story goes to, e.g. `nousresearch/hermes-3-llama-3.1-70b`. */
 	openrouterModelId: string;
@@ -26,7 +32,7 @@ export type DaydreamConfig = {
 	baseUrl: string;
 };
 
-export type DaydreamSettings = Pick<ServerSettings, 'openrouterApiKey' | 'openrouterStoryModel'>;
+export type DaydreamSettings = Pick<ServerSettings, ProviderCredentialKey | 'storyModel'>;
 
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
@@ -50,17 +56,21 @@ export function openrouterBaseUrl(platform: App.Platform | undefined): string {
 	return baseUrl;
 }
 
-/** Null when no key is set, which turns Daydreams off on this server. */
+/**
+ * Null when the story model's provider has no key, which turns Daydreams off
+ * on this server.
+ */
 export function parseDaydreamConfig(
 	settings: DaydreamSettings,
 	baseUrl: string
 ): DaydreamConfig | null {
-	const apiKey = settings.openrouterApiKey.trim();
+	const choice = parseStoryModel(settings.storyModel);
+	const apiKey = providerCredential(settings, choice.provider);
 	if (!apiKey) {
 		return null;
 	}
-	const choice = parseOpenRouterStoryModel(settings.openrouterStoryModel);
 	return {
+		provider: choice.provider,
 		apiKey,
 		openrouterModelId: openrouterModelIdFor(choice),
 		readsLinks: storyModelCallsTools(choice),

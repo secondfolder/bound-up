@@ -1951,16 +1951,22 @@ Set at Settings → Admin → Server settings, and stored as server settings
 (`server/daydream/image-config.ts`). Neither key is ever generated: each
 reply and each picture is paid for on it.
 
-| Setting                   | Default                      | What it is                               |
-| ------------------------- | ---------------------------- | ---------------------------------------- |
-| `openrouterApiKey`        | none — Daydreams are off     | The key every passage is paid for on     |
-| `openrouterStoryModel`    | the `hermes` preset          | The story model: a preset or a custom id |
-| `runwareApiKey`           | none — no pictures           | The key every picture is paid for on     |
-| `runwarePhotoModel`       | the `dark-beast` preset      | The model for photo-style pictures       |
-| `runwareIllustratedModel` | the `wai-illustrious` preset | The same, for illustrations              |
+| Setting            | Default                            | What it is                                             |
+| ------------------ | ---------------------------------- | ------------------------------------------------------ |
+| `storyModel`       | OpenRouter's `hermes` preset       | The story model: its provider, a preset or a custom id |
+| `photoModel`       | Runware's `dark-beast` preset      | The model for photo-style pictures                     |
+| `illustratedModel` | Runware's `wai-illustrious` preset | The same, for illustrations                            |
+| `openrouterApiKey` | none                               | OpenRouter's key, for every model that runs there      |
+| `runwareApiKey`    | none                               | Runware's key, likewise                                |
 
-**A model is a preset or a custom one**, stored as JSON. A preset is stored
-by its id — `{"preset":"hermes"}` — and mapped to the provider's model in code
+Daydreams are off without a key for the story model's provider, and have no
+pictures without one for each picture model's. A key belongs to its provider
+and is shared by every model that runs there
+([server-settings.md](server-settings.md#model-providers)).
+
+**A model is a preset or a custom one**, stored as JSON with its provider. A
+preset is stored by its id — `{"provider":"openrouter","preset":"hermes"}` —
+and mapped to the provider's model in code
 (`OPENROUTER_STORY_MODEL_PRESETS`, `RUNWARE_PICTURE_MODEL_PRESETS` in
 `src/lib/server-settings.ts`), so a preset can move to a newer version of its
 model without anyone touching a setting. The story presets are Hermes (the
@@ -1970,11 +1976,11 @@ FLUX.2 Klein 9B (Black Forest Labs' distilled model, which Runware lists for
 commercial use though BFL publish its weights under a non-commercial licence),
 and WAI-illustrious (Illustrious, the illustrated default).
 
-- **A custom story model** is any OpenRouter id, `{"openrouterModelId":
-  "vendor/id"}`, found on the admin page by searching OpenRouter's public
+- **A custom story model** is any OpenRouter id, `{"provider":"openrouter",
+  "openrouterModelId":"vendor/id"}`, found on the admin page by searching OpenRouter's public
   model list (`GET /api/admin/models/openrouter?q=`).
 - **A custom picture model** is a Runware AIR and the base model it was
-  trained from, `{"runwareModelAir":"…","base":"pony"}`, where the base is one
+  trained from, `{"provider":"runware","runwareModelAir":"…","base":"pony"}`, where the base is one
   of SDXL, Illustrious, Pony, NoobAI, Z-Image Turbo or FLUX.2 Klein. The
   base decides the prompt recipe (`PictureArchitecture` in
   `daydream/image-prompt.ts`): the SDXL family all take tags, Z-Image Turbo

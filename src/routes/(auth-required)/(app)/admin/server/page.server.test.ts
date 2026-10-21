@@ -91,28 +91,46 @@ describe('load', () => {
 
 	it('starts each form from what is saved', async () => {
 		await saveServerSettings(db, {
-			openrouterStoryModel: JSON.stringify({ openrouterModelId: 'some/model' }),
-			runwarePhotoModel: JSON.stringify({ runwareModelAir: 'civitai:1@2', base: 'pony' })
+			storyModel: JSON.stringify({ openrouterModelId: 'some/model' }),
+			photoModel: JSON.stringify({ runwareModelAir: 'civitai:1@2', base: 'pony' })
 		});
 		const data = await runLoad(load(await event(admin)));
 		expect(data.languageModelForm.data).toMatchObject({
+			storyProvider: 'openrouter',
 			storyModel: 'custom',
 			openrouterModelId: 'some/model'
 		});
 		expect(data.imageModelForm.data).toMatchObject({
+			photoProvider: 'runware',
 			photoModel: 'custom',
 			photoRunwareModelAir: 'civitai:1@2',
 			photoBase: 'pony',
 			illustratedModel: 'wai-illustrious'
 		});
+		// One key form per provider, each empty: a stored key is never sent.
+		expect(data.providerForms.openrouter.data).toEqual({
+			provider: 'openrouter',
+			apiKey: '',
+			apiKeyChange: 'keep'
+		});
+		expect(data.providerForms.runware.data.provider).toBe('runware');
 	});
 });
 
 describe('actions', () => {
 	it.each([
 		['saveMail', mail],
-		['saveLanguageModels', { storyModel: 'hermes' }],
-		['saveImageModels', { photoModel: 'dark-beast', illustratedModel: 'wai-illustrious' }],
+		['saveModelProvider', { provider: 'openrouter', apiKey: 'sk-or-stolen', apiKeyChange: 'keep' }],
+		['saveLanguageModels', { storyProvider: 'openrouter', storyModel: 'hermes' }],
+		[
+			'saveImageModels',
+			{
+				photoProvider: 'runware',
+				photoModel: 'dark-beast',
+				illustratedProvider: 'runware',
+				illustratedModel: 'wai-illustrious'
+			}
+		],
 		['savePush', { vapidSubject: '' }],
 		['testEmail', {}],
 		['regenerateVapid', {}],
@@ -169,21 +187,57 @@ describe('actions', () => {
 		expect(await stored('mailFrom')).toBe('');
 	});
 
+	it('saves a provider’s key under that provider’s own setting, keeps it, and removes it', async () => {
+		const save = async (formData: Record<string, string>) =>
+			runAction(actions, 'saveModelProvider', await event(admin, formData));
+		const saved = await save({
+			provider: 'runware',
+			apiKey: 'rw-key-for-pictures',
+			apiKeyChange: 'keep'
+		});
+		expect(await stored('runwareApiKey')).toBe('rw-key-for-pictures');
+		expect(await stored('openrouterApiKey')).toBe('');
+		// Handed back cleared, so it is not posted again, and never echoed.
+		expect(saved).toMatchObject({ form: { data: { apiKey: '' }, message: 'Saved.' } });
+		expect(JSON.stringify(saved)).not.toContain('rw-key-for-pictures');
+
+		await save({ provider: 'runware', apiKey: '', apiKeyChange: 'keep' });
+		expect(await stored('runwareApiKey')).toBe('rw-key-for-pictures');
+
+		await save({ provider: 'runware', apiKey: '', apiKeyChange: 'remove' });
+		expect(await stored('runwareApiKey')).toBe('');
+	});
+
+	it('refuses a provider it does not know, rather than saving a key anywhere', async () => {
+		const before = await loadServerSettings(db, undefined);
+		const refused = await runAction(
+			actions,
+			'saveModelProvider',
+			await event(admin, { provider: 'serverSecret', apiKey: 'x', apiKeyChange: 'keep' })
+		);
+		expect(refused).toMatchObject({ status: 400 });
+		expect(await loadServerSettings(db, undefined)).toEqual(before);
+	});
+
 	it('saves a preset story model by name, and a custom one by its OpenRouter id', async () => {
-		const daydreams = { openrouterApiKey: '', openrouterApiKeyChange: 'keep' };
+		const daydreams = { storyProvider: 'openrouter' };
 		await runAction(
 			actions,
 			'saveLanguageModels',
 			await event(admin, { ...daydreams, storyModel: 'euryale', openrouterModelId: '' })
 		);
-		expect(JSON.parse(await stored('openrouterStoryModel'))).toEqual({ preset: 'euryale' });
+		expect(JSON.parse(await stored('storyModel'))).toEqual({
+			provider: 'openrouter',
+			preset: 'euryale'
+		});
 
 		await runAction(
 			actions,
 			'saveLanguageModels',
 			await event(admin, { ...daydreams, storyModel: 'custom', openrouterModelId: 'vendor/x' })
 		);
-		expect(JSON.parse(await stored('openrouterStoryModel'))).toEqual({
+		expect(JSON.parse(await stored('storyModel'))).toEqual({
+			provider: 'openrouter',
 			openrouterModelId: 'vendor/x'
 		});
 
@@ -196,7 +250,8 @@ describe('actions', () => {
 				openrouterModelId: 'z-ai/glm-5.2@preset/nsfw-compatible'
 			})
 		);
-		expect(JSON.parse(await stored('openrouterStoryModel'))).toEqual({
+		expect(JSON.parse(await stored('storyModel'))).toEqual({
+			provider: 'openrouter',
 			openrouterModelId: 'z-ai/glm-5.2@preset/nsfw-compatible',
 			tools: true
 		});
@@ -208,6 +263,20 @@ describe('actions', () => {
 			await event(admin, { ...daydreams, storyModel: 'custom', openrouterModelId: 'no slash' })
 		);
 		expect(refused).toMatchObject({ status: 400 });
+
+		// A preset is one of the chosen provider's, or nothing.
+		const otherProvider = await runAction(
+			actions,
+			'saveLanguageModels',
+			await event(admin, { ...daydreams, storyModel: 'dark-beast', openrouterModelId: '' })
+		);
+		expect(otherProvider).toMatchObject({ status: 400 });
+		const unknownProvider = await runAction(
+			actions,
+			'saveLanguageModels',
+			await event(admin, { storyProvider: 'runware', storyModel: 'hermes', openrouterModelId: '' })
+		);
+		expect(unknownProvider).toMatchObject({ status: 400 });
 	});
 
 	it('saves a custom story model without tools when OpenRouter cannot be asked', async () => {
@@ -216,38 +285,39 @@ describe('actions', () => {
 			actions,
 			'saveLanguageModels',
 			await event(admin, {
-				openrouterApiKey: '',
-				openrouterApiKeyChange: 'keep',
+				storyProvider: 'openrouter',
 				storyModel: 'custom',
 				openrouterModelId: 'z-ai/glm-5.2'
 			})
 		);
 		expect(saved).not.toMatchObject({ status: 400 });
-		expect(JSON.parse(await stored('openrouterStoryModel'))).toEqual({
+		expect(JSON.parse(await stored('storyModel'))).toEqual({
+			provider: 'openrouter',
 			openrouterModelId: 'z-ai/glm-5.2'
 		});
 	});
 
 	it('saves a custom picture model with its base model, and refuses one without', async () => {
 		const pictures = {
-			runwareApiKey: 'rw-key-for-pictures',
-			runwareApiKeyChange: 'keep',
+			photoProvider: 'runware',
 			photoModel: 'custom',
 			photoRunwareModelAir: 'civitai:1@2',
 			photoBase: 'pony',
+			illustratedProvider: 'runware',
 			illustratedModel: 'wai-illustrious',
 			illustratedRunwareModelAir: '',
 			illustratedBase: ''
 		};
 		await runAction(actions, 'saveImageModels', await event(admin, pictures));
-		expect(JSON.parse(await stored('runwarePhotoModel'))).toEqual({
+		expect(JSON.parse(await stored('photoModel'))).toEqual({
+			provider: 'runware',
 			runwareModelAir: 'civitai:1@2',
 			base: 'pony'
 		});
-		expect(JSON.parse(await stored('runwareIllustratedModel'))).toEqual({
+		expect(JSON.parse(await stored('illustratedModel'))).toEqual({
+			provider: 'runware',
 			preset: 'wai-illustrious'
 		});
-		expect(await stored('runwareApiKey')).toBe('rw-key-for-pictures');
 
 		const refused = await runAction(
 			actions,
