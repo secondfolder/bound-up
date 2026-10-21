@@ -42,7 +42,8 @@ describe('withSettings and stillInEffect', () => {
 
 describe('describeSettings', () => {
 	it('says what is set now, in the dials’ own words', () => {
-		expect(describeSettings({ length: 'long' })).toBe('Now long passages.');
+		expect(describeSettings({ length: 'long' })).toBe('Now longer passages.');
+		expect(describeSettings({ length: 'medium' })).toBe('Now no preferred passage length.');
 		expect(describeSettings({ pace: 2, heat: 4, kink: 1 })).toBe(
 			"Now pace slow, the idea's heat Explicit and the idea's kink Vanilla."
 		);

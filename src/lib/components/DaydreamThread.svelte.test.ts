@@ -1567,7 +1567,7 @@ describe('DaydreamThread', () => {
 			expect(saved(0)?.content).toMatchObject({
 				meta: { settings: { length: 'long' }, settingsBefore: { length: 'medium' } }
 			});
-			await waitFor(() => expect(container.textContent).toContain('Now long passages.'));
+			await waitFor(() => expect(container.textContent).toContain('Now longer passages.'));
 			await press(container, 'Undo');
 			await waitFor(() =>
 				expect(client.saveSetup.mock.calls[1]?.[1]).toMatchObject({
@@ -1582,7 +1582,7 @@ describe('DaydreamThread', () => {
 			const { container } = await againWith({ type: 'direction', id: 'longer', label: 'Longer' });
 			expect(client.saveSetup).not.toHaveBeenCalled();
 			expect(saved(0)?.content).not.toHaveProperty('meta.settings');
-			expect(container.textContent).not.toContain('Now long passages');
+			expect(container.textContent).not.toContain('Now longer passages');
 		});
 
 		it('lets any passage move a character’s own dials, but not the daydream’s', async () => {

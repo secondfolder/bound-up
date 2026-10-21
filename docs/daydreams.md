@@ -463,8 +463,8 @@ copies the functionary it is shown into a system with no one behind it.
 **A monologue** is not a story at all. One voice speaks its mind about
 what the daydream is about, taking the ideas, tropes and common sayings of
 its kinks and turning them into statements: short paragraphs, as many as
-the length dial allows, each one statement (the dials say so for a
-monologue, `MONOLOGUE_LENGTH`), most
+the moment has in it and the length dial leans towards, each one statement
+(the dials say so for a monologue, `MONOLOGUE_LENGTH`), most
 opening with a statement in bold on a line of its own, followed by the
 voice's own words on it — a few sentences, or a longer run caught in an
 ordinary day (on the bus, at a café table), which each example set shows
@@ -1050,11 +1050,38 @@ watcher), a direction for the story, part of the story, out of character.
   and Write again and a rewrite of that passage keep it. The model's own
   readings are never sent back: the passage it wrote already shows them.
 
+## Passage length
+
+The story's Dials hold a **preferred passage length**: Shorter, No
+preference (the default) or Longer. It is a lean, not a size. It used to be
+a count of paragraphs ("two or three short paragraphs"), which held every
+passage to the same length: a deliberately rambling monologue was cut to
+fit, and a one-line answer was padded out. Now the moment sets the length,
+and the user's preference only tilts it (`PASSAGE_LENGTHS` in
+`daydream/dial-words.ts`):
+
+- **The prompt says the lean in words, never as a count**, under `# Dials`:
+  "Passage length: no preference.", or that the user prefers shorter or
+  longer passages.
+- **It always adds that the moment decides** (`LENGTH_FROM_THE_MOMENT`):
+  some passages run long, some are a line or two. Without that line a
+  model writes each passage as long as the ones before it, which the story
+  so far keeps showing it. There is deliberately no list of which moments
+  are long and which are short: a model judges that better than a rule
+  does, and a list would become a new rule.
+- **The stored values are still `short`, `medium` and `long`**, sealed in the
+  setup's `dials` and in a turn's `settings`, so no record changed: `medium`
+  is "No preference". The model sets the same values when the user asks for
+  a lasting change, and tells that apart from a request about one passage
+  ([Settings the story changes](#settings-the-story-changes)).
+- **Room for it.** A passage's token cap ([Configuration](#configuration))
+  allows for the longest a moment may call for, not a few paragraphs.
+
 ## Settings the story changes
 
 The dials move as the story does. Someone who types "can you make these
 longer?" means from now on; before, the next passage obliged and the one
-after went back to the dial's length, which still said otherwise. And a
+after went back to the dial's lean, which still said otherwise. And a
 training story may take its chaste character to eager over twenty
 passages, which their libido dial should follow. So a reply's metadata may
 carry `settings`, new values for two kinds of dial (`SETTINGS_INSTRUCTION`
@@ -1063,7 +1090,12 @@ in `server/daydream/prompt.ts`), never because one scene calls for more:
 - **The daydream's own** — `length`, `pace`, `intensity`, and the idea's
   `heat` and `kink` — when the user's own words ask outright, or keep
   pushing the story that way: a story the user steers from SFW into
-  explicit raises the idea's heat.
+  explicit raises the idea's heat. **Length is told apart most carefully**:
+  "tell me everything about how she got here" or "just a quick answer" is
+  about this passage (or the next one or two), which the model writes that
+  way without setting anything; "make these longer" or "keep them short
+  from now on" sets `length`. A request it cannot place sets nothing, since
+  a user who means it to last will ask again, which is "keeps pushing".
 - **A character's own** — `libido` and `kink`, by name (`characters`) —
   when the story has changed them for good. The idea's heat stays the
   ceiling for everyone.
@@ -1088,7 +1120,7 @@ much as to a model.
   use the model to raise the heat; a rewrite or a check-in keeps none.
   `settingsBefore` is never read from the model.
 - **Said where it happened.** A note under the passage says what is set
-  now (`DaydreamSettingsNote.svelte`: "Now long passages and Mara's libido
+  now (`DaydreamSettingsNote.svelte`: "Now longer passages and Mara's libido
   Slutty."), and the Dials show the new values. **Undo** puts back what it
   was, and is offered only while every value it changed still stands
   (`stillInEffect`), so it never undoes something set by hand since.
@@ -1738,8 +1770,9 @@ terms, and its providers' on OpenRouter, allow adult fiction.
 Most hosted models' terms (Anthropic's, OpenAI's, Workers AI's) do not,
 which is why the choice is made here rather than left to OpenRouter's
 routing. It writes at temperature 0.9, and another take at 1.05
-([Another take](#another-take)). A passage is capped at 4,000 tokens: a few paragraphs and the
-metadata after them, plus room for a reasoning model to think first, since
+([Another take](#another-take)). A passage is capped at 6,000 tokens: the longest passage a
+moment may call for ([Passage length](#passage-length)) and the metadata after it, plus room
+for a reasoning model to think first, since
 OpenRouter counts reasoning against the same cap. A model that still runs out
 before writing anything ends with `finish_reason: "length"`, which the reader
 reports as running out of room rather than as an empty reply. A suggestion's

@@ -165,8 +165,7 @@ export function stillInEffect(setup: DaydreamSetup, settings: StorySettings): bo
 function phrase(key: Key, settings: StorySettings): string | null {
 	switch (key) {
 		case 'length': {
-			const label = PASSAGE_LENGTHS.find((entry) => entry.value === settings.length)?.label;
-			return label ? `${label.toLowerCase()} passages` : null;
+			return PASSAGE_LENGTHS.find((entry) => entry.value === settings.length)?.note ?? null;
 		}
 		case 'pace':
 		case 'intensity': {
@@ -199,7 +198,7 @@ function characterPhrases(entry: NonNullable<StorySettings['characters']>[number
 	});
 }
 
-/** "Now long passages and Mara's libido Slutty.": the note under the passage that changed them. */
+/** "Now longer passages and Mara's libido Slutty.": the note under the passage that changed them. */
 export function describeSettings(settings: StorySettings): string {
 	const parts = [
 		...KEYS.flatMap((key) => {

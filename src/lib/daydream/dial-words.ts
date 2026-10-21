@@ -259,11 +259,47 @@ export function characterLevel(dials: CharacterDials): string | null {
 		: level(labelOf(CHARACTER_SLIDERS, 'libido', dials.libido), dials.kink);
 }
 
-export const PASSAGE_LENGTHS: readonly { value: PassageLength; label: string; phrase: string }[] = [
-	{ value: 'short', label: 'Short', phrase: 'one short paragraph' },
-	{ value: 'medium', label: 'Medium', phrase: 'two or three short paragraphs' },
-	{ value: 'long', label: 'Long', phrase: 'four or five paragraphs' }
+/**
+ * A preference, not a size. A count of paragraphs ("two or three short
+ * paragraphs") held every passage to the same length, so a rambling
+ * monologue was cut to fit and a one-line answer padded out; the moment now
+ * sets the length, and the user only leans it. The stored values stay
+ * `short`/`medium`/`long` (sealed in `daydream-setup` and a turn's
+ * `settings`), so `medium` is "no preference", and the default.
+ * `note` is the "Now …" under a passage that changed it (`story-settings.ts`).
+ */
+export const PASSAGE_LENGTHS: readonly {
+	value: PassageLength;
+	label: string;
+	phrase: string;
+	note: string;
+}[] = [
+	{
+		value: 'short',
+		label: 'Shorter',
+		phrase: 'the user prefers shorter passages, so lean brief',
+		note: 'shorter passages'
+	},
+	{
+		value: 'medium',
+		label: 'No preference',
+		phrase: 'no preference',
+		note: 'no preferred passage length'
+	},
+	{
+		value: 'long',
+		label: 'Longer',
+		phrase: 'the user prefers longer passages, so lean expansive',
+		note: 'longer passages'
+	}
 ];
+
+/**
+ * Said whatever the preference: without it a model writes every passage the
+ * length of the ones before it, which the story so far keeps showing it.
+ */
+const LENGTH_FROM_THE_MOMENT =
+	"Let each moment set its passage's length: some run long, some are a line or two.";
 
 /** The story dials as lines for the model. */
 export function describeStoryDials(dials: StoryDials): string[] {
@@ -271,6 +307,6 @@ export function describeStoryDials(dials: StoryDials): string[] {
 		(slider) => `${slider.label}: ${slider.scale[dials[slider.key]].phrase}.`
 	);
 	const length = PASSAGE_LENGTHS.find((entry) => entry.value === dials.length);
-	lines.push(`Length of each passage: ${length?.phrase ?? 'two or three short paragraphs'}.`);
+	lines.push(`Passage length: ${length?.phrase ?? 'no preference'}. ${LENGTH_FROM_THE_MOMENT}`);
 	return lines;
 }

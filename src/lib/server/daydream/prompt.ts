@@ -348,10 +348,10 @@ function describeOrigin(idea: DaydreamSetupContent['idea']): string | null {
 }
 
 /**
- * How a monologue's length is counted: in statements, its unit, since "two
- * or three short paragraphs" said nothing about how many, and "many short
- * paragraphs" in its guide said the opposite. One line whatever the length,
- * so the length dial's own phrase says how many.
+ * What a monologue's paragraph is: one statement, its unit. When the length
+ * dial was a count of paragraphs, this is what said how many statements
+ * that was; the dial is a lean now, but "a paragraph" still has to mean the
+ * same thing in its guide and its format.
  */
 const MONOLOGUE_LENGTH =
 	"In a monologue, each paragraph is one statement and the voice's words on it.";
@@ -724,10 +724,15 @@ Earlier replies are shown without their reading line and metadata, to keep the s
  * the daydream's own dials, which the page only takes from a reply to the
  * user's own words, and a character's own libido and kink, which follow the
  * story wherever it has taken them. Never the limits, the voice or the
- * cast: those are the user's to change.
+ * cast: those are the user's to change. Length is told apart most
+ * carefully, as it is the dial a one-off asks about most ("tell me all of
+ * it"), and a one-off that set it would leave every passage after leaning
+ * the same way; a doubtful one sets nothing, since asking again is
+ * "keeps pushing" and sets it then.
  */
 const SETTINGS_INSTRUCTION = `- "settings" (optional): the dials, set to new values when the story has changed them. Only what has changed for good, never because one scene calls for more.
-  - The daydream's own: when the user's own words ask outright, or keep pushing the story that way, for a change to how it is written — longer or shorter passages, slower or faster, more or less intense, the idea's heat or the idea's kink higher or lower — write this passage the new way and set it, as {"length": "long"} or {"heat": 4}. Keys: "length" ("short", "medium" or "long"), "pace", "intensity", and the idea's "heat" and "kink", each of the last four a whole number from 1 to 5 on the scales in the setup.
+  - The daydream's own: when the user's own words ask outright, or keep pushing the story that way, for a change to how it is written — longer or shorter passages, slower or faster, more or less intense, the idea's heat or the idea's kink higher or lower — write this passage the new way and set it, as {"length": "long"} or {"heat": 4}. Keys: "length" ("short" to lean shorter, "long" to lean longer, "medium" for no preference), "pace", "intensity", and the idea's "heat" and "kink", each of the last four a whole number from 1 to 5 on the scales in the setup.
+  - Length most of all: tell a request about one passage from a change of preference. "Tell me everything about how she got here", "describe the room properly" or "just a quick answer" is about this passage, or the next one or two: write them that way and set nothing. "Make these longer", "I like it when you go on" or "keep them short from now on" is about every passage to come: set "length". When you cannot tell, answer it in the passage and set nothing; a user who means it to last will say so again.
   - A character's own: when the story has changed a character for good — the chaste one grown eager, the vanilla one turned kinky, or the other way — set their own dials, by name: {"characters": [{"name": "Mara", "libido": 4}]}. "libido" (1 chaste, 2 shy, 3 interested, 4 horny, 5 slutty) and the character's "kink" (1 vanilla, 2 curious, 3 kinky, 4 very kinky, 5 depraved). The idea's heat stays the ceiling for every character.`;
 
 /**

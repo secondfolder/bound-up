@@ -168,7 +168,7 @@ describe('POST /api/daydreams/[id]/reply', () => {
 			content: `${USER_TURN}\n\n(Direction buttons on screen now: "Slower" (id "slower").)`
 		});
 		// Room for the passage, the metadata block after it, and reasoning first.
-		expect(sent.max_tokens).toBe(4000);
+		expect(sent.max_tokens).toBe(6000);
 		expect(sent.temperature).toBe(0.9);
 		// So pressing Stop ends the request upstream as well.
 		expect(init.signal).toBeInstanceOf(AbortSignal);

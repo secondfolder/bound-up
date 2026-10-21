@@ -79,7 +79,8 @@ Write the passage next (after the <yours> block, when you wrote out the user's t
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
 - "ooc": true, only when the passage is out of character.
 - "settings" (optional): the dials, set to new values when the story has changed them. Only what has changed for good, never because one scene calls for more.
-  - The daydream's own: when the user's own words ask outright, or keep pushing the story that way, for a change to how it is written — longer or shorter passages, slower or faster, more or less intense, the idea's heat or the idea's kink higher or lower — write this passage the new way and set it, as {"length": "long"} or {"heat": 4}. Keys: "length" ("short", "medium" or "long"), "pace", "intensity", and the idea's "heat" and "kink", each of the last four a whole number from 1 to 5 on the scales in the setup.
+  - The daydream's own: when the user's own words ask outright, or keep pushing the story that way, for a change to how it is written — longer or shorter passages, slower or faster, more or less intense, the idea's heat or the idea's kink higher or lower — write this passage the new way and set it, as {"length": "long"} or {"heat": 4}. Keys: "length" ("short" to lean shorter, "long" to lean longer, "medium" for no preference), "pace", "intensity", and the idea's "heat" and "kink", each of the last four a whole number from 1 to 5 on the scales in the setup.
+  - Length most of all: tell a request about one passage from a change of preference. "Tell me everything about how she got here", "describe the room properly" or "just a quick answer" is about this passage, or the next one or two: write them that way and set nothing. "Make these longer", "I like it when you go on" or "keep them short from now on" is about every passage to come: set "length". When you cannot tell, answer it in the passage and set nothing; a user who means it to last will say so again.
   - A character's own: when the story has changed a character for good — the chaste one grown eager, the vanilla one turned kinky, or the other way — set their own dials, by name: {"characters": [{"name": "Mara", "libido": 4}]}. "libido" (1 chaste, 2 shy, 3 interested, 4 horny, 5 slutty) and the character's "kink" (1 vanilla, 2 curious, 3 kinky, 4 very kinky, 5 depraved). The idea's heat stays the ceiling for every character.
 - "drifted" (optional, and rare): when the story now contradicts the setup's idea or a character in a way that will last — not a passing moment — say how in one short line, like "Mara is tender with you now, and you have left the office for her flat".
 Earlier replies are shown without their reading line and metadata, to keep the story short; yours must still have the metadata, and the reading line when it is asked for.
@@ -129,7 +130,7 @@ None stated beyond the rules above.
 # Dials
 Intensity: moderate.
 Pace: steady.
-Length of each passage: two or three short paragraphs.
+Passage length: no preference. Let each moment set its passage's length: some run long, some are a line or two.
 
 ===== 2. user =====
 (The story so far is long, so it starts partway through here.)

@@ -231,7 +231,7 @@ No change.
 +How the daydream will be told, for context — these are not lengths for the fields:
 +Intensity: moderate.
 +Pace: steady.
-+Length of each passage: two or three short paragraphs.
++Passage length: no preference. Let each moment set its passage's length: some run long, some are a line or two.
 +
  # The idea so far
 ~~~~

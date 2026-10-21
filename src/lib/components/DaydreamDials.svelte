@@ -5,7 +5,7 @@
 	import Slider from './Slider.svelte';
 
 	/**
-	 * The story's sticky dials: intensity, pace and how long each passage is.
+	 * The story's sticky dials: intensity, pace and which way passages lean in length.
 	 * Sent with every passage until they are changed, unlike a direction
 	 * button, which nudges only the next one. In the setup form and in the
 	 * story's own Dials popover.
@@ -96,7 +96,7 @@
 	{/each}
 
 	<fieldset class="length">
-		<legend>Passage length</legend>
+		<legend>Preferred passage length</legend>
 		<div class="choices">
 			{#each PASSAGE_LENGTHS as choice (choice.value)}
 				<!-- A choice in a group: a native radio, because the state it carries

@@ -993,7 +993,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
 ~~~~
 
-## ¶ 18e7c80083f7ba · user · only when one value was swept from the baseline
+## ¶ 1a5d411da26777 · user · only when one value was swept from the baseline
 
 Only when story ∈ {yes}.
 
@@ -1001,7 +1001,7 @@ Only when story ∈ {yes}.
 How the daydream will be told, for context — these are not lengths for the fields:
 Intensity: moderate.
 Pace: steady.
-Length of each passage: two or three short paragraphs.
+Passage length: no preference. Let each moment set its passage's length: some run long, some are a line or two.
 ~~~~
 
 ## ¶ 17f996265f95d0 · user · only when one value was swept from the baseline

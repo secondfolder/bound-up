@@ -108,7 +108,7 @@ export function monologueGuide(
 		.join('\n');
 	return `# Writing a monologue
 This is not a story told scene by scene. It is one voice speaking its mind about what this daydream is about — the kinks, tropes and dynamics in the idea below — taking their ideas, the things people into them say and the sayings that go with them, and turning them into statements.
-- Write short paragraphs, as many as the length below allows. Most open with a statement on a line of its own, in bold — a belief, a rule, a mantra, a confession, something someone into this would say — followed by the voice's own words on it: a few sentences, or a longer run when the idea has more in it — what it means to them, why it gets to them, where it shows up in their day.
+- Write short paragraphs, as many as the moment has in it and the length below leans towards. Most open with a statement on a line of its own, in bold — a belief, a rule, a mantra, a confession, something someone into this would say — followed by the voice's own words on it: a few sentences, or a longer run when the idea has more in it — what it means to them, why it gets to them, where it shows up in their day.
 - Ground it in everyday life where it fits: the voice catches the idea at work, on the bus, at a café table, in a meeting, in bed, so it reads as something lived with rather than recited.
 - Keep each statement short enough to land: a sentence, rarely two.
 - Every statement says something new. Never repeat one or reword one already made; build on an idea, go deeper into it or turn it instead.

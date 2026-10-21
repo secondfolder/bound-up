@@ -1134,7 +1134,27 @@ describe('describeSetup', () => {
 		);
 		expect(content).toContain('Intensity: very gentle');
 		expect(content).toContain('Pace: fast');
-		expect(content).toContain('one short paragraph');
+		expect(content).toContain('Passage length: the user prefers shorter passages, so lean brief.');
+	});
+
+	it('says the length as a lean, never a count, and lets the moment set it', () => {
+		for (const length of ['short', 'medium', 'long'] as const) {
+			const content = describeSetup(
+				testDaydreamSetup({ dials: { intensity: 3, pace: 3, length } })
+			);
+			const line = defined(
+				content.split('\n').find((each) => each.startsWith('Passage length:')),
+				'the passage length line'
+			);
+			expect(line).not.toMatch(/paragraph|\b(?:three|four|five)\b|\d/u);
+			expect(line).toContain("Let each moment set its passage's length");
+		}
+		expect(
+			describeSetup(testDaydreamSetup({ dials: { intensity: 3, pace: 3, length: 'medium' } }))
+		).toContain('Passage length: no preference.');
+		expect(
+			describeSetup(testDaydreamSetup({ dials: { intensity: 3, pace: 3, length: 'long' } }))
+		).toContain('the user prefers longer passages');
 	});
 
 	it('only mentions who leads when there are characters and the user is there to be led', () => {
@@ -1356,7 +1376,7 @@ describe('the review’s fixes to the reply prompt', () => {
 
 	it('counts a monologue’s length in statements, and writes its sex as statements', () => {
 		const content = told('monologue', { length: 'short', heat: 5, characters: 0 });
-		expect(content).toContain('Length of each passage: one short paragraph.');
+		expect(content).toContain('Passage length: the user prefers shorter passages');
 		expect(content).toContain("each paragraph is one statement and the voice's words on it");
 		expect(content).not.toContain('Write many short paragraphs');
 		expect(content).toContain('not as a scene unfolding');
@@ -1408,6 +1428,14 @@ describe('settings the story changes', () => {
 		expect(RULES).toContain('the dials change only through "settings"');
 		// Nothing about the limits, the voice or the cast.
 		expect(content).not.toMatch(/"settings"[^\n]*limits/);
+	});
+
+	it('tells a request about one passage’s length from a change of preference', () => {
+		const content = system(buildMessages(request({ turns: [said('Tell me all of it')] })));
+		expect(content).toContain('tell a request about one passage from a change of preference');
+		expect(content).toContain('write them that way and set nothing');
+		expect(content).toContain('When you cannot tell, answer it in the passage and set nothing');
+		expect(content).toContain('"medium" for no preference');
 	});
 });
 
