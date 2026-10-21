@@ -536,17 +536,37 @@ describe('DaydreamThread', () => {
 		// Square, so `pill` makes its hover background a circle.
 		expect(chevron('end').offsetWidth).toBe(chevron('end').offsetHeight);
 
+		// Every scroll here is awaited to its `scrollend`, and only then is the
+		// position read. Polling it with `waitFor` was flaky: its deadline is a
+		// timer, and a scroll moves only when a frame is drawn, so a main-thread
+		// stall running past the deadline (a loaded machine in a full run) lets
+		// the timer fire before the frame that finishes the scroll. The wait
+		// then fails on a position from partway through a scroll that had in
+		// fact finished ("expected 160 to be close to 183.2" with a 900ms stall
+		// injected), and each smooth scroll spent 250ms of the 1s budget anyway.
+		// The plain assignments are awaited too: their own `scrollend` comes a
+		// frame later, and would otherwise end the wait for the next scroll.
+		const scrolled = async (scroll: () => void) => {
+			const ended = new Promise((resolve) =>
+				scroller.addEventListener('scrollend', resolve, { once: true })
+			);
+			scroll();
+			await ended;
+		};
+
 		// A chevron scrolls by most of a page.
 		const onePage = scroller.clientWidth * 0.8;
-		chevron('end').click();
-		await waitFor(() => expect(scroller.scrollLeft).toBeCloseTo(onePage, -1));
+		await scrolled(() => chevron('end').click());
+		expect(scroller.scrollLeft).toBeCloseTo(onePage, -1);
 		await waitFor(() => expect(chevron('start').classList.contains('shown')).toBe(true));
-		chevron('start').click();
-		await waitFor(() => expect(scroller.scrollLeft).toBe(0));
+		await scrolled(() => chevron('start').click());
+		expect(scroller.scrollLeft).toBe(0);
 		await waitFor(() => expect(chevron('start').classList.contains('shown')).toBe(false));
 
 		// At the far end, that end is crisp and its chevron gone.
-		scroller.scrollLeft = scroller.scrollWidth;
+		await scrolled(() => {
+			scroller.scrollLeft = scroller.scrollWidth;
+		});
 		await waitFor(() => expect(scroller.hasAttribute('data-more-end')).toBe(false));
 		expect(scroller.hasAttribute('data-more-start')).toBe(true);
 		expect(chevron('end').classList.contains('shown')).toBe(false);
@@ -554,10 +574,12 @@ describe('DaydreamThread', () => {
 		// A page that would stop a sliver short of the end goes all the way.
 		const farEnd = scroller.scrollWidth - scroller.clientWidth;
 		// A page short of the end, plus 4rem (64px): within the 5rem that counts as nearly there.
-		scroller.scrollLeft = farEnd - scroller.clientWidth * 0.8 - 64;
+		await scrolled(() => {
+			scroller.scrollLeft = farEnd - scroller.clientWidth * 0.8 - 64;
+		});
 		await waitFor(() => expect(chevron('end').classList.contains('shown')).toBe(true));
-		chevron('end').click();
-		await waitFor(() => expect(scroller.scrollLeft).toBeCloseTo(farEnd, 0));
+		await scrolled(() => chevron('end').click());
+		expect(scroller.scrollLeft).toBeCloseTo(farEnd, 0);
 	});
 
 	it('shows every reaction icon unpressed, in a variant the free icon set has', async () => {
