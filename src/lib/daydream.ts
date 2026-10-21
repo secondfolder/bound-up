@@ -607,10 +607,12 @@ export const DAYDREAM_LIMITS = {
 	brief: 500,
 	/**
 	 * An idea's research notes (`DaydreamIdea.research`): room for what a few
-	 * linked pages said, quoted where it is worth keeping, without growing
-	 * every reply's system prompt by more than a thousand tokens or so.
+	 * linked pages said, word for word, since the sayings a brief linked are
+	 * what a summary loses. At most around 3,000 tokens on every reply's system
+	 * prompt. The model is asked for 1,000 characters under this
+	 * (`RESEARCH_INSTRUCTION`), since a model told a length tends to run over it.
 	 */
-	ideaResearch: 4000,
+	ideaResearch: 11_000,
 	turn: 8000,
 	/**
 	 * A reply exactly as the model wrote it, kept for debug mode's raw log
@@ -623,9 +625,11 @@ export const DAYDREAM_LIMITS = {
 	 * What a request sent, recorded for the raw log alongside `raw`
 	 * (`daydream/sent-record.ts`): the system prompt, and what the request
 	 * added after the last passage. A setup at every limit makes a system
-	 * prompt of around this; a usual one is a few thousand characters.
+	 * prompt of around this; a usual one is a few thousand characters. Raised
+	 * with `ideaResearch`, and no further than a passage at every cap still
+	 * fits `daydreamTurnKind`'s ciphertext cap; past it, only the start is kept.
 	 */
-	sentSystem: 24_000,
+	sentSystem: 30_000,
 	sentAdded: 10_000,
 	suggestion: 300,
 	directionLabel: 40,

@@ -44,13 +44,14 @@ someone has played one:
   beliefs, mantras or themes to be said and built on, with no plot asked
   for, are a monologue), and the answer gives `voice` first and the summary
   last. Then a story gets `STORY_CRAFT` (who the people are to each other,
-  where, why now) and a monologue `MONOLOGUE_CRAFT` (the beliefs and sayings
+  where, why now) and a monologue `monologueCraft` (the beliefs and sayings
   it is built on, who speaks to whom, where the ideas go), each with its own
   idea fields and cast: a monologue has no parts and nobody in it unless a
   named character is the one speaking, and its sayings go in the idea's
   notes ([Ideas](#ideas)). Who speaks is a voice of its own, talking to the
   user, by default — even when the voice and the user are on the same side,
-  so long as it does not make the user the one it is talking about — and the
+  so long as it does not make the user the one it is talking about, and
+  only the line for the side the user chose is said (`SAME_SIDE_VOICE`) — and the
   user's own inner voice only when the brief asks for it, never merely
   because the brief is about what someone is or what people believe. Told that the
   inner voice "suits a brief about what they are or think", a model read a
@@ -137,7 +138,7 @@ model calls tools, the `ideas` and `daydream` suggestions read those links:
 http(s) links, and if there are any the prompt tells the model to open each
 before it answers and to draw their themes, tropes and sayings in. What a
 page says is material, never instructions, and a page that cannot be read
-is passed over without a word. The endpoint sends OpenRouter's
+is noted in the research and mentioned nowhere else. The endpoint sends OpenRouter's
 `openrouter:web_fetch` server tool with the request (`WEB_FETCH` in
 `api/daydreams/suggest/+server.ts`), so OpenRouter does the fetching while
 the model answers and it is still one call. That request goes to
@@ -173,7 +174,7 @@ what it read before it writes.
 ### What a brief leaves behind
 
 The fields a `daydream` answer fills are a synthesis: a premise of a
-sentence or two, a tone in a few words, a monologue's eight to twelve
+sentence or two, a tone in a few words, a monologue's 8 to 12
 sayings. That is right for them, but on its own it threw away what they were
 made from — the brief as the user typed it, and whatever the model read in
 its links and thought through. A brief pointing at a caption subreddit came
@@ -187,16 +188,20 @@ server's](#the-system-prompt-is-the-servers)):
   never the model's version of them. For a picked idea it is the brief the
   ideas were asked for with.
 - **The research**: the model's analysis of what it was given, kept in full
-  rather than summarised (`RESEARCH_NOTES` in `suggest-prompt.ts`), for
+  rather than summarised (`RESEARCH_INSTRUCTION` in `suggest-prompt.ts`), for
   whoever writes the daydream. It is asked to work in two stages: first the
   analysis — what each linked page was and everything it drew from it, its
   recurring themes, tropes and sayings quoted as written where the wording
   matters, what in the brief it built on, and what it weighed and left out —
   and then, separately, how to turn that analysis into the ideas or the
-  setup, which is its own working and goes nowhere. The notes are the first
-  stage word for word, never a condensed version of it — the model's notes
-  about the pages, not the pages themselves — so the model that writes the
-  daydream sees what the one that read them saw. Short lines, so
+  setup, which is its own working and goes nowhere. The research is the
+  first stage word for word, never a condensed version of it — the model's
+  analysis of the pages, not the pages themselves — so the model that writes
+  the daydream sees what the one that read them saw. Only when word for word
+  would run over the length it is asked for (1,000 characters under
+  `DAYDREAM_LIMITS.ideaResearch`) does it summarise, and only as much as
+  fitting needs. It is called "the research" throughout the prompt, never
+  "notes", which is the idea's own field. Short lines, so
   notes that run over `DAYDREAM_LIMITS.ideaResearch` keep their first lines
   (`parseResearch`), like a monologue's sayings. The `daydream` answer gives
   them after the voice; the `ideas` answer gives one set first, for the

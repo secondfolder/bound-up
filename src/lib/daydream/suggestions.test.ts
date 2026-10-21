@@ -514,7 +514,7 @@ describe('parseResearch', () => {
 	});
 
 	it('keeps as many whole lines as fit when the notes run over', () => {
-		const line = 'x'.repeat(1000);
+		const line = 'x'.repeat(3000);
 		expect(parseResearch({ research: [line, line, line, line, line].join('\n') })).toBe(
 			[line, line, line].join('\n')
 		);
