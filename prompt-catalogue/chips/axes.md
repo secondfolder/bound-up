@@ -13,76 +13,96 @@ Not a request any device could send from the baseline: field: Chips are for one 
 ### field = personality
 
 ~~~~diff
-@@ -20,6 +20,6 @@
- The character as written so far:
+@@ -26,5 +26,5 @@
+ <character>
  Name: ⟦character1.name⟧
 -Type: ⟦character1.archetype⟧
 +Personality: ⟦character1.personality⟧
+ </character>
  
--Suggest up to 12 short phrases the user could add to the character's "Type" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
-+Suggest up to 12 short phrases the user could add to the character's "Personality" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
- Answer as: {"chips": ["…", "…"]}
-\ No newline at end of file
+@@ -35,5 +35,5 @@
+ # What to do
+ 
+-Suggest up to 12 short phrases the user could add to the character's "Type" field (the kind of person they are, in a few words) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
++Suggest up to 12 short phrases the user could add to the character's "Personality" field (how they think and behave) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
+ 
+ # Your answer
 ~~~~
 
 ### field = speech
 
 ~~~~diff
-@@ -20,6 +20,6 @@
- The character as written so far:
+@@ -26,5 +26,5 @@
+ <character>
  Name: ⟦character1.name⟧
 -Type: ⟦character1.archetype⟧
 +How they talk: ⟦character1.speech⟧
+ </character>
  
--Suggest up to 12 short phrases the user could add to the character's "Type" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
-+Suggest up to 12 short phrases the user could add to the character's "How they talk" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
- Answer as: {"chips": ["…", "…"]}
-\ No newline at end of file
+@@ -35,5 +35,5 @@
+ # What to do
+ 
+-Suggest up to 12 short phrases the user could add to the character's "Type" field (the kind of person they are, in a few words) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
++Suggest up to 12 short phrases the user could add to the character's "How they talk" field (their voice, their words, their habits) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
+ 
+ # Your answer
 ~~~~
 
 ### field = appearance
 
 ~~~~diff
-@@ -20,6 +20,6 @@
- The character as written so far:
+@@ -26,5 +26,5 @@
+ <character>
  Name: ⟦character1.name⟧
 -Type: ⟦character1.archetype⟧
 +Appearance: ⟦character1.appearance⟧
+ </character>
  
--Suggest up to 12 short phrases the user could add to the character's "Type" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
-+Suggest up to 12 short phrases the user could add to the character's "Appearance" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
- Answer as: {"chips": ["…", "…"]}
-\ No newline at end of file
+@@ -35,5 +35,5 @@
+ # What to do
+ 
+-Suggest up to 12 short phrases the user could add to the character's "Type" field (the kind of person they are, in a few words) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
++Suggest up to 12 short phrases the user could add to the character's "Appearance" field (what you notice about them; "you" is the user) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
+ 
+ # Your answer
 ~~~~
 
 ### field = likes
 
 ~~~~diff
-@@ -20,6 +20,6 @@
- The character as written so far:
+@@ -26,5 +26,5 @@
+ <character>
  Name: ⟦character1.name⟧
 -Type: ⟦character1.archetype⟧
 +What they enjoy: ⟦character1.likes⟧
+ </character>
  
--Suggest up to 12 short phrases the user could add to the character's "Type" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
-+Suggest up to 12 short phrases the user could add to the character's "What they enjoy" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
- Answer as: {"chips": ["…", "…"]}
-\ No newline at end of file
+@@ -35,5 +35,5 @@
+ # What to do
+ 
+-Suggest up to 12 short phrases the user could add to the character's "Type" field (the kind of person they are, in a few words) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
++Suggest up to 12 short phrases the user could add to the character's "What they enjoy" field (what they want, given the chance) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
+ 
+ # Your answer
 ~~~~
 
 ### field = notes
 
 ~~~~diff
-@@ -20,6 +20,6 @@
- The character as written so far:
+@@ -26,5 +26,5 @@
+ <character>
  Name: ⟦character1.name⟧
 -Type: ⟦character1.archetype⟧
 +Anything else: ⟦character1.notes⟧
+ </character>
  
--Suggest up to 12 short phrases the user could add to the character's "Type" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
-+Suggest up to 12 short phrases the user could add to the character's "Anything else" field — different from what is already there, varied, and fitting the rest of it. Each at most 80 characters, with no commas.
- Answer as: {"chips": ["…", "…"]}
-\ No newline at end of file
+@@ -35,5 +35,5 @@
+ # What to do
+ 
+-Suggest up to 12 short phrases the user could add to the character's "Type" field (the kind of person they are, in a few words) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
++Suggest up to 12 short phrases the user could add to the character's "Anything else" field (whatever the rest leaves out) — different from what is already there, varied, and fitting the rest of the character as written above. Each at most 80 characters, with no commas.
+ 
+ # Your answer
 ~~~~
 
 ### field = setting
@@ -122,25 +142,65 @@ No change.
 ### narrator = monologue
 
 ~~~~diff
-@@ -14,4 +14,5 @@
+@@ -18,4 +18,6 @@
+ # The daydream around it
  
- # The story so far
-+It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot: it needs no place or events, and its notes are the sayings it builds on.
- No characters chosen yet.
- The user's limits, never to be crossed: none stated beyond the rules above
++It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
++
+ No other characters yet.
 ~~~~
 
-## Characters around it (`cast`, descriptive, baseline `none`)
+## Idea dials already set (`rated`, structural, baseline `none`)
+
+### rated = heat
+
+~~~~diff
+@@ -20,5 +20,6 @@
+ No other characters yet.
+ 
+-No heat is set: keep to how sexual what is written already is.
++Heat: steamy: sex happens, written sensually rather than graphically.
++Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+ 
+ # The character so far
+~~~~
+
+### rated = kink
+
+~~~~diff
+@@ -20,4 +20,5 @@
+ No other characters yet.
+ 
++Kink: kinky: BDSM and power exchange.
+ No heat is set: keep to how sexual what is written already is.
+~~~~
+
+### rated = both
+
+~~~~diff
+@@ -20,5 +20,7 @@
+ No other characters yet.
+ 
+-No heat is set: keep to how sexual what is written already is.
++Heat: steamy: sex happens, written sensually rather than graphically.
++Kink: kinky: BDSM and power exchange.
++Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+ 
+ # The character so far
+~~~~
+
+## Characters around it (`cast`, structural, baseline `none`)
 
 ### cast = some
 
 ~~~~diff
-@@ -14,5 +14,5 @@
+@@ -18,5 +18,5 @@
+ # The daydream around it
  
- # The story so far
--No characters chosen yet.
-+Characters in the daydream: ⟦character1.name⟧ (⟦character1.archetype⟧), ⟦character2.name⟧
- The user's limits, never to be crossed: none stated beyond the rules above
+-No other characters yet.
++Other characters in the daydream: ⟦character2.name⟧
+ 
+ No heat is set: keep to how sexual what is written already is.
 ~~~~
 
 ## Limits (`limits`, descriptive, baseline `none`)
@@ -148,11 +208,14 @@ No change.
 ### limits = set
 
 ~~~~diff
-@@ -15,5 +15,5 @@
- # The story so far
- No characters chosen yet.
--The user's limits, never to be crossed: none stated beyond the rules above
-+The user's limits, never to be crossed: ⟦limits⟧
+@@ -31,5 +31,8 @@
+ # The user's limits
  
- ===== 2. user =====
+-None stated beyond the rules.
++Never to be crossed:
++<limits>
++⟦limits⟧
++</limits>
+ 
+ # What to do
 ~~~~

@@ -407,6 +407,7 @@ describe('parseGeneratedIdeas', () => {
 				premise: 'Your neighbour saw everything.',
 				tags: ['exhibition'],
 				you: 'sub',
+				sideFromBrief: false,
 				voice: null,
 				dials: { heat: 4, kink: 3 },
 				research: ''
@@ -421,13 +422,21 @@ describe('parseGeneratedIdeas', () => {
 		expect(parseGeneratedIdeas({ ideas: [idea({ voice: 'poem' })] }, null)[0]?.voice).toBeNull();
 	});
 
-	it('drops an idea that puts the user on the other side, but keeps one with nobody in charge', () => {
+	it('keeps an idea that puts the user on the other side, as the brief’s own word on it', () => {
 		const answer = {
 			ideas: [idea({ title: 'Mine', you: 'dom' }), idea({ title: 'Even', you: null })]
 		};
-		expect(parseGeneratedIdeas(answer, 'sub').map((kept) => kept.title)).toEqual(['Even']);
-		// Asked for either side, every side is fine.
-		expect(parseGeneratedIdeas(answer, null).map((kept) => kept.you)).toEqual(['dom', null]);
+		expect(
+			parseGeneratedIdeas(answer, 'sub').map((kept) => [kept.title, kept.sideFromBrief])
+		).toEqual([
+			['Mine', true],
+			['Even', false]
+		]);
+		// Asked for either side, no side is the brief's over the form's.
+		expect(parseGeneratedIdeas(answer, null).map((kept) => kept.sideFromBrief)).toEqual([
+			false,
+			false
+		]);
 	});
 
 	it('reads anything but the two sides as nobody in charge', () => {

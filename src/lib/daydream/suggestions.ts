@@ -387,7 +387,10 @@ export function parseCasting(value: unknown): { relationship: string; part: stri
 	}
 	const answer = value as Record<string, unknown>;
 	const relationship = capped(answer.relationship, DAYDREAM_LIMITS.relationship);
-	const part = capped(answer.part, DAYDREAM_LIMITS.castPart);
+	// Asked for as "doing" now, the word the whole-daydream answer uses for
+	// the same thing; "part" read as the idea's part. The old key is still
+	// read, for an answer to a prompt from before.
+	const part = capped(answer.doing ?? answer.part, DAYDREAM_LIMITS.castPart);
 	return relationship || part ? { relationship, part } : null;
 }
 
@@ -511,6 +514,13 @@ export type GeneratedIdea = {
 	/** The user's side in it, as a ready-made daydream's `you`. */
 	you: StarterSide | null;
 	/**
+	 * Whether `you` is not the side the ideas were asked for: the brief said
+	 * plainly which side the user is on, and that wins over "You as"
+	 * (`suggest-prompt.ts`). Shown whatever "You as" says, since the brief
+	 * is what asked for it.
+	 */
+	sideFromBrief: boolean;
+	/**
 	 * How it is told, as a ready-made daydream's `voice`, or null for the
 	 * model to choose when it is written out: an idea for a monologue stays
 	 * one, rather than being written out as a story about its theme.
@@ -529,9 +539,10 @@ export type GeneratedIdea = {
  * The ideas in an `ideas` answer, for the side they were asked for. Each
  * needs a title and a premise within their caps; tags are trimmed, capped
  * and de-duplicated; a side that is not one of the two is none. An idea that
- * puts the user on the other side from the one asked for is dropped rather
- * than shown under the wrong filter, as is a second idea with the same title.
- * Each carries the round's research.
+ * puts the user on the other side from the one asked for is kept, marked
+ * `sideFromBrief`: the prompt has the brief's own word on the user's side
+ * win, so it is what they asked for. A second idea with the same title is
+ * dropped. Each carries the round's research.
  */
 export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): GeneratedIdea[] {
 	const parsed = z.object({ ideas: z.array(z.unknown()) }).safeParse(value);
@@ -548,11 +559,7 @@ export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): G
 		const title = capped(idea.title, DAYDREAM_LIMITS.title).replace(QUOTES, '').trim();
 		const premise = capped(idea.premise, MAX_IDEA_PREMISE);
 		const you = idea.you === 'dom' || idea.you === 'sub' ? idea.you : null;
-		if (
-			!(title && premise) ||
-			(side !== null && you !== null && you !== side) ||
-			ideas.some((other) => same(other.title, title))
-		) {
+		if (!(title && premise) || ideas.some((other) => same(other.title, title))) {
 			continue;
 		}
 		ideas.push({
@@ -560,6 +567,7 @@ export function parseGeneratedIdeas(value: unknown, side: StarterSide | null): G
 			premise,
 			tags: ideaTags(idea.tags),
 			you,
+			sideFromBrief: side !== null && you !== null && you !== side,
 			voice: voiceOf(idea.voice),
 			dials: parseIdeaDials(idea),
 			research

@@ -47,6 +47,8 @@ export type SuggestContext = {
 	story?: StoryDials;
 	/** How it is told, when there is a daydream around it: a monologue's idea is a different shape. */
 	narrator?: DaydreamNarrator;
+	/** The idea's heat and kink, so a character is written as sexual as the daydream is set to be. */
+	ideaDials?: IdeaDials;
 };
 
 /**
@@ -157,6 +159,7 @@ export async function suggestFill(input: {
 export async function suggestCasting(input: {
 	character: Omit<DaydreamCharacter, 'dials'>;
 	idea: Pick<DaydreamIdea, 'title' | 'setting' | 'premise' | 'yourRole' | 'tone'>;
+	ideaDials?: IdeaDials;
 	part: Pick<IdeaPart, 'name' | 'description'> | null;
 	others: { name: string; part: string | null }[];
 	stance: DaydreamStance;
@@ -173,8 +176,11 @@ export async function suggestCasting(input: {
 /** A name for a daydream, from its idea and how it opened. */
 export async function suggestName(input: {
 	idea: Pick<DaydreamIdea, 'title' | 'premise'>;
+	ideaDials?: IdeaDials;
 	characters: string[];
 	opening: string;
+	/** The titles of other daydreams from the same idea, for this one not to repeat. */
+	taken?: string[];
 	limits: string;
 }): Promise<Answer<string>> {
 	const answer = await ask({ task: 'name', ...input });

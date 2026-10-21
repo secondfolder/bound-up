@@ -127,7 +127,13 @@
 	const startersShown = $derived(
 		allStarters || searching ? starters : starters.slice(0, SHOWN_STARTERS)
 	);
-	const ideasForSide = $derived(generated ? forSide(generated.ideas, side) : []);
+	// An idea whose brief put the user on the other side is what they asked
+	// for, so "You as" does not hide it.
+	const ideasForSide = $derived(
+		generated
+			? generated.ideas.filter((idea) => idea.sideFromBrief || forSide([idea], side).length > 0)
+			: []
+	);
 	const ideasShown = $derived(ideasForSide.filter((shown) => matchesSearch(shown, filter)));
 
 	const busy = $derived(asking || suggesting || gettingMore);
@@ -228,13 +234,14 @@
 									{#each idea.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
 								</span>
 								<!-- "You’re the dom" says nothing once "You as" has chosen the side
-								     every card shown is for, so cards say it only under "Either". -->
+								     a card is for, so cards say it under "Either", and on one whose
+								     brief chose the other side. -->
 								<span class="meta">
 									{#if writing === idea.title}
 										<span class="level">Writing your daydream…</span>
 									{:else if level}<span class="level">{level}</span>{/if}
 									{#if idea.voice}<span>{voiceLabel(idea.voice)}</span>{/if}
-									{#if idea.you && side === null}<span>You’re the {idea.you}</span>{/if}
+									{#if idea.you && (side === null || idea.sideFromBrief)}<span>You’re the {idea.you}</span>{/if}
 								</span>
 							</button>
 						</li>

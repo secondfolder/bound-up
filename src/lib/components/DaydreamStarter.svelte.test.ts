@@ -21,6 +21,7 @@ const generatedIdeas: GeneratedIdea[] = [
 		premise: 'Your neighbour saw everything.',
 		tags: ['exhibition'],
 		you: 'sub',
+		sideFromBrief: false,
 		voice: null,
 		dials: { heat: 4, kink: 3 },
 		research: ''
@@ -30,6 +31,7 @@ const generatedIdeas: GeneratedIdea[] = [
 		premise: 'They signed up to obey.',
 		tags: ['protocol'],
 		you: 'dom',
+		sideFromBrief: false,
 		voice: null,
 		dials: { heat: 4, kink: 4 },
 		research: ''

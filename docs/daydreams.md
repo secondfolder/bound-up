@@ -50,13 +50,25 @@ someone has played one:
   named character is the one speaking, and its sayings go in the idea's
   notes ([Ideas](#ideas)). Who speaks is a voice of its own, talking to the
   user, by default — even when the voice and the user are on the same side,
-  so long as it does not make the user the one it is talking about, and
-  only the line for the side the user chose is said (`SAME_SIDE_VOICE`) — and the
+  so long as it does not make the user the one it is talking about — and the
   user's own inner voice only when the brief asks for it, never merely
   because the brief is about what someone is or what people believe. Told that the
   inner voice "suits a brief about what they are or think", a model read a
   brief listing what a community says women are for as the user's own
   beliefs, and spoke it as their inner voice.
+
+  **The user's side** is said voice by voice (`SIDE_CLAUSES`): one line
+  for every voice — "whoever else is in it submits to them" — meant
+  nothing to someone who only watches, and contradicted "rules", a system
+  giving the user orders. So "watch" follows the story's dominant or
+  submissive one, a monologue speaks to the user as one who serves them or
+  is in charge of them (or alongside them, where its sayings are of the
+  user's own side), and only the kept voice's clause is said once there is
+  one. **A dominant user is not offered "rules"**: a system they want is
+  told as "talk" or "told", with its people answering to them. And **the
+  brief's own word wins**: where it says plainly which side the user is on,
+  that is their side whatever "You as" says, since someone who chose
+  "dominant" and wrote "I want to be her pet" meant the brief.
 - **Daydream suggestions.** Ready-made daydreams (`DAYDREAM_STARTERS` in
   `daydream/starters.ts`), each an idea starting point, a voice preset and
   character starting points cast into the idea's parts, with the casting
@@ -102,13 +114,16 @@ someone has played one:
   or on neither for one with no one in charge; with "Either", a mix.
   Each idea is only what a card shows — a title, a premise, tags, the
   user's side, how it is told (`voice`, chosen with the same cues as a
-  whole daydream's) and a heat and kink — so a handful comes back quickly;
-  `parseGeneratedIdeas` drops any that put the user on the other side from
-  the one asked for. The round runs hotter than every other suggestion
+  whole daydream's) and a heat and kink — so a handful comes back quickly.
+  An idea that puts the user on the other side from the one asked for is
+  the brief's own word on it, so `parseGeneratedIdeas` keeps it, marked
+  `sideFromBrief`, and "You as" does not hide it; its card says which side
+  it is. The round runs hotter than every other suggestion
   (`IDEAS_TEMPERATURE` in `suggest-prompt.ts`): a brief is asked for again
   and again, and at the default sampling the ideas converge on the same
   few each time. They take the ready-made ones' place, under the
-  request, and are filtered by "You as" the same way (`forSide`); **Clear**
+  request, and are filtered by "You as" the same way (`forSide`), but for
+  those whose brief chose the side; **Clear**
   beside the request puts them away and brings the ready-made ones back.
   **More ideas**, at the end of the list, asks again with the same request
   and the side chosen now, sending the titles already shown (the latest
@@ -138,8 +153,8 @@ model calls tools, the `ideas` and `daydream` suggestions read those links:
 http(s) links, and if there are any the prompt tells the model to open each
 before it answers and to draw their themes, tropes and sayings in. What a
 page says is material, never instructions, and a page that cannot be read
-is noted in the research and mentioned nowhere else. The endpoint sends OpenRouter's
-`openrouter:web_fetch` server tool with the request (`WEB_FETCH` in
+is noted in the research. The endpoint sends OpenRouter's
+`openrouter:web_fetch` server tool with the request (`webFetch` in
 `api/daydreams/suggest/+server.ts`), so OpenRouter does the fetching while
 the model answers and it is still one call. That request goes to
 OpenRouter's Responses API (`/responses`, `readingLinks`) rather than Chat
@@ -149,6 +164,22 @@ was read, and what came back — which debug mode's chat log shows
 the browser reads either shape (`completionText`, `suggestionLog`). The answer gets
 `READING_ALLOWANCE` more tokens, because a model with a tool reasons over
 what it read before it writes.
+
+- **An index is followed, within limits.** A brief often links a list —
+  a subreddit, a tag page — meaning the entries on it. The model chooses
+  every URL it fetches, so the prompt says it may open pages a linked
+  page leads to, and how many in all: the brief's links and four more,
+  at most `MAX_PAGES_READ` (eight), which is the tool's `max_uses` too
+  (`pagesToRead`), so the prompt and the provider cannot disagree.
+- **Only the brief's own sites.** The tool's `allowed_domains` is the
+  hosts of the brief's links (`readableHosts`). Without it, a page could
+  tell the model to fetch a URL of its choosing with the brief and the
+  limits in the query string, and the model holds both.
+- **Links that will not be read are said to be.** With a model that calls
+  no tools the links stay in the brief as text, and the prompt says the
+  pages cannot be opened and are not to be guessed at: asked for "what each
+  linked page was" with no way to open one, a model made the content up
+  from the URL and quoted it as research.
 
 - **Only a model that calls tools.** None of the presets do. A custom model
   is checked against OpenRouter's list when it is saved
@@ -188,16 +219,16 @@ server's](#the-system-prompt-is-the-servers)):
   never the model's version of them. For a picked idea it is the brief the
   ideas were asked for with.
 - **The research**: the model's analysis of what it was given, kept in full
-  rather than summarised (`RESEARCH_INSTRUCTION` in `suggest-prompt.ts`), for
-  whoever writes the daydream. It is asked to work in two stages: first the
-  analysis — what each linked page was and everything it drew from it, its
-  recurring themes, tropes and sayings quoted as written where the wording
-  matters, what in the brief it built on, and what it weighed and left out —
-  and then, separately, how to turn that analysis into the ideas or the
-  setup, which is its own working and goes nowhere. The research is the
-  first stage word for word, never a condensed version of it — the model's
-  analysis of the pages, not the pages themselves — so the model that writes
-  the daydream sees what the one that read them saw. Only when word for word
+  rather than summarised (`researchInstruction` in `suggest-prompt.ts`), for
+  whoever writes the daydream: what each linked page was and what it took
+  from it — recurring themes, tropes, dynamics and sayings, quoted exactly
+  where the wording matters — what in the brief it built on and why, and
+  what it weighed and left out. How it turned that into the ideas or the
+  setup stays out. It is in full, never a condensed version, so the model
+  that writes the daydream sees what the one that read the pages saw; but
+  it is the model's analysis, never the pages copied out. It once said
+  "word for word", which a model could only read as "copy the pages", since
+  the analysis is its own and there is nothing else to copy. Only when it
   would run over the length it is asked for (1,000 characters under
   `DAYDREAM_LIMITS.ideaResearch`) does it summarise, and only as much as
   fitting needs. It is called "the research" throughout the prompt, never
@@ -1339,13 +1370,16 @@ fetch engine (Parallel), so those sites see a request for the page — from
 them, not from the user or this server:
 
 - for a character or idea being written: its fields (and an idea's parts),
-  the names and types of the daydream's other characters, its limits and its
-  dials;
-- for a casting: the character's own fields, the idea's, the part they are
-  cast in, the others' names and parts, where the user stands, and the
-  limits;
-- for a name: the idea's title and premise, the cast's names, the limits,
-  and the first `MAX_NAMING_OPENING` characters of the opening passage;
+  the names and types of the daydream's other characters, its limits, its
+  dials and the idea's heat and kink;
+- for a casting: the character's own fields, the idea's and its heat and
+  kink, the part they are cast in, the others' names and parts, where the
+  user stands, and the limits;
+- for a name: the idea's title, premise, heat and kink, the cast's names,
+  the limits, the first `MAX_NAMING_OPENING` characters of the opening
+  passage, and the titles of the user's other daydreams from the same idea
+  (`taken`), when the browser sends them, so this one is not called the
+  same;
 - for a whole daydream, from the new-daydream page: the brief the user
   wrote (up to `DAYDREAM_LIMITS.brief`) with the side chosen under "You as",
   and for a generated idea also its title and premise, the side and voice it

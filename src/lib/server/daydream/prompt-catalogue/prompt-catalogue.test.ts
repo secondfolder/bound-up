@@ -105,8 +105,8 @@ describe('the catalogue', () => {
 
 	it('counts the combinations no device could send, by reason, and reviews none of them', () => {
 		const catalogue = buildCatalogue(builder('chips'));
-		expect(catalogue.invalid).toEqual([{ problem: 'field: Chips are for one field', count: 54 }]);
-		expect(catalogue.structuralTotal).toBe(66);
+		expect(catalogue.invalid).toEqual([{ problem: 'field: Chips are for one field', count: 432 }]);
+		expect(catalogue.structuralTotal).toBe(528);
 	});
 
 	it('marks a paragraph only a swept descriptive value brings in', () => {

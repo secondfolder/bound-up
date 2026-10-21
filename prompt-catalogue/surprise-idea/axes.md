@@ -28,34 +28,58 @@ No change.
 -maxTokens: 800
 +maxTokens: 1000
  temperature: 1
- readLinks: false
-@@ -14,4 +14,5 @@
+ pagesRead: null
+@@ -18,4 +18,6 @@
+ # The daydream around it
  
- # The story so far
-+It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot: it needs no place or events, and its notes are the sayings it builds on.
++It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
++
  No characters chosen yet.
- The user's limits, never to be crossed: none stated beyond the rules above
-@@ -21,11 +22,10 @@
- Title: ⟦idea.title⟧
  
--Invent an idea for this story that the user will not expect, fitting the characters and the dials.
--What makes a story worth starting — think it through before writing:
+@@ -32,14 +34,13 @@
+ # What to do
+ 
+-Invent an idea for this story that the user will not expect.
++Invent an idea for this monologue that the user will not expect.
+ 
+-What makes a story worth starting — weigh these before you answer, without writing the weighing out:
 -- Who the people are to each other: strangers thrown together by chance, people who have known each other a while without being close (co-workers from different departments, a neighbour, the courier who always delivers), or people already intimate, together for years or still discovering each other.
 -- Where it happens: somewhere with a charge of its own, like the back room at work, deep in an old library, a late train, a mansion with a dungeon in the basement.
 -- Why it happens now: a dare, a debt, a bet, blackmail, a job, money, a craving someone finally admits.
 -- When it is sexual, which dynamic, acts and kinks suit it, picked to fit the rest rather than listed.
 -Draw on the kinds of story people love in erotica and fan fiction, and make it hang together as one story. Tropes are loved for a reason: a familiar one the user would enjoy is a good choice. Be inventive where a fresh angle makes the story better, not for its own sake.
--Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: "heat" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and "kink" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).
--Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}], "heat": 1-5, "kink": 1-5}
-\ No newline at end of file
-+Invent an idea for this monologue that the user will not expect, fitting the characters and the dials.
-+What makes a monologue worth listening to — think it through before writing:
-+- The ideas it is built on: the beliefs, rules, tropes and sayings of what the user is into — the things people into it say to each other and to themselves. Start from any they named or pointed to, in their own words where they gave some, and add the ones that go with them.
-+- Who speaks, and to whom: a voice of its own, speaking to the user — unnamed, or a named character where they asked for a person. That is the default, and a brief being about what someone is or is for, what people believe, or the sayings of a kink or a community is no reason to leave it: a separate voice can say all of those to the user. Where the ideas are those of the user's own side — a dominant's for a dominant user, a submissive's for a submissive one — it says them alongside the user, as one of that side to another, never casting the user as the other side. Only where the brief asks for the ideas in the user's own inner voice is it theirs.
++What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:
++- The ideas it is built on: the beliefs, rules, tropes and sayings of a kink or dynamic that fits what is set above — the things people into it say to each other and to themselves.
++- Who speaks, and to whom: a voice of its own, speaking to the user, unnamed or a named character.
 +- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
-+There is no plot, place or encounter to invent, unless they asked for one.
-+Give it a short title naming what it is about, like "What good girls are for"; the premise: what the voice believes and keeps coming back to, in a sentence or two; your role: who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; its tone, in a few words; the setting empty, unless it is said somewhere in particular; and the notes: the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. No parts, unless a named character is the one speaking. Rate the idea too, as whole numbers from 1 to 5: "heat" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and "kink" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).
-+Answer as: {"title": "…", "setting": "", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [], "heat": 1-5, "kink": 1-5}
++There is no plot, place or encounter to invent.
+ 
+-Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
++The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, "the speaker".
+ 
+ Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
+@@ -49,9 +50,10 @@
+ Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
+ 
+-- "title": a short title
+-- "setting": where it happens
+-- "premise": what is going on as it starts
+-- "yourRole": who the user is in it
+-- "tone": how it should feel
++- "title": a short title naming what it is about
++- "setting": where it is set, if anywhere; empty otherwise
++- "premise": what the voice believes and keeps coming back to
++- "yourRole": who the user is to the voice
++- "tone": how it sounds, in a few words
++- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+ - "parts": the parts for characters to play
+   - "name": a short name for the part
+@@ -60,3 +62,3 @@
+ - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+ 
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
+\ No newline at end of file
++{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file
 ~~~~
 
@@ -64,77 +88,132 @@ No change.
 ### rated = heat
 
 ~~~~diff
-@@ -20,4 +20,6 @@
- The idea as written so far:
- Title: ⟦idea.title⟧
+@@ -26,4 +26,7 @@
+ </idea>
+ 
 +Heat: steamy: sex happens, written sensually rather than graphically.
 +Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
++
+ # The user's limits
  
- Invent an idea for this story that the user will not expect, fitting the characters and the dials.
-@@ -28,4 +30,4 @@
- - When it is sexual, which dynamic, acts and kinks suit it, picked to fit the rest rather than listed.
- Draw on the kinds of story people love in erotica and fan fiction, and make it hang together as one story. Tropes are loved for a reason: a familiar one the user would enjoy is a good choice. Be inventive where a fresh angle makes the story better, not for its own sake.
--Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: "heat" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and "kink" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).
--Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}], "heat": 1-5, "kink": 1-5}
+@@ -32,5 +35,5 @@
+ # What to do
+ 
+-Invent an idea for this story that the user will not expect.
++Invent an idea for this story that the user will not expect, fitting the heat and kink set above.
+ 
+ What makes a story worth starting — weigh these before you answer, without writing the weighing out:
+@@ -43,5 +46,5 @@
+ Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
+ 
+-Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
++Rate the idea's kink too, from what is written: an idea that says nothing sexual is not sexual.
+ 
+ # Your answer
+@@ -57,6 +60,5 @@
+   - "name": a short name for the part
+   - "description": what that part does in the idea, in a few words
+-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+ - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+ 
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file
-+Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: "kink" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).
-+Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}], "kink": 1-5}
++{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …}
 \ No newline at end of file
 ~~~~
 
 ### rated = kink
 
 ~~~~diff
-@@ -20,4 +20,5 @@
- The idea as written so far:
- Title: ⟦idea.title⟧
-+Kink: kinky: BDSM and power exchange.
+@@ -26,4 +26,6 @@
+ </idea>
  
- Invent an idea for this story that the user will not expect, fitting the characters and the dials.
-@@ -28,4 +29,4 @@
- - When it is sexual, which dynamic, acts and kinks suit it, picked to fit the rest rather than listed.
- Draw on the kinds of story people love in erotica and fan fiction, and make it hang together as one story. Tropes are loved for a reason: a familiar one the user would enjoy is a good choice. Be inventive where a fresh angle makes the story better, not for its own sake.
--Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: "heat" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and "kink" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).
--Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}], "heat": 1-5, "kink": 1-5}
++Kink: kinky: BDSM and power exchange.
++
+ # The user's limits
+ 
+@@ -32,5 +34,5 @@
+ # What to do
+ 
+-Invent an idea for this story that the user will not expect.
++Invent an idea for this story that the user will not expect, fitting the heat and kink set above.
+ 
+ What makes a story worth starting — weigh these before you answer, without writing the weighing out:
+@@ -43,5 +45,5 @@
+ Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
+ 
+-Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
++Rate the idea's heat too, from what is written: an idea that says nothing sexual is not sexual.
+ 
+ # Your answer
+@@ -58,5 +60,4 @@
+   - "description": what that part does in the idea, in a few words
+ - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+ 
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file
-+Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: "heat" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy).
-+Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}], "heat": 1-5}
++{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …}
 \ No newline at end of file
 ~~~~
 
 ### rated = both
 
 ~~~~diff
-@@ -20,4 +20,7 @@
- The idea as written so far:
- Title: ⟦idea.title⟧
+@@ -26,4 +26,8 @@
+ </idea>
+ 
 +Heat: steamy: sex happens, written sensually rather than graphically.
 +Kink: kinky: BDSM and power exchange.
 +Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
++
+ # The user's limits
  
- Invent an idea for this story that the user will not expect, fitting the characters and the dials.
-@@ -28,4 +31,4 @@
- - When it is sexual, which dynamic, acts and kinks suit it, picked to fit the rest rather than listed.
- Draw on the kinds of story people love in erotica and fan fiction, and make it hang together as one story. Tropes are loved for a reason: a familiar one the user would enjoy is a good choice. Be inventive where a fresh angle makes the story better, not for its own sake.
--Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: "heat" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and "kink" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).
--Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}], "heat": 1-5, "kink": 1-5}
+@@ -32,5 +36,5 @@
+ # What to do
+ 
+-Invent an idea for this story that the user will not expect.
++Invent an idea for this story that the user will not expect, fitting the heat and kink set above.
+ 
+ What makes a story worth starting — weigh these before you answer, without writing the weighing out:
+@@ -43,6 +47,4 @@
+ Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
+ 
+-Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
+-
+ # Your answer
+ 
+@@ -57,6 +59,4 @@
+   - "name": a short name for the part
+   - "description": what that part does in the idea, in a few words
+-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+ 
+-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file
-+Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
-+Answer as: {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}]}
++{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …]}
 \ No newline at end of file
 ~~~~
 
-## Characters around it (`cast`, descriptive, baseline `none`)
+## Characters around it (`cast`, structural, baseline `none`)
 
 ### cast = some
 
 ~~~~diff
-@@ -14,5 +14,5 @@
+@@ -18,5 +18,5 @@
+ # The daydream around it
  
- # The story so far
 -No characters chosen yet.
 +Characters in the daydream: ⟦character1.name⟧ (⟦character1.archetype⟧), ⟦character2.name⟧
- The user's limits, never to be crossed: none stated beyond the rules above
+ 
+ # The idea so far
+@@ -32,5 +32,5 @@
+ # What to do
+ 
+-Invent an idea for this story that the user will not expect.
++Invent an idea for this story that the user will not expect, built around the characters above, each playing one of its parts.
+ 
+ What makes a story worth starting — weigh these before you answer, without writing the weighing out:
 ~~~~
 
 ## Story dials sent (`story`, descriptive, baseline `no`)
@@ -142,14 +221,15 @@ No change.
 ### story = yes
 
 ~~~~diff
-@@ -16,4 +16,7 @@
+@@ -20,4 +20,9 @@
  No characters chosen yet.
- The user's limits, never to be crossed: none stated beyond the rules above
+ 
++How the daydream will be told, for context — these are not lengths for the fields:
 +Intensity: moderate.
 +Pace: steady.
 +Length of each passage: two or three short paragraphs.
- 
- ===== 2. user =====
++
+ # The idea so far
 ~~~~
 
 ## Limits (`limits`, descriptive, baseline `none`)
@@ -157,11 +237,14 @@ No change.
 ### limits = set
 
 ~~~~diff
-@@ -15,5 +15,5 @@
- # The story so far
- No characters chosen yet.
--The user's limits, never to be crossed: none stated beyond the rules above
-+The user's limits, never to be crossed: ⟦limits⟧
+@@ -28,5 +28,8 @@
+ # The user's limits
  
- ===== 2. user =====
+-None stated beyond the rules.
++Never to be crossed:
++<limits>
++⟦limits⟧
++</limits>
+ 
+ # What to do
 ~~~~

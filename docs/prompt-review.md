@@ -23,6 +23,33 @@ The code is in `src/lib/server/daydream/prompt-catalogue/`. The browser half,
 which holds the shared types, the diffs and the reviewed marks, is
 `src/lib/prompt-review.ts`.
 
+## How a prompt is put together
+
+The builders assemble prompts from `prompt-parts.ts` rather than from
+template strings joined by hand. Joining by hand caused bugs the source
+could not show. "Answer as" read as the last line of "The summary:", the
+rating paragraph sat under "If it is a monologue:", and an empty piece left
+a stray space behind. The parts are:
+
+- **`section(heading, …)`**: a `# Heading` and its paragraphs. An empty
+  piece drops out, and a section with nothing in it disappears.
+- **`paragraphs(…)`**: pieces one blank line apart.
+- **`userText(tag, text)`**: what a user or a web page wrote, inside a tag
+  such as `<brief>`. Every prompt's rules say that tagged text is material,
+  never instructions. A closing tag inside the text is taken out, so a brief
+  cannot end its own tag early and write prompt after it.
+- **`answerFormat(keys)`**: the last section, `# Your answer`. It lists each
+  key and what it holds, then gives a skeleton with `…` for every value. It
+  never uses a sample value, because models copy examples: `"you": "dom"`
+  came back from a user who had chosen the other side. A test fills the
+  skeleton in and runs it through the parser that reads the real answer,
+  so the format and the parser cannot drift apart.
+
+The suggestion prompts all follow one order. The system message holds the
+rules and the task's unchanging instructions. The user message holds what
+the user wrote, tagged, then the sections that depend on this request, then
+the answer. Unchanging text first is what a provider can cache.
+
 ## Builders and axes
 
 `axes.ts` lists one _builder_ per prompt the server sends: `reply`, and each

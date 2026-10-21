@@ -192,7 +192,13 @@ describe('POST /api/daydreams/suggest', () => {
 			expect(url).toBe('https://models.test/api/v1/responses');
 			expect(reading).toMatchObject({
 				model: 'test/model',
-				tools: [{ type: 'openrouter:web_fetch', parameters: { engine: 'parallel' } }],
+				// Only the brief's own site, and its link plus a few an index leads to.
+				tools: [
+					{
+						type: 'openrouter:web_fetch',
+						parameters: { engine: 'parallel', max_uses: 5, allowed_domains: ['www.reddit.com'] }
+					}
+				],
 				text: { format: { type: 'json_object' } },
 				provider: { data_collection: 'deny' }
 			});

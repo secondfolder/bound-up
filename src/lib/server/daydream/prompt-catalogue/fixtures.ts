@@ -372,7 +372,10 @@ export function suggestInput(
 					...(target === 'character'
 						? { dials: characterDials(combo) }
 						: { ideaDials: ideaDials(combo) }),
-					context: contextOf(combo, text)
+					context: {
+						...contextOf(combo, text),
+						...(target === 'character' ? { ideaDials: ideaDials(combo) } : {})
+					}
 				} as SuggestRequest,
 				canReadLinks: false
 			};
@@ -400,6 +403,7 @@ export function suggestInput(
 							? [{ name: text('character2.name'), part: text('part2.name') }]
 							: [],
 					stance: combo.stance as DaydreamStance,
+					ideaDials: ideaDials(combo),
 					limits: limitsOf(combo, text)
 				},
 				canReadLinks: false
@@ -412,6 +416,8 @@ export function suggestInput(
 					characters:
 						combo.characters === 'some' ? [text('character1.name'), text('character2.name')] : [],
 					opening: text('opening'),
+					taken: combo.taken === 'some' ? [text('taken1'), text('taken2')] : [],
+					ideaDials: ideaDials(combo),
 					limits: limitsOf(combo, text)
 				},
 				canReadLinks: false

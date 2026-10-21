@@ -4,7 +4,7 @@ import { daydreamGuard } from '$lib/server/daydream/guard';
 import type { ModelMessage } from '$lib/server/daydream/prompt';
 import {
 	buildSuggestMessages,
-	MAX_BRIEF_LINKS,
+	type Reading,
 	suggestRequestSchema
 } from '$lib/server/daydream/suggest-prompt';
 import { hasAcceptedDisclosure } from '$lib/server/daydreams';
@@ -64,13 +64,13 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		});
 	}
 
-	const { messages, maxTokens, temperature, readLinks } = buildSuggestMessages(parsed.data, {
+	const { messages, maxTokens, temperature, reading } = buildSuggestMessages(parsed.data, {
 		canReadLinks: config.readsLinks
 	});
 	// Stringified once, so debug mode's chat log shows the very text that was sent.
 	const body = JSON.stringify(
-		readLinks
-			? readingLinks(config.openrouterModelId, messages, maxTokens, temperature)
+		reading
+			? readingLinks(config.openrouterModelId, messages, maxTokens, temperature, reading)
 			: {
 					model: config.openrouterModelId,
 					messages,
@@ -85,7 +85,7 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 	);
 	let upstream: Response;
 	try {
-		upstream = await fetch(`${config.baseUrl}/${readLinks ? 'responses' : 'chat/completions'}`, {
+		upstream = await fetch(`${config.baseUrl}/${reading ? 'responses' : 'chat/completions'}`, {
 			method: 'POST',
 			headers: {
 				authorization: `Bearer ${config.apiKey}`,
@@ -157,13 +157,26 @@ function withRequest(answer: string, request: string): Response {
  * because it is the one that reads reddit, which briefs link most: measured
  * 2026-10-20, Exa answered nothing for a subreddit, Firecrawl refuses reddit
  * outright, and OpenRouter's own fetch hands back raw RSS when it gets
- * anything. $1 per 1,000 fetches, on top of the tokens. One fetch a link, and
- * each page cut short, so a brief cannot fill the context.
+ * anything. $1 per 1,000 fetches, on top of the tokens. Each page is cut
+ * short, so a brief cannot fill the context.
+ *
+ * The model picks every URL it fetches, so a page it reads could send it on
+ * to one of the page's choosing with the brief in the query string. Only the
+ * sites the brief's own links are on can be opened (`allowed_domains`), and
+ * only as many pages as the prompt says (`max_uses`, `pagesToRead`): the
+ * brief's links, and a few that an index among them leads to.
  */
-const WEB_FETCH = {
-	type: 'openrouter:web_fetch',
-	parameters: { engine: 'parallel', max_uses: MAX_BRIEF_LINKS, max_content_tokens: 6000 }
-} as const;
+function webFetch(reading: Reading) {
+	return {
+		type: 'openrouter:web_fetch',
+		parameters: {
+			engine: 'parallel',
+			max_uses: reading.maxPages,
+			max_content_tokens: 6000,
+			allowed_domains: reading.hosts
+		}
+	} as const;
+}
 
 /**
  * The request for a suggestion that reads a brief's links: the same one, sent
@@ -177,7 +190,8 @@ function readingLinks(
 	model: string,
 	messages: ModelMessage[],
 	maxTokens: number,
-	temperature: number
+	temperature: number,
+	reading: Reading
 ) {
 	return {
 		model,
@@ -186,7 +200,7 @@ function readingLinks(
 		temperature,
 		text: { format: { type: 'json_object' } },
 		provider: { data_collection: 'deny' },
-		tools: [WEB_FETCH]
+		tools: [webFetch(reading)]
 	};
 }
 

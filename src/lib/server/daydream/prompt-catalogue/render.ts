@@ -36,10 +36,21 @@ export function renderPrompt(
 	if (!parsed.success) {
 		return { ok: false, problem: problemOf(parsed.error.issues) };
 	}
-	const { messages, maxTokens, temperature, readLinks } = buildSuggestMessages(parsed.data, {
+	const { messages, maxTokens, temperature, reading } = buildSuggestMessages(parsed.data, {
 		canReadLinks
 	});
-	return { ok: true, prompt: { messages, params: { maxTokens, temperature, readLinks } } };
+	return {
+		ok: true,
+		prompt: {
+			messages,
+			params: {
+				maxTokens,
+				temperature,
+				pagesRead: reading?.maxPages ?? null,
+				readableHosts: reading ? reading.hosts.join(', ') : null
+			}
+		}
+	};
 }
 
 function problemOf(issues: readonly { path: PropertyKey[]; message: string }[]): string {

@@ -164,7 +164,9 @@ export const BUILDERS: readonly Builder[] = [
 			axis('written', 'Fields written', 'structural', values('name only', 'half')),
 			axis('parts', 'Idea parts', 'structural', values('none', 'some')),
 			ideaRated,
-			axis('cast', 'Characters around it', 'descriptive', values('none', 'some')),
+			// Structural: a character is left out of the cast around it, so the
+			// line differs between a character and an idea.
+			axis('cast', 'Characters around it', 'structural', values('none', 'some')),
 			axis('story', 'Story dials sent', 'descriptive', values('no', 'yes')),
 			limits,
 			...characterDials
@@ -194,7 +196,8 @@ export const BUILDERS: readonly Builder[] = [
 				)
 			),
 			contextNarrator('structural'),
-			axis('cast', 'Characters around it', 'descriptive', values('none', 'some')),
+			ideaRated,
+			axis('cast', 'Characters around it', 'structural', values('none', 'some')),
 			limits
 		]
 	},
@@ -205,7 +208,8 @@ export const BUILDERS: readonly Builder[] = [
 		axes: [
 			contextNarrator('structural'),
 			ideaRated,
-			axis('cast', 'Characters around it', 'descriptive', values('none', 'some')),
+			// Structural: the characters and the dials set make one sentence.
+			axis('cast', 'Characters around it', 'structural', values('none', 'some')),
 			axis('story', 'Story dials sent', 'descriptive', values('no', 'yes')),
 			limits
 		]
@@ -218,6 +222,7 @@ export const BUILDERS: readonly Builder[] = [
 			axis('stance', 'Stance', 'structural', values('self', 'persona', 'absent')),
 			axis('part', 'Part', 'structural', values('none', 'some'), 'some'),
 			axis('others', 'Others in it', 'structural', values('none', 'some')),
+			ideaRated,
 			limits
 		]
 	},
@@ -225,7 +230,12 @@ export const BUILDERS: readonly Builder[] = [
 		id: 'name',
 		label: 'Naming',
 		description: 'A name for a daydream once it opens (`nameMessages`).',
-		axes: [axis('characters', 'Characters', 'structural', values('none', 'some'), 'some'), limits]
+		axes: [
+			axis('characters', 'Characters', 'structural', values('none', 'some'), 'some'),
+			axis('taken', 'Titles already used', 'structural', values('none', 'some')),
+			ideaRated,
+			limits
+		]
 	}
 ];
 

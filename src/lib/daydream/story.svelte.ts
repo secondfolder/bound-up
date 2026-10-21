@@ -1307,6 +1307,7 @@ export class DaydreamStory {
 	async #name(setup: DaydreamSetup, opening: string): Promise<string | null> {
 		const answer = await suggestName({
 			idea: { title: setup.idea.title, premise: setup.idea.premise },
+			ideaDials: setup.idea.dials,
 			characters: setup.characters.map((character) => character.name),
 			opening: opening.slice(0, MAX_NAMING_OPENING),
 			limits: setup.limits

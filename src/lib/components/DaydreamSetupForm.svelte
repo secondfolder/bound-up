@@ -369,7 +369,8 @@
 		})),
 		limits: $form.limits,
 		story: $form.dials,
-		narrator: $form.voice.narrator
+		narrator: $form.voice.narrator,
+		ideaDials: $form.idea.dials
 	});
 
 	function characterSummary(character: DaydreamCharacterCopy): string {
@@ -561,6 +562,7 @@
 		return suggestCasting({
 			character,
 			idea: { title, setting, premise, yourRole, tone },
+			ideaDials: $form.idea.dials,
 			part: part ? { name: part.name, description: part.description } : null,
 			others: $form.characters
 				.filter((_, at) => at !== selfIndex)
