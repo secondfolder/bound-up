@@ -219,12 +219,12 @@ Only when target ∈ {character}; written ∈ {half}.
 {"archetype": "…", "speech": "…", "appearance": "…", "likes": "…", "notes": "…"}
 ~~~~
 
-## ¶ 1e50bc9a2f37c8 · user · in 64 of 384
+## ¶ 0a166e365ceb8a · user · in 64 of 384
 
 Only when narrator ∈ {monologue}.
 
 ~~~~text
-It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
+It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
 ~~~~
 
 ## ¶ 0ada7a1f4b71b4 · user · in 96 of 384
@@ -821,12 +821,12 @@ Only when target ∈ {idea}; written ∈ {half}; rated ∈ {both}.
 {"setting": "…", "yourRole": "…", "tone": "…", "notes": "…"}
 ~~~~
 
-## ¶ 0ceff25328c5e8 · user · in 4 of 384
+## ¶ 021056babfeee0 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {none}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
 ## ¶ 0e2e00998903c6 · user · in 32 of 384
@@ -837,7 +837,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}.
 Leave "setting" empty unless it is set somewhere in particular.
 ~~~~
 
-## ¶ 01c54f5048c680 · user · in 4 of 384
+## ¶ 0b23796c07904c · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {none}.
 
@@ -846,20 +846,20 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
-## ¶ 0253cdc4887e50 · user · in 4 of 384
+## ¶ 02a5c92c966eaa · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {heat}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 0e1bd621a0d85a · user · in 4 of 384
+## ¶ 1d77bd878b92c9 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {heat}.
 
@@ -868,19 +868,19 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
-## ¶ 1380730f8e856e · user · in 4 of 384
+## ¶ 0cdafc4942d7ae · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {kink}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 1736b4fc1d2319 · user · in 4 of 384
+## ¶ 1f505c88bd5070 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {kink}.
 
@@ -889,19 +889,19 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
-## ¶ 05334dbe8d9268 · user · in 4 of 384
+## ¶ 01305ee3b06a48 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {both}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 13ed437e4653ac · user · in 4 of 384
+## ¶ 03653de098f306 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {both}.
 
@@ -910,18 +910,18 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 ~~~~
 
-## ¶ 005851d7fbcaa5 · user · in 4 of 384
+## ¶ 0f2f3c721335d8 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {none}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 06b77699c71281 · user · in 4 of 384
+## ¶ 148e4682ae2d9b · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {none}.
 
@@ -929,20 +929,20 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "setting": where it is set, if anywhere; empty otherwise
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
-## ¶ 00f96cd0aafd7d · user · in 4 of 384
+## ¶ 1c4203d092831a · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {heat}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 0923c6aa503aba · user · in 4 of 384
+## ¶ 0c6d1e05f8d3f5 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {heat}.
 
@@ -950,19 +950,19 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "setting": where it is set, if anywhere; empty otherwise
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
-## ¶ 06697c326ffe09 · user · in 4 of 384
+## ¶ 1e14040f97fca7 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {kink}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 05e7920a2849ce · user · in 4 of 384
+## ¶ 1ff4893b53054c · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {kink}.
 
@@ -970,19 +970,19 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "setting": where it is set, if anywhere; empty otherwise
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
-## ¶ 01657a3b937a79 · user · in 4 of 384
+## ¶ 09d59bdcef9a7f · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {both}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 099f4f3487ca5d · user · in 4 of 384
+## ¶ 0515ff3d7337c7 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {both}.
 
@@ -990,7 +990,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "setting": where it is set, if anywhere; empty otherwise
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 ~~~~
 
 ## ¶ 1a5d411da26777 · user · only when one value was swept from the baseline

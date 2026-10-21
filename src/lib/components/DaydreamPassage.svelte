@@ -20,7 +20,6 @@
 		node,
 		speaker,
 		cast,
-		opening = false,
 		held = false,
 		selected,
 		onBookmark,
@@ -34,8 +33,6 @@
 		speaker: string | null;
 		/** Who has a colour of their own in the passage's dialogue (`DaydreamProse`). */
 		cast: { you: readonly string[]; characters: readonly string[] };
-		/** The story's opening passage. */
-		opening?: boolean;
 		/** The passage that last arrived, where following the end stops (`DaydreamThread`'s `heldId`). */
 		held?: boolean;
 		/** The stretch of this passage that is selected, if any. */
@@ -107,7 +104,7 @@
 	{#if ooc}<span class="who">Out of the story</span>{/if}
 	<div class="text">
 		{#if content === undefined}{PENDING_TEXT}{:else if !passage}{UNREADABLE_TEXT}{:else}
-			<DaydreamProse text={passage.text} {cast} {quotes} {opening} turnId={node.id} />
+			<DaydreamProse text={passage.text} {cast} {quotes} turnId={node.id} />
 		{/if}
 	</div>
 

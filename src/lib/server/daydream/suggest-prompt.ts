@@ -553,7 +553,7 @@ function chipsInstructions(request: RecordRequest): TaskInstructions {
 	const sayings = request.target === 'idea' && isMonologue(request) && field === 'notes';
 	return {
 		instructions: sayings
-			? `Suggest up to ${MAX_SUGGESTED_CHIPS} sayings for the idea's "${label}" field: each one statement in the voice's own words, as it would say it, different from those there already, and fitting the rest of the idea as written above. Each at most ${MAX_CHIP_LENGTH} characters, with no commas.`
+			? `Suggest up to ${MAX_SUGGESTED_CHIPS} sayings for the idea's "${label}" field: each one saying in the voice's own words, as it would say it, different from those there already, and fitting the rest of the idea as written above. Each at most ${MAX_CHIP_LENGTH} characters, with no commas.`
 			: `Suggest up to ${MAX_SUGGESTED_CHIPS} short phrases the user could add to the ${request.target}'s "${label}" field${means} — different from what is already there, varied, and fitting the rest of the ${request.target} as written above. Each at most ${MAX_CHIP_LENGTH} characters, with no commas.`,
 		answer: [{ key: 'chips', says: 'the phrases', shape: 'list' }],
 		maxTokens: 400
@@ -697,17 +697,17 @@ function monologueCraft(fromBrief: boolean): string {
 		? `What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:
 - The ideas it is built on: the beliefs, rules, tropes and sayings of what the user is into — the things people into it say to each other and to themselves. Start from any they named or pointed to, in their own words where they gave some, and add the ones that go with them.
 - Who speaks, and to whom: a voice of its own, speaking to the user — unnamed, or a named character where they asked for a person. That is the default, and a brief being about what someone is or is for, what people believe, or the sayings of a kink or a community is no reason to leave it: a separate voice can say all of those to the user. Only where the brief asks for the ideas in the user's own inner voice is it theirs.
-- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
+- Where it goes: from what sets the ideas out to what goes further or deeper, so it builds rather than repeats.
 There is no plot, place or encounter to invent, unless they asked for one.`
 		: `What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:
 - The ideas it is built on: the beliefs, rules, tropes and sayings of a kink or dynamic that fits what is set above — the things people into it say to each other and to themselves.
 - Who speaks, and to whom: a voice of its own, speaking to the user, unnamed or a named character.
-- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
+- Where it goes: from what sets the ideas out to what goes further or deeper, so it builds rather than repeats.
 There is no plot, place or encounter to invent.`;
 }
 
 /** How a monologue's sayings are written: into the idea's notes, whose cap they share. */
-const MONOLOGUE_SAYINGS = `8 to 12 statements in the voice's own words, one to a line, at most ${FIELD_LIMITS.notes.toLocaleString('en-US')} characters in all`;
+const MONOLOGUE_SAYINGS = `8 to 12 sayings in the voice's own words, one to a line, at most ${FIELD_LIMITS.notes.toLocaleString('en-US')} characters in all`;
 
 /**
  * A monologue's idea, key by key: the same keys as a story's, read its way
@@ -717,7 +717,7 @@ const MONOLOGUE_SAYINGS = `8 to 12 statements in the voice's own words, one to a
 const MONOLOGUE_IDEA = `The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, ${MONOLOGUE_SAYINGS}. No parts, unless a named character is the one speaking: then one part, "the speaker".`;
 
 /** Said of the daydream around an idea or character being written, when it is a monologue. */
-const MONOLOGUE_CONTEXT = `It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.`;
+const MONOLOGUE_CONTEXT = `It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.`;
 
 const PARTS_INSTRUCTION = `Give it 1 to ${MAX_DAYDREAM_CHARACTERS} parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.`;
 
@@ -921,7 +921,7 @@ const VOICES: Readonly<Record<VoiceId, string>> = {
 	command:
 		'"command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.',
 	monologue:
-		'"monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.'
+		'"monologue": not a story: one voice speaking its mind about what the daydream is about.'
 };
 
 const voicesFor = (side: Side): VoiceId[] =>

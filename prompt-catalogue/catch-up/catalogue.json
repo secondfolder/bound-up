@@ -501,8 +501,8 @@
 			}
 		},
 		{
-			"id": "1c7f5be86a1d0d",
-			"text": "- \"idea\": only the idea's fields that changed; leave the others out\n  - \"setting\": where it is set, if anywhere; empty otherwise\n  - \"premise\": what the voice believes and keeps coming back to\n  - \"yourRole\": who the user is to the voice\n  - \"tone\": how it sounds, in a few words\n  - \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"characters\": only the characters who changed, each by name, with only the fields that changed\n  - \"name\": their name, exactly as above\n  - \"personality\": how they think and behave\n  - \"relationship\": who they are to the user\n  - \"doing\": what they are doing or want now",
+			"id": "0e8d59c144b943",
+			"text": "- \"idea\": only the idea's fields that changed; leave the others out\n  - \"setting\": where it is set, if anywhere; empty otherwise\n  - \"premise\": what the voice believes and keeps coming back to\n  - \"yourRole\": who the user is to the voice\n  - \"tone\": how it sounds, in a few words\n  - \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"characters\": only the characters who changed, each by name, with only the fields that changed\n  - \"name\": their name, exactly as above\n  - \"personality\": how they think and behave\n  - \"relationship\": who they are to the user\n  - \"doing\": what they are doing or want now",
 			"roles": [
 				"user"
 			],

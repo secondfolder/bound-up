@@ -70,7 +70,7 @@ Always.
 # How each idea is told
 ~~~~
 
-## ¶ 19df03b84b4d6a · system · in 6 of 18
+## ¶ 1678a3496c8cd8 · system · in 6 of 18
 
 Only when side ∈ {either}.
 
@@ -81,7 +81,7 @@ Each idea is told one way, its "voice", one of:
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
 - "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
-- "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+- "monologue": not a story: one voice speaking its mind about what the daydream is about.
 ~~~~
 
 ## ¶ 052d3c55d602f4 · system · in 6 of 18
@@ -128,7 +128,7 @@ Always.
 # For a monologue
 ~~~~
 
-## ¶ 1cfc06581f9c0a · system · in 18 of 18
+## ¶ 0e8dfcd74db167 · system · in 18 of 18
 
 Always.
 
@@ -136,7 +136,7 @@ Always.
 What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:
 - The ideas it is built on: the beliefs, rules, tropes and sayings of what the user is into — the things people into it say to each other and to themselves. Start from any they named or pointed to, in their own words where they gave some, and add the ones that go with them.
 - Who speaks, and to whom: a voice of its own, speaking to the user — unnamed, or a named character where they asked for a person. That is the default, and a brief being about what someone is or is for, what people believe, or the sayings of a kink or a community is no reason to leave it: a separate voice can say all of those to the user. Only where the brief asks for the ideas in the user's own inner voice is it theirs.
-- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
+- Where it goes: from what sets the ideas out to what goes further or deeper, so it builds rather than repeats.
 There is no plot, place or encounter to invent, unless they asked for one.
 ~~~~
 
@@ -298,7 +298,7 @@ Only when offered ∈ {some}.
 They have already been offered these, so make yours new ones, not these again or close to them: "⟦offered1⟧", "⟦offered2⟧".
 ~~~~
 
-## ¶ 09b097413c22b4 · system · in 6 of 18
+## ¶ 0283767fcbe222 · system · in 6 of 18
 
 Only when side ∈ {dom}.
 
@@ -308,7 +308,7 @@ Each idea is told one way, its "voice", one of:
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
-- "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+- "monologue": not a story: one voice speaking its mind about what the daydream is about.
 ~~~~
 
 ## ¶ 10e517d56363e4 · system · in 6 of 18
@@ -351,7 +351,7 @@ Only when side ∈ {dom}.
   - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
-## ¶ 16fbeefe1ef9f0 · system · in 6 of 18
+## ¶ 0e04eca49cba8c · system · in 6 of 18
 
 Only when side ∈ {sub}.
 
@@ -361,7 +361,7 @@ Each idea is told one way, its "voice", one of:
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
-- "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+- "monologue": not a story: one voice speaking its mind about what the daydream is about.
 ~~~~
 
 ## ¶ 14d8a6a83c0436 · system · in 6 of 18

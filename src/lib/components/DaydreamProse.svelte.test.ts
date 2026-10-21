@@ -35,6 +35,13 @@ describe('DaydreamProse', () => {
 		expect(container.textContent).not.toMatch(/[*]/);
 	});
 
+	it('draws bold at 800 inside a sentence too, not only in a standout line', () => {
+		const { container } = render(DaydreamProse, { text: 'You *always* **fold**.', cast });
+		expect(
+			getComputedStyle(defined(container.querySelector('strong'), 'the bold run')).fontWeight
+		).toBe('800');
+	});
+
 	it('draws a paragraph that is bold throughout as a standout line, larger than the rest', () => {
 		const { container } = render(DaydreamProse, {
 			text: '**Being owned is a relief.**\n\nI mean it.',
@@ -42,6 +49,9 @@ describe('DaydreamProse', () => {
 		});
 		const [statement, after] = [...container.querySelectorAll<HTMLElement>('.prose > p')];
 		expect(statement?.classList.contains('standout')).toBe(true);
+		expect(
+			getComputedStyle(defined(statement?.querySelector('strong'), 'its bold run')).fontWeight
+		).toBe('800');
 		expect(after?.classList.contains('standout')).toBe(false);
 		expect(Number.parseFloat(getComputedStyle(defined(statement)).fontSize)).toBeGreaterThan(
 			Number.parseFloat(getComputedStyle(defined(after)).fontSize)
@@ -86,13 +96,6 @@ describe('DaydreamProse', () => {
 		expect(container.textContent).not.toContain('<sound');
 	});
 
-	it('starts the opening passage with a drop cap, and no other', () => {
-		const opening = render(DaydreamProse, { text: 'Rain.', cast, opening: true });
-		expect(opening.container.querySelector('.prose')?.classList.contains('drop-cap')).toBe(true);
-		const later = render(DaydreamProse, { text: 'Rain.', cast });
-		expect(later.container.querySelector('.prose')?.classList.contains('drop-cap')).toBe(false);
-	});
-
 	it('highlights a quote across formatting', () => {
 		const text = 'She **holds** still.';
 		const { container } = render(DaydreamProse, {
@@ -105,6 +108,25 @@ describe('DaydreamProse', () => {
 			' s'
 		]);
 		expect(container.querySelector('mark')?.classList.contains('bold')).toBe(true);
+	});
+
+	it('draws lists as lists, keeping an ordered list’s own numbers, with none of the markers', () => {
+		const { container } = render(DaydreamProse, {
+			text: 'Say it with me:\n- I am an *object*.\n- I exist to be used.\n\n3. Kneel.\n4. Wait.',
+			cast
+		});
+		const bullets = [...container.querySelectorAll('.prose > ul > li')];
+		expect(bullets.map((item) => item.textContent)).toEqual([
+			'I am an object.',
+			'I exist to be used.'
+		]);
+		expect(bullets[0]?.querySelector('em')?.textContent).toBe('object');
+		const numbered = [...container.querySelectorAll<HTMLLIElement>('.prose > ol > li')];
+		expect(numbered.map((item) => [item.value, item.textContent])).toEqual([
+			[3, 'Kneel.'],
+			[4, 'Wait.']
+		]);
+		expect(container.querySelector('.prose > p')?.textContent).toBe('Say it with me:');
 	});
 
 	it('hides markup still arriving', () => {
@@ -128,6 +150,13 @@ describe('storedOffset', () => {
 		expect(storedOffset(root, holds, 5)).toBe(text.indexOf('holds') + 5);
 		const still = textNode(container, 'still');
 		expect(storedOffset(root, still, 1)).toBe(text.indexOf('still'));
+	});
+
+	it('maps a point in a list item past its hidden marker', () => {
+		const listed = 'Rules:\n- Kneel.\n- Wait.';
+		const { container } = render(DaydreamProse, { text: listed, cast });
+		const root = container.querySelector('.prose') as HTMLElement;
+		expect(storedOffset(root, textNode(container, 'Wait'), 0)).toBe(listed.indexOf('Wait'));
 	});
 
 	it('takes a point between elements as the start of the next run, or the end of the last', () => {

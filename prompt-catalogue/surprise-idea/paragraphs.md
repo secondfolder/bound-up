@@ -316,12 +316,12 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …]}
 ~~~~
 
-## ¶ 1e50bc9a2f37c8 · user · in 8 of 48
+## ¶ 0a166e365ceb8a · user · in 8 of 48
 
 Only when narrator ∈ {monologue}.
 
 ~~~~text
-It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
+It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
 ~~~~
 
 ## ¶ 1eb4a712d3bf30 · user · in 2 of 48
@@ -332,7 +332,7 @@ Only when narrator ∈ {monologue}; rated ∈ {none}.
 Invent an idea for this monologue that the user will not expect.
 ~~~~
 
-## ¶ 1282c8b3e59ccc · user · in 8 of 48
+## ¶ 05200b40828b7b · user · in 8 of 48
 
 Only when narrator ∈ {monologue}.
 
@@ -340,19 +340,19 @@ Only when narrator ∈ {monologue}.
 What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:
 - The ideas it is built on: the beliefs, rules, tropes and sayings of a kink or dynamic that fits what is set above — the things people into it say to each other and to themselves.
 - Who speaks, and to whom: a voice of its own, speaking to the user, unnamed or a named character.
-- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
+- Where it goes: from what sets the ideas out to what goes further or deeper, so it builds rather than repeats.
 There is no plot, place or encounter to invent.
 ~~~~
 
-## ¶ 0a2250943975ec · user · in 8 of 48
+## ¶ 0ea89cb57ac1fd · user · in 8 of 48
 
 Only when narrator ∈ {monologue}.
 
 ~~~~text
-The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, "the speaker".
+The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, "the speaker".
 ~~~~
 
-## ¶ 0b04fde184d686 · user · in 2 of 48
+## ¶ 157066b8f3712d · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {none}.
 
@@ -362,7 +362,7 @@ Only when narrator ∈ {monologue}; rated ∈ {none}.
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
@@ -386,7 +386,7 @@ Only when narrator ∈ {monologue}; rated ∈ {heat, kink, both}.
 Invent an idea for this monologue that the user will not expect, fitting the idea's heat and kink set above.
 ~~~~
 
-## ¶ 12d1c6a93200bd · user · in 2 of 48
+## ¶ 1162c71863cd32 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {heat}.
 
@@ -396,7 +396,7 @@ Only when narrator ∈ {monologue}; rated ∈ {heat}.
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
@@ -411,7 +411,7 @@ Only when narrator ∈ {monologue}; rated ∈ {heat}.
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …}
 ~~~~
 
-## ¶ 1879be3a212337 · user · in 2 of 48
+## ¶ 1e411f9074b4ee · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {kink}.
 
@@ -421,7 +421,7 @@ Only when narrator ∈ {monologue}; rated ∈ {kink}.
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
@@ -436,7 +436,7 @@ Only when narrator ∈ {monologue}; rated ∈ {kink}.
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …}
 ~~~~
 
-## ¶ 1775783b3defdf · user · in 2 of 48
+## ¶ 0ff37a960da4c0 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {both}.
 
@@ -446,7 +446,7 @@ Only when narrator ∈ {monologue}; rated ∈ {both}.
 - "premise": what the voice believes and keeps coming back to
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
-- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words

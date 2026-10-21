@@ -809,8 +809,6 @@ describe('the system voice', () => {
 		});
 	const systemOf = (s: ReturnType<typeof systemSetup>, turns: ContextTurn[] = []) =>
 		system(buildMessages(request({ mode: 'opening', setup: s, turns })));
-	const Tame = 'NOTICE 1: ARRIVAL';
-	const Adult = 'EVENING SCHEDULE';
 
 	it('gets its own guide, after how to read the user and before the reply format', () => {
 		const content = systemOf(systemSetup());
@@ -820,21 +818,15 @@ describe('the system voice', () => {
 		expect(content.indexOf("# Reading the user's turns")).toBeGreaterThan(-1);
 	});
 
-	it('shows the tame examples up to Warm, and the adult ones from Steamy', () => {
-		for (const heat of [null, 1, 2] as const) {
+	// Examples set the shape of every passage, whatever the idea
+	// (impersonal-voice.ts says how that showed).
+	it('shows no examples at any heat, and asks for a system of the idea’s own', () => {
+		for (const heat of [null, 1, 3, 5] as const) {
 			const content = systemOf(systemSetup({ heat }));
-			expect(content).toContain(Tame);
-			expect(content).not.toContain(Adult);
+			expect(content).not.toContain('"""');
+			expect(content).not.toContain('These examples');
+			expect(content).toContain('Give this system its own name, its own rules');
 		}
-		for (const heat of [3, 4, 5] as const) {
-			const content = systemOf(systemSetup({ heat }));
-			expect(content).toContain(Adult);
-			expect(content).not.toContain(Tame);
-		}
-	});
-
-	it('says the examples are form only', () => {
-		expect(systemOf(systemSetup())).toContain('These examples show the form only');
 	});
 
 	it('runs on mechanism with no one behind it, and through functionaries with characters', () => {
@@ -854,8 +846,6 @@ describe('the system voice', () => {
 			});
 			const content = system(buildMessages(request({ mode: 'opening', setup: other })));
 			expect(content).not.toContain('# Writing as the system');
-			expect(content).not.toContain(Tame);
-			expect(content).not.toContain(Adult);
 		}
 	});
 
@@ -907,8 +897,6 @@ describe('the monologue voice', () => {
 		});
 	const monologueOf = (s: ReturnType<typeof monologueSetup>, turns: ContextTurn[] = []) =>
 		system(buildMessages(request({ mode: 'opening', setup: s, turns })));
-	const Tame = 'Rules are a kindness.';
-	const Adult = 'Being owned is a relief.';
 
 	it('gets its own guide, after how to read the user and before the reply format', () => {
 		const content = monologueOf(monologueSetup());
@@ -916,21 +904,38 @@ describe('the monologue voice', () => {
 		expect(guide).toBeGreaterThan(content.indexOf("# Reading the user's turns"));
 		expect(guide).toBeLessThan(content.indexOf('# Reply format'));
 		expect(content).toContain('You speak a monologue');
-		expect(content).toContain('a statement on a line of its own, in bold');
+		expect(content).toContain('Shape it however best fits the idea and the moment');
 	});
 
-	it('shows the tame examples below Steamy, and the adult ones from it, as form only', () => {
-		for (const heat of [null, 1, 2] as const) {
+	// Named at all, even as one way among others, the bold statement with a
+	// paragraph under it was the shape the model planned from
+	// (monologue-voice.ts), so the guide names none, nor assumes statements.
+	it('names no shape for a monologue, and does not assume it is made of statements', () => {
+		const content = monologueOf(monologueSetup());
+		expect(content).not.toMatch(/statement on a line of its own|bold for each statement/u);
+		expect(content).not.toContain('short enough to land');
+		expect(content).not.toContain('each paragraph is one statement');
+		expect(content).not.toContain('turning them into statements');
+		expect(content).not.toContain('Every statement says');
+		expect(content).not.toContain('The statements, and what the voice says about them');
+		expect(content).toContain('Everything it says is new');
+		expect(content).toContain('What the voice says is as explicit as the heat allows');
+	});
+
+	it('asks each passage to say something different, not more', () => {
+		const content = monologueOf(monologueSetup());
+		expect(content).toContain('so each passage says something the last did not');
+		expect(content).not.toContain('says more than the last');
+	});
+
+	// Four examples came back as four statements, a paragraph each
+	// (monologue-voice.ts).
+	it('shows no examples at any heat', () => {
+		for (const heat of [null, 1, 3, 5] as const) {
 			const content = monologueOf(monologueSetup({ heat }));
-			expect(content).toContain(Tame);
-			expect(content).not.toContain(Adult);
+			expect(content).not.toContain('"""');
+			expect(content).not.toContain('These examples');
 		}
-		for (const heat of [3, 4, 5] as const) {
-			const content = monologueOf(monologueSetup({ heat }));
-			expect(content).toContain(Adult);
-			expect(content).not.toContain(Tame);
-		}
-		expect(monologueOf(monologueSetup())).toContain('These examples show the form only');
 	});
 
 	it('describes its idea as what the voice says, with its sayings on lines of their own', () => {
@@ -956,9 +961,7 @@ describe('the monologue voice', () => {
 		expect(story).toContain('What is going on:');
 	});
 
-	it('shows a longer inner-voice example, caught in an ordinary day', () => {
-		expect(monologueOf(monologueSetup({ heat: 4 }))).toContain('I was made to be used.');
-		expect(monologueOf(monologueSetup({ heat: 1 }))).toContain('Being told what to do is restful.');
+	it('grounds it in an ordinary day', () => {
 		expect(monologueOf(monologueSetup())).toContain('Ground it in everyday life where it fits');
 	});
 
@@ -989,17 +992,26 @@ describe('the monologue voice', () => {
 		expect(content).not.toContain('The characters lead');
 	});
 
-	it('asks for bold statement lines, and for none of it in quotation marks', () => {
+	it('encourages bold and italics, says once how a bold paragraph is drawn, and none of it in quotation marks', () => {
 		const content = monologueOf(monologueSetup());
-		expect(content).toContain('**bold** for each statement, on a line of its own');
+		expect(content).toContain('Use Markdown emphasis wherever the voice would lean on something: ');
+		expect(content).toContain('**bold** for the words, phrases or lines that should hit hardest');
+		expect(content).toContain('*italics* for stress');
+		expect(content.match(/drawn larger/gu)).toHaveLength(1);
+		expect(content).not.toContain('bold for each statement');
+		// A mantra or a set of rules may suit a list.
+		expect(content).toContain('No headings, tables or links.');
+		expect(content).not.toContain('No headings, lists');
+		expect(content).not.toContain('what has to land');
 		expect(content).toContain('never in quotation marks');
 		const other = system(buildMessages(request({ mode: 'opening' })));
 		expect(other).toContain('**bold**, rarely, for a word that has to land');
 	});
 
-	it('opens straight into its statements, and is steered by its own buttons', () => {
+	it('opens straight into the monologue in no named shape, and is steered by its own buttons', () => {
 		const opening = buildMessages(request({ mode: 'opening', setup: monologueSetup() })).at(-1);
-		expect(opening?.content).toContain('Open straight into the monologue');
+		expect(opening?.content).toContain('Open straight into the monologue —');
+		expect(opening?.content).not.toContain('statements');
 		expect(opening?.content).not.toContain('Set the scene');
 		const content = monologueOf(monologueSetup());
 		expect(content).toContain('one asking the voice to say more');
@@ -1014,7 +1026,6 @@ describe('the monologue voice', () => {
 			});
 			const content = system(buildMessages(request({ mode: 'opening', setup: other })));
 			expect(content).not.toContain('# Writing a monologue');
-			expect(content).not.toContain(Adult);
 		}
 		const stopped = monologueOf(monologueSetup(), [
 			said('Being owned is a relief.', 'story'),
@@ -1366,22 +1377,19 @@ describe('the review’s fixes to the reply prompt', () => {
 		expect(content).toContain('all taken from the idea below');
 	});
 
-	it('shows a system with no one behind it no functionary to copy', () => {
+	it('mentions no functionary to a system with no one behind it', () => {
 		const alone = told('impersonal', { characters: 0, heat: 4 });
 		expect(alone).not.toContain('The attendant will now');
-		expect(alone).toContain('The restraint on the left wrist closes');
+		expect(alone).toContain('Anything physical happens by mechanism or schedule');
 		expect(told('impersonal', { heat: 4 })).toContain('The attendant will now');
-		expect(told('impersonal', { characters: 0 })).not.toContain('The examiner will now');
 	});
 
-	it('counts a monologue’s length in statements, and writes its sex as statements', () => {
+	it('leans a monologue’s length like any other, and writes its sex as talk', () => {
 		const content = told('monologue', { length: 'short', heat: 5, characters: 0 });
 		expect(content).toContain('Passage length: the user prefers shorter passages');
-		expect(content).toContain("each paragraph is one statement and the voice's words on it");
-		expect(content).not.toContain('Write many short paragraphs');
 		expect(content).toContain('not as a scene unfolding');
 		expect(content).not.toContain('Spend most of the passage on the sex');
-		expect(content).toContain('*Italics* for emphasis only');
+		expect(content).toContain('Use Markdown emphasis wherever the voice would lean on something');
 		expect(content).not.toContain('thoughts always in italics');
 		expect(content).toContain('Picture the most striking thing the passage describes or imagines');
 	});
@@ -1413,6 +1421,34 @@ describe('the review’s fixes to the reply prompt', () => {
 		);
 		expect(content).toContain('with no <reading> line and no <yours> block');
 		expect(RULES).toContain('then end with <meta>{"ooc": true}</meta> and nothing else');
+	});
+});
+
+describe('gender', () => {
+	// Left to itself a model makes the one in charge a man and the one who
+	// submits a woman (writing-guide.ts).
+	it('tells every voice not to read anyone’s gender off their part, the user included', () => {
+		for (const narrator of ['none', 'second-person', 'impersonal', 'monologue'] as const) {
+			const content = system(
+				buildMessages(
+					request({
+						mode: 'opening',
+						setup: testDaydreamSetup({ voice: { narrator, stance: 'self', protagonistName: '' } })
+					})
+				)
+			);
+			expect(content, narrator).toContain(
+				"Never decide anyone's gender from their part in it: someone in charge is not a man, and someone who submits is not a woman"
+			);
+			expect(content, narrator).toContain('no words that carry one, like "good girl"');
+		}
+	});
+
+	it('draws each person as the setup and the story make them, never by who is in charge', () => {
+		const content = system(
+			buildMessages(request({ turns: [said('hi')] }), { pictures: 'z-image-turbo' })
+		);
+		expect(content).toContain('never one chosen by who is in charge');
 	});
 });
 
@@ -1467,7 +1503,7 @@ describe('a system that governs a character', () => {
 		expect(content).toContain('You speak as the system that governs the first character below');
 		expect(content).toContain('It answers to the user, the authority over it');
 		expect(content).toContain('asks them for rulings');
-		expect(content).toContain('Request from the subject');
+		expect(content).toContain('asks them for rulings on what the subject requests');
 		expect(content).toContain('one ruling on something the subject asked for');
 		expect(content).toContain('The user is in charge: the system carries out their orders');
 		expect(content).not.toContain('You speak as the system that governs the user');
@@ -1479,8 +1515,11 @@ describe('a system that governs a character', () => {
 		expect(content).toContain('asks no one for rulings');
 	});
 
-	it('shows the adult examples from Steamy, about the subject', () => {
-		expect(governing('self', 4)).toContain('EVENING SCHEDULE — ROOM 4 — THE SUBJECT');
-		expect(governing('self', 1)).toContain('NOTICE 1: THE SUBJECT');
+	it('shows no examples at any heat', () => {
+		for (const heat of [1, 4] as const) {
+			const content = governing('self', heat);
+			expect(content).not.toContain('"""');
+			expect(content).toContain('Give this system its own name, its own rules');
+		}
 	});
 });

@@ -763,7 +763,7 @@ describe('buildSuggestMessages, a monologue', () => {
 	it('asks a monologue for its sayings in the notes, and for no plot, parts or cast', () => {
 		const prompt = everything(brief);
 		expect(prompt).toContain('# If it is a monologue');
-		expect(prompt).toContain('"notes", the sayings it builds on, 8 to 12 statements');
+		expect(prompt).toContain('"notes", the sayings it builds on, 8 to 12 sayings');
 		expect(prompt).toContain('There is no plot, place or encounter to invent');
 		expect(prompt).toContain('Who is in it: nobody, unless a named character is the one speaking');
 		expect(prompt).toContain('# If it is a story\n\nFor any voice but "monologue".');
@@ -839,7 +839,7 @@ describe('buildSuggestMessages, a monologue', () => {
 		});
 		expect(prompt).toContain('It is told as a monologue');
 		expect(prompt).toContain('Sayings to build on');
-		expect(prompt).toContain('except the sayings to build on, which are 8 to 12 statements');
+		expect(prompt).toContain('except the sayings to build on, which are 8 to 12 sayings');
 		expect(prompt).toContain('Leave "setting" empty unless it is set somewhere in particular.');
 		expect(prompt).not.toContain('"parts"');
 	});
@@ -852,7 +852,7 @@ describe('buildSuggestMessages, a monologue', () => {
 			draft: { title: 'What good girls are for' },
 			context: monologueContext
 		});
-		expect(prompt).toContain("each one statement in the voice's own words, as it would say it");
+		expect(prompt).toContain("each one saying in the voice's own words, as it would say it");
 	});
 
 	it('fills a story’s idea as before, offering parts', () => {

@@ -21,8 +21,7 @@
 		versions = null,
 		debug = false,
 		speaker,
-		cast,
-		opening = false
+		cast
 	}: {
 		/** The passage so far, markup and all. */
 		text: string;
@@ -38,7 +37,6 @@
 		/** Whose voice this is, when one character tells the whole story; null otherwise. */
 		speaker: string | null;
 		cast: { you: readonly string[]; characters: readonly string[] };
-		opening?: boolean;
 	} = $props();
 
 	/**
@@ -69,7 +67,7 @@
 <li class="streaming" data-hold-scroll>
 	{#if speaker}<span class="who">{speaker}</span>{/if}
 	<div class="text">
-		{#if reveal.shown}<DaydreamProse text={reveal.shown} {cast} {opening} streaming />{:else if watch}<ModelProgress {watch} showLive={false} />
+		{#if reveal.shown}<DaydreamProse text={reveal.shown} {cast} streaming />{:else if watch}<ModelProgress {watch} showLive={false} />
 			<!-- The reasoning itself, not a live chat: a passage's request is
 			     the raw log's to show, and a disclosure inside the bubble hid
 			     the one thing worth reading while it waits. -->

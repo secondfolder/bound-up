@@ -12,11 +12,19 @@
  * back into offsets (`passage-selection.ts`).
  *
  * Deliberately a small subset, because a story is prose: `*italic*` or
- * `_italic_`, `**bold**`, `***both***`, and a line of `* * *` (or `---`,
- * `___`, `⁂`) for a scene break. A paragraph that is bold throughout is a
+ * `_italic_`, `**bold**`, `***both***`, a line of `* * *` (or `---`, `___`,
+ * `⁂`) for a scene break, and lists. A paragraph that is bold throughout is a
  * standout line, drawn larger: no new markup, so nothing written before it
- * existed reads differently unless it was all bold already. No headings, lists, links or tables. A
- * marker that does not pair up is shown as written rather than guessed at.
+ * existed reads differently unless it was all bold already. No headings,
+ * links or tables. A marker that does not pair up is shown as written rather
+ * than guessed at.
+ *
+ * A list is lines led by `-`, `*` or `+`, or by a number and `.` or `)`,
+ * then a space and words; an indented line under one carries it on. Its
+ * markers are hidden like emphasis markers, so its runs are still slices of
+ * the passage, and an ordered list keeps the numbers as written. A monologue
+ * may write one (a mantra, a set of rules), and the system voice's numbered
+ * rules, which were drawn as plain lines, are drawn as one too.
  *
  * Speech is set apart two ways. Anything in quotation marks is dialogue; and
  * the prompt asks the model to wrap a spoken line in
@@ -54,11 +62,17 @@ export type Block =
 			/** Straight after a scene break: its first line is set in small caps. */
 			afterBreak: boolean;
 			/**
-			 * Every word in it is bold: a statement on a line of its own, drawn
-			 * larger. A monologue opens most paragraphs with one
-			 * (`monologue-voice.ts`); any voice's is drawn the same way.
+			 * Every word in it is bold: a line on its own, drawn larger. A
+			 * monologue may use them for its key lines; any voice's is drawn
+			 * the same way.
 			 */
 			standout: boolean;
+	  }
+	| {
+			kind: 'list';
+			ordered: boolean;
+			/** `number` is the item's own, as written, for an ordered list; null in a bulleted one. */
+			items: { runs: Run[]; number: number | null }[];
 	  }
 	| { kind: 'break' };
 
@@ -76,6 +90,15 @@ export type FormatOptions = {
 const SCENE_BREAK = /^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|⁂)$/;
 /** The start of a scene break, which may be one once the rest of the line arrives. */
 const MAYBE_SCENE_BREAK = /^[*_\-⁂][*_\-⁂ \t]*$/;
+/**
+ * A list item's marker: a bullet or a number, then a space and something
+ * after it. `**bold**` and `*italic*` have no space, and a whole line of
+ * `* * *` or `- - -` is a scene break, read first.
+ */
+const LIST_ITEM = /^[ \t]*(?:[-*+]|(?<number>\d{1,9})[.)])[ \t]+(?=\S)/;
+/** The start of a numbered item, which may be one once the rest of the line arrives. */
+const MAYBE_LIST_ITEM = /^\d{1,9}[.)]?$/;
+const INDENTED = /^[ \t]/;
 const SAY_TAG = /<(?<close>\/)?say\b[^<>]*>/gi;
 const WHO = /\bwho\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|(?<bare>[^\s"'>]+))/i;
 const SOUND_TAG = /<(?<close>\/)?sound\b[^<>]*>/gi;
@@ -102,6 +125,18 @@ type Marks = {
 
 type Span = { start: number; end: number };
 
+/** A stretch of the passage that becomes a block, or part of one: a list is made of items. */
+type Piece =
+	| ({ kind: 'paragraph' } & Span)
+	| ({
+			kind: 'item';
+			ordered: boolean;
+			number: number | null;
+			/** The indentation of the lines that carry the item on, hidden. */
+			indents: Span[];
+	  } & Span)
+	| { kind: 'break' };
+
 /** The passage as blocks of runs, for drawing. */
 export function formatPassage(text: string, options: FormatOptions = {}): Block[] {
 	return format(text, { streaming: options.streaming === true, strays: 'show' });
@@ -116,9 +151,16 @@ export function formatPassage(text: string, options: FormatOptions = {}): Block[
  */
 export function plainPassage(text: string): string {
 	return format(text, { streaming: false, strays: 'hide' })
-		.flatMap((block) =>
-			block.kind === 'paragraph' ? [block.runs.map((run) => run.text).join('')] : []
-		)
+		.flatMap((block) => {
+			switch (block.kind) {
+				case 'paragraph':
+					return [block.runs.map((run) => run.text).join('')];
+				case 'list':
+					return [block.items.map((item) => item.runs.map((run) => run.text).join('')).join('\n')];
+				default:
+					return [];
+			}
+		})
 		.join('\n\n');
 }
 
@@ -135,10 +177,17 @@ function format(
 		say: new Uint32Array(text.length),
 		speakers: [null]
 	};
-	const layout = paragraphs(text, streaming);
-	const last = layout.findLast((piece) => piece.kind === 'paragraph');
+	const layout = paragraphs(text, streaming).flatMap((piece) =>
+		piece.kind === 'paragraph' ? listItems(text, piece) : [piece]
+	);
+	const last = layout.findLast((piece) => piece.kind !== 'break');
 	for (const piece of layout) {
-		if (piece.kind === 'paragraph') {
+		if (piece.kind !== 'break') {
+			if (piece.kind === 'item') {
+				for (const indent of piece.indents) {
+					hide(marks, indent.start, indent.end);
+				}
+			}
 			const tail = streaming && piece === last;
 			const end = tagsEnd(text, piece, marks, tail);
 			sayTags(text, piece, marks, end);
@@ -156,7 +205,19 @@ function format(
 			continue;
 		}
 		const runs = runsOf(text, piece, marks);
-		if (runs.length > 0) {
+		if (piece.kind === 'item') {
+			const list = blocks.at(-1);
+			if (runs.length === 0) {
+				continue;
+			}
+			const item = { runs, number: piece.number };
+			if (list?.kind === 'list' && list.ordered === piece.ordered) {
+				list.items.push(item);
+			} else {
+				blocks.push({ kind: 'list', ordered: piece.ordered, items: [item] });
+			}
+			afterBreak = false;
+		} else if (runs.length > 0) {
 			blocks.push({ kind: 'paragraph', runs, afterBreak, standout: allBold(runs) });
 			afterBreak = false;
 		}
@@ -189,7 +250,8 @@ function paragraphs(
 		at = end + 1;
 		const trimmed = line.trim();
 		const lastLine = index === lines.length - 1;
-		if (trimmed === '' || (streaming && lastLine && MAYBE_SCENE_BREAK.test(trimmed))) {
+		const maybeMarkup = MAYBE_SCENE_BREAK.test(trimmed) || MAYBE_LIST_ITEM.test(trimmed);
+		if (trimmed === '' || (streaming && lastLine && maybeMarkup)) {
 			open = null;
 			continue;
 		}
@@ -215,6 +277,46 @@ function paragraphs(
 			while (piece.end > piece.start && SPACE.test(text[piece.end - 1] ?? '')) {
 				piece.end -= 1;
 			}
+		}
+	}
+	return pieces;
+}
+
+/**
+ * A paragraph's lines as list items and the text around them. A line with a
+ * marker starts an item; an indented line after one carries it on; any other
+ * line is text, so a list can follow a line introducing it ("Say it with
+ * me:") with no blank line between, and text after a list needs none either.
+ */
+function listItems(text: string, paragraph: Span): Piece[] {
+	const pieces: Piece[] = [];
+	let at = paragraph.start;
+	for (const line of text.slice(paragraph.start, paragraph.end).split('\n')) {
+		const start = at;
+		const end = at + line.length;
+		at = end + 1;
+		// "* *" is a scene break not finished, never a list of "*".
+		const marker: RegExpExecArray | null = MAYBE_SCENE_BREAK.test(line.trim())
+			? null
+			: LIST_ITEM.exec(line);
+		const open = pieces.at(-1);
+		if (marker) {
+			const number = marker.groups?.number;
+			pieces.push({
+				kind: 'item',
+				start: start + marker[0].length,
+				end,
+				ordered: number !== undefined,
+				number: number === undefined ? null : Number(number),
+				indents: []
+			});
+		} else if (open?.kind === 'item' && INDENTED.test(line)) {
+			open.indents.push({ start, end: start + line.length - line.trimStart().length });
+			open.end = end;
+		} else if (open?.kind === 'paragraph') {
+			open.end = end;
+		} else {
+			pieces.push({ kind: 'paragraph', start, end });
 		}
 	}
 	return pieces;
@@ -474,11 +576,8 @@ export function withQuotes(
 	if (ranges.length === 0) {
 		return blocks;
 	}
-	return blocks.map((block) => {
-		if (block.kind !== 'paragraph') {
-			return block;
-		}
-		const runs = block.runs.flatMap((run) => {
+	const cutAtQuotes = (runs: Run[]): Run[] =>
+		runs.flatMap((run) => {
 			const cuts = new Set([run.start, run.end]);
 			for (const [start, end] of ranges) {
 				for (const cut of [start, end]) {
@@ -499,7 +598,18 @@ export function withQuotes(
 				};
 			});
 		});
-		return { ...block, runs };
+	return blocks.map((block) => {
+		switch (block.kind) {
+			case 'paragraph':
+				return { ...block, runs: cutAtQuotes(block.runs) };
+			case 'list':
+				return {
+					...block,
+					items: block.items.map((item) => ({ ...item, runs: cutAtQuotes(item.runs) }))
+				};
+			default:
+				return block;
+		}
 	});
 }
 

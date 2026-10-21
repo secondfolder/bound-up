@@ -87,7 +87,7 @@ No change.
 @@ -18,4 +18,6 @@
  # The daydream around it
  
-+It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
++It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
 +
  No other characters yet.
 ~~~~

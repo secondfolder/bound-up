@@ -236,7 +236,7 @@ Only when narrator ∈ {monologue}.
 Bring the setup up to date with the story: rewrite only the fields the story has changed, so they say where it is now, and leave every other field out. Keep each about as long as it was, in the same kind of words, and the sayings one to a line. Only what the story has settled, never what a passing moment suggested. Never change a name or the title.
 ~~~~
 
-## ¶ 1c7f5be86a1d0d · user · in 3 of 15
+## ¶ 0e8d59c144b943 · user · in 3 of 15
 
 Only when narrator ∈ {monologue}.
 
@@ -246,7 +246,7 @@ Only when narrator ∈ {monologue}.
   - "premise": what the voice believes and keeps coming back to
   - "yourRole": who the user is to the voice
   - "tone": how it sounds, in a few words
-  - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
+  - "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
 - "characters": only the characters who changed, each by name, with only the fields that changed
   - "name": their name, exactly as above
   - "personality": how they think and behave

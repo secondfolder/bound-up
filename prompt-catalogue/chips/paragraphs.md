@@ -176,12 +176,12 @@ The idea's kink: kinky: BDSM and power exchange.
 The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
-## ¶ 1e50bc9a2f37c8 · user · in 88 of 528
+## ¶ 0a166e365ceb8a · user · in 88 of 528
 
 Only when narrator ∈ {monologue}.
 
 ~~~~text
-It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
+It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
 ~~~~
 
 ## ¶ 1d5166a29cea32 · user · in 48 of 528
@@ -345,12 +345,12 @@ Sayings to build on: ⟦idea.notes⟧
 </idea>
 ~~~~
 
-## ¶ 1ea9736e6f3792 · user · in 8 of 528
+## ¶ 193b5c4445fc45 · user · in 8 of 528
 
 Only when target ∈ {idea}; field ∈ {notes}; narrator ∈ {monologue}.
 
 ~~~~text
-Suggest up to 12 sayings for the idea's "Sayings to build on" field: each one statement in the voice's own words, as it would say it, different from those there already, and fitting the rest of the idea as written above. Each at most 80 characters, with no commas.
+Suggest up to 12 sayings for the idea's "Sayings to build on" field: each one saying in the voice's own words, as it would say it, different from those there already, and fitting the rest of the idea as written above. Each at most 80 characters, with no commas.
 ~~~~
 
 ## ¶ 1f0a61760d6896 · user · in 48 of 528

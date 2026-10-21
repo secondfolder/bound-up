@@ -4,8 +4,8 @@
 	import type { Quote } from '$lib/sealed-kinds/daydreams';
 
 	/**
-	 * A passage's words, drawn to be read: paragraphs, scene breaks, emphasis,
-	 * dialogue in its speaker's colour, sounds, and highlighted quotes
+	 * A passage's words, drawn to be read: paragraphs, scene breaks, lists,
+	 * emphasis, dialogue in its speaker's colour, sounds, and highlighted quotes
 	 * (docs/daydreams.md, "Reading a passage"). The formatting itself is
 	 * `formatPassage`'s; this only draws its runs.
 	 *
@@ -20,7 +20,6 @@
 		cast,
 		quotes = [],
 		streaming = false,
-		opening = false,
 		turnId
 	}: {
 		/** The passage as stored, markup and all. */
@@ -30,16 +29,11 @@
 		quotes?: readonly Quote[];
 		/** Still arriving: half-written markup is hidden rather than flickering into view. */
 		streaming?: boolean;
-		/** The story's opening passage, which starts with a drop cap. */
-		opening?: boolean;
 		/** The turn, for selecting words in it (`DaydreamThread`); absent while it is arriving. */
 		turnId?: string;
 	} = $props();
 
 	const blocks = $derived(withQuotes(formatPassage(text, { streaming }), quoteRanges(text, quotes)));
-
-	/** Not on a scene break: the drop cap is the first paragraph's. */
-	const dropCap = $derived(opening && blocks[0]?.kind === 'paragraph');
 
 	/** The run's element: what it means first, then how it looks (its classes). */
 	function tagOf(run: Run): string {
@@ -58,10 +52,14 @@
 	}
 </script>
 
-<div class="prose" class:drop-cap={dropCap} data-passage-text={turnId}>
+<div class="prose" data-passage-text={turnId}>
 	{#each blocks as block, index (index)}
 		{#if block.kind === 'break'}
 			<hr class="scene-break" />
+		{:else if block.kind === 'list'}
+			<!-- One line on purpose, as below. An ordered item's number is the
+			     one written, so a list the model numbered from 4 reads from 4. -->
+			<svelte:element this={block.ordered ? 'ol' : 'ul'} class="list">{#each block.items as item, at (at)}<li value={item.number ?? undefined}>{#each item.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</li>{/each}</svelte:element>
 		{:else}
 			<!-- One line on purpose: see the comment at the top. -->
 			<p class:after-break={block.afterBreak} class:standout={block.standout}>{#each block.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</p>
@@ -104,9 +102,22 @@
 		}
 	}
 
-	p {
+	p,
+	li {
 		/* A single line break inside a paragraph is the model's, and kept. */
 		white-space: pre-wrap;
+	}
+
+	.list {
+		padding-inline-start: 1.6em;
+
+		li + li {
+			margin-block-start: 0.3em;
+		}
+
+		li::marker {
+			color: var(--wa-color-text-quiet);
+		}
 	}
 
 	/* The first line after a scene break, as a book sets a new section. */
@@ -115,22 +126,15 @@
 		letter-spacing: 0.03em;
 	}
 
-	.drop-cap > p:first-child::first-letter {
-		float: left;
-		margin-block-start: 0.06em;
-		padding-inline-end: 0.08em;
-		font-family: var(--wa-font-family-heading);
-		font-size: 3.1em;
-		line-height: 0.85;
-		color: var(--wa-color-brand-on-quiet);
-	}
-
+	/* Heavier than the app's bold (700): a passage's bold is what it leans
+	   on hardest. Rethink Sans is a variable font up to 800 (theme.css), so
+	   this is drawn, not rounded down. */
 	.bold {
-		font-weight: var(--wa-font-weight-bold, 700);
+		font-weight: 800;
 	}
 
-	/* A statement on a line of its own: what a monologue's paragraphs are
-	   built on (`standout` in passage-format.ts), set like a pull quote. */
+	/* A paragraph all in bold, often a monologue's key line (`standout` in
+	   passage-format.ts), set like a pull quote. */
 	.standout {
 		font-family: var(--wa-font-family-heading);
 		font-size: 1.35em;

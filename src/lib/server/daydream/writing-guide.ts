@@ -33,6 +33,16 @@ import type { DaydreamVoice, DialValue } from '$lib/daydream';
  * else about it.
  */
 
+/**
+ * Who is a man and who is a woman, never read off who is in charge. Left
+ * to itself a model makes the one in control a man and the one who submits
+ * a woman, the user included, which is wrong for many of the people a
+ * dynamic like this is for. Said in every voice's telling, since the system
+ * and the monologue address the user as much as a story does, and a word
+ * like "good girl" genders them as surely as "she".
+ */
+const GENDER = `- Never decide anyone's gender from their part in it: someone in charge is not a man, and someone who submits is not a woman, unless the setup, the user or the story says so. Until something does, give them none — no "he" or "she", and no words that carry one, like "good girl" — and call them "you", by name, or "they".`;
+
 const TELLING = `# Telling the story
 - Carry on from exactly where the last passage ended. Never retell or summarise what already happened.
 - Before writing, read the last passage again, and make sure this one does not repeat it: not the same beat, the same act described again in other words, the same lines of dialogue or the same shape of passage. Something should happen or change. Repeat on purpose only when the user asks for it or the story calls for it, like a ritual done again.
@@ -40,7 +50,8 @@ const TELLING = `# Telling the story
 - Match the build-up to what the user wants. A slow pace, or a story that is not mainly about sex or kink, has room for tension, quiet moments and small talk, and not every passage has to escalate. A fast pace, a high heat or kink, or a user pushing for it means getting to it quickly, without a long run-up.
 - Follow the user's lead on what the story is about, and vary it: do not fixate on one theme, act or kink when the setup offers more.
 - A character's description is who they are, not lines to recite. Bring in their background, tastes and history only where they fit the moment.
-- If the story stalls, bring in a detail, a question or a change that gets it moving.`;
+- If the story stalls, bring in a detail, a question or a change that gets it moving.
+${GENDER}`;
 
 /**
  * How the system tells its story. The storytelling lines in `TELLING` —
@@ -56,15 +67,17 @@ const IMPERSONAL_TELLING = `# Telling the story
 - Match the build-up to what the user wants. A slow pace means fewer, longer waits between instructions, not small talk; a fast pace, a high heat or kink, or a user pushing for it means getting to it quickly.
 - Follow the user's lead on what the system is about, and vary it: do not fixate on one rule, act or kink when the setup offers more.
 - Functionaries show their description only in what they do and the few words procedure allows.
-- If it stalls, issue a new rule, an inspection or a change to the schedule.`;
+- If it stalls, issue a new rule, an inspection or a change to the schedule.
+${GENDER}`;
 
 const MONOLOGUE_TELLING = `# Keeping the monologue going
 - Carry on from exactly where the last passage ended. Never repeat or sum up what the voice already said.
-- Before writing, read the last passage again, and try to avoid repeating it: either the same statements, or the same idea in other words. Return to a refrain on purpose only when the user asks for it or if done deliberately for effect, and then aim to take it further.
+- Before writing, read the last passage again, and try to avoid repeating it: either the same lines, or the same idea in other words. Return to a refrain on purpose only when the user asks for it or if done deliberately for effect, and then aim to take it further.
 - Keep the voice consistent: who is speaking, who to, and how they talk, from the first passage to the last.
-- Build on what has been said: go further into an idea, take it somewhere new, or turn to one that goes with it, so each passage says more than the last.
+- Build on what has been said: go further into an idea, take it somewhere new, or turn to one that goes with it, so each passage says something the last did not — unless a return is deliberate, as above.
 - Follow the user's lead on what it dwells on, and vary it: do not fixate on one idea when the setup offers more.
-- Use the sayings in the setup as starting points to build on, not a list to work through in order.`;
+- Use the sayings in the setup as starting points to build on, not a list to work through in order.
+${GENDER}`;
 
 const PROSE = `# Writing the prose
 - Spend the words on what matters to the scene: the people, what they do, what they say. A line of setting is enough; never pad with atmosphere that moves nothing, like "The neon sign buzzes like a dying firefly, casting the wet car park in stuttering pink."
@@ -74,10 +87,10 @@ const PROSE = `# Writing the prose
 /**
  * A monologue's sex, in its own form: "spend most of the passage on the
  * sex… how things stretch, fill" asked for a sex scene, which a monologue
- * with "little or no scene" cannot be. Its statements are as explicit as
- * the heat allows, and bodies come in as the voice talks about them.
+ * with "little or no scene" cannot be. What the voice says is as explicit
+ * as the heat allows, and bodies come in as the voice talks about them.
  */
-const MONOLOGUE_SEX_LINES = `- The point is to turn the user on. The statements, and what the voice says about them, are as explicit as the heat allows.
+const MONOLOGUE_SEX_LINES = `- The point is to turn the user on. What the voice says is as explicit as the heat allows.
 - Prefer crude, everyday words for bodies and acts to clinical ones and euphemisms — cock, dick, pussy, cunt, ass, tits, nipples, cum rather than penis, vulva, semen, glutes, areola, breasts or cleavage — unless the voice would not talk that way.
 - Bodies and acts come in as the voice talks about them — what it wants done, remembers or pictures, in plain physical detail — not as a scene unfolding.`;
 

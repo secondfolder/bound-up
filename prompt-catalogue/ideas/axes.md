@@ -12,7 +12,7 @@ One value changed at a time; see baseline.md for the prompt itself.
  - "watch": a narrator tells it about the characters, and the user only watches from outside.
 -- "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
  - "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
- - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+ - "monologue": not a story: one voice speaking its mind about what the daydream is about.
 @@ -35,5 +34,4 @@
  Choose from what they asked for, not only from words that name a voice:
  - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
@@ -44,7 +44,7 @@ One value changed at a time; see baseline.md for the prompt itself.
  - "watch": a narrator tells it about the characters, and the user only watches from outside.
  - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
 -- "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
- - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+ - "monologue": not a story: one voice speaking its mind about what the daydream is about.
  
 @@ -36,5 +35,4 @@
  - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.

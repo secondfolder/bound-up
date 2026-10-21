@@ -38,7 +38,7 @@ Each idea is told one way, its "voice", one of:
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
 - "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
-- "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+- "monologue": not a story: one voice speaking its mind about what the daydream is about.
 
 Choose from what they asked for, not only from words that name a voice:
 - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
@@ -63,7 +63,7 @@ Draw on the kinds of story people love in erotica and fan fiction, and make it h
 What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:
 - The ideas it is built on: the beliefs, rules, tropes and sayings of what the user is into — the things people into it say to each other and to themselves. Start from any they named or pointed to, in their own words where they gave some, and add the ones that go with them.
 - Who speaks, and to whom: a voice of its own, speaking to the user — unnamed, or a named character where they asked for a person. That is the default, and a brief being about what someone is or is for, what people believe, or the sayings of a kink or a community is no reason to leave it: a separate voice can say all of those to the user. Only where the brief asks for the ideas in the user's own inner voice is it theirs.
-- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
+- Where it goes: from what sets the ideas out to what goes further or deeper, so it builds rather than repeats.
 There is no plot, place or encounter to invent, unless they asked for one.
 
 # Each idea

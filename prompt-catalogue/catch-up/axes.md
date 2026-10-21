@@ -48,7 +48,7 @@ No change.
 +  - "premise": what the voice believes and keeps coming back to
 +  - "yourRole": who the user is to the voice
 +  - "tone": how it sounds, in a few words
-+  - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
++  - "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
  - "characters": only the characters who changed, each by name, with only the fields that changed
    - "name": their name, exactly as above
 ~~~~

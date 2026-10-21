@@ -517,7 +517,7 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		voice: 'monologue',
 		idea: 'owned',
 		summary:
-			'[[idea|A voice that knows exactly what being owned means to you, and says it]]. Statement after statement about belonging to someone, each more [[heat|explicit]] than the last. It’s told [[voice|as a monologue, one voice speaking its mind]].',
+			'[[idea|A voice that knows exactly what being owned means to you, and says it]]. It talks about belonging to someone, and gets more [[heat|explicit]] as it goes. It’s told [[voice|as a monologue, one voice speaking its mind]].',
 		cast: []
 	},
 	{
@@ -527,7 +527,7 @@ export const DAYDREAM_STARTERS: readonly DaydreamStarter[] = [
 		voice: 'monologue',
 		idea: 'yours-to-use',
 		summary:
-			'[[idea|A devoted voice telling you everything it would let you do to it]]. Every statement is about needing you in charge, and they get more [[heat|explicit]] as it goes. It’s told [[voice|as a monologue, one voice speaking its mind]].',
+			'[[idea|A devoted voice telling you everything it would let you do to it]]. It’s all about needing you in charge, and it gets more [[heat|explicit]] as it goes. It’s told [[voice|as a monologue, one voice speaking its mind]].',
 		cast: []
 	},
 	{

@@ -416,7 +416,7 @@ character instead — "the subject" — writes about them in the third
 person, and answers to the user: it asks them for rulings on what the
 subject requests and what an infraction costs, and carries out what they
 decide as amendments ("A system you command"; `governingGuide` in
-`impersonal-voice.ts`, with its own examples). Someone who only watches a
+`impersonal-voice.ts`). Someone who only watches a
 system always watches it govern a character (`systemGoverns`), since it
 cannot order about someone who is not there; that was the review's
 incoherent "absent" case. Fine-tune shows "Whom the system governs" for
@@ -443,32 +443,44 @@ mentioned in passing, and every later passage copied that opening. So it gets
 a guide of its own (`src/lib/server/daydream/impersonal-voice.ts`): what the
 system writes in — notices, numbered rules and amendments, exact
 instructions, logged compliance and infractions — what it never does
-(describe, feel, praise), and four short examples of the form. The examples
-are chosen by the idea's heat: up to Warm (or unset) a tame set, from Steamy
-an adult one, because examples steer content as well as form. They are
-deliberately unlike each other in how they open, and the guide forbids
-reusing their sentences: an earlier set that both began "The following
-applies from this moment" had the model open nearly every story with those
-words. The system's opening request asks for its first notice rather than
+(describe, feel, praise), and that each system takes its name, rules and
+way of speaking from the idea. It has **no examples**, and nor does the
+monologue's guide: examples set the shape of what comes back more than the
+guide does. A set whose openings both began "The following applies from
+this moment" had the model open nearly every story with those words, and
+the monologue's four, each a statement and a paragraph, came back as four
+statements with a paragraph each. Without them the idea suggests the shape.
+The system's opening request asks for its first notice rather than
 "Set the scene", who leads and the suggestion and button ideas are worded for
 a system (Stricter, New rule, Inspection), and its characters are its
 functionaries rather than people with decisions of their own. It is laid out
 as notices — headings in capitals, numbered rules, one to a line — which the
 prose voices' "no headings or lists" used to forbid it (`PASSAGE_LAYOUT`),
 and it tells its story its own way (`IMPERSONAL_TELLING`): a slow pace is
-longer waits between instructions, not small talk. With no characters its
-last example is done by mechanism rather than an attendant, since a model
-copies the functionary it is shown into a system with no one behind it.
+longer waits between instructions, not small talk. With no characters the
+guide says anything physical happens by mechanism or schedule, and names
+no functionary.
 
 **A monologue** is not a story at all. One voice speaks its mind about
 what the daydream is about, taking the ideas, tropes and common sayings of
-its kinks and turning them into statements: short paragraphs, as many as
-the moment has in it and the length dial leans towards, each one statement
-(the dials say so for a monologue, `MONOLOGUE_LENGTH`), most
-opening with a statement in bold on a line of its own, followed by the
-voice's own words on it — a few sentences, or a longer run caught in an
-ordinary day (on the bus, at a café table), which each example set shows
-one of, since shown only short ones a model never writes it. The voice stands in for those ideas
+its kinks and making them its own, often caught in an ordinary day (on
+the bus, at a café table). **Its shape is the model's to choose, and the
+prompt names none.** It used to be told every statement went bold on its own
+line, a sentence long, a paragraph per statement, with its length counted
+in statements — and every monologue came back as that list, whatever the
+idea. Offering that shape as one way among others, described in full beside
+a few words for the rest, still had the model plan its opening from it, as
+did an opening request for "its first statements". Statements often suit a
+monologue, but nothing in the prompt, the setup prompts or the ready-made
+starts assumes them: the voice "makes the ideas its own", and "everything it
+says is new". The passage format does encourage emphasis — **bold** for
+the words, phrases or lines that should hit hardest, *italics* for stress
+and anything said in a different voice — because once the
+shape was free and bold was only allowed, the model used next to none. Bold
+is never tied to a kind of line, and that a paragraph all in bold is drawn
+larger is said once, as a fact. Its guide asks each passage to say something the
+last did not, rather than more than the last, unless a return to a refrain
+is deliberate. The voice stands in for those ideas
 rather than being a fleshed-out character. Who it is is left to the setup:
 an unnamed voice with the user listening unless the idea suggests a
 character, or the user's own inner voice where the idea says so or reads
@@ -478,8 +490,7 @@ never to them as "you";
 watching, the user overhears it, and there is no inner voice. Told only to "speak a monologue" a model writes a
 soliloquy in a room, with a plot, so it gets a guide of its own like the
 system's (`src/lib/server/daydream/monologue-voice.ts`), last before the
-format, with examples of the form in a tame and an adult set by heat, broad
-rather than anyone's particular kink. It gets a sex section of its own —
+format, with no examples (see the system voice above). It gets a sex section of its own —
 as explicit as the heat allows, in plain words, but bodies and acts come
 in as the voice talks about them, not as a scene, since "spend most of the
 passage on the sex" asked a monologue for the scene it cannot have — and
@@ -489,9 +500,9 @@ sayings as starting points rather than a list to work through), but not the
 prose, since it has no scene; its idea is described to the model as what the
 voice believes and who the user is to it, with its sayings on lines of
 their own ([Ideas](#ideas)); its opening
-request asks it to start straight into its statements; its suggestion and
+request asks it to open straight into the monologue; its suggestion and
 button ideas are its own (More like that, A mantra, Another idea); and
-nobody leads it. Its bold statements are drawn as standout lines
+nobody leads it. A paragraph it writes all in bold is drawn as a standout line
 ([Reading a passage](#reading-a-passage)).
 
 The monologue came with setup payload v4, which also renames the setup's
@@ -1129,8 +1140,8 @@ much as to a model.
 - **For the whole daydream.** Settings belong to the setup, not a branch,
   as the popover's do. Like any change to the system prompt's dials, the
   next request is not a cached one ([Cost](#cost)).
-- **A monologue** counts its length in statements, so "say more" there
-  changes the same `length`.
+- **A monologue** has the same `length`, so "say more" there changes it
+  too.
 
 ## Dice
 
@@ -1380,16 +1391,25 @@ of this still point at the same words, and nothing was migrated.
   flanking rules cut down: an opener has a word after it, a closer a word
   before it, and `_` must sit outside a word, so snake_case is left alone.
   A marker that does not pair up is shown as written rather than guessed
-  at, and emphasis never crosses a paragraph.
+  at, and emphasis never crosses a paragraph. Bold is drawn at 800,
+  heavier than the app's own bold, everywhere in a passage.
 - A line of `***`, `* * *`, `---`, `___` or `⁂` on its own is a scene
   break, drawn as a centred ⁂. Repeated breaks collapse to one.
 - A paragraph that is bold throughout is a **standout line** (`standout`),
-  drawn larger and in the brand colour, like a pull quote. A monologue opens
-  most of its paragraphs with one; any voice's is drawn the same way. It is
+  drawn larger and in the brand colour, like a pull quote. A monologue may
+  be built from them; any voice's is drawn the same way. It is
   read from the bold already there, not from new markup, so nothing written
   before it reads differently unless it was all bold already.
-- Anything else — headings, lists, links — is shown as written. The prompt
-  asks for none of it.
+- Lines led by `-`, `*` or `+`, or by a number and `.` or `)`, then a space,
+  are a **list** (`list`), drawn as one, its markers hidden like emphasis
+  markers; an indented line under an item carries it on, and an ordered
+  list keeps the numbers as written. A list may follow the line introducing
+  it with no blank line between. A whole line of `* *` is a scene break on
+  its way, never a list of `*`. A monologue may write one, which its prompt
+  no longer forbids; the system voice's numbered rules, once plain lines,
+  are drawn as lists too.
+- Anything else — headings, links — is shown as written. The prompt asks
+  for none of it.
 
 **Dialogue.** Text in quotation marks, straight or curly, is drawn in the
 dialogue colour, quote marks included. Speech carried on into the next
@@ -1426,8 +1446,9 @@ say tag does, and a tag still arriving is hidden like one.
 outright: quotation marks are how the page tells speech.
 
 **Typography.** A line is capped at about 65 characters, with looser leading
-than the app's. The story's opening passage starts with a drop cap, and the first
-line after a scene break is set in small caps, as a book starts a section.
+than the app's. The first line after a scene break is set in small caps, as
+a book starts a section. There is no drop cap: an oversized first letter
+on the opening passage was tried and taken out.
 
 **While it arrives**, the passage is formatted as it goes, through the same
 component, with `streaming` set: anything only half there is hidden rather
@@ -1633,7 +1654,7 @@ halves, split by a line of dashes and a "This daydream" heading
 
 1. **How to write**, the app's own: the server's `RULES` first, then how to
    read the user's turns, then how a passage is written (see below), then —
-   for the system voice and a monologue — its guide and examples, then
+   for the system voice and a monologue — its guide, then
    either how to format the passage and the reply format or, for a stopped
    scene, the check-in. The guides are left out of a stopped scene, as the
    check-in is out of character. Which of these is sent depends on how the
@@ -1732,6 +1753,14 @@ to itself.
   than fixating on one; let a character's description show rather than
   reciting it; and get a stalled story moving. Passages are not told to end
   on a cue for the user, which suits someone only watching the story badly.
+- **Gender**, in every voice's telling, a monologue's and the system's
+  included (`GENDER`): never decide anyone's gender from their part in it.
+  Left to itself the model made the one in charge a man and the one who
+  submits a woman, the user included. Until the setup, the user or the
+  story says, someone has none — no "he" or "she", and no word that carries
+  one, like "good girl" — and is "you", their name, or "they". A picture
+  draws each person as the setup and the story make them, never by who is
+  in charge.
 - **Writing the prose**, for every voice but the system's, whose own guide
   forbids exactly this kind of narration, and the monologue's, which has no
   scene to describe: spend the words on the people and
@@ -2043,8 +2072,8 @@ Noted so they are not lost; none is in the code.
   record, they run SFW to extreme in order, every chip is one phrase),
   `context.test.ts`, `server/daydream/prompt.test.ts` (the rules always come
   first; a stopped story gets a check-in in any mode; heat is the ceiling;
-  the system voice's and the monologue's guides, their place and their
-  examples by heat, who speaks a monologue; writing a
+  the system voice's and the monologue's guides, their place and that
+  they show no examples, who speaks a monologue; writing a
   turn out, never for a watcher; directions like a button; chosen readings
   as notes that settle it; the formatting asked for, never in a check-in),
   `suggest-prompt.test.ts`, `config.test.ts`, `daydream/image-prompt.test.ts`
@@ -2063,7 +2092,7 @@ Noted so they are not lost; none is in the code.
   kept; a quote selected after hidden markup is stored offsets; a passage
   formatted as it arrives),
   `DaydreamProse.svelte.test.ts` (what is drawn, standout lines drawn larger,
-  voices without names, the drop cap, quotes across formatting,
+  voices without names, quotes across formatting,
   `storedOffset`), `scroll-parent.svelte.test.ts`
   (following, and holding at a passage's top),
   `DaydreamSetupForm.svelte.test.ts` (the disclosures, casting into parts,

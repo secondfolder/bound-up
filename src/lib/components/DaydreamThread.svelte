@@ -191,9 +191,6 @@
 		characters: setup?.characters.map((character) => character.name) ?? []
 	});
 
-	/** The story's first passage on this branch, which opens with a drop cap. */
-	const openingId = $derived(story.shownPath.find((node) => node.role === 'story')?.id ?? null);
-
 	type Answered = { readAs: Reading | null; expansion: string | null; chosen: boolean };
 
 	/**
@@ -533,7 +530,6 @@
 					{speaker}
 					{cast}
 					{debug}
-					opening={node.id === openingId}
 					held={node.id === heldId}
 					selected={selection?.turnId === node.id ? selection.quote : null}
 					onBookmark={(turnId, quote) => {
@@ -570,7 +566,6 @@
 				{debug}
 				{speaker}
 				{cast}
-				opening={openingId === null}
 			/>
 		{/if}
 	</ol>

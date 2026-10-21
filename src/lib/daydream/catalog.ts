@@ -1277,8 +1277,7 @@ export const IDEA_TEMPLATES: readonly {
 		idea: {
 			title: 'Owned',
 			setting: 'nowhere in particular: a voice, and you listening',
-			premise:
-				'a voice that knows exactly what being owned means to you, and says it, statement after statement',
+			premise: 'a voice that knows exactly what being owned means to you, and tells you',
 			yourRole: 'the one who wants to be owned',
 			tone: 'devoted, relentless, filthy',
 			notes: '',

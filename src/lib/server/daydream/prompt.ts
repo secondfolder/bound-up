@@ -175,13 +175,13 @@ function describeNarrator(voice: DaydreamVoice, characterCount: number): string 
 				.filter(Boolean)
 				.join(' ');
 		case 'impersonal':
-			// The full guide, with examples, is general, above: `impersonalGuide`.
+			// The full guide is general, above: `impersonalGuide`.
 			if (systemGoverns(voice) === 'character') {
 				return `There is no narrator. You speak as the system that governs the first character below — its rules, its protocol, its procedures — writing about them in the third person. ${voice.stance === 'absent' ? 'No one else is addressed.' : `It answers to the user, the authority over it, addressing them as "you"${persona ? ` (they are ${name})` : ''}.`} Any other characters below act for it, as its functionaries. See "Writing as the system" above.`;
 			}
 			return `There is no narrator. You speak as the system that governs the user — its rules, its protocol, its procedures — addressing them as "you"${persona ? ` (they are ${name})` : ''}. ${characterCount === 0 ? 'No one is behind it.' : 'The characters below act for it, as its functionaries.'} See "Writing as the system" above.`;
 		case 'monologue':
-			// Who speaks, the form and examples are general, above: `monologueGuide`.
+			// Who speaks and the form are general, above: `monologueGuide`.
 			// The name is said here, with the rest of this daydream, not there.
 			return `You speak a monologue: one voice, in the first person, speaking its mind about what this daydream is about, rather than telling a story. See "Writing a monologue" above.${persona && name ? ` Know the user as ${name}.` : ''}`;
 		default:
@@ -348,15 +348,6 @@ function describeOrigin(idea: DaydreamSetupContent['idea']): string | null {
 }
 
 /**
- * What a monologue's paragraph is: one statement, its unit. When the length
- * dial was a count of paragraphs, this is what said how many statements
- * that was; the dial is a lean now, but "a paragraph" still has to mean the
- * same thing in its guide and its format.
- */
-const MONOLOGUE_LENGTH =
-	"In a monologue, each paragraph is one statement and the voice's words on it.";
-
-/**
  * Said for an idea with no heat set: "as far as the idea's heat allows",
  * said elsewhere, otherwise pointed at a line that is not there.
  */
@@ -409,7 +400,7 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 		),
 		describeOrigin(idea),
 		`# The user's limits, which must never be crossed\n${setup.limits.trim() ? tagged('limits', setup.limits) : 'None stated beyond the rules above.'}`,
-		joinLines('# Dials', ...describeStoryDials(setup.dials), monologue && MONOLOGUE_LENGTH)
+		joinLines('# Dials', ...describeStoryDials(setup.dials))
 	];
 	return sections.filter((section) => section !== null).join('\n\n');
 }
@@ -644,7 +635,7 @@ function imageInstruction(voice: DaydreamVoice, architecture: PictureArchitectur
 	return `- "image": ${monologue ? IMAGE_WHEN.monologue : IMAGE_WHEN.story} ${monologue ? IMAGE_OF.monologue : IMAGE_OF.story}
   It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it in English, as plain, literal sentences in the present tense, ${recipe.length}, and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
 ${steps}
-  Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". Concrete nouns, materials and textures, not adjectives: "a black leather harness across her chest", not "a sexy outfit". Say what is there, never what is not: "bare-chested", not "without a shirt"; "alone on the bed", not "no one else there" — a word for something absent gets drawn. Make what the picture is about prominent in plain words ("with particular attention to her face"). Writing appears only when the moment has some, quoted exactly with what it is on: a collar tag reads "PET". When the user's own character has a penis and nothing says how big, it is thick and long. When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
+  Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Each person is the gender the setup and the story make them, never one chosen by who is in charge. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". Concrete nouns, materials and textures, not adjectives: "a black leather harness across her chest", not "a sexy outfit". Say what is there, never what is not: "bare-chested", not "without a shirt"; "alone on the bed", not "no one else there" — a word for something absent gets drawn. Make what the picture is about prominent in plain words ("with particular attention to her face"). Writing appears only when the moment has some, quoted exactly with what it is on: a collar tag reads "PET". When the user's own character has a penis and nothing says how big, it is thick and long. When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
   Every person is an adult, and looks it. Never anything that would make someone look young — no school, no youthful bodies or clothes, no "girl" or "boy" for an adult. No real, identifiable people. ${IMAGE_HEAT} Never a style, a medium or camera settings — those are chosen for you.`;
 }
 
@@ -652,9 +643,15 @@ ${steps}
  * How a passage is laid out, by voice. Prose is paragraphs. The system's
  * passages are notices, headings and numbered rules, which "prose, no
  * headings or lists" forbade outright; the page draws a single line break
- * as one, so they are plain lines rather than Markdown. A monologue's
- * statements are bold lines of their own, which the page draws larger
- * (`standout`), and it has no thoughts to set apart and no scenes to break.
+ * as one, so they are plain lines rather than Markdown. A monologue picks
+ * its own shape (`monologue-voice.ts`), but is encouraged to use emphasis
+ * within it, at any scale from a word to a whole line: once its shape was
+ * no longer a bold statement and a paragraph, told only that bold and
+ * italics were for emphasis, it used next to none, and a voice that leans
+ * on words reads flat without them. Bold is never tied to a kind of line —
+ * "bold for each statement" was what made every passage a list — and that
+ * a paragraph all in bold is drawn larger (`standout`) is said once, as a
+ * fact. It has no thoughts to set apart and no scenes to break.
  */
 const PASSAGE_LAYOUT = {
 	prose:
@@ -662,7 +659,7 @@ const PASSAGE_LAYOUT = {
 	impersonal:
 		'Write each notice as plain lines: a heading in capitals on a line of its own where it suits, rules numbered "1." or led by a time, one to a line, and a blank line between notices. *Italics* and **bold** rarely, for a word that has to land. No Markdown headings, tables or links.',
 	monologue:
-		"Write the passage in short paragraphs separated by a blank line. *Italics* for emphasis only; **bold** for each statement, on a line of its own, which is drawn larger — and, rarely, for a word that has to land. The voice's own words are the passage itself, never in quotation marks. No headings, lists, tables or links."
+		"Write the passage in paragraphs separated by a blank line. Use Markdown emphasis wherever the voice would lean on something: **bold** for the words, phrases or lines that should hit hardest, and *italics* for stress and for anything said in a different voice — a word drawn out, something the user is made to say. A paragraph all in bold is drawn larger. The voice's own words are the passage itself, never in quotation marks. No headings, tables or links."
 } as const;
 
 /**
@@ -850,7 +847,9 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
  * done anything. "Set the scene" asks for a narrator's description, so the
  * system voice is asked for its first notice instead: the opening is the
  * example every later passage copies. A monologue has no scene to set, so it
- * is asked to begin with its first statements.
+ * is asked to open straight into what the voice says, with no shape named:
+ * asked for "its first statements", it opened with a bold statement and a
+ * paragraph on it, and again under it, before loosening up.
  */
 function openingRequest(voice: DaydreamVoice): string {
 	switch (voice.narrator) {
@@ -859,28 +858,23 @@ function openingRequest(voice: DaydreamVoice): string {
 				? '(Begin. Open with the first notice or rules the system issues to the one it governs — not a description of a scene — and end where the user can rule or respond.)'
 				: '(Begin. Open with the first notice or rules the system issues — not a description of a scene — and end where the user must respond.)';
 		case 'monologue':
-			return '(Begin. Open straight into the monologue with its first statements — not a description of a scene.)';
+			return '(Begin. Open straight into the monologue — not a description of a scene.)';
 		default:
 			return '(Begin the story. Set the scene, and end at a point where the user can respond.)';
 	}
 }
 
 /**
- * The section for a voice that is not ordinary fiction, with examples of its
- * form (`impersonal-voice.ts`, `monologue-voice.ts`), or null for one that is.
+ * The section for a voice that is not ordinary fiction (`impersonal-voice.ts`,
+ * `monologue-voice.ts`), or null for one that is.
  */
 function voiceGuide(setup: DaydreamSetupContent): string | null {
-	const { voice, characters, idea } = setup;
+	const { voice, characters } = setup;
 	switch (voice.narrator) {
 		case 'impersonal':
-			return impersonalGuide(
-				characters.length,
-				idea.dials.heat,
-				systemGoverns(voice),
-				voice.stance === 'absent'
-			);
+			return impersonalGuide(characters.length, systemGoverns(voice), voice.stance === 'absent');
 		case 'monologue':
-			return monologueGuide(voice, characters.length, idea.dials.heat);
+			return monologueGuide(voice, characters.length);
 		default:
 			return null;
 	}

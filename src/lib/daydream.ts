@@ -114,7 +114,7 @@ export const DAYDREAM_NARRATORS: readonly {
 		value: 'monologue',
 		label: 'A monologue',
 		description:
-			'One voice speaking its mind about what the daydream is about, statement after statement, rather than telling a story.',
+			'One voice speaking its mind about what the daydream is about, rather than telling a story.',
 		example: '“**Being owned is a relief.** I mean it. Someone else decides, and I get to stop.”'
 	}
 ];
@@ -213,7 +213,7 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 		id: 'monologue',
 		label: 'A monologue',
 		description:
-			'One voice speaking its mind, with little story around it: the ideas, tropes and sayings of what you are into, said statement by statement, each with a little more after it. The voice stands in for those ideas rather than being a character of its own.',
+			'One voice speaking its mind, with little story around it: the ideas, tropes and sayings of what you are into, in its own words. The voice stands in for those ideas rather than being a character of its own.',
 		examples: [
 			'“**Being owned is a relief.** I mean it. Someone else decides, and I get to stop deciding.”',
 			'“**Good girls say thank you.** Every time. Even when it stings — especially then.”'

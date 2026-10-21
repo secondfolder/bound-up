@@ -32,7 +32,7 @@ No change.
 @@ -18,4 +18,6 @@
  # The daydream around it
  
-+It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
++It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its "Where" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.
 +
  No characters chosen yet.
  
@@ -51,11 +51,11 @@ No change.
 +What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:
 +- The ideas it is built on: the beliefs, rules, tropes and sayings of a kink or dynamic that fits what is set above — the things people into it say to each other and to themselves.
 +- Who speaks, and to whom: a voice of its own, speaking to the user, unnamed or a named character.
-+- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.
++- Where it goes: from what sets the ideas out to what goes further or deeper, so it builds rather than repeats.
 +There is no plot, place or encounter to invent.
  
 -Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
-+The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, "the speaker".
++The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, "the speaker".
  
  Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
 @@ -49,9 +50,10 @@
@@ -71,7 +71,7 @@ No change.
 +- "premise": what the voice believes and keeps coming back to
 +- "yourRole": who the user is to the voice
 +- "tone": how it sounds, in a few words
-+- "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
++- "notes": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all
  - "parts": the parts for characters to play
    - "name": a short name for the part
 @@ -60,3 +62,3 @@

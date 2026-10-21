@@ -8,10 +8,22 @@ import {
 	withQuotes
 } from './passage-format';
 
+const textOf = (list: readonly Run[]) => list.map((run) => run.text).join('');
+
+/** Each block as text: a list as `<ul: a | b>`, or `<ol: 1 a | 2 b>` with its numbers. */
 const paragraphs = (blocks: Block[]) =>
-	blocks.map((block) =>
-		block.kind === 'break' ? '<break>' : block.runs.map((run) => run.text).join('')
-	);
+	blocks.map((block) => {
+		switch (block.kind) {
+			case 'break':
+				return '<break>';
+			case 'list':
+				return `<${block.ordered ? 'ol' : 'ul'}: ${block.items
+					.map((item) => (item.number === null ? '' : `${item.number} `) + textOf(item.runs))
+					.join(' | ')}>`;
+			default:
+				return textOf(block.runs);
+		}
+	});
 
 const runs = (text: string, options = {}) =>
 	formatPassage(text, options).flatMap((block) => (block.kind === 'paragraph' ? block.runs : []));
@@ -34,11 +46,18 @@ const shape = (list: Run[]) =>
 
 /** Whether every run, everywhere, is exactly the stored text at its offsets. */
 const verbatim = (text: string, blocks: Block[]) =>
-	blocks.every(
-		(block) =>
-			block.kind === 'break' ||
-			block.runs.every((run) => text.slice(run.start, run.end) === run.text)
-	);
+	blocks
+		.flatMap((block) => {
+			switch (block.kind) {
+				case 'break':
+					return [];
+				case 'list':
+					return block.items.flatMap((item) => item.runs);
+				default:
+					return block.runs;
+			}
+		})
+		.every((run) => text.slice(run.start, run.end) === run.text);
 
 describe('paragraphs and scene breaks', () => {
 	it('splits on blank lines and keeps single line breaks in a paragraph', () => {
@@ -88,6 +107,79 @@ describe('paragraphs and scene breaks', () => {
 	it('is nothing for an empty passage', () => {
 		expect(formatPassage('')).toEqual([]);
 		expect(formatPassage('\n\n  \n')).toEqual([]);
+	});
+});
+
+describe('lists', () => {
+	it('draws bulleted lines as a list, after a line introducing it, with no blank line needed', () => {
+		const text =
+			'Say it with me:\n- I am an object.\n* I exist to be used.\n+ I am grateful.\nGood.';
+		const blocks = formatPassage(text);
+		expect(paragraphs(blocks)).toEqual([
+			'Say it with me:',
+			'<ul: I am an object. | I exist to be used. | I am grateful.>',
+			'Good.'
+		]);
+		expect(verbatim(text, blocks)).toBe(true);
+	});
+
+	it('keeps an ordered list’s numbers as written, with either punctuation', () => {
+		const blocks = formatPassage('1. Stand on the line.\n2) Speak only to answer.\n7. Wait.');
+		expect(paragraphs(blocks)).toEqual([
+			'<ol: 1 Stand on the line. | 2 Speak only to answer. | 7 Wait.>'
+		]);
+	});
+
+	it('carries an item on through indented lines, hiding the indentation', () => {
+		const text = '- Kneel.\n  Hands open.\n- Wait.';
+		const blocks = formatPassage(text);
+		expect(paragraphs(blocks)).toEqual(['<ul: Kneel.\nHands open. | Wait.>']);
+		expect(verbatim(text, blocks)).toBe(true);
+	});
+
+	it('keeps one list across blank lines, and starts another when the kind changes', () => {
+		expect(paragraphs(formatPassage('- One.\n\n- Two.\n\n1. Three.'))).toEqual([
+			'<ul: One. | Two.>',
+			'<ol: 1 Three.>'
+		]);
+	});
+
+	it('formats inside an item, and leaves emphasis, scene breaks and bare markers alone', () => {
+		const list = formatPassage('- **I am an object.**').at(0);
+		expect(list?.kind === 'list' && shape(list.items[0]?.runs ?? [])).toEqual([
+			'I am an object. b'
+		]);
+		expect(paragraphs(formatPassage('**Bold.** Then more.\n\n*Leaning.*'))).toEqual([
+			'Bold. Then more.',
+			'Leaning.'
+		]);
+		expect(paragraphs(formatPassage('One.\n\n* * *\n\n- - -\n\nTwo.'))).toEqual([
+			'One.',
+			'<break>',
+			'Two.'
+		]);
+		expect(paragraphs(formatPassage('-not a list\n1.5 times'))).toEqual(['-not a list\n1.5 times']);
+	});
+
+	it('hides a number that may be starting an item while it streams, and shows it when done', () => {
+		expect(paragraphs(formatPassage('Begin.\n12', { streaming: true }))).toEqual(['Begin.']);
+		expect(paragraphs(formatPassage('Begin.\n12.', { streaming: true }))).toEqual(['Begin.']);
+		expect(paragraphs(formatPassage('Begin.\n12. Kn', { streaming: true }))).toEqual([
+			'Begin.',
+			'<ol: 12 Kn>'
+		]);
+		expect(paragraphs(formatPassage('Begin.\n12'))).toEqual(['Begin.\n12']);
+	});
+
+	it('marks quotes inside items, and writes items out one to a line', () => {
+		const text = '- I am an object.\n- I exist.';
+		const [list] = withQuotes(formatPassage(text), [[4, 10]]);
+		expect(list?.kind === 'list' && shape(list.items[0]?.runs ?? [])).toEqual([
+			'I ',
+			'am an  m',
+			'object.'
+		]);
+		expect(plainPassage(text)).toBe('I am an object.\nI exist.');
 	});
 });
 

@@ -1124,8 +1124,8 @@
 			}
 		},
 		{
-			"id": "1e50bc9a2f37c8",
-			"text": "It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its \"Where\" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.",
+			"id": "0a166e365ceb8a",
+			"text": "It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its \"Where\" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.",
 			"roles": [
 				"user"
 			],
@@ -3755,8 +3755,8 @@
 			}
 		},
 		{
-			"id": "0ceff25328c5e8",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "021056babfeee0",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3829,8 +3829,8 @@
 			}
 		},
 		{
-			"id": "01c54f5048c680",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
+			"id": "0b23796c07904c",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
 			"roles": [
 				"user"
 			],
@@ -3869,8 +3869,8 @@
 			}
 		},
 		{
-			"id": "0253cdc4887e50",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "02a5c92c966eaa",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3909,8 +3909,8 @@
 			}
 		},
 		{
-			"id": "0e1bd621a0d85a",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
+			"id": "1d77bd878b92c9",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
 			"roles": [
 				"user"
 			],
@@ -3949,8 +3949,8 @@
 			}
 		},
 		{
-			"id": "1380730f8e856e",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "0cdafc4942d7ae",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -3989,8 +3989,8 @@
 			}
 		},
 		{
-			"id": "1736b4fc1d2319",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)",
+			"id": "1f505c88bd5070",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)",
 			"roles": [
 				"user"
 			],
@@ -4029,8 +4029,8 @@
 			}
 		},
 		{
-			"id": "05334dbe8d9268",
-			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "01305ee3b06a48",
+			"text": "Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -4069,8 +4069,8 @@
 			}
 		},
 		{
-			"id": "13ed437e4653ac",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all",
+			"id": "03653de098f306",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all",
 			"roles": [
 				"user"
 			],
@@ -4109,8 +4109,8 @@
 			}
 		},
 		{
-			"id": "005851d7fbcaa5",
-			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "0f2f3c721335d8",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -4149,8 +4149,8 @@
 			}
 		},
 		{
-			"id": "06b77699c71281",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
+			"id": "148e4682ae2d9b",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
 			"roles": [
 				"user"
 			],
@@ -4189,8 +4189,8 @@
 			}
 		},
 		{
-			"id": "00f96cd0aafd7d",
-			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "1c4203d092831a",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -4229,8 +4229,8 @@
 			}
 		},
 		{
-			"id": "0923c6aa503aba",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
+			"id": "0c6d1e05f8d3f5",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
 			"roles": [
 				"user"
 			],
@@ -4269,8 +4269,8 @@
 			}
 		},
 		{
-			"id": "06697c326ffe09",
-			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "1e14040f97fca7",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -4309,8 +4309,8 @@
 			}
 		},
 		{
-			"id": "05e7920a2849ce",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)",
+			"id": "1ff4893b53054c",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)",
 			"roles": [
 				"user"
 			],
@@ -4349,8 +4349,8 @@
 			}
 		},
 		{
-			"id": "01657a3b937a79",
-			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
+			"id": "09d59bdcef9a7f",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.",
 			"roles": [
 				"user"
 			],
@@ -4389,8 +4389,8 @@
 			}
 		},
 		{
-			"id": "099f4f3487ca5d",
-			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all",
+			"id": "0515ff3d7337c7",
+			"text": "- \"setting\": where it is set, if anywhere; empty otherwise\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all",
 			"roles": [
 				"user"
 			],

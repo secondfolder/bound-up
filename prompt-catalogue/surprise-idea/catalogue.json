@@ -869,8 +869,8 @@
 			}
 		},
 		{
-			"id": "1e50bc9a2f37c8",
-			"text": "It is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot, so it needs no events; its \"Where\" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.",
+			"id": "0a166e365ceb8a",
+			"text": "It is told as a monologue: one voice speaking its mind rather than telling a story. Its idea is what the voice says, not a plot, so it needs no events; its \"Where\" is where it is set, if anywhere, and the idea's notes are the sayings it builds on.",
 			"roles": [
 				"user"
 			],
@@ -914,8 +914,8 @@
 			}
 		},
 		{
-			"id": "1282c8b3e59ccc",
-			"text": "What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:\n- The ideas it is built on: the beliefs, rules, tropes and sayings of a kink or dynamic that fits what is set above — the things people into it say to each other and to themselves.\n- Who speaks, and to whom: a voice of its own, speaking to the user, unnamed or a named character.\n- Where it goes: from statements that set the ideas out to ones that go further or deeper, so they build rather than repeat.\nThere is no plot, place or encounter to invent.",
+			"id": "05200b40828b7b",
+			"text": "What makes a monologue worth listening to — weigh these before you answer, without writing the weighing out:\n- The ideas it is built on: the beliefs, rules, tropes and sayings of a kink or dynamic that fits what is set above — the things people into it say to each other and to themselves.\n- Who speaks, and to whom: a voice of its own, speaking to the user, unnamed or a named character.\n- Where it goes: from what sets the ideas out to what goes further or deeper, so it builds rather than repeats.\nThere is no plot, place or encounter to invent.",
 			"roles": [
 				"user"
 			],
@@ -935,8 +935,8 @@
 			}
 		},
 		{
-			"id": "0a2250943975ec",
-			"text": "The idea: \"title\", a short title naming what it is about, like \"What good girls are for\"; \"premise\", what the voice believes and keeps coming back to, in a sentence or two; \"yourRole\", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; \"tone\", in a few words; \"setting\", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and \"notes\", the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, \"the speaker\".",
+			"id": "0ea89cb57ac1fd",
+			"text": "The idea: \"title\", a short title naming what it is about, like \"What good girls are for\"; \"premise\", what the voice believes and keeps coming back to, in a sentence or two; \"yourRole\", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; \"tone\", in a few words; \"setting\", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and \"notes\", the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, \"the speaker\".",
 			"roles": [
 				"user"
 			],
@@ -956,8 +956,8 @@
 			}
 		},
 		{
-			"id": "0b04fde184d686",
-			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
+			"id": "157066b8f3712d",
+			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
 			"roles": [
 				"user"
 			],
@@ -1030,8 +1030,8 @@
 			}
 		},
 		{
-			"id": "12d1c6a93200bd",
-			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
+			"id": "1162c71863cd32",
+			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"kink\": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)",
 			"roles": [
 				"user"
 			],
@@ -1078,8 +1078,8 @@
 			}
 		},
 		{
-			"id": "1879be3a212337",
-			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)",
+			"id": "1e411f9074b4ee",
+			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words\n- \"heat\": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)",
 			"roles": [
 				"user"
 			],
@@ -1126,8 +1126,8 @@
 			}
 		},
 		{
-			"id": "1775783b3defdf",
-			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words",
+			"id": "0ff37a960da4c0",
+			"text": "- \"title\": a short title naming what it is about\n- \"setting\": where it is set, if anywhere; empty otherwise\n- \"premise\": what the voice believes and keeps coming back to\n- \"yourRole\": who the user is to the voice\n- \"tone\": how it sounds, in a few words\n- \"notes\": the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all\n- \"parts\": the parts for characters to play\n  - \"name\": a short name for the part\n  - \"description\": what that part does in the idea, in a few words",
 			"roles": [
 				"user"
 			],
