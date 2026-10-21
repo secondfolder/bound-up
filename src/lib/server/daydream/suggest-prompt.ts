@@ -644,11 +644,18 @@ function briefBlock(brief: string, readLinks: boolean): string {
  * its links — a subreddit's sayings, a caption's exact wording — are what get
  * lost. So the model is asked to keep them, as notes for whoever writes the
  * daydream (the story model reads them as the idea's background, `prompt.ts`).
- * It is asked for less than the most that is kept, since a model told a
- * length tends to run over it, and a list that runs over keeps its first
- * lines (`parseResearch`).
+ *
+ * The notes are its analysis in full, not a summary of it. Asked only to keep
+ * what the fields leave out, a model condenses what it found into a line or
+ * two and the sayings a brief was linked for are lost again — so it is told
+ * to work in two stages, analysis first and the synthesis into what was
+ * asked for second, and to make the notes the first stage word for word.
+ * That is its notes about the pages, not the pages themselves: quotes only
+ * where the wording matters. It is asked for less than the most that is
+ * kept, since a model told a length tends to run over it, and a list that
+ * runs over keeps its first lines (`parseResearch`).
  */
-const RESEARCH_NOTES = `notes for whoever writes the daydream itself, who will read them beside what is set up but has not seen what you saw. Put in what the rest leaves out and would still help: what each page linked was and what it said, when there are any — its recurring themes, tropes, dynamics, phrases and sayings, quoted as written where the wording matters — what in the brief you built on and why, and anything you weighed and left out. Short lines, one point to a line, at most ${DAYDREAM_LIMITS.ideaResearch - 1000} characters in all; empty when there is nothing beyond what the rest says.`;
+const RESEARCH_NOTES = `notes for whoever writes the daydream itself, who will read them beside what is set up but has not seen what you saw. Work in two stages, of which these notes are the first. First analyse, in full: what each page linked was, when there are any, and everything you drew from it — its recurring themes, tropes, dynamics, phrases and sayings, quoted as written where the wording matters — what in the brief you built on and why, and anything you weighed and left out. The notes are that analysis word for word, never a condensed version of it: whoever reads them has seen everything you saw. Second, work out how to turn the analysis into what is asked for; that working is yours alone, and nothing of it goes in the notes. Short lines, one point to a line, at most ${DAYDREAM_LIMITS.ideaResearch - 1000} characters in all; empty when there is nothing beyond what the rest says.`;
 
 /**
  * Said, for a generated idea being written out, of the notes the ideas were
@@ -746,9 +753,25 @@ Answer as: {"research": "…", "ideas": [{"title": "…", "premise": "…", "tag
  */
 export const READING_ALLOWANCE = 6000;
 
+/** The temperature every suggestion runs at but the ideas round. */
+const SUGGEST_TEMPERATURE = 1;
+
+/**
+ * The temperature the ideas round runs at, above every other suggestion's:
+ * the same brief is asked over and over — "Suggest daydreams for this",
+ * then "More ideas", then another visit — and at the default a model
+ * converges on the same few ideas for it, whatever titles it is told were
+ * offered already. Hotter sampling spreads them out. The answer is checked
+ * and read leniently (`completionJson`, `parseGeneratedIdeas`), so the cost
+ * of a wilder sample is a dropped idea, never a broken page.
+ */
+const IDEAS_TEMPERATURE = 1.3;
+
 export type SuggestPrompt = {
 	messages: ModelMessage[];
 	maxTokens: number;
+	/** The sampling temperature, from the task: hotter where variety is the point. */
+	temperature: number;
 	/** Whether to send OpenRouter's `web_fetch` tool, for the links in a brief. */
 	readLinks: boolean;
 };
@@ -763,10 +786,20 @@ export function buildSuggestMessages(
 	{ canReadLinks = false }: { canReadLinks?: boolean } = {}
 ): SuggestPrompt {
 	if (request.task === 'casting') {
-		return { messages: castingMessages(request), maxTokens: 300, readLinks: false };
+		return {
+			messages: castingMessages(request),
+			maxTokens: 300,
+			temperature: SUGGEST_TEMPERATURE,
+			readLinks: false
+		};
 	}
 	if (request.task === 'name') {
-		return { messages: nameMessages(request), maxTokens: 100, readLinks: false };
+		return {
+			messages: nameMessages(request),
+			maxTokens: 100,
+			temperature: SUGGEST_TEMPERATURE,
+			readLinks: false
+		};
 	}
 	if (request.task === 'daydream' || request.task === 'ideas') {
 		// A picked idea comes with what was read for it (`earlierResearch`).
@@ -775,8 +808,18 @@ export function buildSuggestMessages(
 		const allowance = readLinks ? READING_ALLOWANCE : 0;
 		return request.task === 'daydream'
 			? // The most of any task: a whole setup, a monologue's sayings and the research besides.
-				{ messages: daydreamMessages(request, readLinks), maxTokens: 3400 + allowance, readLinks }
-			: { messages: ideasMessages(request, readLinks), maxTokens: 2300 + allowance, readLinks };
+				{
+					messages: daydreamMessages(request, readLinks),
+					maxTokens: 3400 + allowance,
+					temperature: SUGGEST_TEMPERATURE,
+					readLinks
+				}
+			: {
+					messages: ideasMessages(request, readLinks),
+					maxTokens: 2300 + allowance,
+					temperature: IDEAS_TEMPERATURE,
+					readLinks
+				};
 	}
 	const { instructions, maxTokens } = taskInstructions(request);
 	return {
@@ -791,6 +834,7 @@ export function buildSuggestMessages(
 			}
 		],
 		maxTokens,
+		temperature: SUGGEST_TEMPERATURE,
 		readLinks: false
 	};
 }

@@ -160,6 +160,10 @@ describe('POST /api/daydreams/suggest', () => {
 			expect(each.provider).toEqual({ data_collection: 'deny' });
 			expect(each.messages.at(-1).content).toContain(SECRET_WORDS);
 		}
+		// The ideas round runs hotter than the rest, for spread across asks.
+		expect(sent[0].temperature).toBe(1);
+		expect(sent[1].temperature).toBe(1);
+		expect(sent[2].temperature).toBeGreaterThan(1);
 	});
 
 	it('reads a brief’s links through the Responses API, only with a model that calls tools', async () => {
@@ -198,6 +202,9 @@ describe('POST /api/daydreams/suggest', () => {
 			expect(reading.input.at(-1).content).toContain('web_fetch');
 		}
 		expect(sent(1).body.max_output_tokens).toBeGreaterThan(sent(0).body.max_tokens);
+		// The ideas round runs hotter through this API too; a whole daydream keeps the default.
+		expect(sent(1).body.temperature).toBeGreaterThan(1);
+		expect(sent(2).body.temperature).toBe(1);
 
 		// Nothing to read, or a task that takes no brief: Chat Completions, no tool.
 		await post(ada, { ...ideas, brief: SECRET_WORDS });

@@ -103,7 +103,10 @@ someone has played one:
   user's side, how it is told (`voice`, chosen with the same cues as a
   whole daydream's) and a heat and kink — so a handful comes back quickly;
   `parseGeneratedIdeas` drops any that put the user on the other side from
-  the one asked for. They take the ready-made ones' place, under the
+  the one asked for. The round runs hotter than every other suggestion
+  (`IDEAS_TEMPERATURE` in `suggest-prompt.ts`): a brief is asked for again
+  and again, and at the default sampling the ideas converge on the same
+  few each time. They take the ready-made ones' place, under the
   request, and are filtered by "You as" the same way (`forSide`); **Clear**
   beside the request puts them away and brings the ready-made ones back.
   **More ideas**, at the end of the list, asks again with the same request
@@ -183,11 +186,17 @@ server's](#the-system-prompt-is-the-servers)):
   from the request rather than the answer, so it is the user's words and
   never the model's version of them. For a picked idea it is the brief the
   ideas were asked for with.
-- **The research**: notes the model is asked for beside its answer
-  (`RESEARCH_NOTES` in `suggest-prompt.ts`), for whoever writes the daydream
-  — what each linked page was and what it said, its recurring themes,
-  tropes and sayings quoted as written where the wording matters, what in
-  the brief it built on, and what it weighed and left out. Short lines, so
+- **The research**: the model's analysis of what it was given, kept in full
+  rather than summarised (`RESEARCH_NOTES` in `suggest-prompt.ts`), for
+  whoever writes the daydream. It is asked to work in two stages: first the
+  analysis — what each linked page was and everything it drew from it, its
+  recurring themes, tropes and sayings quoted as written where the wording
+  matters, what in the brief it built on, and what it weighed and left out —
+  and then, separately, how to turn that analysis into the ideas or the
+  setup, which is its own working and goes nowhere. The notes are the first
+  stage word for word, never a condensed version of it — the model's notes
+  about the pages, not the pages themselves — so the model that writes the
+  daydream sees what the one that read them saw. Short lines, so
   notes that run over `DAYDREAM_LIMITS.ideaResearch` keep their first lines
   (`parseResearch`), like a monologue's sayings. The `daydream` answer gives
   them after the voice; the `ideas` answer gives one set first, for the

@@ -258,9 +258,14 @@ describe('buildSuggestMessages, a whole daydream', () => {
 		expect(maxTokens).toBeGreaterThan(1000);
 	});
 
-	it('asks for research notes that keep what the fields leave out', () => {
+	it('asks for the full analysis as the research, not a summary of it', () => {
 		const ask = buildSuggestMessages(daydream).messages[1]?.content ?? '';
 		expect(ask).toContain('"research": "…"');
+		// Two stages: the analysis, which the notes carry word for word, then
+		// the synthesis into what was asked for, which stays the model's own.
+		expect(ask).toContain('Work in two stages, of which these notes are the first');
+		expect(ask).toContain('word for word, never a condensed version of it');
+		expect(ask).toContain('nothing of it goes in the notes');
 		expect(ask).toContain('quoted as written where the wording matters');
 		// Nothing earlier to carry over for a brief typed in the box.
 		expect(ask).not.toContain('When the ideas were offered');
@@ -387,6 +392,19 @@ describe('buildSuggestMessages, story ideas', () => {
 		expect(maxTokens).toBeLessThan(
 			buildSuggestMessages({ task: 'daydream', brief: ideas.brief, limits: '' }).maxTokens
 		);
+	});
+
+	it('runs hotter than every other suggestion, so one brief does not keep converging on the same ideas', () => {
+		expect(buildSuggestMessages(ideas).temperature).toBeGreaterThan(1);
+		const others: SuggestRequest[] = [
+			casting,
+			naming,
+			base,
+			{ task: 'daydream', brief: ideas.brief, limits: '' }
+		];
+		for (const other of others) {
+			expect(buildSuggestMessages(other).temperature, other.task).toBe(1);
+		}
 	});
 
 	it('keeps every idea on the side chosen under "You as"', () => {

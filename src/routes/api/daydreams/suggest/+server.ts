@@ -64,18 +64,19 @@ export const POST: RequestHandler = async ({ locals, platform, request }) => {
 		});
 	}
 
-	const { messages, maxTokens, readLinks } = buildSuggestMessages(parsed.data, {
+	const { messages, maxTokens, temperature, readLinks } = buildSuggestMessages(parsed.data, {
 		canReadLinks: config.readsLinks
 	});
 	// Stringified once, so debug mode's chat log shows the very text that was sent.
 	const body = JSON.stringify(
 		readLinks
-			? readingLinks(config.openrouterModelId, messages, maxTokens)
+			? readingLinks(config.openrouterModelId, messages, maxTokens, temperature)
 			: {
 					model: config.openrouterModelId,
 					messages,
 					max_tokens: maxTokens,
-					temperature: 1,
+					// From the task: hotter for the ideas round, whose variety is the point.
+					temperature,
 					// Ignored by a provider that does not support it; the browser
 					// copes with a fenced or chatty answer either way.
 					response_format: { type: 'json_object' },
@@ -172,12 +173,17 @@ const WEB_FETCH = {
  * says only how many there were. The browser reads both shapes, so the
  * answer is still passed back unread.
  */
-function readingLinks(model: string, messages: ModelMessage[], maxTokens: number) {
+function readingLinks(
+	model: string,
+	messages: ModelMessage[],
+	maxTokens: number,
+	temperature: number
+) {
 	return {
 		model,
 		input: messages,
 		max_output_tokens: maxTokens,
-		temperature: 1,
+		temperature,
 		text: { format: { type: 'json_object' } },
 		provider: { data_collection: 'deny' },
 		tools: [WEB_FETCH]
