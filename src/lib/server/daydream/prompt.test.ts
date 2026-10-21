@@ -341,7 +341,9 @@ describe('buildMessages', () => {
 				{ pictures: 'z-image-turbo' }
 			)
 		);
-		expect(monologue).toContain('"image": include it when a picture would be of real interest');
+		expect(monologue).toContain(
+			'"image" (optional), a description of a picture: include it when a picture would be of real interest'
+		);
 		expect(monologue).toContain('draw what the passage is about rather than who is saying it');
 		expect(monologue).toContain("carries the passage's kink and sexual themes");
 		expect(monologue).toContain(
@@ -355,13 +357,17 @@ describe('buildMessages', () => {
 		const withPictures = system(
 			buildMessages(request({ turns: [said('hi')] }), { pictures: 'z-image-turbo' })
 		);
-		expect(withPictures).toContain('"image": include it in most replies');
+		expect(withPictures).toContain(
+			'"image" (optional), a description of a picture: include it in most replies'
+		);
 		// No point drawing the same thing twice: it checks the last description
 		// first, looks for something else to draw, and only then leaves it out.
 		expect(withPictures).toContain('find the most recent "image"');
 		expect(withPictures).toContain('they are the same picture, however differently worded');
 		expect(withPictures).toContain('picture that instead. If nothing in it would look different');
-		expect(withPictures).toContain('"image": "..."');
+		// Optional, so not in the template every reply copies: a model once
+		// copied its placeholder back as the description.
+		expect(withPictures).not.toContain('"image": "..."');
 		expect(withPictures).toContain('an adult age as a number');
 		// The image model has seen nothing else, so it is told nothing it cannot draw.
 		expect(withPictures).toContain('Never a name and never "you" or "I"');

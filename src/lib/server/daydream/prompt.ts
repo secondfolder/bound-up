@@ -632,7 +632,7 @@ function imageInstruction(voice: DaydreamVoice, architecture: PictureArchitectur
 		.map((part, index) => `  ${index + 1}. ${IMAGE_PARTS[part]}`)
 		.join('\n');
 	const monologue = voice.narrator === 'monologue';
-	return `- "image": ${monologue ? IMAGE_WHEN.monologue : IMAGE_WHEN.story} ${monologue ? IMAGE_OF.monologue : IMAGE_OF.story}
+	return `- "image" (optional), a description of a picture: ${monologue ? IMAGE_WHEN.monologue : IMAGE_WHEN.story} ${monologue ? IMAGE_OF.monologue : IMAGE_OF.story}
   It is read by an image model that has seen nothing else — not the story, not the setup, not the last picture — and draws only what the words literally say. So write it in English, as plain, literal sentences in the present tense, ${recipe.length}, and never more than ${DAYDREAM_LIMITS.imagePrompt} characters, in this order:
 ${steps}
   Never a name and never "you" or "I": the image model knows no one, so say "the woman", "the taller man". The user's own character is described like anyone else, by how they look. Each person is the gender the setup and the story make them, never one chosen by who is in charge. Only what a camera could see: no thoughts, feelings, sounds, smells, backstory or what happens next — say a feeling as the expression or posture that shows it. One moment, not a sequence. No metaphors, and only words that can mean one thing: "harness", not "gear". Concrete nouns, materials and textures, not adjectives: "a black leather harness across her chest", not "a sexy outfit". Say what is there, never what is not: "bare-chested", not "without a shirt"; "alone on the bed", not "no one else there" — a word for something absent gets drawn. Make what the picture is about prominent in plain words ("with particular attention to her face"). Writing appears only when the moment has some, quoted exactly with what it is on: a collar tag reads "PET". When the user's own character has a penis and nothing says how big, it is thick and long. When the moment is sexual and the heat allows it, frame it so the sex is plainly in view — the bodies, the genitals, the cum, whatever the moment is about.
@@ -695,13 +695,17 @@ function replyFormat(
 	const rollExample = inStory
 		? '{"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}'
 		: '{"prompt": "Roll to see if she holds still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "She moves"}, {"min": 4, "max": 6, "label": "She holds still"}]}';
+	// The template shows only what every reply has. It used to end in
+	// `"image": "..."`, which read as a field every reply fills, and a model
+	// copied the placeholder back verbatim on a passage with nothing to
+	// picture. The picture is optional, so it is described with the others.
 	return `${passageFormat(voice)}
 
 # Reply format
 When the user's last turn is words they wrote — not a button, a roll or a request to continue — open your reply by deciding how you read it, before writing anything else, on a line of its own: <reading>…</reading>, with one of ${readings}. Then answer it as that.
 Write the passage next${inStory ? " (after the <yours> block, when you wrote out the user's turn)" : ''}. Then, on a new line, end every reply with a metadata block, and write nothing after it:
 <meta>
-{"suggestions": [...], "directions": {"add": [...], "remove": [...]}${pictures === null ? '' : ', "image": "..."'}}
+{"suggestions": [...], "directions": {"add": [...], "remove": [...]}}
 </meta>
 - "suggestions": ${Math.min(2, MAX_SUGGESTIONS)} to ${MAX_SUGGESTIONS} short things the user might write next, in their own voice. ${ideas.suggestions}
 - "directions": buttons for steering the story. The ones on screen now are listed at the end of the last message. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} on screen after your changes. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.

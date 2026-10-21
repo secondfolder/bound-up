@@ -242,6 +242,21 @@ describe('parseReply', () => {
 		expect(long?.suggestions).toEqual(meta.suggestions);
 	});
 
+	it('drops a placeholder for a picture, as if the model had left it out', () => {
+		// Seen from GLM 5.2: the reply format's own `"image": "..."` copied back.
+		for (const image of ['...', '…', 'none', 'N/A', ' . . . ']) {
+			const parsed = parseReply(`x\n<meta>\n${JSON.stringify({ ...meta, image })}\n</meta>`).meta;
+			expect(parsed?.image, image).toBeUndefined();
+			expect(parsed?.suggestions).toEqual(meta.suggestions);
+		}
+		// The same in a block the strict schema refuses, read part by part.
+		const salvaged = parseReply(
+			`x\n<meta>\n${JSON.stringify({ ...meta, image: '...', roll: { sides: 6 } })}\n</meta>`
+		).meta;
+		expect(salvaged?.image).toBeUndefined();
+		expect(salvaged?.suggestions).toEqual(meta.suggestions);
+	});
+
 	it('keeps a roll that covers every face', () => {
 		const roll = {
 			prompt: 'Roll to hold still',

@@ -197,8 +197,23 @@ function parseMeta(body: string): PassageMeta | null {
 	}
 	// What the settings were is the page's to say, from the setup it holds,
 	// never the model's.
-	const { settingsBefore: _before, ...said } = meta;
-	return said;
+	const { settingsBefore: _before, image, ...said } = meta;
+	return image !== undefined && describesSomething(image) ? { ...said, image } : said;
+}
+
+/** Fewer than this many words is not a description of anything to draw. */
+const MIN_IMAGE_WORDS = 3;
+
+/**
+ * Whether an image description says anything an image model could draw. A
+ * model has copied the reply format's `"image": "..."` placeholder back
+ * as its description, which the schema takes as a string like any other and
+ * which was then sent to be drawn. Anything with fewer than three words in it
+ * ("...", "…", "none", "N/A") is a placeholder or a refusal, never the 30 to
+ * 130 words the instruction asks for, so it is dropped as if left out.
+ */
+function describesSomething(image: string): boolean {
+	return (image.match(/\p{L}+/gu) ?? []).length >= MIN_IMAGE_WORDS;
 }
 
 const SETTING_KEYS = ['length', 'pace', 'intensity', 'heat', 'kink'] as const;

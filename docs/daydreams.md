@@ -1179,7 +1179,7 @@ A passage can come with a picture of one moment in it, made by an
 image model tuned for adult imagery, through Runware.
 
 - **The story model describes it.** On a server with a Runware key, the
-  reply format asks for an `"image"` in every passage's metadata
+  reply format asks for an optional `"image"` in every passage's metadata
   (`imageInstruction` in `prompt.ts`) of one moment in the passage —
   usually the one it ends on, but the most striking one, and when the
   idea is sexual the hottest, if that came earlier: the framing, how many
@@ -1229,6 +1229,12 @@ image model tuned for adult imagery, through Runware.
   block holding only the image (`passageAsSent`): that is how the model
   knows what the last picture showed. It is part of the passage from the
   moment it is written, so the history still only adds to itself.
+  The `<meta>` template the reply format shows leaves `"image"` out, as it
+  does every optional field: with `"image": "..."` in it, a model on a
+  passage with nothing to picture copied the placeholder back, and `...`
+  was sent to be drawn. For the same reason the reply parser drops a
+  description of fewer than three words (`describesSomething` in
+  `reply-format.ts`) as if it had been left out.
 - **The server wraps it.** `POST /api/daydreams/[id]/image` takes the
   description, the daydream's style and the idea's heat, and builds the
   request (`runwareTask`, `daydream/image-prompt.ts`): the style's model
