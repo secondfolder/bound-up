@@ -1,37 +1,15 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import type { Infer, SuperForm } from 'sveltekit-superforms';
-	import { assertNever } from '$lib/assert-never';
+	import CheckboxField from '$lib/components/CheckboxField.svelte';
+	import InputField from '$lib/components/InputField.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import SelectField from '$lib/components/SelectField.svelte';
 	import TaskTimeZoneOwnerToggle from '$lib/components/TaskTimeZoneOwnerToggle.svelte';
 	import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
 	import { type TaskEditorFormSchema, taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
 	import type { TaskWeekday } from '$lib/types';
-
-	type NumericStringField =
-		| 'creditsAwarded'
-		| 'rollingLimitCompletions'
-		| 'rollingLimitEvery'
-		| 'afterEvery'
-		| 'scheduledInterval'
-		| 'scheduledDayOfMonth'
-		| 'scheduledCount';
-	type StringField =
-		| 'title'
-		| 'description'
-		| 'completionMessagesText'
-		| 'scheduledAnchorLocal'
-		| 'scheduledUntilLocal';
-	type BooleanField = 'active' | 'rollingLimitEnabled';
-	type SelectField =
-		| 'scheduleMode'
-		| 'rollingLimitUnit'
-		| 'afterUnit'
-		| 'scheduledFrequency'
-		| 'scheduledMonthlyPatternKind'
-		| 'scheduledOrdinal'
-		| 'scheduledWeekday'
-		| 'scheduledEndKind';
 
 	type TimeZoneContext = {
 		viewerUserId: string;
@@ -78,23 +56,20 @@
 		userEdited = true;
 	}
 
-	function setNumericStringField(field: NumericStringField, event: Event) {
-		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement)) {
-			return;
-		}
-		markUserEdited();
-		$form[field] = input.value;
-	}
-
-	function setStringField(field: StringField, event: Event) {
-		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
-			return;
-		}
-		markUserEdited();
-		$form[field] = input.value;
-	}
+	/**
+	 * Any edit in the form marks it edited, heard in the capture phase on the
+	 * form itself: the fields are Web Awesome elements that write to the
+	 * superform on their own (InputField, SelectField, CheckboxField), and their
+	 * events reach the form composed but not through Svelte's delegation.
+	 */
+	const hearEdits: Attachment<HTMLFormElement> = (formElement) => {
+		formElement.addEventListener('input', markUserEdited, { capture: true });
+		formElement.addEventListener('change', markUserEdited, { capture: true });
+		return () => {
+			formElement.removeEventListener('input', markUserEdited, { capture: true });
+			formElement.removeEventListener('change', markUserEdited, { capture: true });
+		};
+	};
 
 	/**
 	 * The description is a rich-text document, so it arrives as a serialised
@@ -107,107 +82,22 @@
 		$form.description = stored;
 	}
 
-	function setBooleanField(field: BooleanField, event: Event) {
-		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement)) {
-			return;
-		}
-		markUserEdited();
-		$form[field] = input.checked;
-	}
+	/**
+	 * A weekday's box, followed with a listener on the element for the reason
+	 * SelectField gives. The days are one array field, so they are not
+	 * CheckboxFields: each box adds or removes its own day.
+	 */
+	const weekdayBox =
+		(weekday: TaskWeekday): Attachment<HTMLElement> =>
+		(element) => {
+			const box = element as HTMLElement & { checked?: boolean };
+			const sync = () => toggleScheduledWeekday(weekday, Boolean(box.checked));
+			box.addEventListener('change', sync);
+			return () => box.removeEventListener('change', sync);
+		};
 
-	function setSelectField(field: SelectField, event: Event) {
-		const select = event.currentTarget;
-		if (!(select instanceof HTMLSelectElement)) {
-			return;
-		}
-		markUserEdited();
-
-		switch (field) {
-			case 'scheduleMode':
-				if (
-					select.value === 'one-off' ||
-					select.value === 'rolling-window' ||
-					select.value === 'after-completion' ||
-					select.value === 'scheduled'
-				) {
-					$form.scheduleMode = select.value;
-				}
-				break;
-			case 'rollingLimitUnit':
-			case 'afterUnit':
-				if (
-					select.value === 'minute' ||
-					select.value === 'hour' ||
-					select.value === 'day' ||
-					select.value === 'week' ||
-					select.value === 'month' ||
-					select.value === 'year'
-				) {
-					if (field === 'rollingLimitUnit') {
-						$form.rollingLimitUnit = select.value;
-					} else {
-						$form.afterUnit = select.value;
-					}
-				}
-				break;
-			case 'scheduledFrequency':
-				if (
-					select.value === 'day' ||
-					select.value === 'week' ||
-					select.value === 'month' ||
-					select.value === 'year'
-				) {
-					$form.scheduledFrequency = select.value;
-				}
-				break;
-			case 'scheduledMonthlyPatternKind':
-				if (select.value === 'day-of-month' || select.value === 'nth-weekday') {
-					$form.scheduledMonthlyPatternKind = select.value;
-				}
-				break;
-			case 'scheduledOrdinal':
-				if (
-					select.value === '1' ||
-					select.value === '2' ||
-					select.value === '3' ||
-					select.value === '4' ||
-					select.value === '-1'
-				) {
-					$form.scheduledOrdinal = select.value;
-				}
-				break;
-			case 'scheduledWeekday':
-				if (
-					select.value === 'mo' ||
-					select.value === 'tu' ||
-					select.value === 'we' ||
-					select.value === 'th' ||
-					select.value === 'fr' ||
-					select.value === 'sa' ||
-					select.value === 'su'
-				) {
-					$form.scheduledWeekday = select.value;
-				}
-				break;
-			case 'scheduledEndKind':
-				if (select.value === 'never' || select.value === 'until' || select.value === 'count') {
-					$form.scheduledEndKind = select.value;
-				}
-				break;
-			default:
-				assertNever(field, 'task form field');
-		}
-	}
-
-	function toggleScheduledWeekday(weekday: TaskWeekday, event: Event) {
-		const input = event.currentTarget;
-		if (!(input instanceof HTMLInputElement)) {
-			return;
-		}
-		markUserEdited();
-
-		if (input.checked) {
+	function toggleScheduledWeekday(weekday: TaskWeekday, checked: boolean) {
+		if (checked) {
 			if (!$form.scheduledWeekdays.includes(weekday)) {
 				$form.scheduledWeekdays = [...$form.scheduledWeekdays, weekday];
 			}
@@ -259,6 +149,43 @@
 	const formIsValid = $derived(taskEditorFormSchema.safeParse($form).success);
 	const hasValidUnsavedChanges = $derived(hasUnsavedChanges && formIsValid);
 
+	const UNIT_OPTIONS = [
+		{ value: 'minute', label: 'Minutes' },
+		{ value: 'hour', label: 'Hours' },
+		{ value: 'day', label: 'Days' },
+		{ value: 'week', label: 'Weeks' },
+		{ value: 'month', label: 'Months' },
+		{ value: 'year', label: 'Years' }
+	];
+	const MODE_OPTIONS = [
+		{ value: 'one-off', label: 'One-off' },
+		{ value: 'rolling-window', label: 'Repeat anytime' },
+		{ value: 'after-completion', label: 'After completion' },
+		{ value: 'scheduled', label: 'On a schedule' }
+	];
+	const FREQUENCY_OPTIONS = [
+		{ value: 'day', label: 'Daily' },
+		{ value: 'week', label: 'Weekly' },
+		{ value: 'month', label: 'Monthly' },
+		{ value: 'year', label: 'Yearly' }
+	];
+	const MONTHLY_PATTERN_OPTIONS = [
+		{ value: 'day-of-month', label: 'Day of month' },
+		{ value: 'nth-weekday', label: 'Nth weekday' }
+	];
+	const ORDINAL_OPTIONS = [
+		{ value: '1', label: 'First' },
+		{ value: '2', label: 'Second' },
+		{ value: '3', label: 'Third' },
+		{ value: '4', label: 'Fourth' },
+		{ value: '-1', label: 'Last' }
+	];
+	const END_OPTIONS = [
+		{ value: 'never', label: 'Never' },
+		{ value: 'until', label: 'On a date' },
+		{ value: 'count', label: 'After a number of times' }
+	];
+
 	const weekdayOptions: { value: TaskWeekday; label: string }[] = [
 		{ value: 'mo', label: 'Mon' },
 		{ value: 'tu', label: 'Tue' },
@@ -270,22 +197,14 @@
 	];
 </script>
 
-<form method="POST" use:superform.enhance class="panel task-form">
+<form method="POST" use:superform.enhance class="panel task-form" {@attach hearEdits}>
 	<input type="hidden" name="timezoneOwnerUserId" value={$form.timezoneOwnerUserId} />
 
-	<label>
-		<span>Title</span>
-		<input
-			name="title"
-			maxlength="80"
-			required
-			value={$form.title}
-			oninput={(event) => setStringField('title', event)}
-		/>
-		{#if $errors.title}<span class="invalid">{$errors.title}</span>{/if}
-	</label>
-	<label>
-		<span>Description</span>
+	<InputField {superform} field="title" title="Title" type="text" maxlength="80" required />
+	<div class="description">
+		<!-- Not a <label>: the editor is named by its own ariaLabel, and a label
+		     wrapping it would turn a click anywhere on the toolbar into focus. -->
+		<span class="label" aria-hidden="true">Description</span>
 		<!--
 			A hidden input carries the serialised document, so the form posts the
 			same way it always has and the action needs no special case.
@@ -302,165 +221,79 @@
 			/>
 		</div>
 		{#if $errors.description}<span class="invalid">{$errors.description}</span>{/if}
-	</label>
-	<div class="editor-row">
-		<label>
-			<span>Credits awarded</span>
-			<input
-				type="number"
-				min="0"
-				step="1"
-				name="creditsAwarded"
-				required
-				value={$form.creditsAwarded}
-				oninput={(event) => setNumericStringField('creditsAwarded', event)}
-			/>
-			{#if $errors.creditsAwarded}<span class="invalid">{$errors.creditsAwarded}</span>{/if}
-		</label>
-		<label class="checkbox">
-			<input
-				type="checkbox"
-				name="active"
-				checked={$form.active}
-				onchange={(event) => setBooleanField('active', event)}
-			/>
-			<span>Active</span>
-		</label>
 	</div>
-	<label>
-		<span>Completion messages</span>
-		<textarea
-			name="completionMessagesText"
-			rows="4"
-			placeholder="One message per line"
-			value={$form.completionMessagesText}
-			oninput={(event) => setStringField('completionMessagesText', event)}></textarea>
-		{#if $errors.completionMessagesText}
-			<span class="invalid">{$errors.completionMessagesText}</span>
-		{/if}
-	</label>
+	<div class="editor-row">
+		<InputField
+			{superform}
+			field="creditsAwarded"
+			title="Credits awarded"
+			type="number"
+			min="0"
+			step="1"
+			required
+		/>
+		<CheckboxField {superform} field="active" title="Active" />
+	</div>
+	<!-- Optional, though the schema's plain string would make superforms mark
+	     it required: a task needs no completion message. -->
+	<InputField
+		{superform}
+		field="completionMessagesText"
+		title="Completion messages"
+		type="textarea"
+		rows="4"
+		placeholder="One message per line"
+		required={false}
+	/>
 
 	<section class="schedule-section">
 		<h3>Repeat</h3>
-		<label>
-			<span>Mode</span>
-			<select
-				name="scheduleMode"
-				value={$form.scheduleMode}
-				onchange={(event) => setSelectField('scheduleMode', event)}
-			>
-				<option value="one-off">One-off</option>
-				<option value="rolling-window">Repeat anytime</option>
-				<option value="after-completion">After completion</option>
-				<option value="scheduled">On a schedule</option>
-			</select>
-		</label>
+		<SelectField {superform} field="scheduleMode" title="Mode" options={MODE_OPTIONS} />
 
 		{#if $form.scheduleMode === 'rolling-window'}
-			<label class="checkbox">
-				<input
-					type="checkbox"
-					name="rollingLimitEnabled"
-					checked={$form.rollingLimitEnabled}
-					onchange={(event) => setBooleanField('rollingLimitEnabled', event)}
-				/>
-				<span>Limit completions per period</span>
-			</label>
+			<CheckboxField
+				{superform}
+				field="rollingLimitEnabled"
+				title="Limit completions per period"
+			/>
 			{#if $form.rollingLimitEnabled}
 				<div class="editor-row">
-					<label>
-						<span>Completions</span>
-						<input
-							type="number"
-							min="1"
-							step="1"
-							name="rollingLimitCompletions"
-							value={$form.rollingLimitCompletions}
-							oninput={(event) => setNumericStringField('rollingLimitCompletions', event)}
-						/>
-						{#if $errors.rollingLimitCompletions}
-							<span class="invalid">{$errors.rollingLimitCompletions}</span>
-						{/if}
-					</label>
-					<label>
-						<span>Every</span>
-						<input
-							type="number"
-							min="1"
-							step="1"
-							name="rollingLimitEvery"
-							value={$form.rollingLimitEvery}
-							oninput={(event) => setNumericStringField('rollingLimitEvery', event)}
-						/>
-						{#if $errors.rollingLimitEvery}
-							<span class="invalid">{$errors.rollingLimitEvery}</span>
-						{/if}
-					</label>
-					<label>
-						<span>Unit</span>
-						<select
-							name="rollingLimitUnit"
-							value={$form.rollingLimitUnit}
-							onchange={(event) => setSelectField('rollingLimitUnit', event)}
-						>
-							<option value="minute">Minutes</option>
-							<option value="hour">Hours</option>
-							<option value="day">Days</option>
-							<option value="week">Weeks</option>
-							<option value="month">Months</option>
-							<option value="year">Years</option>
-						</select>
-					</label>
+					<InputField
+						{superform}
+						field="rollingLimitCompletions"
+						title="Completions"
+						type="number"
+						min="1"
+						step="1"
+					/>
+					<InputField
+						{superform}
+						field="rollingLimitEvery"
+						title="Every"
+						type="number"
+						min="1"
+						step="1"
+					/>
+					<SelectField {superform} field="rollingLimitUnit" title="Unit" options={UNIT_OPTIONS} />
 				</div>
 			{/if}
 		{/if}
 
 		{#if $form.scheduleMode === 'after-completion'}
 			<div class="editor-row">
-				<label>
-					<span>Every</span>
-					<input
-						type="number"
-						min="1"
-						step="1"
-						name="afterEvery"
-						value={$form.afterEvery}
-						oninput={(event) => setNumericStringField('afterEvery', event)}
-					/>
-					{#if $errors.afterEvery}<span class="invalid">{$errors.afterEvery}</span>{/if}
-				</label>
-				<label>
-					<span>Unit</span>
-					<select
-						name="afterUnit"
-						value={$form.afterUnit}
-						onchange={(event) => setSelectField('afterUnit', event)}
-					>
-						<option value="minute">Minutes</option>
-						<option value="hour">Hours</option>
-						<option value="day">Days</option>
-						<option value="week">Weeks</option>
-						<option value="month">Months</option>
-						<option value="year">Years</option>
-					</select>
-				</label>
+				<InputField {superform} field="afterEvery" title="Every" type="number" min="1" step="1" />
+				<SelectField {superform} field="afterUnit" title="Unit" options={UNIT_OPTIONS} />
 			</div>
 		{/if}
 
 		{#if $form.scheduleMode === 'scheduled'}
 			<div class="schedule-row">
-				<label>
-					<span>Starts at</span>
-					<input
-						type="datetime-local"
-						name="scheduledAnchorLocal"
-						value={$form.scheduledAnchorLocal}
-						oninput={(event) => setStringField('scheduledAnchorLocal', event)}
-					/>
-					{#if $errors.scheduledAnchorLocal}
-						<span class="invalid">{$errors.scheduledAnchorLocal}</span>
-					{/if}
-				</label>
+				<InputField
+					{superform}
+					field="scheduledAnchorLocal"
+					title="Starts at"
+					type="datetime-local"
+				/>
 				{#if timeZoneContext}
 					<TaskTimeZoneOwnerToggle
 						viewerUserId={timeZoneContext.viewerUserId}
@@ -475,33 +308,20 @@
 			</div>
 
 			<div class="editor-row">
-				<label>
-					<span>Frequency</span>
-					<select
-						name="scheduledFrequency"
-						value={$form.scheduledFrequency}
-						onchange={(event) => setSelectField('scheduledFrequency', event)}
-					>
-						<option value="day">Daily</option>
-						<option value="week">Weekly</option>
-						<option value="month">Monthly</option>
-						<option value="year">Yearly</option>
-					</select>
-				</label>
-				<label>
-					<span>Every</span>
-					<input
-						type="number"
-						min="1"
-						step="1"
-						name="scheduledInterval"
-						value={$form.scheduledInterval}
-						oninput={(event) => setNumericStringField('scheduledInterval', event)}
-					/>
-					{#if $errors.scheduledInterval}
-						<span class="invalid">{$errors.scheduledInterval}</span>
-					{/if}
-				</label>
+				<SelectField
+					{superform}
+					field="scheduledFrequency"
+					title="Frequency"
+					options={FREQUENCY_OPTIONS}
+				/>
+				<InputField
+					{superform}
+					field="scheduledInterval"
+					title="Every"
+					type="number"
+					min="1"
+					step="1"
+				/>
 			</div>
 
 			{#if $form.scheduledFrequency === 'week'}
@@ -509,16 +329,12 @@
 					<legend>Days</legend>
 					<div class="weekday-grid">
 						{#each weekdayOptions as option (option.value)}
-							<label class="checkbox compact">
-								<input
-									type="checkbox"
-									name="scheduledWeekdays"
-									value={option.value}
-									checked={$form.scheduledWeekdays.includes(option.value)}
-									onchange={(event) => toggleScheduledWeekday(option.value, event)}
-								/>
-								<span>{option.label}</span>
-							</label>
+							<wa-checkbox
+								name="scheduledWeekdays"
+								value={option.value}
+								checked={$form.scheduledWeekdays.includes(option.value)}
+								{@attach weekdayBox(option.value)}>{option.label}</wa-checkbox
+							>
 						{/each}
 					</div>
 					{#if firstErrorMessage($errors.scheduledWeekdays)}
@@ -529,103 +345,57 @@
 
 			{#if $form.scheduledFrequency === 'month'}
 				<div class="editor-row">
-					<label>
-						<span>Monthly pattern</span>
-						<select
-							name="scheduledMonthlyPatternKind"
-							value={$form.scheduledMonthlyPatternKind}
-							onchange={(event) => setSelectField('scheduledMonthlyPatternKind', event)}
-						>
-							<option value="day-of-month">Day of month</option>
-							<option value="nth-weekday">Nth weekday</option>
-						</select>
-					</label>
+					<SelectField
+						{superform}
+						field="scheduledMonthlyPatternKind"
+						title="Monthly pattern"
+						options={MONTHLY_PATTERN_OPTIONS}
+					/>
 					{#if $form.scheduledMonthlyPatternKind === 'day-of-month'}
-						<label>
-							<span>Day</span>
-							<input
-								type="number"
-								min="1"
-								max="31"
-								step="1"
-								name="scheduledDayOfMonth"
-								value={$form.scheduledDayOfMonth}
-								oninput={(event) => setNumericStringField('scheduledDayOfMonth', event)}
-							/>
-							{#if $errors.scheduledDayOfMonth}
-								<span class="invalid">{$errors.scheduledDayOfMonth}</span>
-							{/if}
-						</label>
+						<InputField
+							{superform}
+							field="scheduledDayOfMonth"
+							title="Day"
+							type="number"
+							min="1"
+							max="31"
+							step="1"
+						/>
 					{:else}
-						<label>
-							<span>Ordinal</span>
-							<select
-								name="scheduledOrdinal"
-								value={$form.scheduledOrdinal}
-								onchange={(event) => setSelectField('scheduledOrdinal', event)}
-							>
-								<option value="1">First</option>
-								<option value="2">Second</option>
-								<option value="3">Third</option>
-								<option value="4">Fourth</option>
-								<option value="-1">Last</option>
-							</select>
-						</label>
-						<label>
-							<span>Weekday</span>
-							<select
-								name="scheduledWeekday"
-								value={$form.scheduledWeekday}
-								onchange={(event) => setSelectField('scheduledWeekday', event)}
-							>
-								{#each weekdayOptions as option (option.value)}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
-						</label>
+						<SelectField
+							{superform}
+							field="scheduledOrdinal"
+							title="Ordinal"
+							options={ORDINAL_OPTIONS}
+						/>
+						<SelectField
+							{superform}
+							field="scheduledWeekday"
+							title="Weekday"
+							options={weekdayOptions}
+						/>
 					{/if}
 				</div>
 			{/if}
 
 			<div class="editor-row">
-				<label>
-					<span>Ends</span>
-					<select
-						name="scheduledEndKind"
-						value={$form.scheduledEndKind}
-						onchange={(event) => setSelectField('scheduledEndKind', event)}
-					>
-						<option value="never">Never</option>
-						<option value="until">On a date</option>
-						<option value="count">After a number of times</option>
-					</select>
-				</label>
+				<SelectField {superform} field="scheduledEndKind" title="Ends" options={END_OPTIONS} />
 				{#if $form.scheduledEndKind === 'until'}
-					<label>
-						<span>Until</span>
-						<input
-							type="datetime-local"
-							name="scheduledUntilLocal"
-							value={$form.scheduledUntilLocal}
-							oninput={(event) => setStringField('scheduledUntilLocal', event)}
-						/>
-						{#if $errors.scheduledUntilLocal}
-							<span class="invalid">{$errors.scheduledUntilLocal}</span>
-						{/if}
-					</label>
+					<InputField
+						{superform}
+						field="scheduledUntilLocal"
+						title="Until"
+						type="datetime-local"
+					/>
 				{:else if $form.scheduledEndKind === 'count'}
-					<label>
-						<span>Count</span>
-						<input
-							type="number"
-							min="1"
-							step="1"
-							name="scheduledCount"
-							value={$form.scheduledCount}
-							oninput={(event) => setNumericStringField('scheduledCount', event)}
-						/>
-						{#if $errors.scheduledCount}<span class="invalid">{$errors.scheduledCount}</span>{/if}
-					</label>
+					<InputField
+						{superform}
+						field="scheduledCount"
+						title="Count"
+						type="number"
+						min="1"
+						step="1"
+					/>
 				{/if}
 			</div>
 			{#if $form.scheduledEndKind === 'until' && timeZoneContext}
@@ -675,21 +445,18 @@
 		}
 	}
 
-	label,
 	fieldset {
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
-	}
-
-	fieldset {
 		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 0.6rem;
+		border-radius: var(--wa-form-control-border-radius);
 		padding: 0.75rem;
 	}
 
 	legend {
 		padding-inline: 0.35rem;
+		font-weight: var(--wa-form-control-label-font-weight, var(--wa-font-weight-semibold, 600));
 	}
 
 	.editor-row,
@@ -698,10 +465,21 @@
 		display: flex;
 		gap: 1rem;
 		flex-wrap: wrap;
+		align-items: flex-end;
+
+		/* The fields share the row, and wrap under one another when they
+		   cannot each have a usable width. */
+		> :global(*) {
+			flex: 1 1 10rem;
+		}
 	}
 
 	.weekday-grid {
 		gap: 0.5rem 1rem;
+
+		> :global(*) {
+			flex: 0 0 auto;
+		}
 	}
 
 	.schedule-section {
@@ -714,15 +492,18 @@
 		margin: 0;
 	}
 
-	input,
-	textarea,
-	select {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 0.6rem 0.75rem;
-		border-radius: 0.6rem;
-		border: 1px solid var(--wa-color-surface-border);
-		font: inherit;
+	/* The description is a rich-text editor, not a Web Awesome field, so its
+	   label and box borrow the form controls' tokens to read as one of the
+	   wa-inputs around it. */
+	.description {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+
+		.label {
+			font-weight: var(--wa-form-control-label-font-weight, var(--wa-font-weight-semibold, 600));
+			color: var(--wa-form-control-label-color, var(--wa-color-text-normal));
+		}
 	}
 
 	.richtext-field {
@@ -731,34 +512,16 @@
 		min-block-size: 4.5rem;
 		max-block-size: 40svh;
 		overflow-y: auto;
-		padding: 0.6rem 0.75rem;
-		border-radius: 0.6rem;
-		border: 1px solid var(--wa-color-surface-border);
-		/* The native fields' fill, so the editor reads as one of them; it was
-		   darker than every input around it. */
+		padding: 0.6rem var(--wa-form-control-padding-inline, 0.75rem);
+		border-radius: var(--wa-form-control-border-radius);
+		border: var(--wa-form-control-border-width, 1px) var(--wa-form-control-border-style, solid)
+			var(--wa-form-control-border-color);
 		background: var(--wa-form-control-background-color);
 	}
 
 	.richtext-field:focus-within {
-		outline: 2px solid var(--wa-color-brand-fill-loud, currentColor);
-		outline-offset: -1px;
-	}
-
-	textarea {
-		resize: vertical;
-	}
-
-	.checkbox {
-		flex-direction: row;
-		align-items: center;
-
-		input {
-			width: auto;
-		}
-	}
-
-	.checkbox.compact {
-		gap: 0.25rem;
+		outline: var(--wa-focus-ring);
+		outline-offset: var(--wa-focus-ring-offset, -1px);
 	}
 
 	.invalid {
@@ -769,6 +532,7 @@
 		.editor-row,
 		.schedule-row {
 			flex-direction: column;
+			align-items: stretch;
 		}
 	}
 </style>

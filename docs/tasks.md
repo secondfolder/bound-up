@@ -195,7 +195,9 @@ The server checks only what it can: the ciphertext's shape and size, a known
 permission. Permissions never moved: who may create, edit or complete a task
 is decided from the stored rows exactly as before.
 
-**Forms.** The editor (`SealedTaskEditor.svelte`) is superforms as usual, but
+**Forms.** The editor (`SealedTaskEditor.svelte`, drawing `TaskForm.svelte`,
+whose fields are the app's `InputField`, `SelectField` and `CheckboxField`)
+is superforms as usual, but
 its `onSubmit` validates, seals the three text fields, and posts the sealed
 record (`recordId`, `vaultId`, `ciphertext`, `payloadVersion`,
 `completionMessageCount`) in their place (`sealed-forms.ts`). A new task's id

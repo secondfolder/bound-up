@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { SEALED_PATTERN } from '$lib/sealed';
 import { isClientId } from '$lib/vault';
 
+const WHOLE_NUMBER = /^\d+$/;
+
 const creditsSchema = z.coerce
 	.number()
 	.int('Please enter a whole number')
@@ -30,6 +32,27 @@ export const rewardSealedSubmitSchema = z.object({
 	active: z.boolean(),
 	expectedRevision: z.coerce.number().int().min(0).optional()
 });
+
+/**
+ * The reward editor's fields as typed, before anything is sealed: what the
+ * form validates in the browser. Never parsed on the server, which receives
+ * `rewardSealedSubmitSchema` instead. The cost stays the string the field
+ * holds, so an empty box is an empty string this can name rather than a 0
+ * nobody typed. The description's length is checked when it is sealed, where
+ * its visible text is counted (`rewardKind`).
+ */
+export const rewardEditorFormSchema = z.object({
+	title: z
+		.string()
+		.trim()
+		.min(1, 'Please enter a title')
+		.max(80, 'Please keep the title to 80 characters or fewer'),
+	description: z.string(),
+	cost: z.string().trim().regex(WHOLE_NUMBER, 'Please enter a whole number of credits'),
+	active: z.boolean()
+});
+
+export type RewardEditorFormValues = z.output<typeof rewardEditorFormSchema>;
 
 export const rewardClaimSchema = z.object({ rewardId: rewardIdSchema });
 

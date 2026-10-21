@@ -66,7 +66,7 @@ test.describe('tasks', () => {
 			await ada.page.getByRole('link', { name: 'Add a task' }).click();
 			await ada.page.waitForURL(/\/home\/tasks\/add$/);
 			await waitForHydration(ada.page);
-			await ada.page.locator('input[name="title"]').fill('Long shower');
+			await ada.page.locator('wa-input[name="title"] input').fill('Long shower');
 			/**
 			 * Typed key by key, not bulk-filled, and that is the point.
 			 *
@@ -80,8 +80,10 @@ test.describe('tasks', () => {
 			await expect(ada.page.locator('.task-form .richtext-editor .surface').first()).toHaveText(
 				'Take your time'
 			);
-			await ada.page.locator('input[name="creditsAwarded"]').fill('2');
-			await ada.page.locator('textarea[name="completionMessagesText"]').fill('Nicely done');
+			await ada.page.locator('wa-input[name="creditsAwarded"] input').fill('2');
+			await ada.page
+				.locator('wa-textarea[name="completionMessagesText"] textarea')
+				.fill('Nicely done');
 			await clickWaButton(ada.page, 'Add task');
 			await ada.page.waitForURL(/\/home\/tasks$/);
 
@@ -171,10 +173,10 @@ test.describe('tasks', () => {
 			await jun.page.getByRole('link', { name: 'Add a task' }).click();
 			await jun.page.waitForURL(/\/tasks\/add$/);
 			await waitForHydration(jun.page);
-			await jun.page.locator('input[name="title"]').fill('Make tea');
+			await jun.page.locator('wa-input[name="title"] input').fill('Make tea');
 			await fillRichText(jun.page.locator('.task-form'), 'With the good teapot');
-			await jun.page.locator('input[name="creditsAwarded"]').fill('3');
-			await jun.page.locator('textarea[name="completionMessagesText"]').fill('Perfect');
+			await jun.page.locator('wa-input[name="creditsAwarded"] input').fill('3');
+			await jun.page.locator('wa-textarea[name="completionMessagesText"] textarea').fill('Perfect');
 			await clickWaButton(jun.page, 'Add task');
 			await jun.page.waitForURL(/\/tasks$/);
 			await expect(jun.page.getByRole('heading', { name: 'Make tea' })).toBeVisible();

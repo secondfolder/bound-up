@@ -1,15 +1,16 @@
 <script lang="ts">
-	import type { SubmitFunction } from '@sveltejs/kit';
 	import { onMount, tick } from 'svelte';
-	import { enhance } from '$app/forms';
+	import type { Attachment } from 'svelte/attachments';
+	import { defaults } from 'sveltekit-superforms';
+	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import CheckboxField from '$lib/components/CheckboxField.svelte';
+	import InputField from '$lib/components/InputField.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
-	import { reportRequestFailure } from '$lib/request-failure.svelte';
 	import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
+	import { rewardEditorFormSchema } from '$lib/schemas/rewardForm';
 	import { replaceWithSealed, type SealScope, sealForSubmit } from '$lib/sealed-forms';
 	import { rewardKind } from '$lib/sealed-kinds/tasks';
-
-	/** A cost the server will take: a whole number of credits, zero or more. */
-	const WHOLE_NUMBER = /^\d+$/;
+	import { superForm } from '$lib/superform';
 
 	type RewardFormValues = {
 		title: string;
@@ -36,165 +37,163 @@
 	let newId: string | null = null;
 
 	/**
-	 * Seals the title and description before the form leaves the page, and
-	 * posts the sealed record in their place (`sealed-forms.ts`). Not
-	 * superforms: this form has always posted natively, and the only thing the
-	 * action sends back now is a message.
+	 * A superform built in the browser from `defaults()`, not from a load's
+	 * `superValidate`: the reward's actions never read a superform. The title
+	 * and description are sealed here and posted as a sealed record in their
+	 * place (`sealed-forms.ts`), which the action parses with
+	 * `rewardSealedSubmitSchema`, and it answers a refusal with a message
+	 * rather than a form. What this gives the page is the app's fields
+	 * (InputField and friends), client-side validation and the save
+	 * convention, from the same values the pages already pass.
 	 */
-	const sealOnSubmit: SubmitFunction = async ({ formData, cancel }) => {
-		problem = null;
-		const title = formData.get('title');
-		newId ??= crypto.randomUUID();
-		const outcome = await sealForSubmit(rewardKind, {
-			scope: sealScope,
-			recordId: reward?.id ?? newId,
-			payload: { title: typeof title === 'string' ? title : '', description },
-			describe: (field) =>
-				field === 'description'
-					? 'Please keep the description to 500 characters or fewer'
-					: 'Please enter a reward title of 80 characters or fewer'
-		});
-		if (!outcome.ok) {
-			({ error: problem } = outcome);
-			cancel();
-			return;
-		}
-		replaceWithSealed(formData, ['title', 'description'], {
-			...outcome.fields,
-			...(reward ? { expectedRevision: String(reward.revision) } : {})
-		});
-		return async ({ result, update }) => {
-			if (result.type === 'failure') {
-				problem =
-					typeof result.data?.error === 'string'
-						? result.data.error
-						: 'That reward could not be saved. Reload and try again.';
-			} else if (result.type === 'error') {
-				reportRequestFailure(result.error);
-			} else {
-				await update();
+	// svelte-ignore state_referenced_locally
+	// Captured once on purpose, as on every superform: the stores are the live
+	// connection. The edit pages mount this only once the reward is opened, so
+	// its content is here from the start.
+	const superform = superForm(
+		defaults(
+			{
+				title: values.title,
+				description: values.description,
+				cost: String(values.cost),
+				active: values.active
+			},
+			zod4Client(rewardEditorFormSchema),
+			{ id: reward ? `reward-${reward.id}` : 'reward-new' }
+		),
+		{
+			resetForm: false,
+			validators: zod4Client(rewardEditorFormSchema),
+			async onSubmit({ formData, cancel }) {
+				problem = null;
+				// superforms validates after `onSubmit`, and this seals what it
+				// validated, so it validates first itself.
+				const checked = await superform.validateForm({ update: true });
+				if (!checked.valid) {
+					cancel();
+					return;
+				}
+				newId ??= crypto.randomUUID();
+				const outcome = await sealForSubmit(rewardKind, {
+					scope: sealScope,
+					recordId: reward?.id ?? newId,
+					payload: { title: checked.data.title, description: checked.data.description },
+					describe: (field) =>
+						field === 'description'
+							? 'Please keep the description to 500 characters or fewer'
+							: 'Please enter a reward title of 80 characters or fewer'
+				});
+				if (!outcome.ok) {
+					({ error: problem } = outcome);
+					cancel();
+					return;
+				}
+				replaceWithSealed(formData, ['title', 'description'], {
+					...outcome.fields,
+					...(reward ? { expectedRevision: String(reward.revision) } : {})
+				});
+			},
+			onResult({ result, cancel }) {
+				// A refusal is a message, not a superform: there are no fields of the
+				// server's to send back, so it is shown here and the form kept as typed.
+				if (result.type === 'failure') {
+					cancel();
+					problem =
+						typeof result.data?.error === 'string'
+							? result.data.error
+							: 'That reward could not be saved. Reload and try again.';
+				}
 			}
-		};
-	};
+		}
+	);
+	const { form, errors, submitting } = superform;
 
 	/**
-	 * The editor's document, which `sealOnSubmit` seals with the title. Still
-	 * carried by a hidden input too, so the form's fields are all in one place
-	 * when it is read; that input is removed from what is posted.
+	 * "Unsaved changes", as on TaskForm: a comparison with a baseline that is
+	 * taken again once the description's editor has settled, because the
+	 * editor can normalise its document as it mounts, which is not an edit and
+	 * would otherwise light the save button on a form nobody has touched.
 	 */
 	// svelte-ignore state_referenced_locally
-	let description = $state(values.description);
-
-	/**
-	 * What the fields hold now, read from the form element on every input and
-	 * change — not from the events, which a password manager's fill does not
-	 * always send where Svelte can see them (AGENTS.md). Only for the submit
-	 * button's look: the server re-validates everything.
-	 */
-	let formElement = $state<HTMLFormElement>();
-	// svelte-ignore state_referenced_locally
-	let fields = $state({ title: values.title, cost: String(values.cost), active: values.active });
-	// The editor can normalise its document as it mounts, which is not an edit;
-	// the baseline is taken again once it has settled, as TaskForm does.
-	// svelte-ignore state_referenced_locally
-	let baselineDescription = $state(values.description);
-	let edited = $state(false);
+	let initialValues = $state(structuredClone(superform.capture().data));
+	let mounted = $state(false);
+	let userEdited = $state(false);
 
 	onMount(() => {
+		mounted = true;
 		void tick().then(() => {
-			if (!edited) {
-				baselineDescription = description;
+			if (!userEdited) {
+				initialValues = structuredClone(superform.capture().data);
 			}
 		});
 	});
 
-	function readFields() {
-		if (!formElement) {
-			return;
+	function markUserEdited() {
+		if (mounted) {
+			userEdited = true;
 		}
-		const data = new FormData(formElement);
-		edited = true;
-		fields = {
-			title: String(data.get('title') ?? ''),
-			cost: String(data.get('cost') ?? ''),
-			active: data.has('active')
+	}
+
+	/** Any edit in the form, heard as TaskForm hears it. */
+	const hearEdits: Attachment<HTMLFormElement> = (formElement) => {
+		formElement.addEventListener('input', markUserEdited, { capture: true });
+		formElement.addEventListener('change', markUserEdited, { capture: true });
+		return () => {
+			formElement.removeEventListener('input', markUserEdited, { capture: true });
+			formElement.removeEventListener('change', markUserEdited, { capture: true });
 		};
+	};
+
+	function setDescription(stored: string) {
+		markUserEdited();
+		$form.description = stored;
 	}
 
 	/**
 	 * The save convention (AGENTS.md): outlined while there is nothing to save,
 	 * solid amber once something has changed and would be accepted.
 	 */
-	const canSave = $derived.by(() => {
-		const changed =
-			fields.title !== values.title ||
-			fields.cost !== String(values.cost) ||
-			fields.active !== values.active ||
-			description !== baselineDescription;
-		const valid = fields.title.trim().length > 0 && WHOLE_NUMBER.test(fields.cost.trim());
-		return changed && valid;
-	});
-
-	/*
-	 * The native fields are seeded with `defaultValue` / `defaultChecked`, not
-	 * `value` / `checked`, because nothing here holds them in state: the server's values
-	 * are where the fields start, not something to hold them to.
-	 *
-	 * `value={…}` lost what the user typed. Svelte does not write an input's
-	 * value while hydrating, so it has no record of having set it — and the first
-	 * time this template's effect re-ran for any reason, it wrote `values.title`
-	 * over the field. Typing in the description is such a reason: it updates the
-	 * hidden input below, in the same effect. So on a page loaded in full, a
-	 * title typed before the description was erased (the add page) or reverted to
-	 * the stored one (the edit pages). A client-side navigation mounts rather
-	 * than hydrates, which is why it only showed on a refresh, a direct link, or
-	 * a slow page — first seen as a flaky e2e run.
-	 */
+	const canSave = $derived(
+		userEdited &&
+			JSON.stringify($form) !== JSON.stringify(initialValues) &&
+			rewardEditorFormSchema.safeParse($form).success
+	);
 </script>
 
 <form
 	method="POST"
 	class="panel reward-form add-form"
-	bind:this={formElement}
-	oninput={readFields}
-	onchange={readFields}
-	use:enhance={sealOnSubmit}
+	use:superform.enhance
+	{@attach hearEdits}
 >
 	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
-	<label>
-		<span>Title</span>
-		<input name="title" maxlength="80" required defaultValue={values.title} />
-	</label>
-	<label>
-		<span>Description</span>
-		<input type="hidden" name="description" value={description} />
+	<InputField {superform} field="title" title="Title" type="text" maxlength="80" required />
+	<div class="description">
+		<!-- Not a <label>: the editor is named by its own ariaLabel. -->
+		<span class="label" aria-hidden="true">Description</span>
+		<input type="hidden" name="description" value={$form.description} />
 		<div class="richtext-field">
 			<RichTextEditor
-				value={values.description}
-				onChange={(next) => {
-					description = next;
-				}}
+				value={$form.description}
+				onChange={setDescription}
 				features={DOCUMENT_FEATURES}
 				toolbar
 				placeholder="What is this reward?"
 				ariaLabel="Description"
 			/>
 		</div>
-	</label>
-	<div class="editor-row">
-		<label>
-			<span>Cost</span>
-			<input type="number" min="0" step="1" name="cost" required defaultValue={values.cost} />
-		</label>
-		<label class="checkbox">
-			<input type="checkbox" name="active" defaultChecked={values.active} />
-			<span>Active</span>
-		</label>
+		{#if $errors.description}<span class="invalid">{$errors.description}</span>{/if}
 	</div>
+	<div class="editor-row">
+		<InputField {superform} field="cost" title="Cost" type="number" min="0" step="1" required />
+		<CheckboxField {superform} field="active" title="Active" />
+	</div>
+	<!-- `disabled={x}`, never `disabled={x || undefined}`: see AGENTS.md invariant 11. -->
 	<wa-button
 		type="submit"
 		variant={canSave ? 'brand' : 'neutral'}
-		appearance={canSave ? 'accent' : 'outlined'}>{submitLabel}</wa-button
+		appearance={canSave ? 'accent' : 'outlined'}
+		disabled={$submitting}>{submitLabel}</wa-button
 	>
 </form>
 
@@ -220,25 +219,28 @@
 		}
 	}
 
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-
 	.editor-row {
 		display: flex;
 		gap: 1rem;
 		flex-wrap: wrap;
+		align-items: flex-end;
+
+		> :global(*) {
+			flex: 1 1 10rem;
+		}
 	}
 
-	input:not([type='hidden']) {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 0.6rem 0.75rem;
-		border-radius: 0.6rem;
-		border: 1px solid var(--wa-color-surface-border);
-		font: inherit;
+	/* The description is a rich-text editor, not a Web Awesome field, so its
+	   label and box borrow the form controls' tokens, as on TaskForm. */
+	.description {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+
+		.label {
+			font-weight: var(--wa-form-control-label-font-weight, var(--wa-font-weight-semibold, 600));
+			color: var(--wa-form-control-label-color, var(--wa-color-text-normal));
+		}
 	}
 
 	.richtext-field {
@@ -247,29 +249,19 @@
 		min-block-size: 4.5rem;
 		max-block-size: 40svh;
 		overflow-y: auto;
-		padding: 0.6rem 0.75rem;
-		border-radius: 0.6rem;
-		border: 1px solid var(--wa-color-surface-border);
-		/* The native fields' fill, so the editor reads as one of them. */
+		padding: 0.6rem var(--wa-form-control-padding-inline, 0.75rem);
+		border-radius: var(--wa-form-control-border-radius);
+		border: var(--wa-form-control-border-width, 1px) var(--wa-form-control-border-style, solid)
+			var(--wa-form-control-border-color);
 		background: var(--wa-form-control-background-color);
-		font: inherit;
 	}
 
 	.richtext-field:focus-within {
-		outline: 2px solid var(--wa-color-brand-fill-loud, currentColor);
-		outline-offset: -1px;
+		outline: var(--wa-focus-ring);
+		outline-offset: var(--wa-focus-ring-offset, -1px);
 	}
 
 	.invalid {
 		color: var(--wa-color-text-danger);
-	}
-
-	.checkbox {
-		flex-direction: row;
-		align-items: center;
-
-		input {
-			width: auto;
-		}
 	}
 </style>

@@ -29,13 +29,13 @@ test.describe('rewards', () => {
 		await signUp(page, account('Ada'));
 
 		await page.goto('/home/rewards/add');
-		const title = page.locator('.add-form input[name="title"]');
+		const title = page.locator('.add-form wa-input[name="title"] input');
 		await waitForHydration(page);
 		await title.fill('Long bath');
 		await typeRichText(page.locator('.add-form'), 'No interruptions');
 		await expect(title).toHaveValue('Long bath');
 
-		await page.locator('.add-form input[name="cost"]').fill('2');
+		await page.locator('.add-form wa-input[name="cost"] input').fill('2');
 		await clickWaButton(page, 'Add reward');
 		await page.waitForURL(/\/home\/rewards$/);
 
@@ -70,9 +70,9 @@ test.describe('rewards', () => {
 			await ada.page.getByRole('link', { name: 'Add a reward' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/add$/);
 			await waitForHydration(ada.page);
-			await ada.page.locator('.add-form input[name="title"]').first().fill('Long bath');
+			await ada.page.locator('.add-form wa-input[name="title"] input').first().fill('Long bath');
 			await fillRichText(ada.page.locator('.add-form'), 'No interruptions');
-			await ada.page.locator('.add-form input[name="cost"]').first().fill('2');
+			await ada.page.locator('.add-form wa-input[name="cost"] input').first().fill('2');
 			await clickWaButton(ada.page, 'Add reward');
 			await ada.page.waitForURL(/\/home\/rewards$/);
 
@@ -121,9 +121,9 @@ test.describe('rewards', () => {
 			await jun.page.getByRole('link', { name: 'Add a reward' }).click();
 			await jun.page.waitForURL(/\/rewards\/add$/);
 			await waitForHydration(jun.page);
-			await jun.page.locator('.add-form input[name="title"]').fill('Tea service');
+			await jun.page.locator('.add-form wa-input[name="title"] input').fill('Tea service');
 			await fillRichText(jun.page.locator('.add-form'), 'Fresh pot first');
-			await jun.page.locator('.add-form input[name="cost"]').fill('2');
+			await jun.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(jun.page, 'Add reward');
 			await jun.page.waitForURL(/\/rewards$/);
 			await expect(jun.page.getByRole('heading', { name: 'Tea service' })).toBeVisible();

@@ -126,7 +126,7 @@ test.describe('sealed partnership names', () => {
 
 			await ada.page.goto('/home/tasks/add');
 			await waitForHydration(ada.page);
-			await ada.page.locator('input[name="title"]').fill('Lines, one hundred');
+			await ada.page.locator('wa-input[name="title"] input').fill('Lines, one hundred');
 			await clickWaButton(ada.page, 'Add task');
 			await ada.page.waitForURL(/\/home\/tasks$/);
 
@@ -134,7 +134,9 @@ test.describe('sealed partnership names', () => {
 			await ada.page.goto(edit ?? '');
 			await waitForHydration(ada.page);
 			// Opened in the browser and put in the form: the server sent it empty.
-			await expect(ada.page.locator('input[name="title"]')).toHaveValue('Lines, one hundred');
+			await expect(ada.page.locator('wa-input[name="title"] input')).toHaveValue(
+				'Lines, one hundred'
+			);
 		} finally {
 			await ada.close();
 		}

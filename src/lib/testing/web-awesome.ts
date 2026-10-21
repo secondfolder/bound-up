@@ -85,6 +85,26 @@ export async function waSettled(root: ParentNode): Promise<void> {
 }
 
 /**
+ * Types into the `wa-input` or `wa-textarea` named `name`, as a browser's own
+ * typing reaches it: the value set on the native control inside the shadow
+ * root, then an `input` event that is composed, so it crosses the boundary to
+ * the host and the form as real typing does. Waits for the elements to render
+ * first, since the native control does not exist until then.
+ */
+export async function waType(root: ParentNode, name: string, value: string): Promise<void> {
+	await waSettled(root);
+	const host = root.querySelector(`wa-input[name="${name}"], wa-textarea[name="${name}"]`) as
+		| (HTMLElement & { input?: HTMLInputElement | HTMLTextAreaElement | null })
+		| null;
+	const control = host?.input;
+	if (!control) {
+		throw new Error(`No rendered wa-input or wa-textarea named "${name}"`);
+	}
+	control.value = value;
+	control.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+}
+
+/**
  * Whether a `fetch` was `wa-icon` loading its SVG.
  *
  * The components are installed from npm, but the icons are not: `wa-icon`

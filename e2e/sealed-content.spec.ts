@@ -31,9 +31,11 @@ test.describe('sealed tasks and rewards', () => {
 
 			await ada.page.goto('/home/tasks/add');
 			await waitForHydration(ada.page);
-			await ada.page.locator('input[name="title"]').fill('Ninety lengths');
+			await ada.page.locator('wa-input[name="title"] input').fill('Ninety lengths');
 			await fillRichText(ada.page.locator('.task-form'), 'Before breakfast');
-			await ada.page.locator('textarea[name="completionMessagesText"]').fill('Strong work');
+			await ada.page
+				.locator('wa-textarea[name="completionMessagesText"] textarea')
+				.fill('Strong work');
 			await clickWaButton(ada.page, 'Add task');
 			await ada.page.waitForURL(/\/home\/tasks$/);
 			// Shown, which means opened in the browser: the server never had it.
@@ -41,9 +43,9 @@ test.describe('sealed tasks and rewards', () => {
 
 			await ada.page.goto('/home/rewards/add');
 			await waitForHydration(ada.page);
-			await ada.page.locator('.add-form input[name="title"]').fill('Sunday lie-in');
+			await ada.page.locator('.add-form wa-input[name="title"] input').fill('Sunday lie-in');
 			await fillRichText(ada.page.locator('.add-form'), 'Until noon');
-			await ada.page.locator('.add-form input[name="cost"]').fill('2');
+			await ada.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(ada.page, 'Add reward');
 			await ada.page.waitForURL(/\/home\/rewards$/);
 			await expect(ada.page.getByRole('heading', { name: 'Sunday lie-in' })).toBeVisible();

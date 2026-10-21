@@ -152,10 +152,13 @@ partnership reward. The server sees what it acts on — the cost, whether the
 reward is active, who authored it, credits and claims — and checks only the
 sealed record's envelope and every permission.
 
-- **The form** (`RewardForm.svelte`, SvelteKit's `enhance` rather than
-  superforms, as it was before) seals the title and description on submit
-  and posts the sealed record in their place (`sealed-forms.ts`). The title
-  and description limits run in the browser and on every read.
+- **The form** (`RewardForm.svelte`) is a superform built in the browser
+  from `defaults()` and `rewardEditorFormSchema`, rather than from a load's
+  `superValidate`: the actions never read a superform. Its fields are the
+  app's own (`InputField`, `CheckboxField`); its `onSubmit` validates, seals
+  the title and description and posts the sealed record in their place
+  (`sealed-forms.ts`), and a refusal comes back as a message. The title and
+  description limits run in the browser and on every read.
 - **Edits are compare-and-swap** on `revision`, so a partner's newer edit is
   never overwritten unseen.
 - **A claim** copies the reward's ciphertext as it stood (`snapshot_*`

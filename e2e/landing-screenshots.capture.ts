@@ -84,10 +84,12 @@ test('landing page feature screenshots', async ({ browser }) => {
 		for (const [title, body, credits] of tasks) {
 			await morgan.page.goto(`${partnerPage}/tasks/add`);
 			await waitForHydration(morgan.page);
-			await morgan.page.locator('input[name="title"]').fill(title);
+			await morgan.page.locator('wa-input[name="title"] input').fill(title);
 			await fillRichText(morgan.page.locator('.task-form'), body);
-			await morgan.page.locator('input[name="creditsAwarded"]').fill(credits);
-			await morgan.page.locator('textarea[name="completionMessagesText"]').fill('Good pet.');
+			await morgan.page.locator('wa-input[name="creditsAwarded"] input').fill(credits);
+			await morgan.page
+				.locator('wa-textarea[name="completionMessagesText"] textarea')
+				.fill('Good pet.');
 			await clickWaButton(morgan.page, 'Add task');
 			await morgan.page.waitForURL(/\/tasks$/);
 		}
@@ -100,9 +102,9 @@ test('landing page feature screenshots', async ({ browser }) => {
 		for (const [title, body, cost] of rewards) {
 			await morgan.page.goto(`${partnerPage}/rewards/add`);
 			await waitForHydration(morgan.page);
-			await morgan.page.locator('.add-form input[name="title"]').first().fill(title);
+			await morgan.page.locator('.add-form wa-input[name="title"] input').first().fill(title);
 			await fillRichText(morgan.page.locator('.add-form'), body);
-			await morgan.page.locator('.add-form input[name="cost"]').first().fill(cost);
+			await morgan.page.locator('.add-form wa-input[name="cost"] input').first().fill(cost);
 			await clickWaButton(morgan.page, 'Add reward');
 			await morgan.page.waitForURL(/\/rewards$/);
 		}

@@ -430,7 +430,11 @@ load data is serialised into the HTML of every page. Whitelist fields, as
   `superForm`, **imported from `$lib/superform`**, whose `onError` shows a
   failed submit; the library's own rethrows it into the console and the page
   says nothing. Biome refuses the direct import. Fields go through
-  `InputField.svelte`.
+  `InputField.svelte` (text, email, password, number, date and time, and
+  `type="textarea"`), with `SelectField.svelte` for a choice and
+  `CheckboxField.svelte` for a yes or no — never a native `<input>`. A form
+  whose action reads a sealed record rather than a superform still builds a
+  superform, from `defaults()` in the browser, to use them (`RewardForm`).
 - **An `$effect` that reads the `data` prop re-runs on every `invalidate()`.**
   `data` is reassigned each time a load re-runs, so the effect's dependency is
   the whole prop rather than the field you read from it. For an effect that sets
