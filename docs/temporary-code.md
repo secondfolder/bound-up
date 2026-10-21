@@ -224,7 +224,9 @@ keep their text in plaintext columns until a device seals them: once vaults
 are open, `content-sealing.ts` asks `/api/sealing/[scope]` for the scope's
 unsealed rows, seals each into the scope's vault, and posts them back, and the
 server empties the plaintext in the same write. Any member can seal a
-partnership's rows; only the owner, their own. A completion or claim is sealed
+partnership's completions, claims and tags, but only a member who holds
+`control` its tasks, rewards and names, since sealing one is writing it
+([docs/partners.md](partners.md#names-are-sealed)); only the owner, their own. A completion or claim is sealed
 to its own id, as the task or reward it recorded, with the one message it was
 given at index 0.
 

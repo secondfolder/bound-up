@@ -1,5 +1,10 @@
 import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
-import { namesSourceFor, type PartnerNamesSource, roleOf } from '../partnership';
+import {
+	canEditPartnership,
+	namesSourceFor,
+	type PartnerNamesSource,
+	roleOf
+} from '../partnership';
 import { partnershipNamesKind } from '../sealed-kinds/partnerships';
 import { tagKind } from '../sealed-kinds/tags';
 import { rewardKind, taskKind } from '../sealed-kinds/tasks';
@@ -33,8 +38,14 @@ import {
  * See docs/tasks.md and docs/rewards.md.
  *
  * A scope is the user's own (self tasks and rewards) or one partnership's.
- * Any member of a partnership may seal its rows: both can already read them,
- * and both hold the vault.
+ * Any member of a partnership may seal its completions, claims and tags: both
+ * can already read them, and both hold the vault. Its tasks, rewards and
+ * names are sealed only by a member who holds `control`, because sealing one
+ * is writing it: the server cannot check that the sealed copy says what the
+ * plaintext said, so a read-only member who could seal them could rewrite
+ * them, which `control` says they may not (AGENTS.md invariant 14). A
+ * read-only member is simply not handed them, and the controller's device
+ * seals them instead.
  */
 
 export type ContentScope = { kind: 'self' } | { kind: 'partnership'; partnershipId: string };
@@ -103,6 +114,27 @@ async function scopeVault(db: Db, actorId: string, scope: ContentScope): Promise
 	return await partnershipVaultIdFor(db, scope.partnershipId);
 }
 
+/**
+ * Whether the actor may seal the scope's tasks, rewards and names — the rows
+ * `control` decides who may write. Always, for the actor's own scope. See the
+ * file comment.
+ */
+async function mayEditScope(db: Db, actorId: string, scope: ContentScope): Promise<boolean> {
+	if (scope.kind === 'self') {
+		return true;
+	}
+	const [row] = await db
+		.select({
+			control: partnerships.control,
+			inviterId: partnerships.inviterId,
+			inviteeId: partnerships.inviteeId
+		})
+		.from(partnerships)
+		.where(eq(partnerships.id, scope.partnershipId))
+		.limit(1);
+	return row ? canEditPartnership(row, actorId) : false;
+}
+
 /** Rows owned by the actor, or in the partnership. One predicate for every table. */
 function inScope(
 	table: { ownerId: unknown } | { partnershipId: unknown },
@@ -133,9 +165,15 @@ export async function listUnsealedContent(
 		return null;
 	}
 	const t = tablesFor(scope);
+	// A member without control is handed no tasks, rewards or names: see the
+	// file comment. Their queries still run, matching nothing, so the four
+	// stay one `Promise.all` of one shape.
+	const mayEdit = await mayEditScope(db, actorId, scope);
 
 	const names =
-		scope.kind === 'partnership' ? await unsealedNames(db, scope.partnershipId, actorId) : null;
+		scope.kind === 'partnership' && mayEdit
+			? await unsealedNames(db, scope.partnershipId, actorId)
+			: null;
 	const tags =
 		scope.kind === 'partnership'
 			? await db
@@ -164,7 +202,8 @@ export async function listUnsealedContent(
 				and(
 					inScope(t.tasks, actorId, scope),
 					sql`${t.tasks.ciphertext} is null`,
-					after.tasks ? gt(t.tasks.id, after.tasks) : undefined
+					after.tasks ? gt(t.tasks.id, after.tasks) : undefined,
+					mayEdit ? undefined : sql`false`
 				)
 			)
 			.orderBy(asc(t.tasks.id))
@@ -193,7 +232,8 @@ export async function listUnsealedContent(
 				and(
 					inScope(t.rewards, actorId, scope),
 					sql`${t.rewards.ciphertext} is null`,
-					after.rewards ? gt(t.rewards.id, after.rewards) : undefined
+					after.rewards ? gt(t.rewards.id, after.rewards) : undefined,
+					mayEdit ? undefined : sql`false`
 				)
 			)
 			.orderBy(asc(t.rewards.id))
@@ -369,28 +409,32 @@ export async function sealUnsealedContent(
 	if (!vaultId) {
 		return { ok: false, reason: 'not-found' };
 	}
+	// A read-only member's tasks, rewards and names are dropped rather than
+	// refused: the listing no longer hands them out, but a device still running
+	// the build before that may post them, and failing the whole batch would
+	// fail its completions and tags with them, on every load.
+	const mayEdit = await mayEditScope(db, actorId, scope);
+	const batchTasks = mayEdit ? batch.tasks : [];
+	const batchRewards = mayEdit ? batch.rewards : [];
+	const batchNames = mayEdit ? batch.names : undefined;
 	const batchTags = batch.tags ?? [];
 	const acceptable =
 		batch.vaultId === vaultId &&
-		[...batch.tasks, ...batch.completions].every((row) =>
+		[...batchTasks, ...batch.completions].every((row) =>
 			sealedIsAcceptable(taskKind, row.ciphertext, row.payloadVersion)
 		) &&
-		[...batch.rewards, ...batch.claims].every((row) =>
+		[...batchRewards, ...batch.claims].every((row) =>
 			sealedIsAcceptable(rewardKind, row.ciphertext, row.payloadVersion)
 		) &&
-		(scope.kind === 'partnership' || (batchTags.length === 0 && !batch.names)) &&
-		(!batch.names ||
-			sealedIsAcceptable(
-				partnershipNamesKind,
-				batch.names.ciphertext,
-				batch.names.payloadVersion
-			)) &&
+		(scope.kind === 'partnership' || (batchTags.length === 0 && !batchNames)) &&
+		(!batchNames ||
+			sealedIsAcceptable(partnershipNamesKind, batchNames.ciphertext, batchNames.payloadVersion)) &&
 		batchTags.every(
 			(row) =>
 				sealedIsAcceptable(tagKind, row.ciphertext, row.payloadVersion) &&
 				NAME_INDEX.test(row.nameIndex)
 		) &&
-		batch.tasks.every((row) => isCount(row.completionMessageCount, 20)) &&
+		batchTasks.every((row) => isCount(row.completionMessageCount, 20)) &&
 		batch.completions.every(
 			(row) => row.completionMessageIndex === null || isCount(row.completionMessageIndex, 19)
 		);
@@ -402,7 +446,7 @@ export async function sealUnsealedContent(
 	const tags =
 		scope.kind === 'partnership' ? await withoutTakenNames(db, scope.partnershipId, batchTags) : [];
 	const updates = [
-		...batch.tasks.map((row) =>
+		...batchTasks.map((row) =>
 			db
 				.update(t.tasks)
 				.set({
@@ -446,7 +490,7 @@ export async function sealUnsealedContent(
 				)
 				.returning({ id: t.completions.id })
 		),
-		...batch.rewards.map((row) =>
+		...batchRewards.map((row) =>
 			db
 				.update(t.rewards)
 				.set({
@@ -486,14 +530,14 @@ export async function sealUnsealedContent(
 				)
 				.returning({ id: t.claims.id })
 		),
-		...(scope.kind === 'partnership' && batch.names
+		...(scope.kind === 'partnership' && batchNames
 			? [
 					db
 						.update(partnerships)
 						.set({
-							namesCiphertext: batch.names.ciphertext,
+							namesCiphertext: batchNames.ciphertext,
 							namesVaultId: vaultId,
-							namesPayloadVersion: batch.names.payloadVersion,
+							namesPayloadVersion: batchNames.payloadVersion,
 							namesRevision: sql`${partnerships.namesRevision} + 1`,
 							inviterName: '',
 							inviteeName: '',

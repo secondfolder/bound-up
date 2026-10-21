@@ -54,13 +54,20 @@ them back, and can read none of them. They live under two keys in turn:
    `/invite/<token>#k=<key>`, which a browser never sends to a server — not
    this one, not its logs, not a link previewer. A wrap of the key to the
    inviter's own recipient is stored too, so their devices can show the pending
-   invite and copy its link again.
-2. **The partnership vault.** Once the invite is accepted and a member's device
-   has the vault open, that device seals the names into it (kind
-   `partnership-names`, columns `names_*`) and the invite and its key wrap are
-   cleared, in one write (`content-sealing.ts` and `/api/sealing/[scope]`,
-   alongside tasks and rewards). Edits after that are sealed into the vault,
-   compare-and-swap on `names_revision`.
+   invite and copy its link again. That wrap carries a MAC only the inviter's
+   identity can make (docs/encryption.md, "The self vault's wrap"), so the
+   server cannot hand the inviter a key of its own to build the link from.
+2. **The partnership vault.** Once the invite is accepted and the device of a
+   member who holds `control` has the vault open, that device seals the names
+   into it (kind `partnership-names`, columns `names_*`) and the invite and its
+   key wrap are cleared, in one write (`content-sealing.ts` and
+   `/api/sealing/[scope]`, alongside tasks and rewards). Only a member who
+   holds `control`, because sealing them is writing them: the server cannot
+   compare the sealed copy with the invite, so a read-only member allowed to
+   seal could rewrite the names. Their device is not handed them, and the
+   names stay under the invite key until the controller's device runs. Edits
+   after that are sealed into the vault, compare-and-swap on
+   `names_revision`.
 
 **Accepting needs no keys.** `/invite/[token]` is public and has no keyring,
 so an accepter who may edit (see control, below) seals their changes back under
@@ -71,7 +78,8 @@ trip through signing up — the email confirmation link opens a new tab — and
 forgets it once a page load serves the names from the vault (`openedNames`).
 Not as soon as its own sealing pass has moved them: a page whose load read the
 invite a moment before still needs the key to open it. On another device, the
-invitee sees "…" for the names until either member's device has moved them.
+invitee sees "…" for the names until a device of the member who holds control
+has moved them.
 
 **The inviter's key arrives out of band.** The invite carries the inviter's
 recipient as their device knew it, sealed under a key the server never had.
@@ -81,10 +89,11 @@ a mismatch blocks accepting, and a match is pinned on the invitee's device as
 closes trust-on-first-use in that direction ([docs/encryption.md](encryption.md)).
 
 **What the server can no longer check** is what the names say. It still decides
-who may write them — `acceptInvite` and `updatePartnership` re-read `control`
-from the stored row (invariant 14) — but a read-only accepter whose device
-posted re-sealed names anyway would be ignored only because the server drops
-them, not because it compared them. Partners are trusted to that extent.
+who may write them — `acceptInvite`, `updatePartnership` and the sealing pass
+(`sealUnsealedContent`) re-read `control` from the stored row (invariant 14)
+— but a read-only accepter whose device posted re-sealed names anyway would be
+ignored only because the server drops them, not because it compared them.
+Partners are trusted to that extent.
 
 **Where a name used to be drawn without a key**, it now says less:
 
