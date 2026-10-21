@@ -138,14 +138,23 @@ export function followEnd(
 	const smoothAfter = options.smoothAfter ?? SMOOTH_AFTER_MS;
 	let atEnd = true;
 	let lastTop = scroller.scrollTop;
+	let lastHeight = scroller.scrollHeight;
 	const measure = () => {
 		const top = scroller.scrollTop;
-		if (scroller.scrollHeight - top - scroller.clientHeight <= END_SLACK) {
+		const height = scroller.scrollHeight;
+		if (height - top - scroller.clientHeight <= END_SLACK) {
 			atEnd = true;
-		} else if (top < lastTop) {
+		} else if (top < lastTop && height === lastHeight) {
+			// Upwards with the content unchanged is the reader. Upwards while it
+			// changed is layout: a sent message swapped for the stored one in the
+			// middle of our glide moved the scrollport up 40px and cut the glide
+			// short, and reading that as the reader left a thread stopped short of
+			// its newest. Only the production build answers a send fast enough to
+			// land inside the glide, so it showed only against the Docker image.
 			atEnd = false;
 		}
 		lastTop = top;
+		lastHeight = height;
 	};
 	const follow = () => {
 		if (atEnd) {

@@ -118,6 +118,10 @@ test.describe('partner-assisted sign-in', () => {
 
 			// ── Ada is let in, with the history readable ───────────────────────
 			await requester.waitForURL('/home', { timeout: 20_000 });
+			// Landing is not the end of signing in: going on before the shell has
+			// cached the key throws it away, and against the image's fast redirect
+			// the Security page was sent back to sign in every time.
+			await waitForKeyring(requester);
 			expect(await deviceHoldsKey(requester)).toBe(true);
 			await requester.goto(threadPath);
 			await expect(requester.getByText(secret)).toBeVisible();
