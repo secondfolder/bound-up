@@ -927,6 +927,21 @@
 				},
 				"soloRevision": 4
 			}
+		},
+		{
+			"kind": "daydream-setup-exchange",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000e2",
+			"ciphertext": "sz1.gSl6-U0C-SAOQYH9LfxECH7PNOSphat7HRIqBOnSmfNLrupEcIYsSG1fapgkLqGzeo7hyOIwFt2t-hRGVhiozd8eDBK5xroXKVmGF4H8IFWURAaO4wUj-VfXkLAMo5bCNDOkwHRTlWJFgkGFF82l4nGx_AsINU8b-mX-HXGSd3_3uVAfHy5jnvscjBnqKn06xajZBHWdkjWGulUt-9XbugMqUhytsTYS9T6UCg_ueC7S1uNTV-1Gljjqr7KsZ7G6xLE4GBUw5Bi-a0fdOPl0m4SkxdajToDbFW9Ggbm5VFDt5_2OtmM8WVD7QSTp-76JOvHP-xoo9vJP10IpKtl0rzzJe44dSxTkMsO_zjEAZmTPNkDIWXR2PC8yCvRMrmyyjqa_A4gZmvENwCQuYTL03gU4F_ZTVz-KkgoogQthxwWTCTx8gfVMsV_6OF10YQaS_z2gUOdq_oirNsZpAuSMY2sIKMYwr5l9PsInNfe-JK52YrBho_GFJpq00GWuSGU",
+			"expected": {
+				"task": "daydream",
+				"request": "{\"model\":\"z-ai/glm-4.6\",\"messages\":[{\"role\":\"system\",\"content\":\"You put a daydream together from a brief.\"},{\"role\":\"user\",\"content\":\"Brief: a stranger on a night train\"}],\"max_tokens\":4000,\"response_format\":{\"type\":\"json_object\"}}",
+				"response": {
+					"body": "{\"id\":\"gen-frozen\",\"model\":\"z-ai/glm-4.6\",\"choices\":[{\"message\":{\"content\":\"{\\\"idea\\\":{\\\"title\\\":\\\"Night train\\\"}}\",\"reasoning\":\"A sleeper carriage.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":20,\"total_tokens\":50}}"
+				},
+				"startedAt": 1792500000000,
+				"endedAt": 1792500006000
+			}
 		}
 	]
 }

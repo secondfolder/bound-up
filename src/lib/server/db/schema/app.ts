@@ -1616,6 +1616,32 @@ export const daydreamExchanges = sqliteTable(
 );
 
 /**
+ * A suggestion request that wrote a daydream's draft, and its answer, sealed
+ * and compressed (`daydream-setup-exchange`), for debug mode's raw log
+ * (docs/debug-mode.md, "Setup exchanges"). Sent with the create, and kept
+ * only for an account granted debug mode.
+ *
+ * A table of its own rather than rows in `daydream_exchanges` with no turn:
+ * there, a row that names no turn is a failed opening.
+ */
+export const daydreamSetupExchanges = sqliteTable(
+	'daydream_setup_exchanges',
+	{
+		id: text('id').primaryKey(),
+		daydreamId: text('daydream_id')
+			.notNull()
+			.references(() => daydreams.id, { onDelete: 'cascade' }),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		...timestamps
+	},
+	(table) => [index('daydream_setup_exchanges_daydream_idx').on(table.daydreamId)]
+);
+
+/**
  * A character in the user's library, to pick for any daydream. Picking one
  * copies it into the daydream's setup, with the revision it was copied at, so
  * an edit here never changes a story under way; the setup page notices the

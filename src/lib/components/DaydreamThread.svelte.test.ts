@@ -102,7 +102,8 @@ const client = vi.hoisted(() => ({
 	uploadPicture: vi.fn(),
 	downloadPicture: vi.fn(),
 	saveExchange: vi.fn(),
-	readExchanges: vi.fn()
+	readExchanges: vi.fn(),
+	readSetupExchanges: vi.fn()
 }));
 vi.mock('$lib/daydream/client', () => client);
 
@@ -166,6 +167,7 @@ beforeEach(() => {
 		fn.mockReset();
 	}
 	client.readExchanges.mockResolvedValue({ ok: true, exchanges: [] });
+	client.readSetupExchanges.mockResolvedValue({ ok: true, exchanges: [] });
 	client.saveExchange.mockImplementation(
 		(
 			_id: string,
@@ -1664,6 +1666,91 @@ describe('DaydreamThread in debug mode', () => {
 		});
 	});
 
+	it('heads the raw log with how the daydream was set up, ideas round then draft', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		// The passage kept no exchange, so the log rebuilds its prompt too.
+		client.readPrompt.mockResolvedValue({ ok: true, messages: [] });
+		const setupExchange = (
+			id: string,
+			task: 'ideas' | 'daydream',
+			brief: string,
+			reply: string
+		) => {
+			opened.set(id, {
+				task,
+				request: JSON.stringify({
+					model: 'test/model',
+					messages: [
+						{ role: 'system', content: 'SUGGEST RULES' },
+						{ role: 'user', content: brief }
+					]
+				}),
+				response: {
+					body: JSON.stringify({
+						choices: [{ message: { content: reply }, finish_reason: 'stop' }]
+					})
+				},
+				startedAt: 0,
+				endedAt: 3000
+			});
+			return { id, createdAt: new Date(), sealed: ref(id) };
+		};
+		client.readSetupExchanges.mockResolvedValue({
+			ok: true,
+			exchanges: [
+				setupExchange('s1', 'ideas', 'Brief: a night train', '{"ideas":[]}'),
+				setupExchange('s2', 'daydream', 'Idea: the sleeper car', '{"idea":{}}')
+			]
+		});
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', { type: 'text', text: 'Sit.' })]),
+			available: true,
+			debug: true
+		});
+		const setup = () => container.querySelector('[data-setup-exchanges]');
+		await waitFor(() => expect(setup()).not.toBeNull());
+		await waSettled(container);
+		expect(client.readSetupExchanges).toHaveBeenCalledOnce();
+		const text = setup()?.textContent ?? '';
+		expect(text).toContain('How this daydream was set up');
+		expect(text.indexOf('Ideas round')).toBeLessThan(text.indexOf('Draft'));
+		expect(text).toContain('Brief: a night train');
+		expect(text).toContain('Idea: the sleeper car');
+		const logs = [...(setup()?.querySelectorAll('wa-details.log') ?? [])].map((details) =>
+			waProp(details, 'summary')
+		);
+		expect(logs).toEqual([
+			'Chat log: test/model, chat/completions',
+			'Chat log: test/model, chat/completions'
+		]);
+		// It heads the log, above the story's own turns.
+		expect(container.querySelector('.turns > li')).toBe(setup());
+	});
+
+	it('draws nothing for how a daydream was set up when none was kept', async () => {
+		localStorage.setItem('daydreams.raw-log', '1');
+		client.readPrompt.mockResolvedValue({ ok: true, messages: [] });
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', { type: 'text', text: 'Sit.' })]),
+			available: true,
+			debug: true
+		});
+		await waitFor(() => expect(client.readSetupExchanges).toHaveBeenCalledOnce());
+		await waSettled(container);
+		expect(container.querySelector('[data-setup-exchanges]')).toBeNull();
+	});
+
+	it('does not ask how a daydream was set up while the raw log is off', async () => {
+		localStorage.removeItem('daydreams.raw-log');
+		render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', { type: 'text', text: 'Sit.' })]),
+			available: true,
+			debug: true
+		});
+		await waitFor(() => expect(client.readExchanges).not.toHaveBeenCalled());
+		expect(client.readSetupExchanges).not.toHaveBeenCalled();
+	});
+
 	it('draws a passage’s exchange in the raw log: what was added, reasoning, the request as sent', async () => {
 		localStorage.setItem('daydreams.raw-log', '1');
 		const exchange = (id: string, turnId: string, request: string, body: string) => {
@@ -1754,7 +1841,9 @@ describe('DaydreamThread in debug mode', () => {
 			const exported = JSON.parse(await defined(blobs[0], 'the file').text());
 			expect(exported).toMatchObject({
 				format: 'bound-up-daydream-export',
+				version: 3,
 				daydreamId: 'd1',
+				setupExchanges: [],
 				branch: ['t1', 't2'],
 				turns: [
 					{ id: 't1', role: 'story', content: { text: 'Sit.', raw: Raw } },

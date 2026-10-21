@@ -8,6 +8,7 @@
 	import SuggestionProblem from '$lib/components/SuggestionProblem.svelte';
 	import type { DaydreamSetup, DaydreamVoicePresetId } from '$lib/daydream';
 	import type { ExchangeLogView as ChatLog } from '$lib/daydream/exchange-log';
+	import type { SetupExchange } from '$lib/daydream/setup-exchange';
 	import {
 		assembleSetup,
 		type StarterSide,
@@ -40,6 +41,12 @@
 				described: Described | null;
 				/** How the model wrote it, links read and all, for debug mode; null when not asked for. */
 				log: ChatLog | null;
+				/**
+				 * The same, as the daydream keeps it (`setup-exchange.ts`): the
+				 * draft's, after the round of ideas it came from. Empty when not
+				 * asked for.
+				 */
+				exchanges: SetupExchange[];
 				version: number;
 		  };
 
@@ -56,6 +63,8 @@
 		voice?: DaydreamVoicePresetId | null;
 		chosen?: Pick<GeneratedIdea, 'title' | 'premise'>;
 		research?: string;
+		/** The round of ideas the chosen one came from, as the daydream keeps it, in debug mode. */
+		ideasExchange?: SetupExchange;
 	};
 
 	let stage: Stage = $state({ kind: 'start' });
@@ -74,6 +83,13 @@
 	} | null = $state(null);
 	let writing: string | null = $state(null);
 	let ideaProblem: SuggestFailure | null = $state(null);
+	/**
+	 * Which round of ideas offered each idea shown, by title, in debug mode:
+	 * "More ideas" adds a round, and a daydream keeps the one its idea came
+	 * from. Titles are what `addIdeas` tells ideas apart by. Not state:
+	 * nothing draws it.
+	 */
+	const ideaRounds = new Map<string, SetupExchange>();
 	let versions = 0;
 	/** Counts draft requests, so only the latest one still wanted is applied. */
 	let requests = 0;
@@ -111,7 +127,8 @@
 		draft: DaydreamSetup | null,
 		described: Described | null,
 		summary: MarkedSummary | null = null,
-		log: ChatLog | null = null
+		log: ChatLog | null = null,
+		exchanges: SetupExchange[] = []
 	) {
 		versions += 1;
 		stage = {
@@ -121,6 +138,7 @@
 			layout: draft ? 'summary' : 'full',
 			described,
 			log,
+			exchanges,
 			version: versions
 		};
 	}
@@ -161,7 +179,8 @@
 			{ ...assembleSetup(answer.value), limits },
 			described,
 			answer.value.summary ?? null,
-			answer.log ?? null
+			answer.log ?? null,
+			[described.ideasExchange, answer.exchange].filter((exchange) => exchange !== undefined)
 		);
 	}
 
@@ -176,6 +195,8 @@
 			return answer;
 		}
 		generated = { brief: asked, ideas: answer.value, log: answer.log };
+		ideaRounds.clear();
+		rememberRound(answer.value, answer.exchange);
 		ideaProblem = null;
 		return null;
 	}
@@ -209,7 +230,16 @@
 			return { error: 'No new ideas came back that time. Try again.' };
 		}
 		generated = { brief: shown.brief, ideas: added, log: answer.log ?? shown.log };
+		rememberRound(added.slice(shown.ideas.length), answer.exchange);
 		return null;
+	}
+
+	function rememberRound(ideas: readonly GeneratedIdea[], exchange: SetupExchange | undefined) {
+		if (exchange) {
+			for (const idea of ideas) {
+				ideaRounds.set(idea.title, exchange);
+			}
+		}
 	}
 
 	function writeIdea(chosen: GeneratedIdea) {
@@ -225,7 +255,8 @@
 				side: chosen.you,
 				voice: chosen.voice,
 				chosen: { title: chosen.title, premise: chosen.premise },
-				research: chosen.research
+				research: chosen.research,
+				ideasExchange: ideaRounds.get(chosen.title)
 			},
 			'',
 			(failure) => {
@@ -268,6 +299,7 @@
 				onmore={moreIdeas}
 				onclear={() => {
 					generated = null;
+					ideaRounds.clear();
 					ideaProblem = null;
 				}}
 				onidea={writeIdea}
@@ -312,6 +344,7 @@
 					picturesAvailable={data.picturesAvailable}
 					submitLabel="Start daydreaming"
 					debug={data.debug}
+					setupExchanges={data.debug ? stage.exchanges : []}
 				/>
 			{/key}
 		{/if}

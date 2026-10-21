@@ -21,6 +21,7 @@ import type {
 } from '../daydream';
 import { requestSuggestion } from './client';
 import { type ExchangeLogView, suggestionLog } from './exchange-log';
+import { type SetupExchange, type SetupExchangeTask, setupExchangeFrom } from './setup-exchange';
 import type { DaydreamPieces, StarterSide } from './starters';
 import {
 	completionJson,
@@ -64,12 +65,28 @@ type Answer<T> = { ok: true; value: T } | ({ ok: false } & SuggestFailure);
 
 const NOTHING = 'No ideas came back that time. Try again.';
 
-/** The model's answer: the JSON in its reply, and the answer as it came, to describe if it is no use. */
+/** When a request was sent and its answer arrived, for a setup exchange. */
+type Timing = { startedAt: number; endedAt: number };
+
+/**
+ * The model's answer: the JSON in its reply, the answer as it came, to
+ * describe if it is no use, and when it was asked and answered.
+ */
 async function ask(
 	body: unknown
-): Promise<{ ok: true; value: unknown; body: unknown } | ({ ok: false } & SuggestFailure)> {
+): Promise<
+	{ ok: true; value: unknown; body: unknown; timing: Timing } | ({ ok: false } & SuggestFailure)
+> {
+	const startedAt = Date.now();
 	const answer = await requestSuggestion(body);
-	return answer.ok ? { ok: true, value: completionJson(answer.value), body: answer.value } : answer;
+	return answer.ok
+		? {
+				ok: true,
+				value: completionJson(answer.value),
+				body: answer.value,
+				timing: { startedAt, endedAt: Date.now() }
+			}
+		: answer;
 }
 
 /** "No ideas came back", with what did come back for debug mode. */
@@ -212,6 +229,7 @@ export async function suggestDaydream(input: {
 	}
 	const pieces = parseSuggestedDaydream(answer.value);
 	return withLog(
+		'daydream',
 		answer,
 		pieces
 			? {
@@ -236,13 +254,19 @@ export async function suggestDaydream(input: {
  * What a suggestion that took a brief came back with, and the whole exchange
  * where the request asked for it (`suggestionLog`), for debug mode to show
  * either way: the links it read are in it, and a link that could not be read
- * is half of why ideas can come back thin.
+ * is half of why ideas can come back thin. `exchange` is the same exchange
+ * as it is kept, for a daydream made from it to keep (`setup-exchange.ts`).
  */
-export type WithLog<T> = Answer<T> & { log?: ExchangeLogView };
+export type WithLog<T> = Answer<T> & { log?: ExchangeLogView; exchange?: SetupExchange };
 
-function withLog<T>(answer: { body: unknown }, result: Answer<T>): WithLog<T> {
+function withLog<T>(
+	task: SetupExchangeTask,
+	answer: { body: unknown; timing: Timing },
+	result: Answer<T>
+): WithLog<T> {
 	const log = suggestionLog(answer.body);
-	return log ? { ...result, log } : result;
+	const exchange = log ? setupExchangeFrom(task, answer.body, answer.timing) : null;
+	return log && exchange ? { ...result, log, exchange } : result;
 }
 
 /**
@@ -266,5 +290,5 @@ export async function suggestIdeas(input: {
 		return answer;
 	}
 	const ideas = parseGeneratedIdeas(answer.value, input.side);
-	return withLog(answer, ideas.length > 0 ? { ok: true, value: ideas } : nothing(answer));
+	return withLog('ideas', answer, ideas.length > 0 ? { ok: true, value: ideas } : nothing(answer));
 }

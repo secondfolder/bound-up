@@ -5,9 +5,9 @@
 	/**
 	 * How a draft or ideas were written, for debug mode (docs/debug-mode.md):
 	 * the whole exchange with the model, from the system prompt to how it
-	 * ended, as `suggestionLog` read it. Nothing here is kept; it is the
-	 * answer's own. A daydream's raw log draws its exchanges with the same
-	 * bubbles (`DaydreamRawExchange`).
+	 * ended, as `suggestionLog` read it: the answer's own, or one a daydream
+	 * kept from when it was set up (`DaydreamRawSetup`). A daydream's raw log
+	 * draws its own exchanges with the same bubbles (`DaydreamRawExchange`).
 	 */
 	let { log }: { log: ExchangeLogView } = $props();
 </script>

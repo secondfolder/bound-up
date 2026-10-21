@@ -1274,7 +1274,9 @@ wrote, as an exchange: the request body exactly as the server sent it and
 the response's events exactly as they arrived (`daydream-exchange`), for the
 raw log. Passages from before that kept the reply itself in the turn instead
 (`raw`, `daydream-turn` v4). What the page acts on is still the parsed
-passage and metadata; an exchange is only ever displayed. See
+passage and metadata; an exchange is only ever displayed. A daydream made
+from a draft the model wrote keeps, the same way, the suggestion requests
+that wrote it (setup exchanges). See
 [debug-mode.md](debug-mode.md#daydreams-raw-log).
 
 **Metadata is not sent back, but for the picture.** Past turns go to the
@@ -1299,8 +1301,10 @@ the boundary is stated exactly.
 (`daydream-mark`), each library character and idea
 (`daydream-character`, `daydream-scene`), and, for an account granted debug
 mode, each request's exchange with the model (`daydream-exchange`,
-compressed before it is sealed; [debug-mode.md](debug-mode.md#exchanges)),
-with frozen fixtures. Beside them, in plaintext:
+compressed before it is sealed; [debug-mode.md](debug-mode.md#exchanges))
+and the suggestion requests that wrote a daydream's draft
+(`daydream-setup-exchange`, compressed too;
+[debug-mode.md](debug-mode.md#setup-exchanges)), with frozen fixtures. Beside them, in plaintext:
 
 - who owns each daydream and library item, and when each was changed;
 - each turn's place in the tree (`parent_id`, `position`), when it was

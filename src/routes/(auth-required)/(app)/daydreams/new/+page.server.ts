@@ -13,9 +13,10 @@ import {
 	createDaydream,
 	describeRefusal,
 	getLibrary,
-	hasAcceptedDisclosure
+	hasAcceptedDisclosure,
+	saveSetupExchanges
 } from '$lib/server/daydreams';
-import { requireFeature } from '$lib/server/features';
+import { requireFeature, userHasFeature } from '$lib/server/features';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals: { db, user, settings }, platform }) => {
@@ -53,7 +54,7 @@ export const actions: Actions = {
 		if (!form.valid) {
 			return fail(400, { error: 'That could not be saved. Reload and try again.' });
 		}
-		const { recordId, vaultId, ciphertext, payloadVersion } = form.data;
+		const { recordId, vaultId, ciphertext, payloadVersion, setupExchanges } = form.data;
 		const result = await createDaydream(db, user.id, recordId, {
 			vaultId,
 			ciphertext,
@@ -62,6 +63,16 @@ export const actions: Actions = {
 		if (!result.ok) {
 			const { status, message } = describeRefusal(result.reason);
 			return fail(status, { error: message });
+		}
+		if (setupExchanges?.length && (await userHasFeature(db, user.id, 'debugMode'))) {
+			// How the draft was written, for debug mode's raw log. Debug data:
+			// the daydream is made either way, so a failure here is logged (the
+			// error alone, never the post) and the user is sent on to it.
+			try {
+				await saveSetupExchanges(db, user.id, recordId, setupExchanges);
+			} catch (problem) {
+				console.error("Could not keep a new daydream's setup exchanges", problem);
+			}
 		}
 		redirect(303, `/daydreams/${recordId}`);
 	}

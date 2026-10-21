@@ -83,6 +83,7 @@ import { type ExchangeEnding, MAX_READ_EXCHANGE_TURNS } from './exchange';
 import { ExchangeRecorder } from './exchange-recorder';
 import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
 import { explicitOoc } from './ooc';
+import { type OpenedSetupExchange, openSetupExchanges } from './raw-setup-exchanges.svelte';
 import { suggestName } from './suggest';
 import { MAX_NAMING_OPENING } from './suggestions';
 import {
@@ -175,8 +176,8 @@ export type OpenedExchange = {
 
 export type DaydreamExport = {
 	format: 'bound-up-daydream-export';
-	/** 2 added `exchanges`. */
-	version: 2;
+	/** 2 added `exchanges`; 3, `setupExchanges`. */
+	version: 3;
 	exportedAt: string;
 	daydreamId: string;
 	setup: DaydreamSetupContent | null;
@@ -191,6 +192,10 @@ export type DaydreamExport = {
 	exchanges: OpenedExchange[];
 	/** Why the exchanges could not all be read, if they could not. */
 	exchangesProblem?: string;
+	/** The suggestion requests that wrote its draft, kept with the create (`setup-exchange.ts`). */
+	setupExchanges: OpenedSetupExchange[];
+	/** Why they could not be read, if they could not. */
+	setupExchangesProblem?: string;
 };
 
 export class DaydreamStory {
@@ -924,9 +929,10 @@ export class DaydreamStory {
 			}))
 		);
 		const { exchanges, problem: exchangesProblem } = await this.#allExchanges(openRef);
+		const setupExchanges = await openSetupExchanges(this.id);
 		return {
 			format: 'bound-up-daydream-export',
-			version: 2,
+			version: 3,
 			exportedAt: new Date().toISOString(),
 			daydreamId: this.id,
 			setup:
@@ -938,7 +944,9 @@ export class DaydreamStory {
 			turns,
 			marks,
 			exchanges,
-			...(exchangesProblem ? { exchangesProblem } : {})
+			...(exchangesProblem ? { exchangesProblem } : {}),
+			setupExchanges: setupExchanges.ok ? setupExchanges.exchanges : [],
+			...(setupExchanges.ok ? {} : { setupExchangesProblem: setupExchanges.error })
 		};
 	}
 

@@ -11,8 +11,9 @@ import {
 	voiceProblem
 } from '$lib/daydream';
 import { MAX_READ_EXCHANGE_TURNS } from '$lib/daydream/exchange';
+import { MAX_SETUP_EXCHANGES } from '$lib/daydream/setup-exchange';
 import { SEALED_PATTERN, sealedPatternFor } from '$lib/sealed';
-import { daydreamExchangeKind } from '$lib/sealed-kinds/daydreams';
+import { daydreamExchangeKind, daydreamSetupExchangeKind } from '$lib/sealed-kinds/daydreams';
 import { isClientId } from '$lib/vault';
 
 /**
@@ -190,11 +191,33 @@ const sealedFields = {
 	payloadVersion: z.coerce.number().int().positive()
 };
 
-/** The setup form as it is posted: the sealed setup, and the revision it was edited from. */
+/**
+ * A suggestion request that wrote a new daydream's draft, sealed and
+ * compressed, posted with the create for debug mode's raw log
+ * (`daydream-setup-exchange`). Its own envelope and cap, as an exchange's.
+ */
+const setupExchangeSchema = z.object({
+	id: z.string().refine(isClientId, 'Malformed id'),
+	vaultId: z.string().refine(isClientId, 'Malformed id'),
+	ciphertext: z
+		.string()
+		.min(1)
+		.max(daydreamSetupExchangeKind.maxCiphertextLength)
+		.regex(sealedPatternFor(daydreamSetupExchangeKind)),
+	payloadVersion: z.number().int().positive()
+});
+
+/**
+ * The setup form as it is posted: the sealed setup, the revision it was
+ * edited from, and for a new daydream in debug mode how its draft was written.
+ */
 export const daydreamSealedSubmitSchema = z.object({
 	recordId: z.string().refine(isClientId, 'Malformed id'),
 	...sealedFields,
-	expectedRevision: z.coerce.number().int().min(0).optional()
+	expectedRevision: z.coerce.number().int().min(0).optional(),
+	// Debug data: one that will not pass is dropped rather than refusing the
+	// daydream it came with.
+	setupExchanges: z.array(setupExchangeSchema).max(MAX_SETUP_EXCHANGES).optional().catch(undefined)
 });
 
 export type DaydreamSealedSubmit = z.output<typeof daydreamSealedSubmitSchema>;

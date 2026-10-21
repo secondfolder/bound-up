@@ -40,5 +40,5 @@ under `HKDF-SHA256(key, salt = "", info = "bound-up-vault-enc-v1")`, a random
 12-byte IV, associated data
 `bound-up-sealed-v1|<kind>|<recordId>|<vaultId>|<version>`, and
 `"sb1." + base64url(IV ‖ ciphertext ‖ tag)`. For a compressed kind
-(`daydream-exchange`) the JSON is deflated first with `node:zlib`'s
+(`daydream-exchange`, `daydream-setup-exchange`) the JSON is deflated first with `node:zlib`'s
 `deflateRawSync`, and the prefix is `"sz1."`; everything else is the same.

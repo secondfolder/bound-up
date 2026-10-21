@@ -17,6 +17,7 @@
  */
 
 import { z } from 'zod';
+import { type SetupExchange, setupExchangeAnswer } from './setup-exchange';
 
 /** One bubble in the log. */
 export type LogEntry = {
@@ -437,4 +438,12 @@ export function suggestionLog(answer: unknown): ExchangeLogView | null {
 		api: request.api,
 		entries: [...request.messages.map(sentEntry), settingsEntry(request), ...answerEntries(body)]
 	};
+}
+
+/**
+ * A setup exchange's log (`setup-exchange.ts`): the answer it kept, read as
+ * the new-daydream page read it when the draft was written.
+ */
+export function setupExchangeLog(exchange: SetupExchange): ExchangeLogView | null {
+	return suggestionLog(setupExchangeAnswer(exchange));
 }

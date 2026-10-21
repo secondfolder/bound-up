@@ -7,7 +7,11 @@ import { daydreamSetupFormSchema, EMPTY_DAYDREAM_SETUP } from '$lib/schemas/dayd
 import { waSettled } from '$lib/testing/web-awesome';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
-const client = vi.hoisted(() => ({ saveLibraryItem: vi.fn(), requestSuggestion: vi.fn() }));
+const client = vi.hoisted(() => ({
+	saveLibraryItem: vi.fn(),
+	requestSuggestion: vi.fn(),
+	sealSetupExchanges: vi.fn()
+}));
 vi.mock('$lib/daydream/client', () => client);
 const { default: DaydreamSetupForm } = await import('./DaydreamSetupForm.svelte');
 

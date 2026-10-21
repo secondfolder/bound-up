@@ -21,7 +21,11 @@ vi.mock('$lib/sealed-views.svelte', async (importOriginal) => ({
 	openedDaydreamIdea: (sealed: SealedRefView) => opened.get(sealed.recordId)
 }));
 
-const client = vi.hoisted(() => ({ saveLibraryItem: vi.fn(), requestSuggestion: vi.fn() }));
+const client = vi.hoisted(() => ({
+	saveLibraryItem: vi.fn(),
+	requestSuggestion: vi.fn(),
+	sealSetupExchanges: vi.fn()
+}));
 vi.mock('$lib/daydream/client', () => client);
 
 const { default: DaydreamSetupForm } = await import('./DaydreamSetupForm.svelte');

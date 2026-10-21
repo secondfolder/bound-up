@@ -288,6 +288,13 @@
       "when": 1792501154523,
       "tag": "0040_add_daydream_exchanges",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1792547155135,
+      "tag": "0041_add_daydream_setup_exchanges",
+      "breakpoints": true
     }
   ]
 }

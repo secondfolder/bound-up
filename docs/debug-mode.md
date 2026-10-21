@@ -168,9 +168,12 @@ exchanges in its raw log (below).
 The links a brief pointed at are read ([daydreams.md](daydreams.md#links-in-a-brief))
 by OpenRouter's Responses API rather than Chat Completions because only its
 answer lists each fetch, as an `openrouter:web_fetch` item, which is where
-the log's fetched pages come from. Nothing about a suggestion is stored:
-links are read while setting a daydream up, before there is one to keep
-anything in.
+the log's fetched pages come from.
+
+Nothing about a suggestion is stored while the daydream is being set up,
+since there is no daydream yet to keep it in. When one is made from a draft
+that has a log, the log goes with the create and is kept with it, to read
+again from its raw log (below, "Setup exchanges").
 
 Not a log for suggestions generally: chips, fills, castings and names do not
 ask, so they show only what failed (above).
@@ -253,7 +256,8 @@ How they are stored:
   about 60 KB. Compressing before encrypting lets the ciphertext's length
   say something about the content, which is safe here only because the
   server handled every byte of it in plaintext on its way to and from the
-  model. Only this kind opts in ([encryption.md](encryption.md)).
+  model. Only this kind and setup exchanges, for the same reason, opt in
+  ([encryption.md](encryption.md)).
 - Capped at 1 MiB sealed (`MAX_EXCHANGE_CIPHERTEXT`), and at
   `EXCHANGE_LIMITS` before it is compressed. One past it keeps the request
   whole and as much of the start of the response as fits, cutting it in
@@ -262,6 +266,55 @@ How they are stored:
   so a passage written while it was off can still be inspected once it is
   on. The exchanges endpoints check the feature, and the reply endpoint only
   sends the request to an account holding it.
+
+#### Setup exchanges
+
+A daydream made from a draft the model wrote keeps the suggestion requests
+that wrote it, as **setup exchanges**, for an account granted debug mode:
+the draft's own, and, when the draft was written from a generated idea, the
+round of ideas that offered that idea. That round is where a brief's links
+were read, so it is often where a thin draft came from. They head the raw
+log as "How this daydream was set up" (`DaydreamRawSetup`), ideas round
+first, each drawn by the same reader as the new-daydream page's chat log
+(`setupExchangeLog`, which hands the kept answer to `suggestionLog`), with
+the request and answer as they were kept under it. A daydream with none —
+ready-made, built by hand, made without debug mode, or from before they
+were kept — shows nothing there.
+
+How one is kept:
+
+- `suggestDaydream` and `suggestIdeas` answer, beside the `log`, an
+  `exchange` (`SetupExchange`, `daydream/setup-exchange.ts`): which task it
+  was, the `boundUpRequest` string exactly as the server sent it, the
+  answer without it, and when it was asked and answered. The answer is
+  JSON the page has already parsed, so it is stringified again: the same
+  answer, not its bytes. "Try another" replaces the draft's; the ideas
+  round stays. The new-daydream page remembers which round offered each
+  idea by title, since "More ideas" adds rounds and the log shown is only
+  the latest.
+- The page hands them to `DaydreamSetupForm` (`setupExchanges`), only in
+  debug mode. For a new daydream its submit seals each
+  (`sealSetupExchanges`, halving an answer that will not fit its cap as an
+  exchange's response is, and saying so) under a record id kept across
+  attempts, and puts them in the post as `setupExchanges`. One that will not
+  seal is left out.
+- The create action keeps them after it has made the daydream, only for an
+  account holding the feature (`userHasFeature`), and ignores them for any
+  other. They are debug data, so nothing about them can stop the daydream
+  being made: the schema drops a malformed list (`.catch`), one in the
+  wrong vault or envelope is skipped (`saveSetupExchanges`), and a failure
+  to store them is logged — the error alone — and the user is sent on.
+- The raw log reads them once, the first time it opens
+  (`GET /api/daydreams/[id]/setup-exchanges`, behind the feature,
+  `RawSetupExchanges`).
+
+How they are stored: in `daydream_setup_exchanges`, keyed by the daydream
+and cascading with it, sealed as `daydream-setup-exchange`, compressed,
+with the same caps as an exchange. A table of their own rather than rows in
+`daydream_exchanges` with no turn, which there means a failed opening; a
+kind of its own rather than a version of `daydream-exchange`, whose every
+reader takes its response to be a stream of server-sent events. Kept a
+millisecond apart, so they read back in the order they were sent.
 
 #### Older passages
 
@@ -309,11 +362,11 @@ New passages write neither `raw` nor `sent`: the exchange has both, whole.
 #### Export
 
 Beside the switch, **Export** saves the whole daydream to the device as JSON
-(`DaydreamStory.exportHistory`, format version 2): the setup, every turn on
+(`DaydreamStory.exportHistory`, format version 3): the setup, every turn on
 every branch in the order written, with what is stored for each (`raw` and
 `sent` included where an older passage kept them), the marks, every
-exchange, request and response verbatim, the branch being read and the
-direction buttons on offer. It is for handing a misbehaving story to
+exchange, request and response verbatim, the setup exchanges, the branch
+being read and the direction buttons on offer. It is for handing a misbehaving story to
 someone debugging it. Each record is opened afresh, not read from the
 page's cache, which only holds turns something has rendered. The file is
 the story in the clear, so it is behind debug mode and goes nowhere but the
@@ -368,8 +421,10 @@ gets a 403 however it arrives. A new tool goes in `/debug`'s list.
     answer, and comparing a request's history with the one before;
   - `daydream/exchange-recorder.test.ts`: every byte kept, through a drop,
     the endpoint's own event cut off exactly;
+  - `daydream/setup-exchange.test.ts`: a suggestion's answer kept and read
+    back as the page read it, cut short past its cap;
   - `crypto/sealed.test.ts`: the compressed envelope;
-  - the v4 turn and v1 exchange sealed fixtures;
+  - the v4 turn, v1 exchange and v1 setup exchange sealed fixtures;
   - the migration in `server/db/migrations.test.ts`.
 - **Server:**
   - `settings/page.server.test.ts`: the action, which refuses without the
@@ -380,6 +435,11 @@ gets a 403 however it arrives. A new tool goes in `/debug`'s list.
     model call, no console;
   - `api/daydreams/[id]/exchanges/server.test.ts`: the feature, ownership,
     the turns, the envelope, the cascade;
+  - `daydreams/new/page.server.test.ts`: setup exchanges kept with the
+    create, in order, only for the feature, a bad one skipped and a
+    malformed list never stopping the daydream;
+  - `api/daydreams/[id]/setup-exchanges/server.test.ts`: the feature,
+    ownership, the envelope, the cascade;
   - `api/daydreams/[id]/reply/server.test.ts` and
     `api/daydreams/suggest/server.test.ts`: the exact request body, only when
     asked and only for the feature, never the key.
@@ -392,9 +452,12 @@ gets a 403 however it arrives. A new tool goes in `/debug`'s list.
   - `DaydreamThread.svelte.test.ts`, "in debug mode": an exchange kept with
     the grant and not without, through a Stop and for a failure; a passage's
     exchange drawn in the log; an older passage's `sent` and rebuilt prompt;
-    a failed reply.
+    a failed reply; the setup exchanges heading the log, and nothing for a
+    daydream without them or while the log is off.
 - **End to end:**
   - `e2e/debug-mode.spec.ts`: the toggle, the panel, the switch, a revoke;
-  - the debug test in `e2e/daydreams.spec.ts`, which reads a kept exchange
-    after a reload, its reasoning and usage from the model stub;
+  - the debug tests in `e2e/daydreams.spec.ts`, which read a kept exchange
+    after a reload, its reasoning and usage from the model stub, and a
+    daydream made from a generated idea's draft, its ideas round and draft
+    in its raw log;
   - the testing-aid tests in `e2e/iq-test.spec.ts`.

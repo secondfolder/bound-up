@@ -639,6 +639,13 @@ export type DaydreamExchangeView = {
 	sealed: SealedRefView;
 };
 
+/** A suggestion request that wrote a daydream's draft, for debug mode's raw log. All of it is sealed. */
+export type DaydreamSetupExchangeView = {
+	id: string;
+	createdAt: Date;
+	sealed: SealedRefView;
+};
+
 /** A bookmark or a reaction on a turn. What it is is sealed; which turn it marks is not. */
 export type DaydreamMarkView = {
 	id: string;

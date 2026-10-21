@@ -684,10 +684,12 @@ is deflated (raw DEFLATE) before it is encrypted, and the ciphertext starts
 `sz1.` instead, with the same IV, tag and associated data. Compressing first
 lets a ciphertext's length say something about what is in it, so only a
 kind whose content the server already handled in plaintext may opt in: a
-daydream's exchanges with the model (`daydream-exchange`), which passed
-through the server on their way to and from it
+daydream's exchanges with the model (`daydream-exchange`), and the
+suggestion requests that set one up (`daydream-setup-exchange`), both of
+which passed through the server on their way to and from it
 ([debug-mode.md](debug-mode.md#exchanges)). A kind opens only under its own
-prefix, so neither kind can be read as the other.
+prefix, so a compressed record cannot be read as an uncompressed one or the
+other way round.
 
 `crypto/sealed.ts` seals and opens. Sealing takes a **write grant**
 (`crypto/write-grant.ts`): for a partnership vault one comes only from

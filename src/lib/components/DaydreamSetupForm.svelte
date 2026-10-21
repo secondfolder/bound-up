@@ -27,8 +27,9 @@
 		voiceProblem
 	} from '$lib/daydream';
 	import { type CopyState, copyState } from '$lib/daydream/chips';
-	import { saveLibraryItem } from '$lib/daydream/client';
+	import { saveLibraryItem, sealSetupExchanges } from '$lib/daydream/client';
 	import { IDEA_SLIDERS } from '$lib/daydream/dial-words';
+	import type { SetupExchange } from '$lib/daydream/setup-exchange';
 	import { type SuggestContext, suggestCasting } from '$lib/daydream/suggest';
 	import { type MarkedSummary, setupSummary } from '$lib/daydream/summary';
 	import { type DaydreamSetupFormValues, daydreamSetupFormSchema } from '$lib/schemas/daydreamForm';
@@ -94,7 +95,8 @@
 		suggestionsOn,
 		picturesAvailable = false,
 		submitLabel,
-		debug = false
+		debug = false,
+		setupExchanges = []
 	}: {
 		/** The empty form, as the load prepared it. */
 		setupForm: SuperValidated<DaydreamSetupFormValues>;
@@ -128,6 +130,12 @@
 		 * was written with, around the blanks they made.
 		 */
 		debug?: boolean;
+		/**
+		 * How a new daydream's draft was written, in debug mode: kept with it
+		 * when it is made, for its raw log (`setup-exchange.ts`). Ignored when
+		 * editing one.
+		 */
+		setupExchanges?: readonly SetupExchange[];
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -141,6 +149,8 @@
 	 * daydream twice: the second is refused as a taken id.
 	 */
 	let newId: string | null = null;
+	/** The setup exchanges' record ids, kept across attempts for the same reason. */
+	let setupExchangeIds: string[] = [];
 
 	const sameVoice = (a: DaydreamVoice, b: DaydreamVoice) =>
 		a.narrator === b.narrator && a.stance === b.stance;
@@ -209,6 +219,7 @@
 				({ error: problem } = outcome);
 				return;
 			}
+			const exchanges = daydream ? [] : await sealedSetupExchanges();
 			// Nothing of the setup goes in the post but the sealed record: the
 			// inputs' own fields are taken out, and the JSON is replaced.
 			for (const key of [...formData.keys()]) {
@@ -216,7 +227,8 @@
 			}
 			jsonData({
 				...outcome.fields,
-				...(daydream ? { expectedRevision: daydream.revision } : {})
+				...(daydream ? { expectedRevision: daydream.revision } : {}),
+				...(exchanges.length > 0 ? { setupExchanges: exchanges } : {})
 			} as never);
 		},
 		onResult({ result, cancel }) {
@@ -232,6 +244,19 @@
 			}
 		}
 	});
+
+	/**
+	 * The setup exchanges, sealed for the create. A snapshot, as the draft
+	 * is: the page hands over its own state, which cannot be cloned to seal.
+	 */
+	async function sealedSetupExchanges() {
+		const exchanges = ($state.snapshot(setupExchanges) as SetupExchange[]).map((exchange, index) => ({
+			id: setupExchangeIds[index] ?? crypto.randomUUID(),
+			exchange
+		}));
+		setupExchangeIds = exchanges.map(({ id }) => id);
+		return await sealSetupExchanges(exchanges);
+	}
 
 	const { form, errors, submitting, tainted, isTainted } = superform;
 

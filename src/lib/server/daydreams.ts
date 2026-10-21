@@ -9,6 +9,7 @@ import {
 	daydreamExchangeKind,
 	daydreamIdeaKind,
 	daydreamMarkKind,
+	daydreamSetupExchangeKind,
 	daydreamSetupKind,
 	daydreamTurnKind
 } from '../sealed-kinds/daydreams';
@@ -18,6 +19,7 @@ import type {
 	DaydreamLibraryView,
 	DaydreamListItemView,
 	DaydreamMarkView,
+	DaydreamSetupExchangeView,
 	DaydreamsWidgetView,
 	DaydreamTreeNodeView,
 	DaydreamTurnView,
@@ -30,6 +32,7 @@ import {
 	daydreamIdeas,
 	daydreamMarks,
 	daydreamPreferences,
+	daydreamSetupExchanges,
 	daydreams,
 	daydreamTurns
 } from './db/schema';
@@ -645,6 +648,87 @@ export async function readExchanges(
 		id: row.id,
 		turnId: row.turnId,
 		parentTurnId: row.parentTurnId,
+		createdAt: row.createdAt,
+		sealed: {
+			recordId: row.id,
+			vaultId: row.vaultId,
+			ciphertext: row.ciphertext,
+			payloadVersion: row.payloadVersion
+		}
+	}));
+}
+
+// ── setup exchanges ──────────────────────────────────────────────────────────
+
+/**
+ * Keeps the suggestion requests that wrote a new daydream's draft
+ * (`daydream-setup-exchange`), for debug mode's raw log. The caller has made
+ * the daydream and checked the account holds debug mode; this checks each
+ * envelope and keeps the ones that pass, since one that does not is debug
+ * data lost, not a reason to lose the others. Answers how many were kept.
+ */
+export async function saveSetupExchanges(
+	db: Db,
+	userId: string,
+	daydreamId: string,
+	exchanges: readonly ({ id: string } & SealedWrite)[],
+	now = new Date()
+): Promise<number> {
+	if (exchanges.length === 0 || !(await ownsDaydream(db, userId, daydreamId))) {
+		return 0;
+	}
+	const acceptable: ({ id: string } & SealedWrite)[] = [];
+	for (const exchange of exchanges) {
+		if (!(await contentProblem(db, userId, daydreamSetupExchangeKind, exchange))) {
+			acceptable.push(exchange);
+		}
+	}
+	if (acceptable.length === 0) {
+		return 0;
+	}
+	const inserted = await db
+		.insert(daydreamSetupExchanges)
+		.values(
+			// A millisecond apart, so they read back in the order they were
+			// sent — the ideas round before the draft written from it — rather
+			// than by their random ids.
+			acceptable.map((exchange, index) => ({
+				id: exchange.id,
+				daydreamId,
+				ciphertext: exchange.ciphertext,
+				vaultId: exchange.vaultId,
+				payloadVersion: exchange.payloadVersion,
+				createdAt: new Date(now.getTime() + index),
+				updatedAt: now
+			}))
+		)
+		.onConflictDoNothing()
+		.returning({ id: daydreamSetupExchanges.id });
+	return inserted.length;
+}
+
+/** How a daydream was set up, sealed, oldest first; null when the daydream is not the user's. */
+export async function readSetupExchanges(
+	db: Db,
+	userId: string,
+	daydreamId: string
+): Promise<DaydreamSetupExchangeView[] | null> {
+	if (!(await ownsDaydream(db, userId, daydreamId))) {
+		return null;
+	}
+	const rows = await db
+		.select({
+			id: daydreamSetupExchanges.id,
+			createdAt: daydreamSetupExchanges.createdAt,
+			ciphertext: daydreamSetupExchanges.ciphertext,
+			vaultId: daydreamSetupExchanges.vaultId,
+			payloadVersion: daydreamSetupExchanges.payloadVersion
+		})
+		.from(daydreamSetupExchanges)
+		.where(eq(daydreamSetupExchanges.daydreamId, daydreamId))
+		.orderBy(asc(daydreamSetupExchanges.createdAt), asc(daydreamSetupExchanges.id));
+	return rows.map((row) => ({
+		id: row.id,
 		createdAt: row.createdAt,
 		sealed: {
 			recordId: row.id,

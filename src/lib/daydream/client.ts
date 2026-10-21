@@ -23,17 +23,24 @@ import {
 	daydreamExchangeKind,
 	daydreamIdeaKind,
 	daydreamMarkKind,
+	daydreamSetupExchangeKind,
 	daydreamSetupKind,
 	daydreamTurnKind,
 	type PassageMeta,
 	type Reading
 } from '../sealed-kinds/daydreams';
-import type { DaydreamExchangeView, DaydreamTurnView, SealedRefView } from '../types';
+import type {
+	DaydreamExchangeView,
+	DaydreamSetupExchangeView,
+	DaydreamTurnView,
+	SealedRefView
+} from '../types';
 import type { ContextTurn } from './context';
 import type { Exchange } from './exchange';
 import type { ExchangeRecorder } from './exchange-recorder';
 import { PICTURE_REQUEST_HEADER, type PictureRequest } from './image-prompt';
 import { parseReply, type ReplySoFar, visibleReply } from './reply-format';
+import type { SetupExchange } from './setup-exchange';
 import { readReplyStream } from './stream';
 
 const base = (daydreamId: string) => `/api/daydreams/${encodeURIComponent(daydreamId)}`;
@@ -414,21 +421,20 @@ export async function saveTurn(
 const EXCHANGE_CUTS = 8;
 
 /**
- * Keeps an exchange (`exchange.ts`), sealed and compressed, with the passage
- * it wrote or, for a failed reply, under the turn it answered. One that will
- * not fit its cap even compressed keeps its request whole and as much of the
- * response's start as fits, and says so (`truncated`).
+ * Seals an exchange with the model — a daydream's own, or one that set it up
+ * — compressed. One that will not fit its cap even so keeps its request whole
+ * and as much of the response's start as fits, and says so (`truncated`).
+ * Answers what was sealed, which is what the log should show.
  */
-export async function saveExchange(
-	daydreamId: string,
-	input: { turnId: string | null; parentTurnId: string | null; exchange: Exchange }
-): Promise<Outcome<{ exchange: DaydreamExchangeView; content: DaydreamExchangeContent }>> {
-	const id = crypto.randomUUID();
-	let content: DaydreamExchangeContent = input.exchange;
-	let sealed: Awaited<ReturnType<typeof seal>> | null = null;
-	for (let cut = 0; sealed === null; cut += 1) {
+async function sealToFit<T extends { response: { body: string; truncated?: true } }>(
+	kind: SealedKind<unknown>,
+	id: string,
+	exchange: T
+): Promise<{ content: T; sealed: Awaited<ReturnType<typeof seal>> }> {
+	let content = exchange;
+	for (let cut = 0; ; cut += 1) {
 		try {
-			sealed = await seal(daydreamExchangeKind, id, content);
+			return { content, sealed: await seal(kind, id, content) };
 		} catch (problem) {
 			// Over the cap: `sealRecord` throws, since for any other kind that is a bug.
 			if (cut >= EXCHANGE_CUTS) {
@@ -441,6 +447,45 @@ export async function saveExchange(
 			};
 		}
 	}
+}
+
+/**
+ * Seals how a new daydream's draft was written (`setup-exchange.ts`), to post
+ * with the create. `ids` are the records' ids, one per exchange, kept by the
+ * caller across retries as the daydream's own is. One that will not seal is
+ * left out: it is debug data, and the daydream is made without it.
+ */
+export async function sealSetupExchanges(
+	exchanges: readonly { id: string; exchange: SetupExchange }[]
+): Promise<{ id: string; vaultId: string; ciphertext: string; payloadVersion: number }[]> {
+	const sealed = await Promise.all(
+		exchanges.map(async ({ id, exchange }) => {
+			try {
+				const result = await sealToFit(daydreamSetupExchangeKind, id, exchange);
+				return result.sealed.ok ? { id, ...sealedBody(result.sealed.fields) } : null;
+			} catch {
+				return null;
+			}
+		})
+	);
+	return sealed.filter((each) => each !== null);
+}
+
+/**
+ * Keeps an exchange (`exchange.ts`), sealed and compressed (`sealToFit`),
+ * with the passage it wrote or, for a failed reply, under the turn it
+ * answered.
+ */
+export async function saveExchange(
+	daydreamId: string,
+	input: { turnId: string | null; parentTurnId: string | null; exchange: Exchange }
+): Promise<Outcome<{ exchange: DaydreamExchangeView; content: DaydreamExchangeContent }>> {
+	const id = crypto.randomUUID();
+	const { content, sealed } = await sealToFit<DaydreamExchangeContent>(
+		daydreamExchangeKind,
+		id,
+		input.exchange
+	);
 	if (!sealed.ok) {
 		return { ok: false, error: sealed.error };
 	}
@@ -477,6 +522,26 @@ export async function readExchanges(
 	}
 	const { exchanges } = (await sent.response.json()) as {
 		exchanges: (Omit<DaydreamExchangeView, 'createdAt'> & { createdAt: string })[];
+	};
+	return {
+		ok: true,
+		exchanges: exchanges.map((exchange) => ({
+			...exchange,
+			createdAt: new Date(exchange.createdAt)
+		}))
+	};
+}
+
+/** How a daydream was set up, sealed (`setup-exchange.ts`): read only while the raw log is open. */
+export async function readSetupExchanges(
+	daydreamId: string
+): Promise<Outcome<{ exchanges: DaydreamSetupExchangeView[] }>> {
+	const sent = await send(`${base(daydreamId)}/setup-exchanges`, 'GET');
+	if (!sent.ok) {
+		return sent;
+	}
+	const { exchanges } = (await sent.response.json()) as {
+		exchanges: (Omit<DaydreamSetupExchangeView, 'createdAt'> & { createdAt: string })[];
 	};
 	return {
 		ok: true,

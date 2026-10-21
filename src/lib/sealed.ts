@@ -44,7 +44,8 @@ export const SEALED_PATTERN = /^sb1\.[A-Za-z0-9_-]+$/;
  * JSON deflated (raw DEFLATE, RFC 1951) before it is encrypted. Only for a
  * kind whose content the server already handled in plaintext, since
  * compressing first lets the ciphertext's length say something about what is
- * in it: a daydream's exchanges with the model (`daydream-exchange`), which
+ * in it: a daydream's exchanges with the model (`daydream-exchange`) and the
+ * suggestion requests that set it up (`daydream-setup-exchange`), which
  * passed through the server on their way to and from it.
  */
 export const SEALED_FORMAT_COMPRESSED_V1 = 'sz1.';

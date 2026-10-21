@@ -1,6 +1,9 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DAYDREAM_STARTERS } from '$lib/daydream/starters';
 import type { Db } from '$lib/server/db';
+import { daydreamSetupExchanges } from '$lib/server/db/schema';
+import { grantFeature } from '$lib/server/features';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runAction, runAndCatch, runLoad } from '$lib/testing/events';
 import {
@@ -11,6 +14,7 @@ import {
 	readDaydreamRow,
 	type TestUser
 } from '$lib/testing/fixtures';
+import { superformJson } from '$lib/testing/superform-json';
 import { actions, load } from './+page.server';
 
 let harness: TestDb;
@@ -96,6 +100,90 @@ describe('actions', () => {
 		expect(await runAndCatch(() => runAction(actions, 'default', at(bo, post)))).toMatchObject({
 			type: 'error',
 			status: 403
+		});
+	});
+
+	describe('how the draft was written (debug mode)', () => {
+		/** A stand-in compressed ciphertext: the server checks only its shape. */
+		const fakeCompressed = () => `sz1.${crypto.randomUUID().replaceAll('-', '')}`;
+
+		async function setupExchange(user: TestUser = ada, ciphertext = fakeCompressed()) {
+			return {
+				id: crypto.randomUUID(),
+				vaultId: await ensureTestSelfVault(db, user.id),
+				ciphertext,
+				payloadVersion: 1
+			};
+		}
+
+		async function postWith(setupExchanges: unknown) {
+			const post = await sealedPost();
+			const result = await runAndCatch(() =>
+				runAction(
+					actions,
+					'default',
+					at(ada, superformJson({ ...post, payloadVersion: 1, setupExchanges }))
+				)
+			);
+			return { post, result };
+		}
+
+		const kept = (daydreamId: string) =>
+			db
+				.select({
+					id: daydreamSetupExchanges.id,
+					daydreamId: daydreamSetupExchanges.daydreamId,
+					ciphertext: daydreamSetupExchanges.ciphertext
+				})
+				.from(daydreamSetupExchanges)
+				.where(eq(daydreamSetupExchanges.daydreamId, daydreamId))
+				.orderBy(daydreamSetupExchanges.createdAt);
+
+		const debugMode = () =>
+			grantFeature(db, { userId: ada.id, feature: 'debugMode', grantedByUserId: ada.id });
+
+		it('keeps them with the daydream, in the order they were sent, for an account with debug mode', async () => {
+			await debugMode();
+			const ideas = await setupExchange();
+			const draft = await setupExchange();
+			const { post, result } = await postWith([ideas, draft]);
+			expect(result).toMatchObject({ type: 'redirect', location: `/daydreams/${post.recordId}` });
+			expect(await kept(post.recordId)).toEqual([
+				{ id: ideas.id, daydreamId: post.recordId, ciphertext: ideas.ciphertext },
+				{ id: draft.id, daydreamId: post.recordId, ciphertext: draft.ciphertext }
+			]);
+		});
+
+		it('ignores them for an account without debug mode, and still makes the daydream', async () => {
+			const { post, result } = await postWith([await setupExchange()]);
+			expect(result).toMatchObject({ type: 'redirect' });
+			expect(await readDaydreamRow(db, post.recordId)).toBeDefined();
+			expect(await kept(post.recordId)).toEqual([]);
+		});
+
+		it('drops one in someone else’s vault and keeps the rest', async () => {
+			await debugMode();
+			const jun = await createTestUser(db, { name: 'Jun' });
+			const theirs = await setupExchange(jun);
+			const mine = await setupExchange();
+			const { post } = await postWith([theirs, mine]);
+			expect((await kept(post.recordId)).map((row) => row.id)).toEqual([mine.id]);
+		});
+
+		it('makes the daydream when they are malformed, keeping none of them', async () => {
+			await debugMode();
+			const { post, result } = await postWith([await setupExchange(ada, fakeSealed('plain'))]);
+			expect(result).toMatchObject({ type: 'redirect' });
+			expect(await readDaydreamRow(db, post.recordId)).toBeDefined();
+			expect(await kept(post.recordId)).toEqual([]);
+		});
+
+		it('takes no more than a draft and its round of ideas', async () => {
+			await debugMode();
+			const three = [await setupExchange(), await setupExchange(), await setupExchange()];
+			const { post, result } = await postWith(three);
+			expect(result).toMatchObject({ type: 'redirect' });
+			expect(await kept(post.recordId)).toEqual([]);
 		});
 	});
 });

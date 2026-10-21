@@ -699,3 +699,32 @@ export const daydreamExchangeKind = defineSealedKind({
 });
 
 export type DaydreamExchangeContent = z.output<typeof daydreamExchangeKind.latest>;
+
+// ── setup exchanges ──────────────────────────────────────────────────────────
+
+/**
+ * A suggestion request that wrote a daydream's draft, and its answer, kept
+ * with the daydream for debug mode's raw log (`daydream/setup-exchange.ts`).
+ * Compressed for the reason exchanges are: the server handled all of it in
+ * plaintext on its way to and from the model, and an answer that read a
+ * brief's links carries each page in full.
+ */
+const setupExchangeV1 = z.object({
+	task: z.enum(['daydream', 'ideas']),
+	request: z.string().min(1).max(EXCHANGE_LIMITS.request),
+	response: z.object({
+		body: z.string().max(EXCHANGE_LIMITS.response),
+		truncated: z.literal(true).optional()
+	}),
+	startedAt: z.number().int().nonnegative(),
+	endedAt: z.number().int().nonnegative()
+});
+
+export const daydreamSetupExchangeKind = defineSealedKind({
+	name: 'daydream-setup-exchange',
+	maxCiphertextLength: MAX_EXCHANGE_CIPHERTEXT,
+	compressed: true,
+	versions: [{ version: 1, schema: setupExchangeV1 }]
+});
+
+export type DaydreamSetupExchangeContent = z.output<typeof daydreamSetupExchangeKind.latest>;

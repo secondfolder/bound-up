@@ -6,6 +6,7 @@
 	import { quoteAt } from '$lib/daydream/quotes';
 	import { RawConversation } from '$lib/daydream/raw-conversation.svelte';
 	import { RawExchanges } from '$lib/daydream/raw-exchanges.svelte';
+	import { RawSetupExchanges } from '$lib/daydream/raw-setup-exchanges.svelte';
 	import { DaydreamStory } from '$lib/daydream/story.svelte';
 	import type { ComposedMessage } from '$lib/messaging/client';
 	import { openDraft } from '$lib/messaging/drafts';
@@ -25,6 +26,7 @@
 	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
 	import DaydreamRawExchange from './DaydreamRawExchange.svelte';
 	import DaydreamRawSent from './DaydreamRawSent.svelte';
+	import DaydreamRawSetup from './DaydreamRawSetup.svelte';
 	import DaydreamRawSystem from './DaydreamRawSystem.svelte';
 	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
 	import DaydreamRollCard from './DaydreamRollCard.svelte';
@@ -102,9 +104,12 @@
 	 * falls back to its own `sent` and `raw` (`DaydreamRawSent`).
 	 */
 	const exchanges = new RawExchanges(story);
+	/** How the daydream was set up, which heads the raw log: read the first time it opens. */
+	const setupExchanges = new RawSetupExchanges(story.id);
 	$effect(() => {
 		if (rawLog) {
 			exchanges.load(story.path.map((node) => node.id));
+			setupExchanges.load();
 		}
 	});
 	/** The newest passage on the branch, whose request's system prompt heads the raw log. */
@@ -492,6 +497,9 @@
 		aria-live="polite"
 		{@attach (list) => followEnd(list, { holdAt: () => heldElement(list) })}
 	>
+		{#if rawLog}
+			<DaydreamRawSetup setup={setupExchanges} />
+		{/if}
 		{#if rawLog && newestPassage && exchanges.forTurn(newestPassage.id) === null}
 			<!-- A story whose newest passage has an exchange has its system prompt
 			     in it, so this is only for one written before exchanges were kept. -->

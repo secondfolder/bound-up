@@ -13,6 +13,7 @@ import {
 	settle,
 	shellScroll,
 	signUp,
+	switchOnDebugCookie,
 	waitForHydration
 } from './helpers';
 
@@ -1006,6 +1007,45 @@ test.describe('daydreams', () => {
 		await expect(exchange).toContainText('"usage":{"include":true}');
 		await expect(exchange).toContainText('"total_tokens":120');
 		await expect(raw.last()).not.toContainText('Raw reply not recorded.');
+	});
+
+	test('debug mode keeps how a daydream was set up with it: the ideas round, then the draft', async ({
+		page
+	}) => {
+		const who = await signedUpDreamer(page);
+		await grantFeature(who.email, 'debugMode');
+		await openStart(page);
+		await switchOnDebugCookie(page);
+		await page.reload();
+		await waitForHydration(page);
+
+		await page.getByRole('textbox').fill('something on a train');
+		await clickWaButton(page, 'Suggest daydreams for this');
+		const generated = page.locator('.generated');
+		await expect(generated.locator('.card .title').first()).toBeVisible();
+		await generated
+			.getByRole('button', { name: /^Stub idea for nobody/ })
+			.first()
+			.click();
+		await expect(page.locator('.setup-summary')).toBeVisible();
+		// The draft's chat log, shown here as it was before any of this was kept.
+		await expect(page.locator('wa-details.log')).toHaveCount(1);
+
+		await clickWaButton(page, 'Start daydreaming');
+		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
+		await waitForHydration(page);
+		await page.locator('wa-switch.raw-log').click();
+		const setup = page.locator('[data-setup-exchanges]');
+		await expect(setup).toContainText('How this daydream was set up');
+		await expect(setup.locator('wa-details.log')).toHaveCount(2);
+		await expect(setup).toContainText(/Ideas round[\s\S]*Draft/);
+		// The brief as typed, in what was sent.
+		await expect(setup).toContainText('something on a train');
+		const { rows } = await sql(
+			'select count(*) as count from daydream_setup_exchanges where daydream_id = ?',
+			[new URL(page.url()).pathname.split('/').at(-1) ?? '']
+		);
+		expect(Number(rows[0]?.count)).toBe(2);
 	});
 
 	test('an account without the feature has no way in', async ({ page }) => {
