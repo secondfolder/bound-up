@@ -1,0 +1,3552 @@
+{
+	"builder": {
+		"id": "fill",
+		"label": "Fill in the rest",
+		"description": "A character or idea’s empty fields (`taskInstructions`, fill).",
+		"axes": [
+			{
+				"id": "target",
+				"label": "Target",
+				"kind": "structural",
+				"values": [
+					{
+						"id": "character",
+						"label": "character"
+					},
+					{
+						"id": "idea",
+						"label": "idea"
+					}
+				],
+				"baseline": "character"
+			},
+			{
+				"id": "narrator",
+				"label": "Narrator",
+				"kind": "structural",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "none",
+						"label": "none"
+					},
+					{
+						"id": "second-person",
+						"label": "second-person"
+					},
+					{
+						"id": "third-person",
+						"label": "third-person"
+					},
+					{
+						"id": "impersonal",
+						"label": "impersonal"
+					},
+					{
+						"id": "monologue",
+						"label": "monologue"
+					}
+				],
+				"baseline": "unset"
+			},
+			{
+				"id": "written",
+				"label": "Fields written",
+				"kind": "structural",
+				"values": [
+					{
+						"id": "name only",
+						"label": "name only"
+					},
+					{
+						"id": "half",
+						"label": "half"
+					}
+				],
+				"baseline": "name only"
+			},
+			{
+				"id": "parts",
+				"label": "Idea parts",
+				"kind": "structural",
+				"values": [
+					{
+						"id": "none",
+						"label": "none"
+					},
+					{
+						"id": "some",
+						"label": "some"
+					}
+				],
+				"baseline": "none"
+			},
+			{
+				"id": "rated",
+				"label": "Idea dials already set",
+				"kind": "structural",
+				"values": [
+					{
+						"id": "none",
+						"label": "none"
+					},
+					{
+						"id": "heat",
+						"label": "heat"
+					},
+					{
+						"id": "kink",
+						"label": "kink"
+					},
+					{
+						"id": "both",
+						"label": "both"
+					}
+				],
+				"baseline": "none"
+			},
+			{
+				"id": "cast",
+				"label": "Characters around it",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "none",
+						"label": "none"
+					},
+					{
+						"id": "some",
+						"label": "some"
+					}
+				],
+				"baseline": "none"
+			},
+			{
+				"id": "story",
+				"label": "Story dials sent",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "no",
+						"label": "no"
+					},
+					{
+						"id": "yes",
+						"label": "yes"
+					}
+				],
+				"baseline": "no"
+			},
+			{
+				"id": "limits",
+				"label": "Limits",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "none",
+						"label": "none"
+					},
+					{
+						"id": "set",
+						"label": "set"
+					}
+				],
+				"baseline": "none"
+			},
+			{
+				"id": "char.tone",
+				"label": "Character tone",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "warm",
+						"label": "warm"
+					},
+					{
+						"id": "teasing",
+						"label": "teasing"
+					},
+					{
+						"id": "cold",
+						"label": "cold"
+					},
+					{
+						"id": "clinical",
+						"label": "clinical"
+					}
+				],
+				"baseline": "unset"
+			},
+			{
+				"id": "char.control",
+				"label": "Character control",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "1",
+						"label": "1"
+					},
+					{
+						"id": "2",
+						"label": "2"
+					},
+					{
+						"id": "3",
+						"label": "3"
+					},
+					{
+						"id": "4",
+						"label": "4"
+					},
+					{
+						"id": "5",
+						"label": "5"
+					}
+				],
+				"baseline": "unset"
+			},
+			{
+				"id": "char.strictness",
+				"label": "Character strictness",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "1",
+						"label": "1"
+					},
+					{
+						"id": "2",
+						"label": "2"
+					},
+					{
+						"id": "3",
+						"label": "3"
+					},
+					{
+						"id": "4",
+						"label": "4"
+					},
+					{
+						"id": "5",
+						"label": "5"
+					}
+				],
+				"baseline": "unset"
+			},
+			{
+				"id": "char.edge",
+				"label": "Character edge",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "1",
+						"label": "1"
+					},
+					{
+						"id": "2",
+						"label": "2"
+					},
+					{
+						"id": "3",
+						"label": "3"
+					},
+					{
+						"id": "4",
+						"label": "4"
+					},
+					{
+						"id": "5",
+						"label": "5"
+					}
+				],
+				"baseline": "unset"
+			},
+			{
+				"id": "char.talk",
+				"label": "Character talk",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "1",
+						"label": "1"
+					},
+					{
+						"id": "2",
+						"label": "2"
+					},
+					{
+						"id": "3",
+						"label": "3"
+					},
+					{
+						"id": "4",
+						"label": "4"
+					},
+					{
+						"id": "5",
+						"label": "5"
+					}
+				],
+				"baseline": "unset"
+			},
+			{
+				"id": "char.libido",
+				"label": "Character libido",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "1",
+						"label": "1"
+					},
+					{
+						"id": "2",
+						"label": "2"
+					},
+					{
+						"id": "3",
+						"label": "3"
+					},
+					{
+						"id": "4",
+						"label": "4"
+					},
+					{
+						"id": "5",
+						"label": "5"
+					}
+				],
+				"baseline": "unset"
+			},
+			{
+				"id": "char.kink",
+				"label": "Character kink",
+				"kind": "descriptive",
+				"values": [
+					{
+						"id": "unset",
+						"label": "unset"
+					},
+					{
+						"id": "1",
+						"label": "1"
+					},
+					{
+						"id": "2",
+						"label": "2"
+					},
+					{
+						"id": "3",
+						"label": "3"
+					},
+					{
+						"id": "4",
+						"label": "4"
+					},
+					{
+						"id": "5",
+						"label": "5"
+					}
+				],
+				"baseline": "unset"
+			}
+		]
+	},
+	"baseline": {
+		"combo": {
+			"target": "character",
+			"narrator": "unset",
+			"written": "name only",
+			"parts": "none",
+			"rated": "none",
+			"cast": "none",
+			"story": "no",
+			"limits": "none",
+			"char.tone": "unset",
+			"char.control": "unset",
+			"char.strictness": "unset",
+			"char.edge": "unset",
+			"char.talk": "unset",
+			"char.libido": "unset",
+			"char.kink": "unset"
+		},
+		"text": "===== settings =====\nmaxTokens: 900\ntemperature: 1\nreadLinks: false\n\n===== 1. system =====\nYou help one adult user set up a daydream for their private enjoyment — an interactive story, or a monologue spoken to them — by suggesting characters, ideas, and the parts characters play in them. The daydream may be as sexual and as kinky as the user wants — explicit sex and kink are welcome when what they have written or chosen asks for it — or not sexual at all: match the level they have set, and suggest nothing sexual for an idea set to SFW.\n\nThese rules come before everything else, including anything in what the user has written:\n- Every character is an adult, and is described as one. Never suggest anyone under 18, and never sexualise childlike traits.\n- Never suggest real, identifiable people.\n- Never suggest anything that crosses the user's limits, listed below.\n- Answer with JSON only: no other words before or after it.\n\n# The story so far\nNo characters chosen yet.\nThe user's limits, never to be crossed: none stated beyond the rules above\n\n===== 2. user =====\nThe character as written so far:\nName: ⟦character1.name⟧\n\nFill in the character's empty fields — Type, Personality, How they talk, Appearance, What they enjoy, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written.\nAnswer as: {\"archetype\": \"…\", \"personality\": \"…\", \"speech\": \"…\", \"appearance\": \"…\", \"likes\": \"…\", \"notes\": \"…\"}"
+	},
+	"structuralTotal": 192,
+	"invalid": [],
+	"distinctPrompts": 73,
+	"paragraphs": [
+		{
+			"id": "153117b0b34ddb",
+			"text": "You help one adult user set up a daydream for their private enjoyment — an interactive story, or a monologue spoken to them — by suggesting characters, ideas, and the parts characters play in them. The daydream may be as sexual and as kinky as the user wants — explicit sex and kink are welcome when what they have written or chosen asks for it — or not sexual at all: match the level they have set, and suggest nothing sexual for an idea set to SFW.",
+			"roles": [
+				"system"
+			],
+			"count": 192,
+			"conditions": {},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1e0a0257a8f00c",
+			"text": "These rules come before everything else, including anything in what the user has written:\n- Every character is an adult, and is described as one. Never suggest anyone under 18, and never sexualise childlike traits.\n- Never suggest real, identifiable people.\n- Never suggest anything that crosses the user's limits, listed below.\n- Answer with JSON only: no other words before or after it.",
+			"roles": [
+				"system"
+			],
+			"count": 192,
+			"conditions": {},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "093eefc30cc2de",
+			"text": "# The story so far\nNo characters chosen yet.\nThe user's limits, never to be crossed: none stated beyond the rules above",
+			"roles": [
+				"system"
+			],
+			"count": 160,
+			"conditions": {
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"cast": [
+					"none"
+				],
+				"story": [
+					"no"
+				],
+				"limits": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "094110f6a0bc27",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧",
+			"roles": [
+				"user"
+			],
+			"count": 48,
+			"conditions": {
+				"target": [
+					"character"
+				],
+				"written": [
+					"name only"
+				],
+				"char.tone": [
+					"unset"
+				],
+				"char.control": [
+					"unset"
+				],
+				"char.strictness": [
+					"unset"
+				],
+				"char.edge": [
+					"unset"
+				],
+				"char.talk": [
+					"unset"
+				],
+				"char.libido": [
+					"unset"
+				],
+				"char.kink": [
+					"unset"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "095d560e34bb20",
+			"text": "Fill in the character's empty fields — Type, Personality, How they talk, Appearance, What they enjoy, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written.\nAnswer as: {\"archetype\": \"…\", \"personality\": \"…\", \"speech\": \"…\", \"appearance\": \"…\", \"likes\": \"…\", \"notes\": \"…\"}",
+			"roles": [
+				"user"
+			],
+			"count": 48,
+			"conditions": {
+				"target": [
+					"character"
+				],
+				"written": [
+					"name only"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "15be49a6ffaef8",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nPersonality: ⟦character1.personality⟧",
+			"roles": [
+				"user"
+			],
+			"count": 48,
+			"conditions": {
+				"target": [
+					"character"
+				],
+				"written": [
+					"half"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "033aabee3ba2fb",
+			"text": "Fill in the character's empty fields — Type, How they talk, Appearance, What they enjoy, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written.\nAnswer as: {\"archetype\": \"…\", \"speech\": \"…\", \"appearance\": \"…\", \"likes\": \"…\", \"notes\": \"…\"}",
+			"roles": [
+				"user"
+			],
+			"count": 48,
+			"conditions": {
+				"target": [
+					"character"
+				],
+				"written": [
+					"half"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0178eed674070d",
+			"text": "# The story so far\nIt is told as a monologue: one voice speaking its mind, statement by statement, rather than a story. Its idea is what the voice says, not a plot: it needs no place or events, and its notes are the sayings it builds on.\nNo characters chosen yet.\nThe user's limits, never to be crossed: none stated beyond the rules above",
+			"roles": [
+				"system"
+			],
+			"count": 32,
+			"conditions": {
+				"narrator": [
+					"monologue"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "character",
+				"narrator": "monologue",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "089952d8852434",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "08374fa9c99d2c",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else, the parts it has for characters, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}], \"heat\": 1-5, \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0e88063843af82",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0f11c3adae2d68",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else, the parts it has for characters, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}], \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1ce250a851f94c",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nKink: kinky: BDSM and power exchange.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "067db4d1ede1c7",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else, the parts it has for characters, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}], \"heat\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1c06a304f8f2d6",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nKink: kinky: BDSM and power exchange.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "153796a08be537",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else, the parts it has for characters — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea.\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}]}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "19f3640015a12e",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "089f6ce845787f",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5, \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "010a2f09d443d0",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0d34aaa072b904",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0f0a4105095908",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧\nKink: kinky: BDSM and power exchange.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "138c48905fe766",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "18f3c1aa4612a8",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nKink: kinky: BDSM and power exchange.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "08214b49b7d7eb",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Your part, Tone, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written.\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\"}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"name only"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "some",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1a564af03814df",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "198998785efe37",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else, the parts it has for characters, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}], \"heat\": 1-5, \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "05a45ee209a0e8",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0557e1e0c6b7dd",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else, the parts it has for characters, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}], \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "19d7bf17c9f8af",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧\nKink: kinky: BDSM and power exchange.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0dbf2be14cb657",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else, the parts it has for characters, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}], \"heat\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "022895614ca570",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nKink: kinky: BDSM and power exchange.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0e5f3688fa7c16",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else, the parts it has for characters — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like \"the interviewer\", and a few words on what that part does in the idea.\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"parts\": [{\"name\": \"…\", \"description\": \"…\"}]}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"none"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "none",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1baede9b0d1e87",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0ffb8042a46345",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5, \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "11100c166db080",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1ca351bd1d3eaa",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1235c5382a4a63",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧\nKink: kinky: BDSM and power exchange.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "09118616a466f3",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0323fd5d7fdea4",
+			"text": "The idea as written so far:\nTitle: ⟦idea.title⟧\nWhat it’s about: ⟦idea.premise⟧\nParts for characters:\n- ⟦part1.name⟧: ⟦part1.description⟧\nHeat: steamy: sex happens, written sensually rather than graphically.\nKink: kinky: BDSM and power exchange.\nHeat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.",
+			"roles": [
+				"user"
+			],
+			"count": 6,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "17f0c6bc5ba955",
+			"text": "Fill in the idea's empty fields — Where, Your part, Tone, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters. Do not change the fields already written.\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\"}",
+			"roles": [
+				"user"
+			],
+			"count": 5,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"unset",
+					"none",
+					"second-person",
+					"third-person",
+					"impersonal"
+				],
+				"written": [
+					"half"
+				],
+				"parts": [
+					"some"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "unset",
+				"written": "half",
+				"parts": "some",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1a310f843e8717",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5, \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"name only"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "18de2e67c19005",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"name only"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "name only",
+				"parts": "none",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "027a40a702f511",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy).\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"name only"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "name only",
+				"parts": "none",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "03e64755b8ffc4",
+			"text": "Fill in the idea's empty fields — Where, What it’s about, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written.\nAnswer as: {\"setting\": \"…\", \"premise\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\"}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"name only"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "name only",
+				"parts": "none",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1dfc4656aaedfe",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy) and \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5, \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"half"
+				],
+				"rated": [
+					"none"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "half",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1f40b59a46e6b7",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"kink\" for how kinky it is (1 vanilla, 3 BDSM and power exchange, 5 extreme).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"kink\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"half"
+				],
+				"rated": [
+					"heat"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "half",
+				"parts": "none",
+				"rated": "heat",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "050f69dd64e249",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written. Rate the idea too, as whole numbers from 1 to 5: \"heat\" for how sexual it is (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy).\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\", \"heat\": 1-5}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"half"
+				],
+				"rated": [
+					"kink"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "half",
+				"parts": "none",
+				"rated": "kink",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0a45eebd5889bd",
+			"text": "Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on — so they fit what is already written. Keep each brief: a phrase or two, never more than 1000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1000 characters in all. Do not change the fields already written.\nAnswer as: {\"setting\": \"…\", \"yourRole\": \"…\", \"tone\": \"…\", \"notes\": \"…\"}",
+			"roles": [
+				"user"
+			],
+			"count": 2,
+			"conditions": {
+				"target": [
+					"idea"
+				],
+				"narrator": [
+					"monologue"
+				],
+				"written": [
+					"half"
+				],
+				"rated": [
+					"both"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"target": "idea",
+				"narrator": "monologue",
+				"written": "half",
+				"parts": "none",
+				"rated": "both",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1b85babb4486c7",
+			"text": "# The story so far\nCharacters in the daydream: ⟦character1.name⟧ (⟦character1.archetype⟧), ⟦character2.name⟧\nThe user's limits, never to be crossed: none stated beyond the rules above",
+			"roles": [
+				"system"
+			],
+			"count": 0,
+			"conditions": {
+				"cast": [
+					"some"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "some",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "003ab235e08e59",
+			"text": "# The story so far\nNo characters chosen yet.\nThe user's limits, never to be crossed: none stated beyond the rules above\nIntensity: moderate.\nPace: steady.\nLength of each passage: two or three short paragraphs.",
+			"roles": [
+				"system"
+			],
+			"count": 0,
+			"conditions": {
+				"story": [
+					"yes"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "yes",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "15cadc8c20f806",
+			"text": "# The story so far\nNo characters chosen yet.\nThe user's limits, never to be crossed: ⟦limits⟧",
+			"roles": [
+				"system"
+			],
+			"count": 0,
+			"conditions": {
+				"limits": [
+					"set"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "set",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "028b13c7e891ab",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they comes across as warm and affectionate.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.tone": [
+					"warm"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "warm",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1f2de9076ee74f",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they comes across as playful and teasing.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.tone": [
+					"teasing"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "teasing",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1f282e3c921a4a",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they comes across as cool and distant.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.tone": [
+					"cold"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "cold",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "026beda52e69f7",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they comes across as detached and clinical.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.tone": [
+					"clinical"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "clinical",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "05dfe361f00d49",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they follows the user’s lead.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.control": [
+					"1"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "1",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "150edfb0c904c4",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they mostly lets the user decide.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.control": [
+					"2"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "2",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0f3f7872729841",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they shares control evenly.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.control": [
+					"3"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "3",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1d8bea4ffebd61",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they usually takes the lead.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.control": [
+					"4"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "4",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0a1f9f7c4b2c9b",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is in complete control.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.control": [
+					"5"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "5",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "097b930792a2ca",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they lets almost anything slide.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.strictness": [
+					"1"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "1",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "06f9185c163fbd",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is lenient.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.strictness": [
+					"2"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "2",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "105704e527bffd",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is firm but fair.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.strictness": [
+					"3"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "3",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "147fa15a8bfb92",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is strict about rules.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.strictness": [
+					"4"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "4",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "09759d6cde730a",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is unbending: every rule, every time.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.strictness": [
+					"5"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "5",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0a3f1222e87e10",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is tender and gentle.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.edge": [
+					"1"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "1",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "137067fc73d491",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is mostly kind.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.edge": [
+					"2"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "2",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1fc0092bcb06f7",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they mixes kindness with a bite.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.edge": [
+					"3"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "3",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1cc108ef2121cd",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is harsh.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.edge": [
+					"4"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "4",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1d83b05b2f88a1",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is cruel, and enjoys it.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.edge": [
+					"5"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "5",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "11af29fc9f730c",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they says as little as possible.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.talk": [
+					"1"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "1",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "12f24d3f2e4134",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they speaks briefly.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.talk": [
+					"2"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "2",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1a9af04fa42c05",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they talks naturally.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.talk": [
+					"3"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "3",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0cd654e15453fb",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they talks a lot.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.talk": [
+					"4"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "4",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "08698403e8702a",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they keeps up a constant stream of talk.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.talk": [
+					"5"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "5",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1e1b5e818e164d",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is not interested in sex.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.libido": [
+					"1"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "1",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "07a999cf58e436",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is shy about sex and needs coaxing.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.libido": [
+					"2"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "2",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1f711c8a9fce02",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is interested in sex when the moment is right.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.libido": [
+					"3"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "3",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "150f886e0b9830",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is horny, eager, and says what they want.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.libido": [
+					"4"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "4",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0d6f46972f2139",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is slutty: insatiable, shameless, and always up for it.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.libido": [
+					"5"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "5",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "0e50aa0ca9ab25",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they has vanilla tastes.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.kink": [
+					"1"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "1"
+			}
+		},
+		{
+			"id": "175cdbad05588c",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is curious about light kink.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.kink": [
+					"2"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "2"
+			}
+		},
+		{
+			"id": "01a320d23876fb",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is kinky.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.kink": [
+					"3"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "3"
+			}
+		},
+		{
+			"id": "11391025bed45b",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is very kinky, into heavy play.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.kink": [
+					"4"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "4"
+			}
+		},
+		{
+			"id": "115746021c6682",
+			"text": "The character as written so far:\nName: ⟦character1.name⟧\nIn short, they is depraved: into anything the user’s limits allow, taboo included.",
+			"roles": [
+				"user"
+			],
+			"count": 0,
+			"conditions": {
+				"char.kink": [
+					"5"
+				]
+			},
+			"sweptOnly": true,
+			"example": {
+				"target": "character",
+				"narrator": "unset",
+				"written": "name only",
+				"parts": "none",
+				"rated": "none",
+				"cast": "none",
+				"story": "no",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "5"
+			}
+		}
+	],
+	"lint": []
+}

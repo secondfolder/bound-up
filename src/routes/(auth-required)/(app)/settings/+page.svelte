@@ -93,6 +93,15 @@
 				</a>
 			</li>
 		{/if}
+		<!-- Display only, like the switch below: the debug pages check the feature again. -->
+		{#if debugOn}
+			<li>
+				<a href={resolve('/(auth-required)/(app)/debug')}>
+					<span>Debug tools</span>
+					<wa-icon name="chevron-right" variant="solid"></wa-icon>
+				</a>
+			</li>
+		{/if}
 	</ul>
 
 	{#if debugAvailable}

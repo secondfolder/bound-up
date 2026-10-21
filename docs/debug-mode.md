@@ -337,6 +337,15 @@ kinks at exactly that level, for checking how the catalogue's kinks are
 spread across levels. Never saved. See
 [kink-list.md](kink-list.md#the-level-of-detail).
 
+## Debug tools
+
+Settings, in debug mode, links to `/debug`: whole pages of tooling rather
+than an aid on a page that already exists. There is one so far, the
+[prompt review](prompt-review.md#the-debug-page) at `/debug/prompts`. Every
+load and endpoint behind them calls `requireFeature(…, 'debugMode')`. The link
+is display-only, like everything else here: an account without the feature
+gets a 403 however it arrives. A new tool goes in `/debug`'s list.
+
 ## Adding a debug aid
 
 - **Read `page.data.debug`** in the app shell, or `readDebugMode` on a page

@@ -43,5 +43,10 @@ local-media/
 # Email `npm run dev` would have sent, one JSON file each (docs/email.md)
 .mail-outbox/
 
+# The prompt catalogue's full export and review files (docs/prompt-review.md);
+# the snapshot beside them IS committed.
+prompt-catalogue/.full/
+prompt-catalogue/.review/
+
 # Miscellaneous
 .local
