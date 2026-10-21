@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNotNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, notExists, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { CreateVaultInput, VaultWrapInput } from '../schemas/vault';
 import type { VaultListingView, VaultWrapView } from '../types';
@@ -139,11 +139,38 @@ export async function listVaultsForUser(db: Db, userId: string): Promise<VaultLi
 		return null;
 	}
 	const [self] = selfRows;
+	// An escrow whose share has been released — relayed for a sign-in that
+	// completed by email, so `releaseEscrow` hands it out — is spent, and is
+	// not listed: the device that recovered the vault makes a new one in its
+	// place. Without this, a recovery cut off between writing the new wrap and
+	// deleting the old escrows (a navigation mid-load is enough) left the next
+	// load with a usable wrap *and* an escrow, so it never replaced the spent
+	// one.
 	const escrowRows = self
 		? await db
 				.select({ partnershipId: vaultEscrows.partnershipId })
 				.from(vaultEscrows)
-				.where(eq(vaultEscrows.vaultId, self.id))
+				.where(
+					and(
+						eq(vaultEscrows.vaultId, self.id),
+						notExists(
+							db
+								.select({ id: vaultEscrowRelays.id })
+								.from(vaultEscrowRelays)
+								.innerJoin(
+									accountRecoveryRequests,
+									eq(accountRecoveryRequests.id, vaultEscrowRelays.recoveryRequestId)
+								)
+								.where(
+									and(
+										eq(vaultEscrowRelays.escrowId, vaultEscrows.id),
+										eq(accountRecoveryRequests.status, 'completed'),
+										isNotNull(accountRecoveryRequests.emailConfirmedAt)
+									)
+								)
+						)
+					)
+				)
 		: [];
 
 	return {

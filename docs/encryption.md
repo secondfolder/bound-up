@@ -691,7 +691,10 @@ account's address — within the last seven days (`ESCROW_RELEASE_WINDOW_MS`).
 The device opens the relay with its new key, then `inner` with the share,
 checks the result matches the vault's key check, and writes itself a wrap.
 Every escrow is then **replaced**, under new ids and so new shares, because the
-old shares have been released.
+old shares have been released. The listing stops counting an escrow as held the
+moment its share becomes releasable (a relay for a sign-in completed by
+email), so a device cut off between writing its wrap and deleting the old
+escrows still replaces them on its next load.
 
 **What this does not protect against**: the server and a partner working
 together. Each holds half; together they can open the user's own vault. That
