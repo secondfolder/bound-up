@@ -202,6 +202,34 @@
 							"shippedOn": "2026-10-20"
 						},
 						{
+							"id": "daydreams-own-fields",
+							"title": "Characters and ideas in your own words",
+							"summary": "Add whatever detail you like to a character or an idea, and mark a twist as a spoiler the story keeps from you until it reveals it.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
+							"id": "daydreams-openings",
+							"title": "Places to start",
+							"summary": "Give an idea a few places its story can begin, like three weeks in or the morning after, and start again from another one beside the first.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
+							"id": "daydreams-trackers",
+							"title": "Things the story keeps track of",
+							"summary": "Watch a meter, a count or the rules in force move as the story goes, with a note under each passage that moved one.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
+							"id": "daydreams-thoughts",
+							"title": "What they're thinking",
+							"summary": "See a character's unspoken thoughts set apart from what they say, or keep them hidden.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
 							"id": "daydreams-kink-list",
 							"title": "Daydreams from your kink list",
 							"summary": "Daydreams that start from what you're into, and stay clear of your hard limits.",

@@ -40,6 +40,12 @@
 // spec can see which level the prompt carried; one without says nothing extra.
 // Every passage offers two directions ("Slower", "Surprise me") and two
 // suggestions, and proposes a roll for a turn containing `[roll]`.
+// - a first passage asked to start from one of the idea's openings is
+//   "<character> picks it up at: <the opening's name>.";
+// - a turn containing `[thought]` gets the character's thought after the
+//   passage, `<thought who="<character>">The stub keeps this to itself.</thought>`;
+// - a turn containing `[track]` moves a tracker exactly as the prompt's own
+//   example does (`describeTrackers`), so a spec sees the readout move.
 //
 // A request that asks for a JSON object (`response_format`) is a setup
 // suggestion (`api/daydreams/suggest`), answered with fixed JSON for whichever
@@ -121,8 +127,16 @@ function heatNote(system) {
  */
 function lastUserMessage(messages) {
 	const content = messages.filter((message) => message.role === 'user').at(-1)?.content ?? '';
-	return content.replace(/\n\n\(Direction buttons on screen now: [^\n]*\)$/, '');
+	return content
+		.replace(/\n\n\(What the story keeps track of now: [^\n]*\)$/, '')
+		.replace(/\n\n\(Direction buttons on screen now: [^\n]*\)$/, '');
 }
+
+/** The idea's opening a first passage is asked to start from (`openingRequest`), by its name. */
+const OPENING = /<opening>\n(?<label>[^:\n]+):/;
+
+/** The tracker move the prompt gives as its example (`describeTrackers`), which the stub makes. */
+const TRACKER_EXAMPLE = /like (?<example>\{"trackers": \{[^\n]*?\}\})/;
 
 /** The take another take replaces, as `anotherTakeRequest` quotes it. */
 const ANOTHER_TAKE = /another take on a passage you wrote[^\n]*\n"{3}\n(?<take>[\s\S]*?)\n"{3}/;
@@ -152,8 +166,20 @@ function replyFor(messages) {
 		readAs: 'action',
 		...(last.includes('[roll]') ? { roll: ROLL } : {}),
 		// A picture only when asked, so the other specs' pages stay as they were.
-		...(last.includes('[picture]') ? { image: 'A woman in her thirties at a desk' } : {})
+		...(last.includes('[picture]') ? { image: 'A woman in her thirties at a desk' } : {}),
+		// A tracker moved only when asked, as the prompt's own example moves it.
+		...(last.includes('[track]')
+			? JSON.parse(system.match(TRACKER_EXAMPLE)?.groups?.example ?? '{}')
+			: {})
 	};
+	// What a character thinks, only when asked, so the other specs' passages stay as they were.
+	const thought = last.includes('[thought]')
+		? ` <thought who="${name}">The stub keeps this to itself.</thought>`
+		: '';
+	const opening = last.match(OPENING)?.groups?.label;
+	if (users.length === 1 && opening) {
+		return withMeta(`${name} picks it up at: ${opening}.${heat}`, meta);
+	}
 	if (users.length === 1 && last.startsWith('(Begin. Open straight into the monologue')) {
 		return withMeta(`**The stub voice says its piece.**\n\nAnd then a little more.${heat}`, meta);
 	}
@@ -188,7 +214,7 @@ function replyFor(messages) {
 	if (last.includes('[direction]')) {
 		return `<reading>direction</reading>\n${withMeta(`${name} heard: "${last}"${takeNote}${heat}`, meta)}`;
 	}
-	return withMeta(`${name} heard: "${last}"${takeNote}${heat}`, meta);
+	return withMeta(`${name} heard: "${last}"${takeNote}${heat}${thought}`, meta);
 }
 
 /** A setup suggestion's answer, as OpenRouter wraps a non-streamed completion. */

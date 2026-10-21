@@ -1107,6 +1107,69 @@ test.describe('daydreams', () => {
 		expect(Number(rows[0]?.count)).toBe(2);
 	});
 
+	test('an idea’s place to start, a spoiler of its own and what it keeps track of all play', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await openSetup(page);
+		await clickWaButton(page, 'New idea');
+		const idea = dialog(page);
+		await idea.locator('wa-input[name="title"] input').fill('Kept');
+		await idea.getByRole('textbox', { name: /What’s going on/ }).fill('She keeps you.');
+		// A field of its own, made a spoiler.
+		await idea.getByRole('button', { name: 'Add a field' }).click();
+		await page.getByRole('menuitem', { name: 'Your own…' }).click();
+		await idea.getByRole('textbox', { name: 'Name this field' }).fill('Secret');
+		await idea.getByRole('textbox', { name: /^Secret/ }).fill('She owns the building.');
+		await idea.getByRole('button', { name: 'Spoiler: Secret' }).click();
+		// A place to start, and something to keep track of.
+		await idea.getByRole('button', { name: 'Add a place to start' }).click();
+		await idea.locator('.opening wa-input input').fill('Three weeks in');
+		await idea.locator('.opening wa-textarea textarea').fill('The door is locked.');
+		await idea.getByRole('button', { name: 'Add something to keep track of' }).click();
+		await idea.locator('.tracker wa-input input').first().fill('Submission');
+		await idea.locator('.tracker wa-input input').nth(1).fill('10');
+		await idea.getByRole('button', { name: 'Use this idea' }).click();
+		await expect(idea).toHaveCount(0);
+		await newCharacter(page, 'Mara');
+		// The spoiler is kept off the setup.
+		await expect(page.getByText('She owns the building.')).toHaveCount(0);
+		await page.getByRole('combobox', { name: 'Where it starts' }).click();
+		await page.getByRole('option', { name: 'Three weeks in' }).click();
+		await clickWaButton(page, 'Start daydreaming');
+		await page.waitForURL(/\/daydreams\/[0-9a-f-]{36}$/);
+
+		// It opens where it was asked to, and says so.
+		await expect(page.getByText('Mara picks it up at: Three weeks in.')).toBeVisible();
+		await expect(page.locator('li.passage').first()).toContainText('From “Three weeks in”');
+		await passageSaved(page);
+
+		// What it keeps track of, moved by the story and said under the passage.
+		const kept = page.getByRole('list', { name: 'What the story keeps track of' });
+		await expect(kept).toContainText('Submission');
+		await expect(kept).toContainText('10/100');
+		await reply(page, unique('[track] I obey.'));
+		await expect(kept).toContainText('15/100');
+		await expect(page.locator('li.tracker-note')).toContainText('Submission 10 → 15');
+		await passageSaved(page);
+
+		// A character's thought, set apart from what is said.
+		await reply(page, unique('[thought] Yes.'));
+		await expect(page.locator('.thought').last()).toHaveText('The stub keeps this to itself.');
+		await passageSaved(page);
+
+		// Started again from the premise: a second beginning, with its own count.
+		await page
+			.locator('li.passage')
+			.first()
+			.getByRole('button', { name: 'More for this passage' })
+			.click();
+		await page.getByRole('menuitem', { name: 'From the premise' }).click();
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		await expect(page.locator('li.passage').first()).toContainText('2/2');
+		await expect(kept).toContainText('10/100');
+	});
+
 	test('an account without the feature has no way in', async ({ page }) => {
 		const who = account('Outsider');
 		await signUp(page, who);

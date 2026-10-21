@@ -146,10 +146,13 @@
 			{/if}
 			{#if errors?.[index]?.value}<span class="invalid">{errors[index].value}</span>{/if}
 			<div class="field-actions">
-				<!-- A toggle: a native button, because wa-button forwards no aria-pressed (AGENTS.md). -->
+				<!-- A toggle: a native button, because wa-button forwards no aria-pressed (AGENTS.md).
+				     Named for its field, as every field has one: "Spoiler" alone, several times
+				     over, said nothing of which. -->
 				<button
 					type="button"
 					class="spoiler-toggle"
+					aria-label={`Spoiler: ${label || 'your own field'}`}
 					aria-pressed={field.spoiler}
 					onclick={() => setSpoiler(index, field)}
 				>
