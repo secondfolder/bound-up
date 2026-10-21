@@ -808,6 +808,11 @@ lacks `ElementInternals` altogether.) That changes how to read them:
   `wa-button`'s role is out of their reach; find it by element or class.
 - `userEvent` from `vitest/browser` types real, trusted keystrokes through
   Playwright, for a component whose state depends on real typing.
+- **The real mouse outlives a file.** It belongs to the tab, and every file's
+  frame fills the same tab, so Chromium hovers whatever a file draws under
+  wherever an earlier file's `userEvent` left it. `vitest-setup-browser.ts`
+  parks it in the frame's bottom-right corner before each file; within a file,
+  a test that moves it leaves it there for the tests after it.
 
 The test browser is sealed off. Every host but localhost resolves to a black
 hole (`--host-resolver-rules` in `vite.config.ts`), so an iframe never loads
