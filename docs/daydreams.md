@@ -565,6 +565,21 @@ opening anything:
   characters** (or ideas) makes a library record from the copy. Setups from
   before the library existed upcast to copies with no source, and land here.
 
+**Where a copy has gone its own way.** A revision only says which library
+version a copy came from, and a story changes its copy without touching
+that: the idea's heat raised as the user pushed, a premise rewritten by
+"Update the idea", a character's libido grown with the story. So the setup
+page also compares the fields themselves (`ideaDifferences`,
+`characterDifferences` in `daydream/copy-differences.ts`): under a card
+whose library version has opened, "This idea differs from your library in
+2 places" lists each field and dial with both values
+(`DaydreamCopyDifferences.svelte`). **Use your library's** takes that one
+field into this daydream's copy, saved with the form; **Copy to your
+library** saves this copy's value into the library's at once. The copy is
+marked as matching the new revision only if it matched the one before, so
+"Updated in your library since" still shows when it was due. Casting is
+this daydream's alone and never compared.
+
 Editing a copied character from a daydream's setup edits the library's too
 (the dialog says so), and that daydream's copy follows at once; other
 daydreams then see "Updated". Unticking "Save to my characters" keeps the

@@ -28,6 +28,14 @@
 	} from '$lib/daydream';
 	import { type CopyState, copyState } from '$lib/daydream/chips';
 	import { saveLibraryItem, sealSetupExchanges } from '$lib/daydream/client';
+	import {
+		type CharacterKey,
+		characterDifferences,
+		type IdeaKey,
+		ideaDifferences,
+		takeCharacterField,
+		takeIdeaField
+	} from '$lib/daydream/copy-differences';
 	import { IDEA_SLIDERS } from '$lib/daydream/dial-words';
 	import type { SetupExchange } from '$lib/daydream/setup-exchange';
 	import { type SuggestContext, suggestCasting } from '$lib/daydream/suggest';
@@ -40,6 +48,7 @@
 	import type { DaydreamLibraryItemView, DaydreamLibraryView, SealedRefView } from '$lib/types';
 	import DaydreamCharacterDialog, { type CastingEdit } from './DaydreamCharacterDialog.svelte';
 	import DaydreamCopyCard from './DaydreamCopyCard.svelte';
+	import DaydreamCopyDifferences from './DaydreamCopyDifferences.svelte';
 	import DaydreamDials from './DaydreamDials.svelte';
 	import DaydreamIdeaDialog from './DaydreamIdeaDialog.svelte';
 	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
@@ -520,6 +529,97 @@
 		return Boolean(item && open(item.sealed));
 	}
 
+	// ── where a copy differs from the library ───────────────────────────────
+
+	/** Said when the library's version has not opened yet, so there is nothing to copy onto. */
+	const LIBRARY_NOT_OPEN = 'Your library’s version has not opened yet. Try again in a moment.';
+
+	/** The library's version of the idea this daydream copied, opened, or null. */
+	function libraryIdea() {
+		const item = $form.idea.sourceId ? ideaRevisions.get($form.idea.sourceId) : undefined;
+		const opened = item ? openedDaydreamIdea(item.sealed) : null;
+		return item && opened ? { item, opened } : null;
+	}
+
+	const ideaDiffs = $derived.by(() => {
+		const theirs = libraryIdea();
+		return theirs ? ideaDifferences($form.idea, theirs.opened, $form.voice.narrator) : [];
+	});
+
+	function useLibraryIdeaField(key: IdeaKey) {
+		const theirs = libraryIdea();
+		if (theirs) {
+			putIdea(takeIdeaField($form.idea, theirs.opened, key));
+		}
+	}
+
+	/**
+	 * One of the idea's fields saved into the library's version. The copy is
+	 * marked as matching the new revision only if it matched the one before,
+	 * so "Updated in your library since" still shows when it was due.
+	 */
+	async function copyIdeaFieldToLibrary(key: IdeaKey): Promise<string | null> {
+		const theirs = libraryIdea();
+		if (!theirs) {
+			return LIBRARY_NOT_OPEN;
+		}
+		const saved = await saveLibraryItem('ideas', {
+			id: theirs.item.id,
+			content: takeIdeaField(theirs.opened, $form.idea, key),
+			expectedRevision: theirs.item.revision
+		});
+		if (!saved.ok) {
+			return saved.error;
+		}
+		const matched = $form.idea.sourceRevision === theirs.item.revision;
+		putIdea(
+			{ ...$form.idea, sourceRevision: matched ? saved.revision : $form.idea.sourceRevision },
+			saved.sealed
+		);
+		return null;
+	}
+
+	/** The library's version of a character in this daydream, opened, or null. */
+	function libraryCharacter(character: DaydreamCharacterCopy) {
+		const item = character.sourceId ? characterRevisions.get(character.sourceId) : undefined;
+		const opened = item ? openedDaydreamCharacter(item.sealed) : null;
+		return item && opened ? { item, opened } : null;
+	}
+
+	function useLibraryCharacterField(index: number, key: CharacterKey) {
+		const copy = $form.characters[index];
+		const theirs = copy ? libraryCharacter(copy) : null;
+		if (copy && theirs) {
+			putCharacter(index, takeCharacterField(copy, theirs.opened, key));
+		}
+	}
+
+	async function copyCharacterFieldToLibrary(
+		index: number,
+		key: CharacterKey
+	): Promise<string | null> {
+		const copy = $form.characters[index];
+		const theirs = copy ? libraryCharacter(copy) : null;
+		if (!(copy && theirs)) {
+			return LIBRARY_NOT_OPEN;
+		}
+		const saved = await saveLibraryItem('characters', {
+			id: theirs.item.id,
+			content: takeCharacterField(theirs.opened, copy, key),
+			expectedRevision: theirs.item.revision
+		});
+		if (!saved.ok) {
+			return saved.error;
+		}
+		const matched = copy.sourceRevision === theirs.item.revision;
+		putCharacter(
+			index,
+			{ ...copy, sourceRevision: matched ? saved.revision : copy.sourceRevision },
+			saved.sealed
+		);
+		return null;
+	}
+
 	function ideaState(): CopyState {
 		return copyState($form.idea, ideaRevisions);
 	}
@@ -673,6 +773,15 @@
 			}
 		}}
 	/>
+	{const theirs = $derived(libraryCharacter(character))}
+	{#if theirs}
+		<DaydreamCopyDifferences
+			differences={characterDifferences(character, theirs.opened)}
+			kindName="character"
+			onuselibrary={(key) => useLibraryCharacterField(index, key)}
+			oncopytolibrary={(key) => copyCharacterFieldToLibrary(index, key)}
+		/>
+	{/if}
 {/snippet}
 
 {#snippet castPicker(label: string, partId: string | null)}
@@ -841,6 +950,12 @@
 							putIdea(saved.copy as DaydreamIdeaCopy, saved.sealed);
 						}
 					}}
+				/>
+				<DaydreamCopyDifferences
+					differences={ideaDiffs}
+					kindName="idea"
+					onuselibrary={useLibraryIdeaField}
+					oncopytolibrary={copyIdeaFieldToLibrary}
 				/>
 			{:else}
 				<p class="hint">Where it happens and what is going on.</p>
