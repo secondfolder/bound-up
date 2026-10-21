@@ -231,7 +231,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 128428179e819e · user · in 6 of 18
+## ¶ 0092ea7f30da3c · user · in 6 of 18
 
 Only when side ∈ {either}.
 
@@ -243,8 +243,8 @@ Only when side ∈ {either}.
   - "tags": up to 4 tags of a word or two for its kinks and tropes
   - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
   - "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 0f7e42586eac49 · user · in 18 of 18
@@ -335,7 +335,7 @@ With "watch" they are not in it: the story follows its dominant one, whose side 
 In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
-## ¶ 1049f9f0b38df1 · user · in 6 of 18
+## ¶ 02517a7873aa87 · user · in 6 of 18
 
 Only when side ∈ {dom}.
 
@@ -347,8 +347,8 @@ Only when side ∈ {dom}.
   - "tags": up to 4 tags of a word or two for its kinks and tropes
   - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
   - "voice": how it is told, one of "talk", "told", "watch", "command", "monologue"
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 16fbeefe1ef9f0 · system · in 6 of 18
@@ -388,7 +388,7 @@ With "watch" they are not in it: the story follows its submissive one, whose sid
 In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
 ~~~~
 
-## ¶ 1077b35fa3d24e · user · in 6 of 18
+## ¶ 1ad8fd87cc1288 · user · in 6 of 18
 
 Only when side ∈ {sub}.
 
@@ -400,8 +400,8 @@ Only when side ∈ {sub}.
   - "tags": up to 4 tags of a word or two for its kinks and tropes
   - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
   - "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 17f996265f95d0 · user · only when one value was swept from the baseline

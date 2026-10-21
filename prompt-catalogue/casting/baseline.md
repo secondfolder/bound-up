@@ -41,7 +41,7 @@ Where: ⟦idea.setting⟧
 What it's about: ⟦idea.premise⟧
 </idea>
 
-No heat is set: keep to how sexual what is written already is.
+The idea's heat is not set: keep to how sexual what is written already is.
 
 # Their place in it
 

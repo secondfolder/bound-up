@@ -87,7 +87,12 @@ import { ExchangeRecorder } from './exchange-recorder';
 import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
 import { explicitOoc } from './ooc';
 import { type OpenedSetupExchange, openSetupExchanges } from './raw-setup-exchanges.svelte';
-import { settingsChange, stillInEffect, withSettings } from './story-settings';
+import {
+	settingsChange,
+	stillInEffect,
+	withoutDaydreamSettings,
+	withSettings
+} from './story-settings';
 import { suggestCatchUp, suggestName } from './suggest';
 import {
 	type CatchUp,
@@ -804,16 +809,23 @@ export class DaydreamStory {
 		// The reading the reply opened with outranks the one in its metadata,
 		// written after the passage had already decided it.
 		const readAs = forced ?? (writtenOut ? 'instruction' : (reading ?? meta?.readAs));
-		// Settings change only for what the user wrote themselves, in the story's
-		// own words: a button, a roll or Continue cannot raise the heat, and
-		// neither can a page quoted in the research by way of the model.
+		// The daydream's own settings — length, pace, intensity, the idea's heat
+		// and kink — change only for what the user wrote themselves: a button, a
+		// roll or Continue cannot raise the heat, and neither can a page quoted in
+		// the research by way of the model. A character's own dials follow the
+		// story wherever it has taken them, so any passage may move those.
 		const ownWords =
 			parent?.role === 'user' &&
 			parentContent?.type === 'text' &&
 			forced !== 'ooc' &&
 			!explicitOoc(parentContent.text);
 		const changed =
-			stopped || request.rewrite || !ownWords ? null : settingsChange(setup, meta?.settings);
+			stopped || request.rewrite
+				? null
+				: settingsChange(
+						setup,
+						ownWords ? meta?.settings : withoutDaydreamSettings(meta?.settings)
+					);
 		const finalMeta: PassageMeta | undefined =
 			meta || stopped || request.rewrite || writtenOut || forced || reading
 				? {

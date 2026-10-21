@@ -74,7 +74,7 @@ Who is in it: nobody, unless a named character is the one speaking: then only th
 
 # Rating
 
-For a story or a monologue alike, rate the idea: "heat", how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy); and "kink", how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme). Rate it from what they asked for, any pages they linked included: a daydream that says nothing sexual is not sexual.
+For a story or a monologue alike, rate the idea: "heat", how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy); and "kink", how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme). Rate it from what they asked for, any pages they linked included: a daydream that says nothing sexual is not sexual.
 
 # The summary
 
@@ -120,8 +120,8 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
   - "yourRole": who the user is in it, and on which side
   - "tone": how it should feel
   - "notes": empty for a story; the sayings, for a monologue
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words

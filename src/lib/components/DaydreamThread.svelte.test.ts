@@ -7,7 +7,7 @@ import type { Exchange } from '$lib/daydream/exchange';
 import type { ExchangeRecorder } from '$lib/daydream/exchange-recorder';
 import type { ReplySoFar } from '$lib/daydream/reply-format';
 import { recordSent } from '$lib/daydream/sent-record';
-import type { DaydreamTurnContent, PassageMeta } from '$lib/sealed-kinds/daydreams';
+import type { DaydreamTurnContent, PassageMeta, StorySettings } from '$lib/sealed-kinds/daydreams';
 import { testDaydreamSetup } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
 import { pending } from '$lib/testing/pending';
@@ -1421,14 +1421,17 @@ describe('DaydreamThread', () => {
 
 	describe('settings the story changes', () => {
 		/** Another take of the passage after `parent`, which answers with `settings`. */
-		async function againWith(parent: DaydreamTurnContent | string) {
+		async function againWith(
+			parent: DaydreamTurnContent | string,
+			settings: StorySettings = { length: 'long' }
+		) {
 			client.writeReply.mockResolvedValueOnce({
 				ok: true,
 				passage: 'Longer now.',
 				meta: {
 					suggestions: [],
 					directions: { add: [], remove: [] },
-					settings: { length: 'long' }
+					settings
 				},
 				expansion: null
 			});
@@ -1455,9 +1458,7 @@ describe('DaydreamThread', () => {
 			expect(saved(0)?.content).toMatchObject({
 				meta: { settings: { length: 'long' }, settingsBefore: { length: 'medium' } }
 			});
-			await waitFor(() =>
-				expect(container.textContent).toContain('Now long passages, as you asked.')
-			);
+			await waitFor(() => expect(container.textContent).toContain('Now long passages.'));
 			await press(container, 'Undo');
 			await waitFor(() =>
 				expect(client.saveSetup.mock.calls[1]?.[1]).toMatchObject({
@@ -1472,7 +1473,21 @@ describe('DaydreamThread', () => {
 			const { container } = await againWith({ type: 'direction', id: 'longer', label: 'Longer' });
 			expect(client.saveSetup).not.toHaveBeenCalled();
 			expect(saved(0)?.content).not.toHaveProperty('meta.settings');
-			expect(container.textContent).not.toContain('as you asked');
+			expect(container.textContent).not.toContain('Now long passages');
+		});
+
+		it('lets any passage move a character’s own dials, but not the daydream’s', async () => {
+			const { container } = await againWith(
+				{ type: 'direction', id: 'longer', label: 'Longer' },
+				{ length: 'long', characters: [{ name: 'Mara', libido: 5 }] }
+			);
+			await waitFor(() =>
+				expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({
+					characters: [{ name: 'Mara', dials: { libido: 5 } }]
+				})
+			);
+			expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ dials: { length: 'medium' } });
+			await waitFor(() => expect(container.textContent).toContain("Now Mara's libido Slutty."));
 		});
 	});
 

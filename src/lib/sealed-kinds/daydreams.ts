@@ -468,9 +468,28 @@ export const storySettingsSchema = z
 		pace: dial.optional(),
 		intensity: dial.optional(),
 		heat: dial.optional(),
-		kink: dial.optional()
+		kink: dial.optional(),
+		/**
+		 * Characters' own dials, by name, as the story has changed them: the
+		 * chaste one who has grown eager over a training story.
+		 */
+		characters: z
+			.array(
+				z.object({
+					name: z.string().trim().min(1).max(DAYDREAM_LIMITS.characterName),
+					libido: dial.optional(),
+					kink: dial.optional()
+				})
+			)
+			.max(MAX_DAYDREAM_CHARACTERS)
+			.optional()
 	})
-	.refine((value) => Object.keys(value).length > 0, 'Say which setting changed');
+	.refine(
+		(value) =>
+			Object.entries(value).some(([key, set]) => key !== 'characters' && set !== undefined) ||
+			(value.characters?.length ?? 0) > 0,
+		'Say which setting changed'
+	);
 
 export type StorySettings = z.output<typeof storySettingsSchema>;
 
@@ -483,7 +502,17 @@ const settingsBeforeSchema = z.object({
 	pace: dial.optional(),
 	intensity: dial.optional(),
 	heat: dial.nullable().optional(),
-	kink: dial.nullable().optional()
+	kink: dial.nullable().optional(),
+	characters: z
+		.array(
+			z.object({
+				name: z.string().trim().min(1).max(DAYDREAM_LIMITS.characterName),
+				libido: dial.nullable().optional(),
+				kink: dial.nullable().optional()
+			})
+		)
+		.max(MAX_DAYDREAM_CHARACTERS)
+		.optional()
 });
 
 export type StorySettingsBefore = z.output<typeof settingsBeforeSchema>;

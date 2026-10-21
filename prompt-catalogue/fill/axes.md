@@ -13,7 +13,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -No other characters yet.
 +No characters chosen yet.
  
--No heat is set: keep to how sexual what is written already is.
+-The idea's heat is not set: keep to how sexual what is written already is.
 +# The idea so far
  
 -# The character so far
@@ -54,8 +54,8 @@ One value changed at a time; see baseline.md for the prompt itself.
 +- "parts": the parts for characters to play
 +  - "name": a short name for the part
 +  - "description": what that part does in the idea, in a few words
-+- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-+- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
++- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
++- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  
 -{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "notes": "…"}
 \ No newline at end of file
@@ -139,9 +139,9 @@ No change.
 @@ -20,5 +20,6 @@
  No other characters yet.
  
--No heat is set: keep to how sexual what is written already is.
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+-The idea's heat is not set: keep to how sexual what is written already is.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
  
  # The character so far
 ~~~~
@@ -152,8 +152,8 @@ No change.
 @@ -20,4 +20,5 @@
  No other characters yet.
  
-+Kink: kinky: BDSM and power exchange.
- No heat is set: keep to how sexual what is written already is.
++The idea's kink: kinky: BDSM and power exchange.
+ The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ### rated = both
@@ -162,10 +162,10 @@ No change.
 @@ -20,5 +20,7 @@
  No other characters yet.
  
--No heat is set: keep to how sexual what is written already is.
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Kink: kinky: BDSM and power exchange.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+-The idea's heat is not set: keep to how sexual what is written already is.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's kink: kinky: BDSM and power exchange.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
  
  # The character so far
 ~~~~
@@ -184,7 +184,7 @@ No change.
 +⟦character2.name⟧
 +</characters>
  
- No heat is set: keep to how sexual what is written already is.
+ The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ## Story dials sent (`story`, descriptive, baseline `no`)
@@ -193,7 +193,7 @@ No change.
 
 ~~~~diff
 @@ -22,4 +22,9 @@
- No heat is set: keep to how sexual what is written already is.
+ The idea's heat is not set: keep to how sexual what is written already is.
  
 +How the daydream will be told, for context — these are not lengths for the fields:
 +Intensity: moderate.

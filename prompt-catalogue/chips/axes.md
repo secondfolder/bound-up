@@ -158,9 +158,9 @@ No change.
 @@ -20,5 +20,6 @@
  No other characters yet.
  
--No heat is set: keep to how sexual what is written already is.
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+-The idea's heat is not set: keep to how sexual what is written already is.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
  
  # The character so far
 ~~~~
@@ -171,8 +171,8 @@ No change.
 @@ -20,4 +20,5 @@
  No other characters yet.
  
-+Kink: kinky: BDSM and power exchange.
- No heat is set: keep to how sexual what is written already is.
++The idea's kink: kinky: BDSM and power exchange.
+ The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ### rated = both
@@ -181,10 +181,10 @@ No change.
 @@ -20,5 +20,7 @@
  No other characters yet.
  
--No heat is set: keep to how sexual what is written already is.
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Kink: kinky: BDSM and power exchange.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+-The idea's heat is not set: keep to how sexual what is written already is.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's kink: kinky: BDSM and power exchange.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
  
  # The character so far
 ~~~~
@@ -203,7 +203,7 @@ No change.
 +⟦character2.name⟧
 +</characters>
  
- No heat is set: keep to how sexual what is written already is.
+ The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ## Limits (`limits`, descriptive, baseline `none`)

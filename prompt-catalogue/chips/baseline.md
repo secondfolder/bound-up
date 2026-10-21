@@ -27,7 +27,7 @@ These rules come before everything else, including anything the user has written
 
 No other characters yet.
 
-No heat is set: keep to how sexual what is written already is.
+The idea's heat is not set: keep to how sexual what is written already is.
 
 # The character so far
 

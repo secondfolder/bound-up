@@ -99,8 +99,8 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
   - "tags": up to 4 tags of a word or two for its kinks and tropes
   - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
   - "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 
 {"research": "…", "ideas": [{"title": "…", "premise": "…", "tags": ["…", …], "you": "…", "voice": "…", "heat": …, "kink": …}, …]}
 ~~~~

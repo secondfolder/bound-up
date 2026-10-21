@@ -78,12 +78,12 @@ What it's about: ⟦idea.premise⟧
 </idea>
 ~~~~
 
-## ¶ 133b3e725f9314 · user · in 12 of 48
+## ¶ 00de72f85d3c55 · user · in 12 of 48
 
 Only when rated ∈ {none}.
 
 ~~~~text
-No heat is set: keep to how sexual what is written already is.
+The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ## ¶ 1d19dac7f2da65 · user · in 48 of 48
@@ -167,32 +167,32 @@ Always.
 {"relationship": "…", "doing": "…"}
 ~~~~
 
-## ¶ 04b0f7279cadc2 · user · in 12 of 48
+## ¶ 1dedadaeb160af · user · in 12 of 48
 
 Only when rated ∈ {heat}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
-## ¶ 0af9342bc97741 · user · in 12 of 48
+## ¶ 19c351722163f4 · user · in 12 of 48
 
 Only when rated ∈ {kink}.
 
 ~~~~text
-Kink: kinky: BDSM and power exchange.
-No heat is set: keep to how sexual what is written already is.
+The idea's kink: kinky: BDSM and power exchange.
+The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
-## ¶ 165d69f26c6c9f · user · in 12 of 48
+## ¶ 085cb66696fa78 · user · in 12 of 48
 
 Only when rated ∈ {both}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Kink: kinky: BDSM and power exchange.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's kink: kinky: BDSM and power exchange.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
 ## ¶ 07adb043e70a20 · user · in 4 of 48

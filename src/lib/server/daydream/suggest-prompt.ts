@@ -382,7 +382,7 @@ function limitsSection(limits: string): string {
 }
 
 /** Said when a task has no heat to go by: neither free rein nor nothing sexual. */
-const NO_HEAT = 'No heat is set: keep to how sexual what is written already is.';
+const NO_HEAT = "The idea's heat is not set: keep to how sexual what is written already is.";
 
 /** The idea's heat and kink in words, or `NO_HEAT` when no heat is set. */
 function heatLines(dials: IdeaDialsInput | undefined): string {
@@ -478,8 +478,8 @@ const textKey = (key: string, says: string): AnswerKey => ({ key, says, shape: '
 
 /** How an idea's heat and kink are rated, in the same terms as the sliders (`IDEA_SLIDERS`). */
 const RATINGS = {
-	heat: 'how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)',
-	kink: 'how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)'
+	heat: 'how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)',
+	kink: 'how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)'
 } as const;
 
 type IdeaDial = keyof typeof RATINGS;
@@ -609,7 +609,7 @@ function surpriseInstructions(request: RecordRequest): TaskInstructions {
 		!monologue &&
 			request.context.characters.length > 0 &&
 			'built around the characters above, each playing one of its parts',
-		unrated.length < 2 && 'fitting the heat and kink set above'
+		unrated.length < 2 && "fitting the idea's heat and kink set above"
 	].filter(Boolean);
 	const invent = `Invent an idea for this ${monologue ? 'monologue' : 'story'} that the user will not expect${fits.length > 0 ? `, ${fits.join(', and ')}` : ''}.`;
 	const fields = ['title', ...IDEA_TEXT_FIELDS];

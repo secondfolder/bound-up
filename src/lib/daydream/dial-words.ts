@@ -219,11 +219,16 @@ export const IDEA_SLIDERS: readonly {
 export function describeIdeaDials(dials: IdeaDials): string[] {
 	const lines = IDEA_SLIDERS.flatMap((slider) => {
 		const value = dials[slider.key];
-		return value === null ? [] : [`${slider.label}: ${slider.scale[value].phrase}.`];
+		return value === null
+			? []
+			: [`The idea's ${slider.label.toLowerCase()}: ${slider.scale[value].phrase}.`];
 	});
 	if (dials.heat !== null) {
+		// Two kinds of dial share the words "kink" and "heat"-like eagerness:
+		// the idea's, and each character's own. Said whose every time, since
+		// "kink" alone read as either, to a person and so to a model.
 		lines.push(
-			'Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.'
+			"The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it."
 		);
 	}
 	return lines;

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { testDaydreamSetup, testIdea } from '$lib/testing/daydream-setup';
-import { describeSettings, settingsChange, stillInEffect, withSettings } from './story-settings';
+import { testCharacter, testDaydreamSetup, testIdea } from '$lib/testing/daydream-setup';
+import {
+	describeSettings,
+	settingsChange,
+	stillInEffect,
+	withoutDaydreamSettings,
+	withSettings
+} from './story-settings';
 
 const setup = testDaydreamSetup({
 	dials: { intensity: 3, pace: 3, length: 'medium' },
@@ -36,9 +42,43 @@ describe('withSettings and stillInEffect', () => {
 
 describe('describeSettings', () => {
 	it('says what is set now, in the dials’ own words', () => {
-		expect(describeSettings({ length: 'long' })).toBe('Now long passages, as you asked.');
+		expect(describeSettings({ length: 'long' })).toBe('Now long passages.');
 		expect(describeSettings({ pace: 2, heat: 4, kink: 1 })).toBe(
-			'Now pace slow, heat Explicit and kink Vanilla, as you asked.'
+			"Now pace slow, the idea's heat Explicit and the idea's kink Vanilla."
 		);
+		expect(describeSettings({ characters: [{ name: 'Mara', libido: 5, kink: 3 }] })).toBe(
+			"Now Mara's libido Slutty and Mara's kink Kinky."
+		);
+	});
+});
+
+describe('a character’s own dials', () => {
+	const cast = testDaydreamSetup({
+		characters: [testCharacter({ name: 'Mara' })]
+	});
+
+	it('changes only what moved, for a character in the story, and puts it back', () => {
+		const change = settingsChange(cast, {
+			characters: [
+				{ name: 'mara', libido: 5 },
+				{ name: 'Nobody', libido: 5 }
+			]
+		});
+		expect(change).toEqual({
+			settings: { characters: [{ name: 'Mara', libido: 5 }] },
+			settingsBefore: { characters: [{ name: 'Mara', libido: null }] }
+		});
+		const changed = withSettings(cast, change?.settings ?? {});
+		expect(changed.characters[0]?.dials.libido).toBe(5);
+		expect(stillInEffect(changed, change?.settings ?? {})).toBe(true);
+		const undone = withSettings(changed, change?.settingsBefore ?? {});
+		expect(undone.characters[0]?.dials.libido).toBeNull();
+	});
+
+	it('is all a reply to anything but the user’s own words may change', () => {
+		expect(withoutDaydreamSettings({ heat: 5, characters: [{ name: 'Mara', libido: 4 }] })).toEqual(
+			{ characters: [{ name: 'Mara', libido: 4 }] }
+		);
+		expect(withoutDaydreamSettings({ heat: 5 })).toBeUndefined();
 	});
 });

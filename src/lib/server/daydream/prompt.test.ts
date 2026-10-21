@@ -1054,8 +1054,8 @@ describe('describeSetup', () => {
 				idea: testIdea({ dials: { heat: 1, kink: null } })
 			})
 		);
-		expect(sfw).toContain('Heat: SFW: nothing sexual at all');
-		expect(sfw).toContain('Heat is the ceiling for everyone in the story');
+		expect(sfw).toContain("The idea's heat: SFW: nothing sexual at all");
+		expect(sfw).toContain("The idea's heat is the ceiling for everyone in it");
 		// The character's own dials are still said, for within that ceiling.
 		expect(sfw).toContain('is slutty');
 		expect(sfw).toContain('is depraved');
@@ -1064,14 +1064,14 @@ describe('describeSetup', () => {
 		const filthy = describeSetup(
 			testDaydreamSetup({ idea: testIdea({ dials: { heat: 5, kink: 5 } }) })
 		);
-		expect(filthy).toContain('Heat: filthy');
-		expect(filthy).toContain('Kink: extreme');
+		expect(filthy).toContain("The idea's heat: filthy");
+		expect(filthy).toContain("The idea's kink: extreme");
 	});
 
 	it('says to follow the user’s lead when no heat is set, and nothing of kink', () => {
 		const content = describeSetup(setup);
 		expect(content).toContain(
-			"Heat: not set — follow the user's lead, as explicit as they take it."
+			"The idea's heat: not set — follow the user's lead, as explicit as they take it."
 		);
 		expect(content).not.toContain('Kink');
 	});
@@ -1334,9 +1334,13 @@ describe('the review’s fixes to the reply prompt', () => {
 describe('settings the story changes', () => {
 	it('asks for a changed setting only when the user asks outright, on the dials’ own scales', () => {
 		const content = system(buildMessages(request({ turns: [said('Make these longer')] })));
-		expect(content).toContain('"settings" (optional, and only when asked)');
-		expect(content).toContain('a scene that calls for more is not a request');
-		expect(RULES).toContain('the dials change when the user asks for it');
+		expect(content).toContain('"settings" (optional)');
+		// Two kinds, said apart, since both have a "kink".
+		expect(content).toContain("the idea's heat or the idea's kink higher or lower");
+		expect(content).toContain(`{"characters": [{"name": "Mara", "libido": 4}]}`);
+		expect(content).toContain('the character\'s "kink" (1 vanilla');
+		expect(content).toContain('never because one scene calls for more');
+		expect(RULES).toContain('the dials change only through "settings"');
 		// Nothing about the limits, the voice or the cast.
 		expect(content).not.toMatch(/"settings"[^\n]*limits/);
 	});

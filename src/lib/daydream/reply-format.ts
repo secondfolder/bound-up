@@ -209,12 +209,22 @@ function salvageSettings(value: unknown): StorySettings | undefined {
 		return undefined;
 	}
 	const record = value as Record<string, unknown>;
-	const kept = Object.fromEntries(
+	const kept: Record<string, unknown> = Object.fromEntries(
 		SETTING_KEYS.flatMap((key) => {
 			const one = storySettingsSchema.safeParse({ [key]: record[key] });
 			return one.success && one.data[key] !== undefined ? [[key, one.data[key]]] : [];
 		})
 	);
+	// Each character on their own, so one bad entry costs only itself.
+	const characters = (Array.isArray(record.characters) ? record.characters : []).flatMap(
+		(entry: unknown) => {
+			const one = storySettingsSchema.safeParse({ characters: [entry] });
+			return one.success ? (one.data.characters ?? []) : [];
+		}
+	);
+	if (characters.length > 0) {
+		kept.characters = characters;
+	}
 	const settings = storySettingsSchema.safeParse(kept);
 	return settings.success ? settings.data : undefined;
 }

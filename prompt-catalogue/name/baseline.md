@@ -33,7 +33,7 @@ What it is about: ⟦idea.premise⟧
 With: ⟦character1.name⟧, ⟦character2.name⟧
 </idea>
 
-No heat is set: keep to how sexual what is written already is.
+The idea's heat is not set: keep to how sexual what is written already is.
 
 # How it opens
 

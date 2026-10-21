@@ -172,12 +172,12 @@ Always.
 # Rating
 ~~~~
 
-## ¶ 04a651a70629b1 · system · in 216 of 216
+## ¶ 16386f210f2da5 · system · in 216 of 216
 
 Always.
 
 ~~~~text
-For a story or a monologue alike, rate the idea: "heat", how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy); and "kink", how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme). Rate it from what they asked for, any pages they linked included: a daydream that says nothing sexual is not sexual.
+For a story or a monologue alike, rate the idea: "heat", how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy); and "kink", how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme). Rate it from what they asked for, any pages they linked included: a daydream that says nothing sexual is not sexual.
 ~~~~
 
 ## ¶ 08270d46f263f0 · system · in 216 of 216
@@ -292,7 +292,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 057d740fde00d7 · user · in 72 of 216
+## ¶ 089d72347faa4f · user · in 72 of 216
 
 Only when side ∈ {either}.
 
@@ -306,8 +306,8 @@ Only when side ∈ {either}.
   - "yourRole": who the user is in it, and on which side
   - "tone": how it should feel
   - "notes": empty for a story; the sayings, for a monologue
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
@@ -466,7 +466,7 @@ With "watch" they are not in it: the story follows its dominant one, whose side 
 In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
-## ¶ 031189a580ec39 · user · in 72 of 216
+## ¶ 09a5c848a6750b · user · in 72 of 216
 
 Only when side ∈ {dom}.
 
@@ -480,8 +480,8 @@ Only when side ∈ {dom}.
   - "yourRole": who the user is in it, and on which side
   - "tone": how it should feel
   - "notes": empty for a story; the sayings, for a monologue
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
@@ -559,7 +559,7 @@ With "watch" they are not in it: the story follows its submissive one, whose sid
 In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
 ~~~~
 
-## ¶ 18e4f3977dac25 · user · in 72 of 216
+## ¶ 19e953ab093fca · user · in 72 of 216
 
 Only when side ∈ {sub}.
 
@@ -573,8 +573,8 @@ Only when side ∈ {sub}.
   - "yourRole": who the user is in it, and on which side
   - "tone": how it should feel
   - "notes": empty for a story; the sayings, for a monologue
-  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words

@@ -45,9 +45,9 @@ One value changed at a time; see baseline.md for the prompt itself.
 @@ -26,5 +26,6 @@
  </idea>
  
--No heat is set: keep to how sexual what is written already is.
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+-The idea's heat is not set: keep to how sexual what is written already is.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
  
  # How it opens
 ~~~~
@@ -58,8 +58,8 @@ One value changed at a time; see baseline.md for the prompt itself.
 @@ -26,4 +26,5 @@
  </idea>
  
-+Kink: kinky: BDSM and power exchange.
- No heat is set: keep to how sexual what is written already is.
++The idea's kink: kinky: BDSM and power exchange.
+ The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ### rated = both
@@ -68,10 +68,10 @@ One value changed at a time; see baseline.md for the prompt itself.
 @@ -26,5 +26,7 @@
  </idea>
  
--No heat is set: keep to how sexual what is written already is.
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Kink: kinky: BDSM and power exchange.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+-The idea's heat is not set: keep to how sexual what is written already is.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's kink: kinky: BDSM and power exchange.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
  
  # How it opens
 ~~~~

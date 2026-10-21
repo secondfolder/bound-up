@@ -33,8 +33,8 @@ One value changed at a time; see baseline.md for the prompt itself.
    - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
 -  - "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
 +  - "voice": how it is told, one of "talk", "told", "watch", "command", "monologue"
-   - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-   - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+   - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+   - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ### side = sub
@@ -66,8 +66,8 @@ One value changed at a time; see baseline.md for the prompt itself.
    - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
 -  - "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
 +  - "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
-   - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-   - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+   - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+   - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## Already offered (`offered`, structural, baseline `none`)

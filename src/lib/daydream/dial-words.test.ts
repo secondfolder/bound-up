@@ -30,14 +30,17 @@ describe('the dial words', () => {
 	it('says nothing of an idea dial left unset', () => {
 		expect(describeIdeaDials({ heat: null, kink: null })).toEqual([]);
 		expect(describeIdeaDials({ heat: null, kink: 3 })).toEqual([
-			'Kink: kinky: BDSM and power exchange.'
+			"The idea's kink: kinky: BDSM and power exchange."
 		]);
 	});
 
 	it('makes heat the ceiling whenever it is set', () => {
 		const lines = describeIdeaDials({ heat: 1, kink: null });
 		expect(lines[0]).toContain('SFW: nothing sexual at all');
-		expect(lines.at(-1)).toContain('Heat is the ceiling');
+		// Whose dial each is, every time: the idea's, or a character's own.
+		expect(lines.at(-1)).toContain(
+			"The idea's heat is the ceiling for everyone in it: each character's own libido and kink"
+		);
 	});
 
 	it('names a starting point’s level, kinky from 3 up', () => {

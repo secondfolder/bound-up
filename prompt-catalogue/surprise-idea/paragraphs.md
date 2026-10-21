@@ -141,7 +141,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 1116b520639393 · user · in 10 of 48
+## ¶ 03838b01e06f09 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {none}.
 
@@ -154,8 +154,8 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 1bc35294550d39 · user · in 10 of 48
@@ -186,21 +186,21 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 Invent an idea for this story that the user will not expect, built around the characters above, each playing one of its parts.
 ~~~~
 
-## ¶ 04b0f7279cadc2 · user · in 12 of 48
+## ¶ 1dedadaeb160af · user · in 12 of 48
 
 Only when rated ∈ {heat}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
-## ¶ 03e74378fa24ec · user · in 15 of 48
+## ¶ 020e0d30e75baa · user · in 15 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {heat, kink, both}; cast ∈ {none}.
 
 ~~~~text
-Invent an idea for this story that the user will not expect, fitting the heat and kink set above.
+Invent an idea for this story that the user will not expect, fitting the idea's heat and kink set above.
 ~~~~
 
 ## ¶ 0ea3d7ff257ebc · user · in 12 of 48
@@ -211,7 +211,7 @@ Only when rated ∈ {heat}.
 Rate the idea's kink too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 0137ceec56a9a9 · user · in 10 of 48
+## ¶ 122bccbc4247db · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {heat}.
 
@@ -224,7 +224,7 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 1d12d05bc5bdb0 · user · in 10 of 48
@@ -235,20 +235,20 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …}
 ~~~~
 
-## ¶ 0ea786a3b72322 · user · in 15 of 48
+## ¶ 04694588140888 · user · in 15 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {heat, kink, both}; cast ∈ {some}.
 
 ~~~~text
-Invent an idea for this story that the user will not expect, built around the characters above, each playing one of its parts, and fitting the heat and kink set above.
+Invent an idea for this story that the user will not expect, built around the characters above, each playing one of its parts, and fitting the idea's heat and kink set above.
 ~~~~
 
-## ¶ 0a7ba5edf6bc36 · user · in 12 of 48
+## ¶ 0eaad4aeecb898 · user · in 12 of 48
 
 Only when rated ∈ {kink}.
 
 ~~~~text
-Kink: kinky: BDSM and power exchange.
+The idea's kink: kinky: BDSM and power exchange.
 ~~~~
 
 ## ¶ 0fcab1e579218c · user · in 12 of 48
@@ -259,7 +259,7 @@ Only when rated ∈ {kink}.
 Rate the idea's heat too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 06efe3febe3e44 · user · in 10 of 48
+## ¶ 1e4cf148f60980 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {kink}.
 
@@ -272,7 +272,7 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 13ff03e2b6600e · user · in 10 of 48
@@ -283,14 +283,14 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …}
 ~~~~
 
-## ¶ 165d69f26c6c9f · user · in 12 of 48
+## ¶ 085cb66696fa78 · user · in 12 of 48
 
 Only when rated ∈ {both}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Kink: kinky: BDSM and power exchange.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's kink: kinky: BDSM and power exchange.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
 ## ¶ 0f61ad7f916d10 · user · in 10 of 48
@@ -352,7 +352,7 @@ Only when narrator ∈ {monologue}.
 The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, "the speaker".
 ~~~~
 
-## ¶ 1749b078d3834b · user · in 2 of 48
+## ¶ 0b04fde184d686 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {none}.
 
@@ -366,8 +366,8 @@ Only when narrator ∈ {monologue}; rated ∈ {none}.
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 01a59b271aa888 · user · in 2 of 48
@@ -378,15 +378,15 @@ Only when narrator ∈ {monologue}; rated ∈ {none}.
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 ~~~~
 
-## ¶ 069299edc9c4a2 · user · in 6 of 48
+## ¶ 0de058aa4a7d17 · user · in 6 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {heat, kink, both}.
 
 ~~~~text
-Invent an idea for this monologue that the user will not expect, fitting the heat and kink set above.
+Invent an idea for this monologue that the user will not expect, fitting the idea's heat and kink set above.
 ~~~~
 
-## ¶ 15f929c39eb44d · user · in 2 of 48
+## ¶ 12d1c6a93200bd · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {heat}.
 
@@ -400,7 +400,7 @@ Only when narrator ∈ {monologue}; rated ∈ {heat}.
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 1a3f6ac8fa8060 · user · in 2 of 48
@@ -411,7 +411,7 @@ Only when narrator ∈ {monologue}; rated ∈ {heat}.
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …}
 ~~~~
 
-## ¶ 0ebd98b5b70b93 · user · in 2 of 48
+## ¶ 1879be3a212337 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {kink}.
 
@@ -425,7 +425,7 @@ Only when narrator ∈ {monologue}; rated ∈ {kink}.
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 1c6332dae6a031 · user · in 2 of 48

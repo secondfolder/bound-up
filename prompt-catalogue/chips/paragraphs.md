@@ -46,12 +46,12 @@ Only when target ∈ {character}; field ∈ {archetype, personality, speech, app
 No other characters yet.
 ~~~~
 
-## ¶ 133b3e725f9314 · user · in 72 of 528
+## ¶ 00de72f85d3c55 · user · in 72 of 528
 
 Only when target ∈ {character}; field ∈ {archetype, personality, speech, appearance, likes, notes}; rated ∈ {none}.
 
 ~~~~text
-No heat is set: keep to how sexual what is written already is.
+The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ## ¶ 04ab306b76d114 · user · in 288 of 528
@@ -148,32 +148,32 @@ Other characters in the daydream:
 </characters>
 ~~~~
 
-## ¶ 04b0f7279cadc2 · user · in 132 of 528
+## ¶ 1dedadaeb160af · user · in 132 of 528
 
 Only when rated ∈ {heat}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
-## ¶ 0af9342bc97741 · user · in 72 of 528
+## ¶ 19c351722163f4 · user · in 72 of 528
 
 Only when target ∈ {character}; field ∈ {archetype, personality, speech, appearance, likes, notes}; rated ∈ {kink}.
 
 ~~~~text
-Kink: kinky: BDSM and power exchange.
-No heat is set: keep to how sexual what is written already is.
+The idea's kink: kinky: BDSM and power exchange.
+The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
-## ¶ 165d69f26c6c9f · user · in 132 of 528
+## ¶ 085cb66696fa78 · user · in 132 of 528
 
 Only when rated ∈ {both}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Kink: kinky: BDSM and power exchange.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's kink: kinky: BDSM and power exchange.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
 ## ¶ 1e50bc9a2f37c8 · user · in 88 of 528
@@ -326,12 +326,12 @@ Characters in the daydream:
 </characters>
 ~~~~
 
-## ¶ 0a7ba5edf6bc36 · user · in 60 of 528
+## ¶ 0eaad4aeecb898 · user · in 60 of 528
 
 Only when target ∈ {idea}; field ∈ {notes, setting, premise, yourRole, tone}; rated ∈ {kink}.
 
 ~~~~text
-Kink: kinky: BDSM and power exchange.
+The idea's kink: kinky: BDSM and power exchange.
 ~~~~
 
 ## ¶ 1064646be41f28 · user · in 8 of 528

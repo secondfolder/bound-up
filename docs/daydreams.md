@@ -1004,73 +1004,53 @@ watcher), a direction for the story, part of the story, out of character.
 
 ## Settings the story changes
 
-Someone who types "can you make these longer?" or "make it kinkier"
-mid-story means from now on. Before, the next passage obliged and the one
-after went back to the dial's length, since the dial still said otherwise,
-and contradicted what they asked. So the reply can change a setting
-itself: its metadata may carry `settings`, the new values of `length`,
-`pace`, `intensity`, `heat` or `kink` (`SETTINGS_INSTRUCTION` in
-`server/daydream/prompt.ts`), asked for only when the user asks outright,
-never because a scene calls for more.
+The dials move as the story does. Someone who types "can you make these
+longer?" means from now on; before, the next passage obliged and the one
+after went back to the dial's length, which still said otherwise. And a
+training story may take its chaste character to eager over twenty
+passages, which their libido dial should follow. So a reply's metadata may
+carry `settings`, new values for two kinds of dial (`SETTINGS_INSTRUCTION`
+in `server/daydream/prompt.ts`), never because one scene calls for more:
+
+- **The daydream's own** — `length`, `pace`, `intensity`, and the idea's
+  `heat` and `kink` — when the user's own words ask outright, or keep
+  pushing the story that way: a story the user steers from SFW into
+  explicit raises the idea's heat.
+- **A character's own** — `libido` and `kink`, by name (`characters`) —
+  when the story has changed them for good. The idea's heat stays the
+  ceiling for everyone.
+
+Both have a "kink", so the prompt always says whose: "the idea's kink", a
+character's "kink", and every idea dial line reads "The idea's heat: …"
+(`describeIdeaDials`). Left bare, "kink" read as either, to a person as
+much as to a model.
 
 - **The page applies it**, since only the browser can open the setup.
   `settingsChange` (`daydream/story-settings.ts`) keeps only the values
-  that moved, and the passage stores them with what they were
-  (`settings`, `settingsBefore`, `daydream-turn` v7). Once the passage is
-  saved, the setup is saved with them through the same queue as the
-  Dials popover (`saveSetup`).
-- **Only for the user's own words.** A reply to a button, a roll,
-  Continue, a rewrite, a check-in or an out-of-character turn changes
-  nothing, whatever its metadata says, so a quoted page cannot use the
-  model to raise the heat. `settingsBefore` is never read from the model.
+  that moved, for characters who are in the story, and the passage stores
+  them with what they were (`settings`, `settingsBefore`, `daydream-turn`
+  v7). Once the passage is saved, the setup is saved with them through the
+  same queue as the Dials popover (`saveSetup`). Only this daydream's copy
+  of the idea and characters changes; where it now differs from the
+  library, the setup page says so ([Characters and ideas, and the
+  library](#characters-and-ideas-and-the-library)).
+- **The daydream's own only for the user's own words.** A reply to a
+  button, a roll, Continue or an out-of-character turn keeps only the
+  characters' changes (`withoutDaydreamSettings`), so a quoted page cannot
+  use the model to raise the heat; a rewrite or a check-in keeps none.
+  `settingsBefore` is never read from the model.
 - **Said where it happened.** A note under the passage says what is set
-  now (`DaydreamSettingsNote.svelte`: "Now long passages, as you asked."),
-  and the Dials show the new values. **Undo** puts back what it was, and
-  is offered only while every value it changed still stands
+  now (`DaydreamSettingsNote.svelte`: "Now long passages and Mara's libido
+  Slutty."), and the Dials show the new values. **Undo** puts back what it
+  was, and is offered only while every value it changed still stands
   (`stillInEffect`), so it never undoes something set by hand since.
 - **Never the limits, the voice or the cast.** Those stay the user's to
-  change. Lowering anything is always fine; raising heat or kink only
-  follows an explicit request, and the rules and limits still bind.
+  change.
 - **For the whole daydream.** Settings belong to the setup, not a branch,
   as the popover's do. Like any change to the system prompt's dials, the
   next request is not a cached one ([Cost](#cost)).
 - **A monologue** counts its length in statements, so "say more" there
   changes the same `length`.
-
-## When the story moves on
-
-A user can take a story anywhere the rules allow
-([The system prompt is the server's](#the-system-prompt-is-the-servers)),
-but the setup still describes where it started. Everything that reads the
-setup then works from a stale picture: the next reply's setup section, the
-summary, a character's picture, naming, a daydream copied from this one.
-So the thread offers to bring it up to date, in two steps, so a reply never
-pays for rewriting the idea:
-
-1. **The reply flags it.** Its metadata may carry `drifted`, a line on how
-   the story now contradicts the idea or a character for good, never for a
-   passing moment (`DRIFTED_INSTRUCTION`; kept on the passage,
-   `daydream-turn` v7, capped at `DAYDREAM_LIMITS.drifted`).
-2. **The thread offers it.** Under the newest passage that flagged it, a
-   note (`DaydreamDriftNote.svelte`): "The story has moved on from its
-   idea", with **Update the idea** and **Not now**. Either answers it, and
-   the next offer waits until the story is `DRIFT_GAP` (five) passages past
-   the last answered one (`driftOffer`), so it cannot nag. Answered offers
-   are remembered on the device, since turns never change once written;
-   lost storage only offers again.
-3. **The user decides.** Update the idea sends the `catch-up` suggestion:
-   the idea's fields, each character's personality, who they are to the
-   user and what they are doing, the latest passages up to the flagged one
-   (at most `MAX_CATCH_UP_PASSAGES`, `MAX_CATCH_UP_STORY` characters), and
-   the line. It answers only the fields the story changed (`parseCatchUp`
-   keeps only those that differ, for characters who are in it). Never a
-   name or the idea's title. The dialog (`DaydreamCatchUpDialog.svelte`)
-   shows each as it would read, the words it adds marked (`addedRuns`),
-   with what it replaces, to accept, edit or leave out.
-4. **Only this daydream's copy changes.** Saving goes through `saveSetup`,
-   revision-checked like the Dials. The library's idea and characters stay
-   as they were, for starting other daydreams from; the out-of-sync
-   marker already shows when a copy and its library record differ.
 
 ## Dice
 

@@ -46,12 +46,12 @@ Only when target ∈ {character}; cast ∈ {none}.
 No other characters yet.
 ~~~~
 
-## ¶ 133b3e725f9314 · user · in 48 of 384
+## ¶ 00de72f85d3c55 · user · in 48 of 384
 
 Only when target ∈ {character}; rated ∈ {none}.
 
 ~~~~text
-No heat is set: keep to how sexual what is written already is.
+The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
 ## ¶ 04ab306b76d114 · user · in 192 of 384
@@ -152,32 +152,32 @@ Other characters in the daydream:
 </characters>
 ~~~~
 
-## ¶ 04b0f7279cadc2 · user · in 96 of 384
+## ¶ 1dedadaeb160af · user · in 96 of 384
 
 Only when rated ∈ {heat}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
-## ¶ 0af9342bc97741 · user · in 48 of 384
+## ¶ 19c351722163f4 · user · in 48 of 384
 
 Only when target ∈ {character}; rated ∈ {kink}.
 
 ~~~~text
-Kink: kinky: BDSM and power exchange.
-No heat is set: keep to how sexual what is written already is.
+The idea's kink: kinky: BDSM and power exchange.
+The idea's heat is not set: keep to how sexual what is written already is.
 ~~~~
 
-## ¶ 165d69f26c6c9f · user · in 96 of 384
+## ¶ 085cb66696fa78 · user · in 96 of 384
 
 Only when rated ∈ {both}.
 
 ~~~~text
-Heat: steamy: sex happens, written sensually rather than graphically.
-Kink: kinky: BDSM and power exchange.
-Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
+The idea's heat: steamy: sex happens, written sensually rather than graphically.
+The idea's kink: kinky: BDSM and power exchange.
+The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
 ## ¶ 1d5166a29cea32 · user · in 96 of 384
@@ -277,7 +277,7 @@ Only when target ∈ {idea}; rated ∈ {none}.
 Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 0b6b9595d309d3 · user · in 10 of 384
+## ¶ 001327ed2f0f20 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {none}.
 
@@ -290,8 +290,8 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 0209a532aaafc3 · user · in 10 of 384
@@ -330,7 +330,7 @@ Only when target ∈ {idea}; rated ∈ {heat}.
 Rate the idea's kink too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 1f4ccbac443a51 · user · in 10 of 384
+## ¶ 1dee819eca5fc6 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {heat}.
 
@@ -343,7 +343,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 077b6493cc6896 · user · in 10 of 384
@@ -354,12 +354,12 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 {"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …}
 ~~~~
 
-## ¶ 0a7ba5edf6bc36 · user · in 48 of 384
+## ¶ 0eaad4aeecb898 · user · in 48 of 384
 
 Only when target ∈ {idea}; rated ∈ {kink}.
 
 ~~~~text
-Kink: kinky: BDSM and power exchange.
+The idea's kink: kinky: BDSM and power exchange.
 ~~~~
 
 ## ¶ 1838614e44debe · user · in 10 of 384
@@ -378,7 +378,7 @@ Only when target ∈ {idea}; rated ∈ {kink}.
 Rate the idea's heat too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 14b68efd48f470 · user · in 10 of 384
+## ¶ 0e05840ec02497 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {kink}.
 
@@ -391,7 +391,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 026b1699f5f463 · user · in 10 of 384
@@ -453,7 +453,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, Anything else, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 12d3c74cd46031 · user · in 10 of 384
+## ¶ 126f3b678969b5 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {none}.
 
@@ -463,8 +463,8 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "yourRole": who the user is in it
 - "tone": how it should feel
 - "notes": anything the rest leaves out
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 03849145a4445f · user · in 14 of 384
@@ -483,7 +483,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, Anything else, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 0c7a931a815e35 · user · in 10 of 384
+## ¶ 0efcb4098d2609 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {heat}.
 
@@ -493,7 +493,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "yourRole": who the user is in it
 - "tone": how it should feel
 - "notes": anything the rest leaves out
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 15c31d1dec4970 · user · in 14 of 384
@@ -512,7 +512,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, Anything else, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1f8d47d261aa34 · user · in 10 of 384
+## ¶ 15bda061a088ec · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {kink}.
 
@@ -522,7 +522,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "yourRole": who the user is in it
 - "tone": how it should feel
 - "notes": anything the rest leaves out
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 1f0e6757b7f94d · user · in 14 of 384
@@ -580,7 +580,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, Your role in it, Tone, Anything else, the parts it has for characters, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 04b34829ef7014 · user · in 10 of 384
+## ¶ 0205e60c9c3752 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {none}.
 
@@ -592,8 +592,8 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 135c9b9271bfbe · user · in 10 of 384
@@ -612,7 +612,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, Your role in it, Tone, Anything else, the parts it has for characters, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1b8593d1e721c6 · user · in 10 of 384
+## ¶ 12af9d3d32d808 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {heat}.
 
@@ -624,7 +624,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 08075fbad766ee · user · in 10 of 384
@@ -643,7 +643,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, Your role in it, Tone, Anything else, the parts it has for characters, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 112af274b70b06 · user · in 10 of 384
+## ¶ 1e239a4cbf49bf · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {kink}.
 
@@ -655,7 +655,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 1cd1d323c03420 · user · in 10 of 384
@@ -717,7 +717,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, Your role in it, Tone, Anything else, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 0745dfd65f0839 · user · in 10 of 384
+## ¶ 1631653e31ac47 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {none}.
 
@@ -726,8 +726,8 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "yourRole": who the user is in it
 - "tone": how it should feel
 - "notes": anything the rest leaves out
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 12a278ec0a1514 · user · in 14 of 384
@@ -746,7 +746,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, Your role in it, Tone, Anything else, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1e5a4fc8c823dc · user · in 10 of 384
+## ¶ 11c37af9a887ef · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {heat}.
 
@@ -755,7 +755,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "yourRole": who the user is in it
 - "tone": how it should feel
 - "notes": anything the rest leaves out
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 119ae36ee59ae7 · user · in 14 of 384
@@ -774,7 +774,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 Fill in the idea's empty fields — Where, Your role in it, Tone, Anything else, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1bb2bb0be16171 · user · in 10 of 384
+## ¶ 1f7f7f56ffde23 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {kink}.
 
@@ -783,7 +783,7 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "yourRole": who the user is in it
 - "tone": how it should feel
 - "notes": anything the rest leaves out
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 1215d177007091 · user · in 14 of 384
@@ -837,7 +837,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}.
 Leave "setting" empty unless it is set somewhere in particular.
 ~~~~
 
-## ¶ 16fa79be019be5 · user · in 4 of 384
+## ¶ 01c54f5048c680 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {none}.
 
@@ -847,8 +847,8 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
 - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 0253cdc4887e50 · user · in 4 of 384
@@ -859,7 +859,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 0b559c658fb8e6 · user · in 4 of 384
+## ¶ 0e1bd621a0d85a · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {heat}.
 
@@ -869,7 +869,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
 - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 1380730f8e856e · user · in 4 of 384
@@ -880,7 +880,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 Fill in the idea's empty fields — Where, What it's about, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 15b8a322050341 · user · in 4 of 384
+## ¶ 1736b4fc1d2319 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; rated ∈ {kink}.
 
@@ -890,7 +890,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {name only}; 
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
 - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 05334dbe8d9268 · user · in 4 of 384
@@ -921,7 +921,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 177ff8a53e20a6 · user · in 4 of 384
+## ¶ 06b77699c71281 · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {none}.
 
@@ -930,8 +930,8 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
 - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 00f96cd0aafd7d · user · in 4 of 384
@@ -942,7 +942,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 1fdfd2e93d8f93 · user · in 4 of 384
+## ¶ 0923c6aa503aba · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {heat}.
 
@@ -951,7 +951,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
 - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
-- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 06697c326ffe09 · user · in 4 of 384
@@ -962,7 +962,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 Fill in the idea's empty fields — Where, Who you are to it, Tone, Sayings to build on, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters, except the sayings to build on, which are 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all. Do not change the fields already written.
 ~~~~
 
-## ¶ 0e63a0101038ef · user · in 4 of 384
+## ¶ 05e7920a2849ce · user · in 4 of 384
 
 Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated ∈ {kink}.
 
@@ -971,7 +971,7 @@ Only when target ∈ {idea}; narrator ∈ {monologue}; written ∈ {half}; rated
 - "yourRole": who the user is to the voice
 - "tone": how it sounds, in a few words
 - "notes": the sayings it builds on, 8 to 12 statements in the voice's own words, one to a line, at most 1,000 characters in all
-- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 ~~~~
 
 ## ¶ 01657a3b937a79 · user · in 4 of 384

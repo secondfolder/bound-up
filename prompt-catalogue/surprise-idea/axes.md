@@ -75,7 +75,7 @@ No change.
  - "parts": the parts for characters to play
    - "name": a short name for the part
 @@ -60,3 +62,3 @@
- - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+ - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  
 -{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file
@@ -91,8 +91,8 @@ No change.
 @@ -26,4 +26,7 @@
  </idea>
  
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 +
  # The user's limits
  
@@ -100,7 +100,7 @@ No change.
  # What to do
  
 -Invent an idea for this story that the user will not expect.
-+Invent an idea for this story that the user will not expect, fitting the heat and kink set above.
++Invent an idea for this story that the user will not expect, fitting the idea's heat and kink set above.
  
  What makes a story worth starting — weigh these before you answer, without writing the weighing out:
 @@ -43,5 +46,5 @@
@@ -113,8 +113,8 @@ No change.
 @@ -57,6 +60,5 @@
    - "name": a short name for the part
    - "description": what that part does in the idea, in a few words
--- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
- - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+-- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+ - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  
 -{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file
@@ -128,7 +128,7 @@ No change.
 @@ -26,4 +26,6 @@
  </idea>
  
-+Kink: kinky: BDSM and power exchange.
++The idea's kink: kinky: BDSM and power exchange.
 +
  # The user's limits
  
@@ -136,7 +136,7 @@ No change.
  # What to do
  
 -Invent an idea for this story that the user will not expect.
-+Invent an idea for this story that the user will not expect, fitting the heat and kink set above.
++Invent an idea for this story that the user will not expect, fitting the idea's heat and kink set above.
  
  What makes a story worth starting — weigh these before you answer, without writing the weighing out:
 @@ -43,5 +45,5 @@
@@ -148,8 +148,8 @@ No change.
  # Your answer
 @@ -58,5 +60,4 @@
    - "description": what that part does in the idea, in a few words
- - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
--- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+ - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+-- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  
 -{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file
@@ -163,9 +163,9 @@ No change.
 @@ -26,4 +26,8 @@
  </idea>
  
-+Heat: steamy: sex happens, written sensually rather than graphically.
-+Kink: kinky: BDSM and power exchange.
-+Heat is the ceiling for everyone in the story: a character’s libido and kink say how eager they are within it, never past it.
++The idea's heat: steamy: sex happens, written sensually rather than graphically.
++The idea's kink: kinky: BDSM and power exchange.
++The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 +
  # The user's limits
  
@@ -173,7 +173,7 @@ No change.
  # What to do
  
 -Invent an idea for this story that the user will not expect.
-+Invent an idea for this story that the user will not expect, fitting the heat and kink set above.
++Invent an idea for this story that the user will not expect, fitting the idea's heat and kink set above.
  
  What makes a story worth starting — weigh these before you answer, without writing the weighing out:
 @@ -43,6 +47,4 @@
@@ -186,8 +186,8 @@ No change.
 @@ -57,6 +59,4 @@
    - "name": a short name for the part
    - "description": what that part does in the idea, in a few words
--- "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
--- "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+-- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+-- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
  
 -{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 \ No newline at end of file

@@ -101,7 +101,7 @@ const ROLL = {
 function heatNote(system) {
 	// One line only: an unset heat says so on a line with no colon after
 	// "Heat:", which would otherwise run on into the next line's.
-	const level = system.match(/^Heat: (?<level>[^:\n]+):/m)?.groups?.level;
+	const level = system.match(/^The idea's heat: (?<level>[^:\n]+):/m)?.groups?.level;
 	return level ? ` (Heat: ${level}.)` : '';
 }
 

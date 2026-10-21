@@ -204,18 +204,20 @@ describe('buildSuggestMessages, heat and kink', () => {
 		expect(SUGGEST_RULES).not.toContain('SFW');
 		expect(SUGGEST_RULES).toContain('match how sexual the daydream is set to be');
 		const ask = asks({ ...idea, ideaDials: { heat: 1, kink: 4 } });
-		expect(ask).toContain('Heat: SFW');
-		expect(ask).toContain('Kink: heavy');
+		expect(ask).toContain("The idea's heat: SFW");
+		expect(ask).toContain("The idea's kink: heavy");
 	});
 
 	it('says what to go by when a character is written with no heat set, and the heat when one is', () => {
-		expect(asks(base)).toContain('No heat is set: keep to how sexual what is written already is.');
+		expect(asks(base)).toContain(
+			"The idea's heat is not set: keep to how sexual what is written already is."
+		);
 		const set = asks({
 			...base,
 			context: { characters: [], limits: '', ideaDials: { heat: 4, kink: null } }
 		});
-		expect(set).toContain('Heat:');
-		expect(set).not.toContain('No heat is set');
+		expect(set).toContain("The idea's heat:");
+		expect(set).not.toContain('heat is not set');
 	});
 
 	it('asks the model to rate only the dials left unset, as numbers', () => {
