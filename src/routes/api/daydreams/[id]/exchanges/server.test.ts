@@ -89,15 +89,13 @@ describe('POST /api/daydreams/[id]/exchanges', () => {
 			expect(await call(save, ada, id, body)).toMatchObject({ type: 'ok' });
 		}
 		// Asked about the turn the failure answered, it comes back too; a failed
-		// opening comes back with any read.
-		expect((await readBack(ada, id, [opening])).map((row) => row.id)).toEqual([
-			wrote.id,
-			failedOpening.id
-		]);
-		expect((await readBack(ada, id, [turn])).map((row) => row.id)).toEqual([
-			failed.id,
-			failedOpening.id
-		]);
+		// opening comes back with any read. Compared as sets: saved within one
+		// millisecond, rows tie on `createdAt` and fall back to their random ids,
+		// so their order is not what this is about (and failed it under load).
+		const ids = async (asked: string[]) =>
+			new Set((await readBack(ada, id, asked)).map((row) => row.id));
+		expect(await ids([opening])).toEqual(new Set([wrote.id, failedOpening.id]));
+		expect(await ids([turn])).toEqual(new Set([failed.id, failedOpening.id]));
 	});
 
 	it('refuses an account without debug mode, to save or to read', async () => {

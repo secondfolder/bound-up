@@ -298,20 +298,29 @@ describe('MediaPanel', () => {
 	});
 
 	it('shows its buttons on a tap, which a touchscreen has no hover for, and hides them on another', async () => {
-		const { container } = renderPanel({ images, clips: [], offset: 0 });
-		const slot = await firstSlot(container);
-		const item = defined(slot.querySelector<HTMLElement>('.item'), 'its item');
-		const tap = () =>
-			item.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }));
-		const toolbar = defined(slot.querySelector<HTMLElement>('.toolbar'), 'its buttons');
-		expect(getComputedStyle(toolbar).pointerEvents).toBe('none');
-		tap();
-		await tick();
-		expect(item.classList.contains('revealed')).toBe(true);
-		expect(getComputedStyle(toolbar).pointerEvents).toBe('auto');
-		tap();
-		await tick();
-		expect(item.classList.contains('revealed')).toBe(false);
+		// The rotation held still: under a loaded run a picture could move on
+		// between the tap and the check, and take what the tap showed with it.
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+		try {
+			const { container } = renderPanel({ images, clips: [], offset: 0 });
+			const slot = await firstSlot(container);
+			const item = defined(slot.querySelector<HTMLElement>('.item'), 'its item');
+			const tap = () =>
+				item.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }));
+			const toolbar = defined(slot.querySelector<HTMLElement>('.toolbar'), 'its buttons');
+			expect(getComputedStyle(toolbar).pointerEvents).toBe('none');
+			tap();
+			await tick();
+			// Polled rather than read once: the class lands on the next flush,
+			// which a busy browser can put off past a single tick.
+			await expect.poll(() => item.classList.contains('revealed')).toBe(true);
+			await expect.poll(() => getComputedStyle(toolbar).pointerEvents).toBe('auto');
+			tap();
+			await tick();
+			await expect.poll(() => item.classList.contains('revealed')).toBe(false);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('holds still while a picture is enlarged, and moves on once it is put back', async () => {
@@ -331,7 +340,9 @@ describe('MediaPanel', () => {
 
 			await toggled(item, () => item.hidePopover());
 			vi.advanceTimersByTime(7000);
-			await expect.poll(() => showing(slot)).not.toBe(shown);
+			// The next picture has to load before it shows, which took longer
+			// than the poll's default second when the whole suite was running.
+			await expect.poll(() => showing(slot), { timeout: 10_000 }).not.toBe(shown);
 		} finally {
 			vi.useRealTimers();
 		}
