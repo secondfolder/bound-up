@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DaydreamNarrator, DaydreamSetup } from '$lib/daydream';
+	import { type DaydreamNarrator, type DaydreamSetup, fieldText } from '$lib/daydream';
 	import { ideaFieldLabels } from '$lib/daydream/catalog';
 	import {
 		CATCH_UP_CHARACTER_FIELDS,
@@ -59,7 +59,10 @@
 				key: `idea.${key}`,
 				owner: { kind: 'idea' as const, field: key },
 				label: labels[key].label,
-				was: setup.idea[key],
+				was:
+					key === 'premise' || key === 'yourRole'
+						? setup.idea[key]
+						: fieldText(setup.idea.fields, key),
 				text: text ?? '',
 				use: true
 			};
@@ -69,7 +72,7 @@
 				(each) => each.name.toLowerCase() === name.toLowerCase()
 			);
 			const was: Record<CatchUpCharacterField, string> = {
-				personality: character?.personality ?? '',
+				personality: character ? fieldText(character.fields, 'personality') : '',
 				relationship: character?.casting.relationship ?? '',
 				doing: character?.casting.part ?? ''
 			};

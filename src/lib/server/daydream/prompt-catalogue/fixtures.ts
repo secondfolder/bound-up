@@ -1,5 +1,5 @@
 import {
-	CHARACTER_TEXT_FIELDS,
+	CHARACTER_FIELD_KINDS,
 	type CharacterDials,
 	type DaydreamCharacterCopy,
 	type DaydreamIdeaCopy,
@@ -7,7 +7,11 @@ import {
 	type DaydreamSetup,
 	type DaydreamStance,
 	type DialValue,
-	IDEA_TEXT_FIELDS,
+	fieldsFrom,
+	fieldText,
+	IDEA_FIELD_KINDS,
+	NEW_CHARACTER_FIELDS,
+	newIdeaFields,
 	type PassageLength
 } from '$lib/daydream';
 import type { ContextTurn } from '$lib/daydream/context';
@@ -53,15 +57,19 @@ export function starterText(starterId: string): TextSource {
 	setup.characters.forEach((cast, index) => {
 		const key = `character${index + 1}`;
 		words.set(`${key}.name`, cast.name);
-		for (const field of CHARACTER_TEXT_FIELDS) {
-			words.set(`${key}.${field}`, cast[field]);
+		words.set(`${key}.archetype`, cast.archetype);
+		words.set(`${key}.appearance`, cast.appearance);
+		for (const kind of CHARACTER_FIELD_KINDS) {
+			words.set(`${key}.${kind}`, fieldText(cast.fields, kind));
 		}
 		words.set(`${key}.relationship`, cast.casting.relationship);
 		words.set(`${key}.doing`, cast.casting.part);
 	});
 	words.set('idea.title', setup.idea.title);
-	for (const field of IDEA_TEXT_FIELDS) {
-		words.set(`idea.${field}`, setup.idea[field]);
+	words.set('idea.premise', setup.idea.premise);
+	words.set('idea.yourRole', setup.idea.yourRole);
+	for (const kind of IDEA_FIELD_KINDS) {
+		words.set(`idea.${kind}`, fieldText(setup.idea.fields, kind));
 	}
 	setup.idea.parts.forEach((part, index) => {
 		words.set(`part${index + 1}.name`, part.name);
@@ -81,6 +89,9 @@ const PART_IDS = ['00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-80
 
 /** A part nobody is cast in, which the story plays (`characters=1+story`). */
 const STORY_PART_ID = '00000000-0000-4000-8000-0000000000a9';
+
+/** The idea's field the user named (the `named` axis). */
+const NAMED_FIELD_ID = '00000000-0000-4000-8000-0000000000b1';
 
 const dial = (value: string | undefined): DialValue | null =>
 	value === undefined || value === 'unset' ? null : (Number(value) as DialValue);
@@ -111,11 +122,14 @@ function character(
 		sourceRevision: null,
 		name: text(`${key}.name`),
 		archetype: field('archetype'),
-		personality: field('personality'),
-		speech: field('speech'),
 		appearance: field('appearance'),
-		likes: field('likes'),
-		notes: field('notes'),
+		// The kinds that were fixed fields once, so the catalogue reads as it did.
+		fields: fieldsFrom(['personality', 'speech', 'likes', 'notes'], {
+			personality: field('personality'),
+			speech: field('speech'),
+			likes: field('likes'),
+			notes: field('notes')
+		}),
 		dials: dials ?? characterDials({}),
 		casting: {
 			partId: PART_IDS[index] ?? null,
@@ -132,11 +146,29 @@ function idea(text: TextSource, combo: Combo, characterCount: number): DaydreamI
 		sourceId: null,
 		sourceRevision: null,
 		title: text('idea.title'),
-		setting: field('setting'),
 		premise: text('idea.premise'),
 		yourRole: field('yourRole'),
-		tone: field('tone'),
-		notes: field('notes'),
+		fields: [
+			...fieldsFrom(['setting', 'tone', 'notes'], {
+				setting: field('setting'),
+				tone: field('tone'),
+				notes: field('notes')
+			}),
+			// A field the user named, and whether it is kept from them (the
+			// `named` axis). Written whatever `text` says, so the axis changes
+			// the same lines everywhere (the interaction test).
+			...(combo.named === 'named' || combo.named === 'spoiler'
+				? [
+						{
+							id: NAMED_FIELD_ID,
+							kind: null,
+							label: text('idea.named.label'),
+							value: text('idea.named.value'),
+							spoiler: combo.named === 'spoiler'
+						}
+					]
+				: [])
+		],
 		brief: combo.origin === 'none' ? '' : text('brief'),
 		research: combo.origin === 'brief+research' ? text('research') : '',
 		parts: [
@@ -155,6 +187,8 @@ function idea(text: TextSource, combo: Combo, characterCount: number): DaydreamI
 					]
 				: [])
 		],
+		openings: [],
+		trackers: [],
 		dials: { heat: dial(combo.heat), kink: dial(combo.kink) }
 	};
 }
@@ -183,9 +217,11 @@ function replySetup(text: TextSource, combo: Combo): DaydreamSetup {
 		dials: {
 			intensity: Number(combo.intensity) as DialValue,
 			pace: Number(combo.pace) as DialValue,
-			length: combo.length as PassageLength
+			length: combo.length as PassageLength,
+			thoughts: 'shown'
 		},
-		pictures: { on: combo.pictures !== 'none', style: 'photo' }
+		pictures: { on: combo.pictures !== 'none', style: 'photo' },
+		opening: null
 	};
 }
 
@@ -381,10 +417,19 @@ export function suggestInput(
 		case 'chips': {
 			const target = builder === 'surprise-idea' ? 'idea' : (combo.target as 'character' | 'idea');
 			const half = builder === 'fill' && combo.written === 'half';
+			// The fields a new record starts with, empty, as the dialogs send them:
+			// "Fill in the rest" fills only the fields a record has.
+			const startingFields = Object.fromEntries(
+				(target === 'character'
+					? NEW_CHARACTER_FIELDS
+					: newIdeaFields(combo.narrator === 'monologue' ? 'monologue' : undefined)
+				).map((kind) => [kind, ''])
+			);
 			const draft =
 				target === 'character'
 					? {
 							name: text('character1.name'),
+							...startingFields,
 							...(half ? { personality: text('character1.personality') } : {}),
 							...(builder === 'chips'
 								? { [combo.field ?? '']: text(`character1.${combo.field}`) }
@@ -392,6 +437,7 @@ export function suggestInput(
 						}
 					: {
 							title: text('idea.title'),
+							...startingFields,
 							...(half ? { premise: text('idea.premise') } : {}),
 							...(builder === 'chips' ? { [combo.field ?? '']: text(`idea.${combo.field}`) } : {}),
 							...(combo.parts === 'some'

@@ -1,12 +1,11 @@
 import { z } from 'zod';
 import { assertNever } from '$lib/assert-never';
 import {
-	CHARACTER_TEXT_FIELDS,
 	type CharacterTextField,
 	DAYDREAM_LIMITS,
-	IDEA_TEXT_FIELDS,
 	type IdeaTextField,
-	MAX_DAYDREAM_CHARACTERS
+	MAX_DAYDREAM_CHARACTERS,
+	MAX_FIELDS
 } from '$lib/daydream';
 import { CHARACTER_FIELD_LABELS, ideaFieldLabels } from '$lib/daydream/catalog';
 import {
@@ -71,6 +70,40 @@ import {
 
 const text = (max: number) => z.string().max(max).optional();
 
+/**
+ * A record's texts in the order a prompt lists them: the core and the known
+ * kinds of field (docs/daydreams.md, "Fields"). The idea's are in the order
+ * they always were, where before what is going on, so prompts read as they
+ * did when they were fixed fields.
+ */
+const CHARACTER_KEYS = [
+	'name',
+	'archetype',
+	'personality',
+	'speech',
+	'appearance',
+	'likes',
+	'hides',
+	'wontDo',
+	'wonOver',
+	'notes'
+] as const satisfies readonly (CharacterTextField | 'name')[];
+const IDEA_KEYS = [
+	'title',
+	'setting',
+	'premise',
+	'yourRole',
+	'tone',
+	'notes'
+] as const satisfies readonly (IdeaTextField | 'title')[];
+
+/** A field the record's user named: its name, what it says, and whether it is kept from them. */
+const namedFieldSchema = z.object({
+	label: z.string().max(DAYDREAM_LIMITS.fieldLabel),
+	value: z.string().max(DAYDREAM_LIMITS.customField),
+	spoiler: z.boolean()
+});
+
 const draftSchema = z.object({
 	name: text(FIELD_LIMITS.name),
 	archetype: text(FIELD_LIMITS.archetype),
@@ -78,6 +111,9 @@ const draftSchema = z.object({
 	speech: text(FIELD_LIMITS.speech),
 	appearance: text(FIELD_LIMITS.appearance),
 	likes: text(FIELD_LIMITS.likes),
+	hides: text(FIELD_LIMITS.hides),
+	wontDo: text(FIELD_LIMITS.wontDo),
+	wonOver: text(FIELD_LIMITS.wonOver),
 	notes: text(FIELD_LIMITS.notes),
 	title: text(FIELD_LIMITS.title),
 	setting: text(FIELD_LIMITS.setting),
@@ -85,7 +121,9 @@ const draftSchema = z.object({
 	yourRole: text(FIELD_LIMITS.yourRole),
 	tone: text(FIELD_LIMITS.tone),
 	/** An idea's parts so far, so suggestions fit them. */
-	parts: z.array(partSchema()).max(MAX_DAYDREAM_CHARACTERS).optional()
+	parts: z.array(partSchema()).max(MAX_DAYDREAM_CHARACTERS).optional(),
+	/** The fields the record's user named, so suggestions fit them too. */
+	fields: z.array(namedFieldSchema).max(MAX_FIELDS).optional()
 });
 
 function partSchema() {
@@ -116,14 +154,20 @@ const castingRequestSchema = z.object({
 		speech: true,
 		appearance: true,
 		likes: true,
-		notes: true
+		hides: true,
+		wontDo: true,
+		wonOver: true,
+		notes: true,
+		fields: true
 	}),
 	idea: draftSchema.pick({
 		title: true,
 		setting: true,
 		premise: true,
 		yourRole: true,
-		tone: true
+		tone: true,
+		notes: true,
+		fields: true
 	}),
 	ideaDials: ideaDialsSchema.optional(),
 	/** The idea's part they are cast in, if any. */
@@ -252,8 +296,10 @@ const recordRequestSchema = z
 	.object({
 		task: z.enum(['chips', 'fill', 'surprise-idea']),
 		target: z.enum(['character', 'idea']),
-		/** For `chips`: which field to suggest for. */
+		/** For `chips`: which field to suggest for, or "named" for one the user named. */
 		field: z.string().optional(),
+		/** For `chips` on a field the user named: its name. */
+		label: z.string().max(DAYDREAM_LIMITS.fieldLabel).optional(),
 		draft: draftSchema,
 		/** The character's dials, when the draft is a character. */
 		dials: z
@@ -283,7 +329,12 @@ const recordRequestSchema = z
 			/** The daydream's idea's heat and kink, for a character being written in it. */
 			ideaDials: ideaDialsSchema.optional(),
 			story: z
-				.object({ intensity: dial, pace: dial, length: z.enum(['short', 'medium', 'long']) })
+				.object({
+					intensity: dial,
+					pace: dial,
+					length: z.enum(['short', 'medium', 'long']),
+					thoughts: z.enum(['shown', 'hidden']).default('shown')
+				})
 				.optional(),
 			narrator: z
 				.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue'])
@@ -291,7 +342,8 @@ const recordRequestSchema = z
 		})
 	})
 	.superRefine((value, ctx) => {
-		if (value.task === 'chips' && !fieldsFor(value.target).includes(value.field ?? '')) {
+		const named = value.field === 'named' && Boolean(value.label?.trim());
+		if (value.task === 'chips' && !named && !fieldsFor(value.target).includes(value.field ?? '')) {
 			ctx.addIssue({ code: 'custom', path: ['field'], message: 'Chips are for one field' });
 		}
 		if (value.task === 'surprise-idea' && value.target !== 'idea') {
@@ -318,9 +370,24 @@ type CatchUpRequest = z.output<typeof catchUpRequestSchema>;
 type IdeaDialsInput = z.output<typeof ideaDialsSchema>;
 type Narrator = RecordRequest['context']['narrator'];
 
+/** The fields of a record chips can be asked for by name: all but its name or title. */
 function fieldsFor(target: RecordRequest['target']): readonly string[] {
-	return target === 'character' ? CHARACTER_TEXT_FIELDS : IDEA_TEXT_FIELDS;
+	return target === 'character' ? CHARACTER_KEYS.slice(1) : IDEA_KEYS.slice(1);
 }
+
+/** A record's texts, in the order a prompt lists them. */
+const keysFor = (target: RecordRequest['target']): readonly string[] =>
+	target === 'character' ? CHARACTER_KEYS : IDEA_KEYS;
+
+/** The texts every record has, whatever fields it was given (`DaydreamCharacter`, `DaydreamIdea`). */
+const CORE_KEYS: readonly string[] = [
+	'name',
+	'archetype',
+	'appearance',
+	'title',
+	'premise',
+	'yourRole'
+];
 
 /** Straight apostrophes in the prompt's own words, whatever the form's labels use. */
 const straight = (words: string) => words.replaceAll('’', "'");
@@ -405,18 +472,50 @@ function describeFields(
 	});
 }
 
+/**
+ * The fields the record's user named, as labelled lines, a spoiler said to be
+ * one: what is written in a spoiler is the twist, which a suggestion should
+ * fit but never give away in a field the user will see.
+ */
+function describeNamed(named: readonly NamedField[] | undefined): string[] {
+	return (named ?? []).flatMap((field) => {
+		const value = field.value.trim();
+		if (!(field.label.trim() && value)) {
+			return [];
+		}
+		return [
+			`${field.label.trim()}${field.spoiler ? ' (a spoiler, kept from the user)' : ''}: ${value}`
+		];
+	});
+}
+
+type NamedField = z.output<typeof namedFieldSchema>;
+
+/**
+ * How a suggestion may add a field of its own, or fill one the user named and
+ * left empty (docs/daydreams.md, "Fields"). The kinds named are the ones the
+ * most popular character cards carried beyond a standard sheet; a twist the
+ * user should find in play goes in as a spoiler.
+ */
+function newFieldsInstruction(target: RecordRequest['target']): string {
+	const examples =
+		target === 'character'
+			? "what they hide, what they won't do, how they are won over, a habit"
+			: 'a secret at its heart, a rule everyone follows, a twist';
+	return `Where it would make the ${target} better, add a field or two it does not have yet, each named in a few words — like ${examples} — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.`;
+}
+
 function describePart(part: { name: string; description: string }): string {
 	return part.description.trim() ? `${part.name}: ${part.description.trim()}` : part.name;
 }
 
 /** What is written of the draft, tagged; its dials, which the form set, after it untagged. */
 function describeDraft(request: RecordRequest): string {
-	const { parts, ...draft } = request.draft;
-	const fields =
-		request.target === 'character'
-			? ['name', ...CHARACTER_TEXT_FIELDS]
-			: ['title', ...IDEA_TEXT_FIELDS];
-	const written = describeFields(request.target, fields, draft, request.context.narrator);
+	const { parts, fields: named, ...draft } = request.draft;
+	const written = [
+		...describeFields(request.target, keysFor(request.target), draft, request.context.narrator),
+		...describeNamed(named)
+	];
 	if (request.target === 'idea' && parts && parts.length > 0) {
 		written.push(
 			`Parts for characters:\n${parts.map((part) => `- ${describePart(part)}`).join('\n')}`
@@ -497,6 +596,22 @@ const PARTS_KEY: AnswerKey = {
 	}
 };
 
+const NEW_FIELDS_KEY: AnswerKey = {
+	key: 'fields',
+	says: 'fields to add or fill, if any; an empty list for none',
+	shape: {
+		each: [
+			textKey('label', "the field's name, in a few words"),
+			textKey('value', 'what it says'),
+			{
+				key: 'spoiler',
+				says: 'true for a twist kept from the user, otherwise false',
+				shape: 'boolean'
+			}
+		]
+	}
+};
+
 /** The idea's dials the user left unset: the only ones a fill or a surprise may rate. */
 function unratedIdeaDials(request: RecordRequest): IdeaDial[] {
 	return (['heat', 'kink'] as const).filter((key) => (request.ideaDials?.[key] ?? null) === null);
@@ -537,6 +652,9 @@ const CHARACTER_SAYS: Record<string, string> = {
 	speech: 'how they talk',
 	appearance: 'what you notice about them',
 	likes: 'what they enjoy',
+	hides: 'what they keep from the user, or from everyone',
+	wontDo: "their own limits: what they won't do, whatever is asked",
+	wonOver: 'what it takes to get close to them',
 	notes: 'anything the rest leaves out'
 };
 
@@ -547,7 +665,11 @@ const SAYS_YOU = /\byour?\b/i;
 
 function chipsInstructions(request: RecordRequest): TaskInstructions {
 	const field = request.field ?? '';
-	const { label, hint } = fieldMeaning(request.target, field, request.context.narrator);
+	// A field the user named has their name for it and nothing more.
+	const { label, hint } =
+		field === 'named'
+			? { label: request.label?.trim() ?? '', hint: null }
+			: fieldMeaning(request.target, field, request.context.narrator);
 	const forUser = SAYS_YOU.test(`${label} ${hint ?? ''}`) ? '; "you" is the user' : '';
 	const means = hint ? ` (${hint.toLowerCase()}${forUser})` : '';
 	const sayings = request.target === 'idea' && isMonologue(request) && field === 'notes';
@@ -562,13 +684,15 @@ function chipsInstructions(request: RecordRequest): TaskInstructions {
 
 function fillInstructions(request: RecordRequest): TaskInstructions {
 	const monologue = request.target === 'idea' && isMonologue(request);
-	const fields =
-		request.target === 'character'
-			? ['name', ...CHARACTER_TEXT_FIELDS]
-			: ['title', ...IDEA_TEXT_FIELDS];
-	const { parts: _parts, ...fieldsDraft } = request.draft;
+	const { parts: _parts, fields: _named, ...fieldsDraft } = request.draft;
 	const draft: TextDraft = fieldsDraft;
-	const empty = fields.filter((field) => !draft[field]?.trim());
+	// Only the fields the record has, besides its core: a known kind the user
+	// removed is not brought back, and one not added yet is the model's to
+	// offer through "fields".
+	const present = new Set(Object.keys(fieldsDraft));
+	const empty = keysFor(request.target).filter(
+		(field) => (CORE_KEYS.includes(field) || present.has(field)) && !draft[field]?.trim()
+	);
 	// An idea with no parts yet gets some offered too: casting hangs on
 	// them. A monologue's has none to hang anything on.
 	const wantsParts = request.target === 'idea' && !monologue && !request.draft.parts?.length;
@@ -585,14 +709,16 @@ function fillInstructions(request: RecordRequest): TaskInstructions {
 				empty.includes('setting') &&
 				'Leave "setting" empty unless it is set somewhere in particular.',
 			wantsParts && PARTS_INSTRUCTION,
-			rateInstruction(unrated)
+			rateInstruction(unrated),
+			newFieldsInstruction(request.target)
 		),
 		answer: [
 			...(request.target === 'character'
 				? empty.map((field) => textKey(field, CHARACTER_SAYS[field] ?? field))
 				: ideaFieldKeys(empty, monologue)),
 			...(wantsParts ? [PARTS_KEY] : []),
-			...unrated.map(ratingKey)
+			...unrated.map(ratingKey),
+			NEW_FIELDS_KEY
 		],
 		maxTokens: 900
 	};
@@ -612,7 +738,7 @@ function surpriseInstructions(request: RecordRequest): TaskInstructions {
 		unrated.length < 2 && "fitting the idea's heat and kink set above"
 	].filter(Boolean);
 	const invent = `Invent an idea for this ${monologue ? 'monologue' : 'story'} that the user will not expect${fits.length > 0 ? `, ${fits.join(', and ')}` : ''}.`;
-	const fields = ['title', ...IDEA_TEXT_FIELDS];
+	const fields = IDEA_KEYS;
 	if (monologue) {
 		return {
 			instructions: paragraphs(
@@ -749,12 +875,13 @@ const WHERE_THE_USER_IS = {
 
 function castingMessages(request: CastingRequest): ModelMessage[] {
 	const name = request.character.name?.trim() || 'This character';
-	const character = describeFields(
-		'character',
-		['name', ...CHARACTER_TEXT_FIELDS],
-		request.character
-	);
-	const idea = describeFields('idea', ['title', ...IDEA_TEXT_FIELDS], request.idea);
+	const { fields: characterNamed, ...characterTexts } = request.character;
+	const character = [
+		...describeFields('character', CHARACTER_KEYS, characterTexts),
+		...describeNamed(characterNamed)
+	];
+	const { fields: ideaNamed, ...ideaTexts } = request.idea;
+	const idea = [...describeFields('idea', IDEA_KEYS, ideaTexts), ...describeNamed(ideaNamed)];
 	const others =
 		request.others.length > 0
 			? `Also in the story: ${request.others
@@ -840,12 +967,7 @@ function nameMessages(request: NameRequest): ModelMessage[] {
  */
 function catchUpMessages(request: CatchUpRequest): ModelMessage[] {
 	const monologue = request.narrator === 'monologue';
-	const idea = describeFields(
-		'idea',
-		['title', ...IDEA_TEXT_FIELDS],
-		request.idea,
-		request.narrator
-	);
+	const idea = describeFields('idea', IDEA_KEYS, request.idea, request.narrator);
 	const cast = request.characters.map((character) =>
 		lines(
 			`Name: ${character.name}`,
@@ -1069,6 +1191,14 @@ const MONOLOGUE_CAST =
 	'Who is in it: nobody, unless a named character is the one speaking: then only them, playing "the speaker".';
 
 /**
+ * Fields beyond the standard ones, for a whole daydream: the one or two
+ * things that made the most popular character cards what they were — what
+ * someone hides, the line they won't cross, how they are won over — and a
+ * twist kept for play (docs/daydreams.md, "Fields").
+ */
+const DAYDREAM_FIELDS = `Each character and the idea may have "fields" beyond the standard ones, each named in a few words: for a character, what they hide, what they won't do, how they are won over, or anything else that makes them who they are; for the idea, a rule of its world, a secret at its heart. Mark one "spoiler" when it is a twist the user should only find out in play. Add only the ones that make this daydream better — often one or two in all, often none.`;
+
+/**
  * What a whole daydream's heat and kink are rated from. Pages the user linked
  * count, since they linked them as what they want; without that said, a
  * model could rate a mild brief mild however strong the pages it built on.
@@ -1224,7 +1354,8 @@ function daydreamAnswer(side: Side): AnswerKey[] {
 				textKey('notes', 'empty for a story; the sayings, for a monologue'),
 				ratingKey('heat'),
 				ratingKey('kink'),
-				PARTS_KEY
+				PARTS_KEY,
+				NEW_FIELDS_KEY
 			]
 		},
 		{
@@ -1240,7 +1371,8 @@ function daydreamAnswer(side: Side): AnswerKey[] {
 					textKey('likes', 'what they enjoy'),
 					textKey('part', "the name of the idea's part they play, exactly"),
 					textKey('relationship', 'who they are to the user'),
-					textKey('doing', 'what they are doing or want as it starts')
+					textKey('doing', 'what they are doing or want as it starts'),
+					NEW_FIELDS_KEY
 				]
 			}
 		},
@@ -1272,6 +1404,7 @@ function daydreamInstructions(side: Side, keptVoice: boolean): string {
 			STORY_CAST
 		),
 		section('If it is a monologue', monologueCraft(true), MONOLOGUE_IDEA, MONOLOGUE_CAST),
+		section('Fields of their own', DAYDREAM_FIELDS),
 		section('Rating', DAYDREAM_RATING),
 		section('The summary', SUMMARY_INSTRUCTION)
 	);

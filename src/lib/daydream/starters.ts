@@ -23,7 +23,9 @@ import {
 	DEFAULT_PICTURES,
 	DEFAULT_STORY_DIALS,
 	EMPTY_CASTING,
+	type IdeaOpening,
 	type IdeaOriginField,
+	type IdeaTracker,
 	type IdeaWithoutOrigin,
 	inferVoice,
 	MAX_DAYDREAM_CHARACTERS,
@@ -47,9 +49,16 @@ export type DaydreamCast = {
 export type DaydreamPieces = {
 	/** Null to have it follow who is in it (`inferVoice`). */
 	voice: DaydreamVoicePresetId | null;
-	/** Its brief and research only when it was written from a brief: empty otherwise. */
-	idea: Omit<IdeaWithoutOrigin, 'parts'> &
-		Partial<Pick<DaydreamIdea, IdeaOriginField>> & { parts: readonly SuggestedPart[] };
+	/**
+	 * Its brief and research only when it was written from a brief: empty
+	 * otherwise. Its parts, openings and trackers have no ids yet.
+	 */
+	idea: Omit<IdeaWithoutOrigin, 'parts' | 'openings' | 'trackers'> &
+		Partial<Pick<DaydreamIdea, IdeaOriginField>> & {
+			parts: readonly SuggestedPart[];
+			openings?: readonly Omit<IdeaOpening, 'id'>[];
+			trackers?: readonly Omit<IdeaTracker, 'id'>[];
+		};
 	cast: readonly DaydreamCast[];
 	/**
 	 * The model's summary of it, with its blanks marked; none for a
@@ -107,13 +116,16 @@ export function assembleSetup(
 			brief: pieces.idea.brief ?? '',
 			research: pieces.idea.research ?? '',
 			parts,
+			openings: (pieces.idea.openings ?? []).map((opening) => ({ ...opening, id: newId() })),
+			trackers: (pieces.idea.trackers ?? []).map((tracker) => ({ ...tracker, id: newId() })),
 			sourceId: null,
 			sourceRevision: null
 		},
 		lead: 'character',
 		limits: '',
 		dials: DEFAULT_STORY_DIALS,
-		pictures: DEFAULT_PICTURES
+		pictures: DEFAULT_PICTURES,
+		opening: null
 	};
 }
 

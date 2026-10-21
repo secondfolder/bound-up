@@ -127,6 +127,9 @@ export const BUILDERS: readonly Builder[] = [
 			axis('pace', 'Pace', 'descriptive', dialValues(false), '3'),
 			axis('length', 'Length', 'descriptive', values('short', 'medium', 'long'), 'medium'),
 			axis('text', 'Fields written', 'structural', values('all', 'minimal')),
+			// A field the user named on the idea, and whether it is a spoiler
+			// kept from them (`describeFields` in prompt.ts).
+			axis('named', 'A field of their own', 'descriptive', values('none', 'named', 'spoiler')),
 			axis('origin', 'Idea origin', 'descriptive', values('none', 'brief', 'brief+research')),
 			limits,
 			...characterDials

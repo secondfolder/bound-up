@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { assertNever } from '$lib/assert-never';
 import {
 	DAYDREAM_LIMITS,
+	type DaydreamField,
 	type DaydreamVoice,
 	type DialValue,
 	MAX_CONTEXT_CHARS,
@@ -10,6 +11,7 @@ import {
 	MAX_SUGGESTIONS,
 	systemGoverns
 } from '$lib/daydream';
+import { fieldLabel } from '$lib/daydream/catalog';
 import {
 	type ContextTurn,
 	contextSize,
@@ -270,7 +272,7 @@ function describeCharacter(
 ): string {
 	const heading = part ? `## ${character.name}, ${part.name}` : `## ${character.name}`;
 	const lines: string[] = [];
-	const fields: [string, string][] = [
+	const core: [string, string][] = [
 		// A watcher has no one in the story to be anything to.
 		[
 			absent ? 'Who they are in the story' : 'Who they are to the user',
@@ -278,24 +280,54 @@ function describeCharacter(
 		],
 		['Their part in this daydream', character.casting.part],
 		['Type', character.archetype],
-		['Personality', character.personality],
-		['How they talk', character.speech],
-		['Appearance', character.appearance],
-		['What they enjoy', character.likes],
-		['Notes', character.notes]
+		['Appearance', character.appearance]
 	];
-	for (const [label, value] of fields) {
+	for (const [label, value] of core) {
 		if (value) {
 			lines.push(`${label}: ${value}`);
 		}
 	}
+	const { shown, kept } = describeFields(character.fields, (field) =>
+		fieldLabel(field, 'character')
+	);
 	const dials = describeCharacterDials(character.dials);
 	return joinLines(
 		heading,
-		lines.length > 0 && tagged('character', lines.join('\n')),
+		(lines.length > 0 || shown.length > 0 || kept) &&
+			tagged('character', joinLines(...lines, ...shown, kept)),
 		dials &&
 			`In short, ${character.name} ${dials} Where this and the description above disagree, follow the description.`
 	);
+}
+
+/**
+ * What a spoiler field is for (docs/daydreams.md, "Fields"): the twist the
+ * user chose not to see, so the story can surprise them with it. Said once,
+ * over the fields kept back, so a model does not put the twist in the
+ * opening, or have someone announce it two passages in.
+ */
+const KEPT_FROM_THE_USER =
+	'Kept from the user, for the story to reveal in play — never in the opening, and never said outright before the story has earned it:';
+
+/**
+ * A character's or an idea's fields as lines: the ones written in, and,
+ * apart, the spoilers, under `KEPT_FROM_THE_USER`. An empty field says
+ * nothing, as an empty fixed field never did.
+ */
+function describeFields<Field extends DaydreamField>(
+	fields: readonly Field[],
+	label: (field: Field) => string,
+	line: (field: Field) => string = (field) => `${label(field)}: ${field.value}`
+): { shown: string[]; kept: string | null } {
+	const written = fields.filter((field) => field.value.trim() !== '');
+	const spoilers = written.filter((field) => field.spoiler);
+	return {
+		shown: written.filter((field) => !field.spoiler).map(line),
+		kept:
+			spoilers.length > 0
+				? `${KEPT_FROM_THE_USER}\n${spoilers.map((field) => `- ${line(field)}`).join('\n')}`
+				: null
+	};
 }
 
 /**
@@ -368,6 +400,9 @@ function describeOrigin(idea: DaydreamSetupContent['idea']): string | null {
 		: null;
 }
 
+/** The words the model has always read an idea's known fields under (`describeSetup`). */
+const KNOWN_IDEA_LABELS: Partial<Record<string, string>> = { setting: 'Where', tone: 'Tone' };
+
 /**
  * Said for an idea with no heat set: "as far as the idea's heat allows",
  * said elsewhere, otherwise pointed at a line that is not there.
@@ -386,6 +421,25 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 	const { idea } = setup;
 	const monologue = setup.voice.narrator === 'monologue';
 	const absent = setup.voice.stance === 'absent';
+	// Where it happens comes before what is going on, as it always has; the
+	// rest of the fields after the user's part, in the idea's own order. The
+	// known ones keep the words the model has always read them under.
+	const ideaLabel = (field: (typeof idea.fields)[number]) =>
+		(field.kind && KNOWN_IDEA_LABELS[field.kind]) || field.label;
+	const ideaLine = (field: (typeof idea.fields)[number]) =>
+		field.kind === 'notes'
+			? describeNotes(field.value, monologue)
+			: `${ideaLabel(field)}: ${field.value}`;
+	const where = describeFields(
+		idea.fields.filter((field) => field.kind === 'setting'),
+		ideaLabel,
+		ideaLine
+	);
+	const rest = describeFields(
+		idea.fields.filter((field) => field.kind !== 'setting'),
+		ideaLabel,
+		ideaLine
+	);
 	const sections = [
 		`# How it is told\n${describeVoice(setup.voice, setup.characters.length)}`,
 		setup.characters.length > 0
@@ -405,13 +459,13 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 				'idea',
 				joinLines(
 					`Title: ${idea.title}`,
-					idea.setting && `Where: ${idea.setting}`,
+					...where.shown,
 					`${monologue ? 'What the voice believes' : 'What is going on'}: ${idea.premise}`,
 					idea.yourRole &&
 						!absent &&
 						`${monologue ? 'Who the user is to it' : 'Who the user is'}: ${idea.yourRole}`,
-					idea.tone && `Tone: ${idea.tone}`,
-					idea.notes && describeNotes(idea.notes, monologue)
+					...rest.shown,
+					describeFields(idea.fields, ideaLabel, ideaLine).kept
 				)
 			),
 			...describeIdeaDials(idea.dials),

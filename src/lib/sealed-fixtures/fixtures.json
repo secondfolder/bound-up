@@ -124,11 +124,16 @@
 					{
 						"name": "Mara",
 						"archetype": "",
-						"personality": "Calm, exacting, amused.",
-						"speech": "",
 						"appearance": "",
-						"likes": "",
-						"notes": "",
+						"fields": [
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e01",
+								"kind": "personality",
+								"label": "",
+								"value": "Calm, exacting, amused.",
+								"spoiler": false
+							}
+						],
 						"dials": {
 							"tone": null,
 							"control": null,
@@ -149,32 +154,42 @@
 				],
 				"idea": {
 					"title": "Frozen evening",
-					"setting": "",
 					"premise": "A late meeting that runs over.",
 					"yourRole": "",
-					"tone": "slow-burn",
-					"notes": "",
+					"fields": [
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e09",
+							"kind": "tone",
+							"label": "",
+							"value": "slow-burn",
+							"spoiler": false
+						}
+					],
 					"brief": "",
 					"research": "",
-					"sourceId": null,
-					"sourceRevision": null,
 					"parts": [],
+					"openings": [],
+					"trackers": [],
 					"dials": {
 						"heat": null,
 						"kink": null
-					}
+					},
+					"sourceId": null,
+					"sourceRevision": null
 				},
 				"lead": "character",
 				"limits": "Nothing public.",
 				"dials": {
 					"intensity": 3,
 					"pace": 3,
-					"length": "medium"
+					"length": "medium",
+					"thoughts": "shown"
 				},
 				"pictures": {
 					"on": true,
 					"style": "photo"
-				}
+				},
+				"opening": null
 			}
 		},
 		{
@@ -203,11 +218,37 @@
 					{
 						"name": "Mara",
 						"archetype": "The exacting mentor",
-						"personality": "Calm, exacting, amused.",
-						"speech": "Short sentences.",
 						"appearance": "Grey suit.",
-						"likes": "Punctuality",
-						"notes": "Never raises her voice.",
+						"fields": [
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e01",
+								"kind": "personality",
+								"label": "",
+								"value": "Calm, exacting, amused.",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e02",
+								"kind": "speech",
+								"label": "",
+								"value": "Short sentences.",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e03",
+								"kind": "likes",
+								"label": "",
+								"value": "Punctuality",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e07",
+								"kind": "notes",
+								"label": "",
+								"value": "Never raises her voice.",
+								"spoiler": false
+							}
+						],
 						"dials": {
 							"tone": "cold",
 							"control": 5,
@@ -228,11 +269,16 @@
 					{
 						"name": "Jun",
 						"archetype": "",
-						"personality": "Quiet.",
-						"speech": "",
 						"appearance": "",
-						"likes": "",
-						"notes": "",
+						"fields": [
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e01",
+								"kind": "personality",
+								"label": "",
+								"value": "Quiet.",
+								"spoiler": false
+							}
+						],
 						"dials": {
 							"tone": null,
 							"control": null,
@@ -253,11 +299,24 @@
 				],
 				"idea": {
 					"title": "Frozen evening",
-					"setting": "An empty office.",
 					"premise": "A late meeting that runs over.",
 					"yourRole": "The new hire",
-					"tone": "slow-burn",
-					"notes": "",
+					"fields": [
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e08",
+							"kind": "setting",
+							"label": "",
+							"value": "An empty office.",
+							"spoiler": false
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e09",
+							"kind": "tone",
+							"label": "",
+							"value": "slow-burn",
+							"spoiler": false
+						}
+					],
 					"brief": "",
 					"research": "",
 					"parts": [
@@ -272,24 +331,28 @@
 							"description": ""
 						}
 					],
-					"sourceId": null,
-					"sourceRevision": null,
+					"openings": [],
+					"trackers": [],
 					"dials": {
 						"heat": 4,
 						"kink": null
-					}
+					},
+					"sourceId": null,
+					"sourceRevision": null
 				},
 				"lead": "shared",
 				"limits": "Nothing public.",
 				"dials": {
 					"intensity": 4,
 					"pace": 2,
-					"length": "long"
+					"length": "long",
+					"thoughts": "shown"
 				},
 				"pictures": {
 					"on": true,
 					"style": "photo"
-				}
+				},
+				"opening": null
 			}
 		},
 		{
@@ -308,11 +371,37 @@
 					{
 						"name": "Mara",
 						"archetype": "The exacting mentor",
-						"personality": "Calm, exacting, amused.",
-						"speech": "Short sentences.",
 						"appearance": "Grey suit.",
-						"likes": "Punctuality",
-						"notes": "Never raises her voice.",
+						"fields": [
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e01",
+								"kind": "personality",
+								"label": "",
+								"value": "Calm, exacting, amused.",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e02",
+								"kind": "speech",
+								"label": "",
+								"value": "Short sentences.",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e03",
+								"kind": "likes",
+								"label": "",
+								"value": "Punctuality",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e07",
+								"kind": "notes",
+								"label": "",
+								"value": "Never raises her voice.",
+								"spoiler": false
+							}
+						],
 						"dials": {
 							"tone": "cold",
 							"control": 5,
@@ -333,11 +422,16 @@
 					{
 						"name": "Jun",
 						"archetype": "",
-						"personality": "Quiet.",
-						"speech": "",
 						"appearance": "",
-						"likes": "",
-						"notes": "",
+						"fields": [
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e01",
+								"kind": "personality",
+								"label": "",
+								"value": "Quiet.",
+								"spoiler": false
+							}
+						],
 						"dials": {
 							"tone": null,
 							"control": null,
@@ -358,11 +452,24 @@
 				],
 				"idea": {
 					"title": "Frozen evening",
-					"setting": "An empty office.",
 					"premise": "A late meeting that runs over.",
 					"yourRole": "The new hire",
-					"tone": "slow-burn",
-					"notes": "",
+					"fields": [
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e08",
+							"kind": "setting",
+							"label": "",
+							"value": "An empty office.",
+							"spoiler": false
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e09",
+							"kind": "tone",
+							"label": "",
+							"value": "slow-burn",
+							"spoiler": false
+						}
+					],
 					"brief": "",
 					"research": "",
 					"parts": [
@@ -377,24 +484,28 @@
 							"description": ""
 						}
 					],
-					"sourceId": null,
-					"sourceRevision": null,
+					"openings": [],
+					"trackers": [],
 					"dials": {
 						"heat": 4,
 						"kink": null
-					}
+					},
+					"sourceId": null,
+					"sourceRevision": null
 				},
 				"lead": "shared",
 				"limits": "Nothing public.",
 				"dials": {
 					"intensity": 4,
 					"pace": 2,
-					"length": "long"
+					"length": "long",
+					"thoughts": "shown"
 				},
 				"pictures": {
 					"on": false,
 					"style": "illustrated"
-				}
+				},
+				"opening": null
 			}
 		},
 		{
@@ -412,32 +523,49 @@
 				"characters": [],
 				"idea": {
 					"title": "Frozen mantras",
-					"setting": "Nowhere in particular.",
 					"premise": "A voice that says what belonging means.",
 					"yourRole": "The listener",
-					"tone": "devoted",
-					"notes": "",
+					"fields": [
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e08",
+							"kind": "setting",
+							"label": "",
+							"value": "Nowhere in particular.",
+							"spoiler": false
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e09",
+							"kind": "tone",
+							"label": "",
+							"value": "devoted",
+							"spoiler": false
+						}
+					],
 					"brief": "",
 					"research": "",
 					"parts": [],
-					"sourceId": null,
-					"sourceRevision": null,
+					"openings": [],
+					"trackers": [],
 					"dials": {
 						"heat": 4,
 						"kink": 4
-					}
+					},
+					"sourceId": null,
+					"sourceRevision": null
 				},
 				"lead": "character",
 				"limits": "Nothing public.",
 				"dials": {
 					"intensity": 3,
 					"pace": 3,
-					"length": "medium"
+					"length": "medium",
+					"thoughts": "shown"
 				},
 				"pictures": {
 					"on": true,
 					"style": "photo"
-				}
+				},
+				"opening": null
 			}
 		},
 		{
@@ -455,32 +583,49 @@
 				"characters": [],
 				"idea": {
 					"title": "Frozen mantras",
-					"setting": "Nowhere in particular.",
 					"premise": "A voice that says what belonging means.",
 					"yourRole": "The listener",
-					"tone": "devoted",
-					"notes": "",
+					"fields": [
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e08",
+							"kind": "setting",
+							"label": "",
+							"value": "Nowhere in particular.",
+							"spoiler": false
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e09",
+							"kind": "tone",
+							"label": "",
+							"value": "devoted",
+							"spoiler": false
+						}
+					],
 					"brief": "A late train, a stranger, and https://example.com/stories for the mood",
 					"research": "The linked page is a list of short stories set on night trains.\nRecurring: a shared compartment, a ticket inspector, \"next stop is yours\".",
 					"parts": [],
-					"sourceId": null,
-					"sourceRevision": null,
+					"openings": [],
+					"trackers": [],
 					"dials": {
 						"heat": 4,
 						"kink": 4
-					}
+					},
+					"sourceId": null,
+					"sourceRevision": null
 				},
 				"lead": "character",
 				"limits": "Nothing public.",
 				"dials": {
 					"intensity": 3,
 					"pace": 3,
-					"length": "medium"
+					"length": "medium",
+					"thoughts": "shown"
 				},
 				"pictures": {
 					"on": true,
 					"style": "photo"
-				}
+				},
+				"opening": null
 			}
 		},
 		{
@@ -500,11 +645,30 @@
 					{
 						"name": "Wren",
 						"archetype": "The subject",
-						"personality": "Eager, a little proud.",
-						"speech": "Asks permission for everything.",
 						"appearance": "Plain grey uniform.",
-						"likes": "Being ruled on",
-						"notes": "",
+						"fields": [
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e01",
+								"kind": "personality",
+								"label": "",
+								"value": "Eager, a little proud.",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e02",
+								"kind": "speech",
+								"label": "",
+								"value": "Asks permission for everything.",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e03",
+								"kind": "likes",
+								"label": "",
+								"value": "Being ruled on",
+								"spoiler": false
+							}
+						],
 						"dials": {
 							"tone": null,
 							"control": 1,
@@ -525,11 +689,24 @@
 				],
 				"idea": {
 					"title": "The keyholder’s house",
-					"setting": "A house run by its rules.",
 					"premise": "The house governs Wren, and answers to you.",
 					"yourRole": "The keyholder",
-					"tone": "exacting",
-					"notes": "",
+					"fields": [
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e08",
+							"kind": "setting",
+							"label": "",
+							"value": "A house run by its rules.",
+							"spoiler": false
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e09",
+							"kind": "tone",
+							"label": "",
+							"value": "exacting",
+							"spoiler": false
+						}
+					],
 					"brief": "",
 					"research": "",
 					"parts": [
@@ -539,24 +716,28 @@
 							"description": "Governed by the house."
 						}
 					],
-					"sourceId": null,
-					"sourceRevision": null,
+					"openings": [],
+					"trackers": [],
 					"dials": {
 						"heat": 4,
 						"kink": 4
-					}
+					},
+					"sourceId": null,
+					"sourceRevision": null
 				},
 				"lead": "me",
 				"limits": "Nothing public.",
 				"dials": {
 					"intensity": 3,
 					"pace": 3,
-					"length": "medium"
+					"length": "medium",
+					"thoughts": "shown"
 				},
 				"pictures": {
 					"on": true,
 					"style": "photo"
-				}
+				},
+				"opening": null
 			}
 		},
 		{
@@ -632,8 +813,8 @@
 						"remove": []
 					},
 					"readAs": "instruction",
-					"expansion": "\"Charlie — the fox is safe. I promise.\"",
 					"ooc": false,
+					"expansion": "\"Charlie — the fox is safe. I promise.\"",
 					"readAsChosen": true
 				}
 			}
@@ -811,11 +992,37 @@
 			"expected": {
 				"name": "Mara",
 				"archetype": "The exacting mentor",
-				"personality": "Calm, exacting, amused.",
-				"speech": "Short sentences.",
 				"appearance": "Grey suit.",
-				"likes": "Punctuality",
-				"notes": "Never raises her voice.",
+				"fields": [
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e01",
+						"kind": "personality",
+						"label": "",
+						"value": "Calm, exacting, amused.",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e02",
+						"kind": "speech",
+						"label": "",
+						"value": "Short sentences.",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e03",
+						"kind": "likes",
+						"label": "",
+						"value": "Punctuality",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e07",
+						"kind": "notes",
+						"label": "",
+						"value": "Never raises her voice.",
+						"spoiler": false
+					}
+				],
 				"dials": {
 					"tone": "cold",
 					"control": 5,
@@ -834,11 +1041,24 @@
 			"ciphertext": "sb1.oG1XC1qMQ18hzjXh9F6uRvojgWTCvx6eUKBmAl1NJH8cKVyxhx93rM1J5RhCMOlaFGFBNHAlaXMegCAe8QQxJZDfnImR_P479W6kvnSygJgmnIObBJ4BRFdRpDQgN_eKN2He7bk3rVmrb7kOtqfXsJ4sENa2VmpHlKLN4uk1X9sfFKHmv9cQQ9YOD2wXT77ST0uDnGK5fRVj76l2mw_wWItakmYstm3SCbco-j57dzkT0Dx2zP0_vk1NXH1Ss5e9j0COp6RTaLOMLEUhy--VkUuw2OHXZeWZqaALL-gawiYR1hy6A2WISVZQOJmxTJP5cfcaDw5aCDW2hoq7Ym68EWQYb-_sceCuRpNu7AmrtxfSjiBbr2h0kSyYUyxObPMnVuS6jy6JQS4_0tCiYpNevbUP28w91AhP6Jqfn33ngkr3nmtChZJPUPcNZ1i4gSxAOWLZosXfPcsLLATqwZYJq6ckBU-trEKfJL4AZ-VDHLhFrd1CQSvokZmFnN4_yNZ9EImQCqbYIOdmoF0lArNA6JORH8fLh0ITbl_wfR4",
 			"expected": {
 				"title": "Frozen evening",
-				"setting": "An empty office.",
 				"premise": "A late meeting that runs over.",
 				"yourRole": "The new hire",
-				"tone": "slow-burn",
-				"notes": "",
+				"fields": [
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e08",
+						"kind": "setting",
+						"label": "",
+						"value": "An empty office.",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e09",
+						"kind": "tone",
+						"label": "",
+						"value": "slow-burn",
+						"spoiler": false
+					}
+				],
 				"brief": "",
 				"research": "",
 				"parts": [
@@ -853,6 +1073,8 @@
 						"description": ""
 					}
 				],
+				"openings": [],
+				"trackers": [],
 				"dials": {
 					"heat": 4,
 					"kink": null
@@ -866,11 +1088,24 @@
 			"ciphertext": "sb1.Tq6BwRh83v_ZHrJEGkjxxm6CFEGJoOOzQjHj3E7PCxBDDcZsl_49CwdikcggsNRjQCEuijbA5MJEjct3avnATttbibs5MOLW7ifSe7pKNC7Z8mJjI_7U3s6lMTKsY4W5xDxOpeJ0wAdG7q48tTp1Xew7CKjwlxhPR4n9m_b6jOnAi8Th1kBcJlBp_AnWe4LQodrZWXKvBKOANwS04buJUWuMKQRptLfib5rbLQmxphBOTvYnDlovYcVFhpZcovJF1gLfaY2pfr99dADkUce56HtWsRl_pbCgtmkB1nsylYsFxat4DEKp7Uw25RKwcF7fGK9UuXOn4Mwh2eL_AVkLfI6HR-mecBEoK9XD_DubEQNNhwOUaVnyibfVP5IoY78ry3l0hprMQkoHUnajHFdjioaRhY5Kt9mq3Grnybqowc7vPlmL0F9M69-NaoOY9n2tyWKLSI95J3u0469yrMOiXKLP_IAB3NCILNOsOZ6HfB5mc9xa6zecM5wSYa4O-EFMQhmapBmCMQ1DrOVFJK7D8uU62KjuERyQOxMXqzBSLNb76y4B2NrRQIzP6IrkAJFNLOs9Zz96cCufGMY9JBC2-XY9cZJWnuYilN2MAVePxzS5s4wXr3zwNVyyX6mgc8VdB6IvssooUz0ec5ti4Y0OtGdwC_wiZ8UMQtBEnmGqBNTQ7O-AZyWAcza6--CoomQ7xu-f-DMW2AVkZyci1rZ0QU286JAUphqvmETUgbPGZtFedG0Exdvm-g06rmWoABwuDLdOxzHOwRLFAl2sQ7tiLxlqoZOP0gYEq_pS6UhZFlLDZ4Ge9HoFtAeLlOXEJaxRAmzjoqJfbP8lzp8KRqQjAiLSx0VdWPJhHw",
 			"expected": {
 				"title": "Frozen evening",
-				"setting": "An empty office.",
 				"premise": "A late meeting that runs over.",
 				"yourRole": "The new hire",
-				"tone": "slow-burn",
-				"notes": "",
+				"fields": [
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e08",
+						"kind": "setting",
+						"label": "",
+						"value": "An empty office.",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e09",
+						"kind": "tone",
+						"label": "",
+						"value": "slow-burn",
+						"spoiler": false
+					}
+				],
 				"brief": "A late train, a stranger, and https://example.com/stories for the mood",
 				"research": "The linked page is a list of short stories set on night trains.\nRecurring: a shared compartment, a ticket inspector, \"next stop is yours\".",
 				"parts": [
@@ -885,6 +1120,8 @@
 						"description": ""
 					}
 				],
+				"openings": [],
+				"trackers": [],
 				"dials": {
 					"heat": 4,
 					"kink": null
@@ -1062,6 +1299,254 @@
 					"rewriteOf": {
 						"turnId": "00000000-0000-4000-8000-0000000000dd",
 						"again": true
+					}
+				}
+			}
+		},
+		{
+			"kind": "daydream-character",
+			"version": 2,
+			"recordId": "00000000-0000-4000-8000-000000000105",
+			"ciphertext": "sb1.zz0MrJw31SAFAr7dCsp1ClCRSwwTR7SWFzbQEES573qLRaeHPPAbLZNHP4XHzrAFeDg0PjWEeroVm-UoHhnEVPNHnW59a1eCDf-VnJeJY9YDydwIiTCqYaiKOoCXp26XrFiBYF5yJWJqusb2LxVxK_xJ2d_jtYuiQQdZa6USqh3hD_R1xvXcPmOiJ0FFFSvD7_XivHNIlEcq6JFR_uRlRWqOXjlBMwlGuifxWDRiAj129qXcKHBzYNHR1fyRrFTXKzcNLUuuL3qwdvI6-PqMt_s_SYkuGiyF7QNaxscy9u-UT2xyUOT0uO9xJ5DM2Q6ilO2CURQl0RDCS0GDDOpdUdboQVysm2BJXwu7zOAwk_oIT0ybe8GRYjRs2hJ1c37f1BGYzOm1YWUt0dowQKBf116Utb6ZaWjjzugkTTXUPcmo5rLKxp7ToMTqDQTvqQY4aQKcFx5JCYRkRu-HDiXxksgjFUrQhPpAvtq0SapD7Qt3cEzyy7xZb30UQbbvlDGifW_tHwPD0I7Dp0rlDCoA7HKTZ-w8iFk-_Krlv5z3YwVNJZ2Bu2kX_Xwb61ZEPjaYMBexz6_Oo4Bd2s7bGygovu2rX0l_o0sDAKdi7-GIWgpQoK4I8SAeN3OzCODPOnuGao7loW1CuAr--QfVLJCeZW80KIwRWyBrynxxEyZqd4bUcWhM-00SoAmRMCSCfFJd32D4YL39O9zlxm7rCkdnWcUyJQ0Iv8AsJ1AUR96F96zub76rKK4YNTNtWlI",
+			"expected": {
+				"name": "Mara",
+				"archetype": "strict mentor",
+				"appearance": "grey suit, reading glasses",
+				"fields": [
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e01",
+						"kind": "personality",
+						"label": "",
+						"value": "patient, exacting",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e05",
+						"kind": "wontDo",
+						"label": "",
+						"value": "raise her voice",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000001c1",
+						"kind": null,
+						"label": "What scares her",
+						"value": "being needed",
+						"spoiler": true
+					}
+				],
+				"dials": {
+					"tone": "cold",
+					"control": 4,
+					"strictness": 5,
+					"edge": 2,
+					"talk": 2,
+					"libido": 3,
+					"kink": 4
+				}
+			}
+		},
+		{
+			"kind": "daydream-scene",
+			"version": 3,
+			"recordId": "00000000-0000-4000-8000-000000000106",
+			"ciphertext": "sb1.F7epqqSoVqkfLOlKUJGQWuoRkdS7pupGOXL1w31KuhqEFR_nIIVr5sQcxcT5vCHlzvscRTKhuPPc-wdXoe1jqQ-QpO8bJx20YdYvEYuCLVK4HUu9pAJAYdf-z6es2yVIXIxfEruv1dRppYCw5UlSaunDS5bOutTsFGi6IQkGkM-3zzUFtOXvgV30besTKg69bxBauZb7Ko6y36aJUMQvsRUO0p_fzgYN2NGPW7v-S44OmrbUJPPvGvmoXnksMivhdgX1ozq2YOIeN8Vt4TcFBvzhod1HBoEWvse5GkNav3QOP3FRCA3M6I9gjxX0urCYKKgdITfUrWiychwEHQMZPX-dCeWEwOgD3P2mN5xIsZgkYmsj8o_818v83XVlnojWeNX3ppfm1XQu5QXkiLHR5FRwolsi7ARvVVfLzV8fHFJEIjwT9vrdalykVejd0fJeYMGNe8r8JkIN4gawHa7Jk4EUoieN0AZChWEWORV6Ougk0mTjHvCPGv0IAPbO0CfyQFK-AE7GCLR_Z6-2vSAQfkPdJb6peMx-DH3cn8_8Q8Wge016o4RxpEtf13r21J5h5MhYI3y55P7-AN238Q2QOd96B1KgdNTPLYtcM_fLaOrP0nZSXn9qsOw7ebaxCs283APt1Igq1i3qdmlaYy-nj4o-5RnlJ8qmz224I8xngbTfIdm18LznpzZHu_Xx_KBkdtFQtsI61RMnxwlr6w7ehYuke9276vhjeAL_GO32N_BZi8Y3aMeIey7stuSOkeqRIopeqnh2YXtQgB3FWYo0dm2vsQaC_E5ka5pBTe55I3wm2Sfs02BNzXLQ6Mu_zpUHryYrdeDGdwgVObiME27WYWxdrcZ6FPPHaod37kjBRFaVs-eD1nqVpCqpfOxRzN0Ycay6g2_FJH8x8eUDeIn2pl4MzFe5NW6fnjLdo5YlCWY7t3i03ukNkw1d7tlef18oV0ZLOWUNsNKm-agXUO3KxkTaqQUne9ReTQ-mCYmr60oWg07gY7rWwo-JU3ubpanf6U6pZazUPsWUgORn-tKPlu2WGqIXwIWMq-omzFCjyD9ANkWkXypkLYu6dHqZ1RY97bt8W7vtSO6BpHYeYyE8BhXjMGnU7Jnx9Q",
+			"expected": {
+				"title": "After hours",
+				"premise": "Kept late after the presentation went wrong.",
+				"yourRole": "the new hire",
+				"fields": [
+					{
+						"id": "00000000-0000-4000-8000-0000000f1e08",
+						"kind": "setting",
+						"label": "",
+						"value": "an empty office",
+						"spoiler": false
+					},
+					{
+						"id": "00000000-0000-4000-8000-0000000001c5",
+						"kind": null,
+						"label": "The rule",
+						"value": "nobody leaves before she says",
+						"spoiler": false
+					}
+				],
+				"brief": "",
+				"research": "",
+				"parts": [
+					{
+						"id": "00000000-0000-4000-8000-0000000001c2",
+						"name": "the boss",
+						"description": "keeps you late"
+					}
+				],
+				"openings": [
+					{
+						"id": "00000000-0000-4000-8000-0000000001c3",
+						"label": "Three weeks in",
+						"situation": "It is a routine now, and the door is already locked."
+					}
+				],
+				"trackers": [
+					{
+						"id": "00000000-0000-4000-8000-0000000001c4",
+						"name": "Submission",
+						"kind": "meter",
+						"start": "10",
+						"about": "Rises when you obey."
+					}
+				],
+				"dials": {
+					"heat": 4,
+					"kink": 3
+				}
+			}
+		},
+		{
+			"kind": "daydream-setup",
+			"version": 7,
+			"recordId": "00000000-0000-4000-8000-000000000107",
+			"ciphertext": "sb1.dZN0fgKwzBCJd1Bzdzd1cPuplTu3THhGFp_3P7nl5hOLKA9eJO7Ipz4CdT9Mj0xMlVpdnw7A1_Ay5D9JIMGBUf4YIhsEZc5eokYD0ri9FwH0jjy4gH2lsUuYgvq_0lmNgNV3QwMDy8b83GzTnkafw-6ik39N_vDZSbLT_ysQKTXm2KUr0qH8j5hpb3dCJu_3_6qmru_ypgqh4q_HzNF4iDvMpAN1BoZA1QRiH0XsC8o3LRTmx4t42bHAFuQdFhAudPtP9Qg4OXyMeHHkeOMQrzEMPIEOxUW3cVYpOYyG50iDB91W4-mLRYvg6kZD8TmtXGNWjS8BweyvBQ5ftwYtqizbRn6d9nYgv883RURRuPCwMeztkHyBMz0hLFAZ9beCW8QG04XrABGkBtaObrDjEgxE5WmMRt5BS0y02CM0l6lyAkNLJDDNOp1uem-ZsSkdCjar8Pa02ocjqGK4tDXk4PcuPKnzIZ45LIycTAw2_lY53H1zBgaZE8qL6dPTvo6FryBfYi1e6cly4TKapjr6slVQzvw6pSCXPNQzEHUiadPMn_pk7OhVTngw-vvgRAS2Y_-plIfWDnNv8mQxtbeti5GQ41zW1ATmruteF7ALgwmUXB3K_dbckXWFGZaXOMT9_HjIa9hrm3TcWGLd6sFw4UwMoeebC8bK0SpGH9I3gdBy0JEFl87UkOydzEZrVEfSyGQhOkLi-RuNArnbHYFoii5vnIlPQDK1arMktcTN1zCb4x-xSHpnkK2-wRpLsOLNtpaIxouDAB6aOzhCsop5YWZgl8f0t-jcf8kTP0k_aGfsgkeLitjYrVIpRqtlEuK0Sk0QECOmvWxpj8lu75015H6GXzfSbdUW7n5N0DlMpX4jzPni1Q46XJqnZiocZ-NH_0pnl3ubOZviNr05g4uqBpGoQrFnzSjnEpFB29qGU6riubtV2BULlkVqIfhf5mo7lU03SNQ2IAELD0_IbFXb--Iil_ZsJCP1Nh_1P5x-PpfBxaD5CN68LQ3mPU9nj450NQ4Mu7gYg2d-A0TUQPbp2ld3ZU7lS7_JfORkJ8t3dmAX_ysncQB7bfKbJ3ytSABKNTpAzKh8_avO-Cej6z4mVmoaRRWtOM308kFtZRHhNxJMNQSTMEzKuHznHlqsOlZV6tggDjvX_QJIAsLRGhfzGpApK0djFZi20EZsWs4d6xscUbigdEhQiDNppZnA-0R8QzmRgIvQGobjNzKgbPAUgD9CTPL2ryZ_7CeaV0_PDx1dvr15Z3FwQizIvcbHFTEModzVqIlaBKHndgOZeIbRrTF4Qk7-65bkOc3fDadvc1jyNWyy8XqDKOgmJvJYMqWAMJ-LVL9kc36t-UJTlOwrY_iIK8WlEGA_jf_3TQ6fIF91xxkHTVUWiQ-khgsxexpdaNsWFz50aSVTi8zM791uLnUeOb9pevHYZZyEqqHfRrzw59SXvOvV74LNp5yqw99cYrweTgMp94Wq4BFf568iQHLK170SW8d1dYHcMKsm5TeX_WjCx-4Wf5paQUll07JEE8rQcDA-W9fneNoowsH20RX0qaNdVLTtVS1M_V-SRpUagImiauFu-RdByhK6ldv0HLI9feq9GAJKWIJn058rLjSfpQT_WqU9nfZGTudUhTu7tJNZP3pK_KkI4_W-m7-tTdfZDS-Ko_s90uJX7rtoMqKjH0VEFZgVDjfVHrEdLZoQkt1HwKe2V6hp4BWqQMDEBJ7AbhX9m4yaczP5e1EjeVrmm4Ps-Va1QfPuUDyw_rdDsLk8VLS1L0tUhXA-wxQNXBdI6BkPHIMyhXJN5kuAHeviLN3kd8I6O7YBvB2SXAauALifkdEFBmVL7KE89AuPhEnj-87HGOrUYSWR6J4S9lZmyfqJepUQwjgUee6c5TLtwx54RNe50-jB3jykJ-yyB-Usac5rn9Y2_PUpAgsaAju5uooHdXsL0lUYquLWeU6weuOZeH8p_WXFgQ6lURbWSi5dY-YVQhVi-Ln0tabW4lVKLJLeQZExhMHEm3JoWn5n9QbJRBgbV4poZ_xUAhhOeOpfxd2gA3saneWmbROuycTEddxQc8DrI1ZlNPASZ0lTpG-hrnzUd4xkcZpVMW9ktDM7ai-XKXF16IaqIx1XCKDQAOiQGmw7pfh7vzx8x4_7Na3w973TGVkSIZ0qzqCKC6GAYyfekklhYTyfSmamffeWVeANDW0ECbvJAzBO7jE7e-zhV9kviz51AzfsxKdViOApM3ecZZSWouVaJ2aAE_KmnWCw1kcWUsx050oNODDaHc1LLVDNDgnHiuPIsf2iyf3szpPmxKVpGEJpPH-qHAGUg07ifAK3_TY9Ul2cTH2QbkskqHrcx9cHBVSnzYSSiICz9MN7K2bTJa_tpiAoKQboVc-fANq8FR7JZONEiLY7EXfPQOKAjYu2qupHeTlR-3ZqKWoa3j7QxLs2-nIcD1UgCOlXW4cm4QfurbDYG7bUkCM6",
+			"expected": {
+				"title": "",
+				"voice": {
+					"narrator": "none",
+					"stance": "self",
+					"protagonistName": ""
+				},
+				"characters": [
+					{
+						"name": "Mara",
+						"archetype": "strict mentor",
+						"appearance": "grey suit, reading glasses",
+						"fields": [
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e01",
+								"kind": "personality",
+								"label": "",
+								"value": "patient, exacting",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000f1e05",
+								"kind": "wontDo",
+								"label": "",
+								"value": "raise her voice",
+								"spoiler": false
+							},
+							{
+								"id": "00000000-0000-4000-8000-0000000001c1",
+								"kind": null,
+								"label": "What scares her",
+								"value": "being needed",
+								"spoiler": true
+							}
+						],
+						"dials": {
+							"tone": "cold",
+							"control": 4,
+							"strictness": 5,
+							"edge": 2,
+							"talk": 2,
+							"libido": 3,
+							"kink": 4
+						},
+						"sourceId": null,
+						"sourceRevision": null,
+						"casting": {
+							"partId": "00000000-0000-4000-8000-0000000001c2",
+							"relationship": "your boss",
+							"part": "testing you"
+						}
+					}
+				],
+				"idea": {
+					"title": "After hours",
+					"premise": "Kept late after the presentation went wrong.",
+					"yourRole": "the new hire",
+					"fields": [
+						{
+							"id": "00000000-0000-4000-8000-0000000f1e08",
+							"kind": "setting",
+							"label": "",
+							"value": "an empty office",
+							"spoiler": false
+						},
+						{
+							"id": "00000000-0000-4000-8000-0000000001c5",
+							"kind": null,
+							"label": "The rule",
+							"value": "nobody leaves before she says",
+							"spoiler": false
+						}
+					],
+					"brief": "",
+					"research": "",
+					"parts": [
+						{
+							"id": "00000000-0000-4000-8000-0000000001c2",
+							"name": "the boss",
+							"description": "keeps you late"
+						}
+					],
+					"openings": [
+						{
+							"id": "00000000-0000-4000-8000-0000000001c3",
+							"label": "Three weeks in",
+							"situation": "It is a routine now, and the door is already locked."
+						}
+					],
+					"trackers": [
+						{
+							"id": "00000000-0000-4000-8000-0000000001c4",
+							"name": "Submission",
+							"kind": "meter",
+							"start": "10",
+							"about": "Rises when you obey."
+						}
+					],
+					"dials": {
+						"heat": 4,
+						"kink": 3
+					},
+					"sourceId": null,
+					"sourceRevision": null
+				},
+				"lead": "character",
+				"limits": "",
+				"dials": {
+					"intensity": 3,
+					"pace": 2,
+					"length": "medium",
+					"thoughts": "hidden"
+				},
+				"pictures": {
+					"on": true,
+					"style": "photo"
+				},
+				"opening": "00000000-0000-4000-8000-0000000001c3"
+			}
+		},
+		{
+			"kind": "daydream-turn",
+			"version": 9,
+			"recordId": "00000000-0000-4000-8000-000000000108",
+			"ciphertext": "sb1.1__k1z0SGLwmesedshzGVPu4DnRMcfF8gceULtPAr2nbVA690m-a8yCdpKUqfdxalEXBzCotv9qlLbZ2a5VhsaO25M0sDsydmcUIFyBeSwEDkUs0sHeUq2tIk-fPyyMX34hWMzvFosz9SBnmYiGLhRKu1o8h9WxpBXgPGOGjnh0qkSgQqVhsqQaghMXBRIrG1TDGKluEZpELIhfGYCjaEbjOiknlD_t3r7qMWKJ6_kQ_TUZ7-x_4m1ZDS6KNbWUa4v3Ty3IqDBgBOlZlIyuqZ_YJgACLGHKVqKmDovQIFRuTTQhWrrmFpyo3PdGi5-7mOFJzqAvLxD9Z_ODND1-zbpZgVTwABM0zGBeH5T_itCRA-rhtdXh7iNatNehTmTh745zJ4e-DK0s9PFDt442q0cKt9oYXWB8",
+			"expected": {
+				"type": "text",
+				"text": "She looks up from the desk.",
+				"meta": {
+					"suggestions": ["Sit down"],
+					"directions": {
+						"add": [],
+						"remove": []
+					},
+					"opening": {
+						"label": "Three weeks in",
+						"situation": "It is a routine now, and the door is already locked."
+					},
+					"trackers": {
+						"00000000-0000-4000-8000-0000000001c4": 15
 					}
 				}
 			}

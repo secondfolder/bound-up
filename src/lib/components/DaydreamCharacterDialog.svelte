@@ -3,19 +3,21 @@
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import InputField from '$lib/components/InputField.svelte';
 	import {
-		CHARACTER_PRIMARY_FIELDS,
-		CHARACTER_TEXT_FIELDS,
+		CHARACTER_FIELD_KINDS,
+		type CharacterCoreField,
 		type CharacterDials,
-		type CharacterTextField,
+		type CharacterFieldKind,
 		type CharacterTone,
 		DAYDREAM_LIMITS,
 		type DaydreamCasting,
 		type DaydreamCharacter,
 		type DaydreamCharacterCopy,
+		type DaydreamField,
 		type DialValue,
 		EMPTY_CASTING,
 		EMPTY_CHARACTER,
-		type IdeaPart
+		type IdeaPart,
+		namedFields
 	} from '$lib/daydream';
 	import {
 		CASTING_CHIPS,
@@ -32,6 +34,7 @@
 		suggestChips,
 		suggestFill
 	} from '$lib/daydream/suggest';
+	import { withSuggestedFields } from '$lib/daydream/suggestions';
 	import {
 		type DaydreamCharacterFormValues,
 		daydreamCharacterFormSchema
@@ -39,6 +42,7 @@
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
+	import DaydreamFieldList from './DaydreamFieldList.svelte';
 	import { startOpen } from './details';
 	import OptionalSlider from './OptionalSlider.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
@@ -68,8 +72,10 @@
 	 * doing — which belongs to this daydream alone and is never saved to the
 	 * library. Below it is who they are in any story, which is what "Save to
 	 * my characters" saves. From the library there is only the second half.
-	 * Of that, the name, type and personality are up front; the rest is under
-	 * "More detail", which starts open when any of it is filled.
+	 * Of that, the name, type and fields are up front (`DaydreamFieldList`:
+	 * personality and how they talk to start with, then whatever the user
+	 * adds); their appearance and dials are under "More detail", which starts
+	 * open when any of it is filled.
 	 *
 	 * Guided rather than a blank form: starting points to begin from, dials
 	 * for the broad strokes (a tone, and how much they take charge, how
@@ -127,11 +133,8 @@
 		? {
 				name: existing.name,
 				archetype: existing.archetype,
-				personality: existing.personality,
-				speech: existing.speech,
 				appearance: existing.appearance,
-				likes: existing.likes,
-				notes: existing.notes,
+				fields: existing.fields,
 				dials: existing.dials,
 				casting: castingEdit?.value ?? EMPTY_CASTING,
 				// Ticked for one already in the library; a copy kept only in a
@@ -144,12 +147,8 @@
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();
 	let detail: (HTMLElement & { open: boolean }) | undefined = $state();
 
-	const DETAIL_FIELDS = CHARACTER_TEXT_FIELDS.filter(
-		(field) => !(CHARACTER_PRIMARY_FIELDS as readonly CharacterTextField[]).includes(field)
-	);
-	const detailFilled = (values: Pick<DaydreamCharacterFormValues, CharacterTextField | 'dials'>) =>
-		DETAIL_FIELDS.some((field) => values[field].trim() !== '') ||
-		Object.values(values.dials).some((dial) => dial !== null);
+	const detailFilled = (values: Pick<DaydreamCharacterFormValues, 'appearance' | 'dials'>) =>
+		values.appearance.trim() !== '' || Object.values(values.dials).some((dial) => dial !== null);
 	const startsDetailed = detailFilled(start);
 
 	/** Opens "More detail" when something just wrote into it, so what changed is in view. */
@@ -225,14 +224,24 @@
 		(existing === null || isTainted($tainted)) && daydreamCharacterFormSchema.safeParse($form).success
 	);
 
-	const draft = $derived(
-		Object.fromEntries(
-			(['name', ...CHARACTER_TEXT_FIELDS] as const).map((field) => [field, $form[field]])
-		) as Record<string, string>
-	);
+	/**
+	 * The character as a suggestion is told them: the core, and every known
+	 * field they have, empty ones included, so "Fill in the rest" fills those
+	 * and leaves alone a kind they removed. The fields they named go apart.
+	 */
+	const draft = $derived({
+		name: $form.name,
+		archetype: $form.archetype,
+		appearance: $form.appearance,
+		...Object.fromEntries(
+			$form.fields.flatMap((field) => (field.kind === null ? [] : [[field.kind, field.value]]))
+		)
+	} as Record<string, string>);
+	const named = $derived(namedFields($form.fields));
 
 	const empty = $derived(
-		$form.name.trim() === '' && CHARACTER_TEXT_FIELDS.every((field) => $form[field].trim() === '')
+		[$form.name, $form.archetype, $form.appearance].every((text) => text.trim() === '') &&
+			$form.fields.every((field) => field.value.trim() === '')
 	);
 
 	function useTemplate(id: string) {
@@ -255,20 +264,35 @@
 	async function fillTheRest() {
 		filling = true;
 		problem = null;
-		const answer = await suggestFill({ target: 'character', draft, dials: $form.dials, context });
+		const answer = await suggestFill({
+			target: 'character',
+			draft,
+			named,
+			dials: $form.dials,
+			context
+		});
 		filling = false;
 		if (!answer.ok) {
 			problem = answer;
 			return;
 		}
-		// Only the empty fields: never over what was written.
+		// Only the empty fields: never over what was written. A known kind the
+		// character does not have was not asked for, and is not added.
+		const { fields: filled, named: suggested } = answer.value;
 		const next = { ...$form };
-		for (const field of ['name', ...CHARACTER_TEXT_FIELDS] as const) {
-			const text = answer.value.fields[field];
-			if (text && next[field].trim() === '') {
-				next[field] = text;
+		for (const key of ['name', 'archetype', 'appearance'] as const) {
+			const text = filled[key];
+			if (text && next[key].trim() === '') {
+				next[key] = text;
 			}
 		}
+		next.fields = withSuggestedFields(
+			next.fields.map((field) => {
+				const text = field.kind === null ? undefined : filled[field.kind];
+				return text && field.value.trim() === '' ? { ...field, value: text } : field;
+			}),
+			suggested
+		);
 		$form = next;
 		revealDetail();
 	}
@@ -312,21 +336,36 @@
 		return () => node.removeEventListener('change', update);
 	}
 
-	function moreIdeas(field: CharacterTextField) {
-		return () => suggestChips({ target: 'character', field, draft, dials: $form.dials, context });
+	function moreIdeas(field: CharacterCoreField) {
+		return () =>
+			suggestChips({ target: 'character', field, draft, named, dials: $form.dials, context });
 	}
 
-	const LIMIT_OF: Record<CharacterTextField, number> = {
+	/** More chips for one of the fields: a known kind by name, one the user named by its name. */
+	function moreFieldIdeas(field: DaydreamField<CharacterFieldKind>) {
+		return suggestChips({
+			target: 'character',
+			field: field.kind ?? 'named',
+			...(field.kind === null ? { label: field.label } : {}),
+			draft,
+			named,
+			dials: $form.dials,
+			context
+		});
+	}
+
+	const LIMIT_OF: Record<CharacterCoreField, number> = {
 		archetype: DAYDREAM_LIMITS.archetype,
-		personality: DAYDREAM_LIMITS.personality,
-		speech: DAYDREAM_LIMITS.speech,
-		appearance: DAYDREAM_LIMITS.appearance,
-		likes: DAYDREAM_LIMITS.likes,
-		notes: DAYDREAM_LIMITS.characterNotes
+		appearance: DAYDREAM_LIMITS.appearance
 	};
+
+	/** The fields' errors by their place in the list, as superforms gives them. */
+	const fieldErrors = $derived(
+		$errors.fields as Record<number, { label?: string[]; value?: string[] }> | undefined
+	);
 </script>
 
-{#snippet textField(field: CharacterTextField)}
+{#snippet textField(field: CharacterCoreField)}
 	<DaydreamChipField
 		{debug}
 		label={CHARACTER_FIELD_LABELS[field].label}
@@ -334,7 +373,6 @@
 		value={$form[field]}
 		limit={LIMIT_OF[field]}
 		chips={CHARACTER_CHIPS[field]}
-		rows={field === 'personality' || field === 'notes' ? 3 : 2}
 		onchange={(text) => {
 			$form[field] = text;
 		}}
@@ -427,11 +465,25 @@
 				required
 			/>
 
-			{#each CHARACTER_PRIMARY_FIELDS as field (field)}
-				{@render textField(field)}
-			{/each}
+			{@render textField('archetype')}
+
+			<DaydreamFieldList
+				{debug}
+				fields={$form.fields}
+				of="character"
+				kinds={CHARACTER_FIELD_KINDS}
+				labels={CHARACTER_FIELD_LABELS}
+				chips={CHARACTER_CHIPS}
+				errors={fieldErrors}
+				onchange={(fields) => {
+					$form.fields = fields;
+				}}
+				onMoreIdeas={suggestionsOn ? moreFieldIdeas : undefined}
+			/>
 
 			<wa-details bind:this={detail} summary="More detail" class="detail" {@attach startOpen(startsDetailed)}>
+				{@render textField('appearance')}
+
 				<fieldset class="dials">
 					<legend>In broad strokes</legend>
 					<fieldset class="tones">
@@ -459,10 +511,6 @@
 						/>
 					{/each}
 				</fieldset>
-
-				{#each DETAIL_FIELDS as field (field)}
-					{@render textField(field)}
-				{/each}
 			</wa-details>
 
 			{#if suggestionsOn}

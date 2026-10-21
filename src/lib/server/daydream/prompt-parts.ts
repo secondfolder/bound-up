@@ -62,6 +62,7 @@ export type AnswerKey = {
 	shape:
 		| 'text'
 		| 'number'
+		| 'boolean'
 		| 'choice'
 		| 'list'
 		| readonly AnswerKey[]
@@ -87,7 +88,9 @@ function shapeOf(shape: AnswerKey['shape']): string {
 		case 'text':
 		case 'choice':
 			return '"…"';
+		// Bare, like a number: a sample `false` would be copied back.
 		case 'number':
+		case 'boolean':
 			return '…';
 		case 'list':
 			return '["…", …]';

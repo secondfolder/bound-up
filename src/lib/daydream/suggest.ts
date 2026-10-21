@@ -7,17 +7,20 @@
  * for and nothing else changes.
  */
 
-import type {
-	CharacterDials,
-	DaydreamCharacter,
-	DaydreamIdea,
-	DaydreamNarrator,
-	DaydreamStance,
-	DaydreamVoicePresetId,
-	IdeaDials,
-	IdeaPart,
-	IdeaWithoutOrigin,
-	StoryDials
+import {
+	type CharacterDials,
+	type CharacterFieldKind,
+	type DaydreamCharacter,
+	type DaydreamIdea,
+	type DaydreamNarrator,
+	type DaydreamStance,
+	type DaydreamVoicePresetId,
+	type IdeaDials,
+	type IdeaFieldKind,
+	type IdeaPart,
+	knownValues,
+	namedFields,
+	type StoryDials
 } from '../daydream';
 import { requestSuggestion, type SuggestionWatch } from './client';
 import { type ExchangeLogView, suggestionLog } from './exchange-log';
@@ -35,10 +38,17 @@ import {
 	parseGeneratedIdeas,
 	parseIdeaDials,
 	parseName,
+	parseNewFields,
+	parseOpenings,
 	parseParts,
 	parseSuggestedDaydream,
 	parseSurpriseIdea,
+	parseTrackers,
+	type SuggestedField,
+	type SuggestedIdea,
+	type SuggestedOpening,
 	type SuggestedPart,
+	type SuggestedTracker,
 	type SuggestTarget
 } from './suggestions';
 
@@ -107,17 +117,41 @@ const nothing = (answer: { body: unknown }): { ok: false } & SuggestFailure => (
 /** An idea's parts as a suggestion is told them: no ids, which mean nothing to the model. */
 type PartsDraft = Pick<IdeaPart, 'name' | 'description'>[];
 
-/** The request's draft: the fields, and an idea's parts inside it, as the endpoint takes them. */
-const withParts = ({ parts, ...input }: { draft: Record<string, string>; parts?: PartsDraft }) => ({
+/** A field the record's user named, as a suggestion is told it (`namedFields`). */
+type NamedFieldDraft = Pick<SuggestedField, 'label' | 'value' | 'spoiler'>;
+
+/**
+ * The request's draft as the endpoint takes it: the core and known fields by
+ * name, and inside it an idea's parts and the fields the user named.
+ */
+const withParts = ({
+	parts,
+	named,
+	...input
+}: {
+	draft: Record<string, string>;
+	parts?: PartsDraft;
+	named?: NamedFieldDraft[];
+}) => ({
 	...input,
-	draft: parts ? { ...input.draft, parts } : input.draft
+	draft: {
+		...input.draft,
+		...(parts ? { parts } : {}),
+		...(named && named.length > 0 ? { fields: named } : {})
+	}
 });
 
+/**
+ * Chips for one field: a core or known one by name (`field`), or one the user
+ * named, by its name (`label`, with `field` 'named').
+ */
 export async function suggestChips(input: {
 	target: SuggestTarget;
 	field: string;
+	label?: string;
 	draft: Record<string, string>;
 	parts?: PartsDraft;
+	named?: NamedFieldDraft[];
 	dials?: CharacterDials;
 	ideaDials?: IdeaDials;
 	context: SuggestContext;
@@ -131,12 +165,17 @@ export async function suggestChips(input: {
 }
 
 /**
- * What "Fill in the rest" came back with: text for empty fields, and for an
- * idea its parts when it had none and its heat and kink where they were unset.
+ * What "Fill in the rest" came back with: text for empty fields by name,
+ * fields it named for the record (`named`), and for an idea its parts,
+ * openings and trackers when it had none, and its heat and kink where they
+ * were unset.
  */
 export type Filled = {
 	fields: Partial<Record<string, string>>;
+	named: SuggestedField[];
 	parts: SuggestedPart[];
+	openings: SuggestedOpening[];
+	trackers: SuggestedTracker[];
 	ideaDials: IdeaDials;
 };
 
@@ -144,6 +183,7 @@ export async function suggestFill(input: {
 	target: SuggestTarget;
 	draft: Record<string, string>;
 	parts?: PartsDraft;
+	named?: NamedFieldDraft[];
 	dials?: CharacterDials;
 	ideaDials?: IdeaDials;
 	context: SuggestContext;
@@ -152,19 +192,63 @@ export async function suggestFill(input: {
 	if (!answer.ok) {
 		return answer;
 	}
-	const fields = parseFill(input.target, answer.value);
-	const parts = input.target === 'idea' ? parseParts(answer.value) : [];
-	const ideaDials =
-		input.target === 'idea' ? parseIdeaDials(answer.value) : { heat: null, kink: null };
-	return Object.keys(fields).length > 0 || parts.length > 0
-		? { ok: true, value: { fields, parts, ideaDials } }
+	const idea = input.target === 'idea';
+	const value: Filled = {
+		fields: parseFill(input.target, answer.value),
+		named: parseNewFields(answer.value),
+		parts: idea ? parseParts(answer.value) : [],
+		openings: idea ? parseOpenings(answer.value) : [],
+		trackers: idea ? parseTrackers(answer.value) : [],
+		ideaDials: idea ? parseIdeaDials(answer.value) : { heat: null, kink: null }
+	};
+	return Object.keys(value.fields).length > 0 ||
+		value.named.length > 0 ||
+		value.parts.length > 0 ||
+		value.openings.length > 0 ||
+		value.trackers.length > 0
+		? { ok: true, value }
 		: nothing(answer);
+}
+
+/**
+ * A character as a suggestion is told them: their core and known fields by
+ * name, and the fields their user named.
+ */
+export type CharacterDraft = Pick<DaydreamCharacter, 'name' | 'archetype' | 'appearance'> &
+	Partial<Record<CharacterFieldKind, string>> & { fields?: NamedFieldDraft[] };
+
+/** An idea as a suggestion is told it, by name (`CharacterDraft`'s counterpart). */
+export type IdeaDraft = Pick<DaydreamIdea, 'title' | 'premise' | 'yourRole'> &
+	Partial<Record<IdeaFieldKind, string>> & { fields?: NamedFieldDraft[] };
+
+/** A character as a suggestion is told them (`CharacterDraft`). */
+export function characterDraft(character: Omit<DaydreamCharacter, 'dials'>): CharacterDraft {
+	const named = namedFields(character.fields);
+	return {
+		name: character.name,
+		archetype: character.archetype,
+		appearance: character.appearance,
+		...knownValues(character.fields),
+		...(named.length > 0 ? { fields: named } : {})
+	};
+}
+
+/** An idea as a suggestion is told it (`IdeaDraft`). */
+export function ideaDraft(idea: Pick<DaydreamIdea, 'title' | 'premise' | 'yourRole' | 'fields'>) {
+	const named = namedFields(idea.fields);
+	return {
+		title: idea.title,
+		premise: idea.premise,
+		yourRole: idea.yourRole,
+		...knownValues(idea.fields),
+		...(named.length > 0 ? { fields: named } : {})
+	} satisfies IdeaDraft;
 }
 
 /** Who a character is in this story, written from them and the idea. */
 export async function suggestCasting(input: {
-	character: Omit<DaydreamCharacter, 'dials'>;
-	idea: Pick<DaydreamIdea, 'title' | 'setting' | 'premise' | 'yourRole' | 'tone'>;
+	character: CharacterDraft;
+	idea: IdeaDraft;
 	ideaDials?: IdeaDials;
 	part: Pick<IdeaPart, 'name' | 'description'> | null;
 	others: { name: string; part: string | null }[];
@@ -185,7 +269,8 @@ export async function suggestCasting(input: {
  */
 export async function suggestCatchUp(
 	input: {
-		idea: Pick<DaydreamIdea, 'title' | 'setting' | 'premise' | 'yourRole' | 'tone' | 'notes'>;
+		idea: Pick<DaydreamIdea, 'title' | 'premise' | 'yourRole'> &
+			Record<'setting' | 'tone' | 'notes', string>;
 		narrator: DaydreamNarrator;
 		characters: { name: string; personality: string; relationship: string; doing: string }[];
 		story: string[];
@@ -224,7 +309,7 @@ export async function suggestName(input: {
 export async function surpriseIdea(
 	context: SuggestContext,
 	ideaDials?: IdeaDials
-): Promise<Answer<Omit<IdeaWithoutOrigin, 'parts'> & { parts: SuggestedPart[] }>> {
+): Promise<Answer<SuggestedIdea>> {
 	const answer = await ask({
 		task: 'surprise-idea',
 		target: 'idea',

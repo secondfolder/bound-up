@@ -65,18 +65,23 @@ function renderDialog(props: Record<string, unknown> = {}) {
 }
 
 describe('DaydreamIdeaDialog', () => {
-	it('keeps the title, what it is about and the parts up front, and the rest closed', async () => {
+	it('keeps the title, what it is about, its fields and the parts up front, and the rest closed', async () => {
 		const { baseElement } = renderDialog();
 		await waSettled(baseElement);
 		expect(moreDetail(baseElement).open).toBe(false);
-		const labels = [...moreDetail(baseElement).querySelectorAll('.chip-field .label')].map(
+		const labels = [...baseElement.querySelectorAll('.chip-field .label')].map((label) =>
+			label.textContent?.trim()
+		);
+		const detail = [...moreDetail(baseElement).querySelectorAll('.chip-field .label')].map(
 			(label) => label.textContent?.trim()
 		);
-		expect(labels).toEqual(['Where', 'Your part', 'Tone', 'Anything else']);
+		// A new idea starts with where and the tone, to fill in or remove.
+		expect(labels.slice(0, 3)).toEqual(['What it’s about', 'Where', 'Tone']);
+		expect(detail).toEqual(['Your part']);
 		expect(baseElement.textContent).toContain('Parts for characters');
 	});
 
-	it('asks a monologue for its sayings up front, in its own words for each field', async () => {
+	it('asks a monologue for its sayings first, in its own words for each field', async () => {
 		const { baseElement } = renderDialog({ context: { ...context, narrator: 'monologue' } });
 		await waSettled(baseElement);
 		const all = [...baseElement.querySelectorAll('.chip-field .label')].map((label) =>
@@ -85,13 +90,13 @@ describe('DaydreamIdeaDialog', () => {
 		const detail = [...moreDetail(baseElement).querySelectorAll('.chip-field .label')].map(
 			(label) => label.textContent?.trim()
 		);
-		expect(all.slice(0, 2)).toEqual(['What it’s about', 'Sayings to build on']);
-		expect(detail).toEqual(['Where', 'Who you are to it', 'Tone']);
+		expect(all.slice(0, 4)).toEqual(['What it’s about', 'Sayings to build on', 'Where', 'Tone']);
+		expect(detail).toEqual(['Who you are to it']);
 		expect(baseElement.textContent).toContain('What the voice believes, and keeps coming back to');
 	});
 
 	it('starts with more detail open for an idea that has some', async () => {
-		const { baseElement } = renderDialog({ idea: testIdea({ setting: 'An empty office.' }) });
+		const { baseElement } = renderDialog({ idea: testIdea({ yourRole: 'the new hire' }) });
 		await waSettled(baseElement);
 		expect(moreDetail(baseElement).open).toBe(true);
 	});
@@ -112,14 +117,7 @@ describe('DaydreamIdeaDialog', () => {
 			onsaved
 		});
 		await waSettled(baseElement);
-		expect(detailLabels(baseElement)).toEqual([
-			'Where',
-			'Your part',
-			'Tone',
-			'Anything else',
-			'What you asked for',
-			'Background'
-		]);
+		expect(detailLabels(baseElement)).toEqual(['Your part', 'What you asked for', 'Background']);
 		// Where it came from is nothing the user customised, so it opens nothing.
 		expect(moreDetail(baseElement).open).toBe(false);
 
@@ -203,7 +201,10 @@ describe('DaydreamIdeaDialog', () => {
 			ok: true,
 			value: {
 				fields: { setting: 'A hotel bar.' },
+				named: [],
 				parts: [{ name: 'the stranger', description: '' }],
+				openings: [],
+				trackers: [],
 				ideaDials: { heat: null, kink: null }
 			}
 		});
@@ -217,7 +218,11 @@ describe('DaydreamIdeaDialog', () => {
 		expect(baseElement.querySelector<HTMLElement & { value: string }>('.part-name')?.value).toBe(
 			'the stranger'
 		);
-		expect(moreDetail(baseElement).open).toBe(true);
+		// The idea has no "Where", so the model's is not added: only the fields it has are filled.
+		const labels = [...baseElement.querySelectorAll('.chip-field .label')].map((label) =>
+			label.textContent?.trim()
+		);
+		expect(labels).not.toContain('Where');
 	});
 
 	it('says each starting point’s level on it, from SFW up', async () => {
@@ -254,7 +259,14 @@ describe('DaydreamIdeaDialog', () => {
 	it('takes the model’s heat and kink only where they were unset', async () => {
 		suggest.suggestFill.mockResolvedValue({
 			ok: true,
-			value: { fields: { setting: 'A hotel bar.' }, parts: [], ideaDials: { heat: 4, kink: 5 } }
+			value: {
+				fields: { setting: 'A hotel bar.' },
+				named: [],
+				parts: [],
+				openings: [],
+				trackers: [],
+				ideaDials: { heat: 4, kink: 5 }
+			}
 		});
 		const onsaved = vi.fn();
 		const { baseElement } = renderDialog({

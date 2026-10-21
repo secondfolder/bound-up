@@ -30,7 +30,7 @@ describe('settingsChange', () => {
 describe('withSettings and stillInEffect', () => {
 	it('applies the story dials and the idea’s heat and kink, and puts them back', () => {
 		const changed = withSettings(setup, { length: 'long', heat: 4 });
-		expect(changed.dials).toEqual({ intensity: 3, pace: 3, length: 'long' });
+		expect(changed.dials).toEqual({ intensity: 3, pace: 3, length: 'long', thoughts: 'shown' });
 		expect(changed.idea.dials).toEqual({ heat: 4, kink: 2 });
 		expect(stillInEffect(changed, { length: 'long', heat: 4 })).toBe(true);
 		const undone = withSettings(changed, { length: 'medium', heat: null });

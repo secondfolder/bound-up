@@ -41,7 +41,9 @@ None stated beyond the rules.
 
 # What to do
 
-Fill in the character's empty fields — Type, Personality, How they talk, Appearance, What they enjoy, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the character's empty fields — Type, Personality, How they talk, Appearance — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+
+Where it would make the character better, add a field or two it does not have yet, each named in a few words — like what they hide, what they won't do, how they are won over, a habit — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
 
 # Your answer
 
@@ -51,8 +53,10 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
 - "personality": how they think and behave
 - "speech": how they talk
 - "appearance": what you notice about them
-- "likes": what they enjoy
-- "notes": anything the rest leaves out
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 
-{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "notes": "…"}
+{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~

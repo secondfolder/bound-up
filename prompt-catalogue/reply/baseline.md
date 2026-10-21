@@ -3,7 +3,7 @@
 Each passage of a running daydream (`buildMessages` in prompt.ts).
 
 Every other file in this folder is measured against this one. Combination:
-`narrator=none, stance=self, characters=1, lead=character, heat=unset, pictures=none, state=reply, kink=unset, intensity=3, pace=3, length=medium, text=all, origin=none, limits=none, char.tone=unset, char.control=unset, char.strictness=unset, char.edge=unset, char.talk=unset, char.libido=unset, char.kink=unset`
+`narrator=none, stance=self, characters=1, lead=character, heat=unset, pictures=none, state=reply, kink=unset, intensity=3, pace=3, length=medium, text=all, named=none, origin=none, limits=none, char.tone=unset, char.control=unset, char.strictness=unset, char.edge=unset, char.talk=unset, char.libido=unset, char.kink=unset`
 
 ~~~~text
 ===== settings =====
@@ -103,11 +103,11 @@ Never write the user's words, choices or feelings for them, unless they ask you 
 Who they are to the user: ⟦character1.relationship⟧
 Their part in this daydream: ⟦character1.doing⟧
 Type: ⟦character1.archetype⟧
+Appearance: ⟦character1.appearance⟧
 Personality: ⟦character1.personality⟧
 How they talk: ⟦character1.speech⟧
-Appearance: ⟦character1.appearance⟧
 What they enjoy: ⟦character1.likes⟧
-Notes: ⟦character1.notes⟧
+Anything else: ⟦character1.notes⟧
 </character>
 
 # The idea

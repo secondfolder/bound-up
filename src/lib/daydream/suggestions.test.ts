@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAYDREAM_LIMITS } from '../daydream';
+import { DAYDREAM_LIMITS, fieldText, knownField } from '../daydream';
 import {
 	addIdeas,
 	completionJson,
@@ -157,15 +157,42 @@ describe('parseSurpriseIdea', () => {
 	it('needs a title and a premise', () => {
 		expect(parseSurpriseIdea({ title: 'T', premise: 'P', tone: 'tense' })).toEqual({
 			title: 'T',
-			setting: '',
 			premise: 'P',
 			yourRole: '',
-			tone: 'tense',
-			notes: '',
+			fields: [knownField('tone', 'tense')],
 			parts: [],
+			openings: [],
+			trackers: [],
 			dials: { heat: null, kink: null }
 		});
 		expect(parseSurpriseIdea({ title: 'T' })).toBeNull();
+	});
+
+	it('adds the fields it named, its openings and its trackers', () => {
+		const idea = parseSurpriseIdea({
+			title: 'T',
+			premise: 'P',
+			fields: [
+				{ label: 'The rule', value: 'nobody leaves', spoiler: false },
+				{ label: 'The twist', value: 'she planned it', spoiler: true },
+				{ label: '', value: 'no name' }
+			],
+			openings: [{ label: 'Three weeks in', situation: 'It is a routine now.' }],
+			trackers: [
+				{ name: 'Submission', kind: 'meter', start: 10, about: 'Rises when you obey.' },
+				{ name: 'Mood', kind: 'feeling' }
+			]
+		});
+		expect(idea?.fields.map(({ label, value, spoiler }) => ({ label, value, spoiler }))).toEqual([
+			{ label: 'The rule', value: 'nobody leaves', spoiler: false },
+			{ label: 'The twist', value: 'she planned it', spoiler: true }
+		]);
+		expect(idea?.openings).toEqual([
+			{ label: 'Three weeks in', situation: 'It is a routine now.' }
+		]);
+		expect(idea?.trackers).toEqual([
+			{ name: 'Submission', kind: 'meter', start: '10', about: 'Rises when you obey.' }
+		]);
 	});
 
 	it('keeps a heat and kink it rated, and leaves out what is not a dial', () => {
@@ -276,7 +303,9 @@ describe('parseSuggestedDaydream', () => {
 		expect(pieces?.voice).toBe('monologue');
 		expect(pieces?.cast).toEqual([]);
 		expect(pieces?.idea.parts).toEqual([]);
-		expect(pieces?.idea.notes).toBe('Good girls say thank you.\nAsking is the point.');
+		expect(fieldText(pieces?.idea.fields ?? [], 'notes')).toBe(
+			'Good girls say thank you.\nAsking is the point.'
+		);
 	});
 
 	it('keeps the research on the idea, and leaves the brief for the caller', () => {
@@ -303,8 +332,8 @@ describe('parseSuggestedDaydream', () => {
 				tone: 'y'.repeat(DAYDREAM_LIMITS.tone + 1)
 			}
 		});
-		expect(pieces?.idea.notes).toBe([line, line, line].join('\n'));
-		expect(pieces?.idea.tone).toBe('');
+		expect(fieldText(pieces?.idea.fields ?? [], 'notes')).toBe([line, line, line].join('\n'));
+		expect(fieldText(pieces?.idea.fields ?? [], 'tone')).toBe('');
 	});
 
 	it('reads the voice, the idea and who is in it', () => {
@@ -326,7 +355,7 @@ describe('parseSuggestedDaydream', () => {
 			idea: { title: 'The night train', dials: { heat: 2, kink: null } },
 			cast: [
 				{
-					character: { name: 'Vesper', archetype: 'mysterious stranger', personality: '' },
+					character: { name: 'Vesper', archetype: 'mysterious stranger', fields: [] },
 					partName: 'the stranger',
 					relationship: 'a stranger',
 					doing: 'pretending to read'

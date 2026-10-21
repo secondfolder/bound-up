@@ -19,24 +19,41 @@
  * is built on blood relations. Pure and alias-free.
  */
 
-import type {
-	CharacterTextField,
-	DaydreamCasting,
-	DaydreamCharacter,
-	DaydreamNarrator,
-	IdeaOriginField,
-	IdeaTextField,
-	IdeaWithoutOrigin
+import {
+	type CharacterTextField,
+	characterFromFlat,
+	type DaydreamCasting,
+	type DaydreamCharacter,
+	type DaydreamField,
+	type DaydreamNarrator,
+	type FlatCharacter,
+	type IdeaOpening,
+	type IdeaOriginField,
+	type IdeaPart,
+	type IdeaTextField,
+	type IdeaTracker,
+	type IdeaWithoutOrigin,
+	ideaFromFlat
 } from '../daydream';
 
+/**
+ * Every character text the app knows: the core (type, appearance) and the
+ * known kinds of field. Personality, how they talk and what they enjoy were
+ * fixed fields once; what they hide, what they won't do and how they are won
+ * over came from what the most popular character cards carry beyond a
+ * standard sheet (docs/daydreams.md, "Fields").
+ */
 export const CHARACTER_FIELD_LABELS: Readonly<
 	Record<CharacterTextField, { label: string; hint: string }>
 > = {
 	archetype: { label: 'Type', hint: 'The kind of person they are, in a few words' },
+	appearance: { label: 'Appearance', hint: 'What you notice about them' },
 	personality: { label: 'Personality', hint: 'How they think and behave' },
 	speech: { label: 'How they talk', hint: 'Their voice, their words, their habits' },
-	appearance: { label: 'Appearance', hint: 'What you notice about them' },
 	likes: { label: 'What they enjoy', hint: 'What they want, given the chance' },
+	hides: { label: 'What they hide', hint: 'What they keep from you, or from everyone' },
+	wontDo: { label: 'What they won’t do', hint: 'Their own limits, whatever is asked' },
+	wonOver: { label: 'How they’re won over', hint: 'What it takes to get close to them' },
 	notes: { label: 'Anything else', hint: 'Whatever the rest leaves out' }
 };
 
@@ -199,6 +216,39 @@ export const CHARACTER_CHIPS: Readonly<Record<CharacterTextField, readonly strin
 		'struggle',
 		'objectification'
 	],
+	hides: [
+		'a crush on you',
+		'how lonely they are',
+		'that they want to be the one on their knees',
+		'how much they think about you',
+		'a second life online',
+		'that this was planned',
+		'how close they are to giving in',
+		'a soft side',
+		'a filthier streak than they let on',
+		'that they have done this before'
+	],
+	wontDo: [
+		'kissing on the mouth',
+		'saying they love you',
+		'begging',
+		'being rushed',
+		'anything in public',
+		'sharing you',
+		'letting you take charge',
+		'breaking a rule they set',
+		'being told no twice'
+	],
+	wonOver: [
+		'patience',
+		'being made to laugh',
+		'obedience',
+		'being challenged',
+		'honesty',
+		'slow and earned',
+		'being chosen over everyone else',
+		'never at all (or so they say)'
+	],
 	notes: []
 };
 
@@ -301,6 +351,25 @@ export function ideaFieldLabels(narrator: DaydreamNarrator | undefined): FieldLa
 	return narrator === 'monologue' ? MONOLOGUE_FIELD_LABELS : IDEA_FIELD_LABELS;
 }
 
+/**
+ * A field's name as the screens and the model read it: a known kind's from
+ * the catalog — a monologue's notes as its sayings — or the one its user gave
+ * it.
+ */
+export function fieldLabel(
+	field: Pick<DaydreamField, 'kind' | 'label'>,
+	of: 'character' | 'idea',
+	narrator?: DaydreamNarrator
+): string {
+	if (field.kind === null) {
+		return field.label;
+	}
+	if (of === 'character') {
+		return CHARACTER_FIELD_LABELS[field.kind as CharacterTextField].label;
+	}
+	return ideaFieldLabels(narrator)[field.kind as IdeaTextField].label;
+}
+
 export const IDEA_CHIPS: Readonly<Record<IdeaTextField, readonly string[]>> = {
 	setting: [
 		'a snowed-in lodge',
@@ -395,12 +464,13 @@ export const IDEA_CHIPS: Readonly<Record<IdeaTextField, readonly string[]>> = {
 
 /**
  * Starting points for a new character: a full set of fields to edit from.
- * Ordered by libido, from SFW to slutty, as the dialog shows them.
+ * Ordered by libido, from SFW to slutty, as the dialog shows them. Written
+ * with a key per text, and turned into fields below (`characterFromFlat`).
  */
-export const CHARACTER_TEMPLATES: readonly {
+const CHARACTER_TEMPLATE_TEXTS: readonly {
 	id: string;
 	label: string;
-	character: DaydreamCharacter;
+	character: FlatCharacter;
 }[] = [
 	{
 		id: 'best-friend',
@@ -888,15 +958,50 @@ export const CHARACTER_TEMPLATES: readonly {
 	}
 ];
 
-/**
- * Starting points for a new idea, ordered by heat, from SFW to filthy. Their
- * parts have no ids: each use gives them fresh ones (`DaydreamIdeaDialog`),
- * as a part made by hand gets.
- */
-export const IDEA_TEMPLATES: readonly {
+export const CHARACTER_TEMPLATES: readonly {
 	id: string;
 	label: string;
-	idea: Omit<IdeaWithoutOrigin, 'parts'> & { parts: { name: string; description: string }[] };
+	character: DaydreamCharacter;
+}[] = CHARACTER_TEMPLATE_TEXTS.map(({ character, ...rest }) => ({
+	...rest,
+	character: characterFromFlat(character)
+}));
+
+/** What an idea's parts, openings and trackers are before they have ids. */
+type WithoutId<T> = Omit<T, 'id'>;
+
+/**
+ * A starting point's idea. Its parts, openings and trackers have no ids: each
+ * use gives them fresh ones (`withIds` in `DaydreamIdeaDialog`, and
+ * `assembleSetup`), as ones made by hand get.
+ */
+export type IdeaTemplate = Omit<IdeaWithoutOrigin, 'parts' | 'openings' | 'trackers'> & {
+	parts: WithoutId<IdeaPart>[];
+	openings: WithoutId<IdeaOpening>[];
+	trackers: WithoutId<IdeaTracker>[];
+};
+
+type IdeaTemplateTexts = {
+	title: string;
+	setting: string;
+	premise: string;
+	yourRole: string;
+	tone: string;
+	notes: string;
+	parts: WithoutId<IdeaPart>[];
+	openings?: WithoutId<IdeaOpening>[];
+	trackers?: WithoutId<IdeaTracker>[];
+	dials: IdeaWithoutOrigin['dials'];
+};
+
+/**
+ * Starting points for a new idea, ordered by heat, from SFW to filthy.
+ * Written with a key per text, and turned into fields below (`ideaFromFlat`).
+ */
+const IDEA_TEMPLATE_TEXTS: readonly {
+	id: string;
+	label: string;
+	idea: IdeaTemplateTexts;
 }[] = [
 	{
 		id: 'one-bed',
@@ -1670,3 +1775,9 @@ export const IDEA_TEMPLATES: readonly {
 		}
 	}
 ];
+
+export const IDEA_TEMPLATES: readonly { id: string; label: string; idea: IdeaTemplate }[] =
+	IDEA_TEMPLATE_TEXTS.map(({ idea, ...rest }) => ({
+		...rest,
+		idea: ideaFromFlat({ ...idea, openings: idea.openings ?? [], trackers: idea.trackers ?? [] })
+	}));

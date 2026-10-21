@@ -1,7 +1,8 @@
 import { render, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { knownField } from '$lib/daydream';
 import { testCharacter } from '$lib/testing/daydream-setup';
-import { waSettled } from '$lib/testing/web-awesome';
+import { waByProp, waSettled } from '$lib/testing/web-awesome';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
@@ -91,22 +92,28 @@ describe('DaydreamCharacterDialog', () => {
 		);
 	});
 
-	it('fills in only the empty fields', async () => {
+	it('fills in only the empty fields, and adds the ones it named', async () => {
 		suggest.suggestFill.mockResolvedValue({
 			ok: true,
 			value: {
 				fields: {
 					personality: 'Something else',
 					speech: 'Short sentences.',
+					likes: 'Punctuality',
 					appearance: 'Grey suit.'
 				},
-				parts: []
+				named: [{ label: 'What scares her', value: 'Being needed.', spoiler: false }],
+				parts: [],
+				openings: [],
+				trackers: []
 			}
 		});
 		const { baseElement } = render(DaydreamCharacterDialog, {
 			// Under `props`: a top-level `context` is read as Svelte's mount option.
 			props: {
-				character: testCharacter({ personality: 'Calm.' }),
+				character: testCharacter({
+					fields: [knownField('personality', 'Calm.'), knownField('speech')]
+				}),
 				context,
 				suggestionsOn: true,
 				onsaved: () => undefined,
@@ -120,8 +127,93 @@ describe('DaydreamCharacterDialog', () => {
 		);
 		expect(textarea(baseElement, 'Appearance').value).toBe('Grey suit.');
 		expect(textarea(baseElement, 'Personality').value).toBe('Calm.');
+		expect(textarea(baseElement, 'What scares her').value).toBe('Being needed.');
+		// A known field she does not have was not asked for, and is not added.
+		expect(() => textarea(baseElement, 'What they enjoy')).toThrow();
+		// The empty fields she has went with the request, for the model to fill.
+		expect(suggest.suggestFill.mock.calls[0]?.[0].draft).toMatchObject({ speech: '' });
 		// What it wrote is under "More detail", which opens to show it.
 		expect(moreDetail(baseElement).open).toBe(true);
+	});
+
+	describe('fields', () => {
+		it('adds a known field and one of the user’s own, and removes one', async () => {
+			const onsaved = vi.fn();
+			const { baseElement } = render(DaydreamCharacterDialog, {
+				props: {
+					character: testCharacter({ name: 'Mara', personality: 'Calm.' }),
+					context,
+					suggestionsOn: false,
+					onsaved,
+					onclose: () => undefined
+				}
+			});
+			await waSettled(baseElement);
+			const add = (value: string) =>
+				baseElement.querySelector('wa-dropdown')?.dispatchEvent(
+					new CustomEvent('wa-select', {
+						detail: { item: Object.assign(document.createElement('div'), { value }) }
+					})
+				);
+			add('hides');
+			add('own');
+			await waSettled(baseElement);
+			expect(textarea(baseElement, 'What they hide')).toBeDefined();
+			const name = baseElement.querySelector<HTMLInputElement>('.own-label input');
+			if (!name) {
+				throw new Error('no name for the field');
+			}
+			name.value = 'Her rule';
+			name.dispatchEvent(new Event('input', { bubbles: true }));
+			await waSettled(baseElement);
+			const own = textarea(baseElement, 'Her rule');
+			own.value = 'No phones.';
+			own.dispatchEvent(new Event('input', { bubbles: true }));
+			// And the personality goes.
+			waByProp(baseElement, 'wa-icon', 'label', 'Remove Personality')[0]
+				?.closest('wa-button')
+				?.click();
+			await waSettled(baseElement);
+			expect(() => textarea(baseElement, 'Personality')).toThrow();
+
+			button(baseElement, 'Save changes')?.click();
+			await waitFor(() => expect(onsaved).toHaveBeenCalled());
+			expect(onsaved.mock.calls[0]?.[0].fields).toMatchObject([
+				{ kind: 'hides', value: '' },
+				{ kind: null, label: 'Her rule', value: 'No phones.', spoiler: false }
+			]);
+		});
+
+		it('keeps a spoiler out of sight until asked, and saves it as one', async () => {
+			const onsaved = vi.fn();
+			const { baseElement } = render(DaydreamCharacterDialog, {
+				props: {
+					character: testCharacter({
+						name: 'Mara',
+						fields: [
+							{
+								id: '00000000-0000-4000-8000-000000000c01',
+								kind: null,
+								label: 'The twist',
+								value: 'She planned it.',
+								spoiler: true
+							}
+						]
+					}),
+					context,
+					suggestionsOn: false,
+					onsaved,
+					onclose: () => undefined
+				}
+			});
+			await waSettled(baseElement);
+			expect(baseElement.textContent).not.toContain('She planned it.');
+			expect(baseElement.textContent).toContain('A spoiler, kept from you');
+			button(baseElement, 'Show The twist')?.click();
+			await waitFor(() => expect(textarea(baseElement, 'The twist').value).toBe('She planned it.'));
+			const toggle = baseElement.querySelector<HTMLButtonElement>('.spoiler-toggle');
+			expect(toggle?.getAttribute('aria-pressed')).toBe('true');
+		});
 	});
 
 	it('adds the model’s chips after the built-in ones with More ideas', async () => {
@@ -324,7 +416,10 @@ describe('DaydreamCharacterDialog', () => {
 			);
 			// Never over what was written.
 			expect(textarea(baseElement, 'Who they are to you').value).toBe('your boss');
-			expect(write.mock.calls[0]?.[0]).toMatchObject({ name: 'Mara', personality: 'Calm.' });
+			expect(write.mock.calls[0]?.[0]).toMatchObject({
+				name: 'Mara',
+				fields: [{ kind: 'personality', value: 'Calm.' }]
+			});
 			expect(write.mock.calls[0]?.[1]).toBe('p1');
 		});
 	});

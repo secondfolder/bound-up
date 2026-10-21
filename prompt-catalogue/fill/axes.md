@@ -27,15 +27,18 @@ One value changed at a time; see baseline.md for the prompt itself.
 -
  # The user's limits
  
-@@ -34,16 +32,24 @@
+@@ -34,16 +32,25 @@
  # What to do
  
--Fill in the character's empty fields — Type, Personality, How they talk, Appearance, What they enjoy, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
-+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, Anything else, the parts it has for characters, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+-Fill in the character's empty fields — Type, Personality, How they talk, Appearance — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
++Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
  
+-Where it would make the character better, add a field or two it does not have yet, each named in a few words — like what they hide, what they won't do, how they are won over, a habit — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
 +Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
-+
+ 
 +Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
++
++Where it would make the idea better, add a field or two it does not have yet, each named in a few words — like a secret at its heart, a rule everyone follows, a twist — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
 +
  # Your answer
  
@@ -45,21 +48,23 @@ One value changed at a time; see baseline.md for the prompt itself.
 -- "personality": how they think and behave
 -- "speech": how they talk
 -- "appearance": what you notice about them
--- "likes": what they enjoy
 +- "setting": where it happens
 +- "premise": what is going on as it starts
 +- "yourRole": who the user is in it
 +- "tone": how it should feel
- - "notes": anything the rest leaves out
 +- "parts": the parts for characters to play
 +  - "name": a short name for the part
 +  - "description": what that part does in the idea, in a few words
 +- "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 +- "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+ - "fields": fields to add or fill, if any; an empty list for none
+   - "label": the field's name, in a few words
+@@ -51,3 +58,3 @@
+   - "spoiler": true for a twist kept from the user, otherwise false
  
--{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "notes": "…"}
+-{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
-+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
++{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
 ~~~~
 
@@ -106,22 +111,22 @@ No change.
 @@ -34,5 +35,5 @@
  # What to do
  
--Fill in the character's empty fields — Type, Personality, How they talk, Appearance, What they enjoy, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
-+Fill in the character's empty fields — Type, How they talk, Appearance, What they enjoy, Anything else — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+-Fill in the character's empty fields — Type, Personality, How they talk, Appearance — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
++Fill in the character's empty fields — Type, How they talk, Appearance — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
  
- # Your answer
-@@ -41,5 +42,4 @@
+ Where it would make the character better, add a field or two it does not have yet, each named in a few words — like what they hide, what they won't do, how they are won over, a habit — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
+@@ -43,5 +44,4 @@
  
  - "archetype": their type, in a few words
 -- "personality": how they think and behave
  - "speech": how they talk
  - "appearance": what you notice about them
-@@ -47,3 +47,3 @@
- - "notes": anything the rest leaves out
+@@ -51,3 +51,3 @@
+   - "spoiler": true for a twist kept from the user, otherwise false
  
--{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "notes": "…"}
+-{"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
-+{"archetype": "…", "speech": "…", "appearance": "…", "likes": "…", "notes": "…"}
++{"archetype": "…", "speech": "…", "appearance": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 \ No newline at end of file
 ~~~~
 

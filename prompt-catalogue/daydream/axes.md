@@ -19,7 +19,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -- "rules" when they want orders from rules, a programme or an institution rather than a person.
  - "command" when they want such a system for someone else, with themselves in charge of it.
  - "watch" when they want to see other people, and to be out of it themselves.
-@@ -92,5 +90,7 @@
+@@ -96,5 +94,7 @@
  Where the brief says plainly which side the user is on — that they want to be in charge, or to be told what to do — that is their side, whatever was chosen on the form.
  
 -Otherwise put them on whichever side suits what they asked for, or on neither where nobody is in charge.
@@ -28,7 +28,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 +In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
  
  Say in "yourRole" which side they are on, or, with "watch", whose side the story is on.
-@@ -104,5 +104,5 @@
+@@ -108,5 +108,5 @@
  Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
  
 -- "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
@@ -52,7 +52,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -- "command" when they want such a system for someone else, with themselves in charge of it.
  - "watch" when they want to see other people, and to be out of it themselves.
  - "told" when they want it narrated to them, or there is nobody else in it.
-@@ -92,5 +90,7 @@
+@@ -96,5 +94,7 @@
  Where the brief says plainly which side the user is on — that they want to be in charge, or to be told what to do — that is their side, whatever was chosen on the form.
  
 -Otherwise put them on whichever side suits what they asked for, or on neither where nobody is in charge.
@@ -61,7 +61,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 +In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
  
  Say in "yourRole" which side they are on, or, with "watch", whose side the story is on.
-@@ -104,5 +104,5 @@
+@@ -108,5 +108,5 @@
  Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
  
 -- "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
@@ -89,7 +89,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -
  # The research
  
-@@ -100,4 +91,6 @@
+@@ -104,4 +95,6 @@
  Set the whole daydream up from the brief, keeping to what they asked for and filling in the rest, as the sections above say.
  
 +It was suggested to them as "talk": keep that voice.
@@ -114,7 +114,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -
  # The research
  
-@@ -100,4 +91,6 @@
+@@ -104,4 +95,6 @@
  Set the whole daydream up from the brief, keeping to what they asked for and filling in the rest, as the sections above say.
  
 +It was suggested to them as "told": keep that voice.
@@ -139,7 +139,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -
  # The research
  
-@@ -100,4 +91,6 @@
+@@ -104,4 +95,6 @@
  Set the whole daydream up from the brief, keeping to what they asked for and filling in the rest, as the sections above say.
  
 +It was suggested to them as "watch": keep that voice.
@@ -164,7 +164,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -
  # The research
  
-@@ -100,4 +91,6 @@
+@@ -104,4 +95,6 @@
  Set the whole daydream up from the brief, keeping to what they asked for and filling in the rest, as the sections above say.
  
 +It was suggested to them as "rules": keep that voice.
@@ -189,7 +189,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 -
  # The research
  
-@@ -100,4 +91,6 @@
+@@ -104,4 +95,6 @@
  Set the whole daydream up from the brief, keeping to what they asked for and filling in the rest, as the sections above say.
  
 +It was suggested to them as "monologue": keep that voice.
@@ -202,7 +202,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 ### chosen = yes
 
 ~~~~diff
-@@ -84,4 +84,9 @@
+@@ -88,4 +88,9 @@
  </brief>
  
 +Of the ideas offered for it, they picked this one to be written out:
@@ -212,7 +212,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 +
  # The user's limits
  
-@@ -98,5 +103,5 @@
+@@ -102,5 +107,5 @@
  # What to do
  
 -Set the whole daydream up from the brief, keeping to what they asked for and filling in the rest, as the sections above say.
@@ -226,7 +226,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 ### research = yes
 
 ~~~~diff
-@@ -84,4 +84,9 @@
+@@ -88,4 +88,9 @@
  </brief>
  
 +This research was done earlier, on the brief and on any pages it links. Carry over into yours what is still useful:
@@ -242,7 +242,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 ### links = unread
 
 ~~~~diff
-@@ -81,7 +81,9 @@
+@@ -85,7 +85,9 @@
  The user wants a daydream like this, in their own words:
  <brief>
 -⟦brief⟧
@@ -268,7 +268,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 +readableHosts: "example.com"
  
  ===== 1. system =====
-@@ -81,7 +81,9 @@
+@@ -85,7 +85,9 @@
  The user wants a daydream like this, in their own words:
  <brief>
 -⟦brief⟧
@@ -285,7 +285,7 @@ One value changed at a time; see baseline.md for the prompt itself.
 ### limits = set
 
 ~~~~diff
-@@ -86,5 +86,8 @@
+@@ -90,5 +90,8 @@
  # The user's limits
  
 -None stated beyond the rules.

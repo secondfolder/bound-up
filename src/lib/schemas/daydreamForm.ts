@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+	CHARACTER_FIELD_KINDS,
 	castingProblem,
 	DAYDREAM_LIMITS,
 	DEFAULT_PICTURES,
@@ -7,13 +8,24 @@ import {
 	EMPTY_CASTING,
 	EMPTY_CHARACTER,
 	EMPTY_IDEA,
+	type FieldKind,
+	fieldCap,
+	IDEA_FIELD_KINDS,
 	MAX_DAYDREAM_CHARACTERS,
+	MAX_FIELDS,
+	MAX_OPENINGS,
+	MAX_TRACKERS,
+	TRACKER_KINDS,
 	voiceProblem
 } from '$lib/daydream';
 import { MAX_READ_EXCHANGE_TURNS } from '$lib/daydream/exchange';
 import { MAX_SETUP_EXCHANGES } from '$lib/daydream/setup-exchange';
 import { SEALED_PATTERN, sealedPatternFor } from '$lib/sealed';
-import { daydreamExchangeKind, daydreamSetupExchangeKind } from '$lib/sealed-kinds/daydreams';
+import {
+	daydreamExchangeKind,
+	daydreamSetupExchangeKind,
+	daydreamSetupKind
+} from '$lib/sealed-kinds/daydreams';
 import { isClientId } from '$lib/vault';
 
 /**
@@ -56,16 +68,62 @@ const characterDials = z.object({
 
 const ideaDials = z.object({ heat: dial.nullable(), kink: dial.nullable() });
 
+/**
+ * A character's or an idea's fields (`DaydreamField`): a field with no kind
+ * needs a name, and each is held to its kind's own length.
+ */
+function fieldList<Kind extends string>(
+	kinds: readonly [Kind, ...Kind[]],
+	of: 'character' | 'idea'
+) {
+	return z
+		.array(
+			z
+				.object({
+					id: z.string(),
+					kind: z.enum(kinds).nullable(),
+					label: optional(DAYDREAM_LIMITS.fieldLabel),
+					value: z.string(),
+					spoiler: z.boolean()
+				})
+				.superRefine((field, ctx) => {
+					if (field.kind === null && field.label.trim() === '') {
+						ctx.addIssue({ code: 'custom', path: ['label'], message: 'Please give it a name' });
+					}
+					const cap = fieldCap(field.kind as FieldKind | null, of);
+					if (field.value.length > cap) {
+						ctx.addIssue({
+							code: 'custom',
+							path: ['value'],
+							message: `Please keep this to ${cap} characters or fewer`
+						});
+					}
+				})
+		)
+		.max(MAX_FIELDS, `Up to ${MAX_FIELDS} fields`);
+}
+
 const characterFields = {
 	name: required(DAYDREAM_LIMITS.characterName, 'them a name'),
 	archetype: optional(DAYDREAM_LIMITS.archetype),
-	personality: optional(DAYDREAM_LIMITS.personality),
-	speech: optional(DAYDREAM_LIMITS.speech),
 	appearance: optional(DAYDREAM_LIMITS.appearance),
-	likes: optional(DAYDREAM_LIMITS.likes),
-	notes: optional(DAYDREAM_LIMITS.characterNotes),
+	fields: fieldList(CHARACTER_FIELD_KINDS, 'character'),
 	dials: characterDials
 };
+
+const openingFields = z.object({
+	id: z.string(),
+	label: required(DAYDREAM_LIMITS.openingLabel, 'it a name'),
+	situation: required(DAYDREAM_LIMITS.openingSituation, 'where it starts')
+});
+
+const trackerFields = z.object({
+	id: z.string(),
+	name: required(DAYDREAM_LIMITS.trackerName, 'it a name'),
+	kind: z.enum(TRACKER_KINDS),
+	start: optional(DAYDREAM_LIMITS.trackerStart),
+	about: optional(DAYDREAM_LIMITS.trackerAbout)
+});
 
 const partFields = z.object({
 	id: z.string(),
@@ -75,14 +133,16 @@ const partFields = z.object({
 
 const ideaFields = {
 	title: required(DAYDREAM_LIMITS.title, 'it a title'),
-	setting: optional(DAYDREAM_LIMITS.setting),
 	premise: required(DAYDREAM_LIMITS.premise, 'what is going on'),
 	yourRole: optional(DAYDREAM_LIMITS.yourRole),
-	tone: optional(DAYDREAM_LIMITS.tone),
-	notes: optional(DAYDREAM_LIMITS.ideaNotes),
+	fields: fieldList(IDEA_FIELD_KINDS, 'idea'),
 	brief: optional(DAYDREAM_LIMITS.brief),
 	research: optional(DAYDREAM_LIMITS.ideaResearch),
 	parts: z.array(partFields).max(MAX_DAYDREAM_CHARACTERS, `Up to ${MAX_DAYDREAM_CHARACTERS} parts`),
+	openings: z.array(openingFields).max(MAX_OPENINGS, `Up to ${MAX_OPENINGS} openings`),
+	trackers: z
+		.array(trackerFields)
+		.max(MAX_TRACKERS, `Up to ${MAX_TRACKERS} things to keep track of`),
 	dials: ideaDials
 };
 
@@ -101,7 +161,8 @@ const source = {
 const storyDials = z.object({
 	intensity: dial,
 	pace: dial,
-	length: z.enum(['short', 'medium', 'long'])
+	length: z.enum(['short', 'medium', 'long']),
+	thoughts: z.enum(['shown', 'hidden'])
 });
 
 /**
@@ -125,7 +186,8 @@ export const daydreamSetupFormSchema = z
 		lead: z.enum(['character', 'me', 'shared']),
 		limits: optional(DAYDREAM_LIMITS.limits),
 		dials: storyDials,
-		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) }),
+		opening: z.string().nullable()
 	})
 	.superRefine((value, ctx) => {
 		const problem = voiceProblem(value.voice, value.characters.length);
@@ -150,7 +212,8 @@ export const EMPTY_DAYDREAM_SETUP: DaydreamSetupFormValues = {
 	lead: 'character',
 	limits: '',
 	dials: DEFAULT_STORY_DIALS,
-	pictures: DEFAULT_PICTURES
+	pictures: DEFAULT_PICTURES,
+	opening: null
 };
 
 /**
@@ -186,7 +249,7 @@ const sealedFields = {
 		.string()
 		.min(1)
 		// The largest kind's cap: a setup with four characters (`daydreamSetupKind`).
-		.max(96 * 1024)
+		.max(daydreamSetupKind.maxCiphertextLength)
 		.regex(SEALED_PATTERN),
 	payloadVersion: z.coerce.number().int().positive()
 };

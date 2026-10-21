@@ -1,14 +1,23 @@
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import {
+	CHARACTER_FIELD_KINDS,
 	DAYDREAM_LIMITS,
+	type FieldKind,
+	fieldCap,
+	IDEA_FIELD_KINDS,
+	knownField,
 	MAX_DAYDREAM_CHARACTERS,
+	MAX_FIELDS,
+	MAX_OPENINGS,
 	MAX_SUGGESTIONS,
+	MAX_TRACKERS,
 	UNSET_CHARACTER_DIALS
 } from '../daydream';
 import { EXCHANGE_LIMITS } from '../daydream/exchange';
 import { MAX_PICTURE_REQUEST_PROMPT } from '../daydream/image-prompt';
 import {
+	daydreamCharacterKind,
 	daydreamExchangeKind,
 	daydreamIdeaKind,
 	daydreamMarkKind,
@@ -23,14 +32,40 @@ import {
  */
 const sealedLength = (bytes: number) => 'sb1.'.length + Math.ceil(((12 + bytes + 16) * 4) / 3);
 
-/** An idea with every field at its cap, the brief and research included. */
+const partId = (index: number) => `0000000${index}-0000-4000-8000-000000000000`;
+const ownId = (index: number) => `0000000${index}-0000-4000-8000-0000000000f0`;
+
+/**
+ * As many fields as a record holds, each at its cap: every known kind, then
+ * fields the user named, at the longest a named field may be.
+ */
+function fullFields<Kind extends FieldKind>(kinds: readonly Kind[], of: 'character' | 'idea') {
+	const known = kinds.map((kind) => knownField(kind, 'k'.repeat(fieldCap(kind, of))));
+	const own = Array.from({ length: MAX_FIELDS - known.length }, (_, index) => ({
+		id: ownId(index),
+		kind: null,
+		label: 'l'.repeat(DAYDREAM_LIMITS.fieldLabel),
+		value: 'v'.repeat(DAYDREAM_LIMITS.customField),
+		spoiler: index % 2 === 0
+	}));
+	return [...known, ...own];
+}
+
+/** A character with every field at its cap. */
+const fullCharacter = (index: number) => ({
+	name: `${index}`.repeat(DAYDREAM_LIMITS.characterName),
+	archetype: 'a'.repeat(DAYDREAM_LIMITS.archetype),
+	appearance: 'a'.repeat(DAYDREAM_LIMITS.appearance),
+	fields: fullFields(CHARACTER_FIELD_KINDS, 'character'),
+	dials: UNSET_CHARACTER_DIALS
+});
+
+/** An idea with every field at its cap, the brief, research, openings and trackers included. */
 const fullIdea = (part: (index: number) => string) => ({
 	title: 't'.repeat(DAYDREAM_LIMITS.title),
-	setting: 's'.repeat(DAYDREAM_LIMITS.setting),
 	premise: 'p'.repeat(DAYDREAM_LIMITS.premise),
 	yourRole: 'y'.repeat(DAYDREAM_LIMITS.yourRole),
-	tone: 'o'.repeat(DAYDREAM_LIMITS.tone),
-	notes: 'n'.repeat(DAYDREAM_LIMITS.ideaNotes),
+	fields: fullFields(IDEA_FIELD_KINDS, 'idea'),
 	brief: 'b'.repeat(DAYDREAM_LIMITS.brief),
 	research: 'r'.repeat(DAYDREAM_LIMITS.ideaResearch),
 	parts: Array.from({ length: MAX_DAYDREAM_CHARACTERS }, (_, index) => ({
@@ -38,10 +73,56 @@ const fullIdea = (part: (index: number) => string) => ({
 		name: 'n'.repeat(DAYDREAM_LIMITS.partName),
 		description: 'd'.repeat(DAYDREAM_LIMITS.partDescription)
 	})),
+	openings: Array.from({ length: MAX_OPENINGS }, (_, index) => ({
+		id: `0000000${index}-0000-4000-8000-0000000000e0`,
+		label: 'o'.repeat(DAYDREAM_LIMITS.openingLabel),
+		situation: 's'.repeat(DAYDREAM_LIMITS.openingSituation)
+	})),
+	trackers: Array.from({ length: MAX_TRACKERS }, (_, index) => ({
+		id: `0000000${index}-0000-4000-8000-0000000000d0`,
+		name: `${index}`.repeat(DAYDREAM_LIMITS.trackerName),
+		kind: 'list',
+		start: 's'.repeat(DAYDREAM_LIMITS.trackerStart),
+		about: 'a'.repeat(DAYDREAM_LIMITS.trackerAbout)
+	})),
 	dials: { heat: 5, kink: 5 }
 });
 
-const partId = (index: number) => `0000000${index}-0000-4000-8000-000000000000`;
+describe('daydreamCharacterKind', () => {
+	it('fits a character at every cap inside its ciphertext cap', () => {
+		const character = fullCharacter(1);
+		expect(daydreamCharacterKind.latest.safeParse(character).success).toBe(true);
+		expect(sealedLength(encodedLength(character))).toBeLessThanOrEqual(
+			daydreamCharacterKind.maxCiphertextLength
+		);
+	});
+
+	it('refuses a field the user named with no name, and one past its cap', () => {
+		const character = fullCharacter(1);
+		const unnamed = character.fields.map((field) =>
+			field.kind === null ? { ...field, label: '' } : field
+		);
+		expect(daydreamCharacterKind.latest.safeParse({ ...character, fields: unnamed }).success).toBe(
+			false
+		);
+		const long = character.fields.map((field) =>
+			field.kind === 'speech' ? { ...field, value: `${field.value}x` } : field
+		);
+		expect(daydreamCharacterKind.latest.safeParse({ ...character, fields: long }).success).toBe(
+			false
+		);
+	});
+
+	it('refuses a known field under any id but its own', () => {
+		const character = fullCharacter(1);
+		const moved = character.fields.map((field) =>
+			field.kind === 'personality' ? { ...field, id: ownId(9) } : field
+		);
+		expect(daydreamCharacterKind.latest.safeParse({ ...character, fields: moved }).success).toBe(
+			false
+		);
+	});
+});
 
 const encodedLength = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
 
@@ -68,14 +149,7 @@ describe('daydreamSetupKind', () => {
 			characters: Array.from({ length: MAX_DAYDREAM_CHARACTERS }, (_, index) => ({
 				sourceId: null,
 				sourceRevision: null,
-				name: `${index}`.repeat(DAYDREAM_LIMITS.characterName),
-				archetype: 'a'.repeat(DAYDREAM_LIMITS.archetype),
-				personality: 'p'.repeat(DAYDREAM_LIMITS.personality),
-				speech: 's'.repeat(DAYDREAM_LIMITS.speech),
-				appearance: 'a'.repeat(DAYDREAM_LIMITS.appearance),
-				likes: 'l'.repeat(DAYDREAM_LIMITS.likes),
-				notes: 'n'.repeat(DAYDREAM_LIMITS.characterNotes),
-				dials: UNSET_CHARACTER_DIALS,
+				...fullCharacter(index),
 				casting: {
 					partId: partId(index),
 					relationship: 'r'.repeat(DAYDREAM_LIMITS.relationship),
@@ -85,8 +159,9 @@ describe('daydreamSetupKind', () => {
 			idea: { ...fullIdea(partId), sourceId: null, sourceRevision: null },
 			lead: 'character',
 			limits: 'l'.repeat(DAYDREAM_LIMITS.limits),
-			dials: { intensity: 3, pace: 3, length: 'medium' },
-			pictures: { on: true, style: 'photo' }
+			dials: { intensity: 3, pace: 3, length: 'medium', thoughts: 'hidden' },
+			pictures: { on: true, style: 'photo' },
+			opening: '00000000-0000-4000-8000-0000000000e0'
 		};
 		expect(daydreamSetupKind.latest.safeParse(setup).success).toBe(true);
 		expect(sealedLength(encodedLength(setup))).toBeLessThanOrEqual(

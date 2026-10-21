@@ -13,16 +13,26 @@
 
 import { z } from 'zod';
 import {
-	CHARACTER_TEXT_FIELDS,
+	CHARACTER_FIELD_KINDS,
 	type CharacterTextField,
+	characterFromFlat,
 	DAYDREAM_LIMITS,
+	type DaydreamField,
 	type DaydreamVoicePresetId,
 	type DialValue,
-	IDEA_TEXT_FIELDS,
+	type FieldKind,
+	IDEA_FIELD_KINDS,
 	type IdeaDials,
+	type IdeaOpening,
 	type IdeaTextField,
+	type IdeaTracker,
 	type IdeaWithoutOrigin,
+	ideaFromFlat,
 	MAX_DAYDREAM_CHARACTERS,
+	MAX_FIELDS,
+	MAX_OPENINGS,
+	MAX_TRACKERS,
+	TRACKER_KINDS,
 	UNSET_CHARACTER_DIALS
 } from '../daydream';
 import { unfence } from './reply-format';
@@ -59,6 +69,9 @@ export const FIELD_LIMITS: Readonly<
 	speech: DAYDREAM_LIMITS.speech,
 	appearance: DAYDREAM_LIMITS.appearance,
 	likes: DAYDREAM_LIMITS.likes,
+	hides: DAYDREAM_LIMITS.hides,
+	wontDo: DAYDREAM_LIMITS.wontDo,
+	wonOver: DAYDREAM_LIMITS.wonOver,
 	notes: DAYDREAM_LIMITS.characterNotes,
 	title: DAYDREAM_LIMITS.title,
 	setting: DAYDREAM_LIMITS.setting,
@@ -66,6 +79,19 @@ export const FIELD_LIMITS: Readonly<
 	yourRole: DAYDREAM_LIMITS.yourRole,
 	tone: DAYDREAM_LIMITS.tone
 };
+
+/**
+ * Every text an answer may write for a record, by name: its core and its
+ * known kinds of field. A field the user named is written through `fields`
+ * instead (`parseNewFields`).
+ */
+export const CHARACTER_ANSWER_KEYS = [
+	'name',
+	'archetype',
+	'appearance',
+	...CHARACTER_FIELD_KINDS
+] as const;
+export const IDEA_ANSWER_KEYS = ['title', 'premise', 'yourRole', ...IDEA_FIELD_KINDS] as const;
 
 const envelopeSchema = z.object({
 	choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1)
@@ -236,7 +262,7 @@ export function parseFill(target: SuggestTarget, value: unknown): Partial<Record
 		return {};
 	}
 	const fields: readonly string[] =
-		target === 'character' ? ['name', ...CHARACTER_TEXT_FIELDS] : ['title', ...IDEA_TEXT_FIELDS];
+		target === 'character' ? CHARACTER_ANSWER_KEYS : IDEA_ANSWER_KEYS;
 	const filled: Partial<Record<string, string>> = {};
 	for (const field of fields) {
 		const text = (value as Record<string, unknown>)[field];
@@ -290,6 +316,142 @@ export function parseResearch(value: unknown): string {
 	}
 	const kept = wholeLines(research.trim(), DAYDREAM_LIMITS.ideaResearch);
 	return kept.length <= DAYDREAM_LIMITS.ideaResearch ? kept : '';
+}
+
+/** A field the model named, as it suggests it: no id yet, which whatever adds it gives it. */
+export type SuggestedField = { label: string; value: string; spoiler: boolean };
+
+/**
+ * Fields the model named in an answer's `fields` (docs/daydreams.md,
+ * "Fields"): each with a name and a value within their caps, no name twice,
+ * and no more than a record can hold. A field it names after a known kind
+ * ("Personality") is left to that kind's own key, which says it already.
+ */
+export function parseNewFields(value: unknown): SuggestedField[] {
+	if (!value || typeof value !== 'object') {
+		return [];
+	}
+	const list = (value as Record<string, unknown>).fields;
+	const fields: SuggestedField[] = [];
+	for (const entry of Array.isArray(list) ? list : []) {
+		const parsed = z
+			.object({ label: z.string(), value: z.string(), spoiler: z.boolean().optional() })
+			.safeParse(entry);
+		if (!parsed.success) {
+			continue;
+		}
+		const label = parsed.data.label.trim();
+		const text = parsed.data.value.trim();
+		if (
+			label &&
+			text &&
+			label.length <= DAYDREAM_LIMITS.fieldLabel &&
+			text.length <= DAYDREAM_LIMITS.customField &&
+			!fields.some((field) => same(field.label, label))
+		) {
+			fields.push({ label, value: text, spoiler: parsed.data.spoiler ?? false });
+		}
+	}
+	return fields.slice(0, MAX_FIELDS);
+}
+
+/**
+ * Fields with what an answer wrote added: a named field fills one of the same
+ * name that is still empty, or is added as a new one, until the record is
+ * full; a field with something written in is never written over.
+ */
+export function withSuggestedFields<Kind extends FieldKind>(
+	fields: readonly DaydreamField<Kind>[],
+	suggested: readonly SuggestedField[],
+	newId: () => string = () => crypto.randomUUID()
+): DaydreamField<Kind>[] {
+	const result = [...fields];
+	for (const field of suggested) {
+		const index = result.findIndex(
+			(candidate) => candidate.kind === null && same(candidate.label, field.label)
+		);
+		const existing = result[index];
+		if (existing) {
+			if (!existing.value.trim()) {
+				result[index] = { ...existing, value: field.value, spoiler: field.spoiler };
+			}
+		} else if (result.length < MAX_FIELDS) {
+			result.push({ id: newId(), kind: null, ...field });
+		}
+	}
+	return result;
+}
+
+/** An opening as the model suggests it, before it has an id. */
+export type SuggestedOpening = Omit<IdeaOpening, 'id'>;
+
+/** The openings in an answer's `openings`: within their caps, no label twice, the first few. */
+export function parseOpenings(value: unknown): SuggestedOpening[] {
+	if (!value || typeof value !== 'object') {
+		return [];
+	}
+	const list = (value as Record<string, unknown>).openings;
+	const openings: SuggestedOpening[] = [];
+	for (const entry of Array.isArray(list) ? list : []) {
+		const parsed = z.object({ label: z.string(), situation: z.string() }).safeParse(entry);
+		if (!parsed.success) {
+			continue;
+		}
+		const label = parsed.data.label.trim();
+		const situation = parsed.data.situation.trim();
+		if (
+			label &&
+			situation &&
+			label.length <= DAYDREAM_LIMITS.openingLabel &&
+			situation.length <= DAYDREAM_LIMITS.openingSituation &&
+			!openings.some((opening) => same(opening.label, label))
+		) {
+			openings.push({ label, situation });
+		}
+	}
+	return openings.slice(0, MAX_OPENINGS);
+}
+
+/** A tracker as the model suggests it, before it has an id. */
+export type SuggestedTracker = Omit<IdeaTracker, 'id'>;
+
+/** The trackers in an answer's `trackers`: a known kind, within their caps, no name twice. */
+export function parseTrackers(value: unknown): SuggestedTracker[] {
+	if (!value || typeof value !== 'object') {
+		return [];
+	}
+	const list = (value as Record<string, unknown>).trackers;
+	const trackers: SuggestedTracker[] = [];
+	for (const entry of Array.isArray(list) ? list : []) {
+		const parsed = z
+			.object({
+				name: z.string(),
+				kind: z.enum(TRACKER_KINDS),
+				start: z.union([z.string(), z.number()]).optional(),
+				about: z.string().optional()
+			})
+			.safeParse(entry);
+		if (!parsed.success) {
+			continue;
+		}
+		const name = parsed.data.name.trim();
+		const start = String(parsed.data.start ?? '').trim();
+		const about = (parsed.data.about ?? '').trim();
+		if (
+			name &&
+			name.length <= DAYDREAM_LIMITS.trackerName &&
+			start.length <= DAYDREAM_LIMITS.trackerStart &&
+			!trackers.some((tracker) => same(tracker.name, name))
+		) {
+			trackers.push({
+				name,
+				kind: parsed.data.kind,
+				start,
+				about: about.length <= DAYDREAM_LIMITS.trackerAbout ? about : ''
+			});
+		}
+	}
+	return trackers.slice(0, MAX_TRACKERS);
 }
 
 /** An idea part as the model suggests it: no id yet, which the dialog gives it. */
@@ -352,24 +514,32 @@ export function parseIdeaDials(value: unknown): IdeaDials {
 	return { heat: dialOf(answer.heat), kink: dialOf(answer.kink) };
 }
 
+/** An idea as a suggestion writes it: its parts, openings and trackers without ids yet. */
+export type SuggestedIdea = Omit<IdeaWithoutOrigin, 'parts' | 'openings' | 'trackers'> & {
+	parts: SuggestedPart[];
+	openings: SuggestedOpening[];
+	trackers: SuggestedTracker[];
+};
+
 /** A whole idea from "Surprise me", or null when it lacks the two fields an idea must have. */
-export function parseSurpriseIdea(
-	value: unknown
-): (Omit<IdeaWithoutOrigin, 'parts'> & { parts: SuggestedPart[] }) | null {
+export function parseSurpriseIdea(value: unknown): SuggestedIdea | null {
 	const fields = parseFill('idea', value);
 	if (!(fields.title && fields.premise)) {
 		return null;
 	}
-	return {
+	const idea = ideaFromFlat({
 		title: fields.title,
-		setting: fields.setting ?? '',
 		premise: fields.premise,
-		yourRole: fields.yourRole ?? '',
-		tone: fields.tone ?? '',
-		notes: fields.notes ?? '',
+		yourRole: fields.yourRole,
+		setting: fields.setting,
+		tone: fields.tone,
+		notes: fields.notes,
 		parts: parseParts(value),
+		openings: parseOpenings(value),
+		trackers: parseTrackers(value),
 		dials: parseIdeaDials(value)
-	};
+	});
+	return { ...idea, fields: withSuggestedFields(idea.fields, parseNewFields(value)) };
 }
 
 /** Strings within a cap, trimmed; anything else as empty. */
@@ -453,16 +623,15 @@ export function parseSuggestedDaydream(value: unknown): DaydreamPieces | null {
 		}
 		const person = entry as Record<string, unknown>;
 		const partName = capped(person.part, DAYDREAM_LIMITS.partName);
+		const character = characterFromFlat({
+			...fields,
+			name: fields.name,
+			dials: UNSET_CHARACTER_DIALS
+		});
 		cast.push({
 			character: {
-				name: fields.name,
-				archetype: fields.archetype ?? '',
-				personality: fields.personality ?? '',
-				speech: fields.speech ?? '',
-				appearance: fields.appearance ?? '',
-				likes: fields.likes ?? '',
-				notes: fields.notes ?? '',
-				dials: UNSET_CHARACTER_DIALS
+				...character,
+				fields: withSuggestedFields(character.fields, parseNewFields(entry))
 			},
 			partName: partName || null,
 			relationship: capped(person.relationship, DAYDREAM_LIMITS.relationship),

@@ -21,13 +21,16 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { openRecord } from '../crypto/sealed';
 import { vaultById, vaultsSettled } from '../crypto/vaults.svelte';
-import type {
-	DaydreamPictures,
-	DaydreamSetup,
-	DaydreamTurnRole,
-	DialValue,
-	IdeaDials,
-	StoryDials
+import {
+	type DaydreamPictures,
+	type DaydreamSetup,
+	type DaydreamTurnRole,
+	type DialValue,
+	fieldText,
+	type IdeaDials,
+	type IdeaFieldKind,
+	type StoryDials,
+	withField
 } from '../daydream';
 import { reportRequestFailure } from '../request-failure.svelte';
 import {
@@ -992,14 +995,21 @@ export class DaydreamStory {
 			story.unshift(passage.text);
 			size += passage.text.length;
 		}
-		const { title, setting, premise, yourRole, tone, notes } = setup.idea;
+		const { title, premise, yourRole, fields } = setup.idea;
 		return await suggestCatchUp(
 			{
-				idea: { title, setting, premise, yourRole, tone, notes },
+				idea: {
+					title,
+					premise,
+					yourRole,
+					setting: fieldText(fields, 'setting'),
+					tone: fieldText(fields, 'tone'),
+					notes: fieldText(fields, 'notes')
+				},
 				narrator: setup.voice.narrator,
 				characters: setup.characters.map((character) => ({
 					name: character.name,
-					personality: character.personality,
+					personality: fieldText(character.fields, 'personality'),
 					relationship: character.casting.relationship,
 					doing: character.casting.part
 				})),
@@ -1017,9 +1027,19 @@ export class DaydreamStory {
 	 * they were, for starting other daydreams from. The offer is answered.
 	 */
 	async applyCatchUp(turnId: string, accepted: CatchUp): Promise<string | null> {
+		const { premise, yourRole, setting, tone, notes } = accepted.idea;
 		const failed = await this.saveSetup((now) => ({
 			...now,
-			idea: { ...now.idea, ...accepted.idea },
+			idea: {
+				...now.idea,
+				...(premise === undefined ? {} : { premise }),
+				...(yourRole === undefined ? {} : { yourRole }),
+				fields: Object.entries({ setting, tone, notes }).reduce(
+					(fields, [kind, value]) =>
+						value === undefined ? fields : withField(fields, kind as IdeaFieldKind, value),
+					now.idea.fields
+				)
+			},
 			characters: now.characters.map((character) => {
 				const change = accepted.characters.find(
 					(each) => each.name.toLowerCase() === character.name.toLowerCase()
@@ -1029,7 +1049,9 @@ export class DaydreamStory {
 				}
 				return {
 					...character,
-					...(change.personality === undefined ? {} : { personality: change.personality }),
+					...(change.personality === undefined
+						? {}
+						: { fields: withField(character.fields, 'personality', change.personality) }),
 					casting: {
 						...character.casting,
 						...(change.relationship === undefined ? {} : { relationship: change.relationship }),

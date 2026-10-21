@@ -13,14 +13,24 @@
 
 import { z } from 'zod';
 import {
+	CHARACTER_FIELD_KINDS,
 	castingProblem,
 	DAYDREAM_LIMITS,
 	type DaydreamVoice,
 	DEFAULT_PICTURES,
-	DEFAULT_STORY_DIALS,
+	type FieldKind,
+	fieldCap,
+	fieldsFrom,
+	IDEA_FIELD_KINDS,
+	KNOWN_FIELD_IDS,
 	MAX_DAYDREAM_CHARACTERS,
 	MAX_DIRECTIONS,
+	MAX_FIELD_LENGTH,
+	MAX_FIELDS,
+	MAX_OPENINGS,
 	MAX_SUGGESTIONS,
+	MAX_TRACKERS,
+	TRACKER_KINDS,
 	UNSET_CHARACTER_DIALS,
 	UNSET_IDEA_DIALS,
 	voiceProblem
@@ -112,27 +122,179 @@ const sourceShape = {
 	sourceRevision: z.number().int().min(0).nullable()
 };
 
+/**
+ * A field of a character or an idea (`DaydreamField`): a known kind, whose
+ * label is the catalog's, or one the user named, which must have a name. A
+ * record holds each known kind once, under its fixed id, and every id once.
+ */
+function fieldsSchema<Kind extends string>(
+	kinds: readonly [Kind, ...Kind[]],
+	of: 'character' | 'idea'
+) {
+	return z
+		.array(
+			z
+				.object({
+					id: clientId,
+					kind: z.enum(kinds).nullable(),
+					label: optional(DAYDREAM_LIMITS.fieldLabel),
+					value: optional(MAX_FIELD_LENGTH),
+					spoiler: z.boolean()
+				})
+				.superRefine((field, ctx) => {
+					if (field.kind === null && field.label === '') {
+						ctx.addIssue({ code: 'custom', path: ['label'], message: 'Name the field' });
+					}
+					if (field.value.length > fieldCap(field.kind as FieldKind | null, of)) {
+						ctx.addIssue({ code: 'custom', path: ['value'], message: 'Too long' });
+					}
+					if (field.kind !== null && field.id !== KNOWN_FIELD_IDS[field.kind as FieldKind]) {
+						ctx.addIssue({ code: 'custom', path: ['id'], message: 'Not the field’s own id' });
+					}
+				})
+		)
+		.max(MAX_FIELDS)
+		.refine(
+			(fields) => new Set(fields.map((field) => field.id)).size === fields.length,
+			'Duplicate field'
+		);
+}
+
+const characterFieldsSchema = fieldsSchema(CHARACTER_FIELD_KINDS, 'character');
+const ideaFieldsSchema = fieldsSchema(IDEA_FIELD_KINDS, 'idea');
+
+/**
+ * v2 of a character: their type and appearance, and everything else as
+ * fields (`DaydreamField`) rather than four fixed ones — the ones the user
+ * names, and what they hide, won't do or are won over by.
+ */
+const characterV2Shape = {
+	name: required(DAYDREAM_LIMITS.characterName),
+	archetype: optional(DAYDREAM_LIMITS.archetype),
+	appearance: optional(DAYDREAM_LIMITS.appearance),
+	fields: characterFieldsSchema,
+	dials: characterDialsSchema
+};
+
+type CharacterV1 = z.output<z.ZodObject<typeof characterShape>>;
+type CharacterV2 = z.output<z.ZodObject<typeof characterV2Shape>>;
+
+/** A v1 character's fixed fields, as v2's known fields: the empty ones dropped. */
+function characterToV2<T extends CharacterV1>({
+	personality,
+	speech,
+	likes,
+	notes,
+	...rest
+}: T): Omit<T, 'personality' | 'speech' | 'likes' | 'notes'> & Pick<CharacterV2, 'fields'> {
+	return {
+		...rest,
+		fields: fieldsFrom(['personality', 'speech', 'likes', 'notes'], {
+			personality,
+			speech,
+			likes,
+			notes
+		})
+	};
+}
+
 export const daydreamCharacterKind = defineSealedKind({
 	name: 'daydream-character',
-	maxCiphertextLength: 16 * 1024,
-	versions: [{ version: 1, schema: z.object(characterShape) }]
+	// Every field at its cap: twelve fields at the longest a field may be.
+	maxCiphertextLength: 48 * 1024,
+	versions: [
+		{
+			version: 1,
+			schema: z.object(characterShape),
+			upcast: (value: CharacterV1): CharacterV2 => characterToV2(value)
+		},
+		{ version: 2, schema: z.object(characterV2Shape) }
+	]
 });
 
 export type DaydreamCharacterContent = z.output<typeof daydreamCharacterKind.latest>;
+
+const openingSchema = z.object({
+	id: clientId,
+	label: required(DAYDREAM_LIMITS.openingLabel),
+	situation: required(DAYDREAM_LIMITS.openingSituation)
+});
+
+const trackerSchema = z.object({
+	id: clientId,
+	name: required(DAYDREAM_LIMITS.trackerName),
+	kind: z.enum(TRACKER_KINDS),
+	start: optional(DAYDREAM_LIMITS.trackerStart),
+	about: optional(DAYDREAM_LIMITS.trackerAbout)
+});
+
+const uniqueIds = <T extends { id: string }>(items: readonly T[]) =>
+	new Set(items.map((item) => item.id)).size === items.length;
+
+/**
+ * v3 of an idea: its premise and the user's part, and everything else as
+ * fields; the places its story can start (`openings`); and what the story
+ * keeps track of (`trackers`).
+ */
+const ideaV3Shape = {
+	title: required(DAYDREAM_LIMITS.title),
+	premise: required(DAYDREAM_LIMITS.premise),
+	yourRole: optional(DAYDREAM_LIMITS.yourRole),
+	fields: ideaFieldsSchema,
+	brief: optional(DAYDREAM_LIMITS.brief),
+	research: optional(DAYDREAM_LIMITS.ideaResearch),
+	parts: ideaShape.parts,
+	openings: z.array(openingSchema).max(MAX_OPENINGS).refine(uniqueIds, 'Duplicate opening'),
+	trackers: z
+		.array(trackerSchema)
+		.max(MAX_TRACKERS)
+		.refine(uniqueIds, 'Duplicate tracker')
+		.refine(
+			(trackers) =>
+				new Set(trackers.map((tracker) => tracker.name.toLocaleLowerCase())).size ===
+				trackers.length,
+			'Two trackers with one name'
+		),
+	dials: ideaDialsSchema
+};
+
+type IdeaV2 = z.output<z.ZodObject<typeof ideaV2Shape>>;
+type IdeaV3 = z.output<z.ZodObject<typeof ideaV3Shape>>;
+
+/** A v2 idea's fixed fields, as v3's known fields; it had no openings or trackers. */
+function ideaToV3<T extends IdeaV2>({
+	setting,
+	tone,
+	notes,
+	...rest
+}: T): Omit<T, 'setting' | 'tone' | 'notes'> & Pick<IdeaV3, 'fields' | 'openings' | 'trackers'> {
+	return {
+		...rest,
+		fields: fieldsFrom(['setting', 'tone', 'notes'], { setting, tone, notes }),
+		openings: [],
+		trackers: []
+	};
+}
 
 // Named for what an idea was called when it shipped: the name is in every
 // stored envelope, so it cannot follow the rename (docs/daydreams.md, "Ideas").
 export const daydreamIdeaKind = defineSealedKind({
 	name: 'daydream-scene',
-	// Every field at its cap, research included, JSON-escaped, sealed and base64url'd.
-	maxCiphertextLength: 24 * 1024,
+	// Every field at its cap, research included, JSON-escaped, sealed and
+	// base64url'd. Raised from 24 KB with v3's fields, openings and trackers.
+	maxCiphertextLength: 64 * 1024,
 	versions: [
 		{
 			version: 1,
 			schema: z.object(ideaShape),
 			upcast: (value: z.output<z.ZodObject<typeof ideaShape>>) => ({ ...value, ...NO_ORIGIN })
 		},
-		{ version: 2, schema: z.object(ideaV2Shape) }
+		{
+			version: 2,
+			schema: z.object(ideaV2Shape),
+			upcast: (value: IdeaV2): IdeaV3 => ideaToV3(value)
+		},
+		{ version: 3, schema: z.object(ideaV3Shape) }
 	]
 });
 
@@ -181,10 +343,10 @@ const setupV2Shape = {
 function refineSetup(
 	value: {
 		voice: Pick<DaydreamVoice, 'narrator' | 'stance' | 'protagonistName' | 'governs'>;
-		characters: z.output<typeof setupV2Shape.characters>;
+		characters: readonly { casting: { partId: string | null } }[];
 	} & (
-		| { scene: z.output<typeof setupV2Shape.scene> }
-		| { idea: z.output<typeof setupV2Shape.scene> }
+		| { scene: { parts: readonly { id: string }[] } }
+		| { idea: { parts: readonly { id: string }[] } }
 	),
 	ctx: z.RefinementCtx
 ) {
@@ -258,11 +420,53 @@ const setupV6 = z
 	})
 	.superRefine(refineSetup);
 
+// v7: characters' and the idea's text as fields (character v2, idea v3), the
+// idea's openings and trackers, the opening the story starts from, and
+// whether the characters' thoughts are shown (docs/daydreams.md, "Fields",
+// "Openings", "Trackers", "Thoughts").
+const setupV7 = z
+	.object({
+		title: setupV2Shape.title,
+		voice: z.object({
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
+			stance: z.enum(['self', 'persona', 'absent']),
+			protagonistName: optional(DAYDREAM_LIMITS.protagonistName),
+			governs: z.literal('character').optional()
+		}),
+		characters: z
+			.array(z.object({ ...characterV2Shape, ...sourceShape, casting: castingSchema }))
+			.max(MAX_DAYDREAM_CHARACTERS),
+		idea: z.object({ ...ideaV3Shape, ...sourceShape }),
+		lead: setupV2Shape.lead,
+		limits: setupV2Shape.limits,
+		dials: z.object({
+			intensity: dial,
+			pace: dial,
+			length: z.enum(['short', 'medium', 'long']),
+			thoughts: z.enum(['shown', 'hidden'])
+		}),
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) }),
+		opening: clientId.nullable()
+	})
+	.superRefine(refineSetup)
+	.superRefine((value, ctx) => {
+		if (value.opening !== null && !value.idea.openings.some(({ id }) => id === value.opening)) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['opening'],
+				message: 'The story starts from an opening the idea does not have.'
+			});
+		}
+	});
+
+type SetupV6 = z.output<typeof setupV6>;
+type SetupV7 = z.output<typeof setupV7>;
+
 export const daydreamSetupKind = defineSealedKind({
 	name: 'daydream-setup',
 	// Four characters with every field at its cap, an idea likewise, JSON-escaped,
-	// sealed and base64url'd, fit inside.
-	maxCiphertextLength: 96 * 1024,
+	// sealed and base64url'd, fit inside. Raised from 96 KB with v7's fields.
+	maxCiphertextLength: 160 * 1024,
 	versions: [
 		{
 			version: 1,
@@ -305,7 +509,8 @@ export const daydreamSetupKind = defineSealedKind({
 				},
 				lead: value.lead,
 				limits: value.limits,
-				dials: DEFAULT_STORY_DIALS
+				// v2's dials, written out: `DEFAULT_STORY_DIALS` has grown since.
+				dials: { intensity: 3, pace: 3, length: 'medium' }
 			})
 		},
 		{
@@ -341,7 +546,20 @@ export const daydreamSetupKind = defineSealedKind({
 			// Every v5 voice is a v6 one: a system governed the user until then.
 			upcast: (value: z.output<typeof setupV5>): z.output<typeof setupV6> => value
 		},
-		{ version: 6, schema: setupV6 }
+		{
+			version: 6,
+			schema: setupV6,
+			// Fixed fields become known fields, thoughts are shown as they always
+			// were, and the story starts from the premise, as it always did.
+			upcast: ({ characters, idea, dials, ...rest }: SetupV6): SetupV7 => ({
+				...rest,
+				characters: characters.map((character) => characterToV2(character)),
+				idea: ideaToV3(idea),
+				dials: { ...dials, thoughts: 'shown' },
+				opening: null
+			})
+		},
+		{ version: 7, schema: setupV7 }
 	]
 });
 
@@ -556,8 +774,36 @@ export const passageMetaV8 = passageMetaV7.extend({
 		.optional()
 });
 
-/** A passage's meta as the latest turn version stores it (`passageMetaV8`). */
-export type PassageMeta = z.output<typeof passageMetaV8>;
+/** A tracker's value (`TrackerValue`): a meter's or count's number, a list's items, a line. */
+export const trackerValueSchema = z.union([
+	z.number().finite(),
+	z.string().trim().max(DAYDREAM_LIMITS.trackerText),
+	z.array(z.string().trim().min(1).max(DAYDREAM_LIMITS.trackerItem)).max(20)
+]);
+
+/**
+ * v9's: an opening passage says which of the idea's openings it was written
+ * from, as it read then (`opening`), so the history sends its request again
+ * exactly as it was sent even after the idea changes (docs/daydreams.md,
+ * "Openings"); and a passage carries every tracker's value after it
+ * (`trackers`, by tracker id), so each branch has its own (docs/daydreams.md,
+ * "Trackers"). Both written by the page, never read from the model.
+ */
+export const passageMetaV9 = passageMetaV8.extend({
+	opening: z
+		.object({
+			label: required(DAYDREAM_LIMITS.openingLabel),
+			situation: required(DAYDREAM_LIMITS.openingSituation)
+		})
+		.optional(),
+	trackers: z
+		.record(clientId, trackerValueSchema)
+		.refine((values) => Object.keys(values).length <= MAX_TRACKERS, 'Too many trackers')
+		.optional()
+});
+
+/** A passage's meta as the latest turn version stores it (`passageMetaV9`). */
+export type PassageMeta = z.output<typeof passageMetaV9>;
 
 const turnV1 = z.object({ text: z.string().min(1).max(DAYDREAM_LIMITS.turn) });
 
@@ -680,6 +926,17 @@ const turnV8 = z.discriminatedUnion('type', [
 	...turnTypesV2
 ]);
 
+// v9: an opening passage's opening, and every passage's tracker values
+// (`passageMetaV9`).
+const turnV9 = z.discriminatedUnion('type', [
+	textTurn(passageMetaV9).extend({
+		raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+		rawTruncated: z.literal(true).optional(),
+		sent: sentRecordSchema.optional()
+	}),
+	...turnTypesV2
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
@@ -728,7 +985,13 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v7 could say, v8 says the same way.
 			upcast: (value: z.output<typeof turnV7>) => value
 		},
-		{ version: 8, schema: turnV8 }
+		{
+			version: 8,
+			schema: turnV8,
+			// Everything v8 could say, v9 says the same way.
+			upcast: (value: z.output<typeof turnV8>) => value
+		},
+		{ version: 9, schema: turnV9 }
 	]
 });
 

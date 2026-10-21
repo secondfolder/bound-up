@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fieldText, KNOWN_FIELD_IDS, withField } from '$lib/daydream';
 import { testCharacter, testIdea } from '$lib/testing/daydream-setup';
 import {
 	characterDifferences,
@@ -6,6 +7,8 @@ import {
 	takeCharacterField,
 	takeIdeaField
 } from './copy-differences';
+
+const OWN = '00000000-0000-4000-8000-000000000c01';
 
 describe('ideaDifferences', () => {
 	const library = testIdea({ premise: 'A strict interview.', dials: { heat: 1, kink: null } });
@@ -32,14 +35,49 @@ describe('ideaDifferences', () => {
 		const here = {
 			...library,
 			premise: 'A tender evening.',
-			tone: 'warm',
+			fields: withField(library.fields, 'tone', 'warm'),
 			dials: { heat: 4 as const, kink: null }
 		};
 		const updated = takeIdeaField(library, here, 'heat');
 		expect(updated.dials.heat).toBe(4);
 		expect(updated.premise).toBe('A strict interview.');
 		expect(takeIdeaField(here, library, 'premise').premise).toBe('A strict interview.');
-		expect(takeIdeaField(here, library, 'premise').tone).toBe('warm');
+		expect(fieldText(takeIdeaField(here, library, 'premise').fields, 'tone')).toBe('warm');
+	});
+
+	it('compares fields by id: one added, one changed, its openings', () => {
+		const here = {
+			...library,
+			fields: [
+				...withField(library.fields, 'setting', 'a lift'),
+				{ id: OWN, kind: null, label: 'The rule', value: 'no talking', spoiler: false }
+			],
+			openings: [{ id: OWN, label: 'Stuck', situation: 'The lift stops.' }]
+		};
+		expect(ideaDifferences(here, library)).toEqual([
+			{
+				key: `field:${KNOWN_FIELD_IDS.setting}`,
+				label: 'Where',
+				here: 'a lift',
+				library: '(not there)'
+			},
+			{ key: `field:${OWN}`, label: 'The rule', here: 'no talking', library: '(not there)' },
+			{ key: 'openings', label: 'Where it can start', here: 'Stuck', library: '(none)' }
+		]);
+		// Taken from the library, a field it does not have goes.
+		expect(takeIdeaField(here, library, `field:${OWN}`).fields.map((field) => field.id)).toEqual([
+			KNOWN_FIELD_IDS.setting
+		]);
+	});
+
+	it('never shows what a spoiler says', () => {
+		const here = {
+			...library,
+			fields: [{ id: OWN, kind: null, label: 'The twist', value: 'she planned it', spoiler: true }]
+		};
+		const [difference] = ideaDifferences(here, library);
+		expect(difference).toMatchObject({ label: 'The twist', here: '(a spoiler, kept hidden)' });
+		expect(JSON.stringify(ideaDifferences(here, library))).not.toContain('planned');
 	});
 });
 
@@ -49,21 +87,28 @@ describe('characterDifferences', () => {
 	it('compares the fields and every dial', () => {
 		const here = {
 			...library,
-			personality: 'tender',
+			fields: withField(library.fields, 'personality', 'tender'),
 			dials: { ...library.dials, libido: 5 as const, tone: 'warm' as const }
 		};
 		expect(characterDifferences(here, library).map((difference) => difference.key)).toEqual([
-			'personality',
+			`field:${KNOWN_FIELD_IDS.personality}`,
 			'tone',
 			'libido'
 		]);
 		const libido = characterDifferences(here, library).find((each) => each.key === 'libido');
 		expect(libido).toMatchObject({ label: 'Libido', here: 'Slutty' });
+		const [personality] = characterDifferences(here, library);
+		expect(personality).toMatchObject({ label: 'Personality', here: 'tender', library: 'cold' });
 	});
 
 	it('takes one field or dial across', () => {
-		const here = { ...library, dials: { ...library.dials, libido: 5 as const } };
+		const here = {
+			...library,
+			fields: withField(library.fields, 'personality', 'tender'),
+			dials: { ...library.dials, libido: 5 as const }
+		};
 		expect(takeCharacterField(library, here, 'libido').dials.libido).toBe(5);
-		expect(takeCharacterField(here, library, 'personality').personality).toBe('cold');
+		const taken = takeCharacterField(here, library, `field:${KNOWN_FIELD_IDS.personality}`);
+		expect(fieldText(taken.fields, 'personality')).toBe('cold');
 	});
 });

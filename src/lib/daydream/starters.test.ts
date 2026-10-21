@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DAYDREAM_VOICE_PRESETS, UNSET_CHARACTER_DIALS } from '../daydream';
+import {
+	DAYDREAM_VOICE_PRESETS,
+	fieldsFrom,
+	IDEA_FIELD_KINDS,
+	UNSET_CHARACTER_DIALS
+} from '../daydream';
 import { daydreamSetupFormSchema } from '../schemas/daydreamForm';
 import { CHARACTER_TEMPLATES, IDEA_TEMPLATES } from './catalog';
 import {
@@ -33,11 +38,9 @@ const pieces = (overrides: Partial<DaydreamPieces> = {}): DaydreamPieces => ({
 	voice: 'talk',
 	idea: {
 		title: 'The night train',
-		setting: 'a sleeper carriage',
 		premise: 'A stranger takes the seat across from you.',
 		yourRole: 'a passenger',
-		tone: 'mysterious',
-		notes: '',
+		fields: fieldsFrom(IDEA_FIELD_KINDS, { setting: 'a sleeper carriage', tone: 'mysterious' }),
 		parts: [
 			{ name: 'the stranger', description: 'boarded at the last stop' },
 			{ name: 'the guard', description: '' }

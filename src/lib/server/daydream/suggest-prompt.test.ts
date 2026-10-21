@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAYDREAM_LIMITS } from '$lib/daydream';
+import { DAYDREAM_LIMITS, fieldText } from '$lib/daydream';
 import {
 	GENERATED_IDEAS,
 	MAX_IDEA_PREMISE,
@@ -130,7 +130,7 @@ describe('buildSuggestMessages', () => {
 			context: {
 				characters: [{ name: 'Mara', archetype: 'strict mentor' }],
 				limits: '',
-				story: { intensity: 4, pace: 2, length: 'medium' }
+				story: { intensity: 4, pace: 2, length: 'medium', thoughts: 'shown' }
 			}
 		});
 		expect(ask).toContain(
@@ -831,10 +831,11 @@ describe('buildSuggestMessages, a monologue', () => {
 	});
 
 	it('fills a monologue’s idea in its own words, with its sayings and no parts', () => {
+		// The fields a new monologue idea starts with, still empty.
 		const prompt = everything({
 			task: 'fill',
 			target: 'idea',
-			draft: { title: 'What good girls are for' },
+			draft: { title: 'What good girls are for', notes: '', setting: '', tone: '' },
 			context: monologueContext
 		});
 		expect(prompt).toContain('It is told as a monologue');
@@ -859,7 +860,7 @@ describe('buildSuggestMessages, a monologue', () => {
 		const prompt = everything({
 			task: 'fill',
 			target: 'idea',
-			draft: { title: 'After hours' },
+			draft: { title: 'After hours', setting: '', tone: '', notes: '' },
 			context: { characters: [], limits: '' }
 		});
 		expect(prompt).not.toContain('It is told as a monologue');
@@ -965,6 +966,7 @@ describe('the answer formats, against the parsers that read them', () => {
 			.replace(/"(?<key>heat|kink)": …/g, '"$<key>": 3')
 			.replaceAll('"you": "…"', '"you": "sub"')
 			.replaceAll('"voice": "…"', '"voice": "talk"')
+			.replaceAll('"spoiler": …', '"spoiler": true')
 			.replace(/"…"/g, () => {
 				count += 1;
 				return `"value ${count}"`;
@@ -990,9 +992,42 @@ describe('the answer formats, against the parsers that read them', () => {
 		expect(parsed?.cast[0]?.relationship).not.toBe('');
 		expect(parsed?.cast[0]?.doing).not.toBe('');
 		expect(parsed?.cast[0]?.partName).toBe(part?.name);
-		for (const field of ['setting', 'premise', 'yourRole', 'tone', 'notes'] as const) {
+		for (const field of ['premise', 'yourRole'] as const) {
 			expect(parsed?.idea[field], field).not.toBe('');
 		}
+		for (const kind of ['setting', 'tone', 'notes'] as const) {
+			expect(fieldText(parsed?.idea.fields ?? [], kind), kind).not.toBe('');
+		}
+		// The fields it named, on the idea and on the character, spoilers and all.
+		expect(parsed?.idea.fields.some((field) => field.kind === null && field.spoiler)).toBe(true);
+		expect(parsed?.cast[0]?.character.fields.some((field) => field.kind === null)).toBe(true);
+	});
+
+	it('fills only the known fields a record has, and offers fields of its own', () => {
+		const prompt = everything({
+			task: 'fill',
+			target: 'character',
+			draft: { name: 'Mara', personality: '' },
+			context: { characters: [], limits: '' }
+		});
+		expect(prompt).toContain('"personality"');
+		// Not a field she has, so not one to fill: offered through "fields" instead.
+		expect(prompt).not.toContain('"wontDo"');
+		expect(prompt).toContain('add a field or two it does not have yet');
+		expect(prompt).toContain('"fields"');
+	});
+
+	it('tells a suggestion the fields the user named, and which are spoilers', () => {
+		const prompt = everything({
+			task: 'fill',
+			target: 'character',
+			draft: {
+				name: 'Mara',
+				fields: [{ label: 'The twist', value: 'she planned it', spoiler: true }]
+			},
+			context: { characters: [], limits: '' }
+		});
+		expect(prompt).toContain('The twist (a spoiler, kept from the user): she planned it');
 	});
 
 	it('asks for ideas the way their parser reads them', () => {

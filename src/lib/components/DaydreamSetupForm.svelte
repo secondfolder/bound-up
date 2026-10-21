@@ -5,7 +5,6 @@
 	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import InputField from '$lib/components/InputField.svelte';
 	import {
-		CHARACTER_TEXT_FIELDS,
 		DAYDREAM_LEADS,
 		DAYDREAM_LIMITS,
 		DAYDREAM_NARRATORS,
@@ -38,7 +37,12 @@
 	} from '$lib/daydream/copy-differences';
 	import { IDEA_SLIDERS } from '$lib/daydream/dial-words';
 	import type { SetupExchange } from '$lib/daydream/setup-exchange';
-	import { type SuggestContext, suggestCasting } from '$lib/daydream/suggest';
+	import {
+		characterDraft,
+		ideaDraft,
+		type SuggestContext,
+		suggestCasting
+	} from '$lib/daydream/suggest';
 	import { type MarkedSummary, setupSummary } from '$lib/daydream/summary';
 	import { type DaydreamSetupFormValues, daydreamSetupFormSchema } from '$lib/schemas/daydreamForm';
 	import { sealForSubmit } from '$lib/sealed-forms';
@@ -383,7 +387,10 @@
 	});
 
 	function characterSummary(character: DaydreamCharacterCopy): string {
-		return [character.archetype, character.personality].filter(Boolean).join(' · ').slice(0, 140);
+		// Never a spoiler's words, however it is labelled.
+		const personality =
+			character.fields.find((field) => field.kind === 'personality' && !field.spoiler)?.value ?? '';
+		return [character.archetype, personality].filter(Boolean).join(' · ').slice(0, 140);
 	}
 
 	// ── dialogs ──────────────────────────────────────────────────────────────
@@ -658,10 +665,9 @@
 		selfIndex: number | null
 	) {
 		const part = $form.idea.parts.find((candidate) => candidate.id === partId);
-		const { title, setting, premise, yourRole, tone } = $form.idea;
 		return suggestCasting({
-			character,
-			idea: { title, setting, premise, yourRole, tone },
+			character: characterDraft(character),
+			idea: ideaDraft($form.idea),
 			ideaDials: $form.idea.dials,
 			part: part ? { name: part.name, description: part.description } : null,
 			others: $form.characters
@@ -687,10 +693,7 @@
 			return;
 		}
 		drafting.add(sourceId);
-		const actor = Object.fromEntries(
-			(['name', ...CHARACTER_TEXT_FIELDS] as const).map((field) => [field, character[field]])
-		) as Omit<DaydreamCharacter, 'dials'>;
-		const answer = await writeCasting(actor, character.casting.partId, cast);
+		const answer = await writeCasting(character, character.casting.partId, cast);
 		drafting.delete(sourceId);
 		const index = $form.characters.findIndex((candidate) => candidate.sourceId === sourceId);
 		const now = $form.characters[index];

@@ -5,17 +5,21 @@
 	import InputField from '$lib/components/InputField.svelte';
 	import {
 		DAYDREAM_LIMITS,
+		type DaydreamField,
 		type DaydreamIdeaCopy,
 		type DialValue,
 		EMPTY_IDEA,
+		IDEA_FIELD_KINDS,
 		IDEA_ORIGIN_FIELDS,
-		IDEA_TEXT_FIELDS,
+		type IdeaCoreField,
 		type IdeaDials,
+		type IdeaFieldKind,
 		type IdeaOriginField,
 		type IdeaPart,
-		type IdeaTextField,
-		ideaPrimaryFields,
-		MAX_DAYDREAM_CHARACTERS
+		knownField,
+		MAX_DAYDREAM_CHARACTERS,
+		namedFields,
+		newIdeaFields
 	} from '$lib/daydream';
 	import {
 		IDEA_CHIPS,
@@ -32,11 +36,12 @@
 		suggestFill,
 		surpriseIdea
 	} from '$lib/daydream/suggest';
-	import type { SuggestedPart } from '$lib/daydream/suggestions';
+	import { withSuggestedFields } from '$lib/daydream/suggestions';
 	import { type DaydreamIdeaFormValues, daydreamIdeaFormSchema } from '$lib/schemas/daydreamForm';
 	import { superForm } from '$lib/superform';
 	import type { SealedRefView } from '$lib/types';
 	import DaydreamChipField from './DaydreamChipField.svelte';
+	import DaydreamFieldList from './DaydreamFieldList.svelte';
 	import { startOpen } from './details';
 	import OptionalSlider from './OptionalSlider.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
@@ -49,14 +54,16 @@
 	 * first — from the characters, the limits and the dials — and it opens
 	 * here to read, change, or try again before it is used.
 	 *
-	 * Up front: the title, what is going on, how sexual and how kinky it is,
-	 * and the parts it has for characters, which is what a daydream casts
-	 * them into. Heat and kink are up front because they decide what kind of
-	 * story it is — SFW or filthy — more than any other field. The rest is
-	 * under "More detail", which starts open when any of it is filled. So is
-	 * where it came from — the brief it was written from and the research
-	 * behind it — for an idea that has either; those alone do not open it,
-	 * since nobody customised them.
+	 * Up front: the title, what is going on, its fields (`DaydreamFieldList`:
+	 * where and the tone to start with, a monologue's sayings first, then
+	 * whatever the user adds), how sexual and how kinky it is, and the parts
+	 * it has for characters, which is what a daydream casts them into. Heat
+	 * and kink are up front because they decide what kind of story it is —
+	 * SFW or filthy — more than any other field. The user's part is under
+	 * "More detail", which starts open when it is filled. So is where it came
+	 * from — the brief it was written from and the research behind it — for an
+	 * idea that has either; those alone do not open it, since nobody
+	 * customised them.
 	 *
 	 * An SPA superform saving through `api/daydreams/ideas`, for the reason
 	 * the character dialog gives.
@@ -91,35 +98,38 @@
 	const surprising = surprise;
 	const inLibrary = existing?.sourceId !== null && knownRevision !== null;
 
+	// How the daydream around it is told, as it was when the dialog opened: a
+	// monologue's idea asks for its sayings first, in words of its own.
+	// svelte-ignore state_referenced_locally
+	const { narrator } = context;
+	const labels = ideaFieldLabels(narrator);
+
 	const start: DaydreamIdeaFormValues = existing
 		? {
 				title: existing.title,
-				setting: existing.setting,
 				premise: existing.premise,
 				yourRole: existing.yourRole,
-				tone: existing.tone,
-				notes: existing.notes,
+				fields: existing.fields.map((field) => ({ ...field })),
 				brief: existing.brief,
 				research: existing.research,
 				parts: existing.parts.map((part) => ({ ...part })),
+				openings: existing.openings.map((opening) => ({ ...opening })),
+				trackers: existing.trackers.map((tracker) => ({ ...tracker })),
 				dials: { ...existing.dials },
 				saveToLibrary: inLibrary
 			}
-		: { ...EMPTY_IDEA, saveToLibrary: true };
+		: {
+				...EMPTY_IDEA,
+				fields: newIdeaFields(narrator).map((kind) => knownField(kind)),
+				saveToLibrary: true
+			};
 
 	let problem: SuggestFailure | null = $state(null);
 	let dialog: (HTMLElement & { open: boolean }) | undefined = $state();
 	let detail: (HTMLElement & { open: boolean }) | undefined = $state();
 
-	// How the daydream around it is told, as it was when the dialog opened: a
-	// monologue's idea asks for its sayings up front, in words of its own.
-	// svelte-ignore state_referenced_locally
-	const { narrator } = context;
-	const labels = ideaFieldLabels(narrator);
-	const PRIMARY_FIELDS = ideaPrimaryFields(narrator);
-	const DETAIL_FIELDS = IDEA_TEXT_FIELDS.filter((field) => !PRIMARY_FIELDS.includes(field));
-	const detailFilled = (values: Pick<DaydreamIdeaFormValues, IdeaTextField>) =>
-		DETAIL_FIELDS.some((field) => values[field].trim() !== '');
+	const detailFilled = (values: Pick<DaydreamIdeaFormValues, 'yourRole'>) =>
+		values.yourRole.trim() !== '';
 	const startsDetailed = detailFilled(start);
 	// Only for an idea that came with them: an empty "What you asked for" on
 	// an idea written by hand would ask for something nobody needs to write.
@@ -142,9 +152,9 @@
 		$form.dials = { ...$form.dials, [key]: level };
 	}
 
-	/** Parts from a template or the model, with ids of their own. */
-	const withIds = (parts: readonly SuggestedPart[]): IdeaPart[] =>
-		parts.map((part) => ({ ...part, id: crypto.randomUUID() }));
+	/** Parts, openings or trackers from a template or the model, with ids of their own. */
+	const withIds = <T extends object>(items: readonly T[]): (T & { id: string })[] =>
+		items.map((item) => ({ ...item, id: crypto.randomUUID() }));
 
 	const superform = superForm(defaults(start, zod4Client(daydreamIdeaFormSchema)), {
 		SPA: true,
@@ -207,22 +217,36 @@
 		(existing === null || isTainted($tainted)) && daydreamIdeaFormSchema.safeParse($form).success
 	);
 
-	const draft = $derived(
-		Object.fromEntries(
-			(['title', ...IDEA_TEXT_FIELDS] as const).map((field) => [field, $form[field]])
-		) as Record<string, string>
-	);
+	/**
+	 * The idea as a suggestion is told it: the core, and every known field it
+	 * has, empty ones included (`DaydreamCharacterDialog`'s `draft`).
+	 */
+	const draft = $derived({
+		title: $form.title,
+		premise: $form.premise,
+		yourRole: $form.yourRole,
+		...Object.fromEntries(
+			$form.fields.flatMap((field) => (field.kind === null ? [] : [[field.kind, field.value]]))
+		)
+	} as Record<string, string>);
+	const named = $derived(namedFields($form.fields));
 
 	const empty = $derived(
-		$form.title.trim() === '' &&
-			IDEA_TEXT_FIELDS.every((field) => $form[field].trim() === '') &&
+		[$form.title, $form.premise, $form.yourRole].every((text) => text.trim() === '') &&
+			$form.fields.every((field) => field.value.trim() === '') &&
 			$form.parts.length === 0
 	);
 
 	function useTemplate(id: string) {
 		const template = IDEA_TEMPLATES.find((entry) => entry.id === id);
 		if (template) {
-			$form = { ...$form, ...template.idea, parts: withIds(template.idea.parts) };
+			$form = {
+				...$form,
+				...template.idea,
+				parts: withIds(template.idea.parts),
+				openings: withIds(template.idea.openings),
+				trackers: withIds(template.idea.trackers)
+			};
 			revealDetail();
 		}
 	}
@@ -267,6 +291,8 @@
 				...$form,
 				...answer.value,
 				parts: withIds(answer.value.parts),
+				openings: withIds(answer.value.openings),
+				trackers: withIds(answer.value.trackers),
 				dials: keepSetDials(answer.value.dials)
 			};
 			revealDetail();
@@ -288,6 +314,7 @@
 			target: 'idea',
 			draft,
 			parts: namedParts(),
+			named,
 			ideaDials: $form.dials,
 			context
 		});
@@ -296,16 +323,32 @@
 			problem = answer;
 			return;
 		}
+		const { fields: filled } = answer.value;
 		const next = { ...$form };
-		for (const field of ['title', ...IDEA_TEXT_FIELDS] as const) {
-			const text = answer.value.fields[field];
-			if (text && next[field].trim() === '') {
-				next[field] = text;
+		for (const key of ['title', 'premise', 'yourRole'] as const) {
+			const text = filled[key];
+			if (text && next[key].trim() === '') {
+				next[key] = text;
 			}
 		}
-		// Parts only for an idea that had none: never over the ones written.
+		// Only the empty fields the idea has: never over what was written.
+		next.fields = withSuggestedFields(
+			next.fields.map((field) => {
+				const text = field.kind === null ? undefined : filled[field.kind];
+				return text && field.value.trim() === '' ? { ...field, value: text } : field;
+			}),
+			answer.value.named
+		);
+		// Parts, openings and trackers only for an idea that had none: never
+		// over the ones written.
 		if (next.parts.length === 0) {
 			next.parts = withIds(answer.value.parts);
+		}
+		if (next.openings.length === 0) {
+			next.openings = withIds(answer.value.openings);
+		}
+		if (next.trackers.length === 0) {
+			next.trackers = withIds(answer.value.trackers);
 		}
 		next.dials = keepSetDials(answer.value.ideaDials);
 		$form = next;
@@ -318,17 +361,37 @@
 			.filter((part) => part.name.trim() !== '')
 			.map(({ name, description }) => ({ name, description }));
 
-	function moreIdeas(field: IdeaTextField) {
+	function moreIdeas(field: IdeaCoreField) {
 		return () =>
 			suggestChips({
 				target: 'idea',
 				field,
 				draft,
 				parts: namedParts(),
+				named,
 				ideaDials: $form.dials,
 				context
 			});
 	}
+
+	/** More chips for one of the fields: a known kind by name, one the user named by its name. */
+	function moreFieldIdeas(field: DaydreamField<IdeaFieldKind>) {
+		return suggestChips({
+			target: 'idea',
+			field: field.kind ?? 'named',
+			...(field.kind === null ? { label: field.label } : {}),
+			draft,
+			parts: namedParts(),
+			named,
+			ideaDials: $form.dials,
+			context
+		});
+	}
+
+	/** The fields' errors by their place in the list, as superforms gives them. */
+	const fieldErrors = $derived(
+		$errors.fields as Record<number, { label?: string[]; value?: string[] }> | undefined
+	);
 
 	function labelFor(): string {
 		if (surprising) {
@@ -338,12 +401,9 @@
 	}
 	const dialogLabel = labelFor();
 
-	const LIMIT_OF: Record<IdeaTextField, number> = {
-		setting: DAYDREAM_LIMITS.setting,
+	const LIMIT_OF: Record<IdeaCoreField, number> = {
 		premise: DAYDREAM_LIMITS.premise,
-		yourRole: DAYDREAM_LIMITS.yourRole,
-		tone: DAYDREAM_LIMITS.tone,
-		notes: DAYDREAM_LIMITS.ideaNotes
+		yourRole: DAYDREAM_LIMITS.yourRole
 	};
 
 	const ORIGIN_LIMIT_OF: Record<IdeaOriginField, number> = {
@@ -352,7 +412,7 @@
 	};
 </script>
 
-{#snippet textField(field: IdeaTextField)}
+{#snippet textField(field: IdeaCoreField)}
 	<DaydreamChipField
 		{debug}
 		label={labels[field].label}
@@ -360,7 +420,7 @@
 		value={$form[field]}
 		limit={LIMIT_OF[field]}
 		chips={IDEA_CHIPS[field]}
-		rows={field === 'premise' || (field === 'notes' && narrator === 'monologue') ? 4 : 2}
+		rows={field === 'premise' ? 4 : 2}
 		onchange={(text) => {
 			$form[field] = text;
 		}}
@@ -411,9 +471,22 @@
 			required
 		/>
 
-		{#each PRIMARY_FIELDS as field (field)}
-			{@render textField(field)}
-		{/each}
+		{@render textField('premise')}
+
+		<DaydreamFieldList
+			{debug}
+			fields={$form.fields}
+			of="idea"
+			kinds={IDEA_FIELD_KINDS}
+			{labels}
+			chips={IDEA_CHIPS}
+			{narrator}
+			errors={fieldErrors}
+			onchange={(fields) => {
+				$form.fields = fields;
+			}}
+			onMoreIdeas={suggestionsOn ? moreFieldIdeas : undefined}
+		/>
 
 		<fieldset class="heat">
 			<legend>Heat and kink</legend>
@@ -468,9 +541,7 @@
 		</fieldset>
 
 		<wa-details bind:this={detail} summary="More detail" class="detail" {@attach startOpen(startsDetailed)}>
-			{#each DETAIL_FIELDS as field (field)}
-				{@render textField(field)}
-			{/each}
+			{@render textField('yourRole')}
 			<!-- No chips: these are what was asked for and found, not ideas to pick from. -->
 			{#each ORIGIN_FIELDS as field (field)}
 				<DaydreamChipField

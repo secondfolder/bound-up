@@ -661,7 +661,8 @@ test.describe('daydreams', () => {
 
 		// Its idea is a monologue's: what it says, and the sayings it builds on, up front.
 		await page.getByText('A voice that knows exactly what a stub is for').click();
-		const sayings = dialog(page).getByLabel('Sayings to build on');
+		// The text box, not the field's "Remove Sayings to build on" button.
+		const sayings = dialog(page).getByRole('textbox', { name: /^Sayings to build on/ });
 		await expect(sayings).toHaveValue('Good stubs say thank you.\nAsking is the point.');
 		await dialog(page).getByRole('button', { name: 'Cancel' }).click();
 

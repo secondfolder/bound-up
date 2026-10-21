@@ -1,6 +1,6 @@
 # Daydream from a brief: every paragraph
 
-59 distinct paragraphs, from 181 distinct prompts
+61 distinct paragraphs, from 181 distinct prompts
 over 216 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -164,6 +164,22 @@ Always.
 Who is in it: nobody, unless a named character is the one speaking: then only them, playing "the speaker".
 ~~~~
 
+## ¶ 085e059aaa8fc0 · system · in 216 of 216
+
+Always.
+
+~~~~text
+# Fields of their own
+~~~~
+
+## ¶ 040d94251cc066 · system · in 216 of 216
+
+Always.
+
+~~~~text
+Each character and the idea may have "fields" beyond the standard ones, each named in a few words: for a character, what they hide, what they won't do, how they are won over, or anything else that makes them who they are; for the idea, a rule of its world, a secret at its heart. Mark one "spoiler" when it is a twist the user should only find out in play. Add only the ones that make this daydream better — often one or two in all, often none.
+~~~~
+
 ## ¶ 145502030ee445 · system · in 216 of 216
 
 Always.
@@ -292,7 +308,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 089d72347faa4f · user · in 72 of 216
+## ¶ 17e5a78f514dfc · user · in 72 of 216
 
 Only when side ∈ {either}.
 
@@ -311,6 +327,10 @@ Only when side ∈ {either}.
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "characters": who is in it, one for each part; empty for a monologue with no named speaker
   - "name": their name
   - "archetype": their type
@@ -321,15 +341,19 @@ Only when side ∈ {either}.
   - "part": the name of the idea's part they play, exactly
   - "relationship": who they are to the user
   - "doing": what they are doing or want as it starts
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "summary": the summary, with its marks
 ~~~~
 
-## ¶ 118338d1f9aa9c · user · in 216 of 216
+## ¶ 10fe7d46d6023b · user · in 216 of 216
 
 Always.
 
 ~~~~text
-{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}, …], "summary": "…"}
+{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
 ~~~~
 
 ## ¶ 1615353ec8ec67 · user · in 144 of 216
@@ -466,7 +490,7 @@ With "watch" they are not in it: the story follows its dominant one, whose side 
 In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
-## ¶ 09a5c848a6750b · user · in 72 of 216
+## ¶ 18543d1f69dee3 · user · in 72 of 216
 
 Only when side ∈ {dom}.
 
@@ -485,6 +509,10 @@ Only when side ∈ {dom}.
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "characters": who is in it, one for each part; empty for a monologue with no named speaker
   - "name": their name
   - "archetype": their type
@@ -495,6 +523,10 @@ Only when side ∈ {dom}.
   - "part": the name of the idea's part they play, exactly
   - "relationship": who they are to the user
   - "doing": what they are doing or want as it starts
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "summary": the summary, with its marks
 ~~~~
 
@@ -559,7 +591,7 @@ With "watch" they are not in it: the story follows its submissive one, whose sid
 In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
 ~~~~
 
-## ¶ 19e953ab093fca · user · in 72 of 216
+## ¶ 053f97ba77588f · user · in 72 of 216
 
 Only when side ∈ {sub}.
 
@@ -578,6 +610,10 @@ Only when side ∈ {sub}.
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "characters": who is in it, one for each part; empty for a monologue with no named speaker
   - "name": their name
   - "archetype": their type
@@ -588,6 +624,10 @@ Only when side ∈ {sub}.
   - "part": the name of the idea's part they play, exactly
   - "relationship": who they are to the user
   - "doing": what they are doing or want as it starts
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "summary": the summary, with its marks
 ~~~~
 

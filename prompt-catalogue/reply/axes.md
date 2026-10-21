@@ -320,11 +320,11 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 +Who they are to the user: ⟦character2.relationship⟧
 +Their part in this daydream: ⟦character2.doing⟧
 +Type: ⟦character2.archetype⟧
++Appearance: ⟦character2.appearance⟧
 +Personality: ⟦character2.personality⟧
 +How they talk: ⟦character2.speech⟧
-+Appearance: ⟦character2.appearance⟧
 +What they enjoy: ⟦character2.likes⟧
-+Notes: ⟦character2.notes⟧
++Anything else: ⟦character2.notes⟧
 +</character>
 +
  # The idea
@@ -996,11 +996,11 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 -Who they are to the user: ⟦character1.relationship⟧
 -Their part in this daydream: ⟦character1.doing⟧
 -Type: ⟦character1.archetype⟧
+-Appearance: ⟦character1.appearance⟧
 -Personality: ⟦character1.personality⟧
 -How they talk: ⟦character1.speech⟧
--Appearance: ⟦character1.appearance⟧
 -What they enjoy: ⟦character1.likes⟧
--Notes: ⟦character1.notes⟧
+-Anything else: ⟦character1.notes⟧
 -</character>
  
  # The idea
@@ -1019,6 +1019,31 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 +- ⟦part1.name⟧, played by ⟦character1.name⟧
  </parts>
  The characters lead: they set the pace, give instructions and make the decisions.
+~~~~
+
+## A field of their own (`named`, descriptive, baseline `none`)
+
+### named = named
+
+~~~~diff
+@@ -111,4 +111,5 @@
+ Tone: ⟦idea.tone⟧
+ Notes: ⟦idea.notes⟧
++⟦idea.named.label⟧: ⟦idea.named.value⟧
+ </idea>
+ The idea's heat: not set — follow the user's lead, as explicit as they take it.
+~~~~
+
+### named = spoiler
+
+~~~~diff
+@@ -111,4 +111,6 @@
+ Tone: ⟦idea.tone⟧
+ Notes: ⟦idea.notes⟧
++Kept from the user, for the story to reveal in play — never in the opening, and never said outright before the story has earned it:
++- ⟦idea.named.label⟧: ⟦idea.named.value⟧
+ </idea>
+ The idea's heat: not set — follow the user's lead, as explicit as they take it.
 ~~~~
 
 ## Idea origin (`origin`, descriptive, baseline `none`)
@@ -1084,7 +1109,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ comes across as warm and affectionate. Where this and the description above disagree, follow the description.
  
@@ -1095,7 +1120,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ comes across as playful and teasing. Where this and the description above disagree, follow the description.
  
@@ -1106,7 +1131,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ comes across as cool and distant. Where this and the description above disagree, follow the description.
  
@@ -1117,7 +1142,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ comes across as detached and clinical. Where this and the description above disagree, follow the description.
  
@@ -1130,7 +1155,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ follows the user’s lead. Where this and the description above disagree, follow the description.
  
@@ -1141,7 +1166,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ mostly lets the user decide. Where this and the description above disagree, follow the description.
  
@@ -1152,7 +1177,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ shares control evenly. Where this and the description above disagree, follow the description.
  
@@ -1163,7 +1188,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ usually takes the lead. Where this and the description above disagree, follow the description.
  
@@ -1174,7 +1199,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is in complete control. Where this and the description above disagree, follow the description.
  
@@ -1187,7 +1212,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ lets almost anything slide. Where this and the description above disagree, follow the description.
  
@@ -1198,7 +1223,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is lenient. Where this and the description above disagree, follow the description.
  
@@ -1209,7 +1234,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is firm but fair. Where this and the description above disagree, follow the description.
  
@@ -1220,7 +1245,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is strict about rules. Where this and the description above disagree, follow the description.
  
@@ -1231,7 +1256,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is unbending: every rule, every time. Where this and the description above disagree, follow the description.
  
@@ -1244,7 +1269,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is tender and gentle. Where this and the description above disagree, follow the description.
  
@@ -1255,7 +1280,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is mostly kind. Where this and the description above disagree, follow the description.
  
@@ -1266,7 +1291,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ mixes kindness with a bite. Where this and the description above disagree, follow the description.
  
@@ -1277,7 +1302,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is harsh. Where this and the description above disagree, follow the description.
  
@@ -1288,7 +1313,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is cruel, and enjoys it. Where this and the description above disagree, follow the description.
  
@@ -1301,7 +1326,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ says as little as possible. Where this and the description above disagree, follow the description.
  
@@ -1312,7 +1337,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ speaks briefly. Where this and the description above disagree, follow the description.
  
@@ -1323,7 +1348,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ talks naturally. Where this and the description above disagree, follow the description.
  
@@ -1334,7 +1359,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ talks a lot. Where this and the description above disagree, follow the description.
  
@@ -1345,7 +1370,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ keeps up a constant stream of talk. Where this and the description above disagree, follow the description.
  
@@ -1358,7 +1383,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is not interested in sex. Where this and the description above disagree, follow the description.
  
@@ -1369,7 +1394,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is shy about sex and needs coaxing. Where this and the description above disagree, follow the description.
  
@@ -1380,7 +1405,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is interested in sex when the moment is right. Where this and the description above disagree, follow the description.
  
@@ -1391,7 +1416,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is horny, eager, and says what they want. Where this and the description above disagree, follow the description.
  
@@ -1402,7 +1427,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is slutty: insatiable, shameless, and always up for it. Where this and the description above disagree, follow the description.
  
@@ -1415,7 +1440,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ has vanilla tastes. Where this and the description above disagree, follow the description.
  
@@ -1426,7 +1451,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is curious about light kink. Where this and the description above disagree, follow the description.
  
@@ -1437,7 +1462,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is kinky. Where this and the description above disagree, follow the description.
  
@@ -1448,7 +1473,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is very kinky, into heavy play. Where this and the description above disagree, follow the description.
  
@@ -1459,7 +1484,7 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 
 ~~~~diff
 @@ -102,4 +102,5 @@
- Notes: ⟦character1.notes⟧
+ Anything else: ⟦character1.notes⟧
  </character>
 +In short, ⟦character1.name⟧ is depraved: into anything the user’s limits allow, taboo included. Where this and the description above disagree, follow the description.
  

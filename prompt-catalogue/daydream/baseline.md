@@ -72,6 +72,10 @@ The idea: "title", a short title naming what it is about, like "What good girls 
 
 Who is in it: nobody, unless a named character is the one speaking: then only them, playing "the speaker".
 
+# Fields of their own
+
+Each character and the idea may have "fields" beyond the standard ones, each named in a few words: for a character, what they hide, what they won't do, how they are won over, or anything else that makes them who they are; for the idea, a rule of its world, a secret at its heart. Mark one "spoiler" when it is a twist the user should only find out in play. Add only the ones that make this daydream better — often one or two in all, often none.
+
 # Rating
 
 For a story or a monologue alike, rate the idea: "heat", how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy); and "kink", how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme). Rate it from what they asked for, any pages they linked included: a daydream that says nothing sexual is not sexual.
@@ -125,6 +129,10 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "characters": who is in it, one for each part; empty for a monologue with no named speaker
   - "name": their name
   - "archetype": their type
@@ -135,7 +143,11 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
   - "part": the name of the idea's part they play, exactly
   - "relationship": who they are to the user
   - "doing": what they are doing or want as it starts
+  - "fields": fields to add or fill, if any; an empty list for none
+    - "label": the field's name, in a few words
+    - "value": what it says
+    - "spoiler": true for a twist kept from the user, otherwise false
 - "summary": the summary, with its marks
 
-{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…"}, …], "summary": "…"}
+{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
 ~~~~
