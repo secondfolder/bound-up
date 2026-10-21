@@ -35,9 +35,9 @@
 	/* The app shell's <main> is the full-width scroll container, so the page
 	   carries its own column, as /home/guides does. */
 	.page {
-		max-width: 800px;
+		max-width: var(--page-width);
 		margin-inline: auto;
-		padding: 1em;
+		padding: var(--wa-space-m) var(--page-gutter);
 
 		h1 {
 			text-align: center;

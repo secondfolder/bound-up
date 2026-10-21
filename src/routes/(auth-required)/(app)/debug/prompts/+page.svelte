@@ -48,7 +48,7 @@
 
 <style>
 	section {
-		max-width: 72rem;
+		max-width: var(--page-width-wide);
 		margin: 0 auto;
 		width: 100%;
 		padding-bottom: var(--wa-space-l);
@@ -57,7 +57,7 @@
 	.content {
 		display: flex;
 		flex-direction: column;
-		padding: var(--wa-space-l);
+		padding: var(--wa-space-l) var(--page-gutter);
 	}
 
 	.description {

@@ -33,13 +33,13 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
 		width: 100%;
 		padding-bottom: var(--wa-space-l);
 
 		ul {
-			padding: 0 var(--wa-space-l);
+			padding: 0 var(--page-gutter);
 			margin: 0;
 
 			li {

@@ -92,9 +92,9 @@
 	.page {
 		box-sizing: border-box;
 		inline-size: 100%;
-		max-width: 800px;
+		max-width: var(--page-width);
 		margin-inline: auto;
-		padding: 1em;
+		padding: var(--wa-space-m) var(--page-gutter);
 	}
 
 	h1 {

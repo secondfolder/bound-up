@@ -78,9 +78,9 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
-		padding: var(--wa-space-l);
+		padding: var(--wa-space-l) var(--page-gutter);
 		display: flex;
 		flex-direction: column;
 		align-items: center;

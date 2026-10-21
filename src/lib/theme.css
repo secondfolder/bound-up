@@ -47,6 +47,33 @@
 	   read as translucent mixes toward this (the roadmap's dimmed lines). */
 	--page-wash-floor: oklch(from var(--rust-dark) calc(l * 0.6) c h);
 
+	/* Page columns. Every page picks one of these rather than a width of its
+	   own: there used to be seven, so moving between sibling pages made the
+	   column jump. Narrow is for settings and history, where a line of text or
+	   a row of a list is the unit; the default is for lists, forms, stories and
+	   conversations; wide is for the debug tooling's side-by-side panes. */
+	--page-width-narrow: 40rem;
+	--page-width: 50rem;
+	--page-width-wide: 72rem;
+	/* The column the home and partner cards sit in: a scan list, narrower
+	   than a page. */
+	--card-column-width: 30rem;
+
+	/* The space between a page's content and the edge of its column. The page
+	   header (NestedPageHeader) and every page's content use this one value, so
+	   the back link, the title, the divider and the cards share a left edge.
+	   Smaller on a phone, where cards nested in panels otherwise left a long
+	   title a third of the screen. */
+	--page-gutter: var(--wa-space-l);
+	@media (width < 40rem) {
+		--page-gutter: var(--wa-space-m);
+	}
+
+	/* Page titles. The display face is wide, and a long single word
+	   ("Notifications") overflowed a 360px phone at a fixed size. The landing
+	   page's hero is the one title bigger than this. */
+	--page-title-size: clamp(2rem, 4vw + 1.25rem, 3rem);
+
 	/* The wash every page sits on: rust left to right, darkening from 300px
 	   down to 800px. The stops are the landing page's, which is where the
 	   halftone band below starts and finishes fading, so the two line up. */
@@ -127,7 +154,10 @@
 		--wa-color-surface-border: color-mix(in oklab, var(--accent-color) 28%, transparent);
 
 		--wa-color-text-normal: oklch(94% 0.035 78);
-		--wa-color-text-quiet: oklch(80% 0.06 62);
+		/* 85% rather than 80% so it holds 4.5:1 (AA) on the brightest part of
+		   the wash, top left, where every page puts its description line. At
+		   80% it measured 4.0:1 there; it is still well apart from normal text. */
+		--wa-color-text-quiet: oklch(85% 0.055 62);
 		--wa-color-text-link: var(--accent-color);
 
 		/* The landing page's focus ring. */
@@ -176,6 +206,21 @@
 		--daydream-voice-2: oklch(86% 0.075 205);
 		--daydream-voice-3: oklch(87% 0.09 145);
 		--daydream-voice-4: oklch(84% 0.08 300);
+	}
+
+	/* Lists. Web Awesome indents a list by giving every `li` a start margin,
+	   which a list that switches its bullets off and zeroes its own padding
+	   still inherited: every such list sat 18px in from its own heading. The
+	   indent lives on the list's padding instead, as in a browser's own
+	   stylesheet, so a bulleted list keeps it and a list that zeroes its
+	   padding is flush. In this layer, so any component's own rule wins. */
+	ul,
+	ol {
+		padding-inline-start: 1.125em;
+	}
+
+	li {
+		margin-inline-start: 0;
 	}
 }
 
@@ -233,7 +278,12 @@ body::after {
 body::before {
 	position: absolute;
 	inset: 0 0 auto;
-	height: 800px;
+	/* Never taller than the body. At a flat 800px it outgrew a short page on
+	   any screen under 800px tall, so the document scrolled past the end of
+	   the body into a band of bare grain with no wash under it. The app shell,
+	   whose body has no height of its own, pins this to the window instead
+	   (see its layout). */
+	height: min(800px, 100%);
 	opacity: 0.35;
 	background: repeating-linear-gradient(195deg, #000 0, #6e6e6e 4px, #000 8px);
 	mask-image: linear-gradient(to bottom, #000 300px, transparent 800px);
@@ -259,5 +309,10 @@ body::after {
 :where(h1) {
 	font-family: var(--font-display);
 	font-weight: 400;
+	font-size: var(--page-title-size);
+	line-height: 1.1;
 	color: var(--accent-color);
+	/* A title that is one long word still wraps rather than pushing the page
+	   sideways on a narrow phone. */
+	overflow-wrap: break-word;
 }

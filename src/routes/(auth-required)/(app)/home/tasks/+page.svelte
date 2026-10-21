@@ -58,7 +58,7 @@
 
 <style>
 	.page {
-		max-width: 52rem;
+		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -73,7 +73,7 @@
 	}
 
 	.content {
-		padding: 0 var(--wa-space-l) var(--wa-space-l);
+		padding: 0 var(--page-gutter) var(--wa-space-l);
 	}
 
 	.status {

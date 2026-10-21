@@ -90,7 +90,7 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
 		width: 100%;
 		padding-bottom: var(--wa-space-l);
@@ -99,7 +99,7 @@
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
-			padding: var(--wa-space-l);
+			padding: var(--wa-space-l) var(--page-gutter);
 		}
 
 		h2,

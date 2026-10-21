@@ -40,11 +40,16 @@
 </header>
 
 <style>
+	/* Inset by the page gutter as a margin rather than a padding, so the
+	   divider runs exactly as wide as the content under it, and the back link,
+	   the title and the cards below all start at one edge. They used to be
+	   16px and 24px in, with the divider overhanging the cards. */
 	header {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
-		padding: var(--wa-space-s) var(--wa-space-m);
+		gap: 0.5rem;
+		margin-inline: var(--page-gutter);
+		padding-block: var(--wa-space-xs) var(--wa-space-m);
 		border-block-end: 1px solid var(--wa-color-surface-border);
 	}
 
@@ -59,6 +64,8 @@
 		align-items: center;
 		gap: 0.25rem;
 		min-inline-size: 0;
+		/* A comfortable tap target: the text alone was about 20px tall. */
+		min-block-size: 2.75rem;
 		text-decoration: none;
 		color: inherit;
 		font-weight: var(--wa-font-weight-semibold, 600);

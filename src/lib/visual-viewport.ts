@@ -79,11 +79,18 @@ export function fitVisualViewport(
 	};
 	viewport.addEventListener('resize', schedule);
 	viewport.addEventListener('scroll', schedule);
+	// A document scroll on a desktop browser moves the layout viewport, not the
+	// visual one, so neither listener above hears it. The page cannot normally
+	// scroll at all (the shell is fixed and the body has no height), but
+	// something that scrolls an element into view still reaches the root, so
+	// the reset in `apply` has to hear the window too.
+	window.addEventListener('scroll', schedule);
 	apply();
 	return () => {
 		cancelAnimationFrame(frame);
 		viewport.removeEventListener('resize', schedule);
 		viewport.removeEventListener('scroll', schedule);
+		window.removeEventListener('scroll', schedule);
 		node.style.removeProperty('--viewport-height');
 		node.style.removeProperty('--viewport-top');
 	};

@@ -79,9 +79,12 @@
 		--wa-color-fill-loud: color-mix(in oklab, contrast-color(currentColor) 20%, transparent);
 		--wa-color-fill-normal: color-mix(in oklab, contrast-color(currentColor) 20%, transparent);
 		--wa-color-fill-quiet: color-mix(in oklab, contrast-color(currentColor) 20%, transparent);
-		--wa-color-border-loud: currentColor;
-		--wa-color-border-normal: currentColor;
-		--wa-color-border-quiet: currentColor;
+		/* The border is the text colour, softened: at full strength every
+		   secondary button ("History", "Open full task list") was a bright cream
+		   outline, louder than the filled actions it sat beside. */
+		--wa-color-border-loud: color-mix(in oklab, currentColor 55%, transparent);
+		--wa-color-border-normal: color-mix(in oklab, currentColor 55%, transparent);
+		--wa-color-border-quiet: color-mix(in oklab, currentColor 55%, transparent);
 		--wa-color-on-loud: currentColor;
 		--wa-color-on-normal: currentColor;
 		--wa-color-on-quiet: currentColor;
