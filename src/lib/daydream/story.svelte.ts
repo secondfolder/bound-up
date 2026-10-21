@@ -18,7 +18,7 @@
  * "opening".
  */
 
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { openRecord } from '../crypto/sealed';
 import { vaultById, vaultsSettled } from '../crypto/vaults.svelte';
 import type {
@@ -81,14 +81,21 @@ import {
 	trimContext
 } from './context';
 import { outcomeFor, type RollProposal, roll } from './dice';
+import { driftOffer } from './drift';
 import { type ExchangeEnding, MAX_READ_EXCHANGE_TURNS } from './exchange';
 import { ExchangeRecorder } from './exchange-recorder';
 import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
 import { explicitOoc } from './ooc';
 import { type OpenedSetupExchange, openSetupExchanges } from './raw-setup-exchanges.svelte';
 import { settingsChange, stillInEffect, withSettings } from './story-settings';
-import { suggestName } from './suggest';
-import { MAX_NAMING_OPENING, MAX_TAKEN_TITLES } from './suggestions';
+import { suggestCatchUp, suggestName } from './suggest';
+import {
+	type CatchUp,
+	MAX_CATCH_UP_PASSAGES,
+	MAX_CATCH_UP_STORY,
+	MAX_NAMING_OPENING,
+	MAX_TAKEN_TITLES
+} from './suggestions';
 import {
 	childrenOf,
 	currentDirections,
@@ -292,6 +299,9 @@ export class DaydreamStory {
 		this.#marks = [...daydream.marks];
 		for (const turn of daydream.path) {
 			this.#refs.set(turn.id, turn.sealed);
+		}
+		for (const id of readDriftAnswered(this.id)) {
+			this.#driftAnswered.add(id);
 		}
 	}
 
@@ -820,6 +830,8 @@ export class DaydreamStory {
 						// A check-in after Stop the scene is out of character, whatever the model said.
 						...(stopped || meta?.ooc ? { ooc: true } : {}),
 						...(changed ?? {}),
+						// How the story has moved on from its setup; a check-in says nothing about it.
+						...(meta?.drifted && !stopped ? { drifted: meta.drifted } : {}),
 						...(request.rewrite
 							? {
 									rewriteOf: {
@@ -871,6 +883,109 @@ export class DaydreamStory {
 		const settings = content?.type === 'text' ? content.meta?.settings : undefined;
 		const { setup } = this;
 		return settings && setup ? { settings, inEffect: stillInEffect(setup, settings) } : null;
+	}
+
+	// ── when the story moves on ──────────────────────────────────────────────
+
+	/** The passages whose "Update the idea" offer was answered, remembered on this device. */
+	readonly #driftAnswered = new SvelteSet<string>();
+
+	/**
+	 * The passage the thread offers "Update the idea" under, or null
+	 * (`driftOffer`; docs/daydreams.md, "When the story moves on").
+	 */
+	get driftOfferId(): string | null {
+		const passages = this.path.flatMap((node) => {
+			if (node.role !== 'story') {
+				return [];
+			}
+			const content = this.content(node.id);
+			return [
+				{ id: node.id, drifted: (content?.type === 'text' && content.meta?.drifted) || null }
+			];
+		});
+		return driftOffer(passages, this.#driftAnswered);
+	}
+
+	/** "Not now", or an update made: this offer is answered, and the next waits. */
+	answerDrift(turnId: string): void {
+		this.#driftAnswered.add(turnId);
+		writeDriftAnswered(this.id, [...this.#driftAnswered]);
+	}
+
+	/**
+	 * Asks for the setup brought up to date with the story, from the passage
+	 * that said it had moved on: the latest passages up to it, as many as fit,
+	 * and the setup's idea and cast as they stand.
+	 */
+	async catchUp(turnId: string): Promise<Awaited<ReturnType<typeof suggestCatchUp>>> {
+		const { setup } = this;
+		const content = this.content(turnId);
+		const drifted = content?.type === 'text' ? content.meta?.drifted : undefined;
+		if (!(setup && drifted)) {
+			return { ok: false, error: NOT_READY };
+		}
+		const upTo = pathTo(this.index, turnId).filter((node) => node.role === 'story');
+		const story: string[] = [];
+		let size = 0;
+		for (const node of upTo.toReversed()) {
+			const passage = this.content(node.id);
+			if (passage?.type !== 'text' || story.length >= MAX_CATCH_UP_PASSAGES) {
+				continue;
+			}
+			if (size + passage.text.length > MAX_CATCH_UP_STORY) {
+				break;
+			}
+			story.unshift(passage.text);
+			size += passage.text.length;
+		}
+		const { title, setting, premise, yourRole, tone, notes } = setup.idea;
+		return await suggestCatchUp({
+			idea: { title, setting, premise, yourRole, tone, notes },
+			narrator: setup.voice.narrator,
+			characters: setup.characters.map((character) => ({
+				name: character.name,
+				personality: character.personality,
+				relationship: character.casting.relationship,
+				doing: character.casting.part
+			})),
+			story,
+			drifted,
+			limits: setup.limits
+		});
+	}
+
+	/**
+	 * The changes the user accepted from "Update the idea", saved to this
+	 * daydream's copy of its idea and characters only: the library's stay as
+	 * they were, for starting other daydreams from. The offer is answered.
+	 */
+	async applyCatchUp(turnId: string, accepted: CatchUp): Promise<string | null> {
+		const failed = await this.saveSetup((now) => ({
+			...now,
+			idea: { ...now.idea, ...accepted.idea },
+			characters: now.characters.map((character) => {
+				const change = accepted.characters.find(
+					(each) => each.name.toLowerCase() === character.name.toLowerCase()
+				)?.fields;
+				if (!change) {
+					return character;
+				}
+				return {
+					...character,
+					...(change.personality === undefined ? {} : { personality: change.personality }),
+					casting: {
+						...character.casting,
+						...(change.relationship === undefined ? {} : { relationship: change.relationship }),
+						...(change.doing === undefined ? {} : { part: change.doing })
+					}
+				};
+			})
+		}));
+		if (failed === null) {
+			this.answerDrift(turnId);
+		}
+		return failed;
 	}
 
 	/** Puts back what passage `turnId` changed, while it still stands. */
@@ -1663,3 +1778,30 @@ export class DaydreamStory {
 
 /** The abort reason that means "drop what arrived", from Stop the scene and Ease off. */
 const DISCARD = 'discard';
+
+/**
+ * Which "Update the idea" offers were answered, per daydream, on this device:
+ * turns never change once written, so it cannot go on the passage, and a
+ * per-device memory of "Not now" is all it needs (AGENTS.md: browser
+ * storage only for conveniences). Lost storage just offers again.
+ */
+const driftKey = (daydreamId: string) => `daydream-drift-answered:${daydreamId}`;
+
+function readDriftAnswered(daydreamId: string): string[] {
+	try {
+		const stored: unknown = JSON.parse(
+			globalThis.localStorage?.getItem(driftKey(daydreamId)) ?? '[]'
+		);
+		return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
+	} catch {
+		return [];
+	}
+}
+
+function writeDriftAnswered(daydreamId: string, ids: string[]): void {
+	try {
+		globalThis.localStorage?.setItem(driftKey(daydreamId), JSON.stringify(ids.slice(-50)));
+	} catch {
+		// Private browsing, or storage full: the offer may come back, which is all.
+	}
+}

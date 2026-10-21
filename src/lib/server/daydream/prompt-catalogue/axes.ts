@@ -33,7 +33,8 @@ export const BUILDER_IDS = [
 	'chips',
 	'surprise-idea',
 	'casting',
-	'name'
+	'name',
+	'catch-up'
 ] as const;
 
 export type BuilderId = (typeof BUILDER_IDS)[number];
@@ -234,6 +235,17 @@ export const BUILDERS: readonly Builder[] = [
 			axis('characters', 'Characters', 'structural', values('none', 'some'), 'some'),
 			axis('taken', 'Titles already used', 'structural', values('none', 'some')),
 			ideaRated,
+			limits
+		]
+	},
+	{
+		id: 'catch-up',
+		label: 'Update the idea',
+		description: 'The setup brought up to date once the story moves on (`catchUpMessages`).',
+		axes: [
+			axis('narrator', 'Narrator', 'structural', values(...NARRATORS)),
+			axis('characters', 'Characters', 'structural', values('0', '1', '2'), '1'),
+			axis('passages', 'Passages sent', 'descriptive', values('1', '3')),
 			limits
 		]
 	}

@@ -312,6 +312,7 @@ function salvageMeta(value: unknown): PassageMeta | null {
 	const image = passageMetaV7.shape.image.safeParse(record.image);
 	const readAs = readingSchema.safeParse(record.readAs);
 	const settings = salvageSettings(record.settings);
+	const drifted = passageMetaV7.shape.drifted.safeParse(record.drifted);
 	const salvaged = passageMetaV7.safeParse({
 		suggestions,
 		directions: { add, remove },
@@ -319,7 +320,8 @@ function salvageMeta(value: unknown): PassageMeta | null {
 		...(readAs.success ? { readAs: readAs.data } : {}),
 		...(record.ooc === true ? { ooc: true } : {}),
 		...(image.success && image.data ? { image: image.data } : {}),
-		...(settings ? { settings } : {})
+		...(settings ? { settings } : {}),
+		...(drifted.success && drifted.data ? { drifted: drifted.data } : {})
 	});
 	return salvaged.success ? salvaged.data : null;
 }

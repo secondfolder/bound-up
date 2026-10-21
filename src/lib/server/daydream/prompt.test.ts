@@ -1341,3 +1341,11 @@ describe('settings the story changes', () => {
 		expect(content).not.toMatch(/"settings"[^\n]*limits/);
 	});
 });
+
+describe('when the story moves on', () => {
+	it('asks for a line when the story has left its setup behind for good, not for a moment', () => {
+		const content = system(buildMessages(request({ turns: [said('hi')] })));
+		expect(content).toContain('"drifted" (optional, and rare)');
+		expect(content).toContain('in a way that will last — not a passing moment');
+	});
+});

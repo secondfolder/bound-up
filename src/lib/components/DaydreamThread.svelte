@@ -21,6 +21,7 @@
 	import DaydreamBranchMap from './DaydreamBranchMap.svelte';
 	import DaydreamDials from './DaydreamDials.svelte';
 	import DaydreamDirections from './DaydreamDirections.svelte';
+	import DaydreamDriftNote from './DaydreamDriftNote.svelte';
 	import DaydreamNotThisDialog from './DaydreamNotThisDialog.svelte';
 	import DaydreamPassage from './DaydreamPassage.svelte';
 	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
@@ -561,6 +562,9 @@
 					}}
 				/>
 				<DaydreamSettingsNote {story} turnId={node.id} />
+				{#if story.driftOfferId === node.id && available && !busy}
+					<DaydreamDriftNote {story} turnId={node.id} {debug} />
+				{/if}
 			{:else}
 				<DaydreamUserTurn
 					{story}

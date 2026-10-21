@@ -643,7 +643,9 @@ export const DAYDREAM_LIMITS = {
 	 * (`daydream/image-prompt.ts`). SDXL reads well under this; the server
 	 * adds its own style and safety words around it.
 	 */
-	imagePrompt: 1000
+	imagePrompt: 1000,
+	/** A passage's line on how the story has moved on from its setup (`drifted`). */
+	drifted: 200
 } as const;
 
 /**

@@ -473,7 +473,14 @@ export type StorySettingsBefore = z.output<typeof settingsBeforeSchema>;
  */
 export const passageMetaV7 = passageMetaV6.extend({
 	settings: storySettingsSchema.optional(),
-	settingsBefore: settingsBeforeSchema.optional()
+	settingsBefore: settingsBeforeSchema.optional(),
+	/**
+	 * How the story has moved on from its setup, in a line, when the model
+	 * says it now contradicts the idea or a character for good: what the
+	 * thread's "Update the idea" offer is about (docs/daydreams.md, "When the
+	 * story moves on"). Added to v7 before any build wrote one.
+	 */
+	drifted: z.string().trim().min(1).max(DAYDREAM_LIMITS.drifted).optional()
 });
 
 /** A passage's meta as the latest turn version stores it (`passageMetaV7`). */

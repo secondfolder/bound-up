@@ -422,6 +422,35 @@ export function suggestInput(
 				},
 				canReadLinks: false
 			};
+		case 'catch-up': {
+			const count = Number(combo.characters ?? '1');
+			return {
+				request: {
+					task: 'catch-up',
+					idea: {
+						title: text('idea.title'),
+						setting: text('idea.setting'),
+						premise: text('idea.premise'),
+						yourRole: text('idea.yourRole'),
+						tone: text('idea.tone'),
+						notes: text('idea.notes')
+					},
+					narrator: (combo.narrator ?? 'none') as 'none',
+					characters: Array.from({ length: count }, (_, index) => ({
+						name: text(`character${index + 1}.name`),
+						personality: text(`character${index + 1}.personality`),
+						relationship: text(`character${index + 1}.relationship`),
+						doing: text(`character${index + 1}.doing`)
+					})),
+					story: Array.from({ length: Number(combo.passages ?? '1') }, (_, index) =>
+						text(`passage${index + 1}`)
+					),
+					drifted: text('drifted'),
+					limits: limitsOf(combo, text)
+				},
+				canReadLinks: false
+			};
+		}
 		default:
 			return builder satisfies never;
 	}

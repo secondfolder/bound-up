@@ -1476,6 +1476,70 @@ describe('DaydreamThread', () => {
 		});
 	});
 
+	describe('when the story moves on', () => {
+		const completion = (body: unknown) => ({
+			ok: true,
+			value: { choices: [{ message: { content: JSON.stringify(body) } }] }
+		});
+
+		/** A story whose newest passage says it has moved on from its setup. */
+		function movedOn() {
+			localStorage.clear();
+			return daydream([
+				turn('t1', null, 'user', 'Kiss me.'),
+				turn('t2', 't1', 'story', {
+					type: 'text',
+					text: 'She softens, and takes you home.',
+					meta: {
+						suggestions: [],
+						directions: { add: [], remove: [] },
+						drifted: 'Mara is tender now, and you are at her flat.'
+					}
+				})
+			]);
+		}
+
+		it('offers to update the idea, and "Not now" puts it away', async () => {
+			const { container } = render(DaydreamThread, { daydream: movedOn(), available: true });
+			await waitFor(() =>
+				expect(container.textContent).toContain('The story has moved on from its idea.')
+			);
+			await press(container, 'Not now');
+			await waitFor(() =>
+				expect(container.textContent).not.toContain('The story has moved on from its idea.')
+			);
+			expect(localStorage.getItem('daydream-drift-answered:d1')).toContain('t2');
+		});
+
+		it('proposes the changes, and saves the ones accepted to this daydream’s copy', async () => {
+			client.requestSuggestion.mockResolvedValue(
+				completion({ idea: { premise: 'A tender evening at her flat.' } })
+			);
+			client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+			const { container } = render(DaydreamThread, { daydream: movedOn(), available: true });
+			await press(container, 'Update the idea');
+			await waitFor(() => expect(container.textContent).toContain('A tender evening at her flat.'));
+			expect(client.requestSuggestion.mock.calls[0]?.[0]).toMatchObject({
+				task: 'catch-up',
+				story: ['She softens, and takes you home.'],
+				drifted: 'Mara is tender now, and you are at her flat.'
+			});
+			await waSettled(container);
+			const saves = [...container.querySelectorAll<HTMLElement>('wa-button')].filter(
+				(candidate) => candidate.textContent?.trim() === 'Update the idea'
+			);
+			saves.at(-1)?.click();
+			await waitFor(() =>
+				expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({
+					idea: { premise: 'A tender evening at her flat.' }
+				})
+			);
+			await waitFor(() =>
+				expect(container.textContent).not.toContain('The story has moved on from its idea.')
+			);
+		});
+	});
+
 	describe('naming', () => {
 		/** A daydream with no name yet, its opening written. */
 		function unnamed() {

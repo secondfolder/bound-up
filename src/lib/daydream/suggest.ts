@@ -24,10 +24,12 @@ import { type ExchangeLogView, suggestionLog } from './exchange-log';
 import { type SetupExchange, type SetupExchangeTask, setupExchangeFrom } from './setup-exchange';
 import type { DaydreamPieces, StarterSide } from './starters';
 import {
+	type CatchUp,
 	completionJson,
 	describeUnusable,
 	type GeneratedIdea,
 	parseCasting,
+	parseCatchUp,
 	parseChips,
 	parseFill,
 	parseGeneratedIdeas,
@@ -171,6 +173,26 @@ export async function suggestCasting(input: {
 	}
 	const casting = parseCasting(answer.value);
 	return casting ? { ok: true, value: casting } : nothing(answer);
+}
+
+/**
+ * "Update the idea": the setup's fields brought up to date with the story,
+ * only those that changed (`parseCatchUp`), or why there are none.
+ */
+export async function suggestCatchUp(input: {
+	idea: Pick<DaydreamIdea, 'title' | 'setting' | 'premise' | 'yourRole' | 'tone' | 'notes'>;
+	narrator: DaydreamNarrator;
+	characters: { name: string; personality: string; relationship: string; doing: string }[];
+	story: string[];
+	drifted: string;
+	limits: string;
+}): Promise<Answer<CatchUp>> {
+	const answer = await ask({ task: 'catch-up', ...input });
+	if (!answer.ok) {
+		return answer;
+	}
+	const proposed = parseCatchUp(answer.value, input);
+	return proposed ? { ok: true, value: proposed } : nothing(answer);
 }
 
 /** A name for a daydream, from its idea and how it opened. */

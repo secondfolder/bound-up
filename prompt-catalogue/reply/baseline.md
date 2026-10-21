@@ -78,6 +78,7 @@ Write the passage next (after the <yours> block, when you wrote out the user's t
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: {"prompt": "Roll to see if you can hold still", "sides": 6, "outcomes": [{"min": 1, "max": 3, "label": "You move"}, {"min": 4, "max": 6, "label": "You hold still"}]}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
 - "ooc": true, only when the passage is out of character.
 - "settings" (optional, and only when asked): when the user's own words ask outright for a change to how the story is written — longer or shorter passages, slower or faster, more or less intense, more or less sexual or kinky — write this passage the new way and set the new value here, as {"length": "long"}. Keys: "length" ("short", "medium" or "long"), "pace", "intensity", "heat" and "kink", each of the last four a whole number from 1 to 5 on the scales in the setup's dials and heat. Only what they asked for, and only when they asked outright: a scene that calls for more is not a request.
+- "drifted" (optional, and rare): when the story now contradicts the setup's idea or a character in a way that will last — not a passing moment — say how in one short line, like "Mara is tender with you now, and you have left the office for her flat".
 Earlier replies are shown without their reading line and metadata, to keep the story short; yours must still have the metadata, and the reading line when it is asked for.
 
 ----------------------

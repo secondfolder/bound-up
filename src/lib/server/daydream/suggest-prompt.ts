@@ -17,6 +17,8 @@ import {
 import {
 	FIELD_LIMITS,
 	GENERATED_IDEAS,
+	MAX_CATCH_UP_PASSAGES,
+	MAX_CATCH_UP_STORY,
 	MAX_CHIP_LENGTH,
 	MAX_IDEA_PREMISE,
 	MAX_IDEA_TAGS,
@@ -155,6 +157,43 @@ const nameRequestSchema = z.object({
 	limits: limitsSchema
 });
 
+/**
+ * `catch-up`: "Update the idea", once the story has moved on from its setup
+ * (docs/daydreams.md, "When the story moves on"). The setup's idea and cast
+ * as they stand, the latest passages, and the line the story said how it had
+ * moved on in: what a reply request already carries, and nothing more.
+ */
+const catchUpRequestSchema = z
+	.object({
+		task: z.literal('catch-up'),
+		idea: draftSchema.pick({
+			title: true,
+			setting: true,
+			premise: true,
+			yourRole: true,
+			tone: true,
+			notes: true
+		}),
+		narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
+		characters: z
+			.array(
+				z.object({
+					name: z.string().max(DAYDREAM_LIMITS.characterName),
+					personality: z.string().max(DAYDREAM_LIMITS.personality),
+					relationship: z.string().max(DAYDREAM_LIMITS.relationship),
+					doing: z.string().max(DAYDREAM_LIMITS.castPart)
+				})
+			)
+			.max(MAX_DAYDREAM_CHARACTERS),
+		story: z.array(z.string().min(1).max(DAYDREAM_LIMITS.turn)).min(1).max(MAX_CATCH_UP_PASSAGES),
+		drifted: z.string().min(1).max(DAYDREAM_LIMITS.drifted),
+		limits: limitsSchema
+	})
+	.refine(
+		(value) => value.story.reduce((sum, passage) => sum + passage.length, 0) <= MAX_CATCH_UP_STORY,
+		{ path: ['story'], message: 'Too much story' }
+	);
+
 /** The user's side, from the new-daydream page's "You as": null for either. */
 const sideSchema = z.enum(['dom', 'sub']).nullable();
 type Side = z.output<typeof sideSchema> | undefined;
@@ -265,7 +304,8 @@ export const suggestRequestSchema = z.union([
 	castingRequestSchema,
 	nameRequestSchema,
 	daydreamRequestSchema,
-	ideasRequestSchema
+	ideasRequestSchema,
+	catchUpRequestSchema
 ]);
 
 export type SuggestRequest = z.output<typeof suggestRequestSchema>;
@@ -274,6 +314,7 @@ type CastingRequest = z.output<typeof castingRequestSchema>;
 type NameRequest = z.output<typeof nameRequestSchema>;
 type DaydreamRequest = z.output<typeof daydreamRequestSchema>;
 type IdeasRequest = z.output<typeof ideasRequestSchema>;
+type CatchUpRequest = z.output<typeof catchUpRequestSchema>;
 type IdeaDialsInput = z.output<typeof ideaDialsSchema>;
 type Narrator = RecordRequest['context']['narrator'];
 
@@ -780,6 +821,77 @@ function nameMessages(request: NameRequest): ModelMessage[] {
 					`Name this daydream, the kind of title someone gives a favourite story they mean to come back to: two to five evocative words, at most ${DAYDREAM_LIMITS.title} characters, with no quotation marks inside the title itself. Borrowing words from the idea's title is fine${taken.length > 0 ? ", and so is the idea's title, where it is short, with something added that sets this one apart" : ''}.`
 				),
 				answerFormat([textKey('title', 'the name')])
+			)
+		}
+	];
+}
+
+/**
+ * "Update the idea": what the story has settled, written back into the
+ * setup. Only fields it changed come back, so the dialog can show each one
+ * against what it replaces; never a name or the title, which the user chose
+ * and the list knows the daydream by, and nothing a passing moment
+ * suggested. The idea's fields are read the monologue's way for one.
+ */
+function catchUpMessages(request: CatchUpRequest): ModelMessage[] {
+	const monologue = request.narrator === 'monologue';
+	const idea = describeFields(
+		'idea',
+		['title', ...IDEA_TEXT_FIELDS],
+		request.idea,
+		request.narrator
+	);
+	const cast = request.characters.map((character) =>
+		lines(
+			`Name: ${character.name}`,
+			character.personality && `Personality: ${character.personality}`,
+			character.relationship && `Who they are to the user: ${character.relationship}`,
+			character.doing && `What they are doing or want: ${character.doing}`
+		)
+	);
+	return [
+		{ role: 'system', content: SUGGEST_RULES },
+		{
+			role: 'user',
+			content: paragraphs(
+				section(
+					'How the daydream was set up',
+					`Its idea:\n${userText('idea', idea.join('\n'))}`,
+					cast.length > 0 && `Who is in it:\n${userText('characters', cast.join('\n\n'))}`
+				),
+				section(
+					'The story so far',
+					'Its latest passages, oldest first:',
+					userText('story', request.story.join('\n\n* * *\n\n'))
+				),
+				section(
+					'How it has moved on',
+					`The story said, as it wrote the latest of them:\n${userText('drifted', request.drifted)}`
+				),
+				limitsSection(request.limits),
+				section(
+					'What to do',
+					`Bring the setup up to date with the story: rewrite only the fields the story has changed, so they say where it is now, and leave every other field out. Keep each about as long as it was, in the same kind of words${monologue ? ', and the sayings one to a line' : ''}. Only what the story has settled, never what a passing moment suggested. Never change a name or the title.`
+				),
+				answerFormat([
+					{
+						key: 'idea',
+						says: "only the idea's fields that changed; leave the others out",
+						shape: ideaFieldKeys(['setting', 'premise', 'yourRole', 'tone', 'notes'], monologue)
+					},
+					{
+						key: 'characters',
+						says: 'only the characters who changed, each by name, with only the fields that changed',
+						shape: {
+							each: [
+								textKey('name', 'their name, exactly as above'),
+								textKey('personality', 'how they think and behave'),
+								textKey('relationship', 'who they are to the user'),
+								textKey('doing', 'what they are doing or want now')
+							]
+						}
+					}
+				])
 			)
 		}
 	];
@@ -1340,6 +1452,14 @@ export function buildSuggestMessages(
 		return {
 			messages: castingMessages(request),
 			maxTokens: 300,
+			temperature: SUGGEST_TEMPERATURE,
+			reading: null
+		};
+	}
+	if (request.task === 'catch-up') {
+		return {
+			messages: catchUpMessages(request),
+			maxTokens: 1500,
 			temperature: SUGGEST_TEMPERATURE,
 			reading: null
 		};

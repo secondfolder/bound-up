@@ -486,6 +486,93 @@ const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLower
  */
 export const MAX_TAKEN_TITLES = 20;
 
+/**
+ * How much of the story an "Update the idea" request carries: the latest
+ * passages, enough to see where it has got to, oldest first.
+ */
+export const MAX_CATCH_UP_PASSAGES = 6;
+export const MAX_CATCH_UP_STORY = 12_000;
+
+/** The idea's fields "Update the idea" may change: never its title, which is a name. */
+export const CATCH_UP_IDEA_FIELDS = ['setting', 'premise', 'yourRole', 'tone', 'notes'] as const;
+
+/** A character's fields it may change: never their name. */
+export const CATCH_UP_CHARACTER_FIELDS = ['personality', 'relationship', 'doing'] as const;
+
+export type CatchUpIdeaField = (typeof CATCH_UP_IDEA_FIELDS)[number];
+export type CatchUpCharacterField = (typeof CATCH_UP_CHARACTER_FIELDS)[number];
+
+/** What "Update the idea" proposes: only fields that change, each a whole new value. */
+export type CatchUp = {
+	idea: Partial<Record<CatchUpIdeaField, string>>;
+	characters: { name: string; fields: Partial<Record<CatchUpCharacterField, string>> }[];
+};
+
+const CATCH_UP_CHARACTER_LIMITS: Readonly<Record<CatchUpCharacterField, number>> = {
+	personality: DAYDREAM_LIMITS.personality,
+	relationship: DAYDREAM_LIMITS.relationship,
+	doing: DAYDREAM_LIMITS.castPart
+};
+
+/**
+ * A `catch-up` answer, against the setup it was asked about: only fields
+ * that differ from what is there, within their caps, and only characters
+ * who are in it, matched by name. Anything else is dropped, and an answer
+ * with nothing left is null.
+ */
+export function parseCatchUp(
+	value: unknown,
+	current: {
+		idea: Record<CatchUpIdeaField, string>;
+		characters: ({ name: string } & Record<CatchUpCharacterField, string>)[];
+	}
+): CatchUp | null {
+	if (!value || typeof value !== 'object') {
+		return null;
+	}
+	const answer = value as Record<string, unknown>;
+	const changed = (text: unknown, was: string, limit: number) =>
+		typeof text === 'string' &&
+		text.trim() &&
+		text.trim() !== was.trim() &&
+		text.trim().length <= limit
+			? text.trim()
+			: null;
+	const ideaAnswer =
+		answer.idea && typeof answer.idea === 'object' ? (answer.idea as Record<string, unknown>) : {};
+	const idea: CatchUp['idea'] = {};
+	for (const field of CATCH_UP_IDEA_FIELDS) {
+		const text = changed(ideaAnswer[field], current.idea[field], FIELD_LIMITS[field]);
+		if (text) {
+			idea[field] = text;
+		}
+	}
+	const characters: CatchUp['characters'] = [];
+	for (const entry of Array.isArray(answer.characters) ? answer.characters : []) {
+		if (!entry || typeof entry !== 'object') {
+			continue;
+		}
+		const person = entry as Record<string, unknown>;
+		const now = current.characters.find(
+			(character) => typeof person.name === 'string' && same(character.name, person.name)
+		);
+		if (!now || characters.some((other) => same(other.name, now.name))) {
+			continue;
+		}
+		const fields: CatchUp['characters'][number]['fields'] = {};
+		for (const field of CATCH_UP_CHARACTER_FIELDS) {
+			const text = changed(person[field], now[field], CATCH_UP_CHARACTER_LIMITS[field]);
+			if (text) {
+				fields[field] = text;
+			}
+		}
+		if (Object.keys(fields).length > 0) {
+			characters.push({ name: now.name, fields });
+		}
+	}
+	return Object.keys(idea).length > 0 || characters.length > 0 ? { idea, characters } : null;
+}
+
 /** How many ideas one "Suggest daydreams for this" or "More ideas" asks for. */
 export const GENERATED_IDEAS = 6;
 

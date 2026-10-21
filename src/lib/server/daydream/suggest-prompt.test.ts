@@ -7,6 +7,7 @@ import {
 	MAX_OFFERED_IDEAS,
 	MAX_TAKEN_TITLES,
 	parseCasting,
+	parseCatchUp,
 	parseGeneratedIdeas,
 	parseSuggestedDaydream
 } from '$lib/daydream/suggestions';
@@ -999,5 +1000,67 @@ describe('the answer formats, against the parsers that read them', () => {
 		const parsed = parseCasting(sampleFrom(asks(casting)));
 		expect(parsed?.relationship).not.toBe('');
 		expect(parsed?.part).not.toBe('');
+	});
+});
+
+describe('buildSuggestMessages, catching the idea up with the story', () => {
+	const catchUp: SuggestRequest = {
+		task: 'catch-up',
+		idea: { title: 'After hours', premise: 'A strict interview.', setting: 'the office' },
+		narrator: 'none',
+		characters: [
+			{ name: 'Mara', personality: 'cold', relationship: 'your new boss', doing: 'testing you' }
+		],
+		story: ['She softens.', 'You follow her home.'],
+		drifted: 'Mara is tender now, and you are at her flat.',
+		limits: ''
+	};
+
+	it('sends the setup, the latest passages and how it moved on, all as material', () => {
+		const ask = asks(catchUp);
+		expect(ask).toContain('<idea>\nTitle: After hours');
+		expect(ask).toContain('<characters>\nName: Mara\nPersonality: cold');
+		expect(ask).toContain('<story>\nShe softens.\n\n* * *\n\nYou follow her home.\n</story>');
+		expect(ask).toContain('<drifted>\nMara is tender now');
+		expect(ask).toContain('rewrite only the fields the story has changed');
+		expect(ask).toContain('Never change a name or the title.');
+		expect(skeleton(ask).startsWith('{"idea": {"setting": "…"')).toBe(true);
+	});
+
+	it('holds the story it carries to its caps', () => {
+		expect(suggestRequestSchema.safeParse(catchUp).success).toBe(true);
+		expect(suggestRequestSchema.safeParse({ ...catchUp, story: [] }).success).toBe(false);
+		expect(
+			suggestRequestSchema.safeParse({ ...catchUp, story: new Array(7).fill('x') }).success
+		).toBe(false);
+		expect(
+			suggestRequestSchema.safeParse({ ...catchUp, story: ['x'.repeat(8000), 'x'.repeat(8000)] })
+				.success
+		).toBe(false);
+	});
+
+	it('is read back as only what changed, for characters who are in it', () => {
+		const current = {
+			idea: {
+				setting: 'the office',
+				premise: 'A strict interview.',
+				yourRole: '',
+				tone: '',
+				notes: ''
+			},
+			characters: [{ name: 'Mara', personality: 'cold', relationship: 'your new boss', doing: '' }]
+		};
+		const sample = {
+			idea: { setting: 'her flat', premise: 'A strict interview.', title: 'New title' },
+			characters: [
+				{ name: 'mara', personality: 'tender', relationship: 'your new boss' },
+				{ name: 'Jun', personality: 'new' }
+			]
+		};
+		expect(parseCatchUp(sample, current)).toEqual({
+			idea: { setting: 'her flat' },
+			characters: [{ name: 'Mara', fields: { personality: 'tender' } }]
+		});
+		expect(parseCatchUp({ idea: { setting: 'the office' } }, current)).toBeNull();
 	});
 });

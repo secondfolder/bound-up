@@ -275,3 +275,14 @@ describe('parseReply, settings', () => {
 		expect(withMeta('{"settings": {"heat": 9}}')?.settings).toBeUndefined();
 	});
 });
+
+describe('parseReply, drift', () => {
+	it('keeps the line on how the story moved on, held to its cap', () => {
+		const block = (drifted: string) =>
+			parseReply(
+				`She softens.\n<meta>\n${JSON.stringify({ suggestions: ['x'], drifted })}\n</meta>`
+			).meta;
+		expect(block('Mara is tender now.')?.drifted).toBe('Mara is tender now.');
+		expect(block('x'.repeat(201))?.drifted).toBeUndefined();
+	});
+});

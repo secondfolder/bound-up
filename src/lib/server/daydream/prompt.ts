@@ -692,7 +692,8 @@ Write the passage next${inStory ? " (after the <yours> block, when you wrote out
 - "directions": buttons for steering the story. The ones on screen now are listed at the end of the last message. Judge them by where the passage you just wrote leaves the story, not where it stood before it: remove, by id, every button for something that has now happened or can no longer happen (once the envelope is opened, "Open the envelope" goes), and any that no longer fit. Add buttons that suit what could come next — labels of one to three words, like {"id": "slower", "label": "Slower"}. At most ${MAX_DIRECTIONS} on screen after your changes. Ideas: ${ideas.directions}. Offer "Surprise me" (id "surprise-me") when an unexpected turn would suit the story. Never add Continue, Stop the scene or Ease off: those are always there.
 - "roll" (optional, and rare): at a genuinely uncertain moment, let a die decide it instead of you: ${rollExample}. The outcomes must cover every face exactly once. End the passage at the moment of the roll, without deciding it.
 - "ooc": true, only when the passage is out of character.
-${SETTINGS_INSTRUCTION}${pictures === null ? '' : `\n${imageInstruction(voice, pictures)}`}
+${SETTINGS_INSTRUCTION}
+${DRIFTED_INSTRUCTION}${pictures === null ? '' : `\n${imageInstruction(voice, pictures)}`}
 Earlier replies are shown without their reading line and metadata, to keep the story short; yours must still have the metadata, and the reading line when it is asked for.`;
 }
 
@@ -706,6 +707,15 @@ Earlier replies are shown without their reading line and metadata, to keep the s
  * the limits, the voice or the cast: those are the user's to change.
  */
 const SETTINGS_INSTRUCTION = `- "settings" (optional, and only when asked): when the user's own words ask outright for a change to how the story is written — longer or shorter passages, slower or faster, more or less intense, more or less sexual or kinky — write this passage the new way and set the new value here, as {"length": "long"}. Keys: "length" ("short", "medium" or "long"), "pace", "intensity", "heat" and "kink", each of the last four a whole number from 1 to 5 on the scales in the setup's dials and heat. Only what they asked for, and only when they asked outright: a scene that calls for more is not a request.`;
+
+/**
+ * Asked for when the story has left its setup behind for good, so the
+ * thread can offer to bring the idea up to date (docs/daydreams.md, "When the
+ * story moves on"). A line, not the rewrite: rewriting the idea in every
+ * reply would cost every passage for something the user may never want, so
+ * the rewrite is a separate request, made only when they ask.
+ */
+const DRIFTED_INSTRUCTION = `- "drifted" (optional, and rare): when the story now contradicts the setup's idea or a character in a way that will last — not a passing moment — say how in one short line, like "Mara is tender with you now, and you have left the office for her flat".`;
 
 const CHECK_IN = `# The scene is stopped
 The user pressed Stop the scene. Do not continue the story. Step out of it and write a short, warm check-in in your own plain voice: ask how they are, and let them know they can carry on, carry on more gently, or stop here — whatever they like. Two or three sentences at most, with no <reading> line and no <yours> block. Then end with this, exactly:

@@ -1019,6 +1019,41 @@ never because a scene calls for more.
 - **A monologue** counts its length in statements, so "say more" there
   changes the same `length`.
 
+## When the story moves on
+
+A user can take a story anywhere the rules allow
+([The system prompt is the server's](#the-system-prompt-is-the-servers)),
+but the setup still describes where it started. Everything that reads the
+setup then works from a stale picture: the next reply's setup section, the
+summary, a character's picture, naming, a daydream copied from this one.
+So the thread offers to bring it up to date, in two steps, so a reply never
+pays for rewriting the idea:
+
+1. **The reply flags it.** Its metadata may carry `drifted`, a line on how
+   the story now contradicts the idea or a character for good, never for a
+   passing moment (`DRIFTED_INSTRUCTION`; kept on the passage,
+   `daydream-turn` v7, capped at `DAYDREAM_LIMITS.drifted`).
+2. **The thread offers it.** Under the newest passage that flagged it, a
+   note (`DaydreamDriftNote.svelte`): "The story has moved on from its
+   idea", with **Update the idea** and **Not now**. Either answers it, and
+   the next offer waits until the story is `DRIFT_GAP` (five) passages past
+   the last answered one (`driftOffer`), so it cannot nag. Answered offers
+   are remembered on the device, since turns never change once written;
+   lost storage only offers again.
+3. **The user decides.** Update the idea sends the `catch-up` suggestion:
+   the idea's fields, each character's personality, who they are to the
+   user and what they are doing, the latest passages up to the flagged one
+   (at most `MAX_CATCH_UP_PASSAGES`, `MAX_CATCH_UP_STORY` characters), and
+   the line. It answers only the fields the story changed (`parseCatchUp`
+   keeps only those that differ, for characters who are in it). Never a
+   name or the idea's title. The dialog (`DaydreamCatchUpDialog.svelte`)
+   shows each as it would read, the words it adds marked (`addedRuns`),
+   with what it replaces, to accept, edit or leave out.
+4. **Only this daydream's copy changes.** Saving goes through `saveSetup`,
+   revision-checked like the Dials. The library's idea and characters stay
+   as they were, for starting other daydreams from; the out-of-sync
+   marker already shows when a copy and its library record differ.
+
 ## Dice
 
 At a genuinely uncertain moment the model may propose a roll
@@ -1454,6 +1489,10 @@ them, not from the user or this server:
   was made for, and the research its round came with; and any limits written
   on the draft; it answers with research notes and a summary to show the
   draft as, too (see "Starting one");
+- for "Update the idea" (`catch-up`): the idea's fields, each character's
+  name, personality, who they are to the user and what they are doing, the
+  latest passages of the story (what a reply request already carries), the
+  line the story said it had moved on in, and the limits;
 - for generated ideas: the brief (up to `DAYDREAM_LIMITS.brief`), the side
   chosen under "You as", and for **More ideas** the titles of those already
   shown; it answers with research notes for the round.
