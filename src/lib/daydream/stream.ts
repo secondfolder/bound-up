@@ -14,15 +14,20 @@
  */
 
 export type StreamOutcome =
-	/** The stream said it was done, or simply ended. */
-	| { kind: 'done' }
+	/**
+	 * The stream said it was done, or simply ended. `outOfRoom` when the
+	 * model stopped at `max_tokens` (`finish_reason: "length"`): a reasoning
+	 * model can spend the whole budget thinking and send no text at all,
+	 * which without this reads the same as a model that chose to say nothing.
+	 */
+	| { kind: 'done'; outOfRoom?: true }
 	/** The provider reported a failure partway through. */
 	| { kind: 'error' };
 
 const LINE_BREAK = /\r?\n/;
 
 type StreamEvent = {
-	choices?: { delta?: { content?: unknown } }[];
+	choices?: { delta?: { content?: unknown }; finish_reason?: unknown }[];
 	error?: unknown;
 	/** The reply endpoint's own event, first, for debug mode: the request body it sent the model. */
 	boundUpRequest?: unknown;
@@ -42,22 +47,29 @@ export async function readReplyStream(
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffered = '';
+	// Set by the event that carries `finish_reason`, which comes before `[DONE]`.
+	const ending: { outOfRoom: boolean } = { outOfRoom: false };
+	const done = (): StreamOutcome =>
+		ending.outOfRoom ? { kind: 'done', outOfRoom: true } : { kind: 'done' };
 	try {
 		for (;;) {
-			const { done, value } = await reader.read();
-			buffered += done ? decoder.decode() : decoder.decode(value, { stream: true });
+			const { done: finished, value } = await reader.read();
+			buffered += finished ? decoder.decode() : decoder.decode(value, { stream: true });
 			// Events end at a blank line; a line may arrive split across chunks,
 			// so only complete lines are handled and the rest waits.
 			const lines = buffered.split(LINE_BREAK);
-			buffered = done ? '' : (lines.pop() ?? '');
+			buffered = finished ? '' : (lines.pop() ?? '');
 			for (const line of lines) {
-				const outcome = handleLine(line, onText, onRequest);
+				const outcome = handleLine(line, onText, onRequest, ending);
+				if (outcome === 'done') {
+					return done();
+				}
 				if (outcome) {
 					return outcome;
 				}
 			}
-			if (done) {
-				return { kind: 'done' };
+			if (finished) {
+				return done();
 			}
 		}
 	} finally {
@@ -68,15 +80,16 @@ export async function readReplyStream(
 function handleLine(
 	line: string,
 	onText: (piece: string) => void,
-	onRequest: (body: string) => void
-): StreamOutcome | null {
+	onRequest: (body: string) => void,
+	ending: { outOfRoom: boolean }
+): { kind: 'error' } | 'done' | null {
 	if (!line.startsWith('data:')) {
 		// Blank separators, `: keep-alive` comments, `event:` and `id:` fields.
 		return null;
 	}
 	const data = line.slice('data:'.length).trim();
 	if (data === '[DONE]') {
-		return { kind: 'done' };
+		return 'done';
 	}
 	let event: StreamEvent;
 	try {
@@ -93,6 +106,9 @@ function handleLine(
 	}
 	if (event.error) {
 		return { kind: 'error' };
+	}
+	if (event.choices?.[0]?.finish_reason === 'length') {
+		ending.outOfRoom = true;
 	}
 	const piece = event.choices?.[0]?.delta?.content;
 	if (typeof piece === 'string' && piece !== '') {

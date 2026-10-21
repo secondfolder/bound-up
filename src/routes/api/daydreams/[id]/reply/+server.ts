@@ -85,8 +85,11 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		messages,
 		stream: true,
 		// A few paragraphs, which is what the dials ask for at most, plus
-		// the metadata block after them; also the most one reply can cost.
-		max_tokens: 1200,
+		// the metadata block after them, plus room for a reasoning model to
+		// think first: on OpenRouter its reasoning counts against this too,
+		// and at 1,200 GLM-5.2 spent all of it thinking and wrote nothing.
+		// Also the most one reply can cost.
+		max_tokens: 4000,
 		temperature: 0.9,
 		// Only route to providers that do not keep or train on prompts.
 		provider: { data_collection: 'deny' },

@@ -116,6 +116,10 @@ export type ReplyOutcome =
 
 const INCOMPLETE = 'The reply stopped partway through. Try again.';
 const EMPTY = 'The reply came back empty. Try again.';
+// A reasoning model that thought until it hit `max_tokens` and never began
+// the passage. Not "empty": the model did work, and was paid for, but the
+// budget ran out first.
+const OUT_OF_ROOM = 'The model ran out of room before it started writing. Try again.';
 
 /** One message as the model reads it, as `server/daydream/prompt.ts` builds it. */
 export type PromptMessage = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -225,7 +229,13 @@ export async function writeReply(
 				reading: parsed.reading,
 				raw: text
 			}
-		: { ok: false, error: EMPTY, partial: '', raw: text, ended: 'done' };
+		: {
+				ok: false,
+				error: outcome.outOfRoom ? OUT_OF_ROOM : EMPTY,
+				partial: '',
+				raw: text,
+				ended: 'done'
+			};
 }
 
 // ── sealing ──────────────────────────────────────────────────────────────────

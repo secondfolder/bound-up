@@ -99,4 +99,28 @@ describe('readReplyStream', () => {
 		const crlf = `data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' } }] })}\r\n\r\n`;
 		expect((await read(body(crlf, 'data: [DONE]\r\n\r\n'))).text).toBe('ok');
 	});
+
+	it('says when the model ran out of room, even with no text at all', async () => {
+		// A reasoning model that spent the whole budget thinking: reasoning
+		// deltas, no content, then `finish_reason: "length"`.
+		const result = await read(
+			body(
+				`data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'Hmm…' } }] })}\n\n`,
+				`data: ${JSON.stringify({ choices: [{ delta: { content: '' }, finish_reason: 'length' }] })}\n\n`,
+				'data: [DONE]\n\n'
+			)
+		);
+		expect(result.text).toBe('');
+		expect(result.outcome).toEqual({ kind: 'done', outOfRoom: true });
+	});
+
+	it('does not say so for a reply that finished on its own', async () => {
+		const result = await read(
+			body(
+				event('Done.'),
+				`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`
+			)
+		);
+		expect(result.outcome).toEqual({ kind: 'done' });
+	});
 });

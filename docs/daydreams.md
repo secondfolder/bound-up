@@ -1689,12 +1689,17 @@ The story model is an OpenRouter model, chosen on the admin page (see
 terms, and its providers' on OpenRouter, allow adult fiction.
 Most hosted models' terms (Anthropic's, OpenAI's, Workers AI's) do not,
 which is why the choice is made here rather than left to OpenRouter's
-routing. A passage is capped at 1,200 tokens, room for a few paragraphs and
-the metadata after them; a suggestion at 400–900.
+routing. A passage is capped at 4,000 tokens: a few paragraphs and the
+metadata after them, plus room for a reasoning model to think first, since
+OpenRouter counts reasoning against the same cap. A model that still runs out
+before writing anything ends with `finish_reason: "length"`, which the reader
+reports as running out of room rather than as an empty reply. A suggestion's
+cap is set per task in `suggest-prompt.ts`, from 100 tokens for a name to
+5,200 for a whole setup, and more when it reads links.
 
 The browser reads OpenRouter's stream itself (`src/lib/daydream/stream.ts`):
 `data:` events carrying `choices[0].delta.content`, keep-alive comments, a
-mid-stream `error` event, and `[DONE]`. The reply endpoint passes the
+mid-stream `error` event, a `finish_reason`, and `[DONE]`. The reply endpoint passes the
 upstream body through untouched rather than parsing and re-encoding it, so
 the worker spends no CPU on a reply it has no reason to read. `EventSource`
 cannot be used, because it can only send a GET.
