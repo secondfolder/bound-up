@@ -103,7 +103,8 @@ const client = vi.hoisted(() => ({
 	downloadPicture: vi.fn(),
 	saveExchange: vi.fn(),
 	readExchanges: vi.fn(),
-	readSetupExchanges: vi.fn()
+	readSetupExchanges: vi.fn(),
+	listDaydreamSetups: vi.fn()
 }));
 vi.mock('$lib/daydream/client', () => client);
 
@@ -1445,6 +1446,24 @@ describe('DaydreamThread', () => {
 				characters: ['Mara']
 			});
 			expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({ title: 'After the meeting' });
+		});
+
+		it('tells the model the titles of the user’s other daydreams from the same idea', async () => {
+			client.requestSuggestion.mockResolvedValue(completion({ title: 'Third time' }));
+			client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+			opened.set('d2', { ...SETUP, title: 'Overtime' });
+			opened.set('d3', { ...SETUP, title: 'Elsewhere', idea: { ...SETUP.idea, title: 'Other' } });
+			client.listDaydreamSetups.mockResolvedValue(
+				['d1', 'd2', 'd3'].map((id) => ({ id, setup: ref(id) }))
+			);
+			const onnamed = vi.fn();
+			render(DaydreamThread, { daydream: unnamed(), available: true, onnamed });
+
+			await waitFor(() => expect(onnamed).toHaveBeenCalledWith('Third time'));
+			expect(client.requestSuggestion.mock.calls[0]?.[0]).toMatchObject({
+				task: 'name',
+				taken: ['Overtime']
+			});
 		});
 
 		/**

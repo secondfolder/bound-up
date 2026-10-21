@@ -269,7 +269,7 @@ export const IDEA_FIELD_LABELS: FieldLabels = {
  * are the sayings it is built from, which the reply prompt sends as written.
  */
 const MONOLOGUE_FIELD_LABELS: FieldLabels = {
-	setting: { label: 'Where', hint: 'Where it is said, if anywhere' },
+	setting: { label: 'Where', hint: 'Where it is set, if anywhere' },
 	premise: { label: 'What it’s about', hint: 'What the voice believes, and keeps coming back to' },
 	yourRole: { label: 'Who you are to it', hint: 'Who it speaks to, or whose inner voice it is' },
 	tone: { label: 'Tone', hint: 'How it sounds' },

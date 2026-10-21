@@ -365,12 +365,12 @@ Only when target ∈ {idea}; field ∈ {setting}; narrator ∈ {unset, none, sec
 Suggest up to 12 short phrases the user could add to the idea's "Where" field (the place it happens) — different from what is already there, varied, and fitting the rest of the idea as written above. Each at most 80 characters, with no commas.
 ~~~~
 
-## ¶ 16520d38e9d2f3 · user · in 8 of 528
+## ¶ 0fe1daebb64604 · user · in 8 of 528
 
 Only when target ∈ {idea}; field ∈ {setting}; narrator ∈ {monologue}.
 
 ~~~~text
-Suggest up to 12 short phrases the user could add to the idea's "Where" field (where it is said, if anywhere) — different from what is already there, varied, and fitting the rest of the idea as written above. Each at most 80 characters, with no commas.
+Suggest up to 12 short phrases the user could add to the idea's "Where" field (where it is set, if anywhere) — different from what is already there, varied, and fitting the rest of the idea as written above. Each at most 80 characters, with no commas.
 ~~~~
 
 ## ¶ 0b7e5e99226933 · user · in 48 of 528

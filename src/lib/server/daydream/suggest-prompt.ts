@@ -22,7 +22,8 @@ import {
 	MAX_IDEA_TAGS,
 	MAX_NAMING_OPENING,
 	MAX_OFFERED_IDEAS,
-	MAX_SUGGESTED_CHIPS
+	MAX_SUGGESTED_CHIPS,
+	MAX_TAKEN_TITLES
 } from '$lib/daydream/suggestions';
 import { MAX_SUMMARY, TOLD_AS } from '$lib/daydream/summary';
 import type { ModelMessage } from './prompt';
@@ -137,9 +138,6 @@ const castingRequestSchema = z.object({
 	stance: z.enum(['self', 'persona', 'absent']),
 	limits: limitsSchema
 });
-
-/** The most titles of other daydreams from the same idea a name request carries. */
-export const MAX_TAKEN_TITLES = 20;
 
 /** `name`: a name for a daydream, once its opening is written. */
 const nameRequestSchema = z.object({

@@ -5,6 +5,7 @@ import {
 	MAX_IDEA_PREMISE,
 	MAX_NAMING_OPENING,
 	MAX_OFFERED_IDEAS,
+	MAX_TAKEN_TITLES,
 	parseCasting,
 	parseGeneratedIdeas,
 	parseSuggestedDaydream
@@ -14,7 +15,6 @@ import {
 	buildSuggestMessages,
 	MAX_BRIEF_LINKS,
 	MAX_PAGES_READ,
-	MAX_TAKEN_TITLES,
 	pagesToRead,
 	READING_ALLOWANCE,
 	readableHosts,

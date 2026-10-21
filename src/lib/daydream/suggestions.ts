@@ -479,6 +479,13 @@ export function parseSuggestedDaydream(value: unknown): DaydreamPieces | null {
 
 const same = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
+/**
+ * The most titles of the user's other daydreams from the same idea a name
+ * request carries: enough to steer clear of, without the prompt growing for
+ * as long as someone keeps starting the one idea.
+ */
+export const MAX_TAKEN_TITLES = 20;
+
 /** How many ideas one "Suggest daydreams for this" or "More ideas" asks for. */
 export const GENERATED_IDEAS = 6;
 

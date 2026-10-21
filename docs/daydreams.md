@@ -751,6 +751,18 @@ as the `name` suggestion, and saves the answer into the setup through the
 same path as the dials. The page's heading is told the new name directly
 rather than reloading, which would read every turn again.
 
+**Titles already used.** One idea started several times used to leave
+the list with several daydreams called the same. So the request also
+carries `taken`: the titles of the user's other daydreams from the same
+idea, at most `MAX_TAKEN_TITLES`. The same idea means the same library
+idea, or, for one not from the library, the same idea title. Only the
+browser can read a title, so `#takenTitles` fetches every setup, sealed,
+from `GET /api/daydreams` and opens them itself. The prompt says the title
+must differ from those. It may borrow words from the idea's title, and
+where that title is short it may use it with something added that sets
+this daydream apart. If the list cannot be read, the name is asked for
+without it.
+
 It is asked at most once per visit, and never retried: a failure says
 nothing (the idea's title is still standing in) and the next visit asks
 again, and an answer that arrives after the setup gained a name some other

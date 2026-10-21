@@ -532,6 +532,27 @@ export async function readExchanges(
 	};
 }
 
+/**
+ * The user's daydreams, setups sealed, for naming one (`DaydreamStory`'s
+ * `#takenTitles`), or null when they could not be read. Background work
+ * nobody waits on — a name is asked for without them — so a failure is
+ * not reported: a bare `fetch`, caught, rather than `tryFetch`.
+ */
+export async function listDaydreamSetups(): Promise<{ id: string; setup: SealedRefView }[] | null> {
+	try {
+		const response = await fetch('/api/daydreams');
+		if (!response.ok) {
+			return null;
+		}
+		const { daydreams } = (await response.json()) as {
+			daydreams: { id: string; setup: SealedRefView }[];
+		};
+		return daydreams;
+	} catch {
+		return null;
+	}
+}
+
 /** How a daydream was set up, sealed (`setup-exchange.ts`): read only while the raw log is open. */
 export async function readSetupExchanges(
 	daydreamId: string

@@ -55,6 +55,7 @@ import {
 	deleteMark,
 	downloadPicture,
 	estimatePicture,
+	listDaydreamSetups,
 	type PromptMessage,
 	type ReplyRequestBody,
 	readExchanges,
@@ -85,7 +86,7 @@ import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-p
 import { explicitOoc } from './ooc';
 import { type OpenedSetupExchange, openSetupExchanges } from './raw-setup-exchanges.svelte';
 import { suggestName } from './suggest';
-import { MAX_NAMING_OPENING } from './suggestions';
+import { MAX_NAMING_OPENING, MAX_TAKEN_TITLES } from './suggestions';
 import {
 	childrenOf,
 	currentDirections,
@@ -1292,6 +1293,35 @@ export class DaydreamStory {
 	 * retried on a revision conflict either — something else just changed the
 	 * setup, and naming is not worth overwriting it.
 	 */
+	/**
+	 * The titles of the user's other daydreams from the same idea, for the
+	 * name not to repeat: one idea started three times otherwise left three
+	 * daydreams with one title in the list. The same idea is the same library
+	 * idea, or for one not from the library (a ready-made one, or written on
+	 * the spot) the same idea title. Only the browser can open a title, so it
+	 * opens every setup; none at all when the list cannot be read.
+	 */
+	async #takenTitles(setup: DaydreamSetup): Promise<string[]> {
+		const listed = (await listDaydreamSetups()) ?? [];
+		const sameIdea = (other: DaydreamSetup) =>
+			setup.idea.sourceId === null
+				? other.idea.title.trim().toLowerCase() === setup.idea.title.trim().toLowerCase()
+				: other.idea.sourceId === setup.idea.sourceId;
+		const opened = await Promise.all(
+			listed
+				.filter((daydream) => daydream.id !== this.id)
+				.map(async ({ setup: ref }) => {
+					const vault = vaultById(ref.vaultId);
+					return vault ? await openRecord(daydreamSetupKind, { ...ref, vault }) : null;
+				})
+		);
+		return opened
+			.flatMap((other) =>
+				other && sameIdea(other) && other.title.trim() ? [other.title.trim()] : []
+			)
+			.slice(0, MAX_TAKEN_TITLES);
+	}
+
 	nameIfUnnamed(): Promise<string | null> {
 		const { setup } = this;
 		const opening = this.path.find((node) => node.role === 'story');
@@ -1310,6 +1340,7 @@ export class DaydreamStory {
 			ideaDials: setup.idea.dials,
 			characters: setup.characters.map((character) => character.name),
 			opening: opening.slice(0, MAX_NAMING_OPENING),
+			taken: await this.#takenTitles(setup),
 			limits: setup.limits
 		});
 		if (!answer.ok) {
