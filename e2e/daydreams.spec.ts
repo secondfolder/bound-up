@@ -5,6 +5,7 @@ import { test } from './fixtures';
 import {
 	account,
 	clickWaButton,
+	expectComposerAtBottom,
 	fillRichText,
 	fillWaInput,
 	grantFeature,
@@ -167,6 +168,16 @@ async function passageMenu(page: Page, item: string) {
 }
 
 test.describe('daydreams', () => {
+	test('a short story keeps its composer at the bottom of the screen, above the nav', async ({
+		page
+	}) => {
+		await signedUpDreamer(page);
+		await startDaydream(page);
+		await expect(page.getByText('Mara looks up as you come in.')).toBeVisible();
+		await passageSaved(page);
+		await expectComposerAtBottom(page, page.locator('.compose'));
+	});
+
 	test('a daydream opens, answers, keeps its story sealed, and branches when a passage is written again', async ({
 		page
 	}) => {

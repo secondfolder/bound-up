@@ -617,6 +617,23 @@ export function shellScroll(page: Page): Promise<{ top: number; fromEnd: number 
 	});
 }
 
+/**
+ * That `composer` sits at the bottom of the app shell's scrollport, directly
+ * above the nav, however little is above it. A page with less than a screen of
+ * content used to leave its composer just under the content, part-way up.
+ */
+export async function expectComposerAtBottom(page: Page, composer: Locator): Promise<void> {
+	await settle(page);
+	const [box, pane] = await Promise.all([
+		composer.boundingBox(),
+		page.locator('main').boundingBox()
+	]);
+	if (!(box && pane)) {
+		throw new Error('The composer or <main> has no box: is either on the page?');
+	}
+	expect(Math.abs(pane.y + pane.height - (box.y + box.height))).toBeLessThan(2);
+}
+
 /** Scrolls the app shell's scrollport to `top`, as a reader would. */
 export async function scrollShellTo(page: Page, top: number): Promise<void> {
 	await page.evaluate((to) => {

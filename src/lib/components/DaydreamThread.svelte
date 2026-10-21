@@ -713,6 +713,10 @@
 		gap: 0.5rem;
 	}
 
+	/* Grows into whatever a short story leaves of the screen, so the compose
+	   box is always at the bottom, above the nav. Rather than an auto margin on
+	   the box, which would take the place of its own margin, and that margin is
+	   what keeps the last line clear of the fade above it. */
 	.turns {
 		list-style: none;
 		margin: 0;
@@ -720,6 +724,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
+		flex: 1 0 auto;
 	}
 
 	.problem {

@@ -61,12 +61,18 @@
 </section>
 
 <style>
+	/* Fills the pane however short the story is, so the compose box can sit at
+	   its bottom: `flex`, not `min-block-size: 100%`, which counted none of the
+	   hints above the page in <main> and let the box sit wherever the story
+	   ended. The width, because auto margins in <main>'s flex column would
+	   otherwise shrink the column to its content. */
 	.page {
 		max-width: 48rem;
+		inline-size: 100%;
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
-		min-block-size: 100%;
+		flex: 1 1 auto;
 	}
 
 	.content {

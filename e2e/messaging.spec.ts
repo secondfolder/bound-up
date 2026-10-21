@@ -10,6 +10,7 @@ import { sql } from './db';
 import { test } from './fixtures';
 import {
 	clickWaButton,
+	expectComposerAtBottom,
 	fillRichText,
 	linkAccounts,
 	newSide,
@@ -163,6 +164,32 @@ test.describe('a thread', () => {
 			// Jun sees the tapback.
 			await jun.page.reload();
 			await expect(jun.page.getByRole('list', { name: 'Reactions' })).toContainText('🔥');
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+});
+
+test.describe('a short thread', () => {
+	test('keeps its composer at the bottom of the screen, above the nav', async ({ browser }) => {
+		// A phone's screen, where a short thread leaves the most room under it.
+		const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
+		const ada = await newSide(browser, 'Ada', phone);
+		const jun = await newSide(browser, 'Jun');
+		try {
+			await signUp(ada.page, ada.who);
+			await signUp(jun.page, jun.who);
+			await linkAccounts(ada, jun);
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await writeThread(ada.page, 'one line');
+			await expect(ada.page.locator('.messages > li')).toHaveCount(1);
+			await expectComposerAtBottom(ada.page, ada.page.locator('.thread > footer'));
+			// And after coming back to it, rather than straight after writing it.
+			await ada.page.reload();
+			await expect(ada.page.locator('.messages > li')).toHaveCount(1);
+			await expectComposerAtBottom(ada.page, ada.page.locator('.thread > footer'));
 		} finally {
 			await ada.close();
 			await jun.close();
