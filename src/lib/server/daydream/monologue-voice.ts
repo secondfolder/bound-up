@@ -70,18 +70,31 @@ export function monologueExamples(heat: DialValue | null): readonly string[] {
 	return heat !== null && heat >= ADULT_FROM ? ADULT_EXAMPLES : TAME_EXAMPLES;
 }
 
+/** Who speaks with no character set: an unnamed voice, or the user's own inner voice where it fits. */
+const UNNAMED_SPEAKER = {
+	listening:
+		"No speaker is set. Unless the idea suggests one, speak as an unnamed voice with the user listening. Where the idea says so, or would work better as the user's own thoughts, the voice is instead their own inner voice, in the first person as them — but an idea about what someone is or what people believe is no reason on its own.",
+	overheard: 'No speaker is set. Unless the idea suggests one, speak as an unnamed voice.'
+} as const;
+
+/** Who speaks with characters set: one of them, or the user's own inner voice where it fits. */
+const CHARACTER_SPEAKER = {
+	listening:
+		"The speaker is one of the characters in it, below — the first, unless the idea says otherwise — or, where the idea says so or would work better as their own thoughts, the user's own inner voice; anyone else is someone the voice talks about or to.",
+	overheard:
+		'The speaker is one of the characters in it, below — the first, unless the idea says otherwise; anyone else is someone the voice talks about or to.'
+} as const;
+
 /** Who speaks, and where the user stands: left to the setup, with a default for when it says nothing. */
 export function monologueSpeaker(voice: DaydreamVoice, characterCount: number): string {
-	const who =
-		characterCount === 0
-			? 'No speaker is set. Unless the idea suggests one, speak as an unnamed voice with the user listening. Where the idea says so, or would work better as the user’s own thoughts, the voice is instead their own inner voice, in the first person as them — but an idea about what someone is or what people believe is no reason on its own.'
-			: 'The speaker is one of the characters in it, below — the first, unless the idea says otherwise — or, where the idea says so or would work better as their own thoughts, the user’s own inner voice; anyone else is someone the voice talks about or to.';
-	const user =
-		voice.stance === 'absent'
-			? 'The user is not spoken to: they overhear it.'
-			: // Their name, for a persona, is with the rest of this daydream (`describeNarrator`).
-				'Speak to the user as "you" where it fits.';
-	return `${who} Whoever it is stands in for the story's ideas rather than being a character with a life of their own: give them a way of talking, and keep their own history to a touch. ${user}`;
+	// Someone who only overhears has no inner voice in it to speak as.
+	const absent = voice.stance === 'absent';
+	const who = characterCount === 0 ? UNNAMED_SPEAKER : CHARACTER_SPEAKER;
+	const user = absent
+		? 'The user is not spoken to: they overhear it.'
+		: // Their name, for a persona, is with the rest of this daydream (`describeNarrator`).
+			'Speak to the user as "you" where it fits. As their own inner voice it says what they think, as "I", and never speaks to them as "you".';
+	return `${absent ? who.overheard : who.listening} Whoever it is stands in for the story's ideas rather than being a character with a life of their own: give them a way of talking, and keep their own history to a touch. ${user}`;
 }
 
 /** The section that tells the model how to write the monologue, with examples of the form. */
@@ -95,8 +108,8 @@ export function monologueGuide(
 		.join('\n');
 	return `# Writing a monologue
 This is not a story told scene by scene. It is one voice speaking its mind about what this daydream is about — the kinks, tropes and dynamics in the idea below — taking their ideas, the things people into them say and the sayings that go with them, and turning them into statements.
-- Write many short paragraphs. Most open with a statement on a line of its own, in bold — a belief, a rule, a mantra, a confession, something someone into this would say — followed by the voice's own words on it: a few sentences, or a longer run when the idea has more in it — what it means to them, why it gets to them, where it shows up in their day.
-- Ground it in everyday life where it fits: the voice catches the idea at work on the bus, at a café table, in a meeting, in bed, so it reads as something lived with rather than recited.
+- Write short paragraphs, as many as the length below allows. Most open with a statement on a line of its own, in bold — a belief, a rule, a mantra, a confession, something someone into this would say — followed by the voice's own words on it: a few sentences, or a longer run when the idea has more in it — what it means to them, why it gets to them, where it shows up in their day.
+- Ground it in everyday life where it fits: the voice catches the idea at work, on the bus, at a café table, in a meeting, in bed, so it reads as something lived with rather than recited.
 - Keep each statement short enough to land: a sentence, rarely two.
 - Every statement says something new. Never repeat one or reword one already made; build on an idea, go deeper into it or turn it instead.
 - Write in the first person, in the voice's own way of talking.

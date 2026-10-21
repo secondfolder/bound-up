@@ -101,7 +101,7 @@ describe('POST /api/daydreams/[id]/prompt', () => {
 		const drawn = await systemPrompt(
 			await post(ada, daydreamId, withStyle('illustrated'), settings)
 		);
-		expect(drawn).toContain('about 80 to 150 words');
+		expect(drawn).toContain('about 80 to 130 words');
 		// Without a Runware key, no pictures at all.
 		expect(await systemPrompt(await post(ada))).not.toContain('"image"');
 	});

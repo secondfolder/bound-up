@@ -40,6 +40,21 @@ const TELLING = `# Telling the story
 - A character's description is who they are, not lines to recite. Bring in their background, tastes and history only where they fit the moment.
 - If the story stalls, bring in a detail, a question or a change that gets it moving.`;
 
+/**
+ * How the system tells its story. The storytelling lines in `TELLING` —
+ * "room for tension, quiet moments and small talk", "bring in their
+ * background" — are narration the system's guide forbids, so it gets its
+ * own: pace is how long it waits between instructions, and its
+ * functionaries show who they are only in what procedure lets them do.
+ */
+const IMPERSONAL_TELLING = `# Telling the story
+- Carry on from exactly where the last passage ended. Never retell or summarise what already happened.
+- Keep strict continuity: every rule issued, every infraction recorded, where the user is and what has been done.
+- Match the build-up to what the user wants. A slow pace means fewer, longer waits between instructions, not small talk; a fast pace, a high heat or kink, or a user pushing for it means getting to it quickly.
+- Follow the user's lead on what the system is about, and vary it: do not fixate on one rule, act or kink when the setup offers more.
+- Functionaries show their description only in what they do and the few words procedure allows.
+- If it stalls, issue a new rule, an inspection or a change to the schedule.`;
+
 const MONOLOGUE_TELLING = `# Keeping the monologue going
 - Carry on from exactly where the last passage ended. Never repeat or sum up what the voice already said.
 - Keep the voice consistent: who is speaking, who to, and how they talk, from the first passage to the last.
@@ -52,6 +67,16 @@ const PROSE = `# Writing the prose
 - Be concrete. Say what a thing physically is and does rather than what it is like: prefer plain physical description to metaphor and simile, and plain words to flowery ones.
 - Write the senses: skin's flush, warmth and texture; weight, sway and movement; breath, sounds and the voice someone says a thing in.`;
 
+/**
+ * A monologue's sex, in its own form: "spend most of the passage on the
+ * sex… how things stretch, fill" asked for a sex scene, which a monologue
+ * with "little or no scene" cannot be. Its statements are as explicit as
+ * the heat allows, and bodies come in as the voice talks about them.
+ */
+const MONOLOGUE_SEX_LINES = `- The point is to turn the user on. The statements, and what the voice says about them, are as explicit as the heat allows.
+- Prefer crude, everyday words for bodies and acts to clinical ones and euphemisms — cock, dick, pussy, cunt, ass, tits, nipples, cum rather than penis, vulva, semen, glutes, areola, breasts or cleavage — unless the voice would not talk that way.
+- Bodies and acts come in as the voice talks about them — what it wants done, remembers or pictures, in plain physical detail — not as a scene unfolding.`;
+
 /** Explicit and up: sex on the page in detail, which is what these lines are for. */
 const EXPLICIT_FROM: DialValue = 4;
 
@@ -61,25 +86,29 @@ const SEX_LINES = `- The point is to turn the user on. Spend most of the passage
 - Put moans, gasps and dirty talk in the characters' mouths where they fit them. The sound of a deepthroated cock is <sound>gluck</sound>.
 - A scene about degradation or humiliation can be written cruder still, where that suits the characters and the story.`;
 
-function sexGuide(heat: DialValue | null): string | null {
+function sexGuide(heat: DialValue | null, lines: string): string | null {
 	if (heat === null) {
-		return `# Writing sex\nIf the story turns sexual and is written explicitly, write it like this:\n${SEX_LINES}`;
+		return `# Writing sex\nIf it turns sexual and is written explicitly, write it like this:\n${lines}`;
 	}
 	if (heat < EXPLICIT_FROM) {
 		return null;
 	}
-	return `# Writing sex\n${heat === 5 ? 'Hold nothing back: graphic, visceral, filthy, within the user’s limits.\n' : ''}${SEX_LINES}`;
+	return `# Writing sex\n${heat === 5 ? "Hold nothing back: graphic, visceral, filthy, within the user's limits.\n" : ''}${lines}`;
 }
 
 /** The sections on how a passage is written, for one setup's voice and heat. */
 export function writingGuide(voice: DaydreamVoice, heat: DialValue | null): string {
 	if (voice.narrator === 'impersonal') {
-		return TELLING;
+		return IMPERSONAL_TELLING;
 	}
 	// A monologue has no scene to write prose about, but its sex is still
-	// written in plain, crude words.
+	// written in plain, crude words, in its own form.
 	if (voice.narrator === 'monologue') {
-		return [MONOLOGUE_TELLING, sexGuide(heat)].filter((section) => section !== null).join('\n\n');
+		return [MONOLOGUE_TELLING, sexGuide(heat, MONOLOGUE_SEX_LINES)]
+			.filter((section) => section !== null)
+			.join('\n\n');
 	}
-	return [TELLING, PROSE, sexGuide(heat)].filter((section) => section !== null).join('\n\n');
+	return [TELLING, PROSE, sexGuide(heat, SEX_LINES)]
+		.filter((section) => section !== null)
+		.join('\n\n');
 }

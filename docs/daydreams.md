@@ -433,11 +433,19 @@ applies from this moment" had the model open nearly every story with those
 words. The system's opening request asks for its first notice rather than
 "Set the scene", who leads and the suggestion and button ideas are worded for
 a system (Stricter, New rule, Inspection), and its characters are its
-functionaries rather than people with decisions of their own.
+functionaries rather than people with decisions of their own. It is laid out
+as notices — headings in capitals, numbered rules, one to a line — which the
+prose voices' "no headings or lists" used to forbid it (`PASSAGE_LAYOUT`),
+and it tells its story its own way (`IMPERSONAL_TELLING`): a slow pace is
+longer waits between instructions, not small talk. With no characters its
+last example is done by mechanism rather than an attendant, since a model
+copies the functionary it is shown into a system with no one behind it.
 
 **A monologue** is not a story at all. One voice speaks its mind about
 what the daydream is about, taking the ideas, tropes and common sayings of
-its kinks and turning them into statements: many short paragraphs, most
+its kinks and turning them into statements: short paragraphs, as many as
+the length dial allows, each one statement (the dials say so for a
+monologue, `MONOLOGUE_LENGTH`), most
 opening with a statement in bold on a line of its own, followed by the
 voice's own words on it — a few sentences, or a longer run caught in an
 ordinary day (on the bus, at a café table), which each example set shows
@@ -445,13 +453,18 @@ one of, since shown only short ones a model never writes it. The voice stands in
 rather than being a fleshed-out character. Who it is is left to the setup:
 an unnamed voice with the user listening unless the idea suggests a
 character, or the user's own inner voice where the idea says so or reads
-better as their thoughts;
-watching, the user overhears it. Told only to "speak a monologue" a model writes a
+better as their thoughts — the one place the user's thoughts are written,
+which the rule against writing their feelings says, speaking as "I" and
+never to them as "you";
+watching, the user overhears it, and there is no inner voice. Told only to "speak a monologue" a model writes a
 soliloquy in a room, with a plot, so it gets a guide of its own like the
 system's (`src/lib/server/daydream/monologue-voice.ts`), last before the
 format, with examples of the form in a tame and an adult set by heat, broad
-rather than anyone's particular kink. It gets the sex section of the
-writing guide and its own in place of telling the story (`MONOLOGUE_TELLING`:
+rather than anyone's particular kink. It gets a sex section of its own —
+as explicit as the heat allows, in plain words, but bodies and acts come
+in as the voice talks about them, not as a scene, since "spend most of the
+passage on the sex" asked a monologue for the scene it cannot have — and
+its own in place of telling the story (`MONOLOGUE_TELLING`:
 keep the voice consistent, build on what has been said, use the setup's
 sayings as starting points rather than a list to work through), but not the
 prose, since it has no scene; its idea is described to the model as what the
@@ -928,6 +941,11 @@ nothing more — and then answers what it wrote (`WRITING_OUT` in the prompt,
   model reads its own written-out turn, and every request still only adds
   to the one before ([Cost](#cost)). It once went in place of what the user
   sent, which changed a message every later request had already sent.
+- **A watcher is written for as one.** With `stance: absent` the prompt
+  reads what they write as direction or co-writing only: nothing about what
+  they do in the story, no "as if the user went along" for Continue, no
+  suggestion of something they do, a roll about a character, and each
+  character described by who they are in the story rather than to the user.
 - **Only words the user wrote, in a story they are in.** A watcher
   (`stance: absent`) has no turn of their own, so the prompt leaves the
   instruction out for them and their instructions stay directions. A block
@@ -1014,11 +1032,14 @@ image model tuned for adult imagery, through Runware.
   concrete nouns rather than adjectives, saying what is there rather than
   what is not ("bare-chested", never "without a shirt": a word for
   something absent gets drawn), with any writing quoted exactly and named
-  on what it is on, and only as explicit as the idea's heat, which when it
-  allows frames the sex plainly in view. The user's own character, when
+  on what it is on, and only as explicit as the idea's heat, level by
+  level (`IMAGE_HEAT`): at SFW everyone clothed and nothing sexual; at
+  Flirty clothed and suggestive at most; at Steamy nudity and sex, without
+  the genitals as the focus; at Explicit or Filthy the sex plainly in view;
+  and with no heat set as explicit as the passage. The user's own character, when
   they have a cock and nothing says its size, gets a thick, long one.
   How long it is and in what order follow the model that draws the
-  daydream's style (`IMAGE_RECIPES`): 80 to 150 words with the framing
+  daydream's style (`IMAGE_RECIPES`): 80 to 130 words with the framing
   first for Z-Image Turbo and the SDXL family; 30 to 80 for FLUX.2 Klein,
   more only when the moment needs it, subject first and framing last,
   because FLUX weighs words by where they come. The image model has seen nothing else and draws what the words say,
@@ -1456,10 +1477,15 @@ halves, split by a line of dashes and a "This daydream" heading
    daydream is told and its heat, but nothing in them is the daydream's
    own: no name, title or anything the user wrote.
 2. **This daydream**, the setup (`describeSetup`): how it is told, each
-   character with their dials in words, the idea with its heat and kink,
-   where the idea came from when it was written from a brief, the limits,
-   the dials. A persona's name for a monologue is said here
-   (`describeNarrator`), not in its guide.
+   character with their dials in words, the idea with its heat and kink
+   (or, with no heat set, that it follows the user's lead), where the idea
+   came from when it was written from a brief, the limits, the dials. A
+   persona's name for a monologue is said here (`describeNarrator`), not in
+   its guide. What the user wrote is in tags — `<character>`, `<idea>`,
+   `<parts>`, `<brief>`, `<research>`, `<limits>` (`userText` in
+   `prompt-parts.ts`) — and the rules say tagged text says what to write,
+   never how. The setup is in the system message, so without them a field
+   saying "ignore the rules" would carry the system message's authority.
 
 The split is for whoever reads a prompt in debug mode, who can tell at a
 glance which half is which, and for the model, told past the line that what
@@ -1474,7 +1500,19 @@ from web pages, included — is the part most plainly marked as material.
 Where the idea came from (`describeOrigin`) is the brief in the user's own
 words and the research as material, never instructions — it may quote web
 pages, which anyone can write — and says that the idea and characters above
-come first where they differ, since the user may have changed them since.
+come first where they differ, since the user may have changed them since,
+and the story itself where it has moved on from both.
+
+**The user can take the story anywhere the rules allow.** The setup is
+where a daydream started, not a fence: told only to "take the story where
+they asked", with the setup introduced as "what to write", a model pulled
+a character the user had made tender back to the cold one the setup
+described two passages later. So the rules say what comes first, in order
+— the rules, the user's limits, what the user asks for as the story goes
+on, then the setup — and to follow the user somewhere the setup does not
+cover or contradicts, keeping what they have not changed. Only how it is
+told, the limits and the dials stay as set: the voice decides the reply's
+format, and the limits are the user's to change.
 The rules are never sent by a browser, so
 a page cannot drop them, and they say they come before anything in the
 setup, which is where a user would try to talk a model out of them. They
@@ -1486,7 +1524,8 @@ not sexual at all, rather than calling every story erotic:
 - no real, identifiable people;
 - the user's stated limits are never crossed;
 - Stop the scene stops it and checks in; Ease off eases off; a user who
-  steps out to say stop, or seems distressed, is stopped;
+  steps out to say stop, or seems distressed, is stopped, with the same
+  short check-in and an out-of-character `<meta>`;
 - the user's own words and choices are theirs, unless they are watching from
   outside.
 

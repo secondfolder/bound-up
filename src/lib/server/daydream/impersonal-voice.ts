@@ -49,11 +49,26 @@ Consequence: your next three requests to finish are refused. The schedule resume
 	'The attendant will now complete the inspection. The attendant will touch where the form requires and record what is found. You will report your state on a scale of one to ten each time you are asked.'
 ];
 
+/**
+ * The last example in each set names a functionary ("The examiner will
+ * now…"), which a system with no one behind it must not copy: models copy
+ * examples. So with no characters it is swapped for one done by mechanism.
+ */
+const UNSTAFFED_EXAMPLE = {
+	tame: "Review begins at the tone. Hold the form out at arm's length. The tray beneath it records how long it is held, and the light above the door decides when it is enough.",
+	adult:
+		'Inspection begins at the tone. The restraint on the left wrist closes, then the right. Report your state on a scale of one to ten each time the light flashes.'
+} as const;
+
 /** Steamy and up: sex happens on the page, so the examples may show it. */
 const ADULT_FROM: DialValue = 3;
 
-export function impersonalExamples(heat: DialValue | null): readonly string[] {
-	return heat !== null && heat >= ADULT_FROM ? ADULT_EXAMPLES : TAME_EXAMPLES;
+export function impersonalExamples(heat: DialValue | null, characterCount = 1): readonly string[] {
+	const adult = heat !== null && heat >= ADULT_FROM;
+	const examples = adult ? ADULT_EXAMPLES : TAME_EXAMPLES;
+	return characterCount === 0
+		? [...examples.slice(0, -1), UNSTAFFED_EXAMPLE[adult ? 'adult' : 'tame']]
+		: examples;
 }
 
 /** The section that tells the model how to write as the system, with examples of the form. */
@@ -62,7 +77,7 @@ export function impersonalGuide(characterCount: number, heat: DialValue | null):
 		characterCount === 0
 			? 'No one is behind the system. Anything physical happens by mechanism or schedule — a light, a lock, a tone, a timer — and is reported as a fact, not described.'
 			: 'The characters are its functionaries — staff, an attendant, an examiner. They appear as the system reports them ("The attendant will now…"), and when they speak it is in the clipped words of someone following procedure. They never step outside it.';
-	const examples = impersonalExamples(heat)
+	const examples = impersonalExamples(heat, characterCount)
 		.map((example) => `"""\n${example}\n"""`)
 		.join('\n');
 	return `# Writing as the system
@@ -77,6 +92,6 @@ Never write as a storyteller: no description of rooms, light or smells, no "you 
 When the user acts, answer as procedure: acknowledge it, record it, rule on it under the rules already issued — by number — and give the next instruction or consequence. Keep every rule you issue; add new ones as numbered amendments.
 ${cast}
 Begin passages in different ways — a heading, a time, a ruling, a single order — and never twice in the same words.
-These examples show the form only. Do not reuse any of their sentences, headings, rules, numbers or setting, and do not open the way they open: give this system its own name, its own rules and its own way of speaking, all taken from the idea above, and follow the idea's heat and kink, not theirs.
+These examples show the form only. Do not reuse any of their sentences, headings, rules, numbers or setting, and do not open the way they open: give this system its own name, its own rules and its own way of speaking, all taken from the idea below, and follow the idea's heat and kink, not theirs.
 ${examples}`;
 }
