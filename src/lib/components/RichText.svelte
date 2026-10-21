@@ -4,7 +4,8 @@
 		type CachedEmbedDetails,
 		embedErrorDetails,
 		embedSpecFor,
-		fetchEmbedDetailsResult
+		fetchEmbedDetailsResult,
+		isSafeHttpUrl
 	} from '$lib/embeds';
 	import {
 		documentEmbedUrls,
@@ -222,12 +223,18 @@
 				onActivate={onEmbedActivated}
 				onRefresh={onRefreshEmbed}
 			/>
-		{:else}
+		{:else if isSafeHttpUrl(block.url)}
 			<!-- An embed whose provider we no longer support. It degrades to the
-			     link it was made from rather than vanishing. -->
+			     link it was made from rather than vanishing. Only an http(s) one:
+			     the schema does not check the scheme, so a document a partner
+			     crafted by hand could carry a `javascript:` URL here, and this is
+			     the one place an embed's URL becomes an `href` without a provider
+			     having matched it first. -->
 			<p>
 				<a href={block.url} target="_blank" rel="noopener noreferrer ugc">{block.url}</a>
 			</p>
+		{:else}
+			<p>{block.url}</p>
 		{/if}
 	{/if}
 {/each}

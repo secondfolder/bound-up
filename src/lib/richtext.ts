@@ -111,9 +111,12 @@ export type RichTextDocument = { root: { type: 'root'; children: RichTextBlockNo
  *    stored, which is the same guarantee as not registering it in the editor,
  *    enforced on the other side.
  *
- * URLs are checked with `isSafeHttpUrl` by the caller
- * (`parseRichTextDocument`), which cannot be done here without making this
- * module depend on `embeds.ts`.
+ * URLs are not checked here, which cannot be done without making this module
+ * depend on `embeds.ts`. A stored document may carry any scheme — a sealed one
+ * is written by a partner's browser, which need not be this app's — so every
+ * place a URL becomes an `href` checks it with `isSafeHttpUrl` first
+ * (`RichTextInline.svelte`, and the fallback link in `RichText.svelte`), and
+ * an embed's URL reaches a provider only through `embedSpecFor`.
  */
 const textNodeSchema = z.object({
 	type: z.literal('text'),
