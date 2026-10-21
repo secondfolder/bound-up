@@ -25,6 +25,7 @@
 		selected,
 		onBookmark,
 		onNotThis,
+		onRawLog,
 		debug = false
 	}: {
 		story: DaydreamStory;
@@ -41,7 +42,12 @@
 		selected: Quote | null;
 		onBookmark: (turnId: string, quote: Quote | null) => void;
 		onNotThis: (turnId: string, quote: Quote) => void;
-		/** Debug mode is on on this device: a picture shows what it was made from when tapped. */
+		/** Opens this passage's raw log by itself; offered in debug mode only. */
+		onRawLog?: (turnId: string) => void;
+		/**
+		 * Debug mode is on on this device: a picture shows what it was made
+		 * from when tapped, and the menu offers the passage's raw log.
+		 */
 		debug?: boolean;
 	} = $props();
 
@@ -86,6 +92,9 @@
 				break;
 			case 'from-here':
 				void story.rewindTo(node.id);
+				break;
+			case 'raw-log':
+				onRawLog?.(node.id);
 				break;
 			default:
 				break;
@@ -167,6 +176,12 @@
 					<wa-dropdown-item value="from-here" disabled={story.busy}>
 						<wa-icon slot="icon" name="code-branch" variant="solid"></wa-icon>
 						Carry on from here
+					</wa-dropdown-item>
+				{/if}
+				{#if debug && onRawLog}
+					<wa-dropdown-item value="raw-log">
+						<wa-icon slot="icon" name="code" variant="solid"></wa-icon>
+						Raw log
 					</wa-dropdown-item>
 				{/if}
 			</wa-dropdown>

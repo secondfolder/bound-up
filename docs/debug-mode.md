@@ -213,6 +213,17 @@ This is a "Raw log" switch in a daydream's tool row, remembered on the device
 in `localStorage`. While it is on, the branch being read is drawn as what
 happened between the daydream and the model, not as the story.
 
+#### One passage's raw log
+
+In debug mode, each passage's menu also has "Raw log", which opens that
+passage alone in a drawer (`DaydreamRawPassage`), drawn exactly as the
+switch would draw it (`DaydreamRawNode`, which both use): its exchange —
+what was sent, the reasoning, the reply as it arrived, its metadata — the
+turn as stored, and any request after it that failed. It reads that
+passage's exchange and the one before it, for the history comparison, and
+nothing else, so a long story does not have to be loaded whole to look at
+one reply. The switch does not have to be on, and is left as it was.
+
 #### Exchanges
 
 Every request a daydream makes to the model — an opening, a reply, a

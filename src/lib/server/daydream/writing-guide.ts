@@ -10,8 +10,9 @@ import type { DaydreamVoice, DialValue } from '$lib/daydream';
  * Each line answers something the default model does: it pads a passage
  * with scenery that moves nothing ("the neon sign buzzes like a dying
  * firefly"), reaches for metaphor where the reader wanted the thing itself,
- * recites a character's description back, retells the passage before, and
- * paces every story alike — taking its time over a run-up the user set the
+ * recites a character's description back, retells the passage before,
+ * writes the same beat again in new words when the user only says Continue,
+ * and paces every story alike — taking its time over a run-up the user set the
  * dials to skip, or escalating a slow one until there is nowhere left to go.
  *
  * Two halves. How to tell the story holds for every voice, the system's
@@ -34,6 +35,7 @@ import type { DaydreamVoice, DialValue } from '$lib/daydream';
 
 const TELLING = `# Telling the story
 - Carry on from exactly where the last passage ended. Never retell or summarise what already happened.
+- Before writing, read the last passage again, and make sure this one does not repeat it: not the same beat, the same act described again in other words, the same lines of dialogue or the same shape of passage. Something should happen or change. Repeat on purpose only when the user asks for it or the story calls for it, like a ritual done again.
 - Keep strict continuity: where everyone is, what they are wearing, what has been done and said, what was agreed, and how the characters stand with each other.
 - Match the build-up to what the user wants. A slow pace, or a story that is not mainly about sex or kink, has room for tension, quiet moments and small talk, and not every passage has to escalate. A fast pace, a high heat or kink, or a user pushing for it means getting to it quickly, without a long run-up.
 - Follow the user's lead on what the story is about, and vary it: do not fixate on one theme, act or kink when the setup offers more.
@@ -49,6 +51,7 @@ const TELLING = `# Telling the story
  */
 const IMPERSONAL_TELLING = `# Telling the story
 - Carry on from exactly where the last passage ended. Never retell or summarise what already happened.
+- Before writing, read the last passage again, and try to avoid repeating the same content: either the same notice reissued, the same rules in other words or the same shape of passage. Aim to have something issued, enforced or changed. A routine can recur, as procedure does, but say what is different this time; repeat outright only when the user asks for it or if done deliberately for effect.
 - Keep strict continuity: every rule issued, every infraction recorded, where the user is and what has been done.
 - Match the build-up to what the user wants. A slow pace means fewer, longer waits between instructions, not small talk; a fast pace, a high heat or kink, or a user pushing for it means getting to it quickly.
 - Follow the user's lead on what the system is about, and vary it: do not fixate on one rule, act or kink when the setup offers more.
@@ -57,6 +60,7 @@ const IMPERSONAL_TELLING = `# Telling the story
 
 const MONOLOGUE_TELLING = `# Keeping the monologue going
 - Carry on from exactly where the last passage ended. Never repeat or sum up what the voice already said.
+- Before writing, read the last passage again, and try to avoid repeating it: either the same statements, or the same idea in other words. Return to a refrain on purpose only when the user asks for it or if done deliberately for effect, and then aim to take it further.
 - Keep the voice consistent: who is speaking, who to, and how they talk, from the first passage to the last.
 - Build on what has been said: go further into an idea, take it somewhere new, or turn to one that goes with it, so each passage says more than the last.
 - Follow the user's lead on what it dwells on, and vary it: do not fixate on one idea when the setup offers more.

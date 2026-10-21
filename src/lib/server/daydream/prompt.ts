@@ -558,10 +558,14 @@ function steeringIdeas(
  * since none of these models take weight syntax. The last line about the
  * user's cock is the user's own preference, from that prompt.
  *
- * A picture is skipped when little has visibly changed since the last one:
- * a second picture of the same moment costs a request and shows nothing
- * new. The model can judge that because each past passage goes back with
- * the description it wrote (`passageAsSent`).
+ * A picture is never a second one of the same moment: it costs a request and
+ * shows nothing new. Told only to skip one when little had changed, a model
+ * still drew much the same picture passage after passage, since every
+ * passage of one scene has the same people in the same place; so it is told
+ * to find the last description and compare against it first, and when they
+ * match, to look for something else in the passage to draw before leaving
+ * the picture out. The model can do that because each past passage goes
+ * back with the description it wrote (`passageAsSent`).
  */
 /**
  * How long a description is, and in what order, for the model that draws it.
@@ -623,9 +627,9 @@ const IMAGE_WHEN = {
  */
 const IMAGE_OF = {
 	story:
-		'It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the passage is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the passage to see. Leave it out, too, when little a camera could see has changed since the last passage that had one (its "image" is in that passage\'s metadata): the same people, in the same place and much the same pose, doing much the same thing — another picture of it would show nothing new. A new act, position, place, person or outfit is a change worth one. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.',
+		'It is a picture of one moment in the passage, shown to the user beside it: usually the moment it ends on, but the most striking one in it if that came earlier — when the passage is sexual, the hottest. Leave it out when a picture would make no sense: a check-in or an aside out of the story, or nothing in the passage to see. Before writing one, find the most recent "image" in the metadata of an earlier passage and compare yours with it: if both show the same people in the same place, in much the same pose, doing much the same thing, they are the same picture, however differently worded. Then look for something else in this passage worth picturing that would look different — an earlier moment, another act or position, another person, a detail the passage dwells on, or a different framing that brings it into view — and picture that instead. If nothing in it would look different, leave "image" out. A passage that is mostly talk still has people in a place, and gets one if they look different from the last picture.',
 	monologue:
-		'Picture the most striking thing the passage describes or imagines — when it is sexual, the hottest — shown to the user beside it. Leave it out in a check-in or an aside out of the monologue, and when nothing new is pictured since the last passage that had one (its "image" is in that passage\'s metadata).'
+		'Picture the most striking thing the passage describes or imagines — when it is sexual, the hottest — shown to the user beside it. Leave it out in a check-in or an aside out of the monologue. Before writing one, find the most recent "image" in the metadata of an earlier passage and compare yours with it: if both show much the same people doing much the same thing, they are the same picture, however differently worded. Then picture something else this passage describes or imagines that would look different, or, if there is nothing, leave "image" out.'
 } as const;
 
 /**

@@ -26,10 +26,10 @@
 	import DaydreamPassage from './DaydreamPassage.svelte';
 	import DaydreamPicturesControl from './DaydreamPicturesControl.svelte';
 	import DaydreamRawExchange from './DaydreamRawExchange.svelte';
-	import DaydreamRawSent from './DaydreamRawSent.svelte';
+	import DaydreamRawNode from './DaydreamRawNode.svelte';
+	import DaydreamRawPassage from './DaydreamRawPassage.svelte';
 	import DaydreamRawSetup from './DaydreamRawSetup.svelte';
 	import DaydreamRawSystem from './DaydreamRawSystem.svelte';
-	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
 	import DaydreamRollCard from './DaydreamRollCard.svelte';
 	import DaydreamSafety from './DaydreamSafety.svelte';
 	import DaydreamSettingsNote from './DaydreamSettingsNote.svelte';
@@ -382,6 +382,9 @@
 	let notThis: { turnId: string; quote: Quote } | null = $state(null);
 	let showBranches = $state(false);
 	let showBookmarks = $state(false);
+	/** The passage whose raw log is open by itself, from its menu in debug mode. */
+	let rawOf: string | null = $state(null);
+	const rawOfNode = $derived(rawOf ? (story.index.byId.get(rawOf) ?? null) : null);
 	let dialsProblem: string | null = $state(null);
 
 	// ── the composer ─────────────────────────────────────────────────────────
@@ -515,34 +518,14 @@
 		<!-- `shownPath`: a passage written again arrives in the old one's place. -->
 		{#each story.shownPath as node (node.id)}
 			{#if rawLog}
-				{#if node.role === 'story'}
-					{const exchange = $derived(exchanges.forTurn(node.id))}
-					{#if exchange}
-						{const before = $derived(previousPassage.get(node.id))}
-						<DaydreamRawExchange
-							{exchange}
-							previous={before ? (exchanges.forTurn(before.id) ?? null) : null}
-						/>
-					{:else if exchange === null}
-						<DaydreamRawSent
-							{story}
-							{conversation}
-							{node}
-							previous={previousPassage.get(node.id) ?? null}
-							system={rawSystem}
-						/>
-					{:else}
-						<li class="raw-loading"><wa-spinner></wa-spinner></li>
-					{/if}
-				{/if}
-				<DaydreamRawTurn {story} {node} exchanged={Boolean(exchanges.forTurn(node.id))} />
-				{#each exchanges.failedAfter(node.id) as failed (failed.id)}
-					{const before = $derived(node.role === 'story' ? node : previousPassage.get(node.id))}
-					<DaydreamRawExchange
-						exchange={failed}
-						previous={before ? (exchanges.forTurn(before.id) ?? null) : null}
-					/>
-				{/each}
+				<DaydreamRawNode
+					{story}
+					{node}
+					{exchanges}
+					{conversation}
+					previous={previousPassage.get(node.id) ?? null}
+					system={rawSystem}
+				/>
 			{:else if node.role === 'story'}
 				<DaydreamPassage
 					{story}
@@ -560,6 +543,9 @@
 					onNotThis={(turnId, quote) => {
 						notThis = { turnId, quote };
 						selection = null;
+					}}
+					onRawLog={(turnId) => {
+						rawOf = turnId;
 					}}
 				/>
 				<DaydreamSettingsNote {story} turnId={node.id} />
@@ -676,6 +662,19 @@
 		<DaydreamBranchMap {story} onclose={() => {
 			showBranches = false;
 		}} onjump={scrollToTurn} />
+	{/if}
+	{#if rawOfNode && debug}
+		<DaydreamRawPassage
+			{story}
+			node={rawOfNode}
+			{exchanges}
+			{conversation}
+			previous={previousPassage.get(rawOfNode.id) ?? null}
+			system={rawSystem}
+			onclose={() => {
+			rawOf = null;
+		}}
+		/>
 	{/if}
 	{#if showBookmarks}
 		<DaydreamBookmarks {story} onclose={() => {

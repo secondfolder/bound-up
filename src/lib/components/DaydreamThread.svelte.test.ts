@@ -2016,6 +2016,60 @@ describe('DaydreamThread in debug mode', () => {
 		expect(container.textContent).not.toContain('Raw reply not recorded');
 	});
 
+	it('opens one passage’s raw log from its menu, without switching the thread to the raw log', async () => {
+		localStorage.removeItem('daydreams.raw-log');
+		opened.set('x3', {
+			endpoint: 'chat/completions',
+			request: Request,
+			response: { status: 200, body: Stream },
+			ended: 'done',
+			startedAt: 0,
+			endedAt: 2000
+		});
+		client.readExchanges.mockResolvedValue({
+			ok: true,
+			exchanges: [
+				{ id: 'x3', turnId: 't3', parentTurnId: 't2', createdAt: new Date(), sealed: ref('x3') }
+			]
+		});
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', { type: 'text', text: 'Sit.' }),
+				turn('t2', 't1', 'user', 'I sit.'),
+				turn('t3', 't2', 'story', { type: 'text', text: 'Mara looks up.', meta: meta() })
+			]),
+			available: true,
+			debug: true
+		});
+		await waSettled(container);
+		// Nothing is read until it is asked for.
+		expect(client.readExchanges).not.toHaveBeenCalled();
+		const menu = container.querySelector(
+			'li.passage[data-turn-id="t3"] wa-dropdown'
+		) as HTMLElement;
+		const [raw] = waByProp(menu, 'wa-dropdown-item', 'value', 'raw-log');
+		menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: raw } }));
+
+		const drawer = () => container.querySelector('wa-drawer.raw-passage');
+		await waitFor(() => expect(drawer()?.querySelector('[data-exchange-for="t3"]')).not.toBeNull());
+		// This passage and the one before it, to compare histories against: not the whole branch.
+		await waitFor(() => expect(drawer()?.textContent).toContain('Slowly.'));
+		expect(client.readExchanges).toHaveBeenCalledWith('d1', ['t1', 't3']);
+		expect(drawer()?.textContent).not.toContain('Raw reply not recorded');
+		// The thread itself is still drawn as the story.
+		expect(container.querySelector('li.passage[data-turn-id="t3"]')).not.toBeNull();
+	});
+
+	it('offers a passage’s raw log only in debug mode', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([turn('t1', null, 'story', 'Sit.')]),
+			available: true
+		});
+		await waSettled(container);
+		const menu = container.querySelector('li.passage wa-dropdown') as HTMLElement;
+		expect(waByProp(menu, 'wa-dropdown-item', 'value', 'raw-log')).toEqual([]);
+	});
+
 	it('exports the whole story, every branch, opened, as a file', async () => {
 		const blobs: Blob[] = [];
 		const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {

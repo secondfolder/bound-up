@@ -1134,9 +1134,16 @@ image model tuned for adult imagery, through Runware.
   so it gets no names, no "you", and nothing a camera could not see: a
   story's names and feelings only crowd out what it can draw, and a head
   count left unsaid grew a stranger in the frame. It is left out
-  where a picture makes no sense, never in a check-in, and when little a
-  camera could see has changed since the last passage that had one — a
-  second picture of the same moment costs a request and shows nothing new.
+  where a picture makes no sense, and never in a check-in. It is never a
+  second picture of the same moment, which costs a request and shows
+  nothing new: told only to skip one when little had changed, the model
+  still drew much the same picture passage after passage, since every
+  passage of a scene has the same people in the same place. So it is told
+  to find the most recent description in the history (each passage goes
+  back with its own, `passageAsSent`) and compare first; when the two
+  match, to picture something else in the passage that would look
+  different — an earlier moment, another act, person or framing — and only
+  when there is nothing, to leave the picture out.
   A monologue's is judged differently: it has no moment of its own, and
   asked for one anyway the model drew the speaker at a café table looking
   out of a window — SFW beside a filthy passage, and nothing the daydream is
@@ -1654,7 +1661,11 @@ to itself.
 
 - **Telling the story**, for every voice but a monologue, which has its own
   lines on keeping its ideas moving (`MONOLOGUE_TELLING`): carry on from where the last
-  passage ended without retelling it; keep strict continuity; match the
+  passage ended without retelling it; read the last passage again and do
+  not write the same beat over in new words — given Continue, the model
+  did — unless the user asks for it or the story calls for it (a ritual
+  done again; a system's routine, which says what is different this time;
+  a monologue's refrain, taken further); keep strict continuity; match the
   build-up to what the user wants — a slow or less sexual story has room
   for quiet moments, a fast, hot or kinky one, or a user pushing for it,
   gets there quickly; follow the user's lead and vary the themes rather

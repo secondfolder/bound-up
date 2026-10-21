@@ -348,6 +348,7 @@ describe('buildMessages', () => {
 			'looking out of a window or going about their day is not worth a picture'
 		);
 		expect(monologue).not.toContain('include it in most replies');
+		expect(monologue).toContain('find the most recent "image"');
 	});
 
 	it('asks for a picture of each passage only on a server that makes them', () => {
@@ -355,8 +356,11 @@ describe('buildMessages', () => {
 			buildMessages(request({ turns: [said('hi')] }), { pictures: 'z-image-turbo' })
 		);
 		expect(withPictures).toContain('"image": include it in most replies');
-		// No point drawing the same thing twice.
-		expect(withPictures).toContain('little a camera could see has changed since the last');
+		// No point drawing the same thing twice: it checks the last description
+		// first, looks for something else to draw, and only then leaves it out.
+		expect(withPictures).toContain('find the most recent "image"');
+		expect(withPictures).toContain('they are the same picture, however differently worded');
+		expect(withPictures).toContain('picture that instead. If nothing in it would look different');
 		expect(withPictures).toContain('"image": "..."');
 		expect(withPictures).toContain('an adult age as a number');
 		// The image model has seen nothing else, so it is told nothing it cannot draw.
@@ -637,6 +641,15 @@ describe('how a passage is written', () => {
 		expect(content).not.toContain('End every passage');
 		expect(content).toContain('never pad with atmosphere');
 		expect(content).toContain('prefer plain physical description to metaphor and simile');
+	});
+
+	// Given Continue, a model wrote the same beat again in new words.
+	it('tells every voice not to repeat the last passage unless asked to', () => {
+		for (const narrator of ['none', 'impersonal', 'monologue'] as const) {
+			const content = systemAt(null, narrator);
+			expect(content, narrator).toContain('Before writing, read the last passage again');
+			expect(content, narrator).toContain('when the user asks for it');
+		}
 	});
 
 	// The system's own guide forbids narration of the kind the prose lines ask for.
