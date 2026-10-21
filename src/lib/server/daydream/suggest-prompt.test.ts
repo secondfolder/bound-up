@@ -541,8 +541,10 @@ describe('buildSuggestMessages, the side a daydream is for', () => {
 	it('does not offer a dominant user the "rules" voice, a system ordering them about', () => {
 		const dom = daydream('dom');
 		expect(dom).not.toContain('"rules": no narrator');
-		expect(dom).toContain('never as "rules"');
-		expect(dom).toContain('"voice": how it is told, one of "talk", "told", "watch", "monologue"');
+		expect(dom).toContain('never "rules"');
+		expect(dom).toContain(
+			'"voice": how it is told, one of "talk", "told", "watch", "command", "monologue"'
+		);
 		expect(daydream('sub')).toContain('"rules": no narrator');
 	});
 
@@ -651,7 +653,9 @@ describe('buildSuggestMessages, story ideas', () => {
 	it('mixes the sides for "Either", and never puts a user in charge under "rules"', () => {
 		const prompt = everything({ ...ideas, side: null });
 		expect(prompt).toContain('Otherwise mix them');
-		expect(prompt).toContain('An idea with the user in charge is never told as "rules".');
+		expect(prompt).toContain(
+			'A system with the user in charge is "command", and one with them submitting "rules".'
+		);
 		expect(prompt).not.toContain('The user is the');
 	});
 
@@ -1066,5 +1070,31 @@ describe('buildSuggestMessages, catching the idea up with the story', () => {
 			characters: [{ name: 'Mara', fields: { personality: 'tender' } }]
 		});
 		expect(parseCatchUp({ idea: { setting: 'the office' } }, current)).toBeNull();
+	});
+});
+
+describe('buildSuggestMessages, a system for each side', () => {
+	const voices = (side: 'dom' | 'sub' | null) =>
+		everything({ task: 'daydream', brief: 'b', side, limits: '' });
+
+	it('offers a dominant user a system that governs someone else, and a submissive one a system over them', () => {
+		const dom = voices('dom');
+		expect(dom).toContain('"command": no narrator');
+		expect(dom).not.toContain('"rules": no narrator');
+		expect(dom).toContain('governs someone else and answers to them: "command", never "rules"');
+		const sub = voices('sub');
+		expect(sub).toContain('"rules": no narrator');
+		expect(sub).not.toContain('"command": no narrator');
+		const either = voices(null);
+		expect(either).toContain('"rules": no narrator');
+		expect(either).toContain('"command": no narrator');
+	});
+
+	it('reads a "command" answer as the system that governs a character', () => {
+		const parsed = parseSuggestedDaydream({
+			voice: 'command',
+			idea: { title: 'The house', premise: 'It governs Wren.' }
+		});
+		expect(parsed?.voice).toBe('command');
 	});
 });

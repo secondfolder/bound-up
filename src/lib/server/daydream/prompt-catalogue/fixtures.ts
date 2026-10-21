@@ -152,9 +152,12 @@ function replySetup(text: TextSource, combo: Combo): DaydreamSetup {
 	return {
 		title: text('title'),
 		voice: {
-			narrator: combo.narrator as DaydreamNarrator,
+			narrator: (combo.narrator === 'impersonal-governs'
+				? 'impersonal'
+				: combo.narrator) as DaydreamNarrator,
 			stance,
-			protagonistName: stance === 'persona' ? text('protagonistName') : ''
+			protagonistName: stance === 'persona' ? text('protagonistName') : '',
+			...(combo.narrator === 'impersonal-governs' ? { governs: 'character' as const } : {})
 		},
 		characters: Array.from({ length: count }, (_, index) =>
 			character(text, index, all, index === 0 ? characterDials(combo) : null)

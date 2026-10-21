@@ -37,11 +37,13 @@ Each idea is told one way, its "voice", one of:
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
+- "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
 - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
 
 Choose from what they asked for, not only from words that name a voice:
 - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
 - "rules" when they want orders from rules, a programme or an institution rather than a person.
+- "command" when they want such a system for someone else, with themselves in charge of it.
 - "watch" when they want to see other people, and to be out of it themselves.
 - "told" when they want it narrated to them, or there is nobody else in it.
 - "talk" otherwise: someone speaking with them.
@@ -82,7 +84,7 @@ None stated beyond the rules.
 
 Where the brief says plainly which side the user is on — that they want to be in charge, or to be told what to do — that is their side, whatever was chosen on the form. Every idea then puts them on it, with "you" set to match.
 
-Otherwise mix them: some with the user in charge ("you": "dom"), some with them submitting ("you": "sub"), and any with no one in charge as "you": null. An idea with the user in charge is never told as "rules".
+Otherwise mix them: some with the user in charge ("you": "dom"), some with them submitting ("you": "sub"), and any with no one in charge as "you": null. A system with the user in charge is "command", and one with them submitting "rules".
 
 With "watch", "you" is the side the story follows.
 
@@ -96,7 +98,7 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
   - "premise": a sentence or two, at most 418 characters
   - "tags": up to 4 tags of a word or two for its kinks and tropes
   - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
-  - "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
+  - "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
   - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
   - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 

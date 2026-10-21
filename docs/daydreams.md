@@ -64,8 +64,10 @@ someone has played one:
   submissive one, a monologue speaks to the user as one who serves them or
   is in charge of them (or alongside them, where its sayings are of the
   user's own side), and only the kept voice's clause is said once there is
-  one. **A dominant user is not offered "rules"**: a system they want is
-  told as "talk" or "told", with its people answering to them. And **the
+  one. **Each side is offered its own system**: "rules" is a system giving
+  the user orders, which a dominant user cannot be the one taking, so they
+  are offered "command" instead — a system governing someone else and
+  answering to them — and a submissive user is offered only "rules". And **the
   brief's own word wins**: where it says plainly which side the user is on,
   that is their side whatever "You as" says, since someone who chose
   "dominant" and wrote "I want to be her pet" meant the brief.
@@ -270,7 +272,7 @@ characters** (or ideas) as any such copy does.
 A draft opens in the form's **summary** layout: the setup as a short summary
 with blanks in it, built by `setupSummary` (`daydream/summary.ts`). Each blank
 is the control for that part of it: the heat a menu of levels, the voice a
-menu of the five presets, a character their dialog, the idea the idea
+menu of the six presets, a character their dialog, the idea the idea
 dialog. "Add someone" and "Anything off the table?" (the limits) sit under it.
 
 The summary is two paragraphs:
@@ -378,9 +380,10 @@ Between them they make every shape of story:
 | A story told to you    | 0+         | second-person | self     |
 | Watch a story unfold   | 1+         | third-person  | absent   |
 | A system in charge     | 0+         | impersonal    | self     |
+| A system you command   | 1+         | impersonal, governing a character | self |
 | A monologue            | 0+         | monologue     | self     |
 
-Those five are the presets. **It is asked last, and guessed until then.**
+Those six are the presets. **It is asked last, and guessed until then.**
 Until the user picks one, the voice follows who is in the story
 (`inferVoice`): nobody in it is a story told to you, anyone is talking with
 them, and the one-line summary says "Picked from who's in it." Watching, a
@@ -403,6 +406,21 @@ in italics, a monologue's statement in bold. The two settings under "Fine-tune h
 it's told" are names only in the same way, and for a combination no preset
 gives the panel describes the chosen narrator and stance instead, with the
 narrator's example.
+
+**A system can govern someone else** (`DaydreamVoice.governs`, setup v6).
+By default the system governs the user, which suits a submissive user and
+contradicts a dominant one: they would be the one taking orders while
+being "in charge". With `governs: 'character'` it governs the first
+character instead — "the subject" — writes about them in the third
+person, and answers to the user: it asks them for rulings on what the
+subject requests and what an infraction costs, and carries out what they
+decide as amendments ("A system you command"; `governingGuide` in
+`impersonal-voice.ts`, with its own examples). Someone who only watches a
+system always watches it govern a character (`systemGoverns`), since it
+cannot order about someone who is not there; that was the review's
+incoherent "absent" case. Fine-tune shows "Whom the system governs" for
+the system narrator; any other narrator clears it, and `voiceProblem`
+needs a character for it to govern.
 
 A problem with the voice is shown under the presets, outside "Fine-tune", and
 in the one-line summary while the picker is closed, so nothing closed ever

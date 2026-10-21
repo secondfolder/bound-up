@@ -103,7 +103,9 @@ export const BUILDERS: readonly Builder[] = [
 		label: 'Story reply',
 		description: 'Each passage of a running daydream (`buildMessages` in prompt.ts).',
 		axes: [
-			axis('narrator', 'Narrator', 'structural', values(...NARRATORS)),
+			// "impersonal-governs" is the system governing a character
+			// (`DaydreamVoice.governs`), a narrator of its own for review.
+			axis('narrator', 'Narrator', 'structural', values(...NARRATORS, 'impersonal-governs')),
 			axis('stance', 'Stance', 'structural', values('self', 'persona', 'absent')),
 			axis('characters', 'Characters', 'structural', values('0', '1', '2'), '1'),
 			axis('lead', 'Lead', 'structural', values('character', 'me', 'shared')),

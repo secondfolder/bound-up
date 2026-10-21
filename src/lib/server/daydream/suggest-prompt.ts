@@ -198,7 +198,7 @@ const catchUpRequestSchema = z
 const sideSchema = z.enum(['dom', 'sub']).nullable();
 type Side = z.output<typeof sideSchema> | undefined;
 
-const VOICE_IDS = ['talk', 'told', 'watch', 'rules', 'monologue'] as const;
+const VOICE_IDS = ['talk', 'told', 'watch', 'rules', 'command', 'monologue'] as const;
 type VoiceId = (typeof VOICE_IDS)[number];
 
 /** What the user typed on the new-daydream page. */
@@ -903,12 +903,13 @@ function catchUpMessages(request: CatchUpRequest): ModelMessage[] {
 }
 
 /**
- * The five voices, in the terms of `DAYDREAM_VOICE_PRESETS`. "talk" is the
+ * The voices, in the terms of `DAYDREAM_VOICE_PRESETS`. "talk" is the
  * default, as it is on the form, so a sentence that says nothing about how it
  * is told gets the shape most people mean. "rules" is a system giving the
- * user orders, which a dominant user cannot be the one taking, so it is not
- * offered to one (docs/daydreams.md, "Voices"): a system they want is told
- * with its people answering to them (`SIDE_CLAUSES`).
+ * user orders, which a dominant user cannot be the one taking, and "command"
+ * a system governing someone else and answering to the user, which a
+ * submissive one would not be: each side is offered only its own
+ * (docs/daydreams.md, "Voices").
  */
 const VOICES: Readonly<Record<VoiceId, string>> = {
 	talk: '"talk": the characters speak to the user directly, with no narrator.',
@@ -917,12 +918,16 @@ const VOICES: Readonly<Record<VoiceId, string>> = {
 		'"watch": a narrator tells it about the characters, and the user only watches from outside.',
 	rules:
 		'"rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.',
+	command:
+		'"command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.',
 	monologue:
 		'"monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.'
 };
 
 const voicesFor = (side: Side): VoiceId[] =>
-	VOICE_IDS.filter((voice) => !(voice === 'rules' && side === 'dom'));
+	VOICE_IDS.filter(
+		(voice) => !((voice === 'rules' && side === 'dom') || (voice === 'command' && side === 'sub'))
+	);
 
 const voiceList = (side: Side) =>
 	voicesFor(side)
@@ -940,6 +945,8 @@ function voiceCues(side: Side): string {
 		'- "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.',
 		side !== 'dom' &&
 			'- "rules" when they want orders from rules, a programme or an institution rather than a person.',
+		side !== 'sub' &&
+			'- "command" when they want such a system for someone else, with themselves in charge of it.',
 		'- "watch" when they want to see other people, and to be out of it themselves.',
 		'- "told" when they want it narrated to them, or there is nobody else in it.',
 		'- "talk" otherwise: someone speaking with them.'
@@ -960,7 +967,7 @@ const SIDE_CLAUSES: Readonly<
 > = {
 	dom: {
 		story:
-			'Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want is theirs: told as "talk" or "told", with its people answering to them, never as "rules".',
+			'Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want governs someone else and answers to them: "command", never "rules".',
 		watch:
 			'With "watch" they are not in it: the story follows its dominant one, whose side they are on.',
 		monologue:
@@ -985,6 +992,7 @@ function sideClauses(side: 'dom' | 'sub', voice: VoiceId | null | undefined): st
 		case 'talk':
 		case 'told':
 		case 'rules':
+		case 'command':
 			return clauses.story;
 		default:
 			return lines(clauses.story, clauses.watch, clauses.monologue);
@@ -1020,7 +1028,7 @@ function ideasSide(side: Side): string {
 		`${EXPLICIT_SIDE} Every idea then puts them on it, with "you" set to match.`,
 		side
 			? `Otherwise every idea puts them on the side chosen, the ${SIDE_NAMES[side]} one ("you": "${side}"), unless nobody is in charge in it ("you": null). ${sideClauses(side, null)}`
-			: 'Otherwise mix them: some with the user in charge ("you": "dom"), some with them submitting ("you": "sub"), and any with no one in charge as "you": null. An idea with the user in charge is never told as "rules".',
+			: 'Otherwise mix them: some with the user in charge ("you": "dom"), some with them submitting ("you": "sub"), and any with no one in charge as "you": null. A system with the user in charge is "command", and one with them submitting "rules".',
 		'With "watch", "you" is the side the story follows.'
 	);
 }
@@ -1055,7 +1063,7 @@ These are suggestions, not a template: write what reads best for this daydream. 
 const STORY_IDEA = `The idea: "title", short; "setting", where it happens; "premise", what is going on as it starts; "yourRole", who the user is in it; "tone", how it should feel; each a sentence or two, and "notes" empty. Give it 1 to ${MAX_DAYDREAM_CHARACTERS} parts for characters to play, other than the user (0 to ${MAX_DAYDREAM_CHARACTERS} with "told"): each a short name, like "the interviewer", and a few words on what that part does in the idea.`;
 
 /** Who is in a story, key by key: one character a part. */
-const STORY_CAST = `Who is in it: one character for each part, with "part" set to that part's name exactly as you gave it. For each, a name of their own, and a phrase or two for their type ("archetype"), personality, how they talk ("speech"), appearance and what they enjoy ("likes"); who they are to the user in this daydream ("relationship"), in a few words; and what they are doing or want as it starts ("doing"), in a sentence. With "rules", they are the system's functionaries: they act and are named in its notices, and speak only in procedure's clipped words — give "speech" as that. With "watch", "relationship" is who they are to the others in it.`;
+const STORY_CAST = `Who is in it: one character for each part, with "part" set to that part's name exactly as you gave it. For each, a name of their own, and a phrase or two for their type ("archetype"), personality, how they talk ("speech"), appearance and what they enjoy ("likes"); who they are to the user in this daydream ("relationship"), in a few words; and what they are doing or want as it starts ("doing"), in a sentence. With "rules", they are the system's functionaries: they act and are named in its notices, and speak only in procedure's clipped words — give "speech" as that. With "command", the first of them is the one the system governs, and any others its functionaries. With "watch", "relationship" is who they are to the others in it.`;
 
 const MONOLOGUE_CAST =
 	'Who is in it: nobody, unless a named character is the one speaking: then only them, playing "the speaker".';

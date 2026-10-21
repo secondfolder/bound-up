@@ -1,6 +1,6 @@
 # Ideas from a brief: every paragraph
 
-37 distinct paragraphs, from 19 distinct prompts
+40 distinct paragraphs, from 19 distinct prompts
 over 18 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -70,9 +70,9 @@ Always.
 # How each idea is told
 ~~~~
 
-## ¶ 16fbeefe1ef9f0 · system · in 12 of 18
+## ¶ 19df03b84b4d6a · system · in 6 of 18
 
-Only when side ∈ {either, sub}.
+Only when side ∈ {either}.
 
 ~~~~text
 Each idea is told one way, its "voice", one of:
@@ -80,17 +80,19 @@ Each idea is told one way, its "voice", one of:
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
+- "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
 - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
 ~~~~
 
-## ¶ 14d8a6a83c0436 · system · in 12 of 18
+## ¶ 052d3c55d602f4 · system · in 6 of 18
 
-Only when side ∈ {either, sub}.
+Only when side ∈ {either}.
 
 ~~~~text
 Choose from what they asked for, not only from words that name a voice:
 - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
 - "rules" when they want orders from rules, a programme or an institution rather than a person.
+- "command" when they want such a system for someone else, with themselves in charge of it.
 - "watch" when they want to see other people, and to be out of it themselves.
 - "told" when they want it narrated to them, or there is nobody else in it.
 - "talk" otherwise: someone speaking with them.
@@ -197,12 +199,12 @@ Always.
 Where the brief says plainly which side the user is on — that they want to be in charge, or to be told what to do — that is their side, whatever was chosen on the form. Every idea then puts them on it, with "you" set to match.
 ~~~~
 
-## ¶ 0c26b816e531fc · user · in 6 of 18
+## ¶ 11459e31799aee · user · in 6 of 18
 
 Only when side ∈ {either}.
 
 ~~~~text
-Otherwise mix them: some with the user in charge ("you": "dom"), some with them submitting ("you": "sub"), and any with no one in charge as "you": null. An idea with the user in charge is never told as "rules".
+Otherwise mix them: some with the user in charge ("you": "dom"), some with them submitting ("you": "sub"), and any with no one in charge as "you": null. A system with the user in charge is "command", and one with them submitting "rules".
 ~~~~
 
 ## ¶ 19a95d76b29994 · user · in 18 of 18
@@ -229,9 +231,9 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 1077b35fa3d24e · user · in 12 of 18
+## ¶ 128428179e819e · user · in 6 of 18
 
-Only when side ∈ {either, sub}.
+Only when side ∈ {either}.
 
 ~~~~text
 - "research": the research, one point to a line; empty when there is nothing to add
@@ -240,7 +242,7 @@ Only when side ∈ {either, sub}.
   - "premise": a sentence or two, at most 418 characters
   - "tags": up to 4 tags of a word or two for its kinks and tropes
   - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
-  - "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
+  - "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
   - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
   - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
@@ -296,7 +298,7 @@ Only when offered ∈ {some}.
 They have already been offered these, so make yours new ones, not these again or close to them: "⟦offered1⟧", "⟦offered2⟧".
 ~~~~
 
-## ¶ 0cd04b068b57d8 · system · in 6 of 18
+## ¶ 09b097413c22b4 · system · in 6 of 18
 
 Only when side ∈ {dom}.
 
@@ -305,33 +307,35 @@ Each idea is told one way, its "voice", one of:
 - "talk": the characters speak to the user directly, with no narrator.
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
+- "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
 - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
 ~~~~
 
-## ¶ 076c35d463d283 · system · in 6 of 18
+## ¶ 10e517d56363e4 · system · in 6 of 18
 
 Only when side ∈ {dom}.
 
 ~~~~text
 Choose from what they asked for, not only from words that name a voice:
 - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
+- "command" when they want such a system for someone else, with themselves in charge of it.
 - "watch" when they want to see other people, and to be out of it themselves.
 - "told" when they want it narrated to them, or there is nobody else in it.
 - "talk" otherwise: someone speaking with them.
 Where nothing points to one, vary them.
 ~~~~
 
-## ¶ 15d8a8b088544d · user · in 6 of 18
+## ¶ 13b162072e73b0 · user · in 6 of 18
 
 Only when side ∈ {dom}.
 
 ~~~~text
-Otherwise every idea puts them on the side chosen, the dominant one ("you": "dom"), unless nobody is in charge in it ("you": null). Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want is theirs: told as "talk" or "told", with its people answering to them, never as "rules".
+Otherwise every idea puts them on the side chosen, the dominant one ("you": "dom"), unless nobody is in charge in it ("you": null). Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want governs someone else and answers to them: "command", never "rules".
 With "watch" they are not in it: the story follows its dominant one, whose side they are on.
 In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
-## ¶ 1453ff9df1d234 · user · in 6 of 18
+## ¶ 1049f9f0b38df1 · user · in 6 of 18
 
 Only when side ∈ {dom}.
 
@@ -342,9 +346,36 @@ Only when side ∈ {dom}.
   - "premise": a sentence or two, at most 418 characters
   - "tags": up to 4 tags of a word or two for its kinks and tropes
   - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
-  - "voice": how it is told, one of "talk", "told", "watch", "monologue"
+  - "voice": how it is told, one of "talk", "told", "watch", "command", "monologue"
   - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
   - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+~~~~
+
+## ¶ 16fbeefe1ef9f0 · system · in 6 of 18
+
+Only when side ∈ {sub}.
+
+~~~~text
+Each idea is told one way, its "voice", one of:
+- "talk": the characters speak to the user directly, with no narrator.
+- "told": a narrator tells it to the user, as "you"; there may be no characters at all.
+- "watch": a narrator tells it about the characters, and the user only watches from outside.
+- "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
+- "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+~~~~
+
+## ¶ 14d8a6a83c0436 · system · in 6 of 18
+
+Only when side ∈ {sub}.
+
+~~~~text
+Choose from what they asked for, not only from words that name a voice:
+- "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
+- "rules" when they want orders from rules, a programme or an institution rather than a person.
+- "watch" when they want to see other people, and to be out of it themselves.
+- "told" when they want it narrated to them, or there is nobody else in it.
+- "talk" otherwise: someone speaking with them.
+Where nothing points to one, vary them.
 ~~~~
 
 ## ¶ 19255b91c306ac · user · in 6 of 18
@@ -355,6 +386,22 @@ Only when side ∈ {sub}.
 Otherwise every idea puts them on the side chosen, the submissive one ("you": "sub"), unless nobody is in charge in it ("you": null). Where they are in it, whoever else is in it is in charge of them, and the story is about them giving up control. With "rules", the system is what they submit to.
 With "watch" they are not in it: the story follows its submissive one, whose side they are on.
 In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
+~~~~
+
+## ¶ 1077b35fa3d24e · user · in 6 of 18
+
+Only when side ∈ {sub}.
+
+~~~~text
+- "research": the research, one point to a line; empty when there is nothing to add
+- "ideas": the 6 ideas
+  - "title": a short title, at most 80 characters
+  - "premise": a sentence or two, at most 418 characters
+  - "tags": up to 4 tags of a word or two for its kinks and tropes
+  - "you": the user's side in it: "dom", "sub", or null where nobody is in charge
+  - "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
+  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 ~~~~
 
 ## ¶ 17f996265f95d0 · user · only when one value was swept from the baseline

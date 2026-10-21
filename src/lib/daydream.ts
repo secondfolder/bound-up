@@ -52,7 +52,27 @@ export type DaydreamVoice = {
 	stance: DaydreamStance;
 	/** What the story calls the user. Required for `persona`; optional for `self`; unused for `absent`. */
 	protagonistName: string;
+	/**
+	 * Whom a system governs, for the `impersonal` narrator: the user, unless
+	 * this says a character (docs/daydreams.md, "Voices"). With a character
+	 * governed, the system answers to the user, who is in charge of it — a
+	 * dominant user's system of rules. Someone who only watches a system is
+	 * always watching it govern a character (`systemGoverns`).
+	 */
+	governs?: 'character';
 };
+
+/**
+ * Whom the system governs: a character when the voice says so, or when the
+ * user only watches, since a system cannot order about someone who is not
+ * there; otherwise the user. Only means anything for the `impersonal`
+ * narrator.
+ */
+export function systemGoverns(
+	voice: Pick<DaydreamVoice, 'stance' | 'governs'>
+): 'user' | 'character' {
+	return voice.governs === 'character' || voice.stance === 'absent' ? 'character' : 'user';
+}
 
 /**
  * The two settings under "Fine-tune how it's told". Each option shows only its
@@ -131,7 +151,8 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 	label: string;
 	description: string;
 	examples: readonly string[];
-	voice: Pick<DaydreamVoice, 'narrator' | 'stance'>;
+	// `governs` is said by every preset, so choosing one clears another's.
+	voice: Pick<DaydreamVoice, 'narrator' | 'stance' | 'governs'>;
 }[] = [
 	{
 		id: 'talk',
@@ -142,7 +163,7 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 			'“Sit. No — closer. I want to see your face when I tell you.”',
 			'*sets the key on the table between you* “You’re late again.”'
 		],
-		voice: { narrator: 'none', stance: 'self' }
+		voice: { narrator: 'none', stance: 'self', governs: undefined }
 	},
 	{
 		id: 'told',
@@ -153,7 +174,7 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 			'“You feel the rope tighten as the door clicks shut behind you.”',
 			'“The rain has not stopped for three days, and you are the only one still awake.”'
 		],
-		voice: { narrator: 'second-person', stance: 'self' }
+		voice: { narrator: 'second-person', stance: 'self', governs: undefined }
 	},
 	{
 		id: 'watch',
@@ -164,7 +185,7 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 			'“She waits by the door, counting his footsteps on the stairs.”',
 			'“Across the room, Ash finally looks up.”'
 		],
-		voice: { narrator: 'third-person', stance: 'absent' }
+		voice: { narrator: 'third-person', stance: 'absent', governs: undefined }
 	},
 	{
 		id: 'rules',
@@ -175,7 +196,18 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 			'“Rule 2: Kneel at the line. Wait for the tone.”',
 			'“Rule 2 broken. Infraction logged.”'
 		],
-		voice: { narrator: 'impersonal', stance: 'self' }
+		voice: { narrator: 'impersonal', stance: 'self', governs: undefined }
+	},
+	{
+		id: 'command',
+		label: 'A system you command',
+		description:
+			'No narrator, just rules — but they govern someone else, and answer to you. The system issues its orders to a character, logs what they do, and reports to you for your rulings.',
+		examples: [
+			'“Amendment 3, at the keyholder’s instruction: the subject kneels at the door from 19:00.”',
+			'“Request from the subject: permission to speak. Awaiting your ruling.”'
+		],
+		voice: { narrator: 'impersonal', stance: 'self', governs: 'character' }
 	},
 	{
 		id: 'monologue',
@@ -186,16 +218,19 @@ export const DAYDREAM_VOICE_PRESETS: readonly {
 			'“**Being owned is a relief.** I mean it. Someone else decides, and I get to stop deciding.”',
 			'“**Good girls say thank you.** Every time. Even when it stings — especially then.”'
 		],
-		voice: { narrator: 'monologue', stance: 'self' }
+		voice: { narrator: 'monologue', stance: 'self', governs: undefined }
 	}
 ];
 
-export type DaydreamVoicePresetId = 'talk' | 'told' | 'watch' | 'rules' | 'monologue';
+export type DaydreamVoicePresetId = 'talk' | 'told' | 'watch' | 'rules' | 'command' | 'monologue';
 
 /** The preset a voice is, or undefined for a combination no preset gives. */
-export function voicePreset(voice: Pick<DaydreamVoice, 'narrator' | 'stance'>) {
+export function voicePreset(voice: Pick<DaydreamVoice, 'narrator' | 'stance' | 'governs'>) {
 	return DAYDREAM_VOICE_PRESETS.find(
-		(preset) => preset.voice.narrator === voice.narrator && preset.voice.stance === voice.stance
+		(preset) =>
+			preset.voice.narrator === voice.narrator &&
+			preset.voice.stance === voice.stance &&
+			preset.voice.governs === voice.governs
 	);
 }
 
@@ -238,6 +273,16 @@ export function voiceProblem(voice: DaydreamVoice, characterCount: number): stri
 	}
 	if (voice.stance === 'persona' && voice.protagonistName.trim() === '') {
 		return 'Give the person you are playing a name.';
+	}
+	if (voice.governs === 'character' && voice.narrator !== 'impersonal') {
+		return 'Only a system governs someone else.';
+	}
+	if (
+		voice.narrator === 'impersonal' &&
+		systemGoverns(voice) === 'character' &&
+		characterCount === 0
+	) {
+		return 'Add the character the system governs.';
 	}
 	return null;
 }

@@ -312,6 +312,7 @@ export const TOLD_AS: Readonly<Record<DaydreamVoicePresetId, string>> = {
 	told: 'to you by a narrator',
 	watch: 'by a narrator, as you watch from outside',
 	rules: 'as a system’s orders to you',
+	command: 'as a system’s orders to the one it governs, answering to you',
 	monologue: 'as a monologue, one voice speaking its mind'
 };
 

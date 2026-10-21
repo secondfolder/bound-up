@@ -1,6 +1,6 @@
 # Daydream from a brief: every paragraph
 
-56 distinct paragraphs, from 181 distinct prompts
+59 distinct paragraphs, from 181 distinct prompts
 over 216 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -38,9 +38,9 @@ Always.
 # How a daydream is told
 ~~~~
 
-## ¶ 02badd4000439d · system · in 144 of 216
+## ¶ 11541f39aa9c60 · system · in 72 of 216
 
-Only when side ∈ {either, sub}.
+Only when side ∈ {either}.
 
 ~~~~text
 First decide how it is told, its "voice", because it decides what the rest is. One of:
@@ -48,17 +48,19 @@ First decide how it is told, its "voice", because it decides what the rest is. O
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
+- "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
 - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
 ~~~~
 
-## ¶ 0ed82f5009178f · system · in 24 of 216
+## ¶ 0b1ebbe3231771 · system · in 12 of 216
 
-Only when side ∈ {either, sub}; voice ∈ {choose}.
+Only when side ∈ {either}; voice ∈ {choose}.
 
 ~~~~text
 Choose from what they asked for, not only from words that name a voice:
 - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
 - "rules" when they want orders from rules, a programme or an institution rather than a person.
+- "command" when they want such a system for someone else, with themselves in charge of it.
 - "watch" when they want to see other people, and to be out of it themselves.
 - "told" when they want it narrated to them, or there is nobody else in it.
 - "talk" otherwise: someone speaking with them.
@@ -118,12 +120,12 @@ Always.
 The idea: "title", short; "setting", where it happens; "premise", what is going on as it starts; "yourRole", who the user is in it; "tone", how it should feel; each a sentence or two, and "notes" empty. Give it 1 to 4 parts for characters to play, other than the user (0 to 4 with "told"): each a short name, like "the interviewer", and a few words on what that part does in the idea.
 ~~~~
 
-## ¶ 0870627002f4db · system · in 216 of 216
+## ¶ 0d75d7aa6b76c2 · system · in 216 of 216
 
 Always.
 
 ~~~~text
-Who is in it: one character for each part, with "part" set to that part's name exactly as you gave it. For each, a name of their own, and a phrase or two for their type ("archetype"), personality, how they talk ("speech"), appearance and what they enjoy ("likes"); who they are to the user in this daydream ("relationship"), in a few words; and what they are doing or want as it starts ("doing"), in a sentence. With "rules", they are the system's functionaries: they act and are named in its notices, and speak only in procedure's clipped words — give "speech" as that. With "watch", "relationship" is who they are to the others in it.
+Who is in it: one character for each part, with "part" set to that part's name exactly as you gave it. For each, a name of their own, and a phrase or two for their type ("archetype"), personality, how they talk ("speech"), appearance and what they enjoy ("likes"); who they are to the user in this daydream ("relationship"), in a few words; and what they are doing or want as it starts ("doing"), in a sentence. With "rules", they are the system's functionaries: they act and are named in its notices, and speak only in procedure's clipped words — give "speech" as that. With "command", the first of them is the one the system governs, and any others its functionaries. With "watch", "relationship" is who they are to the others in it.
 ~~~~
 
 ## ¶ 0c632221ed1584 · system · in 216 of 216
@@ -186,7 +188,7 @@ Always.
 # The summary
 ~~~~
 
-## ¶ 1f4ea3c310b1e0 · system · in 216 of 216
+## ¶ 0538151ae63b28 · system · in 216 of 216
 
 Always.
 
@@ -195,7 +197,7 @@ One short paragraph, at most 600 characters, telling the user, as "you", what th
 - [[idea|…]] for the daydream's idea: what it is about as a whole, not just where it happens. Opening with one tight sentence that gives the whole daydream, most of it the marked idea, usually works well, like "[[idea|A couple’s invitation: one of them is yours, and the other only watches]]." or, for a monologue, "[[idea|A voice that knows exactly what you are for]], and tells you so."
 - [[Name|…]] for each character, keyed by the name you give them, round whatever words first refer to them.
 - [[heat|…]] for how sexual it is, a word like "slow-burning" or "filthy", if it fits naturally into a sentence, like "watches every [[heat|filthy]] second".
-- [[voice|…]] for how it is told, only where it can be said without misleading. Worked into the story as "you talk with them", it makes talking sound like what the story is about, so it is usually better said plainly in a closing sentence of its own, in these words: for "talk", "It’s told [[voice|in the characters’ own words, with no narrator]]."; for "told", "It’s told [[voice|to you by a narrator]]."; for "watch", "It’s told [[voice|by a narrator, as you watch from outside]]."; for "rules", "It’s told [[voice|as a system’s orders to you]]."; for "monologue", "It’s told [[voice|as a monologue, one voice speaking its mind]]."
+- [[voice|…]] for how it is told, only where it can be said without misleading. Worked into the story as "you talk with them", it makes talking sound like what the story is about, so it is usually better said plainly in a closing sentence of its own, in these words: for "talk", "It’s told [[voice|in the characters’ own words, with no narrator]]."; for "told", "It’s told [[voice|to you by a narrator]]."; for "watch", "It’s told [[voice|by a narrator, as you watch from outside]]."; for "rules", "It’s told [[voice|as a system’s orders to you]]."; for "command", "It’s told [[voice|as a system’s orders to the one it governs, answering to you]]."; for "monologue", "It’s told [[voice|as a monologue, one voice speaking its mind]]."
 These are suggestions, not a template: write what reads best for this daydream. Mark only the first mention of each, and leave out any that would make the summary awkward; anything left out is shown after it. Use [[ and ]] nowhere else.
 ~~~~
 
@@ -290,12 +292,12 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 18e4f3977dac25 · user · in 144 of 216
+## ¶ 057d740fde00d7 · user · in 72 of 216
 
-Only when side ∈ {either, sub}.
+Only when side ∈ {either}.
 
 ~~~~text
-- "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
+- "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
 - "research": the research, one point to a line; empty when there is nothing to add
 - "idea": the idea, as its section says
   - "title": a short title
@@ -427,7 +429,7 @@ Only when voice ∈ {monologue}.
 It was suggested to them as "monologue": keep that voice.
 ~~~~
 
-## ¶ 17fd778cdf71ef · system · in 72 of 216
+## ¶ 09ec830aefa6a3 · system · in 72 of 216
 
 Only when side ∈ {dom}.
 
@@ -436,38 +438,40 @@ First decide how it is told, its "voice", because it decides what the rest is. O
 - "talk": the characters speak to the user directly, with no narrator.
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
+- "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
 - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
 ~~~~
 
-## ¶ 1717bb921a7c99 · system · in 12 of 216
+## ¶ 0336b45129bc6f · system · in 12 of 216
 
 Only when side ∈ {dom}; voice ∈ {choose}.
 
 ~~~~text
 Choose from what they asked for, not only from words that name a voice:
 - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
+- "command" when they want such a system for someone else, with themselves in charge of it.
 - "watch" when they want to see other people, and to be out of it themselves.
 - "told" when they want it narrated to them, or there is nobody else in it.
 - "talk" otherwise: someone speaking with them.
 When nothing points to one, choose "talk".
 ~~~~
 
-## ¶ 03b4505caf0606 · user · in 12 of 216
+## ¶ 08c131bd0ef349 · user · in 12 of 216
 
 Only when side ∈ {dom}; voice ∈ {choose}.
 
 ~~~~text
-Otherwise the user is the dominant one. Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want is theirs: told as "talk" or "told", with its people answering to them, never as "rules".
+Otherwise the user is the dominant one. Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want governs someone else and answers to them: "command", never "rules".
 With "watch" they are not in it: the story follows its dominant one, whose side they are on.
 In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
-## ¶ 0bd400fb0e2369 · user · in 72 of 216
+## ¶ 031189a580ec39 · user · in 72 of 216
 
 Only when side ∈ {dom}.
 
 ~~~~text
-- "voice": how it is told, one of "talk", "told", "watch", "monologue"
+- "voice": how it is told, one of "talk", "told", "watch", "command", "monologue"
 - "research": the research, one point to a line; empty when there is nothing to add
 - "idea": the idea, as its section says
   - "title": a short title
@@ -494,12 +498,12 @@ Only when side ∈ {dom}.
 - "summary": the summary, with its marks
 ~~~~
 
-## ¶ 04446fad119d52 · user · in 36 of 216
+## ¶ 1f749d56a10022 · user · in 36 of 216
 
 Only when side ∈ {dom}; voice ∈ {talk, told, rules}.
 
 ~~~~text
-Otherwise the user is the dominant one. Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want is theirs: told as "talk" or "told", with its people answering to them, never as "rules".
+Otherwise the user is the dominant one. Where they are in it, whoever else is in it submits to them, and the story is about them being in charge. A system of rules they want governs someone else and answers to them: "command", never "rules".
 ~~~~
 
 ## ¶ 1fcf36a9c27179 · user · in 12 of 216
@@ -518,6 +522,33 @@ Only when side ∈ {dom}; voice ∈ {monologue}.
 Otherwise the user is the dominant one. In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
+## ¶ 02badd4000439d · system · in 72 of 216
+
+Only when side ∈ {sub}.
+
+~~~~text
+First decide how it is told, its "voice", because it decides what the rest is. One of:
+- "talk": the characters speak to the user directly, with no narrator.
+- "told": a narrator tells it to the user, as "you"; there may be no characters at all.
+- "watch": a narrator tells it about the characters, and the user only watches from outside.
+- "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
+- "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
+~~~~
+
+## ¶ 0ed82f5009178f · system · in 12 of 216
+
+Only when side ∈ {sub}; voice ∈ {choose}.
+
+~~~~text
+Choose from what they asked for, not only from words that name a voice:
+- "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
+- "rules" when they want orders from rules, a programme or an institution rather than a person.
+- "watch" when they want to see other people, and to be out of it themselves.
+- "told" when they want it narrated to them, or there is nobody else in it.
+- "talk" otherwise: someone speaking with them.
+When nothing points to one, choose "talk".
+~~~~
+
 ## ¶ 09f979b97d882c · user · in 12 of 216
 
 Only when side ∈ {sub}; voice ∈ {choose}.
@@ -526,6 +557,38 @@ Only when side ∈ {sub}; voice ∈ {choose}.
 Otherwise the user is the submissive one. Where they are in it, whoever else is in it is in charge of them, and the story is about them giving up control. With "rules", the system is what they submit to.
 With "watch" they are not in it: the story follows its submissive one, whose side they are on.
 In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
+~~~~
+
+## ¶ 18e4f3977dac25 · user · in 72 of 216
+
+Only when side ∈ {sub}.
+
+~~~~text
+- "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
+- "research": the research, one point to a line; empty when there is nothing to add
+- "idea": the idea, as its section says
+  - "title": a short title
+  - "setting": where it happens, or where a monologue is set; may be empty
+  - "premise": what is going on as it starts, or what the voice believes
+  - "yourRole": who the user is in it, and on which side
+  - "tone": how it should feel
+  - "notes": empty for a story; the sayings, for a monologue
+  - "heat": how sexual it is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+  - "kink": how kinky it is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+  - "parts": the parts for characters to play
+    - "name": a short name for the part
+    - "description": what that part does in the idea, in a few words
+- "characters": who is in it, one for each part; empty for a monologue with no named speaker
+  - "name": their name
+  - "archetype": their type
+  - "personality": their personality
+  - "speech": how they talk
+  - "appearance": their appearance
+  - "likes": what they enjoy
+  - "part": the name of the idea's part they play, exactly
+  - "relationship": who they are to the user
+  - "doing": what they are doing or want as it starts
+- "summary": the summary, with its marks
 ~~~~
 
 ## ¶ 15656a8a4e12b1 · user · in 36 of 216

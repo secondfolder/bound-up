@@ -29,11 +29,13 @@ First decide how it is told, its "voice", because it decides what the rest is. O
 - "told": a narrator tells it to the user, as "you"; there may be no characters at all.
 - "watch": a narrator tells it about the characters, and the user only watches from outside.
 - "rules": no narrator and no people speaking: an impersonal system of rules and notices gives the user orders.
+- "command": no narrator and no people speaking for themselves: an impersonal system of rules governs a character, and answers to the user, who rules on what it asks.
 - "monologue": not a story: one voice speaking its mind about what the daydream is about, statement by statement.
 
 Choose from what they asked for, not only from words that name a voice:
 - "monologue" when what they want said matters more than anything happening: sayings, beliefs, mantras, slogans, captions or themes to be said and built on — a list of the things people into it say, a voice telling them what they are or what they are for, their own inner voice — with no plot, place or encounter asked for.
 - "rules" when they want orders from rules, a programme or an institution rather than a person.
+- "command" when they want such a system for someone else, with themselves in charge of it.
 - "watch" when they want to see other people, and to be out of it themselves.
 - "told" when they want it narrated to them, or there is nobody else in it.
 - "talk" otherwise: someone speaking with them.
@@ -56,7 +58,7 @@ Draw on the kinds of story people love in erotica and fan fiction, and make it h
 
 The idea: "title", short; "setting", where it happens; "premise", what is going on as it starts; "yourRole", who the user is in it; "tone", how it should feel; each a sentence or two, and "notes" empty. Give it 1 to 4 parts for characters to play, other than the user (0 to 4 with "told"): each a short name, like "the interviewer", and a few words on what that part does in the idea.
 
-Who is in it: one character for each part, with "part" set to that part's name exactly as you gave it. For each, a name of their own, and a phrase or two for their type ("archetype"), personality, how they talk ("speech"), appearance and what they enjoy ("likes"); who they are to the user in this daydream ("relationship"), in a few words; and what they are doing or want as it starts ("doing"), in a sentence. With "rules", they are the system's functionaries: they act and are named in its notices, and speak only in procedure's clipped words — give "speech" as that. With "watch", "relationship" is who they are to the others in it.
+Who is in it: one character for each part, with "part" set to that part's name exactly as you gave it. For each, a name of their own, and a phrase or two for their type ("archetype"), personality, how they talk ("speech"), appearance and what they enjoy ("likes"); who they are to the user in this daydream ("relationship"), in a few words; and what they are doing or want as it starts ("doing"), in a sentence. With "rules", they are the system's functionaries: they act and are named in its notices, and speak only in procedure's clipped words — give "speech" as that. With "command", the first of them is the one the system governs, and any others its functionaries. With "watch", "relationship" is who they are to the others in it.
 
 # If it is a monologue
 
@@ -80,7 +82,7 @@ One short paragraph, at most 600 characters, telling the user, as "you", what th
 - [[idea|…]] for the daydream's idea: what it is about as a whole, not just where it happens. Opening with one tight sentence that gives the whole daydream, most of it the marked idea, usually works well, like "[[idea|A couple’s invitation: one of them is yours, and the other only watches]]." or, for a monologue, "[[idea|A voice that knows exactly what you are for]], and tells you so."
 - [[Name|…]] for each character, keyed by the name you give them, round whatever words first refer to them.
 - [[heat|…]] for how sexual it is, a word like "slow-burning" or "filthy", if it fits naturally into a sentence, like "watches every [[heat|filthy]] second".
-- [[voice|…]] for how it is told, only where it can be said without misleading. Worked into the story as "you talk with them", it makes talking sound like what the story is about, so it is usually better said plainly in a closing sentence of its own, in these words: for "talk", "It’s told [[voice|in the characters’ own words, with no narrator]]."; for "told", "It’s told [[voice|to you by a narrator]]."; for "watch", "It’s told [[voice|by a narrator, as you watch from outside]]."; for "rules", "It’s told [[voice|as a system’s orders to you]]."; for "monologue", "It’s told [[voice|as a monologue, one voice speaking its mind]]."
+- [[voice|…]] for how it is told, only where it can be said without misleading. Worked into the story as "you talk with them", it makes talking sound like what the story is about, so it is usually better said plainly in a closing sentence of its own, in these words: for "talk", "It’s told [[voice|in the characters’ own words, with no narrator]]."; for "told", "It’s told [[voice|to you by a narrator]]."; for "watch", "It’s told [[voice|by a narrator, as you watch from outside]]."; for "rules", "It’s told [[voice|as a system’s orders to you]]."; for "command", "It’s told [[voice|as a system’s orders to the one it governs, answering to you]]."; for "monologue", "It’s told [[voice|as a monologue, one voice speaking its mind]]."
 These are suggestions, not a template: write what reads best for this daydream. Mark only the first mention of each, and leave out any that would make the summary awkward; anything left out is shown after it. Use [[ and ]] nowhere else.
 
 ===== 2. user =====
@@ -109,7 +111,7 @@ Set the whole daydream up from the brief, keeping to what they asked for and fil
 
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 
-- "voice": how it is told, one of "talk", "told", "watch", "rules", "monologue"
+- "voice": how it is told, one of "talk", "told", "watch", "rules", "command", "monologue"
 - "research": the research, one point to a line; empty when there is nothing to add
 - "idea": the idea, as its section says
   - "title": a short title

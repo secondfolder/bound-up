@@ -180,7 +180,7 @@ const setupV2Shape = {
  */
 function refineSetup(
 	value: {
-		voice: Pick<DaydreamVoice, 'narrator' | 'stance' | 'protagonistName'>;
+		voice: Pick<DaydreamVoice, 'narrator' | 'stance' | 'protagonistName' | 'governs'>;
 		characters: z.output<typeof setupV2Shape.characters>;
 	} & (
 		| { scene: z.output<typeof setupV2Shape.scene> }
@@ -237,6 +237,22 @@ const setupV5 = z
 			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
 			stance: z.enum(['self', 'persona', 'absent']),
 			protagonistName: optional(DAYDREAM_LIMITS.protagonistName)
+		}),
+		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
+	})
+	.superRefine(refineSetup);
+
+// v6: a system may govern a character rather than the user, answering to
+// them (`DaydreamVoice.governs`; docs/daydreams.md, "Voices").
+const setupV6 = z
+	.object({
+		...setupV2Rest,
+		idea: z.object({ ...ideaV2Shape, ...sourceShape }),
+		voice: z.object({
+			narrator: z.enum(['none', 'second-person', 'third-person', 'impersonal', 'monologue']),
+			stance: z.enum(['self', 'persona', 'absent']),
+			protagonistName: optional(DAYDREAM_LIMITS.protagonistName),
+			governs: z.literal('character').optional()
 		}),
 		pictures: z.object({ on: z.boolean(), style: z.enum(['photo', 'illustrated']) })
 	})
@@ -319,7 +335,13 @@ export const daydreamSetupKind = defineSealedKind({
 				idea: { ...idea, ...NO_ORIGIN }
 			})
 		},
-		{ version: 5, schema: setupV5 }
+		{
+			version: 5,
+			schema: setupV5,
+			// Every v5 voice is a v6 one: a system governed the user until then.
+			upcast: (value: z.output<typeof setupV5>): z.output<typeof setupV6> => value
+		},
+		{ version: 6, schema: setupV6 }
 	]
 });
 

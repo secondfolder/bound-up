@@ -7,7 +7,8 @@ import {
 	MAX_CONTEXT_CHARS,
 	MAX_CONTEXT_TURNS,
 	MAX_DIRECTIONS,
-	MAX_SUGGESTIONS
+	MAX_SUGGESTIONS,
+	systemGoverns
 } from '$lib/daydream';
 import {
 	type ContextTurn,
@@ -180,6 +181,9 @@ function describeNarrator(voice: DaydreamVoice, characterCount: number): string 
 				.join(' ');
 		case 'impersonal':
 			// The full guide, with examples, is general, above: `impersonalGuide`.
+			if (systemGoverns(voice) === 'character') {
+				return `There is no narrator. You speak as the system that governs the first character below — its rules, its protocol, its procedures — writing about them in the third person. ${voice.stance === 'absent' ? 'No one else is addressed.' : `It answers to the user, the authority over it, addressing them as "you"${persona ? ` (they are ${name})` : ''}.`} Any other characters below act for it, as its functionaries. See "Writing as the system" above.`;
+			}
 			return `There is no narrator. You speak as the system that governs the user — its rules, its protocol, its procedures — addressing them as "you"${persona ? ` (they are ${name})` : ''}. ${characterCount === 0 ? 'No one is behind it.' : 'The characters below act for it, as its functionaries.'} See "Writing as the system" above.`;
 		case 'monologue':
 			// Who speaks, the form and examples are general, above: `monologueGuide`.
@@ -219,7 +223,10 @@ function leadLine(setup: DaydreamSetupContent): string | null {
 		return null;
 	}
 	if (setup.voice.narrator === 'impersonal') {
-		return systemLeadLine(setup.lead);
+		// A system the user commands answers to them whoever "leads".
+		return systemGoverns(setup.voice) === 'character'
+			? 'The user is in charge: the system carries out their orders and rulings, and rules by itself only where they have said nothing.'
+			: systemLeadLine(setup.lead);
 	}
 	switch (setup.lead) {
 		case 'character':
@@ -479,6 +486,17 @@ function steeringIdeas(
 			suggestions:
 				'Vary them: one asking the voice to say more about something it said, one pushing it to go further, one turning it towards a related idea.',
 			directions: `Harsher, Softer, More like that, A mantra, Another idea, Slower${sex}`
+		};
+	}
+	if (
+		voice.narrator === 'impersonal' &&
+		voice.stance !== 'absent' &&
+		systemGoverns(voice) === 'character'
+	) {
+		return {
+			suggestions:
+				'Vary them: one adding a rule for the subject, one ruling on something the subject asked for, one ordering a consequence.',
+			directions: `Stricter, Gentler, New rule, Inspection, Skip ahead${sex}`
 		};
 	}
 	if (voice.narrator === 'impersonal') {
@@ -828,7 +846,9 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 function openingRequest(voice: DaydreamVoice): string {
 	switch (voice.narrator) {
 		case 'impersonal':
-			return '(Begin. Open with the first notice or rules the system issues — not a description of a scene — and end where the user must respond.)';
+			return systemGoverns(voice) === 'character'
+				? '(Begin. Open with the first notice or rules the system issues to the one it governs — not a description of a scene — and end where the user can rule or respond.)'
+				: '(Begin. Open with the first notice or rules the system issues — not a description of a scene — and end where the user must respond.)';
 		case 'monologue':
 			return '(Begin. Open straight into the monologue with its first statements — not a description of a scene.)';
 		default:
@@ -844,7 +864,12 @@ function voiceGuide(setup: DaydreamSetupContent): string | null {
 	const { voice, characters, idea } = setup;
 	switch (voice.narrator) {
 		case 'impersonal':
-			return impersonalGuide(characters.length, idea.dials.heat);
+			return impersonalGuide(
+				characters.length,
+				idea.dials.heat,
+				systemGoverns(voice),
+				voice.stance === 'absent'
+			);
 		case 'monologue':
 			return monologueGuide(voice, characters.length, idea.dials.heat);
 		default:

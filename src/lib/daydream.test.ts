@@ -10,6 +10,7 @@ import {
 	inferVoice,
 	leadApplies,
 	MAX_DAYDREAM_CHARACTERS,
+	systemGoverns,
 	voiceCanWork,
 	voicePreset,
 	voiceProblem
@@ -157,5 +158,33 @@ describe('casting', () => {
 		expect(
 			fitCastingToIdea([cast('p1', 'your boss'), cast('p3', 'your rival')], [{ id: 'p1' }])
 		).toEqual([cast('p1', 'your boss'), cast(null, 'your rival')]);
+	});
+});
+
+describe('a system that governs a character', () => {
+	const command = { ...voice('impersonal', 'self'), governs: 'character' as const };
+
+	it('is its own preset, and the plain system is still "rules"', () => {
+		expect(voicePreset(command)?.id).toBe('command');
+		expect(voicePreset(voice('impersonal', 'self'))?.id).toBe('rules');
+	});
+
+	it('needs a character to govern, and only a system can govern one', () => {
+		expect(voiceProblem(command, 0)).toBe('Add the character the system governs.');
+		expect(voiceProblem(command, 1)).toBeNull();
+		expect(voiceProblem({ ...voice('none', 'self'), governs: 'character' }, 1)).toBe(
+			'Only a system governs someone else.'
+		);
+	});
+
+	it('is what someone watching a system always watches', () => {
+		expect(systemGoverns(voice('impersonal', 'absent'))).toBe('character');
+		expect(systemGoverns(voice('impersonal', 'self'))).toBe('user');
+		expect(systemGoverns(command)).toBe('character');
+	});
+
+	it('is cleared by choosing any other preset', () => {
+		const rules = DAYDREAM_VOICE_PRESETS.find((preset) => preset.id === 'rules');
+		expect({ ...command, ...rules?.voice }.governs).toBeUndefined();
 	});
 });

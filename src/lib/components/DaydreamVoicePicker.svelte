@@ -137,7 +137,13 @@
 							value={choice.value}
 							checked={value.narrator === choice.value}
 							disabled={blocked !== null}
-							onchange={() => set({ narrator: choice.value })}
+							onchange={() =>
+								// Only a system governs anyone, so any other narrator clears it.
+								set(
+									choice.value === 'impersonal'
+										? { narrator: choice.value }
+										: { narrator: choice.value, governs: undefined }
+								)}
 						/>
 						<span>
 							{choice.label}
@@ -167,6 +173,33 @@
 				{/each}
 			</fieldset>
 		</div>
+
+		{#if value.narrator === 'impersonal' && value.stance !== 'absent'}
+			<!-- Someone who watches a system always watches it govern a character. -->
+			<fieldset class="governs">
+				<legend>Whom the system governs</legend>
+				<label class="choice">
+					<input
+						type="radio"
+						name={`${id}-governs`}
+						value="user"
+						checked={value.governs !== 'character'}
+						onchange={() => set({ governs: undefined })}
+					/>
+					<span>You</span>
+				</label>
+				<label class="choice">
+					<input
+						type="radio"
+						name={`${id}-governs`}
+						value="character"
+						checked={value.governs === 'character'}
+						onchange={() => set({ governs: 'character' })}
+					/>
+					<span>A character, and it answers to you</span>
+				</label>
+			</fieldset>
+		{/if}
 
 		{#if value.stance !== 'absent'}
 			<wa-input

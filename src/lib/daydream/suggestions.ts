@@ -412,7 +412,7 @@ export function parseName(value: unknown): string | null {
 
 const QUOTES = /^["'“”‘’]+|["'“”‘’]+$/g;
 
-const VOICE_IDS = ['talk', 'told', 'watch', 'rules', 'monologue'] as const;
+const VOICE_IDS = ['talk', 'told', 'watch', 'rules', 'command', 'monologue'] as const;
 
 /** A voice preset's id from an answer, or null for anything else. */
 const voiceOf = (value: unknown): DaydreamVoicePresetId | null =>

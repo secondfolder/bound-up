@@ -1349,3 +1349,41 @@ describe('when the story moves on', () => {
 		expect(content).toContain('in a way that will last — not a passing moment');
 	});
 });
+
+describe('a system that governs a character', () => {
+	const governing = (stance: DaydreamStance = 'self', heat: DialValue | null = null) =>
+		system(
+			buildMessages(
+				request({
+					setup: testDaydreamSetup({
+						voice: { narrator: 'impersonal', stance, protagonistName: '', governs: 'character' },
+						characters: [testCharacter({ name: 'Wren' })],
+						idea: testIdea({ dials: { heat, kink: null } })
+					}),
+					turns: [said('hi')]
+				})
+			)
+		);
+
+	it('writes about the one it governs, and answers to the user', () => {
+		const content = governing();
+		expect(content).toContain('You speak as the system that governs the first character below');
+		expect(content).toContain('It answers to the user, the authority over it');
+		expect(content).toContain('asks them for rulings');
+		expect(content).toContain('Request from the subject');
+		expect(content).toContain('one ruling on something the subject asked for');
+		expect(content).toContain('The user is in charge: the system carries out their orders');
+		expect(content).not.toContain('You speak as the system that governs the user');
+	});
+
+	it('addresses no one but the subject for someone who only watches', () => {
+		const content = governing('absent');
+		expect(content).toContain('No one else is addressed.');
+		expect(content).toContain('asks no one for rulings');
+	});
+
+	it('shows the adult examples from Steamy, about the subject', () => {
+		expect(governing('self', 4)).toContain('EVENING SCHEDULE — ROOM 4 — THE SUBJECT');
+		expect(governing('self', 1)).toContain('NOTICE 1: THE SUBJECT');
+	});
+});

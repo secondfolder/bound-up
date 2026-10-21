@@ -484,6 +484,82 @@
 			}
 		},
 		{
+			"kind": "daydream-setup",
+			"version": 6,
+			"recordId": "00000000-0000-4000-8000-000000000103",
+			"ciphertext": "sb1.thOSrw5F1pLNieLQLkRBp4Q9QVOBr_Yg0ZNBSJaEBWQ29ZJC1LRg1ad9c1W_LctOBSXdkr4ApHkWlxaFdPq6bKNYkYcR6RJ_jCTPYr0Lz9O1lpRPU2Z_K2oTsXnbvLvSatGZHdGG9ODSvzK-G6bnfUs7Yp71kJES5ZU1oJROIpFIwDWvMD0K_3RxyNfegx0Y1FnqDOUCFkBAfI-V5O_2igVhRDHztycJQepB1pUfeseZwCrUhSTtJDv9gFwky-qwu1tEAZRtRZPPlPUCbFAxZo6t191e6Gqcm4xvuuXjoGkybJUFGeLKgo_Q480s1lTFKnU0IpGM28lo49w_AdMZZSl3Cg7jjljGXP-aYNJQJRplo03dgv-9hMPgcRPrYWSRF7wI68dIUBXGk-O6_KAr3eoD1h_k5v-MtOeShoy7u3uoai2daBiO-u6fHLvmvNxJYZuncEooKvS5cxLcNWETzNzL-IQZgkb5GvfKvKELliAjJvcP55IXAe6oam6fBOQU9q5i8qCqzD3_YVad99uiTfB96nRntYMFjI89SmBBHYv8vlXcTcF_yeQi7P2V5ecnNuSgV8ghSGSHX1GVmu1nl4RVNUHgjPH0xZsMk1C35770AxyIkmmDjddRa2NPnctF7oVGRYWlDM4BemY1Vb8N-qwsapfnTHzzSe6ejECKW8WX0_BAHjRG9jlrf4Fmo0uhzEu1rMBVF3-0VLQ3J0FUwbTVHelw2kBqYLeCH7v2Qfad9OokbsREVI5yiijN152wNT40NzTvr46qkibzN-VQ_cljguqAxfeuLk5RoYVK223zTnuE3o6KrF3XmU1blo-g751I7LhS1BdF-hb2--rhijjSVanJtsFS_fbsolBbwMUQTKrRL-2zGcI_qlqpV6eJ1-1uRZPhIS56IPLU2W2Far7rojngPfuAsAJpLSH1FgFwrluJDi8_6HFIYE_4Q_d8QmJBR5MjS2sh5LP9kwhkBEtPIgkTbQXiJ2YjIRkxmsABriFEbjTn1ZBVVkE3Km9bcKvSJ86Bx5Qgo1quiXfvVRSs0LPlR716nznI5QaKvojk58x6G3jtOqHHYxGe8ixYgpE8RL6kg4XECShzlPvw-SXfQbDxyE4149AWpRgUL_dc382yqP1dREPbnJLl4prPrJdxabDA3ayYupXIxVfFTR7sinfAzN1iI9letd3ZFL5EWUU2Yd7--jxdCJwL60oxRogRkHAznYop5whrdMCLkwsH7A5VP87kR0x8fhkcPDWGv3LJqMct5tG2nNFA8EvP_ncYJe-SMklS8VM_w2VOAl_rHOGbl7wH77a8zQdHYeyUgLPRrb9cfKm1nTqIKmMZsdXS36hPyl9YbXDEv7NSB9ZFpfSbBQiX23atzxfATJ9nQCyXpRbXRm7mw8uNZXta6azpc34pNvbrs_dDP0toXnNHUI9SHJnCWMJCu2t7FB7hRtgC_Af9Em_5ruJIM2PKsLJR_3GMDR3t9GMqvSV4fpCmTlgU08vIzS7srFgWIXoupZmA",
+			"expected": {
+				"title": "",
+				"voice": {
+					"narrator": "impersonal",
+					"stance": "self",
+					"protagonistName": "",
+					"governs": "character"
+				},
+				"characters": [
+					{
+						"name": "Wren",
+						"archetype": "The subject",
+						"personality": "Eager, a little proud.",
+						"speech": "Asks permission for everything.",
+						"appearance": "Plain grey uniform.",
+						"likes": "Being ruled on",
+						"notes": "",
+						"dials": {
+							"tone": null,
+							"control": 1,
+							"strictness": null,
+							"edge": null,
+							"talk": 2,
+							"libido": 4,
+							"kink": 4
+						},
+						"sourceId": null,
+						"sourceRevision": null,
+						"casting": {
+							"partId": "00000000-0000-4000-8000-0000000000e3",
+							"relationship": "Yours to rule on.",
+							"part": "Kneeling at the door from 19:00."
+						}
+					}
+				],
+				"idea": {
+					"title": "The keyholder’s house",
+					"setting": "A house run by its rules.",
+					"premise": "The house governs Wren, and answers to you.",
+					"yourRole": "The keyholder",
+					"tone": "exacting",
+					"notes": "",
+					"brief": "",
+					"research": "",
+					"parts": [
+						{
+							"id": "00000000-0000-4000-8000-0000000000e3",
+							"name": "the subject",
+							"description": "Governed by the house."
+						}
+					],
+					"sourceId": null,
+					"sourceRevision": null,
+					"dials": {
+						"heat": 4,
+						"kink": 4
+					}
+				},
+				"lead": "me",
+				"limits": "Nothing public.",
+				"dials": {
+					"intensity": 3,
+					"pace": 3,
+					"length": "medium"
+				},
+				"pictures": {
+					"on": true,
+					"style": "photo"
+				}
+			}
+		},
+		{
 			"kind": "daydream-turn",
 			"version": 2,
 			"recordId": "00000000-0000-4000-8000-0000000000d4",
