@@ -244,7 +244,7 @@ function replySetup(text: TextSource, combo: Combo): DaydreamSetup {
 			intensity: Number(combo.intensity) as DialValue,
 			pace: Number(combo.pace) as DialValue,
 			length: combo.length as PassageLength,
-			thoughts: 'shown'
+			thoughts: combo.thoughts === 'hidden' ? 'hidden' : 'shown'
 		},
 		pictures: { on: combo.pictures !== 'none', style: 'photo' },
 		opening: null

@@ -38,6 +38,7 @@ const shape = (list: Run[]) =>
 			run.dialogue ? 'd' : '',
 			run.speaker ? `@${run.speaker}` : '',
 			run.sound ? 's' : '',
+			run.thought ? 't' : '',
 			run.marked ? 'm' : ''
 		]
 			.filter(Boolean)
@@ -298,6 +299,34 @@ describe('sound tags', () => {
 	});
 });
 
+describe('thought tags', () => {
+	it('hides the tags, says whose thought it is, and never reads it as speech', () => {
+		const text =
+			'<say who="Mara">"Fine,"</say> she says. <thought who="Mara">It is not fine.</thought>';
+		expect(shape(runs(text))).toEqual([
+			'"Fine," d @Mara',
+			' she says. ',
+			'It is not fine. @Mara t'
+		]);
+		expect(verbatim(text, formatPassage(text))).toBe(true);
+		// Quotation marks a model put in one anyway are not dialogue.
+		expect(shape(runs('<thought who="Jo">"Run."</thought>'))).toEqual(['"Run." @Jo t']);
+	});
+
+	it('keeps emphasis inside a thought, ends an unclosed one with its paragraph, and has no thinker for none named', () => {
+		expect(shape(runs('<thought who="Mara">*Now*, then.\n\nShe moves.'))).toEqual([
+			'Now i @Mara t',
+			', then. @Mara t',
+			'She moves.'
+		]);
+		expect(runs('<thought>Hm.</thought>')[0]).toMatchObject({ speaker: null, thought: true });
+	});
+
+	it('is left as words in the plain passage', () => {
+		expect(plainPassage('She nods. <thought who="Mara">Liar.</thought>')).toBe('She nods. Liar.');
+	});
+});
+
 describe('while it streams', () => {
 	const streaming = { streaming: true };
 
@@ -311,7 +340,11 @@ describe('while it streams', () => {
 			'</sa',
 			'<so',
 			'<sound',
-			'</soun'
+			'</soun',
+			'<t',
+			'<thou',
+			'<thought who="Ma',
+			'</thought'
 		]) {
 			expect(paragraphs(formatPassage(`She says ${tail}`, streaming))).toEqual(['She says ']);
 		}

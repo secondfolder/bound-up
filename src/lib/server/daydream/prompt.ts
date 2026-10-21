@@ -9,7 +9,8 @@ import {
 	MAX_CONTEXT_TURNS,
 	MAX_DIRECTIONS,
 	MAX_SUGGESTIONS,
-	systemGoverns
+	systemGoverns,
+	thoughtsApply
 } from '$lib/daydream';
 import { fieldLabel } from '$lib/daydream/catalog';
 import {
@@ -573,9 +574,27 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 		describeTrackers(setup),
 		describeOrigin(idea),
 		`# The user's limits, which must never be crossed\n${setup.limits.trim() ? tagged('limits', setup.limits) : 'None stated beyond the rules above.'}`,
-		joinLines('# Dials', ...describeStoryDials(setup.dials))
+		joinLines('# Dials', ...describeStoryDials(setup.dials), thoughtsLine(setup))
 	];
 	return sections.filter((section) => section !== null).join('\n\n');
+}
+
+/**
+ * Whether the characters' unspoken thoughts are on the page (the thoughts
+ * dial; docs/daydreams.md, "Thoughts"), or null for a voice they do not
+ * apply to. Shown, they are a line now and then, best where someone thinks
+ * other than they say — what the most-played character cards lean on a
+ * thoughts block for — and not a running commentary. Hidden is the camera
+ * kept outside every head, for a user who wants to read people only by what
+ * they do.
+ */
+function thoughtsLine(setup: DaydreamSetupContent): string | null {
+	if (!thoughtsApply(setup.voice.narrator)) {
+		return null;
+	}
+	return setup.dials.thoughts === 'hidden'
+		? "Their thoughts: hidden. Stay outside every head: no one's unspoken thoughts, only what they say and do, and what shows on them."
+		: 'Their thoughts: shown. Now and then, give a line of what a character thinks and does not say, in a thought tag — most of all where it is not what they say. A line, not a paragraph, and not in every passage.';
 }
 
 const READING_IN_STORY =
@@ -828,7 +847,7 @@ ${steps}
  */
 const PASSAGE_LAYOUT = {
 	prose:
-		"Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis and for a character's unspoken thoughts — thoughts always in italics, never in quotation marks; **bold**, rarely, for a word that has to land; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.",
+		'Write the passage as prose, in paragraphs separated by a blank line. It is drawn with a little formatting, and no more: *italics* for emphasis; **bold**, rarely, for a word that has to land; and a line of * * * on its own for a scene break, when the story jumps in time or place. No headings, lists, tables or links.',
 	impersonal:
 		'Write each notice as plain lines: a heading in capitals on a line of its own where it suits, rules numbered "1." or led by a time, one to a line, and a blank line between notices. *Italics* and **bold** rarely, for a word that has to land. No Markdown headings, tables or links.',
 	monologue:
@@ -839,19 +858,28 @@ const PASSAGE_LAYOUT = {
  * How a passage is written so the page can draw it (`daydream/passage-format.ts`,
  * docs/daydreams.md, "Reading a passage"): the small Markdown subset it
  * reads, the scene break, say tags, which are how a line of dialogue is
- * given its speaker's colour, and sound tags, which set a moan or a slap
- * apart from words. Thoughts in italics is the convention the page
- * relies on to tell them from speech, which quotation marks mark out.
- * A watcher has no words of their own and no written-out turn, so neither
- * is mentioned to them.
+ * given its speaker's colour, sound tags, which set a moan or a slap apart
+ * from words, and thought tags, which set what someone thinks apart from
+ * what they say (docs/daydreams.md, "Thoughts"). Thoughts were italics
+ * until then, which the page could not tell from emphasis or give a
+ * thinker. How to write a thought tag is said whether or not thoughts are
+ * shown, so this stays the same when the dial moves; whether to write any
+ * is the dial's line (`thoughtsLine`). Not for a monologue or the system,
+ * which have no characters' thoughts to show. A watcher has no words of
+ * their own and no written-out turn, so neither is mentioned to them.
  */
 function passageFormat(voice: DaydreamVoice): string {
 	const inStory = voice.stance !== 'absent';
+	const thoughts = thoughtsApply(voice.narrator);
 	return `# Formatting the passage
 ${PASSAGE_LAYOUT[voice.narrator === 'impersonal' || voice.narrator === 'monologue' ? voice.narrator : 'prose']}
 Put every line someone speaks aloud in a say tag naming them, with its quotation marks inside: <say who="Charlie">"Sit down,"</say> she says. Name them as the story knows them${inStory ? '; for the user\'s own words, who="you"' : ''}.
-Put a sound someone or something makes — a moan, a gasp, a slap, a knock — in a sound tag, so it is drawn as one: <sound>Mmmph</sound>, a sharp <sound>crack</sound>. Inside someone's line too: <say who="Charlie">"<sound>Ah</sound> — don't stop."</say>
-Say and sound tags go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
+Put a sound someone or something makes — a moan, a gasp, a slap, a knock — in a sound tag, so it is drawn as one: <sound>Mmmph</sound>, a sharp <sound>crack</sound>. Inside someone's line too: <say who="Charlie">"<sound>Ah</sound> — don't stop."</say>${
+		thoughts
+			? `\nPut what a character thinks and does not say in a thought tag naming them, with no quotation marks: <thought who="Charlie">He has no idea what he just agreed to.</thought> Only the characters' thoughts${inStory ? ", never the user's" : ''}; whether to write any, the dials say.`
+			: ''
+	}
+${thoughts ? 'Say, sound and thought tags' : 'Say and sound tags'} go in the passage only, never${inStory ? ' in a <yours> block or' : ''} in the metadata.`;
 }
 
 function replyFormat(

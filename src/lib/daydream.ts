@@ -779,6 +779,13 @@ export type PassageLength = 'short' | 'medium' | 'long';
  */
 export type ThoughtsShown = 'shown' | 'hidden';
 
+/**
+ * Whether a voice has characters' thoughts to show or hide: not a monologue,
+ * which is one voice saying its piece, nor the system, which issues notices.
+ */
+export const thoughtsApply = (narrator: DaydreamNarrator): boolean =>
+	narrator !== 'monologue' && narrator !== 'impersonal';
+
 /** The story's sticky dials: sent with every reply until they are changed. */
 export type StoryDials = {
 	intensity: DialValue;

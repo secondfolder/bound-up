@@ -5,7 +5,8 @@
 
 	/**
 	 * A passage's words, drawn to be read: paragraphs, scene breaks, lists,
-	 * emphasis, dialogue in its speaker's colour, sounds, and highlighted quotes
+	 * emphasis, dialogue in its speaker's colour, thoughts in a quieter one,
+	 * sounds, and highlighted quotes
 	 * (docs/daydreams.md, "Reading a passage"). The formatting itself is
 	 * `formatPassage`'s; this only draws its runs.
 	 *
@@ -59,10 +60,10 @@
 		{:else if block.kind === 'list'}
 			<!-- One line on purpose, as below. An ordered item's number is the
 			     one written, so a list the model numbered from 4 reads from 4. -->
-			<svelte:element this={block.ordered ? 'ol' : 'ul'} class="list">{#each block.items as item, at (at)}<li value={item.number ?? undefined}>{#each item.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</li>{/each}</svelte:element>
+			<svelte:element this={block.ordered ? 'ol' : 'ul'} class="list">{#each block.items as item, at (at)}<li value={item.number ?? undefined}>{#each item.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} class:thought={run.thought} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</li>{/each}</svelte:element>
 		{:else}
 			<!-- One line on purpose: see the comment at the top. -->
-			<p class:after-break={block.afterBreak} class:standout={block.standout}>{#each block.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</p>
+			<p class:after-break={block.afterBreak} class:standout={block.standout}>{#each block.runs as run (run.start)}<svelte:element this={tagOf(run)} data-start={run.start} class:bold={run.bold} class:italic={run.italic} class:dialogue={run.dialogue} class:sound={run.sound} class:thought={run.thought} style:--voice={voice(run)}>{run.text}</svelte:element>{/each}</p>
 		{/if}
 	{/each}
 </div>
@@ -154,6 +155,15 @@
 
 	.dialogue {
 		color: var(--voice, var(--daydream-dialogue));
+	}
+
+	/* What someone thinks and does not say: italic, as fiction sets a
+	   thought, and in their voice's colour pulled toward the quiet text, so
+	   it reads against what they say aloud without being mistaken for it.
+	   Never in quotation marks: the model is told not to write them. */
+	.thought {
+		font-style: italic;
+		color: color-mix(in oklch, var(--voice, var(--daydream-thought)) 65%, var(--wa-color-text-quiet));
 	}
 
 	/* A moan or a slap reads as a sound, not a word: small caps, spaced, and

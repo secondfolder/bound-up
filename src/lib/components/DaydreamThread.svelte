@@ -469,6 +469,7 @@
 				<div class="dials">
 					<DaydreamDials
 						value={setup.dials}
+						narrator={setup.voice.narrator}
 						onchange={async (dials) => {
 							dialsProblem = await story.setDials(dials);
 						}}

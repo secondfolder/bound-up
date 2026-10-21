@@ -35,6 +35,11 @@
  * drawn so they read as sounds rather than words. Inside a say tag a sound
  * keeps its speaker's colour; only its type changes.
  *
+ * And what someone thinks and does not say, in
+ * `<thought who="Mara">…</thought>` (docs/daydreams.md, "Thoughts"): never
+ * dialogue, whatever quotation marks are in it, and drawn in its thinker's
+ * colour but quieter, so what they think reads against what they say.
+ *
  * Pure and alias-free.
  */
 
@@ -47,8 +52,13 @@ export type Run = {
 	italic: boolean;
 	/** Spoken aloud: inside quotation marks, or a say tag. */
 	dialogue: boolean;
-	/** Who says it, as the say tag named them; null for narration and unattributed speech. */
+	/**
+	 * Who says it, or thinks it, as the say or thought tag named them; null
+	 * for narration and unattributed speech.
+	 */
 	speaker: string | null;
+	/** Thought and not said, in a thought tag. */
+	thought: boolean;
 	/** A sound someone makes, in a sound tag. */
 	sound: boolean;
 	/** Inside a highlighted quote (`withQuotes`). */
@@ -102,11 +112,13 @@ const INDENTED = /^[ \t]/;
 const SAY_TAG = /<(?<close>\/)?say\b[^<>]*>/gi;
 const WHO = /\bwho\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|(?<bare>[^\s"'>]+))/i;
 const SOUND_TAG = /<(?<close>\/)?sound\b[^<>]*>/gi;
+const THOUGHT_TAG = /<(?<close>\/)?thought\b[^<>]*>/gi;
 /**
- * A say or sound tag cut off by the end of what has arrived: `<`, `<sa`,
- * `</say`, `<say who="Ma`, `<sou`.
+ * A say, sound or thought tag cut off by the end of what has arrived: `<`,
+ * `<sa`, `</say`, `<say who="Ma`, `<sou`, `<thou`.
  */
-const PARTIAL_TAG = /<(?:\/?(?:s(?:a(?:y(?:\b[^<>]*)?)?|o(?:u(?:n(?:d(?:\b[^<>]*)?)?)?)?)?)?)$/i;
+const PARTIAL_TAG =
+	/<(?:\/?(?:s(?:a(?:y(?:\b[^<>]*)?)?|o(?:u(?:n(?:d(?:\b[^<>]*)?)?)?)?)?|t(?:h(?:o(?:u(?:g(?:h(?:t(?:\b[^<>]*)?)?)?)?)?)?)?)?)$/i;
 const SPACE = /\s/;
 const SPACES = /\s+/;
 const WORD = /[\p{L}\p{N}]/u;
@@ -118,7 +130,8 @@ type Marks = {
 	italic: Uint8Array;
 	dialogue: Uint8Array;
 	sound: Uint8Array;
-	/** Which say tag a character is inside, numbered from 1; 0 for none. */
+	thought: Uint8Array;
+	/** Which say or thought tag a character is inside, numbered from 1; 0 for none. */
 	say: Uint32Array;
 	speakers: (string | null)[];
 };
@@ -174,6 +187,7 @@ function format(
 		italic: new Uint8Array(text.length),
 		dialogue: new Uint8Array(text.length),
 		sound: new Uint8Array(text.length),
+		thought: new Uint8Array(text.length),
 		say: new Uint32Array(text.length),
 		speakers: [null]
 	};
@@ -191,6 +205,7 @@ function format(
 			const tail = streaming && piece === last;
 			const end = tagsEnd(text, piece, marks, tail);
 			sayTags(text, piece, marks, end);
+			thoughtTags(text, piece, marks, end);
 			soundTags(text, piece, marks, end);
 			quotationMarks(text, piece, marks);
 			emphasis(text, piece, marks, { tail, strays });
@@ -352,16 +367,37 @@ function tagsEnd(text: string, paragraph: Span, marks: Marks, tail: boolean): nu
  * the rest of the passage; a closing tag with nothing open is just hidden.
  */
 function sayTags(text: string, paragraph: Span, marks: Marks, end: number) {
+	attributedTags(text, paragraph, marks, end, SAY_TAG, marks.dialogue);
+}
+
+/**
+ * `<thought who="…">` and `</thought>`, read as say tags are, but what is
+ * between them is thought rather than dialogue — a say tag inside one would
+ * be the model contradicting itself, and is read as written.
+ */
+function thoughtTags(text: string, paragraph: Span, marks: Marks, end: number) {
+	attributedTags(text, paragraph, marks, end, THOUGHT_TAG, marks.thought);
+}
+
+/** A tag that names someone: hidden, with what is between it and its close marked as `kind` and theirs. */
+function attributedTags(
+	text: string,
+	paragraph: Span,
+	marks: Marks,
+	end: number,
+	tag: RegExp,
+	kind: Uint8Array
+) {
 	const body = text.slice(paragraph.start, end);
 	let open: { from: number; id: number } | null = null;
 	const finish = (to: number) => {
 		if (open) {
 			marks.say.fill(open.id, open.from, to);
-			marks.dialogue.fill(1, open.from, to);
+			kind.fill(1, open.from, to);
 			open = null;
 		}
 	};
-	for (const match of body.matchAll(SAY_TAG)) {
+	for (const match of body.matchAll(tag)) {
 		const start = paragraph.start + match.index;
 		const after = start + match[0].length;
 		hide(marks, start, after);
@@ -401,7 +437,7 @@ function soundTags(text: string, paragraph: Span, marks: Marks, end: number) {
 }
 
 /**
- * Quotation marks, straight or curly, outside say tags: the marks and what is
+ * Quotation marks, straight or curly, outside say and thought tags: the marks and what is
  * between them are dialogue. Speech carried on into the next paragraph
  * leaves its opening mark unclosed, as fiction does, so an unclosed mark is
  * dialogue to the end of its paragraph.
@@ -531,6 +567,7 @@ function runsOf(text: string, paragraph: Span, marks: Marks): Run[] {
 		const italic = marks.italic[index] === 1;
 		const dialogue = marks.dialogue[index] === 1;
 		const sound = marks.sound[index] === 1;
+		const thought = marks.thought[index] === 1;
 		const speaker = marks.speakers[marks.say[index] ?? 0] ?? null;
 		const last = runs.at(-1);
 		if (
@@ -540,6 +577,7 @@ function runsOf(text: string, paragraph: Span, marks: Marks): Run[] {
 			last.italic === italic &&
 			last.dialogue === dialogue &&
 			last.sound === sound &&
+			last.thought === thought &&
 			last.speaker === speaker
 		) {
 			last.end = index + 1;
@@ -553,6 +591,7 @@ function runsOf(text: string, paragraph: Span, marks: Marks): Run[] {
 			italic,
 			dialogue,
 			speaker,
+			thought,
 			sound,
 			marked: false
 		};

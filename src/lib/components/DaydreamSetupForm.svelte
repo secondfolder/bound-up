@@ -1106,6 +1106,7 @@
 				<legend>Dials</legend>
 				<DaydreamDials
 					value={$form.dials}
+					narrator={$form.voice.narrator}
 					onchange={(dials) => {
 						$form.dials = dials;
 					}}

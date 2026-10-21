@@ -328,6 +328,53 @@ describe('buildMessages', () => {
 		expect(messages.some((message) => message.content.includes('on screen now'))).toBe(false);
 	});
 
+	describe('thoughts', () => {
+		const told = (narrator: DaydreamNarrator, thoughts: 'shown' | 'hidden' = 'shown') =>
+			system(
+				buildMessages(
+					request({
+						mode: 'opening',
+						setup: {
+							...setup,
+							voice: { ...setup.voice, narrator },
+							dials: { ...setup.dials, thoughts }
+						}
+					})
+				)
+			);
+
+		it('puts a character’s thoughts in a thought tag, never the user’s, and no longer in italics', () => {
+			const content = told('second-person');
+			expect(content).toContain(
+				'<thought who="Charlie">He has no idea what he just agreed to.</thought>'
+			);
+			expect(content).toContain("Only the characters' thoughts, never the user's");
+			expect(content).toContain('Say, sound and thought tags go in the passage only');
+			expect(content).not.toContain('thoughts always in italics');
+		});
+
+		it('says whether to write any in the dials, and the format the same either way', () => {
+			const shown = told('second-person');
+			const hidden = told('second-person', 'hidden');
+			expect(shown).toContain('Their thoughts: shown.');
+			expect(hidden).toContain('Their thoughts: hidden. Stay outside every head');
+			const format = (content: string) =>
+				content.slice(
+					content.indexOf('# Formatting the passage'),
+					content.indexOf('# Reply format')
+				);
+			expect(format(hidden)).toBe(format(shown));
+		});
+
+		it('says nothing of thoughts to a monologue or the system', () => {
+			for (const narrator of ['monologue', 'impersonal'] as const) {
+				const content = told(narrator);
+				expect(content, narrator).not.toContain('thought tag');
+				expect(content, narrator).not.toContain('Their thoughts:');
+			}
+		});
+	});
+
 	describe('trackers', () => {
 		const Meter = '00000000-0000-4000-8000-0000000000f1';
 		const RulesList = '00000000-0000-4000-8000-0000000000f2';
@@ -607,14 +654,14 @@ describe('buildMessages', () => {
 		const section = content.slice(formatting, content.indexOf('# Reply format'));
 		// What `passage-format.ts` reads, and nothing it does not.
 		expect(section).toContain('*italics*');
-		expect(section).toContain('unspoken thoughts');
+		expect(section).toContain('<thought who="Charlie">');
 		expect(section).toContain('**bold**');
 		expect(section).toContain('* * *');
 		expect(section).toContain('<say who="Charlie">"Sit down,"</say>');
 		expect(section).toContain('who="you"');
 		expect(section).toContain('No headings, lists, tables or links');
 		expect(section).toContain('<sound>Mmmph</sound>');
-		expect(section).toContain('Say and sound tags go in the passage only');
+		expect(section).toContain('Say, sound and thought tags go in the passage only');
 		expect(section).toContain('never in a <yours> block or in the metadata');
 	});
 

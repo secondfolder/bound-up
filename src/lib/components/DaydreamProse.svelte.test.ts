@@ -81,6 +81,19 @@ describe('DaydreamProse', () => {
 		expect(container.textContent).not.toContain('<say');
 	});
 
+	it('sets a thought apart from speech, in italics and its thinker’s colour, never as dialogue', () => {
+		const { container } = render(DaydreamProse, {
+			text: '<say who="Mara">"Fine."</say> <thought who="Mara">It is not fine.</thought>',
+			cast
+		});
+		const [thought] = [...container.querySelectorAll<HTMLElement>('.thought')];
+		expect(thought?.textContent).toBe('It is not fine.');
+		expect(thought?.classList.contains('dialogue')).toBe(false);
+		expect(thought?.style.getPropertyValue('--voice')).toBe('var(--daydream-voice-1)');
+		expect(getComputedStyle(defined(thought)).fontStyle).toBe('italic');
+		expect(container.textContent).not.toContain('<thought');
+	});
+
 	it('sets sounds apart, in their own colour outside a line and the speaker’s inside one', () => {
 		const { container } = render(DaydreamProse, {
 			text: 'A <sound>crack</sound>. <say who="Mara">"<sound>Ah</sound> — more."</say>',

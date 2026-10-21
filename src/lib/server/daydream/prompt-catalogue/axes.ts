@@ -128,6 +128,8 @@ export const BUILDERS: readonly Builder[] = [
 			axis('intensity', 'Intensity', 'descriptive', dialValues(false), '3'),
 			axis('pace', 'Pace', 'descriptive', dialValues(false), '3'),
 			axis('length', 'Length', 'descriptive', values('short', 'medium', 'long'), 'medium'),
+			// Whether the characters' thoughts are on the page (`thoughtsLine` in prompt.ts).
+			axis('thoughts', 'Their thoughts', 'descriptive', values('shown', 'hidden'), 'shown'),
 			axis('text', 'Fields written', 'structural', values('all', 'minimal')),
 			// A field the user named on the idea, and whether it is a spoiler
 			// kept from them (`describeFields` in prompt.ts).

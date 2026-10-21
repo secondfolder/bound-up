@@ -1,11 +1,21 @@
 <script lang="ts">
-	import type { DialValue, IdeaDials, PassageLength, StoryDials } from '$lib/daydream';
+	import {
+		type DaydreamNarrator,
+		type DialValue,
+		type IdeaDials,
+		type PassageLength,
+		type StoryDials,
+		type ThoughtsShown,
+		thoughtsApply
+	} from '$lib/daydream';
 	import { IDEA_SLIDERS, PASSAGE_LENGTHS, STORY_SLIDERS } from '$lib/daydream/dial-words';
 	import OptionalSlider from './OptionalSlider.svelte';
 	import Slider from './Slider.svelte';
 
 	/**
-	 * The story's sticky dials: intensity, pace and which way passages lean in length.
+	 * The story's sticky dials: intensity, pace, which way passages lean in
+	 * length, and whether the characters' thoughts are on the page — the last
+	 * only for a voice with characters' thoughts to show (`thoughtsApply`).
 	 * Sent with every passage until they are changed, unlike a direction
 	 * button, which nudges only the next one. In the setup form and in the
 	 * story's own Dials popover.
@@ -17,10 +27,13 @@
 		value,
 		onchange,
 		idea,
-		onideachange
+		onideachange,
+		narrator
 	}: {
 		value: StoryDials;
 		onchange: (dials: StoryDials) => void;
+		/** How the daydream is told, which decides whether its thoughts can be shown or hidden. */
+		narrator: DaydreamNarrator;
 		/**
 		 * The idea's heat and kink, shown above the rest when given: in the
 		 * story's popover, so they can be turned up or down mid-story. The
@@ -47,6 +60,17 @@
 	function setLength(length: PassageLength) {
 		if (length !== value.length) {
 			onchange({ ...value, length });
+		}
+	}
+
+	const THOUGHTS: { value: ThoughtsShown; label: string }[] = [
+		{ value: 'shown', label: 'Shown' },
+		{ value: 'hidden', label: 'Hidden' }
+	];
+
+	function setThoughts(thoughts: ThoughtsShown) {
+		if (thoughts !== value.thoughts) {
+			onchange({ ...value, thoughts });
 		}
 	}
 </script>
@@ -114,6 +138,27 @@
 			{/each}
 		</div>
 	</fieldset>
+
+	{#if thoughtsApply(narrator)}
+		<fieldset class="length">
+			<legend>Their thoughts</legend>
+			<div class="choices">
+				{#each THOUGHTS as choice (choice.value)}
+					<!-- A native radio, as for the length above. -->
+					<label class="choice">
+						<input
+							type="radio"
+							name="their-thoughts"
+							value={choice.value}
+							checked={value.thoughts === choice.value}
+							onchange={() => setThoughts(choice.value)}
+						/>
+						<span>{choice.label}</span>
+					</label>
+				{/each}
+			</div>
+		</fieldset>
+	{/if}
 </div>
 
 <style>
