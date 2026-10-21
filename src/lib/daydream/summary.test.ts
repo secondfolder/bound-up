@@ -135,6 +135,32 @@ describe('setupSummary, without the model’s', () => {
 		expect(read(setupSummary(setup('none', 'self', ['Mara']), null))[1]).not.toContain('It starts');
 	});
 
+	it('takes where it starts from a summary that says so, and nothing after it', () => {
+		const base = setup('none', 'self', ['Mara']);
+		const opened = {
+			...base,
+			idea: {
+				...base.idea,
+				openings: [{ id: 'o1', label: 'Three weeks in', situation: 'The door is locked.' }]
+			},
+			opening: null
+		};
+		const said = marked(
+			'[[idea|Kept late]] at a [[heat|steamy]] hour, starting [[opening|at the beginning]], with [[Mara|Mara]], [[voice|in their own words]].'
+		);
+		const written = { marked: said, draft: opened };
+		expect(read(setupSummary(opened, written))).toEqual([
+			'[Kept late] at a [steamy] hour, starting [at the beginning], with [Mara], [in their own words].'
+		]);
+		// Another opening chosen since: the blank says the new one.
+		expect(read(setupSummary({ ...opened, opening: 'o1' }, written))[0]).toContain(
+			'starting [three weeks in]'
+		);
+		// An idea with no openings left: the words, as plain text.
+		const none = { ...opened, idea: { ...opened.idea, openings: [] } };
+		expect(read(setupSummary(none, written))[0]).toContain('starting at the beginning,');
+	});
+
 	it('says how each preset is told in a sentence of its own', () => {
 		const second = (narrator: DaydreamNarrator, stance: DaydreamStance, names: string[]) =>
 			read(setupSummary(setup(narrator, stance, names), null))[1];

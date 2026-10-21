@@ -1,17 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_IDEA } from '../daydream';
 import { daydreamCharacterKind, daydreamIdeaKind } from '../sealed-kinds/daydreams';
+import { isClientId } from '../vault';
 import {
 	CASTING_CHIPS,
 	CHARACTER_CHIPS,
 	CHARACTER_TEMPLATES,
 	IDEA_CHIPS,
-	IDEA_TEMPLATES
+	IDEA_TEMPLATES,
+	ownFieldId
 } from './catalog';
 import { MAX_CHIP_LENGTH } from './suggestions';
 
 const isSorted = (values: number[]) =>
 	values.every((value, at) => at === 0 || value >= (values[at - 1] ?? 0));
+
+describe('ownFieldId', () => {
+	it('is a client id, the same for the same seed and different for another', () => {
+		const one = ownFieldId('idea:kept:The secret');
+		expect(isClientId(one)).toBe(true);
+		expect(ownFieldId('idea:kept:The secret')).toBe(one);
+		expect(ownFieldId('idea:kept:The rule')).not.toBe(one);
+	});
+});
 
 describe('the catalog', () => {
 	it('has starting points a character or idea can be saved as', () => {

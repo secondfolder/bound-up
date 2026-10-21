@@ -57,6 +57,8 @@ export type SummarySlot =
 	| { kind: 'heat' }
 	| { kind: 'voice' }
 	| { kind: 'idea' }
+	/** Where it starts, for an idea with openings: a ready-made daydream's summary may say. */
+	| { kind: 'opening' }
 	| { kind: 'character'; name: string };
 
 /**
@@ -72,7 +74,7 @@ export type MarkedSummary = readonly MarkedPiece[];
 /** The model's summary and the setup it was written for. */
 export type WrittenSummary = {
 	marked: MarkedSummary;
-	draft: Pick<DaydreamSetup, 'voice' | 'idea'>;
+	draft: Pick<DaydreamSetup, 'voice' | 'idea'> & Partial<Pick<DaydreamSetup, 'opening'>>;
 };
 
 /** The longest summary kept, in visible characters: a paragraph, not a story. */
@@ -101,7 +103,7 @@ const tidy = (value: string) => value.replace(/\s+/g, ' ');
 
 function slotFor(key: string, names: readonly string[]): SummarySlot | null {
 	const word = key.trim().toLocaleLowerCase();
-	if (word === 'heat' || word === 'voice' || word === 'idea') {
+	if (word === 'heat' || word === 'voice' || word === 'idea' || word === 'opening') {
 		return { kind: word };
 	}
 	const name = names.find((candidate) => same(candidate, key));
@@ -194,16 +196,23 @@ function startsSentence(setup: Setup): SummaryPiece[] {
 	if (setup.idea.openings.length === 0) {
 		return [];
 	}
+	return [text('It starts '), { kind: 'opening', label: openingLabel(setup) }, text('.')];
+}
+
+/** The opening the setup starts from, as its blank says it. */
+function openingLabel(setup: Setup): string {
 	const chosen = setup.idea.openings.find((opening) => opening.id === setup.opening);
-	return [
-		text('It starts '),
-		{ kind: 'opening', label: chosen ? chosen.label.toLocaleLowerCase() : FROM_THE_PREMISE },
-		text('.')
-	];
+	return chosen ? chosen.label.toLocaleLowerCase() : FROM_THE_PREMISE;
 }
 
 /** Which pieces of the setup already have their blank. */
-type Mentioned = { heat: boolean; voice: boolean; idea: boolean; characters: Set<number> };
+type Mentioned = {
+	heat: boolean;
+	voice: boolean;
+	idea: boolean;
+	opening: boolean;
+	characters: Set<number>;
+};
 
 const characterIndex = (setup: Setup, name: string) =>
 	setup.characters.findIndex((character) => same(character.name, name));
@@ -253,6 +262,18 @@ function fromMarked(
 			case 'idea':
 				mentioned.idea = true;
 				return { kind: 'idea', label: words, key };
+			case 'opening':
+				// Only a blank while there are openings to choose between; its own
+				// words while it is still the one they were written for.
+				if (setup.idea.openings.length === 0) {
+					return { kind: 'text', text: words };
+				}
+				mentioned.opening = true;
+				return {
+					kind: 'opening',
+					label: (setup.opening ?? null) === (draft.opening ?? null) ? words : openingLabel(setup),
+					key
+				};
 			default: {
 				const index = characterIndex(setup, slot.name);
 				mentioned.characters.add(index);
@@ -391,7 +412,7 @@ function remainder(setup: Setup, mentioned: Mentioned): SummaryPiece[] {
 		about = [...listOf(missing), text(missing.length === 1 ? ' is in it too.' : ' are in it too.')];
 	}
 	const told = mentioned.voice ? [] : toldSentence(setup);
-	return [about, startsSentence(setup), told]
+	return [about, mentioned.opening ? [] : startsSentence(setup), told]
 		.filter((sentence) => sentence.length > 0)
 		.flatMap((sentence, at) => (at === 0 ? sentence : [text(' '), ...sentence]));
 }
@@ -402,7 +423,13 @@ function remainder(setup: Setup, mentioned: Mentioned): SummaryPiece[] {
  * Empty paragraphs are left out.
  */
 export function setupSummary(setup: Setup, written: WrittenSummary | null): SummaryPiece[][] {
-	const mentioned: Mentioned = { heat: false, voice: false, idea: false, characters: new Set() };
+	const mentioned: Mentioned = {
+		heat: false,
+		voice: false,
+		idea: false,
+		opening: false,
+		characters: new Set()
+	};
 	const first =
 		written && stillDescribes(written, setup)
 			? fromMarked(written, setup, mentioned)
