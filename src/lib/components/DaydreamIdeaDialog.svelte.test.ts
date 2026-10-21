@@ -196,6 +196,33 @@ describe('DaydreamIdeaDialog', () => {
 		});
 	});
 
+	it('writes places its story can start, and saves them', async () => {
+		const onsaved = vi.fn();
+		const { baseElement } = renderDialog({
+			idea: testIdea({ title: 'Late', premise: 'A meeting.' }),
+			onsaved
+		});
+		await waSettled(baseElement);
+		button(baseElement, 'Add a place to start')?.click();
+		await waitFor(() => expect(baseElement.querySelector('.opening')).not.toBeNull());
+		await waSettled(baseElement);
+		const row = baseElement.querySelector('.opening') as HTMLElement;
+		const label = row.querySelector('wa-input')?.shadowRoot?.querySelector('input');
+		const situation = row.querySelector('wa-textarea')?.shadowRoot?.querySelector('textarea');
+		await userEvent.type(defined(label, 'the opening’s name'), 'Three weeks in');
+		await userEvent.type(defined(situation, 'where it starts'), 'The door is locked.');
+		await waSettled(baseElement);
+		button(baseElement, 'Save changes')?.click();
+
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		const saved = defined(onsaved.mock.calls[0], 'the saved idea') as [
+			{ openings: { id: string }[] }
+		];
+		const [opening] = saved[0].openings;
+		expect(opening).toMatchObject({ label: 'Three weeks in', situation: 'The door is locked.' });
+		expect(isClientId(opening?.id)).toBe(true);
+	});
+
 	it('takes the model’s parts only for an idea that had none', async () => {
 		suggest.suggestFill.mockResolvedValue({
 			ok: true,

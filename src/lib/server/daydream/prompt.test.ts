@@ -1565,3 +1565,49 @@ describe('a system that governs a character', () => {
 		}
 	});
 });
+
+describe('openings', () => {
+	const opening = {
+		label: 'Three weeks in',
+		situation: 'It is a routine now; the door is locked.'
+	};
+	const messagesOf = (messages: ReturnType<typeof buildMessages>) => messages.slice(1);
+
+	it('names the opening a first passage starts from, as the user’s words', () => {
+		const asked = buildMessages(request({ mode: 'opening', opening })).at(-1)?.content ?? '';
+		expect(asked).toContain('Open just before the moment it turns on');
+		expect(asked).toContain(
+			'<opening>\nThree weeks in: It is a routine now; the door is locked.\n</opening>'
+		);
+		// From the premise, nothing is said of one.
+		expect(buildMessages(request({ mode: 'opening' })).at(-1)?.content).not.toContain('<opening>');
+	});
+
+	it('sends a first passage from an opening back with the request that asked for it', () => {
+		const first = messagesOf(buildMessages(request({ mode: 'opening', opening })));
+		const passage: ContextTurn = { type: 'text', role: 'story', text: 'She is waiting.', opening };
+		const next = messagesOf(
+			buildMessages(request({ mode: 'reply', turns: [passage, said('I sit.')] }))
+		);
+		// Every message the first request sent, but its trailing buttons note, comes first again.
+		expect(next[0]?.content).toBe(withoutNote(first[0]?.content));
+	});
+
+	it('keeps the opening for another take on a first passage, and sends it back the same way', () => {
+		const rewrite = { targetText: 'She is waiting.', again: true as const };
+		const asked = messagesOf(
+			buildMessages(request({ mode: 'rewrite', turns: [], rewrite, opening }))
+		);
+		expect(asked[0]?.content).toContain('<opening>');
+		expect(asked[0]?.content).toContain('another take');
+		const take: ContextTurn = {
+			type: 'text',
+			role: 'story',
+			text: 'She looks up.',
+			opening,
+			rewrite
+		};
+		const next = messagesOf(buildMessages(request({ mode: 'reply', turns: [take, said('Hi.')] })));
+		expect(next[0]?.content).toBe(withoutNote(asked[0]?.content));
+	});
+});

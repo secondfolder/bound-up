@@ -422,9 +422,31 @@
 	 * A new or changed idea. Castings in a part it no longer has let go of
 	 * the part and keep their words, which are still the user's to reuse.
 	 */
+	/** The menu value for starting from the idea's premise rather than one of its openings. */
+	const FROM_PREMISE = 'premise';
+
+	/** The full layout's "Where it starts", wired by hand: its change comes from inside a shadow root (AGENTS.md). */
+	function openingSelect(node: HTMLElement & { value: string }) {
+		const update = () => {
+			$form.opening = node.value === FROM_PREMISE ? null : node.value;
+		};
+		node.addEventListener('change', update);
+		return () => node.removeEventListener('change', update);
+	}
+
+	/** Where the story starts: one of the idea's openings, or its premise. */
+	function pickOpening(event: WaSelectEvent) {
+		const value = selectedValue(event);
+		$form.opening = value === FROM_PREMISE || value === undefined ? null : value;
+	}
+
 	function putIdea(idea: DaydreamIdeaCopy, sealed?: SealedRefView) {
 		$form.idea = idea;
 		$form.characters = fitCastingToIdea($form.characters, idea.parts);
+		// An opening the idea no longer has lets go, as a part does.
+		if (!idea.openings.some((opening) => opening.id === $form.opening)) {
+			$form.opening = null;
+		}
 		rememberLibrary('ideas', idea, sealed);
 	}
 
@@ -870,7 +892,15 @@
 									partId: $form.characters[piece.index]?.casting.partId ?? null
 								};
 							}}
-						/>{:else}<SummaryBlank
+						/>{:else if piece.kind === 'opening'}<SummaryBlank
+							label={piece.label}
+							name={`Where it starts: ${piece.label}`}
+							onselect={pickOpening}
+							>{#snippet items()}{#each $form.idea.openings as opening (opening.id)}<wa-dropdown-item value={opening.id}
+										>{opening.label}</wa-dropdown-item
+									>{/each}<wa-dropdown-item value={FROM_PREMISE}>From the beginning</wa-dropdown-item
+								>{/snippet}</SummaryBlank
+						>{:else}<SummaryBlank
 							label={piece.label}
 							onclick={() => {
 								ideaDialog = { surprise: false, edit: true };
@@ -960,6 +990,18 @@
 					onuselibrary={useLibraryIdeaField}
 					oncopytolibrary={copyIdeaFieldToLibrary}
 				/>
+				{#if $form.idea.openings.length > 0}
+					<wa-select
+						{@attach openingSelect}
+						label="Where it starts"
+						value={$form.opening ?? FROM_PREMISE}
+					>
+						{#each $form.idea.openings as opening (opening.id)}
+							<wa-option value={opening.id}>{opening.label}</wa-option>
+						{/each}
+						<wa-option value={FROM_PREMISE}>From the beginning</wa-option>
+					</wa-select>
+				{/if}
 			{:else}
 				<p class="hint">Where it happens and what is going on.</p>
 			{/if}

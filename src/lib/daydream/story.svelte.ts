@@ -22,6 +22,7 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { openRecord } from '../crypto/sealed';
 import { vaultById, vaultsSettled } from '../crypto/vaults.svelte';
 import {
+	chosenOpening,
 	type DaydreamPictures,
 	type DaydreamSetup,
 	type DaydreamTurnRole,
@@ -29,6 +30,7 @@ import {
 	fieldText,
 	type IdeaDials,
 	type IdeaFieldKind,
+	type IdeaOpening,
 	type StoryDials,
 	withField
 } from '../daydream';
@@ -78,6 +80,7 @@ import {
 	type ContextTurn,
 	chosenReadingIn,
 	expansionIn,
+	type OpeningSnapshot,
 	passageAsSent,
 	passageExcerpt,
 	type Reaction,
@@ -147,7 +150,16 @@ type Generate = {
 		/** "Write again": another take, shown the one it replaces, rather than a rewrite of it. */
 		again?: true;
 	};
+	/**
+	 * For a first passage: the idea's opening it starts from, as it reads now
+	 * (docs/daydreams.md, "Openings"). Kept on the passage it writes.
+	 */
+	opening?: OpeningSnapshot;
 };
+
+/** An opening as a first passage keeps it: what it said, not which one it was. */
+const snapshotOf = (opening: IdeaOpening | null): OpeningSnapshot | undefined =>
+	opening ? { label: opening.label, situation: opening.situation } : undefined;
 
 /** The user's turn as `request` sends it written out, if it carries one: a rewrite's. */
 function carriedIn(request: Generate): string | undefined {
@@ -660,6 +672,7 @@ export class DaydreamStory {
 			turns: context,
 			currentDirections: currentDirections(before),
 			...(this.#keepRawReplies ? { record: true } : {}),
+			...(request.opening ? { opening: request.opening } : {}),
 			...(request.rewrite
 				? {
 						rewrite: {
@@ -867,7 +880,7 @@ export class DaydreamStory {
 						ownWords ? meta?.settings : withoutDaydreamSettings(meta?.settings)
 					);
 		const finalMeta: PassageMeta | undefined =
-			meta || stopped || request.rewrite || writtenOut || forced || reading
+			meta || stopped || request.rewrite || writtenOut || forced || reading || request.opening
 				? {
 						suggestions: stopped ? [] : (meta?.suggestions ?? []),
 						directions: stopped
@@ -884,6 +897,8 @@ export class DaydreamStory {
 						...(changed ?? {}),
 						// How the story has moved on from its setup; a check-in says nothing about it.
 						...(meta?.drifted && !stopped ? { drifted: meta.drifted } : {}),
+						// Where a first passage started, so its request can be sent again as it was.
+						...(request.opening ? { opening: request.opening } : {}),
 						...(request.rewrite
 							? {
 									rewriteOf: {
@@ -1236,11 +1251,42 @@ export class DaydreamStory {
 		}
 	}
 
-	/** The opening, asked for by itself when a daydream has no turns yet. */
+	/**
+	 * The opening, asked for by itself when a daydream has no turns yet: from
+	 * the idea's opening the setup chose, or its premise.
+	 */
 	open(): void {
 		if (this.tree.length === 0 && this.available && !this.busy) {
-			void this.#start({ parentId: null, mode: 'opening' });
+			void this.#start({ parentId: null, mode: 'opening', ...this.#chosenOpening() });
 		}
+	}
+
+	/** The setup's chosen opening, for a request that starts the story. */
+	#chosenOpening(): { opening?: OpeningSnapshot } {
+		const opening = this.setup ? snapshotOf(chosenOpening(this.setup)) : undefined;
+		return opening ? { opening } : {};
+	}
+
+	/**
+	 * "Start somewhere else": a new beginning beside the others, from one of
+	 * the idea's openings or (null) its premise. The tree keeps every root,
+	 * so the beginnings already written stay, a switch away.
+	 */
+	async startFrom(openingId: string | null): Promise<void> {
+		if (!this.setup || this.busy) {
+			return;
+		}
+		const opening = snapshotOf(
+			this.setup.idea.openings.find((candidate) => candidate.id === openingId) ?? null
+		);
+		await this.#settled();
+		void this.#start({ parentId: null, mode: 'opening', ...(opening ? { opening } : {}) });
+	}
+
+	/** The opening a first passage was written from, if it was written from one. */
+	openingOf(turnId: string): OpeningSnapshot | null {
+		const content = this.content(turnId);
+		return content?.type === 'text' ? (content.meta?.opening ?? null) : null;
 	}
 
 	/**
@@ -1265,10 +1311,11 @@ export class DaydreamStory {
 	/** More of the story, with nothing said: no turn is added for the press itself. */
 	async continueStory(): Promise<void> {
 		await this.#settled();
-		void this.#start({
-			parentId: this.activeTurnId,
-			mode: this.activeTurnId ? 'reply' : 'opening'
-		});
+		void this.#start(
+			this.activeTurnId
+				? { parentId: this.activeTurnId, mode: 'reply' }
+				: { parentId: null, mode: 'opening', ...this.#chosenOpening() }
+		);
 	}
 
 	/** A direction button: recorded as a turn, so a reload, a retry or a branch all see it. */
@@ -1303,9 +1350,12 @@ export class DaydreamStory {
 				content: this.content(earlier.id) ?? null
 			}))
 		);
+		// A first passage's take starts where it did.
+		const opening = node.parentId === null ? this.openingOf(turnId) : null;
 		await this.#settled();
 		void this.#start({
 			parentId: node.parentId,
+			...(opening ? { opening } : {}),
 			...(content?.type === 'text' && !stopped
 				? {
 						mode: 'rewrite' as const,

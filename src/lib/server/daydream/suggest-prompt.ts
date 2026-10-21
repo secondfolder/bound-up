@@ -5,7 +5,8 @@ import {
 	DAYDREAM_LIMITS,
 	type IdeaTextField,
 	MAX_DAYDREAM_CHARACTERS,
-	MAX_FIELDS
+	MAX_FIELDS,
+	MAX_OPENINGS
 } from '$lib/daydream';
 import { CHARACTER_FIELD_LABELS, ideaFieldLabels } from '$lib/daydream/catalog';
 import {
@@ -123,7 +124,17 @@ const draftSchema = z.object({
 	/** An idea's parts so far, so suggestions fit them. */
 	parts: z.array(partSchema()).max(MAX_DAYDREAM_CHARACTERS).optional(),
 	/** The fields the record's user named, so suggestions fit them too. */
-	fields: z.array(namedFieldSchema).max(MAX_FIELDS).optional()
+	fields: z.array(namedFieldSchema).max(MAX_FIELDS).optional(),
+	/** An idea's openings so far (docs/daydreams.md, "Openings"): only offered when it has none. */
+	openings: z
+		.array(
+			z.object({
+				label: z.string().max(DAYDREAM_LIMITS.openingLabel),
+				situation: z.string().max(DAYDREAM_LIMITS.openingSituation)
+			})
+		)
+		.max(MAX_OPENINGS)
+		.optional()
 });
 
 function partSchema() {
@@ -511,7 +522,7 @@ function describePart(part: { name: string; description: string }): string {
 
 /** What is written of the draft, tagged; its dials, which the form set, after it untagged. */
 function describeDraft(request: RecordRequest): string {
-	const { parts, fields: named, ...draft } = request.draft;
+	const { parts, fields: named, openings, ...draft } = request.draft;
 	const written = [
 		...describeFields(request.target, keysFor(request.target), draft, request.context.narrator),
 		...describeNamed(named)
@@ -519,6 +530,11 @@ function describeDraft(request: RecordRequest): string {
 	if (request.target === 'idea' && parts && parts.length > 0) {
 		written.push(
 			`Parts for characters:\n${parts.map((part) => `- ${describePart(part)}`).join('\n')}`
+		);
+	}
+	if (request.target === 'idea' && openings && openings.length > 0) {
+		written.push(
+			`Where it can start:\n${openings.map((opening) => `- ${opening.label}: ${opening.situation}`).join('\n')}`
 		);
 	}
 	const dials: string[] = [];
@@ -592,6 +608,25 @@ const PARTS_KEY: AnswerKey = {
 		each: [
 			textKey('name', 'a short name for the part'),
 			textKey('description', 'what that part does in the idea, in a few words')
+		]
+	}
+};
+
+/**
+ * An idea's openings (docs/daydreams.md, "Openings"): other places its story
+ * can start. Several named greetings were what most set the most-played
+ * character cards apart — a scenario menu, a later point in the story, a
+ * gentler or hotter way in — so a written idea gets a few to choose from.
+ */
+const OPENINGS_INSTRUCTION = `Give it 2 to ${MAX_OPENINGS} openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.`;
+
+const OPENINGS_KEY: AnswerKey = {
+	key: 'openings',
+	says: 'other places its story can start; an empty list for a monologue',
+	shape: {
+		each: [
+			textKey('label', 'a short name for where it starts'),
+			textKey('situation', 'where the story picks up, in a sentence or two')
 		]
 	}
 };
@@ -684,7 +719,7 @@ function chipsInstructions(request: RecordRequest): TaskInstructions {
 
 function fillInstructions(request: RecordRequest): TaskInstructions {
 	const monologue = request.target === 'idea' && isMonologue(request);
-	const { parts: _parts, fields: _named, ...fieldsDraft } = request.draft;
+	const { parts: _parts, fields: _named, openings: _openings, ...fieldsDraft } = request.draft;
 	const draft: TextDraft = fieldsDraft;
 	// Only the fields the record has, besides its core: a known kind the user
 	// removed is not brought back, and one not added yet is the model's to
@@ -696,10 +731,13 @@ function fillInstructions(request: RecordRequest): TaskInstructions {
 	// An idea with no parts yet gets some offered too: casting hangs on
 	// them. A monologue's has none to hang anything on.
 	const wantsParts = request.target === 'idea' && !monologue && !request.draft.parts?.length;
+	// Likewise its openings, which a monologue, with no story to start, has none of.
+	const wantsOpenings = request.target === 'idea' && !monologue && !request.draft.openings?.length;
 	const unrated = request.target === 'idea' ? unratedIdeaDials(request) : [];
 	const named = [
 		...empty.map((field) => fieldLabel(request.target, field, request.context.narrator)),
 		...(wantsParts ? ['the parts it has for characters'] : []),
+		...(wantsOpenings ? ['where its story can start'] : []),
 		...unrated.map((key) => `its ${key}`)
 	];
 	return {
@@ -709,6 +747,7 @@ function fillInstructions(request: RecordRequest): TaskInstructions {
 				empty.includes('setting') &&
 				'Leave "setting" empty unless it is set somewhere in particular.',
 			wantsParts && PARTS_INSTRUCTION,
+			wantsOpenings && OPENINGS_INSTRUCTION,
 			rateInstruction(unrated),
 			newFieldsInstruction(request.target)
 		),
@@ -717,10 +756,11 @@ function fillInstructions(request: RecordRequest): TaskInstructions {
 				? empty.map((field) => textKey(field, CHARACTER_SAYS[field] ?? field))
 				: ideaFieldKeys(empty, monologue)),
 			...(wantsParts ? [PARTS_KEY] : []),
+			...(wantsOpenings ? [OPENINGS_KEY] : []),
 			...unrated.map(ratingKey),
 			NEW_FIELDS_KEY
 		],
-		maxTokens: 900
+		maxTokens: 1200
 	};
 }
 
@@ -745,10 +785,16 @@ function surpriseInstructions(request: RecordRequest): TaskInstructions {
 				invent,
 				monologueCraft(false),
 				MONOLOGUE_IDEA,
-				rateInstruction(unrated)
+				rateInstruction(unrated),
+				newFieldsInstruction('idea')
 			),
-			answer: [...ideaFieldKeys(fields, true), PARTS_KEY, ...unrated.map(ratingKey)],
-			maxTokens: 1000
+			answer: [
+				...ideaFieldKeys(fields, true),
+				PARTS_KEY,
+				...unrated.map(ratingKey),
+				NEW_FIELDS_KEY
+			],
+			maxTokens: 1200
 		};
 	}
 	return {
@@ -756,7 +802,9 @@ function surpriseInstructions(request: RecordRequest): TaskInstructions {
 			invent,
 			STORY_CRAFT,
 			`Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. ${PARTS_INSTRUCTION}`,
-			rateInstruction(unrated)
+			OPENINGS_INSTRUCTION,
+			rateInstruction(unrated),
+			newFieldsInstruction('idea')
 		),
 		answer: [
 			...ideaFieldKeys(
@@ -764,9 +812,11 @@ function surpriseInstructions(request: RecordRequest): TaskInstructions {
 				false
 			),
 			PARTS_KEY,
-			...unrated.map(ratingKey)
+			OPENINGS_KEY,
+			...unrated.map(ratingKey),
+			NEW_FIELDS_KEY
 		],
-		maxTokens: 800
+		maxTokens: 1200
 	};
 }
 
@@ -1355,6 +1405,7 @@ function daydreamAnswer(side: Side): AnswerKey[] {
 				ratingKey('heat'),
 				ratingKey('kink'),
 				PARTS_KEY,
+				OPENINGS_KEY,
 				NEW_FIELDS_KEY
 			]
 		},
@@ -1401,6 +1452,7 @@ function daydreamInstructions(side: Side, keptVoice: boolean): string {
 			'For any voice but "monologue".',
 			STORY_CRAFT,
 			STORY_IDEA,
+			OPENINGS_INSTRUCTION,
 			STORY_CAST
 		),
 		section('If it is a monologue', monologueCraft(true), MONOLOGUE_IDEA, MONOLOGUE_CAST),

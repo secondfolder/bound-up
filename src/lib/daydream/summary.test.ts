@@ -113,6 +113,28 @@ describe('setupSummary, without the model’s', () => {
 		]);
 	});
 
+	it('says where it starts, as a blank, only for an idea with openings to choose from', () => {
+		const withOpenings = (opening: string | null) => {
+			const base = setup('none', 'self', ['Mara']);
+			return {
+				...base,
+				idea: {
+					...base.idea,
+					openings: [{ id: 'o1', label: 'Three weeks in', situation: 'The door is locked.' }]
+				},
+				opening
+			};
+		};
+		expect(read(setupSummary(withOpenings(null), null))[1]).toBe(
+			'It’s a [steamy] daydream: [After hours], with [Mara] (the interviewer, your boss). It starts [from the beginning]. It’s told [in the characters’ own words, with no narrator].'
+		);
+		expect(read(setupSummary(withOpenings('o1'), null))[1]).toContain(
+			'It starts [three weeks in].'
+		);
+		// No openings, nothing to choose: nothing said.
+		expect(read(setupSummary(setup('none', 'self', ['Mara']), null))[1]).not.toContain('It starts');
+	});
+
 	it('says how each preset is told in a sentence of its own', () => {
 		const second = (narrator: DaydreamNarrator, stance: DaydreamStance, names: string[]) =>
 			read(setupSummary(setup(narrator, stance, names), null))[1];

@@ -35,7 +35,7 @@ import type {
 	DaydreamTurnView,
 	SealedRefView
 } from '../types';
-import type { ContextTurn, RewriteRequest } from './context';
+import type { ContextTurn, OpeningSnapshot, RewriteRequest } from './context';
 import type { Exchange } from './exchange';
 import type { ExchangeRecorder } from './exchange-recorder';
 import { PICTURE_REQUEST_HEADER, type PictureRequest } from './image-prompt';
@@ -88,6 +88,8 @@ export type ReplyRequestBody = {
 	turns: ContextTurn[];
 	currentDirections: Direction[];
 	rewrite?: RewriteRequest;
+	/** For a first passage: the idea's opening it starts from (docs/daydreams.md, "Openings"). */
+	opening?: OpeningSnapshot;
 	/** Debug mode: have the endpoint say what it sent the model, for the exchange (`exchange.ts`). */
 	record?: boolean;
 };

@@ -7,7 +7,7 @@ Every other file in this folder is measured against this one. Combination:
 
 ~~~~text
 ===== settings =====
-maxTokens: 800
+maxTokens: 1200
 temperature: 1
 pagesRead: null
 readableHosts: null
@@ -50,7 +50,11 @@ Draw on the kinds of story people love in erotica and fan fiction, and make it h
 
 Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
 
+Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
+
 Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
+
+Where it would make the idea better, add a field or two it does not have yet, each named in a few words — like a secret at its heart, a rule everyone follows, a twist — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
 
 # Your answer
 
@@ -64,8 +68,15 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~

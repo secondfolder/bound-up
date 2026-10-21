@@ -299,6 +299,17 @@ export function replyInput(combo: Combo, text: TextSource): ReplyInput {
 	switch (combo.state) {
 		case 'opening':
 			return { request: { ...base, mode: 'opening', turns: [] }, pictures };
+		// The first passage from one of the idea's openings, rather than its premise.
+		case 'opening-from':
+			return {
+				request: {
+					...base,
+					mode: 'opening',
+					turns: [],
+					opening: { label: text('opening.label'), situation: text('opening.situation') }
+				},
+				pictures
+			};
 		case 'rewrite':
 			return {
 				request: {

@@ -17,6 +17,7 @@ import {
 	type DaydreamVoicePresetId,
 	type IdeaDials,
 	type IdeaFieldKind,
+	type IdeaOpening,
 	type IdeaPart,
 	knownValues,
 	namedFields,
@@ -127,19 +128,25 @@ type NamedFieldDraft = Pick<SuggestedField, 'label' | 'value' | 'spoiler'>;
 const withParts = ({
 	parts,
 	named,
+	openings,
 	...input
 }: {
 	draft: Record<string, string>;
 	parts?: PartsDraft;
 	named?: NamedFieldDraft[];
+	openings?: OpeningsDraft;
 }) => ({
 	...input,
 	draft: {
 		...input.draft,
 		...(parts ? { parts } : {}),
-		...(named && named.length > 0 ? { fields: named } : {})
+		...(named && named.length > 0 ? { fields: named } : {}),
+		...(openings && openings.length > 0 ? { openings } : {})
 	}
 });
+
+/** An idea's openings as a suggestion is told them: no ids, which mean nothing to the model. */
+type OpeningsDraft = Pick<IdeaOpening, 'label' | 'situation'>[];
 
 /**
  * Chips for one field: a core or known one by name (`field`), or one the user
@@ -184,6 +191,7 @@ export async function suggestFill(input: {
 	draft: Record<string, string>;
 	parts?: PartsDraft;
 	named?: NamedFieldDraft[];
+	openings?: OpeningsDraft;
 	dials?: CharacterDials;
 	ideaDials?: IdeaDials;
 	context: SuggestContext;

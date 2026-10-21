@@ -119,7 +119,8 @@ export const BUILDERS: readonly Builder[] = [
 				'state',
 				'Request',
 				'structural',
-				values('opening', 'reply', 'rewrite', 'again', 'stopped'),
+				// "opening-from": the first passage from one of the idea's openings.
+				values('opening', 'opening-from', 'reply', 'rewrite', 'again', 'stopped'),
 				'reply'
 			),
 			axis('kink', 'Kink', 'descriptive', dialValues()),

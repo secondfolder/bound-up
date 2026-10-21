@@ -7,7 +7,7 @@ Every other file in this folder is measured against this one. Combination:
 
 ~~~~text
 ===== settings =====
-maxTokens: 900
+maxTokens: 1200
 temperature: 1
 pagesRead: null
 readableHosts: null

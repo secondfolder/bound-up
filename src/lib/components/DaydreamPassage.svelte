@@ -77,10 +77,28 @@
 		{ value: 'not-for-me', icon: 'thumbs-down', label: 'Not for me', outline: true }
 	];
 
+	/**
+	 * A first passage's: where it started, if from one of the idea's openings,
+	 * and the other places a story can start (docs/daydreams.md, "Openings").
+	 * Each is a new beginning beside this one, so none is offered until the
+	 * idea has openings to choose between.
+	 */
+	const first = $derived(node.parentId === null);
+	const startedFrom = $derived(first ? story.openingOf(node.id) : null);
+	const openings = $derived(first ? (story.setup?.idea.openings ?? []) : []);
+	const START = 'start:';
+	const PREMISE = 'premise';
+
 	function onMenu(event: WaSelectEvent) {
 		// The property, not the attribute: a value Svelte sets on an upgraded
 		// element is a property, which Lit does not reflect (AGENTS.md).
-		switch ((event.detail.item as HTMLElement & { value?: string }).value) {
+		const { value } = event.detail.item as HTMLElement & { value?: string };
+		if (value?.startsWith(START)) {
+			const from = value.slice(START.length);
+			void story.startFrom(from === PREMISE ? null : from);
+			return;
+		}
+		switch (value) {
 			case 'bookmark':
 				onBookmark(node.id, null);
 				break;
@@ -100,6 +118,7 @@
 </script>
 
 <li class="passage" class:ooc data-turn-id={node.id} data-hold-scroll={held || undefined}>
+	{#if startedFrom}<span class="who">From “{startedFrom.label}”</span>{/if}
 	{#if speaker && !ooc}<span class="who">{speaker}</span>{/if}
 	{#if ooc}<span class="who">Out of the story</span>{/if}
 	<div class="text">
@@ -173,6 +192,21 @@
 					<wa-dropdown-item value="from-here" disabled={story.busy}>
 						<wa-icon slot="icon" name="code-branch" variant="solid"></wa-icon>
 						Carry on from here
+					</wa-dropdown-item>
+				{/if}
+				{#if story.available && openings.length > 0}
+					<wa-divider></wa-divider>
+					<!-- Web Awesome styles a heading in a dropdown as the label over its items. -->
+					<h3>Start somewhere else</h3>
+					{#each openings as opening (opening.id)}
+						<wa-dropdown-item value={`${START}${opening.id}`} disabled={story.busy}>
+							<wa-icon slot="icon" name="play" variant="solid"></wa-icon>
+							{opening.label}
+						</wa-dropdown-item>
+					{/each}
+					<wa-dropdown-item value={`${START}${PREMISE}`} disabled={story.busy}>
+						<wa-icon slot="icon" name="play" variant="solid"></wa-icon>
+						From the premise
 					</wa-dropdown-item>
 				{/if}
 				{#if debug && onRawLog}

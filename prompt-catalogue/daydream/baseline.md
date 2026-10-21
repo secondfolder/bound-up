@@ -58,6 +58,8 @@ Draw on the kinds of story people love in erotica and fan fiction, and make it h
 
 The idea: "title", short; "setting", where it happens; "premise", what is going on as it starts; "yourRole", who the user is in it; "tone", how it should feel; each a sentence or two, and "notes" empty. Give it 1 to 4 parts for characters to play, other than the user (0 to 4 with "told"): each a short name, like "the interviewer", and a few words on what that part does in the idea.
 
+Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
+
 Who is in it: one character for each part, with "part" set to that part's name exactly as you gave it. For each, a name of their own, and a phrase or two for their type ("archetype"), personality, how they talk ("speech"), appearance and what they enjoy ("likes"); who they are to the user in this daydream ("relationship"), in a few words; and what they are doing or want as it starts ("doing"), in a sentence. With "rules", they are the system's functionaries: they act and are named in its notices, and speak only in procedure's clipped words — give "speech" as that. With "command", the first of them is the one the system governs, and any others its functionaries. With "watch", "relationship" is who they are to the others in it.
 
 # If it is a monologue
@@ -129,6 +131,9 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "openings": other places its story can start; an empty list for a monologue
+    - "label": a short name for where it starts
+    - "situation": where the story picks up, in a sentence or two
   - "fields": fields to add or fill, if any; an empty list for none
     - "label": the field's name, in a few words
     - "value": what it says
@@ -149,5 +154,5 @@ Answer with this JSON and nothing else. Every … is yours to fill in; write a l
     - "spoiler": true for a twist kept from the user, otherwise false
 - "summary": the summary, with its marks
 
-{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
+{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
 ~~~~

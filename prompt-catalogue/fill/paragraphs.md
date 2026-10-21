@@ -1,6 +1,6 @@
 # Fill in the rest: every paragraph
 
-147 distinct paragraphs, from 132 distinct prompts
+148 distinct paragraphs, from 132 distinct prompts
 over 384 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -265,12 +265,12 @@ Title: ⟦idea.title⟧
 </idea>
 ~~~~
 
-## ¶ 1bd59abfd8742a · user · in 10 of 384
+## ¶ 0d084425f70daa · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {none}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
 ## ¶ 1c569cf055a6fe · user · in 80 of 384
@@ -279,6 +279,14 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 
 ~~~~text
 Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
+~~~~
+
+## ¶ 0ce040c2b19bc7 · user · in 160 of 384
+
+Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}.
+
+~~~~text
+Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
 ~~~~
 
 ## ¶ 0d8a5339d99fe0 · user · in 48 of 384
@@ -297,7 +305,7 @@ Only when target ∈ {idea}.
 Where it would make the idea better, add a field or two it does not have yet, each named in a few words — like a secret at its heart, a rule everyone follows, a twist — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
 ~~~~
 
-## ¶ 0d1e1d4b8eda0b · user · in 10 of 384
+## ¶ 1f80d9bca575f7 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {none}.
 
@@ -309,6 +317,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
@@ -317,12 +328,12 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 19798df50d9361 · user · in 10 of 384
+## ¶ 1c4c39cedc6de4 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {none}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 1c0c90ea8c7d02 · user · in 96 of 384
@@ -337,12 +348,12 @@ Characters in the daydream:
 </characters>
 ~~~~
 
-## ¶ 0c499ea2ce96ec · user · in 10 of 384
+## ¶ 161c093dd0be85 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {heat}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
 ## ¶ 0ea3d7ff257ebc · user · in 48 of 384
@@ -353,7 +364,7 @@ Only when target ∈ {idea}; rated ∈ {heat}.
 Rate the idea's kink too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 161c1c80a631a3 · user · in 10 of 384
+## ¶ 0a981f3749c0db · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {heat}.
 
@@ -365,6 +376,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -372,12 +386,12 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1bb9810df4fa56 · user · in 10 of 384
+## ¶ 0d851f608b6f36 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {heat}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 0eaad4aeecb898 · user · in 48 of 384
@@ -388,12 +402,12 @@ Only when target ∈ {idea}; rated ∈ {kink}.
 The idea's kink: kinky: BDSM and power exchange.
 ~~~~
 
-## ¶ 17d8b4ae1c7ab1 · user · in 10 of 384
+## ¶ 061a7912fda37e · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {kink}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
 ## ¶ 0fcab1e579218c · user · in 48 of 384
@@ -404,7 +418,7 @@ Only when target ∈ {idea}; rated ∈ {kink}.
 Rate the idea's heat too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 1e9fef8ba352b9 · user · in 10 of 384
+## ¶ 19b976a3d58fb3 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {kink}.
 
@@ -416,6 +430,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -423,23 +440,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 11e7ded659fb26 · user · in 10 of 384
+## ¶ 00baaad53816e1 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {kink}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 0b033d649fe155 · user · in 10 of 384
+## ¶ 0d614340ef63dc · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {both}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, the parts it has for characters, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 086e143dda1674 · user · in 10 of 384
+## ¶ 116a29600f9ac8 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {both}.
 
@@ -451,18 +468,21 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
   - "value": what it says
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 06a47042624da1 · user · in 10 of 384
+## ¶ 0dce518d097a4e · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {none}; rated ∈ {both}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 1a909772342b2a · user · in 48 of 384
@@ -477,15 +497,15 @@ Parts for characters:
 </idea>
 ~~~~
 
-## ¶ 0d547f2d416a89 · user · in 10 of 384
+## ¶ 07685ad76e57e8 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {none}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 0ecbfb78df2f09 · user · in 10 of 384
+## ¶ 1589a619597a36 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {none}.
 
@@ -494,6 +514,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "premise": what is going on as it starts
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
@@ -502,23 +525,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 19d7e884bab6f8 · user · in 10 of 384
+## ¶ 0850e575f05b44 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {none}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 1f0ccbbe7c0520 · user · in 10 of 384
+## ¶ 11e84ba5ea4f1f · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {heat}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 069e0ffc83bdcb · user · in 10 of 384
+## ¶ 0dc8761abd10aa · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {heat}.
 
@@ -527,6 +550,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "premise": what is going on as it starts
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -534,23 +560,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 068c13715d288b · user · in 10 of 384
+## ¶ 14654b421dac2f · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {heat}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 067f817c78894a · user · in 10 of 384
+## ¶ 079222257edf50 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {kink}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1a7cf64288ce44 · user · in 10 of 384
+## ¶ 0db44e8604e29e · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {kink}.
 
@@ -559,6 +585,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "premise": what is going on as it starts
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -566,23 +595,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 09143d0a7cb262 · user · in 10 of 384
+## ¶ 1800ad43692293 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {kink}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 1ba0c910dc9df6 · user · in 10 of 384
+## ¶ 17a625f1c58ba6 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {both}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, What it's about, Your role in it, Tone, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 09e1a28fff0192 · user · in 10 of 384
+## ¶ 1baf7d04060155 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {both}.
 
@@ -591,18 +620,21 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "premise": what is going on as it starts
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
   - "value": what it says
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 040d053447e034 · user · in 10 of 384
+## ¶ 00523422e7e121 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {name only}; parts ∈ {some}; rated ∈ {both}.
 
 ~~~~text
-{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 0b7e5e99226933 · user · in 48 of 384
@@ -616,15 +648,15 @@ What it's about: ⟦idea.premise⟧
 </idea>
 ~~~~
 
-## ¶ 06174851f906f3 · user · in 10 of 384
+## ¶ 09b52743d27e8e · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {none}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 040d500d734760 · user · in 10 of 384
+## ¶ 04f4f4ad781ce1 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {none}.
 
@@ -635,6 +667,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
@@ -643,23 +678,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 011c94f223b6a8 · user · in 10 of 384
+## ¶ 041bb13ea0bbf3 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {none}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 0d1b9a3f0af9e2 · user · in 10 of 384
+## ¶ 1c5c6bccbcee78 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {heat}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1bf1bb76c02f54 · user · in 10 of 384
+## ¶ 1b30c2ed41ef84 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {heat}.
 
@@ -670,6 +705,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -677,23 +715,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 01a83ccc165960 · user · in 10 of 384
+## ¶ 09f4c57d524e57 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {heat}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 150795312340d1 · user · in 10 of 384
+## ¶ 18ce73fac23ebf · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {kink}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 182e2655f071f5 · user · in 10 of 384
+## ¶ 13c7e3f7e03ba4 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {kink}.
 
@@ -704,6 +742,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -711,23 +752,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 16e4c11f8d9630 · user · in 10 of 384
+## ¶ 01de3c854b8410 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {kink}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 028bb5da89b0e9 · user · in 10 of 384
+## ¶ 1fd2c41e127b81 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {both}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, the parts it has for characters, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 0c3033df058f44 · user · in 10 of 384
+## ¶ 157b3d6d4137cd · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {both}.
 
@@ -738,18 +779,21 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
   - "value": what it says
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1b34d3d77d252c · user · in 10 of 384
+## ¶ 13226da2db497b · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {none}; rated ∈ {both}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 0acdad2720a51e · user · in 48 of 384
@@ -765,15 +809,15 @@ Parts for characters:
 </idea>
 ~~~~
 
-## ¶ 1f1b7642819ced · user · in 10 of 384
+## ¶ 04023b04f8ddb5 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {none}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, its heat, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 065d5896041454 · user · in 10 of 384
+## ¶ 0d334283da3aa6 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {none}.
 
@@ -781,6 +825,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "setting": where it happens
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
@@ -789,23 +836,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 15863e68b88617 · user · in 10 of 384
+## ¶ 0f8963bb417f62 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {none}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 0d810ef5c0ab10 · user · in 10 of 384
+## ¶ 0213688cd23795 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {heat}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, its kink — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1f4b3a12dc3de5 · user · in 10 of 384
+## ¶ 09aec02adf7730 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {heat}.
 
@@ -813,6 +860,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "setting": where it happens
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -820,23 +870,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 0f6351bd5cdf05 · user · in 10 of 384
+## ¶ 0fde2665e5d5b0 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {heat}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 110cd7f82f1ca0 · user · in 10 of 384
+## ¶ 1f186251af964c · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {kink}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start, its heat — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 1a38afdbf68de7 · user · in 10 of 384
+## ¶ 0d1788c41a4b0f · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {kink}.
 
@@ -844,6 +894,9 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "setting": where it happens
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
@@ -851,23 +904,23 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 190008ee279df7 · user · in 10 of 384
+## ¶ 140d8aced5f409 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {kink}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 04d759eb674ab2 · user · in 10 of 384
+## ¶ 1d1aaf34ec8983 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {both}.
 
 ~~~~text
-Fill in the idea's empty fields — Where, Your role in it, Tone — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
+Fill in the idea's empty fields — Where, Your role in it, Tone, where its story can start — so they fit what is already written. Keep each brief: a phrase or two, never more than 1,000 characters. Do not change the fields already written.
 ~~~~
 
-## ¶ 14146aece15369 · user · in 10 of 384
+## ¶ 1fc4d509a3c1d6 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {both}.
 
@@ -875,18 +928,21 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 - "setting": where it happens
 - "yourRole": who the user is in it
 - "tone": how it should feel
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "fields": fields to add or fill, if any; an empty list for none
   - "label": the field's name, in a few words
   - "value": what it says
   - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 0622402b608740 · user · in 10 of 384
+## ¶ 1a954476aad477 · user · in 10 of 384
 
 Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-person, impersonal}; written ∈ {half}; parts ∈ {some}; rated ∈ {both}.
 
 ~~~~text
-{"setting": "…", "yourRole": "…", "tone": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
+{"setting": "…", "yourRole": "…", "tone": "…", "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 021056babfeee0 · user · in 4 of 384

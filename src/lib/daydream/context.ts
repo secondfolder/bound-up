@@ -93,6 +93,18 @@ export const rewriteSchema = z
 
 export type RewriteRequest = z.output<typeof rewriteSchema>;
 
+/**
+ * One of an idea's openings as a first passage was written from it
+ * (docs/daydreams.md, "Openings"): what its request said, kept with the
+ * passage so the history sends that request again exactly as it was sent.
+ */
+export const openingSnapshotSchema = z.object({
+	label: z.string().trim().min(1).max(DAYDREAM_LIMITS.openingLabel),
+	situation: z.string().trim().min(1).max(DAYDREAM_LIMITS.openingSituation)
+});
+
+export type OpeningSnapshot = z.output<typeof openingSnapshotSchema>;
+
 export const contextTurnSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('text'),
@@ -117,6 +129,8 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 		 * have had.
 		 */
 		rewrite: rewriteSchema.optional(),
+		/** A first passage's: the opening it was written from, which its request named. */
+		opening: openingSnapshotSchema.optional(),
 		/**
 		 * A passage's: the direction buttons on screen when it was asked for,
 		 * which that request listed (`buttonsNote`). Absent for one written
@@ -167,6 +181,7 @@ export function contextSize(turn: ContextTurn): number {
 				turn.text.length +
 				(turn.expansion?.length ?? 0) +
 				(turn.image?.length ?? 0) +
+				(turn.opening ? turn.opening.label.length + turn.opening.situation.length : 0) +
 				(turn.rewrite
 					? turn.rewrite.targetText.length +
 						(turn.rewrite.quote?.length ?? 0) +
@@ -240,6 +255,7 @@ export function toContextTurn(
 			const expansion = asUser ? null : (content.meta?.expansion ?? null);
 			const rewriteOf = asUser ? null : (content.meta?.rewriteOf ?? null);
 			const image = asUser ? null : (content.meta?.image ?? null);
+			const opening = asUser ? null : (content.meta?.opening ?? null);
 			return {
 				type: 'text',
 				role,
@@ -248,6 +264,7 @@ export function toContextTurn(
 				...(readAs && asUser ? { readAs } : {}),
 				...(expansion ? { expansion: expansion.slice(0, DAYDREAM_LIMITS.turn) } : {}),
 				...(image ? { image } : {}),
+				...(opening ? { opening } : {}),
 				...(rewriteOf && rewrote
 					? {
 							rewrite: {

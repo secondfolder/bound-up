@@ -48,7 +48,9 @@ export type SummaryPiece =
 	| ({ kind: 'voice'; label: string } & FromMarker)
 	/** A character, by their index in the setup's list. */
 	| ({ kind: 'character'; index: number; label: string } & FromMarker)
-	| ({ kind: 'idea'; label: string } & FromMarker);
+	| ({ kind: 'idea'; label: string } & FromMarker)
+	/** Where the story starts, for an idea with openings to choose from (docs/daydreams.md, "Openings"). */
+	| ({ kind: 'opening'; label: string } & FromMarker);
 
 /** What a marked blank in the model's summary stands for. A character is named, as the model named them. */
 export type SummarySlot =
@@ -177,7 +179,28 @@ function heatWord(heat: DialValue): string {
 
 const heatLabel = (heat: DialValue | null) => (heat === null ? 'any kind of' : heatWord(heat));
 
-type Setup = Pick<DaydreamSetup, 'voice' | 'characters' | 'idea'>;
+type Setup = Pick<DaydreamSetup, 'voice' | 'characters' | 'idea'> &
+	Partial<Pick<DaydreamSetup, 'opening'>>;
+
+/** What the opening blank says when the story starts from the idea's premise. */
+export const FROM_THE_PREMISE = 'from the beginning';
+
+/**
+ * Where it starts, for an idea with openings to choose from: the blank is
+ * the control for choosing one (`DaydreamSetupForm`). Nothing for an idea
+ * with none, since there is nothing to choose.
+ */
+function startsSentence(setup: Setup): SummaryPiece[] {
+	if (setup.idea.openings.length === 0) {
+		return [];
+	}
+	const chosen = setup.idea.openings.find((opening) => opening.id === setup.opening);
+	return [
+		text('It starts '),
+		{ kind: 'opening', label: chosen ? chosen.label.toLocaleLowerCase() : FROM_THE_PREMISE },
+		text('.')
+	];
+}
 
 /** Which pieces of the setup already have their blank. */
 type Mentioned = { heat: boolean; voice: boolean; idea: boolean; characters: Set<number> };
@@ -368,7 +391,9 @@ function remainder(setup: Setup, mentioned: Mentioned): SummaryPiece[] {
 		about = [...listOf(missing), text(missing.length === 1 ? ' is in it too.' : ' are in it too.')];
 	}
 	const told = mentioned.voice ? [] : toldSentence(setup);
-	return about.length > 0 && told.length > 0 ? [...about, text(' '), ...told] : [...about, ...told];
+	return [about, startsSentence(setup), told]
+		.filter((sentence) => sentence.length > 0)
+		.flatMap((sentence, at) => (at === 0 ? sentence : [text(' '), ...sentence]));
 }
 
 /**

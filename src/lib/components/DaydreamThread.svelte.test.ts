@@ -8,7 +8,7 @@ import type { ExchangeRecorder } from '$lib/daydream/exchange-recorder';
 import type { ReplySoFar } from '$lib/daydream/reply-format';
 import { recordSent } from '$lib/daydream/sent-record';
 import type { DaydreamTurnContent, PassageMeta, StorySettings } from '$lib/sealed-kinds/daydreams';
-import { testDaydreamSetup } from '$lib/testing/daydream-setup';
+import { testDaydreamSetup, testIdea } from '$lib/testing/daydream-setup';
 import { defined } from '$lib/testing/defined';
 import { pending } from '$lib/testing/pending';
 import { detailsTitle, waByProp, waProp, waSettled } from '$lib/testing/web-awesome';
@@ -2725,6 +2725,80 @@ describe('DaydreamThread pictures', () => {
 		await waitFor(() => expect(frame(container)?.textContent).toContain('can’t be pictured'));
 		expect(client.requestPicture).not.toHaveBeenCalled();
 		expect(button(container, 'Try again')).toBeUndefined();
+	});
+});
+
+describe('DaydreamThread openings', () => {
+	const Routine = { id: 'o1', label: 'Three weeks in', situation: 'The door is already locked.' };
+	const withOpenings = testDaydreamSetup({
+		idea: testIdea({ openings: [Routine] }),
+		opening: 'o1'
+	});
+	const answered: ReplyOutcome = {
+		ok: true,
+		raw: '',
+		expansion: null,
+		reading: null,
+		passage: 'She is waiting.',
+		meta: null
+	};
+
+	it('opens from the opening the setup chose, and keeps it on the passage', async () => {
+		client.writeReply.mockResolvedValueOnce(answered);
+		opened.set('d1', withOpenings);
+		const { container } = render(DaydreamThread, {
+			daydream: daydreamKeeping([]),
+			available: true
+		});
+		await waitFor(() => expect(saved(0)).toMatchObject({ parentId: null, role: 'story' }));
+		expect(asked(0)).toMatchObject({
+			mode: 'opening',
+			opening: { label: 'Three weeks in', situation: 'The door is already locked.' }
+		});
+		expect(saved(0)?.content).toMatchObject({
+			meta: { opening: { label: 'Three weeks in', situation: 'The door is already locked.' } }
+		});
+		// The first passage says where it started.
+		await waitFor(() =>
+			expect(container.querySelector('li.passage')?.textContent).toContain('From “Three weeks in”')
+		);
+	});
+
+	it('starts somewhere else as a new beginning beside the first', async () => {
+		client.writeReply.mockResolvedValueOnce({ ...answered, passage: 'Another start.' });
+		opened.set('d1', withOpenings);
+		const { container } = render(DaydreamThread, {
+			daydream: daydreamKeeping([turn('t1', null, 'story', 'She is waiting.')]),
+			available: true
+		});
+		await waSettled(container);
+		const menu = container.querySelector('li.passage wa-dropdown') as HTMLElement;
+		const [premise] = waByProp(menu, 'wa-dropdown-item', 'value', 'start:premise');
+		expect(waByProp(menu, 'wa-dropdown-item', 'value', 'start:o1')).toHaveLength(1);
+		menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: premise } }));
+		await waitFor(() => expect(saved(0)).toMatchObject({ parentId: null, role: 'story' }));
+		// From the premise: no opening asked for, and none kept.
+		expect(asked(0)).toMatchObject({ mode: 'opening', turns: [] });
+		expect(asked(0)).not.toHaveProperty('opening');
+		await waitFor(() => expect(container.textContent).toContain('2/2'));
+	});
+
+	it('offers nowhere else to start for an idea with no openings, or past the first passage', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', 'She is waiting.'),
+				turn('t2', 't1', 'user', 'I sit.'),
+				turn('t3', 't2', 'story', 'She smiles.')
+			]),
+			available: true
+		});
+		await waSettled(container);
+		expect(container.querySelectorAll('wa-dropdown-item[value^="start:"]')).toHaveLength(0);
+		expect(
+			[...container.querySelectorAll('wa-dropdown-item')].filter((item) =>
+				String(waProp(item as HTMLElement, 'value')).startsWith('start:')
+			)
+		).toHaveLength(0);
 	});
 });
 

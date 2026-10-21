@@ -1,6 +1,6 @@
 # Daydream from a brief: every paragraph
 
-61 distinct paragraphs, from 181 distinct prompts
+62 distinct paragraphs, from 181 distinct prompts
 over 216 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -118,6 +118,14 @@ Always.
 
 ~~~~text
 The idea: "title", short; "setting", where it happens; "premise", what is going on as it starts; "yourRole", who the user is in it; "tone", how it should feel; each a sentence or two, and "notes" empty. Give it 1 to 4 parts for characters to play, other than the user (0 to 4 with "told"): each a short name, like "the interviewer", and a few words on what that part does in the idea.
+~~~~
+
+## ¶ 0ce040c2b19bc7 · system · in 216 of 216
+
+Always.
+
+~~~~text
+Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
 ~~~~
 
 ## ¶ 0d75d7aa6b76c2 · system · in 216 of 216
@@ -308,7 +316,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 17e5a78f514dfc · user · in 72 of 216
+## ¶ 1274c40b41a891 · user · in 72 of 216
 
 Only when side ∈ {either}.
 
@@ -327,6 +335,9 @@ Only when side ∈ {either}.
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "openings": other places its story can start; an empty list for a monologue
+    - "label": a short name for where it starts
+    - "situation": where the story picks up, in a sentence or two
   - "fields": fields to add or fill, if any; an empty list for none
     - "label": the field's name, in a few words
     - "value": what it says
@@ -348,12 +359,12 @@ Only when side ∈ {either}.
 - "summary": the summary, with its marks
 ~~~~
 
-## ¶ 10fe7d46d6023b · user · in 216 of 216
+## ¶ 17a84a8d50c8ba · user · in 216 of 216
 
 Always.
 
 ~~~~text
-{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
+{"voice": "…", "research": "…", "idea": {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "heat": …, "kink": …, "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, "characters": [{"name": "…", "archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "part": "…", "relationship": "…", "doing": "…", "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}, …], "summary": "…"}
 ~~~~
 
 ## ¶ 1615353ec8ec67 · user · in 144 of 216
@@ -490,7 +501,7 @@ With "watch" they are not in it: the story follows its dominant one, whose side 
 In a monologue the voice speaks to them as one who serves them, or, where its sayings are a dominant's, alongside them as one dominant to another, never making them the one the sayings are about.
 ~~~~
 
-## ¶ 18543d1f69dee3 · user · in 72 of 216
+## ¶ 0b600672b14afe · user · in 72 of 216
 
 Only when side ∈ {dom}.
 
@@ -509,6 +520,9 @@ Only when side ∈ {dom}.
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "openings": other places its story can start; an empty list for a monologue
+    - "label": a short name for where it starts
+    - "situation": where the story picks up, in a sentence or two
   - "fields": fields to add or fill, if any; an empty list for none
     - "label": the field's name, in a few words
     - "value": what it says
@@ -591,7 +605,7 @@ With "watch" they are not in it: the story follows its submissive one, whose sid
 In a monologue the voice speaks to them as one in charge of them, or, where its sayings are a submissive's, alongside them as one submissive to another, never submitting to them as it says them.
 ~~~~
 
-## ¶ 053f97ba77588f · user · in 72 of 216
+## ¶ 1ca0390a8e394b · user · in 72 of 216
 
 Only when side ∈ {sub}.
 
@@ -610,6 +624,9 @@ Only when side ∈ {sub}.
   - "parts": the parts for characters to play
     - "name": a short name for the part
     - "description": what that part does in the idea, in a few words
+  - "openings": other places its story can start; an empty list for a monologue
+    - "label": a short name for where it starts
+    - "situation": where the story picks up, in a sentence or two
   - "fields": fields to add or fill, if any; an empty list for none
     - "label": the field's name, in a few words
     - "value": what it says

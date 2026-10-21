@@ -16,6 +16,8 @@ import {
 	type ContextTurn,
 	contextSize,
 	contextTurnSchema,
+	type OpeningSnapshot,
+	openingSnapshotSchema,
 	passageAsSent,
 	rewriteSchema
 } from '$lib/daydream/context';
@@ -74,7 +76,12 @@ export const replyRequestSchema = z
 		currentDirections: z.array(directionSchema).max(MAX_DIRECTIONS).default([]),
 		// The passage being rewritten as it was sent (`passageAsSent`), and
 		// what to change, or that it is another take (`again`).
-		rewrite: rewriteSchema.optional()
+		rewrite: rewriteSchema.optional(),
+		/**
+		 * For a first passage: which of the idea's openings it starts from,
+		 * as it reads now (docs/daydreams.md, "Openings"); none for its premise.
+		 */
+		opening: openingSnapshotSchema.optional()
 	})
 	.superRefine((value, ctx) => {
 		const total =
@@ -938,7 +945,16 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
  * theirs is only set moving: "end where the user can respond" was sent to
  * watchers too until then.
  */
-function openingRequest(voice: DaydreamVoice): string {
+function openingRequest(voice: DaydreamVoice, opening?: OpeningSnapshot): string {
+	const request = beginRequest(voice);
+	// Where the story starts, when the user chose one of the idea's openings
+	// rather than its premise: in a tag, since it is their words.
+	return opening
+		? `${request}\nStart it here, where the user chose to begin — the premise is the idea's, this is where its story picks up:\n${tagged('opening', `${opening.label}: ${opening.situation}`)}`
+		: request;
+}
+
+function beginRequest(voice: DaydreamVoice): string {
 	const watching = voice.stance === 'absent';
 	switch (voice.narrator) {
 		case 'impersonal':
@@ -1092,9 +1108,14 @@ export function buildMessages(
 		// stopped, listed none.
 		if (turn.type === 'text' && turn.role === 'story') {
 			if (turn.rewrite) {
+				// Another take on a first passage from one of the idea's openings
+				// was asked with that opening's request before it, as below.
+				if (conversation.length === 0 && turn.opening) {
+					add({ role: 'user', content: openingRequest(request.setup.voice, turn.opening) });
+				}
 				add({ role: 'user', content: rewriteRequest(turn.rewrite) });
 			} else if (conversation.length === 0) {
-				add({ role: 'user', content: openingRequest(request.setup.voice) });
+				add({ role: 'user', content: openingRequest(request.setup.voice, turn.opening) });
 			} else if (conversation.at(-1)?.role === 'assistant') {
 				add({ role: 'user', content: CONTINUE_REQUEST });
 			}
@@ -1109,9 +1130,13 @@ export function buildMessages(
 
 	if (!stopped) {
 		if (request.mode === 'rewrite' && request.rewrite) {
+			// Another take on a first passage keeps where it started.
+			if (conversation.length === 0 && request.opening) {
+				add({ role: 'user', content: openingRequest(request.setup.voice, request.opening) });
+			}
 			add({ role: 'user', content: rewriteRequest(request.rewrite) });
 		} else if (conversation.length === 0) {
-			add({ role: 'user', content: openingRequest(request.setup.voice) });
+			add({ role: 'user', content: openingRequest(request.setup.voice, request.opening) });
 		}
 	}
 	// Chat models expect to answer a user message. A conversation that ends on

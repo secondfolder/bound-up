@@ -705,6 +705,134 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 \ No newline at end of file
 ~~~~
 
+### state = opening-from
+
+~~~~diff
+@@ -128,116 +128,9 @@
+ 
+ ===== 2. user =====
+-(The story so far is long, so it starts partway through here.)
++(Begin the story. Open just before the moment it turns on — an arrival, a discovery, the moment itself, not a wind-up — and end on something the user must answer: a question put to them, an offer, a choice, a move made on them. Never end on a pose with nothing in it for them.)
++Start it here, where the user chose to begin — the premise is the idea's, this is where its story picks up:
++<opening>
++⟦opening.label⟧: ⟦opening.situation⟧
++</opening>
+ 
+-(Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
+-
+-===== 3. assistant =====
+-⟦turn.story1⟧
+-<meta>
+-{"image":"⟦turn.image⟧"}
+-</meta>
+-
+-===== 4. user =====
+-⟦turn.user1⟧
+-
+-(Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
+-
+-===== 5. assistant =====
+-<yours>
+-⟦turn.expansion⟧
+-</yours>
+-⟦turn.story2⟧
+-
+-===== 6. user =====
+-(Reaction: the user loved that passage.)
+-
+-(Read this as what the user says or does in the story.)
+-⟦turn.user2⟧
+-
+-===== 7. assistant =====
+-⟦turn.story3⟧
+-
+-===== 8. user =====
+-(Read this as an instruction for the user's own turn: write their turn out first, in a <yours> block, then answer it.)
+-⟦turn.user3⟧
+-
+-===== 9. assistant =====
+-⟦turn.story4⟧
+-
+-===== 10. user =====
+-(Direction: ⟦turn.user4⟧)
+-
+-===== 11. assistant =====
+-⟦turn.story5⟧
+-
+-===== 12. user =====
+-(Read this as the next part of the story, co-written: continue seamlessly from it.)
+-⟦turn.user5⟧
+-
+-===== 13. assistant =====
+-⟦turn.story6⟧
+-
+-===== 14. user =====
+-[Out of character] ⟦turn.user6⟧
+-
+-===== 15. assistant =====
+-⟦turn.story7⟧
+-
+-===== 16. user =====
+-(Direction: Slower.)
+-
+-===== 17. assistant =====
+-⟦turn.story8⟧
+-
+-===== 18. user =====
+-(The user wants more of this: "⟦turn.quote1⟧")
+-
+-===== 19. assistant =====
+-⟦turn.story9⟧
+-
+-===== 20. user =====
+-(The user does not want this, and has added it to their limits: "⟦turn.quote2⟧")
+-
+-(Your next passage replaces one you wrote before. This is how it read:
+-"""
+-⟦turn.story9⟧
+-"""
+-Change this part in particular: "⟦turn.quote3⟧"
+-The user asks: ⟦turn.instruction1⟧
+-Keep it consistent with everything before it.)
+-
+-===== 21. assistant =====
+-⟦turn.story10⟧
+-
+-===== 22. user =====
+-(The user wants more of this: "⟦turn.quote4⟧")
+-
+-===== 23. assistant =====
+-⟦turn.story11⟧
+-
+-===== 24. user =====
+-(Reaction: the user liked that passage — the one that began "⟦turn.excerpt⟧".)
+-
+-(Reaction: the user did not enjoy that passage — write less like it.)
+-
+-(Roll: the user rolled 4 on a 6-sided die — "⟦turn.outcome⟧". This is what happens; honour it.)
+-
+-===== 25. assistant =====
+-⟦turn.story12⟧
+-
+-===== 26. user =====
+-(Ease off: the user pressed it. Carry on, noticeably gentler.)
+-
+-===== 27. assistant =====
+-⟦turn.story13⟧
+-
+-===== 28. user =====
+-(The user is ready to carry on with the story.)
+-
+-===== 29. assistant =====
+-⟦turn.story14⟧
+-
+-===== 30. user =====
+-⟦turn.user7⟧
+-
+ (Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
+\ No newline at end of file
+~~~~
+
 ### state = rewrite
 
 ~~~~diff

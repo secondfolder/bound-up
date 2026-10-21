@@ -14,10 +14,12 @@
 		type IdeaCoreField,
 		type IdeaDials,
 		type IdeaFieldKind,
+		type IdeaOpening,
 		type IdeaOriginField,
 		type IdeaPart,
 		knownField,
 		MAX_DAYDREAM_CHARACTERS,
+		MAX_OPENINGS,
 		namedFields,
 		newIdeaFields
 	} from '$lib/daydream';
@@ -278,6 +280,31 @@
 		};
 	}
 
+	// ── openings ─────────────────────────────────────────────────────────────
+
+	function addOpening() {
+		$form.openings = [...$form.openings, { id: crypto.randomUUID(), label: '', situation: '' }];
+	}
+
+	function setOpening(index: number, patch: Partial<IdeaOpening>) {
+		$form.openings = $form.openings.map((opening, at) =>
+			at === index ? { ...opening, ...patch } : opening
+		);
+	}
+
+	function removeOpening(index: number) {
+		$form.openings = $form.openings.filter((_, at) => at !== index);
+	}
+
+	/** An opening's text box, wired by hand for the reason `partField` gives. */
+	function openingField(index: number, key: 'label' | 'situation') {
+		return (node: HTMLElement & { value: string }) => {
+			const update = () => setOpening(index, { [key]: node.value });
+			node.addEventListener('input', update);
+			return () => node.removeEventListener('input', update);
+		};
+	}
+
 	let thinking = $state(false);
 
 	/** A whole idea from the model, in place of what is in the form. */
@@ -315,6 +342,9 @@
 			draft,
 			parts: namedParts(),
 			named,
+			openings: $form.openings
+				.filter((opening) => opening.label.trim() && opening.situation.trim())
+				.map(({ label, situation }) => ({ label, situation })),
 			ideaDials: $form.dials,
 			context
 		});
@@ -540,6 +570,43 @@
 			{/if}
 		</fieldset>
 
+		<fieldset class="parts">
+			<legend>Where it can start</legend>
+			<p class="hint">
+				Other places its story can begin — three weeks in, the morning after — to choose between
+				when you start a daydream from it. Optional: without any, it starts from what it’s about.
+			</p>
+			{#each $form.openings as opening, index (opening.id)}
+				<div class="opening">
+					<wa-input
+						{@attach openingField(index, 'label')}
+						label={`Start ${index + 1}`}
+						placeholder="Three weeks in"
+						value={opening.label}
+						maxlength={DAYDREAM_LIMITS.openingLabel}
+					></wa-input>
+					<wa-textarea
+						{@attach openingField(index, 'situation')}
+						label="Where it starts"
+						rows="2"
+						value={opening.situation}
+						maxlength={DAYDREAM_LIMITS.openingSituation}
+					></wa-textarea>
+					<wa-button size="s" appearance="plain" onclick={() => removeOpening(index)}>
+						<wa-icon name="xmark" variant="solid" label={`Remove ${opening.label || `start ${index + 1}`}`}></wa-icon>
+					</wa-button>
+				</div>
+				{#if $errors.openings?.[index]?.label}<span class="invalid">{$errors.openings[index].label}</span>{/if}
+				{#if $errors.openings?.[index]?.situation}<span class="invalid">{$errors.openings[index].situation}</span>{/if}
+			{/each}
+			{#if $form.openings.length < MAX_OPENINGS}
+				<wa-button class="add-part" size="s" appearance="outlined" onclick={addOpening}>
+					<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+					Add a place to start
+				</wa-button>
+			{/if}
+		</fieldset>
+
 		<wa-details bind:this={detail} summary="More detail" class="detail" {@attach startOpen(startsDetailed)}>
 			{@render textField('yourRole')}
 			<!-- No chips: these are what was asked for and found, not ideas to pick from. -->
@@ -667,6 +734,22 @@
 	}
 
 	/* Wraps rather than squeezing: on a phone the description drops under the name. */
+	/* A place to start: its name, and a line or two on where. */
+	.opening {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: end;
+		gap: 0.5rem;
+
+		wa-input {
+			flex: 1 1 8rem;
+		}
+
+		wa-textarea {
+			flex: 2 1 14rem;
+		}
+	}
+
 	.part {
 		display: flex;
 		flex-wrap: wrap;

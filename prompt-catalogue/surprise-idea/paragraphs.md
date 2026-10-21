@@ -1,6 +1,6 @@
 # Surprise idea: every paragraph
 
-47 distinct paragraphs, from 18 distinct prompts
+49 distinct paragraphs, from 18 distinct prompts
 over 48 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -117,12 +117,28 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}.
 Give it a short title; say where it happens, what is going on as it starts, who the user is in it, and its tone, each in a sentence or two. Give it 1 to 4 parts for characters to play, other than the user: each a short name, like "the interviewer", and a few words on what that part does in the idea.
 ~~~~
 
+## ¶ 0ce040c2b19bc7 · user · in 40 of 48
+
+Only when narrator ∈ {unset, none, second-person, third-person, impersonal}.
+
+~~~~text
+Give it 2 to 4 openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.
+~~~~
+
 ## ¶ 0d8a5339d99fe0 · user · in 12 of 48
 
 Only when rated ∈ {none}.
 
 ~~~~text
 Rate the idea's heat and kink too, from what is written: an idea that says nothing sexual is not sexual.
+~~~~
+
+## ¶ 1bdab172b6d334 · user · in 48 of 48
+
+Always.
+
+~~~~text
+Where it would make the idea better, add a field or two it does not have yet, each named in a few words — like a secret at its heart, a rule everyone follows, a twist — and fill any field above that the user named and left empty. Mark a field "spoiler" when it is a twist the user should only find out in play. Only fields that earn their place; none is fine.
 ~~~~
 
 ## ¶ 1e5bd327b294f9 · user · in 48 of 48
@@ -141,7 +157,7 @@ Always.
 Answer with this JSON and nothing else. Every … is yours to fill in; write a line break inside a string as \n.
 ~~~~
 
-## ¶ 03838b01e06f09 · user · in 10 of 48
+## ¶ 0ac319828f3153 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {none}.
 
@@ -154,16 +170,23 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1bc35294550d39 · user · in 10 of 48
+## ¶ 123ee0e80a54d1 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {none}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 1c0c90ea8c7d02 · user · in 24 of 48
@@ -211,7 +234,7 @@ Only when rated ∈ {heat}.
 Rate the idea's kink too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 122bccbc4247db · user · in 10 of 48
+## ¶ 0d16e90c95d372 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {heat}.
 
@@ -224,15 +247,22 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1d12d05bc5bdb0 · user · in 10 of 48
+## ¶ 1e61049d94eb74 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {heat}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 04694588140888 · user · in 15 of 48
@@ -259,7 +289,7 @@ Only when rated ∈ {kink}.
 Rate the idea's heat too, from what is written: an idea that says nothing sexual is not sexual.
 ~~~~
 
-## ¶ 1e4cf148f60980 · user · in 10 of 48
+## ¶ 03246d103695d8 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {kink}.
 
@@ -272,15 +302,22 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 13ff03e2b6600e · user · in 10 of 48
+## ¶ 0ffd841e491d48 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {kink}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 085cb66696fa78 · user · in 12 of 48
@@ -293,7 +330,7 @@ The idea's kink: kinky: BDSM and power exchange.
 The idea's heat is the ceiling for everyone in it: each character's own libido and kink dials say how eager and how kinky they are within it, never past it.
 ~~~~
 
-## ¶ 0f61ad7f916d10 · user · in 10 of 48
+## ¶ 14571b5e5d042f · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {both}.
 
@@ -306,14 +343,21 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "openings": other places its story can start; an empty list for a monologue
+  - "label": a short name for where it starts
+  - "situation": where the story picks up, in a sentence or two
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 0be2d632c3b46e · user · in 10 of 48
+## ¶ 1477f438d91738 · user · in 10 of 48
 
 Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; rated ∈ {both}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …]}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "openings": [{"label": "…", "situation": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 0a166e365ceb8a · user · in 8 of 48
@@ -352,7 +396,7 @@ Only when narrator ∈ {monologue}.
 The idea: "title", a short title naming what it is about, like "What good girls are for"; "premise", what the voice believes and keeps coming back to, in a sentence or two; "yourRole", who the user is to it — the one it speaks to, or, where it is their own thoughts, the one whose voice it is; "tone", in a few words; "setting", where it is set — where the voice speaks from — if anywhere, and empty otherwise; and "notes", the sayings it builds on, 8 to 12 sayings in the voice's own words, one to a line, at most 1,000 characters in all. No parts, unless a named character is the one speaking: then one part, "the speaker".
 ~~~~
 
-## ¶ 157066b8f3712d · user · in 2 of 48
+## ¶ 0dcb4b955f1690 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {none}.
 
@@ -368,14 +412,18 @@ Only when narrator ∈ {monologue}; rated ∈ {none}.
   - "description": what that part does in the idea, in a few words
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 01a59b271aa888 · user · in 2 of 48
+## ¶ 17705763ece993 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {none}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 0de058aa4a7d17 · user · in 6 of 48
@@ -386,7 +434,7 @@ Only when narrator ∈ {monologue}; rated ∈ {heat, kink, both}.
 Invent an idea for this monologue that the user will not expect, fitting the idea's heat and kink set above.
 ~~~~
 
-## ¶ 1162c71863cd32 · user · in 2 of 48
+## ¶ 088d89c4b5046a · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {heat}.
 
@@ -401,17 +449,21 @@ Only when narrator ∈ {monologue}; rated ∈ {heat}.
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
 - "kink": how kinky the idea is, a whole number from 1 to 5 (1 vanilla, 3 BDSM and power exchange, 5 extreme)
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1a3f6ac8fa8060 · user · in 2 of 48
+## ¶ 03e4ab3494e7fb · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {heat}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "kink": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 1e411f9074b4ee · user · in 2 of 48
+## ¶ 01eeb13329ad5f · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {kink}.
 
@@ -426,17 +478,21 @@ Only when narrator ∈ {monologue}; rated ∈ {kink}.
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
 - "heat": how sexual the idea is, a whole number from 1 to 5 (1 not sexual at all, 3 sex written sensually, 5 graphic and filthy)
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 1c6332dae6a031 · user · in 2 of 48
+## ¶ 0d950a852b9293 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {kink}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
-## ¶ 0ff37a960da4c0 · user · in 2 of 48
+## ¶ 04d5ca6f50e915 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {both}.
 
@@ -450,14 +506,18 @@ Only when narrator ∈ {monologue}; rated ∈ {both}.
 - "parts": the parts for characters to play
   - "name": a short name for the part
   - "description": what that part does in the idea, in a few words
+- "fields": fields to add or fill, if any; an empty list for none
+  - "label": the field's name, in a few words
+  - "value": what it says
+  - "spoiler": true for a twist kept from the user, otherwise false
 ~~~~
 
-## ¶ 02c7da05b127e9 · user · in 2 of 48
+## ¶ 0243674d065e27 · user · in 2 of 48
 
 Only when narrator ∈ {monologue}; rated ∈ {both}.
 
 ~~~~text
-{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …]}
+{"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "fields": [{"label": "…", "value": "…", "spoiler": …}, …]}
 ~~~~
 
 ## ¶ 1a5d411da26777 · user · only when one value was swept from the baseline
