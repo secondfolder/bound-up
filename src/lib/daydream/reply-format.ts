@@ -43,10 +43,12 @@ import {
 	type Direction,
 	directionSchema,
 	type PassageMeta,
-	passageMetaV6,
+	passageMetaV7,
 	type Reading,
 	readingSchema,
-	rollProposalSchema
+	rollProposalSchema,
+	type StorySettings,
+	storySettingsSchema
 } from '../sealed-kinds/daydreams';
 
 const OPEN = '<meta>';
@@ -188,8 +190,33 @@ function parseMeta(body: string): PassageMeta | null {
 	if (value === undefined) {
 		return null;
 	}
-	const strict = passageMetaV6.safeParse(value);
-	return strict.success ? strict.data : salvageMeta(value);
+	const strict = passageMetaV7.safeParse(value);
+	const meta = strict.success ? strict.data : salvageMeta(value);
+	if (!meta) {
+		return null;
+	}
+	// What the settings were is the page's to say, from the setup it holds,
+	// never the model's.
+	const { settingsBefore: _before, ...said } = meta;
+	return said;
+}
+
+const SETTING_KEYS = ['length', 'pace', 'intensity', 'heat', 'kink'] as const;
+
+/** The settings in a block, each kept on its own when it is valid, or undefined for none. */
+function salvageSettings(value: unknown): StorySettings | undefined {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return undefined;
+	}
+	const record = value as Record<string, unknown>;
+	const kept = Object.fromEntries(
+		SETTING_KEYS.flatMap((key) => {
+			const one = storySettingsSchema.safeParse({ [key]: record[key] });
+			return one.success && one.data[key] !== undefined ? [[key, one.data[key]]] : [];
+		})
+	);
+	const settings = storySettingsSchema.safeParse(kept);
+	return settings.success ? settings.data : undefined;
 }
 
 /**
@@ -282,15 +309,17 @@ function salvageMeta(value: unknown): PassageMeta | null {
 		.slice(0, MAX_DIRECTIONS * 2);
 
 	const roll = rollProposalSchema.safeParse(record.roll);
-	const image = passageMetaV6.shape.image.safeParse(record.image);
+	const image = passageMetaV7.shape.image.safeParse(record.image);
 	const readAs = readingSchema.safeParse(record.readAs);
-	const salvaged = passageMetaV6.safeParse({
+	const settings = salvageSettings(record.settings);
+	const salvaged = passageMetaV7.safeParse({
 		suggestions,
 		directions: { add, remove },
 		...(roll.success ? { roll: roll.data } : {}),
 		...(readAs.success ? { readAs: readAs.data } : {}),
 		...(record.ooc === true ? { ooc: true } : {}),
-		...(image.success && image.data ? { image: image.data } : {})
+		...(image.success && image.data ? { image: image.data } : {}),
+		...(settings ? { settings } : {})
 	});
 	return salvaged.success ? salvaged.data : null;
 }

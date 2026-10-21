@@ -727,22 +727,32 @@ test.describe('daydreams', () => {
 		await page.getByRole('textbox').fill('something on a train');
 		await clickWaButton(page, 'Suggest daydreams for this');
 
-		// The side reached the model, and the idea for the other side is left
-		// out. Only the suggested ones show, not the ready-made ones.
+		// The side reached the model. An idea on the other side is the brief's
+		// own word on it, so it shows too, saying which side it puts you on.
+		// Only the suggested ones show, not the ready-made ones.
 		const generated = page.locator('.generated');
 		await expect(generated).toContainText('For “something on a train”');
 		await expect(generated.locator('.card .title')).toHaveText([
 			'Stub idea for the sub',
+			'Stub idea for the dom',
 			'Stub idea for nobody'
 		]);
+		await expect(generated.locator('.card', { hasText: 'Stub idea for the dom' })).toContainText(
+			'You’re the dom'
+		);
+		await expect(
+			generated.locator('.card', { hasText: 'Stub idea for the sub' })
+		).not.toContainText('You’re the');
 		await expect(readyMade).toHaveCount(0);
 
 		// More are added after them, told what was already offered.
 		await clickWaButton(page, 'More ideas');
 		await expect(generated.locator('.card .title')).toHaveText([
 			'Stub idea for the sub',
+			'Stub idea for the dom',
 			'Stub idea for nobody',
 			'Stub idea for the sub, again',
+			'Stub idea for the dom, again',
 			'Stub idea for nobody, again'
 		]);
 
@@ -765,7 +775,7 @@ test.describe('daydreams', () => {
 
 		// Back to the ways in, with the ideas still there, until cleared.
 		await clickWaButton(page, 'Other ways to start');
-		await expect(generated.locator('.card .title')).toHaveCount(4);
+		await expect(generated.locator('.card .title')).toHaveCount(6);
 		await clickWaButton(page, /^Clear$/);
 		await expect(generated).toHaveCount(0);
 		await expect(readyMade.first()).toBeVisible();

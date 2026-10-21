@@ -1419,6 +1419,63 @@ describe('DaydreamThread', () => {
 		});
 	});
 
+	describe('settings the story changes', () => {
+		/** Another take of the passage after `parent`, which answers with `settings`. */
+		async function againWith(parent: DaydreamTurnContent | string) {
+			client.writeReply.mockResolvedValueOnce({
+				ok: true,
+				passage: 'Longer now.',
+				meta: {
+					suggestions: [],
+					directions: { add: [], remove: [] },
+					settings: { length: 'long' }
+				},
+				expansion: null
+			});
+			client.saveSetup.mockResolvedValue({ ok: true, revision: 1 });
+			const view = render(DaydreamThread, {
+				daydream: daydream([turn('t1', null, 'user', parent), turn('t2', 't1', 'story', 'Short.')]),
+				available: true
+			});
+			await waSettled(view.container);
+			const menu = view.container.querySelector('li.passage wa-dropdown') as HTMLElement;
+			const [again] = waByProp(menu, 'wa-dropdown-item', 'value', 'again');
+			menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: again } }));
+			await waitFor(() => expect(view.container.textContent).toContain('Longer now.'));
+			return view;
+		}
+
+		it('sets what the user asked for, says so under the passage, and undoes it', async () => {
+			const { container } = await againWith('Make these longer, please.');
+			await waitFor(() =>
+				expect(client.saveSetup.mock.calls[0]?.[1]).toMatchObject({
+					dials: { length: 'long' }
+				})
+			);
+			expect(saved(0)?.content).toMatchObject({
+				meta: { settings: { length: 'long' }, settingsBefore: { length: 'medium' } }
+			});
+			await waitFor(() =>
+				expect(container.textContent).toContain('Now long passages, as you asked.')
+			);
+			await press(container, 'Undo');
+			await waitFor(() =>
+				expect(client.saveSetup.mock.calls[1]?.[1]).toMatchObject({
+					dials: { length: 'medium' }
+				})
+			);
+			// Put back, so there is nothing left to undo.
+			await waitFor(() => expect(button(container, 'Undo')).toBeUndefined());
+		});
+
+		it('changes nothing for a reply to a button rather than the user’s own words', async () => {
+			const { container } = await againWith({ type: 'direction', id: 'longer', label: 'Longer' });
+			expect(client.saveSetup).not.toHaveBeenCalled();
+			expect(saved(0)?.content).not.toHaveProperty('meta.settings');
+			expect(container.textContent).not.toContain('as you asked');
+		});
+	});
+
 	describe('naming', () => {
 		/** A daydream with no name yet, its opening written. */
 		function unnamed() {

@@ -254,3 +254,24 @@ describe('parseReply', () => {
 		expect(parseReply(`x\n<meta>${JSON.stringify({ roll })}</meta>`).meta?.roll).toEqual(roll);
 	});
 });
+
+describe('parseReply, settings', () => {
+	const withMeta = (block: string) => parseReply(`She slows down.\n<meta>\n${block}\n</meta>`).meta;
+
+	it('reads the settings the user asked for', () => {
+		expect(withMeta('{"settings": {"length": "long", "heat": 4}}')?.settings).toEqual({
+			length: 'long',
+			heat: 4
+		});
+	});
+
+	it('keeps what holds of them, drops the rest, and never takes what they were from the model', () => {
+		const salvaged = withMeta(
+			'{"suggestions": ["Go on."], "settings": {"length": "endless", "pace": 2, "limits": "none"}, "settingsBefore": {"pace": 5}}'
+		);
+		expect(salvaged?.settings).toEqual({ pace: 2 });
+		expect(salvaged?.settingsBefore).toBeUndefined();
+		expect(salvaged?.suggestions).toEqual(['Go on.']);
+		expect(withMeta('{"settings": {"heat": 9}}')?.settings).toBeUndefined();
+	});
+});

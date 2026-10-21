@@ -434,8 +434,50 @@ export const passageMetaV6 = passageMetaSchema.extend({
 	image: z.string().trim().min(1).max(DAYDREAM_LIMITS.imagePrompt).optional()
 });
 
-/** A passage's meta as the latest turn version stores it (`passageMetaV6`). */
-export type PassageMeta = z.output<typeof passageMetaV6>;
+/**
+ * The settings a passage changed because the user asked outright — longer
+ * passages, slower, more intense, more or less sexual or kinky
+ * (docs/daydreams.md, "Settings the story changes"). The new values; at
+ * least one.
+ */
+export const storySettingsSchema = z
+	.object({
+		length: z.enum(['short', 'medium', 'long']).optional(),
+		pace: dial.optional(),
+		intensity: dial.optional(),
+		heat: dial.optional(),
+		kink: dial.optional()
+	})
+	.refine((value) => Object.keys(value).length > 0, 'Say which setting changed');
+
+export type StorySettings = z.output<typeof storySettingsSchema>;
+
+/**
+ * The same settings as they were before, for Undo: the idea's heat and kink
+ * may have been unset, so those may be null.
+ */
+const settingsBeforeSchema = z.object({
+	length: z.enum(['short', 'medium', 'long']).optional(),
+	pace: dial.optional(),
+	intensity: dial.optional(),
+	heat: dial.nullable().optional(),
+	kink: dial.nullable().optional()
+});
+
+export type StorySettingsBefore = z.output<typeof settingsBeforeSchema>;
+
+/**
+ * v7's: a passage may carry the settings it changed (`settings`) and what
+ * they were (`settingsBefore`), written by the browser from what the model
+ * set in its metadata, and only for a reply to the user's own words.
+ */
+export const passageMetaV7 = passageMetaV6.extend({
+	settings: storySettingsSchema.optional(),
+	settingsBefore: settingsBeforeSchema.optional()
+});
+
+/** A passage's meta as the latest turn version stores it (`passageMetaV7`). */
+export type PassageMeta = z.output<typeof passageMetaV7>;
 
 const turnV1 = z.object({ text: z.string().min(1).max(DAYDREAM_LIMITS.turn) });
 
@@ -537,6 +579,17 @@ const turnV6 = z.discriminatedUnion('type', [
 	...turnTypesV2
 ]);
 
+// v7: a passage may carry the settings it changed when the user asked
+// (`passageMetaV7`).
+const turnV7 = z.discriminatedUnion('type', [
+	textTurn(passageMetaV7).extend({
+		raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+		rawTruncated: z.literal(true).optional(),
+		sent: sentRecordSchema.optional()
+	}),
+	...turnTypesV2
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
@@ -573,7 +626,13 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v5 could say, v6 says the same way.
 			upcast: (value: z.output<typeof turnV5>) => value
 		},
-		{ version: 6, schema: turnV6 }
+		{
+			version: 6,
+			schema: turnV6,
+			// Everything v6 could say, v7 says the same way.
+			upcast: (value: z.output<typeof turnV6>) => value
+		},
+		{ version: 7, schema: turnV7 }
 	]
 });
 

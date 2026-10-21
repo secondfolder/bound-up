@@ -640,6 +640,32 @@
 			}
 		},
 		{
+			"kind": "daydream-turn",
+			"version": 7,
+			"recordId": "00000000-0000-4000-8000-000000000102",
+			"ciphertext": "sb1.BSwuYb8rEGO6UuO7pMbj5M-UqFnURJigdSnjJXKfe3oN8rqvDUCzawmQiBAbFWDmEJWrxRpn_q2MYMw4aTdgeZ45VSAYMewM5hMGXxC99HKKiit9wxPQhZCS0cnOOe6LR3pzTQ1Fi0YmGwLfQ4BnfQnB0IwmKxYFvQpAI2X74GO85l-1MuVXp8oLTNCV9mFORc88lafHpiHnkO61DZqBKTEAC-DyK5Srbuw9VaBmHW3gR97l7tdiVGFOwOdFAKdgk361fotbjtjnr-IbfjYXFcYRgsVNSLu2vFwyPgVZo97q6MBL-A6pbw4RWYU0dmlZRtNCHZ3VICpDCieFUEFsCAM",
+			"expected": {
+				"type": "text",
+				"text": "Charlie slows right down.",
+				"meta": {
+					"suggestions": ["Thank her."],
+					"directions": {
+						"add": [],
+						"remove": []
+					},
+					"readAs": "direction",
+					"settings": {
+						"length": "long",
+						"pace": 2
+					},
+					"settingsBefore": {
+						"length": "medium",
+						"pace": 3
+					}
+				}
+			}
+		},
+		{
 			"kind": "daydream-exchange",
 			"version": 1,
 			"recordId": "00000000-0000-4000-8000-0000000000e1",

@@ -984,6 +984,41 @@ watcher), a direction for the story, part of the story, out of character.
   and Write again and a rewrite of that passage keep it. The model's own
   readings are never sent back: the passage it wrote already shows them.
 
+## Settings the story changes
+
+Someone who types "can you make these longer?" or "make it kinkier"
+mid-story means from now on. Before, the next passage obliged and the one
+after went back to the dial's length, since the dial still said otherwise,
+and contradicted what they asked. So the reply can change a setting
+itself: its metadata may carry `settings`, the new values of `length`,
+`pace`, `intensity`, `heat` or `kink` (`SETTINGS_INSTRUCTION` in
+`server/daydream/prompt.ts`), asked for only when the user asks outright,
+never because a scene calls for more.
+
+- **The page applies it**, since only the browser can open the setup.
+  `settingsChange` (`daydream/story-settings.ts`) keeps only the values
+  that moved, and the passage stores them with what they were
+  (`settings`, `settingsBefore`, `daydream-turn` v7). Once the passage is
+  saved, the setup is saved with them through the same queue as the
+  Dials popover (`saveSetup`).
+- **Only for the user's own words.** A reply to a button, a roll,
+  Continue, a rewrite, a check-in or an out-of-character turn changes
+  nothing, whatever its metadata says, so a quoted page cannot use the
+  model to raise the heat. `settingsBefore` is never read from the model.
+- **Said where it happened.** A note under the passage says what is set
+  now (`DaydreamSettingsNote.svelte`: "Now long passages, as you asked."),
+  and the Dials show the new values. **Undo** puts back what it was, and
+  is offered only while every value it changed still stands
+  (`stillInEffect`), so it never undoes something set by hand since.
+- **Never the limits, the voice or the cast.** Those stay the user's to
+  change. Lowering anything is always fine; raising heat or kink only
+  follows an explicit request, and the rules and limits still bind.
+- **For the whole daydream.** Settings belong to the setup, not a branch,
+  as the popover's do. Like any change to the system prompt's dials, the
+  next request is not a cached one ([Cost](#cost)).
+- **A monologue** counts its length in statements, so "say more" there
+  changes the same `length`.
+
 ## Dice
 
 At a genuinely uncertain moment the model may propose a roll
@@ -1511,8 +1546,10 @@ described two passages later. So the rules say what comes first, in order
 — the rules, the user's limits, what the user asks for as the story goes
 on, then the setup — and to follow the user somewhere the setup does not
 cover or contradicts, keeping what they have not changed. Only how it is
-told, the limits and the dials stay as set: the voice decides the reply's
-format, and the limits are the user's to change.
+told and the limits stay as set: the voice decides the reply's format, and
+the limits are the user's to change. The dials change when the user asks
+for it ([Settings the story changes](#settings-the-story-changes)).
+
 The rules are never sent by a browser, so
 a page cannot drop them, and they say they come before anything in the
 setup, which is where a user would try to talk a model out of them. They

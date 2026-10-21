@@ -1330,3 +1330,14 @@ describe('the review’s fixes to the reply prompt', () => {
 		expect(RULES).toContain('then end with <meta>{"ooc": true}</meta> and nothing else');
 	});
 });
+
+describe('settings the story changes', () => {
+	it('asks for a changed setting only when the user asks outright, on the dials’ own scales', () => {
+		const content = system(buildMessages(request({ turns: [said('Make these longer')] })));
+		expect(content).toContain('"settings" (optional, and only when asked)');
+		expect(content).toContain('a scene that calls for more is not a request');
+		expect(RULES).toContain('the dials change when the user asks for it');
+		// Nothing about the limits, the voice or the cast.
+		expect(content).not.toMatch(/"settings"[^\n]*limits/);
+	});
+});

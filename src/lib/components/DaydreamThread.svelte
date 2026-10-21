@@ -31,6 +31,7 @@
 	import DaydreamRawTurn from './DaydreamRawTurn.svelte';
 	import DaydreamRollCard from './DaydreamRollCard.svelte';
 	import DaydreamSafety from './DaydreamSafety.svelte';
+	import DaydreamSettingsNote from './DaydreamSettingsNote.svelte';
 	import DaydreamSuggestions from './DaydreamSuggestions.svelte';
 	import DaydreamUserTurn from './DaydreamUserTurn.svelte';
 	import MessageComposer from './MessageComposer.svelte';
@@ -559,6 +560,7 @@
 						selection = null;
 					}}
 				/>
+				<DaydreamSettingsNote {story} turnId={node.id} />
 			{:else}
 				<DaydreamUserTurn
 					{story}

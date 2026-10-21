@@ -99,7 +99,9 @@ const ROLL = {
 
 /** "(Heat: SFW.)" for an idea whose heat is set (`describeIdeaDials`), or nothing. */
 function heatNote(system) {
-	const level = system.match(/^Heat: (?<level>[^:]+):/m)?.groups?.level;
+	// One line only: an unset heat says so on a line with no colon after
+	// "Heat:", which would otherwise run on into the next line's.
+	const level = system.match(/^Heat: (?<level>[^:\n]+):/m)?.groups?.level;
 	return level ? ` (Heat: ${level}.)` : '';
 }
 
@@ -153,7 +155,7 @@ function replyFor(messages) {
 	const take = (takes.get(conversation) ?? 0) + 1;
 	takes.set(conversation, take);
 	const takeNote = take > 1 ? ` (take ${take})` : '';
-	if (last.includes('(Rewrite the passage')) {
+	if (last.includes('(Your next passage replaces one')) {
 		return withMeta(`${name} rewrites it.${takeNote}`, meta);
 	}
 	if (last.includes('[write out]')) {
@@ -169,9 +171,11 @@ function replyFor(messages) {
 function suggestionFor(messages) {
 	const ask = messages.at(-1)?.content ?? '';
 	let content;
-	const brief = ask.split('in their own words:\n')[1]?.split('\n')[0] ?? '';
+	const brief = ask.match(/<brief>\n(?<brief>[\s\S]*?)\n<\/brief>/)?.groups?.brief ?? '';
+	// A whole daydream's answer starts with its voice (`daydreamAnswer`).
+	const wholeDaydream = ask.includes('{"voice": "…"');
 	if (
-		ask.includes('Answer as: {"voice"') &&
+		wholeDaydream &&
 		(brief.includes('sayings') || ask.includes('suggested to them as "monologue"'))
 	) {
 		content = {
@@ -191,7 +195,7 @@ function suggestionFor(messages) {
 			summary:
 				'[[idea|A voice that knows exactly what a stub is for]], and tells you so. It’s told [[voice|as a monologue, one voice speaking its mind]].'
 		};
-	} else if (ask.includes('Answer as: {"voice"')) {
+	} else if (wholeDaydream) {
 		content = {
 			summary:
 				'[[idea|A stranger on the stub night train]]. [[Vesper|A watchful stranger called Vesper]] takes the seat across from you, and the journey turns [[heat|slow-burning]].',
@@ -219,7 +223,7 @@ function suggestionFor(messages) {
 			]
 		};
 	} else if (ask.includes('"ideas": [{"title"')) {
-		const side = ask.match(/The user is the (?<side>dominant|submissive) one/)?.groups?.side;
+		const side = ask.match(/the side chosen, the (?<side>dominant|submissive) one/)?.groups?.side;
 		const asked = { dominant: 'dom', submissive: 'sub' }[side] ?? 'either';
 		const again = ask.includes('already been offered') ? ', again' : '';
 		content = {
@@ -264,7 +268,7 @@ function suggestionFor(messages) {
 	} else if (ask.includes('{"relationship"')) {
 		content = { relationship: 'your stub boss', part: 'stub-testing you' };
 	} else if (ask.includes('{"title": "…"}')) {
-		const idea = ask.split('Its idea is "')[1]?.split('"')[0] ?? 'stub';
+		const idea = ask.match(/^Title: (?<title>.*)$/m)?.groups?.title ?? 'stub';
 		content = { title: `The ${idea} story` };
 	} else {
 		content = { archetype: 'stub archetype', speech: 'Speaks in stubs.' };

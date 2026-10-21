@@ -42,7 +42,8 @@ import {
 	daydreamTurnKind,
 	type PassageMeta,
 	type Quote,
-	type Reading
+	type Reading,
+	type StorySettings
 } from '../sealed-kinds/daydreams';
 import {
 	openedDaydreamMark,
@@ -85,6 +86,7 @@ import { ExchangeRecorder } from './exchange-recorder';
 import { imagePromptProblem, PICTURE_SIZE, type PictureRequest } from './image-prompt';
 import { explicitOoc } from './ooc';
 import { type OpenedSetupExchange, openSetupExchanges } from './raw-setup-exchanges.svelte';
+import { settingsChange, stillInEffect, withSettings } from './story-settings';
 import { suggestName } from './suggest';
 import { MAX_NAMING_OPENING, MAX_TAKEN_TITLES } from './suggestions';
 import {
@@ -792,6 +794,16 @@ export class DaydreamStory {
 		// The reading the reply opened with outranks the one in its metadata,
 		// written after the passage had already decided it.
 		const readAs = forced ?? (writtenOut ? 'instruction' : (reading ?? meta?.readAs));
+		// Settings change only for what the user wrote themselves, in the story's
+		// own words: a button, a roll or Continue cannot raise the heat, and
+		// neither can a page quoted in the research by way of the model.
+		const ownWords =
+			parent?.role === 'user' &&
+			parentContent?.type === 'text' &&
+			forced !== 'ooc' &&
+			!explicitOoc(parentContent.text);
+		const changed =
+			stopped || request.rewrite || !ownWords ? null : settingsChange(setup, meta?.settings);
 		const finalMeta: PassageMeta | undefined =
 			meta || stopped || request.rewrite || writtenOut || forced || reading
 				? {
@@ -807,6 +819,7 @@ export class DaydreamStory {
 						...(forced ? { readAsChosen: true } : {}),
 						// A check-in after Stop the scene is out of character, whatever the model said.
 						...(stopped || meta?.ooc ? { ooc: true } : {}),
+						...(changed ?? {}),
 						...(request.rewrite
 							? {
 									rewriteOf: {
@@ -836,9 +849,41 @@ export class DaydreamStory {
 			this.retry = () => void this.#start(request);
 			return;
 		}
+		if (changed) {
+			// Background, like naming: a change that does not save leaves the
+			// note under the passage without its Undo, and the dials as they were.
+			void this.saveSetup((now) => withSettings(now, changed.settings));
+		}
 		if (finalMeta?.image && this.#picturesAutomatic) {
 			void this.illustrate(saved);
 		}
+	}
+
+	/**
+	 * The settings passage `turnId` changed because the user asked, for the
+	 * note under it (docs/daydreams.md, "Settings the story changes"), and
+	 * whether they still stand — Undo is offered only then, so it never puts
+	 * back something the user has since set by hand. Null for a passage that
+	 * changed none.
+	 */
+	settingsChangedBy(turnId: string): { settings: StorySettings; inEffect: boolean } | null {
+		const content = this.content(turnId);
+		const settings = content?.type === 'text' ? content.meta?.settings : undefined;
+		const { setup } = this;
+		return settings && setup ? { settings, inEffect: stillInEffect(setup, settings) } : null;
+	}
+
+	/** Puts back what passage `turnId` changed, while it still stands. */
+	async undoSettings(turnId: string): Promise<string | null> {
+		const content = this.content(turnId);
+		const meta = content?.type === 'text' ? content.meta : undefined;
+		const { settings, settingsBefore } = meta ?? {};
+		if (!(settings && settingsBefore)) {
+			return null;
+		}
+		return await this.saveSetup((now) =>
+			stillInEffect(now, settings) ? withSettings(now, settingsBefore) : null
+		);
 	}
 
 	/**
