@@ -91,3 +91,32 @@ describe('the per-address email limit', () => {
 		expect(request.sent.map((mail) => mail.to)).toEqual([EMAIL]);
 	});
 });
+
+/**
+ * Sign-up is only the form action's: see `disabledPaths` in `auth.ts`. The
+ * endpoint answered as quickly as Better Auth could, so its timing said
+ * whether an address had an account.
+ */
+describe('sign-up over HTTP', () => {
+	it('is not found, while the form action’s in-process call still signs up', async () => {
+		const request = requestAuth();
+		const response = await request.auth.handler(
+			new Request('https://app.test/api/auth/sign-up/email', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', origin: 'https://app.test' },
+				body: JSON.stringify({ name: 'Ada', email: EMAIL, password: PASSWORD, timezone: 'UTC' })
+			})
+		);
+		expect(response.status).toBe(404);
+		// And not because the router missed: the rest of it answers.
+		const ok = await request.auth.handler(new Request('https://app.test/api/auth/ok'));
+		expect(ok.status).toBe(200);
+
+		await expect(
+			request.auth.api.signUpEmail({
+				body: { name: 'Ada', email: EMAIL, password: PASSWORD, timezone: 'UTC' }
+			})
+		).resolves.toMatchObject({ user: { email: EMAIL } });
+		await request.settled();
+	});
+});

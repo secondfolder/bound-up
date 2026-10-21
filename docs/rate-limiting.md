@@ -79,7 +79,9 @@ Better Auth has a rate limiter, and it is switched off (`rateLimit` in
   a refusal with a form error and a 429 ("Too many attempts. Try again in 42
   seconds."). The hook calls it too, for the equivalent Better Auth endpoints
   (`/api/auth/sign-in/*`, `/api/auth/sign-up/*`, `/api/auth/change-password`,
-  `/api/auth/send-verification-email`),
+  `/api/auth/send-verification-email`; `/api/auth/sign-up/email` is turned off
+  over HTTP altogether — see `disabledPaths` in `server/auth.ts` — and answers
+  404 before any limit),
   answering with a 429 in Better Auth's error shape and a `Retry-After`. The
   form and its endpoint share a bucket, so alternating between them buys
   nothing. Passkey sign-in is not limited: an assertion cannot be guessed.

@@ -89,7 +89,9 @@ an account:
   two inserts and the action a key batch, which a taken address skips, so it
   answered measurably faster. Every sign-up that reaches Better Auth now waits
   out `SIGN_UP_RESPONSE_FLOOR_MS` (`src/lib/server/response-floor.ts`), set
-  above the slower path.
+  above the slower path. The form action is the only way to sign up: Better
+  Auth's own `POST /api/auth/sign-up/email` is in `disabledPaths`
+  (`server/auth.ts`), since it had no floor, and answers 404.
 
 ### The first account on a new server
 
