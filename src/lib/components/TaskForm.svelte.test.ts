@@ -39,12 +39,12 @@ describe('TaskForm', () => {
 		}
 
 		expect(waProp(save, 'appearance')).toBe('outlined');
-		expect(waProp(save, 'variant')).toBeUndefined();
+		expect(waProp(save, 'variant')).toBe('neutral');
 
 		await fireEvent.input(title, { target: { value: 'Long shower' } });
 
 		await waitFor(() => {
-			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'appearance')).toBe('accent');
 			expect(waProp(save, 'variant')).toBe('brand');
 		});
 	});
@@ -62,19 +62,19 @@ describe('TaskForm', () => {
 		}
 
 		expect(waProp(save, 'appearance')).toBe('outlined');
-		expect(waProp(save, 'variant')).toBeUndefined();
+		expect(waProp(save, 'variant')).toBe('neutral');
 
 		await fireEvent.input(title, { target: { value: '' } });
 
 		await waitFor(() => {
 			expect(waProp(save, 'appearance')).toBe('outlined');
-			expect(waProp(save, 'variant')).toBeUndefined();
+			expect(waProp(save, 'variant')).toBe('neutral');
 		});
 
 		await fireEvent.input(title, { target: { value: 'Long shower deluxe' } });
 
 		await waitFor(() => {
-			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'appearance')).toBe('accent');
 			expect(waProp(save, 'variant')).toBe('brand');
 		});
 	});

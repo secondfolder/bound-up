@@ -42,13 +42,8 @@ function data(claimCount: number): PageData {
 }
 
 describe('/home/rewards/+page.svelte', () => {
-	it('hides claim history when there are no self claims', () => {
+	it('always offers claim history, as the tasks page does, so the buttons never move', () => {
 		const { container } = render(Page, { data: data(0) });
-		expect(container.textContent).not.toContain('Claim history');
-	});
-
-	it('shows claim history when self claims exist', () => {
-		const { container } = render(Page, { data: data(1) });
 		const buttons = Array.from(container.querySelectorAll('wa-button')).map((node) =>
 			node.textContent?.trim()
 		);
@@ -58,11 +53,21 @@ describe('/home/rewards/+page.svelte', () => {
 	it('uses the controller-style header format for self and partner sections', () => {
 		const { container } = render(Page, { data: data(0) });
 		const rows = container.querySelectorAll('.title-row');
-		expect(rows[0]?.textContent).toContain('Your Rewards');
+		expect(rows[0]?.textContent).toContain('Your rewards');
 		expect(rows[0]?.textContent).toContain('Credits:');
 		expect(rows[0]?.textContent).toContain('3');
-		expect(rows[1]?.textContent).toContain("Jun's Rewards");
+		expect(rows[1]?.textContent).toContain("Jun's rewards");
 		expect(rows[1]?.textContent).toContain('Credits:');
 		expect(rows[1]?.textContent).toContain('4');
+	});
+
+	it('lays out the self section like the partner ones once there are partners', () => {
+		const { container } = render(Page, { data: data(0) });
+		expect(container.querySelector('.self')).toHaveClass('panel');
+		expect(container.querySelector('.partner')).toHaveClass('panel');
+		const actions = Array.from(container.querySelectorAll('.partner wa-button')).map((node) =>
+			node.textContent?.trim()
+		);
+		expect(actions).toContain('Open full rewards');
 	});
 });

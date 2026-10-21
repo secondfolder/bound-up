@@ -3,6 +3,7 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardCreditsInline from '$lib/components/RewardCreditsInline.svelte';
 	import RewardList from '$lib/components/RewardList.svelte';
+	import SectionPanel from '$lib/components/SectionPanel.svelte';
 	import { partnerName } from '$lib/partner-names.svelte';
 	import type { ActionData, PageData } from './$types';
 
@@ -35,57 +36,59 @@
 	/>
 
 	<div class="content">
-		<nav class="links">
-			{#if data.partner.canManageRewards}
-				<wa-button
-					appearance="outlined"
-					href={resolve('/(auth-required)/(app)/partner/[id]/rewards/add', { id: data.partner.id })}
-					>Add a reward</wa-button
-				>
-			{/if}
-			{#if data.claims.length > 0}
+		{#if form?.message}<p class="status">{form.message}</p>{/if}
+		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
+
+		<!--
+			One list, so no panel and no section title: the page is titled
+			"Rewards", and a panel around the only list on the page put every
+			reward in a card inside a card. The balance takes the title's place.
+		-->
+		<SectionPanel framed={false}>
+			{#snippet meta()}
+				{#if data.partner.canClaimRewards}
+					<RewardCreditsInline label="Your credits:" unit={null} credits={data.viewerCredits} compact />
+				{:else if data.counterpartCredits !== null && data.counterpartUserId}
+					<RewardCreditsInline
+						label={`${partnerShown}'s credits:`}
+						unit={null}
+						credits={data.counterpartCredits}
+						compact
+						editable={{
+							action: '?/setCredits',
+							inputLabel: `Set ${partnerShown}'s reward credits`,
+							editLabel: `Edit ${partnerShown}'s reward credits`,
+							saveLabel: `Save ${partnerShown}'s reward credits`,
+							cancelLabel: 'Cancel editing reward credits',
+							targetUserId: data.counterpartUserId
+						}}
+					/>
+				{/if}
+			{/snippet}
+			{#snippet actions()}
+				<!-- Always there, as on /home/rewards and the tasks pages. -->
 				<wa-button
 					appearance="outlined"
 					href={resolve('/(auth-required)/(app)/partner/[id]/rewards/history', {
 						id: data.partner.id
 					})}>Claim history</wa-button
 				>
-			{/if}
-		</nav>
-
-		{#if form?.message}<p class="status">{form.message}</p>{/if}
-		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
-
-		<section class="panel">
-			<div class="panel-header">
-				<div class="title-row">
-					<h2>{data.partner.canClaimRewards ? 'Rewards' : `${partnerShown}'s Rewards`}</h2>
-					{#if data.partner.canClaimRewards}
-						<RewardCreditsInline credits={data.viewerCredits} compact />
-					{:else if data.counterpartCredits !== null && data.counterpartUserId}
-						<RewardCreditsInline
-							label="Credits:"
-							unit={null}
-							credits={data.counterpartCredits}
-							compact
-							editable={{
-								action: '?/setCredits',
-								inputLabel: `Set ${partnerShown}'s reward credits`,
-								editLabel: `Edit ${partnerShown}'s reward credits`,
-								saveLabel: `Save ${partnerShown}'s reward credits`,
-								cancelLabel: 'Cancel editing reward credits',
-								targetUserId: data.counterpartUserId
-							}}
-						/>
-					{/if}
-				</div>
-			</div>
+				{#if data.partner.canManageRewards}
+					<wa-button
+						appearance="outlined"
+						href={resolve('/(auth-required)/(app)/partner/[id]/rewards/add', { id: data.partner.id })}
+						>Add a reward</wa-button
+					>
+				{/if}
+			{/snippet}
 
 			{#if data.partner.canClaimRewards && data.counterpartCredits !== null && data.counterpartUserId}
 				<div class="secondary-credit-row">
 					<RewardCreditsInline
-						label={`${partnerShown}'s credits`}
+						label={`${partnerShown}'s credits:`}
+						unit={null}
 						credits={data.counterpartCredits}
+						compact
 						editable={{
 							action: '?/setCredits',
 							inputLabel: `Set ${partnerShown}'s reward credits`,
@@ -104,8 +107,9 @@
 				claimAction="?/claimReward"
 				editHref={data.partner.canManageRewards ? editHref : null}
 				showClaimUi={data.partner.canClaimRewards}
+				balance={data.partner.canClaimRewards ? data.viewerCredits : null}
 			/>
-		</section>
+		</SectionPanel>
 	</div>
 </section>
 
@@ -125,46 +129,11 @@
 		gap: 1rem;
 	}
 
-	.links {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.panel-header,
-	.title-row,
 	.secondary-credit-row {
-		display: flex;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	.title-row {
-		align-items: center;
-		justify-content: space-between;
-		width: 100%;
-	}
-
-	.secondary-credit-row {
-		padding-block-end: 0.25rem;
+		padding-block-end: 0.75rem;
 		border-block-end: 1px solid color-mix(in srgb, var(--wa-color-surface-border) 75%, transparent);
 	}
 
-	.panel {
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-panel-border-radius);
-		padding: var(--wa-space-l);
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		background: color-mix(
-			in srgb,
-			var(--wa-color-surface-default) 94%,
-			var(--wa-color-brand-fill-quiet)
-		);
-	}
-
-	h2,
 	p {
 		margin: 0;
 	}
@@ -175,11 +144,5 @@
 
 	.invalid {
 		color: var(--wa-color-text-danger);
-	}
-
-	@media (max-width: 640px) {
-		.title-row {
-			align-items: flex-start;
-		}
 	}
 </style>

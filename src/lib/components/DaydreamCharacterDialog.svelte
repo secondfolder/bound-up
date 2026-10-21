@@ -42,6 +42,7 @@
 	import { startOpen } from './details';
 	import OptionalSlider from './OptionalSlider.svelte';
 	import SuggestionProblem from './SuggestionProblem.svelte';
+	import './choice-controls.css';
 
 	/** What the dialog needs to edit a character's casting: given only when opened from a daydream. */
 	export type CastingEdit = {
@@ -440,7 +441,7 @@
 							<!-- A toggle: a native button, because wa-button forwards no aria-pressed. -->
 							<button
 								type="button"
-								class="tone"
+								class="tone choice-chip"
 								aria-pressed={$form.dials.tone === tone.value}
 								onclick={() => setTone(tone.value)}
 							>
@@ -574,24 +575,9 @@
 		border: 0;
 	}
 
-	.tone {
-		padding: 0.3rem 0.85rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: transparent;
-		color: inherit;
-		font: inherit;
-		cursor: pointer;
-
-		&[aria-pressed='true'] {
-			background: var(--wa-color-brand-fill-quiet);
-		}
-
-		&:focus-visible {
-			outline: var(--wa-focus-ring);
-			outline-offset: var(--wa-focus-ring-offset);
-		}
-	}
+	/* A tone's look is `.choice-chip` (choice-controls.css), the same size
+	   as the trait chips: it was a size larger, inheriting a form control's
+	   height from Web Awesome's native button styles. */
 
 	/* How sexual and how kinky a starting point is, said on it, so nobody
 	   picks one blind. Quiet, beside the name it qualifies. */

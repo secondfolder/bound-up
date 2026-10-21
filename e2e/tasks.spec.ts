@@ -86,7 +86,15 @@ test.describe('tasks', () => {
 			await ada.page.waitForURL(/\/home\/tasks$/);
 
 			await expect(ada.page.getByRole('heading', { name: 'Long shower' })).toBeVisible();
+			// Complete submits in the background (use:enhance) and celebrates
+			// before the list refreshes, so wait for the action's answer rather
+			// than the page: navigating straight away could cancel the request.
+			const completed = ada.page.waitForResponse(
+				(response) =>
+					response.request().method() === 'POST' && response.url().includes('/home/tasks')
+			);
 			await clickWaButton(ada.page, 'Complete');
+			expect((await completed).ok()).toBe(true);
 			await expect(ada.page.getByRole('heading', { name: 'Long shower' })).toBeVisible();
 
 			await ada.page.goto('/home/rewards');
@@ -185,14 +193,14 @@ test.describe('tasks', () => {
 			await expect(tasksCard).not.toContainText('Nothing to do right now.');
 
 			await ada.page.goto('/home/tasks');
-			await expect(ada.page.locator('.partner-sections')).toContainText("Jun's Tasks");
+			await expect(ada.page.locator('.partner-sections')).toContainText("Jun's tasks");
 			await clickWaButton(ada.page, 'Complete');
 			await expect(ada.page.getByText('Task completed.')).toBeVisible();
 
 			await ada.page.getByRole('link', { name: 'Open full task list' }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/tasks$/);
 			await expect(ada.page.getByRole('heading', { name: 'Make tea' })).toBeVisible();
-			await ada.page.getByRole('link', { name: 'Completion History' }).click();
+			await ada.page.getByRole('link', { name: 'Completion history' }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/tasks\/history$/);
 			await expect(ada.page.getByText('Completed by you')).toBeVisible();
 

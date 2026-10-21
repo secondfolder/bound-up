@@ -47,7 +47,8 @@
 		provider,
 		legend,
 		presets,
-		providerField
+		providerField,
+		onmissing
 	}: {
 		superform: SuperForm<T>;
 		choiceField: FormPathLeaves<T>;
@@ -57,6 +58,8 @@
 		legend: string;
 		presets: readonly ModelPresetOption[];
 		providerField?: Snippet;
+		/** Whether the provider says it has no model by the custom id (`ModelDetails`). */
+		onmissing?: (missing: boolean) => void;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -171,12 +174,14 @@
 					modelId={String($modelId ?? '')}
 					known={picked}
 					onfound={foundRunware}
+					{onmissing}
 				/>
 			{:else}
 				<ModelDetails
 					provider="openrouter"
 					modelId={String($modelId ?? '')}
 					known={pickedOpenRouter}
+					{onmissing}
 				/>
 			{/if}
 			{#if baseField && baseValue}

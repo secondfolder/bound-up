@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import { waProp } from '$lib/testing/web-awesome';
 import type { PartnershipTaskView, SelfTaskView } from '$lib/types';
 
 const { default: ManagedTaskList } = await import('./ManagedTaskList.svelte');
@@ -201,7 +202,7 @@ describe('ManagedTaskList', () => {
 			throw new Error('missing actions column');
 		}
 
-		expect(article?.lastElementChild).toBe(actionsColumn);
+		expect(article?.querySelector('.layout')?.lastElementChild).toBe(actionsColumn);
 		expect(contentColumn.querySelector('.credits')).toBeNull();
 		expect(actionsColumn.querySelector('.action-credits')?.textContent).toContain('+3 credits');
 		expect(actionsColumn.querySelectorAll('wa-button')).toHaveLength(2);
@@ -221,5 +222,33 @@ describe('ManagedTaskList', () => {
 		}
 
 		expect(credits).toHaveClass('muted-credits');
+	});
+
+	it('keeps the credits beside the actions on a card with no actions, as on every other', () => {
+		const { container } = render(ManagedTaskList, {
+			tasks: [partnershipTask({ active: false, canComplete: false, createdByMe: false })],
+			emptyMessage: 'No tasks'
+		});
+
+		const contentColumn = container.querySelector('.content-column');
+		expect(contentColumn?.querySelector('.credits')).toBeNull();
+		expect(container.querySelector('.actions-column .action-credits')?.textContent).toContain(
+			'+3 credits'
+		);
+	});
+
+	it('makes Complete the amber action, and names each edit link by its task', () => {
+		const { container } = render(ManagedTaskList, {
+			tasks: [task()],
+			emptyMessage: 'No tasks',
+			completeAction: '?/completeTask',
+			editHref: (taskId: string) => `/tasks/${taskId}`
+		});
+
+		const [complete, edit] = Array.from(container.querySelectorAll('wa-button'));
+		expect(complete?.textContent?.trim()).toBe('Complete');
+		expect(waProp(complete, 'appearance')).toBe('accent');
+		expect(waProp(complete, 'variant')).toBe('brand');
+		expect(edit?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Edit Stretch');
 	});
 });

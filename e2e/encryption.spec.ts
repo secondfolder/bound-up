@@ -14,6 +14,7 @@ import {
 	fillPassword,
 	fillWaInput,
 	finishSignUp,
+	LOG_IN_BUTTON,
 	logIn,
 	logInHere,
 	logOut,
@@ -180,7 +181,7 @@ test.describe('honest degradation', () => {
 		const page = await context.newPage();
 		try {
 			await page.goto('/login');
-			await expect(page.getByText(/Signing in needs JavaScript/)).toBeVisible();
+			await expect(page.getByText(/Logging in needs JavaScript/)).toBeVisible();
 
 			// The pre-existing dead end: the custom elements are in the markup but
 			// never upgrade, so the only real input is the hidden authSecret field.
@@ -209,14 +210,14 @@ test.describe('honest degradation', () => {
 		await waitForEnhancedForm(page);
 		await fillWaInput(page, 'email', who.email);
 		await fillPassword(page, 'password', 'definitely-not-the-password');
-		await submitEnhancedForm(page, 'Login');
+		await submitEnhancedForm(page, LOG_IN_BUTTON);
 		await expect(page.getByText(message)).toBeVisible();
 
 		await page.goto('/login');
 		await waitForEnhancedForm(page);
 		await fillWaInput(page, 'email', 'nobody-at-all@example.test');
 		await fillPassword(page, 'password', who.password);
-		await submitEnhancedForm(page, 'Login');
+		await submitEnhancedForm(page, LOG_IN_BUTTON);
 		await expect(page.getByText(message)).toBeVisible();
 	});
 });
@@ -243,7 +244,7 @@ test.describe('password strength', () => {
 		await fillWaInput(page, 'email', who.email);
 		await fillPassword(page, 'password', 'short');
 		await fillPassword(page, 'passwordConfirm', 'short');
-		await submitEnhancedForm(page, 'Sign Up');
+		await submitEnhancedForm(page, 'Sign up');
 
 		await expect(page.getByText(/at least 12 characters/)).toBeVisible();
 		expect(posts).toBe(0);
@@ -265,7 +266,7 @@ test.describe('password strength', () => {
 		await fillWaInput(page, 'email', who.email);
 		await fillPassword(page, 'password', who.password);
 		await fillPassword(page, 'passwordConfirm', `${who.password}-different`);
-		await submitEnhancedForm(page, 'Sign Up');
+		await submitEnhancedForm(page, 'Sign up');
 
 		await expect(page.getByText(/Passwords don't match/)).toBeVisible();
 		expect(posts).toBe(0);
@@ -309,7 +310,7 @@ test.describe('password manager autofill', () => {
 		// never landed, meter present but signup refused means something else.
 		await expect(page.locator('wa-input[data-field="password"] ~ .strength')).toBeVisible();
 
-		await submitEnhancedForm(page, 'Sign Up');
+		await submitEnhancedForm(page, 'Sign up');
 		await finishSignUp(page, who);
 		await expect(page).toHaveURL(/\/home$/);
 		await expect(page.getByText(/at least 12 characters/)).toBeHidden();
@@ -325,7 +326,7 @@ test.describe('password manager autofill', () => {
 		await waitForEnhancedForm(page);
 		await autofillWaInput(page, 'wa-input[name="email"]', who.email);
 		await autofillPassword(page, 'password', who.password);
-		await submitEnhancedForm(page, 'Login');
+		await submitEnhancedForm(page, LOG_IN_BUTTON);
 
 		await expect(page).toHaveURL(/\/home$/);
 	});
@@ -345,7 +346,7 @@ test.describe('password manager autofill', () => {
 		await autofillPasswordSilently(page, 'password', who.password);
 		await autofillPasswordSilently(page, 'passwordConfirm', who.password);
 
-		await submitEnhancedForm(page, 'Sign Up');
+		await submitEnhancedForm(page, 'Sign up');
 		await finishSignUp(page, who);
 		await expect(page).toHaveURL(/\/home$/);
 	});
@@ -396,7 +397,7 @@ test.describe('signing in is what unlocks', () => {
 		await expectSentToSignIn(page, '/home/tasks');
 
 		// An ordinary login page: nothing about keys, locks or messages.
-		await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+		await expect(page.getByRole('button', { name: LOG_IN_BUTTON })).toBeVisible();
 		await expect(page.getByText(/unlock|encrypt|your messages/i)).toHaveCount(0);
 		// And the email already filled in, so a password manager or passkey
 		// autofill matches the right account.
@@ -502,7 +503,7 @@ test.describe('signing in is what unlocks', () => {
 		await waitForEnhancedForm(page);
 		await fillWaInput(page, 'email', who.email);
 		await fillPassword(page, 'password', who.password);
-		await submitEnhancedForm(page, 'Login');
+		await submitEnhancedForm(page, LOG_IN_BUTTON);
 		await expect(page.getByText('Invalid email or password')).toBeVisible();
 
 		await logIn(page, { ...who, password: newPassword });

@@ -69,7 +69,7 @@ test.describe('partner-assisted sign-in', () => {
 			const requester = await fresh.newPage();
 			await requester.goto('/login');
 			await waitForHydration(requester);
-			await requester.getByRole('link', { name: 'Forgot password' }).click();
+			await requester.getByRole('link', { name: 'Forgot password?' }).click();
 			await requester.waitForURL('/login/recover');
 			await waitForHydration(requester);
 			await requester.locator('wa-input[data-field="recoverEmail"] input').fill(ada.who.email);

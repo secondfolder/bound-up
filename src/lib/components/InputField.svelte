@@ -164,10 +164,16 @@
 
 <style>
 	.field {
+		/* A fixed lead-in ("Riley's …"), not part of the value. In the quiet
+		   colour alone it read as something already typed, so it is set apart
+		   by style and a rule as well. */
 		.start-text {
 			color: var(--wa-color-text-quiet);
+			font-style: italic;
 			white-space: nowrap;
-			margin-inline-end: 0.35rem;
+			margin-inline-end: 0.5rem;
+			padding-inline-end: 0.5rem;
+			border-inline-end: 1px solid var(--wa-color-surface-border);
 		}
 
 		.invalid {

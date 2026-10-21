@@ -1,0 +1,1 @@
+Bound Up Title: Rubik Black (https://github.com/googlefonts/rubik, commit e337a5f) with procedurally distressed edges and per-letter wobble, built by scripts/title-font/build.py (`npm run title-font`). SIL Open Font License 1.1: see bound-up-title-OFL.txt. Rubik declares no Reserved Font Name; the modified font is renamed anyway, so it is never mistaken for Rubik.

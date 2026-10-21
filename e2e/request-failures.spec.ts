@@ -48,7 +48,7 @@ test.describe('request failures', () => {
 			})
 		);
 
-		await submitEnhancedForm(page, 'Sign Up');
+		await submitEnhancedForm(page, 'Sign up');
 
 		await expect(page.getByRole('alert')).toContainText('Something went wrong on our side');
 		await expect(page).toHaveURL(/\/signup/);
@@ -59,7 +59,7 @@ test.describe('request failures', () => {
 		await fillSignup(page);
 		await onSignupPost(page, (route) => route.abort('internetdisconnected'));
 
-		await submitEnhancedForm(page, 'Sign Up');
+		await submitEnhancedForm(page, 'Sign up');
 
 		await expect(page.getByRole('alert')).toContainText("Couldn't reach Bound Up");
 	});
@@ -67,7 +67,7 @@ test.describe('request failures', () => {
 	test('the notice can be dismissed', async ({ page }) => {
 		await fillSignup(page);
 		await onSignupPost(page, (route) => route.fulfill({ status: 500, body: '{"type":"error"}' }));
-		await submitEnhancedForm(page, 'Sign Up');
+		await submitEnhancedForm(page, 'Sign up');
 
 		await page.getByRole('alert').getByRole('button', { name: 'Dismiss' }).click();
 		await expect(page.getByRole('alert')).toHaveCount(0);

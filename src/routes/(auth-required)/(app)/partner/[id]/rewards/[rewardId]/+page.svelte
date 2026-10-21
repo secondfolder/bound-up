@@ -39,7 +39,7 @@
 		backLabel="Back to rewards"
 		backText="Rewards"
 		title={`Edit a reward for ${partnerShown}`}
-		description="Use the same reward form here that creates a new partnership reward, but with the current values prefilled."
+		description="Change the title, description, cost, or whether it can be claimed."
 	/>
 
 	<div class="content">

@@ -134,13 +134,18 @@
 
 <div class="notifications" data-support={support}>
 	{#if !vapidPublicKey}
+		<!-- Every state carries an icon, as the app's other callouts do: the
+		     blocked one in particular read as a plain box of text, with
+		     nothing to say something was wrong. -->
 		<wa-callout variant="neutral" data-testid="push-unconfigured">
+			<wa-icon slot="icon" name="circle-info" variant="solid"></wa-icon>
 			Notifications are not set up on this server.
 		</wa-callout>
 	{:else if support === 'checking'}
 		<wa-skeleton effect="sheen"></wa-skeleton>
 	{:else if support === 'needs-install'}
 		<wa-callout variant="neutral" data-testid="push-needs-install">
+			<wa-icon slot="icon" name="mobile-screen" variant="solid"></wa-icon>
 			<strong>Add Bound Up to your Home Screen first</strong>
 			<p>
 				Your iPhone or iPad only shows notifications from apps on the Home Screen. Tap <ShareGlyph
@@ -149,17 +154,19 @@
 		</wa-callout>
 	{:else if support === 'unsupported'}
 		<wa-callout variant="neutral" data-testid="push-unsupported">
+			<wa-icon slot="icon" name="bell-slash" variant="solid"></wa-icon>
 			This browser cannot show notifications.
 		</wa-callout>
 	{:else if support === 'denied'}
 		<wa-callout variant="warning" data-testid="push-denied">
+			<wa-icon slot="icon" name="bell-slash" variant="solid"></wa-icon>
 			Notifications are blocked for Bound Up. Allow them in your device or browser settings, then
 			come back here.
 		</wa-callout>
 	{:else if !subscribedHere}
 		<p>Get a notification when your partner sends you a message.</p>
 		<!-- `disabled={busy}`, never `busy || undefined` — see AGENTS.md. -->
-		<wa-button variant="brand" onclick={turnOn} disabled={busy} data-testid="push-turn-on">
+		<wa-button class="turn-on" variant="brand" onclick={turnOn} disabled={busy} data-testid="push-turn-on">
 			Turn on notifications
 		</wa-button>
 	{/if}
@@ -208,6 +215,32 @@
 		wa-callout p {
 			margin-top: 0.25rem;
 			color: var(--wa-color-text-quiet);
+		}
+
+		/* Full width on a phone, its own width on anything wider. */
+		.turn-on {
+			align-self: flex-start;
+
+			@media (width < 40rem) {
+				align-self: stretch;
+			}
+		}
+
+		/* Label on the left, switch on the right, like a settings row. The
+		   text stays inside the switch, so the whole row is its label. */
+		wa-switch {
+			display: flex;
+
+			&::part(base) {
+				flex: 1 1 auto;
+				flex-direction: row-reverse;
+				justify-content: space-between;
+				gap: 1rem;
+			}
+
+			&::part(label) {
+				margin-inline-start: 0;
+			}
 		}
 
 		.devices {

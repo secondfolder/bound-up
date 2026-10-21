@@ -77,7 +77,11 @@ someone has played one:
   written for that story. Each card says its level, how it is told, and its
   kinks and tropes as tags (`tags`), so the harder ones can be told apart
   at a glance; under "Either" it also says which side the user is on in it,
-  which with a side chosen would only repeat the filter. They come in a
+  which with a side chosen would only repeat the filter. A card's title,
+  premise, tags and those facts sit on rows shared across its row of cards
+  (CSS subgrid), a fact to a line, so the facts line up across a row
+  however long each premise runs. A generated idea being written up has an
+  amber light running round its edge until its draft arrives. They come in a
   fresh order on each visit (`shuffledStarterIds`, `inOrder`), so the page
   does not always open on the same few. The page's load draws it: drawn
   while rendering, the server and the browser would each draw their own and
@@ -97,7 +101,9 @@ someone has played one:
   six shown. Focus leaving it while it is empty folds it away; Escape
   empties it, and a second Escape folds it away too.
 
-  **You as: Either / Dom / Sub** (`DaydreamSidePicker.svelte`) filters them
+  **You as: Either / Dom / Sub** (`DaydreamSidePicker.svelte`), a segmented
+  control drawn as the kink list's "Answer as" is (`choice-controls.css`),
+  filters them
   (`startersFor`). Each story says
   whether the user is the dom, the sub, or neither (`you`); a side's filter
   shows its own stories and the ones with no one in charge. Every story with
@@ -145,6 +151,12 @@ someone has played one:
   given.
 - **Build your own.** A section like the others, its **Build it yourself**
   button opening the full form, empty.
+
+Moving between the ways in and the setup (choosing a story, Build it
+yourself, Other ways to start) cross-fades with a view transition where the
+browser has one and motion is welcome, and goes back to the top of the page
+either way: the setup used to appear wherever the ways in had been scrolled
+to, usually at its last field.
 
 ### Links in a brief
 
@@ -668,7 +680,9 @@ The character and idea dialogs (`DaydreamCharacterDialog.svelte`,
   same thing.
 - **Idea dials**: heat and kink, up front in the idea dialog (below).
 - **Chips under every field**: phrases that toggle in the field's text
-  (`toggleChip`), leaving whatever else was written exactly as it was. The
+  (`toggleChip`), leaving whatever else was written exactly as it was. They
+  and the character's tone are one chip style (`.choice-chip` in
+  `components/choice-controls.css`), one size wherever they appear. The
   casting's two fields have their own (`CASTING_CHIPS`).
 - **Up front, and under "More detail".** A character shows its name, type and
   personality; an idea its title, what is going on and its parts. The rest —
@@ -1343,9 +1357,11 @@ this app's, in three layers, any one of which would stop it:
 
 **Stop the scene** and **Ease off** are always on screen, while a passage is
 arriving too, and they replace typed safewords. They sit at the right-hand
-end of the direction buttons' row; the button reads just **Stop**. Under
-650px wide the two fold into a menu at that end of the row, so the
-directions keep most of it.
+end of the direction buttons' row, pills like the directions; the button
+reads just **Stop**. Under 650px wide Ease off folds into a menu before
+Stop, so the directions keep most of the row. Stop itself never folds away:
+it is the safety control, and behind an unlabelled menu it was a tap and a
+guess further off than it should be.
 
 - **Stop the scene** drops whatever was arriving — not kept, as an ordinary
   Stop keeps it: it may be the very thing that made someone press — adds a
@@ -1388,6 +1404,19 @@ and `DaydreamProse.svelte` draws each run as one element carrying
 it lands in (`storedOffset` in `passage-selection.ts`), never by measuring the
 drawn text, which is shorter by every hidden marker. Quotes saved before any
 of this still point at the same words, and nothing was migrated.
+
+**How it looks.** A passage is a bubble with a 65-character measure and
+1.6 leading, a touch larger (1.0625rem, more padding) from 48rem wide, where
+long passages at body size read cramped. The passage arriving
+(`DaydreamArriving`) matches it, so nothing changes size as it is saved, and
+rises into place as it appears, each new paragraph fading up as it begins
+(`streaming` in `DaydreamProse`); the saved passage that replaces it does
+not animate. Suggested replies sit right under the passage they answer,
+shaped as the user's own turn's bubble, outlined where a sent one is
+filled; the room a short story leaves goes between them and the compose
+box, which stays at the foot of the screen. A reaction pops as it is given
+(the flame flickers), and a fresh roll's die tumbles before its result
+shows. All of this only under `prefers-reduced-motion: no-preference`.
 
 **What it reads**, deliberately little, because a story is prose:
 

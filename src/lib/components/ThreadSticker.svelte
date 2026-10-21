@@ -593,6 +593,28 @@
 		}
 	}
 
+	/* A halo that swells out from the card and fades: the arrival itself, on
+	   top of the ring that then marks where it is. */
+	@keyframes halo-pulse {
+		from {
+			box-shadow: 0 0 0 0 color-mix(in oklab, var(--wa-color-brand-fill-loud) 55%, transparent);
+		}
+
+		to {
+			box-shadow: 0 0 0 0.9rem transparent;
+		}
+	}
+
+	@keyframes dot-in {
+		from {
+			transform: scale(0);
+		}
+
+		60% {
+			transform: scale(1.4);
+		}
+	}
+
 	li {
 		position: relative;
 	}
@@ -912,6 +934,21 @@
 			block-size: 0.6rem;
 			border-radius: 50%;
 			background: var(--wa-color-brand-fill-loud, currentColor);
+		}
+	}
+
+	/* Movement, so only for those who have not asked for less; the ring above
+	   is a fade and stays for everyone. Two pulses, then still: the sticker
+	   says "this one", it does not keep calling. */
+	@media (prefers-reduced-motion: no-preference) {
+		a .card.highlighted {
+			animation:
+				highlight-fade 4s ease-in forwards,
+				halo-pulse 900ms ease-out 2;
+		}
+
+		a .dot {
+			animation: dot-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 		}
 	}
 

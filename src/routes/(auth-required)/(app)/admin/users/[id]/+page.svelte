@@ -155,6 +155,11 @@
 				margin: 0;
 			}
 
+			/* The size every settings subsection heading uses. */
+			h2 {
+				font-size: var(--wa-font-size-l);
+			}
+
 			p {
 				color: var(--wa-color-text-quiet);
 			}

@@ -15,8 +15,9 @@ The roadmap's toy collection and the like are planned for it.
   lists the tools: a name, a blurb, an icon and a route id. It is alias-free
   and holds data only.
 - **Index.** [`/playroom`](<../src/routes/(auth-required)/(app)/playroom/+page.svelte>)
-  is a page in the signed-in app shell that lists the registry. It has no load
-  function and no feature flag.
+  is a page in the signed-in app shell that lists the registry, as tiles side
+  by side where there is room and one to a row on a phone. It has no load
+  function and no feature flag. The kink list links back to it.
 - **Home card.** [`PlayroomWidget`](../src/lib/components/PlayroomWidget.svelte)
   is the Playroom's card on `/home`. Its body is the last IQ result, read by
   `latestIqTestResult` in the home load.
@@ -111,12 +112,14 @@ The page has three stages: intro, questions, results.
 
 1. **Setup dialog.** [`SetupDialog`](../src/lib/components/iq-test/SetupDialog.svelte)
    opens at the start of every visit, a dialog over the dimmed page. It is
-   the window's full height less a margin, whatever it holds, so options
-   coming and going under the slider never resize it and move the slider. It
-   holds:
+   the window's height less a margin, capped at 44rem, whatever it holds, so
+   options coming and going under the slider never resize it and move the
+   slider; the cap keeps a tall screen from showing a mostly empty panel.
+   Focus lands on the disclaimer as it opens, not on the first role button,
+   which otherwise showed a focus ring as if already chosen. It holds:
    - the disclaimer;
    - a "Stimulation intensity" slider from None to Max, five
-     levels, at most 300px wide and centred
+     levels, at most 300px wide, on the disclaimer's left edge
      ([`IntensitySlider`](../src/lib/components/iq-test/IntensitySlider.svelte)).
      It is the app's slider ([sliders.md](sliders.md)): the knob moves freely
      while dragged and springs onto the nearest notch when let go, the keys

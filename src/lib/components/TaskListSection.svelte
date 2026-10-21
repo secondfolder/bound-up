@@ -1,11 +1,13 @@
 <script lang="ts">
 	import ManagedTaskList from '$lib/components/ManagedTaskList.svelte';
+	import SectionPanel from '$lib/components/SectionPanel.svelte';
 	import type { PartnershipTaskView, SelfTaskView } from '$lib/types';
 
 	type TaskView = SelfTaskView | PartnershipTaskView;
 
 	type Props = {
-		title: string;
+		/** Null on a page whose title already names the one list on it. */
+		title?: string | null;
 		tasks: TaskView[];
 		emptyMessage: string;
 		completeAction?: string | null;
@@ -18,77 +20,43 @@
 		extraHref?: string | null;
 		extraLabel?: string;
 		wrapInPanel?: boolean;
+		class?: string;
 	};
 
 	let {
-		title,
+		title = null,
 		tasks,
 		emptyMessage,
 		completeAction = null,
 		completePartnershipId = null,
 		editHref = null,
 		historyHref = null,
-		historyLabel = 'Completion History',
+		historyLabel = 'Completion history',
 		addHref = null,
 		addLabel = 'Add a task',
 		extraHref = null,
 		extraLabel = '',
-		wrapInPanel = true
+		wrapInPanel = true,
+		class: className = ''
 	}: Props = $props();
+
+	const hasActions = $derived(Boolean(historyHref || (extraHref && extraLabel) || addHref));
 </script>
 
-<section class:panel={wrapInPanel} class="task-section">
-	<div class="section-header">
-		<h2>{title}</h2>
-		{#if historyHref || extraHref || addHref}
-			<div class="section-actions">
-				{#if historyHref}
-					<wa-button appearance="outlined" href={historyHref}>{historyLabel}</wa-button>
-				{/if}
-				{#if extraHref && extraLabel}
-					<wa-button appearance="outlined" href={extraHref}>{extraLabel}</wa-button>
-				{/if}
-				{#if addHref}
-					<wa-button appearance="outlined" href={addHref}>{addLabel}</wa-button>
-				{/if}
-			</div>
-		{/if}
-	</div>
-
+<SectionPanel {title} framed={wrapInPanel} class={className} actions={hasActions ? sectionActions : undefined}>
 	<ManagedTaskList {tasks} {emptyMessage} {completeAction} {completePartnershipId} {editHref} />
-</section>
+</SectionPanel>
 
-<style>
-	.task-section {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.section-header,
-	.section-actions {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.section-header {
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.panel {
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-panel-border-radius);
-		padding: var(--wa-space-l);
-		background: color-mix(
-			in srgb,
-			var(--wa-color-surface-default) 94%,
-			var(--wa-color-brand-fill-quiet)
-		);
-	}
-
-	h2 {
-		margin: 0;
-	}
-</style>
+<!-- The same order on every tasks and rewards page: where to look first, then
+     the one that makes something new, last. -->
+{#snippet sectionActions()}
+	{#if historyHref}
+		<wa-button appearance="outlined" href={historyHref}>{historyLabel}</wa-button>
+	{/if}
+	{#if extraHref && extraLabel}
+		<wa-button appearance="outlined" href={extraHref}>{extraLabel}</wa-button>
+	{/if}
+	{#if addHref}
+		<wa-button appearance="outlined" href={addHref}>{addLabel}</wa-button>
+	{/if}
+{/snippet}

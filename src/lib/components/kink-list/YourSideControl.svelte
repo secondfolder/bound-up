@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { YOUR_SIDE_LABELS, YOUR_SIDES } from '$lib/kink-list/answers';
 	import { kinkListContext } from '$lib/kink-list/context';
+	import '../choice-controls.css';
 
 	/**
 	 * "Answer as: Dom · Sub · Both". Dom or Sub hides the contexts and kinks
@@ -41,7 +42,7 @@
 			</p>
 		</div>
 	</wa-popover>
-	<div class="segments">
+	<div class="choice-segments">
 		{#each YOUR_SIDES as side (side)}
 			<label>
 				<input
@@ -97,45 +98,8 @@
 		}
 	}
 
-	.segments {
-		display: inline-flex;
-		border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-		border-radius: var(--wa-border-radius-pill);
-		overflow: hidden;
-	}
-
-	label {
-		position: relative;
-
-		input {
-			position: absolute;
-			inset: 0;
-			margin: 0;
-			opacity: 0;
-			cursor: pointer;
-		}
-
-		span {
-			display: block;
-			padding: 0.2rem 0.75rem;
-			font-size: 0.875rem;
-		}
-
-		& + label span {
-			border-inline-start: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-		}
-
-		input:checked + span {
-			font-weight: var(--wa-font-weight-bold);
-			color: var(--wa-color-brand-on-loud);
-			background: var(--wa-color-brand-fill-loud);
-		}
-
-		input:focus-visible + span {
-			outline: var(--wa-focus-ring);
-			outline-offset: calc(-1 * var(--wa-focus-ring-width, 2px));
-		}
-	}
+	/* The segments are `.choice-segments` (choice-controls.css), shared with
+	   the daydreams' "You as". */
 
 	.hint {
 		font-size: 0.8125rem;

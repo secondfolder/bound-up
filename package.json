@@ -30,6 +30,7 @@
 		"auth:schema": "better-auth generate --config ./better-auth.config.ts --output src/lib/server/db/schema/auth.ts --yes",
 		"cf-typegen": "wrangler types ./src/worker-env.d.ts --include-runtime=false",
 		"brand-images": "tsx scripts/generate-brand-images.ts",
+		"title-font": "uv run --no-project --python 3.13 --with-requirements scripts/title-font/requirements.txt python scripts/title-font/build.py",
 		"prompts:export": "tsx scripts/prompts-export.ts",
 		"prompts:review": "tsx scripts/prompts-review.ts"
 	},

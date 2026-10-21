@@ -119,7 +119,13 @@
 <svelte:head><title>{partnerShown} — message</title></svelte:head>
 
 <div class="page">
-	<NestedPageHeader {backHref} backLabel="Back to messages" backText={partnerShown} />
+	<!-- "Messages", not the partner's name: the board's own back link says the
+	     name, and two levels in a row both reading "Morgan" did not say which
+	     one this went back to. -->
+	<NestedPageHeader {backHref} backLabel="Back to messages" backText="Messages" />
+	<!-- A heading for the page without a title bar over the conversation: the
+	     messages are the page, and a messenger shows none. -->
+	<h1 class="wa-visually-hidden">Messages with {partnerShown}</h1>
 	<MessageToasts bind:this={toasts} partnershipId={data.partner.id} partnerName={partnerShown} />
 
 	{#if keyring.status === 'unlocked'}
@@ -157,7 +163,11 @@
 </div>
 
 <style>
+	/* A centred column, as every other page is. Full width, the two sides of
+	   a conversation ended up a whole screen apart on a desktop. */
 	.page {
+		max-inline-size: var(--page-width);
+		margin-inline: auto;
 		display: flex;
 		flex-direction: column;
 		flex: 1 1 auto;
@@ -165,7 +175,7 @@
 	}
 
 	.trust {
-		padding: var(--wa-space-s) var(--wa-space-m) 0;
+		padding: var(--wa-space-s) var(--page-gutter) 0;
 	}
 
 	.settling {

@@ -51,15 +51,43 @@
 		});
 	});
 
+	/**
+	 * Who is what, in a sentence, beside their avatar. It used to be the
+	 * header's description as "Mistress / pet", which did not say whose role
+	 * was which.
+	 */
+	const roleLine = $derived.by(() => {
+		const parts = [
+			opened?.partnerRole ? `They're your ${opened.partnerRole}` : null,
+			opened?.yourRole
+				? `${opened?.partnerRole ? "you're" : "You're"} their ${opened.yourRole}`
+				: null
+		].filter(Boolean);
+		return parts.length > 0 ? parts.join(' · ') : null;
+	});
+
 	let shareStatus: string | null = $state(null);
+	/** The share button shows a check for a moment once the link has gone. */
+	let shareDone = $state(false);
+	$effect(() => {
+		if (!shareDone) {
+			return;
+		}
+		const timer = setTimeout(() => {
+			shareDone = false;
+		}, 1500);
+		return () => clearTimeout(timer);
+	});
 	let rotateError: string | null = $state(null);
 
 	async function share(url: string) {
 		const outcome = await shareInviteLink(url);
 		if (outcome.shared) {
 			shareStatus = 'Shared.';
+			shareDone = true;
 		} else if (outcome.copied) {
 			shareStatus = 'Link copied to your clipboard.';
+			shareDone = true;
 		} else {
 			shareStatus = 'Could not copy automatically — select the link above.';
 		}
@@ -72,17 +100,19 @@
 		backLabel="Back to partners"
 		backText="Partners"
 		title={shownName}
-		description={[opened?.partnerRole, opened?.yourRole].filter(Boolean).join(' / ') || null}
 	/>
 
 	<div class="content">
-		<header>
+		<!-- Left-aligned with everything else. Centred on its own under a
+		     left-aligned title, it floated in the middle of the column. -->
+		<div class="identity">
 			<wa-avatar
 				image={partnership.counterpartImage ?? undefined}
 				initials={initialsFor(shownName)}
 				label={shownName}
 			></wa-avatar>
-		</header>
+			{#if roleLine}<p>{roleLine}</p>{/if}
+		</div>
 
 		{#if partnership.status === 'pending'}
 			<div class="pending">
@@ -100,7 +130,14 @@
 						aria-label="Invite link"
 					/>
 					<wa-button onclick={() => inviteLink && share(inviteLink)}>
-						<wa-icon slot="start" name="share-nodes" variant="solid"></wa-icon>
+						{#key shareDone}
+							<wa-icon
+								slot="start"
+								class:done={shareDone}
+								name={shareDone ? 'check' : 'share-nodes'}
+								variant="solid"
+							></wa-icon>
+						{/key}
 						Share link again
 					</wa-button>
 					{#if shareStatus}<p class="status">{shareStatus}</p>{/if}
@@ -180,7 +217,14 @@
 			{/if}
 		{/if}
 
-		<div class="actions">
+		<!-- Set apart from the settings above, with what it does said before
+		     the button rather than only in the confirm. -->
+		<div class="leave">
+			<p class="hint">
+				{partnership.status === 'pending'
+					? 'Cancelling stops the invite link from working.'
+					: 'Ends the link for both of you. This cannot be undone.'}
+			</p>
 
 			<!-- Always available, whoever holds control: see the disconnect action. -->
 			<form
@@ -221,19 +265,25 @@
 			padding: var(--wa-space-l) var(--page-gutter);
 		}
 
-		header {
+		.identity {
 			display: flex;
-			flex-direction: column;
 			align-items: center;
-			gap: 0.5rem;
+			gap: 0.75rem;
 
 			wa-avatar {
-				--size: 4rem;
+				--size: 3rem;
+				flex: none;
+			}
+
+			p {
+				margin: 0;
+				color: var(--wa-color-text-quiet);
 			}
 		}
 
+		/* The size every settings subsection heading uses. */
 		h2 {
-			font-size: 1rem;
+			font-size: var(--wa-font-size-l);
 			margin: 0;
 		}
 
@@ -267,16 +317,25 @@
 			gap: 1rem;
 		}
 
-		/* The disconnect form contributes only its button, so let the .actions
-		   row lay the two buttons out as siblings. */
-		.actions {
+		.leave {
 			display: flex;
-			flex-wrap: wrap;
-			align-items: center;
+			flex-direction: column;
+			align-items: flex-start;
 			gap: 0.75rem;
+			margin-top: var(--wa-space-s);
+			padding-top: var(--wa-space-l);
+			border-top: 1px solid var(--wa-color-surface-border);
 
+			/* The form contributes only its button. */
 			form {
 				display: contents;
+			}
+		}
+
+		/* The share icon pops as it turns into a check. */
+		@media (prefers-reduced-motion: no-preference) {
+			wa-icon.done {
+				animation: share-done 0.4s ease-out;
 			}
 		}
 
@@ -303,6 +362,18 @@
 
 		.invalid {
 			color: var(--wa-color-text-danger);
+		}
+	}
+
+	@keyframes share-done {
+		0% {
+			scale: 0.4;
+		}
+		60% {
+			scale: 1.25;
+		}
+		100% {
+			scale: 1;
 		}
 	}
 </style>

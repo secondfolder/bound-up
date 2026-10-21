@@ -246,7 +246,13 @@
 		{/each}
 
 		<wa-dropdown onwa-select={onAddTagSelect}>
-			<wa-button slot="trigger" size="s" with-caret>Add tag</wa-button>
+			<!-- The same button, label and icon as the one that starts editing
+			     below, so "add a tag" looks like one action wherever it is. They
+			     used to be a filled "Add tag" and an outlined "Add tags". -->
+			<wa-button slot="trigger" size="s" appearance="plain" with-caret>
+				<wa-icon slot="start" name="tag" variant="solid"></wa-icon>
+				Add tag
+			</wa-button>
 			{#each addableTags as tag (tag.id)}
 				<wa-dropdown-item value={tag.id}>
 					<span class="swatch" slot="icon" style={`background: ${tag.color}`}></span>
@@ -297,8 +303,12 @@
 	</div>
 {:else}
 	<div class="tag-picker display">
-		<wa-button type="button" size="s" appearance="outlined" pill onclick={() => { editing = true; }}>
-			Add tags
+		<!-- Plain, not outlined: at the top of a thread this is the first thing
+		     on the page, and an outlined pill drew the eye away from the
+		     messages under it. -->
+		<wa-button type="button" size="s" appearance="plain" onclick={() => { editing = true; }}>
+			<wa-icon slot="start" name="tag" variant="solid"></wa-icon>
+			Add tag
 		</wa-button>
 	</div>
 {/if}

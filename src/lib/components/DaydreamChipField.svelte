@@ -2,6 +2,7 @@
 	import { hasChip, mergeChips, toggleChip } from '$lib/daydream/chips';
 	import type { SuggestFailure } from '$lib/daydream/suggest';
 	import SuggestionProblem from './SuggestionProblem.svelte';
+	import './choice-controls.css';
 
 	/**
 	 * A free-text field with suggestions under it. The text is the truth: a
@@ -78,7 +79,7 @@
 				     aria-pressed to the button inside it (AGENTS.md). -->
 				<button
 					type="button"
-					class="chip"
+					class="chip choice-chip"
 					aria-pressed={hasChip(value, chip)}
 					onclick={() => onchange(toggleChip(value, chip).slice(0, limit))}
 				>
@@ -137,24 +138,6 @@
 		}
 	}
 
-	.chip {
-		padding: 0.2rem 0.65rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		background: transparent;
-		color: inherit;
-		font: inherit;
-		font-size: 0.8125rem;
-		cursor: pointer;
-
-		&[aria-pressed='true'] {
-			background: var(--wa-color-brand-fill-quiet);
-			border-color: var(--wa-color-brand-border-quiet, var(--wa-color-surface-border));
-		}
-
-		&:focus-visible {
-			outline: var(--wa-focus-ring);
-			outline-offset: var(--wa-focus-ring-offset);
-		}
-	}
+	/* A chip's look is `.choice-chip` (choice-controls.css): one size for
+	   these and the tones beside them in the character dialog. */
 </style>

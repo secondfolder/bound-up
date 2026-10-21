@@ -53,14 +53,17 @@
 	onclick={() => { open = !open; }}
 >
 	<!-- Always the same smiley, never the chosen emoji: the reaction itself is
-	     already shown under the message, so echoing it here duplicated it. -->
-	☺
+	     already shown under the message, so echoing it here duplicated it. An
+	     icon rather than the "☺" character it used to be, which drew at about
+	     9px in the body font beside the time. -->
+	<wa-icon name="face-smile" variant="regular"></wa-icon>
 </button>
 
 {#if open}
 	<fieldset class="menu" aria-label="Reactions">
-		{#each REACTIONS as emoji (emoji)}
+		{#each REACTIONS as emoji, index (emoji)}
 			<wa-button
+				style={`--index: ${index}`}
 				type="button"
 				appearance="plain"
 				pill
@@ -75,19 +78,34 @@
 {/if}
 
 <style>
+	/*
+	 * Drawn small, so it does not compete with the message, and tapped large.
+	 * The glyph is about 16px, but the hit area reaches 44px square through a
+	 * pseudo-element, without moving the time beside it or the next message
+	 * below. It used to be 14 by 38 pixels, and drawn at 70% opacity on top of
+	 * the quiet colour.
+	 */
 	.trigger {
+		position: relative;
+		display: inline-grid;
+		place-items: center;
 		border: none;
 		background: none;
 		cursor: pointer;
-		padding: 0 0.125rem;
-		font-size: 0.875rem;
+		padding: 0 0.25rem;
+		font-size: 1rem;
 		line-height: 1;
-		color: inherit;
-		opacity: 0.7;
+		color: var(--wa-color-text-quiet);
+
+		&::after {
+			content: '';
+			position: absolute;
+			inset: -0.875rem -0.75rem;
+		}
 
 		&:hover,
 		&:focus-visible {
-			opacity: 1;
+			color: var(--wa-color-text-normal);
 		}
 	}
 
@@ -111,6 +129,34 @@
 			&.chosen::part(base) {
 				background: var(--wa-color-brand-fill-quiet, rgb(0 0 0 / 8%));
 			}
+		}
+	}
+
+	/* The row fans open from the smiley, one emoji a beat after the last, so it
+	   reads as coming out of the button rather than appearing beside it. */
+	@media (prefers-reduced-motion: no-preference) {
+		.menu {
+			transform-origin: left center;
+			animation: menu-in 160ms ease-out;
+
+			wa-button {
+				animation: emoji-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+				animation-delay: calc(var(--index) * 25ms);
+			}
+		}
+	}
+
+	@keyframes menu-in {
+		from {
+			opacity: 0;
+			transform: scale(0.85);
+		}
+	}
+
+	@keyframes emoji-in {
+		from {
+			opacity: 0;
+			transform: translateY(0.375rem) scale(0.5);
 		}
 	}
 </style>

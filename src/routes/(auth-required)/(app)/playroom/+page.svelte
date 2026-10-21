@@ -51,16 +51,26 @@
 		}
 	}
 
+	/* Tiles side by side where there is room, one to a row on a phone: a
+	   single 30rem column left most of a wide screen empty, and will not hold
+	   more than a handful of tools. Each tile fills its cell's height, so a
+	   row of them lines up whatever their blurbs' lengths. */
 	.tools {
 		list-style: none;
 		padding: 0;
-		margin: 2rem auto 0;
-		max-inline-size: 30rem;
+		margin: 2rem 0 0;
 		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
 		gap: 1rem;
 
+		li {
+			display: flex;
+		}
+
 		a {
+			flex: 1 1 auto;
 			display: grid;
+			align-content: center;
 			grid-template-columns: auto 1fr;
 			column-gap: 1rem;
 			row-gap: 0.25rem;
@@ -75,6 +85,16 @@
 			&:hover,
 			&:focus-visible {
 				border-color: var(--wa-color-brand-border-loud);
+			}
+
+			@media (prefers-reduced-motion: no-preference) {
+				transition:
+					border-color 120ms ease-out,
+					translate 120ms ease-out;
+
+				&:hover {
+					translate: 0 -2px;
+				}
 			}
 
 			wa-icon {

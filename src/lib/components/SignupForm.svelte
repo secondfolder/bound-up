@@ -12,7 +12,7 @@
 	import { wrapIdentity } from '$lib/crypto/wrap';
 	import { MASTER_KEY_VERSIONS } from '$lib/encryption';
 	import { MIN_PASSWORD_LENGTH, scorePassword } from '$lib/password-strength';
-	import type { SignupFormSchema } from '$lib/schemas/signupForm';
+	import { type SignupFormSchema, signupFormSchema } from '$lib/schemas/signupForm';
 	import { superForm } from '$lib/superform';
 	import { currentTimeZoneOrUtc } from '$lib/timezone';
 	import AuthBox from './AuthBox.svelte';
@@ -137,7 +137,26 @@
 			}
 		}
 	});
-	const { errors, submitting } = superform;
+	const { errors, form: formValues, submitting } = superform;
+
+	/**
+	 * Whether everything the form checks before posting would pass, for the
+	 * Sign up button's style: outlined until then, solid once it would (the
+	 * save-button convention in AGENTS.md). It was outlined for good, so the
+	 * one action on the page never looked ready.
+	 *
+	 * By hand, like the log-in form's: there are no client `validators` (see
+	 * above), and the passwords are never in `$form`. So it is the schema's
+	 * own name and email rules plus the two checks `onSubmit` makes. Style
+	 * only — the button stays enabled, so a field a password manager filled
+	 * without an event Svelte sees leaves it outlined rather than unusable.
+	 */
+	const canSignUp = $derived(
+		signupFormSchema.shape.name.safeParse($formValues.name).success &&
+			signupFormSchema.shape.email.safeParse($formValues.email).success &&
+			scorePassword(password).acceptable &&
+			password === passwordConfirm
+	);
 
 	/** The box's loading bar: the keys being made, then the request. */
 	const busy = $derived(working || $submitting);
@@ -188,8 +207,11 @@
 		<input type="hidden" name="wrapBlob" value="" />
 		<input type="hidden" name="timezone" value="" />
 
-		<wa-button type="submit" variant="brand" appearance="outlined" disabled={!hydrated || working}
-			>Sign Up</wa-button
+		<wa-button
+			type="submit"
+			variant="brand"
+			appearance={canSignUp ? 'accent' : 'outlined'}
+			disabled={!hydrated || working}>Sign up</wa-button
 		>
 		{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
 		{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}

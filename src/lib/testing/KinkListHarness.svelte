@@ -4,6 +4,7 @@
 	import KinkListHome from '$lib/components/kink-list/KinkListHome.svelte';
 	import KinkRow from '$lib/components/kink-list/KinkRow.svelte';
 	import ListFilters from '$lib/components/kink-list/ListFilters.svelte';
+	import TriageGrid from '$lib/components/kink-list/TriageGrid.svelte';
 	import YourSideControl from '$lib/components/kink-list/YourSideControl.svelte';
 	import { kinkById } from '$lib/kink-list/catalog';
 	import { setKinkListContext } from '$lib/kink-list/context';
@@ -12,8 +13,8 @@
 	/**
 	 * A kink-list screen needs its store and paths from a layout's context,
 	 * which a bare component render has none of. This is that layout, for the
-	 * component tests: one row, one whole category, the quick-fill deck, or the
-	 * whole page (`home`), with the filters and "Answer as" above it when
+	 * component tests: one row, one whole category, the quick-fill deck or its
+	 * triage, or the whole page (`home`), with the filters and "Answer as" above it when
 	 * `controls` is set.
 	 */
 	let {
@@ -21,6 +22,7 @@
 		itemKey,
 		categoryId,
 		deck = false,
+		triage = false,
 		home = false,
 		controls = false,
 		ondone = () => undefined
@@ -29,6 +31,7 @@
 		itemKey?: string;
 		categoryId?: string;
 		deck?: boolean;
+		triage?: boolean;
 		home?: boolean;
 		controls?: boolean;
 		ondone?: () => void;
@@ -53,6 +56,8 @@
 {/if}
 {#if home}
 	<KinkListHome />
+{:else if triage}
+	<TriageGrid remaining={0} onstart={() => undefined} />
 {:else if deck}
 	<Deck {ondone} />
 {:else if itemKey}

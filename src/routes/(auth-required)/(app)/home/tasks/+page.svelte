@@ -27,9 +27,10 @@
 		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
 
 		<TaskListSection
-			title="Your Tasks"
+			title="Your tasks"
+			class="self"
 			tasks={data.selfTasks.tasks}
-			emptyMessage="You have not created any self tasks yet."
+			emptyMessage="You have not created any tasks of your own yet."
 			completeAction="?/selfCompleteTask"
 			editHref={selfEditHref}
 			{historyHref}
@@ -40,7 +41,8 @@
 		<div class="partner-sections">
 			{#each data.partnerTasks as section (section.partnershipId)}
 				<TaskListSection
-					title={`${partnerName(section.names)}'s Tasks`}
+					title={`${partnerName(section.names)}'s tasks`}
+					class="partner"
 					tasks={section.tasks}
 					emptyMessage={`No active tasks from ${partnerName(section.names)} right now.`}
 					completeAction="?/partnerCompleteTask"

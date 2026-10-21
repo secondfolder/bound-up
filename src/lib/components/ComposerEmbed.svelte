@@ -90,7 +90,7 @@
 		white-space: initial; /* Overrides white-space supplied by the RichTextEditor */
 		margin-block: 0.35rem;
 		/* The same cap a message bubble has, because that is what this is a
-		   preview of — kept in step with the `li` rule in MessageBubble.svelte.
+		   preview of — kept in step with the `.message` rule in MessageBubble.svelte.
 		   Without it the embed is as wide as the composer and the writer is
 		   shown something the reader will never see. */
 		max-inline-size: min(78%, 34rem);

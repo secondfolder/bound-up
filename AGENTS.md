@@ -583,7 +583,8 @@ onto every page by setting `--wa-color-*` and friends in Web Awesome's last
 cascade layer, and `<html>` is `wa-dark` unconditionally. A component names a
 semantic token (`--wa-color-surface-default`, `--wa-color-text-quiet`), never
 a hex value, and a colour the palette lacks becomes a token there first. Page
-titles are `h1`s, which the theme sets in Muddy Tractor. See
+titles are `h1`s, which the theme sets in the title face (Rubik Black,
+distressed by `scripts/title-font/`; `npm run title-font` rebuilds it). See
 [docs/theme.md](docs/theme.md).
 
 **Prefer a `wa-*` component wherever an appropriate one exists** — a
@@ -656,6 +657,17 @@ standalone tools (`/playroom/iq-test`). `/playroom` itself is signed-in.
 hydration. Route ids are identical on both sides.
 
 **CSS lives in the component's `<style>` block**, nested, no framework.
+
+**A page's width and gutter are tokens, never a number of its own.** A page
+root takes `max-width: var(--page-width-narrow | --page-width |
+--page-width-wide)` and pads its content's sides with `--page-gutter`, the same
+token `NestedPageHeader` is inset by, so the back link, title, divider and
+content share one edge. There used to be seven column widths and two gutters,
+and moving between sibling pages made the column jump. The app layout makes
+every page root fill `<main>`; do not undo that with a root of `width: auto`.
+A bullet-less list zeroes its own `padding` and is flush: `theme.css` moves Web
+Awesome's list indent off the `li` and onto the list. See
+[docs/theme.md](docs/theme.md#page-layout).
 
 **Two links on one page must not share an accessible name.** Duplicate names
 going to different places are a real problem for anyone navigating by link

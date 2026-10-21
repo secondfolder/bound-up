@@ -19,7 +19,10 @@ address, because each on its own is someone else's say-so (see below).
 ## The flow
 
 **Starting — `/login/recover`, no session.** The login page links to it as
-"Forgot password". The person enters their email and a new password. Their
+"Forgot password?", under the password box. The page is titled "Can't log
+in?" and sits in the same `AuthPage` layout and `AuthBox` as log in and sign
+up; its "Ask my partner" button stays outlined until the email, the new
+password's strength and the confirmation would all pass. The person enters their email and a new password. Their
 browser makes a brand-new identity and seals it under the new password — the
 same `buildIdentitySubmission` signup uses — and posts the email, the new
 public key and the new password wrap to `POST /api/account-recovery`. It gets

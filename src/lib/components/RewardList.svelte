@@ -1,5 +1,11 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { enhance } from '$app/forms';
+	import ItemCard from '$lib/components/ItemCard.svelte';
 	import RichText from '$lib/components/RichText.svelte';
+	import { creditsLabel, rewardClaimStatus } from '$lib/credits';
+	import { ItemAction } from '$lib/item-action.svelte';
 	import { openedReward, shownTitle } from '$lib/sealed-views.svelte';
 	import type { PartnershipRewardView, SelfRewardView } from '$lib/types';
 
@@ -12,7 +18,8 @@
 		claimAction,
 		claimPartnershipId = null,
 		editHref = null,
-		showClaimUi = true
+		showClaimUi = true,
+		balance = null
 	}: {
 		rewards: RewardView[];
 		emptyMessage: string;
@@ -20,6 +27,11 @@
 		claimPartnershipId?: string | null;
 		editHref?: EditHrefBuilder;
 		showClaimUi?: boolean;
+		/**
+		 * The credits the viewer can spend on these rewards, so an unaffordable
+		 * one can say how far off it is. Null where that is not known.
+		 */
+		balance?: number | null;
 	} = $props();
 
 	function rewardCreatedByMe(reward: RewardView): boolean {
@@ -28,6 +40,27 @@
 
 	/** Each row with its content opened, or a placeholder while it opens (`sealed-views.svelte.ts`). */
 	const rows = $derived(rewards.map((reward) => ({ reward, content: openedReward(reward) })));
+
+	const claiming = new ItemAction();
+
+	/**
+	 * Rewards that have just come within reach while this list was on screen —
+	 * the balance was edited up, say — whose Claim button glows once to say so.
+	 *
+	 * Only a change is marked. Every claimable reward glowing as the page
+	 * loads would be noise, and would make the glow mean nothing.
+	 */
+	const glowing = new SvelteSet<string>();
+	const wasClaimable = new Map<string, boolean>();
+	$effect(() => {
+		for (const { id, canClaim } of rewards) {
+			if (wasClaimable.get(id) === false && canClaim) {
+				untrack(() => glowing.add(id));
+				setTimeout(() => glowing.delete(id), 1200);
+			}
+			wasClaimable.set(id, canClaim);
+		}
+	});
 </script>
 
 {#if rewards.length === 0}
@@ -35,51 +68,68 @@
 {:else}
 	<ul class="reward-list">
 		{#each rows as { reward, content } (reward.id)}
-			<li class:inactive={!reward.active}>
-				<div class="reward-head">
-					<div>
-						<h3>{shownTitle(content)}</h3>
-						<p>{reward.cost} credits</p>
-					</div>
-					<div class="reward-meta">
-						{#if editHref}
-							<a class="icon-link" href={editHref(reward.id)}>
-								<wa-icon name="pen-to-square" variant="solid"></wa-icon>
-								<span class="wa-visually-hidden">Edit {shownTitle(content)}</span>
-							</a>
-						{/if}
-					</div>
-				</div>
+			{const claimable = $derived(showClaimUi && !rewardCreatedByMe(reward))}
+			{const status = $derived(claimable ? rewardClaimStatus(reward, balance) : null)}
+			<li>
+				<ItemCard
+					title={shownTitle(content)}
+					inactive={!reward.active}
+					celebrating={claiming.celebrating === reward.id}
+					actions={claimable || editHref ? rewardActions : undefined}
+					status={status ? claimStatus : undefined}
+				>
+					{#snippet value()}{creditsLabel(reward.cost)}{/snippet}
 
-				{#if content?.description}<div class="description">
-						<RichText text={content.description} />
-					</div>{/if}
+					{#if content?.description}<RichText text={content.description} />{/if}
+				</ItemCard>
+			</li>
 
-				{#if showClaimUi && !rewardCreatedByMe(reward)}
-					<form method="POST" action={claimAction} class="claim-form">
+			{#snippet claimStatus()}
+				<p>{status}</p>
+			{/snippet}
+
+			{#snippet rewardActions()}
+				{#if claimable}
+					<form
+						method="POST"
+						action={claimAction}
+						class="claim-form"
+						use:enhance={claiming.enhance(reward.id)}
+					>
 						{#if claimPartnershipId}
 							<input type="hidden" name="partnershipId" value={claimPartnershipId} />
 						{/if}
 						<input type="hidden" name="rewardId" value={reward.id} />
-						<wa-button type="submit" size="s" disabled={!reward.canClaim}>Claim</wa-button>
-						<span class="quiet">
-							{#if !reward.active}
-								Inactive right now.
-							{:else if !reward.canClaim}
-								You need {reward.cost} credits.
+						<!-- Amber only when it can be claimed: a claim the balance does not
+						     cover stays a quiet outline, with the shortfall said beside it. -->
+						<wa-button
+							type="submit"
+							class:glow={glowing.has(reward.id)}
+							variant={reward.canClaim ? 'brand' : 'neutral'}
+							appearance={reward.canClaim ? 'accent' : 'outlined'}
+							disabled={!reward.canClaim || claiming.waiting(reward.id)}
+						>
+							{#if claiming.celebrating === reward.id}
+								<wa-icon class="done" name="gift" variant="solid" label="Claimed"></wa-icon>
 							{:else}
-								Ready to claim.
+								Claim
 							{/if}
-						</span>
+						</wa-button>
 					</form>
 				{/if}
-			</li>
+				{#if editHref}
+					<!-- The title is in the name, so a list of cards is not a list of
+					     links all called "Edit". -->
+					<wa-button appearance="outlined" href={editHref(reward.id)}
+						>Edit <span class="wa-visually-hidden">{shownTitle(content)}</span></wa-button
+					>
+				{/if}
+			{/snippet}
 		{/each}
 	</ul>
 {/if}
 
 <style>
-	h3,
 	p {
 		margin: 0;
 	}
@@ -90,57 +140,33 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.reward-list li {
-		border: 1px solid color-mix(in srgb, var(--wa-color-surface-border) 75%, transparent);
-		border-radius: 0.75rem;
-		padding: 0.85rem;
-		display: flex;
-		flex-direction: column;
 		gap: 0.75rem;
 	}
 
-	.reward-head,
-	.claim-form,
-	.reward-meta {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.reward-head {
-		justify-content: space-between;
-		align-items: flex-start;
-	}
-
-	.reward-meta {
-		align-items: center;
-	}
-
-	.claim-form {
-		align-items: center;
-	}
-
-	.quiet,
 	.empty {
 		color: var(--wa-color-text-quiet);
 	}
 
-	.icon-link {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		inline-size: 2.25rem;
-		block-size: 2.25rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		text-decoration: none;
-		color: var(--wa-color-text-quiet);
+	@media (prefers-reduced-motion: no-preference) {
+		.glow {
+			border-radius: var(--wa-form-control-border-radius);
+			animation: glow 1200ms ease-out;
+		}
+
+		.done {
+			animation: pop 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+		}
 	}
 
-	.inactive {
-		opacity: 0.7;
+	@keyframes glow {
+		30% {
+			box-shadow: 0 0 0 0.375rem var(--wa-color-brand-fill-normal);
+		}
+	}
+
+	@keyframes pop {
+		from {
+			transform: scale(0.8);
+		}
 	}
 </style>

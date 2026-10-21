@@ -29,12 +29,14 @@
 				modelId: string;
 				known?: OpenRouterModelResult | null;
 				onfound?: (result: OpenRouterModelResult) => void;
+				onmissing?: (missing: boolean) => void;
 		  }
 		| {
 				provider: 'runware';
 				modelId: string;
 				known?: RunwareModelResult | null;
 				onfound?: (result: RunwareModelResult) => void;
+				onmissing?: (missing: boolean) => void;
 		  };
 
 	let props: Props = $props();
@@ -46,6 +48,14 @@
 	let message = $state('');
 
 	const DEBOUNCE_MS = 400;
+
+	// Tells the page whether the provider has said it has no such model, so the
+	// panel's badge can stop saying "Working" above a warning that it is not.
+	$effect(() => {
+		const missing = lookup === 'missing';
+		untrack(() => props.onmissing)?.(missing);
+	});
+	$effect(() => () => untrack(() => props.onmissing)?.(false));
 
 	const providerName = $derived(props.provider === 'openrouter' ? 'OpenRouter' : 'Runware');
 	const target = $derived(props.modelId.trim());

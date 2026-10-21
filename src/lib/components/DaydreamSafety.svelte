@@ -11,8 +11,13 @@
 	 * stopped scene whatever a page asks for; the banner then offers the way
 	 * on. Ease off keeps going, gentler, and turns the intensity down a notch.
 	 *
-	 * Under 650px wide the two fold into a menu, so the directions keep most
-	 * of the row.
+	 * Under 650px wide Ease off folds into a menu, so the directions keep most
+	 * of the row. Stop never does: it is the safety control, and behind an
+	 * unlabelled ⋮ it was one tap and one guess further away than it should
+	 * ever be.
+	 *
+	 * Pills, as the directions beside them are, so the row reads as one set of
+	 * controls in two groups rather than two kinds of button.
 	 *
 	 * `children` is the rest of their row, on the left: the direction buttons,
 	 * or Stop writing. It is passed in rather than placed beside this
@@ -26,9 +31,6 @@
 		switch ((event.detail.item as HTMLElement & { value?: string }).value) {
 			case 'ease-off':
 				void story.easeOff();
-				break;
-			case 'stop':
-				void story.stopScene();
 				break;
 			default:
 				break;
@@ -55,22 +57,21 @@
 <div class="row">
 	<div class="lead">{@render children?.()}</div>
 	<div class="controls">
-		<wa-button size="s" appearance="outlined" variant="warning" onclick={() => void story.easeOff()} disabled={story.halted}>
+		<wa-button class="ease" size="s" appearance="outlined" variant="warning" pill onclick={() => void story.easeOff()} disabled={story.halted}>
 			Ease off
 		</wa-button>
-		<wa-button size="s" appearance="outlined" variant="danger" onclick={() => void story.stopScene()} disabled={story.halted}>
+		<wa-button size="s" appearance="outlined" variant="danger" pill onclick={() => void story.stopScene()} disabled={story.halted}>
 			Stop
 		</wa-button>
 	</div>
-	<!-- The same two, folded into a menu on a narrow screen so the directions
-	     keep the row. Both are always rendered and CSS picks one, so nothing
+	<!-- Ease off, folded into a menu on a narrow screen so the directions keep
+	     the row. Both forms are always rendered and CSS picks one, so nothing
 	     shifts as the page hydrates. -->
 	<wa-dropdown class="menu" placement="top-end" onwa-select={onMenu}>
 		<wa-button slot="trigger" size="s" appearance="plain" pill>
-			<wa-icon name="ellipsis-vertical" variant="solid" label="Ease off or stop"></wa-icon>
+			<wa-icon name="ellipsis-vertical" variant="solid" label="More: ease off"></wa-icon>
 		</wa-button>
 		<wa-dropdown-item value="ease-off" disabled={story.halted}>Ease off</wa-dropdown-item>
-		<wa-dropdown-item value="stop" variant="danger" disabled={story.halted}>Stop</wa-dropdown-item>
 	</wa-dropdown>
 </div>
 
@@ -121,8 +122,14 @@
 			gap: 0;
 		}
 
+		/* Stop stays, last on the row where a thumb finds it; Ease off goes
+		   into the menu before it. */
 		.controls {
-			display: none;
+			order: 1;
+
+			.ease {
+				display: none;
+			}
 		}
 
 		.menu {

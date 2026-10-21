@@ -5,6 +5,7 @@ import {
 	account,
 	fillPassword,
 	fillWaInput,
+	LOG_IN_BUTTON,
 	logInHere,
 	signUp,
 	submitEnhancedForm,
@@ -30,7 +31,7 @@ async function submitSignUp(page: Page, who: Account, from = '/signup') {
 	await fillWaInput(page, 'email', who.email);
 	await fillPassword(page, 'password', who.password);
 	await fillPassword(page, 'passwordConfirm', who.password);
-	await submitEnhancedForm(page, 'Sign Up');
+	await submitEnhancedForm(page, 'Sign up');
 	await page.waitForURL((url) => url.pathname === '/signup/check-email');
 }
 
@@ -39,7 +40,7 @@ async function submitLogIn(page: Page, who: Account) {
 	await waitForEnhancedForm(page);
 	await fillWaInput(page, 'email', who.email);
 	await fillPassword(page, 'password', who.password);
-	await submitEnhancedForm(page, 'Login');
+	await submitEnhancedForm(page, LOG_IN_BUTTON);
 }
 
 test.describe('email verification', () => {

@@ -228,9 +228,12 @@
 		flex-direction: column;
 		gap: 0.375rem;
 
+		/* The field's own size, as a <wa-input>'s label is: Web Awesome sizes
+		   labels by inheritance, and defines no label size token, so the small
+		   fallback this used to name was always the one used and "Timezone" sat
+		   a size below "Name" above it. */
 		label {
 			font: inherit;
-			font-size: var(--wa-form-control-label-font-size, var(--wa-font-size-s));
 			font-weight: var(--wa-form-control-label-font-weight, var(--wa-font-weight-semibold, 600));
 			color: var(--wa-form-control-label-color, var(--wa-color-text-normal));
 		}

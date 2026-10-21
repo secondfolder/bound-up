@@ -27,7 +27,7 @@
 		{backHref}
 		backLabel="Back to tasks"
 		backText="Tasks"
-		title="Edit self task"
+		title="Edit task"
 		description="Update your task details, schedule, and reward credits here."
 	/>
 

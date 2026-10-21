@@ -30,7 +30,9 @@
 		if (store.unsaved || store.save.status === 'saving') {
 			return 'Saving…';
 		}
-		return store.kind === 'device' ? 'Saved on this device' : 'Saved';
+		// Not "Saved on this device" for a list without an account: the banner
+		// under the title already says so, and the two said it twice in a row.
+		return 'Saved';
 	});
 </script>
 

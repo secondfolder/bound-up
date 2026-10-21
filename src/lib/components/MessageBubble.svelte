@@ -29,7 +29,12 @@
 		reactions,
 		onReact,
 		onClearReaction,
-		seenBy = null
+		seenBy = null,
+		showTime = true,
+		continuesRun = false,
+		day = null,
+		arrived = false,
+		animateReactions = false
 	}: {
 		message: MessageView;
 		payload: MessagePayload | null | undefined;
@@ -47,6 +52,29 @@
 		 * have seen: the read receipt. Null on every other message.
 		 */
 		seenBy?: { name: string; image: string | null } | null;
+		/**
+		 * Whether the time is drawn, as the last message of its run. When it is
+		 * not, it is still there for a screen reader, which reads messages one
+		 * at a time and has no run to take the time from. See
+		 * `src/lib/message-timeline.ts`.
+		 */
+		showTime?: boolean;
+		/** Carries on a run from the message above: drawn closer to it. */
+		continuesRun?: boolean;
+		/** A label for the day this message starts ("Today"), or null. */
+		day?: string | null;
+		/**
+		 * Arrived while the thread was open — sent from here or by the partner —
+		 * rather than loaded with it, so it animates in. Messages loaded with
+		 * the page do not: a whole thread popping in at once is noise.
+		 */
+		arrived?: boolean;
+		/**
+		 * Whether a reaction appearing now is new. False while the thread's
+		 * reactions are first being decrypted, so opening a thread does not pop
+		 * every tapback in it.
+		 */
+		animateReactions?: boolean;
 	} = $props();
 
 	const mine = $derived(message.mine);
@@ -55,77 +83,126 @@
 	const cachedEmbedsPending = $derived(message.metadataCiphertext !== null && metadata === undefined);
 </script>
 
-<li class:mine class:theirs={!mine} data-message-id={message.id}>
-	<div class="bubble">
-		{#if payload === undefined}
-			<span class="pending" role="img" aria-label="Decrypting">···</span>
-		{:else if payload === null}
-			<span class="unreadable">
-				You can't read this one — it was sent to a key you no longer have. Ask your partner to
-				restore your history.
-			</span>
-		{:else}
-			{#if payload.text}
-				<div class="text">
-					<RichText
-						text={payload.text}
-						{cachedEmbeds}
-						{cachedEmbedsPending}
-						{onEmbedActivated}
-						{onRefreshEmbed}
-					/>
-				</div>
-			{/if}
-			{#each payload.attachments as info (info.id)}
-				<AttachmentPreview
-					{info}
-					{partnershipId}
-					view={message.attachments.find((attachment) => attachment.id === info.id)}
-				/>
-			{/each}
-		{/if}
-
-		{#if reactions.length > 0}
-			<ul class="reactions" aria-label="Reactions">
-				{#each reactions as reaction, index (index)}
-					<li>{reaction.emoji}</li>
-				{/each}
-			</ul>
-		{/if}
-	</div>
-
-	<div class="meta">
-		<span class="when">{when}</span>
-		<!-- Only on messages you received: the requirement is reacting to what
-		     your partner sent, and setReaction refuses your own regardless. -->
-		{#if !mine}
-			<ReactionPicker
-				messageId={message.id}
-				current={myReaction}
-				react={onReact}
-				clear={onClearReaction}
-			/>
-		{/if}
-	</div>
-
-	{#if seenBy}
-		<!-- Inside the message's <li> rather than after it, so it is announced
-		     with the message it belongs to. `image` is left off when null, as in
-		     AppNav: an empty one would render a broken image. -->
-		<wa-avatar
-			class="seen"
-			image={seenBy.image ?? undefined}
-			initials={initialsFor(seenBy.name)}
-			label="Seen by {seenBy.name}"
-		></wa-avatar>
+<!-- The <li> spans the thread so a day label can sit centred above the
+     message; the message itself is the `.message` column inside it, capped
+     and pushed to its side. One <li> per message, label included, so the list
+     still counts messages. -->
+<li
+	class="message-row"
+	class:mine
+	class:theirs={!mine}
+	class:continues={continuesRun}
+	class:arrived={arrived}
+	data-message-id={message.id}
+>
+	{#if day}
+		<p class="day"><span>{day}</span></p>
 	{/if}
+	<div class="message">
+		<div class="bubble">
+			{#if payload === undefined}
+				<span class="pending" role="img" aria-label="Decrypting">···</span>
+			{:else if payload === null}
+				<span class="unreadable">
+					You can't read this one — it was sent to a key you no longer have. Ask your partner to
+					restore your history.
+				</span>
+			{:else}
+				{#if payload.text}
+					<div class="text">
+						<RichText
+							text={payload.text}
+							{cachedEmbeds}
+							{cachedEmbedsPending}
+							{onEmbedActivated}
+							{onRefreshEmbed}
+						/>
+					</div>
+				{/if}
+				{#each payload.attachments as info (info.id)}
+					<AttachmentPreview
+						{info}
+						{partnershipId}
+						view={message.attachments.find((attachment) => attachment.id === info.id)}
+					/>
+				{/each}
+			{/if}
+
+			{#if reactions.length > 0}
+				<ul class="reactions" class:pop={animateReactions} aria-label="Reactions">
+					<!-- Keyed by whose and which, so a changed reaction is a new chip
+					     and pops like one. One reaction each per message. -->
+					{#each reactions as reaction (`${reaction.mine}:${reaction.emoji}`)}
+						<li>{reaction.emoji}</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
+
+		<div class="meta" class:collapsed={mine && !showTime}>
+			<span class="when" class:wa-visually-hidden={!showTime}>{when}</span>
+			<!-- Only on messages you received: the requirement is reacting to what
+			     your partner sent, and setReaction refuses your own regardless. -->
+			{#if !mine}
+				<ReactionPicker
+					messageId={message.id}
+					current={myReaction}
+					react={onReact}
+					clear={onClearReaction}
+				/>
+			{/if}
+		</div>
+
+		{#if seenBy}
+			<!-- Inside the message's <li> rather than after it, so it is announced
+			     with the message it belongs to. `image` is left off when null, as in
+			     AppNav: an empty one would render a broken image. -->
+			<wa-avatar
+				class="seen"
+				image={seenBy.image ?? undefined}
+				initials={initialsFor(seenBy.name)}
+				label="Seen by {seenBy.name}"
+			></wa-avatar>
+		{/if}
+	</div>
 </li>
 
 <style>
-	li {
+	.message-row {
+		display: flex;
+		flex-direction: column;
+
+		/* Messages in one run sit close, so a run reads as one turn of the
+		   conversation. The list's own gap is the space between turns. */
+		&.continues {
+			margin-block-start: -0.5rem;
+		}
+	}
+
+	/* A rule across the thread with the day in the middle of it. */
+	.day {
+		margin: 0.75rem 0 0.5rem;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+		gap: var(--wa-space-s);
+		font-size: 0.75rem;
+		font-weight: var(--wa-font-weight-semibold, 600);
+		color: var(--wa-color-text-quiet);
+
+		&::before,
+		&::after {
+			content: '';
+			border-block-start: 1px solid var(--wa-color-surface-border);
+		}
+	}
+
+	.message {
 		display: flex;
 		flex-direction: column;
 		gap: 0.125rem;
+		/* Kept in step with `.composer-embed` in ComposerEmbed.svelte, which
+		   previews a message at this width. */
 		max-inline-size: min(78%, 34rem);
 
 		.bubble {
@@ -190,48 +267,19 @@
 			}
 		}
 
-		&.mine {
-			margin-inline-start: auto;
-			align-items: flex-end;
-
-			.bubble {
-				background: var(--wa-color-brand-fill-loud, #2563eb);
-				color: var(--wa-color-brand-on-loud, white);
-				border-end-end-radius: 0.25rem;
-
-				/* The embed's own chrome is mixed from `currentColor`, so it
-				   follows this bubble's text without being told the colours —
-				   see the note in UrlEmbed.svelte. */
-				:global(.text a),
-				:global(.card-link),
-				:global(.card-shell) {
-					color: inherit;
-				}
-
-				.reactions {
-					inset-inline-start: unset;
-					inset-inline-end: 0.5rem;
-				}
-			}
-		}
-
-		&.theirs {
-			margin-inline-end: auto;
-			align-items: flex-start;
-
-			.bubble {
-				background: var(--wa-color-neutral-fill-quiet, rgb(0 0 0 / 6%));
-				border-end-start-radius: 0.25rem;
-			}
-		}
-
 		.meta {
 			display: flex;
 			align-items: center;
 			gap: 0.375rem;
-			font-size: 0.6875rem;
+			/* 12px: at 11px, quiet, it was the hardest text in the thread to read. */
+			font-size: 0.75rem;
 			color: var(--wa-color-text-quiet);
 			min-block-size: 1.25rem;
+
+			/* Only a time a screen reader reads: no line of its own. */
+			&.collapsed {
+				min-block-size: 0;
+			}
 		}
 
 		/* Small enough to read as a mark rather than a message of its own. It
@@ -240,22 +288,100 @@
 		.seen {
 			--size: 1rem;
 			font-size: 0.5rem;
+		}
+	}
+
+	.mine .message {
+		margin-inline-start: auto;
+		align-items: flex-end;
+
+		.bubble {
+			background: var(--wa-color-brand-fill-loud, #2563eb);
+			color: var(--wa-color-brand-on-loud, white);
+			border-end-end-radius: 0.25rem;
+
+			/* The embed's own chrome is mixed from `currentColor`, so it
+			   follows this bubble's text without being told the colours —
+			   see the note in UrlEmbed.svelte. */
+			:global(.text a),
+			:global(.card-link),
+			:global(.card-shell) {
+				color: inherit;
+			}
+
+			.reactions {
+				inset-inline-start: unset;
+				inset-inline-end: 0.5rem;
+			}
+		}
+	}
+
+	.theirs .message {
+		margin-inline-end: auto;
+		align-items: flex-start;
+
+		.bubble {
+			background: var(--wa-color-neutral-fill-quiet, rgb(0 0 0 / 6%));
+			border-end-start-radius: 0.25rem;
+		}
+	}
+
+	/* Motion, only for those who have not asked for less. Each one marks
+	   something that just happened, and none of them runs on a thread as it
+	   loads. */
+	@media (prefers-reduced-motion: no-preference) {
+		/* A message that has just arrived grows out of its own side: from the
+		   composer's corner for one sent from here, in from the left for the
+		   partner's. The overshoot is small, a settle rather than a bounce. */
+		.arrived.mine .message {
+			transform-origin: bottom right;
+			animation: sent-in 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+		}
+
+		.arrived.theirs .message {
+			transform-origin: bottom left;
+			animation: received-in 240ms ease-out;
+		}
+
+		/* A tapback lands with a small pop, the way it does in a messenger. */
+		.reactions.pop li {
+			animation: reaction-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+		}
+
+		/* The receipt moves down the thread as the partner reads, and sliding
+		   it in where it lands makes the move noticeable without being loud. */
+		.seen {
 			animation: seen-in 200ms ease-out;
 		}
 	}
 
-	/* The receipt moves down the thread as the partner reads, and fading it in
-	   where it lands makes the move noticeable without being loud. */
-	@keyframes seen-in {
+	@keyframes sent-in {
 		from {
 			opacity: 0;
-			transform: translateY(-0.25rem);
+			transform: translateY(0.75rem) scale(0.92);
 		}
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		li .seen {
-			animation: none;
+	@keyframes received-in {
+		from {
+			opacity: 0;
+			transform: translateX(-0.5rem);
+		}
+	}
+
+	@keyframes reaction-pop {
+		from {
+			transform: scale(0);
+		}
+		60% {
+			transform: scale(1.25);
+		}
+	}
+
+	@keyframes seen-in {
+		from {
+			opacity: 0;
+			transform: translateY(-0.375rem);
 		}
 	}
 </style>

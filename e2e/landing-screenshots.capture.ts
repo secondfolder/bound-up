@@ -39,6 +39,13 @@ async function capture(page: Page, name: string) {
 	await waitForHydration(page);
 	await page.evaluate(() => document.fonts.ready);
 	await settle(page);
+	// A message that has just arrived animates in; without this the shot can
+	// catch it half faded and keep it that way on the landing page.
+	await page.evaluate(() =>
+		Promise.all(
+			document.getAnimations().map((animation) => animation.finished.catch(() => undefined))
+		)
+	);
 	await page.screenshot({ path: path.join(OUT_DIR, `${name}.jpg`), type: 'jpeg', quality: 82 });
 }
 

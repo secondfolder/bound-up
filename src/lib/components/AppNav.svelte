@@ -30,7 +30,15 @@
 	// Both tabs own child routes (/home/guides, /settings/security) and stay lit
 	// while you are inside them, so these are prefix matches rather than equality.
 	const isHome = $derived(routeId?.startsWith('/(auth-required)/(app)/home') ?? false);
-	const isSettings = $derived(routeId?.startsWith('/(auth-required)/(app)/settings') ?? false);
+	// Admin and debug are reached from Settings and have no tab of their own,
+	// so Settings stays lit inside them rather than the nav showing no tab at all.
+	const isSettings = $derived(
+		[
+			'/(auth-required)/(app)/settings',
+			'/(auth-required)/(app)/admin',
+			'/(auth-required)/(app)/debug'
+		].some((prefix) => routeId?.startsWith(prefix) ?? false)
+	);
 	// A prefix match, like isHome and isSettings above: the partner tab owns
 	// child routes now (/partner/[id]/messages and the threads under it) and an
 	// exact match would make the tab go dark the moment you opened a message.
@@ -129,6 +137,17 @@
 			/* Kills the grey flash on tap that makes a web nav feel non-native. */
 			-webkit-tap-highlight-color: transparent;
 
+			/* One box for an icon and an avatar alike, so every label sits on
+			   the same line: the avatar is taller than an icon, and pushed its
+			   name a couple of pixels below the others. */
+			wa-icon,
+			wa-avatar {
+				block-size: 1.75rem;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
 			wa-icon {
 				font-size: 1.5rem;
 			}
@@ -145,7 +164,8 @@
 			}
 
 			span {
-				font-size: 0.7rem;
+				/* Not smaller: these are the only words on the nav. */
+				font-size: 0.75rem;
 				line-height: 1;
 				max-width: 100%;
 				overflow: hidden;

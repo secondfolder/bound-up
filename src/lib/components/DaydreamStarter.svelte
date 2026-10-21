@@ -254,6 +254,7 @@
 							<button
 								type="button"
 								class="card"
+								class:writing={writing === idea.title}
 								disabled={asking}
 								onclick={() => onidea(idea)}
 							>
@@ -344,6 +345,22 @@
 </div>
 
 <style>
+	/* Left to right across the edge: the gradient is three cards wide, and
+	   its bright middle passes from one end of the card to the other. */
+	@keyframes writing-sweep {
+		from {
+			background-position:
+				0 0,
+				100% 0;
+		}
+
+		to {
+			background-position:
+				0 0,
+				0 0;
+		}
+	}
+
 	.starter {
 		display: flex;
 		flex-direction: column;
@@ -480,22 +497,29 @@
 		grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
 		gap: 0.5rem;
 
+		/* Each card's title, premise, tags and facts on rows shared across its
+		   row of cards (subgrid), so the facts start on one line however long
+		   each premise runs; they were pinned to the foot of each card and
+		   wrapped there differently, so no line of them matched its neighbour. */
 		li {
-			/* Web Awesome's native styles indent every `li` by 1.125em. */
 			margin: 0;
-			display: flex;
+			display: grid;
+			grid-row: span 4;
+			grid-template-rows: subgrid;
+			row-gap: 0;
 		}
 	}
 
 	/* Web Awesome's native styles make every <button> a one-line control of
 	   the form height, which a card is not. */
 	.card {
-		flex: 1 1 auto;
-		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		justify-content: flex-start;
-		gap: 0.25rem;
+		display: grid;
+		grid-row: span 4;
+		grid-template-rows: subgrid;
+		/* Each part at the top of its row: Web Awesome's native button styles
+		   centre them, which put every card's facts at a different height. */
+		align-items: start;
+		row-gap: 0.25rem;
 		block-size: auto;
 		min-inline-size: 0;
 		margin: 0;
@@ -525,6 +549,28 @@
 			outline-offset: var(--wa-focus-ring-offset);
 		}
 
+		/* The idea being written up: an amber light runs round its edge while
+		   the model works, so the card waited on is the busy one, not only the
+		   progress line further down. */
+		&.writing {
+			border-color: var(--wa-color-brand-border-loud);
+
+			@media (prefers-reduced-motion: no-preference) {
+				background:
+					linear-gradient(var(--wa-color-surface-default), var(--wa-color-surface-default))
+					padding-box,
+					linear-gradient(
+						100deg,
+						var(--wa-color-surface-border) 30%,
+						var(--accent-color) 50%,
+						var(--wa-color-surface-border) 70%
+					)
+					0 0 / 300% 100% border-box;
+				border-color: transparent;
+				animation: writing-sweep 1.6s linear infinite;
+			}
+		}
+
 		.title {
 			font-weight: 600;
 		}
@@ -549,11 +595,11 @@
 			font-size: 0.75rem;
 		}
 
+		/* A fact to a line, so the lines match across cards too. */
 		.meta {
 			display: flex;
-			flex-wrap: wrap;
-			gap: 0.25rem 0.75rem;
-			margin-block-start: auto;
+			flex-direction: column;
+			gap: 0.125rem;
 			padding-block-start: 0.25rem;
 			font-size: 0.75rem;
 			color: var(--wa-color-text-quiet);

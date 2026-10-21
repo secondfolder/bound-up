@@ -14,6 +14,9 @@
 
 	const { store } = kinkListContext();
 
+	/** The area just ruled out, for its one pulse; never one that loaded that way. */
+	let pulsed: string | null = $state(null);
+
 	function value(categoryId: string) {
 		return store.list.triage[categoryId]?.value ?? 'none';
 	}
@@ -33,7 +36,13 @@
 			<h2 id="triage-{section}">{title}</h2>
 			<ul class="tiles">
 				{#each categories(section) as category (category.id)}
-					<li class="tile {value(category.id)}">
+					<li
+						class="tile {value(category.id)}"
+						class:pulsed={pulsed === category.id}
+						onanimationend={() => {
+							pulsed = null;
+						}}
+					>
 						<!-- A toggle: aria-pressed, which wa-button would not forward. -->
 						<button
 							type="button"
@@ -50,7 +59,11 @@
 						<button
 							type="button"
 							class="limit-all"
-							onclick={() => store.setTriage(category.id, value(category.id) === 'limit' ? 'none' : 'limit')}
+							onclick={() => {
+								const next = value(category.id) === 'limit' ? 'none' : 'limit';
+								pulsed = next === 'limit' ? category.id : null;
+								store.setTriage(category.id, next);
+							}}
 						>
 							{value(category.id) === 'limit' ? 'Not a hard limit after all' : 'Hard limit everything here'}<span
 								class="wa-visually-hidden">({category.name})</span
@@ -102,7 +115,6 @@
 	}
 
 	.tile {
-		/* Web Awesome's native styles indent every <li> for its marker. */
 		margin: 0;
 		display: flex;
 		flex-direction: column;
@@ -111,24 +123,49 @@
 		background: var(--wa-color-surface-default);
 		overflow: hidden;
 
-		&.none {
-			border-color: var(--wa-color-brand-border-loud);
-		}
-
+		/* "Going through" is where every tile starts, so it keeps the plain
+		   border: amber on all thirty said nothing. Only a change stands out. */
 		&.skip {
-			opacity: 0.6;
+			opacity: 0.55;
+			scale: 0.98;
 		}
 
 		&.limit {
 			border-color: var(--wa-color-danger-border-loud);
 		}
+
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				opacity 150ms ease-out,
+				scale 150ms ease-out,
+				border-color 150ms ease-out;
+
+			/* One red pulse as a whole area is ruled out, so the tap that did
+			   it is seen to have done something that big. */
+			&.pulsed {
+				animation: ruled-out 450ms ease-out;
+			}
+		}
 	}
 
+	@keyframes ruled-out {
+		30% {
+			box-shadow: 0 0 0 0.25rem var(--wa-color-danger-fill-quiet);
+		}
+	}
+
+	/* Web Awesome's native styles give a <button> a form control's height,
+	   centred: a two-line name ran out of the top and bottom of the tile and
+	   pushed its state out of sight. Sized by its content instead, from the
+	   top, so every tile's name starts on the same line. */
 	.toggle {
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
+		justify-content: flex-start;
 		gap: 0.15rem;
+		flex: 1 1 auto;
+		block-size: auto;
 		min-block-size: 4.5rem;
 		inline-size: 100%;
 		padding: 0.75rem;
@@ -162,23 +199,38 @@
 		}
 	}
 
+	/* Quiet until it is meant: thirty red links read as thirty warnings. Red
+	   on hover and focus, and once the area is a hard limit. */
 	.limit-all {
+		justify-content: flex-start;
+		block-size: auto;
 		padding: 0.4rem 0.75rem;
 		border: 0;
 		border-block-start: var(--wa-border-width-s) solid var(--wa-color-surface-border);
 		background: none;
-		color: var(--wa-color-danger-on-quiet);
+		color: var(--wa-color-text-quiet);
 		font: inherit;
 		font-size: 0.75rem;
 		text-align: start;
+		white-space: normal;
 		cursor: pointer;
+
+		&:hover,
+		&:focus-visible,
+		.limit > & {
+			color: var(--wa-color-danger-on-quiet);
+		}
 	}
 
+	/* Pinned to the foot of the screen over an opaque strip, as the list's
+	   pinned bar is at its head: with nothing behind it the button sat on top
+	   of the tiles and covered their text. */
 	.start {
 		position: sticky;
 		inset-block-end: 0;
 		display: flex;
 		justify-content: center;
 		padding-block: 0.75rem;
+		background: linear-gradient(to bottom, transparent, var(--wa-color-surface-lowered) 0.75rem);
 	}
 </style>

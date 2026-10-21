@@ -52,7 +52,7 @@
 	}
 </script>
 
-<div class="prose" data-passage-text={turnId}>
+<div class="prose" class:streaming data-passage-text={turnId}>
 	{#each blocks as block, index (index)}
 		{#if block.kind === 'break'}
 			<hr class="scene-break" />
@@ -99,6 +99,22 @@
 				content: '⁂';
 				font-size: 1.4em;
 			}
+		}
+	}
+
+	/* While it arrives, each new paragraph fades up as it begins. Only new
+	   ones: blocks are keyed by position, so one already shown is updated in
+	   place and never inserted again, and a CSS animation runs on insertion. */
+	@media (prefers-reduced-motion: no-preference) {
+		.streaming > * {
+			animation: paragraph-in 260ms ease-out;
+		}
+	}
+
+	@keyframes paragraph-in {
+		from {
+			opacity: 0;
+			translate: 0 0.25rem;
 		}
 	}
 

@@ -163,7 +163,7 @@ describe('KinkCategory', () => {
 		const store = storeWith();
 		render(KinkListHarness, { store, categoryId: 'anal' });
 		expect(screen.queryByRole('group', { name: 'Rimming, giving' })).toBeNull();
-		await userEvent.click(screen.getByRole('button', { name: /related kinks/ }));
+		await userEvent.click(screen.getByRole('button', { name: /related kinks?\b/ }));
 		const rimming = screen.getByRole('group', { name: 'Rimming, giving' });
 		await userEvent.click(within(rimming).getByRole('radio', { name: 'Love' }));
 		// One answer, under the kink's own key, wherever it was given.

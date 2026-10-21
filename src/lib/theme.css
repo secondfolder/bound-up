@@ -9,13 +9,19 @@
  * or per-component rule this app writes.
  */
 
+/* The title face: Rubik Black, distressed by scripts/title-font/build.py, with
+   two variation axes of its own (ROUG, roughness; WOBL, wobble) that
+   `--font-display-variation` sets. One weight, Black, so the descriptor is
+   900 and anything that uses the face asks for 900 rather than letting the
+   browser embolden it. Source and licence in static/fonts/bound-up-title-*. */
 @font-face {
-	font-family: 'Muddy Tractor';
-	src: url('/fonts/muddy-tractor.woff2') format('woff2');
+	font-family: 'Bound Up Title';
+	src: url('/fonts/bound-up-title.woff2') format('woff2');
+	font-weight: 900;
 	font-display: swap;
 }
 
-/* Self-hosted rather than linked from Google Fonts, as Muddy Tractor is: no
+/* Self-hosted rather than linked from Google Fonts, as the title face is: no
    request to a third party for every visitor, and a same-origin file the
    landing page's snapshot can embed in its capture without a CORS round trip.
    One variable file covers every weight; the latin subset is all the app's
@@ -34,7 +40,11 @@
 	--accent-color: #ffac00;
 	--accent-tint: #ffcf7a;
 
-	--font-display: 'Muddy Tractor', var(--wa-font-family-body);
+	--font-display: 'Bound Up Title', var(--wa-font-family-body);
+	/* How worn the title face is: roughness chips the outline, wobble tilts
+	   and nudges each letter (both 0-100). Every use of the face sets this
+	   along with the family, since a face's axes default to clean. */
+	--font-display-variation: 'ROUG' 70, 'WOBL' 100;
 
 	/* A small label laid over a photo or video: the modal overlay's near-black,
 	   thinner, so it stays readable over a white image without blacking out a
@@ -206,6 +216,15 @@
 		--daydream-voice-2: oklch(86% 0.075 205);
 		--daydream-voice-3: oklch(87% 0.09 145);
 		--daydream-voice-4: oklch(84% 0.08 300);
+
+		/* Web Awesome's placeholder is gray-50, a cool blue-grey that was the
+		   only cold colour on a page. The quiet text colour instead, which is
+		   warm, a little faded so a placeholder never passes for a typed value. */
+		--wa-form-control-placeholder-color: color-mix(
+			in oklab,
+			var(--wa-color-text-quiet) 75%,
+			transparent
+		);
 	}
 
 	/* Lists. Web Awesome indents a list by giving every `li` a start margin,
@@ -221,6 +240,16 @@
 
 	li {
 		margin-inline-start: 0;
+	}
+
+	/* A native select's caret. Web Awesome draws a lavender SVG and blends two
+	   copies of it into whatever is behind; on rust that came out purple. One
+	   copy, unblended, in the quiet text colour (#e9c6aa is
+	   oklch(85% 0.055 62): a data URI cannot read a custom property). */
+	select {
+		--icon-caret: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path fill="%23e9c6aa" d="M201.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 338.7 54.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"/></svg>');
+		background-image: var(--icon-caret);
+		background-blend-mode: normal;
 	}
 }
 
@@ -303,12 +332,13 @@ body::after {
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncG type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncB type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncA type='table' tableValues='1 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Page titles in the landing page's display face. Only h1: Muddy Tractor is a
+/* Page titles in the landing page's display face. Only h1: it is a
    distressed poster face, and at section-heading sizes its texture turns to
    noise. */
 :where(h1) {
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: 900;
+	font-variation-settings: var(--font-display-variation);
 	font-size: var(--page-title-size);
 	line-height: 1.1;
 	color: var(--accent-color);

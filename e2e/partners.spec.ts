@@ -4,6 +4,7 @@ import {
 	clickWaButton,
 	createInvite,
 	fillPassword,
+	LOG_IN_BUTTON,
 	logOut,
 	navTabs,
 	newSide,
@@ -153,7 +154,7 @@ test.describe('linking two accounts', () => {
 			// Through the helper: the password box carries no `name`, only
 			// `data-field` — see PasswordField.svelte.
 			await fillPassword(jun.page, 'password', jun.who.password);
-			await clickWaButton(jun.page, 'Login');
+			await clickWaButton(jun.page, LOG_IN_BUTTON);
 
 			// Logging in must return them to the invite rather than to /home.
 			await jun.page.waitForURL(/\/invite\//);

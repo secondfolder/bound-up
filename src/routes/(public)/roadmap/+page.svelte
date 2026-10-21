@@ -141,11 +141,20 @@
 			display: inline-flex;
 			align-items: center;
 			gap: 0.35rem;
-			color: var(--accent-color);
+			/* The tint, not the amber: these sit on the brightest corner of the
+			   wash, where the amber measures about 4:1. */
+			color: var(--accent-tint);
 			font-weight: 700;
 
 			&:hover {
-				color: var(--accent-tint);
+				color: var(--wa-color-text-normal);
+			}
+
+			/* Right-aligned even when a phone wraps it under the first, where
+			   `space-between` alone left it under "Back", like a second item
+			   of one list. */
+			& + a {
+				margin-inline-start: auto;
 			}
 		}
 	}
@@ -153,9 +162,10 @@
 	header {
 		text-align: center;
 
+		/* The app-wide title size (theme.css), like every page's but the
+		   landing page's own. */
 		h1 {
 			margin: 0;
-			font-size: clamp(2.5rem, 12vw, 4.5rem);
 		}
 
 		p {
@@ -189,6 +199,13 @@
 		font-size: var(--wa-font-size-s);
 		cursor: pointer;
 
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				background-color 0.15s ease,
+				border-color 0.15s ease,
+				color 0.15s ease;
+		}
+
 		&[aria-pressed='false'] {
 			background: transparent;
 			border-color: var(--wa-color-neutral-border-quiet);
@@ -209,6 +226,19 @@
 		box-sizing: border-box;
 		border-radius: 50%;
 		border: 2px solid var(--accent-color);
+
+		/* Shrinks away as its status is hidden from the tree, and springs back
+		   when it is shown again. */
+		[aria-pressed='false'] > & {
+			scale: 0.55;
+			opacity: 0.5;
+		}
+
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				scale 0.25s cubic-bezier(0.3, 1.6, 0.5, 1),
+				opacity 0.15s ease;
+		}
 
 		[data-status='shipped'] & {
 			background: var(--accent-color);

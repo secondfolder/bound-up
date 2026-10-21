@@ -1,4 +1,5 @@
 <script lang="ts">
+	import KinkListCrumbs from '$lib/components/kink-list/KinkListCrumbs.svelte';
 	import type { Answer } from '$lib/kink-list/answers';
 	import { LEVEL_LABELS } from '$lib/kink-list/answers';
 	import { kinkById } from '$lib/kink-list/catalog';
@@ -35,7 +36,7 @@
 	<title>Just for {name} · Kink list · Bound Up</title>
 </svelte:head>
 
-<nav class="crumbs"><a href={paths.home}>Your list for {name}</a></nav>
+<KinkListCrumbs href={paths.home} text="Your list for {name}" label="Back to your list for {name}" />
 <h1>Just for {name}</h1>
 
 {#if rows.length === 0}
@@ -64,10 +65,6 @@
 <style>
 	h1 {
 		text-align: center;
-	}
-
-	.crumbs {
-		margin-block-end: 1rem;
 	}
 
 	.quiet {

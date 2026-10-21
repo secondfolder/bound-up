@@ -90,6 +90,13 @@
 		&.bodyless::part(header) {
 			border-block-end-width: 0;
 		}
+
+		/* The header's padding moves onto the link inside it (below), so the
+		   whole bar is the tap target. With the padding on the part, only the
+		   22px line of text was: a tap on the bar around it did nothing. */
+		&::part(header) {
+			padding: 0;
+		}
 	}
 
 	h2 {
@@ -101,6 +108,11 @@
 			display: flex;
 			align-items: center;
 			gap: 0.625rem;
+			/* wa-card's own header padding, which `--spacing` is inherited from
+			   the card for. */
+			padding: calc(var(--spacing) / 2) var(--spacing);
+			min-block-size: 2.75rem;
+			box-sizing: border-box;
 		}
 
 		.title {
@@ -129,6 +141,19 @@
 		.go {
 			color: var(--wa-color-text-quiet);
 			font-size: 0.875em;
+		}
+
+		/* The chevron leans towards where the link goes, so a pointer over any
+		   part of the bar shows the bar is the link. */
+		@media (prefers-reduced-motion: no-preference) {
+			.go {
+				transition: transform 150ms ease-out;
+			}
+
+			a:hover .go,
+			a:focus-visible .go {
+				transform: translateX(3px);
+			}
 		}
 	}
 </style>

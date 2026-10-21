@@ -1,5 +1,8 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import ItemCard from '$lib/components/ItemCard.svelte';
 	import RichText from '$lib/components/RichText.svelte';
+	import { creditAwardLabel } from '$lib/credits';
 	import { openedCompletion, openedPart, shownText } from '$lib/sealed-views.svelte';
 	import type { PartnershipTaskCompletionView, TaskCompletionView } from '$lib/types';
 
@@ -32,34 +35,30 @@
 </script>
 
 {#if completions.length === 0}
-	<p class="empty">{emptyMessage}</p>
+	<EmptyState icon="clock-rotate-left" title={emptyMessage}>
+		<p>Each task completed shows up here, with the credits it earned.</p>
+	</EmptyState>
 {:else}
 	<div class="list">
 		{#each rows as { completion, opened } (completion.id)}
-			<article class="card">
-				<div class="header-row">
-					<h3>{shownText(openedPart(opened, (value) => value.taskTitle))}</h3>
-					<p class="credits">
-						+{completion.creditsAwarded} credit{completion.creditsAwarded === 1 ? '' : 's'}
+			<ItemCard title={shownText(openedPart(opened, (value) => value.taskTitle))}>
+				{#snippet meta()}
+					<p>
+						{formatDateTime(completion.createdAt)}
+						{#if isPartnershipCompletion(completion)}
+							· {completion.mine ? 'Completed by you' : 'Completed by your partner'}
+							{#if completion.createdByMe}
+								· Created by you{/if}
+						{/if}
 					</p>
-				</div>
-				{#if opened?.taskDescription}
-					<div class="description"><RichText text={opened.taskDescription} /></div>
-				{/if}
+				{/snippet}
+				{#snippet value()}{creditAwardLabel(completion.creditsAwarded)}{/snippet}
+
+				{#if opened?.taskDescription}<RichText text={opened.taskDescription} />{/if}
 				{#if opened?.completionMessage}
 					<p class="message">{opened.completionMessage}</p>
 				{/if}
-				<div class="meta">
-					<p class="muted">{formatDateTime(completion.createdAt)}</p>
-					{#if isPartnershipCompletion(completion)}
-						<p class="muted">
-							{completion.mine ? 'Completed by you' : 'Completed by your partner'}
-							{#if completion.createdByMe}
-								· Created by you{/if}
-						</p>
-					{/if}
-				</div>
-			</article>
+			</ItemCard>
 		{/each}
 	</div>
 {/if}
@@ -71,42 +70,16 @@
 		gap: 0.75rem;
 	}
 
-	.card {
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-panel-border-radius);
-		padding: var(--wa-space-m);
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.header-row,
-	.meta {
-		display: flex;
-		justify-content: space-between;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	h3,
 	p {
 		margin: 0;
 	}
 
-	.credits {
-		font-weight: 600;
-	}
-
-	.empty,
-	.muted,
 	.message {
 		color: var(--wa-color-text-quiet);
+		font-style: italic;
 	}
 
-	@media (max-width: 640px) {
-		.header-row,
-		.meta {
-			flex-direction: column;
-		}
+	.message:not(:first-child) {
+		margin-block-start: 0.5rem;
 	}
 </style>

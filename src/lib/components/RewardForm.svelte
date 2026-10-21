@@ -1,11 +1,15 @@
 <script lang="ts">
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import { onMount, tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
 	import { reportRequestFailure } from '$lib/request-failure.svelte';
 	import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
 	import { replaceWithSealed, type SealScope, sealForSubmit } from '$lib/sealed-forms';
 	import { rewardKind } from '$lib/sealed-kinds/tasks';
+
+	/** A cost the server will take: a whole number of credits, zero or more. */
+	const WHOLE_NUMBER = /^\d+$/;
 
 	type RewardFormValues = {
 		title: string;
@@ -81,6 +85,56 @@
 	// svelte-ignore state_referenced_locally
 	let description = $state(values.description);
 
+	/**
+	 * What the fields hold now, read from the form element on every input and
+	 * change — not from the events, which a password manager's fill does not
+	 * always send where Svelte can see them (AGENTS.md). Only for the submit
+	 * button's look: the server re-validates everything.
+	 */
+	let formElement = $state<HTMLFormElement>();
+	// svelte-ignore state_referenced_locally
+	let fields = $state({ title: values.title, cost: String(values.cost), active: values.active });
+	// The editor can normalise its document as it mounts, which is not an edit;
+	// the baseline is taken again once it has settled, as TaskForm does.
+	// svelte-ignore state_referenced_locally
+	let baselineDescription = $state(values.description);
+	let edited = $state(false);
+
+	onMount(() => {
+		void tick().then(() => {
+			if (!edited) {
+				baselineDescription = description;
+			}
+		});
+	});
+
+	function readFields() {
+		if (!formElement) {
+			return;
+		}
+		const data = new FormData(formElement);
+		edited = true;
+		fields = {
+			title: String(data.get('title') ?? ''),
+			cost: String(data.get('cost') ?? ''),
+			active: data.has('active')
+		};
+	}
+
+	/**
+	 * The save convention (AGENTS.md): outlined while there is nothing to save,
+	 * solid amber once something has changed and would be accepted.
+	 */
+	const canSave = $derived.by(() => {
+		const changed =
+			fields.title !== values.title ||
+			fields.cost !== String(values.cost) ||
+			fields.active !== values.active ||
+			description !== baselineDescription;
+		const valid = fields.title.trim().length > 0 && WHOLE_NUMBER.test(fields.cost.trim());
+		return changed && valid;
+	});
+
 	/*
 	 * The native fields are seeded with `defaultValue` / `defaultChecked`, not
 	 * `value` / `checked`, because nothing here holds them in state: the server's values
@@ -98,7 +152,14 @@
 	 */
 </script>
 
-<form method="POST" class="panel reward-form add-form" use:enhance={sealOnSubmit}>
+<form
+	method="POST"
+	class="panel reward-form add-form"
+	bind:this={formElement}
+	oninput={readFields}
+	onchange={readFields}
+	use:enhance={sealOnSubmit}
+>
 	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
 	<label>
 		<span>Title</span>
@@ -110,7 +171,9 @@
 		<div class="richtext-field">
 			<RichTextEditor
 				value={values.description}
-				onChange={(next) => { description = next; }}
+				onChange={(next) => {
+					description = next;
+				}}
 				features={DOCUMENT_FEATURES}
 				toolbar
 				placeholder="What is this reward?"
@@ -128,10 +191,17 @@
 			<span>Active</span>
 		</label>
 	</div>
-	<wa-button type="submit">{submitLabel}</wa-button>
+	<wa-button
+		type="submit"
+		variant={canSave ? 'brand' : 'neutral'}
+		appearance={canSave ? 'accent' : 'outlined'}>{submitLabel}</wa-button
+	>
 </form>
 
 <style>
+	/* The same panel as the tasks and rewards pages' sections. Without a fill
+	   it was the one translucent card in the app, the wash showing through
+	   behind the fields. */
 	.panel {
 		border: 1px solid var(--wa-color-surface-border);
 		border-radius: var(--wa-panel-border-radius);
@@ -139,6 +209,15 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+		background: color-mix(
+			in srgb,
+			var(--wa-color-surface-default) 94%,
+			var(--wa-color-brand-fill-quiet)
+		);
+
+		@media (width < 40rem) {
+			padding: var(--wa-space-m);
+		}
 	}
 
 	label {
@@ -171,6 +250,8 @@
 		padding: 0.6rem 0.75rem;
 		border-radius: 0.6rem;
 		border: 1px solid var(--wa-color-surface-border);
+		/* The native fields' fill, so the editor reads as one of them. */
+		background: var(--wa-form-control-background-color);
 		font: inherit;
 	}
 

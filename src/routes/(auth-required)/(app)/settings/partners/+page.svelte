@@ -22,13 +22,6 @@
 	/>
 
 	<div class="content">
-		<div class="actions">
-			<wa-button href={resolve('/(auth-required)/(app)/settings/partners/new')} size="s">
-				<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
-				Add
-			</wa-button>
-		</div>
-
 		<p class="intro">
 			Linking with a partner lets the two of you see each other in the app. You choose what you call
 			each other and who can change those settings.
@@ -90,6 +83,17 @@
 				{/each}
 			</ul>
 		{/if}
+
+		<!-- After the explanation and the list, where it reads as the next step,
+		     rather than a lone button above the text that explains it. -->
+		<wa-button
+			class="add"
+			appearance="outlined"
+			href={resolve('/(auth-required)/(app)/settings/partners/new')}
+		>
+			<wa-icon slot="start" name="plus" variant="solid"></wa-icon>
+			Add a partner
+		</wa-button>
 	</div>
 </section>
 
@@ -103,10 +107,13 @@
 			padding: var(--wa-space-l) var(--page-gutter);
 		}
 
-		.actions {
-			display: flex;
-			justify-content: flex-end;
-			margin-bottom: var(--wa-space-s);
+		.add {
+			margin-top: var(--wa-space-s);
+
+			/* A thumb's target on a phone. */
+			@media (width < 40rem) {
+				display: flex;
+			}
 		}
 
 		.intro,

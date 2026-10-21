@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import AuthPage from '$lib/components/AuthPage.svelte';
 	import SignupForm from '$lib/components/SignupForm.svelte';
 
 	let { data } = $props();
@@ -14,28 +15,18 @@
 		: resolve('/login');
 </script>
 
-<!-- In the landing page's display face, as every page title is (src/lib/theme.css):
-     without one, these were the only screens with nothing of it but the wash. -->
-<h1>Sign up</h1>
+<AuthPage title="Sign up">
+	<SignupForm data={data.signupForm} />
 
-<SignupForm data={data.signupForm} />
-
-<!-- Not plain "Log in": the (public) header already has a link by that name,
-     and two links with the same accessible name going to different places is a
-     real problem for anyone navigating by link list (see AGENTS.md). -->
-<a class="cross-link" href={loginHref}>Already have an account? Log in</a>
+	<!-- Not plain "Log in": the landing page and the log-in page's own button
+	     use that name, and AGENTS.md keeps link names unambiguous within a
+	     page — this says where it goes, too. -->
+	<a class="cross-link" href={loginHref}>Already have an account? Log in</a>
+</AuthPage>
 
 <style>
-	h1 {
-		text-align: center;
-		font-size: clamp(2.5rem, 12vw, 4rem);
-		margin: 1rem 0 1.5rem;
-	}
-
 	.cross-link {
-		display: block;
-		margin: 1rem auto 0;
-		width: fit-content;
+		align-self: center;
 		color: var(--wa-color-text-quiet);
 	}
 </style>

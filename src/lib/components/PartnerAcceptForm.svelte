@@ -103,7 +103,16 @@
 	     upgrades the element Svelte assigns to the `disabled` *property*, and
 	     this alpha coerces `undefined` to true — leaving the button permanently
 	     disabled. A plain boolean assigns false and behaves. -->
-	<wa-button type="submit" form="partner-accept" disabled={$submitting}>Accept and link</wa-button>
+	<!-- Brand and solid: the page's one action, valid as it arrives (the
+	     fields come filled in from the invite). It was Web Awesome's default
+	     neutral, the only primary action on the public pages not in amber. -->
+	<wa-button
+		type="submit"
+		form="partner-accept"
+		variant="brand"
+		appearance="accent"
+		disabled={$submitting}>Accept and link</wa-button
+	>
 	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 	{#if problem}<span class="invalid" role="alert">{problem}</span>{/if}
 	{@render children?.()}

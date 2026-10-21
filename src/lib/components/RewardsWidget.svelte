@@ -50,12 +50,13 @@
 			-->
 			<ul class="credits">
 				{#each balances as balance (balance.id)}
+					<!-- Always with its unit: "3 with Morgan" left the reader to guess
+					     three of what. -->
 					<li>
 						<strong>{balance.credits}</strong>
+						credit{balance.credits === 1 ? '' : 's'}
 						{#if balance.label}
 							<span class="whose">with {partnerName(balance.label)}</span>
-						{:else}
-							credit{balance.credits === 1 ? '' : 's'}
 						{/if}
 					</li>
 				{/each}

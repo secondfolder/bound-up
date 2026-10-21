@@ -13,8 +13,8 @@
 		{backHref}
 		backLabel="Back to tasks"
 		backText="Tasks"
-		title="Add a self task"
-		description="This task belongs only to you and awards credits into your self-reward balance when completed."
+		title="Add a task"
+		description="This task belongs only to you and adds its credits to your own reward balance when you complete it."
 	/>
 
 	<div class="content">

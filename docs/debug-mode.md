@@ -50,7 +50,10 @@ than refusing, since the request itself is for everyone.
   - It is a native `<button aria-pressed>`, because `wa-button` forwards no
     ARIA state.
 - **Settings.** `/settings` has a "Debug mode on this device" switch for an
-  account holding the feature.
+  account holding the feature, laid out as a settings row with the switch on
+  the right. Turning it on adds a "Debug tools" row to the list above it,
+  which pulses amber once so it is noticed; it does not pulse on a visit that
+  opens with debug mode already on.
 
 Both are plain `use:enhance` forms posting to `/settings?/debug`, with
 `submitDebugToggle` (`src/lib/debug-toggle.ts`). It does not use enhance's

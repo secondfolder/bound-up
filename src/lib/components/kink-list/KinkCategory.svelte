@@ -75,7 +75,7 @@
 					showRelated = !showRelated;
 				}}
 			>
-				{showRelated ? 'Hide related kinks' : `${related.length} related kinks`}
+				{#if showRelated}Hide related kinks{:else if related.length === 1}1 related kink{:else}{related.length} related kinks{/if}
 			</button>
 		</div>
 
@@ -101,6 +101,15 @@
 			flex-direction: column;
 			gap: 0.5rem;
 			padding-block-start: 0;
+		}
+
+		/* Less inset on a phone, where every pixel of it comes out of the row
+		   of dots beside a nested kink's name. */
+		@media (width < 40rem) {
+			&::part(header),
+			&::part(content) {
+				padding-inline: var(--wa-space-s);
+			}
 		}
 	}
 

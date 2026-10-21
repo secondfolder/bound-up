@@ -122,7 +122,18 @@ costs:
 ## The page
 
 Six cards, each with its own superform and action, each with a save button
-that stays outlined until it has something valid to save:
+that stays outlined until it has something valid to save, then turns solid
+amber (`appearance="accent"`). A save that lands shows a check and the
+action's message beside the button (`SavedNote`). A sticky row of links at
+the top jumps to each card, with the same working / not-set-up marks the
+admin hub shows, because the page runs to several screens on a phone.
+
+Every card's badge uses one pair of words: **Working** or **Not set up** —
+a warning where the server needs the part (email, notifications), neutral
+where it is optional (the models). A model card says **Model not found**
+instead when the saved custom model is one its provider says it does not
+have (`ModelDetails`' `onmissing`, through `ModelChoice`); an edit not yet
+saved does not count, since nothing is sent to it.
 
 1. **Email** — the sender (`mailFrom`), how it is sent (`mailTransport`:
    Resend, an SMTP server, or files on this server), and that transport's
@@ -194,9 +205,10 @@ the setting it is stored under comes from the registry, never from the
 browser, so a forged `provider` is refused rather than written anywhere.
 
 Whether Daydreams are on (`readDaydreamConfig`) and whether they have
-pictures (`readImageConfig`), and the admin hub's On/Off badges
-(`serverSettingsStatus`), all ask the same question: does the chosen model's
-provider have a key.
+pictures (`readImageConfig`), and the admin hub's status marks and the
+cards' Working / Not set up badges (`serverSettingsStatus`), all ask the same
+question: does the chosen model's provider have a key. Only the "Model not
+found" badge asks the provider anything, and only in the browser.
 
 ## Choosing a model
 

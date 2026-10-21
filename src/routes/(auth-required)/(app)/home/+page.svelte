@@ -75,7 +75,7 @@
 		   preview list centred under its own title is much harder to scan. */
 		.widgets {
 			inline-size: 100%;
-			max-inline-size: 30rem;
+			max-inline-size: var(--card-column-width);
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;

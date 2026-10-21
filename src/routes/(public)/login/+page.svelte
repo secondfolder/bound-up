@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import AuthPage from '$lib/components/AuthPage.svelte';
 	import HomeScreenHint from '$lib/components/HomeScreenHint.svelte';
 	import LoginForm from '$lib/components/LoginForm.svelte';
 
@@ -15,52 +16,42 @@
 		: resolve('/signup');
 </script>
 
-<!-- In the landing page's display face, as every page title is (src/lib/theme.css):
-     without one, these were the only screens with nothing of it but the wash. -->
-<h1>Log in</h1>
+<AuthPage title="Log in">
+	<!-- Where a verification link lands. An old or broken link needs no resend
+	     button here: signing in to an unconfirmed account sends a fresh one. -->
+	{#if data.verification === 'first-account'}
+		<wa-callout variant="brand" size="s" class="notice" data-testid="verification-notice">
+			<wa-icon slot="icon" name="key" variant="solid"></wa-icon>
+			You're the first account here, so you're its admin, and this server can't send email yet. Log in,
+			then set up email in Settings → Admin so the next people to sign up can confirm theirs.
+		</wa-callout>
+	{:else if data.verification === 'verified'}
+		<wa-callout variant="success" size="s" class="notice" data-testid="verification-notice">
+			<wa-icon slot="icon" name="envelope-circle-check" variant="solid"></wa-icon>
+			Your email is confirmed. Log in to continue.
+		</wa-callout>
+	{:else if data.verification}
+		<wa-callout variant="warning" size="s" class="notice" data-testid="verification-notice">
+			<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
+			{data.verification === 'expired' ? 'That link has expired.' : "That link didn't work."}
+			Log in and we'll email you a new one.
+		</wa-callout>
+	{/if}
 
-<!-- Where a verification link lands. An old or broken link needs no resend
-     button here: signing in to an unconfirmed account sends a fresh one. -->
-{#if data.verification === 'first-account'}
-	<wa-callout variant="brand" size="s" class="notice" data-testid="verification-notice">
-		<wa-icon slot="icon" name="key" variant="solid"></wa-icon>
-		You're the first account here, so you're its admin, and this server can't send email yet. Log in,
-		then set up email in Settings → Admin so the next people to sign up can confirm theirs.
-	</wa-callout>
-{:else if data.verification === 'verified'}
-	<wa-callout variant="success" size="s" class="notice" data-testid="verification-notice">
-		<wa-icon slot="icon" name="envelope-circle-check" variant="solid"></wa-icon>
-		Your email is confirmed. Log in to continue.
-	</wa-callout>
-{:else if data.verification}
-	<wa-callout variant="warning" size="s" class="notice" data-testid="verification-notice">
-		<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
-		{data.verification === 'expired' ? 'That link has expired.' : "That link didn't work."}
-		Log in and we'll email you a new one.
-	</wa-callout>
-{/if}
+	<LoginForm data={data.loginForm} redirectTo={data.redirectTo} reason={data.reason} />
 
-<LoginForm data={data.loginForm} redirectTo={data.redirectTo} reason={data.reason} />
+	<a class="cross-link" href={signupHref}>Create an account</a>
 
-<a class="cross-link" href={signupHref}>Create an account</a>
-
-<HomeScreenHint />
+	<HomeScreenHint />
+</AuthPage>
 
 <style>
-	h1 {
-		text-align: center;
-		font-size: clamp(2.5rem, 12vw, 4rem);
-		margin: 1rem 0 1.5rem;
-	}
-
 	.notice {
-		margin-bottom: 1rem;
+		margin: 0;
 	}
 
 	.cross-link {
-		display: block;
-		margin: 1rem auto 0;
-		width: fit-content;
+		align-self: center;
 		color: var(--wa-color-text-quiet);
 	}
 </style>

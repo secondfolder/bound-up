@@ -63,8 +63,9 @@
 				{editHref}
 			/>
 		{:else}
+			<!-- No section title: the page is titled "Tasks" and this is its one
+			     list, so a heading here only said "Tasks" a second time. -->
 			<TaskListSection
-				title={data.partner.canCompleteTasks ? 'Tasks' : `${partnerShown}'s Tasks`}
 				tasks={data.tasks}
 				emptyMessage="No tasks have been created for this partnership yet."
 				completeAction="?/completeTask"

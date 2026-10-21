@@ -64,7 +64,7 @@ test.describe('rewards', () => {
 			await ada.page.getByRole('button', { name: 'Edit your reward credits' }).click();
 			await ada.page.getByLabel('Set your reward credits').fill('4');
 			await ada.page.getByRole('button', { name: 'Save your reward credits' }).click();
-			await expect(ada.page.locator('.self .title-row')).toContainText('Your Rewards');
+			await expect(ada.page.locator('.self .title-row')).toContainText('Your rewards');
 			await expect(ada.page.locator('.self .title-row')).toContainText('Credits: 4');
 
 			await ada.page.getByRole('link', { name: 'Add a reward' }).click();
@@ -83,7 +83,7 @@ test.describe('rewards', () => {
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/history$/);
 			await expect(ada.page.getByText('Long bath')).toBeVisible();
-			await expect(ada.page.getByRole('heading', { name: 'Self reward history' })).toBeVisible();
+			await expect(ada.page.getByRole('heading', { name: 'Your reward history' })).toBeVisible();
 		} finally {
 			await ada.close();
 		}

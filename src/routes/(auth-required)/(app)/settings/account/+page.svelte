@@ -5,7 +5,9 @@
 	import { page } from '$app/state';
 	import InputField from '$lib/components/InputField.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import SavedNote from '$lib/components/SavedNote.svelte';
 	import TimezoneSelect from '$lib/components/TimezoneSelect.svelte';
+	import { accountFormSchema } from '$lib/schemas/accountForm';
 	import { superForm } from '$lib/superform';
 	import { currentTimeZoneOrUtc } from '$lib/timezone';
 	import type { PageData } from './$types';
@@ -31,11 +33,22 @@
 			if (!form.valid) {
 				return;
 			}
+			saved = true;
 			await invalidateAll();
 		}
 	});
-	const { errors, isTainted, submitting, tainted } = superform;
+	const { errors, form: values, isTainted, submitting, tainted } = superform;
 	const hasUnsavedChanges = $derived(isTainted($tainted));
+	// Solid only when there is something valid to save (AGENTS.md): a change
+	// that would only be refused stays outlined, like no change at all.
+	const canSave = $derived(hasUnsavedChanges && accountFormSchema.safeParse($values).success);
+	// From a save that landed until the next edit.
+	let saved = $state(false);
+	$effect(() => {
+		if (hasUnsavedChanges) {
+			saved = false;
+		}
+	});
 </script>
 
 <section>
@@ -57,14 +70,17 @@
 			<InputField {superform} field="name" title="Name" type="text" autocomplete="name" />
 			<TimezoneSelect {superform} field="timezone" title="Timezone" {deviceTimezone} />
 
-			<wa-button
-				type="submit"
-				appearance={hasUnsavedChanges ? 'filled' : 'outlined'}
-				variant={hasUnsavedChanges ? 'brand' : undefined}
-				disabled={$submitting}
-			>
-				Save account details
-			</wa-button>
+			<div class="actions">
+				<wa-button
+					type="submit"
+					appearance={canSave ? 'accent' : 'outlined'}
+					variant={canSave ? 'brand' : undefined}
+					disabled={$submitting}
+				>
+					Save account details
+				</wa-button>
+				{#if saved}<SavedNote />{/if}
+			</div>
 			{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 		</form>
 
@@ -72,11 +88,10 @@
 			<div class="email-panel">
 				<h2>Email</h2>
 				<p class="value">{user.email}</p>
-				<p>
-					Email changes are not available yet. This app ties email to both sign-in credentials and
-					encrypted-message access, so changing it safely needs coordinated auth and key-migration
-					work.
-				</p>
+				<!-- Says nothing about why: the reason is how sign-in and its keys are
+				     tied to the address, and encryption is never something people are
+				     asked to think about (AGENTS.md). -->
+				<p>Email changes are not available yet. This is the address you sign in with.</p>
 			</div>
 		{/if}
 
@@ -107,6 +122,28 @@
 			margin: 0;
 		}
 
+		/* A card's title, the size every settings subsection uses; Web
+		   Awesome's own h2 is a page-sized 2xl, which wrapped "Password and
+		   sign-in" onto two lines on a phone. */
+		h2 {
+			font-size: var(--wa-font-size-l);
+		}
+
+		.actions {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.75rem;
+
+			/* Full width on a phone, where it is a thumb's target; its own width
+			   on anything wider, where a 600px bar shouted. */
+			@media (width < 40rem) {
+				wa-button {
+					flex: 1 1 100%;
+				}
+			}
+		}
+
 		.email-panel p,
 		.linked-setting p {
 			color: var(--wa-color-text-quiet);
@@ -133,6 +170,7 @@
 			.value {
 				font-weight: var(--wa-font-weight-semibold, 600);
 				color: var(--wa-color-text-normal);
+				overflow-wrap: break-word;
 			}
 		}
 

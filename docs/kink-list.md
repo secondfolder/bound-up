@@ -319,6 +319,11 @@ failed save.
 ([`KinkListHome`](../src/lib/components/kink-list/KinkListHome.svelte)), dense
 enough to fill in without a click per category:
 
+- a way back to the Playroom (a partner's view goes back to your own list),
+  drawn as every page's back link is, a chevron and the parent's name
+  ([`KinkListCrumbs`](../src/lib/components/kink-list/KinkListCrumbs.svelte));
+  the sub-pages (quick fill, import and export, history, a partner's compare
+  and differences) use the same, all saying "Kink list" for your own list
 - Quick fill, Share (a dialog that makes a link), Import or export, and
   History, on one row
 - pinned above the list as it scrolls, under that row: search over names
@@ -330,7 +335,16 @@ enough to fill in without a click per category:
   and Expand all / Collapse all. It has no background of its own until it
   sticks; then one fades in, reaching from edge to edge of the page, so rows
   scrolling under it are hidden right across. A sentinel above it, watched
-  with an `IntersectionObserver`, says when it has stuck.
+  with an `IntersectionObserver`, says when it has stuck. **On a phone**
+  (under 40rem) it pins only the search and the key: the level of detail,
+  "Answer as" and Expand / Collapse all sit just above it instead and scroll
+  away, since pinned they took over a third of the screen. They are moved,
+  not hidden (a `MediaQuery` picks where each renders), so each control
+  exists once. The level of detail grows to the whole row once it wraps
+  under the search.
+- the column is wider than the pages around it, 60rem rather than the usual
+  50rem, so a nested kink's name fits beside two contexts of dots rather
+  than dropping them onto a line of their own
 - every category by section, each a `wa-details`
   ([`KinkCategory`](../src/lib/components/kink-list/KinkCategory.svelte))
   that starts open and folds away, with how much of it is answered, and
@@ -349,9 +363,20 @@ the left, and on the right a row of dots per context
   that gets stronger toward Love, so the yeses read as more of one answer.
   Colour is never the only cue: each radio is named by its word, each dot
   has it as a tooltip, the position on the scale is fixed, and the key says
-  which is which. A chosen dot is filled with a check; choosing it again
-  clears it. An inherited hard limit is a dashed ring whose tooltip says where
-  it comes from.
+  which is which. **Each level has a mark** as well
+  ([`level-glyphs.css`](../src/lib/components/kink-list/level-glyphs.css)):
+  a cross for Hard limit, a minus, a tilde for Conditional, an equals for
+  Don't mind, a question for Curious, a plus for Like, a heart for Love. A
+  chosen dot is filled and wears its mark, so which answer it is never rests
+  on colour (Like and Love are neighbouring greens, and the red and orange
+  run together for red-green colourblindness); the key shows the marks too.
+  Choosing the chosen dot again clears it. An inherited hard limit is a
+  dashed ring with its mark in its own colour, whose tooltip says where it
+  comes from. A dot pops as it is chosen, under
+  `prefers-reduced-motion: no-preference`, and only the one just chosen.
+- **The dots never shrink.** A nested row on a phone squeezed them closer
+  than a finger can pick apart; instead the context's label gives way and
+  wraps, and in a narrow category specifics step in less.
 - **A kink with a role pair always shows both contexts**, side by side with
   their labels, or stacked under the name on a phone. "Answer as" can narrow
   it to one.
@@ -470,8 +495,12 @@ list, so a reload loses nothing and lands back on triage.
 
 1. **Triage** ([`TriageGrid`](../src/lib/components/kink-list/TriageGrid.svelte)).
    Every category is a tile, in by default, and tapping one out skips it.
-   "Hard limit everything here" answers a whole category, and the level of
-   detail is set here too.
+   "Hard limit everything here" answers a whole category (a tile so ruled
+   out takes a red edge, with one pulse as it is tapped), and the level of
+   detail is set here too. A tile keeps the plain border while it is in, so
+   only a change stands out, and the limit link stays quiet until hovered or
+   used. Start is pinned to the foot of the screen over an opaque strip, so
+   it never covers a tile.
 2. **The deck** ([`Deck`](../src/lib/components/kink-list/Deck.svelte)): one
    card per kink.
    - Every answer is always a button under the card, so the deck works
@@ -519,7 +548,8 @@ Like the IQ test, the kink list works signed out, at `/kink-list/…`
     test's device storage.
   - The list opens after hydration, and the server renders a placeholder.
 - **A banner** ([`DeviceBanner`](../src/lib/components/kink-list/DeviceBanner.svelte))
-  says the list is on this device only. It makes the case for an account
+  says the list is on this device only, which is why the save status above
+  it says only "Saved", as it does signed in. It makes the case for an account
   (keeping it, and comparing with a partner) and links to sign up or log in,
   with `redirectTo` set to the list in the account.
 - **Someone signed in** who opens `/kink-list/…` is sent to the same screen

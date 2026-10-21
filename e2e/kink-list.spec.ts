@@ -120,7 +120,7 @@ test('a related kink answered in one category shows the same answer in its own',
 	await signUp(page, account('Cai'));
 	await openList(page);
 	const anal = page.locator('#category-anal');
-	await anal.getByRole('button', { name: /related kinks/ }).click();
+	await anal.getByRole('button', { name: /related kinks?\b/ }).click();
 	await anal
 		.getByRole('group', { name: 'Rimming, giving', exact: true })
 		.getByRole('radio', { name: 'Love', exact: true })
@@ -175,7 +175,7 @@ test.describe('quick fill', () => {
 
 		// The whole list shows them, on both sides — a card answers for both
 		// unless one is picked — and Oral's kinks carry the category's limit.
-		await page.getByRole('link', { name: 'Whole list' }).click();
+		await page.getByRole('link', { name: 'Back to kink list' }).click();
 		for (const side of ['giving', 'receiving']) {
 			await expect(
 				scale(page, `Handjobs, ${side}`).getByRole('radio', { name: 'Like' })
@@ -200,7 +200,7 @@ test.describe('without an account', () => {
 		await waitForHydration(page);
 		await answer(page, 'Spanking, giving', 'Like');
 		await answer(page, 'Spanking, receiving', 'Like');
-		await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible();
+		await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 	}
 
 	async function makeLink(page: Page, name: string): Promise<string> {

@@ -55,13 +55,8 @@ function data(claimCount: number, claimable = true): PageData {
 }
 
 describe('/partner/[id]/rewards/+page.svelte', () => {
-	it('hides claim history when the partnership has no claims', () => {
+	it('always offers claim history, as the tasks page does', () => {
 		const { container } = render(Page, { data: data(0) });
-		expect(container.textContent).not.toContain('Claim history');
-	});
-
-	it('shows claim history when the partnership has claims', () => {
-		const { container } = render(Page, { data: data(1) });
 		const buttons = Array.from(container.querySelectorAll('wa-button')).map((node) =>
 			node.textContent?.trim()
 		);
@@ -70,11 +65,22 @@ describe('/partner/[id]/rewards/+page.svelte', () => {
 
 	it('hides claim-side credits and claim controls for the controller-only view', () => {
 		const { container } = render(Page, { data: data(0, false) });
-		expect(container.querySelector('.title-row')?.textContent).toContain("Jun's Rewards");
-		expect(container.querySelector('.title-row')?.textContent).toContain('Credits:');
+		expect(container.querySelector('.title-row')?.textContent).toContain("Jun's credits:");
 		expect(container.querySelector('.title-row')?.textContent).toContain('1');
-		expect(container.textContent).not.toContain('Claim');
-		expect(container.textContent).not.toContain('You need 2 credits.');
-		expect(container.textContent).not.toContain("Jun's credits");
+		expect(container.querySelector('.claim-form')).toBeNull();
+		expect(container.textContent).not.toContain('more credits to go');
+		expect(container.querySelector('.secondary-credit-row')).toBeNull();
+	});
+
+	it('puts the only list straight on the page, not in a panel, with no heading of its own', () => {
+		const { container } = render(Page, { data: data(0) });
+		expect(container.querySelector('.panel')).toBeNull();
+		expect(container.querySelectorAll('h2')).toHaveLength(0);
+	});
+
+	it('shows the claimant their own balance beside the list', () => {
+		const { container } = render(Page, { data: data(0) });
+		expect(container.querySelector('.title-row')?.textContent).toContain('Your credits:');
+		expect(container.querySelector('.title-row')?.textContent).toContain('4');
 	});
 });

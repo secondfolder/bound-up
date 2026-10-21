@@ -45,7 +45,7 @@
 							{#each parts as part (part.name)}
 								<span class:off={!part.ready}>
 									<wa-icon
-										name={part.ready ? 'circle-check' : 'circle-minus'}
+										name={part.ready ? 'circle-check' : 'circle-exclamation'}
 										variant="solid"
 										label={part.ready ? 'set up' : 'not set up'}
 									></wa-icon>
@@ -92,13 +92,34 @@
 				list-style-type: none;
 				border-bottom: 1px solid var(--wa-color-surface-border);
 
+				/* The settings list's row: padded and pulled back out, so the
+				   hover wash has room while the text keeps the page's edge. */
 				a {
 					display: flex;
 					align-items: center;
 					gap: 0.75rem;
-					padding: 0.875rem 0;
+					padding: 0.875rem 0.5rem;
+					margin-inline: -0.5rem;
+					border-radius: var(--wa-border-radius-m);
 					text-decoration: none;
 					color: inherit;
+
+					&:hover,
+					&:focus-visible {
+						background: var(--wa-color-surface-raised);
+					}
+
+					@media (prefers-reduced-motion: no-preference) {
+						transition: background-color var(--wa-transition-fast);
+
+						> wa-icon {
+							transition: translate var(--wa-transition-fast);
+						}
+
+						&:hover > wa-icon {
+							translate: 2px 0;
+						}
+					}
 				}
 			}
 		}
@@ -127,8 +148,10 @@
 				color: var(--wa-color-success-on-quiet);
 			}
 
+			/* Amber, not quiet grey: a part that is not set up is the thing an
+			   admin came here to find, and in grey only its icon told it apart. */
 			.off {
-				color: var(--wa-color-text-quiet);
+				color: var(--wa-color-warning-on-quiet);
 			}
 		}
 	}

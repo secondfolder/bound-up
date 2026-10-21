@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import PartnerMessagesWidget from '$lib/components/PartnerMessagesWidget.svelte';
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
+	import SectionWidget from '$lib/components/SectionWidget.svelte';
 	import TasksWidget from '$lib/components/TasksWidget.svelte';
 	import TimeZoneDisplay from '$lib/components/TimeZoneDisplay.svelte';
 	import { initialsFor } from '$lib/initials';
@@ -59,19 +60,24 @@
 				href={resolve('/(auth-required)/(app)/partner/[id]/rewards', { id: partner.id })}
 			/>
 		{/if}
+
+		<!-- A card with no body rather than a plain link under the others: the
+		     kink list has no summary worth a preview, and what it shows a partner
+		     is sealed until the page opens it. As a bare link it read as an
+		     afterthought tacked on under three cards. -->
+		<SectionWidget
+			title="Kink lists"
+			icon="clipboard-list"
+			href={resolve('/(auth-required)/(app)/playroom/kink-list/partner/[partnershipId]', {
+				partnershipId: partner.id
+			})}
+		/>
 	</div>
 
-	<!-- A plain link rather than a card: the kink list has no summary worth a
-	     widget, and what it shows a partner is sealed until the page opens it. -->
-	<a
-		href={resolve('/(auth-required)/(app)/playroom/kink-list/partner/[partnershipId]', {
-			partnershipId: partner.id
-		})}
-	>
-		Kink lists
-	</a>
-
-	<a href={resolve('/(auth-required)/(app)/settings/partners/[id]', { id: partner.id })}>
+	<!-- Settings is not a section of the relationship, so it stays a quiet link
+	     at the foot rather than a fifth card. -->
+	<a class="settings" href={resolve('/(auth-required)/(app)/settings/partners/[id]', { id: partner.id })}>
+		<wa-icon name="gear" variant="solid"></wa-icon>
 		{partner.canEdit ? 'Edit this connection' : 'Connection settings'}
 	</a>
 </section>
@@ -115,10 +121,31 @@
 		   preview list centred under its own title is much harder to scan. */
 		.widgets {
 			inline-size: 100%;
+			/* The same column as the cards on /home, so the one component does not
+			   change width between the two pages. */
+			max-inline-size: var(--card-column-width);
+			/* Sized by the column, never by what is in it: a preview row is a
+			   single ellipsised line, and its full unwrapped width once pushed
+			   this page off the side of a phone. */
+			contain: inline-size;
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
 			text-align: start;
+		}
+
+		.settings {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.5rem;
+			/* A tap target, not just a line of text. */
+			min-block-size: 2.75rem;
+			color: var(--wa-color-text-quiet);
+			font-size: 0.9375rem;
+
+			wa-icon {
+				font-size: 0.875em;
+			}
 		}
 	}
 </style>

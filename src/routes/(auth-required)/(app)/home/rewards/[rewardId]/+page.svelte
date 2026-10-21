@@ -33,8 +33,8 @@
 		{backHref}
 		backLabel="Back to rewards"
 		backText="Rewards"
-		title="Edit self reward"
-		description="Use the same reward form here that creates a new self reward, but with the current values prefilled."
+		title="Edit reward"
+		description="Change the title, description, cost, or whether it can be claimed."
 	/>
 
 	<div class="content">

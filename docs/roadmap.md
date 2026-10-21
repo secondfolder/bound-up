@@ -79,7 +79,12 @@ only what the roadmap puts on it.
   grows to the right. From 720px the trunk is centred and the boughs are
   packed either side of it (`spread`; see [tree.md](tree.md#packing)).
 - **Folding.** A branch head folds its leaves and a leaf with twigs folds
-  them. The page passes the item the drawer shows as `reveal`, so following
+  them. The roadmap stretches each node across its column
+  (`--tree-content-grow: 1`), so every fold toggle lines up on the column's
+  outer edge.
+- **Summaries** are clamped to two lines, three on a phone, and wrapped with
+  `text-wrap: pretty` so no word sits alone on a last line. On a phone the
+  status word always takes a line of its own under the title. The page passes the item the drawer shows as `reveal`, so following
   a fragment to an item inside a folded branch opens it.
 
 **Status** is shown three ways: by the marker's shape (a filled disc with a
@@ -94,7 +99,9 @@ keeps its shape. `RoadmapTree` tells Tree an item is hidden when the legend
 hides its status, and that a branch, which has no status, always is, so a
 branch head and its bough and stem dim only when everything in the branch is
 hidden. How each stretch of connector dims, and why hidden ones are drawn
-solid and underneath, is in [tree.md](tree.md#dimming).
+solid and underneath, is in [tree.md](tree.md#dimming). A toggle's swatch
+shrinks as its status is hidden and springs back as it is shown, unless
+reduced motion is asked for.
 
 ### Why no graph library
 
@@ -139,7 +146,9 @@ straight back.
 is the "Coming Up" section: the first six `featuredUpcoming()` items as tiles,
 and "See the full roadmap".
 [RoadmapRecent.svelte](../src/lib/components/roadmap/RoadmapRecent.svelte) is
-"Recently added", the four newest `recentlyShipped()`. It sits apart, under
+"Recently added", the four newest `recentlyShipped()`, with a run of twigs
+under one leaf grouped under that leaf's title once rather than prefixed with
+it each time. It sits apart, under
 the landing page's feature overview
 ([LandingFeatures.svelte](../src/lib/components/landing/LandingFeatures.svelte)),
 because what has shipped belongs with what the app does rather than with what

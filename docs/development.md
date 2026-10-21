@@ -287,6 +287,8 @@ other is half a script, is in
 | `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against `vite dev`          |
 | `test:e2e:image`                                              | Build the Docker image, then Playwright against it            |
 | `screenshots:landing`                                         | Retake the landing page's feature screenshots (`static/landing/`) |
+| `brand-images`                                                | Redraw the favicons, app icons and share card in `static/`    |
+| `title-font`                                                  | Rebuild the title face from Rubik's sources (needs `uv`)      |
 | `db:generate`                                                 | Generate a migration from the schema                          |
 | `db:migrate:dev` / `db:migrate:production`                    | Apply migrations to local.db / production D1                  |
 | `db:migrate:local-preview` / `db:migrate:remote-preview`      | Apply migrations to the emulated D1 / the Worker Previews' D1 |

@@ -42,7 +42,11 @@
 			{#if summary}<span class="summary">{summary}</span>{/if}
 		</div>
 		<div class="actions">
-			<wa-button size="s" appearance="outlined" onclick={onedit}>Edit {title}</wa-button>
+			<!-- "Edit" to see, the name for a screen reader: in full, "Edit After
+			     hours" squeezed the idea's line to a word a line on a phone. -->
+			<wa-button size="s" appearance="outlined" onclick={onedit}
+				>Edit <span class="wa-visually-hidden">{title}</span></wa-button
+			>
 			{#if onremove}
 				<wa-button size="s" appearance="plain" onclick={onremove}>
 					<wa-icon name="xmark" variant="solid" label={`Remove ${title}`}></wa-icon>
@@ -65,9 +69,17 @@
 </wa-card>
 
 <style>
+	/* A smaller inset than wa-card's own: inside a fieldset that already
+	   pads it, the default made a box in a box in a box. */
+	.copy {
+		--spacing: var(--wa-space-m);
+	}
+
+	/* Centred against the buttons: top-aligned, a name with no summary sat
+	   above the middle of a card held open by the button beside it. */
 	.body {
 		display: flex;
-		align-items: flex-start;
+		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem;
 	}

@@ -12,7 +12,7 @@ import {
 	readPartnershipTaskRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -121,5 +121,25 @@ describe('actions', () => {
 		const result = await runAndCatch(() => actions.default?.(at(id, jun, post)));
 		expect(result).toMatchObject({ type: 'error', status: 403 });
 		await expect(readPartnershipTaskRows(db, id)).resolves.toEqual([]);
+	});
+});
+
+describe('load', () => {
+	it('sends the side without control back to the task list, not to an error page', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+
+		const result = await runAndCatch(() => load(at(id, jun)));
+		expect(result).toMatchObject({
+			type: 'redirect',
+			status: 303,
+			location: `/partner/${id}/tasks`
+		});
+	});
+
+	it('serves the form to the controlling side', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'me' });
+
+		const result = await runAndCatch(() => load(at(id, ada)));
+		expect(result).toMatchObject({ type: 'ok' });
 	});
 });

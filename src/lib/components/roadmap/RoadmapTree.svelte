@@ -72,6 +72,9 @@
 	.roadmap-tree {
 		--branch-icon-size: 2.75rem;
 		--tree-dim-opacity: 0.3;
+		/* Every fold toggle on the column's outer edge, in one line per side
+		   (see Tree). */
+		--tree-content-grow: 1;
 
 		/* Per depth: a branch head (its icon is its marker), a leaf, a twig.
 		   Each is inherited by the depths under it, so a leaf puts the
@@ -129,6 +132,8 @@
 		h2 {
 			margin: 0;
 			font-family: var(--font-display);
+			font-weight: 900;
+			font-variation-settings: var(--font-display-variation);
 			font-size: 1.6rem;
 			line-height: 1.1;
 			color: var(--accent-color);

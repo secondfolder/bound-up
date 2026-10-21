@@ -74,17 +74,25 @@ describe('SetupDialog', () => {
 		expect(container).toHaveTextContent('agreed to play');
 	});
 
-	it('is the window’s full height whatever it holds, so the slider never moves', async () => {
+	it('is the window’s height, capped at 44rem, whatever it holds, so the slider never moves', async () => {
 		const { container } = await renderDialog();
 		const panel = () =>
 			defined(
 				container.querySelector('wa-dialog')?.shadowRoot?.querySelector('[part~="dialog"]'),
 				'the dialog panel'
 			).getBoundingClientRect().height;
-		await expect.poll(panel).toBe(window.innerHeight - 32);
+		const expected = Math.min(window.innerHeight - 32, 44 * 16);
+		await expect.poll(panel).toBe(expected);
 		await slideTo(container, 4);
 		await waSettled(container);
-		expect(panel()).toBe(window.innerHeight - 32);
+		expect(panel()).toBe(expected);
+	});
+
+	it('puts focus on the disclaimer as it opens, not on either role button', async () => {
+		const { container } = await renderDialog();
+		await expect
+			.poll(() => document.activeElement === container.querySelector('.disclaimer'))
+			.toBe(true);
 	});
 
 	it('keeps the role buttons at its foot while everything fits, and after the rest when not', async () => {

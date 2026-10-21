@@ -249,9 +249,9 @@ token (`not-found`), an expired one (`expired`), the inviter's own link
 
 | Route                              | Group             | What it does                                                                                              |
 | ---------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `/settings/partners`               | `(auth-required)` | Linked partners and outstanding invites. "Add" starts a new one.                                          |
+| `/settings/partners`               | `(auth-required)` | Linked partners and outstanding invites. "Add a partner", after the list, starts a new one.               |
 | `/settings/partners/new`           | `(auth-required)` | Name/Title, Roles, and the control question. Creates the pending row and the link.                        |
-| `/settings/partners/[id]`          | `(auth-required)` | Pending: the link, share, renew, cancel. Accepted: edit, disconnect.                                      |
+| `/settings/partners/[id]`          | `(auth-required)` | Who is whose role, then: pending, the link, share, renew; accepted, edit. Disconnect/cancel last, apart.  |
 | `/invite/[token]`                  | **`(public)`**    | The landing page for the person being invited.                                                            |
 | `/partner/[id]`                    | `(auth-required)` | The partner's own page. Accepted links only. Shows their local time, and date too when their day differs. |
 | `/partner/[id]/tasks`              | `(auth-required)` | Shared tasks and recent completion history for that link.                                                 |

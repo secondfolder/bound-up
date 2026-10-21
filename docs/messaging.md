@@ -275,6 +275,51 @@ Threads now sit in a plain grid rather than a jittered sticker layout. The
 preview and timestamp lines want stable alignment more than they want novelty,
 so the board no longer offsets or tilts each tile.
 
+The board and the thread are centred columns of `--page-width`, with the page
+gutter (`--page-gutter`) as their inset, like every other page. Full width,
+the two sides of a conversation ended up a whole desktop apart. The thread's
+composer band still spans the pane: it is painted with a border image's
+outset rather than a background, which as ink overflow never scrolls sideways.
+The board's "Write something" button floats with a shadow and no band behind
+it, and shows a pen: the paper plane is the composer's own Send.
+
+A sticker the live feed has just brought in, or a notification's tap points
+at, gets a ring that fades over four seconds and, motion allowed, two halo
+pulses as it arrives. An unread sticker's dot, and the dot beside "N unread
+threads" on the partner's page, pop in as they appear.
+
+## The thread, in time
+
+Times are grouped the way a messenger groups them (`src/lib/message-timeline.ts`).
+Consecutive messages from one side within five minutes are a **run**, drawn
+close together, and only the last of a run shows its time. A new calendar day,
+in the viewer's own time zone, gets a label above its first message: "Today",
+"Yesterday", the weekday for the rest of the past week, then a date. A run
+never crosses midnight.
+
+A grouped-away time is hidden from sight, not from a screen reader, which reads
+messages one at a time and has no run to take it from. The day label sits
+inside its message's `<li>`, so the list still has one item per message, which
+is what the e2e suite counts.
+
+**Motion marks what just happened, and none of it runs as a thread loads.**
+Everything here is behind `prefers-reduced-motion: no-preference`:
+
+- A message that arrives while the thread is open grows in from its own side,
+  from the composer's corner for one sent here and from the left for the
+  partner's. "Arrived" means not among the messages the thread opened with.
+- A tapback pops in. Not while the thread's reactions are first being
+  decrypted, so opening a thread does not pop every one of them.
+- The reaction row fans out of the smiley, one emoji a beat after the last.
+- The read receipt slides into place as it moves down the thread.
+- The new-message dialog grows out of the button that opened it. Web Awesome's
+  own show animation never runs for a dialog rendered already open, and a CSS
+  animation on `::part(dialog)` would also replace its hide animation, so this
+  one is a Web Animation on the panel.
+
+The reaction control is a small smiley with a 44px hit area from a
+pseudo-element, so it is easy to tap without pushing the time beside it.
+
 ## Attachments and media
 
 Each file is encrypted under **its own ephemeral age identity**, and that
@@ -772,6 +817,13 @@ newer message arrives, which is followed as usual.
 **Following glides once the thread is open.** A new message slides in with a
 smooth scroll; the opening, anything further than a screen, and a reader who
 asks for reduced motion jump instead (`followEnd` says why).
+
+**The new-message dialog says who it is to**, in a "To …" line over the tag
+picker, since its header is hidden to keep the panel small. On a phone it is a
+sheet from the bottom of the visual viewport the shell tracks
+(`--viewport-top`, `--viewport-height`), so the keyboard does not cover it.
+Adding a tag is one button everywhere, a plain "Add tag" with a tag icon,
+in the dialog and at the top of a thread alike.
 
 **The new-message dialog is in the URL.** "Write something" shallow-routes to
 `/partner/[id]/messages/new` (`pushState`), so the board stays mounted under

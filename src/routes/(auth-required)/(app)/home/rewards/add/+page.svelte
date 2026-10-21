@@ -12,8 +12,8 @@
 		{backHref}
 		backLabel="Back to rewards"
 		backText="Rewards"
-		title="Add a self reward"
-		description="This reward belongs only to you and spends from your own self-reward credit balance."
+		title="Add a reward"
+		description="This reward belongs only to you and is paid for from your own reward balance."
 	/>
 
 	<div class="content">

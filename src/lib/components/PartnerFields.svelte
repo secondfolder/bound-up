@@ -35,108 +35,120 @@
 	] as const;
 </script>
 
-{#if editable}
-	<fieldset class="question-fieldset">
-		<legend>Name/Title</legend>
-		<p class="question-description">How should you both refer to each other?</p>
-		<div class="inline-fields">
-			<div class="field-item">
-				<InputField {superform} field="partnerName" title="Theirs" type="text" />
+<!-- One column with its own gap, so the space between the questions is the
+     same in every form that holds them. Each fieldset used to carry a top
+     margin, which a flex form's gap then added to: 2rem between questions on
+     the add screen, against 1rem everywhere else. -->
+<div class="partner-fields">
+	{#if editable}
+		<fieldset class="question-fieldset">
+			<legend>Name/Title</legend>
+			<p class="question-description">How should you both refer to each other?</p>
+			<div class="inline-fields">
+				<div class="field-item">
+					<InputField {superform} field="partnerName" title="Theirs" type="text" />
+				</div>
+				<div class="field-item">
+					<InputField {superform} field="yourName" title="Yours" type="text" />
+				</div>
 			</div>
-			<div class="field-item">
-				<InputField {superform} field="yourName" title="Yours" type="text" />
-			</div>
-		</div>
-	</fieldset>
+		</fieldset>
 
-	<fieldset class="question-fieldset">
-		<legend>Roles</legend>
-		<div class="stacked-fields">
-			<div class="field-item">
-				<InputField
-					{superform}
-					field="partnerRole"
-					title="Theirs"
-					type="text"
-					startText={$form.yourName ? `${$form.yourName}'s` : null}
-				/>
-			</div>
-			<div class="field-item">
-				<InputField
-					{superform}
-					field="yourRole"
-					title="Yours"
-					type="text"
-					startText={$form.partnerName ? `${$form.partnerName}'s` : null}
-				/>
-			</div>
-		</div>
-	</fieldset>
-{:else}
-	<fieldset class="question-fieldset">
-		<legend>Name/Title</legend>
-		<p class="question-description">How should you both refer to each other?</p>
-		<dl class="readonly">
-			<dt>Theirs</dt>
-			<dd>{$form.partnerName}</dd>
-			<dt>Yours</dt>
-			<dd>{$form.yourName}</dd>
-		</dl>
-	</fieldset>
-
-	<fieldset class="question-fieldset">
-		<legend>Roles</legend>
-		<dl class="readonly">
-			{#if $form.partnerRole}
-				<dt>Theirs</dt>
-				<dd>{$form.yourName ? `${$form.yourName}'s ` : ''}{$form.partnerRole}</dd>
-			{/if}
-			{#if $form.yourRole}
-				<dt>Yours</dt>
-				<dd>{$form.partnerName ? `${$form.partnerName}'s ` : ''}{$form.yourRole}</dd>
-			{/if}
-		</dl>
-	</fieldset>
-	<input type="hidden" name="partnerName" value={$form.partnerName} />
-	<input type="hidden" name="yourName" value={$form.yourName} />
-	<input type="hidden" name="partnerRole" value={$form.partnerRole ?? ''} />
-	<input type="hidden" name="yourRole" value={$form.yourRole ?? ''} />
-{/if}
-
-{#if editable}
-	<!-- Native radios rather than <wa-radio-group>: this control decides a
-	     permission, so it must submit even if the Web Awesome CDN bundle has not
-	     upgraded the custom elements yet. -->
-	<fieldset class="control-fieldset">
-		<legend>Who calls the shots?</legend>
-		<p class="control-description">
-			This decides who can set tasks, punishments, rewards and other settings for this link.
-		</p>
-		<div class="control-options">
-			{#each controlOptions as option (option.value)}
-				<label class:selected={$form.control === option.value}>
-					<input
-						type="radio"
-						name="control"
-						value={option.value}
-						checked={$form.control === option.value}
-						onchange={() => { $form.control = option.value; }}
+		<fieldset class="question-fieldset">
+			<legend>Roles</legend>
+			<div class="stacked-fields">
+				<div class="field-item">
+					<InputField
+						{superform}
+						field="partnerRole"
+						title="Theirs"
+						type="text"
+						startText={$form.yourName ? `${$form.yourName}'s` : null}
 					/>
-					{option.label}
-				</label>
-			{/each}
-		</div>
-	</fieldset>
-{:else}
-	<!-- The question is not shown at all to someone who cannot change the
-	     answer — a row of disabled radios is noise, not information. The value
-	     still has to be sent so the payload matches the same Zod schema; like
-	     the names above, the server does not trust it and re-reads the stored
-	     row (see invariant 14 in AGENTS.md). -->
-	<input type="hidden" name="control" value={$form.control} />
-{/if}
+				</div>
+				<div class="field-item">
+					<InputField
+						{superform}
+						field="yourRole"
+						title="Yours"
+						type="text"
+						startText={$form.partnerName ? `${$form.partnerName}'s` : null}
+					/>
+				</div>
+			</div>
+		</fieldset>
+	{:else}
+		<fieldset class="question-fieldset">
+			<legend>Name/Title</legend>
+			<p class="question-description">How should you both refer to each other?</p>
+			<dl class="readonly">
+				<dt>Theirs</dt>
+				<dd>{$form.partnerName}</dd>
+				<dt>Yours</dt>
+				<dd>{$form.yourName}</dd>
+			</dl>
+		</fieldset>
+
+		<fieldset class="question-fieldset">
+			<legend>Roles</legend>
+			<dl class="readonly">
+				{#if $form.partnerRole}
+					<dt>Theirs</dt>
+					<dd>{$form.yourName ? `${$form.yourName}'s ` : ''}{$form.partnerRole}</dd>
+				{/if}
+				{#if $form.yourRole}
+					<dt>Yours</dt>
+					<dd>{$form.partnerName ? `${$form.partnerName}'s ` : ''}{$form.yourRole}</dd>
+				{/if}
+			</dl>
+		</fieldset>
+		<input type="hidden" name="partnerName" value={$form.partnerName} />
+		<input type="hidden" name="yourName" value={$form.yourName} />
+		<input type="hidden" name="partnerRole" value={$form.partnerRole ?? ''} />
+		<input type="hidden" name="yourRole" value={$form.yourRole ?? ''} />
+	{/if}
+
+	{#if editable}
+		<!-- Native radios rather than <wa-radio-group>: this control decides a
+		     permission, so it must submit even if the Web Awesome CDN bundle has not
+		     upgraded the custom elements yet. -->
+		<fieldset class="control-fieldset">
+			<legend>Who calls the shots?</legend>
+			<p class="control-description">
+				This decides who can set tasks, punishments, rewards and other settings for this link.
+			</p>
+			<div class="control-options">
+				{#each controlOptions as option (option.value)}
+					<label class:selected={$form.control === option.value}>
+						<input
+							type="radio"
+							name="control"
+							value={option.value}
+							checked={$form.control === option.value}
+							onchange={() => { $form.control = option.value; }}
+						/>
+						{option.label}
+					</label>
+				{/each}
+			</div>
+		</fieldset>
+	{:else}
+		<!-- The question is not shown at all to someone who cannot change the
+		     answer — a row of disabled radios is noise, not information. The value
+		     still has to be sent so the payload matches the same Zod schema; like
+		     the names above, the server does not trust it and re-reads the stored
+		     row (see invariant 14 in AGENTS.md). -->
+		<input type="hidden" name="control" value={$form.control} />
+	{/if}
+</div>
 
 <style>
+	.partner-fields {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
 	.question-fieldset,
 	.control-fieldset {
 		border-color: var(--wa-color-surface-border);
@@ -146,13 +158,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		margin: 1rem 0 0;
+		margin: 0;
 		min-width: 0;
 
 		legend {
 			padding: 0 0.25rem;
 			color: var(--wa-color-text-normal);
-			font-size: 1.25rem;
+			font-size: var(--wa-font-size-l);
 			font-weight: var(--wa-font-weight-semibold, 600);
 		}
 	}

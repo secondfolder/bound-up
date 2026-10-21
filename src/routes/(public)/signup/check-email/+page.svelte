@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import AuthBox from '$lib/components/AuthBox.svelte';
+	import AuthPage from '$lib/components/AuthPage.svelte';
 	import InputField from '$lib/components/InputField.svelte';
 	import { RESEND_COOLDOWN_SECONDS, resendAction } from '$lib/email-verification';
 	import { resendVerificationFormSchema } from '$lib/schemas/resendVerificationForm';
@@ -82,78 +84,85 @@
 
 <svelte:head><title>Check your email</title></svelte:head>
 
-<h1>Check your email</h1>
+<AuthPage title="Check your email">
+	<AuthBox busy={$submitting} busyLabel="Sending a new link">
+		<!-- An envelope that bobs twice as the page arrives: the one thing to
+		     do next is somewhere else, and this points at it. -->
+		<wa-icon class="envelope" name="envelope" variant="solid" aria-hidden="true"></wa-icon>
+		<p>
+			{#if data.email}
+				We've sent a link to <strong>{data.email}</strong>.
+			{:else}
+				We've sent a link to the address you signed up with.
+			{/if}
+			Open it to confirm the address is yours, then log in.
+		</p>
+		<p class="quiet">
+			It can take a minute or two to arrive. Not there? Check your Junk or Spam folder. The link works
+			for 24 hours.
+		</p>
 
-<section>
-	<p>
-		{#if data.email}
-			We've sent a link to <strong>{data.email}</strong>.
-		{:else}
-			We've sent a link to the address you signed up with.
-		{/if}
-		Open it to confirm the address is yours, then log in.
-	</p>
-	<p class="quiet">
-		It can take a minute or two to arrive. Not there? Check your Junk or Spam folder. The link works
-		for 24 hours.
-	</p>
-
-	<form method="POST" {action} use:superform.enhance data-ready={ready ? 'true' : undefined}>
-		<InputField {superform} field="email" title="Email" type="email" autocomplete="username" />
-		<wa-button
-			type="submit"
-			variant="brand"
-			appearance={canResend ? 'accent' : 'outlined'}
-			disabled={$submitting || secondsLeft > 0}
-		>
-			{secondsLeft > 0 ? `Send a new link in ${secondsLeft}s` : 'Send a new link'}
-		</wa-button>
-		<!-- A wait is shown by the countdown above, not repeated as an error. -->
-		{#if $errors._errors && secondsLeft === 0}<span class="invalid" role="alert">{$errors._errors}</span>{/if}
-		{#if $message}<p role="status">{$message}</p>{/if}
-	</form>
+		<form method="POST" {action} use:superform.enhance data-ready={ready ? 'true' : undefined}>
+			<InputField {superform} field="email" title="Email" type="email" autocomplete="username" />
+			<wa-button
+				type="submit"
+				variant="brand"
+				appearance={canResend ? 'accent' : 'outlined'}
+				disabled={$submitting || secondsLeft > 0}
+			>
+				{secondsLeft > 0 ? `Send a new link in ${secondsLeft}s` : 'Send a new link'}
+			</wa-button>
+			<!-- A wait is shown by the countdown above, not repeated as an error. -->
+			{#if $errors._errors && secondsLeft === 0}<span class="invalid" role="alert">{$errors._errors}</span>{/if}
+			{#if $message}<p role="status">{$message}</p>{/if}
+		</form>
+	</AuthBox>
 
 	<!-- Not plain "Log in", for the reason the sign-up page gives: no two links
 	     on a page share an accessible name. -->
 	<a class="cross-link" href={loginHref}>Confirmed it? Log in</a>
-</section>
+</AuthPage>
 
 <style>
-	h1 {
-		text-align: center;
-		font-size: clamp(2.5rem, 12vw, 4rem);
-		margin: 1rem 0 1.5rem;
+	.quiet {
+		color: var(--wa-color-text-quiet);
+		font-size: 0.9375rem;
 	}
 
-	section {
-		max-width: 26rem;
-		margin: 0 auto;
+	form {
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-m);
+	}
 
-		p {
-			margin: 0;
+	.invalid {
+		color: var(--wa-color-text-danger);
+	}
+
+	.cross-link {
+		align-self: center;
+		color: var(--wa-color-text-quiet);
+	}
+
+	.envelope {
+		align-self: center;
+		font-size: 2rem;
+		color: var(--accent-color);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.envelope {
+			animation: bob 1.2s ease-in-out 0.2s 2;
 		}
+	}
 
-		.quiet {
-			color: var(--wa-color-text-quiet);
-			font-size: 0.9375rem;
+	@keyframes bob {
+		0%,
+		100% {
+			translate: 0 0;
 		}
-
-		form {
-			display: flex;
-			flex-direction: column;
-			gap: var(--wa-space-m);
-		}
-
-		.invalid {
-			color: var(--wa-color-text-danger);
-		}
-
-		.cross-link {
-			align-self: center;
-			color: var(--wa-color-text-quiet);
+		50% {
+			translate: 0 -6px;
 		}
 	}
 </style>

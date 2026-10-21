@@ -4,6 +4,7 @@
 	import { deckCards } from '$lib/kink-list/deck';
 	import Deck from './Deck.svelte';
 	import DeckReview from './DeckReview.svelte';
+	import KinkListCrumbs from './KinkListCrumbs.svelte';
 	import SaveStatus from './SaveStatus.svelte';
 	import TriageGrid from './TriageGrid.svelte';
 
@@ -22,10 +23,9 @@
 	const remaining = $derived(deckCards(store.list).length);
 </script>
 
-<nav class="crumbs">
-	<a href={paths.home}>Whole list</a>
+<KinkListCrumbs href={paths.home} text="Kink list" label="Back to kink list">
 	<SaveStatus />
-</nav>
+</KinkListCrumbs>
 
 {#if step === 'triage'}
 	<TriageGrid
@@ -49,12 +49,3 @@
 	/>
 {/if}
 
-<style>
-	.crumbs {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		gap: 1rem;
-		margin-block-end: 1rem;
-	}
-</style>

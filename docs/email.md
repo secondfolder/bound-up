@@ -44,7 +44,9 @@ your email address first" and **sends a fresh link** (`sendOnSignIn`). Better
 Auth checks the password before it says anything about verification, so only
 the account holder ever learns the address is unconfirmed.
 
-**The check-email page** says where the link went, from a short-lived cookie
+**The check-email page** (in the shared `AuthPage` layout, its copy and
+resend form in an `AuthBox` under an envelope that bobs twice on arrival,
+unless reduced motion is asked for) says where the link went, from a short-lived cookie
 the sign-up action sets (an address in a query string would end up in the
 history and in access logs), and has a resend form. The cookie also holds when
 the last link went, and the button counts down what is left of the minute

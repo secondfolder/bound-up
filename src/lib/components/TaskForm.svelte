@@ -644,8 +644,8 @@
 
 	<wa-button
 		type="submit"
-		appearance={hasValidUnsavedChanges ? 'filled' : 'outlined'}
-		variant={hasValidUnsavedChanges ? 'brand' : undefined}
+		appearance={hasValidUnsavedChanges ? 'accent' : 'outlined'}
+		variant={hasValidUnsavedChanges ? 'brand' : 'neutral'}
 		disabled={$submitting}
 	>
 		{submitLabel}
@@ -654,6 +654,9 @@
 </form>
 
 <style>
+	/* The same panel as the tasks and rewards pages' sections. Without a fill
+	   it was the one translucent card in the app, the wash showing through
+	   behind the fields. */
 	.panel {
 		border: 1px solid var(--wa-color-surface-border);
 		border-radius: var(--wa-panel-border-radius);
@@ -661,6 +664,15 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+		background: color-mix(
+			in srgb,
+			var(--wa-color-surface-default) 94%,
+			var(--wa-color-brand-fill-quiet)
+		);
+
+		@media (width < 40rem) {
+			padding: var(--wa-space-m);
+		}
 	}
 
 	label,
@@ -722,7 +734,9 @@
 		padding: 0.6rem 0.75rem;
 		border-radius: 0.6rem;
 		border: 1px solid var(--wa-color-surface-border);
-		background: var(--wa-color-surface-lowered, transparent);
+		/* The native fields' fill, so the editor reads as one of them; it was
+		   darker than every input around it. */
+		background: var(--wa-form-control-background-color);
 	}
 
 	.richtext-field:focus-within {

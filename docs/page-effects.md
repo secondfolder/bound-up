@@ -126,8 +126,11 @@ fresh iframe holding a copy of the whole document and its stylesheets — about
 Four options matter:
 
 - **`excludeMode: 'remove'`.** The snapshot's own clip and anything marked
-  `data-vfx-capture-ignore="true"` (the effects canvas, and the CTA, which sits
-  above the effect rather than being screened by it) are excluded. SnapDOM's
+  `data-vfx-capture-ignore="true"` (the effects canvas; the CTA, which sits
+  above the effect rather than being screened by it; and the title's "beta"
+  tag, which stamps itself on as the page loads, so a capture taken mid-stamp
+  would screen a ghost of it — absolutely placed, its removal moves nothing)
+  are excluded. SnapDOM's
   default leaves an invisible spacer in each excluded element's place, and in
   this flex `<body>` the spacers are laid out: they pushed the title down the
   page and widened the bitmap, which is what once got SnapDOM rejected here as
@@ -141,7 +144,9 @@ Four options matter:
   (`.below-cta`): it stays under the canvas, so the grain still covers it, but
   it is not screened, and being last on the page nothing after it can shift.
   Anything added below the CTA belongs inside that wrapper, or the CTA needs a
-  stand-in of its own height in the clone.
+  stand-in of its own height in the clone. Being uncaptured is also what lets the
+  feature screenshots slide in on a scroll-driven animation: nothing a
+  snapshot sees moves.
 - **`reconcile: true`.** Measures the clone against the live layout and pins
   whatever diverges. Without it, text in an inline element (the subtitle) keeps
   its natural width and could re-wrap, and SnapDOM says so with a console

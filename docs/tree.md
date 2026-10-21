@@ -206,7 +206,12 @@ otherwise.
     folds the forks off it.
 - **The toggle** sits beside the node, outside the consumer's snippet. It is a
   native `<button aria-expanded aria-controls>`, because `wa-button` forwards
-  no ARIA state. Its icon is a chevron; folded, it also shows how many nodes
+  no ARIA state. Its icon is one chevron that turns from pointing outward to
+  pointing down as the node opens (a transition, off under reduced motion);
+  on a touch screen an invisible margin widens its target without moving the
+  row. It follows the end of the consumer's content unless the consumer sets
+  `--tree-content-grow: 1`, which stretches the content across the column and
+  lines every toggle up on its outer edge. Folded, it also shows how many nodes
   are hidden ("+12"), and its accessible name is "Show 12 more under …" or
   "Hide 12 under …", from the consumer's `label(node)`.
 - **State.** `collapsed` is a bindable `SvelteSet` of keys, in memory only.

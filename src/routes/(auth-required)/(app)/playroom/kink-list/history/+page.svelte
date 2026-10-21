@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
 	import { SvelteSet } from 'svelte/reactivity';
+	import KinkListCrumbs from '$lib/components/kink-list/KinkListCrumbs.svelte';
 	import { ACCOUNT_LIST_UNREADABLE, openOwnList } from '$lib/kink-list/account-store.svelte';
 	import { LEVEL_LABELS, type ListPayload } from '$lib/kink-list/answers';
 	import { kinkById, sidesOf } from '$lib/kink-list/catalog';
@@ -151,7 +152,7 @@
 	<title>History · Kink list · Bound Up</title>
 </svelte:head>
 
-<nav class="crumbs"><a href={paths.home}>Your list</a></nav>
+<KinkListCrumbs href={paths.home} text="Kink list" label="Back to kink list" />
 
 <h1>How your list has changed</h1>
 
@@ -256,10 +257,6 @@
 	h2 {
 		margin: 1.25rem 0 0.5rem;
 		font-size: 1.1rem;
-	}
-
-	.crumbs {
-		margin-block-end: 1rem;
 	}
 
 	.quiet {

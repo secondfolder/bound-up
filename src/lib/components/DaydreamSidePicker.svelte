@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { StarterSide } from '$lib/daydream/starters';
+	import './choice-controls.css';
 
 	/**
 	 * "You as: Either / Dom / Sub", the side the user is on in the stories
@@ -21,28 +22,31 @@
 
 <fieldset class="sides">
 	<legend class="hint">You as</legend>
-	{#each SIDES as option (option.label)}
-		<label class="side">
-			<input
-				type="radio"
-				{name}
-				checked={side === option.value}
-				onchange={() => {
-					side = option.value;
-				}}
-			/>
-			{option.label}
-		</label>
-	{/each}
+	<div class="choice-segments">
+		{#each SIDES as option (option.label)}
+			<label class="side">
+				<input
+					type="radio"
+					{name}
+					checked={side === option.value}
+					onchange={() => {
+						side = option.value;
+					}}
+				/>
+				<span>{option.label}</span>
+			</label>
+		{/each}
+	</div>
 </fieldset>
 
 <style>
-	/* A segmented control: native radios, since it is one choice of three,
-	   visually hidden inside labels that look like the idea chips. */
+	/* A segmented control (choice-controls.css), as the kink list's "Answer
+	   as" is: the same kind of choice, which was drawn as separate pills
+	   here. */
 	.sides {
 		display: flex;
 		align-items: center;
-		gap: 0.375rem;
+		gap: 0.5rem;
 		margin: 0;
 		padding: 0;
 		border: 0;
@@ -51,33 +55,6 @@
 			float: inline-start;
 			padding: 0;
 			margin-inline-end: 0.25rem;
-		}
-	}
-
-	.side {
-		padding: 0.25rem 0.7rem;
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: 999px;
-		font-size: 0.875rem;
-		cursor: pointer;
-
-		&:has(input:checked) {
-			border-color: var(--wa-color-brand-border-loud, var(--wa-color-surface-border));
-			background: var(--wa-color-brand-fill-quiet);
-		}
-
-		&:has(input:focus-visible) {
-			outline: var(--wa-focus-ring);
-			outline-offset: var(--wa-focus-ring-offset);
-		}
-
-		input {
-			position: absolute;
-			inline-size: 1px;
-			block-size: 1px;
-			margin: 0;
-			opacity: 0;
-			pointer-events: none;
 		}
 	}
 

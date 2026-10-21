@@ -27,7 +27,7 @@ function innerInput(container: HTMLElement, selector: string): HTMLInputElement 
 }
 
 describe('LoginForm', () => {
-	it('keeps Login outlined until the email is valid and a password is typed', async () => {
+	it('keeps Log in outlined until the email is valid and a password is typed', async () => {
 		const data = await superValidate(zod4(loginFormSchema));
 		const { container } = render(LoginForm, { data });
 		await waSettled(container);

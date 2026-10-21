@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { authClient } from '$lib/auth-client';
+	import AuthBox from '$lib/components/AuthBox.svelte';
+	import AuthPage from '$lib/components/AuthPage.svelte';
 	import PasswordField from '$lib/components/PasswordField.svelte';
 	import SafetyNumber from '$lib/components/SafetyNumber.svelte';
 	import { recoveryCode } from '$lib/crypto/fingerprint';
@@ -48,6 +51,41 @@
 	let confirm = $state('');
 	let formError: string | null = $state(null);
 	let confirmErrors: string[] | undefined = $state(undefined);
+
+	/**
+	 * The email box's value as typed, for the button's style only — `start()`
+	 * still reads the element itself, which is authoritative (AGENTS.md).
+	 * Followed with listeners on the element and its inner control, not an
+	 * `oninput=` attribute, which Svelte's delegation does not reliably see
+	 * from inside the shadow root.
+	 */
+	let typedEmail = $state('');
+	const followEmail: Attachment<HTMLElement> = (element) => {
+		const host = element as WaInput;
+		const controller = new AbortController();
+		const sync = () => {
+			typedEmail = host.input?.value ?? host.value ?? '';
+		};
+		host.addEventListener('input', sync, { signal: controller.signal });
+		void customElements.whenDefined('wa-input').then(() => {
+			if (!controller.signal.aborted) {
+				host.input?.addEventListener('input', sync, { signal: controller.signal });
+			}
+		});
+		return () => controller.abort();
+	};
+
+	/**
+	 * Whether `start()`'s own checks would pass, for "Ask my partner": outlined
+	 * until then, solid once they would (the save-button convention in
+	 * AGENTS.md). It was solid from the start, unlike every other form here.
+	 * Style only — the button stays enabled, and `start()` says what is wrong.
+	 */
+	const canAsk = $derived(
+		normaliseEmail(typedEmail).includes('@') &&
+			scorePassword(password).acceptable &&
+			password === confirm
+	);
 
 	/** What completing needs, kept out of reactive state on purpose. */
 	let pending:
@@ -237,138 +275,131 @@
 			await goto(resolve('/(auth-required)/(app)/home'));
 		} catch (error) {
 			console.error(error);
-			end('You are back in, but signing in did not finish. Sign in with your new password.');
+			end('You are back in, but logging in did not finish. Log in with your new password.');
 		}
 	}
 </script>
 
-<svelte:head><title>Can't sign in</title></svelte:head>
+<svelte:head><title>Can't log in</title></svelte:head>
 
-<section>
-	<h1>Can't sign in?</h1>
-
-	{#if stage.kind === 'form' || stage.kind === 'working'}
-		<p>
-			If you have lost your password and your passkeys, a partner can help you back in. Choose a new
-			password, then your partner confirms it is you.
-		</p>
-		<p class="quiet">
-			Your old passkeys will stop working, and any device still signed in will be signed out. You
-			can add new passkeys afterwards.
-		</p>
-		<form onsubmit={start}>
-			<wa-input bind:this={emailHost} data-field="recoverEmail" type="email" label="Email" autocomplete="username"
-			></wa-input>
-			<PasswordField
-				bind:value={password}
-				field="newPassword"
-				label="New password"
-				autocomplete="new-password"
-				strength
+<AuthPage title="Can't log in?">
+	<AuthBox busy={stage.kind === 'working' || stage.kind === 'finishing'} busyLabel="Setting up">
+		{#if stage.kind === 'form' || stage.kind === 'working'}
+			<p>
+				If you have lost your password and your passkeys, a partner can help you back in. Choose a
+				new password, then your partner confirms it is you.
+			</p>
+			<p class="quiet">
+				Your old passkeys will stop working, and any device still logged in will be logged out. You
+				can add new passkeys afterwards.
+			</p>
+			<form onsubmit={start}>
+				<wa-input
+					bind:this={emailHost}
+					{@attach followEmail}
+					data-field="recoverEmail"
+					type="email"
+					label="Email"
+					autocomplete="username"
+				></wa-input>
+				<PasswordField
+					bind:value={password}
+					field="newPassword"
+					label="New password"
+					autocomplete="new-password"
+					strength
+				/>
+				<PasswordField
+					bind:value={confirm}
+					field="confirmPassword"
+					label="Confirm new password"
+					autocomplete="new-password"
+					errors={confirmErrors}
+				/>
+				{#if formError}<p class="invalid" role="alert">{formError}</p>{/if}
+				<wa-button
+					type="submit"
+					variant="brand"
+					appearance={canAsk ? 'accent' : 'outlined'}
+					disabled={stage.kind === 'working'}
+				>
+					{stage.kind === 'working' ? 'Setting up…' : 'Ask my partner'}
+				</wa-button>
+			</form>
+		{:else if stage.kind === 'waiting'}
+			<p>
+				Now ask your partner to open Bound Up. They will be asked to help you, and shown a code.
+			</p>
+			<SafetyNumber
+				value={stage.code}
+				partnerName="your partner"
+				instructions="Read this to your partner in person or over a call — not in this app. When it matches theirs and they confirm, and you have opened the email below, you will be logged in here."
 			/>
-			<PasswordField
-				bind:value={confirm}
-				field="confirmPassword"
-				label="Confirm new password"
-				autocomplete="new-password"
-				errors={confirmErrors}
-			/>
-			{#if formError}<p class="invalid" role="alert">{formError}</p>{/if}
-			<wa-button type="submit" variant="brand" disabled={stage.kind === 'working'}>
-				{stage.kind === 'working' ? 'Setting up…' : 'Ask my partner'}
+			<!-- Both halves, in whichever order they happen. The email line reads the
+			     same for an address with no account, which is never sent anything:
+			     this page must not say whether the account exists. -->
+			<ul class="steps" role="status">
+				<li data-done={stage.partnerApproved}>
+					{stage.partnerApproved ? 'Your partner confirmed it is you.' : 'Waiting for your partner…'}
+				</li>
+				<li data-done={stage.emailConfirmed}>
+					{#if stage.emailConfirmed}
+						Your email is confirmed.
+					{:else}
+						We've emailed a link to <strong>{stage.email}</strong>. Open it and confirm it's you.
+						Not there? Check your Junk or Spam folder.
+					{/if}
+				</li>
+			</ul>
+			<p class="quiet">Keep this page open.</p>
+		{:else if stage.kind === 'finishing'}
+			<p role="status">That's everything confirmed. Logging you in…</p>
+		{:else}
+			<p role="status">{stage.message}</p>
+			<wa-button
+				appearance="outlined"
+				onclick={() => {
+					stage = { kind: 'form' };
+				}}
+			>
+				Start again
 			</wa-button>
-		</form>
-	{:else if stage.kind === 'waiting'}
-		<p>
-			Now ask your partner to open Bound Up. They will be asked to help you, and shown a code.
-		</p>
-		<SafetyNumber
-			value={stage.code}
-			partnerName="your partner"
-			instructions="Read this to your partner in person or over a call — not in this app. When it matches theirs and they confirm, and you have opened the email below, you will be signed in here."
-		/>
-		<!-- Both halves, in whichever order they happen. The email line reads the
-		     same for an address with no account, which is never sent anything:
-		     this page must not say whether the account exists. -->
-		<ul class="steps" role="status">
-			<li data-done={stage.partnerApproved}>
-				{stage.partnerApproved ? 'Your partner confirmed it is you.' : 'Waiting for your partner…'}
-			</li>
-			<li data-done={stage.emailConfirmed}>
-				{#if stage.emailConfirmed}
-					Your email is confirmed.
-				{:else}
-					We've emailed a link to <strong>{stage.email}</strong>. Open it and confirm it's you.
-					Not there? Check your Junk or Spam folder.
-				{/if}
-			</li>
-		</ul>
-		<p class="quiet">Keep this page open.</p>
-	{:else if stage.kind === 'finishing'}
-		<p role="status">That's everything confirmed. Signing you in…</p>
-	{:else}
-		<p role="status">{stage.message}</p>
-		<wa-button
-			appearance="outlined"
-			onclick={() => {
-				stage = { kind: 'form' };
-			}}
-		>
-			Start again
-		</wa-button>
-	{/if}
+		{/if}
+	</AuthBox>
 
-	<a class="back" href={resolve('/(public)/login')}>Back to sign in</a>
-</section>
+	<a class="back" href={resolve('/(public)/login')}>Back to log in</a>
+</AuthPage>
 
 <style>
-	section {
-		max-width: 26rem;
-		margin: 0 auto;
+	.quiet {
+		color: var(--wa-color-text-quiet);
+		font-size: 0.9375rem;
+	}
+
+	form {
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-m);
-		padding: var(--wa-space-l) 0;
+	}
 
-		h1 {
-			margin: 0;
-			font-size: 1.5rem;
-		}
+	.invalid {
+		color: var(--wa-color-text-danger);
+	}
 
-		p {
-			margin: 0;
-		}
+	.steps {
+		margin: 0;
+		padding-left: 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: var(--wa-space-xs);
 
-		.quiet {
-			color: var(--wa-color-text-quiet);
-			font-size: 0.9375rem;
-		}
-
-		form {
-			display: flex;
-			flex-direction: column;
-			gap: var(--wa-space-m);
-		}
-
-		.invalid {
-			color: var(--wa-color-text-danger);
-		}
-
-		.steps {
-			margin: 0;
-			padding-left: 1.25rem;
-			display: flex;
-			flex-direction: column;
-			gap: var(--wa-space-xs);
-
-			li[data-done='true'] {
-				color: var(--wa-color-text-quiet);
-			}
-		}
-
-		.back {
-			align-self: center;
+		li[data-done='true'] {
 			color: var(--wa-color-text-quiet);
 		}
+	}
+
+	.back {
+		align-self: center;
+		color: var(--wa-color-text-quiet);
 	}
 </style>

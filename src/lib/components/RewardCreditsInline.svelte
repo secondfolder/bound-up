@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { prefersReducedMotion, Tween } from 'svelte/motion';
+
 	type EditableCredit = {
 		action: string;
 		inputLabel: string;
@@ -24,6 +26,34 @@
 		compact?: boolean;
 		showLabel?: boolean;
 	} = $props();
+
+	/**
+	 * The balance counts to its new value rather than jumping, and bumps once
+	 * in amber, when a claim, a completed task or an edit changes it while the
+	 * page is open — so the number that moved is the one the eye goes to.
+	 * Starts at the real value, so a page load shows no count-up.
+	 */
+	const shown = Tween.of(() => credits, {
+		duration: () => (prefersReducedMotion.current ? 0 : 400)
+	});
+	const shownCredits = $derived(Math.round(shown.current));
+
+	let bumped = $state(false);
+	// Read once, as the value to compare the first change against; the effect
+	// below keeps it current.
+	// svelte-ignore state_referenced_locally
+	let previous = credits;
+	$effect(() => {
+		if (credits === previous) {
+			return;
+		}
+		previous = credits;
+		bumped = true;
+		const timer = setTimeout(() => {
+			bumped = false;
+		}, 600);
+		return () => clearTimeout(timer);
+	});
 
 	let editing = $state(false);
 	let draft = $state('');
@@ -77,7 +107,7 @@
 			</div>
 		{:else}
 			<div class="credit-display">
-				<strong class="credit-value">{credits}</strong>
+				<strong class={['credit-value', { bumped }]}>{shownCredits}</strong>
 				{#if unit}<span class="credit-unit">{unit}</span>{/if}
 				<wa-button type="button" class="icon-button" appearance="plain" pill onclick={startEditing}>
 					<wa-icon name="pen-to-square" variant="solid" label={editable.editLabel}></wa-icon>
@@ -89,7 +119,7 @@
 	<div class="credit-shell" class:compact={compact}>
 		{#if showLabel && label}<span class="credit-label">{label}</span>{/if}
 		<div class="credit-display">
-			<strong class="credit-value">{credits}</strong>
+			<strong class={['credit-value', { bumped }]}>{shownCredits}</strong>
 			{#if unit}<span class="credit-unit">{unit}</span>{/if}
 		</div>
 	</div>
@@ -103,6 +133,14 @@
 		align-items: center;
 		gap: 0.55rem;
 		flex-wrap: wrap;
+	}
+
+	/* On the baseline, so "Credits:" sits on the same line as the bigger
+	   number beside it. Centred, the label rode high; on a phone, where this
+	   was `stretch`, it sat at the top of the row. */
+	.credit-shell,
+	.credit-display {
+		align-items: baseline;
 	}
 
 	.credit-shell {
@@ -141,6 +179,20 @@
 		font-size: clamp(1rem, 3vw, 1.35rem);
 	}
 
+	@media (prefers-reduced-motion: no-preference) {
+		.bumped {
+			display: inline-block;
+			animation: bump 600ms ease-out;
+		}
+	}
+
+	@keyframes bump {
+		35% {
+			transform: scale(1.12);
+			color: var(--wa-color-brand-on-quiet);
+		}
+	}
+
 	.credit-input {
 		width: min(8rem, 100%);
 		box-sizing: border-box;
@@ -158,13 +210,10 @@
 	.icon-button {
 		--wa-form-control-height: 2.25rem;
 		color: var(--wa-color-text-quiet);
+		align-self: center;
 	}
 
 	@media (max-width: 640px) {
-		.credit-shell {
-			align-items: stretch;
-		}
-
 		.credit-display,
 		.credit-actions {
 			justify-content: flex-start;

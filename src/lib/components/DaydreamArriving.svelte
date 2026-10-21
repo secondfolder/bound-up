@@ -129,6 +129,27 @@
 			background: var(--wa-color-surface-raised, var(--wa-color-surface-default));
 			border: 1px solid var(--wa-color-surface-border);
 			overflow-wrap: anywhere;
+
+			/* As DaydreamPassage's, so nothing changes size as it is saved. */
+			@media (width >= 48rem) {
+				padding: 0.75rem 1rem;
+				font-size: 1.0625rem;
+			}
+		}
+
+		/* The bubble rises into place as it appears, and each paragraph fades
+		   up as it begins (DaydreamProse's `streaming`): a passage arrives
+		   rather than blinking into being. Not on the saved passage that
+		   replaces this, which must not flash as it swaps in. */
+		@media (prefers-reduced-motion: no-preference) {
+			animation: arrive 240ms ease-out;
+		}
+	}
+
+	@keyframes arrive {
+		from {
+			opacity: 0;
+			translate: 0 0.375rem;
 		}
 	}
 </style>

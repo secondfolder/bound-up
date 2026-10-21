@@ -253,8 +253,9 @@
 				disabled={open.has(laid.key)}
 				onclick={() => toggle(laid)}
 			>
-				<wa-icon name={folded ? 'chevron-right' : 'chevron-down'} variant="solid" aria-hidden="true"
-				></wa-icon>
+				<!-- One chevron, turned rather than swapped, so opening and closing
+				     is a motion rather than a cut (see `.tree-toggle wa-icon`). -->
+				<wa-icon name="chevron-right" variant="solid" aria-hidden="true"></wa-icon>
 				{#if folded}<span class="tree-count" aria-hidden="true">+{laid.folds}</span>{/if}
 				<span class="wa-visually-hidden">
 					{folded ? `Show ${laid.folds} more under` : `Hide ${laid.folds} under`}
@@ -477,8 +478,12 @@
 		gap: 0.35rem;
 	}
 
+	/* `--tree-content-grow: 1` stretches the consumer's content across the
+	   column, which puts every fold toggle on one line at the column's outer
+	   edge; left shrink-wrapped, each toggle followed the end of its own
+	   node's widest line, and no two sat in the same place. */
 	.tree-content {
-		flex: 0 1 auto;
+		flex: var(--tree-content-grow, 0) 1 auto;
 		min-inline-size: 0;
 	}
 
@@ -500,9 +505,32 @@
 		color: var(--wa-color-text-quiet);
 		font: inherit;
 		cursor: pointer;
+		/* Anchors the larger hit area below. */
+		position: relative;
+
+		/* A finger-sized target on a touch screen, drawn as an invisible
+		   margin rather than a bigger button: a taller toggle would push its
+		   row's height about, and the 1.5rem one was a third of a fingertip. */
+		@media (pointer: coarse) {
+			&::after {
+				content: '';
+				position: absolute;
+				inset: -0.6rem;
+			}
+		}
 
 		wa-icon {
-			font-size: 0.7rem;
+			font-size: 0.8rem;
+			/* Points outward folded (mirrored on a bough left of the trunk) and
+			   turns down as it opens. */
+			transform: scaleX(var(--tree-flip, 1)) rotate(90deg);
+
+			@media (prefers-reduced-motion: no-preference) {
+				transition: transform 0.15s ease-out;
+			}
+		}
+
+		&[aria-expanded='false'] wa-icon {
 			transform: scaleX(var(--tree-flip, 1));
 		}
 

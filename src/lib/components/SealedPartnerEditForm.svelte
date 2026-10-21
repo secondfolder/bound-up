@@ -87,7 +87,10 @@
 			}
 		}
 	);
-	const { submitting } = superform;
+	const { form, isTainted, submitting, tainted } = superform;
+	// Solid only when there is a valid change to save (AGENTS.md), by
+	// superforms' own idea of "changed".
+	const canSave = $derived(isTainted($tainted) && partnerEditFormSchema.safeParse($form).success);
 
 	/**
 	 * Where the names go: into the vault once the partnership is accepted, or
@@ -124,7 +127,12 @@
 	<PartnerFields {superform} />
 	<div class="actions">
 		<!-- `disabled={x}`, never `disabled={x || undefined}`: see AGENTS.md invariant 11. -->
-		<wa-button type="submit" disabled={$submitting}>Save</wa-button>
+		<wa-button
+			type="submit"
+			appearance={canSave ? 'accent' : 'outlined'}
+			variant={canSave ? 'brand' : undefined}
+			disabled={$submitting}>Save</wa-button
+		>
 	</div>
 	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
 </form>
