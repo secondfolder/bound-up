@@ -2772,6 +2772,9 @@ describe('DaydreamThread pictures', () => {
 		);
 		await press(container, 'Try again');
 		await waitFor(() => expect(frame(container)?.querySelector('img')).not.toBeNull());
+		// Kept before the test ends: the upload after it otherwise landed in a
+		// later test, whose fresh mocks answer nothing, as an unhandled rejection.
+		await waitFor(() => expect(frame(container)?.getAttribute('data-kept')).toBe('kept'));
 	});
 
 	it('never asks for one whose description puts a minor in it, and says so', async () => {
