@@ -137,12 +137,15 @@ Always.
 {"chips": ["…", …]}
 ~~~~
 
-## ¶ 013dcc114a0453 · user · in 144 of 528
+## ¶ 1ebdd40f4622f6 · user · in 144 of 528
 
 Only when target ∈ {character}; field ∈ {archetype, personality, speech, appearance, likes, notes}; cast ∈ {some}.
 
 ~~~~text
-Other characters in the daydream: ⟦character2.name⟧
+Other characters in the daydream:
+<characters>
+⟦character2.name⟧
+</characters>
 ~~~~
 
 ## ¶ 04b0f7279cadc2 · user · in 132 of 528
@@ -311,12 +314,16 @@ Only when target ∈ {idea}; field ∈ {notes}; narrator ∈ {unset, none, secon
 Suggest up to 12 short phrases the user could add to the idea's "Anything else" field (whatever the rest leaves out) — different from what is already there, varied, and fitting the rest of the idea as written above. Each at most 80 characters, with no commas.
 ~~~~
 
-## ¶ 0b84161f7c9d9b · user · in 120 of 528
+## ¶ 1c0c90ea8c7d02 · user · in 120 of 528
 
 Only when target ∈ {idea}; field ∈ {notes, setting, premise, yourRole, tone}; cast ∈ {some}.
 
 ~~~~text
-Characters in the daydream: ⟦character1.name⟧ (⟦character1.archetype⟧), ⟦character2.name⟧
+Characters in the daydream:
+<characters>
+⟦character1.name⟧ (⟦character1.archetype⟧)
+⟦character2.name⟧
+</characters>
 ~~~~
 
 ## ¶ 0a7ba5edf6bc36 · user · in 60 of 528

@@ -194,11 +194,14 @@ No change.
 ### cast = some
 
 ~~~~diff
-@@ -18,5 +18,5 @@
+@@ -18,5 +18,8 @@
  # The daydream around it
  
 -No other characters yet.
-+Other characters in the daydream: ⟦character2.name⟧
++Other characters in the daydream:
++<characters>
++⟦character2.name⟧
++</characters>
  
  No heat is set: keep to how sexual what is written already is.
 ~~~~

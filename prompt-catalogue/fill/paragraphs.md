@@ -141,12 +141,15 @@ Only when target ∈ {character}; written ∈ {name only}.
 {"archetype": "…", "personality": "…", "speech": "…", "appearance": "…", "likes": "…", "notes": "…"}
 ~~~~
 
-## ¶ 013dcc114a0453 · user · in 96 of 384
+## ¶ 1ebdd40f4622f6 · user · in 96 of 384
 
 Only when target ∈ {character}; cast ∈ {some}.
 
 ~~~~text
-Other characters in the daydream: ⟦character2.name⟧
+Other characters in the daydream:
+<characters>
+⟦character2.name⟧
+</characters>
 ~~~~
 
 ## ¶ 04b0f7279cadc2 · user · in 96 of 384
@@ -299,12 +302,16 @@ Only when target ∈ {idea}; narrator ∈ {unset, none, second-person, third-per
 {"setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "notes": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 ~~~~
 
-## ¶ 0b84161f7c9d9b · user · in 96 of 384
+## ¶ 1c0c90ea8c7d02 · user · in 96 of 384
 
 Only when target ∈ {idea}; cast ∈ {some}.
 
 ~~~~text
-Characters in the daydream: ⟦character1.name⟧ (⟦character1.archetype⟧), ⟦character2.name⟧
+Characters in the daydream:
+<characters>
+⟦character1.name⟧ (⟦character1.archetype⟧)
+⟦character2.name⟧
+</characters>
 ~~~~
 
 ## ¶ 1d6aad04a92bf7 · user · in 10 of 384

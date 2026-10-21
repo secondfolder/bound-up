@@ -451,7 +451,7 @@ function describeContext(request: RecordRequest): string {
 		.map((character) =>
 			character.archetype ? `${character.name} (${character.archetype})` : character.name
 		)
-		.join(', ');
+		.join('\n');
 	return paragraphs(
 		isMonologue(request) && MONOLOGUE_CONTEXT,
 		castLine(request.target, named),
@@ -461,11 +461,16 @@ function describeContext(request: RecordRequest): string {
 	);
 }
 
+/** The cast around the draft, one to a line and tagged: names and types are the user's words. */
 function castLine(target: RecordRequest['target'], named: string): string {
 	if (target === 'character') {
-		return named ? `Other characters in the daydream: ${named}` : 'No other characters yet.';
+		return named
+			? `Other characters in the daydream:\n${userText('characters', named)}`
+			: 'No other characters yet.';
 	}
-	return named ? `Characters in the daydream: ${named}` : 'No characters chosen yet.';
+	return named
+		? `Characters in the daydream:\n${userText('characters', named)}`
+		: 'No characters chosen yet.';
 }
 
 /** One text key of an answer. */

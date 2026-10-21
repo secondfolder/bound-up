@@ -200,14 +200,18 @@ No change.
 ### cast = some
 
 ~~~~diff
-@@ -18,5 +18,5 @@
+@@ -18,5 +18,9 @@
  # The daydream around it
  
 -No characters chosen yet.
-+Characters in the daydream: ⟦character1.name⟧ (⟦character1.archetype⟧), ⟦character2.name⟧
++Characters in the daydream:
++<characters>
++⟦character1.name⟧ (⟦character1.archetype⟧)
++⟦character2.name⟧
++</characters>
  
  # The idea so far
-@@ -32,5 +32,5 @@
+@@ -32,5 +36,5 @@
  # What to do
  
 -Invent an idea for this story that the user will not expect.

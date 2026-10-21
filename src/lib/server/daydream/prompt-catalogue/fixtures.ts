@@ -179,9 +179,11 @@ const DIRECTIONS = [
 /**
  * One conversation with every kind of turn in it, so a reply's history shows
  * how each is put to the model. Turns are rendered one at a time
- * (`render` in prompt.ts), so one of each covers them all.
+ * (`render` in prompt.ts), so one of each covers them all. For someone who
+ * only watches, only what the page lets them send: no turn written out for
+ * them, and no "instruction" reading (`DaydreamUserTurn.svelte`).
  */
-function conversation(text: TextSource): ContextTurn[] {
+function conversation(text: TextSource, watching = false): ContextTurn[] {
 	const story = (n: number, extra: Partial<Extract<ContextTurn, { type: 'text' }>> = {}) =>
 		({ type: 'text', role: 'story', text: text(`turn.story${n}`), ...extra }) as const;
 	const user = (n: number, extra: Partial<Extract<ContextTurn, { type: 'text' }>> = {}) =>
@@ -190,11 +192,16 @@ function conversation(text: TextSource): ContextTurn[] {
 		{ type: 'omitted' },
 		story(1, { buttons: DIRECTIONS, image: text('turn.image') }),
 		user(1),
-		story(2, { expansion: text('turn.expansion'), buttons: DIRECTIONS }),
+		story(
+			2,
+			watching
+				? { buttons: DIRECTIONS }
+				: { expansion: text('turn.expansion'), buttons: DIRECTIONS }
+		),
 		{ type: 'reaction', reaction: 'love', of: null },
 		user(2, { readAs: 'action' }),
 		story(3),
-		user(3, { readAs: 'instruction' }),
+		user(3, watching ? { readAs: 'direction' } : { readAs: 'instruction' }),
 		story(4),
 		user(4, { readAs: 'direction' }),
 		story(5),
@@ -233,6 +240,7 @@ export type ReplyInput = { request: ReplyRequest; pictures: PictureArchitecture 
 export function replyInput(combo: Combo, text: TextSource): ReplyInput {
 	const setup = replySetup(text, combo);
 	const base = { setup, currentDirections: DIRECTIONS };
+	const watching = setup.voice.stance === 'absent';
 	const pictures = combo.pictures === 'none' ? null : (combo.pictures as PictureArchitecture);
 	switch (combo.state) {
 		case 'opening':
@@ -242,7 +250,7 @@ export function replyInput(combo: Combo, text: TextSource): ReplyInput {
 				request: {
 					...base,
 					mode: 'rewrite',
-					turns: conversation(text),
+					turns: conversation(text, watching),
 					rewrite: {
 						targetText: text('turn.rewriteTarget'),
 						quote: text('turn.rewriteQuote'),
@@ -256,12 +264,12 @@ export function replyInput(combo: Combo, text: TextSource): ReplyInput {
 				request: {
 					...base,
 					mode: 'reply',
-					turns: [...conversation(text), { type: 'safety', signal: 'red' }]
+					turns: [...conversation(text, watching), { type: 'safety', signal: 'red' }]
 				},
 				pictures
 			};
 		default:
-			return { request: { ...base, mode: 'reply', turns: conversation(text) }, pictures };
+			return { request: { ...base, mode: 'reply', turns: conversation(text, watching) }, pictures };
 	}
 }
 

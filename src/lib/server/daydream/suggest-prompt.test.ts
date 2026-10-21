@@ -133,7 +133,9 @@ describe('buildSuggestMessages', () => {
 				story: { intensity: 4, pace: 2, length: 'medium' }
 			}
 		});
-		expect(ask).toContain('Characters in the daydream: Mara (strict mentor)');
+		expect(ask).toContain(
+			'Characters in the daydream:\n<characters>\nMara (strict mentor)\n</characters>'
+		);
 		expect(ask).toContain('not lengths for the fields:\nIntensity: intense');
 		expect(ask).toContain('built around the characters above, each playing one of its parts');
 		expect(ask).toContain('"premise": "…"');
@@ -184,7 +186,9 @@ describe('buildSuggestMessages', () => {
 				limits: ''
 			}
 		});
-		expect(withOthers).toContain('Other characters in the daydream: Jun (rival)');
+		expect(withOthers).toContain(
+			'Other characters in the daydream:\n<characters>\nJun (rival)\n</characters>'
+		);
 	});
 });
 

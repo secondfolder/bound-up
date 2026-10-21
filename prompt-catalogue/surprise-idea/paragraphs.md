@@ -166,12 +166,16 @@ Only when narrator ∈ {unset, none, second-person, third-person, impersonal}; r
 {"title": "…", "setting": "…", "premise": "…", "yourRole": "…", "tone": "…", "parts": [{"name": "…", "description": "…"}, …], "heat": …, "kink": …}
 ~~~~
 
-## ¶ 0b84161f7c9d9b · user · in 24 of 48
+## ¶ 1c0c90ea8c7d02 · user · in 24 of 48
 
 Only when cast ∈ {some}.
 
 ~~~~text
-Characters in the daydream: ⟦character1.name⟧ (⟦character1.archetype⟧), ⟦character2.name⟧
+Characters in the daydream:
+<characters>
+⟦character1.name⟧ (⟦character1.archetype⟧)
+⟦character2.name⟧
+</characters>
 ~~~~
 
 ## ¶ 083eeb9eb6b936 · user · in 5 of 48

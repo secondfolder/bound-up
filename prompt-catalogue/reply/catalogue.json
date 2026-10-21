@@ -1591,8 +1591,12 @@
 			"roles": [
 				"assistant"
 			],
-			"count": 15120,
+			"count": 12096,
 			"conditions": {
+				"stance": [
+					"self",
+					"persona"
+				],
 				"state": [
 					"reply",
 					"rewrite",
@@ -1747,8 +1751,12 @@
 			"roles": [
 				"user"
 			],
-			"count": 15120,
+			"count": 12096,
 			"conditions": {
+				"stance": [
+					"self",
+					"persona"
+				],
 				"state": [
 					"reply",
 					"rewrite",
@@ -8607,6 +8615,100 @@
 				"pace": "3",
 				"length": "medium",
 				"text": "minimal",
+				"origin": "none",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1893264bd2bb2d",
+			"text": "⟦turn.story2⟧",
+			"roles": [
+				"assistant"
+			],
+			"count": 3024,
+			"conditions": {
+				"narrator": [
+					"third-person",
+					"impersonal",
+					"monologue"
+				],
+				"stance": [
+					"absent"
+				],
+				"state": [
+					"reply",
+					"rewrite",
+					"stopped"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"narrator": "third-person",
+				"stance": "absent",
+				"characters": "1",
+				"lead": "character",
+				"heat": "unset",
+				"pictures": "none",
+				"state": "reply",
+				"kink": "unset",
+				"intensity": "3",
+				"pace": "3",
+				"length": "medium",
+				"text": "all",
+				"origin": "none",
+				"limits": "none",
+				"char.tone": "unset",
+				"char.control": "unset",
+				"char.strictness": "unset",
+				"char.edge": "unset",
+				"char.talk": "unset",
+				"char.libido": "unset",
+				"char.kink": "unset"
+			}
+		},
+		{
+			"id": "1d54a4bdfdcf25",
+			"text": "(Direction: ⟦turn.user3⟧)",
+			"roles": [
+				"user"
+			],
+			"count": 3024,
+			"conditions": {
+				"narrator": [
+					"third-person",
+					"impersonal",
+					"monologue"
+				],
+				"stance": [
+					"absent"
+				],
+				"state": [
+					"reply",
+					"rewrite",
+					"stopped"
+				]
+			},
+			"sweptOnly": false,
+			"example": {
+				"narrator": "third-person",
+				"stance": "absent",
+				"characters": "1",
+				"lead": "character",
+				"heat": "unset",
+				"pictures": "none",
+				"state": "reply",
+				"kink": "unset",
+				"intensity": "3",
+				"pace": "3",
+				"length": "medium",
+				"text": "all",
 				"origin": "none",
 				"limits": "none",
 				"char.tone": "unset",

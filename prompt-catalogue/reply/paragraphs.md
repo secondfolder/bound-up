@@ -1,6 +1,6 @@
 # Story reply: every paragraph
 
-436 distinct paragraphs, from 12916 distinct prompts
+438 distinct paragraphs, from 12916 distinct prompts
 over 20160 valid combinations of the structural axes, plus
 each descriptive value swept from the baseline. Each paragraph is listed once,
 in the order prompts put them, with the axis values it appears under.
@@ -296,9 +296,9 @@ Only when state ∈ {reply, rewrite, stopped}.
 ⟦turn.user1⟧
 ~~~~
 
-## ¶ 02a97d8591286c · assistant · in 15120 of 20160
+## ¶ 02a97d8591286c · assistant · in 12096 of 20160
 
-Only when state ∈ {reply, rewrite, stopped}.
+Only when stance ∈ {self, persona}; state ∈ {reply, rewrite, stopped}.
 
 ~~~~text
 <yours>
@@ -332,9 +332,9 @@ Only when state ∈ {reply, rewrite, stopped}.
 ⟦turn.story3⟧
 ~~~~
 
-## ¶ 0ddb0fe001024d · user · in 15120 of 20160
+## ¶ 0ddb0fe001024d · user · in 12096 of 20160
 
-Only when state ∈ {reply, rewrite, stopped}.
+Only when stance ∈ {self, persona}; state ∈ {reply, rewrite, stopped}.
 
 ~~~~text
 (Read this as an instruction for the user's own turn: write their turn out first, in a <yours> block, then answer it.)
@@ -2686,6 +2686,22 @@ The parts in it:
 <parts>
 - ⟦part1.name⟧, played by ⟦character1.name⟧
 </parts>
+~~~~
+
+## ¶ 1893264bd2bb2d · assistant · in 3024 of 20160
+
+Only when narrator ∈ {third-person, impersonal, monologue}; stance ∈ {absent}; state ∈ {reply, rewrite, stopped}.
+
+~~~~text
+⟦turn.story2⟧
+~~~~
+
+## ¶ 1d54a4bdfdcf25 · user · in 3024 of 20160
+
+Only when narrator ∈ {third-person, impersonal, monologue}; stance ∈ {absent}; state ∈ {reply, rewrite, stopped}.
+
+~~~~text
+(Direction: ⟦turn.user3⟧)
 ~~~~
 
 ## ¶ 14c49e57b2e7fa · system · in 288 of 20160
