@@ -141,6 +141,8 @@ type Generate = {
 		 * kept, rather than written out again differently.
 		 */
 		expansion?: string;
+		/** "Write again": another take, shown the one it replaces, rather than a rewrite of it. */
+		again?: true;
 	};
 };
 
@@ -665,7 +667,8 @@ export class DaydreamStory {
 								expansionIn(this.content(request.rewrite.target.id))
 							),
 							...(request.rewrite.quote ? { quote: request.rewrite.quote.text } : {}),
-							...(request.rewrite.instruction ? { instruction: request.rewrite.instruction } : {})
+							...(request.rewrite.instruction ? { instruction: request.rewrite.instruction } : {}),
+							...(request.rewrite.again ? { again: true as const } : {})
 						}
 					}
 				: {})
@@ -851,8 +854,10 @@ export class DaydreamStory {
 			parentContent?.type === 'text' &&
 			forced !== 'ooc' &&
 			!explicitOoc(parentContent.text);
+		// Another take answers the same turn as the first did, so it may change
+		// them as any reply may; a rewrite only rewords.
 		const changed =
-			stopped || request.rewrite
+			stopped || (request.rewrite && !request.rewrite.again)
 				? null
 				: settingsChange(
 						setup,
@@ -883,7 +888,8 @@ export class DaydreamStory {
 										...(request.rewrite.quote ? { quote: request.rewrite.quote } : {}),
 										...(request.rewrite.instruction
 											? { instruction: request.rewrite.instruction }
-											: {})
+											: {}),
+										...(request.rewrite.again ? { again: true as const } : {})
 									}
 								}
 							: {})
@@ -1079,7 +1085,7 @@ export class DaydreamStory {
 			...(readAs ? { readAs } : {})
 		};
 		if (meta?.rewriteOf) {
-			const { turnId: targetId, quote, instruction } = meta.rewriteOf;
+			const { turnId: targetId, quote, instruction, again } = meta.rewriteOf;
 			await this.ensureLoaded([targetId]);
 			const target = this.content(targetId);
 			if (target?.type !== 'text') {
@@ -1092,7 +1098,9 @@ export class DaydreamStory {
 					target: { id: targetId, text: target.text },
 					...(quote ? { quote } : {}),
 					...(instruction ? { instruction } : {}),
-					...(expansion ? { expansion } : {})
+					...(again ? { again } : {}),
+					// Another take wrote the user's turn out afresh, so carries none.
+					...(expansion && !again ? { expansion } : {})
 				}
 			};
 		}
@@ -1253,17 +1261,35 @@ export class DaydreamStory {
 	/**
 	 * Another take on a passage: a new turn beside it, which the user is moved
 	 * to. A reading the user chose for the turn before it still stands.
+	 *
+	 * The model is shown the take it replaces and asked for a different one
+	 * (docs/daydreams.md, "Another take"): asked the same thing again, it
+	 * wrote much the same passage. A check-in is the exception, since a
+	 * stopped scene is answered with one whatever is asked (`isStopped` on
+	 * the server), so its request never carried the take, and later requests
+	 * would not send it as it was sent.
 	 */
 	async writeAgain(turnId: string): Promise<void> {
 		const node = this.index.byId.get(turnId);
 		if (!node || this.busy) {
 			return;
 		}
-		const readAs = chosenReadingIn(this.content(turnId));
+		const content = this.content(turnId);
+		const readAs = chosenReadingIn(content);
+		const stopped = isHalted(
+			pathTo(this.index, node.parentId).map((earlier) => ({
+				content: this.content(earlier.id) ?? null
+			}))
+		);
 		await this.#settled();
 		void this.#start({
 			parentId: node.parentId,
-			mode: node.parentId === null ? 'opening' : 'reply',
+			...(content?.type === 'text' && !stopped
+				? {
+						mode: 'rewrite' as const,
+						rewrite: { target: { id: turnId, text: content.text }, again: true as const }
+					}
+				: { mode: node.parentId === null ? ('opening' as const) : ('reply' as const) }),
 			...(readAs ? { readAs } : {})
 		});
 	}

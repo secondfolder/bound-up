@@ -262,6 +262,17 @@ export function replyInput(combo: Combo, text: TextSource): ReplyInput {
 				},
 				pictures
 			};
+		// "Write again": another take on the last passage, shown the one it replaces.
+		case 'again':
+			return {
+				request: {
+					...base,
+					mode: 'rewrite',
+					turns: conversation(text, watching),
+					rewrite: { targetText: text('turn.rewriteTarget'), again: true }
+				},
+				pictures
+			};
 		case 'stopped':
 			return {
 				request: {

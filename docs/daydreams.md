@@ -948,6 +948,34 @@ row's plaintext `role` says only who wrote it, `user` or `story`.
   marks. They go to the model with the passage they are on, as taste.
 - **Dice**, below.
 
+### Another take
+
+Write again asks for a different passage at the same point in the story,
+beside the one it replaces. Asked exactly what the first take was asked, a
+model wrote much the same passage again: the story so far decides most of
+it, and sampling alone varies little. So the request shows the model the
+take it replaces and asks for one that goes another way — a different beat,
+different words, a different turn of events or a different place to leave
+the story — while still answering the same turn (`anotherTakeRequest` in
+`prompt.ts`). It is sent as a rewrite marked `again`, with no quote or
+instruction (`rewriteSchema` refuses one with either), and runs a little
+hotter than a reply: temperature 1.05 rather than 0.9. Only a little, since
+much past 1 a model loses track of the story and writes metadata that will
+not parse, and some reasoning models ignore the setting anyway; the request
+is what does most of the work.
+
+Unlike a rewrite, another take is a reply in every other way: it writes the
+user's turn out afresh (below), and it may change the daydream's settings
+as any reply to the user's own words may. The passage records that it was
+one (`meta.rewriteOf.again`, `daydream-turn` v8), so later requests send
+its request again as it was sent ([Cost](#cost)).
+
+Only the take being replaced is shown, not every earlier one, so a third
+take can come back close to the first. A check-in is written again as a
+plain request: a stopped scene is answered with a check-in whatever is
+asked, so the take could never be shown, and later requests could not send
+it as it was sent.
+
 ## Written out for you
 
 Sometimes a user writes what their turn should be rather than the turn
@@ -1709,7 +1737,8 @@ The story model is an OpenRouter model, chosen on the admin page (see
 terms, and its providers' on OpenRouter, allow adult fiction.
 Most hosted models' terms (Anthropic's, OpenAI's, Workers AI's) do not,
 which is why the choice is made here rather than left to OpenRouter's
-routing. A passage is capped at 4,000 tokens: a few paragraphs and the
+routing. It writes at temperature 0.9, and another take at 1.05
+([Another take](#another-take)). A passage is capped at 4,000 tokens: a few paragraphs and the
 metadata after them, plus room for a reasoning model to think first, since
 OpenRouter counts reasoning against the same cap. A model that still runs out
 before writing anything ends with `finish_reason: "length"`, which the reader

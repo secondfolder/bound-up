@@ -115,7 +115,7 @@ export const BUILDERS: readonly Builder[] = [
 				'state',
 				'Request',
 				'structural',
-				values('opening', 'reply', 'rewrite', 'stopped'),
+				values('opening', 'reply', 'rewrite', 'again', 'stopped'),
 				'reply'
 			),
 			axis('kink', 'Kink', 'descriptive', dialValues()),

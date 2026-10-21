@@ -73,6 +73,26 @@ export function passageExcerpt(text: string): string {
 	return text.length > REACTION_EXCERPT ? `${text.slice(0, REACTION_EXCERPT).trimEnd()}…` : text;
 }
 
+/**
+ * What a rewrite's request asks: the passage it replaces, as it was sent, and
+ * what to change. `again` is "Write again": another take, which changes
+ * nothing in particular but goes a different way (docs/daydreams.md,
+ * "Another take"), so it never comes with a quote or an instruction.
+ */
+export const rewriteSchema = z
+	.object({
+		targetText: z.string().min(1).max(MAX_PASSAGE_AS_SENT),
+		quote: z.string().max(DAYDREAM_LIMITS.quote).optional(),
+		instruction: z.string().max(DAYDREAM_LIMITS.instruction).optional(),
+		again: z.literal(true).optional()
+	})
+	.refine(
+		(value) => !(value.again && (value.quote || value.instruction)),
+		'Another take is not asked to change anything in particular'
+	);
+
+export type RewriteRequest = z.output<typeof rewriteSchema>;
+
 export const contextTurnSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('text'),
@@ -91,17 +111,12 @@ export const contextTurnSchema = z.discriminatedUnion('type', [
 		/** A passage's: the picture it described, which goes back with it (`passageAsSent`). */
 		image: z.string().min(1).max(DAYDREAM_LIMITS.imagePrompt).optional(),
 		/**
-		 * A passage's that rewrote another: what its request asked
-		 * (`rewriteRequest` in `server/daydream/prompt.ts`), which goes back in
-		 * place of the plain request it would otherwise have had.
+		 * A passage's that rewrote another, or was another take on it: what
+		 * its request asked (`rewriteRequest` in `server/daydream/prompt.ts`),
+		 * which goes back in place of the plain request it would otherwise
+		 * have had.
 		 */
-		rewrite: z
-			.object({
-				targetText: z.string().min(1).max(MAX_PASSAGE_AS_SENT),
-				quote: z.string().max(DAYDREAM_LIMITS.quote).optional(),
-				instruction: z.string().max(DAYDREAM_LIMITS.instruction).optional()
-			})
-			.optional(),
+		rewrite: rewriteSchema.optional(),
 		/**
 		 * A passage's: the direction buttons on screen when it was asked for,
 		 * which that request listed (`buttonsNote`). Absent for one written
@@ -238,7 +253,8 @@ export function toContextTurn(
 							rewrite: {
 								targetText: rewrote.slice(0, MAX_PASSAGE_AS_SENT),
 								...(rewriteOf.quote ? { quote: rewriteOf.quote.text } : {}),
-								...(rewriteOf.instruction ? { instruction: rewriteOf.instruction } : {})
+								...(rewriteOf.instruction ? { instruction: rewriteOf.instruction } : {}),
+								...(rewriteOf.again ? { again: true as const } : {})
 							}
 						}
 					: {}),

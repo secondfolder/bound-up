@@ -788,6 +788,22 @@ Not a request any device could send from the baseline: setup.voice: With no narr
 \ No newline at end of file
 ~~~~
 
+### state = again
+
+~~~~diff
+@@ -238,3 +238,9 @@
+ ⟦turn.user7⟧
+ 
++(The user asked for another take on a passage you wrote, for the same point in the story. This is the take it replaces:
++"""
++⟦turn.rewriteTarget⟧
++"""
++Write a different one, not this one reworded: take the moment another way — a different beat, different words from everyone, a different turn of events or a different place to leave the story — while it still follows on from everything before it and answers the same turn.)
++
+ (Direction buttons on screen now: "Slower" (id "slower"), "Tease me" (id "tease").)
+\ No newline at end of file
+~~~~
+
 ### state = stopped
 
 ~~~~diff

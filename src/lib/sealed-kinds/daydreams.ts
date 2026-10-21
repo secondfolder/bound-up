@@ -534,8 +534,30 @@ export const passageMetaV7 = passageMetaV6.extend({
 	drifted: z.string().trim().min(1).max(DAYDREAM_LIMITS.drifted).optional()
 });
 
-/** A passage's meta as the latest turn version stores it (`passageMetaV7`). */
-export type PassageMeta = z.output<typeof passageMetaV7>;
+/**
+ * v8's: a passage written by "Write again" says so (`rewriteOf.again`). It
+ * is another take, not a rewrite: its request showed the model the take it
+ * replaces and asked for a different one (docs/daydreams.md, "Another take"),
+ * and later requests send that again, as it was sent. Neither a quote nor an
+ * instruction comes with it.
+ */
+export const passageMetaV8 = passageMetaV7.extend({
+	rewriteOf: z
+		.object({
+			turnId: clientId,
+			quote: quoteSchema.optional(),
+			instruction: z.string().trim().max(DAYDREAM_LIMITS.instruction).optional(),
+			again: z.literal(true).optional()
+		})
+		.refine(
+			(value) => !(value.again && (value.quote || value.instruction)),
+			'Another take is not asked to change anything in particular'
+		)
+		.optional()
+});
+
+/** A passage's meta as the latest turn version stores it (`passageMetaV8`). */
+export type PassageMeta = z.output<typeof passageMetaV8>;
 
 const turnV1 = z.object({ text: z.string().min(1).max(DAYDREAM_LIMITS.turn) });
 
@@ -648,6 +670,16 @@ const turnV7 = z.discriminatedUnion('type', [
 	...turnTypesV2
 ]);
 
+// v8: a passage written by "Write again" says so (`passageMetaV8`).
+const turnV8 = z.discriminatedUnion('type', [
+	textTurn(passageMetaV8).extend({
+		raw: z.string().min(1).max(DAYDREAM_LIMITS.rawReply).optional(),
+		rawTruncated: z.literal(true).optional(),
+		sent: sentRecordSchema.optional()
+	}),
+	...turnTypesV2
+]);
+
 export const daydreamTurnKind = defineSealedKind({
 	name: 'daydream-turn',
 	// Raised from 48 KB with v4, whose `raw` repeats the passage and the
@@ -690,7 +722,13 @@ export const daydreamTurnKind = defineSealedKind({
 			// Everything v6 could say, v7 says the same way.
 			upcast: (value: z.output<typeof turnV6>) => value
 		},
-		{ version: 7, schema: turnV7 }
+		{
+			version: 7,
+			schema: turnV7,
+			// Everything v7 could say, v8 says the same way.
+			upcast: (value: z.output<typeof turnV7>) => value
+		},
+		{ version: 8, schema: turnV8 }
 	]
 });
 

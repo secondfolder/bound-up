@@ -1044,6 +1044,27 @@
 				"startedAt": 1792500000000,
 				"endedAt": 1792500006000
 			}
+		},
+		{
+			"kind": "daydream-turn",
+			"version": 8,
+			"recordId": "00000000-0000-4000-8000-000000000104",
+			"ciphertext": "sb1.3JjilcmnoPzPv9sYPlLecW5aDM7tCshewkcD2N4cGFuXTJAt80UIuKBJV4eAmIsyj2eWpUiY8AgDPjOP77_VgGhlwH7LsO2fCUDoBn4PvueDmoiry8cJxiejjP6dUuYs-LfBX9qMY9mMzn6m0ZYmpHA42GUcWPpyX4mraVoS1de7Dy_XWck5DqrFIrTU5N2XLVP92s2344oCkgkCmbr3xJt1aws3NC5aALbd7HIfiH-Kd6cx9Ln2lgIiVbVrjaJLS9GSyK6uNWMlkpgcqAugTyHeTTLXmMgAfEjx2MFEkJeXMAXv2Gy-X9HTOEL7fEYc",
+			"expected": {
+				"type": "text",
+				"text": "Charlie turns the key the other way.",
+				"meta": {
+					"suggestions": ["Ask her why."],
+					"directions": {
+						"add": [],
+						"remove": []
+					},
+					"rewriteOf": {
+						"turnId": "00000000-0000-4000-8000-0000000000dd",
+						"again": true
+					}
+				}
+			}
 		}
 	]
 }

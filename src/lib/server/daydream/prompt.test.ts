@@ -526,6 +526,45 @@ describe('buildMessages', () => {
 		expect(last).toContain('Colder.');
 	});
 
+	// Asked the same thing again, a model wrote much the same passage again.
+	it('asks for another take as a different passage, shown the one it replaces', () => {
+		const messages = buildMessages(
+			request({
+				mode: 'rewrite',
+				turns: [said('I kneel.')],
+				rewrite: { targetText: 'She smiles warmly.', again: true }
+			})
+		);
+		const last = messages.at(-1)?.content ?? '';
+		expect(last).toContain('I kneel.');
+		expect(last).toContain('another take on a passage you wrote');
+		expect(last).toContain('She smiles warmly.');
+		expect(last).toContain('not this one reworded');
+		// Not a rewrite: nothing in particular is to be changed or kept.
+		expect(last).not.toContain('replaces one you wrote before');
+	});
+
+	it('sends another take back after the request that asked for it', () => {
+		const messages = buildMessages(
+			request({
+				turns: [
+					said('I kneel.'),
+					{
+						type: 'text',
+						role: 'story',
+						text: 'She laughs.',
+						rewrite: { targetText: 'She smiles warmly.', again: true }
+					},
+					said('I look up.')
+				]
+			})
+		);
+		const contents = messages.map((message) => message.content);
+		const take = contents.indexOf('She laughs.');
+		expect(contents[take - 1]).toContain('another take on a passage you wrote');
+		expect(contents[take - 1]).toContain('She smiles warmly.');
+	});
+
 	it('says nothing of typed safewords', () => {
 		const content = system(buildMessages(request({ mode: 'opening' })));
 		expect(content.toLowerCase()).not.toContain('safeword');
@@ -1189,6 +1228,19 @@ describe('replyRequestSchema', () => {
 		expect(replyRequestSchema.safeParse({ ...valid, rewrite: { targetText: 'x' } }).success).toBe(
 			false
 		);
+	});
+
+	it('refuses another take that asks for a change in particular', () => {
+		const again = { ...valid, mode: 'rewrite' as const };
+		expect(
+			replyRequestSchema.safeParse({ ...again, rewrite: { targetText: 'x', again: true } }).success
+		).toBe(true);
+		expect(
+			replyRequestSchema.safeParse({
+				...again,
+				rewrite: { targetText: 'x', again: true, instruction: 'Colder.' }
+			}).success
+		).toBe(false);
 	});
 
 	it('refuses more story than the budget', () => {

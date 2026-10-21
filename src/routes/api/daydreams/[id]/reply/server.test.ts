@@ -169,6 +169,7 @@ describe('POST /api/daydreams/[id]/reply', () => {
 		});
 		// Room for the passage, the metadata block after it, and reasoning first.
 		expect(sent.max_tokens).toBe(4000);
+		expect(sent.temperature).toBe(0.9);
 		// So pressing Stop ends the request upstream as well.
 		expect(init.signal).toBeInstanceOf(AbortSignal);
 	});
@@ -203,6 +204,13 @@ describe('POST /api/daydreams/[id]/reply', () => {
 		const { id } = await createTestDaydream(db, jun.id);
 		expect(await post(jun, id)).toMatchObject({ type: 'error', status: 409 });
 		expect(upstream).not.toHaveBeenCalled();
+	});
+
+	it('writes another take a little hotter than a reply, for one that goes another way', async () => {
+		const { id } = await createTestDaydream(db, ada.id);
+		await post(ada, id, { ...body, mode: 'rewrite', rewrite: { targetText: 'Sit.', again: true } });
+		const [, init] = upstream.mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(String(init.body)).temperature).toBe(1.05);
 	});
 
 	it('refuses a rewrite that does not say what to rewrite', async () => {

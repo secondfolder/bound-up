@@ -43,7 +43,7 @@ import {
 	type Direction,
 	directionSchema,
 	type PassageMeta,
-	passageMetaV7,
+	passageMetaV8,
 	type Reading,
 	readingSchema,
 	rollProposalSchema,
@@ -190,7 +190,7 @@ function parseMeta(body: string): PassageMeta | null {
 	if (value === undefined) {
 		return null;
 	}
-	const strict = passageMetaV7.safeParse(value);
+	const strict = passageMetaV8.safeParse(value);
 	const meta = strict.success ? strict.data : salvageMeta(value);
 	if (!meta) {
 		return null;
@@ -319,11 +319,11 @@ function salvageMeta(value: unknown): PassageMeta | null {
 		.slice(0, MAX_DIRECTIONS * 2);
 
 	const roll = rollProposalSchema.safeParse(record.roll);
-	const image = passageMetaV7.shape.image.safeParse(record.image);
+	const image = passageMetaV8.shape.image.safeParse(record.image);
 	const readAs = readingSchema.safeParse(record.readAs);
 	const settings = salvageSettings(record.settings);
-	const drifted = passageMetaV7.shape.drifted.safeParse(record.drifted);
-	const salvaged = passageMetaV7.safeParse({
+	const drifted = passageMetaV8.shape.drifted.safeParse(record.drifted);
+	const salvaged = passageMetaV8.safeParse({
 		suggestions,
 		directions: { add, remove },
 		...(roll.success ? { roll: roll.data } : {}),

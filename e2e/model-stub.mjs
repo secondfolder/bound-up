@@ -22,6 +22,9 @@
 //   little more.", so a spec sees the statement drawn as a standout line;
 // - a short out-of-character check-in after Stop the scene;
 // - "<character> rewrites it." for a rewrite;
+// - for another take (Write again), the take it was shown, numbered one on:
+//   `<character> heard: "…" (take 2)` after the first, so a spec sees the
+//   replaced take reached the model (`anotherTakeRequest`);
 // - otherwise `<character> heard: "<the user's last turn>"`, with a take
 //   number when the same conversation is answered again (a retried reply).
 //   Counted per whole conversation, because the specs run in parallel against
@@ -121,6 +124,9 @@ function lastUserMessage(messages) {
 	return content.replace(/\n\n\(Direction buttons on screen now: [^\n]*\)$/, '');
 }
 
+/** The take another take replaces, as `anotherTakeRequest` quotes it. */
+const ANOTHER_TAKE = /another take on a passage you wrote[^\n]*\n"{3}\n(?<take>[\s\S]*?)\n"{3}/;
+
 function withMeta(passage, meta) {
 	return `${passage}\n\n<meta>\n${JSON.stringify(meta)}\n</meta>`;
 }
@@ -154,6 +160,18 @@ function replyFor(messages) {
 	if (users.length === 1 && last.startsWith('(Begin the story')) {
 		return withMeta(
 			`${name} looks up as you come in.${heat}\n\n*The door clicks shut behind you.*`,
+			meta
+		);
+	}
+	const shown = last.match(ANOTHER_TAKE);
+	if (shown?.groups) {
+		const previous = shown.groups.take.match(/ \(take (?<number>\d+)\)/);
+		const number = Number(previous?.groups ? previous.groups.number : 1) + 1;
+		const passage = shown.groups.take
+			.replace(/^<yours>\n[\s\S]*?\n<\/yours>\n/, '')
+			.replace(/ \(take \d+\)/, '');
+		return withMeta(
+			passage.replace(/^(?<heard>.*? heard: ".*?")/, `$<heard> (take ${number})`),
 			meta
 		);
 	}

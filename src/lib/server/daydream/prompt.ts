@@ -14,8 +14,8 @@ import {
 	type ContextTurn,
 	contextSize,
 	contextTurnSchema,
-	MAX_PASSAGE_AS_SENT,
-	passageAsSent
+	passageAsSent,
+	rewriteSchema
 } from '$lib/daydream/context';
 import {
 	describeCharacterDials,
@@ -70,14 +70,9 @@ export const replyRequestSchema = z
 		record: z.boolean().optional(),
 		/** The direction buttons on screen now, for the model to add to or prune. */
 		currentDirections: z.array(directionSchema).max(MAX_DIRECTIONS).default([]),
-		rewrite: z
-			.object({
-				// The passage being rewritten as it was sent (`passageAsSent`).
-				targetText: z.string().min(1).max(MAX_PASSAGE_AS_SENT),
-				quote: z.string().max(DAYDREAM_LIMITS.quote).optional(),
-				instruction: z.string().max(DAYDREAM_LIMITS.instruction).optional()
-			})
-			.optional()
+		// The passage being rewritten as it was sent (`passageAsSent`), and
+		// what to change, or that it is another take (`again`).
+		rewrite: rewriteSchema.optional()
 	})
 	.superRefine((value, ctx) => {
 		const total =
@@ -901,7 +896,23 @@ const OMITTED_NOTE = '(The story so far is long, so it starts partway through he
 /** Sent when the newest turn is a passage: the user asked for more without saying anything. */
 const CONTINUE_REQUEST = '(Continue.)';
 
+/**
+ * "Write again": another take on a passage, for the same point in the story.
+ * Asked for with exactly the request the first take had, a model wrote much
+ * the same passage again — the story so far decides most of it, and
+ * sampling alone varies little — so the user pressed it and got a reworded
+ * copy. Shown the take it replaces and asked for a different one, it goes
+ * another way. Unlike a rewrite, nothing in particular is wrong with the
+ * take, so it is not asked to keep any of it.
+ */
+function anotherTakeRequest(targetText: string): string {
+	return `(The user asked for another take on a passage you wrote, for the same point in the story. This is the take it replaces:\n"""\n${targetText}\n"""\nWrite a different one, not this one reworded: take the moment another way — a different beat, different words from everyone, a different turn of events or a different place to leave the story — while it still follows on from everything before it and answers the same turn.)`;
+}
+
 function rewriteRequest(rewrite: NonNullable<ReplyRequest['rewrite']>): string {
+	if (rewrite.again) {
+		return anotherTakeRequest(rewrite.targetText);
+	}
 	const parts = [
 		`(Your next passage replaces one you wrote before. This is how it read:\n"""\n${rewrite.targetText}\n"""`
 	];

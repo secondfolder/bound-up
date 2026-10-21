@@ -33,6 +33,18 @@ import type { RequestHandler } from './$types';
  * server's prompt going back to the user who sent them, without the key,
  * which is a header; it is never kept here.
  */
+/** How varied a passage is: enough to surprise, not so much it loses the thread or the format. */
+const TEMPERATURE = 0.9;
+
+/**
+ * "Write again" a little hotter, for a take that goes another way. Only a
+ * little: much past 1 a model starts losing track of the story and writing
+ * metadata that will not parse, and some reasoning models ignore the setting
+ * entirely. What does the most is the request itself, which shows the model
+ * the take it replaces (`anotherTakeRequest` in `prompt.ts`).
+ */
+const ANOTHER_TAKE_TEMPERATURE = 1.05;
+
 export const POST: RequestHandler = async ({ locals, params, platform, request }) => {
 	if (!locals.user) {
 		error(401, 'Not signed in');
@@ -90,7 +102,7 @@ export const POST: RequestHandler = async ({ locals, params, platform, request }
 		// and at 1,200 GLM-5.2 spent all of it thinking and wrote nothing.
 		// Also the most one reply can cost.
 		max_tokens: 4000,
-		temperature: 0.9,
+		temperature: parsed.data.rewrite?.again ? ANOTHER_TAKE_TEMPERATURE : TEMPERATURE,
 		// Only route to providers that do not keep or train on prompts.
 		provider: { data_collection: 'deny' },
 		// For debug mode's raw log: the token counts and cost, in the

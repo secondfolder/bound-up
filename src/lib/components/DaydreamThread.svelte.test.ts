@@ -664,12 +664,75 @@ describe('DaydreamThread', () => {
 		const [again] = waByProp(menu, 'wa-dropdown-item', 'value', 'again');
 		menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: again } }));
 		await waitFor(() => expect(saved(0)).toMatchObject({ parentId: 't1', role: 'story' }));
+		// Shown the take it replaces, and asked for a different one.
 		expect(asked(0)).toMatchObject({
-			mode: 'reply',
-			turns: [{ type: 'text', role: 'user', text: 'Hello.' }]
+			mode: 'rewrite',
+			turns: [{ type: 'text', role: 'user', text: 'Hello.' }],
+			rewrite: { targetText: 'First take.', again: true }
 		});
+		// Kept on the passage, so later requests send it again as it was sent.
+		expect(saved(0)?.content).toMatchObject({ meta: { rewriteOf: { turnId: 't2', again: true } } });
 		await waitFor(() => expect(container.textContent).toContain('Second take.'));
 		expect(container.textContent).toContain('2/2');
+	});
+
+	it('sends another take back after it as the request that asked for it', async () => {
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'user', 'Hello.'),
+				turn('t2', 't1', 'story', 'First take.'),
+				turn('t3', 't1', 'story', {
+					type: 'text',
+					text: 'Second take.',
+					meta: { ...meta(), rewriteOf: { turnId: 't2', again: true } }
+				})
+			]),
+			available: true
+		});
+		await waSettled(container);
+		const story = container.querySelector('li.passage[data-turn-id="t3"]');
+		expect(story).not.toBeNull();
+		await press(container, 'Continue');
+		await waitFor(() => expect(asked(0)).toBeDefined());
+		expect(asked(0)?.turns).toContainEqual(
+			expect.objectContaining({
+				role: 'story',
+				text: 'Second take.',
+				rewrite: { targetText: 'First take.', again: true }
+			})
+		);
+	});
+
+	// A stopped scene is answered with a check-in whatever is asked, so the
+	// request never carried the take, and later requests could not send it as sent.
+	it('writes a check-in again as a plain reply', async () => {
+		client.writeReply.mockResolvedValueOnce({
+			ok: true,
+			passage: 'Still with me?',
+			meta: null,
+			expansion: null
+		});
+		const { container } = render(DaydreamThread, {
+			daydream: daydream([
+				turn('t1', null, 'story', 'Sit.'),
+				turn('t2', 't1', 'user', { type: 'safety', signal: 'red' }),
+				turn('t3', 't2', 'story', {
+					type: 'text',
+					text: 'How are you?',
+					meta: { ...meta(), ooc: true }
+				})
+			]),
+			available: true
+		});
+		await waSettled(container);
+		const menu = container.querySelector(
+			'li.passage[data-turn-id="t3"] wa-dropdown'
+		) as HTMLElement;
+		const [again] = waByProp(menu, 'wa-dropdown-item', 'value', 'again');
+		menu.dispatchEvent(new CustomEvent('wa-select', { detail: { item: again } }));
+		await waitFor(() => expect(asked(0)).toBeDefined());
+		expect(asked(0)).toMatchObject({ mode: 'reply' });
+		expect(asked(0)).not.toHaveProperty('rewrite');
 	});
 
 	/**

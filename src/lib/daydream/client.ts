@@ -35,7 +35,7 @@ import type {
 	DaydreamTurnView,
 	SealedRefView
 } from '../types';
-import type { ContextTurn } from './context';
+import type { ContextTurn, RewriteRequest } from './context';
 import type { Exchange } from './exchange';
 import type { ExchangeRecorder } from './exchange-recorder';
 import { PICTURE_REQUEST_HEADER, type PictureRequest } from './image-prompt';
@@ -87,7 +87,7 @@ export type ReplyRequestBody = {
 	setup: DaydreamSetup;
 	turns: ContextTurn[];
 	currentDirections: Direction[];
-	rewrite?: { targetText: string; quote?: string; instruction?: string };
+	rewrite?: RewriteRequest;
 	/** Debug mode: have the endpoint say what it sent the model, for the exchange (`exchange.ts`). */
 	record?: boolean;
 };

@@ -196,6 +196,22 @@ describe('toContextTurn', () => {
 		expect(toContextTurn('story', rewritten)).toEqual(said('Charlie laughs.', 'story'));
 	});
 
+	it('sends another take with the take it replaced, and says it was one', () => {
+		const take = {
+			type: 'text' as const,
+			text: 'Charlie laughs.',
+			meta: {
+				suggestions: [],
+				directions: { add: [], remove: [] },
+				rewriteOf: { turnId: crypto.randomUUID(), again: true as const }
+			}
+		};
+		expect(toContextTurn('story', take, { rewrote: 'Charlie sighs.' })).toEqual({
+			...said('Charlie laughs.', 'story'),
+			rewrite: { targetText: 'Charlie sighs.', again: true }
+		});
+	});
+
 	it('says how the user chose to have their turn read, and only theirs', () => {
 		const answer = (readAsChosen: boolean) => ({
 			type: 'text' as const,
