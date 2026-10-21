@@ -54,6 +54,16 @@ const TELLING = `# Telling the story
 ${GENDER}`;
 
 /**
+ * Where a passage ends, when the user is in the story. Left to itself a
+ * model ends on a pose or a summary, which leaves the user nothing to answer
+ * but "Continue"; the most-played character cards end on a question, an
+ * offer or a move made on the user. A watcher has nothing to answer, so they
+ * are not given it: that is why it is not in every telling.
+ */
+const HANDING_OVER =
+	'- End each passage where the user has something to answer: a question put to them, an offer, a choice, a move made on them, a line left hanging for their reply. Not every passage needs a question, but none ends on a pose, a summary or a moment with nothing in it for them. A roll ends at its moment instead, as the reply format says.';
+
+/**
  * How the system tells its story. The storytelling lines in `TELLING` —
  * "room for tension, quiet moments and small talk", "bring in their
  * background" — are narration the system's guide forbids, so it gets its
@@ -125,7 +135,8 @@ export function writingGuide(voice: DaydreamVoice, heat: DialValue | null): stri
 			.filter((section) => section !== null)
 			.join('\n\n');
 	}
-	return [TELLING, PROSE, sexGuide(heat, SEX_LINES)]
+	const telling = voice.stance === 'absent' ? TELLING : `${TELLING}\n${HANDING_OVER}`;
+	return [telling, PROSE, sexGuide(heat, SEX_LINES)]
 		.filter((section) => section !== null)
 		.join('\n\n');
 }

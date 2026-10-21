@@ -79,6 +79,9 @@ const SUMMARY_BLANK = /\[\[[^|\]]+\|(?<words>[^\]]+)\]\]/g;
 
 const PART_IDS = ['00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2'];
 
+/** A part nobody is cast in, which the story plays (`characters=1+story`). */
+const STORY_PART_ID = '00000000-0000-4000-8000-0000000000a9';
+
 const dial = (value: string | undefined): DialValue | null =>
 	value === undefined || value === 'unset' ? null : (Number(value) as DialValue);
 
@@ -136,17 +139,29 @@ function idea(text: TextSource, combo: Combo, characterCount: number): DaydreamI
 		notes: field('notes'),
 		brief: combo.origin === 'none' ? '' : text('brief'),
 		research: combo.origin === 'brief+research' ? text('research') : '',
-		parts: Array.from({ length: characterCount }, (_, index) => ({
-			id: PART_IDS[index] ?? '',
-			name: text(`part${index + 1}.name`),
-			description: all ? text(`part${index + 1}.description`) : ''
-		})),
+		parts: [
+			...Array.from({ length: characterCount }, (_, index) => ({
+				id: PART_IDS[index] ?? '',
+				name: text(`part${index + 1}.name`),
+				description: all ? text(`part${index + 1}.description`) : ''
+			})),
+			...(combo.characters === '1+story'
+				? [
+						{
+							id: STORY_PART_ID,
+							name: text('storyPart.name'),
+							description: all ? text('storyPart.description') : ''
+						}
+					]
+				: [])
+		],
 		dials: { heat: dial(combo.heat), kink: dial(combo.kink) }
 	};
 }
 
 function replySetup(text: TextSource, combo: Combo): DaydreamSetup {
-	const count = Number(combo.characters);
+	// "1+story": one character, and a part the story plays (`idea`).
+	const count = combo.characters === '1+story' ? 1 : Number(combo.characters);
 	const all = combo.text !== 'minimal';
 	const stance = combo.stance as DaydreamStance;
 	return {

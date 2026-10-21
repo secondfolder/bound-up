@@ -107,7 +107,11 @@ export const BUILDERS: readonly Builder[] = [
 			// (`DaydreamVoice.governs`), a narrator of its own for review.
 			axis('narrator', 'Narrator', 'structural', values(...NARRATORS, 'impersonal-governs')),
 			axis('stance', 'Stance', 'structural', values('self', 'persona', 'absent')),
-			axis('characters', 'Characters', 'structural', values('0', '1', '2'), '1'),
+			// "1+story" is one character and a part nobody is cast in, which the
+			// story plays (`describeParts`). A value here rather than an axis of
+			// its own: it changes what the parts say only alongside the cast,
+			// and crossing a new axis with every other doubled the catalogue.
+			axis('characters', 'Characters', 'structural', values('0', '1', '2', '1+story'), '1'),
 			axis('lead', 'Lead', 'structural', values('character', 'me', 'shared')),
 			axis('heat', 'Heat', 'structural', dialValues()),
 			axis('pictures', 'Pictures', 'structural', values('none', 'z-image-turbo', 'sdxl', 'flux-2')),

@@ -1005,8 +1005,13 @@
 					</div>
 					{#if player}
 						{@render castCard(player, index)}
-					{:else if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
-						{@render castPicker(`Cast ${part.name}`, part.id)}
+					{:else}
+						<!-- Nobody cast: the story plays the part, so it is said here, and
+						     casting someone (or removing the part) is the way to change it. -->
+						<p class="played">Played by the story</p>
+						{#if $form.characters.length < MAX_DAYDREAM_CHARACTERS}
+							{@render castPicker(`Cast ${part.name}`, part.id)}
+						{/if}
 					{/if}
 				</div>
 			{/each}
@@ -1198,6 +1203,13 @@
 		.part-name {
 			display: flex;
 			flex-direction: column;
+		}
+
+		.played {
+			margin: 0;
+			font-size: 0.875rem;
+			font-style: italic;
+			color: var(--wa-color-text-quiet);
 		}
 	}
 

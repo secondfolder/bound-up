@@ -479,6 +479,9 @@ describe('DaydreamSetupForm', () => {
 			expect(interviewer?.querySelector('wa-card')?.textContent).toContain('Mara');
 			expect(interviewer?.textContent).toContain('your boss · testing you');
 			expect(observer?.querySelector('wa-card')).toBeNull();
+			// Nobody cast: the story plays the part, and says so.
+			expect(observer?.textContent).toContain('Played by the story');
+			expect(interviewer?.textContent).not.toContain('Played by the story');
 			expect(button(observer as HTMLElement, 'Cast the observer')).toBeDefined();
 			// Everyone has a part, so the last picker is for someone besides.
 			expect(button(container, 'Add someone else')).toBeDefined();

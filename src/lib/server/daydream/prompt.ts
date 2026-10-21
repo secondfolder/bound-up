@@ -157,9 +157,11 @@ function describeNarrator(voice: DaydreamVoice, characterCount: number): string 
 	const name = voice.protagonistName.trim();
 	const persona = voice.stance === 'persona';
 	const one = characterCount === 1;
+	// With nobody cast, the idea's parts are still played (`describeParts`), so
+	// only the passing figures stay in the background.
 	const cast =
 		characterCount === 0
-			? 'There are no set characters: anyone else who appears is a passing figure you invent, and stays in the background.'
+			? "There are no set characters: anyone who appears is someone you invent — whoever the idea's parts below call for, and passing figures, who stay in the background."
 			: 'Voice the characters below through the narration.';
 	switch (voice.narrator) {
 		case 'none':
@@ -297,20 +299,39 @@ function describeCharacter(
 }
 
 /**
- * The idea's parts that someone plays, as the idea describes them. A part
- * nobody was cast in is left out: the model would otherwise invent someone
- * to fill it, which the user chose not to.
+ * Said under the parts when one is played by the story: who fills it, and
+ * that a part naming a group is a group. Without it a model given a part
+ * with no character either left it empty or brought in a stranger with a
+ * new name in every passage.
  */
-function describeCastParts(setup: DaydreamSetupContent): string | null {
-	const cast = setup.idea.parts.flatMap((part) => {
+const STORY_PLAYED_PARTS =
+	'A part played by the story has no set character: bring them in as the story needs them, invented from what the part says, with a name, a look and a manner of their own that stay the same from then on. A part that names more than one person ("the regulars", "the guards") is as many people as the story needs, each with something of their own.';
+
+/**
+ * The idea's parts, as the idea describes them, with who plays each. A part
+ * nobody was cast in is played by the story (docs/daydreams.md, "Characters,
+ * ideas and casting"): the foil whose texts keep arriving, the crowd at the
+ * club. It used to be left out, so as not to have the model invent someone
+ * the user had not chosen; but a part is a choice already, and deleting it is
+ * how to leave someone out.
+ */
+function describeParts(setup: DaydreamSetupContent): string | null {
+	let storyPlayed = false;
+	const parts = setup.idea.parts.map((part) => {
 		const player = setup.characters.find((character) => character.casting.partId === part.id);
-		return player
-			? [
-					`- ${part.name}, played by ${player.name}${part.description ? `: ${part.description}` : ''}`
-				]
-			: [];
+		const description = part.description ? `: ${part.description}` : '';
+		if (player) {
+			return `- ${part.name}, played by ${player.name}${description}`;
+		}
+		storyPlayed = true;
+		return `- ${part.name}, played by the story${description}`;
 	});
-	return cast.length > 0 ? `The parts in it:\n${tagged('parts', cast.join('\n'))}` : null;
+	return parts.length > 0
+		? joinLines(
+				`The parts in it:\n${tagged('parts', parts.join('\n'))}`,
+				storyPlayed && STORY_PLAYED_PARTS
+			)
+		: null;
 }
 
 /**
@@ -395,7 +416,7 @@ export function describeSetup(setup: DaydreamSetupContent): string {
 			),
 			...describeIdeaDials(idea.dials),
 			idea.dials.heat === null && UNSET_HEAT,
-			describeCastParts(setup),
+			describeParts(setup),
 			leadLine(setup)
 		),
 		describeOrigin(idea),
@@ -848,23 +869,35 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
 
 /**
  * What the model is asked to write first: the story, before the user has
- * done anything. "Set the scene" asks for a narrator's description, so the
- * system voice is asked for its first notice instead: the opening is the
- * example every later passage copies. A monologue has no scene to set, so it
- * is asked to open straight into what the voice says, with no shape named:
- * asked for "its first statements", it opened with a bold statement and a
- * paragraph on it, and again under it, before loosening up.
+ * done anything. The system voice is asked for its first notice rather than
+ * a scene: the opening is the example every later passage copies. A
+ * monologue has no scene to set, so it is asked to open straight into what
+ * the voice says, with no shape named: asked for "its first statements", it
+ * opened with a bold statement and a paragraph on it, and again under it,
+ * before loosening up.
+ *
+ * A story opens at the threshold and hands the turn over. "Set the scene"
+ * got a wind-up — the room, the weather, the walk there — and an ending on a
+ * pose; the openings of the most-played character cards on public card
+ * sites, surveyed in October 2026, start just before the moment the idea
+ * turns on and end on something the user has to answer. A watcher has nothing to answer, so
+ * theirs is only set moving: "end where the user can respond" was sent to
+ * watchers too until then.
  */
 function openingRequest(voice: DaydreamVoice): string {
+	const watching = voice.stance === 'absent';
 	switch (voice.narrator) {
 		case 'impersonal':
-			return systemGoverns(voice) === 'character'
-				? '(Begin. Open with the first notice or rules the system issues to the one it governs — not a description of a scene — and end where the user can rule or respond.)'
-				: '(Begin. Open with the first notice or rules the system issues — not a description of a scene — and end where the user must respond.)';
+			if (systemGoverns(voice) === 'character') {
+				return `(Begin. Open with the first notice or rules the system issues to the one it governs — not a description of a scene — and end where ${watching ? 'the one it governs must respond' : 'the user can rule or respond'}.)`;
+			}
+			return '(Begin. Open with the first notice or rules the system issues — not a description of a scene — and end where the user must respond.)';
 		case 'monologue':
 			return '(Begin. Open straight into the monologue — not a description of a scene.)';
 		default:
-			return '(Begin the story. Set the scene, and end at a point where the user can respond.)';
+			return watching
+				? '(Begin the story. Open just before its first turn — an arrival, a discovery, the moment itself, not a wind-up — and set it moving.)'
+				: '(Begin the story. Open just before the moment it turns on — an arrival, a discovery, the moment itself, not a wind-up — and end on something the user must answer: a question put to them, an offer, a choice, a move made on them. Never end on a pose with nothing in it for them.)';
 	}
 }
 

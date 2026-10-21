@@ -445,6 +445,11 @@ describe('buildMessages', () => {
 		expect(content).not.toContain('as if the user went along');
 		expect(content).not.toContain('one something they do');
 		expect(content).toContain('Roll to see if she holds still');
+		// Nor is anything handed to them to answer, at the opening or after it.
+		expect(content).not.toContain('End each passage where the user has something to answer');
+		const opening = buildMessages(request({ mode: 'opening', setup: watching })).at(-1);
+		expect(opening?.content).toContain('set it moving');
+		expect(opening?.content).not.toContain('the user must answer');
 	});
 
 	it('asks for nothing written out in a stopped scene’s check-in', () => {
@@ -682,8 +687,8 @@ describe('how a passage is written', () => {
 		// Fast or hot gets there quickly; slow has room to breathe.
 		expect(content).toContain('getting to it quickly');
 		expect(content).toContain('not every passage has to escalate');
-		// A user only watching has nothing to answer, so passages are not made to end on a cue.
-		expect(content).not.toContain('End every passage');
+		// The user is in this story, so each passage hands them something to answer.
+		expect(content).toContain('End each passage where the user has something to answer');
 		expect(content).toContain('never pad with atmosphere');
 		expect(content).toContain('prefer plain physical description to metaphor and simile');
 	});
@@ -868,8 +873,10 @@ describe('the system voice', () => {
 		const opening = buildMessages(request({ mode: 'opening', setup: systemSetup() })).at(-1);
 		expect(opening?.role).toBe('user');
 		expect(opening?.content).toContain('Open with the first notice or rules the system issues');
-		expect(opening?.content).not.toContain('Set the scene');
-		expect(buildMessages(request({ mode: 'opening' })).at(-1)?.content).toContain('Set the scene');
+		expect(opening?.content).not.toContain('Open just before');
+		expect(buildMessages(request({ mode: 'opening' })).at(-1)?.content).toContain(
+			'Open just before the moment it turns on'
+		);
 	});
 
 	it('says who leads in the system’s terms', () => {
@@ -1098,11 +1105,40 @@ describe('describeSetup', () => {
 		);
 		expect(content).toContain('## Jun');
 		expect(content).not.toContain('## Jun,');
-		// The idea lists the parts someone plays, and not the one nobody was cast in.
+		// The idea lists every part: the one nobody was cast in is the story's to play.
 		expect(content).toContain(
-			'The parts in it:\n<parts>\n- the interviewer, played by Mara: runs the interview'
+			'The parts in it:\n<parts>\n- the interviewer, played by Mara: runs the interview\n- the observer, played by the story\n</parts>\nA part played by the story has no set character'
 		);
-		expect(content).not.toContain('the observer');
+	});
+
+	it('says nothing of story-played parts when every part is cast', () => {
+		const content = describeSetup(
+			testDaydreamSetup({
+				idea: testIdea({ parts: [{ id: PART_A, name: 'the interviewer', description: '' }] }),
+				characters: [
+					testCharacter({
+						name: 'Mara',
+						casting: { partId: PART_A, relationship: '', part: '' }
+					})
+				]
+			})
+		);
+		expect(content).toContain('- the interviewer, played by Mara');
+		expect(content).not.toContain('played by the story');
+	});
+
+	it('tells a narrator with nobody cast that the parts are still played', () => {
+		const content = describeSetup(
+			testDaydreamSetup({
+				voice: { narrator: 'second-person', stance: 'self', protagonistName: '' },
+				idea: testIdea({
+					parts: [{ id: PART_A, name: 'the regulars', description: 'the bar crowd' }]
+				}),
+				characters: []
+			})
+		);
+		expect(content).toContain("whoever the idea's parts below call for");
+		expect(content).toContain('- the regulars, played by the story: the bar crowd');
 	});
 
 	it('leaves out what was not filled in rather than showing it blank', () => {
