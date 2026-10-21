@@ -150,6 +150,15 @@ export function createAuth(db: Db, config: AuthRequestConfig) {
 		// Trusting both forms of the same host fixes that without changing
 		// baseURL, which `isAuthPath` compares against the request origin.
 		trustedOrigins: [config.origin, `https://${config.host}`],
+		// Sign-up over HTTP is off: the app signs up only from the sign-up form
+		// action, which calls `auth.api.signUpEmail` in-process, where this does
+		// not apply. Reachable, `/api/auth/sign-up/email` skipped everything
+		// that action adds — the response floor that stops its timing saying
+		// whether an address has an account (docs/email.md), and the account's
+		// keys, so a call left a keyless, unverified account squatting the
+		// address. Better Auth checks this list only in its HTTP router, and
+		// answers 404.
+		disabledPaths: ['/sign-up/email'],
 		database: drizzleAdapter(db, { provider: 'sqlite', schema }),
 		user: {
 			additionalFields: {

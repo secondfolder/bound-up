@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import AuthBox from '$lib/components/AuthBox.svelte';
+	import AuthPage from '$lib/components/AuthPage.svelte';
 	import { superForm } from '$lib/superform';
 	import type { PageData } from './$types';
 
@@ -43,59 +45,53 @@
 
 <svelte:head><title>Confirm it's you</title></svelte:head>
 
-<section>
-	<h1>Is this you?</h1>
-
-	{#if outcome === 'confirmed'}
-		<p role="status">
-			Thanks — that's confirmed. Go back to the page where you asked for help. Once your partner has
-			confirmed too, you'll be signed in there.
-		</p>
-	{:else if outcome === 'invalid'}
-		<p role="status">
-			This link doesn't work any more. It may have expired, or been replaced by a newer request. You
-			can start again from the sign-in page.
-		</p>
-		<a href={resolve('/(public)/login/recover')}>Start again</a>
-	{:else}
-		<p>
-			Someone asked to sign back in to your account with a new password, with a partner vouching for
-			them. Only confirm if that was you.
-		</p>
-		<form method="POST" use:superform.enhance data-ready={ready ? 'true' : undefined}>
-			<input type="hidden" name="token" value={$form.token} />
-			<wa-button type="submit" variant="brand" appearance="accent" disabled={!ready || $submitting}>
-				Yes, this is me
+<AuthPage title="Is this you?">
+	<AuthBox busy={$submitting} busyLabel="Confirming">
+		{#if outcome === 'confirmed'}
+			<p role="status">
+				Thanks — that's confirmed. Go back to the page where you asked for help. Once your partner
+				has confirmed too, you'll be logged in there.
+			</p>
+		{:else if outcome === 'invalid'}
+			<p role="status">
+				This link doesn't work any more. It may have expired, or been replaced by a newer request.
+				You can start again from the log-in page.
+			</p>
+			<wa-button href={resolve('/(public)/login/recover')} variant="brand" appearance="outlined">
+				Start again
 			</wa-button>
-		</form>
-		<p class="quiet">
-			If it wasn't you, close this page. Without this, the request cannot finish, and it expires within
-			a day.
-		</p>
-	{/if}
-</section>
+		{:else}
+			<p>
+				Someone asked to log back in to your account with a new password, with a partner vouching
+				for them. Only confirm if that was you.
+			</p>
+			<form method="POST" use:superform.enhance data-ready={ready ? 'true' : undefined}>
+				<input type="hidden" name="token" value={$form.token} />
+				<wa-button
+					type="submit"
+					variant="brand"
+					appearance="accent"
+					disabled={!ready || $submitting}
+				>
+					Yes, this is me
+				</wa-button>
+			</form>
+			<p class="quiet">
+				If it wasn't you, close this page. Without this, the request cannot finish, and it expires
+				within a day.
+			</p>
+		{/if}
+	</AuthBox>
+</AuthPage>
 
 <style>
-	section {
-		max-width: 26rem;
-		margin: 0 auto;
+	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--wa-space-m);
-		padding: var(--wa-space-l) 0;
+	}
 
-		h1 {
-			margin: 0;
-			font-size: 1.5rem;
-		}
-
-		p {
-			margin: 0;
-		}
-
-		.quiet {
-			color: var(--wa-color-text-quiet);
-			font-size: 0.9375rem;
-		}
+	.quiet {
+		color: var(--wa-color-text-quiet);
+		font-size: 0.9375rem;
 	}
 </style>

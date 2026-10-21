@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import AuthBox from '$lib/components/AuthBox.svelte';
+	import AuthPage from '$lib/components/AuthPage.svelte';
 	import PartnerAcceptForm from '$lib/components/PartnerAcceptForm.svelte';
 	import ShareMeta from '$lib/components/ShareMeta.svelte';
 	import { openInviteLink, pinInviterFromInvite } from '$lib/partner-sealing';
@@ -51,6 +53,23 @@
 	});
 	const inviterName = $derived(opened ? opened.invite.inviterName : '…');
 
+	/** The page's title, one per state, in the order the markup tests them. */
+	const title = $derived.by(() => {
+		if (data.state === 'invalid') {
+			return "This link doesn't work";
+		}
+		if (opened === null) {
+			return 'This link is incomplete';
+		}
+		if (data.state === 'self') {
+			return "That's your own link";
+		}
+		if (data.state === 'already-linked') {
+			return "You're already linked";
+		}
+		return `${inviterName} wants to add you as a partner`;
+	});
+
 	/**
 	 * Whether the inviter's key the server serves is the one inside the invite.
 	 * Undefined until both are known; once it matches it is pinned as verified,
@@ -81,107 +100,105 @@
 </svelte:head>
 <ShareMeta {...share} />
 
-<section>
-	{#if data.state === 'invalid'}
-		<h1>This link doesn't work</h1>
-		<p>It may have expired, already been used, or been cancelled. Ask them to send a new one.</p>
-		<a href={resolve('/')}>Go to the home page</a>
-	{:else if opened === null}
-		<h1>This link is incomplete</h1>
-		<p>Part of it seems to have been cut off. Ask them to send it again.</p>
-		<a href={resolve('/')}>Go to the home page</a>
-	{:else if data.state === 'sign-in-required'}
-		<h1>{inviterName} wants to add you as a partner</h1>
-		<p>Sign in or create an account to see what they're proposing. You can still say no.</p>
-		<!-- "Create an account" is primary on purpose: someone reaching an invite
-		     link while signed out most likely does not have an account yet, so
-		     that is the more probable action — and more probable actions get the
-		     solid button. "Log in to accept" rather than plain "Log in", because
-		     it says what happens next: the invite is waiting on the other side. -->
-		<div class="actions">
-			<wa-button
-				appearance="outlined"
-				href={`${resolve('/login')}?redirectTo=${encodeURIComponent(data.redirectTo)}`}
-			>
-				Log in to accept
-			</wa-button>
-			<wa-button href={`${resolve('/signup')}?redirectTo=${encodeURIComponent(data.redirectTo)}`}>
-				Create an account
-			</wa-button>
-		</div>
-	{:else if data.state === 'self'}
-		<h1>That's your own link</h1>
-		<p>Send it to the person you want to link with.</p>
-		<a href={resolve('/(auth-required)/(app)/settings/partners')}>Back to partners</a>
-	{:else if data.state === 'already-linked'}
-		<h1>You're already linked</h1>
-		<p>You and {inviterName} are already partners.</p>
-		<a href={resolve('/(auth-required)/(app)/settings/partners')}>Back to partners</a>
-	{:else if data.state === 'confirm'}
-		<h1>{inviterName} wants to add you as a partner</h1>
-		{#if opened && inviterChecked === false}
-			<!-- The key the server serves for them is not the one their own device
-			     put in the link. Going on would link to whoever made that swap. -->
-			<p class="warning" role="alert">
-				Something about this invite doesn't match what we have for {inviterName}, so it can't be
-				accepted here. Ask them to send you a new link, and let us know if it happens again.
-			</p>
-		{:else if opened && inviterChecked && data.inviterRecipient}
+<AuthPage {title} wide>
+	<AuthBox>
+		{#if data.state === 'invalid' || opened === null}
 			<p>
-				{#if data.editable}
-					Check these over — you can change them — then accept.
+				{#if data.state === 'invalid'}
+					It may have expired, already been used, or been cancelled. Ask them to send a new one.
 				{:else}
-					If you accept, they'll be able to set tasks, rewards and punishments for you.
+					Part of it seems to have been cut off. Ask them to send it again.
 				{/if}
 			</p>
+			<!-- A way on rather than a dead end: someone who followed a dead invite
+			     most likely still wants in. -->
+			<wa-button href={resolve('/')} variant="brand" appearance="accent">Go to Bound Up</wa-button>
+			{#if !page.data.user}
+				<a class="secondary" href={resolve('/(public)/login')}>Log in</a>
+			{/if}
+		{:else if data.state === 'sign-in-required'}
+			<p>Log in or create an account to see what they're proposing. You can still say no.</p>
+			<!-- "Create an account" is primary on purpose: someone reaching an invite
+			     link while logged out most likely does not have an account yet, so
+			     that is the more probable action — and more probable actions get the
+			     solid button. "Log in to accept" rather than plain "Log in", because
+			     it says what happens next: the invite is waiting on the other side. -->
+			<div class="actions">
+				<wa-button
+					variant="brand"
+					appearance="outlined"
+					href={`${resolve('/login')}?redirectTo=${encodeURIComponent(data.redirectTo)}`}
+				>
+					Log in to accept
+				</wa-button>
+				<wa-button
+					variant="brand"
+					appearance="accent"
+					href={`${resolve('/signup')}?redirectTo=${encodeURIComponent(data.redirectTo)}`}
+				>
+					Create an account
+				</wa-button>
+			</div>
+		{:else if data.state === 'self'}
+			<p>Send it to the person you want to link with.</p>
+			<a href={resolve('/(auth-required)/(app)/settings/partners')}>Back to partners</a>
+		{:else if data.state === 'already-linked'}
+			<p>You and {inviterName} are already partners.</p>
+			<a href={resolve('/(auth-required)/(app)/settings/partners')}>Back to partners</a>
+		{:else if data.state === 'confirm'}
+			{#if opened && inviterChecked === false}
+				<!-- The key the server serves for them is not the one their own device
+				     put in the link. Going on would link to whoever made that swap. -->
+				<p class="warning" role="alert">
+					Something about this invite doesn't match what we have for {inviterName}, so it can't be
+					accepted here. Ask them to send you a new link, and let us know if it happens again.
+				</p>
+			{:else if opened && inviterChecked && data.inviterRecipient}
+				<p>
+					{#if data.editable}
+						Check these over — you can change them — then accept.
+					{:else}
+						If you accept, they'll be able to set tasks, rewards and punishments for you.
+					{/if}
+				</p>
 
-			<PartnerAcceptForm
-				data={data.partnerAcceptForm}
-				editable={data.editable}
-				names={namesForViewer(opened.invite, 'invitee')}
-				invite={{
-					partnershipId: data.invite.partnershipId,
-					key: opened.key,
-					inviterRecipient: opened.invite.inviterRecipient
-				}}
-			>
-				<a class="decline" href={resolve('/')}>Not now</a>
-			</PartnerAcceptForm>
-		{:else}
-			<p>…</p>
+				<PartnerAcceptForm
+					data={data.partnerAcceptForm}
+					editable={data.editable}
+					names={namesForViewer(opened.invite, 'invitee')}
+					invite={{
+						partnershipId: data.invite.partnershipId,
+						key: opened.key,
+						inviterRecipient: opened.invite.inviterRecipient
+					}}
+				>
+					<a class="decline" href={resolve('/')}>Not now</a>
+				</PartnerAcceptForm>
+			{:else}
+				<p>…</p>
+			{/if}
 		{/if}
-	{/if}
-</section>
+	</AuthBox>
+</AuthPage>
 
 <style>
-	section {
+	.actions {
 		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		max-width: 30rem;
-		margin: 0 auto;
+		flex-wrap: wrap;
+		gap: 0.75rem;
 
-		h1 {
-			margin-bottom: 0;
-			font-size: 1.5rem;
+		wa-button {
+			flex: 1 1 10rem;
 		}
+	}
 
-		p {
-			margin: 0;
-			color: var(--wa-color-text-quiet);
-		}
+	.secondary,
+	.decline {
+		align-self: center;
+		color: var(--wa-color-text-quiet);
+	}
 
-		.actions {
-			display: flex;
-			gap: 0.75rem;
-		}
-
-		.decline {
-			color: var(--wa-color-text-quiet);
-		}
-
-		.warning {
-			color: var(--wa-color-text-danger);
-		}
+	.warning {
+		color: var(--wa-color-text-danger);
 	}
 </style>

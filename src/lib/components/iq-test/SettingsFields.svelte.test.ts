@@ -302,7 +302,9 @@ describe('SettingsFields', () => {
 		await expect.poll(() => slider.value, { timeout: 5000 }).toBe(1);
 	});
 
-	it('is no wider than 300px, in the middle', async () => {
+	// Lined up with the left-aligned text above it: centred, it lined up with
+	// nothing.
+	it('is no wider than 300px, on the fields’ left edge', async () => {
 		const { container } = render(SettingsFields, { initial });
 		await waSettled(container);
 		const slider = defined(container.querySelector('wa-slider'), 'the slider');
@@ -310,7 +312,7 @@ describe('SettingsFields', () => {
 		const box = slider.getBoundingClientRect();
 		const outer = fields.getBoundingClientRect();
 		expect(box.width).toBeLessThanOrEqual(300);
-		expect(Math.abs(box.left - outer.left - (outer.right - box.right))).toBeLessThan(1);
+		expect(Math.abs(box.left - outer.left)).toBeLessThan(1);
 	});
 
 	it('has an info button beside each option, outside its label, that says what it does ticked and not', async () => {

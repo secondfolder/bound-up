@@ -95,7 +95,15 @@
 		</div>
 	</div>
 {:else}
-	<KinkListHome title="Your list for {name}" minimal>
+	<KinkListHome
+		title="Your list for {name}"
+		minimal
+		back={{
+			href: resolve('/(auth-required)/(app)/playroom/kink-list'),
+			text: 'Kink list',
+			label: 'Back to your own kink list'
+		}}
+	>
 		{#snippet intro()}
 			<nav class="partner-links" aria-label="For {name}">
 				<a href="{base}/compare">Compare with {name}</a>

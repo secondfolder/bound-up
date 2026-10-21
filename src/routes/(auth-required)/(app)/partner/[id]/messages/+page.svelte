@@ -180,7 +180,20 @@
 		return () => removeEventListener('popstate', sync);
 	});
 
-	function startComposing() {
+	/**
+	 * Where the dialog grows from: the centre of the button that opened it, so
+	 * the composer visibly comes out of that button rather than appearing in
+	 * the middle of the screen. Null when the dialog opens with the page
+	 * (`/new` loaded outright), which has no button to come from.
+	 */
+	let composeOrigin: { x: number; y: number } | null = $state(null);
+
+	function startComposing(event: MouseEvent) {
+		const button = event.currentTarget;
+		if (button instanceof Element) {
+			const rect = button.getBoundingClientRect();
+			composeOrigin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+		}
 		composing = true;
 		pushed = true;
 		pushState(resolve('/(auth-required)/(app)/partner/[id]/messages/new', { id: partnershipId }), {});
@@ -302,17 +315,18 @@
 				<div class="new">
 					<!-- "Write something" rather than "New message": /home already has
 					     a "new messages from …" link, and two controls must not share an
-					     accessible name. -->
+					     accessible name. Named by its icon's label, which is what reaches
+					     the inner <button>. A pen, not the paper plane it used to be: a
+					     paper plane is the composer's own Send, and this starts writing. -->
 					<wa-button
 						variant="brand"
 						appearance="filled"
 						size="xl"
 						pill
 						class="fab"
-						aria-label="Write something"
 						onclick={startComposing}
 					>
-						<wa-icon name="paper-plane" variant="solid" label="Write something"></wa-icon>
+						<wa-icon name="pen-to-square" variant="solid" label="Write something"></wa-icon>
 					</wa-button>
 				</div>
 			{/if}
@@ -322,6 +336,7 @@
 					partnerName={partnerShown}
 					partnershipId={data.partner.id}
 					tags={data.tags}
+					origin={composeOrigin}
 					{send}
 					permanentMedia={hasFeature(data.features, 'permanentMedia')}
 					highQualityMedia={hasFeature(data.features, 'highQualityMedia')}
@@ -333,7 +348,12 @@
 {/if}
 
 <style>
+	/* A centred column, as every other page is. Full width, a single sticker
+	   sat in the top-left corner of a desktop with the write button in the
+	   opposite one. */
 	.page {
+		max-inline-size: var(--page-width);
+		margin-inline: auto;
 		display: flex;
 		flex-direction: column;
 		flex: 1 1 auto;
@@ -361,7 +381,10 @@
 	}
 
 	wa-button.fab::part(button) {
-		box-shadow: 0 0.8rem 1.6rem rgb(0 0 0 / 18%);
+		/* Darker than a light theme's shadow would be: with no band behind the
+		   button any more, this is what separates it from a sticker under it,
+		   on a background that is already dark. */
+		box-shadow: 0 0.6rem 1.4rem rgb(0 0 0 / 45%);
 	}
 
 	wa-button.fab::part(label) {
@@ -369,9 +392,8 @@
 		place-items: center;
 		inline-size: 100%;
 		block-size: 100%;
-		/* Visually center icon */
-		margin-left: -0.1em;
-		margin-bottom: -0.1em;
+		/* No optical nudge: the paper plane this used to show leaned up and to
+		   the right and needed one, and the pen sits square in its box. */
 
 		wa-icon {
 			display: block;
@@ -388,7 +410,7 @@
 		min-block-size: 0;
 
 		header {
-			padding: 0 var(--wa-space-m);
+			padding: 0 var(--page-gutter);
 			display: flex;
 			flex-direction: column;
 			gap: var(--wa-space-s);
@@ -402,12 +424,11 @@
 		margin-block-start: auto;
 		display: flex;
 		justify-content: flex-end;
-		padding: var(--wa-space-s) var(--wa-space-m) var(--wa-space-m);
-		background: linear-gradient(
-			to bottom,
-			transparent,
-			var(--wa-color-surface-default, white) 0.75rem
-		);
+		padding: var(--wa-space-s) var(--page-gutter) var(--wa-space-m);
+		/* No band behind it. The thread's composer has one because text
+		   scrolls under it; this is one round button, and its shadow is enough
+		   to lift it off a sticker passing underneath. As a band it read as an
+		   empty footer across the whole board. */
 		pointer-events: none;
 
 		wa-button {

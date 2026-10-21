@@ -174,7 +174,16 @@
 						</wa-button>
 					</div>
 				{:else}
-					<wa-button size="s" appearance="plain" onclick={() => { showNumber = true; }}>
+					<!-- In the link colour with an icon: as a plain button it was quiet
+					     grey text that did not look like it did anything, the first
+					     line on the board. -->
+					<wa-button
+						class="check"
+						size="s"
+						appearance="plain"
+						onclick={() => { showNumber = true; }}
+					>
+						<wa-icon slot="start" name="shield-halved" variant="solid"></wa-icon>
 						Check your safety number
 					</wa-button>
 				{/if}
@@ -202,6 +211,16 @@
 		.actions {
 			display: flex;
 			gap: 0.5rem;
+		}
+
+		/* Flush with the text above it and the board's gutter, rather than
+		   indented by a button's padding. */
+		wa-button.check {
+			--wa-form-control-padding-inline: 0;
+
+			&::part(base) {
+				color: var(--wa-color-text-link);
+			}
 		}
 	}
 

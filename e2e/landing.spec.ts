@@ -542,7 +542,13 @@ test('the screened title and subtitle line up with the real ones', async ({ page
 
 		// The live page under the same box, with the effects out of the way.
 		// Hiding the canvas moves nothing, so it does not trigger a recapture.
-		await page.addStyleTag({ content: '.vfx-canvas { visibility: hidden; }' });
+		// The "beta" tag goes too: it is amber like the title but deliberately
+		// left out of the capture (it stamps itself on as the page loads), so
+		// counted here it stretched the live ink box past the captured one by
+		// the tag's own overhang. Absolutely placed, so hiding it moves nothing.
+		await page.addStyleTag({
+			content: '.vfx-canvas, .landing h1 .beta { visibility: hidden; }'
+		});
 		const shot = await page.screenshot({ clip: region });
 		const live = await page.evaluate(async (png) => {
 			const image = new Image();

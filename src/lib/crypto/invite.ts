@@ -14,9 +14,14 @@
  * are sealed".
  */
 
-import { fromBase64, fromBase64Url, toBase64Url } from '../encryption';
-import { loadAge } from './identity';
-import { generateVaultKey, type OpenVault, vaultFromKey, wrapVaultKey } from './vault';
+import { fromBase64Url, toBase64Url } from '../encryption';
+import {
+	generateVaultKey,
+	type OpenVault,
+	unwrapOwnKey,
+	vaultFromKey,
+	wrapSelfVaultKey
+} from './vault';
 import { issueWriteGrant, type WriteGrant } from './write-grant';
 
 const LEADING_HASH = /^#/;
@@ -51,40 +56,43 @@ export function inviteWriteGrant(vault: OpenVault): WriteGrant {
 	return issueWriteGrant(vault.id);
 }
 
-/** The key wrapped to the inviter's own recipient, so their devices can reopen it. */
+/**
+ * The key wrapped to the inviter's own recipient, so their devices can reopen
+ * it. With the same MAC as the self vault's wrap: the inviter's device builds
+ * the link's `#k=` from whatever this opens to, and seals edited names under
+ * it, so a key the server made up and wrapped to them would leak both.
+ */
 export async function wrapInviteKey(
 	partnershipId: string,
-	raw: Uint8Array,
-	recipient: string
+	raw: Uint8Array<ArrayBuffer>,
+	held: { recipient: string; identity: CryptoKey | string }
 ): Promise<string> {
-	return await wrapVaultKey({ vaultId: inviteVaultId(partnershipId), raw, recipient });
+	return await wrapSelfVaultKey({
+		vaultId: inviteVaultId(partnershipId),
+		raw,
+		identity: held.identity,
+		recipient: held.recipient
+	});
 }
 
-/** The key inside a wrap made by `wrapInviteKey`, or null when this identity cannot open it. */
+/**
+ * The key inside a wrap made by `wrapInviteKey`, or null when this identity
+ * did not make it. A wrap from before the MAC still opens while
+ * `ACCEPT_LEGACY_SELF_WRAPS` says so; an invite is short-lived, so nothing
+ * upgrades it.
+ */
 export async function unwrapInviteKey(
 	partnershipId: string,
 	ciphertext: string,
-	identity: CryptoKey | string
+	held: { recipient: string; identity: CryptoKey | string }
 ): Promise<Uint8Array<ArrayBuffer> | null> {
-	try {
-		const age = await loadAge();
-		const decrypter = new age.Decrypter();
-		decrypter.addIdentity(identity);
-		const payload: unknown = JSON.parse(await decrypter.decrypt(fromBase64(ciphertext), 'text'));
-		if (
-			typeof payload === 'object' &&
-			payload !== null &&
-			'vaultId' in payload &&
-			'key' in payload &&
-			payload.vaultId === inviteVaultId(partnershipId) &&
-			typeof payload.key === 'string'
-		) {
-			return keyFrom(payload.key);
-		}
-	} catch {
-		// Not a wrap this identity opens: the same answer as any other failure.
-	}
-	return null;
+	const opened = await unwrapOwnKey({
+		ciphertext,
+		identity: held.identity,
+		recipient: held.recipient,
+		vaultId: inviteVaultId(partnershipId)
+	});
+	return opened?.raw ?? null;
 }
 
 function keyFrom(encoded: string): Uint8Array<ArrayBuffer> | null {

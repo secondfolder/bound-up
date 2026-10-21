@@ -29,13 +29,13 @@ test.describe('rewards', () => {
 		await signUp(page, account('Ada'));
 
 		await page.goto('/home/rewards/add');
-		const title = page.locator('.add-form input[name="title"]');
+		const title = page.locator('.add-form wa-input[name="title"] input');
 		await waitForHydration(page);
 		await title.fill('Long bath');
 		await typeRichText(page.locator('.add-form'), 'No interruptions');
 		await expect(title).toHaveValue('Long bath');
 
-		await page.locator('.add-form input[name="cost"]').fill('2');
+		await page.locator('.add-form wa-input[name="cost"] input').fill('2');
 		await clickWaButton(page, 'Add reward');
 		await page.waitForURL(/\/home\/rewards$/);
 
@@ -64,15 +64,15 @@ test.describe('rewards', () => {
 			await ada.page.getByRole('button', { name: 'Edit your reward credits' }).click();
 			await ada.page.getByLabel('Set your reward credits').fill('4');
 			await ada.page.getByRole('button', { name: 'Save your reward credits' }).click();
-			await expect(ada.page.locator('.self .title-row')).toContainText('Your Rewards');
+			await expect(ada.page.locator('.self .title-row')).toContainText('Your rewards');
 			await expect(ada.page.locator('.self .title-row')).toContainText('Credits: 4');
 
 			await ada.page.getByRole('link', { name: 'Add a reward' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/add$/);
 			await waitForHydration(ada.page);
-			await ada.page.locator('.add-form input[name="title"]').first().fill('Long bath');
+			await ada.page.locator('.add-form wa-input[name="title"] input').first().fill('Long bath');
 			await fillRichText(ada.page.locator('.add-form'), 'No interruptions');
-			await ada.page.locator('.add-form input[name="cost"]').first().fill('2');
+			await ada.page.locator('.add-form wa-input[name="cost"] input').first().fill('2');
 			await clickWaButton(ada.page, 'Add reward');
 			await ada.page.waitForURL(/\/home\/rewards$/);
 
@@ -83,7 +83,7 @@ test.describe('rewards', () => {
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/history$/);
 			await expect(ada.page.getByText('Long bath')).toBeVisible();
-			await expect(ada.page.getByRole('heading', { name: 'Self reward history' })).toBeVisible();
+			await expect(ada.page.getByRole('heading', { name: 'Your reward history' })).toBeVisible();
 		} finally {
 			await ada.close();
 		}
@@ -121,9 +121,9 @@ test.describe('rewards', () => {
 			await jun.page.getByRole('link', { name: 'Add a reward' }).click();
 			await jun.page.waitForURL(/\/rewards\/add$/);
 			await waitForHydration(jun.page);
-			await jun.page.locator('.add-form input[name="title"]').fill('Tea service');
+			await jun.page.locator('.add-form wa-input[name="title"] input').fill('Tea service');
 			await fillRichText(jun.page.locator('.add-form'), 'Fresh pot first');
-			await jun.page.locator('.add-form input[name="cost"]').fill('2');
+			await jun.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(jun.page, 'Add reward');
 			await jun.page.waitForURL(/\/rewards$/);
 			await expect(jun.page.getByRole('heading', { name: 'Tea service' })).toBeVisible();
@@ -135,10 +135,20 @@ test.describe('rewards', () => {
 			await clickWaButton(ada.page, 'Claim');
 			await expect(ada.page.locator('.partner .title-row').first()).toContainText('Credits: 2');
 
+			/**
+			 * Both waits name the partner's route, as tasks.spec.ts does. A bare
+			 * `/\/rewards$/` already matches /home/rewards, so it returned before
+			 * the client-side navigation had loaded anything, and the click below
+			 * found /home/rewards' own "Claim history" — the self one — whenever
+			 * the partner page's load was slower than the click (four workers,
+			 * now and then). Ada then landed on /home/rewards/history, which
+			 * `/\/rewards\/history$/` matched too, and "Claimed by you" never
+			 * came, because her self history is empty.
+			 */
 			await ada.page.getByRole('link', { name: 'Open full rewards' }).click();
-			await ada.page.waitForURL(/\/rewards$/);
+			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards$/);
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
-			await ada.page.waitForURL(/\/rewards\/history$/);
+			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards\/history$/);
 			await expect(ada.page.getByText('Claimed by you')).toBeVisible();
 		} finally {
 			await ada.close();

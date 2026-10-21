@@ -9,13 +9,19 @@
  * or per-component rule this app writes.
  */
 
+/* The title face: Rubik Black, distressed by scripts/title-font/build.py, with
+   two variation axes of its own (ROUG, roughness; WOBL, wobble) that
+   `--font-display-variation` sets. One weight, Black, so the descriptor is
+   900 and anything that uses the face asks for 900 rather than letting the
+   browser embolden it. Source and licence in static/fonts/bound-up-title-*. */
 @font-face {
-	font-family: 'Muddy Tractor';
-	src: url('/fonts/muddy-tractor.woff2') format('woff2');
+	font-family: 'Bound Up Title';
+	src: url('/fonts/bound-up-title.woff2') format('woff2');
+	font-weight: 900;
 	font-display: swap;
 }
 
-/* Self-hosted rather than linked from Google Fonts, as Muddy Tractor is: no
+/* Self-hosted rather than linked from Google Fonts, as the title face is: no
    request to a third party for every visitor, and a same-origin file the
    landing page's snapshot can embed in its capture without a CORS round trip.
    One variable file covers every weight; the latin subset is all the app's
@@ -34,7 +40,11 @@
 	--accent-color: #ffac00;
 	--accent-tint: #ffcf7a;
 
-	--font-display: 'Muddy Tractor', var(--wa-font-family-body);
+	--font-display: 'Bound Up Title', var(--wa-font-family-body);
+	/* How worn the title face is: roughness chips the outline, wobble tilts
+	   and nudges each letter (both 0-100). Every use of the face sets this
+	   along with the family, since a face's axes default to clean. */
+	--font-display-variation: 'ROUG' 70, 'WOBL' 100;
 
 	/* A small label laid over a photo or video: the modal overlay's near-black,
 	   thinner, so it stays readable over a white image without blacking out a
@@ -46,6 +56,33 @@
 	   most of any long page. Something drawn in a solid colour that has to
 	   read as translucent mixes toward this (the roadmap's dimmed lines). */
 	--page-wash-floor: oklch(from var(--rust-dark) calc(l * 0.6) c h);
+
+	/* Page columns. Every page picks one of these rather than a width of its
+	   own: there used to be seven, so moving between sibling pages made the
+	   column jump. Narrow is for settings and history, where a line of text or
+	   a row of a list is the unit; the default is for lists, forms, stories and
+	   conversations; wide is for the debug tooling's side-by-side panes. */
+	--page-width-narrow: 40rem;
+	--page-width: 50rem;
+	--page-width-wide: 72rem;
+	/* The column the home and partner cards sit in: a scan list, narrower
+	   than a page. */
+	--card-column-width: 30rem;
+
+	/* The space between a page's content and the edge of its column. The page
+	   header (NestedPageHeader) and every page's content use this one value, so
+	   the back link, the title, the divider and the cards share a left edge.
+	   Smaller on a phone, where cards nested in panels otherwise left a long
+	   title a third of the screen. */
+	--page-gutter: var(--wa-space-l);
+	@media (width < 40rem) {
+		--page-gutter: var(--wa-space-m);
+	}
+
+	/* Page titles. The display face is wide, and a long single word
+	   ("Notifications") overflowed a 360px phone at a fixed size. The landing
+	   page's hero is the one title bigger than this. */
+	--page-title-size: clamp(2rem, 4vw + 1.25rem, 3rem);
 
 	/* The wash every page sits on: rust left to right, darkening from 300px
 	   down to 800px. The stops are the landing page's, which is where the
@@ -127,7 +164,10 @@
 		--wa-color-surface-border: color-mix(in oklab, var(--accent-color) 28%, transparent);
 
 		--wa-color-text-normal: oklch(94% 0.035 78);
-		--wa-color-text-quiet: oklch(80% 0.06 62);
+		/* 85% rather than 80% so it holds 4.5:1 (AA) on the brightest part of
+		   the wash, top left, where every page puts its description line. At
+		   80% it measured 4.0:1 there; it is still well apart from normal text. */
+		--wa-color-text-quiet: oklch(85% 0.055 62);
 		--wa-color-text-link: var(--accent-color);
 
 		/* The landing page's focus ring. */
@@ -179,6 +219,40 @@
 		--daydream-voice-2: oklch(86% 0.075 205);
 		--daydream-voice-3: oklch(87% 0.09 145);
 		--daydream-voice-4: oklch(84% 0.08 300);
+
+		/* Web Awesome's placeholder is gray-50, a cool blue-grey that was the
+		   only cold colour on a page. The quiet text colour instead, which is
+		   warm, a little faded so a placeholder never passes for a typed value. */
+		--wa-form-control-placeholder-color: color-mix(
+			in oklab,
+			var(--wa-color-text-quiet) 75%,
+			transparent
+		);
+	}
+
+	/* Lists. Web Awesome indents a list by giving every `li` a start margin,
+	   which a list that switches its bullets off and zeroes its own padding
+	   still inherited: every such list sat 18px in from its own heading. The
+	   indent lives on the list's padding instead, as in a browser's own
+	   stylesheet, so a bulleted list keeps it and a list that zeroes its
+	   padding is flush. In this layer, so any component's own rule wins. */
+	ul,
+	ol {
+		padding-inline-start: 1.125em;
+	}
+
+	li {
+		margin-inline-start: 0;
+	}
+
+	/* A native select's caret. Web Awesome draws a lavender SVG and blends two
+	   copies of it into whatever is behind; on rust that came out purple. One
+	   copy, unblended, in the quiet text colour (#e9c6aa is
+	   oklch(85% 0.055 62): a data URI cannot read a custom property). */
+	select {
+		--icon-caret: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path fill="%23e9c6aa" d="M201.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 338.7 54.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z"/></svg>');
+		background-image: var(--icon-caret);
+		background-blend-mode: normal;
 	}
 }
 
@@ -236,7 +310,12 @@ body::after {
 body::before {
 	position: absolute;
 	inset: 0 0 auto;
-	height: 800px;
+	/* Never taller than the body. At a flat 800px it outgrew a short page on
+	   any screen under 800px tall, so the document scrolled past the end of
+	   the body into a band of bare grain with no wash under it. The app shell,
+	   whose body has no height of its own, pins this to the window instead
+	   (see its layout). */
+	height: min(800px, 100%);
 	opacity: 0.35;
 	background: repeating-linear-gradient(195deg, #000 0, #6e6e6e 4px, #000 8px);
 	mask-image: linear-gradient(to bottom, #000 300px, transparent 800px);
@@ -256,11 +335,17 @@ body::after {
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncG type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncB type='linear' slope='0.55' intercept='0.225'/%3E%3CfeFuncA type='table' tableValues='1 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Page titles in the landing page's display face. Only h1: Muddy Tractor is a
+/* Page titles in the landing page's display face. Only h1: it is a
    distressed poster face, and at section-heading sizes its texture turns to
    noise. */
 :where(h1) {
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: 900;
+	font-variation-settings: var(--font-display-variation);
+	font-size: var(--page-title-size);
+	line-height: 1.1;
 	color: var(--accent-color);
+	/* A title that is one long word still wraps rather than pushing the page
+	   sideways on a narrow phone. */
+	overflow-wrap: break-word;
 }

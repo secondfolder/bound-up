@@ -54,9 +54,10 @@
 					<li>
 						<a href={resolve('/(auth-required)/(app)/daydreams/[id]', { id: daydream.id })}>
 							<span class="title">{shownText(openedPart(setup, daydreamTitle))}</span>
+							<!-- The separator's spaces as a string: written as text at the end of
+							     the block, Svelte trimmed the one after it ("with Mara ·played"). -->
 							<span class="detail">
-								{#if setup}{withWhom(setup)} ·
-								{/if}{daydream.lastTurnAt
+								{#if setup}{withWhom(setup)}{' · '}{/if}{daydream.lastTurnAt
 									? `played ${dateFormat.format(daydream.lastTurnAt)}`
 									: 'not started yet'}
 							</span>
@@ -72,9 +73,9 @@
 	/* The app shell's <main> is the full-width scroll container, so the page
 	   carries its own column, as the Playroom does. */
 	.page {
-		max-width: 800px;
+		max-width: var(--page-width);
 		margin-inline: auto;
-		padding: 1em;
+		padding: var(--wa-space-m) var(--page-gutter);
 
 		h1 {
 			text-align: center;

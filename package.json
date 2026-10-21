@@ -30,6 +30,7 @@
 		"auth:schema": "better-auth generate --config ./better-auth.config.ts --output src/lib/server/db/schema/auth.ts --yes",
 		"cf-typegen": "wrangler types ./src/worker-env.d.ts --include-runtime=false",
 		"brand-images": "tsx scripts/generate-brand-images.ts",
+		"title-font": "uv run --no-project --python 3.13 --with-requirements scripts/title-font/requirements.txt python scripts/title-font/build.py",
 		"prompts:export": "NODE_OPTIONS=--max-old-space-size=8192 tsx scripts/prompts-export.ts",
 		"prompts:review": "NODE_OPTIONS=--max-old-space-size=8192 tsx scripts/prompts-review.ts"
 	},
@@ -92,6 +93,7 @@
 		"@lexical/selection": "^0.51.0",
 		"@lexical/utils": "^0.51.0",
 		"@libsql/client": "^0.18.0",
+		"@noble/curves": "^2.4.0",
 		"@scure/base": "^2.4.0",
 		"@simplewebauthn/browser": "13.3.0",
 		"@vfx-js/core": "1.1.0",

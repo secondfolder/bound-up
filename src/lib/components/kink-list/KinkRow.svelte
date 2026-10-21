@@ -481,7 +481,17 @@
 	   stacked, all right-aligned, so the dots still line up down the page. */
 	@container kinks (width < 38rem) {
 		.contexts {
+			--context-label: 4.25rem;
 			grid-template-columns: auto;
+		}
+
+		/* Specifics step in less, so two levels deep still fits a row of dots
+		   and its label on a phone. Through `.kink`, to outrank the rule
+		   further down. */
+		.kink .specifics {
+			padding-inline-start: 0.75rem;
+			background-position-x: 0.75rem;
+			background-size: calc(100% - 0.75rem) var(--wa-border-width-s);
 		}
 
 		.side-a,
@@ -503,8 +513,10 @@
 		align-items: center;
 		gap: 0 0.375rem;
 
+		/* The label may shrink, and wraps when it does; the dots may not
+		   (AnswerScale), so a deep row on a phone keeps their spacing. */
 		&.labelled {
-			grid-template-columns: var(--context-label) auto;
+			grid-template-columns: minmax(0, var(--context-label)) auto;
 		}
 
 		& > :not(.context-label) {

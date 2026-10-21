@@ -67,7 +67,7 @@
 	   ended. The width, because auto margins in <main>'s flex column would
 	   otherwise shrink the column to its content. */
 	.page {
-		max-width: 48rem;
+		max-width: var(--page-width);
 		inline-size: 100%;
 		margin: 0 auto;
 		display: flex;
@@ -80,7 +80,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		padding: var(--wa-space-m) var(--wa-space-l) 0;
+		padding: var(--wa-space-m) var(--page-gutter) 0;
 
 		.setup {
 			align-self: flex-end;

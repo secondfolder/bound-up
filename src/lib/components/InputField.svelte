@@ -60,7 +60,10 @@
 	 * Svelte cannot know it has a value property until the CDN bundle upgrades
 	 * it, and the binding silently does nothing until then.
 	 */
-	type WaInput = HTMLElement & { value?: unknown; input?: HTMLInputElement | null };
+	type WaInput = HTMLElement & {
+		value?: unknown;
+		input?: HTMLInputElement | HTMLTextAreaElement | null;
+	};
 
 	/**
 	 * Follows what is typed with listeners of its own, on the element and on
@@ -111,7 +114,7 @@
 		host.addEventListener('input', sync, { signal });
 		host.addEventListener('change', syncChange, { signal });
 		customElements
-			.whenDefined('wa-input')
+			.whenDefined(host.localName)
 			.then(async () => {
 				await (host as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
 				if (!signal.aborted) {
@@ -122,6 +125,14 @@
 			.catch(() => undefined);
 		return () => controller.abort();
 	};
+
+	/**
+	 * The `wa-input` types a field may be. A number is kept as the string the
+	 * control holds, as every form here declares its numeric fields: an empty
+	 * box is then an empty string the schema can name, rather than a 0 nobody
+	 * typed.
+	 */
+	const TEXT_TYPES = new Set(['text', 'email', 'number', 'datetime-local', 'date', 'time']);
 
 	// null is a legitimate stored value (an omitted relationship label), but it
 	// would render as the literal string "null".
@@ -143,7 +154,19 @@
 		>
 			{#if startText}<span slot="start" class="start-text">{startText}</span>{/if}
 		</wa-input>
-	{:else if type === 'email' || type === 'text'}
+	{:else if type === 'textarea'}
+		<!-- `wa-textarea` keeps its native control as `.input` too, so `follow`
+		     reads it the same way. -->
+		<wa-textarea
+			label={title || field}
+			name={field}
+			value={displayValue}
+			{@attach follow}
+			aria-invalid={$errors ? 'true' : undefined}
+			{...attributes}
+			{...otherProps}
+		></wa-textarea>
+	{:else if TEXT_TYPES.has(type)}
 		<wa-input
 			label={title || field}
 			name={field}
@@ -164,10 +187,16 @@
 
 <style>
 	.field {
+		/* A fixed lead-in ("Riley's …"), not part of the value. In the quiet
+		   colour alone it read as something already typed, so it is set apart
+		   by style and a rule as well. */
 		.start-text {
 			color: var(--wa-color-text-quiet);
+			font-style: italic;
 			white-space: nowrap;
-			margin-inline-end: 0.35rem;
+			margin-inline-end: 0.5rem;
+			padding-inline-end: 0.5rem;
+			border-inline-end: 1px solid var(--wa-color-surface-border);
 		}
 
 		.invalid {

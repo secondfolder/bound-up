@@ -218,7 +218,8 @@ Feature grants have no such lag.
 ### The pages
 
 - `/admin` is a hub with two links. **Server settings** shows a one-line
-  status for each area — Email, Language models, Image models, Notifications — and the
+  status for each area — Email, Language models, Image models, Notifications,
+  each with a green check or, when not set up, an amber exclamation — and the
   hub warns, above both, when email is not set up, since nobody new can finish
   signing up until it is. **Accounts** goes to the search.
 - `/admin/server` edits the server settings, one form per area, and has the

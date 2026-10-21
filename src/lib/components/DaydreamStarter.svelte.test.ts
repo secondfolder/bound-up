@@ -88,6 +88,18 @@ function button(container: HTMLElement, text: string): HTMLElement | undefined {
 }
 
 describe('DaydreamStarter', () => {
+	it('starts each card’s facts on one line across a row, however long its premise', async () => {
+		const { container } = await renderStarter();
+		const cards = [...container.querySelectorAll<HTMLElement>('.card')];
+		const top = (card: HTMLElement) => Math.round(card.getBoundingClientRect().top);
+		const firstRow = cards.filter((card) => top(card) === top(cards[0] as HTMLElement));
+		expect(firstRow.length).toBeGreaterThan(1);
+		const metaTops = firstRow.map((card) =>
+			Math.round(defined(card.querySelector('.meta'), 'facts').getBoundingClientRect().top)
+		);
+		expect(new Set(metaTops).size).toBe(1);
+	});
+
 	it('shows how generated ideas were written, in debug mode only', async () => {
 		const generated = {
 			brief: 'from https://www.reddit.com/r/Example/',

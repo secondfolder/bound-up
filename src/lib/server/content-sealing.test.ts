@@ -602,6 +602,75 @@ describe('partnership names', () => {
 		});
 	});
 
+	describe('a member without control', () => {
+		/** Ada invites Jun and keeps control, so Jun may read but not edit. */
+		async function readOnlyForJun() {
+			const invite = await createTestInvite(harness.db, ada, { control: 'me' });
+			const accepted = await acceptInvite(harness.db, {
+				token: invite.inviteToken,
+				inviteeId: jun.id
+			});
+			if (!accepted.ok) {
+				throw new Error(`could not accept: ${accepted.reason}`);
+			}
+			return invite.id;
+		}
+
+		it('is not handed the names, tasks or rewards to seal', async () => {
+			const partnershipId = await readOnlyForJun();
+			const ids = await insertLegacyPartnershipRows(partnershipId, ada, jun);
+			const scope: ContentScope = { kind: 'partnership', partnershipId };
+
+			const forJun = defined(await listUnsealedContent(harness.db, jun.id, scope), 'page');
+			expect(forJun.names).toBeNull();
+			expect(forJun.tasks).toEqual([]);
+			expect(forJun.rewards).toEqual([]);
+			// Completions and claims are not `control`'s to decide, so are still listed.
+			expect(forJun.completions.map((row) => row.id)).toEqual([ids.completionId]);
+			expect(forJun.claims.map((row) => row.id)).toEqual([ids.claimId]);
+
+			const forAda = defined(await listUnsealedContent(harness.db, ada.id, scope), 'page');
+			expect(forAda.names?.invite).not.toBeNull();
+			expect(forAda.tasks.map((row) => row.id)).toEqual([ids.taskId]);
+		});
+
+		it('cannot write the names, tasks or rewards by sealing them', async () => {
+			const partnershipId = await readOnlyForJun();
+			const ids = await insertLegacyPartnershipRows(partnershipId, ada, jun);
+			const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+			const scope: ContentScope = { kind: 'partnership', partnershipId };
+			const before = await readPartnershipRow(harness.db, partnershipId);
+
+			const batch = {
+				...batchFor(vaultId, ids),
+				names: { ciphertext: fakeSealed('names'), payloadVersion: 1 }
+			};
+			// The completion and claim still seal; nothing `control` gates does.
+			await expect(sealUnsealedContent(harness.db, jun.id, scope, batch)).resolves.toEqual({
+				ok: true,
+				sealed: 2
+			});
+			await expect(readPartnershipRow(harness.db, partnershipId)).resolves.toMatchObject({
+				namesCiphertext: null,
+				namesRevision: before?.namesRevision,
+				inviteCiphertext: before?.inviteCiphertext
+			});
+			await expect(readPartnershipTaskRow(harness.db, ids.taskId)).resolves.toMatchObject({
+				ciphertext: null,
+				title: 'Shared task'
+			});
+			await expect(readPartnershipRewardRow(harness.db, ids.rewardId)).resolves.toMatchObject({
+				ciphertext: null,
+				title: 'Shared reward'
+			});
+
+			// The member who holds control seals them as before.
+			await expect(
+				sealUnsealedContent(harness.db, ada.id, scope, namesBatch(vaultId))
+			).resolves.toEqual({ ok: true, sealed: 1 });
+		});
+	});
+
 	it('refuses a malformed names ciphertext, and writes none of the batch', async () => {
 		const partnershipId = (
 			await createTestPartnership(harness.db, ada, jun, { legacyNames: Legacy })

@@ -33,7 +33,7 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
 		width: 100%;
 		padding-bottom: var(--wa-space-l);
@@ -42,7 +42,7 @@
 			display: flex;
 			flex-direction: column;
 			gap: var(--wa-space-m);
-			padding: var(--wa-space-l);
+			padding: var(--wa-space-l) var(--page-gutter);
 		}
 
 		.privacy {

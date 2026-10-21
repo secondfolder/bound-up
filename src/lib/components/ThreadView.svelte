@@ -6,6 +6,7 @@
 	import { currentKeyring, unlockedIdentity } from '$lib/crypto/session.svelte';
 	import { writeGrantFor } from '$lib/crypto/trust.svelte';
 	import { partnershipVault } from '$lib/crypto/vaults.svelte';
+	import { timelineMarks } from '$lib/message-timeline';
 	import {
 		buildReaction,
 		type ComposedMessage,
@@ -82,6 +83,13 @@
 	let reactions: Record<string, { emoji: string; mine: boolean }[]> = $state({});
 	const attemptedMetadataBackfill = new SvelteSet<string>();
 
+	/**
+	 * Which thread's reactions have all been opened once. Until they have, a
+	 * reaction appearing is one that was already there, decrypting, and does
+	 * not pop; after, it is one that has just been added.
+	 */
+	let reactionsOpenedFor: string | null = $state(null);
+
 	$effect(() => {
 		const unlocked = keyring.status === 'unlocked' ? keyring.identity : null;
 		if (!unlocked) {
@@ -92,6 +100,7 @@
 		// Captured so a run superseded by a newer one bails out rather than
 		// writing stale plaintext over fresh — the same guard EdgeTask.svelte uses.
 		const { messages } = thread;
+		const messagesThreadId = thread.id;
 		let cancelled = false;
 
 		void (async () => {
@@ -126,6 +135,9 @@
 					return;
 				}
 				reactions[message.id] = decoded;
+			}
+			if (!cancelled) {
+				reactionsOpenedFor = messagesThreadId;
 			}
 		})();
 
@@ -198,6 +210,20 @@
 		const grant = writeGrantFor(partnershipId, vault.id);
 		return grant ? { vault, grant } : null;
 	}
+
+	/**
+	 * The messages the thread opened with, by id. Anything not in it arrived
+	 * while the thread was on screen, a reply sent from here or one from the
+	 * partner, and animates in. Recomputed only when the thread itself changes:
+	 * the page component is reused across threads.
+	 */
+	const loadedIds = $derived.by(() => {
+		void threadId;
+		return untrack(() => new Set(thread.messages.map((message) => message.id)));
+	});
+
+	/** Which messages show their time, and where each day starts (`message-timeline.ts`). */
+	const marks = $derived(timelineMarks(thread.messages, new Date()));
 
 	function formatWhen(date: Date): string {
 		return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
@@ -308,7 +334,7 @@
 	     (`heldId`), and follows new ones only for a reader already at the
 	     end: one who has scrolled up to read is left there. -->
 	<ul class="messages" {@attach (list) => followEnd(list, { holdAt: () => heldElement(list) })}>
-		{#each thread.messages as message (message.id)}
+		{#each thread.messages as message, index (message.id)}
 			<MessageBubble
 				{message}
 				payload={message.id in bodies ? bodies[message.id] : undefined}
@@ -321,6 +347,11 @@
 				onReact={(emoji) => react(message, emoji)}
 				onClearReaction={() => clearReaction(message)}
 				seenBy={message.id === thread.seenMessageId ? partner : null}
+				showTime={marks[index]?.showTime ?? true}
+				continuesRun={marks[index]?.continuesRun ?? false}
+				day={marks[index]?.day ?? null}
+				arrived={!loadedIds.has(message.id)}
+				animateReactions={reactionsOpenedFor === thread.id}
 			/>
 		{/each}
 	</ul>
@@ -366,7 +397,7 @@
 	.messages {
 		list-style: none;
 		margin: 0;
-		padding: var(--wa-space-m);
+		padding: var(--wa-space-m) var(--page-gutter);
 		display: flex;
 		flex-direction: column;
 		gap: 0.625rem;
@@ -374,18 +405,21 @@
 	}
 
 	.thread-tags {
-		padding: var(--wa-space-s) var(--wa-space-m) 0;
+		padding: var(--wa-space-s) var(--page-gutter) 0;
 	}
 
 	footer {
 		position: sticky;
 		inset-block-end: 0;
-		padding: var(--wa-space-s) var(--wa-space-m) var(--wa-space-m);
-		/* So bubbles scrolling under the composer stay legible on the way past. */
-		background: linear-gradient(
-			to bottom,
-			transparent,
-			var(--wa-color-surface-default, white) 0.75rem
-		);
+		padding: var(--wa-space-s) var(--page-gutter) var(--wa-space-m);
+		/* So bubbles scrolling under the composer stay legible on the way past.
+		   A border image rather than a background, for its outset: the thread is
+		   a centred column, and a background would stop at the column's edges,
+		   leaving a dark box floating over the wash on a wide screen. The outset
+		   paints the band across the whole pane, and as ink overflow it never
+		   makes anything scroll sideways. */
+		border-image:
+			linear-gradient(to bottom, transparent, var(--wa-color-surface-default, white) 0.75rem) fill
+			0 / 0 / 0 100vmax;
 	}
 </style>

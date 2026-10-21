@@ -375,6 +375,41 @@ describe('DaydreamThread', () => {
 		});
 	});
 
+	it('keeps the suggested replies under the passage, not at the foot of a tall screen', async () => {
+		// A tall column, as the route gives a short story: the space it leaves
+		// goes between the suggestions and the composer, not above them.
+		const content = document.createElement('div');
+		content.style.cssText =
+			'display: flex; flex-direction: column; gap: 0.75rem; block-size: 1500px';
+		document.body.append(content);
+		try {
+			render(DaydreamThread, {
+				target: content,
+				props: {
+					daydream: daydream([
+						turn('t1', null, 'story', {
+							type: 'text',
+							text: 'Sit.',
+							meta: meta({ suggestions: ['I kneel instead.'] })
+						})
+					]),
+					available: true
+				}
+			});
+			await waitFor(() => expect(content.querySelector('.suggestions')).not.toBeNull());
+			await waSettled(content);
+			const turns = defined(content.querySelector('.turns'), 'turns').getBoundingClientRect();
+			const offered = defined(content.querySelector('.suggestions'), 'suggestions');
+			expect(offered.getBoundingClientRect().top - turns.bottom).toBeLessThan(40);
+			const compose = defined(content.querySelector('.compose'), 'compose');
+			expect(
+				content.getBoundingClientRect().bottom - compose.getBoundingClientRect().bottom
+			).toBeLessThan(2);
+		} finally {
+			content.remove();
+		}
+	});
+
 	it('sends a suggestion with a tap', async () => {
 		const { container } = render(DaydreamThread, {
 			daydream: daydream([
@@ -501,17 +536,37 @@ describe('DaydreamThread', () => {
 		// Square, so `pill` makes its hover background a circle.
 		expect(chevron('end').offsetWidth).toBe(chevron('end').offsetHeight);
 
+		// Every scroll here is awaited to its `scrollend`, and only then is the
+		// position read. Polling it with `waitFor` was flaky: its deadline is a
+		// timer, and a scroll moves only when a frame is drawn, so a main-thread
+		// stall running past the deadline (a loaded machine in a full run) lets
+		// the timer fire before the frame that finishes the scroll. The wait
+		// then fails on a position from partway through a scroll that had in
+		// fact finished ("expected 160 to be close to 183.2" with a 900ms stall
+		// injected), and each smooth scroll spent 250ms of the 1s budget anyway.
+		// The plain assignments are awaited too: their own `scrollend` comes a
+		// frame later, and would otherwise end the wait for the next scroll.
+		const scrolled = async (scroll: () => void) => {
+			const ended = new Promise((resolve) =>
+				scroller.addEventListener('scrollend', resolve, { once: true })
+			);
+			scroll();
+			await ended;
+		};
+
 		// A chevron scrolls by most of a page.
 		const onePage = scroller.clientWidth * 0.8;
-		chevron('end').click();
-		await waitFor(() => expect(scroller.scrollLeft).toBeCloseTo(onePage, -1));
+		await scrolled(() => chevron('end').click());
+		expect(scroller.scrollLeft).toBeCloseTo(onePage, -1);
 		await waitFor(() => expect(chevron('start').classList.contains('shown')).toBe(true));
-		chevron('start').click();
-		await waitFor(() => expect(scroller.scrollLeft).toBe(0));
+		await scrolled(() => chevron('start').click());
+		expect(scroller.scrollLeft).toBe(0);
 		await waitFor(() => expect(chevron('start').classList.contains('shown')).toBe(false));
 
 		// At the far end, that end is crisp and its chevron gone.
-		scroller.scrollLeft = scroller.scrollWidth;
+		await scrolled(() => {
+			scroller.scrollLeft = scroller.scrollWidth;
+		});
 		await waitFor(() => expect(scroller.hasAttribute('data-more-end')).toBe(false));
 		expect(scroller.hasAttribute('data-more-start')).toBe(true);
 		expect(chevron('end').classList.contains('shown')).toBe(false);
@@ -519,10 +574,12 @@ describe('DaydreamThread', () => {
 		// A page that would stop a sliver short of the end goes all the way.
 		const farEnd = scroller.scrollWidth - scroller.clientWidth;
 		// A page short of the end, plus 4rem (64px): within the 5rem that counts as nearly there.
-		scroller.scrollLeft = farEnd - scroller.clientWidth * 0.8 - 64;
+		await scrolled(() => {
+			scroller.scrollLeft = farEnd - scroller.clientWidth * 0.8 - 64;
+		});
 		await waitFor(() => expect(chevron('end').classList.contains('shown')).toBe(true));
-		chevron('end').click();
-		await waitFor(() => expect(scroller.scrollLeft).toBeCloseTo(farEnd, 0));
+		await scrolled(() => chevron('end').click());
+		expect(scroller.scrollLeft).toBeCloseTo(farEnd, 0);
 	});
 
 	it('shows every reaction icon unpressed, in a variant the free icon set has', async () => {
@@ -811,7 +868,7 @@ describe('DaydreamThread', () => {
 		await waitFor(() => expect(saved(2)?.content).toEqual({ type: 'safety', signal: 'resume' }));
 	});
 
-	it('folds Ease off and Stop into a menu on a narrow screen', async () => {
+	it('folds Ease off into a menu on a narrow screen, and keeps Stop in sight', async () => {
 		await page.viewport(600, 800);
 		try {
 			const { container } = render(DaydreamThread, {
@@ -822,19 +879,21 @@ describe('DaydreamThread', () => {
 			await waSettled(container);
 			const visible = (element: Element | null | undefined) => element?.checkVisibility() ?? false;
 			expect(visible(button(container, 'Ease off'))).toBe(false);
-			expect(visible(button(container, 'Stop'))).toBe(false);
+			// The safety control is never behind a menu.
+			expect(visible(button(container, 'Stop'))).toBe(true);
 			const menu = defined(container.querySelector('.menu'), 'menu');
 			expect(visible(menu)).toBe(true);
 
 			defined(menu.querySelector<HTMLElement>('[slot="trigger"]'), 'trigger').click();
-			const stop = defined(
+			const easeOff = defined(
 				[...menu.querySelectorAll<HTMLElement>('wa-dropdown-item')].find(
-					(item) => item.textContent?.trim() === 'Stop'
+					(item) => item.textContent?.trim() === 'Ease off'
 				),
-				'Stop item'
+				'Ease off item'
 			);
-			await waitFor(() => expect(visible(stop)).toBe(true));
-			stop.click();
+			await waitFor(() => expect(visible(easeOff)).toBe(true));
+
+			await press(container, 'Stop');
 			await waitFor(() => expect(saved(0)?.content).toEqual({ type: 'safety', signal: 'red' }));
 		} finally {
 			await page.viewport(1280, 800);

@@ -100,7 +100,13 @@
 	onwa-hide={onHide}
 	onwa-after-hide={afterHide}
 >
-	<div class="disclaimer">
+	<!-- Focus lands on the disclaimer as the dialog opens, rather than on the
+	     first button: there it showed a focus ring before anything was pressed,
+	     which made "smart dom" look already chosen over its equal. Read first by
+	     a screen reader, too, which is right for a disclaimer. -->
+	<!-- svelte-ignore a11y_autofocus -->
+	<!-- biome-ignore lint/a11y/noAutofocus: this is inside a modal (wa-dialog), which Biome cannot see through; the dialog's own focus would otherwise land on a choice. -->
+	<div class="disclaimer" tabindex="-1" autofocus>
 		<p>
 			Don't take it seriously, and don't use it on anyone who hasn't agreed to play. If you're under
 			18, close this page.
@@ -126,6 +132,11 @@
 	   page dimmed behind it. */
 	.setup {
 		--width: min(calc(100vw - 2rem), 46rem);
+		/* The window's height, but no taller than 44rem: on a 1080px screen the
+		   full height left 700px of empty panel between the slider and the
+		   buttons at the lowest level. Still fixed whatever is in it, for the
+		   reason below; what does not fit scrolls. */
+		--setup-height: min(calc(100dvh - 2rem), 44rem);
 		/* No grow-in: before it upgrades, the rule below already draws the
 		   dialog's panel in the same place, so the real one should simply
 		   replace it. */
@@ -136,8 +147,8 @@
 		   shrank around the slider, moving it from under the pointer. Its
 		   width stays as it was. */
 		&::part(dialog) {
-			block-size: calc(100dvh - 2rem);
-			max-block-size: calc(100dvh - 2rem);
+			block-size: var(--setup-height);
+			max-block-size: var(--setup-height);
 		}
 
 		&::part(body) {
@@ -165,7 +176,7 @@
 		z-index: 100;
 		display: block;
 		inline-size: min(calc(100vw - 2rem), 46rem);
-		block-size: calc(100dvh - 2rem);
+		block-size: min(calc(100dvh - 2rem), 44rem);
 		margin: auto;
 		border-radius: var(--wa-border-radius-l);
 		background: var(--wa-color-surface-raised);
@@ -174,6 +185,11 @@
 		> * {
 			visibility: hidden;
 		}
+	}
+
+	.disclaimer {
+		/* Focused on open (see the markup), but not a control: no ring. */
+		outline: none;
 	}
 
 	.disclaimer p {

@@ -77,12 +77,13 @@
 	ul {
 		list-style: none;
 		margin: 0;
-		padding: var(--wa-space-m);
+		/* The page gutter, so the stickers line up with the header above them. */
+		padding: var(--wa-space-m) var(--page-gutter);
 		display: grid;
 		/*
-		 * auto-fill, not auto-fit: on a 320px phone this settles at three columns
-		 * and keeps a real tap target, where auto-fit would stretch two stickers
-		 * across the width.
+		 * auto-fill, not auto-fit: with a single thread, auto-fit would stretch
+		 * that one sticker across the whole board. A phone settles at two
+		 * columns.
 		 */
 		grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
 		gap: var(--wa-space-s);
@@ -93,7 +94,7 @@
 		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
 		gap: var(--wa-space-s);
-		padding-inline: var(--wa-space-m);
+		padding-inline: var(--page-gutter);
 
 		span {
 			font-size: 0.75rem;

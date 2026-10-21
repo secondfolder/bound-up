@@ -20,8 +20,11 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!page) {
 		error(404, 'Partner not found');
 	}
+	// The side without control has nothing to do here, but a link or a
+	// bookmark can still bring them: back to the list rather than an error
+	// page. The action below still refuses a direct post with a 403.
 	if (!page.partner.canManageTasks) {
-		error(403, 'Only the controlling side can add tasks here.');
+		redirect(303, `/partner/${params.id}/tasks`);
 	}
 	return {
 		...page,

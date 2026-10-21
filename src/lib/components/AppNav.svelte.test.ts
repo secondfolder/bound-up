@@ -73,6 +73,21 @@ describe('AppNav', () => {
 		expect(screen.getByRole('link', { name: /Ada/ })).not.toHaveAttribute('aria-current');
 	});
 
+	it('marks Settings current inside admin and debug, which are reached from it', () => {
+		for (const routeId of [
+			'/(auth-required)/(app)/admin/users/[id]',
+			'/(auth-required)/(app)/debug/prompts'
+		]) {
+			const { unmount } = renderNav(routeId, { id: 'u1' });
+			expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute(
+				'aria-current',
+				'page'
+			);
+			expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
+			unmount();
+		}
+	});
+
 	it('marks only the partner whose page is open', () => {
 		renderNav('/(auth-required)/(app)/partner/[id]', { id: 'p-jun' });
 		expect(screen.getByRole('link', { name: /Jun/ })).toHaveAttribute('aria-current', 'page');

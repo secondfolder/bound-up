@@ -1,11 +1,13 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { tick } from 'svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 	import { adopted } from '$lib/kink-list/adopted.svelte';
 	import { isShown, searchView } from '$lib/kink-list/answers';
 	import { catalog, categories, childrenOf, type KinkItem } from '$lib/kink-list/catalog';
 	import { kinkListContext, setKinkListSearch } from '$lib/kink-list/context';
 	import KinkCategory from './KinkCategory.svelte';
+	import KinkListCrumbs from './KinkListCrumbs.svelte';
 	import LevelKey from './LevelKey.svelte';
 	import ListFilters from './ListFilters.svelte';
 	import SaveStatus from './SaveStatus.svelte';
@@ -27,10 +29,13 @@
 	let {
 		intro,
 		title = 'Kink list',
-		minimal = false
+		minimal = false,
+		back
 	}: {
 		intro?: Snippet;
 		title?: string;
+		/** The way up from the list, where there is one: the Playroom, or your own list. */
+		back?: { href: string; text: string; label: string };
 		/** A partner's view: the list, without quick fill, sharing a link, or import. */
 		minimal?: boolean;
 	} = $props();
@@ -110,6 +115,16 @@
 		return () => node.removeEventListener('input', onInput);
 	}
 
+	/**
+	 * A phone pins only the search and the key. Everything pinned is list not
+	 * seen, and there the level of detail and "Answer as" took the pinned bar
+	 * to over a third of the screen; they sit above it instead, to scroll away
+	 * with the top of the page. Moved rather than hidden, so each control
+	 * exists once. Only the browser renders this component (the list opens
+	 * after hydration), so the query's answer is never a guess.
+	 */
+	const phone = new MediaQuery('width < 40rem');
+
 	let sectionsEl: HTMLElement | undefined = $state();
 	let sharing = $state(false);
 
@@ -139,7 +154,8 @@
 	}
 </script>
 
-<div class="home">
+<div class="home kink-list-home">
+	{#if back}<KinkListCrumbs {...back} />{/if}
 	<header>
 		<h1>{title}</h1>
 		<SaveStatus />
@@ -198,6 +214,23 @@
 		{/if}
 	{/if}
 
+	{#snippet sideRow()}
+		<div class="pinned-row">
+			<YourSideControl />
+			<span class="fold">
+				<button type="button" class="link" onclick={() => setAllOpen(true)}>Expand all</button>
+				<button type="button" class="link" onclick={() => setAllOpen(false)}>Collapse all</button>
+			</span>
+		</div>
+	{/snippet}
+
+	{#if phone.current}
+		<div class="unpinned">
+			<ListFilters />
+			{@render sideRow()}
+		</div>
+	{/if}
+
 	<div class="sentinel" aria-hidden="true" {@attach watchStuck}></div>
 	<div class="pinned" class:stuck={stuck}>
 		<div class="controls">
@@ -213,16 +246,10 @@
 			>
 				<wa-icon slot="start" name="magnifying-glass" variant="solid"></wa-icon>
 			</wa-input>
-			<ListFilters />
+			{#if !phone.current}<ListFilters />{/if}
 		</div>
 		<LevelKey />
-		<div class="pinned-row">
-			<YourSideControl />
-			<span class="fold">
-				<button type="button" class="link" onclick={() => setAllOpen(true)}>Expand all</button>
-				<button type="button" class="link" onclick={() => setAllOpen(false)}>Collapse all</button>
-			</span>
-		</div>
+		{#if !phone.current}{@render sideRow()}{/if}
 	</div>
 
 	<!-- Said as the search changes, so a screen reader hears what it left. -->
@@ -283,7 +310,16 @@
 		gap: 0.75rem 1.5rem;
 
 		wa-input {
-			flex: 1 1 14rem;
+			flex: 3 1 14rem;
+		}
+
+		/* Never sized by its content: the reading beside its title is a
+		   different width at each level ("Common", "Very detailed"), and
+		   every move would resize the search beside it. Growing a little
+		   beside the search, and to the whole row once it wraps under it on a
+		   phone, where at a fixed width it stopped well short of the edge. */
+		> :global(.filter) {
+			flex: 1 0 15em;
 		}
 
 		/* Visually hidden rather than gone, so the field keeps its name. */
@@ -348,6 +384,12 @@
 				transition: none;
 			}
 		}
+	}
+
+	.unpinned {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 	}
 
 	.pinned-row {

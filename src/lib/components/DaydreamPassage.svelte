@@ -59,6 +59,8 @@
 			)
 	);
 	const reaction = $derived(story.reactionFor(node.id)?.reaction ?? null);
+	/** The reaction just given, for its pop; cleared once that has played. */
+	let popped: string | null = $state(null);
 	const bookmarked = $derived(
 		story
 			.bookmarksFor(node.id)
@@ -167,7 +169,15 @@
 							class="reaction"
 							aria-label={choice.label}
 							aria-pressed={reaction === choice.value}
-							onclick={() => void story.react(node.id, choice.value)}
+							class:popped={popped === choice.value}
+							class:flame={choice.icon === 'fire'}
+							onclick={() => {
+								popped = reaction === choice.value ? null : choice.value;
+								void story.react(node.id, choice.value);
+							}}
+							onanimationend={() => {
+								popped = null;
+							}}
 						>
 							<wa-icon name={choice.icon} variant={choice.outline && reaction !== choice.value ? 'regular' : 'solid'}></wa-icon>
 						</button>
@@ -242,6 +252,15 @@
 			background: var(--wa-color-surface-raised, var(--wa-color-surface-default));
 			border: 1px solid var(--wa-color-surface-border);
 			overflow-wrap: anywhere;
+
+			/* A touch larger, with more room, where there is room: long passages
+			   at body size in a chat bubble read cramped on a big screen.
+			   DaydreamArriving matches, so a passage does not change size as it
+			   is saved. */
+			@media (width >= 48rem) {
+				padding: 0.75rem 1rem;
+				font-size: 1.0625rem;
+			}
 		}
 
 		&.ooc .text {
@@ -249,6 +268,29 @@
 			border-style: dashed;
 			font-style: italic;
 			color: var(--wa-color-text-quiet);
+		}
+	}
+
+	@keyframes reacted {
+		40% {
+			scale: 1.3;
+		}
+	}
+
+	@keyframes flicker {
+		25% {
+			scale: 1.3;
+			rotate: -8deg;
+		}
+
+		50% {
+			scale: 1.15;
+			rotate: 6deg;
+		}
+
+		75% {
+			scale: 1.22;
+			rotate: -3deg;
 		}
 	}
 
@@ -291,6 +333,19 @@
 
 		&[aria-pressed='true'] {
 			color: var(--wa-color-brand-on-quiet);
+		}
+
+		/* A pop as a reaction is given, and a flicker for the flame: the tap
+		   lands visibly. Only on the one just pressed (`popped`), never on
+		   reactions already there as the story opens. */
+		@media (prefers-reduced-motion: no-preference) {
+			&.popped wa-icon {
+				animation: reacted 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+			}
+
+			&.popped.flame wa-icon {
+				animation: flicker 420ms ease-out;
+			}
 		}
 
 		&:hover {

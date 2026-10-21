@@ -195,7 +195,9 @@ The server checks only what it can: the ciphertext's shape and size, a known
 permission. Permissions never moved: who may create, edit or complete a task
 is decided from the stored rows exactly as before.
 
-**Forms.** The editor (`SealedTaskEditor.svelte`) is superforms as usual, but
+**Forms.** The editor (`SealedTaskEditor.svelte`, drawing `TaskForm.svelte`,
+whose fields are the app's `InputField`, `SelectField` and `CheckboxField`)
+is superforms as usual, but
 its `onSubmit` validates, seals the three text fields, and posts the sealed
 record (`recordId`, `vaultId`, `ciphertext`, `payloadVersion`,
 `completionMessageCount`) in their place (`sealed-forms.ts`). A new task's id
@@ -256,16 +258,43 @@ completion can trigger it.
 | Route                          | What it shows                                                  |
 | ------------------------------ | -------------------------------------------------------------- |
 | `/home/tasks`                  | Self tasks plus one summary section per partner when any exist |
-| `/home/tasks/add`              | Create a self task                                             |
+| `/home/tasks/add`              | Create a self task (titled "Add a task": "self" is not a word users see) |
 | `/home/tasks/[taskId]`         | Edit one self task                                             |
 | `/home/tasks/history`          | Self task completion history                                   |
 | `/partner/[id]/tasks`          | Partnership tasks, split by assignee under shared control      |
 | `/partner/[id]/tasks/history`  | Partnership task completion history                            |
-| `/partner/[id]/tasks/add`      | Create a partnership task when this side controls tasks        |
+| `/partner/[id]/tasks/add`      | Create a partnership task when this side controls tasks; the other side is redirected to the list (a direct post is still a 403) |
 | `/partner/[id]/tasks/[taskId]` | Edit one partnership task when this side controls tasks        |
 
 The home tasks page now uses the same section pattern as the partner page:
 self tasks always exist, partner sections appear only when there are incoming
 partner tasks to show, and a single section renders directly on the page rather
-than inside a panel. Completion history lives on dedicated routes for both self
-tasks and partnership tasks.
+than inside a panel. A page with a single list gives it no section heading of
+its own either, because the page title already names it. Completion history
+lives on dedicated routes for both self tasks and partnership tasks, as a list
+straight on the page with an empty state when there is nothing yet.
+
+### The cards and the Complete button
+
+Every task — and every reward, and every history entry — is an `ItemCard`
+(`src/lib/components/ItemCard.svelte`): the title and its quiet meta lines
+(schedule, time zone note) on the left; the credits and the actions in a column
+on the right, which drops under the text as a row when the card itself is
+narrow (a container query, since the same card sits in panels of different
+widths). The credits always sit in that column, even on a card with no button.
+Sections are `SectionPanel`s: title and anything that qualifies it (a balance)
+on the left, buttons on the right — history first, "Add" last — in equal
+columns under the title when narrow.
+
+Complete is the one amber (`accent`, `brand`) button on a card, and only appears
+when the task can be completed. Its form is enhanced (`ItemAction` in
+`src/lib/item-action.svelte.ts`) rather than posting natively, so the card can
+celebrate: on success the button becomes a check, the award rises off the
+credits, and the border flashes amber; the page's loads re-run
+`CELEBRATION_MS` later, and a card that the refreshed list no longer has slides
+shut. With reduced motion there is no wait and no motion. A refusal still shows
+the action's own error at the top of the page; an `error` result goes to the
+app-wide notice (docs/request-failures.md).
+
+The task form's save button follows the app's convention: outlined until the
+form holds a valid change, then solid amber.

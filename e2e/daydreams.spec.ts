@@ -85,7 +85,9 @@ async function newCharacter(page: Page, name: string, picker = 'Add a character'
 	await expect(dialog(page).getByRole('textbox', { name: /Personality/ })).toHaveValue('patient');
 	await dialog(page).getByRole('button', { name: 'Add character' }).click();
 	await expect(dialog(page)).toHaveCount(0);
-	await expect(page.locator('form.panel').getByText(name, { exact: true })).toBeVisible();
+	// The card's title, not its Edit button, which also carries the name, as
+	// visually hidden text, so the button's accessible name says what it edits.
+	await expect(page.locator('form.panel strong').getByText(name, { exact: true })).toBeVisible();
 }
 
 /** Makes a new idea in the setup's dialog, with a part for each of `parts`. */
@@ -471,7 +473,9 @@ test.describe('daydreams', () => {
 		await openSetup(page);
 		await clickWaButton(page, 'Add a character');
 		await page.getByRole('menuitem', { name: 'Mara' }).click();
-		await expect(page.locator('form.panel').getByText('Mara', { exact: true })).toBeVisible();
+		await expect(
+			page.locator('form.panel strong').getByText('Mara', { exact: true })
+		).toBeVisible();
 		await newIdea(page, 'Elsewhere', 'Somewhere else entirely.');
 
 		// Changed from here, which changes the library's too.
@@ -494,7 +498,8 @@ test.describe('daydreams', () => {
 
 		// And the library page lists it.
 		await page.goto('/daydreams/characters');
-		await expect(page.getByText('Mara', { exact: true })).toBeVisible();
+		// The card's title: its Edit button carries the name too, visually hidden.
+		await expect(page.locator('li strong').getByText('Mara', { exact: true })).toBeVisible();
 	});
 
 	test('Surprise me writes an idea to read and change before using it', async ({ page }) => {

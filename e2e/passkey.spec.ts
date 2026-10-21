@@ -106,7 +106,7 @@ async function wrapTypes(page: Page): Promise<string[]> {
 }
 
 /**
- * Signs in by clicking "Sign in with a passkey" on the page already open.
+ * Signs in by clicking "Log in with a passkey" on the page already open.
  *
  * Passkey autofill also runs on the login page, and a virtual authenticator
  * may answer it on its own before the click — so either way in counts, and the
@@ -115,7 +115,7 @@ async function wrapTypes(page: Page): Promise<string[]> {
 async function signInWithPasskeyHere(page: Page) {
 	await waitForHydration(page);
 	if (new URL(page.url()).pathname === '/login') {
-		await clickWaButton(page, 'Sign in with a passkey').catch(() => undefined);
+		await clickWaButton(page, 'Log in with a passkey').catch(() => undefined);
 	}
 	await page.waitForURL((url) => url.pathname !== '/login');
 	// The ceremony leaves the key in the in-memory stash, like a password sign-in;

@@ -486,7 +486,14 @@ protocol prevents that. What the design gives you instead is that a
 - **Your own recipient is pinned too**, separately. A server that swapped
   _your_ key would make everything your partner sends undecryptable by you,
   which without a pin looks like data loss rather than an attack. The two
-  mismatches read very differently and are worded differently.
+  mismatches read very differently and are worded differently. Unlike your
+  partner's, your own key is never trusted on first use: once the device is
+  unlocked it knows its key, so the own pin is that key (`evaluateTrust`'s
+  `ownRecipient`, set by `initialiseVaults`), and a served one that differs is
+  `changed` from the first sighting. And `ensureVaults` writes nothing — no
+  vault, wrap or escrow — for a partnership whose served own key is not the
+  device's: the wraps it makes go to these recipients, so a substitute pinned
+  on a new device would have been handed the partnership's vault key.
 - **A changed key blocks sending** — on the board and in the thread, since a
   reply is a send too — until the user explicitly accepts it. The banner says
   that already-received messages stay readable, because "key changed" otherwise
@@ -539,10 +546,43 @@ keeping the key around.
 | `vaults`      | `id` (chosen by the browser), `kind`, the owner or the partnership, `key_check` |
 | `vault_wraps` | One per member: the key age-encrypted to their recipient, and which recipient |
 
-A wrap's plaintext is `{ v: 1, vaultId, key }`, and opening one checks both
-that it names the vault it was served with and that the key it holds derives
-that vault's key check. So a server cannot pair a real wrap with another
-vault's row, or a vault row with a key it made up.
+A partnership vault's wrap's plaintext is `{ v: 1, vaultId, key }`, and
+opening one checks both that it names the vault it was served with and that
+the key it holds derives that vault's key check. So a server cannot pair a real
+wrap with another vault's row. It _can_ pair a vault row with a key it made up
+— it knows the recipient, and can fingerprint its own key — which is what the
+pinned key check and the safety number above catch for a partnership.
+
+### The self vault's wrap
+
+The self vault has no partner to compare a number with, so its wrap proves who
+made it instead. Its plaintext is `{ v: 2, vaultId, key, mac }`, where `mac`
+is HMAC-SHA256 over `bound-up-self-vault-v1|<vault id>|<key check>` under a key
+derived (HKDF, `info` `bound-up-self-vault-v1`) from the X25519 agreement of
+the user's identity **with its own recipient**. Only the holder of the identity
+can compute that agreement; the server knows the recipient and nothing else.
+So a server cannot make a self vault of its own, wrap it to the user and read
+everything they then seal in it, which a version 1 wrap allowed: age lets
+anyone encrypt to a public recipient. `unwrapSelfVaultKey` refuses a version 2
+wrap whose MAC does not verify, and `unwrapVaultKey` refuses version 2
+altogether, so the check cannot be skipped by opening it as a partnership's.
+
+It needs no new secret and no new storage: every device signed in to the
+account holds the identity (the non-extractable `CryptoKey` works, through
+WebCrypto's X25519, or `@noble/curves` on a browser without it), and a device
+recovered through a partner-assisted sign-in derives the key for its new
+identity the same way when it writes itself a wrap. `crypto/vault.test.ts`
+holds a frozen MAC made by an independent implementation on `node:crypto`.
+
+The invite key's wrap to the inviter (`crypto/invite.ts`) is the same format
+for the same reason: the inviter's page builds the link's `#k=` from it and
+seals edited names under it, so a key the server made up would leak both.
+
+**Wraps from before the MAC are upgraded in place.** A version 1 self wrap is
+still opened while `ACCEPT_LEGACY_SELF_WRAPS` (`src/lib/vault.ts`) is true,
+and `ensureVaults` replaces it with a version 2 one the moment it does
+(`upgradeSelfWrap`), so no account loses its records. Until that constant is
+false the protection is not complete — see "Not built yet".
 
 **Why a symmetric key, and not a vault public key.** Anyone can encrypt to a
 public key, the server included, so a public-key vault would let the server
@@ -564,7 +604,8 @@ identity, `EncryptionGate` runs `initialiseVaults` (`crypto/vaults.svelte.ts`),
 which runs `ensureVaults` (`crypto/ensure-vaults.ts`) over
 `GET /api/vaults`:
 
-- **The self vault** is opened, or made if the account has none.
+- **The self vault** is opened, or made if the account has none, with the MAC
+  above; one from before it is upgraded as it opens.
 - **Each accepted partnership's vault** is opened, or made — wrapped to both
   members — if the partnership has none. The device that made it pins its key
   check at once, so its first sighting is the real one.
@@ -576,7 +617,9 @@ partnership that existed before vaults, with no migration of its own.
 
 **Making or wrapping for a partner waits on the trust check.** Both hand the
 vault key to whatever recipient the server says the partner has, so a key this
-device has been warned about gets nothing until the user accepts it. Opening a
+device has been warned about gets nothing until the user accepts it. The
+creating device's own wrap goes to the key it holds, never to the one served
+for it. Opening a
 vault needs no such check — reading leaks nothing — so a vault is open even
 while writing into it is held back.
 
@@ -648,7 +691,10 @@ account's address — within the last seven days (`ESCROW_RELEASE_WINDOW_MS`).
 The device opens the relay with its new key, then `inner` with the share,
 checks the result matches the vault's key check, and writes itself a wrap.
 Every escrow is then **replaced**, under new ids and so new shares, because the
-old shares have been released.
+old shares have been released. The listing stops counting an escrow as held the
+moment its share becomes releasable (a relay for a sign-in completed by
+email), so a device cut off between writing its wrap and deleting the old
+escrows still replaces them on its next load.
 
 **What this does not protect against**: the server and a partner working
 together. Each holds half; together they can open the user's own vault. That
@@ -772,6 +818,20 @@ The honest boundary of the above:
   would fix it and is not built. Until then the UI shows _when_ a key was first
   seen, so "first seen a moment ago" cannot be mistaken for "first seen two
   years ago".
+- **A version 1 self wrap still opens.** While `ACCEPT_LEGACY_SELF_WRAPS` is
+  true, a server can still serve a self vault of its own with a version 1 wrap
+  and have it accepted — and then upgraded, as if it were genuine. It is true
+  so that accounts upgrade rather than lose their own records; setting it to
+  false closes this, at the cost of the own records of any account none of
+  whose devices has opened the app since.
+- **A recovery's relay is not authenticated.** After a partner-assisted
+  sign-in the own vault comes back from a relay sealed under the server's
+  share and encrypted to the new identity's public recipient, both of which
+  the server has. So for an account inside its seven-day release window, the
+  server alone could serve a relay and a self vault row for a key of its own,
+  and the device would write itself a genuine wrap for it. Nothing the old
+  identity could have signed survives losing it; the partner's device could
+  sign the relay, and does not yet.
 - **Only one direction arrives out of band.** The invitee learns the inviter's
   recipient from the invite itself, sealed under the key in the link's
   fragment, and pins it as verified — no trust-on-first-use for that direction

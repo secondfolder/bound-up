@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { describe, expect, it } from 'vitest';
 import { taskEditorFormSchema } from '$lib/schemas/taskEditorForm';
 import { type TaskEditorFormValues, taskEditorFormValuesForCreate } from '$lib/task-editor-form';
-import { waButtonOfType, waProp } from '$lib/testing/web-awesome';
+import { waButtonOfType, waProp, waSettled, waType } from '$lib/testing/web-awesome';
 
 const { default: TaskFormHarness } = await import('$lib/testing/TaskFormHarness.svelte');
 
@@ -33,18 +33,14 @@ describe('TaskForm', () => {
 			submitLabel: 'Add task'
 		});
 		const save = waButtonOfType(container, 'submit');
-		const title = container.querySelector('input[name="title"]');
-		if (!(title instanceof HTMLInputElement)) {
-			throw new Error('missing title input');
-		}
 
 		expect(waProp(save, 'appearance')).toBe('outlined');
-		expect(waProp(save, 'variant')).toBeUndefined();
+		expect(waProp(save, 'variant')).toBe('neutral');
 
-		await fireEvent.input(title, { target: { value: 'Long shower' } });
+		await waType(container, 'title', 'Long shower');
 
 		await waitFor(() => {
-			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'appearance')).toBe('accent');
 			expect(waProp(save, 'variant')).toBe('brand');
 		});
 	});
@@ -56,25 +52,21 @@ describe('TaskForm', () => {
 			submitLabel: 'Save task'
 		});
 		const save = waButtonOfType(container, 'submit');
-		const title = container.querySelector('input[name="title"]');
-		if (!(title instanceof HTMLInputElement)) {
-			throw new Error('missing title input');
-		}
 
 		expect(waProp(save, 'appearance')).toBe('outlined');
-		expect(waProp(save, 'variant')).toBeUndefined();
+		expect(waProp(save, 'variant')).toBe('neutral');
 
-		await fireEvent.input(title, { target: { value: '' } });
+		await waType(container, 'title', '');
 
 		await waitFor(() => {
 			expect(waProp(save, 'appearance')).toBe('outlined');
-			expect(waProp(save, 'variant')).toBeUndefined();
+			expect(waProp(save, 'variant')).toBe('neutral');
 		});
 
-		await fireEvent.input(title, { target: { value: 'Long shower deluxe' } });
+		await waType(container, 'title', 'Long shower deluxe');
 
 		await waitFor(() => {
-			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'appearance')).toBe('accent');
 			expect(waProp(save, 'variant')).toBe('brand');
 		});
 	});
@@ -99,5 +91,83 @@ describe('TaskForm', () => {
 
 		expect(screen.getByText('Choose at least one day')).toBeInTheDocument();
 		expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+	});
+
+	it('posts every field through the shared field components', async () => {
+		const data = await superValidate(editValues(), zod4(taskEditorFormSchema), { errors: false });
+		const { container } = render(TaskFormHarness, { data, submitLabel: 'Save task' });
+		await waSettled(container);
+		await waType(container, 'creditsAwarded', '5');
+		await waType(container, 'completionMessagesText', 'Good\nVery good');
+		await waSettled(container);
+
+		const form = container.querySelector('form');
+		if (!form) {
+			throw new Error('missing form');
+		}
+		// The Web Awesome fields are form-associated: what they hold is what the
+		// form posts, from the same FormData the action reads.
+		const posted = new FormData(form);
+		expect(posted.get('title')).toBe('Long shower');
+		expect(posted.get('creditsAwarded')).toBe('5');
+		expect(posted.get('completionMessagesText')).toBe('Good\nVery good');
+		expect(posted.get('scheduleMode')).toBe('one-off');
+		expect(posted.get('active')).toBe('on');
+		// No native field is left behind: the text fields are wa-input/-textarea.
+		expect(container.querySelector('input[name="title"], textarea, select')).toBeNull();
+	});
+
+	it('shows the fields of the repeat mode chosen from the select', async () => {
+		const data = await superValidate(editValues(), zod4(taskEditorFormSchema), { errors: false });
+		const { container } = render(TaskFormHarness, { data, submitLabel: 'Save task' });
+		await waSettled(container);
+		expect(container.querySelector('wa-input[name="afterEvery"]')).toBeNull();
+
+		const mode = container.querySelector('wa-select[name="scheduleMode"]') as
+			| (HTMLElement & { value?: string })
+			| null;
+		if (!mode) {
+			throw new Error('missing mode select');
+		}
+		// A choice reaches the field as `wa-select` reports it: its value, then
+		// a change on the host.
+		mode.value = 'after-completion';
+		mode.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+
+		await waitFor(() => {
+			expect(container.querySelector('wa-input[name="afterEvery"]')).not.toBeNull();
+			expect(container.querySelector('wa-select[name="afterUnit"]')).not.toBeNull();
+		});
+		const save = waButtonOfType(container, 'submit');
+		await waitFor(() => expect(waProp(save, 'appearance')).toBe('accent'));
+	});
+
+	it('turns a task off from its checkbox', async () => {
+		const data = await superValidate(editValues(), zod4(taskEditorFormSchema), { errors: false });
+		const { container } = render(TaskFormHarness, { data, submitLabel: 'Save task' });
+		await waSettled(container);
+		const active = container.querySelector('wa-checkbox[name="active"]') as
+			| (HTMLElement & { checked?: boolean })
+			| null;
+		if (!active) {
+			throw new Error('missing active checkbox');
+		}
+		expect(active.checked).toBe(true);
+		active.checked = false;
+		active.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+		await waSettled(container);
+
+		const form = container.querySelector('form');
+		expect(form && new FormData(form).has('active')).toBe(false);
+		const save = waButtonOfType(container, 'submit');
+		await waitFor(() => expect(waProp(save, 'appearance')).toBe('accent'));
+	});
+
+	it('does not require a completion message', async () => {
+		const data = await superValidate(editValues(), zod4(taskEditorFormSchema), { errors: false });
+		const { container } = render(TaskFormHarness, { data, submitLabel: 'Save task' });
+		await waSettled(container);
+		const messages = container.querySelector('wa-textarea[name="completionMessagesText"]');
+		expect(waProp(messages, 'required')).toBe(false);
 	});
 });

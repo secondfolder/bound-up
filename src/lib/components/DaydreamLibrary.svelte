@@ -121,7 +121,9 @@
 			editing = { item, character: shown.character, idea: shown.idea };
 		}}
 							>
-								Edit {shown.name}
+								<!-- "Edit" to see, the name for a screen reader: in full, a long name
+								     squeezed the line beside it to a word a line on a phone. -->
+								Edit <span class="wa-visually-hidden">{shown.name}</span>
 							</wa-button>
 							<wa-button size="s" appearance="plain" onclick={() => remove(item, shown.name)}>
 								<wa-icon name="trash-can" variant="regular" label={`Delete ${shown.name}`}></wa-icon>
@@ -160,7 +162,7 @@
 
 <style>
 	.page {
-		max-width: 48rem;
+		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -168,7 +170,7 @@
 	}
 
 	.content {
-		padding: 0 var(--wa-space-l) var(--wa-space-l);
+		padding: 0 var(--page-gutter) var(--wa-space-l);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
@@ -186,13 +188,16 @@
 		flex-direction: column;
 		gap: 0.5rem;
 
+		/* The same card as a daydream on /daydreams, so the three lists of
+		   things you made look like one family; these were outlines only. */
 		li {
 			display: flex;
 			align-items: center;
 			gap: 0.5rem;
-			padding: 0.625rem 0.75rem;
-			border: 1px solid var(--wa-color-surface-border);
-			border-radius: 0.6rem;
+			padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+			border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+			border-radius: var(--wa-border-radius-l);
+			background: var(--wa-color-surface-default);
 		}
 
 		.text {

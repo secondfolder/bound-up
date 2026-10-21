@@ -378,6 +378,57 @@ describe('MessageBubble', () => {
 		expect(container.querySelector('.trigger')).toBeNull();
 	});
 
+	/**
+	 * A time left out of a run is hidden from sight, never from a screen
+	 * reader, which reads one message at a time and has no run to take it from.
+	 */
+	it('keeps a grouped-away time for a screen reader only', () => {
+		const shown = render(MessageBubble, {
+			props: { ...props, message: message(), payload: null, metadata: undefined }
+		});
+		expect(shown.container.querySelector('.when')?.classList.contains('wa-visually-hidden')).toBe(
+			false
+		);
+		shown.unmount();
+
+		const { container } = render(MessageBubble, {
+			props: {
+				...props,
+				message: message({ mine: true }),
+				payload: null,
+				metadata: undefined,
+				showTime: false
+			}
+		});
+		const when = container.querySelector('.when');
+		expect(when?.textContent).toBe('12:00');
+		expect(when?.classList.contains('wa-visually-hidden')).toBe(true);
+		// With nothing else on the line, it takes no room under the bubble.
+		expect(container.querySelector('.meta.collapsed')).not.toBeNull();
+	});
+
+	it('keeps the reaction control on a received message whose time is grouped away', () => {
+		const { container } = render(MessageBubble, {
+			props: {
+				...props,
+				message: message({ mine: false }),
+				payload: null,
+				metadata: undefined,
+				showTime: false
+			}
+		});
+		expect(container.querySelector('.trigger')).not.toBeNull();
+		expect(container.querySelector('.meta.collapsed')).toBeNull();
+	});
+
+	it('labels the day above the first message of one, inside the same list item', () => {
+		const { container } = render(MessageBubble, {
+			props: { ...props, message: message(), payload: null, metadata: undefined, day: 'Today' }
+		});
+		// Inside the <li>: the thread counts its messages by list item.
+		expect(container.querySelector('li > .day')?.textContent).toBe('Today');
+	});
+
 	it('offers one on a message you received', () => {
 		const { container } = render(MessageBubble, {
 			props: { ...props, message: message({ mine: false }), payload: null, metadata: undefined }

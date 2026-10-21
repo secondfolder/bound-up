@@ -16,9 +16,9 @@
 		   growing and left EdgeTask's sticky footer with nothing to stick inside.
 		   min-height fills a short guide without fighting a long one. */
 		min-height: 100%;
-		max-width: 800px;
+		max-width: var(--page-width);
 		margin-inline: auto;
-		padding: 0 1em;
+		padding: 0 var(--page-gutter);
 
 		display: flex;
 		flex-direction: column;

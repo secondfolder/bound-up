@@ -164,11 +164,21 @@
 	}
 
 	.status {
-		font-size: var(--wa-font-size-2xs);
+		/* xs, not 2xs: at 11px the uppercase label was the smallest text on
+		   the page, on the thing it most needs to say. */
+		font-size: var(--wa-font-size-xs);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		font-weight: 700;
 		color: var(--accent-color);
+		white-space: nowrap;
+
+		/* On a phone, always a line of its own under the title. Inline, it sat
+		   beside a short title and dropped under a long one, so the eye never
+		   knew where to find it. */
+		@media (width < 40rem) {
+			flex-basis: 100%;
+		}
 
 		[data-status='exploring'] & {
 			color: var(--wa-color-text-quiet);
@@ -179,12 +189,22 @@
 		flex-basis: 100%;
 		font-size: var(--wa-font-size-s);
 		color: var(--wa-color-text-quiet);
-		/* Two lines at most: the drawer has the rest. */
+		/* No word left alone on a last line ("given.", "added."), which the
+		   narrow, right-aligned left-hand column made a habit of. */
+		text-wrap: pretty;
+		/* A few lines at most: the drawer has the rest. Three on a phone, where
+		   the column is narrow enough that two cut most summaries off
+		   mid-word. */
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;
 		line-clamp: 2;
 		overflow: hidden;
+
+		@media (width < 40rem) {
+			-webkit-line-clamp: 3;
+			line-clamp: 3;
+		}
 	}
 
 	/* The states last, as the most specific rules here. */

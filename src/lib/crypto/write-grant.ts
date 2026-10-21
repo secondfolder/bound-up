@@ -35,8 +35,11 @@ export function issueWriteGrant(vaultId: string): WriteGrant {
 
 /**
  * A grant for the user's own vault. No trust check applies: nothing about it
- * involves anyone else's key, and the self vault's wrap is checked against its
- * fingerprint when it is opened.
+ * involves anyone else's key, and the self vault only opens from a wrap whose
+ * MAC this user's identity made (`unwrapSelfVaultKey`), so it cannot be one
+ * the server made up. The fingerprint alone would not show that: the server
+ * can fingerprint a key of its own. (A wrap from before the MAC still opens
+ * while `ACCEPT_LEGACY_SELF_WRAPS` is true; see docs/encryption.md.)
  */
 export function selfWriteGrant(vault: { id: string; kind: 'self' | 'partnership' }): WriteGrant {
 	if (vault.kind !== 'self') {

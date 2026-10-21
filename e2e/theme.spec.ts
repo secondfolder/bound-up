@@ -41,7 +41,7 @@ test('a page other than the landing page is textured, dark, and titled in the di
 	}
 
 	const title = page.getByRole('heading', { level: 1, name: 'Log in' });
-	await expect(title).toHaveCSS('font-family', /Muddy Tractor/);
+	await expect(title).toHaveCSS('font-family', /Bound Up Title/);
 	// The landing page's amber, as its title is.
 	await expect(title).toHaveCSS('color', 'rgb(255, 172, 0)');
 });

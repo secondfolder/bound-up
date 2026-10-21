@@ -44,7 +44,9 @@ your email address first" and **sends a fresh link** (`sendOnSignIn`). Better
 Auth checks the password before it says anything about verification, so only
 the account holder ever learns the address is unconfirmed.
 
-**The check-email page** says where the link went, from a short-lived cookie
+**The check-email page** (in the shared `AuthPage` layout, its copy and
+resend form in an `AuthBox` under an envelope that bobs twice on arrival,
+unless reduced motion is asked for) says where the link went, from a short-lived cookie
 the sign-up action sets (an address in a query string would end up in the
 history and in access logs), and has a resend form. The cookie also holds when
 the last link went, and the button counts down what is left of the minute
@@ -89,7 +91,9 @@ an account:
   two inserts and the action a key batch, which a taken address skips, so it
   answered measurably faster. Every sign-up that reaches Better Auth now waits
   out `SIGN_UP_RESPONSE_FLOOR_MS` (`src/lib/server/response-floor.ts`), set
-  above the slower path.
+  above the slower path. The form action is the only way to sign up: Better
+  Auth's own `POST /api/auth/sign-up/email` is in `disabledPaths`
+  (`server/auth.ts`), since it had no floor, and answers 404.
 
 ### The first account on a new server
 

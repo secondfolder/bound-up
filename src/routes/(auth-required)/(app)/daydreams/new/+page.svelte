@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { flushSync, onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import DaydreamSetupForm from '$lib/components/DaydreamSetupForm.svelte';
 	import DaydreamStarter from '$lib/components/DaydreamStarter.svelte';
@@ -21,6 +21,7 @@
 	import { type SuggestFailure, suggestDaydream, suggestIdeas } from '$lib/daydream/suggest';
 	import { addIdeas, type GeneratedIdea, MAX_OFFERED_IDEAS } from '$lib/daydream/suggestions';
 	import type { MarkedSummary } from '$lib/daydream/summary';
+	import { scrollParentOf } from '$lib/scroll-parent';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -70,6 +71,31 @@
 	};
 
 	let stage: Stage = $state({ kind: 'start' });
+	let pageElement: HTMLElement | undefined = $state();
+
+	/**
+	 * Moves between the ways in and the setup: a cross-fade where the browser
+	 * can and motion is welcome, and back to the top of the page either way.
+	 * The two are different pages in all but URL; swapped in place, the
+	 * setup appeared wherever the ways in had been scrolled to, usually its
+	 * last field with the title out of sight, and all at once.
+	 */
+	function changeStage(next: Stage) {
+		const apply = () => {
+			stage = next;
+		};
+		const calm = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (calm || !document.startViewTransition) {
+			apply();
+		} else {
+			// Flushed inside the callback, so the transition's "after" is the
+			// new stage rather than the old one again.
+			document.startViewTransition(() => flushSync(apply));
+		}
+		if (pageElement) {
+			scrollParentOf(pageElement).scrollTo({ top: 0 });
+		}
+	}
 	let brief = $state('');
 	// The load's order, captured once: going back to the ways in shows the
 	// stories as they were, and a re-run load must not reshuffle them.
@@ -154,7 +180,7 @@
 		exchanges: SetupExchange[] = []
 	) {
 		versions += 1;
-		stage = {
+		changeStage({
 			kind: 'setup',
 			draft,
 			summary,
@@ -163,7 +189,7 @@
 			log,
 			exchanges,
 			version: versions
-		};
+		});
 	}
 
 	/**
@@ -304,7 +330,7 @@
 	}
 </script>
 
-<section class="page">
+<section class="page" bind:this={pageElement}>
 	<NestedPageHeader
 		backHref={resolve('/(auth-required)/(app)/daydreams')}
 		backLabel="Back to daydreams"
@@ -357,7 +383,7 @@
 					watching = null;
 					problem = null;
 					ideaProblem = null;
-					stage = { kind: 'start' };
+					changeStage({ kind: 'start' });
 				}}
 			>
 				<wa-icon slot="start" name="arrow-left" variant="solid"></wa-icon>
@@ -394,7 +420,7 @@
 
 <style>
 	.page {
-		max-width: 48rem;
+		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -405,7 +431,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		padding: 0 var(--wa-space-l) var(--wa-space-l);
+		padding: 0 var(--page-gutter) var(--wa-space-l);
 	}
 
 	.back {

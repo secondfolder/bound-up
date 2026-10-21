@@ -40,6 +40,14 @@
 
 	const content = $derived(story.content(node.id));
 
+	/**
+	 * Made just now, as opposed to read back from the story: only then does a
+	 * roll tumble. Read once, as the turn first draws; a story opening on its
+	 * old rolls must not set every die on the page spinning.
+	 */
+	// svelte-ignore state_referenced_locally
+	const fresh = Date.now() - node.createdAt.getTime() < 5000;
+
 	/** Showing what the user sent rather than what it was written out to. */
 	let showSent = $state(false);
 
@@ -174,7 +182,12 @@
 		</div>
 	</li>
 {:else}
-	<li class="marker" class:safety={content.type === 'safety'} data-turn-id={node.id}>
+	<li
+		class="marker"
+		class:safety={content.type === 'safety'}
+		class:rolled={content.type === 'roll' && fresh}
+		data-turn-id={node.id}
+	>
 		{#if content.type === 'direction'}
 			<wa-icon name="arrow-right" variant="solid"></wa-icon> {content.label}
 		{:else if content.type === 'steer'}
@@ -182,7 +195,8 @@
 			{STEER_WORDS[content.action]}:
 			<q>{plainPassage(content.quote.text)}</q>
 		{:else if content.type === 'roll'}
-			<wa-icon name="dice" variant="solid"></wa-icon> Rolled {content.result} — {content.outcome}
+			<wa-icon class="die" name="dice" variant="solid"></wa-icon>
+			<span class="result">Rolled {content.result} — {content.outcome}</span>
 		{:else if content.type === 'safety'}
 			{SAFETY_WORDS[content.signal]}
 		{/if}
@@ -237,6 +251,35 @@
 
 	.reread wa-button {
 		--wa-form-control-height: 1.75rem;
+	}
+
+	/* A fresh roll: the die tumbles and settles with a little overshoot, and
+	   the result comes up once it has landed. */
+	@media (prefers-reduced-motion: no-preference) {
+		.rolled .die {
+			animation: tumble 520ms cubic-bezier(0.34, 1.4, 0.64, 1);
+		}
+
+		.rolled .result {
+			animation: result-in 200ms ease-out 400ms backwards;
+		}
+	}
+
+	@keyframes tumble {
+		from {
+			rotate: -2turn;
+			scale: 0.6;
+		}
+
+		70% {
+			scale: 1.2;
+		}
+	}
+
+	@keyframes result-in {
+		from {
+			opacity: 0;
+		}
 	}
 
 	.marker {

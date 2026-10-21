@@ -53,7 +53,7 @@ describe('/partner/[id]/tasks/+page.svelte', () => {
 			node.textContent?.trim()
 		);
 		expect(buttons).toContain('Add a task');
-		expect(buttons).toContain('Completion History');
+		expect(buttons).toContain('Completion history');
 		expect(container.textContent).not.toContain('Recent Task Completions');
 		expect(container.querySelectorAll('.panel')).toHaveLength(0);
 	});
@@ -63,10 +63,12 @@ describe('/partner/[id]/tasks/+page.svelte', () => {
 			data: data({ canManageTasks: false, canCompleteTasks: true })
 		});
 		expect(container.textContent).not.toContain('Add a task');
-		expect(container.textContent).toContain('Completion History');
+		expect(container.textContent).toContain('Completion history');
 		expect(container.textContent).not.toContain('Tasks for you');
 		expect(container.textContent).not.toContain('Tasks for Jun');
 		expect(container.querySelectorAll('.panel')).toHaveLength(0);
+		// The page is titled "Tasks"; its one list does not say it again.
+		expect(container.querySelectorAll('h2')).toHaveLength(0);
 	});
 
 	it('splits shared-control tasks into sections for you and your partner', () => {
@@ -122,7 +124,7 @@ describe('/partner/[id]/tasks/+page.svelte', () => {
 		expect(container.textContent).toContain('Tasks for you');
 		expect(container.textContent).toContain('Tasks for Jun');
 		expect(container.textContent).not.toContain('Recent Task Completions');
-		expect(container.textContent?.match(/Completion History/g)?.length).toBe(2);
+		expect(container.textContent?.match(/Completion history/g)?.length).toBe(2);
 		expect(container.textContent?.match(/Add a task/g)?.length).toBe(1);
 		expect(panels[0]?.textContent).toContain('Tasks for you');
 		expect(panels[0]?.textContent).not.toContain('Add a task');

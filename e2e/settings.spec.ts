@@ -28,7 +28,7 @@ test.describe('settings information architecture', () => {
 		await expect(page.getByRole('link', { name: 'Security' })).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Partners' })).toBeVisible();
 		await expect(page.getByRole('link', { name: 'Encrypted messages' })).toHaveCount(0);
-		await expect(page.locator('.account').getByRole('button', { name: 'Log out' })).toBeVisible();
+		await expect(page.locator('.sign-out').getByRole('button', { name: 'Log out' })).toBeVisible();
 	});
 
 	// Worked out at build time from the git history under `vite dev`, and from
@@ -132,12 +132,12 @@ test.describe('settings actions', () => {
 		await expect(page.getByText(/Email changes are not available yet/)).toBeVisible();
 	});
 
-	test('signs out from the signed-in panel on settings', async ({ page }) => {
+	test('signs out from the end of settings', async ({ page }) => {
 		const who = account('Seth');
 		await signUp(page, who);
 
 		await page.goto('/settings');
-		await expect(page.locator('.account').getByRole('button', { name: 'Log out' })).toBeVisible();
+		await expect(page.locator('.sign-out').getByRole('button', { name: 'Log out' })).toBeVisible();
 		await clickWaButton(page, 'Log out');
 		await page.waitForURL('/');
 

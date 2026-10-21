@@ -73,11 +73,10 @@
 </div>
 
 <style>
-	/* Its width is never the content's: the reading beside the title is a
-	   different width at each level ("Common", "Very detailed"), and sized by
-	   it, every move would resize the search beside it. */
+	/* How it flexes is up to where it sits (KinkListHome's row beside the
+	   search; TriageGrid's column, where a flex basis set here became a
+	   240px-tall gap under it). */
 	.filter {
-		flex: 0 1 15em;
 		min-inline-size: 11em;
 	}
 

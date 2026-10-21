@@ -92,9 +92,19 @@
 	.page {
 		box-sizing: border-box;
 		inline-size: 100%;
-		max-width: 800px;
+		max-width: var(--page-width);
 		margin-inline: auto;
-		padding: 1em;
+		padding: var(--wa-space-m) var(--page-gutter);
+
+		/* The whole list, wider than the pages around it: at the usual column
+		   two contexts of dots left a name about 140px, so "Kissing on the
+		   mouth" and every other nested name of more than a word or two
+		   dropped its dots onto a line of their own, and rows alternated in
+		   height. Not the wide column: past this the eye has too far to go
+		   from a name to its dots. */
+		&:has(:global(.kink-list-home)) {
+			max-width: 60rem;
+		}
 	}
 
 	h1 {

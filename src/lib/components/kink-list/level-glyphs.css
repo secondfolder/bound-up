@@ -1,0 +1,49 @@
+/*
+ * A mark for each answer level, drawn on its dot (AnswerScale.svelte) and in
+ * the key (LevelKey.svelte), so which answer a dot is never rests on colour
+ * alone. Like and Love are neighbouring greens, and Hard limit and Not for me
+ * run together for anyone red-green colourblind; the chosen dot's old check
+ * said that something was chosen, not what.
+ *
+ * Each mark leans on what its word means, so it reads without the key once
+ * seen. SVG used as a mask rather than text: a heart character turns into an
+ * emoji on some platforms, and a font's symbols sit at different heights.
+ * Here, as CSS keyed by `data-kink-level`, rather than set per dot from
+ * script: the list draws seven dots on each of a few hundred rows, and an
+ * inline data URI on every one of them was most of a megabyte of attributes.
+ */
+
+/* a cross: no */
+[data-kink-level='limit'] {
+	--kink-glyph: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2010%2010%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M2.5%202.5l5%205M7.5%202.5l-5%205%27%2F%3E%3C%2Fsvg%3E');
+}
+
+/* a minus */
+[data-kink-level='not-for-me'] {
+	--kink-glyph: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2010%2010%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M2.25%205h5.5%27%2F%3E%3C%2Fsvg%3E');
+}
+
+/* a tilde: it depends */
+[data-kink-level='conditional'] {
+	--kink-glyph: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2010%2010%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M1.75%205.75C3%203.75%204%203.75%205%205s2%201.25%203.25-.75%27%2F%3E%3C%2Fsvg%3E');
+}
+
+/* an equals: either way */
+[data-kink-level='dont-mind'] {
+	--kink-glyph: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2010%2010%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M2.25%203.75h5.5M2.25%206.25h5.5%27%2F%3E%3C%2Fsvg%3E');
+}
+
+/* a question */
+[data-kink-level='curious'] {
+	--kink-glyph: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2010%2010%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M3.4%203.6a1.65%201.65%200%201%201%202.5%201.4c-.55.33-.9.7-.9%201.35M5%208.15v.05%27%2F%3E%3C%2Fsvg%3E');
+}
+
+/* a plus */
+[data-kink-level='like'] {
+	--kink-glyph: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2010%2010%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20d%3D%27M5%202.25v5.5M2.25%205h5.5%27%2F%3E%3C%2Fsvg%3E');
+}
+
+/* a heart */
+[data-kink-level='love'] {
+	--kink-glyph: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2010%2010%27%3E%3Cpath%20fill%3D%27black%27%20d%3D%27M5%208.4%202.05%205.5a1.75%201.75%200%200%201%202.5-2.5L5%203.45l.45-.45a1.75%201.75%200%200%201%202.5%202.5Z%27%2F%3E%3C%2Fsvg%3E');
+}

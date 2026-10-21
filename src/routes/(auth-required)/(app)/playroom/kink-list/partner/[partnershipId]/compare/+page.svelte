@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CompareView from '$lib/components/kink-list/CompareView.svelte';
+	import KinkListCrumbs from '$lib/components/kink-list/KinkListCrumbs.svelte';
 	import YourSideControl from '$lib/components/kink-list/YourSideControl.svelte';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import { asList, effectiveList, type PartnerPayload } from '$lib/kink-list/partner';
@@ -43,12 +44,13 @@
 	<title>You and {name} · Kink list · Bound Up</title>
 </svelte:head>
 
-<nav class="crumbs">
-	<a href={resolve('/(auth-required)/(app)/playroom/kink-list/partner/[partnershipId]', { partnershipId: data.partnershipId })}
-		>Your list for {name}</a
-	>
+<KinkListCrumbs
+	href={resolve('/(auth-required)/(app)/playroom/kink-list/partner/[partnershipId]', { partnershipId: data.partnershipId })}
+	text="Your list for {name}"
+	label="Back to your list for {name}"
+>
 	<a href={messages}>Talk about it in messages</a>
-</nav>
+</KinkListCrumbs>
 <h1>You and {name}</h1>
 
 {#if !store.shared}
@@ -76,14 +78,6 @@
 <style>
 	h1 {
 		text-align: center;
-	}
-
-	.crumbs {
-		display: flex;
-		justify-content: space-between;
-		flex-wrap: wrap;
-		gap: 0.5rem 1rem;
-		margin-block-end: 1rem;
 	}
 
 	.quiet {

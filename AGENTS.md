@@ -430,7 +430,11 @@ load data is serialised into the HTML of every page. Whitelist fields, as
   `superForm`, **imported from `$lib/superform`**, whose `onError` shows a
   failed submit; the library's own rethrows it into the console and the page
   says nothing. Biome refuses the direct import. Fields go through
-  `InputField.svelte`.
+  `InputField.svelte` (text, email, password, number, date and time, and
+  `type="textarea"`), with `SelectField.svelte` for a choice and
+  `CheckboxField.svelte` for a yes or no — never a native `<input>`. A form
+  whose action reads a sealed record rather than a superform still builds a
+  superform, from `defaults()` in the browser, to use them (`RewardForm`).
 - **An `$effect` that reads the `data` prop re-runs on every `invalidate()`.**
   `data` is reassigned each time a load re-runs, so the effect's dependency is
   the whole prop rather than the field you read from it. For an effect that sets
@@ -583,7 +587,8 @@ onto every page by setting `--wa-color-*` and friends in Web Awesome's last
 cascade layer, and `<html>` is `wa-dark` unconditionally. A component names a
 semantic token (`--wa-color-surface-default`, `--wa-color-text-quiet`), never
 a hex value, and a colour the palette lacks becomes a token there first. Page
-titles are `h1`s, which the theme sets in Muddy Tractor. See
+titles are `h1`s, which the theme sets in the title face (Rubik Black,
+distressed by `scripts/title-font/`; `npm run title-font` rebuilds it). See
 [docs/theme.md](docs/theme.md).
 
 **Prefer a `wa-*` component wherever an appropriate one exists** — a
@@ -656,6 +661,17 @@ standalone tools (`/playroom/iq-test`). `/playroom` itself is signed-in.
 hydration. Route ids are identical on both sides.
 
 **CSS lives in the component's `<style>` block**, nested, no framework.
+
+**A page's width and gutter are tokens, never a number of its own.** A page
+root takes `max-width: var(--page-width-narrow | --page-width |
+--page-width-wide)` and pads its content's sides with `--page-gutter`, the same
+token `NestedPageHeader` is inset by, so the back link, title, divider and
+content share one edge. There used to be seven column widths and two gutters,
+and moving between sibling pages made the column jump. The app layout makes
+every page root fill `<main>`; do not undo that with a root of `width: auto`.
+A bullet-less list zeroes its own `padding` and is flush: `theme.css` moves Web
+Awesome's list indent off the `li` and onto the list. See
+[docs/theme.md](docs/theme.md#page-layout).
 
 **Two links on one page must not share an accessible name.** Duplicate names
 going to different places are a real problem for anyone navigating by link
@@ -792,6 +808,11 @@ lacks `ElementInternals` altogether.) That changes how to read them:
   `wa-button`'s role is out of their reach; find it by element or class.
 - `userEvent` from `vitest/browser` types real, trusted keystrokes through
   Playwright, for a component whose state depends on real typing.
+- **The real mouse outlives a file.** It belongs to the tab, and every file's
+  frame fills the same tab, so Chromium hovers whatever a file draws under
+  wherever an earlier file's `userEvent` left it. `vitest-setup-browser.ts`
+  parks it in the frame's bottom-right corner before each file; within a file,
+  a test that moves it leaves it there for the tests after it.
 
 The test browser is sealed off. Every host but localhost resolves to a black
 hole (`--host-resolver-rules` in `vite.config.ts`), so an iframe never loads

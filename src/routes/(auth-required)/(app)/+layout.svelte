@@ -72,6 +72,16 @@
 		margin: 0;
 		overflow: hidden;
 	}
+
+	/* The halftone, pinned to the window. Nothing scrolls behind the shell,
+		   so it looks the same; but absolutely positioned it was the only thing
+		   giving this zero-height body any height, which made the document
+		   scrollable by however much 800px beat the window. Anything that
+		   scrolled an element into view did scroll it, cutting off the top of
+		   the page and showing bare grain above the nav. */
+	body::before {
+		position: fixed;
+	}
 </style>
 </svelte:head>
 
@@ -136,6 +146,17 @@
 			flex-direction: column;
 			/* Momentum scrolling inside the pane, not rubber-banding of the page. */
 			overscroll-behavior: contain;
+
+			/* Every page's root fills the pane's width, up to its own max-width.
+			   A root centred with `margin-inline: auto` is a flex item with auto
+			   margins, which turns off stretching: it shrank to fit its content,
+			   so sibling pages with the same max-width came out different widths
+			   (tasks 830px, rewards 525px), a page changed width with its data,
+			   and a long unwrappable title pushed the partner page off the side
+			   of a phone. */
+			> :global(*) {
+				inline-size: 100%;
+			}
 		}
 	}
 </style>

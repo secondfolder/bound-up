@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/svelte';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it } from 'vitest';
+import { legacyNamesSource } from '$lib/testing/names';
+import { waProp } from '$lib/testing/web-awesome';
 import type { RewardsWidgetView, TasksWidgetView } from '$lib/types';
 import RewardsWidget from './RewardsWidget.svelte';
 import TasksWidget from './TasksWidget.svelte';
@@ -50,6 +52,33 @@ describe('TasksWidget', () => {
 		expect(screen.getByText('Morning stretches')).toBeInTheDocument();
 		expect(screen.getByText('+2')).toBeInTheDocument();
 		expect(screen.getByText('and 3 more ready')).toBeInTheDocument();
+	});
+
+	it('keeps whose a row is beside a title too long to fit, rather than inside its ellipsis', () => {
+		const { container } = render(TasksWidget, {
+			href: '/home/tasks',
+			tasks: tasks({
+				ready: [
+					{
+						id: 't1',
+						title: 'Write me a letter with a deliberately long title to see wrapping',
+						kind: 'task',
+						sealed: null,
+						note: '+2',
+						context: legacyNamesSource('p1', { partnerName: 'Morgan' })
+					}
+				],
+				readyCount: 1,
+				activeCount: 1
+			})
+		});
+
+		const context = container.querySelector('.context');
+		expect(context).toHaveTextContent('Morgan');
+		expect(context?.parentElement?.tagName).toBe('LI');
+		expect(container.querySelector('.title .context')).toBeNull();
+		// The note is credits, and says so.
+		expect(waProp(container.querySelector('.note wa-icon'), 'label')).toBe('credits');
 	});
 
 	it('shows a placeholder, not an empty title, for a sealed row no vault has opened', () => {
@@ -129,6 +158,7 @@ describe('RewardsWidget', () => {
 		});
 
 		expect(screen.getByText('12')).toBeInTheDocument();
+		expect(screen.getByText('12').parentElement).toHaveTextContent('12 credits');
 		expect(screen.getByText('Long bath')).toBeInTheDocument();
 		// Counts only the ones it did not have room for, never the ones the
 		// balance does not cover.

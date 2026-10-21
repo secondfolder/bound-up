@@ -3,11 +3,13 @@
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardCreditsInline from '$lib/components/RewardCreditsInline.svelte';
 	import RewardList from '$lib/components/RewardList.svelte';
+	import SectionPanel from '$lib/components/SectionPanel.svelte';
 	import { partnerName } from '$lib/partner-names.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: ActionData } = $props();
 	const backHref = $derived(resolve('/(auth-required)/(app)/home'));
+	const hasPartnerSections = $derived(data.partnerRewards.length > 0);
 	const selfEditHref = (rewardId: string) =>
 		resolve('/(auth-required)/(app)/home/rewards/[rewardId]', { rewardId });
 </script>
@@ -25,60 +27,59 @@
 		{#if form?.message}<p class="status">{form.message}</p>{/if}
 		{#if form?.error}<p class="invalid">{form.error}</p>{/if}
 
-		<section class="panel self">
-			<div class="panel-header">
-				<div class="title-stack">
-					<div class="title-row">
-						<h2>Your Rewards</h2>
-						<RewardCreditsInline
-							label="Credits:"
-							unit={null}
-							credits={data.selfRewards.credits}
-							compact
-							editable={{
-								action: '?/selfSetCredits',
-								inputLabel: 'Set your reward credits',
-								editLabel: 'Edit your reward credits',
-								saveLabel: 'Save your reward credits',
-								cancelLabel: 'Cancel editing reward credits'
-							}}
-						/>
-					</div>
-				</div>
-				<div class="actions">
-					<wa-button appearance="outlined" href={resolve('/(auth-required)/(app)/home/rewards/add')}
-						>Add a reward</wa-button
-					>
-					{#if data.selfRewards.claims.length > 0}
-						<wa-button
-							appearance="outlined"
-							href={resolve('/(auth-required)/(app)/home/rewards/history')}>Claim history</wa-button
-						>
-					{/if}
-				</div>
-			</div>
+		<!-- Laid out as /home/tasks is: a panel per section once there is more
+		     than one, the balance beside the title, the buttons on the right. -->
+		<SectionPanel title="Your rewards" class="self" framed={hasPartnerSections}>
+			{#snippet meta()}
+				<RewardCreditsInline
+					label="Credits:"
+					unit={null}
+					credits={data.selfRewards.credits}
+					compact
+					editable={{
+						action: '?/selfSetCredits',
+						inputLabel: 'Set your reward credits',
+						editLabel: 'Edit your reward credits',
+						saveLabel: 'Save your reward credits',
+						cancelLabel: 'Cancel editing reward credits'
+					}}
+				/>
+			{/snippet}
+			{#snippet actions()}
+				<!-- Always there, like the tasks page's history: an empty history
+				     page says so, and the buttons do not move when the first claim
+				     lands. -->
+				<wa-button appearance="outlined" href={resolve('/(auth-required)/(app)/home/rewards/history')}
+					>Claim history</wa-button
+				>
+				<wa-button appearance="outlined" href={resolve('/(auth-required)/(app)/home/rewards/add')}
+					>Add a reward</wa-button
+				>
+			{/snippet}
+
 			<RewardList
 				rewards={data.selfRewards.rewards}
-				emptyMessage="You have not created any self rewards yet."
+				emptyMessage="You have not created any rewards of your own yet."
 				claimAction="?/selfClaimReward"
 				editHref={selfEditHref}
+				balance={data.selfRewards.credits}
 			/>
-		</section>
+		</SectionPanel>
 
 		<div class="partner-sections">
 			{#each data.partnerRewards as section (section.partnershipId)}
-				<section class="panel partner">
-					<div class="panel-header">
-						<div class="title-row">
-							<h2>{partnerName(section.names)}'s Rewards</h2>
-							<RewardCreditsInline label="Credits:" unit={null} credits={section.credits} compact />
-						</div>
-						<a
+				<SectionPanel title={`${partnerName(section.names)}'s rewards`} class="partner">
+					{#snippet meta()}
+						<RewardCreditsInline label="Credits:" unit={null} credits={section.credits} compact />
+					{/snippet}
+					{#snippet actions()}
+						<wa-button
+							appearance="outlined"
 							href={resolve('/(auth-required)/(app)/partner/[id]/rewards', {
 								id: section.partnershipId
-							})}>Open full rewards</a
+							})}>Open full rewards</wa-button
 						>
-					</div>
+					{/snippet}
 
 					<RewardList
 						rewards={section.rewards}
@@ -86,8 +87,9 @@
 						claimAction="?/partnerClaimReward"
 						claimPartnershipId={section.partnershipId}
 						editHref={null}
+						balance={section.credits}
 					/>
-				</section>
+				</SectionPanel>
 			{/each}
 		</div>
 	</div>
@@ -95,66 +97,26 @@
 
 <style>
 	.page {
-		max-width: 52rem;
+		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
 	}
 
-	.content {
-		padding: 0 var(--wa-space-l) var(--wa-space-l);
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.panel-header,
-	.actions {
-		display: flex;
-		gap: 0.75rem;
-		align-items: end;
-		flex-wrap: wrap;
-	}
-
-	.title-stack {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-
-	.title-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		width: 100%;
-	}
-
-	h2,
-	p {
-		margin: 0;
-	}
-
-	.panel {
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-panel-border-radius);
-		padding: var(--wa-space-l);
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		background: color-mix(
-			in srgb,
-			var(--wa-color-surface-default) 94%,
-			var(--wa-color-brand-fill-quiet)
-		);
-	}
-
+	.content,
 	.partner-sections {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+	}
+
+	.content {
+		padding: 0 var(--page-gutter) var(--wa-space-l);
+	}
+
+	p {
+		margin: 0;
 	}
 
 	.status {
@@ -163,16 +125,5 @@
 
 	.invalid {
 		color: var(--wa-color-text-danger);
-	}
-
-	@media (max-width: 640px) {
-		.panel-header {
-			flex-direction: column;
-			align-items: stretch;
-		}
-
-		.title-row {
-			align-items: flex-start;
-		}
 	}
 </style>

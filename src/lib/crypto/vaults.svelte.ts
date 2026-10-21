@@ -21,7 +21,7 @@ import {
 	type OpenedVaults,
 	StaleIdentityError
 } from './ensure-vaults';
-import { refreshTrust, trustAllowsSending } from './trust.svelte';
+import { refreshTrust, setOwnRecipient, trustAllowsSending } from './trust.svelte';
 import { type OpenVault, unwrapVaultKey, wrapVaultKey } from './vault';
 
 export type VaultsState =
@@ -226,6 +226,7 @@ export async function initialiseVaults(
 		state = { status: 'loading' };
 	}
 	heldIdentity = identity;
+	setOwnRecipient(identity.recipient);
 	runningFor = userId;
 	running = ensureVaults(deps)
 		.then((opened): VaultsState => {

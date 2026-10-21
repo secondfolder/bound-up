@@ -1,9 +1,26 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { formatShippedOn, recentlyShipped } from '$lib/roadmap';
+	import { formatShippedOn, type PlacedItem, recentlyShipped } from '$lib/roadmap';
 
 	const roadmapHref = resolve('/(public)/roadmap');
-	const recent = recentlyShipped(4);
+
+	/**
+	 * Runs of items under one parent, in the order they shipped. The newest
+	 * few are often all twigs of one branch — four "Daydreams: …" in a row
+	 * read as a stammer — so the parent is said once, over its run.
+	 */
+	const groups = recentlyShipped(4).reduce<{ parent: PlacedItem['parent']; items: PlacedItem[] }[]>(
+		(runs, placed) => {
+			const last = runs.at(-1);
+			if (last && last.parent?.id === placed.parent?.id) {
+				last.items.push(placed);
+			} else {
+				runs.push({ parent: placed.parent, items: [placed] });
+			}
+			return runs;
+		},
+		[]
+	);
 </script>
 
 <!-- The newest shipped roadmap items, each linking to its own node on
@@ -13,18 +30,26 @@
      unshipped items, and $lib/roadmap refuses duplicate titles. -->
 <div class="recent">
 	<h3 id="recently-added">Recently added</h3>
-	<ul aria-labelledby="recently-added">
-		{#each recent as { item, parent } (item.id)}
-			<li>
-				<wa-icon name="check" variant="solid" aria-hidden="true"></wa-icon>
-				<!-- On one line: whitespace inside the link would be underlined. -->
-				<a href="{roadmapHref}#{item.id}">{#if parent}<span class="parent">{parent.title}:</span>&nbsp;{/if}{item.title}</a>
-				{#if item.shippedOn}
-					<span class="date">{formatShippedOn(item.shippedOn)}</span>
-				{/if}
-			</li>
+	<!-- One block, centred as a whole, with its lines aligned left inside it:
+	     centring each line on its own left the check marks in a zigzag. -->
+	<div class="runs">
+		{#each groups as { parent, items }, index (`${parent?.id ?? "top"}-${index}`)}
+			<div class="run">
+				{#if parent}<p class="parent" id="recent-parent-{index}">{parent.title}</p>{/if}
+				<ul aria-labelledby={parent ? `recent-parent-${index}` : 'recently-added'}>
+					{#each items as { item } (item.id)}
+						<li>
+							<wa-icon name="check" variant="solid" aria-hidden="true"></wa-icon>
+							<a href="{roadmapHref}#{item.id}">{item.title}</a>
+							{#if item.shippedOn}
+								<span class="date">{formatShippedOn(item.shippedOn)}</span>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</div>
 		{/each}
-	</ul>
+	</div>
 </div>
 
 <style>
@@ -33,7 +58,9 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 1rem;
-		text-align: center;
+		/* On top of the section's gap: this sat closer to the last feature than
+		   the features sit to each other, and read as part of it. */
+		margin-block-start: 1rem;
 	}
 
 	h3 {
@@ -42,6 +69,19 @@
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		color: var(--wa-color-text-normal);
+	}
+
+	.runs {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		max-inline-size: 100%;
+		text-align: start;
+	}
+
+	.parent {
+		margin: 0 0 0.25rem;
+		color: var(--wa-color-text-quiet);
 	}
 
 	ul {
@@ -54,11 +94,9 @@
 	}
 
 	li {
-		/* Web Awesome's native styles indent every `li` by 1.125em. */
 		margin: 0;
 		display: flex;
 		flex-wrap: wrap;
-		justify-content: center;
 		align-items: baseline;
 		column-gap: 0.45rem;
 	}
@@ -75,11 +113,6 @@
 		&:hover {
 			color: var(--accent-tint);
 		}
-	}
-
-	.parent {
-		font-weight: 400;
-		color: var(--wa-color-text-quiet);
 	}
 
 	.date {

@@ -13,24 +13,24 @@
 		{backHref}
 		backLabel="Back to tasks"
 		backText="Tasks"
-		title="Self task history"
+		title="Your task history"
 		description="Each completion keeps the title, credits, and message it had at the time."
 	/>
 
+	<!-- The list straight on the page, under no heading of its own: the page
+	     title already says what it is, and a panel around the only list put
+	     every entry in a card inside a card. -->
 	<div class="content">
-		<section class="panel">
-			<h2>Completion history</h2>
-			<TaskCompletionList
-				completions={data.selfTasks.completions}
-				emptyMessage="No self tasks have been completed yet."
-			/>
-		</section>
+		<TaskCompletionList
+			completions={data.selfTasks.completions}
+			emptyMessage="Nothing completed yet."
+		/>
 	</div>
 </section>
 
 <style>
 	.page {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -38,20 +38,7 @@
 	}
 
 	.content {
-		padding: 0 var(--wa-space-l) var(--wa-space-l);
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	h2 {
-		margin: 0;
-	}
-
-	.panel {
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-panel-border-radius);
-		padding: var(--wa-space-l);
+		padding: 0 var(--page-gutter) var(--wa-space-l);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;

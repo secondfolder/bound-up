@@ -7,6 +7,7 @@
 	import SecretSettingField from '$lib/components/admin/SecretSettingField.svelte';
 	import InputField from '$lib/components/InputField.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import SavedNote from '$lib/components/SavedNote.svelte';
 	import {
 		imageModelSettingsFormSchema,
 		languageModelSettingsFormSchema,
@@ -99,6 +100,41 @@
 	const canSavePush = $derived(
 		pushIsTainted($pushTainted) && pushSettingsFormSchema.safeParse($push).success
 	);
+
+	/**
+	 * Whether the provider says it has no model by a custom id. Only the
+	 * saved value counts — an edit that is not saved yet changes nothing the
+	 * server sends to — so the badge says "Model not found" rather than
+	 * "Working" above a warning that stories sent to it would fail.
+	 */
+	let storyMissing = $state(false);
+	let photoMissing = $state(false);
+	let illustratedMissing = $state(false);
+	const languageModelsBroken = $derived(
+		storyMissing && !languageModelIsTainted($languageModelTainted)
+	);
+	const imageModelsBroken = $derived(
+		(photoMissing || illustratedMissing) && !imageModelIsTainted($imageModelTainted)
+	);
+
+	/**
+	 * The page's sections, for the jump row at the top. The page is long —
+	 * about eight screens on a phone — and each part has its own status, so
+	 * the row is both a way down and the admin index's summary repeated.
+	 * `ready` is null for a section with no status of its own.
+	 */
+	const sections = $derived([
+		{ id: 'email', label: 'Email', ready: data.status.mailProblem === null },
+		{ id: 'providers', label: 'Providers', ready: null },
+		{
+			id: 'language-models',
+			label: 'Language',
+			ready: data.status.languageModels && !languageModelsBroken
+		},
+		{ id: 'image-models', label: 'Image', ready: data.status.imageModels && !imageModelsBroken },
+		{ id: 'push', label: 'Notifications', ready: data.status.push },
+		{ id: 'secret', label: 'Secret', ready: null }
+	]);
 
 	// Each model setting's presets are those of the provider it has chosen.
 	const storyPresets: ModelPresetOption[] = $derived(
@@ -226,8 +262,26 @@
 	/>
 
 	<div class="content">
+		<!-- Sticky inside the scrolling <main>, so it stays in reach all the
+		     way down. In-page links, which need no `resolve()`. -->
+		<nav class="jump" aria-label="Sections">
+			{#each sections as section (section.id)}
+				<a href="#{section.id}">
+					{#if section.ready !== null}
+						<wa-icon
+							class:off={!section.ready}
+							name={section.ready ? 'circle-check' : 'circle-exclamation'}
+							variant="solid"
+							label={section.ready ? 'working' : 'not set up'}
+						></wa-icon>
+					{/if}
+					{section.label}
+				</a>
+			{/each}
+		</nav>
+
 		<!-- ── Email ─────────────────────────────────────────────────────── -->
-		<article class="panel" aria-labelledby="email-heading">
+		<article id="email" class="panel" aria-labelledby="email-heading">
 			<header>
 				<h2 id="email-heading">Email</h2>
 				{#if data.status.mailProblem === null}
@@ -323,10 +377,10 @@
 				{/if}
 
 				<div class="actions">
-					{#if $mailMessage}<span class="saved" role="status">{$mailMessage}</span>{/if}
+					{#if $mailMessage}<SavedNote>{$mailMessage}</SavedNote>{/if}
 					<wa-button
 						type="submit"
-						appearance={canSaveMail ? 'filled' : 'outlined'}
+						appearance={canSaveMail ? 'accent' : 'outlined'}
 						variant={canSaveMail ? 'brand' : 'neutral'}
 						disabled={$mailSubmitting}
 					>
@@ -347,7 +401,7 @@
 				>
 					Send a test email
 				</wa-button>
-				{#if $testMessage}<span class="saved" role="status">{$testMessage}</span>{/if}
+				{#if $testMessage}<SavedNote>{$testMessage}</SavedNote>{/if}
 				{#if $testErrors._errors}<span class="invalid" role="alert">{$testErrors._errors}</span>{/if}
 			</form>
 		</article>
@@ -355,7 +409,7 @@
 		<!-- ── Model providers ───────────────────────────────────────────── -->
 		<!-- Credentials apart from models: a provider's key is the account with
 		     it, shared by every model setting that chooses it. -->
-		<article class="panel" aria-labelledby="providers-heading">
+		<article id="providers" class="panel" aria-labelledby="providers-heading">
 			<header>
 				<h2 id="providers-heading">Model providers</h2>
 			</header>
@@ -395,13 +449,18 @@
 		<!-- Named for what the provider does rather than for Daydreams, its
 		     first user: a later feature that writes text uses the same key,
 		     with a model setting of its own here. -->
-		<article class="panel" aria-labelledby="language-models-heading">
+		<!-- One pair of words for every badge on the page, where there were three
+		     ("Working", "On", "Off"): neutral where a part is optional, a
+		     warning where something is wrong or the server needs it. -->
+		<article id="language-models" class="panel" aria-labelledby="language-models-heading">
 			<header>
 				<h2 id="language-models-heading">Language models</h2>
-				{#if data.status.languageModels}
-					<wa-badge variant="success">On</wa-badge>
+				{#if languageModelsBroken}
+					<wa-badge variant="warning">Model not found</wa-badge>
+				{:else if data.status.languageModels}
+					<wa-badge variant="success">Working</wa-badge>
 				{:else}
-					<wa-badge variant="neutral">Off</wa-badge>
+					<wa-badge variant="neutral">Not set up</wa-badge>
 				{/if}
 			</header>
 			<p class="lead">
@@ -416,6 +475,9 @@
 					provider={$languageModels.storyProvider}
 					legend="Daydreams story model"
 					presets={storyPresets}
+					onmissing={(missing) => {
+						storyMissing = missing;
+					}}
 				>
 					{#snippet providerField()}
 						<ModelProviderField
@@ -446,10 +508,10 @@
 					{@render envNote(stillInEnv('storyModel'))}
 				{/if}
 				<div class="actions">
-					{#if $languageModelMessage}<span class="saved" role="status">{$languageModelMessage}</span>{/if}
+					{#if $languageModelMessage}<SavedNote>{$languageModelMessage}</SavedNote>{/if}
 					<wa-button
 						type="submit"
-						appearance={canSaveLanguageModels ? 'filled' : 'outlined'}
+						appearance={canSaveLanguageModels ? 'accent' : 'outlined'}
 						variant={canSaveLanguageModels ? 'brand' : 'neutral'}
 						disabled={$languageModelSubmitting}
 					>
@@ -461,13 +523,15 @@
 
 		<!-- ── Image models ──────────────────────────────────────────────── -->
 		<!-- Named for what the provider does, as the language models are. -->
-		<article class="panel" aria-labelledby="image-models-heading">
+		<article id="image-models" class="panel" aria-labelledby="image-models-heading">
 			<header>
 				<h2 id="image-models-heading">Image models</h2>
-				{#if data.status.imageModels}
-					<wa-badge variant="success">On</wa-badge>
+				{#if imageModelsBroken}
+					<wa-badge variant="warning">Model not found</wa-badge>
+				{:else if data.status.imageModels}
+					<wa-badge variant="success">Working</wa-badge>
 				{:else}
-					<wa-badge variant="neutral">Off</wa-badge>
+					<wa-badge variant="neutral">Not set up</wa-badge>
 				{/if}
 			</header>
 			<p class="lead">
@@ -483,6 +547,9 @@
 					provider={$imageModels.photoProvider}
 					legend="Daydreams photo model"
 					presets={photoPresets}
+					onmissing={(missing) => {
+						photoMissing = missing;
+					}}
 				>
 					{#snippet providerField()}
 						<ModelProviderField
@@ -506,6 +573,9 @@
 					provider={$imageModels.illustratedProvider}
 					legend="Daydreams illustration model"
 					presets={illustratedPresets}
+					onmissing={(missing) => {
+						illustratedMissing = missing;
+					}}
 				>
 					{#snippet providerField()}
 						<ModelProviderField
@@ -525,10 +595,10 @@
 					{@render envNote(stillInEnv('photoModel', 'illustratedModel'))}
 				{/if}
 				<div class="actions">
-					{#if $imageModelMessage}<span class="saved" role="status">{$imageModelMessage}</span>{/if}
+					{#if $imageModelMessage}<SavedNote>{$imageModelMessage}</SavedNote>{/if}
 					<wa-button
 						type="submit"
-						appearance={canSaveImageModels ? 'filled' : 'outlined'}
+						appearance={canSaveImageModels ? 'accent' : 'outlined'}
 						variant={canSaveImageModels ? 'brand' : 'neutral'}
 						disabled={$imageModelSubmitting}
 					>
@@ -539,13 +609,13 @@
 		</article>
 
 		<!-- ── Notifications ─────────────────────────────────────────────── -->
-		<article class="panel" aria-labelledby="push-heading">
+		<article id="push" class="panel" aria-labelledby="push-heading">
 			<header>
 				<h2 id="push-heading">Notifications</h2>
 				{#if data.status.push}
 					<wa-badge variant="success">Working</wa-badge>
 				{:else}
-					<wa-badge variant="warning">Off</wa-badge>
+					<wa-badge variant="warning">Not set up</wa-badge>
 				{/if}
 			</header>
 			<p class="lead">
@@ -566,10 +636,10 @@
 					autocomplete="off"
 				/>
 				<div class="actions">
-					{#if $pushMessage}<span class="saved" role="status">{$pushMessage}</span>{/if}
+					{#if $pushMessage}<SavedNote>{$pushMessage}</SavedNote>{/if}
 					<wa-button
 						type="submit"
-						appearance={canSavePush ? 'filled' : 'outlined'}
+						appearance={canSavePush ? 'accent' : 'outlined'}
 						variant={canSavePush ? 'brand' : 'neutral'}
 						disabled={$pushSubmitting}
 					>
@@ -582,7 +652,7 @@
 					<span class="label">Public key</span>
 					<code class="key">{data.vapid.publicKey}</code>
 					<small>{origin(data.vapid.source, data.vapid.updatedAt)}</small>
-					{#if $vapidMessage}<span class="saved" role="status">{$vapidMessage}</span>{/if}
+					{#if $vapidMessage}<SavedNote>{$vapidMessage}</SavedNote>{/if}
 				</div>
 				<wa-button
 					appearance="outlined"
@@ -600,7 +670,7 @@
 		</article>
 
 		<!-- ── Server secret ─────────────────────────────────────────────── -->
-		<article class="panel" aria-labelledby="secret-heading">
+		<article id="secret" class="panel" aria-labelledby="secret-heading">
 			<header>
 				<h2 id="secret-heading">Server secret</h2>
 			</header>
@@ -690,7 +760,7 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
 		width: 100%;
 		padding-bottom: var(--wa-space-l);
@@ -699,7 +769,51 @@
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
-			padding: var(--wa-space-l);
+			padding: var(--wa-space-l) var(--page-gutter);
+		}
+	}
+
+	.jump {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		display: flex;
+		gap: 0.25rem 0.5rem;
+		/* One scrolling row on a phone rather than three wrapped ones. */
+		overflow-x: auto;
+		scrollbar-width: none;
+		/* Pulled out to the column's edges so it covers what scrolls under it,
+		   on an opaque surface: the wash behind is not opaque, and text
+		   scrolling beneath showed through. */
+		margin-inline: calc(-1 * var(--page-gutter));
+		padding: var(--wa-space-xs) var(--page-gutter);
+		background: var(--wa-color-surface-lowered);
+		border-bottom: 1px solid var(--wa-color-surface-border);
+
+		a {
+			display: inline-flex;
+			flex: none;
+			align-items: center;
+			gap: 0.35rem;
+			min-block-size: 2.25rem;
+			padding-inline: 0.6rem;
+			border-radius: var(--wa-border-radius-pill);
+			color: var(--wa-color-text-normal);
+			font-size: var(--wa-font-size-s);
+			text-decoration: none;
+
+			&:hover,
+			&:focus-visible {
+				background: var(--wa-color-surface-raised);
+			}
+		}
+
+		wa-icon {
+			color: var(--wa-color-success-on-quiet);
+
+			&.off {
+				color: var(--wa-color-warning-on-quiet);
+			}
 		}
 	}
 
@@ -710,6 +824,14 @@
 		padding: 1rem;
 		border: 1px solid var(--wa-color-surface-border);
 		border-radius: var(--wa-border-radius-l);
+		/* Clear of the sticky jump row when one of its links scrolls here. */
+		scroll-margin-top: 3.5rem;
+
+		/* Less inset on a phone, where the gutter and the panel's padding
+		   together left inputs a little over 270px wide and cut off a path. */
+		@media (width < 40rem) {
+			padding: var(--wa-space-m) var(--wa-space-s);
+		}
 
 		header {
 			display: flex;
@@ -718,8 +840,11 @@
 			gap: 0.5rem;
 		}
 
+		/* The size every settings subsection heading uses; Web Awesome's own h2
+		   is page-sized. */
 		h2 {
 			margin: 0;
+			font-size: var(--wa-font-size-l);
 		}
 
 		.lead {
@@ -794,18 +919,17 @@
 		gap: 0.75rem;
 	}
 
-	.saved {
-		color: var(--wa-color-success-on-quiet);
-	}
-
 	.invalid {
 		color: var(--wa-color-text-danger);
 	}
 
+	/* Its button right-aligned like every save on the page, also when it
+	   wraps under the text on a phone. */
 	.panel form.test {
 		flex-direction: row;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: flex-end;
 		gap: 0.5rem 0.75rem;
 		padding-top: 1rem;
 		border-top: 1px solid var(--wa-color-surface-border);

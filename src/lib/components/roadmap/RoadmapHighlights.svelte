@@ -45,6 +45,8 @@
 			   and the tiles crowded it at the gap alone. */
 			margin: 0 0 0.75rem;
 			font-family: var(--font-display);
+			font-weight: 900;
+			font-variation-settings: var(--font-display-variation);
 			font-size: clamp(2rem, 8vw, 3rem);
 			color: var(--accent-color);
 		}

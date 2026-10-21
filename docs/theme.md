@@ -2,7 +2,7 @@
 
 Every page wears the landing page's look: the rust wash, a halftone line
 screen fading out down the page, grain, amber accents, Rethink Sans for text
-and Muddy Tractor for page titles. The landing page draws its texture with
+and a distressed Rubik Black for page titles. The landing page draws its texture with
 WebGL (see [page-effects.md](page-effects.md)); everywhere else it is CSS.
 
 | Where                              | What                                                                  |
@@ -33,8 +33,14 @@ theme without being unlayered, where it would also beat every component's own
 
 - **Brand is the landing page's amber** (`--accent-color`, `#ffac00`), with
   dark rust on it rather than Web Awesome's white, which is illegible on amber.
-  `variant="brand" appearance="outlined"` is the landing page's CTA: amber
-  border, amber text. Login and signup's buttons use it.
+  `variant="brand" appearance="outlined"` — amber border, amber text — is an
+  idle save or submit button, and `appearance="accent"` the same button once
+  there is something valid to send (AGENTS.md). The landing page's CTA is a
+  solid pill in the same loud fill, drawn by hand with the brand tokens.
+- **Amber on the brightest wash is about 4:1.** The top-left of the wash is
+  the lightest it gets, so a link drawn there (the auth pages' and the
+  roadmap's "Back to Bound Up", the landing page's "Log in") uses
+  `--accent-tint` instead, which clears AA.
 - **Neutrals are re-hued warm.** The whole `--wa-color-neutral-*` scale is
   replaced, so everything Web Awesome derives from it — input borders, neutral
   buttons, dividers — belongs to the palette. A filled neutral button is a
@@ -50,8 +56,85 @@ theme without being unlayered, where it would also beat every component's own
   [roadmap.md](roadmap.md)).
 - **`--wa-color-text-danger`** is defined here as a light red: Web Awesome
   has no token by that name, and the old value, red-40, vanished on rust.
-- `h1` is Muddy Tractor in amber. Only `h1`: at section-heading sizes the
-  distressed face turns to noise, so smaller headings are Rethink Sans bold.
+- `h1` is the title face in amber (see [The title face](#the-title-face)).
+  Only `h1`: at section-heading sizes the distressed face turns to noise, so
+  smaller headings are Rethink Sans bold.
+  Its size is `--page-title-size`, a clamp that scales with the viewport: at
+  a fixed size one long word ("Notifications") overflowed a 360px phone. The
+  landing page's hero and the home screen's title are the only bigger ones.
+- **`--wa-color-text-quiet` is 85% lightness**, not the 80% it started at,
+  so it holds 4.5:1 on the brightest part of the wash, top left, where every
+  page's description line sits (it measured 4.0:1 there).
+- **Placeholders and select carets are warm.** Web Awesome's placeholder is a
+  cool grey and its native select caret a lavender SVG blended into what is
+  behind it; both were the only cold colours on a page. The placeholder is the
+  quiet text colour, faded, and the caret one unblended copy in the quiet
+  colour (as a literal: a data URI cannot read a custom property).
+
+## Page layout
+
+Every signed-in page's root is a column centred in `<main>`, one of three
+widths, and every page's content sits one gutter in from that column's edge.
+
+| Token                  | Value                | For                                                  |
+| ---------------------- | -------------------- | ---------------------------------------------------- |
+| `--page-width-narrow`  | 40rem                | Settings, admin, history: rows and lines of text     |
+| `--page-width`         | 50rem                | Lists, forms, details, stories, conversations        |
+| `--page-width-wide`    | 72rem                | The debug tooling's side-by-side panes               |
+| `--card-column-width`  | 30rem                | The home and partner cards, a scan list              |
+| `--page-gutter`        | `l`, `m` under 40rem | Between a column's edge and its content              |
+
+- **A page root fills `<main>`'s width.** `<main>` is a flex column, and a
+  root centred with `margin-inline: auto` is a flex item with auto margins,
+  which turns stretching off: it shrank to its content, so sibling pages with
+  the same `max-width` came out different widths, a page changed width with
+  its data, and an unwrappable title pushed the partner page off a phone. The
+  app layout gives every root `inline-size: 100%`, so `max-width` is the width.
+- **The header and the content share the gutter.** `NestedPageHeader` is
+  inset by `--page-gutter` as a margin, so its divider is exactly as wide as
+  the content below and the back link, the title and the cards start at one
+  edge. A page's content pads its sides with the same token.
+- **A list's indent is its padding, not its items' margin.** Web Awesome gives
+  every `li` a start margin, which a bullet-less list that zeroed its own
+  padding still inherited, so every such list sat 18px in from its heading.
+  `theme.css` moves the indent onto `ul`/`ol` padding in Web Awesome's last
+  layer: a bulleted list keeps it, and a list that zeroes its padding is flush.
+- **One exception to the widths:** the kink list's home is 60rem, for its two
+  answer columns (see [kink-list.md](kink-list.md)).
+- **Errors have pages.** `(auth-required)/(app)/+error.svelte` keeps the app
+  shell and offers a way back (to the partner when the route has one, else
+  home); the root `+error.svelte` covers everything else. Both name the
+  status in words (`src/lib/error-page.ts`) and show the thrown message,
+  which the code writes for the person reading it.
+
+## The title face
+
+`static/fonts/bound-up-title.woff2` is **Bound Up Title**: Rubik Black
+(SIL OFL 1.1) with two variation axes of its own, built by
+`scripts/title-font/build.py` from Rubik's Glyphs sources at a pinned commit.
+`npm run title-font` rebuilds it, given `uv`; the output is committed and
+byte-for-byte reproducible, so it only changes when the design does.
+
+- **`ROUG`, roughness (0–100)** erodes the outline into chips and nicks, as a
+  worn rubber stamp prints. Each point of a flattened outline moves into the
+  ink by fractal noise, capped at a third of the stroke's local thickness, so
+  a stroke is nicked but never cut through.
+- **`WOBL`, wobble (0–100)** turns each letter up to 4.5°, nudges it off the
+  baseline and scales it a touch, as hand-set type sits.
+- **Every letter and digit has three stamps** (default, `.alt1`, `.alt2`),
+  each with its own chips and tilt, and `calt` cycles them along a word, so a
+  doubled letter is never the same twice. They join the kerning groups of the
+  letter they vary, so spacing is Rubik's.
+- **Set the look with `--font-display-variation`** (`'ROUG' 70, 'WOBL' 100`)
+  in `theme.css`. A face's axes default to clean, so anything that uses
+  `--font-display` sets that token and `font-weight: 900` with it, as the
+  `h1` rule does.
+
+It replaced Muddy Tractor, whose file was the personal-use demo: it could not
+ship in an open-source repo, and it drew a "PERSONAL USE DEMO" stamp in place
+of `?`, `&`, `’` and `·`. Its source and licence are
+`static/fonts/bound-up-title-source.txt` and `bound-up-title-OFL.txt`; the
+brand images (`npm run brand-images`) are drawn in it too.
 
 ## The texture
 
@@ -61,8 +144,13 @@ canvas, where 50% grey is the identity:
 - `body::before` is the halftone: a 195° repeating gradient — lines 15° from
   horizontal, 8 px apart, the landing page's settings — at opacity 0.35, masked
   to fade out from 300 px to 800 px down the page. It scrolls with a public
-  page; the app shell's body does not scroll, so there it stays at the top of
-  the window.
+  page, and is never taller than the body (`min(800px, 100%)`): at a flat
+  800px it outgrew a short page on a short screen, which then scrolled into a
+  band of bare grain. The app shell pins it `position: fixed`, because there
+  the body has no height at all and the layer was the only thing giving the
+  document any: anything that scrolled an element into view scrolled the
+  whole document, cutting off the page's top. `fitVisualViewport` also resets
+  a stray window scroll on the window's own `scroll` event.
 - `body::after` is the grain: an SVG `feTurbulence` tile, desaturated and
   squeezed around 50% grey, fixed to the window.
 

@@ -167,6 +167,15 @@ describe('RichText, stored documents', () => {
 });
 
 describe('RichText, security', () => {
+	/** The fallback for an embed no provider matches, which `href`s its URL. */
+	it('renders an embed with a javascript: scheme as text, never as a link', () => {
+		const { container } = render(RichText, {
+			props: { text: stored([{ type: 'embed', url: 'javascript:alert(1)' }]) }
+		});
+		expect(links(container)).toHaveLength(0);
+		expect(container.textContent).toContain('javascript:alert(1)');
+	});
+
 	it('renders a javascript: scheme as text, never as a link', () => {
 		const { container } = render(RichText, {
 			props: {

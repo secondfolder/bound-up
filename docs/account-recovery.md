@@ -19,7 +19,10 @@ address, because each on its own is someone else's say-so (see below).
 ## The flow
 
 **Starting — `/login/recover`, no session.** The login page links to it as
-"Forgot password". The person enters their email and a new password. Their
+"Forgot password?", under the password box. The page is titled "Can't log
+in?" and sits in the same `AuthPage` layout and `AuthBox` as log in and sign
+up; its "Ask my partner" button stays outlined until the email, the new
+password's strength and the confirmation would all pass. The person enters their email and a new password. Their
 browser makes a brand-new identity and seals it under the new password — the
 same `buildIdentitySubmission` signup uses — and posts the email, the new
 public key and the new password wrap to `POST /api/account-recovery`. It gets
@@ -144,7 +147,10 @@ only at completion, and only as the hash Better Auth stores.
 **Rate limits.** Three requests per email and ten per client address, per
 hour (`MAX_REQUESTS_PER_EMAIL`, `MAX_REQUESTS_PER_IP` in `server/recovery.ts`).
 A 429 is the only other answer the start endpoint gives, and an unknown email
-reaches it at exactly the same rate.
+reaches it at exactly the same rate. Every answer also waits out
+`RECOVERY_START_RESPONSE_FLOOR_MS` (`server/response-floor.ts`), because an
+address with an account costs one more read — its partnerships — than an
+unknown one, and that would otherwise show in how fast it answers.
 
 **One request at a time.** A new request supersedes the requester's pending
 one, and its restore requests go with it, so a partner is never shown two codes

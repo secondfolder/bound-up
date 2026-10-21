@@ -47,7 +47,7 @@ async function openInviteVault(source: PartnerNamesSource): Promise<OpenVault | 
 	if (invite.keyWrap) {
 		// The inviter: the key is wrapped to them, and their identity opens it.
 		const held = heldVaultIdentity();
-		raw = held ? await unwrapInviteKey(partnershipId, invite.keyWrap, held.identity) : null;
+		raw = held ? await unwrapInviteKey(partnershipId, invite.keyWrap, held) : null;
 	} else {
 		// The invitee: the key came in the link, and this device kept it.
 		raw = recallInviteKey(partnershipId);

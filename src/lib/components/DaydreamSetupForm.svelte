@@ -940,7 +940,10 @@
 	{:else}
 		<!-- Only once there is a daydream to rename: a new one is named by the
 		     model after its opening, and nobody should have to think of a name
-		     before they have started. -->
+		     before they have started. Never marked required: superforms reads
+		     any string field without `.optional()` as required, and its asterisk
+		     sat over a hint saying to leave it empty. The hint is the field's
+		     own, so it sits with it rather than a gap below. -->
 		{#if daydream}
 			<InputField
 				{superform}
@@ -948,8 +951,9 @@
 				type="text"
 				title="Name"
 				maxlength={DAYDREAM_LIMITS.title}
+				hint="Leave it empty to have it named for you."
+				required={false}
 			/>
-			<p class="hint name-hint">Leave it empty to have it named for you.</p>
 		{/if}
 
 		<fieldset>
@@ -1074,7 +1078,7 @@
 			{/if}
 		</fieldset>
 
-		<wa-details summary="More options" class="more" {@attach startOpen(customisedOptions)}>
+		<wa-details summary="More options" class="more" appearance="outlined" {@attach startOpen(customisedOptions)}>
 			{#if showLead}
 				<fieldset class="lead">
 					<legend>Who leads</legend>
@@ -1236,10 +1240,6 @@
 		resize: vertical;
 	}
 
-	.name-hint {
-		margin-block-start: -0.75rem;
-	}
-
 	/* An idea part, and who plays it. */
 	.part {
 		display: flex;
@@ -1263,6 +1263,20 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+	}
+
+	/* Outlined, like the fieldsets around it, rather than the one filled box
+	   in the form; and its chevron points down, then up, as a section that
+	   opens in place does. Pointing right, it read as a link to another page. */
+	.more::part(icon),
+	.limits::part(icon) {
+		rotate: 90deg;
+	}
+
+	/* `open` is set by Web Awesome, which the compiler cannot see. */
+	.more:global([open])::part(icon),
+	.limits:global([open])::part(icon) {
+		rotate: -90deg;
 	}
 
 	.idea-choices {

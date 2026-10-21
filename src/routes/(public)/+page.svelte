@@ -58,7 +58,12 @@
 
 <div class="landing">
 	<header>
-		<h1>Bound Up <span class="beta">beta</span></h1>
+		<!-- The tag is left out of the page capture: it stamps itself on as the
+		     page arrives, and a capture taken mid-stamp would screen a ghost of
+		     it at the wrong size. Absolutely placed, so removing it from the
+		     clone moves nothing else. It stays under the effects canvas, so the
+		     grain still covers it. -->
+		<h1>Bound Up <span class="beta" data-vfx-capture-ignore="true">beta</span></h1>
 		<div class="subtitle">
 			Explore your kinks and manage your dynamics. Either with a partner or solo.
 		</div>
@@ -71,13 +76,13 @@
 		     screened twice — once live and once as a static ghost under it. -->
 	<div class="cta" data-vfx-capture-ignore="true">
 		{#if user}
-			<a class="big" href={resolve('/(auth-required)/(app)/home')}><span>Open</span></a>
+			<a class="big" href={resolve('/(auth-required)/(app)/home')}>Open</a>
 		{:else}
 			<!-- The aria-label says where the big "Sign up" goes, since on its own
 			     the word is a verb with no object for anyone navigating by link
 			     list. -->
 			<a class="big" href={resolve('/(public)/signup')} aria-label="Sign up for Bound Up">
-				<span>Sign up</span>
+				Sign up
 			</a>
 			<a class="small" href={resolve('/(public)/login')}>Log in</a>
 		{/if}
@@ -132,6 +137,8 @@
 				/* Was a flat 5rem, which ran off both edges of a phone. The vw
 				   term keeps the desktop size and shrinks it to fit below that. */
 				font-family: var(--font-display);
+				font-weight: 900;
+				font-variation-settings: var(--font-display-variation);
 				font-size: clamp(2.5rem, 10vw, 7em);
 				margin: 0;
 				/* Never wraps, so the page capture cannot wrap it either. The
@@ -155,7 +162,8 @@
 					margin-left: -0.8em;
 					padding: 0.15em 0.4em;
 					font-family: var(--wa-font-family-body);
-					font-size: 0.18em;
+					/* With a floor: 0.18em of a phone's 40px title is 7px. */
+					font-size: max(0.18em, 0.6875rem);
 					font-weight: 700;
 					letter-spacing: 0.08em;
 					line-height: 1;
@@ -163,6 +171,12 @@
 					border: 2px solid var(--accent-color);
 					border-radius: 0.3em;
 					rotate: 8deg;
+
+					/* Stamped on, like ink on paper: dropped from above the page
+					   at a slant, overshooting its own size as it lands. */
+					@media (prefers-reduced-motion: no-preference) {
+						animation: stamp 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) 0.4s both;
+					}
 				}
 			}
 			.subtitle {
@@ -201,7 +215,9 @@
 	}
 
 	.small {
-		color: var(--accent-color);
+		/* The tint rather than the amber: this sits high on the wash, where the
+		   amber measures about 4:1 against it. */
+		color: var(--accent-tint);
 		text-decoration: underline;
 		white-space: nowrap;
 		margin-top: 1em;
@@ -210,49 +226,75 @@
 		transition: color 0.1s ease;
 
 		&:hover {
-			color: var(--accent-color);
+			color: var(--wa-color-text-normal);
 		}
 
 		&:focus-visible {
-			outline: 2px solid #ffcf7a;
+			outline: 2px solid var(--wa-color-focus);
 			outline-offset: 3px;
 		}
 	}
 
+	/*
+	 * The one thing on the page to do, so a solid amber pill: the brand's loud
+	 * fill with its dark rust on it. It was a thin outline, which made the
+	 * landing page's main action quieter than the passkey button on the log-in
+	 * page. (An earlier version drew a distressed pill through a turbulence
+	 * filter on a ::before; that pseudo-element was gone long before this, and
+	 * the comment describing it had outlived it.)
+	 */
 	.big {
 		position: relative;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		padding: 0.2em 0.4em;
-		/* Separate the text from the distorted shape: the second turbulence pass
-		   is supposed to chew the outline, and when the filter lived on the
-		   anchor it mostly showed up as wobble in the glyphs and shadow instead.
-		   The decorative ::before pill now carries the filter; the label stays
-		   crisp and all of the displacement budget is spent on the silhouette. */
-		isolation: isolate;
+		padding: 0.25em 0.8em 0.3em;
 		line-height: 1;
-		color: #ffac00;
-		text-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+		color: var(--wa-color-brand-on-loud);
+		background: var(--wa-color-brand-fill-loud);
+		box-shadow: 0 8px 28px rgb(0 0 0 / 0.45);
 		font-size: clamp(1.5rem, 20vw, 3em);
 		font-weight: 700;
 		text-decoration: none;
-		border-radius: 0.2em;
-		border: #ffac00 2px solid;
+		border-radius: 999px;
 
-		span {
-			position: relative;
-			z-index: 1;
-			transition: scale 0.1s ease;
-
-			&:hover {
-				scale: 1.03;
-			}
+		&:hover {
+			background: var(--wa-color-brand-70);
 		}
 
 		&:focus-visible {
-			outline: 2px solid #ffcf7a;
-			outline-offset: 3px;
+			outline: 2px solid var(--wa-color-focus);
+			outline-offset: 4px;
+		}
+
+		/* Leans in under the pointer and gives a little under a press. On the
+		   whole pill, where it used to be on the label alone, so hovering the
+		   button's edge did nothing. */
+		@media (prefers-reduced-motion: no-preference) {
+			transition:
+				scale 0.15s ease,
+				background-color 0.15s ease;
+
+			&:hover {
+				scale: 1.04;
+			}
+
+			&:active {
+				scale: 0.98;
+			}
+		}
+	}
+
+	@keyframes stamp {
+		from {
+			opacity: 0;
+			scale: 1.8;
+			rotate: -4deg;
+		}
+		to {
+			opacity: 1;
+			scale: 1;
+			rotate: 8deg;
 		}
 	}
 </style>

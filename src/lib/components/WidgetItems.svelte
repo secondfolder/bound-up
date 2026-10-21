@@ -27,18 +27,28 @@
 	<ul>
 		{#each items as item (item.id)}
 			<li>
-				<span class="title">
-					<!-- Opened here, in the browser: the server never had the title. -->
-					{shownText(openedWidgetTitle(item))}
-					{#if item.context}
-						<!-- Which section this row came from on the page the header links
-						     to. /home merges your things with every partner's, and two
-						     partners can name a task the same thing. -->
-						<span class="context">{partnerName(item.context)}</span>
-					{/if}
-				</span>
+				<!-- Opened here, in the browser: the server never had the title. -->
+				<span class="title">{shownText(openedWidgetTitle(item))}</span>
+				{#if item.context}
+					<!-- Which section this row came from on the page the header links
+					     to. /home merges your things with every partner's, and two
+					     partners can name a task the same thing.
+
+					     A sibling of the title rather than inside it, so a long title
+					     ellipsises before it and this stays: inside, the ellipsis cut
+					     it off entirely and the row no longer said whose it was. -->
+					<span class="context">{partnerName(item.context)}</span>
+				{/if}
 				{#if item.note}
-					<span class="note">{item.note}</span>
+					<span class="note">
+						{item.note}
+						{#if item.kind === 'task' || item.kind === 'reward'}
+							<!-- A task's note is what it awards and a reward's what it
+							     costs: both credits, which a bare "2" next to a balance did
+							     not say. -->
+							<wa-icon name="coins" variant="solid" label="credits"></wa-icon>
+						{/if}
+					</span>
 				{/if}
 			</li>
 		{/each}
@@ -60,27 +70,38 @@
 		li {
 			display: flex;
 			align-items: baseline;
-			gap: 0.5rem;
+			gap: 0.375rem;
 
 			.title {
-				flex: 1 1 auto;
+				flex: 0 1 auto;
 				min-inline-size: 0;
 				overflow: hidden;
 				text-overflow: ellipsis;
 				white-space: nowrap;
+			}
 
-				.context {
-					color: var(--wa-color-text-quiet);
-					font-size: 0.8125rem;
+			.context {
+				flex: 0 1 auto;
+				/* Never more than a third of the row, so a long name cannot push
+				   the title out instead. */
+				max-inline-size: 33%;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				color: var(--wa-color-text-quiet);
+				font-size: 0.8125rem;
 
-					&::before {
-						content: '· ';
-					}
+				&::before {
+					content: '· ';
 				}
 			}
 
 			.note {
 				flex: none;
+				margin-inline-start: auto;
+				display: inline-flex;
+				align-items: center;
+				gap: 0.25rem;
 				font-size: 0.8125rem;
 				padding: 0.0625rem 0.4375rem;
 				border-radius: 999px;

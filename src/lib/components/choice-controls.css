@@ -1,0 +1,98 @@
+/*
+ * The two small choice controls the daydream and kink list screens share,
+ * imported by each component that draws one. They were drawn four ways:
+ * a character's tone and its trait chips at two different sizes in the one
+ * dialog, and "You as" (daydreams) as separate pills where "Answer as" (the
+ * kink list), the same kind of choice, was a segmented control.
+ *
+ * Global class names, because each is used by several components; prefixed
+ * so they cannot collide with a component's own.
+ */
+
+/*
+ * A chip: a native <button> toggled with aria-pressed (wa-button forwards no
+ * ARIA state), or a label around a visually hidden input. One size wherever
+ * it appears.
+ */
+.choice-chip {
+	display: inline-flex;
+	align-items: center;
+	/* Web Awesome's native styles give every <button> a form control's
+	   height; a chip is sized by its text. */
+	block-size: auto;
+	min-block-size: 1.875rem;
+	padding: 0.2rem 0.75rem;
+	border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+	border-radius: var(--wa-border-radius-pill);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 0.8125rem;
+	line-height: 1.3;
+	white-space: normal;
+	text-align: start;
+	cursor: pointer;
+
+	&[aria-pressed='true'],
+	&:has(input:checked) {
+		background: var(--wa-color-brand-fill-quiet);
+		border-color: var(--wa-color-brand-border-loud);
+	}
+
+	&:focus-visible,
+	&:has(input:focus-visible) {
+		outline: var(--wa-focus-ring);
+		outline-offset: var(--wa-focus-ring-offset);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		transition:
+			background-color 120ms ease-out,
+			border-color 120ms ease-out;
+	}
+}
+
+/*
+ * A segmented control: one choice of a few, as native radios inside labels,
+ * each radio stretched invisibly over its label so the whole segment is the
+ * target and the arrow keys move along it.
+ */
+.choice-segments {
+	display: inline-flex;
+	border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+	border-radius: var(--wa-border-radius-pill);
+	overflow: hidden;
+
+	> label {
+		position: relative;
+
+		input {
+			position: absolute;
+			inset: 0;
+			margin: 0;
+			opacity: 0;
+			cursor: pointer;
+		}
+
+		span {
+			display: block;
+			padding: 0.2rem 0.75rem;
+			font-size: 0.875rem;
+		}
+
+		& + label span {
+			border-inline-start: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+		}
+
+		input:checked + span {
+			font-weight: var(--wa-font-weight-bold);
+			color: var(--wa-color-brand-on-loud);
+			background: var(--wa-color-brand-fill-loud);
+		}
+
+		input:focus-visible + span {
+			outline: var(--wa-focus-ring);
+			outline-offset: calc(-1 * var(--wa-focus-ring-width, 2px));
+		}
+	}
+}

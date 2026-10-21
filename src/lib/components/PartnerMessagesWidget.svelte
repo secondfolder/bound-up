@@ -26,6 +26,9 @@
 {#snippet preview()}
 	{#if messages.unreadThreads > 0}
 		<p class="unread">
+			<!-- The same dot an unread sticker wears on the board, so the two read
+			     as one signal. Decorative: the words say it. -->
+			<span class="dot" aria-hidden="true"></span>
 			{messages.unreadThreads} unread thread{messages.unreadThreads === 1 ? '' : 's'}
 		</p>
 	{:else}
@@ -42,8 +45,38 @@
 	}
 
 	.unread {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 		color: var(--wa-color-brand-fill-loud, var(--wa-color-text-link));
 		font-weight: var(--wa-font-weight-semibold, 600);
+	}
+
+	.dot {
+		flex: none;
+		inline-size: 0.5rem;
+		block-size: 0.5rem;
+		border-radius: 50%;
+		background: currentColor;
+	}
+
+	/* It pops in as the line appears: on the page opening with something
+	   unread, or on any reload of the page's data that swaps "All caught up"
+	   for it. */
+	@media (prefers-reduced-motion: no-preference) {
+		.dot {
+			animation: dot-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+		}
+	}
+
+	@keyframes dot-in {
+		from {
+			transform: scale(0);
+		}
+
+		60% {
+			transform: scale(1.4);
+		}
 	}
 
 	.summary {

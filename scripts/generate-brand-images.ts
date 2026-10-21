@@ -3,7 +3,7 @@
  * Regenerates every brand image in static/ from the landing page itself, run
  * through the page's halftone and grain:
  *
- * - the favicons and app icons, a "B" in Muddy Tractor on the page's rust wash;
+ * - the favicons and app icons, a "B" in the title face on the page's rust wash;
  * - the Open Graph card link previews show (`og-image.jpg`), the landing
  *   page's title and subtitle on the same wash.
  *
@@ -151,8 +151,8 @@ function html(body: string): string {
 
 const FILES: Record<string, { path: URL; type: string }> = {
 	'/theme.css': { path: new URL('src/lib/theme.css', ROOT), type: 'text/css' },
-	'/fonts/muddy-tractor.woff2': {
-		path: new URL('fonts/muddy-tractor.woff2', STATIC),
+	'/fonts/bound-up-title.woff2': {
+		path: new URL('fonts/bound-up-title.woff2', STATIC),
 		type: 'font/woff2'
 	},
 	'/fonts/rethink-sans-latin.woff2': {
@@ -178,7 +178,7 @@ async function servePage(page: Page, body: string): Promise<void> {
 	await page.goto(`${ORIGIN}/`);
 	// A screenshot taken before the faces arrive shows the fallback face.
 	await page.evaluate(async () => {
-		await document.fonts.load('1em "Muddy Tractor"');
+		await document.fonts.load('900 1em "Bound Up Title"');
 		await document.fonts.load('700 1em "Rethink Sans"');
 		await document.fonts.ready;
 	});

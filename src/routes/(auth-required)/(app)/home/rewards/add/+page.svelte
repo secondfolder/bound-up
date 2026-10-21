@@ -12,8 +12,8 @@
 		{backHref}
 		backLabel="Back to rewards"
 		backText="Rewards"
-		title="Add a self reward"
-		description="This reward belongs only to you and spends from your own self-reward credit balance."
+		title="Add a reward"
+		description="This reward belongs only to you and is paid for from your own reward balance."
 	/>
 
 	<div class="content">
@@ -23,7 +23,7 @@
 
 <style>
 	.page {
-		max-width: 40rem;
+		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -31,7 +31,7 @@
 	}
 
 	.content {
-		padding: 0 var(--wa-space-l) var(--wa-space-l);
+		padding: 0 var(--page-gutter) var(--wa-space-l);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;

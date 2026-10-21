@@ -16,6 +16,7 @@
 	} from '$lib/kink-list/import/kinklist-links';
 	import { applyImport, type ImportedAnswer, type ImportResult } from '$lib/kink-list/import/result';
 	import { decodeShareLink } from '$lib/kink-list/share-link';
+	import KinkListCrumbs from './KinkListCrumbs.svelte';
 	import SaveStatus from './SaveStatus.svelte';
 
 	/**
@@ -94,9 +95,13 @@
 		}
 	}
 
+	let fileInput: HTMLInputElement | undefined = $state();
+	let fileName: string | null = $state(null);
+
 	async function readFile(event: Event) {
 		reset();
 		const file = (event.currentTarget as HTMLInputElement).files?.[0];
+		fileName = file?.name ?? null;
 		if (!file) {
 			return;
 		}
@@ -165,10 +170,9 @@
 	}
 </script>
 
-<nav class="crumbs">
-	<a href={paths.home}>Whole list</a>
+<KinkListCrumbs href={paths.home} text="Kink list" label="Back to kink list">
 	<SaveStatus />
-</nav>
+</KinkListCrumbs>
 
 <h1>Import and export</h1>
 
@@ -212,10 +216,29 @@
 			Read link
 		</wa-button>
 	</div>
-	<label class="file">
-		Or choose a file
-		<input type="file" accept=".json, .csv" onchange={(event) => void readFile(event)} />
-	</label>
+	<!-- The native file input stays, for its picker and for the file it
+	     holds, but out of sight: its own "Choose File" button and "No file
+	     chosen" are the browser's, unlike every other control here, and
+	     cannot be styled. The button opens it, and says what was picked. -->
+	<div class="file">
+		<span class="file-title" id="file-title">Or choose a file</span>
+		<div class="file-row">
+			<wa-button appearance="outlined" onclick={() => fileInput?.click()}>
+				<wa-icon slot="start" name="file-arrow-up" variant="solid"></wa-icon>
+				Choose a file
+			</wa-button>
+			<span class="file-name">{fileName ?? 'A Bound Up export (.json) or a spreadsheet (.csv)'}</span>
+		</div>
+		<input
+			bind:this={fileInput}
+			class="wa-visually-hidden"
+			type="file"
+			accept=".json, .csv"
+			tabindex="-1"
+			aria-labelledby="file-title"
+			onchange={(event) => void readFile(event)}
+		/>
+	</div>
 	<p class="quiet small">
 		Lists that keep your answers on their own servers, such as kinkli.st, and links that expire,
 		such as KNKI's, can't be imported.
@@ -286,8 +309,11 @@
 		gap: 0.75rem;
 		margin-block-end: 2rem;
 
+		/* The size every kink list page gives a section heading (the list's
+		   own, history's): Web Awesome's default was nearly the title's. */
 		h2 {
 			margin: 0;
+			font-size: 1.1rem;
 		}
 	}
 
@@ -298,14 +324,6 @@
 		&.small {
 			font-size: 0.85rem;
 		}
-	}
-
-	.crumbs {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		gap: 1rem;
-		margin-block-end: 1rem;
 	}
 
 	.row {
@@ -328,6 +346,25 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
+	}
+
+	.file-title {
+		font-weight: var(--wa-form-control-label-font-weight);
+		color: var(--wa-form-control-label-color);
+	}
+
+	.file-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 0.75rem;
+	}
+
+	.file-name {
+		min-inline-size: 0;
+		overflow-wrap: anywhere;
+		font-size: 0.875rem;
+		color: var(--wa-color-text-quiet);
 	}
 
 	.preview {

@@ -428,6 +428,23 @@ describe('escrow', () => {
 			expect(await releaseEscrow(harness.db, Secret, jun.id)).toEqual([]);
 		});
 
+		it('stops listing an escrow once its share can be released, so it is made again', async () => {
+			const request = await relayed();
+			const escrowed = async () =>
+				defined(await listVaultsForUser(harness.db, ada.id), 'listing').self?.escrowPartnershipIds;
+			// Relayed but not yet completed: the share is still a secret.
+			expect(await escrowed()).toEqual([partnershipId]);
+
+			// Completed by email: the share is out, so the escrow is spent even
+			// if the device that recovered never got as far as deleting it.
+			await finish(request.recoveryRequestId);
+			expect(await escrowed()).toEqual([]);
+
+			// Its replacement, under a new id, counts again.
+			await putEscrow(harness.db, ada.id, { id: id(33), partnershipId, ciphertext: OTHER_WRAP });
+			expect(await escrowed()).toEqual([partnershipId]);
+		});
+
 		it('gives nothing for a sign-in that skipped the email, or long ago', async () => {
 			const request = await relayed();
 			await finish(request.recoveryRequestId, { emailConfirmed: false });

@@ -151,6 +151,18 @@ describe('followEnd', () => {
 		await expect.poll(opened.atEnd).toBe(true);
 	});
 
+	it('goes on following when content changing under a glide moves the scrollport up', async () => {
+		// The shape of a sent message swapped for the stored one mid-glide,
+		// which once left a thread stopped short of its newest message.
+		const { scroller, add, atEnd } = conversation({ smoothAfter: 0 });
+		await frame();
+		const sent = add(100);
+		await frame();
+		sent.style.height = '140px';
+		scroller.scrollTop -= 40;
+		await expect.poll(atEnd).toBe(true);
+	});
+
 	it('jumps, rather than glides, further than a screen', async () => {
 		const { scroller, add, atEnd } = conversation({ smoothAfter: 0 });
 		const glides = vi.spyOn(scroller, 'scrollTo');

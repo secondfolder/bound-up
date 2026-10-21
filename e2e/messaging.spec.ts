@@ -382,8 +382,18 @@ test.describe('the board', () => {
 			await expect(shell).toHaveCount(0);
 			await clickWaButton(ada.page, 'Write something');
 			await expect(shell).toHaveCount(1);
-			const measured = await shell.evaluate((element) => {
+			const measured = await shell.evaluate(async (element) => {
 				const root = element.shadowRoot;
+				// The panel grows out of the button that opened it, and mid-grow
+				// its box is scaled about that button — off to one side. Measured
+				// once it has landed, which is where it stays.
+				await (element as HTMLElement & { updateComplete?: Promise<unknown> }).updateComplete;
+				await new Promise(requestAnimationFrame);
+				await Promise.all(
+					(root?.querySelector('[part~="dialog"]')?.getAnimations() ?? []).map(
+						(animation) => animation.finished
+					)
+				);
 				const body = root?.querySelector<HTMLElement>('[part~="body"]');
 				const panel = root?.querySelector<HTMLElement>('[part~="dialog"]');
 				const title = root?.querySelector<HTMLElement>('[part~="title"]');
@@ -773,6 +783,13 @@ test.describe('attachments', () => {
 					};
 				});
 
+			// The thumbnails decrypt one at a time, and each one that lands
+			// re-deals the fan: every card slides to its new place over the
+			// transition checked below. Measured once they have all landed —
+			// mid-slide, a card sits partway between two slots.
+			await fan.evaluate((element) =>
+				Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished))
+			);
 			const before = defined(await fanSpread(), 'the fanned cards');
 			expect(before.leftGap).toBeLessThanOrEqual(24);
 			expect(before.rightGap).toBeLessThanOrEqual(24);

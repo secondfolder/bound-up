@@ -185,6 +185,33 @@ describe('ModelDetails for OpenRouter', () => {
 		await view.rerender({ provider: 'openrouter', modelId: 'nobody/none' });
 		expect(await screen.findByText(/OpenRouter doesn't list/)).toBeInTheDocument();
 	});
+
+	it('tells the page when OpenRouter lists no such model, and when that stops', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (input: unknown) =>
+				String(input).includes('?id=z-ai%2Fglm-5.2')
+					? Response.json({ results: [{ openrouterModelId: 'z-ai/glm-5.2', name: 'GLM' }] })
+					: Response.json({ results: [] })
+			)
+		);
+		const onmissing = vi.fn();
+		const view = render(ModelDetails, {
+			provider: 'openrouter',
+			modelId: 'nobody/none',
+			onmissing
+		});
+		await waitFor(() => expect(onmissing).toHaveBeenLastCalledWith(true));
+
+		await view.rerender({ provider: 'openrouter', modelId: 'z-ai/glm-5.2', onmissing });
+		await waitFor(() => expect(onmissing).toHaveBeenLastCalledWith(false));
+
+		// Gone, as when Custom is no longer chosen, it no longer says anything is wrong.
+		await view.rerender({ provider: 'openrouter', modelId: 'nobody/none', onmissing });
+		await waitFor(() => expect(onmissing).toHaveBeenLastCalledWith(true));
+		view.unmount();
+		expect(onmissing).toHaveBeenLastCalledWith(false);
+	});
 });
 
 describe('ModelChoice', () => {

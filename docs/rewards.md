@@ -110,8 +110,32 @@ and gives rewards their own nested page structure, matching the partner flows.
 The home rewards page reuses the same credits panel and reward list components
 as the partner rewards page, so changes to those shared pieces land in both
 places together. Editing no longer happens inline in a rewards list. If a user
-may edit a reward, its row shows an edit icon that opens the same form layout
+may edit a reward, its card shows an Edit button (named "Edit <title>", so a
+list of them is not a list of identical links) that opens the same form layout
 used by the add screen, prefilled with the current values.
+
+Each reward is the same `ItemCard` a task is (see
+[tasks.md](tasks.md#the-cards-and-the-complete-button)): its cost sits where a
+task's credits do, beside the Claim button. Claim is solid amber only when the
+reward can be claimed; otherwise it is a disabled outline, and the card says
+how far short the balance is ("5 more credits to go", `rewardClaimStatus` in
+`src/lib/credits.ts`) rather than repeating the cost. The list is handed the
+balance it is claimed against for that. Claiming is enhanced like completing a
+task: the button becomes a gift, the card flashes, then the page refreshes and
+the balance counts down to its new value (`RewardCreditsInline` tweens it and
+bumps it once). A Claim button that becomes affordable while the page is open —
+the balance edited up — glows once; one that was already affordable on load
+does not.
+
+Claim history is always offered, on `/home/rewards` and the partner rewards
+page alike, as Completion history is for tasks: an empty history page says so,
+and the buttons do not move when the first claim lands. The partner rewards
+page is one list, so it has no panel and no section heading: the balance stands
+where the heading would be.
+
+The add and edit form's save button is outlined until the form holds a valid
+change (a title, and a whole-number cost), then solid amber — the app's save
+convention, which this form now follows too.
 
 The home rewards page's partner sections are intentionally claim-focused rather
 than a second management UI. Editing partnership rewards stays on the partner
@@ -128,10 +152,13 @@ partnership reward. The server sees what it acts on — the cost, whether the
 reward is active, who authored it, credits and claims — and checks only the
 sealed record's envelope and every permission.
 
-- **The form** (`RewardForm.svelte`, SvelteKit's `enhance` rather than
-  superforms, as it was before) seals the title and description on submit
-  and posts the sealed record in their place (`sealed-forms.ts`). The title
-  and description limits run in the browser and on every read.
+- **The form** (`RewardForm.svelte`) is a superform built in the browser
+  from `defaults()` and `rewardEditorFormSchema`, rather than from a load's
+  `superValidate`: the actions never read a superform. Its fields are the
+  app's own (`InputField`, `CheckboxField`); its `onSubmit` validates, seals
+  the title and description and posts the sealed record in their place
+  (`sealed-forms.ts`), and a refusal comes back as a message. The title and
+  description limits run in the browser and on every read.
 - **Edits are compare-and-swap** on `revision`, so a partner's newer edit is
   never overwritten unseen.
 - **A claim** copies the reward's ciphertext as it stood (`snapshot_*`

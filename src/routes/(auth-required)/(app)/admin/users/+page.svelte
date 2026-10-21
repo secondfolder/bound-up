@@ -40,11 +40,14 @@
 				{#each data.users as account (account.id)}
 					<li>
 						<a href={resolve('/(auth-required)/(app)/admin/users/[id]', { id: account.id })}>
+							<!-- The name first, as a person reads the list; the address under
+							     it, which is what tells two Adas apart. -->
 							<span class="who">
-								<span class="email">{account.email}</span>
-								<small>{account.name}</small>
+								<span class="name">{account.name}</span>
+								<small class="email">{account.email}</small>
 							</span>
-							{#if account.isAdmin}<wa-badge variant="brand">Admin</wa-badge>{/if}
+							<!-- Outlined: solid amber is what a save button says. -->
+							{#if account.isAdmin}<wa-badge variant="brand" appearance="outlined">Admin</wa-badge>{/if}
 							<wa-icon name="chevron-right" variant="solid"></wa-icon>
 						</a>
 					</li>
@@ -56,7 +59,7 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
 		width: 100%;
 		padding-bottom: var(--wa-space-l);
@@ -65,7 +68,7 @@
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
-			padding: var(--wa-space-l);
+			padding: var(--wa-space-l) var(--page-gutter);
 		}
 
 		form {
@@ -78,8 +81,10 @@
 			}
 		}
 
+		/* The size every settings subsection heading uses. */
 		h2 {
 			margin: 0;
+			font-size: var(--wa-font-size-l);
 		}
 
 		.empty {
@@ -112,13 +117,19 @@
 			flex: 1 1 auto;
 			min-width: 0;
 
+			/* break-word, not anywhere: it breaks at the address's hyphens and
+			   dots first, where anywhere split "example.te / st". */
 			.email {
-				overflow-wrap: anywhere;
+				overflow-wrap: break-word;
 			}
 
 			small {
 				color: var(--wa-color-text-quiet);
 			}
+		}
+
+		wa-badge {
+			flex: none;
 		}
 	}
 </style>

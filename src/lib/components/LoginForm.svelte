@@ -144,7 +144,7 @@
 	const { errors, form: formValues, submitting } = superform;
 
 	/**
-	 * Whether there is something to sign in with, for the Login button's style:
+	 * Whether there is something to log in with, for the Log in button's style:
 	 * outlined while there is not, solid once there is (the save-button
 	 * convention in AGENTS.md).
 	 *
@@ -241,14 +241,14 @@
 	});
 </script>
 
-<AuthBox {busy} busyLabel="Signing in">
+<AuthBox {busy} busyLabel="Logging in">
 	<form method="POST" use:superform.enhance data-ready={hydrated ? 'true' : null}>
 		<noscript>
 			<!-- Said before a wasted round trip, not after it. Signing in genuinely
 			     cannot work without JavaScript now: the server has nothing to check,
 			     because it never receives a password. -->
 			<p class="invalid">
-				Signing in needs JavaScript. Your password is turned into a key in this browser and never sent
+				Logging in needs JavaScript. Your password is turned into a key in this browser and never sent
 				to the server, so there is nothing for the server to check without it.
 			</p>
 		</noscript>
@@ -257,7 +257,7 @@
 		     nothing typed, and unlocks messages in the same touch. `type="button"`
 		     so Enter in the password box still submits the password. -->
 		<wa-button type="button" variant="brand" onclick={signInWithPasskey}
-			>Sign in with a passkey</wa-button
+			>Log in with a passkey</wa-button
 		>
 		{#if passkeyError}<span class="invalid">{passkeyError}</span>{/if}
 
@@ -277,6 +277,10 @@
 			autocomplete="current-password"
 			errors={$errors.authSecret}
 		/>
+		<!-- Beside the box it is about, where people look for it, rather than
+		     under the submit button behind a divider. For someone who has lost
+		     every way in: see docs/account-recovery.md. -->
+		<a class="recover" href={resolve('/(public)/login/recover')}>Forgot password?</a>
 		<!-- Empty in the HTML and filled by onSubmit. With no JavaScript it posts
 		     blank, which the Zod field rejects with a message naming the real cause. -->
 		<input type="hidden" name="authSecret" value="" />
@@ -285,14 +289,11 @@
 			type="submit"
 			variant="brand"
 			appearance={canSignIn ? 'accent' : 'outlined'}
-			disabled={!hydrated || deriving}>Login</wa-button
+			disabled={!hydrated || deriving}>Log in</wa-button
 		>
 		{#if cryptoError}<span class="invalid">{cryptoError}</span>{/if}
 		{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
 
-		<hr />
-		<!-- For someone who has lost every way in. See docs/account-recovery.md. -->
-		<a class="recover" href={resolve('/(public)/login/recover')}>Forgot password</a>
 	</form>
 </AuthBox>
 
@@ -306,15 +307,11 @@
 			color: var(--wa-color-text-danger);
 		}
 
-		hr {
-			inline-size: 100%;
-			margin: 0;
-			border: none;
-			border-top: 1px solid var(--wa-color-surface-border);
-		}
-
 		.recover {
-			align-self: center;
+			align-self: flex-end;
+			/* Tucked up under the password box it belongs to, inside the form's
+			   1rem rhythm. */
+			margin-block-start: -0.5rem;
 			color: var(--wa-color-text-quiet);
 			font-size: 0.875em;
 		}

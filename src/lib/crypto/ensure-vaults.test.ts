@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { toBase64, toBase64Url } from '../encryption';
 import { ADA_IDENTITY, ADA_RECIPIENT, JUN_IDENTITY, JUN_RECIPIENT } from '../testing/crypto';
 import { defined } from '../testing/defined';
 import type { VaultListingView } from '../types';
@@ -9,8 +10,14 @@ import {
 	type VaultCreation
 } from './ensure-vaults';
 import { decryptBytes, encryptBytesTo, openUnderShare } from './escrow';
-import { generateAgeIdentity } from './identity';
-import { unwrapVaultKey } from './vault';
+import { generateAgeIdentity, loadAge } from './identity';
+import {
+	deriveVaultKeys,
+	generateVaultKey,
+	unwrapSelfVaultKey,
+	unwrapVaultKey,
+	wrapVaultKey
+} from './vault';
 
 /** The fake server's share: the same function it uses. */
 async function shareOf(escrowId: string): Promise<string> {
@@ -217,6 +224,142 @@ describe('ensureVaults', () => {
 		const opened = await ensureVaults(ada);
 		expect(ada.created.map((vault) => vault.kind)).toEqual(['self']);
 		expect(opened.partnerships).toEqual({});
+	});
+
+	/**
+	 * A server serving a key of its own as the user's, for one partnership only,
+	 * so the listing's own recipient still matches the device. Creating the
+	 * vault would wrap its key to the server.
+	 */
+	it('writes nothing to a key the server says is the user’s own when it is not', async () => {
+		const server = fakeServer();
+		const impostor = await generateAgeIdentity();
+		const report = vi.fn();
+		const honest = server.deps('ada', ADA_IDENTITY);
+		const ada = server.deps('ada', ADA_IDENTITY, {
+			report,
+			list: async () => {
+				const listing = await honest.list();
+				return {
+					...listing,
+					partnerships: listing.partnerships.map((entry) => ({
+						...entry,
+						recipients: { ...entry.recipients, mine: impostor.recipient }
+					}))
+				};
+			}
+		});
+		const opened = await ensureVaults(ada);
+
+		expect(ada.created.map((vault) => vault.kind)).toEqual(['self']);
+		expect(opened.partnerships).toEqual({});
+		expect(server.escrows.size).toBe(0);
+		const wrappedTo = server.vaults.flatMap((v) =>
+			[...v.wraps.values()].map((w) => w.forRecipient)
+		);
+		expect(wrappedTo).not.toContain(impostor.recipient);
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('not theirs'));
+	});
+
+	it('wraps a vault it creates to the key it holds', async () => {
+		const server = fakeServer();
+		const ada = server.deps('ada', ADA_IDENTITY);
+		await ensureVaults(ada);
+		const partnership = defined(
+			ada.created.find((vault) => vault.kind === 'partnership'),
+			'the partnership vault'
+		);
+		expect(partnership.wraps.map((wrap) => [wrap.userId, wrap.forRecipient])).toEqual([
+			['ada', ADA_RECIPIENT],
+			['jun', JUN_RECIPIENT]
+		]);
+	});
+
+	describe('the own vault', () => {
+		/** Puts a self vault for Ada in the fake server, with whatever wrap it is given. */
+		async function plantSelfVault(
+			server: ReturnType<typeof fakeServer>,
+			wrap: (vault: { id: string; raw: Uint8Array<ArrayBuffer> }) => Promise<string>
+		) {
+			const id = crypto.randomUUID();
+			const raw = generateVaultKey();
+			const { keyCheck } = await deriveVaultKeys(raw);
+			server.vaults.push({
+				id,
+				kind: 'self',
+				owner: 'ada',
+				partnershipId: null,
+				keyCheck,
+				wraps: new Map([
+					['ada', { ciphertext: await wrap({ id, raw }), forRecipient: ADA_RECIPIENT }]
+				])
+			});
+			return { id, keyCheck };
+		}
+
+		/**
+		 * A server making a vault of its own, which it can wrap to Ada's public
+		 * recipient and fingerprint correctly. Everything sealed in it would be
+		 * the server's to read.
+		 */
+		it('does not open a self vault the server made up', async () => {
+			const server = fakeServer();
+			await plantSelfVault(server, async ({ id, raw }) => {
+				const age = await loadAge();
+				const encrypter = new age.Encrypter();
+				encrypter.addRecipient(ADA_RECIPIENT);
+				const payload = { v: 2, vaultId: id, key: toBase64Url(raw), mac: 'A'.repeat(43) };
+				return toBase64(await encrypter.encrypt(new TextEncoder().encode(JSON.stringify(payload))));
+			});
+			const report = vi.fn();
+			const opened = await ensureVaults(server.deps('ada', ADA_IDENTITY, { report }));
+
+			expect(opened.self).toBeNull();
+			expect(report).toHaveBeenCalledWith(expect.stringContaining('self vault'));
+			// Nor is it handed to the partner in escrow.
+			expect(server.escrows.size).toBe(0);
+		});
+
+		it('upgrades a wrap from before the MAC as it opens it', async () => {
+			const server = fakeServer();
+			const planted = await plantSelfVault(
+				server,
+				async ({ id, raw }) => await wrapVaultKey({ vaultId: id, raw, recipient: ADA_RECIPIENT })
+			);
+			const opened = await ensureVaults(server.deps('ada', ADA_IDENTITY));
+
+			expect(opened.self?.id).toBe(planted.id);
+			const wrap = defined(
+				server.vaults.find((v) => v.id === planted.id)?.wraps.get('ada'),
+				"ada's wrap"
+			);
+			await expect(
+				unwrapSelfVaultKey({
+					ciphertext: wrap.ciphertext,
+					identity: ADA_IDENTITY,
+					recipient: ADA_RECIPIENT,
+					vault: planted
+				})
+			).resolves.toMatchObject({ legacy: false });
+		});
+
+		it('is made with a wrap that carries the MAC', async () => {
+			const server = fakeServer();
+			const ada = server.deps('ada', ADA_IDENTITY);
+			await ensureVaults(ada);
+			const self = defined(
+				ada.created.find((vault) => vault.kind === 'self'),
+				'the self vault'
+			);
+			await expect(
+				unwrapSelfVaultKey({
+					ciphertext: defined(self.wraps[0], 'its wrap').ciphertext,
+					identity: ADA_IDENTITY,
+					recipient: ADA_RECIPIENT,
+					vault: self
+				})
+			).resolves.toMatchObject({ legacy: false });
+		});
 	});
 
 	/** After a partner-assisted sign-in: the partner's wrap is for the key they lost. */

@@ -27,7 +27,7 @@ function renderPage() {
 }
 
 describe('/settings/+page.svelte', () => {
-	it('renders the signed-in panel with the logout form inside it', () => {
+	it('renders the signed-in panel, and the logout form after the list', () => {
 		const { container } = renderPage();
 
 		expect(screen.getByText('Signed in as')).toBeInTheDocument();
@@ -36,9 +36,17 @@ describe('/settings/+page.svelte', () => {
 
 		const panel = container.querySelector('.account');
 		expect(panel).not.toBeNull();
-		expect(panel?.querySelector('form[action="/logout"]')).not.toBeNull();
+		expect(panel?.querySelector('form')).toBeNull();
+
+		// The last thing before the version: a settings screen ends with it.
+		const signOut = container.querySelector('form.sign-out');
+		expect(signOut).toHaveAttribute('action', '/logout');
+		expect(signOut?.textContent).toContain('Log out');
 		expect(container.querySelectorAll('form')).toHaveLength(1);
-		expect(panel?.textContent).toContain('Log out');
+		expect(container.querySelector('ul')?.compareDocumentPosition(signOut as Node)).toBe(
+			Node.DOCUMENT_POSITION_FOLLOWING
+		);
+		expect(signOut?.nextElementSibling).toBe(screen.getByText('Version 1.2.3'));
 	});
 
 	it('always shows the account, security, and partners links', () => {

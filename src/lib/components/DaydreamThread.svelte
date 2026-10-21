@@ -600,6 +600,11 @@
 		{/if}
 	{/if}
 
+	<!-- The room a short story leaves, taken here rather than by the turns, so
+	     the suggestions and the roll stay under the passage they answer and
+	     only the compose box goes to the bottom. -->
+	<div class="grow" aria-hidden="true"></div>
+
 	{#if available}
 		<div class="compose">
 			<DaydreamTrackers {story} />
@@ -718,10 +723,6 @@
 		gap: 0.5rem;
 	}
 
-	/* Grows into whatever a short story leaves of the screen, so the compose
-	   box is always at the bottom, above the nav. Rather than an auto margin on
-	   the box, which would take the place of its own margin, and that margin is
-	   what keeps the last line clear of the fade above it. */
 	.turns {
 		list-style: none;
 		margin: 0;
@@ -729,7 +730,19 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		flex: 1 0 auto;
+	}
+
+	/* Grows into whatever a short story leaves of the screen, so the compose
+	   box is always at the bottom, above the nav. A spacer rather than an auto
+	   margin on the box, which would take the place of its own margin, and
+	   that margin is what keeps the last line clear of the fade above it. Not
+	   the turns themselves, which did this once and left the suggested
+	   replies stranded at the bottom of a tall screen, far from the passage
+	   they answer. The negative margin takes back the column's gap above it,
+	   so a long story is spaced as it was. */
+	.grow {
+		flex: 1 0 0;
+		margin-block-start: -0.75rem;
 	}
 
 	.problem {

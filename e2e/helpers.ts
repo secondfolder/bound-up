@@ -121,8 +121,15 @@ export async function waitForEnhancedForm(page: Page) {
 	await page.locator('form[data-ready]').first().waitFor();
 }
 
+/**
+ * The log-in form's submit button, matched exactly: a plain name is a
+ * substring match, and "Log in" is also the start of "Log in with a passkey"
+ * on the same form.
+ */
+export const LOG_IN_BUTTON = /^Log in$/;
+
 /** Submits a form whose behaviour lives in `use:superform.enhance`. */
-export async function submitEnhancedForm(page: Page, buttonName: string) {
+export async function submitEnhancedForm(page: Page, buttonName: string | RegExp) {
 	await waitForEnhancedForm(page);
 	await clickWaButton(page, buttonName);
 }
@@ -197,7 +204,7 @@ export async function signUp(page: Page, who: Account, from = '/signup') {
 	await fillWaInput(page, 'email', who.email);
 	await fillPassword(page, 'password', who.password);
 	await fillPassword(page, 'passwordConfirm', who.password);
-	await submitEnhancedForm(page, 'Sign Up');
+	await submitEnhancedForm(page, 'Sign up');
 	await finishSignUp(page, who);
 }
 
@@ -222,7 +229,7 @@ export async function logIn(page: Page, who: Account, from = '/login') {
 	await waitForEnhancedForm(page);
 	await fillWaInput(page, 'email', who.email);
 	await fillPassword(page, 'password', who.password);
-	await submitEnhancedForm(page, 'Login');
+	await submitEnhancedForm(page, LOG_IN_BUTTON);
 	// See the note in signUp: the destination depends on `redirectTo`.
 	await page.waitForURL((url) => !url.pathname.startsWith('/login'));
 	await waitForKeyring(page);
@@ -247,7 +254,7 @@ export async function logInHere(page: Page, who: Account) {
 	await waitForEnhancedForm(page);
 	await fillWaInput(page, 'email', who.email);
 	await fillPassword(page, 'password', who.password);
-	await submitEnhancedForm(page, 'Login');
+	await submitEnhancedForm(page, LOG_IN_BUTTON);
 	await page.waitForURL((url) => !url.pathname.startsWith('/login'));
 	await waitForKeyring(page);
 }
@@ -306,7 +313,7 @@ export async function createInvite(
 	}
 ): Promise<string> {
 	await page.goto('/settings/partners');
-	await page.getByRole('link', { name: 'Add' }).click();
+	await page.getByRole('link', { name: 'Add a partner' }).click();
 	await page.waitForURL('**/settings/partners/new');
 
 	await fillWaInput(page, 'partnerName', answers.partnerName);

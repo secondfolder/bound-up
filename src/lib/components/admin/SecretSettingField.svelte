@@ -93,13 +93,17 @@
 					<wa-icon name="key" variant="solid"></wa-icon>
 					Saved{#if stored.tail}, ending <code>…{stored.tail}</code>{/if}
 				</span>
-				<wa-button size="s" appearance="outlined" onclick={replace}>Replace</wa-button>
-				<wa-button
-					size="s"
-					appearance="outlined"
-					variant="danger"
-					onclick={remove}>Remove</wa-button
-				>
+				<!-- Together, so on a phone they wrap onto the next line as a pair
+				     rather than leaving Remove alone under the other two. -->
+				<span class="buttons">
+					<wa-button size="s" appearance="outlined" onclick={replace}>Replace</wa-button>
+					<wa-button
+						size="s"
+						appearance="outlined"
+						variant="danger"
+						onclick={remove}>Remove</wa-button
+					>
+				</span>
 			{/if}
 		</div>
 		{#if hint && $change !== 'remove'}<small class="hint">{hint}</small>{/if}
@@ -126,6 +130,11 @@
 			display: flex;
 			flex-wrap: wrap;
 			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.buttons {
+			display: inline-flex;
 			gap: 0.5rem;
 		}
 

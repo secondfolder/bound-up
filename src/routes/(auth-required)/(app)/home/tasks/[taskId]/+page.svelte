@@ -27,7 +27,7 @@
 		{backHref}
 		backLabel="Back to tasks"
 		backText="Tasks"
-		title="Edit self task"
+		title="Edit task"
 		description="Update your task details, schedule, and reward credits here."
 	/>
 
@@ -49,7 +49,7 @@
 
 <style>
 	.page {
-		max-width: 48rem;
+		max-width: var(--page-width);
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -57,7 +57,7 @@
 	}
 
 	.content {
-		padding: 0 var(--wa-space-l) var(--wa-space-l);
+		padding: 0 var(--page-gutter) var(--wa-space-l);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;

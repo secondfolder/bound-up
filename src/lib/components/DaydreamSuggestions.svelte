@@ -55,12 +55,18 @@
 			max-inline-size: 90%;
 		}
 
+		/* Shaped as your own turn's bubble, outlined where a sent one is
+		   filled: each is a turn of yours waiting to be sent. As square
+		   buttons they were a third shape in a footer of pills and bubbles. */
 		.say::part(base) {
 			height: auto;
 			min-height: var(--wa-form-control-height);
 			white-space: normal;
 			text-align: start;
 			padding-block: 0.375rem;
+			border-radius: 1rem;
+			border-end-end-radius: 0.25rem;
+			border-color: var(--wa-color-brand-border-quiet);
 		}
 	}
 </style>

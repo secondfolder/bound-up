@@ -49,7 +49,7 @@ describe('/home/tasks/+page.svelte', () => {
 			node.textContent?.trim()
 		);
 		expect(buttons).toContain('Add a task');
-		expect(buttons).toContain('Completion History');
+		expect(buttons).toContain('Completion history');
 		expect(container.textContent).not.toContain('Your Recent Task Completions');
 		expect(container.querySelectorAll('.panel')).toHaveLength(0);
 	});
@@ -65,7 +65,7 @@ describe('/home/tasks/+page.svelte', () => {
 				}
 			])
 		});
-		expect(container.textContent).toContain("Jun's Tasks");
+		expect(container.textContent).toContain("Jun's tasks");
 		expect(container.textContent).toContain('Open full task list');
 		expect(container.querySelectorAll('.panel')).toHaveLength(2);
 	});

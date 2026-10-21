@@ -129,7 +129,7 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
 		width: 100%;
 		padding-bottom: var(--wa-space-l);
@@ -138,7 +138,7 @@
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
-			padding: var(--wa-space-l);
+			padding: var(--wa-space-l) var(--page-gutter);
 		}
 
 		.panel {
@@ -153,6 +153,11 @@
 			h2,
 			p {
 				margin: 0;
+			}
+
+			/* The size every settings subsection heading uses. */
+			h2 {
+				font-size: var(--wa-font-size-l);
 			}
 
 			p {

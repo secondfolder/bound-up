@@ -28,7 +28,7 @@ Guides, Tasks and Rewards all want, so that list exists once.
 | Page            | Cards                                                                                           |
 | --------------- | ----------------------------------------------------------------------------------------------- |
 | `/home`         | Messages (conditional), Guides (conditional), Daydreams (conditional), Tasks, Rewards, Playroom |
-| `/partner/[id]` | Messages, Tasks, Rewards                                                                        |
+| `/partner/[id]` | Messages, Tasks, Rewards, Kink lists (header only)                                              |
 
 The Guides card shows **only to an account that holds the `guides` feature**
 (see [features-and-admin.md](features-and-admin.md)). The `/home` load reads
@@ -39,6 +39,13 @@ refuses an account without the feature by itself. The Daydreams card works
 the same way with the `daydreams` feature, returning `daydreams: null`
 without it; its titles are sealed, so `WidgetItems` opens them in the browser
 like a task's.
+
+On `/partner/[id]` the cards sit in the same `--card-column-width` column as
+on `/home`, so the one component is one width on both. Kink lists is a bare
+`SectionWidget`, header and no body: it has no summary worth a preview, and
+what it shows is sealed until its page opens it, but as a lone link under
+three cards it read as an afterthought. Connection settings stays a quiet link
+at the foot, since it is not a section of the relationship.
 
 Every `/home` card shows self **and** partner data wherever both exist — see
 below.
@@ -222,6 +229,17 @@ stay that way, or the partner card and `/home` would disagree about what
   unlabelled, so "Tasks" stays "Tasks" — the name the `wa-button` it replaced
   had, and the name the Playwright suite locates these cards by. Anything added
   to that header that carries a label will break those specs.
+- **The whole header bar is the link.** The header part's padding is zeroed and
+  moved onto the `<a>` inside it, so a tap anywhere on the bar lands; with the
+  padding on the part, only the 22px line of text did. The chevron leans 3px
+  towards the link on hover and focus (not with reduced motion).
+- **A row's context is a sibling of its title, not inside it.** The title
+  ellipsises; the partner's name after it keeps its place (up to a third of the
+  row). Inside the title, a long title's ellipsis cut the name off entirely,
+  and the row no longer said whose it was.
+- **A task or reward row's note is credits, and says so** with a coins icon
+  labelled "credits"; a balance always carries its unit ("3 credits with
+  Morgan"), never a bare number.
 - **A card body must not contain a link with the header's name.** Two links
   sharing an accessible name is a real problem for anyone navigating by link
   list. `WidgetItems` rows are deliberately not links for this reason.

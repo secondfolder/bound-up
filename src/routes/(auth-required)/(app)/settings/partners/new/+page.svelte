@@ -89,7 +89,10 @@
 			);
 		}
 	});
-	const { errors, submitting } = superform;
+	const { errors, form, submitting } = superform;
+	// Solid once there is a valid invite to make (AGENTS.md's save-button
+	// rule). Validity alone: the name it needs cannot be there untouched.
+	const canCreate = $derived(partnerInviteFormSchema.safeParse($form).success);
 </script>
 
 <section>
@@ -110,7 +113,12 @@
 		     *property*, and this alpha coerces `undefined` to true, which leaves the
 		     button permanently disabled. -->
 			<div class="actions">
-				<wa-button type="submit" disabled={$submitting}>Create invite link</wa-button>
+				<wa-button
+					type="submit"
+					appearance={canCreate ? 'accent' : 'outlined'}
+					variant={canCreate ? 'brand' : undefined}
+					disabled={$submitting}>Create invite link</wa-button
+				>
 				<a class="cancel" href={resolve('/(auth-required)/(app)/settings/partners')}>Cancel</a>
 			</div>
 			{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
@@ -121,14 +129,13 @@
 
 <style>
 	section {
-		max-width: 40rem;
+		max-width: var(--page-width-narrow);
 		margin: 0 auto;
-		padding: var(--wa-space-l);
-
+		padding-bottom: var(--wa-space-l);
 		width: 100%;
 
 		.content {
-			padding: var(--wa-space-l);
+			padding: var(--wa-space-l) var(--page-gutter);
 		}
 
 		form {

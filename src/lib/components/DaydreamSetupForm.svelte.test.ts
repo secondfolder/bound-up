@@ -7,8 +7,9 @@ import { type MarkedSummary, parseMarkedSummary } from '$lib/daydream/summary';
 import { daydreamSetupFormSchema, EMPTY_DAYDREAM_SETUP } from '$lib/schemas/daydreamForm';
 import type { DaydreamSetupContent } from '$lib/sealed-kinds/daydreams';
 import { testCharacter, testDaydreamSetup } from '$lib/testing/daydream-setup';
+import { defined } from '$lib/testing/defined';
 import { TYPE_SLOWLY_TIMEOUT, typeSlowly } from '$lib/testing/type-slowly';
-import { waSettled } from '$lib/testing/web-awesome';
+import { waProp, waSettled } from '$lib/testing/web-awesome';
 import type { DaydreamLibraryView, SealedRefView } from '$lib/types';
 
 vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
@@ -154,6 +155,15 @@ describe('DaydreamSetupForm', () => {
 		},
 		TYPE_SLOWLY_TIMEOUT
 	);
+
+	it('offers the name as optional, with its hint as the field’s own', async () => {
+		const { container } = await renderForm({ setup: testDaydreamSetup() });
+		const name = defined(container.querySelector<HTMLElement>('wa-input'), 'the name field');
+		// A string field reads as required to superforms; this one is not, and
+		// its asterisk sat over a hint saying to leave it empty.
+		expect(waProp(name, 'required')).toBe(false);
+		expect(waProp(name, 'hint')).toBe('Leave it empty to have it named for you.');
+	});
 
 	it('fills both settings from a preset, and disables what could never work with it', async () => {
 		const { container } = await renderForm();

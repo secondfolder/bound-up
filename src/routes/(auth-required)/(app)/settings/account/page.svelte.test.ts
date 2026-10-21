@@ -4,7 +4,7 @@ import { superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { describe, expect, it, vi } from 'vitest';
 import { accountFormSchema } from '$lib/schemas/accountForm';
-import { waButtonOfType, waProp } from '$lib/testing/web-awesome';
+import { waButtonOfType, waProp, waSettled } from '$lib/testing/web-awesome';
 import type { PageData } from './$types';
 
 const pageState = {
@@ -132,9 +132,35 @@ describe('/settings/account/+page.svelte', () => {
 		await fireEvent.click(button);
 
 		await waitFor(() => {
-			expect(waProp(save, 'appearance')).toBe('filled');
+			expect(waProp(save, 'appearance')).toBe('accent');
 			expect(waProp(save, 'variant')).toBe('brand');
 		});
+	});
+
+	it('keeps the save button outlined while the change could not be saved', async () => {
+		const { container } = render(Page, { data: await data('Europe/London') });
+		const save = waButtonOfType(container, 'submit');
+		await waSettled(container);
+		const name = container
+			.querySelector('wa-input[name="name"]')
+			?.shadowRoot?.querySelector('input');
+		if (!(name instanceof HTMLInputElement)) {
+			throw new Error('missing name input');
+		}
+
+		const type = (value: string) => {
+			name.value = value;
+			name.dispatchEvent(new Event('input', { bubbles: true }));
+		};
+
+		// A valid change first, so the outlined state below is the refusal and
+		// not simply the change not having registered.
+		type('Ada Lovelace');
+		await waitFor(() => expect(waProp(save, 'appearance')).toBe('accent'));
+
+		// An empty name is still a change, but not one the schema accepts.
+		type('');
+		await waitFor(() => expect(waProp(save, 'appearance')).toBe('outlined'));
 	});
 
 	it('shows the inline Set to action only while the field differs from this device', async () => {

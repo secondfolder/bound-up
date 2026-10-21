@@ -144,6 +144,49 @@ describe('evaluateTrust', () => {
 		expect(trust.partner.kind).toBe('pinned');
 	});
 
+	describe('with the key this device holds', () => {
+		it('never pins a substitute for it on first sight', async () => {
+			const store = fakeStore();
+			const trust = await evaluateTrust(
+				store,
+				ada,
+				partnership,
+				{ mine: 'age1notmine', theirs: theirKey },
+				1000,
+				myKey
+			);
+
+			expect(trust.own.kind).toBe('changed');
+			// And the next sighting of the real one is quiet.
+			const again = await evaluateTrust(
+				store,
+				ada,
+				partnership,
+				{ mine: myKey, theirs: theirKey },
+				2000,
+				myKey
+			);
+			expect(again.own).toEqual({ kind: 'pinned', pinnedAt: 1000 });
+		});
+
+		it('takes the device’s word over a pin it no longer matches', async () => {
+			const store = fakeStore();
+			await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey }, 1000);
+
+			// After a partner-assisted sign-in the device holds a new key, and the
+			// server serves it: nothing to warn about.
+			const trust = await evaluateTrust(
+				store,
+				ada,
+				partnership,
+				{ mine: 'age1newkey', theirs: theirKey },
+				2000,
+				'age1newkey'
+			);
+			expect(trust.own).toEqual({ kind: 'pinned', pinnedAt: 2000 });
+		});
+	});
+
 	it('keeps one account’s pins away from another on the same device', async () => {
 		const store = fakeStore();
 		await evaluateTrust(store, ada, partnership, { mine: myKey, theirs: theirKey });
