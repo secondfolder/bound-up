@@ -26,23 +26,40 @@ describe('the answer dots', () => {
 		render(KinkListHarness, { store: emptyStore(), itemKey: 'romance' });
 		const scale = screen.getByRole('group', { name: 'Romance and affection' });
 		const love = within(scale).getByRole('radio', { name: 'Love' });
-		await userEvent.click(love);
-
 		const label = defined(love.closest('label'), 'its label');
 		expect(label.dataset.kinkLevel).toBe('love');
+
+		// Which dots popped, recorded as it happens rather than sampled after
+		// the click. `popped` lasts only as long as the 220ms pop, and
+		// `userEvent.click` resolves only once its round trip through Vitest
+		// and Playwright has come back, which under a full parallel run took
+		// 300–600ms: the pop had ended and taken the class with it, so a
+		// check after the click saw `false`.
+		const popped = new Set<string>();
+		const observer = new MutationObserver((records) => {
+			for (const { target } of records) {
+				if (target instanceof HTMLElement && target.classList.contains('popped')) {
+					popped.add(target.dataset.kinkLevel ?? '');
+				}
+			}
+		});
+		observer.observe(scale, { attributeFilter: ['class'], subtree: true });
+		try {
+			await userEvent.click(love);
+			// The one just chosen pops; the others are left alone.
+			await waitFor(() => expect([...popped]).toEqual(['love']));
+			// Once the pop has played the class goes, so reading the mark after
+			// that reads where it settles, not a frame of its scale-in.
+			await waitFor(() => expect(label.classList.contains('popped')).toBe(false));
+		} finally {
+			observer.disconnect();
+		}
+
+		// The mark is the level's own (level-glyphs.css), and showing.
 		const dot = defined(label.querySelector('.dot'), 'its dot');
 		const mark = getComputedStyle(dot, '::after');
-		// The one just chosen pops; the others are left alone.
-		expect(label.classList.contains('popped')).toBe(true);
-		// The mark is the level's own (level-glyphs.css), and showing once the
-		// pop has played.
 		expect(mark.maskImage).toContain('data:image/svg+xml');
-		await waitFor(() => expect(getComputedStyle(dot, '::after').opacity).toBe('1'));
-		const like = defined(
-			within(scale).getByRole('radio', { name: 'Like' }).closest('label'),
-			'Like'
-		);
-		expect(like.classList.contains('popped')).toBe(false);
+		expect(mark.opacity).toBe('1');
 	});
 
 	it('gives every level in the key a different mark', () => {
