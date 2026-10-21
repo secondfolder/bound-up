@@ -25,6 +25,16 @@ test('keeps a character made in the dialog in the daydream being set up', async 
 		revision: 0,
 		sealed: { recordId: 'x', vaultId: 'v', ciphertext: 'sb1.x', payloadVersion: 1 }
 	});
+	// The name field keeps focus when the dialog is submitted by anything but
+	// a click, and Chromium fires `change` on a focused, changed input as its
+	// removal from the DOM takes focus from it. Web Awesome relays that
+	// change, `InputField`'s listener ran with Svelte's removal effect still
+	// active, and its write to the form store was an uncaught
+	// `state_unsafe_mutation` — reported against the run without failing this
+	// test. Collected and asserted here, so a regression fails the test that
+	// reproduces it.
+	const unhandled: unknown[] = [];
+	globalThis.addEventListener('error', (event) => unhandled.push(event.error));
 	const setupForm = await superValidate(EMPTY_DAYDREAM_SETUP, zod4(daydreamSetupFormSchema), {
 		errors: false
 	});
@@ -55,4 +65,5 @@ test('keeps a character made in the dialog in the daydream being set up', async 
 	await new Promise((resolve) => setTimeout(resolve, 300));
 	expect(container.querySelectorAll('wa-card')).toHaveLength(1);
 	expect(container.querySelector('wa-card')?.textContent).toContain('Mara');
+	expect(unhandled).toEqual([]);
 });

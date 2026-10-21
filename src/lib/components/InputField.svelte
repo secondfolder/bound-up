@@ -80,22 +80,43 @@
 		const controller = new AbortController();
 		const { signal } = controller;
 		const sync = () => {
+			// A field no longer in the document has nothing to sync.
+			if (!host.isConnected) {
+				return;
+			}
 			const typed = host.input?.value ?? host.value ?? '';
 			// `as` because the proxy is typed to the field's own type; every input
 			// this component renders is a string field.
 			$value = String(typed) as typeof $value;
 		};
-		for (const name of ['input', 'change']) {
-			host.addEventListener(name, sync, { signal });
-		}
+		/**
+		 * A `change` can arrive while Svelte is tearing this field down.
+		 * Chromium fires `change` on a focused input whose value changed as
+		 * its removal from the DOM takes focus from it — a form submitted
+		 * with Enter keeps the field focused, where a click blurs it first —
+		 * and Web Awesome relays that from the host while the element is
+		 * still connected, so connectivity cannot tell that artifact from a
+		 * real change. Writing to the form store there and then is
+		 * `state_unsafe_mutation`, an uncaught error that kills the
+		 * teardown. So a `change`'s write is deferred by a microtask, past
+		 * the synchronous removal, and skipped by `sync` for a field that is
+		 * gone by then; a real change lands a microtask later, which nothing
+		 * can observe — blur and click are separate tasks, so any submit
+		 * that follows still sees the value. `PasswordField.svelte` defers
+		 * the same way.
+		 */
+		const syncChange = () => {
+			queueMicrotask(sync);
+		};
+		host.addEventListener('input', sync, { signal });
+		host.addEventListener('change', syncChange, { signal });
 		customElements
 			.whenDefined('wa-input')
 			.then(async () => {
 				await (host as unknown as { updateComplete?: Promise<unknown> }).updateComplete;
 				if (!signal.aborted) {
-					for (const name of ['input', 'change']) {
-						host.input?.addEventListener(name, sync, { signal });
-					}
+					host.input?.addEventListener('input', sync, { signal });
+					host.input?.addEventListener('change', syncChange, { signal });
 				}
 			})
 			.catch(() => undefined);

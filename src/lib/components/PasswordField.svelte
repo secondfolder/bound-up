@@ -74,9 +74,38 @@
 		if (!control) {
 			return;
 		}
+		// A field no longer in the document has nothing left to sync. This is
+		// not what catches the teardown artifact — that needs `syncChange`
+		// below — but it keeps a deferred write from touching a form that is
+		// already gone.
+		if (!host?.isConnected) {
+			return;
+		}
 		if (control.value !== value) {
 			({ value } = control);
 		}
+	}
+
+	/**
+	 * A `change` can arrive while Svelte is tearing this field down:
+	 * Chromium fires `change` on a focused input whose value changed as its
+	 * removal from the DOM takes focus from it, and Web Awesome relays that
+	 * from the host while the element is still connected, so connectivity
+	 * cannot tell that artifact from a real change. Writing state there and
+	 * then is `state_unsafe_mutation`, an uncaught error that kills the
+	 * teardown. So a `change`'s write is deferred by a microtask, past the
+	 * synchronous removal, and skipped by `sync` for a field that is gone
+	 * by then; a real change lands a microtask later, which nothing can
+	 * observe. The submit-time `sync()` above stays synchronous — that is
+	 * the one caller whose value is read in the same task. `InputField.svelte`
+	 * defers the same way.
+	 */
+	function syncChange() {
+		queueMicrotask(() => {
+			if (host?.isConnected) {
+				sync();
+			}
+		});
 	}
 
 	onMount(() => {
@@ -141,7 +170,7 @@
 					continue;
 				}
 				target.addEventListener('input', sync, { signal });
-				target.addEventListener('change', sync, { signal });
+				target.addEventListener('change', syncChange, { signal });
 			}
 
 			// A manager may have filled the box before the element upgraded, which
