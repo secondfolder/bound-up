@@ -1,12 +1,12 @@
 #!/usr/bin/env -S npx tsx
 /**
  * Writes the prompt catalogue: every prompt the daydream builders can send,
- * as the committed snapshot in prompt-catalogue/ (docs/prompt-review.md).
+ * into prompt-catalogue/ (gitignored; docs/prompt-review.md).
  *
  *   npm run prompts:export
  *
- * Run it after changing a prompt and read the diff: the snapshot test fails
- * until it has been. With --full it also writes every distinct prompt whole,
+ * Run it to read what a prompt change sends, and for the debug page, which
+ * reads what it writes. With --full it also writes every distinct prompt whole,
  * one JSON line each, to prompt-catalogue/.full/ (gitignored), for grepping:
  * close to 200 MB, mostly the replies, so only when asked for.
  *
@@ -68,5 +68,5 @@ for (const catalogue of catalogues) {
 	);
 }
 console.info(
-	`Wrote ${CATALOGUE_DIR}/ in ${Math.round(performance.now() - started)} ms. Review it with git diff ${CATALOGUE_DIR}/.`
+	`Wrote ${CATALOGUE_DIR}/ in ${Math.round(performance.now() - started)} ms. Read it there, or at /debug/prompts on the dev server.`
 );

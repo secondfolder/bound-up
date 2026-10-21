@@ -22,7 +22,7 @@
 // file, and a stale one is told apart from a live one by trying to connect to
 // it — nothing is listening on a stale one.
 import { spawn } from 'node:child_process';
-import { mkdirSync, rmSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, unlinkSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 
 const { E2E_PORT, E2E_MODEL_PORT, E2E_RUN_DIR, E2E_MEDIA_DIR, E2E_LOCK_PATH, E2E_IMAGE } =
@@ -102,6 +102,13 @@ if (E2E_IMAGE) {
 	await serveImage(E2E_IMAGE);
 } else {
 	await run('npx', ['drizzle-kit', 'migrate']);
+	// The prompt review page reads the generated catalogue, which is not
+	// committed (docs/prompt-review.md). Written once if this checkout has
+	// none, before Vite starts so its glob finds it; an image has none, and
+	// its specs skip there.
+	if (!existsSync('prompt-catalogue/reply/catalogue.json')) {
+		await run('npm', ['run', 'prompts:export']);
+	}
 
 	const vite = spawn('npx', ['vite', 'dev', '--port', E2E_PORT, '--strictPort'], {
 		stdio: 'inherit'

@@ -7,7 +7,7 @@ import type { PageServerLoad } from './$types';
 
 /**
  * The prompt review page (docs/prompt-review.md, "The debug page"): the
- * builders and their axes, and the opened builder's committed catalogue.
+ * builders and their axes, and the opened builder's generated catalogue.
  * Single prompts are rendered on demand by /api/debug/prompts.
  */
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -21,7 +21,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 	const catalogue = await loadCatalogue(builder.id);
 	if (!catalogue) {
-		error(500, `No catalogue for "${builder.id}": run \`npm run prompts:export\` and commit it.`);
+		error(
+			404,
+			`No catalogue for "${builder.id}" in this build. It is generated, not committed: run \`npm run prompts:export\` in a checkout and open this page from its dev server.`
+		);
 	}
 	return {
 		builders: BUILDERS.map(({ id, label, description }) => ({ id, label, description })),

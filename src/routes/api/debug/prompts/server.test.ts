@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PromptView } from '$lib/prompt-review';
 import type { Db } from '$lib/server/db';
 import { grantFeature } from '$lib/server/features';
@@ -8,6 +8,23 @@ import { createTestUser, type TestUser } from '$lib/testing/fixtures';
 import { load as indexLoad } from '../../../(auth-required)/(app)/debug/+page.server';
 import { load as promptsLoad } from '../../../(auth-required)/(app)/debug/prompts/+page.server';
 import { GET } from './+server';
+
+// The page reads the catalogue `npm run prompts:export` writes, which is not
+// committed (docs/prompt-review.md): a test cannot count on it being there,
+// so it is built here instead, for the small builders a test opens.
+const catalogue = vi.hoisted(() => ({ present: true }));
+vi.mock('$lib/server/daydream/prompt-catalogue/snapshot', async (original) => {
+	const actual = await original<typeof import('$lib/server/daydream/prompt-catalogue/snapshot')>();
+	const { builderById } = await import('$lib/server/daydream/prompt-catalogue/axes');
+	const { buildCatalogue } = await import('$lib/server/daydream/prompt-catalogue/enumerate');
+	return {
+		...actual,
+		loadCatalogue: (id: string) => {
+			const builder = builderById(id);
+			return Promise.resolve(catalogue.present && builder ? buildCatalogue(builder) : null);
+		}
+	};
+});
 
 /**
  * The prompt review (docs/prompt-review.md): only for an account granted
@@ -107,7 +124,7 @@ describe('the debug pages', () => {
 		).toMatchObject(forbidden);
 	});
 
-	it('opens a builder with its committed catalogue', async () => {
+	it('opens a builder with its generated catalogue', async () => {
 		const data = await runLoad(
 			promptsLoad(fakeEvent({ db, user: ada, path: '/debug/prompts?builder=casting' }))
 		);
@@ -115,5 +132,18 @@ describe('the debug pages', () => {
 		expect(data.catalogue.builder.id).toBe('casting');
 		expect(data.catalogue.paragraphs.length).toBeGreaterThan(0);
 		expect(data.builders.map((builder: { id: string }) => builder.id)).toContain('reply');
+	});
+
+	it('says how to generate the catalogue where there is none, as on a deployed build', async () => {
+		catalogue.present = false;
+		try {
+			expect(
+				await runAndCatch(() =>
+					promptsLoad(fakeEvent({ db, user: ada, path: '/debug/prompts?builder=casting' }))
+				)
+			).toMatchObject({ type: 'error', status: 404 });
+		} finally {
+			catalogue.present = true;
+		}
 	});
 });

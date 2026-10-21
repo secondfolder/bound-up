@@ -8,7 +8,7 @@
  *   npm run prompts:review -- --since main       weighted to what changed since a ref
  *   npm run prompts:review -- --prepare          write the files only, run nothing
  *
- * It refreshes the snapshot (`prompts:export`), writes what a review reads to
+ * It refreshes the catalogue (`prompts:export`), writes what a review reads to
  * prompt-catalogue/.review/ (gitignored) — the brief, and per builder a few
  * whole prompts plus every other paragraph in context (`reviewSelection`) —
  * then runs `claude -p` once per builder, read-only, and gathers the answers
@@ -19,10 +19,15 @@
  * `claude` CLI on the PATH and signed in; --prepare does not.
  */
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { BUILDER_IDS } from '../src/lib/server/daydream/prompt-catalogue/axes.ts';
-import { CATALOGUE_DIR, reviewFiles } from '../src/lib/server/daydream/prompt-catalogue/export.ts';
+import {
+	CATALOGUE_DIR,
+	reviewFiles,
+	unifiedDiff
+} from '../src/lib/server/daydream/prompt-catalogue/export.ts';
 
 const ROOT = new URL('../', import.meta.url).pathname;
 const REVIEW = join(ROOT, CATALOGUE_DIR, '.review');
@@ -42,10 +47,19 @@ if (unknown.length > 0) {
 }
 const builders = asked.length > 0 ? asked : [...BUILDER_IDS];
 
-execFileSync('npx', ['tsx', join(ROOT, 'scripts/prompts-export.ts')], {
-	cwd: ROOT,
-	stdio: 'inherit'
-});
+/**
+ * Writes the catalogue in `cwd`. With the heap `prompts:export` gives it:
+ * enumerating every reply peaks a little over Node's default 4 GB, and a
+ * checkout from before that flag has a package.json without it.
+ */
+const exportIn = (cwd: string) =>
+	execFileSync('npx', ['tsx', 'scripts/prompts-export.ts'], {
+		cwd,
+		stdio: 'inherit',
+		env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192' }
+	});
+
+exportIn(ROOT);
 
 await rm(REVIEW, { recursive: true, force: true });
 for (const [path, contents] of reviewFiles()) {
@@ -54,14 +68,47 @@ for (const [path, contents] of reviewFiles()) {
 	await writeFile(target, contents);
 }
 
+/** The files an export writes that read as a diff: the JSON says what the markdown does. */
+const COMPARED = [
+	'lint.md',
+	...BUILDER_IDS.flatMap((id) =>
+		['baseline.md', 'axes.md', 'paragraphs.md'].map((file) => `${id}/${file}`)
+	)
+];
+
+/**
+ * What changed in the catalogue since `ref`. The catalogue is not committed
+ * (docs/prompt-review.md), so it is exported at `ref` too, in a worktree of
+ * its own that borrows this checkout's node_modules, and the two compared.
+ */
+async function changesSince(ref: string): Promise<string> {
+	const before = await mkdtemp(join(tmpdir(), 'prompts-before-'));
+	execFileSync('git', ['worktree', 'add', '--detach', before, ref], {
+		cwd: ROOT,
+		stdio: 'inherit'
+	});
+	try {
+		await symlink(join(ROOT, 'node_modules'), join(before, 'node_modules'));
+		// tsx resolves `$lib` through the tsconfig SvelteKit generates.
+		execFileSync('npx', ['svelte-kit', 'sync'], { cwd: before, stdio: 'inherit' });
+		exportIn(before);
+		const read = (root: string, path: string) =>
+			readFile(join(root, CATALOGUE_DIR, path), 'utf8').catch(() => '');
+		const diffs = await Promise.all(
+			COMPARED.map(async (path) => {
+				const diff = unifiedDiff(await read(before, path), await read(ROOT, path));
+				return diff ? `--- ${CATALOGUE_DIR}/${path}\n${diff}` : '';
+			})
+		);
+		return diffs.filter(Boolean).join('\n\n');
+	} finally {
+		execFileSync('git', ['worktree', 'remove', '--force', before], { cwd: ROOT, stdio: 'inherit' });
+	}
+}
+
 let changes = '';
 if (since) {
-	// The JSON says what the markdown does; the markdown is what reads as a diff.
-	changes = execFileSync(
-		'git',
-		['diff', since, '--', CATALOGUE_DIR, `:!${CATALOGUE_DIR}/**/catalogue.json`],
-		{ cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
-	);
+	changes = await changesSince(since);
 	await writeFile(join(REVIEW, 'CHANGES.diff'), changes);
 }
 

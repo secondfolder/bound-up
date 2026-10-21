@@ -1,5 +1,3 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defined } from '$lib/testing/defined';
 import { BUILDERS, baselineCombo, builderById, comboFrom, comboLabel } from './axes';
@@ -14,42 +12,11 @@ import {
 	structuralAxes,
 	textHash
 } from './enumerate';
-import { CATALOGUE_DIR, exportFiles, unifiedDiff } from './export';
+import { unifiedDiff } from './export';
 import { lintPrompt } from './lint';
 import { renderPrompt } from './render';
 
 const builder = (id: string) => defined(builderById(id), `the "${id}" builder`);
-
-async function filesUnder(directory: string): Promise<string[]> {
-	const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
-	const nested = await Promise.all(
-		entries
-			.filter((entry) => !entry.name.startsWith('.'))
-			.map((entry) =>
-				entry.isDirectory()
-					? filesUnder(join(directory, entry.name))
-					: Promise.resolve([join(directory, entry.name)])
-			)
-	);
-	return nested.flat();
-}
-
-describe('the committed prompt catalogue', () => {
-	it('is what the builders produce now', { timeout: 60_000 }, async () => {
-		const { files } = exportFiles();
-		const root = join(process.cwd(), CATALOGUE_DIR);
-		const onDisk = (await filesUnder(root))
-			.map((path) => relative(root, path))
-			.sort((a, b) => a.localeCompare(b));
-		const stale =
-			'The prompt catalogue is out of date: run `npm run prompts:export` and read the diff.';
-		expect(onDisk, stale).toEqual([...files.keys()].sort((a, b) => a.localeCompare(b)));
-		for (const [path, contents] of files) {
-			// One file at a time, so a failure names it rather than dumping the lot.
-			expect(await readFile(join(root, path), 'utf8'), `${path}: ${stale}`).toBe(contents);
-		}
-	});
-});
 
 describe('the axes', () => {
 	it('gives every builder a baseline that is a request a device could send', () => {

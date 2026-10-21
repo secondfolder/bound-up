@@ -13,8 +13,8 @@ cannot be seen in the source at all.
 The prompt catalogue turns every prompt the builders can send into something
 reviewable three ways:
 
-- **a committed snapshot** (`prompt-catalogue/`), so every prompt change shows
-  up in a diff as the words that changed;
+- **a generated catalogue** (`prompt-catalogue/`, not committed), which lays
+  every prompt out as paragraphs and diffs to read;
 - **a debug page** (`/debug/prompts`) to browse, compare and mark paragraphs
   reviewed;
 - **a review script** that has Claude Code read the lot.
@@ -90,10 +90,10 @@ characters, is counted by reason and never reviewed.
 axis reaches is a prompt the catalogue never shows. Add the input to
 `axes.ts`, build it in `fixtures.ts`, and run `npm run prompts:export`.
 
-## The snapshot
+## The catalogue
 
-`npm run prompts:export` writes `prompt-catalogue/`, which is committed and
-excluded from Biome. Per builder it writes:
+`npm run prompts:export` writes `prompt-catalogue/`, which is ignored by
+version control and excluded from Biome. Per builder it writes:
 
 - `baseline.md`: one whole prompt, the point of comparison for everything
   else.
@@ -113,9 +113,15 @@ ones that need a whole message (pairs, blank lines) or a whole prompt
 The first one found was a real bug: the naming prompt left a blank line where
 its character list went when there were none.
 
-The snapshot test (`prompt-catalogue.test.ts`) regenerates the files and fails
-when they differ from what is committed. **A prompt change is therefore not
-done until the export has been run and its diff read.** `--full` also writes
+It used to be committed, with a test that failed until it was refreshed, so
+every prompt change showed up in its diff. That stopped on 2026-10-22: the
+files ran to megabytes, a change of a few lines rewrote hundreds of them, and
+the snapshot rarely caught what reading the prompt did not. Seeing what a
+change does is now `npm run prompts:review -- --since <ref>` (below), or an
+export copied aside before the change and compared after it.
+
+Enumerating every reply peaks a little over Node's default 4 GB heap, so both
+scripts run with 8 GB (`NODE_OPTIONS` in `package.json`). `--full` also writes
 every distinct prompt whole, one JSON line each, to `prompt-catalogue/.full/`
 (gitignored), for grepping. That is close to 200 MB, so it is only written on
 request.
@@ -148,9 +154,13 @@ the URL, so any prompt can be linked to.
 
 Each request renders one prompt, or one per value of a single axis, which
 stays well inside a Worker's CPU budget. Anything exhaustive comes from the
-committed `catalogue.json`. Each builder's file is a lazily loaded chunk of
+generated `catalogue.json`. Each builder's file is a lazily loaded chunk of
 the server bundle (`snapshot.ts`), because enumerating the replies takes
-seconds of CPU.
+seconds of CPU — and far too much memory to do in every build. So the page
+works on a dev server in a checkout that has run the export, and anywhere
+else, deployed builds included, it says to run it. The e2e server
+(`e2e/server.mjs`) exports once when a checkout has none; its specs skip
+against a Docker image, which never has one.
 
 **Reviewed marks** are per device, in `localStorage`. A paragraph's id is a
 hash of its text, so editing one makes it unreviewed again by itself. After a
@@ -162,13 +172,14 @@ diff of 14 KB prompts.
 
 ## Reviewing with Claude
 
-`npm run prompts:review` refreshes the snapshot, writes what a review reads to
+`npm run prompts:review` refreshes the catalogue, writes what a review reads to
 `prompt-catalogue/.review/` (gitignored), and runs `claude -p`, read-only,
 once per builder. It gathers the answers into `.review/REVIEW.md`. Useful
 flags:
 
 - `--builder <id>` (repeatable) reviews only some builders.
-- `--since <ref>` adds `git diff <ref>` of the snapshot and asks for the
+- `--since <ref>` exports the catalogue at `<ref>` as well, in a temporary
+  worktree, adds the difference as `CHANGES.diff`, and asks for those
   changes to be reviewed first.
 - `--prepare` writes the files and runs nothing, for a reviewer, or an agent
   already in a session, to read directly.

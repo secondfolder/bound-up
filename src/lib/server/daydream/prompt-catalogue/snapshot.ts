@@ -2,11 +2,12 @@ import { AXIS_PARAM, type Catalogue, type Combo } from '$lib/prompt-review';
 import { type Builder, type BuilderId, comboFrom } from './axes';
 
 /**
- * The committed catalogue, for the debug page (docs/prompt-review.md, "The
- * debug page"). Read from the snapshot rather than worked out per request:
- * enumerating the replies takes seconds of CPU, which a Worker on the Free
- * plan does not have, and the snapshot test keeps it identical to what the
- * builders produce. Each builder's file is its own chunk, loaded when that
+ * The generated catalogue, for the debug page (docs/prompt-review.md, "The
+ * debug page"). Read from what `npm run prompts:export` wrote rather than
+ * worked out per request: enumerating the replies takes seconds of CPU, which
+ * a Worker on the Free plan does not have. It is not committed, so a build
+ * from a checkout that never ran the export — every deploy — has none, and
+ * the page says so. Each builder's file is its own chunk, loaded when that
  * builder is opened, so none of it weighs on any other page.
  */
 const files = import.meta.glob<Catalogue>('/prompt-catalogue/*/catalogue.json', {
