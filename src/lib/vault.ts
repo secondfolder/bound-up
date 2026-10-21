@@ -54,13 +54,55 @@ export function encodeKeyCheck(bytes: Uint8Array): string {
  * The vault id rides along so a wrap cannot be passed off as belonging to a
  * different vault: age has no associated data, so the binding goes in the
  * plaintext and is checked on the way out, alongside the key check.
+ *
+ * Version 2 is a self vault's wrap, and adds a MAC only the account holder
+ * can make. Without it a wrap proves nothing about who made it — age lets
+ * anyone encrypt to a public recipient, the server included — so a server
+ * could make a self vault of its own, wrap it to the user, and read
+ * everything the user then sealed in it. A partnership vault is defended
+ * against that by its pinned key check and the safety number instead, and
+ * keeps version 1. See docs/encryption.md, "The self vault's wrap".
  */
-export type VaultWrapPayload = {
-	v: 1;
-	vaultId: string;
-	/** The 32-byte key, base64url. */
-	key: string;
-};
+export type VaultWrapPayload =
+	| {
+			v: 1;
+			vaultId: string;
+			/** The 32-byte key, base64url. */
+			key: string;
+	  }
+	| {
+			v: 2;
+			vaultId: string;
+			key: string;
+			/** HMAC-SHA256 of `selfWrapMacInput`, base64url, under the identity's self key. */
+			mac: string;
+	  };
+
+/**
+ * The HKDF `info` the self-wrap MAC key is derived under, from the X25519
+ * agreement of the user's identity with its own recipient: a secret only the
+ * holder of the identity can compute.
+ */
+export const SELF_WRAP_INFO = 'bound-up-self-vault-v1';
+
+/** What a self vault's MAC covers: the vault and its fingerprint, and so its key. */
+export function selfWrapMacInput(vaultId: string, keyCheck: string): string {
+	return `${SELF_WRAP_INFO}|${vaultId}|${keyCheck}`;
+}
+
+/**
+ * Whether a self vault's wrap from before version 2 is still opened.
+ *
+ * True for now, so every account's own vault upgrades in place the next time
+ * one of its devices opens it (`ensure-vaults.ts`), rather than its records
+ * being lost. While it is true a server can still plant a version 1 self
+ * vault, so the protection is complete only once this is false — which loses
+ * the own records of any account that has not opened the app since. TODO:
+ * set it to false once accounts have had time to upgrade.
+ */
+// Typed wide on purpose, so the checks on it read as checks rather than as
+// always-true to the type checker and the linter.
+export const ACCEPT_LEGACY_SELF_WRAPS: boolean = true;
 
 /**
  * How long a wrap's ciphertext may be. An age header with one X25519 stanza

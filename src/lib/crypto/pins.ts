@@ -191,17 +191,31 @@ export type PartnershipTrust = {
 /** What the server served for one partnership: both recipients and the vault's key check. */
 export type ServedKeys = { mine: string; theirs: string; vaultCheck?: string | null };
 
+/**
+ * `ownRecipient` is the key this device actually holds, when it is known. Then
+ * the own pin is that, never what the server served: the device has no need
+ * to trust anyone about its own key, and pinning the served one on first
+ * sight would let a server that substituted it on a new device have the
+ * substitute pinned as genuine. It is re-pinned whenever it differs, because
+ * the device's key does change, legitimately, after a partner-assisted
+ * sign-in, and the device is the authority on what it is now.
+ */
 export async function evaluateTrust(
 	store: KeyStore,
 	userId: string,
 	partnershipId: string,
 	served: ServedKeys,
-	now: number = Date.now()
+	now: number = Date.now(),
+	ownRecipient?: string
 ): Promise<PartnershipTrust> {
 	const pins = await readPins(store, userId);
 
 	let partner = pinStateFor(pins.get(partnershipId), served.theirs);
-	const own = pinStateFor(pins.get(OWN_KEY_PIN), served.mine);
+	let ownPin = pins.get(OWN_KEY_PIN);
+	if (ownRecipient && ownPin?.recipient !== ownRecipient) {
+		ownPin = await writePin(store, userId, OWN_KEY_PIN, ownRecipient, { now });
+	}
+	const own = pinStateFor(ownPin, served.mine);
 	const vault = served.vaultCheck
 		? pinStateFor(pins.get(vaultPinId(partnershipId)), served.vaultCheck)
 		: null;
@@ -236,7 +250,8 @@ export async function evaluateTrust(
 export async function deviceTrust(
 	userId: string,
 	partnershipId: string,
-	served: ServedKeys
+	served: ServedKeys,
+	ownRecipient?: string
 ): Promise<PartnershipTrust> {
-	return evaluateTrust(await keyStore(), userId, partnershipId, served);
+	return evaluateTrust(await keyStore(), userId, partnershipId, served, Date.now(), ownRecipient);
 }

@@ -43,6 +43,19 @@ export type TrustView =
 
 const views = $state<Record<string, TrustView>>({});
 
+/**
+ * The key this device holds, once it is unlocked: what the own pin is checked
+ * against instead of what the server serves (see `evaluateTrust`). Set by
+ * `initialiseVaults`, which has the identity; null until then, when the own
+ * pin falls back to trust on first use.
+ */
+let ownRecipient: string | null = null;
+
+/** For `initialiseVaults` only. */
+export function setOwnRecipient(recipient: string | null): void {
+	ownRecipient = recipient;
+}
+
 /** Reactive: reading this in a template tracks it. */
 export function trustFor(partnershipId: string): TrustView {
 	return views[partnershipId] ?? { status: 'unknown' };
@@ -60,7 +73,7 @@ export async function refreshTrust(
 	served: ServedKeys
 ): Promise<TrustView> {
 	try {
-		const trust = await deviceTrust(userId, partnershipId, served);
+		const trust = await deviceTrust(userId, partnershipId, served, ownRecipient ?? undefined);
 		const number = await safetyNumber(served.mine, served.theirs, served.vaultCheck);
 
 		const view: TrustView = { status: 'known', safetyNumber: number, ...trust };
@@ -164,6 +177,7 @@ export async function trustRecoveredKey(
 
 /** Drops the cache — on sign-out, or a different account in the same tab. */
 export function resetTrust(): void {
+	ownRecipient = null;
 	for (const key of Object.keys(views)) {
 		delete views[key];
 	}

@@ -92,6 +92,7 @@
 		"@lexical/selection": "^0.51.0",
 		"@lexical/utils": "^0.51.0",
 		"@libsql/client": "^0.18.0",
+		"@noble/curves": "^2.4.0",
 		"@scure/base": "^2.4.0",
 		"@simplewebauthn/browser": "13.3.0",
 		"@vfx-js/core": "1.1.0",

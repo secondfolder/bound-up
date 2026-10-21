@@ -8,7 +8,10 @@
  * partnerships and every partnership that predates vaults all be handled the
  * same way, with no migration of their own:
  *
- * - **The self vault** is opened, or created if the account has none.
+ * - **The self vault** is opened, or created if the account has none. Its
+ *   wrap carries a MAC only this user's identity can make, so it is the one
+ *   vault no trust check is needed for; one from before the MAC is replaced
+ *   as it is opened (`upgradeSelfWrap`).
  * - **Each partnership vault** is opened, or created — wrapped to both
  *   members — if the partnership has none.
  * - **A partner whose wrap is missing or stale** (made for a key they no
@@ -17,6 +20,9 @@
  * Creating or wrapping for a partner hands the vault key to whatever
  * recipient the server says they have, so both wait on the trust check: a key
  * this device has been warned about gets nothing until the user accepts it.
+ * The user's own key needs no trust at all, because the device holds it: what
+ * the server says it is is checked against the identity, never pinned on
+ * first use.
  * Opening needs no such check — reading cannot leak anything — so a vault is
  * opened even while writes into it are held back.
  *
@@ -32,8 +38,10 @@ import {
 	generateVaultKey,
 	type OpenVault,
 	openVaultWrap,
+	unwrapSelfVaultKey,
 	unwrapVaultKey,
 	vaultFromKey,
+	wrapSelfVaultKey,
 	wrapVaultKey
 } from './vault';
 
@@ -138,8 +146,9 @@ async function pass(
 	let lostRace = false;
 	const opened: OpenedVaults = { self: null, partnerships: {} };
 	/**
-	 * The own vault's raw key, when this pass made or recovered it, for making
-	 * escrows below without opening the wrap again. Zeroed at the end.
+	 * The own vault's raw key, once this pass has opened, made or recovered it,
+	 * for making escrows below without opening the wrap again. Zeroed at the
+	 * end.
 	 */
 	let selfRaw: Uint8Array<ArrayBuffer> | null = null;
 	/** Partnerships already holding the own vault in escrow. */
@@ -149,12 +158,21 @@ async function pass(
 	let createSelf = !listing.self;
 	if (listing.self) {
 		if (usable(listing.self.wrap, identity.recipient)) {
-			opened.self = await openVaultWrap({
+			// Checked against a MAC only this identity can make, so a self vault
+			// the server made up does not open (`unwrapSelfVaultKey`).
+			const unwrapped = await unwrapSelfVaultKey({
 				ciphertext: listing.self.wrap.ciphertext,
 				identity: identity.identity,
+				recipient: identity.recipient,
 				vault: listing.self
 			});
-			if (!opened.self) {
+			if (unwrapped) {
+				opened.self = await vaultFromKey(unwrapped.raw, listing.self);
+				selfRaw = unwrapped.raw;
+				if (unwrapped.legacy) {
+					await upgradeSelfWrap(deps, listing.self.id, unwrapped.raw);
+				}
+			} else {
 				deps.report('the self vault has a wrap for this key that does not open');
 			}
 		} else {
@@ -185,7 +203,12 @@ async function pass(
 			wraps: [
 				{
 					userId,
-					ciphertext: await wrapVaultKey({ vaultId: id, raw, recipient: identity.recipient }),
+					ciphertext: await wrapSelfVaultKey({
+						vaultId: id,
+						raw,
+						identity: identity.identity,
+						recipient: identity.recipient
+					}),
 					forRecipient: identity.recipient
 				}
 			]
@@ -200,36 +223,30 @@ async function pass(
 		}
 	}
 
-	/** The own vault's raw key, opened from its wrap if this pass did not already hold it. */
-	const ownRaw = async (): Promise<Uint8Array<ArrayBuffer> | null> => {
-		if (selfRaw) {
-			return selfRaw;
-		}
-		const { self } = listing;
-		if (!(self && usable(self.wrap, identity.recipient))) {
-			return null;
-		}
-		selfRaw = await unwrapVaultKey({
-			ciphertext: self.wrap.ciphertext,
-			identity: identity.identity,
-			vault: self
-		});
-		return selfRaw;
-	};
-
 	// ── partnership vaults ──
 	for (const entry of listing.partnerships) {
 		const { partnershipId, partnerId, recipients } = entry;
-		const allowed = await deps.trustAllows(partnershipId, {
-			mine: recipients.mine,
-			theirs: recipients.theirs,
-			vaultCheck: entry.vault?.keyCheck ?? null
-		});
+		// The server says what this user's own key is per partnership as well as
+		// at the top of the listing, and a server that served a key of its own
+		// here would be handed the vault key: every wrap and escrow below is
+		// made to these recipients. The device knows its own key for certain, so
+		// a mismatch is never trusted on first use — nothing is written for the
+		// partnership until the two agree. Opening is still safe.
+		const mineIsOurs = recipients.mine === identity.recipient;
+		if (!mineIsOurs) {
+			deps.report(`partnership ${partnershipId} was served a key for this user that is not theirs`);
+		}
+		const allowed =
+			(await deps.trustAllows(partnershipId, {
+				mine: recipients.mine,
+				theirs: recipients.theirs,
+				vaultCheck: entry.vault?.keyCheck ?? null
+			})) && mineIsOurs;
 
 		// The own vault, held in escrow with this partner — handing them half of
 		// it, so it waits on the trust check like anything else for them.
 		if (allowed && opened.self && !escrowed.has(partnershipId)) {
-			const raw = await ownRaw();
+			const raw = selfRaw;
 			if (raw) {
 				const escrowId = newId();
 				const share = await deps.escrow.issueShare(escrowId);
@@ -299,7 +316,13 @@ async function pass(
 			id,
 			partnershipId,
 			keyCheck,
-			wraps: [await wrapFor(recipients.mine, userId), await wrapFor(recipients.theirs, partnerId)]
+			// The device's own key, not `recipients.mine` — equal by now, but this
+			// is the wrap that decides who holds the vault, so it names the key the
+			// device actually has.
+			wraps: [
+				await wrapFor(identity.recipient, userId),
+				await wrapFor(recipients.theirs, partnerId)
+			]
 		});
 		if (result === 'created') {
 			opened.partnerships[partnershipId] = await vaultFromKey(raw, {
@@ -341,10 +364,42 @@ async function recoverSelfVault(
 		}
 		await deps.putWrap(self.id, {
 			userId: deps.userId,
-			ciphertext: await wrapVaultKey({ vaultId: self.id, raw, recipient: deps.identity.recipient }),
+			ciphertext: await wrapSelfVaultKey({
+				vaultId: self.id,
+				raw,
+				identity: deps.identity.identity,
+				recipient: deps.identity.recipient
+			}),
 			forRecipient: deps.identity.recipient
 		});
 		return raw;
 	}
 	return null;
+}
+
+/**
+ * Replaces a self vault's wrap from before the MAC with one that has it, so
+ * the account stops depending on `ACCEPT_LEGACY_SELF_WRAPS`. Reported rather
+ * than thrown when the write fails: the vault is open either way, and the
+ * next page load tries again.
+ */
+async function upgradeSelfWrap(
+	deps: EnsureVaultsDeps,
+	vaultId: string,
+	raw: Uint8Array<ArrayBuffer>
+): Promise<void> {
+	try {
+		await deps.putWrap(vaultId, {
+			userId: deps.userId,
+			ciphertext: await wrapSelfVaultKey({
+				vaultId,
+				raw,
+				identity: deps.identity.identity,
+				recipient: deps.identity.recipient
+			}),
+			forRecipient: deps.identity.recipient
+		});
+	} catch (error) {
+		deps.report(`could not upgrade the self vault's wrap: ${String(error)}`);
+	}
 }

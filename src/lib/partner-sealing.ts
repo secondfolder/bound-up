@@ -91,7 +91,7 @@ export async function sealInvite(
 		fields: {
 			inviteCiphertext: sealed.ciphertext,
 			invitePayloadVersion: String(sealed.payloadVersion),
-			inviteKeyWrap: await wrapInviteKey(partnershipId, key, held.recipient)
+			inviteKeyWrap: await wrapInviteKey(partnershipId, key, held)
 		}
 	};
 }
@@ -119,7 +119,7 @@ export async function inviterInviteKey(
 	keyWrap: string
 ): Promise<Uint8Array<ArrayBuffer> | null> {
 	const held = await inviterIdentity();
-	return held ? await unwrapInviteKey(partnershipId, keyWrap, held.identity) : null;
+	return held ? await unwrapInviteKey(partnershipId, keyWrap, held) : null;
 }
 
 /** An accepted partnership's names, sealed in its vault, for the edit form. */

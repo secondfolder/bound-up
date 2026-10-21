@@ -271,7 +271,7 @@ async function readUnsealedNames(source: PartnerNamesSource): Promise<StoredName
 	}
 	const held = heldVaultIdentity();
 	const key = invite.keyWrap
-		? held && (await unwrapInviteKey(partnershipId, invite.keyWrap, held.identity))
+		? held && (await unwrapInviteKey(partnershipId, invite.keyWrap, held))
 		: recallInviteKey(partnershipId);
 	if (!key) {
 		return null;
