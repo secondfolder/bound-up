@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { prefersReducedMotion, Tween } from 'svelte/motion';
+	import { enhance } from '$app/forms';
 
 	type EditableCredit = {
 		action: string;
@@ -70,7 +71,26 @@
 </script>
 
 {#if editable}
-	<form method="POST" action={editable.action} class="credit-shell" class:compact={compact} class:editing>
+	<!--
+		Enhanced, so saving stays on the page. As a plain POST it navigated to
+		`?/selfSetCredits`, which then sat in history: a sheet closing back onto
+		the list returned to that URL, and the balance jumped on a reload rather
+		than counting to its new value.
+	-->
+	<form
+		method="POST"
+		action={editable.action}
+		class="credit-shell"
+		class:compact={compact}
+		class:editing
+		use:enhance={() =>
+			async ({ result, update }) => {
+				await update();
+				if (result.type === 'success') {
+					editing = false;
+				}
+			}}
+	>
 		{#if editable.targetUserId}
 			<input
 				type="hidden"
