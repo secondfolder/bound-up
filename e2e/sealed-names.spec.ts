@@ -9,7 +9,8 @@ import {
 	newAccount,
 	newAccounts,
 	newSide,
-	waitForHydration
+	waitForHydration,
+	waitForSheetClosed
 } from './helpers';
 
 /**
@@ -133,11 +134,11 @@ test.describe('sealed partnership names', () => {
 			await waitForHydration(ada.page);
 			await ada.page.locator('wa-input[name="title"] input').fill('Lines, one hundred');
 			await clickWaButton(ada.page, 'Add task');
-			await ada.page.waitForURL(/\/home\/tasks$/);
+			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
 
 			// Edit is in the task's detail, which its row opens.
 			await waitForHydration(ada.page);
-			await ada.page.getByRole('button', { name: /Lines, one hundred/ }).click();
+			await ada.page.getByRole('button', { name: /^Lines, one hundred/ }).click();
 			const edit = await ada.page
 				.locator('wa-dialog')
 				.getByRole('link', { name: 'Edit' })

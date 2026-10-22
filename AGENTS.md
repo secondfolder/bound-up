@@ -179,9 +179,10 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
     every `invalidate()` would reset the form. Add one to new ones.
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
-- `npm run test:e2e`: Playwright specs, about seven minutes for the current
-  ~235 of them at four workers against `vite dev`, once the browser is
-  installed (`npx playwright install chromium` first). A spec sitting at ~90 seconds is one hanging on its
+- `npm run test:e2e`: Playwright specs, about three and a half minutes for the
+  current ~235 of them at four workers against the built server (seven under
+  `vite dev`), once the browser is installed (`npx playwright install
+  chromium` first). A spec sitting at ~90 seconds is one hanging on its
   timeout, and the reported failure is usually the `finally` that could not
   close its contexts rather than the step that actually stalled — the trace's
   last unfinished call is what names it, and `error-context.md` beside it has

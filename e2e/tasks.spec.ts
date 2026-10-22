@@ -8,7 +8,8 @@ import {
 	newAccount,
 	newSide,
 	typeRichText,
-	waitForHydration
+	waitForHydration,
+	waitForSheetClosed
 } from './helpers';
 
 test.describe('tasks', () => {
@@ -42,8 +43,10 @@ test.describe('tasks', () => {
 			// Selecting is not formatting.
 			await expect(surface.locator('strong')).toHaveCount(0);
 
-			// It lives on <body>, so it cannot clip or grow the field it belongs to.
-			await expect(toolbar).toHaveJSProperty('parentElement.tagName', 'BODY');
+			// It lives outside the field, so it cannot clip or grow it: in the
+			// add sheet's dialog, since outside a modal dialog it could not be
+			// clicked at all.
+			await expect(toolbar).toHaveJSProperty('parentElement.tagName', 'WA-DIALOG');
 
 			await toolbar.getByRole('button', { name: 'Bold' }).click();
 			await expect(surface.locator('strong')).toHaveText('Take');
@@ -85,10 +88,10 @@ test.describe('tasks', () => {
 				.locator('wa-textarea[name="completionMessagesText"] textarea')
 				.fill('Nicely done');
 			await clickWaButton(ada.page, 'Add task');
-			await ada.page.waitForURL(/\/home\/tasks$/);
+			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
 
 			const ready = ada.page.locator('.item-group').filter({ hasText: 'Ready' });
-			await expect(ready.getByRole('button', { name: /Long shower/ })).toBeVisible();
+			await expect(ready.getByRole('button', { name: /^Long shower/ })).toBeVisible();
 
 			// The circle submits in the background (use:enhance) and celebrates
 			// before the list refreshes, so wait for the action's answer rather
@@ -114,7 +117,7 @@ test.describe('tasks', () => {
 			await expect(ready.getByRole('button', { name: 'Complete Long shower' })).toBeVisible();
 
 			// The deliberate way: open the task and complete it from its detail.
-			await ready.getByRole('button', { name: /Long shower/ }).click();
+			await ready.getByRole('button', { name: /^Long shower/ }).click();
 			const dialog = ada.page.locator('wa-dialog');
 			await expect(dialog).toContainText('Take your time');
 			completed = posted('selfCompleteTask');
@@ -145,12 +148,12 @@ test.describe('tasks', () => {
 		});
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.goto('/home/tasks/add');
 			await waitForHydration(ada.page);
 			await ada.page.locator('wa-input[name="title"] input').fill('Stretch');
 			await clickWaButton(ada.page, 'Add task');
-			await ada.page.waitForURL(/\/home\/tasks$/);
+			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
 
 			const panel = async () =>
 				await ada.page.locator('wa-dialog').evaluate(async (dialog) => {
@@ -163,14 +166,14 @@ test.describe('tasks', () => {
 				});
 
 			await waitForHydration(ada.page);
-			await ada.page.getByRole('button', { name: /Stretch/ }).click();
+			await ada.page.getByRole('button', { name: /^Stretch/ }).click();
 			await expect.poll(panel).toEqual({ left: 0, width: 390, bottom: expect.closeTo(844, 0) });
 
 			await ada.page.keyboard.press('Escape');
 			await expect(ada.page.locator('wa-dialog')).toHaveCount(0);
 
 			await ada.page.setViewportSize({ width: 1280, height: 800 });
-			await ada.page.getByRole('button', { name: /Stretch/ }).click();
+			await ada.page.getByRole('button', { name: /^Stretch/ }).click();
 			await expect.poll(async () => (await panel())?.width).toBe(512);
 			const centred = await panel();
 			expect(centred?.left).toBeCloseTo((1280 - 512) / 2, 0);
@@ -254,10 +257,10 @@ test.describe('tasks', () => {
 			await jun.page.locator('wa-input[name="creditsAwarded"] input').fill('3');
 			await jun.page.locator('wa-textarea[name="completionMessagesText"] textarea').fill('Perfect');
 			await clickWaButton(jun.page, 'Add task');
-			await jun.page.waitForURL(/\/tasks$/);
+			await waitForSheetClosed(jun.page, /\/tasks$/);
 			// Jun set it, so Jun watches it rather than ticks it.
 			const waiting = jun.page.getByRole('region', { name: 'Tasks set for Ada' });
-			await expect(waiting.getByRole('button', { name: /Make tea/ })).toBeVisible();
+			await expect(waiting.getByRole('button', { name: /^Make tea/ })).toBeVisible();
 			await expect(jun.page.getByRole('button', { name: 'Complete Make tea' })).toHaveCount(0);
 
 			/**
@@ -286,7 +289,7 @@ test.describe('tasks', () => {
 			await ada.page.goto(adaPartnerTasks);
 			await waitForHydration(ada.page);
 			await ada.page.locator('wa-details.collapsed').filter({ hasText: 'Inactive' }).click();
-			await expect(ada.page.getByRole('button', { name: /Make tea/ })).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: /^Make tea/ })).toBeVisible();
 			await ada.page.getByRole('link', { name: 'Completion history' }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/tasks\/history$/);
 			await expect(ada.page.getByText('Completed by you')).toBeVisible();

@@ -8,7 +8,8 @@ import {
 	newAccount,
 	newSide,
 	typeRichText,
-	waitForHydration
+	waitForHydration,
+	waitForSheetClosed
 } from './helpers';
 
 test.describe('rewards', () => {
@@ -37,11 +38,11 @@ test.describe('rewards', () => {
 
 		await page.locator('.add-form wa-input[name="cost"] input').fill('2');
 		await clickWaButton(page, 'Add reward');
-		await page.waitForURL(/\/home\/rewards$/);
+		await waitForSheetClosed(page, /\/home\/rewards$/);
 
 		// Edit is in the reward's detail, which its row opens.
 		await waitForHydration(page);
-		await page.getByRole('button', { name: /Long bath/ }).click();
+		await page.getByRole('button', { name: /^Long bath/ }).click();
 		const edit = await page
 			.locator('wa-dialog')
 			.getByRole('link', { name: 'Edit' })
@@ -81,12 +82,12 @@ test.describe('rewards', () => {
 			await fillRichText(ada.page.locator('.add-form'), 'No interruptions');
 			await ada.page.locator('.add-form wa-input[name="cost"] input').first().fill('2');
 			await clickWaButton(ada.page, 'Add reward');
-			await ada.page.waitForURL(/\/home\/rewards$/);
+			await waitForSheetClosed(ada.page, /\/home\/rewards$/);
 
 			// Claimed only from the reward's detail: a second, deliberate tap.
 			const within = ada.page.locator('.item-group').filter({ hasText: 'Within reach' });
 			await waitForHydration(ada.page);
-			await within.getByRole('button', { name: /Long bath/ }).click();
+			await within.getByRole('button', { name: /^Long bath/ }).click();
 			await expect(ada.page.locator('wa-dialog')).toContainText('2 credits left');
 			await clickWaButton(ada.page, /^Claim · 2 credits$/);
 			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
@@ -95,7 +96,7 @@ test.describe('rewards', () => {
 
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/history$/);
-			await expect(ada.page.getByText('Long bath')).toBeVisible();
+			await expect(ada.page.locator('wa-dialog').getByText('Long bath')).toBeVisible();
 			await expect(ada.page.getByRole('heading', { name: 'Your reward history' })).toBeVisible();
 		} finally {
 			await ada.close();
@@ -138,20 +139,20 @@ test.describe('rewards', () => {
 			await fillRichText(jun.page.locator('.add-form'), 'Fresh pot first');
 			await jun.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(jun.page, 'Add reward');
-			await jun.page.waitForURL(/\/rewards$/);
+			await waitForSheetClosed(jun.page, /\/rewards$/);
 			// Jun set it, against Ada's balance: Jun sees whether Ada can afford it.
 			const affordable = jun.page.locator('.item-group').filter({ hasText: 'Ada can afford' });
-			await expect(affordable.getByRole('button', { name: /Tea service/ })).toBeVisible();
+			await expect(affordable.getByRole('button', { name: /^Tea service/ })).toBeVisible();
 
 			await ada.page.goto('/home/rewards');
 			await expect(ada.page.getByRole('heading', { name: 'From Jun' })).toBeVisible();
 			const balance = ada.page.locator('.balances li').filter({ hasText: 'With Jun' });
 			await expect(balance).toContainText('4');
-			const teaService = ada.page.locator('.partner').getByRole('button', { name: /Tea service/ });
+			const teaService = ada.page.locator('.partner').getByRole('button', { name: /^Tea service/ });
 			await waitForHydration(ada.page);
 			await teaService.click();
 			await clickWaButton(ada.page, /^Claim · 2 credits$/);
-			await expect(balance).toContainText('Credits: 2');
+			await expect(balance).toContainText(/With Jun\s*2\b/);
 
 			/**
 			 * Both waits name the partner's route, as tasks.spec.ts does. A bare

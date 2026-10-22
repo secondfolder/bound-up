@@ -7,7 +7,8 @@ import {
 	newAccount,
 	newSide,
 	waitForHydration,
-	waitForKeyring
+	waitForKeyring,
+	waitForSheetClosed
 } from './helpers';
 
 /**
@@ -37,9 +38,9 @@ test.describe('sealed tasks and rewards', () => {
 				.locator('wa-textarea[name="completionMessagesText"] textarea')
 				.fill('Strong work');
 			await clickWaButton(ada.page, 'Add task');
-			await ada.page.waitForURL(/\/home\/tasks$/);
+			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
 			// Shown, which means opened in the browser: the server never had it.
-			await expect(ada.page.getByRole('button', { name: /Ninety lengths/ })).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: /^Ninety lengths/ })).toBeVisible();
 
 			await ada.page.goto('/home/rewards/add');
 			await waitForHydration(ada.page);
@@ -47,8 +48,8 @@ test.describe('sealed tasks and rewards', () => {
 			await fillRichText(ada.page.locator('.add-form'), 'Until noon');
 			await ada.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(ada.page, 'Add reward');
-			await ada.page.waitForURL(/\/home\/rewards$/);
-			await expect(ada.page.getByRole('button', { name: /Sunday lie-in/ })).toBeVisible();
+			await waitForSheetClosed(ada.page, /\/home\/rewards$/);
+			await expect(ada.page.getByRole('button', { name: /^Sunday lie-in/ })).toBeVisible();
 
 			const tasks = await sql('SELECT * FROM self_tasks WHERE owner_id = ?', [adaId]);
 			const rewards = await sql('SELECT * FROM self_rewards WHERE owner_id = ?', [adaId]);
@@ -99,7 +100,7 @@ test.describe('sealed tasks and rewards', () => {
 
 			await ada.page.goto('/home/tasks');
 			await waitForKeyring(ada.page);
-			await expect(ada.page.getByRole('button', { name: /Old plank/ })).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: /^Old plank/ })).toBeVisible();
 
 			await expect
 				.poll(async () => {
@@ -118,7 +119,7 @@ test.describe('sealed tasks and rewards', () => {
 
 			// Read back from the sealed copy now, the plain description converted.
 			await ada.page.reload();
-			const row = ada.page.getByRole('button', { name: /Old plank/ });
+			const row = ada.page.getByRole('button', { name: /^Old plank/ });
 			await expect(row).toBeVisible();
 			// The description is in the task's detail, which its row opens.
 			await waitForHydration(ada.page);

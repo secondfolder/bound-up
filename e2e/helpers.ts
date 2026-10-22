@@ -210,6 +210,18 @@ export async function signUp(page: Page, who: Account, from = '/signup') {
 }
 
 /**
+ * Waits for a sheet (`RouteSheet`) to close back onto the list at `url`, as
+ * it does once its form has saved.
+ *
+ * `waitUntil: 'commit'`, because closing steps back through history inside the
+ * page, and no load event follows that: with the default of `'load'`, the wait
+ * sat out the test's whole timeout with the list already on screen.
+ */
+export async function waitForSheetClosed(page: Page, url: RegExp) {
+	await page.waitForURL(url, { waitUntil: 'commit' });
+}
+
+/**
  * A new person, signed in on `page`: the account made directly
  * (`createAccount` in `e2e/accounts.ts`), then signed in through the real
  * login form, which is what caches the key on this device. For every spec that
