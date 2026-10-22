@@ -85,12 +85,13 @@
 		color: var(--wa-color-text-quiet);
 	}
 
-	/* No wider than it needs to be to drag comfortably, on the same left edge
-	   as the text above it. Centred, it sat out on its own under a
-	   left-aligned disclaimer, lined up with nothing. */
+	/* No wider than it needs to be to drag comfortably, and centred: the
+	   one control every setting hangs off. It was moved to the disclaimer's
+	   left edge in a design review (90ac6ad) and put back at the owner's
+	   request, so leave it centred. */
 	.full {
 		display: block;
-		align-self: flex-start;
+		align-self: center;
 		inline-size: min(100%, 300px);
 
 		:global(wa-slider)::part(label) {
