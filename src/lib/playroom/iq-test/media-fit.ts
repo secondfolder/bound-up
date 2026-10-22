@@ -74,6 +74,27 @@ export function pornSpacing(intensity: number): PornSpacing {
 	return intensity >= 4 ? { gap: 0.5, widest: 20, strip: 9 } : { gap: 2.5, widest: 40, strip: 18 };
 }
 
+/** The densest "Give up and goon" goes: its slider runs from 0 to this. */
+export const GOON_DENSITY_MAX = 6;
+/** Where its slider starts: about level 4's packing. */
+export const GOON_DENSITY_DEFAULT = 3;
+
+/**
+ * How the porn is laid out alone, at a density from 0 to `GOON_DENSITY_MAX`:
+ * from level 3's room around few big pieces at 0, through about level 4's
+ * at the middle, to well past it, many small pieces almost touching. The
+ * gap shrinks evenly; the widest column and the strip by a constant factor
+ * a step, so each step looks about as big a change as the last.
+ */
+export function goonSpacing(density: number): PornSpacing {
+	const t = Math.min(1, Math.max(0, density / GOON_DENSITY_MAX));
+	return {
+		gap: 2.5 + (0.25 - 2.5) * t,
+		widest: 40 * (10 / 40) ** t,
+		strip: 18 * (6 / 18) ** t
+	};
+}
+
 /** The most strips a space below the question is filled with, however tall. */
 export const MOST_FILL_ROWS = 8;
 

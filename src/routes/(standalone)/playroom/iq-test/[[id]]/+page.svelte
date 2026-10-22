@@ -27,9 +27,11 @@
 		localId,
 		markDialogSeen,
 		markRoleChosen,
+		rememberedGoonDensity,
 		rememberedHypnoCategories,
 		rememberedHypnoSource,
 		rememberedSettings,
+		rememberGoonDensity,
 		rememberHypnoCategories,
 		rememberHypnoSource,
 		rememberSettings,
@@ -49,6 +51,7 @@
 	import { HypnoSession } from '$lib/playroom/iq-test/hypno-session.svelte';
 	import { hypnoSlot } from '$lib/playroom/iq-test/hypno-video-host';
 	import { hasMedia } from '$lib/playroom/iq-test/media';
+	import { GOON_DENSITY_DEFAULT } from '$lib/playroom/iq-test/media-fit';
 	import { PornFeed } from '$lib/playroom/iq-test/porn-feed.svelte';
 	import { newSeed } from '$lib/playroom/iq-test/random';
 	import { ResultBook } from '$lib/playroom/iq-test/result-book.svelte';
@@ -223,6 +226,7 @@
 		const stopWatching = watchFullscreen();
 		dialogClosable = roleChosen();
 		preferredSource = rememberedHypnoSource();
+		goonDensity = rememberedGoonDensity();
 		book.readDevice();
 		if (opened) {
 			// A signed-out result is the viewer's own if this device kept it.
@@ -372,7 +376,37 @@
 	const showSettings = $derived(
 		!dialogOpen && (stage === 'questions' || (stage === 'results' && isFullscreen()))
 	);
+	/**
+	 * "Give up and goon": nothing on the page but the porn, filling it, and a
+	 * button back. Only while there is porn up around a question to goon to;
+	 * the question waits, mounted and out of sight, its clock running on.
+	 */
+	let gooning = $state(false);
+	const goonsAlone = $derived(gooning && showPornControls);
 	const showDock = $derived(showHypnoControls || showPornControls || showSettings);
+	/** How densely the porn is packed while gooning: the settings tab's slider then. */
+	let goonDensity = $state(GOON_DENSITY_DEFAULT);
+	function setGoonDensity(density: number) {
+		goonDensity = density;
+		rememberGoonDensity(density);
+	}
+
+	/**
+	 * The back button takes focus as it appears: the link that was focused has
+	 * gone. Once it has rendered: a `wa-button` forwards `focus()` to the
+	 * native button inside it, which does not exist until then, and focusing
+	 * it at once threw (as `autofocus` on a `wa-textarea` does; see AGENTS.md).
+	 */
+	function focusOnMount(node: HTMLElement & { updateComplete?: Promise<unknown> }) {
+		void customElements
+			.whenDefined(node.localName)
+			.then(() => node.updateComplete)
+			.then(() => {
+				if (node.isConnected) {
+					node.focus();
+				}
+			});
+	}
 	/**
 	 * Only offer a volume when there is a clip it could reach: one with sound,
 	 * playing as the page's own video rather than fallen back to Redgifs'
@@ -655,6 +689,18 @@
 				<button type="button" class="start-over" onclick={startOver}>Start over</button>
 				<span aria-hidden="true">·</span>
 			{/if}
+			{#if showPornControls}
+				<!-- A button styled as a link, like Start over: it acts on the page. -->
+				<button
+					type="button"
+					class="start-over"
+					data-testid="give-up-and-goon"
+					onclick={() => {
+						gooning = true;
+					}}>Give up and goon</button
+				>
+				<span aria-hidden="true">·</span>
+			{/if}
 			<a href={resolve('/')}>Part of the Bound Up kink app</a>
 		</span>
 	</footer>
@@ -676,7 +722,9 @@
 		intensity={settings.intensity}
 		media={settings.pornMedia}
 		show={showColumns}
-		backdrop={playsBackdrop(settings) && stage === 'questions'}
+		alone={goonsAlone}
+		density={goonDensity}
+		backdrop={goonsAlone || (playsBackdrop(settings) && stage === 'questions')}
 		docked={showDock}
 		lead={hypno?.source === 'pmvhaven' && hypno.current ? hypnoLead : undefined}
 		leadControls={hypnoControls}
@@ -823,10 +871,27 @@
 			onsettings={changeSettings}
 			onsource={switchSource}
 			oncategories={(categories) => rememberHypnoCategories(settings, categories)}
+			density={goonsAlone ? { value: goonDensity, onchange: setGoonDensity } : null}
 		/>
 	{/if}
 
-	{#if flashes(settings) && stage === 'questions'}
+	{#if goonsAlone}
+		<!-- Over the porn, in the corner a thumb reaches; round, as a FAB is. -->
+		<wa-button
+			{@attach focusOnMount}
+			class="stop-gooning"
+			variant="brand"
+			pill
+			data-testid="stop-gooning"
+			onclick={() => {
+				gooning = false;
+			}}
+		>
+			<wa-icon name="arrow-left" variant="solid" label="Back to the test"></wa-icon>
+		</wa-button>
+	{/if}
+
+	{#if flashes(settings) && stage === 'questions' && !goonsAlone}
 		<FlashLayer images={porn.feed.images} taunts={flashTaunts} {progress} {phase} />
 	{/if}
 
@@ -981,6 +1046,18 @@
 	.account-note {
 		font-size: 0.875rem;
 		color: var(--wa-color-text-quiet);
+	}
+
+	/* Above the dock, which keeps the foot of the window. */
+	.stop-gooning {
+		position: fixed;
+		inset-block-end: calc(5rem + env(safe-area-inset-bottom));
+		inset-inline-end: max(1rem, env(safe-area-inset-right));
+		z-index: 2;
+		--wa-form-control-height: 3.5rem;
+		font-size: 1.25rem;
+		box-shadow: var(--wa-shadow-l);
+		border-radius: 50%;
 	}
 
 	footer {

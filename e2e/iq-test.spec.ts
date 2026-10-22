@@ -921,6 +921,64 @@ test.describe('IQ test', () => {
 			return a && b ? Math.round(b.top - a.bottom) : null;
 		});
 
+	test('gives up and goons: the porn alone, filling the window, and back to the same question', async ({
+		page
+	}) => {
+		// Wide enough for the settings tab's bar to hold its slider.
+		await startWithPorn(page, 3, { width: 2000, height: 900 });
+		const question = page.getByText('Question 1 of 36');
+
+		await page.getByRole('button', { name: 'Give up and goon' }).click();
+		const alone = page.getByTestId('porn-alone');
+		await expect(alone).toBeVisible();
+		await expect(question).toBeHidden();
+		// The way back takes focus as it appears.
+		const back = page.getByRole('button', { name: 'Back to the test' });
+		await expect(back).toBeFocused();
+		// Edge to edge, the whole window, under the dock, with pictures in it.
+		expect(await alone.boundingBox()).toEqual({ x: 0, y: 0, width: 2000, height: 900 });
+		await expect(alone.locator('.media-panel img').first()).toBeVisible();
+		const lastPicture = await alone.locator('.slot').last().boundingBox();
+		expect((lastPicture?.y ?? 0) + (lastPicture?.height ?? 0)).toBeGreaterThan(900 - 50);
+		// Something behind it all, as at sensory overload, though this is level 3:
+		// a picture, with no clip in this feed to play.
+		await expect(page.getByTestId('overload-backdrop')).toHaveCount(1);
+
+		// The dock stays, its settings tab holding only the density: in the
+		// bar, with room on a wide window, and in the panel.
+		await expect(page.getByTestId('porn-tab')).toBeVisible();
+		const settingsTab = page.getByTestId('settings-tab');
+		const barSlider = settingsTab.locator('.bar wa-slider');
+		await expect(barSlider).toHaveCount(1);
+		await expect(barSlider).toHaveAttribute('name', 'density');
+		const columns = () => alone.locator('.media-panel').count();
+		const before = await columns();
+		// Its densest end packs in more, narrower columns.
+		const track = defined(await barSlider.boundingBox(), 'the density slider');
+		await page.mouse.click(track.x + track.width - 4, track.y + track.height / 2);
+		await expect.poll(columns).toBeGreaterThan(before);
+		// The panel holds it too, in place of the test's settings.
+		await page.getByRole('button', { name: 'More settings controls' }).click();
+		const panel = page.getByRole('region', { name: 'Settings controls' });
+		await expect(panel.locator('wa-slider[name="density"]')).toBeVisible();
+		await expect(panel.locator('wa-checkbox')).toHaveCount(0);
+		await page.getByRole('button', { name: 'More settings controls' }).click();
+
+		await back.click();
+		await expect(alone).toHaveCount(0);
+		await expect(question).toBeVisible();
+		await expect(page.getByTestId('porn-before')).toBeVisible();
+	});
+
+	test('offers no way to goon without porn around the question', async ({ page }) => {
+		await rememberSettings(page, 2, 'denial');
+		await page.goto('/playroom/iq-test');
+		await waitForHydration(page);
+		await dialog(page).getByRole('button', { name: SUB }).click();
+		await expect(page.getByText('Question 1 of 36')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Give up and goon' })).toHaveCount(0);
+	});
+
 	test('packs the porn tight at 4, and fills the room under the question with it', async ({
 		page
 	}) => {

@@ -8,6 +8,7 @@ import {
 	isHypnoCategory,
 	isHypnoSource
 } from './hypno';
+import { GOON_DENSITY_DEFAULT, GOON_DENSITY_MAX } from './media-fit';
 import type { Run } from './run';
 import { DEFAULT_SETTINGS, type Settings, type SettingsLike, settingsSchema } from './settings';
 
@@ -140,6 +141,23 @@ export function rememberedHypnoSource(): HypnoSource | null {
 
 export function rememberHypnoSource(source: HypnoSource): void {
 	write(local, HYPNO_SOURCE_KEY, source);
+}
+
+const GOON_DENSITY_KEY = 'playroom.iq-test.goon-density';
+
+/** How densely "Give up and goon" packs the porn, as last left on this device. */
+export function rememberedGoonDensity(): number {
+	const stored = read(local, GOON_DENSITY_KEY);
+	return typeof stored === 'number' &&
+		Number.isInteger(stored) &&
+		stored >= 0 &&
+		stored <= GOON_DENSITY_MAX
+		? stored
+		: GOON_DENSITY_DEFAULT;
+}
+
+export function rememberGoonDensity(density: number): void {
+	write(local, GOON_DENSITY_KEY, density);
 }
 
 const TIMERS_CLEARED_KEY = 'playroom.iq-test.timers-cleared';

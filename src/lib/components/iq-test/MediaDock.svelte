@@ -9,6 +9,7 @@
 	import type { HypnoSession } from '$lib/playroom/iq-test/hypno-session.svelte';
 	import type { MediaFeed } from '$lib/playroom/iq-test/media';
 	import { soundMuted, soundVolume, toggleMuted } from '$lib/playroom/iq-test/sound.svelte';
+	import DensitySlider from './DensitySlider.svelte';
 	import HypnoBrowser from './HypnoBrowser.svelte';
 	import IntensitySlider from './IntensitySlider.svelte';
 	import MediaTab from './MediaTab.svelte';
@@ -38,7 +39,8 @@
 		editable,
 		onsettings,
 		onsource,
-		oncategories
+		oncategories,
+		density = null
 	}: {
 		hypno: HypnoSession | null;
 		/** Whether the hypno's tab is shown: once it has started, so it can always be stopped. */
@@ -60,7 +62,16 @@
 		onsource: (source: HypnoSource) => void;
 		/** The hypno categories chosen in its browser, to remember. */
 		oncategories: (categories: HypnoCategory[]) => void;
+		/**
+		 * "Give up and goon": the settings panel holds only how densely the
+		 * porn is packed, in place of the test's settings, and the bar no
+		 * intensity slider. Null the rest of the time.
+		 */
+		density?: { value: number; onchange: (density: number) => void } | null;
 	} = $props();
+
+	/** The test's own settings, in the bar and the panel: not while gooning. */
+	const testSettings = $derived(editable && density === null);
 
 	const SOURCE_OPTIONS: readonly { id: HypnoSource; label: string }[] = [
 		{ id: 'bambicloud', label: 'Bambi Cloud (audio)' },
@@ -128,7 +139,12 @@
 	 */
 	let width = $state(0);
 	const liveLayouts = $derived(
-		dockLayouts(width, (showHypno && hypno ? 1 : 0) + (showPorn ? 1 : 0), showSettings, editable)
+		dockLayouts(
+			width,
+			(showHypno && hypno ? 1 : 0) + (showPorn ? 1 : 0),
+			showSettings,
+			testSettings || density !== null
+		)
 	);
 
 	/**
@@ -306,7 +322,7 @@
 							onclick: toggleFullscreen
 						}
 					: null}
-				more={editable}
+				more={editable || density !== null}
 				expanded={open === 'settings'}
 				panelId="settings-panel"
 				ontoggle={() => toggle('settings')}
@@ -315,7 +331,14 @@
 				actionInHead
 			>
 				{#snippet barExtra()}
-					{#if editable}
+					{#if density !== null}
+						<DensitySlider
+							compact
+							value={density.value}
+							onchange={density.onchange}
+							ondrag={(dragging) => (dragging ? hold() : release())}
+						/>
+					{:else if testSettings}
 						<IntensitySlider
 							compact
 							value={settings.intensity}
@@ -324,7 +347,9 @@
 						/>
 					{/if}
 				{/snippet}
-				{#if editable}
+				{#if density !== null}
+					<DensitySlider value={density.value} onchange={density.onchange} />
+				{:else if editable}
 					<SettingsFields value={settings} onchange={onsettings} sliderLast />
 				{/if}
 			</MediaTab>

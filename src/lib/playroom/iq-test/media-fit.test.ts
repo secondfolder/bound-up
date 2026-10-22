@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { fitCount, MOST_FILL_ROWS, pornSpacing, sideColumns, stripRows } from './media-fit';
+import {
+	fitCount,
+	GOON_DENSITY_MAX,
+	goonSpacing,
+	MOST_FILL_ROWS,
+	pornSpacing,
+	sideColumns,
+	stripRows
+} from './media-fit';
 
 describe('fitCount', () => {
 	it('picks the count whose natural lengths come nearest the space', () => {
@@ -53,6 +61,27 @@ describe('pornSpacing', () => {
 		expect(three.gap).toBeGreaterThan(four.gap);
 		expect(three.widest).toBeGreaterThan(four.widest);
 		expect(three.strip).toBeGreaterThan(four.strip);
+	});
+});
+
+describe('goonSpacing', () => {
+	it("runs from level 3's spacing to tighter than level 4's, packing more in at every step", () => {
+		expect(goonSpacing(0)).toEqual(pornSpacing(3));
+		const densest = goonSpacing(GOON_DENSITY_MAX);
+		expect(densest.gap).toBeLessThan(pornSpacing(4).gap);
+		expect(densest.widest).toBeLessThan(pornSpacing(4).widest);
+		for (let density = 1; density <= GOON_DENSITY_MAX; density += 1) {
+			const before = goonSpacing(density - 1);
+			const at = goonSpacing(density);
+			expect(at.gap).toBeLessThan(before.gap);
+			expect(at.widest).toBeLessThan(before.widest);
+			expect(at.strip).toBeLessThan(before.strip);
+		}
+	});
+
+	it('holds at its ends rather than running past them', () => {
+		expect(goonSpacing(-2)).toEqual(goonSpacing(0));
+		expect(goonSpacing(GOON_DENSITY_MAX + 3)).toEqual(goonSpacing(GOON_DENSITY_MAX));
 	});
 });
 

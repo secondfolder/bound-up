@@ -735,6 +735,28 @@ clip, muted, filling the window behind everything and dimmed under the page's
 own colour so the questions stay readable. It takes a clip no column is
 playing.
 
+**Give up and goon.** While there is porn around a question, the footer
+offers "Give up and goon" beside "Part of the Bound Up kink app". It leaves
+nothing on the page but the porn and the dock. The porn fills the window
+edge to edge, to the very bottom with the dock floating over it, in as many
+columns as fit (`alone` in `PornLayout`). Behind it plays a backdrop as at
+sensory overload, whatever the level: a clip, or a picture when the feed has
+no clip to play. The flashes go.
+
+The dock keeps its hypno, porn and settings tabs, but while gooning the
+settings tab holds only **Porn density** (`DensitySlider`) in place of the
+test's settings, in its panel and, with room, in its collapsed bar as the
+intensity slider is otherwise. Density runs from 0 to 6 (`goonSpacing` in
+`media-fit.ts`): from level 3's spacing at 0, through about level 4's in the
+middle (where it starts), to tighter than level 4's. Each step shrinks the
+gap evenly, and the widest column and the strip by a constant factor, so
+narrower columns hold more, smaller pieces. The density is kept on the
+device (`rememberedGoonDensity`).
+
+A round back button above the dock, focused once it has rendered, puts the
+page back. The question is not torn down meanwhile, only hidden, so it comes
+back as it was, though its clock has run on.
+
 **New porn.** A button in the porn tab (see "The media dock") swaps
 everything on show for other pictures and clips. It reshuffles the feed the
 page already has (`shuffleFeed`) rather than fetching again. A vibe's feed is

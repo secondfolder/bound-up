@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { MediaFeed, Origin } from '$lib/playroom/iq-test/media';
-	import { pornSpacing, sideColumns, stripRows } from '$lib/playroom/iq-test/media-fit';
+	import { goonSpacing, pornSpacing, sideColumns, stripRows } from '$lib/playroom/iq-test/media-fit';
 	import type { Intensity, PornMedia } from '$lib/playroom/iq-test/settings';
 	import { wideWindow } from '$lib/playroom/iq-test/wide-window.svelte';
 	import ClipPlayer from './ClipPlayer.svelte';
@@ -38,7 +38,9 @@
 		feed,
 		intensity,
 		media = 'both',
-		show,
+		show: showAround,
+		alone = false,
+		density = 0,
 		backdrop,
 		docked,
 		lead,
@@ -53,6 +55,14 @@
 		media?: PornMedia;
 		/** Whether there is porn around the question at all. */
 		show: boolean;
+		/**
+		 * "Give up and goon": the porn alone, in columns filling the window,
+		 * and nothing else. The question stays mounted out of sight, so going
+		 * back finds it as it was.
+		 */
+		alone?: boolean;
+		/** Alone, how tightly the porn is packed: `goonSpacing`'s density. */
+		density?: number;
 		/** Whether a clip plays behind everything (sensory overload). */
 		backdrop: boolean;
 		/** Whether the media dock is at the foot of the window, to keep the middle column's foot clear of. */
@@ -68,6 +78,8 @@
 		footer: Snippet;
 	} = $props();
 
+	/** Porn around the question: not while it is alone. */
+	const show = $derived(showAround && !alone);
 	const bands = $derived(show && wideWindow.current);
 
 	/** The frame's width, which is the page's, less its 1rem side padding. */
@@ -88,7 +100,7 @@
 	const SHEET_REM = 44;
 
 	/** Fewer, bigger pieces with more room around them at 3; packed at 4. */
-	const spacing = $derived(pornSpacing(intensity));
+	const spacing = $derived(alone ? goonSpacing(density) : pornSpacing(intensity));
 	/**
 	 * The space between one piece of porn and the next, and so between the
 	 * outermost and the window's edge too: `MediaPanel`'s gap.
@@ -125,8 +137,14 @@
 	const fillOffsets = $derived(
 		Array.from({ length: fillRows }, (_, index) => (bands ? band.count * 2 : 1) + index)
 	);
+	/** The window's width, while the porn is alone in it. */
+	let aloneWidth = $state(0);
+	/** Alone, as many columns as the window takes, each no wider than the intensity's widest. */
+	const aloneColumns = $derived(
+		sideColumns(Math.max(0, aloneWidth - 2 * edge), edge, spacing.widest * rem).count
+	);
 	/** Every column and strip takes its own share of the feed. */
-	const columnCount = $derived((bands ? band.count * 2 : 1) + fillRows);
+	const columnCount = $derived(alone ? aloneColumns : (bands ? band.count * 2 : 1) + fillRows);
 
 	/**
 	 * The column whose clip is enlarged, if any: that one is heard, rather
@@ -154,18 +172,20 @@
 	/** How long a picture is the backdrop, with pictures only, before the next. */
 	const BACKDROP_PICTURE_MS = 15_000;
 	/**
-	 * With pictures only, the backdrop is a picture instead, changing every
-	 * so often: from the far end of the feed, which the columns reach last.
+	 * With pictures only, or a feed with no clip that plays, the backdrop is
+	 * a picture instead, changing every so often: from the far end of the
+	 * feed, which the columns reach last.
 	 */
+	const stillBackdrop = $derived(media === 'images' || backdropClip === null);
 	const backdropPicture = $derived.by(() => {
-		if (media !== 'images' || feed.images.length === 0) {
+		if (!stillBackdrop || feed.images.length === 0) {
 			return null;
 		}
 		const count = feed.images.length;
 		return feed.images[(((count - 1 - backdropIndex) % count) + count) % count] ?? null;
 	});
 	$effect(() => {
-		if (!(backdrop && media === 'images')) {
+		if (!(backdrop && stillBackdrop)) {
 			return;
 		}
 		const timer = setInterval(() => {
@@ -200,7 +220,7 @@
 {/snippet}
 
 {#if backdrop && backdropPicture}
-	<!-- Pictures only: the same backdrop, still. -->
+	<!-- Pictures only, or no clip to play: the same backdrop, still. -->
 	<div class="backdrop" aria-hidden="true" data-testid="overload-backdrop">
 		<img src={backdropPicture} alt="" referrerpolicy="no-referrer" decoding="async" />
 	</div>
@@ -220,9 +240,23 @@
 	</div>
 {/if}
 
+{#if alone}
+	<div
+		class="alone"
+		bind:clientWidth={aloneWidth}
+		style:--porn-gap="{edge}px"
+		data-testid="porn-alone"
+	>
+		{#each Array.from({ length: aloneColumns }, (_, index) => index) as index (index)}
+			<div class="alone-column">{@render column(index, 'column')}</div>
+		{/each}
+	</div>
+{/if}
+
 <div
 	bind:clientWidth={frameWidth}
 	class="frame"
+	class:out-of-sight={alone}
 	class:with-media={show}
 	class:wide-media={bands}
 	class:docked={docked}
@@ -278,7 +312,7 @@
 	{/if}
 </div>
 
-{#if !bands}
+{#if !(bands || alone)}
 	{@render footer()}
 {/if}
 
@@ -333,8 +367,33 @@
 		}
 	}
 
+	/* The window, edge to edge, with nothing but the porn in it, over the
+	   backdrop's clip. */
+	.alone {
+		position: fixed;
+		inset: 0;
+		z-index: 1;
+		display: flex;
+		gap: var(--porn-gap);
+		/* To the foot of the window, under the dock: with no question to keep
+		   clear of it, the porn takes the whole height and the dock floats
+		   over it. */
+		padding: var(--porn-gap);
+	}
+
+	.alone-column {
+		flex: 1 1 0;
+		min-inline-size: 0;
+	}
+
 	.frame {
 		flex: 1 1 auto;
+
+		/* Kept, with the question in it, while the porn is alone. */
+		&.out-of-sight {
+			display: none;
+		}
+
 		display: grid;
 		grid-template-columns: minmax(0, 44rem);
 		justify-content: center;
