@@ -222,6 +222,7 @@
 		if (!reference) {
 			return;
 		}
+		raise(element);
 
 		const place = () => {
 			void computePosition(reference, element, {
@@ -237,19 +238,41 @@
 	});
 
 	/**
-	 * Moves the toolbar out to `document.body`.
+	 * Moves the toolbar out of the field: to `document.body`, or to the dialog
+	 * the editor is in.
 	 *
 	 * Svelte has no portal, and this is the whole reason the toolbar used to
 	 * distort the field it belongs to — see the note at the top.
+	 *
+	 * Into the dialog, not `<body>`, when there is one — the add and edit sheets
+	 * are modal `wa-dialog`s. A modal dialog makes everything outside it inert,
+	 * so on `<body>` the toolbar showed and its buttons did nothing: every click
+	 * went to the dialog. Inside it, the toolbar is part of the dialog, and being
+	 * a popover (`raise`) keeps the dialog's scrolling body from clipping it.
 	 */
 	$effect(() => {
 		const element = bar;
 		if (!element) {
 			return;
 		}
-		document.body.append(element);
+		const host = editor.getRootElement()?.closest('wa-dialog') ?? document.body;
+		host.append(element);
+		raise(element);
 		return () => element.remove();
 	});
+
+	/**
+	 * Puts the toolbar at the top of the top layer, as a manual popover, so that
+	 * neither the dialog it may be in nor anything that dialog scrolls covers or
+	 * clips it. The popover shown last is on top, so it is shown again each time
+	 * it appears, above whatever has opened since.
+	 */
+	function raise(element: HTMLElement) {
+		if (element.matches(':popover-open')) {
+			element.hidePopover();
+		}
+		element.showPopover();
+	}
 
 	$effect(() => {
 		const offSelection = editor.registerCommand(
@@ -294,6 +317,7 @@
 {#if shown.length > 0}
 	<div
 		bind:this={bar}
+		popover="manual"
 		class="toolbar"
 		class:hidden={!visible || dragging}
 		role="toolbar"
@@ -324,8 +348,13 @@
 
 <style>
 	.toolbar {
-		/* Positioned by Floating UI in the `fixed` strategy, from `document.body`. */
+		/* Positioned by Floating UI in the `fixed` strategy, from `document.body`.
+		   A popover's own `inset: 0` and `margin: auto` would centre it instead. */
 		position: fixed;
+		inset: auto;
+		margin: 0;
+		overflow: visible;
+		color: inherit;
 		inset-block-start: 0;
 		inset-inline-start: 0;
 		z-index: 40;
