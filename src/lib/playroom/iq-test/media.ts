@@ -47,7 +47,6 @@ export type MediaSource =
 
 const SHARED_SOURCES: readonly MediaSource[] = [
 	{ kind: 'redgifs', tags: ['Caption', 'Goon'] },
-	{ kind: 'redgifs', tags: 'PMV' },
 	{ kind: 'redgifs', niche: 'rough-sex' },
 	{ kind: 'redgifs', niche: 'goonette' },
 	{ kind: 'redgifs', niche: 'triple-penetration' },
