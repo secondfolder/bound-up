@@ -135,8 +135,13 @@ it only once its POST succeeds. On opening the entry, anything still in it is
 applied and sent again; Yjs and the batch's id make a resend harmless.
 
 The save state says which of these is happening: "Saved", "Saving…", or
-"Offline: changes kept on this device". A failed send retries with backoff. A
-single change too large to seal (one paste over the batch cap) stays in the
+"Offline: changes kept on this device". A failed send retries with backoff
+(1 second, doubling to 30), and at once when the browser says it is back
+online, so an entry written offline does not sit out the backoff once the
+connection returns. A batch reaches the outbox up to 400ms after the
+keystrokes in it, encrypted on the way, so a page closed in that moment can
+lose them: no synchronous save is possible without storing them in the clear.
+A single change too large to seal (one paste over the batch cap) stays in the
 outbox and the page says to undo it and add it in parts.
 
 ## Versions

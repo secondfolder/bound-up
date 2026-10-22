@@ -275,20 +275,60 @@ test.describe('offline', () => {
 			await side.page.goto('/home/notebook');
 			const url = await startEntry(side.page, 'note');
 
-			await side.page.route('**/api/notebook/entries/*/updates', (route) =>
-				route.request().method() === 'POST' ? route.abort() : route.continue()
-			);
+			let refused = 0;
+			await side.page.route('**/api/notebook/entries/*/updates', (route) => {
+				if (route.request().method() !== 'POST') {
+					return route.continue();
+				}
+				refused += 1;
+				return route.abort();
+			});
 			await typeRichText(side.page, 'Written on a train.');
 			await expect(side.page.getByText(/Offline: changes kept on this device/)).toBeVisible({
 				timeout: 15_000
 			});
 
 			// A reload while still offline: the edit comes back from the device.
+			// Kept on the device before the reload: the last keystrokes reach the
+			// outbox in a batch up to 400ms later, and are encrypted on the way,
+			// so a reload straight after typing could beat them there. Nothing
+			// says when that has happened, so poll it a second apart, longer than a
+			// batch takes, until two readings in a row agree.
+			const kept = () =>
+				side.page.evaluate(
+					() =>
+						Object.entries(localStorage).find(([key]) =>
+							key.startsWith('bound-up:notebook-outbox')
+						)?.[1] ?? null
+				);
+			let lastKept: string | null = null;
+			await expect
+				.poll(
+					async () => {
+						const now = await kept();
+						const still = now !== null && now === lastKept;
+						lastKept = now;
+						return still;
+					},
+					{ intervals: [1000], timeout: 15_000 }
+				)
+				.toBe(true);
+
+			refused = 0;
 			await side.page.goto(url);
 			await expect(surface(side.page)).toContainText('Written on a train.');
 
+			// Offline long enough for the backoff to grow: four refusals after the
+			// reload (1, 2 and 4 seconds apart) put the next try 8 seconds off.
+			await expect.poll(() => refused, { timeout: 20_000 }).toBeGreaterThanOrEqual(4);
+
+			// Back online, as the browser says when the connection returns: it
+			// sends at once, well inside the 8 seconds its backoff would have
+			// waited. It used to wait them out, and with the backoff grown to its
+			// 30 second cap that ran a slow CI run past the test's time.
 			await side.page.unroute('**/api/notebook/entries/*/updates');
-			await expect(side.page.getByText('Saved')).toBeVisible({ timeout: 40_000 });
+			await side.page.evaluate(() => globalThis.dispatchEvent(new Event('online')));
+			await expect(side.page.getByText('Saved')).toBeVisible({ timeout: 5000 });
 
 			// And now it is on the server: a fresh device-less load still has it.
 			await side.page.evaluate(() => {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
+	import { navigating } from '$app/state';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import { groupByMonth, NOTEBOOK_LIST_TOPIC, type NotebookKind } from '$lib/notebook';
@@ -77,7 +78,16 @@
 	const roomKey = $derived(room);
 	$effect(() => {
 		const key = roomKey;
-		const refresh = () => void invalidate(dependency);
+		// Not while leaving: starting an entry tells the room, which tells this
+		// list, and a refresh landing during the redirect to the new entry
+		// raced it. Now and then the refresh won, the page stayed on the list
+		// with the new entry in it, and "New note" sat disabled for good. A
+		// list being left has nothing to refresh for.
+		const refresh = () => {
+			if (navigating.to === null) {
+				void invalidate(dependency);
+			}
+		};
 		return watchRoom({
 			room: key,
 			topics: [NOTEBOOK_LIST_TOPIC],

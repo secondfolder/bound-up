@@ -263,6 +263,7 @@ export class NotebookSession {
 		);
 		document.addEventListener('visibilitychange', this.#onVisibility);
 		window.addEventListener('pagehide', this.#onPageHide);
+		globalThis.addEventListener('online', this.#onOnline);
 	}
 
 	/**
@@ -402,6 +403,7 @@ export class NotebookSession {
 		clearInterval(this.#versionTimer);
 		document.removeEventListener('visibilitychange', this.#onVisibility);
 		window.removeEventListener('pagehide', this.#onPageHide);
+		globalThis.removeEventListener('online', this.#onOnline);
 		// Tell the others this page has gone, so its caret goes at once rather
 		// than after the awareness timeout.
 		removeAwarenessStates(this.awareness, [this.doc.clientID], 'local');
@@ -846,6 +848,21 @@ export class NotebookSession {
 	 * goes into the outbox, which a reload then sends, and the title goes now,
 	 * with `keepalive`, since nothing else will send it before next time.
 	 */
+	/**
+	 * Back online: send what is waiting now, rather than when the backoff
+	 * next comes round. Offline for a while, that had grown to its 30 second
+	 * cap, so an entry written on a train sat unsent for up to half a minute
+	 * after the connection came back, saying "Offline" all the while.
+	 */
+	readonly #onOnline = (): void => {
+		if (this.saveState !== 'offline') {
+			return;
+		}
+		clearTimeout(this.#retryTimer);
+		this.#retryMs = 0;
+		void this.#send();
+	};
+
 	readonly #onPageHide = (): void => {
 		this.#batch();
 		void this.#saveHeader();
