@@ -170,6 +170,7 @@ The Zod schema accepts only `me` / `them` / `mix` — posting the _stored_ value
 | Manage partnership rewards and set reward credits     | Whoever `control` names, or both                 |
 | Manage partnership tasks                              | Whoever `control` names, or both                 |
 | Complete partnership tasks                            | The non-controller, or both under shared control |
+| Make a notebook entry read-only or hidden for the other | Whoever `control` names, or both ([notebook.md](notebook.md#access)) |
 | Rewrite the names and roles while accepting an invite | The accepter, if control is theirs or shared     |
 | Disconnect, or cancel a pending invite                | **Either member, always**                        |
 

@@ -40,7 +40,12 @@ const UNAVAILABLE = 'This could not be saved from this device. Reload the page a
 const KEYS_CHANGED =
 	"Your partner's keys have changed. Check them on your messages page before saving here.";
 
-async function writableVault(
+/**
+ * The vault a scope writes to, with the grant that permits it, or a message
+ * saying why not, worded for the person waiting. Exported for the notebook,
+ * which seals as it types rather than on a submit.
+ */
+export async function writableVault(
 	scope: SealScope
 ): Promise<{ vault: OpenVault; grant: WriteGrant } | string> {
 	// A submit made while the page is still opening its vaults waits for them

@@ -92,6 +92,7 @@
 		"@lexical/rich-text": "^0.51.0",
 		"@lexical/selection": "^0.51.0",
 		"@lexical/utils": "^0.51.0",
+		"@lexical/yjs": "^0.51.0",
 		"@libsql/client": "^0.18.0",
 		"@noble/curves": "^2.4.0",
 		"@scure/base": "^2.4.0",
@@ -111,6 +112,8 @@
 		"mediabunny": "^1.60.0",
 		"nodemailer": "^10.1.1",
 		"sveltekit-superforms": "^2.30.2",
+		"y-protocols": "^1.0.7",
+		"yjs": "^13.6.33",
 		"zod": "^4.5.4"
 	},
 	"overrides": {

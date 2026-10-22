@@ -266,6 +266,11 @@ export default defineConfig(({ command, mode }) => {
 			 *
 			 * `mediabunny` is the video transcoder, reached only through
 			 * `await import()` when a message with a video is sent.
+			 *
+			 * `yjs`, `@lexical/yjs` and `y-protocols/awareness` are the notebook's
+			 * live editing, reached through `await import()` from the list page's
+			 * new-entry form as well as statically from the entry page; listed so
+			 * whichever comes first does not discover them mid-run.
 			 */
 			include: [
 				'age-encryption',
@@ -280,7 +285,10 @@ export default defineConfig(({ command, mode }) => {
 				'exifr',
 				// The one dependency of the excluded AVIF encoder, listed so that
 				// the first photo sent does not discover it mid-run either.
-				'@jsquash/avif > wasm-feature-detect'
+				'@jsquash/avif > wasm-feature-detect',
+				'yjs',
+				'@lexical/yjs',
+				'y-protocols/awareness'
 			],
 			/**
 			 * The AVIF encoder is the one dependency that must NOT be pre-bundled.

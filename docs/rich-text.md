@@ -480,6 +480,33 @@ If the card lands outside the scrollport, the reader is smooth-scrolled to it.
 A card inserted above a long line is otherwise somewhere they cannot see, and
 nothing would appear to have happened.
 
+## Collaborative editing
+
+A notebook entry is edited by several people at once
+([notebook.md](notebook.md)), so its editor is bound to a shared Yjs document
+rather than to a value. It is still `RichTextEditor.svelte`, given a
+`collaborate` hook (by `notebook/CollaborativeEditor.svelte`) that receives the
+editor once it is built, binds it, and returns the teardown. With the hook,
+`value`, `onChange` and `setValue` go unused, and three things change:
+
+- **Undo is the document's.** `createRichTextEditor({ history: false })` leaves
+  out `@lexical/history`, and Yjs's undo manager takes Ctrl+Z, so a writer
+  undoes only their own edits. Lexical's history would undo a partner's typing
+  too, and two undo stacks fighting over one key is worse than either.
+- **Embeds are inserted by whoever typed the link.** The embed handling is
+  `components/editor-embeds.svelte.ts`, shared by both kinds of editor; it
+  skips any update tagged as remote (`COLLABORATION_TAG` or `HISTORIC_TAG`).
+  Without that, every device watching would answer a partner's new link by
+  inserting an embed of its own, and the document would gain one per device.
+- **Other writers' carets** are drawn into an overlay (`.cursors`) by
+  `@lexical/yjs`, styled by the theme's `collaboration` classes in
+  `richtext-editor.ts` rather than its inline defaults.
+
+What lives in the shared document is the editor's shape, with embeds as blocks
+at the root (see "Decorator blocks" above). Anything rendered outside the
+editor, a version preview, goes through `toStoredDocument` first, like any
+stored document.
+
 ## Security
 
 **No `{@html}`, ever.** Every character of user prose goes through ordinary

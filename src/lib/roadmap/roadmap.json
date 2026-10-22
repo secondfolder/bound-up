@@ -309,13 +309,49 @@
 					"id": "journal-notes",
 					"title": "Journal and notes",
 					"summary": "Somewhere to write things down, as often as you like.",
-					"status": "planned",
+					"status": "in-progress",
 					"icon": "feather",
 					"notes": [
 						"Journal: dated entries about how things are going",
 						"Fantasies: the things you daydream about",
 						"Bucket list: ideas you want to try some day",
 						"Free text notes: anything that doesn't fit anywhere else"
+					],
+					"children": [
+						{
+							"id": "notebook-journal",
+							"title": "Journal entries",
+							"summary": "Dated entries about how things are going, in your own notebook or one you share with a partner.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
+							"id": "notebook-notes",
+							"title": "Free text notes",
+							"summary": "Pages for anything that doesn't fit anywhere else.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
+							"id": "notebook-together",
+							"title": "Writing together",
+							"summary": "Write in a shared entry at the same time as your partner and watch each other's words appear, or make an entry read-only or hidden for them.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
+							"id": "notebook-history",
+							"title": "Every version kept",
+							"summary": "Earlier versions of an entry are saved as you go, and you can look back at one or bring it back.",
+							"status": "shipped",
+							"shippedOn": "2026-10-22"
+						},
+						{
+							"id": "notebook-recovery-bin",
+							"title": "Recovery bin",
+							"summary": "A deleted entry waits in a bin for a while before it's gone for good, so you can bring it back, unless you choose to delete it straight away.",
+							"status": "planned"
+						}
 					]
 				},
 				{

@@ -1550,6 +1550,43 @@
 					}
 				}
 			}
+		},
+		{
+			"kind": "notebook-entry",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000e1",
+			"ciphertext": "sb1.PsWBEFimNlXlY5krWuml4KEPkj4PZfQrv-LPpI9XlG9jVso_oYbyuBWxcSij2FA7itgKLT86uekmK1PchtBUYJqBbjMdckep0RuLYWqBJogvuFGo9AIvX-Py9wg",
+			"expected": {
+				"title": "Frozen page",
+				"excerpt": "Written once and never again"
+			}
+		},
+		{
+			"kind": "notebook-update",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000e2",
+			"ciphertext": "sb1.TLjgec1-uPPaGWPpLRZacg8Kv-xCdg4_JlZaEM41wul083TeP4yDWpVimtjwerF-5VyEP1M0otqBgYAYLTqkaeij6_Hk-Asxpw",
+			"expected": {
+				"update": "AQGFsIHyBQAEAQV0aXRsZQZGcm96ZW4A"
+			}
+		},
+		{
+			"kind": "notebook-awareness",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000e3",
+			"ciphertext": "sb1.dPQMyLbaxlXEXDaF0_DN63YARJx-VUYE3MyDgV1YdPvP4I2o8LeFExujTfOpjOK-ES6z_diL4JY",
+			"expected": {
+				"state": "AQGFsIHyBQECe30="
+			}
+		},
+		{
+			"kind": "notebook-snapshot",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000e4",
+			"ciphertext": "sb1.r7SbfY6JGsGHQAKX4PticgT90O8zh9B_qv2RpbAhMyZvzCqAwpR_6_T7Bt9FzdoTOmFBAwaFs8wDlaqyrWp9Fb9ZEmPKWu7O",
+			"expected": {
+				"state": "AQGFsIHyBQAEAQV0aXRsZQZGcm96ZW4A"
+			}
 		}
 	]
 }

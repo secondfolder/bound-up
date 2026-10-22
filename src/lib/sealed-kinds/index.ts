@@ -21,6 +21,12 @@ import {
 } from './daydreams';
 import { kinkListKind, kinkListPartnerKind } from './kink-list';
 import { messageBodyKind, messageMetadataKind, messageReactionKind } from './messages';
+import {
+	notebookAwarenessKind,
+	notebookEntryKind,
+	notebookSnapshotKind,
+	notebookUpdateKind
+} from './notebook';
 import { partnershipInviteKind, partnershipNamesKind } from './partnerships';
 import { tagKind } from './tags';
 import { rewardKind, taskKind } from './tasks';
@@ -42,5 +48,9 @@ export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
 	daydreamExchangeKind,
 	daydreamSetupExchangeKind,
 	kinkListKind,
-	kinkListPartnerKind
+	kinkListPartnerKind,
+	notebookEntryKind,
+	notebookUpdateKind,
+	notebookAwarenessKind,
+	notebookSnapshotKind
 ];

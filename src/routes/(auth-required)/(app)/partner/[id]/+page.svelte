@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import NotebookWidget from '$lib/components/notebook/NotebookWidget.svelte';
 	import PartnerMessagesWidget from '$lib/components/PartnerMessagesWidget.svelte';
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
 	import SectionWidget from '$lib/components/SectionWidget.svelte';
@@ -60,6 +61,11 @@
 				href={resolve('/(auth-required)/(app)/partner/[id]/rewards', { id: partner.id })}
 			/>
 		{/if}
+
+		<NotebookWidget
+			items={data.notebook}
+			href={resolve('/(auth-required)/(app)/partner/[id]/notebook', { id: partner.id })}
+		/>
 
 		<!-- A card with no body rather than a plain link under the others: the
 		     kink list has no summary worth a preview, and what it shows a partner

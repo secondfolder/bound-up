@@ -62,11 +62,24 @@ export type ReactionPayload = { version: 1; emoji: string };
  */
 export type DraftPayload = { version: 1; text: string; tagIds: string[] };
 
+/**
+ * A notebook entry's edits that have not reached the server yet, kept on the
+ * device so closing the tab or losing the connection loses nothing. Each is a
+ * Yjs update, base64, with the id it will be posted (and sealed) under. See
+ * `src/lib/notebook/outbox.ts`.
+ */
+export type NotebookOutboxPayload = { version: 1; batches: { id: string; update: string }[] };
+
 const encoder = new TextEncoder();
 
 /** Encrypts a payload to every given recipient. Both partners, in practice. */
 export async function encryptPayload(
-	payload: MessagePayload | MessageMetadataPayload | ReactionPayload | DraftPayload,
+	payload:
+		| MessagePayload
+		| MessageMetadataPayload
+		| ReactionPayload
+		| DraftPayload
+		| NotebookOutboxPayload,
 	recipients: string[]
 ): Promise<string> {
 	if (recipients.length === 0) {

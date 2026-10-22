@@ -1,0 +1,267 @@
+import { error, fail, redirect } from '@sveltejs/kit';
+import { superValidate } from 'sveltekit-superforms';
+import { zod4 } from 'sveltekit-superforms/adapters';
+import { entryTopic, isEntryDate, type PartnerAccess } from '../notebook';
+import { notebookCreateSchema, partnerAccessSchema } from '../schemas/notebook';
+import { calendarDayKey } from '../timezone';
+import type { NotebookEntryView, SealedRefView } from '../types';
+import { createMediaStore } from './media/backend';
+import {
+	createEntry,
+	deleteEntry,
+	getEntryContext,
+	liftHiddenEntry,
+	listEntries,
+	type NotebookScope,
+	resolveScope,
+	setPartnerAccess
+} from './notebook';
+import { publishEntryFrame, publishListChange } from './notebook-live';
+import { createNotifier } from './realtime/backend';
+import type { RoomKey } from './realtime/index';
+import { sealedRef } from './sealed-content';
+
+/**
+ * The loads and actions behind the notebook's pages, shared by the solo
+ * notebook (`/home/notebook`) and each partnership's (`/partner/[id]/notebook`),
+ * which differ only in their scope. See docs/notebook.md.
+ *
+ * Every one of them resolves the scope and the entry from the database for
+ * itself: an action runs before any load, so a check that lived in a layout
+ * would gate nothing (AGENTS.md, "Adding a route").
+ */
+
+type Event = {
+	locals: App.Locals;
+	params: Record<string, string>;
+	platform?: App.Platform | undefined;
+	request: Request;
+	depends: (...deps: `${string}:${string}`[]) => void;
+};
+
+type ActionEvent = Omit<Event, 'depends'>;
+
+function requireUser(locals: App.Locals): NonNullable<App.Locals['user']> {
+	if (!locals.user) {
+		error(401, 'Not signed in');
+	}
+	return locals.user;
+}
+
+/** The invalidation key a scope's lists and cards share. */
+export function notebookDependency(scope: NotebookScope): `notebook:${string}` {
+	return scope.kind === 'self' ? 'notebook:self' : `notebook:${scope.partnershipId}`;
+}
+
+/** Where a scope's notebook lives. */
+export function notebookPath(scope: NotebookScope): string {
+	return scope.kind === 'self' ? '/home/notebook' : `/partner/${scope.partnershipId}/notebook`;
+}
+
+export type NotebookListData = {
+	journal: NotebookEntryView[];
+	notes: NotebookEntryView[];
+	room: RoomKey;
+	viewerId: string;
+	/** Today in the viewer's timezone, for a new journal entry's date. */
+	today: string;
+};
+
+export async function loadNotebookList(
+	event: Pick<Event, 'locals' | 'depends'>,
+	scope: NotebookScope
+): Promise<NotebookListData> {
+	const user = requireUser(event.locals);
+	const resolved = await resolveScope(event.locals.db, scope, user.id);
+	if (!resolved) {
+		error(404, 'Partner not found');
+	}
+	event.depends(notebookDependency(scope));
+	const [journal, notes] = await Promise.all([
+		listEntries(event.locals.db, resolved, user.id, 'journal'),
+		listEntries(event.locals.db, resolved, user.id, 'note')
+	]);
+	return {
+		journal,
+		notes,
+		room: resolved.room,
+		viewerId: user.id,
+		today: calendarDayKey(user.timezone, new Date())
+	};
+}
+
+/**
+ * Creates an entry from the sealed header and first edit the page posted in
+ * place of anything typed (`NewEntryForm`), then opens it.
+ */
+export async function createEntryAction(event: ActionEvent, scope: NotebookScope) {
+	const user = requireUser(event.locals);
+	const form = await event.request.formData();
+	let body: unknown;
+	try {
+		body = JSON.parse(String(form.get('entry') ?? ''));
+	} catch {
+		body = null;
+	}
+	const parsed = notebookCreateSchema.safeParse(body);
+	if (!parsed.success) {
+		return fail(400, { error: 'That entry could not be created. Reload the page and try again.' });
+	}
+	const { entryDate, kind, ...input } = parsed.data;
+	if (kind === 'journal' && !isEntryDate(entryDate)) {
+		return fail(400, { error: 'Please choose a date for this journal entry.' });
+	}
+	const resolved = await resolveScope(event.locals.db, scope, user.id);
+	if (!resolved) {
+		error(404, 'Partner not found');
+	}
+	const result = await createEntry(event.locals.db, resolved, user.id, {
+		...input,
+		kind,
+		entryDate: kind === 'journal' ? entryDate : null
+	});
+	if (!result.ok) {
+		return fail(result.reason === 'exists' ? 409 : 400, {
+			error:
+				result.reason === 'wrong-vault'
+					? 'This device’s keys are out of date. Reload the page and try again.'
+					: 'That entry could not be created. Reload the page and try again.'
+		});
+	}
+	await publishListChange(await createNotifier(event), resolved.room);
+	redirect(303, `${notebookPath(scope)}/${input.id}`);
+}
+
+/**
+ * Shows an entry hidden from the viewer again, once control has moved to
+ * them from whoever hid it. See `canSetAccess`.
+ */
+export async function showHiddenEntryAction(event: ActionEvent, scope: NotebookScope) {
+	const user = requireUser(event.locals);
+	if (scope.kind !== 'partnership') {
+		error(404, 'Not found');
+	}
+	const form = await event.request.formData();
+	const entryId = String(form.get('entryId') ?? '');
+	const result = await liftHiddenEntry(event.locals.db, entryId, user.id, scope.partnershipId);
+	if (!result.ok) {
+		error(404, 'Not found');
+	}
+	const notifier = await createNotifier(event);
+	const resolved = await resolveScope(event.locals.db, scope, user.id);
+	if (resolved) {
+		await publishListChange(notifier, resolved.room);
+		await publishEntryFrame(notifier, resolved.room, entryId, { type: 'access' });
+	}
+	return { shown: true };
+}
+
+export type NotebookEntryData = {
+	entry: {
+		id: string;
+		kind: NotebookEntryView['kind'];
+		entryDate: string | null;
+		vaultId: string;
+		revision: number;
+		header: SealedRefView | null;
+		createdByUserId: string | null;
+		canWrite: boolean;
+		canSetAccess: boolean;
+		partnerAccess: PartnerAccess;
+		/** Whether the restriction, if any, is one the viewer set. */
+		restrictedByViewer: boolean;
+	};
+	room: RoomKey;
+	viewerId: string;
+};
+
+export async function loadNotebookEntry(
+	event: Pick<Event, 'locals' | 'params' | 'depends'>,
+	scope: NotebookScope
+): Promise<NotebookEntryData> {
+	const user = requireUser(event.locals);
+	const { entryId } = event.params;
+	event.depends(`notebook:entry:${entryId}`);
+	const context = await getEntryContext(event.locals.db, entryId, user.id, scope);
+	if (!context) {
+		error(404, 'Not found');
+	}
+	const { entry } = context;
+	return {
+		entry: {
+			id: entry.id,
+			kind: entry.kind,
+			entryDate: entry.entryDate,
+			vaultId: entry.vaultId,
+			revision: entry.revision,
+			header: sealedRef(entry.id, entry),
+			createdByUserId: entry.createdByUserId,
+			canWrite: context.access === 'edit',
+			canSetAccess: context.canSetAccess,
+			partnerAccess: entry.partnerAccess,
+			restrictedByViewer: entry.accessSetByUserId === user.id
+		},
+		room: context.room,
+		viewerId: user.id
+	};
+}
+
+/**
+ * Who else may see or edit a partnership entry. Re-checks control against
+ * the stored rows (invariant 14), then makes an open page follow: a member
+ * who may no longer read it is dropped from the entry's stream, and every
+ * open copy is told to reload what it may do.
+ */
+export async function setAccessAction(event: ActionEvent, scope: NotebookScope) {
+	const user = requireUser(event.locals);
+	const form = await superValidate(event.request, zod4(partnerAccessSchema));
+	if (!form.valid) {
+		return fail(400, { form });
+	}
+	const context = await getEntryContext(event.locals.db, event.params.entryId, user.id, scope);
+	if (!context?.partnership) {
+		error(404, 'Not found');
+	}
+	const access = form.data.access as PartnerAccess;
+	const result = await setPartnerAccess(event.locals.db, context, user.id, access);
+	if (!result.ok) {
+		error(403, 'Only whoever holds control of this partnership can change that.');
+	}
+	const notifier = await createNotifier(event);
+	const { partnership } = context;
+	const other = partnership.inviterId === user.id ? partnership.inviteeId : partnership.inviterId;
+	// Told before evicted: the frame is queued ahead of the close, so the
+	// partner's open page hears it and leaves at once, rather than only finding
+	// out after its reconnects have been refused and it has fallen back to
+	// polling.
+	await publishEntryFrame(notifier, context.room, context.entry.id, { type: 'access' });
+	if (access === 'hidden' && other) {
+		await notifier.evict(context.room, { userId: other, topic: entryTopic(context.entry.id) });
+	}
+	await publishListChange(notifier, context.room);
+	return { form };
+}
+
+export async function deleteEntryAction(event: ActionEvent, scope: NotebookScope) {
+	const user = requireUser(event.locals);
+	const context = await getEntryContext(event.locals.db, event.params.entryId, user.id, scope);
+	if (!context) {
+		error(404, 'Not found');
+	}
+	const result = await deleteEntry(event.locals.db, await createMediaStore(event), context);
+	if (!result.ok) {
+		error(403, 'You can only read this entry, so you cannot delete it.');
+	}
+	if (result.purgeFailed) {
+		// Reported, not thrown: the entry is gone, and an unreadable leftover is
+		// a much smaller problem than a delete that seems to fail. See
+		// `deleteEntry`.
+		console.error('[notebook] an entry’s versions could not all be removed from storage', {
+			entryId: context.entry.id
+		});
+	}
+	const notifier = await createNotifier(event);
+	await publishEntryFrame(notifier, context.room, context.entry.id, { type: 'deleted' });
+	await publishListChange(notifier, context.room);
+	redirect(303, notebookPath(scope));
+}

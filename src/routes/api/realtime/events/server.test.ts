@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { entryTopic } from '$lib/notebook';
 import { createNotifier } from '$lib/server/realtime/backend';
 import { partnershipRoom, userRoom } from '$lib/server/realtime/index';
 import { publishMessagingEvent } from '$lib/server/realtime/messaging';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { defined } from '$lib/testing/defined';
 import { fakeEvent, runAndCatch } from '$lib/testing/events';
-import { createTestPartnership, createTestUser, type TestUser } from '$lib/testing/fixtures';
+import {
+	createTestNotebookEntry,
+	createTestPartnership,
+	createTestUser,
+	type TestUser
+} from '$lib/testing/fixtures';
 import { POST } from '../presence/+server';
 import { GET } from './+server';
 
@@ -104,6 +110,66 @@ describe('GET /api/realtime/events', () => {
 
 describe('POST /api/realtime/presence', () => {
 	const room = () => partnershipRoom(partnershipId);
+
+	/**
+	 * A device with only a notebook page open is not watching the board, so a
+	 * message must still be pushed to it.
+	 */
+	it('does not count a notebook stream as watching the board', async () => {
+		const response = await openFeed(
+			ada,
+			`room=${partnershipRoom(partnershipId)}&topic=notebook&stream=${crypto.randomUUID()}`
+		);
+		expect(await watching()).toEqual([]);
+		await release(response);
+	});
+
+	describe('notebook entries', () => {
+		it("opens a stream on an entry the viewer may read, in the entry's room", async () => {
+			const entry = await createTestNotebookEntry(harness.db, ada, { partnershipId });
+			const response = await openFeed(
+				bo,
+				`room=${partnershipRoom(partnershipId)}&topic=${entryTopic(entry.id)}&stream=${crypto.randomUUID()}`
+			);
+			expect(response.headers.get('content-type')).toBe('text/event-stream');
+			await release(response);
+		});
+
+		it('refuses an entry hidden from the viewer, as if it did not exist', async () => {
+			const entry = await createTestNotebookEntry(harness.db, ada, {
+				partnershipId,
+				partnerAccess: 'hidden'
+			});
+			const result = await runAndCatch(() =>
+				openFeed(
+					bo,
+					`room=${partnershipRoom(partnershipId)}&topic=${entryTopic(entry.id)}&stream=${crypto.randomUUID()}`
+				)
+			);
+			expect(result).toMatchObject({ type: 'error', status: 404 });
+		});
+
+		it('refuses an entry named in a room it does not belong to', async () => {
+			const solo = await createTestNotebookEntry(harness.db, ada);
+			const result = await runAndCatch(() =>
+				openFeed(
+					ada,
+					`room=${partnershipRoom(partnershipId)}&topic=${entryTopic(solo.id)}&stream=${crypto.randomUUID()}`
+				)
+			);
+			expect(result).toMatchObject({ type: 'error', status: 404 });
+		});
+
+		it("opens a stream on the viewer's own entry in their own room", async () => {
+			const solo = await createTestNotebookEntry(harness.db, ada);
+			const response = await openFeed(
+				ada,
+				`room=${userRoom(ada.id)}&topic=${entryTopic(solo.id)}&stream=${crypto.randomUUID()}`
+			);
+			expect(response.headers.get('content-type')).toBe('text/event-stream');
+			await release(response);
+		});
+	});
 
 	it('refuses an unsigned visitor', async () => {
 		const result = await runAndCatch(() =>

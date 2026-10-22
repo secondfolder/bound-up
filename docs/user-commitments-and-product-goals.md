@@ -24,6 +24,10 @@ In practice that means:
   so writing in one thread never touches another thread's draft or the
   new-message draft. See [`docs/messaging.md`](messaging.md#drafts) and
   `src/lib/messaging/drafts.ts`.
+  A notebook entry has no draft, because what is typed there is already on its
+  way to the server; it keeps an **outbox** instead: every batch of edits the
+  server has not confirmed, encrypted on the device, sent again the next time
+  the entry opens. See [`docs/notebook.md`](notebook.md#never-losing-what-was-typed).
 - **Context that belongs to the unsent thing is kept with it.** The tags chosen
   in the new-message dialog are part of its draft. They are kept only while
   there is text, because tags on their own are not a message anyone is in the

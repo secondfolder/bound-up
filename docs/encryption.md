@@ -778,6 +778,18 @@ browser before sealing and again after opening. That is a policy that has moved
 into the browser, like password strength above, and not a permission:
 who may write a record is still the server's decision (AGENTS.md invariant 14).
 
+### Records that are not rows
+
+A notebook entry is sealed records all the way down, but most of them are not
+rows with a `ciphertext` column. Each batch of edits is one (`notebook-update`,
+stored in D1 and also relayed, still sealed, over the realtime stream), each
+writer's caret is one that is only ever relayed (`notebook-awareness`), and
+each version is one stored as an object in the media store
+(`notebook-snapshot`), because a whole document outgrows a row. They are the
+same envelope under the same associated data, each with its own client-chosen
+id; the server checks their size, version and vault exactly as for a row. See
+[notebook.md](notebook.md#encryption-at-rest).
+
 ### Showing them
 
 `sealedReader.read(kind, row, vault)` (`src/lib/sealed-cache.svelte.ts`) is

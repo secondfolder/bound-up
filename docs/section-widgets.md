@@ -27,8 +27,8 @@ Guides, Tasks and Rewards all want, so that list exists once.
 
 | Page            | Cards                                                                                           |
 | --------------- | ----------------------------------------------------------------------------------------------- |
-| `/home`         | Messages (conditional), Guides (conditional), Daydreams (conditional), Tasks, Rewards, Playroom |
-| `/partner/[id]` | Messages, Tasks, Rewards, Kink lists (header only)                                              |
+| `/home`         | Messages (conditional), Guides (conditional), Daydreams (conditional), Tasks, Rewards, Notebook, Playroom |
+| `/partner/[id]` | Messages, Tasks, Rewards, Notebook, Kink lists (header only)                                              |
 
 The Guides card shows **only to an account that holds the `guides` feature**
 (see [features-and-admin.md](features-and-admin.md)). The `/home` load reads
@@ -131,6 +131,7 @@ What counts as "something to say" is per widget:
 | Daydreams          | there is at least one daydream                       |
 | Messages (partner) | there is at least one thread                         |
 | Playroom           | an IQ test result has been saved to the account      |
+| Notebook           | there is at least one entry the viewer may see       |
 
 Two of those are deliberately **not** treated as empty states, because they say
 something an absent body does not:
@@ -193,6 +194,7 @@ only what the preview shows:
 | `DaydreamsWidgetView`       | `getDaydreamsWidget`, only with the daydreams feature | `server/daydreams.ts` |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
 | `IqTestResultView`          | `latestIqTestResult` (one row)                        | `server/iq-test.ts`   |
+| `WidgetItemView[]` (notebook) | `getHomeNotebookWidget`, `getPartnershipNotebookWidget`; hidden entries left out on the server | `server/notebook.ts` |
 
 These deliberately do **not** reuse `getSelfTasksSection`, `getSelfRewardsSection`
 or the `get*Page` loaders. Those also read every completion and every claim ever

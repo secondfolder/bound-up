@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { generateAgeIdentity } from '../crypto/identity';
 import type { DaydreamTurnRole } from '../daydream';
 import type { ThreadIcon } from '../messaging';
+import type { NotebookKind, PartnerAccess } from '../notebook';
 import type { ControlAnswer } from '../partnership';
 import { controlFromAnswer } from '../partnership';
 import { appendTurn, createDaydream } from '../server/daydreams';
@@ -14,6 +15,9 @@ import {
 	messageAttachments,
 	messages,
 	messageThreads,
+	notebookEntries,
+	notebookUpdates,
+	notebookVersions,
 	partnershipRewardClaims,
 	partnershipRewardCredits,
 	partnershipRewards,
@@ -35,6 +39,7 @@ import { grantFeature } from '../server/features';
 import { putUserKeys } from '../server/keys';
 import type { MediaStore } from '../server/media';
 import { type OutgoingAttachment, sendMessage, startThread } from '../server/messaging';
+import { createEntry, resolveScope } from '../server/notebook';
 import { acceptInvite, createInvite } from '../server/partnerships';
 import {
 	claimPartnershipReward,
@@ -816,4 +821,81 @@ export async function readDaydreamTurnRows(db: Db, daydreamId: string) {
 		where: eq(daydreamTurns.daydreamId, daydreamId),
 		orderBy: (turn, { asc }) => [asc(turn.position), asc(turn.id)]
 	});
+}
+
+/**
+ * A notebook entry, created through `createEntry` with stand-in ciphertexts,
+ * in someone's own notebook or a partnership's. The server never opens what
+ * an entry holds, so nothing here needs to.
+ */
+export async function createTestNotebookEntry(
+	db: Db,
+	author: TestUser,
+	options: {
+		partnershipId?: string;
+		kind?: NotebookKind;
+		entryDate?: string | null;
+		partnerAccess?: PartnerAccess;
+		/** Who restricted it, when `partnerAccess` is not `edit`. The author, unless given. */
+		accessSetBy?: TestUser;
+	} = {}
+): Promise<{ id: string; vaultId: string; firstSeq: number }> {
+	const scope = options.partnershipId
+		? ({ kind: 'partnership', partnershipId: options.partnershipId } as const)
+		: ({ kind: 'self' } as const);
+	const vaultId = options.partnershipId
+		? await ensureTestPartnershipVault(db, options.partnershipId)
+		: await ensureTestSelfVault(db, author.id);
+	const resolved = await resolveScope(db, scope, author.id);
+	if (!resolved) {
+		throw new Error('fixture: the author is not in that notebook’s scope');
+	}
+	const id = crypto.randomUUID();
+	const kind = options.kind ?? 'note';
+	const created = await createEntry(db, resolved, author.id, {
+		id,
+		kind,
+		entryDate: kind === 'journal' ? (options.entryDate ?? '2026-10-22') : null,
+		header: { vaultId, ciphertext: fakeSealed('header'), payloadVersion: 1 },
+		firstUpdate: {
+			id: crypto.randomUUID(),
+			vaultId,
+			ciphertext: fakeSealed('update'),
+			payloadVersion: 1
+		}
+	});
+	if (!created.ok) {
+		throw new Error(`fixture could not create a notebook entry: ${created.reason}`);
+	}
+	if (options.partnerAccess && options.partnerAccess !== 'edit') {
+		await db
+			.update(notebookEntries)
+			.set({
+				partnerAccess: options.partnerAccess,
+				accessSetByUserId: (options.accessSetBy ?? author).id
+			})
+			.where(eq(notebookEntries.id, id));
+	}
+	return { id, vaultId, firstSeq: created.seq };
+}
+
+export async function readNotebookEntryRow(db: Db, id: string) {
+	const [row] = await db.select().from(notebookEntries).where(eq(notebookEntries.id, id));
+	return row;
+}
+
+export async function readNotebookUpdateRows(db: Db, entryId: string) {
+	return await db
+		.select()
+		.from(notebookUpdates)
+		.where(eq(notebookUpdates.entryId, entryId))
+		.orderBy(notebookUpdates.seq);
+}
+
+export async function readNotebookVersionRows(db: Db, entryId: string) {
+	return await db
+		.select()
+		.from(notebookVersions)
+		.where(eq(notebookVersions.entryId, entryId))
+		.orderBy(notebookVersions.upToSeq);
 }

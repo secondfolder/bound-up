@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import DaydreamsWidget from '$lib/components/DaydreamsWidget.svelte';
 	import GuidesWidget from '$lib/components/GuidesWidget.svelte';
+	import NotebookWidget from '$lib/components/notebook/NotebookWidget.svelte';
 	import PlayroomWidget from '$lib/components/PlayroomWidget.svelte';
 	import RewardsWidget from '$lib/components/RewardsWidget.svelte';
 	import TasksWidget from '$lib/components/TasksWidget.svelte';
@@ -36,6 +37,7 @@
 		{/if}
 		<TasksWidget tasks={data.tasks} href={resolve('/(auth-required)/(app)/home/tasks')} />
 		<RewardsWidget rewards={data.rewards} href={resolve('/(auth-required)/(app)/home/rewards')} />
+		<NotebookWidget items={data.notebook} href={resolve('/(auth-required)/(app)/home/notebook')} />
 		<PlayroomWidget latestIq={data.latestIq} href={resolve('/(auth-required)/(app)/playroom')} />
 	</div>
 </div>

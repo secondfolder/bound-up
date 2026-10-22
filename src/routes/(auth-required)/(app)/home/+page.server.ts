@@ -4,9 +4,15 @@ import type { Db } from '$lib/server/db';
 import { guides } from '$lib/server/db/schema';
 import { latestIqTestResult } from '$lib/server/iq-test';
 import { listUnreadCounts } from '$lib/server/messaging';
+import { getHomeNotebookWidget } from '$lib/server/notebook';
 import { getHomeRewardsWidget } from '$lib/server/rewards';
 import { getHomeTasksWidget } from '$lib/server/tasks';
-import type { DaydreamsWidgetView, GuidesWidgetView, IqTestResultView } from '$lib/types';
+import type {
+	DaydreamsWidgetView,
+	GuidesWidgetView,
+	IqTestResultView,
+	WidgetItemView
+} from '$lib/types';
 import type { PageServerLoad } from './$types';
 
 /** Rows the guides card previews before it falls back to "and N more". */
@@ -29,7 +35,8 @@ function emptyPage() {
 			claimableCount: 0,
 			activeCount: 0
 		},
-		latestIq: null as IqTestResultView | null
+		latestIq: null as IqTestResultView | null,
+		notebook: [] as WidgetItemView[]
 	};
 }
 
@@ -51,24 +58,29 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 	// task or claiming a reward refreshes the cards here too.
 	depends('tasks:home');
 	depends('rewards:home');
+	// The solo notebook's own key, so an entry written elsewhere refreshes the card.
+	depends('notebook:self');
 
-	const [unread, guidesCard, daydreamsCard, tasks, rewards, latestIq] = await Promise.all([
-		listUnreadCounts(locals.db, locals.user.id, partners),
-		// Only for an account that holds guides: D1 charges for rows read by a
-		// card nobody sees. This decides what is shown, which is all the layout's
-		// `features` may be used for; /home/guides checks for itself.
-		hasFeature(features, 'guides') ? loadGuidesCard(locals.db) : null,
-		// The same for Daydreams; /daydreams checks for itself.
-		hasFeature(features, 'daydreams')
-			? getDaydreamsWidget(locals.db, locals.user.id, DAYDREAMS_PREVIEW_LIMIT)
-			: null,
-		// Both take the layout's partner list: the cards mirror /home/tasks and
-		// /home/rewards, which show your own things AND each partner's.
-		getHomeTasksWidget(locals.db, locals.user.id, partners),
-		getHomeRewardsWidget(locals.db, locals.user.id, partners),
-		// One row, for the Playroom card's "Last IQ test" line.
-		latestIqTestResult(locals.db, locals.user.id)
-	]);
+	const [unread, guidesCard, daydreamsCard, tasks, rewards, latestIq, notebook] = await Promise.all(
+		[
+			listUnreadCounts(locals.db, locals.user.id, partners),
+			// Only for an account that holds guides: D1 charges for rows read by a
+			// card nobody sees. This decides what is shown, which is all the layout's
+			// `features` may be used for; /home/guides checks for itself.
+			hasFeature(features, 'guides') ? loadGuidesCard(locals.db) : null,
+			// The same for Daydreams; /daydreams checks for itself.
+			hasFeature(features, 'daydreams')
+				? getDaydreamsWidget(locals.db, locals.user.id, DAYDREAMS_PREVIEW_LIMIT)
+				: null,
+			// Both take the layout's partner list: the cards mirror /home/tasks and
+			// /home/rewards, which show your own things AND each partner's.
+			getHomeTasksWidget(locals.db, locals.user.id, partners),
+			getHomeRewardsWidget(locals.db, locals.user.id, partners),
+			// One row, for the Playroom card's "Last IQ test" line.
+			latestIqTestResult(locals.db, locals.user.id),
+			getHomeNotebookWidget(locals.db, locals.user.id)
+		]
+	);
 
 	return {
 		unread,
@@ -76,7 +88,8 @@ export const load: PageServerLoad = async ({ locals, parent, depends }) => {
 		daydreams: daydreamsCard,
 		tasks,
 		rewards,
-		latestIq
+		latestIq,
+		notebook
 	};
 };
 

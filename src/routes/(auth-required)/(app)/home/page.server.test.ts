@@ -194,7 +194,8 @@ describe('load', () => {
 				claimableCount: 0,
 				activeCount: 0
 			},
-			latestIq: null
+			latestIq: null,
+			notebook: []
 		});
 	});
 

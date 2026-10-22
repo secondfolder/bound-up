@@ -1,5 +1,7 @@
+import { NOTEBOOK_LIST_TOPIC } from '../../notebook';
 import type { Db } from '../db';
 import { requireMembership } from '../messaging';
+import { getEntryContext } from '../notebook';
 import { type RoomKey, roomScope } from './index';
 import { MESSAGES_TOPIC } from './messaging';
 
@@ -16,6 +18,8 @@ import { MESSAGES_TOPIC } from './messaging';
  * imports it. Only the endpoints do.
  */
 
+const ENTRY_TOPIC = /^notebook-entry:(?<entryId>[0-9a-f-]{36})$/;
+
 /** Whether `userId` may open a stream on `room` at all. */
 async function mayEnterRoom(db: Db, userId: string, room: RoomKey): Promise<boolean> {
 	const { kind, id } = roomScope(room);
@@ -26,11 +30,27 @@ async function mayEnterRoom(db: Db, userId: string, room: RoomKey): Promise<bool
 }
 
 /** Whether `userId`, already allowed in `room`, may hear `topic` there. */
-function mayHear(room: RoomKey, topic: string): boolean {
-	const { kind } = roomScope(room);
+async function mayHear(db: Db, userId: string, room: RoomKey, topic: string): Promise<boolean> {
+	const { kind, id } = roomScope(room);
 	if (topic === MESSAGES_TOPIC) {
 		// Messaging only exists between partners.
 		return kind === 'partnership';
+	}
+	if (topic === NOTEBOOK_LIST_TOPIC) {
+		return true;
+	}
+	const match: RegExpExecArray | null = ENTRY_TOPIC.exec(topic);
+	const entryId = match?.groups?.entryId;
+	if (entryId) {
+		// The entry must be in this room's scope, and readable by this viewer: an
+		// entry hidden from them is refused like one that does not exist.
+		const context = await getEntryContext(
+			db,
+			entryId,
+			userId,
+			kind === 'user' ? { kind: 'self' } : { kind: 'partnership', partnershipId: id }
+		);
+		return context !== null && context.room === room;
 	}
 	return false;
 }
@@ -51,7 +71,7 @@ export async function mayWatch(
 		return false;
 	}
 	for (const topic of topics) {
-		if (!mayHear(room, topic)) {
+		if (!(await mayHear(db, userId, room, topic))) {
 			return false;
 		}
 	}

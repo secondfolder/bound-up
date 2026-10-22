@@ -84,7 +84,8 @@ export function formatTimeInTimeZone(timeZone: string, date: Date = new Date()):
 	return new Intl.DateTimeFormat(undefined, { timeStyle: 'short', timeZone }).format(date);
 }
 
-function calendarDayKey(timeZone: string, date: Date): string {
+/** The calendar day it is at `date` in `timeZone`, as `YYYY-MM-DD`. */
+export function calendarDayKey(timeZone: string, date: Date): string {
 	return new Intl.DateTimeFormat('en-CA', {
 		timeZone,
 		year: 'numeric',

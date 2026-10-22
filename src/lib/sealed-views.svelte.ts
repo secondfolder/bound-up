@@ -32,6 +32,7 @@ import {
 	daydreamSetupKind,
 	daydreamTurnKind
 } from './sealed-kinds/daydreams';
+import { type NotebookEntryHeader, notebookEntryKind } from './sealed-kinds/notebook';
 import { tagKind } from './sealed-kinds/tags';
 import { type RewardContent, rewardKind, type TaskContent, taskKind } from './sealed-kinds/tasks';
 import type {
@@ -126,6 +127,8 @@ export function openedWidgetTitle(item: WidgetItemView): Opened<string> {
 			return openedPart(open(taskKind, item.sealed), (value) => value.title);
 		case 'daydream':
 			return openedPart(open(daydreamSetupKind, item.sealed), daydreamTitle);
+		case 'notebook':
+			return openedPart(open(notebookEntryKind, item.sealed), (value) => value.title || 'Untitled');
 		default:
 			return openedPart(open(rewardKind, item.sealed), (value) => value.title);
 	}
@@ -187,4 +190,13 @@ export function openedPart<T, Part>(opened: Opened<T>, part: (value: T) => Part)
 /** A title in its three states, for a heading. */
 export function shownTitle(opened: Opened<{ title: string }>): string {
 	return shownText(openedPart(opened, (value) => value.title));
+}
+
+/**
+ * A notebook entry's title and excerpt. Null for an entry listed without one
+ * (hidden from the viewer), as for one that will not open here: either way
+ * there is nothing to show.
+ */
+export function openedNotebookHeader(header: SealedRefView | null): Opened<NotebookEntryHeader> {
+	return header ? open(notebookEntryKind, header) : null;
 }

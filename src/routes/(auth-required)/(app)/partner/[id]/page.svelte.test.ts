@@ -55,6 +55,7 @@ function data(timezone: string | null): PageData {
 			claimableCount: 0,
 			activeCount: 0
 		},
+		notebook: [],
 		partner: {
 			id: 'p1',
 			// Plaintext, as a partnership from before sealing: the only names

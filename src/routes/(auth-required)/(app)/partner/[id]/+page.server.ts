@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { getPartnerMessagesWidget } from '$lib/server/messaging';
+import { getPartnershipNotebookWidget } from '$lib/server/notebook';
 import { getPartnershipForUser } from '$lib/server/partnerships';
 import { getPartnershipRewardsWidget } from '$lib/server/rewards';
 import { getPartnershipTasksWidget } from '$lib/server/tasks';
@@ -25,16 +26,18 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 	depends(`messages:board:${params.id}`);
 	depends('tasks:home');
 	depends('rewards:home');
+	depends(`notebook:${params.id}`);
 
 	// Each widget re-checks membership for itself rather than being handed the
 	// partnership above: tasks and rewards each resolve a *different* permission
 	// from it (who completes, who claims), and those checks live with the rules
 	// they enforce. Three single-row reads is the price of not re-deriving
 	// either rule here.
-	const [messages, tasks, rewards] = await Promise.all([
+	const [messages, tasks, rewards, notebook] = await Promise.all([
 		getPartnerMessagesWidget(locals.db, params.id, locals.user.id),
 		getPartnershipTasksWidget(locals.db, params.id, locals.user.id, locals.user.timezone),
-		getPartnershipRewardsWidget(locals.db, params.id, locals.user.id)
+		getPartnershipRewardsWidget(locals.db, params.id, locals.user.id),
+		getPartnershipNotebookWidget(locals.db, params.id, locals.user.id)
 	]);
 
 	// `inviteToken` is deliberately not returned: load data is serialised into
@@ -43,6 +46,7 @@ export const load: PageServerLoad = async ({ locals, params, depends }) => {
 		messages,
 		tasks,
 		rewards,
+		notebook: notebook ?? [],
 		partner: {
 			id: partnership.id,
 			names: partnership.names,

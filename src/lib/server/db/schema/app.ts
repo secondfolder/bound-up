@@ -12,6 +12,7 @@ import type { DaydreamTurnRole } from '../../../daydream';
 import type { AccountRecoveryStatus, KeyWrapParams, KeyWrapType } from '../../../encryption';
 import type { FeatureKey, FeatureSource } from '../../../features';
 import type { MessageBodyFormat, RestoreRequestStatus, ThreadIcon } from '../../../messaging';
+import type { NotebookKind, PartnerAccess } from '../../../notebook';
 import type { PartnershipControl, PartnershipStatus } from '../../../partnership';
 import type { Intensity, Role, Vibe } from '../../../playroom/iq-test/settings';
 import type { ServerSettingKey, ServerSettingSource } from '../../../server-settings';
@@ -1833,6 +1834,158 @@ export const kinkListVersions = sqliteTable(
 );
 
 export type KinkListVersionRow = typeof kinkListVersions.$inferSelect;
+
+/**
+ * A notebook entry: a journal entry (dated) or a note, belonging to one
+ * account (`owner_id`) or one partnership (`partnership_id`), never both.
+ * See docs/notebook.md.
+ *
+ * **Nothing here is content.** The document itself is the entry's edits
+ * (`notebook_updates`) and versions (`notebook_versions`), every one sealed in
+ * the browser. The `ciphertext` on this row is the `notebook-entry` header
+ * (title and list excerpt), a cache a device rewrites as the document changes,
+ * sealed like everything else. Unlike tasks and rewards there is no plaintext
+ * column for content to fall back on and no "plaintext until sealed" path: an
+ * entry is sealed from its first byte. The id comes from the browser, because
+ * the header is sealed to it.
+ *
+ * `partner_access` and `access_set_by_user_id` restrict a partnership entry
+ * for the member who did not set them; the rules are `entryAccessFor` in
+ * `src/lib/notebook.ts`, and the server enforces them on every read and
+ * write. `last_edited_*` are written at most once a minute per entry, because
+ * every batch of typing is a request and D1 bills for rows written.
+ */
+export const notebookEntries = sqliteTable(
+	'notebook_entries',
+	{
+		id: text('id').primaryKey(),
+		ownerId: text('owner_id').references(() => user.id, { onDelete: 'cascade' }),
+		partnershipId: text('partnership_id').references(() => partnerships.id, {
+			onDelete: 'cascade'
+		}),
+		kind: text('kind').$type<NotebookKind>().notNull(),
+		/** `YYYY-MM-DD`, for a journal entry; null for a note. */
+		entryDate: text('entry_date'),
+		createdByUserId: text('created_by_user_id').references(() => user.id, {
+			onDelete: 'set null'
+		}),
+		partnerAccess: text('partner_access').$type<PartnerAccess>().notNull().default('edit'),
+		accessSetByUserId: text('access_set_by_user_id').references(() => user.id, {
+			onDelete: 'set null'
+		}),
+		lastEditedAt: integer('last_edited_at', { mode: 'timestamp_ms' })
+			.notNull()
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`),
+		lastEditedByUserId: text('last_edited_by_user_id').references(() => user.id, {
+			onDelete: 'set null'
+		}),
+		ciphertext: text('ciphertext').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		revision: integer('revision').notNull().default(0),
+		...timestamps
+	},
+	(table) => [
+		check(
+			'notebook_entries_one_scope',
+			sql`(${table.ownerId} IS NOT NULL AND ${table.partnershipId} IS NULL) OR (${table.ownerId} IS NULL AND ${table.partnershipId} IS NOT NULL)`
+		),
+		index('notebook_entries_owner_date_idx').on(table.ownerId, table.kind, table.entryDate),
+		index('notebook_entries_partnership_date_idx').on(
+			table.partnershipId,
+			table.kind,
+			table.entryDate
+		),
+		index('notebook_entries_owner_edited_idx').on(table.ownerId, table.lastEditedAt),
+		index('notebook_entries_partnership_edited_idx').on(table.partnershipId, table.lastEditedAt)
+	]
+);
+
+export type NotebookEntryRow = typeof notebookEntries.$inferSelect;
+export type NewNotebookEntryRow = typeof notebookEntries.$inferInsert;
+
+/**
+ * One batch of edits to an entry, sealed: a Yjs update. Opening an entry is
+ * its latest version plus every update after it.
+ *
+ * `seq` is the order the server stored them in, and the only order it
+ * guarantees. Yjs merges updates in any order, so `seq` is not about
+ * correctness: it is how a device asks for "everything after what I have"
+ * after a reconnect, and how a version says what it covers. The id is the
+ * browser's, because the update is sealed to it, and unique, so a batch
+ * resent after a lost response is stored once.
+ *
+ * Deleted once two versions cover them; see `compactionBound` in
+ * `src/lib/notebook.ts`.
+ */
+export const notebookUpdates = sqliteTable(
+	'notebook_updates',
+	{
+		seq: integer('seq').primaryKey({ autoIncrement: true }),
+		id: text('id').notNull().unique(),
+		entryId: text('entry_id')
+			.notNull()
+			.references(() => notebookEntries.id, { onDelete: 'cascade' }),
+		authorUserId: text('author_user_id').references(() => user.id, { onDelete: 'set null' }),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		ciphertext: text('ciphertext').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.notNull()
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+	},
+	(table) => [index('notebook_updates_entry_seq_idx').on(table.entryId, table.seq)]
+);
+
+export type NotebookUpdateRow = typeof notebookUpdates.$inferSelect;
+
+/**
+ * An automatic version of an entry: the whole document as it stood once a
+ * sitting of edits ended. The snapshot itself is sealed and kept in the media
+ * store (R2, or the media directory), because a long entry outgrows a
+ * comfortable D1 row; this row is what the history lists. Its key is derived
+ * from the entry's scope and the two ids, `notebookSnapshotKey`.
+ *
+ * `up_to_seq` is the last edit the snapshot includes, unique per entry so two
+ * devices cutting the same version store it once. The contributors are
+ * the authors of the edits it covers, which the server knows anyway because
+ * it saw who posted each one.
+ */
+export const notebookVersions = sqliteTable(
+	'notebook_versions',
+	{
+		id: text('id').primaryKey(),
+		entryId: text('entry_id')
+			.notNull()
+			.references(() => notebookEntries.id, { onDelete: 'cascade' }),
+		upToSeq: integer('up_to_seq').notNull(),
+		vaultId: text('vault_id')
+			.notNull()
+			.references(() => vaults.id, { onDelete: 'cascade' }),
+		payloadVersion: integer('payload_version').notNull(),
+		/** Characters of sealed snapshot in the media store, for the cap and for debugging. */
+		size: integer('size').notNull(),
+		contributorUserIds: text('contributor_user_ids', { mode: 'json' }).$type<string[]>().notNull(),
+		/** Set when this version was cut by restoring an earlier one. Not a reference: that one may since be gone. */
+		restoredFromVersionId: text('restored_from_version_id'),
+		createdByUserId: text('created_by_user_id').references(() => user.id, {
+			onDelete: 'set null'
+		}),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.notNull()
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+	},
+	(table) => [
+		uniqueIndex('notebook_versions_entry_seq_idx').on(table.entryId, table.upToSeq),
+		index('notebook_versions_entry_created_idx').on(table.entryId, table.createdAt)
+	]
+);
+
+export type NotebookVersionRow = typeof notebookVersions.$inferSelect;
 
 /**
  * The server's own settings, edited from Admin → Server settings: its secrets,

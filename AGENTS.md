@@ -45,6 +45,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
 | `src/lib/effects/`            | Our VFX-JS effects and `mix()`; library ones come from `@vfx-js/effects`                     |
 | `src/lib/media/`              | Browser-only media transcoding. See [docs/messaging.md](docs/messaging.md#transcoding)       |
+| `src/lib/notebook.ts`, `src/lib/notebook/` | The notebook: access, version and compaction rules (pure, alias-free), and the live session, the Lexical–Yjs binding and the outbox (browser). See [docs/notebook.md](docs/notebook.md) |
 | `src/lib/realtime/`, `src/lib/server/realtime/` | The one realtime room every live feature shares: rooms per scope, topics per stream, the lease. See [docs/realtime.md](docs/realtime.md) |
 | `src/lib/daydream/`           | Daydreams: the story tree, reply format, dice, chips, catalog (its presets a module per theme in `presets/`), ready-made stories and the setup summary (pure, alias-free), and the page's `DaydreamStory` and calls (browser). See [docs/daydreams.md](docs/daydreams.md) |
 | `src/lib/server/daydream/prompt-catalogue/`, `src/lib/prompt-review.ts` | Every daydream prompt enumerated, linted and exported to `prompt-catalogue/`, and the `/debug/prompts` page's browser half. See [docs/prompt-review.md](docs/prompt-review.md) |
@@ -493,8 +494,9 @@ forgotten. Only background work nobody is waiting on may fail silently. See
 [docs/request-failures.md](docs/request-failures.md).
 
 **Never lose something a user typed.** Every message composer keeps an
-encrypted draft on the device until it is sent or emptied, and a new place
-people write needs the same treatment. The commitment, and how it sits beside
+encrypted draft on the device until it is sent or emptied, a notebook entry
+keeps every unconfirmed edit in an encrypted outbox, and a new place people
+write needs the same treatment. The commitment, and how it sits beside
 privacy (drafts are sealed to the writer's own key, never stored in the clear),
 is in [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md).
 
@@ -546,7 +548,8 @@ edited and an inline node in the stored document**;
 the caret behaviour from Lexical rather than by hand. See [docs/rich-text.md](docs/rich-text.md).
 
 **User-authored content is sealed, never stored in plaintext.** Messages,
-tasks, rewards, tag names and partnership names are sealed records in a vault
+tasks, rewards, tag names, partnership names and notebook entries are sealed
+records in a vault
 (`src/lib/sealed.ts`, `src/lib/crypto/sealed.ts`; docs/encryption.md, "Sealed
 records"). A form seals its text in the browser and posts the sealed record in
 its place (`sealed-forms.ts`, `partner-sealing.ts`); the server checks only
@@ -1018,6 +1021,7 @@ Four places, split on scope:
 | [docs/sliders.md](docs/sliders.md)                                                       | The base slider every slider is built on: notches, springing, unset          |
 | [docs/server-settings.md](docs/server-settings.md)                                       | Secrets, email and model providers in the database: generating, the admin page, presets |
 | [docs/prompt-review.md](docs/prompt-review.md)                                           | Every daydream prompt: axes, the committed snapshot, lint, the debug page, Claude review |
+| [docs/notebook.md](docs/notebook.md)                                                     | Journal and notes: live co-editing, encryption at rest, versions, the outbox, access |
 | [docs/realtime.md](docs/realtime.md)                                                     | The shared realtime room: scopes, topics, eviction, leases, cost, the DO export |
 
 **Keeping these current is part of the change, not a follow-up to it.**

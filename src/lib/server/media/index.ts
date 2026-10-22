@@ -100,6 +100,36 @@ export function daydreamPicturesPrefix(daydreamId: string): string {
 }
 
 /**
+ * Where a notebook entry's versions live (docs/notebook.md, "Versions"): the
+ * sealed snapshots, kept for good, so under `permanent/`.
+ *
+ * A partnership entry's sit under the partnership's own permanent prefix,
+ * so disconnecting takes them with everything else `purgePartnershipMedia`
+ * deletes, with no step of its own; `notebook` is never a message id, so it
+ * cannot meet an attachment's key. A solo entry's sit under its owner. Both
+ * are one prefix per entry, so deleting an entry takes its versions without
+ * listing them. Derived from the ids rather than stored.
+ */
+export function notebookSnapshotKey(
+	entry: { id: string; ownerId: string | null; partnershipId: string | null },
+	versionId: string
+): string {
+	return `${notebookEntryPrefix(entry)}${versionId}`;
+}
+
+/** All of one entry's versions, for `deletePrefix`. */
+export function notebookEntryPrefix(entry: {
+	id: string;
+	ownerId: string | null;
+	partnershipId: string | null;
+}): string {
+	if (entry.partnershipId) {
+		return `permanent/${entry.partnershipId}/notebook/${entry.id}/`;
+	}
+	return `permanent/users/${entry.ownerId}/notebook/${entry.id}/`;
+}
+
+/**
  * The shape of a key both implementations will accept.
  *
  * R2 does not care what is in a key, but the local dev store turns separators

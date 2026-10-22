@@ -1,6 +1,7 @@
 import type { DaydreamTurnRole } from './daydream';
 import type { KeyWrapParams, KeyWrapType } from './encryption';
 import type { ThreadIcon } from './messaging';
+import type { EntryAccess, NotebookKind, PartnerAccess } from './notebook';
 import type { PartnerNamesSource } from './partnership';
 import type { Intensity, Role, Vibe } from './playroom/iq-test/settings';
 import type { VaultKind } from './vault';
@@ -525,7 +526,7 @@ export type WidgetItemView = {
 	 */
 	title: string;
 	/** Which kind `sealed` opens as. A guide is never sealed: guides are the app's, not a user's. */
-	kind: 'task' | 'reward' | 'guide' | 'daydream';
+	kind: 'task' | 'reward' | 'guide' | 'daydream' | 'notebook';
 	sealed: SealedRefView | null;
 	/** A credit award, a cost — rendered as a pill, or omitted when null. */
 	note: string | null;
@@ -731,4 +732,32 @@ export type KinkListView = {
 	revision: number;
 	editedAt: Date;
 	sealed: SealedRefView;
+};
+
+/**
+ * A notebook entry in a list or a card. The title and excerpt are sealed in
+ * `header`, opened in the browser (`openedNotebookHeader`); null for an entry
+ * hidden from the viewer that they may now show again, listed so they can.
+ * See docs/notebook.md.
+ */
+export type NotebookEntryView = {
+	id: string;
+	kind: NotebookKind;
+	entryDate: string | null;
+	lastEditedAt: string;
+	lastEditedByUserId: string | null;
+	createdByUserId: string | null;
+	access: EntryAccess;
+	partnerAccess: PartnerAccess;
+	header: SealedRefView | null;
+};
+
+/** One automatic version of a notebook entry, as its history lists it. */
+export type NotebookVersionView = {
+	id: string;
+	upToSeq: number;
+	createdAt: string;
+	contributorUserIds: string[];
+	restoredFromVersionId: string | null;
+	createdByUserId: string | null;
 };
