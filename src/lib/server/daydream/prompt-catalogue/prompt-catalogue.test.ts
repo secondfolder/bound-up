@@ -3,7 +3,6 @@ import { defined } from '$lib/testing/defined';
 import { BUILDERS, baselineCombo, builderById, comboFrom, comboLabel } from './axes';
 import {
 	buildCatalogue,
-	interactionProblems,
 	paragraphContext,
 	paragraphsOf,
 	productOf,
@@ -36,16 +35,10 @@ describe('the axes', () => {
 		expect(comboLabel(reply, baselineCombo(reply))).toBe('baseline');
 	});
 
-	it('only ever swaps descriptive values for lines the baseline sweep shows', {
-		timeout: 60_000
-	}, () => {
-		// Sampled for the replies, whose structural product is 20,000-odd;
-		// every combination for the rest. Empty is what makes the catalogue
-		// complete: see `interactionProblems`.
-		for (const entry of BUILDERS) {
-			expect(interactionProblems(entry, entry.id === 'reply' ? 41 : 1), entry.id).toEqual([]);
-		}
-	});
+	// Whether the descriptive values only ever swap lines the baseline sweep
+	// shows — what makes the catalogue complete — is checked by
+	// `npm run prompts:export` (`catalogueGaps`), not here: about ten seconds
+	// that every CI run paid for a catalogue only a checkout reads.
 });
 
 describe('the catalogue', () => {

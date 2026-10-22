@@ -6,6 +6,7 @@ import {
 	type Locator,
 	type Page
 } from '@playwright/test';
+import { createAccount } from './accounts';
 import { sql } from './db';
 import { linkIn, waitForMailTo } from './mail';
 
@@ -206,6 +207,27 @@ export async function signUp(page: Page, who: Account, from = '/signup') {
 	await fillPassword(page, 'passwordConfirm', who.password);
 	await submitEnhancedForm(page, 'Sign up');
 	await finishSignUp(page, who);
+}
+
+/**
+ * A new person, signed in on `page`: the account made directly
+ * (`createAccount` in `e2e/accounts.ts`), then signed in through the real
+ * login form, which is what caches the key on this device. For every spec that
+ * needs someone signed in rather than a sign-up; a spec about signing up uses
+ * `signUp`, which goes through the form and the emailed link.
+ *
+ * The account's timezone is the browser's, as the form would have posted it,
+ * so no spec meets a timezone mismatch it did not ask for.
+ */
+export async function newAccount(page: Page, who: Account) {
+	const timezone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+	await createAccount(who, timezone);
+	await logIn(page, who);
+}
+
+/** `newAccount` for each side, at the same time. */
+export async function newAccounts(...sides: Side[]) {
+	await Promise.all(sides.map((side) => newAccount(side.page, side.who)));
 }
 
 /**

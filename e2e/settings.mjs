@@ -16,7 +16,7 @@
 export const E2E_RESEND_KEY = 'e2e-resend-key';
 
 /**
- * @param {{ target: 'vite' | 'image' | 'worker', outboxDir: string }} options
+ * @param {{ target: 'node' | 'vite' | 'image' | 'worker', outboxDir: string }} options
  * @returns {Record<string, string>}
  */
 export function e2eSettings({ target, outboxDir }) {

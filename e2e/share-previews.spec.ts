@@ -1,6 +1,6 @@
 import { type Browser, expect, type Page } from '@playwright/test';
 import { test } from './fixtures';
-import { createInvite, newSide, signUp } from './helpers';
+import { createInvite, newAccount, newSide } from './helpers';
 
 /**
  * Link previews: the Open Graph tags a chat app builds its card from when a
@@ -45,7 +45,7 @@ test.describe('link previews', () => {
 		const previewer = await asPreviewer(browser);
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',

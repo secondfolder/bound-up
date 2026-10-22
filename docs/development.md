@@ -244,10 +244,27 @@ page. On a fresh deployment, sign up straight after the first deploy. See
 npx playwright install chromium   # once — both suites use it
 npm test                          # everything: vitest, then the Playwright suite
 npm run test:unit                 # vitest alone, in watch mode
-npm run test:e2e                  # the Playwright suite alone
+npm run test:e2e                  # the Playwright suite alone, against the built Node server
+npm run test:e2e:dev              # the Playwright suite against `vite dev`
 npm run test:e2e:image            # the Playwright suite against a fresh Docker build
 npm run test:e2e:worker           # the Playwright suite against the built worker
 ```
+
+**While working on something, run the specs for what you touched, not the
+whole suite.** The full Playwright suite is minutes of every core the machine
+has; the spec for one feature is seconds:
+
+```sh
+npx playwright test e2e/notebook.spec.ts         # one feature's spec
+npx playwright test e2e/messaging.spec.ts -g draft   # the tests in it whose title matches
+npx playwright test --only-changed=main          # specs and helpers you changed since main
+```
+
+`--only-changed` follows imports from the spec files, and the specs drive the
+app over HTTP rather than importing it, so it sees a changed spec or helper but
+not a change to the app itself. Name the specs for the feature as well. Run
+the whole suite once before calling the work done, as
+[AGENTS.md](../AGENTS.md) asks; CI runs it on every pull request in any case.
 
 The landing page's feature screenshots in `static/landing/` are real screens,
 staged through the UI by `e2e/landing-screenshots.capture.ts`. Retake them with
@@ -257,13 +274,23 @@ against the same throwaway server as the Playwright suite, which never picks up
 
 The server tests build a SQLite database in memory from the committed
 migrations. The component tests run in headless Chromium (Vitest's browser
-mode), sealed off from the network. The Playwright suite starts its own
-`vite dev` against a throwaway database under the OS temp directory, on a port
-derived from the checkout's path, so it never touches your `local.db` or
-`npm run dev`, and two worktrees can run it at once. A second run in the same
-checkout is refused until the first finishes. The app fetches its icons from
-Font Awesome's CDN, so the Playwright suite expects a network connection.
+mode), sealed off from the network. The Playwright suite builds the
+self-hosted Node server (`npm run build:node`) and runs it against a throwaway
+database under the OS temp directory, on a port derived from the checkout's
+path, so it never touches your `local.db` or `npm run dev`, and two worktrees
+can run it at once. A second run in the same checkout is refused until the
+first finishes. The app fetches its icons from Font Awesome's CDN, so the
+Playwright suite expects a network connection.
 [AGENTS.md](../AGENTS.md) has the details of how each level is meant to be used.
+
+The built server is the default because `vite dev` was the suite's bottleneck:
+it compiles and server-renders every route on demand in one process, so more
+workers did not make a run faster, and it reloaded every open test page
+whenever a file changed under it. The build adds under a minute to the start
+of a run. `npm run test:e2e:dev` still runs the suite against `vite dev`, which
+starts at once and runs the development builds of Svelte and Lit: their
+warnings fail a test (see the fixture in `e2e/fixtures.ts`), and a production
+build never prints them, so run it when you change a component.
 
 ### The Workers target
 
@@ -313,7 +340,8 @@ other is half a script, is in
 | `preview`                                                     | Build, migrate the emulated D1, then run the real worker      |
 | `deploy`                                                      | Build and deploy to Cloudflare                                |
 | `check` / `lint` / `format` / `test`                          | svelte-check / Biome check / Biome write / all tests          |
-| `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against `vite dev`          |
+| `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against the built Node server |
+| `test:e2e:dev`                                                | Playwright against `vite dev`                                 |
 | `test:e2e:image`                                              | Build the Docker image, then Playwright against it            |
 | `test:e2e:worker`                                             | Build the worker, then Playwright against it on `wrangler dev` |
 | `screenshots:landing`                                         | Retake the landing page's feature screenshots (`static/landing/`) |

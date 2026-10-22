@@ -10,9 +10,10 @@ import {
 	fillPassword,
 	linkAccounts,
 	logOut,
+	newAccount,
+	newAccounts,
 	newSide,
 	openBoard,
-	signUp,
 	waitForHydration,
 	waitForKeyring,
 	writeThread
@@ -142,7 +143,7 @@ test.describe('adding a passkey', () => {
 		const who = account('Ines');
 		const authenticator = await useAuthenticator(page, { prf: true });
 		try {
-			await signUp(page, who);
+			await newAccount(page, who);
 			await addPasskey(page, who.password);
 			await expect(page.getByText('You can sign in with this passkey now.')).toBeVisible();
 			await finishNaming(page);
@@ -162,7 +163,7 @@ test.describe('adding a passkey', () => {
 		const who = account('Jem');
 		const authenticator = await useAuthenticator(page, { prf: false });
 		try {
-			await signUp(page, who);
+			await newAccount(page, who);
 			await addPasskey(page, who.password);
 			await finishNaming(page);
 
@@ -176,7 +177,7 @@ test.describe('adding a passkey', () => {
 		const who = account('Kai');
 		const authenticator = await useAuthenticator(page, { prf: true });
 		try {
-			await signUp(page, who);
+			await newAccount(page, who);
 			await page.goto('/settings/security');
 			await clickWaButton(page, 'Add a passkey');
 			await fillPassword(page, 'addPasskeyPassword', 'not-the-password');
@@ -194,7 +195,7 @@ test.describe('adding a passkey', () => {
 		const who = account('Lux');
 		const authenticator = await useAuthenticator(page, { prf: true });
 		try {
-			await signUp(page, who);
+			await newAccount(page, who);
 			await addPasskey(page, who.password);
 			await page.locator('wa-input[data-field="passkeyName"] input').fill('Work laptop');
 			await finishNaming(page);
@@ -211,7 +212,7 @@ test.describe('adding a passkey', () => {
 		const who = account('Mo');
 		const authenticator = await useAuthenticator(page, { prf: true });
 		try {
-			await signUp(page, who);
+			await newAccount(page, who);
 			await addPasskey(page, who.password);
 			await finishNaming(page);
 			expect(await wrapTypes(page)).toEqual(['passkey-prf', 'password']);
@@ -233,7 +234,7 @@ test.describe('signing in with a passkey', () => {
 			const who = account(prf ? 'Nell' : 'Otto');
 			const authenticator = await useAuthenticator(page, { prf });
 			try {
-				await signUp(page, who);
+				await newAccount(page, who);
 				await addPasskey(page, who.password);
 				await finishNaming(page);
 				await logOut(page);
@@ -258,7 +259,7 @@ test.describe('signing in with a passkey', () => {
 		const authenticator = await useAuthenticator(page, { prf: true });
 		const bodies = recordCeremonyBodies(page);
 		try {
-			await signUp(page, who);
+			await newAccount(page, who);
 			await addPasskey(page, who.password);
 			await finishNaming(page);
 			await logOut(page);
@@ -284,7 +285,7 @@ test.describe('signing in with a passkey', () => {
 		const who = account('Quil');
 		const authenticator = await useAuthenticator(page, { prf: false });
 		try {
-			await signUp(page, who);
+			await newAccount(page, who);
 			await addPasskey(page, who.password);
 			await finishNaming(page);
 
@@ -307,8 +308,7 @@ test.describe('signing in with a passkey', () => {
 		const authenticator = await useAuthenticator(ada.page, { prf: true });
 		const secret = 'written before the passkey sign-in';
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await jun.page.goto('/home');
@@ -343,8 +343,7 @@ test.describe('the messages screens without a key', () => {
 		const jun = await newSide(browser, 'Jun');
 		const secret = 'the thing that must not be rendered as an ellipsis';
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');

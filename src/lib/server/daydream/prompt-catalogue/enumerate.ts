@@ -273,8 +273,8 @@ function lineDelta(before: string, after: string): string {
  * complete. A change that does nothing in a combination — a character's
  * dials with no characters — is fine: there is nothing unseen.
  *
- * `every` samples the structural combinations, for a test that has to be
- * quick; the export checks them all.
+ * `every` samples the structural combinations: every one of the replies'
+ * 20,000-odd would take minutes. `catalogueGaps` in export.ts is what runs it.
  */
 export function interactionProblems(builder: Builder, every = 1): string[] {
 	const problems: string[] = [];

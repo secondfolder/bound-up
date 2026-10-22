@@ -9,7 +9,7 @@ import {
 	fillPassword,
 	fillWaInput,
 	logInHere,
-	signUp,
+	newAccount,
 	uniqueEmail,
 	waitForEnhancedForm
 } from './helpers';
@@ -21,7 +21,7 @@ test.describe('settings information architecture', () => {
 	 */
 	test('lists account, security and partners, and nothing about encryption', async ({ page }) => {
 		const ada = account('Ada');
-		await signUp(page, ada);
+		await newAccount(page, ada);
 
 		await page.goto('/settings');
 		await expect(page.getByRole('link', { name: 'Account' })).toBeVisible();
@@ -35,7 +35,7 @@ test.describe('settings information architecture', () => {
 	// the image's APP_VERSION against Docker — either way a real version, not
 	// package.json's placeholder.
 	test('shows the version the app is running', async ({ page }) => {
-		await signUp(page, account('Vic'));
+		await newAccount(page, account('Vic'));
 
 		await page.goto('/settings');
 		await expect(page.getByText(/^Version \d+\.\d+\.\d+/)).toBeVisible();
@@ -44,7 +44,7 @@ test.describe('settings information architecture', () => {
 
 	test('uses nested sub-pages for account and security', async ({ page }) => {
 		const who = account('Nia');
-		await signUp(page, who);
+		await newAccount(page, who);
 
 		await page.goto('/settings/account');
 		await expect(page.getByRole('link', { name: 'Back to settings' })).toBeVisible();
@@ -64,7 +64,7 @@ test.describe('settings information architecture', () => {
 
 	test('renames passkeys settings to security and redirects old deep links', async ({ page }) => {
 		const who = account('Oren');
-		await signUp(page, who);
+		await newAccount(page, who);
 
 		await page.goto('/settings/passkeys');
 		await page.waitForURL('/settings/security');
@@ -78,7 +78,7 @@ test.describe('settings information architecture', () => {
 test.describe('settings actions', () => {
 	test('updates the account name from the account page', async ({ page }) => {
 		const who = account('Pia');
-		await signUp(page, who);
+		await newAccount(page, who);
 
 		await page.goto('/settings/account');
 		await waitForEnhancedForm(page);
@@ -105,7 +105,7 @@ test.describe('settings actions', () => {
 		const who = account('Quinn');
 		const newPassword = 'vocalist-hazy-radar-plunge';
 
-		await signUp(page, who);
+		await newAccount(page, who);
 		await page.goto('/settings/security');
 		await waitForEnhancedForm(page);
 		await fillPassword(page, 'oldPassword', who.password);
@@ -125,7 +125,7 @@ test.describe('settings actions', () => {
 
 	test('shows the read-only email explanation on the account page', async ({ page }) => {
 		const who = { name: 'Rhea', email: uniqueEmail('rhea'), password: 'correct-horse-battery' };
-		await signUp(page, who);
+		await newAccount(page, who);
 
 		await page.goto('/settings/account');
 		await expect(page.getByText(who.email)).toBeVisible();
@@ -134,7 +134,7 @@ test.describe('settings actions', () => {
 
 	test('signs out from the end of settings', async ({ page }) => {
 		const who = account('Seth');
-		await signUp(page, who);
+		await newAccount(page, who);
 
 		await page.goto('/settings');
 		await expect(page.locator('.sign-out').getByRole('button', { name: 'Log out' })).toBeVisible();

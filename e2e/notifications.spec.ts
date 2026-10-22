@@ -7,10 +7,11 @@ import {
 	clickWaButton,
 	linkAccounts,
 	logOut,
+	newAccount,
+	newAccounts,
 	newSide,
 	openBoard,
 	reply,
-	signUp,
 	waitForHydration,
 	writeThread
 } from './helpers';
@@ -105,7 +106,7 @@ test.describe('push notification settings', () => {
 		const who = account('Noor');
 		try {
 			const { page } = device;
-			await signUp(page, who);
+			await newAccount(page, who);
 			await openNotificationSettings(page);
 
 			await clickWaButton(page, 'Turn on notifications');
@@ -137,7 +138,7 @@ test.describe('push notification settings', () => {
 		const who = account('Omar');
 		try {
 			const { page } = device;
-			await signUp(page, who);
+			await newAccount(page, who);
 			await openNotificationSettings(page);
 			await clickWaButton(page, 'Turn on notifications');
 			await expect.poll(() => deviceRows(who.email)).toHaveLength(1);
@@ -163,14 +164,14 @@ test.describe('push notification settings', () => {
 		const second = account('Rui');
 		try {
 			const { page } = device;
-			await signUp(page, first);
+			await newAccount(page, first);
 			await openNotificationSettings(page);
 			await clickWaButton(page, 'Turn on notifications');
 			await expect.poll(() => deviceRows(first.email)).toHaveLength(1);
 
 			// The session goes with nothing of ours running: no `disablePush`.
 			await page.context().clearCookies();
-			await signUp(page, second);
+			await newAccount(page, second);
 
 			// Released by the app shell on its first load, and given to nobody.
 			await expect.poll(() => deviceRows(first.email)).toHaveLength(0);
@@ -191,7 +192,7 @@ test.describe('push notification settings', () => {
 		});
 		try {
 			const { page } = device;
-			await signUp(page, account('Pia'));
+			await newAccount(page, account('Pia'));
 			await openNotificationSettings(page);
 			await expect(page.getByTestId('push-needs-install')).toBeVisible();
 			await expect(page.getByRole('button', { name: 'Turn on notifications' })).toHaveCount(0);
@@ -214,8 +215,7 @@ test.describe('tapping a message notification', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -269,8 +269,7 @@ test.describe('in-app notices while watching', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
@@ -294,8 +293,7 @@ test.describe('in-app notices while watching', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');

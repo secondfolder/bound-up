@@ -5,9 +5,10 @@ import { test } from './fixtures';
 import {
 	clickWaButton,
 	linkAccounts,
+	newAccount,
+	newAccounts,
 	newSide,
 	type Side,
-	signUp,
 	typeRichText,
 	waitForHydration
 } from './helpers';
@@ -49,8 +50,7 @@ async function sharedNotebook(
 ): Promise<{ ada: Side; bo: Side; notebookUrl: string }> {
 	const ada = await newSide(browser, 'Ada');
 	const bo = await newSide(browser, 'Bo');
-	await signUp(ada.page, ada.who);
-	await signUp(bo.page, bo.who);
+	await newAccounts(ada, bo);
 	await linkAccounts(ada, bo, control);
 	// The invitee lands on the partner page; its notebook is one link away.
 	await bo.page.getByRole('link', { name: 'Notebook' }).click();
@@ -62,7 +62,7 @@ test.describe('the solo journal', () => {
 	test('keeps an entry, sealed, across a reload', async ({ browser }) => {
 		const side = await newSide(browser, 'Ada');
 		try {
-			await signUp(side.page, side.who);
+			await newAccount(side.page, side.who);
 			await side.page.goto('/home/notebook');
 			const url = await startEntry(side.page, 'journal');
 
@@ -105,7 +105,7 @@ test.describe('the writing surface', () => {
 	test('takes a click anywhere below the text', async ({ browser }) => {
 		const side = await newSide(browser, 'Ada');
 		try {
-			await signUp(side.page, side.who);
+			await newAccount(side.page, side.who);
 			await side.page.goto('/home/notebook');
 			await startEntry(side.page, 'note');
 			await typeRichText(side.page, 'One line.');
@@ -234,7 +234,7 @@ test.describe('version history', () => {
 					JSON.stringify({ idleMs: 500, checkMs: 300 })
 				);
 			});
-			await signUp(side.page, side.who);
+			await newAccount(side.page, side.who);
 			await side.page.goto('/home/notebook');
 			await startEntry(side.page, 'note');
 
@@ -271,7 +271,7 @@ test.describe('offline', () => {
 	test('keeps what was typed on the device and sends it once back online', async ({ browser }) => {
 		const side = await newSide(browser, 'Ada');
 		try {
-			await signUp(side.page, side.who);
+			await newAccount(side.page, side.who);
 			await side.page.goto('/home/notebook');
 			const url = await startEntry(side.page, 'note');
 

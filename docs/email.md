@@ -177,7 +177,9 @@ the admin page says so.
 `./.mail-outbox` (gitignored): open the newest file to find a sign-up link.
 The Playwright suite points it at its run directory (`e2e/global-setup.ts`
 writes the setting) and reads the links back with `e2e/mail.ts`, so `signUp`
-in `e2e/helpers.ts` follows the real link before signing in.
+in `e2e/helpers.ts` follows the real link before signing in. Specs that only
+need someone signed in use `newAccount` instead, which makes the account
+already confirmed and sends no email.
 
 **`RESEND_BASE_URL`** replaces Resend's API root (`https://api.resend.com`),
 from the worker's vars or the environment. Only the Playwright suite's Workers

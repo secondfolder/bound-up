@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, clickWaButton, reply, signUp, waitForHydration } from './helpers';
+import { account, clickWaButton, newAccount, reply, waitForHydration } from './helpers';
 
 /**
  * How sexual and how kinky a daydream is: an idea's heat, from a starting
@@ -15,7 +15,7 @@ const dialog = (page: Page) => page.locator('wa-dialog');
 
 async function dreamer(page: Page) {
 	const who = account('Dreamer');
-	await signUp(page, who);
+	await newAccount(page, who);
 	await sql(
 		`insert into user_features (id, user_id, feature, source)
 		 select ?, id, 'daydreams', 'grant' from user where email = ?`,

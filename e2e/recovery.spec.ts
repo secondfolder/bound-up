@@ -6,9 +6,9 @@ import {
 	deviceHoldsKey,
 	fillPassword,
 	linkAccounts,
+	newAccounts,
 	newSide,
 	openBoard,
-	signUp,
 	waitForHydration,
 	waitForKeyring,
 	writeThread
@@ -36,8 +36,7 @@ test.describe('partner-assisted sign-in', () => {
 		const secret = 'written before Ada lost everything';
 		const newPassword = 'vocalist-hazy-radar-plunge';
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			// Ada's device holds her own vault in escrow with Jun once it sees the
@@ -159,8 +158,7 @@ test.describe('partner-assisted sign-in', () => {
 		const jun = await newSide(browser, 'Jun');
 		const fresh = await browser.newContext();
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			const requester = await fresh.newPage();
@@ -217,8 +215,7 @@ test.describe('partner-assisted sign-in', () => {
 		const jun = await newSide(browser, 'Jun');
 		const fresh = await browser.newContext();
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			const mailsBefore = (await mailsTo(ada.who.email)).length;
 

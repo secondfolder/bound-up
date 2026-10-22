@@ -5,8 +5,8 @@ import {
 	clickWaButton,
 	createInvite,
 	fillRichText,
+	newAccount,
 	newSide,
-	signUp,
 	typeRichText,
 	waitForHydration
 } from './helpers';
@@ -26,7 +26,7 @@ test.describe('rewards', () => {
 	 * navigation, which mounts instead, and never showed it.
 	 */
 	test('keeps a title typed before the description, adding and editing', async ({ page }) => {
-		await signUp(page, account('Ada'));
+		await newAccount(page, account('Ada'));
 
 		await page.goto('/home/rewards/add');
 		const title = page.locator('.add-form wa-input[name="title"] input');
@@ -62,7 +62,7 @@ test.describe('rewards', () => {
 		const ada = await newSide(browser, 'Ada');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			await ada.page.getByRole('link', { name: 'Rewards' }).click();
 			await ada.page.waitForURL(/\/home\/rewards$/);
@@ -109,7 +109,7 @@ test.describe('rewards', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			await ada.page.getByRole('link', { name: 'Rewards' }).click();
 			await ada.page.waitForURL(/\/home\/rewards$/);
@@ -119,7 +119,7 @@ test.describe('rewards', () => {
 				control: 'them'
 			});
 
-			await signUp(jun.page, jun.who);
+			await newAccount(jun.page, jun.who);
 			await jun.page.waitForURL('**/home');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');

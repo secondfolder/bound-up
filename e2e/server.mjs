@@ -1,5 +1,20 @@
 // Playwright's `webServer` command: holds this checkout's e2e lock, rebuilds the
-// run's database from the committed migrations, then runs `vite dev`.
+// run's database from the committed migrations, then builds the self-hosted
+// Node server (`npm run build:node`) and runs it on the host, through the same
+// entrypoint the Docker image uses.
+//
+// The built server rather than `vite dev`, because `vite dev` was the run's
+// bottleneck: one process compiling and server-rendering every route on
+// demand, so eight workers finished no sooner than four, and failed more. It
+// also reloaded every open page when a file changed under it mid-run — an
+// edit, a `svelte-kit sync`, a dependency re-optimization — which surfaced as
+// flaky failures in whichever flow it landed on. A built server has no
+// watcher to do that.
+//
+// With `E2E_DEV` set (`npm run test:e2e:dev`) it runs `vite dev` instead: no
+// build to wait for, and the development builds of Svelte and Lit, whose
+// warnings the fixture fails a test on and which a production build never
+// prints.
 //
 // With `E2E_IMAGE` set (`npm run test:e2e:image`, and CI) it runs that Docker
 // image instead, on two fresh named volumes laid out exactly as a
@@ -27,7 +42,7 @@
 // file, and a stale one is told apart from a live one by trying to connect to
 // it — nothing is listening on a stale one.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import { join } from 'node:path';
 import { createClient } from '@libsql/client';
@@ -40,7 +55,8 @@ const {
 	E2E_MEDIA_DIR,
 	E2E_LOCK_PATH,
 	E2E_IMAGE,
-	E2E_WORKER
+	E2E_WORKER,
+	E2E_DEV
 } = process.env;
 if (!(E2E_PORT && E2E_MODEL_PORT && E2E_RUN_DIR && E2E_MEDIA_DIR && E2E_LOCK_PATH)) {
 	console.error('e2e/server.mjs is started by playwright.config.ts, which sets its environment.');
@@ -117,23 +133,63 @@ if (E2E_IMAGE) {
 	await serveImage(E2E_IMAGE);
 } else if (E2E_WORKER) {
 	await serveWorker();
+} else if (E2E_DEV) {
+	await serveVite();
 } else {
-	await run('npx', ['drizzle-kit', 'migrate']);
-	// The prompt review page reads the generated catalogue, which is not
-	// committed (docs/prompt-review.md). Written once if this checkout has
-	// none, before Vite starts so its glob finds it; an image has none, and
-	// its specs skip there.
-	if (!existsSync('prompt-catalogue/reply/catalogue.json')) {
-		await run('npm', ['run', 'prompts:export']);
-	}
+	await serveNode();
+}
 
-	const vite = spawn('npx', ['vite', 'dev', '--port', E2E_PORT, '--strictPort'], {
-		stdio: 'inherit'
-	});
+/** Stops `child` with this process, and this process with `child`. */
+function forward(child) {
 	for (const signal of ['SIGINT', 'SIGTERM']) {
-		process.on(signal, () => vite.kill(signal));
+		process.on(signal, () => child.kill(signal));
 	}
-	vite.once('exit', (code) => process.exit(code ?? 1));
+	child.once('exit', (code) => process.exit(code ?? 1));
+}
+
+async function serveVite() {
+	await run('npx', ['drizzle-kit', 'migrate']);
+	forward(
+		spawn('npx', ['vite', 'dev', '--port', E2E_PORT, '--strictPort'], {
+			stdio: 'inherit'
+		})
+	);
+}
+
+/**
+ * Builds the self-hosted server and runs it the way the image does, by its
+ * entrypoint, which applies the migrations and then starts `build/`. The
+ * database, media and outbox are files in the run directory, as under
+ * `vite dev`, so specs reach them from the host.
+ *
+ * Built on every run: a stale `build/` would test code that is not in the
+ * checkout, and the build costs less than the route compiles `vite dev`
+ * spread over the run.
+ */
+async function serveNode() {
+	await run('npm', ['run', 'build:node']);
+	forward(
+		spawn('node', ['scripts/docker-entrypoint.mjs'], {
+			stdio: 'inherit',
+			env: {
+				...process.env,
+				NODE_ENV: 'production',
+				PORT: E2E_PORT,
+				// Not adapter-node's default of every interface: a server with the
+				// sign-in limit off has no business on the LAN. `localhost` rather
+				// than 127.0.0.1 because it is what the specs ask for, and on macOS
+				// that resolves to ::1 first — `vite dev` binds the same way.
+				HOST: 'localhost',
+				ORIGIN: `http://localhost:${E2E_PORT}`,
+				// The image's value, which the attachment specs need; see the
+				// Dockerfile.
+				BODY_SIZE_LIMIT: '32M',
+				// As for the image: every test signs up from one address, many times
+				// a minute, which the sign-in limit would refuse.
+				AUTH_RATE_LIMIT: 'off'
+			}
+		})
+	);
 }
 
 /**

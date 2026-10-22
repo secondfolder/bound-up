@@ -240,16 +240,32 @@ directory, to be inspected.
 
 1. **verify** — commitlint over a PR's commits, then `lint`, `check` and
    `vitest run` (node and browser projects).
-2. **image** — build the amd64 image, the smoke test, then the Playwright
-   suite against it. Traces are uploaded when it fails.
-3. **release** — on `main` only, and only if both passed. semantic-release
-   (`release.config.mjs`) reads the conventional commits since the last `v*`
-   tag and decides the version. Its `prepare` step runs
-   `scripts/publish-image.sh`, which builds amd64 and arm64 (QEMU, reusing the
-   image job's layer cache) and pushes `ghcr.io/secondfolder/bound-up` as
-   `:<x.y.z>`, `:<x.y>` and `:latest`. Only then is the tag pushed and the
-   GitHub Release written. A push that fails therefore leaves no tag behind,
-   and a rerun starts clean.
+2. **image** — at the same time as verify: build the amd64 image and run the
+   smoke test, then hand the image to the next job as an artifact. Only a
+   push to `main` writes the layer cache; pull requests read it.
+3. **e2e** — the Playwright suite against that image, split four ways with
+   `--shard`, one runner each. A shard's traces are uploaded when it fails.
+4. **release** — on `main` only, and only if verify and every shard passed.
+   semantic-release (`release.config.mjs`) reads the conventional commits
+   since the last `v*` tag and decides the version. Its `prepare` step runs
+   `scripts/publish-image.sh`, which builds amd64 and arm64 and pushes
+   `ghcr.io/secondfolder/bound-up` as `:<x.y.z>`, `:<x.y>` and `:latest`.
+   Only then is the tag pushed and the GitHub Release written. A push that
+   fails therefore leaves no tag behind, and a rerun starts clean.
+5. **deploy** — migrates production's D1 and runs `wrangler deploy`.
+
+Both architectures are built without emulation. Every Dockerfile stage that
+runs a command is pinned to the build platform (`--platform=$BUILDPLATFORM`):
+`build/` is plain JavaScript, so it is built once and shared, and the
+production dependencies are installed for the target with npm's `--os`,
+`--cpu` and `--libc`, which choose which prebuilt native binaries (libsql's)
+it downloads. The target-platform stage only copies files in. Building arm64
+under QEMU took ten to fifteen minutes of every release; it now reuses the
+image job's cache for everything except arm64's `node_modules`.
+
+The `deps` stage installs from `package.json` with its `scripts` and tool
+config stripped (the `manifest` stage), so editing an npm script does not
+reinstall every dependency.
 
 The preset behind the notes generator is pinned on purpose.
 `conventional-changelog-conventionalcommits` is a direct devDependency because

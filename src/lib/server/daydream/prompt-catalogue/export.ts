@@ -1,7 +1,14 @@
 import { createPatch } from 'diff';
 import { type Catalogue, type Combo, LINT_RULE_LABELS } from '$lib/prompt-review';
 import { BUILDERS, type Builder } from './axes';
-import { buildCatalogue, paragraphContext, renderAll, reviewSelection, sweeps } from './enumerate';
+import {
+	buildCatalogue,
+	interactionProblems,
+	paragraphContext,
+	renderAll,
+	reviewSelection,
+	sweeps
+} from './enumerate';
 import { promptText, renderPrompt } from './render';
 
 /**
@@ -152,6 +159,25 @@ export function exportFiles(): { files: Map<string, string>; catalogues: Catalog
 	});
 	files.set('lint.md', lintFile(catalogues));
 	return { files, catalogues };
+}
+
+/**
+ * Where the catalogue would miss a prompt the builders can send: every
+ * builder's `interactionProblems`, named by builder. Empty is what makes the
+ * catalogue complete.
+ *
+ * Checked by the scripts that write and read the catalogue rather than by a
+ * test, because the catalogue is only ever used from a checkout — the debug
+ * page and `prompts:review` — and the check costs about ten seconds, which
+ * every CI run paid for a file CI never reads. Sampled for the replies, whose
+ * structural product is 20,000-odd; every combination for the rest.
+ */
+export function catalogueGaps(): string[] {
+	return BUILDERS.flatMap((builder) =>
+		interactionProblems(builder, builder.id === 'reply' ? 41 : 1).map(
+			(problem) => `${builder.id}: ${problem}`
+		)
+	);
 }
 
 /** Each builder's distinct prompts, one JSON line each, for grepping: too big to commit. */

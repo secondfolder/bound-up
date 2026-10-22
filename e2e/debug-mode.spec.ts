@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, grantFeature, signUp, waitForHydration } from './helpers';
+import { account, grantFeature, newAccount, waitForHydration } from './helpers';
 
 /**
  * Debug mode (docs/debug-mode.md): granted per account, switched on per
@@ -20,7 +20,7 @@ test('the corner toggle switches debug mode on and off, and only for an account 
 	page
 }) => {
 	const who = account('Debugger');
-	await signUp(page, who);
+	await newAccount(page, who);
 	await page.goto('/settings');
 	await waitForHydration(page);
 	await expect(toggle(page)).toHaveCount(0);
@@ -55,7 +55,7 @@ test('the corner toggle switches debug mode on and off, and only for an account 
 
 test('a revoked grant turns debug mode off, whatever the device says', async ({ page }) => {
 	const who = account('Debugger');
-	await signUp(page, who);
+	await newAccount(page, who);
 	await grantFeature(who.email, 'debugMode');
 	await page.goto('/settings');
 	await waitForHydration(page);

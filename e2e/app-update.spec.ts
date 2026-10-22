@@ -1,17 +1,21 @@
 import { expect } from '@playwright/test';
 import { test } from './fixtures';
-import { account, signUp } from './helpers';
+import { account, newAccount } from './helpers';
+import { e2eTarget } from './run-paths';
 
 test.describe('a new version being deployed', () => {
 	// SvelteKit never checks for a new version under `vite dev` — `updated.check()`
-	// answers false without asking — so only a production build can show this.
-	// `npm run test:e2e:image` and CI run it; UpdateAvailableNotice.svelte.test.ts
-	// covers the component everywhere.
+	// answers false without asking — so only a production build can show this:
+	// `npm run test:e2e`, `npm run test:e2e:image` and CI run it.
+	// UpdateAvailableNotice.svelte.test.ts covers the component everywhere.
 	// biome-ignore lint/suspicious/noSkippedTests: conditional on the server under test, not a test left switched off; it runs in CI.
-	test.skip(!process.env.E2E_IMAGE, 'needs a production build: run npm run test:e2e:image');
+	test.skip(
+		e2eTarget() !== 'node' && e2eTarget() !== 'image',
+		'needs the Node production build: run npm run test:e2e'
+	);
 
 	test('is offered on coming back to the app, and the reload loads it', async ({ page }) => {
-		await signUp(page, account('Uma'));
+		await newAccount(page, account('Uma'));
 		const toast = page.getByTestId('update-available');
 		await expect(toast).toHaveCount(0);
 

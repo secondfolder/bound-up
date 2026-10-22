@@ -69,8 +69,13 @@ Axes are one of two kinds:
 The full product of both kinds runs to millions for the replies, almost all
 of it the same text again. The sweep can stand in for the product only if a
 descriptive axis changes the same lines whatever the structural axes are.
-`interactionProblems` checks exactly that, and the catalogue test runs it, so
-"every combination" is a checked claim. When it fails, it names the axis. The
+`interactionProblems` checks exactly that, and `npm run prompts:export` runs it
+for every builder (`catalogueGaps`), sampling the replies, so "every
+combination" is a checked claim. When it fails, the export fails and names
+the axis, and so `prompts:review`, which runs it, fails too. It is not a CI
+test any more,
+because only a checkout ever reads the catalogue, and it cost every run about
+ten seconds. The
 fix is to make that axis structural, as happened with `text` (fields written),
 which behaves differently with two characters.
 
@@ -158,9 +163,9 @@ generated `catalogue.json`. Each builder's file is a lazily loaded chunk of
 the server bundle (`snapshot.ts`), because enumerating the replies takes
 seconds of CPU — and far too much memory to do in every build. So the page
 works on a dev server in a checkout that has run the export, and anywhere
-else, deployed builds included, it says to run it. The e2e server
-(`e2e/server.mjs`) exports once when a checkout has none; its specs skip
-against a Docker image, which never has one.
+else, deployed builds included, it says to run it. Nothing tests the page
+end to end: it is a local tool, and the export it needs costs more than a bug
+in it would.
 
 **Reviewed marks** are per device, in `localStorage`. A paragraph's id is a
 hash of its text, so editing one makes it unreviewed again by itself. After a

@@ -13,13 +13,13 @@ import {
 	expectComposerAtBottom,
 	fillRichText,
 	linkAccounts,
+	newAccounts,
 	newSide,
 	openBoard,
 	reply,
 	scrollShellTo,
 	settle,
 	shellScroll,
-	signUp,
 	typeRichText,
 	writeThread
 } from './helpers';
@@ -42,8 +42,7 @@ test.describe('a message between partners', () => {
 		const secret = 'meet me in the kitchen at eleven';
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			// ── Ada writes ──────────────────────────────────────────────────────
@@ -93,8 +92,7 @@ test.describe('a message between partners', () => {
 		const bodies: string[] = [];
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			ada.page.on('request', (request) => {
@@ -128,8 +126,7 @@ test.describe('a thread', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -178,8 +175,7 @@ test.describe('a short thread', () => {
 		const ada = await newSide(browser, 'Ada', phone);
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
@@ -208,8 +204,7 @@ test.describe('opening a thread', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			const long = 'Something long enough to wrap over several lines of the thread. '.repeat(5);
@@ -257,8 +252,7 @@ test.describe('the board', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			// Two threads from Ada, in order.
@@ -325,8 +319,7 @@ test.describe('the board', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -372,8 +365,7 @@ test.describe('the board', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -482,8 +474,7 @@ test.describe('live updates', () => {
 				};
 			});
 
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -539,8 +530,7 @@ test.describe('live updates', () => {
 		try {
 			// Short, so a few messages overflow it.
 			await ada.page.setViewportSize({ width: 400, height: 700 });
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -590,8 +580,7 @@ test.describe('live updates', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -629,8 +618,7 @@ test.describe('live updates', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			// Both get past the one-time warning, then Ada waits on her board.
@@ -673,8 +661,7 @@ test.describe('attachments', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -738,8 +725,7 @@ test.describe('attachments', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -834,9 +820,7 @@ test.describe('attachments', () => {
 		const cas = await newSide(browser, 'Cas');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
-			await signUp(cas.page, cas.who);
+			await newAccounts(ada, jun, cas);
 			await linkAccounts(ada, jun);
 			await linkAccounts(ada, cas);
 
@@ -913,8 +897,7 @@ test.describe('attachments', () => {
 		await jun.page.route('**/attachments/**', (route) => route.continue());
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -1005,8 +988,7 @@ test.describe('attachments', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			// Features are read from the database per request, so the grant
 			// applies from Ada's next page load without signing in again.
@@ -1130,8 +1112,7 @@ test.describe('attachments', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -1171,8 +1152,7 @@ test.describe('attachments', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			await sql(
 				`insert into user_features (id, user_id, feature, source)
@@ -1229,8 +1209,7 @@ test.describe('attachments', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -1260,8 +1239,7 @@ test.describe('thread tags', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -1333,8 +1311,7 @@ test.describe('thread tags', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -1410,8 +1387,7 @@ test.describe('embeds', () => {
 		}
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -1474,8 +1450,7 @@ test.describe('embeds', () => {
 		}
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			// Narrowed only now: the invite round trip is not what is under test.
@@ -1583,8 +1558,7 @@ test.describe('embeds', () => {
 		}
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -1980,8 +1954,7 @@ test.describe('embeds', () => {
 		);
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -2114,8 +2087,7 @@ test.describe('drafts', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');
@@ -2201,8 +2173,7 @@ test.describe('drafts', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
 			await ada.page.goto('/home');

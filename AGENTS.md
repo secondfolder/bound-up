@@ -55,7 +55,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/server-settings.ts`, `src/lib/server/settings/` | Server settings: the keys and model presets (pure, alias-free), and loading, generating and saving them. See [docs/server-settings.md](docs/server-settings.md) |
 | `src/lib/server/self-hosted/` | What only the Docker build runs: the media sweep. See [docs/self-hosting.md](docs/self-hosting.md) |
 | `src/service-worker.ts`       | Shows push notifications, and nothing else: no `fetch` handler, no cache. See [docs/notifications.md](docs/notifications.md) |
-| `e2e/`                        | Playwright specs. Run against `vite dev` on a port and SQLite file of their own per checkout |
+| `e2e/`                        | Playwright specs. Run against the built Node server on a port and SQLite file of their own per checkout |
 | `src/routes/(public)/`        | Anonymous-reachable routes. No header: each page links onwards itself                        |
 | `src/routes/(standalone)/`    | Public pages that should not look like Bound Up at all (the Playroom's tools). No shell      |
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
@@ -71,7 +71,8 @@ Run before declaring anything done:
 npm run check    # svelte-check
 npm run lint     # biome ci + the Svelte <script>/<style> format check
 npm test         # everything: vitest (node + browser projects), then playwright
-npm run test:e2e # playwright alone, real browser against vite dev
+npm run test:e2e # playwright alone, real browser against the built Node server
+npm run test:e2e:dev # the same against vite dev, with Svelte's and Lit's dev warnings
 npm run test:e2e:image # playwright against a fresh Docker build, as CI runs it
 npm run test:e2e:worker # playwright against the built worker under wrangler dev
 npm run format   # fixes everything `lint` complains about that is mechanical
@@ -87,11 +88,18 @@ commitlint as well: release versions are computed from conventional commit
 messages (see [docs/self-hosting.md](docs/self-hosting.md#versioning-and-publishing)),
 so a malformed one is refused rather than silently left out of a release.
 
-CI (`.github/workflows/ci.yml`) runs `lint`, `check` and vitest, then builds
-the Docker image and runs the Playwright suite against it — not against
-`vite dev` — and publishes only if all of that passed. A change that works under
-`vite dev` but not in the Node build fails there; `npm run test:e2e:image`
-reproduces it locally.
+CI (`.github/workflows/ci.yml`) runs `lint`, `check` and vitest and, alongside
+them, builds the Docker image and runs the Playwright suite against it in four
+shards, and publishes only if all of that passed. A change that works on the
+host but not in the image fails there; `npm run test:e2e:image` reproduces it
+locally.
+
+While iterating, run the Playwright specs for the feature you touched
+(`npx playwright test e2e/notebook.spec.ts`) rather than the whole suite, and
+the whole suite once before calling the work done. `--only-changed=main` adds
+any spec or helper you edited, but cannot see app changes: the specs drive the
+app over HTTP rather than importing it. See
+[docs/development.md](docs/development.md#tests).
 
 Honest baseline as of this writing — `lint`, `check`, `test` and `test:e2e` are
 all clean. It was not always so; both suppression conventions below exist
@@ -171,9 +179,9 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
     every `invalidate()` would reset the form. Add one to new ones.
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
-- `npm run test:e2e`: Playwright specs, about a minute for the current ~80 of
-  them at four workers, once the browser is installed (`npx playwright install
-chromium` first). A spec sitting at ~90 seconds is one hanging on its
+- `npm run test:e2e`: Playwright specs, about seven minutes for the current
+  ~235 of them at four workers against `vite dev`, once the browser is
+  installed (`npx playwright install chromium` first). A spec sitting at ~90 seconds is one hanging on its
   timeout, and the reported failure is usually the `finally` that could not
   close its contexts rather than the step that actually stalled — the trace's
   last unfinished call is what names it, and `error-context.md` beside it has
@@ -856,11 +864,15 @@ page: routing, the server, real sessions, hydration.
 
 **End to end** — `e2e/*.spec.ts`. This is the only level that sees the auth
 hook, real session cookies, the `(auth-required)` guard and the round trip
-through `/signup?redirectTo=`. It runs `vite dev` against an `e2e.db` of its
-own, rebuilt from the migrations by the server command (`e2e/server.mjs`) —
-not in a `globalSetup`: Playwright starts the web server first, and deleting
-the file underneath it leaves every write failing with
-`SQLITE_READONLY_DBMOVED`.
+through `/signup?redirectTo=`. It builds the self-hosted Node server
+(`build:node`) and runs it through the image's own entrypoint, on the host,
+against an `e2e.db` of its own, rebuilt from the migrations by the server
+command (`e2e/server.mjs`) — not in a `globalSetup`: Playwright starts the web
+server first, and deleting the file underneath it leaves every write failing
+with `SQLITE_READONLY_DBMOVED`. Not `vite dev`, which was the bottleneck (more
+workers made a run no faster) and reloaded every open page when a file changed
+under it; `E2E_DEV` (`npm run test:e2e:dev`) still runs it against `vite dev`,
+for the development-only warnings the fixture fails on.
 
 With `E2E_IMAGE` set (`npm run test:e2e:image`, and CI) the same command runs
 that Docker image instead, on fresh named volumes. **A spec that reads or
@@ -968,15 +980,16 @@ Notes that cost a debugging round each:
   `optimizeDeps.include`. Otherwise Vite discovers it mid-run, forces a
   re-optimization, and tells every connected client to reload — which loses an
   in-flight form submit.
-- **Run nothing that loads the Vite config in a checkout while its e2e suite
-  runs** — `vitest`, `npm run check`, a commit's husky hook. Each runs
-  `svelte-kit sync`, which rewrites `.svelte-kit/generated/`, and the suite's
-  `vite dev` answers by reloading every open page. A reload during sign-in
+- **Under `test:e2e:dev`, run nothing that loads the Vite config in that
+  checkout while the suite runs** — `vitest`, `npm run check`, a commit's husky
+  hook. Each runs `svelte-kit sync`, which rewrites `.svelte-kit/generated/`,
+  and the suite's `vite dev` answers by reloading every open page. A reload during sign-in
   throws away the key stash, so the failures look like the sign-in race above:
   a test stuck on `/login?reason=device`, or on `/signup` navigated to twice.
   The server log names it: `page reload .svelte-kit/generated/…`. Use another
-  worktree.
-- **The suite's `vite dev` runs with `NO_HMR=1`** (`webServer.env` in
+  worktree. The default run is immune once its build has finished: a built
+  server watches nothing.
+- **Under `test:e2e:dev`, the suite's `vite dev` runs with `NO_HMR=1`** (`webServer.env` in
   `playwright.config.ts`), so editing a source file mid-run no longer
   hot-updates or reloads every open test page. It only stops the reloads that
   come from file changes. SvelteKit's own `full-reload`s (a route added, or
@@ -997,6 +1010,15 @@ Notes that cost a debugging round each:
   'focus')" as it upgrades, and the symptom was a send button that never
   enabled — nowhere near the cause. Worth checking `page.on('pageerror')` early
   when a component seems inert.
+- **A spec that needs a person, not a sign-up, uses `newAccount`** (or
+  `newAccounts` for several, at once). It writes the account the sign-up form
+  would have made — keys generated and wrapped by the same `src/lib/crypto`
+  code, address already confirmed (`e2e/accounts.ts`) — and signs in through
+  the real login form, which caches the key on the device. The form costs
+  about two seconds a person, most of it a response deliberately held to
+  1.5 s so its timing cannot tell who has an account, and it was a large share
+  of the suite. `signUp` is for the specs about signing up — encryption, email
+  verification, timezone, the invite round trip through `/signup`.
 - **`signUp` goes through the email.** An account cannot sign in until its
   address is confirmed, so the helper submits the form, reads the link out of
   the server's outbox (`e2e/mail.ts`), follows it and signs in. A spec that

@@ -19,8 +19,8 @@ import { linkIn, mailsTo, waitForMailTo } from './mail';
  * signing in there is what finishes it — and unlocks, as it always does.
  * See docs/email.md.
  *
- * Every other spec signs up through `signUp`, which does all of this; these
- * look at each step on its own.
+ * `signUp` does all of this for the other specs about signing up, and the
+ * rest skip it with `newAccount`; these look at each step on its own.
  */
 
 /** Fills and submits the sign-up form, and stops on the check-email page. */

@@ -2,7 +2,16 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { type Account, account, clickWaButton, logIn, logOut, newSide, signUp } from './helpers';
+import {
+	type Account,
+	account,
+	clickWaButton,
+	logIn,
+	logOut,
+	newAccount,
+	newAccounts,
+	newSide
+} from './helpers';
 
 /**
  * Sets an account's role straight in the database, then signs it in afresh.
@@ -40,8 +49,7 @@ test('an admin grants and revokes a feature, and makes another admin', async ({ 
 	const admin = await newSide(browser, 'Root');
 	const ada = await newSide(browser, 'Ada');
 	try {
-		await signUp(admin.page, admin.who);
-		await signUp(ada.page, ada.who);
+		await newAccounts(admin, ada);
 		await becomeRole(admin.page, admin.who, 'admin');
 		await becomeRole(ada.page, ada.who, 'user');
 
@@ -90,7 +98,7 @@ test('an admin grants and revokes a feature, and makes another admin', async ({ 
 
 test('the admin pages are a 404 for anyone else', async ({ page }) => {
 	const bo = account('Bo');
-	await signUp(page, bo);
+	await newAccount(page, bo);
 	await becomeRole(page, bo, 'user');
 
 	expect((await page.goto('/admin'))?.status()).toBe(404);

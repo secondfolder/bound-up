@@ -6,17 +6,36 @@
 #
 # bookworm-slim rather than alpine: @libsql/client ships prebuilt glibc
 # binaries, and the musl ones have lagged behind.
+#
+# Every stage but the last runs on the BUILD platform, never under emulation.
+# A release builds linux/arm64 on an amd64 runner through QEMU, where `npm ci`
+# and `vite build` took over ten minutes; `build/` is plain JavaScript, so it is
+# built once, natively, and both architectures share it — and share the cache
+# entries the CI image job already wrote. The one thing that differs per
+# architecture is which prebuilt native binaries `prod-deps` downloads, and npm
+# picks those by `--os`/`--cpu`/`--libc` rather than by the machine it runs on.
 ARG NODE_VERSION=24
 
-FROM node:${NODE_VERSION}-bookworm-slim AS base
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-bookworm-slim AS base
 WORKDIR /app
 # `prepare` runs husky, which has no .git to install hooks into here.
 ENV HUSKY=0
 
+# package.json without its `scripts` and tool config, which change far more
+# often than the dependencies do. `npm ci` keys its layer on the files copied
+# in before it, so the whole package.json there meant that editing any npm
+# script reinstalled every dependency and pushed a fresh ~500 MB layer into a
+# GitHub Actions cache already at its 10 GB limit. COPY --from is keyed on the
+# content this stage produces, so an unchanged result keeps the layers below.
+FROM base AS manifest
+COPY package.json ./
+RUN node -e "const p = require('./package.json'); for (const k of ['scripts', 'lint-staged']) delete p[k]; require('node:fs').writeFileSync('manifest.json', JSON.stringify(p, null, '\t'))"
+
 # Everything, dev dependencies included: the build needs vite, the adapters
 # and svelte-kit itself.
 FROM base AS deps
-COPY package.json package-lock.json .npmrc ./
+COPY --from=manifest /app/manifest.json ./package.json
+COPY package-lock.json .npmrc ./
 RUN npm ci
 
 FROM deps AS build
@@ -25,10 +44,21 @@ RUN npm run build:node
 
 # Only what `build/` leaves external: adapter-node bundles devDependencies into
 # the output and imports `dependencies` at runtime, which is why @libsql/client
-# (native) is a dependency and wrangler's plugin is not.
+# (native) is a dependency and wrangler's plugin is not. Installed for the
+# TARGET architecture: npm takes Docker's `amd64` as `x64`, and `--libc` is
+# what picks @libsql's glibc binary over its musl one.
 FROM base AS prod-deps
-COPY package.json package-lock.json .npmrc ./
-RUN npm ci --omit=dev --ignore-scripts
+ARG TARGETARCH
+COPY --from=manifest /app/manifest.json ./package.json
+COPY package-lock.json .npmrc ./
+RUN npm ci --omit=dev --ignore-scripts --os=linux --libc=glibc \
+	--cpu="$(if [ "$TARGETARCH" = amd64 ]; then echo x64; else echo "$TARGETARCH"; fi)"
+
+# The volume mount points, made here rather than with a RUN in the runtime
+# stage: that stage is the target architecture, and a RUN there is the one
+# thing that would still need QEMU to build arm64.
+FROM base AS data-dirs
+RUN mkdir -p /data/db /data/media
 
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 WORKDIR /app
@@ -47,9 +77,10 @@ COPY --from=build /app/build ./build
 COPY drizzle ./drizzle
 COPY package.json ./
 COPY scripts/docker-entrypoint.mjs ./scripts/docker-entrypoint.mjs
-# Made here and owned by `node`, so a named volume mounted over them starts out
-# writable by the unprivileged user the server runs as.
-RUN mkdir -p /data/db /data/media && chown -R node:node /data
+# Owned by `node`, so a named volume mounted over them starts out writable by
+# the unprivileged user the server runs as. --chown resolves the name from this
+# image's /etc/passwd without running anything in it.
+COPY --from=data-dirs --chown=node:node /data /data
 USER node
 VOLUME ["/data/db", "/data/media"]
 EXPOSE 3000

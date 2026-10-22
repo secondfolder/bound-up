@@ -5,8 +5,8 @@ import {
 	clickWaButton,
 	createInvite,
 	fillRichText,
+	newAccount,
 	newSide,
-	signUp,
 	typeRichText,
 	waitForHydration
 } from './helpers';
@@ -28,7 +28,7 @@ test.describe('tasks', () => {
 		const ada = await newSide(browser, 'Ada');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.goto('/home/tasks/add');
 			const surface = ada.page.locator('.task-form .richtext-editor .surface').first();
 			await typeRichText(ada.page.locator('.task-form'), 'Take your time');
@@ -58,7 +58,7 @@ test.describe('tasks', () => {
 		const ada = await newSide(browser, 'Ada');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			await ada.page.getByRole('link', { name: 'Tasks' }).click();
 			await ada.page.waitForURL(/\/home\/tasks$/);
@@ -193,7 +193,7 @@ test.describe('tasks', () => {
 		const ada = await newSide(browser, 'Ada');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 
 			/**
@@ -228,7 +228,7 @@ test.describe('tasks', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -236,7 +236,7 @@ test.describe('tasks', () => {
 				control: 'them'
 			});
 
-			await signUp(jun.page, jun.who);
+			await newAccount(jun.page, jun.who);
 			await jun.page.waitForURL('**/home');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');

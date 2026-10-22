@@ -1,5 +1,6 @@
-# Every pull request and every push to main: the full test suite, then the
-# Docker image built and put through the Playwright suite. On main only, if
+# Every pull request and every push to main: the full test suite and, beside
+# it, the Docker image built and put through the Playwright suite in four
+# shards. On main only, if
 # all of that passed, semantic-release works out the version from the
 # conventional commits and publishes the image to GHCR under it, and then
 # production on Cloudflare is migrated and deployed.
@@ -47,21 +48,18 @@ jobs:
           npx commitlint
           --from ${{ github.event.pull_request.base.sha }}
           --to ${{ github.event.pull_request.head.sha }}
-      - run: npx playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-browser
       - run: npm run lint
       - run: npm run check
       - run: npx vitest run
 
+  # Not after `verify`: the two share nothing, and waiting cost every run the
+  # three or four minutes `verify` takes. `release` still needs both.
   image:
-    name: Docker image, smoke test and e2e suite
-    needs: verify
+    name: Docker image and smoke test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
       - uses: docker/setup-buildx-action@v3
       - name: Build the amd64 image
         uses: docker/build-push-action@v6
@@ -69,29 +67,70 @@ jobs:
           context: .
           load: true
           tags: ${{ env.IMAGE }}
-          # Shared with the release job, so it rebuilds nothing but the labels.
+          # Shared with the release job, which then builds nothing but the
+          # labels and arm64's production dependencies.
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Written from main only. A pull request's entries can be read by
+          # that pull request alone, but count against the same 10 GB as
+          # main's and evict the layers every later run on main wants — and
+          # the export was over two minutes of every run. A pull request
+          # still reads main's.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,ignore-error=true' || '' }}
       - name: Volumes survive a restart; migrations apply once
         run: scripts/docker-smoke.sh "$IMAGE"
+      # Handed to the e2e shards as a file, so every shard tests this exact
+      # image rather than a rebuild of it.
+      - run: docker save "$IMAGE" | gzip -1 > "$RUNNER_TEMP/image.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar.gz
+          # Already gzipped.
+          compression-level: 0
+          retention-days: 1
+
+  # The Playwright suite against the image, split across runners. On one it
+  # was thirteen of the run's minutes, and it is CPU-bound: more workers on the
+  # same runner do not make it faster. `fullyParallel` lets `--shard` split it
+  # by test rather than by file.
+  e2e:
+    name: E2E suite against the image (${{ matrix.shard }}/4)
+    needs: image
+    runs-on: ubuntu-latest
+    strategy:
+      # Every shard's failures, not just the first one's.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: image
+          path: ${{ runner.temp }}
+      - run: gunzip -c "$RUNNER_TEMP/image.tar.gz" | docker load
       # Playwright itself runs on the host and drives the container.
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-browser
       - name: Playwright suite against the image
-        run: npx playwright test
+        run: npx playwright test --shard=${{ matrix.shard }}/4
         env:
           E2E_IMAGE: ${{ env.IMAGE }}
       - name: Keep traces of what failed
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results
+          name: playwright-results-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
 
   release:
     name: Version and publish
-    needs: image
+    needs: [verify, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -109,11 +148,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - uses: docker/setup-qemu-action@v3
+      # No QEMU: every stage that runs anything is built on the runner's own
+      # platform (see the Dockerfile), and the arm64 image is assembled from
+      # their output without executing a thing in it.
       - uses: docker/setup-buildx-action@v3
       # Puts ACTIONS_RUNTIME_TOKEN in the environment, so the `docker buildx`
       # in scripts/publish-image.sh can reach the same GHA cache as the image
-      # job and only builds arm64 from scratch.
+      # job and only installs arm64's production dependencies afresh.
       - uses: crazy-max/ghaction-github-runtime@v3
       - uses: docker/login-action@v3
         with:

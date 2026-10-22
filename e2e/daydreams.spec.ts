@@ -9,11 +9,11 @@ import {
 	fillRichText,
 	fillWaInput,
 	grantFeature,
+	newAccount,
 	reply,
 	scrollShellTo,
 	settle,
 	shellScroll,
-	signUp,
 	switchOnDebugCookie,
 	waitForHydration
 } from './helpers';
@@ -154,7 +154,7 @@ async function startDaydream(page: Page, character = 'Mara') {
 
 async function signedUpDreamer(page: Page) {
 	const who = account('Dreamer');
-	await signUp(page, who);
+	await newAccount(page, who);
 	await grantDaydreams(who.email);
 	return who;
 }
@@ -1177,7 +1177,7 @@ test.describe('daydreams', () => {
 
 	test('an account without the feature has no way in', async ({ page }) => {
 		const who = account('Outsider');
-		await signUp(page, who);
+		await newAccount(page, who);
 		await expect(page.getByRole('link', { name: 'Daydreams' })).toHaveCount(0);
 		const response = await page.goto('/daydreams');
 		expect(response?.status()).toBe(403);

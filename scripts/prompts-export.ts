@@ -12,6 +12,8 @@
  *
  *   npm run prompts:export -- --full
  *
+ * It also checks the catalogue is complete (`catalogueGaps`), and fails if not.
+ *
  * Files the export no longer produces are deleted, so a builder or axis that
  * goes away takes its files with it. Anything starting with a dot is left
  * alone: that is where the full export and the review script's output live.
@@ -20,6 +22,7 @@ import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import {
 	CATALOGUE_DIR,
+	catalogueGaps,
 	exportFiles,
 	fullExport
 } from '../src/lib/server/daydream/prompt-catalogue/export.ts';
@@ -70,3 +73,14 @@ for (const catalogue of catalogues) {
 console.info(
 	`Wrote ${CATALOGUE_DIR}/ in ${Math.round(performance.now() - started)} ms. Read it there, or at /debug/prompts on the dev server.`
 );
+
+// After writing, so the files are there to look into. A failure, not a warning:
+// a catalogue with gaps is not what it claims to be, and a review of it
+// (`prompts:review`, which runs this) would vouch for prompts it never saw.
+const gaps = catalogueGaps();
+if (gaps.length > 0) {
+	console.error(
+		`\nThe catalogue misses prompts the builders can send: a descriptive axis changes other lines in some combinations than it does from the baseline, so sweeping it from the baseline does not show every prompt. Make that axis structural in prompt-catalogue/axes.ts (docs/prompt-review.md, "Axes").\n${gaps.map((gap) => `  - ${gap}`).join('\n')}\n`
+	);
+	process.exit(1);
+}

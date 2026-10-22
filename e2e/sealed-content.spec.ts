@@ -4,8 +4,8 @@ import { test } from './fixtures';
 import {
 	clickWaButton,
 	fillRichText,
+	newAccount,
 	newSide,
-	signUp,
 	waitForHydration,
 	waitForKeyring
 } from './helpers';
@@ -26,7 +26,7 @@ test.describe('sealed tasks and rewards', () => {
 	test('the server stores a new task and reward only as ciphertext', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			const adaId = await userId(ada.who.email);
 
 			await ada.page.goto('/home/tasks/add');
@@ -77,7 +77,7 @@ test.describe('sealed tasks and rewards', () => {
 	}) => {
 		const ada = await newSide(browser, 'Ada');
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			const adaId = await userId(ada.who.email);
 			const taskId = crypto.randomUUID();
 			// What a task looked like before sealing: its text in plaintext columns.

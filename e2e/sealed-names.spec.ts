@@ -2,7 +2,15 @@ import { expect } from '@playwright/test';
 import { generateIdentity, identityToRecipient } from 'age-encryption';
 import { sql } from './db';
 import { test } from './fixtures';
-import { clickWaButton, createInvite, navTabs, newSide, signUp, waitForHydration } from './helpers';
+import {
+	clickWaButton,
+	createInvite,
+	navTabs,
+	newAccount,
+	newAccounts,
+	newSide,
+	waitForHydration
+} from './helpers';
 
 /**
  * Partnership names are end-to-end encrypted (docs/partners.md, "Names are
@@ -23,8 +31,7 @@ test.describe('sealed partnership names', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			const link = await createInvite(ada.page, {
 				partnerName: 'Pup',
 				yourName: 'Handler',
@@ -73,8 +80,7 @@ test.describe('sealed partnership names', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -96,8 +102,7 @@ test.describe('sealed partnership names', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -122,7 +127,7 @@ test.describe('sealed partnership names', () => {
 	test('editing a sealed task starts from its content', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 
 			await ada.page.goto('/home/tasks/add');
 			await waitForHydration(ada.page);

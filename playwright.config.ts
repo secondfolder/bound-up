@@ -17,12 +17,12 @@ import {
  * `(auth-required)` group guard, and the round trip through /signup that an
  * invite link has to survive. That is what these are for.
  *
- * Runs against `vite dev` on a port and a SQLite file of its own, both derived
- * from the checkout path (see `e2e/run-paths.ts`), so a local `local.db` is
- * never touched and runs in separate worktrees never touch each other. With
- * `E2E_IMAGE` set it runs against that Docker image on the same port and file
- * instead, and with `E2E_WORKER` set against the built worker under
- * `wrangler dev` — see `e2e/server.mjs`.
+ * Runs against the self-hosted Node build on a port and a SQLite file of its
+ * own, both derived from the checkout path (see `e2e/run-paths.ts`), so a local
+ * `local.db` is never touched and runs in separate worktrees never touch each
+ * other. With `E2E_DEV` set it runs against `vite dev` instead, with
+ * `E2E_IMAGE` set against that Docker image, and with `E2E_WORKER` set against
+ * the built worker under `wrangler dev` — see `e2e/server.mjs`.
  */
 
 export default defineConfig({
@@ -31,13 +31,14 @@ export default defineConfig({
 	// database-isolated: `account()` mints a fresh email per person, and each
 	// person gets their own browser context. Nothing asserts on global state —
 	// "you have no partners yet" is always about an account made in that test.
-	// One shared server also means one shared, warm route-compile cache.
 	workers: process.env.CI ? 2 : 4,
+	// `fullyParallel` is also what lets CI's `--shard` split the suite by test
+	// rather than by file.
 	fullyParallel: true,
 	forbidOnly: Boolean(process.env.CI),
-	// Generous because these run against `vite dev`, which compiles each route
-	// the first time it is requested — the first pass through a flow pays for
-	// every screen in it.
+	// Generous for `vite dev` (`E2E_DEV`), which compiles each route the first
+	// time it is requested — the first pass through a flow pays for every
+	// screen in it.
 	timeout: 90_000,
 	expect: { timeout: 15_000 },
 	retries: process.env.CI ? 1 : 0,
@@ -63,8 +64,10 @@ export default defineConfig({
 		reuseExistingServer: false,
 		stdout: 'pipe',
 		stderr: 'pipe',
-		// A Workers run builds the app first, which takes a few minutes.
-		timeout: process.env.E2E_WORKER ? 600_000 : 120_000,
+		// A Workers run builds the app first, which takes a few minutes; the
+		// default run builds the Node server, which takes under one. Only an
+		// upper bound: `vite dev` and an already-built image are up in seconds.
+		timeout: process.env.E2E_WORKER ? 600_000 : 300_000,
 		// So that `e2e/server.mjs` gets to `docker stop` the container in image
 		// mode, rather than being killed and leaving it running. Harmless for
 		// `vite dev`, which it forwards the signal to.
@@ -88,15 +91,19 @@ export default defineConfig({
 			// vite.config.ts points `server.origin` at a personal dev tunnel, which
 			// would make the page ask localhost for its assets over that hostname.
 			VITE_DEV_ORIGIN: E2E_BASE_URL,
-			// So that editing a file mid-run does not hot-update or reload every
-			// open test page: a reload during sign-in throws away the key stash and
-			// one mid-flow loses a half-filled form, and the failures that left
-			// looked like flakiness in whichever flow it landed on. Server-side code
-			// still picks up the edit, so a run is only fully isolated from them in
-			// a worktree of its own.
+			// Under `vite dev`: so that editing a file mid-run does not hot-update or
+			// reload every open test page: a reload during sign-in throws away the
+			// key stash and one mid-flow loses a half-filled form, and the failures
+			// that left looked like flakiness in whichever flow it landed on.
+			// Server-side code still picks up the edit, so a `vite dev` run is only
+			// fully isolated from them in a worktree of its own. The built server
+			// (the default) has no watcher at all.
 			NO_HMR: '1',
-			// Set to a Docker image to run the suite against it instead of
-			// `vite dev` (`npm run test:e2e:image`; CI does this for every build).
+			// Set to run the suite against `vite dev` instead of the built server
+			// (`npm run test:e2e:dev`).
+			...(process.env.E2E_DEV ? { E2E_DEV: process.env.E2E_DEV } : {}),
+			// Set to a Docker image to run the suite against it instead
+			// (`npm run test:e2e:image`; CI does this for every build).
 			...(process.env.E2E_IMAGE ? { E2E_IMAGE: process.env.E2E_IMAGE } : {}),
 			// Set to run it against the built worker under `wrangler dev` instead
 			// (`npm run test:e2e:worker`).

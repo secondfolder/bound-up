@@ -2,7 +2,14 @@ import { expect } from '@playwright/test';
 import { Encrypter } from 'age-encryption';
 import { sql } from './db';
 import { test } from './fixtures';
-import { linkAccounts, newSide, openBoard, signUp, waitForKeyring, writeThread } from './helpers';
+import {
+	linkAccounts,
+	newAccounts,
+	newSide,
+	openBoard,
+	waitForKeyring,
+	writeThread
+} from './helpers';
 
 /**
  * Vaults are made by the devices, never by the server: the first device to
@@ -24,8 +31,7 @@ test.describe('vaults', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			const adaId = await userId(ada.who.email);
 			const junId = await userId(jun.who.email);
 
@@ -98,8 +104,7 @@ test.describe('vaults', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			// Ada's page is still on the invite she sent; the partner tab arrives
 			// with a fresh load.

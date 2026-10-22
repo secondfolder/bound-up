@@ -8,7 +8,7 @@ import {
 	clickWaButton,
 	logIn,
 	logOut,
-	signUp,
+	newAccount,
 	waitForHydration
 } from './helpers';
 import { waitForMailTo } from './mail';
@@ -38,7 +38,7 @@ async function openServerSettings(page: Page) {
 
 test('an admin sees what is set up, and sends themselves a test email', async ({ page }) => {
 	const root = account('Root');
-	await signUp(page, root);
+	await newAccount(page, root);
 	await becomeAdmin(page, root);
 	await openServerSettings(page);
 
@@ -57,7 +57,7 @@ test('an admin sees what is set up, and sends themselves a test email', async ({
 
 test('an admin finds a story model on OpenRouter and saves it', async ({ page }) => {
 	const root = account('Root');
-	await signUp(page, root);
+	await newAccount(page, root);
 	await becomeAdmin(page, root);
 	await openServerSettings(page);
 
@@ -87,7 +87,7 @@ test('an admin finds a story model on OpenRouter and saves it', async ({ page })
 
 test('a custom picture model found on Runware fills in its base model', async ({ page }) => {
 	const root = account('Root');
-	await signUp(page, root);
+	await newAccount(page, root);
 	await becomeAdmin(page, root);
 	await openServerSettings(page);
 
@@ -116,7 +116,7 @@ test('each model chooses a provider, whose key is set once under Model providers
 	page
 }) => {
 	const root = account('Root');
-	await signUp(page, root);
+	await newAccount(page, root);
 	await becomeAdmin(page, root);
 	await openServerSettings(page);
 
@@ -143,7 +143,7 @@ test('each model chooses a provider, whose key is set once under Model providers
 
 test('the server settings are a 404 for anyone but an admin', async ({ page }) => {
 	const bo = account('Bo');
-	await signUp(page, bo);
+	await newAccount(page, bo);
 	await sql("update user set role = 'user' where email = ?", [bo.email]);
 	await logOut(page);
 	await logIn(page, bo);

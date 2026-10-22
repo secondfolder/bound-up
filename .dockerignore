@@ -18,6 +18,8 @@ local-media
 .github
 .husky
 .agents
+# Agents' worktrees: each one a whole checkout, node_modules included.
+.claude
 test-results
 playwright-report
 e2e

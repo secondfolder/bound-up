@@ -17,6 +17,7 @@
 		"test:unit": "vitest",
 		"test": "vitest run && playwright test",
 		"test:e2e": "playwright test",
+		"test:e2e:dev": "E2E_DEV=1 playwright test",
 		"test:e2e:image": "docker build -t bound-up:local . && E2E_IMAGE=bound-up:local playwright test",
 		"test:e2e:worker": "E2E_WORKER=1 playwright test",
 		"screenshots:landing": "playwright test --config playwright.screenshots.config.ts",

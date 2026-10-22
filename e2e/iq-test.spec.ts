@@ -2,7 +2,13 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import { defined } from '../src/lib/testing/defined';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, grantFeature, signUp, switchOnDebugCookie, waitForHydration } from './helpers';
+import {
+	account,
+	grantFeature,
+	newAccount,
+	switchOnDebugCookie,
+	waitForHydration
+} from './helpers';
 
 /**
  * The Playroom and its IQ test.
@@ -1254,7 +1260,7 @@ test.describe('IQ test', () => {
 
 	test('"Correct answer", in debug mode, taps through a run to a full score', async ({ page }) => {
 		const who = account('Tester');
-		await signUp(page, who);
+		await newAccount(page, who);
 		await page.goto('/playroom/iq-test');
 		await waitForHydration(page);
 		await dialog(page).getByRole('button', { name: SUB }).click();
@@ -1294,7 +1300,7 @@ test.describe('IQ test', () => {
 		page
 	}) => {
 		const who = account('Tester');
-		await signUp(page, who);
+		await newAccount(page, who);
 		await grantFeature(who.email, 'debugMode');
 		await switchOnDebugCookie(page);
 		await page.goto('/playroom/iq-test');
@@ -1329,7 +1335,7 @@ test.describe('IQ test', () => {
 	});
 
 	test('saves a signed-in result to the account', async ({ page }) => {
-		await signUp(page, account('IqTaker'));
+		await newAccount(page, account('IqTaker'));
 		await page.goto('/playroom/iq-test');
 		await takeTest(page);
 		await expect(page.getByTestId('iq-history').locator('li')).toHaveCount(1);
@@ -1348,7 +1354,7 @@ test.describe('IQ test', () => {
 	});
 
 	test('is reached from the Playroom card on /home', async ({ page }) => {
-		await signUp(page, account('Player'));
+		await newAccount(page, account('Player'));
 		await page.goto('/home');
 		await waitForHydration(page);
 		await page.getByRole('link', { name: 'Playroom' }).click();

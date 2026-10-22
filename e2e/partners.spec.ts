@@ -7,6 +7,7 @@ import {
 	LOG_IN_BUTTON,
 	logOut,
 	navTabs,
+	newAccount,
 	newSide,
 	signUp,
 	waitForHydration
@@ -28,7 +29,7 @@ test.describe('linking two accounts', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 
 			// A brand new account has no partner tabs.
@@ -90,7 +91,7 @@ test.describe('linking two accounts', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -98,7 +99,7 @@ test.describe('linking two accounts', () => {
 				control: 'me'
 			});
 
-			await signUp(jun.page, jun.who);
+			await newAccount(jun.page, jun.who);
 			await jun.page.waitForURL('**/home');
 			await jun.page.goto(link);
 
@@ -135,10 +136,10 @@ test.describe('linking two accounts', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(jun.page, jun.who);
+			await newAccount(jun.page, jun.who);
 			await logOut(jun.page);
 
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -172,7 +173,7 @@ test.describe('managing a link', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -180,7 +181,7 @@ test.describe('managing a link', () => {
 				control: 'me'
 			});
 
-			await signUp(jun.page, jun.who);
+			await newAccount(jun.page, jun.who);
 			await jun.page.waitForURL('**/home');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');
@@ -210,7 +211,7 @@ test.describe('managing a link', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -236,7 +237,7 @@ test.describe('managing a link', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const first = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -266,7 +267,7 @@ test.describe('managing a link', () => {
 		const jun = await newSide(browser, 'Jun');
 
 		try {
-			await signUp(ada.page, ada.who);
+			await newAccount(ada.page, ada.who);
 			await ada.page.waitForURL('**/home');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -274,7 +275,7 @@ test.describe('managing a link', () => {
 				control: 'me'
 			});
 
-			await signUp(jun.page, jun.who);
+			await newAccount(jun.page, jun.who);
 			await jun.page.waitForURL('**/home');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');

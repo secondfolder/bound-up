@@ -1,7 +1,16 @@
 import { expect, type Page } from '@playwright/test';
 import { sql } from './db';
 import { test } from './fixtures';
-import { account, clickWaButton, linkAccounts, newSide, signUp, waitForHydration } from './helpers';
+import {
+	account,
+	clickWaButton,
+	linkAccounts,
+	newAccount,
+	newAccounts,
+	newSide,
+	signUp,
+	waitForHydration
+} from './helpers';
 
 /**
  * The kink list, signed in: answering, search, related kinks, and that what
@@ -41,7 +50,7 @@ async function openRow(page: Page, name: string) {
 
 test('an answer is saved, sealed, and still there after a reload', async ({ page }) => {
 	const ada = account('Ada');
-	await signUp(page, ada);
+	await newAccount(page, ada);
 	await openList(page);
 
 	// Every category is on the one page, open.
@@ -71,7 +80,7 @@ test('a role kink’s two contexts sit side by side when there is room', async (
 	// The rows are a size container, which a page column that shrinks to fit
 	// its content collapsed: every pair stacked, however wide the window.
 	await page.setViewportSize({ width: 1280, height: 900 });
-	await signUp(page, account('Wren'));
+	await newAccount(page, account('Wren'));
 	await openList(page);
 	const giving = await scale(page, 'Spanking, giving').boundingBox();
 	const receiving = await scale(page, 'Spanking, receiving').boundingBox();
@@ -80,7 +89,7 @@ test('a role kink’s two contexts sit side by side when there is room', async (
 });
 
 test('a category folds away and opens again', async ({ page }) => {
-	await signUp(page, account('Ivy'));
+	await newAccount(page, account('Ivy'));
 	await openList(page);
 	await expect(scale(page, 'Spanking, giving')).toBeVisible();
 	await page.locator('#category-impact').getByText('Impact play', { exact: true }).click();
@@ -90,7 +99,7 @@ test('a category folds away and opens again', async ({ page }) => {
 });
 
 test('your side hides the contexts that lean the other way', async ({ page }) => {
-	await signUp(page, account('Kit'));
+	await newAccount(page, account('Kit'));
 	await openList(page);
 	await page.getByRole('radio', { name: 'Sub', exact: true }).check();
 	await expect(scale(page, 'Spanking, receiving')).toBeVisible();
@@ -104,7 +113,7 @@ test('your side hides the contexts that lean the other way', async ({ page }) =>
 });
 
 test('search finds a kink by another name', async ({ page }) => {
-	await signUp(page, account('Bea'));
+	await newAccount(page, account('Bea'));
 	await openList(page);
 	await page.locator('wa-input[type="search"] input').fill('fellatio');
 	// Found in its own category, with the rest of the list narrowed away.
@@ -117,7 +126,7 @@ test('search finds a kink by another name', async ({ page }) => {
 test('a related kink answered in one category shows the same answer in its own', async ({
 	page
 }) => {
-	await signUp(page, account('Cai'));
+	await newAccount(page, account('Cai'));
 	await openList(page);
 	const anal = page.locator('#category-anal');
 	await anal.getByRole('button', { name: /related kinks?\b/ }).click();
@@ -139,7 +148,7 @@ test.describe('quick fill', () => {
 	test.use({ viewport: { width: 390, height: 844 } });
 
 	test('triage, a swipe, a button, and a whole category ruled out', async ({ page }) => {
-		await signUp(page, account('Dee'));
+		await newAccount(page, account('Dee'));
 		await page.goto('/playroom/kink-list/quick');
 		await waitForHydration(page);
 
@@ -277,7 +286,7 @@ test.describe('without an account', () => {
 			await sharer.close();
 		}
 
-		await signUp(page, account('Gus'));
+		await newAccount(page, account('Gus'));
 		await page.goto('/kink-list/quick');
 		await expect(page).toHaveURL(/\/playroom\/kink-list\/quick$/);
 
@@ -295,7 +304,7 @@ test.describe('without an account', () => {
 });
 
 test('imports a KinkSheet link, exports the list, and reads the export back', async ({ page }) => {
-	await signUp(page, account('Hal'));
+	await newAccount(page, account('Hal'));
 	const sheet = (await import('../src/lib/kink-list/import/lists/kinksheet.json', {
 		with: { type: 'json' }
 	})) as { default: { levels: unknown[]; categories: { items: unknown[]; columns: unknown[] }[] } };
@@ -346,8 +355,7 @@ test.describe('with a partner', () => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 		try {
-			await signUp(ada.page, ada.who);
-			await signUp(jun.page, jun.who);
+			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 			const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
 			const partnerList = `/playroom/kink-list/partner/${partnershipId}`;
@@ -424,8 +432,7 @@ test('a partner view starts you on your own list before offering to share it', a
 	const ada = await newSide(browser, 'Ada');
 	const jun = await newSide(browser, 'Jun');
 	try {
-		await signUp(ada.page, ada.who);
-		await signUp(jun.page, jun.who);
+		await newAccounts(ada, jun);
 		await linkAccounts(ada, jun);
 		const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
 		await ada.page.goto(`/playroom/kink-list/partner/${partnershipId}`);
@@ -451,7 +458,7 @@ test('a partner view starts you on your own list before offering to share it', a
 
 test('a week without changes keeps a version, and history shows what moved', async ({ page }) => {
 	const eve = account('Eve');
-	await signUp(page, eve);
+	await newAccount(page, eve);
 	await openList(page);
 	// Nothing kept yet: no History to offer.
 	await expect(page.getByRole('link', { name: 'History' })).toHaveCount(0);
@@ -495,8 +502,7 @@ test('a partner view starts on the side who is in control puts you on', async ({
 	const ada = await newSide(browser, 'Ada');
 	const jun = await newSide(browser, 'Jun');
 	try {
-		await signUp(ada.page, ada.who);
-		await signUp(jun.page, jun.who);
+		await newAccounts(ada, jun);
 		// Ada is in control: with Jun, she is on the dom side.
 		await linkAccounts(ada, jun, 'me');
 		const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';

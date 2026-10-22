@@ -5,8 +5,9 @@
 #
 # Called by semantic-release (release.config.mjs) with the version it worked
 # out, after CI has tested the amd64 build of the same Dockerfile. Needs
-# `docker login ghcr.io` and a buildx builder that can emulate arm64 (QEMU),
-# which the workflow sets up.
+# `docker login ghcr.io` and a buildx builder. Not QEMU: the Dockerfile runs
+# every build step on the builder's own platform and only assembles the other
+# architecture's image, so it needs no emulation for either.
 set -euo pipefail
 
 version="${1:?usage: scripts/publish-image.sh <version>}"
