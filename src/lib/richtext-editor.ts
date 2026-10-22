@@ -482,6 +482,15 @@ const EDITOR_THEME = {
 		bold: 'rt-bold',
 		italic: 'rt-italic',
 		strikethrough: 'rt-strikethrough'
+	},
+	/**
+	 * Another writer's caret and name, in a collaborative editor
+	 * (`CollaborativeEditor.svelte`). Without these `@lexical/yjs` styles them
+	 * inline, in Arial on a hard-coded colour; with them the theme's tokens do.
+	 */
+	collaboration: {
+		cursor: 'rt-remote-cursor',
+		cursorName: 'rt-remote-cursor-name'
 	}
 };
 
@@ -504,6 +513,13 @@ export function createRichTextEditor(options: {
 	features: readonly RichTextFeature[];
 	namespace: string;
 	onError?: (error: Error) => void;
+	/**
+	 * Lexical's own undo history. On, except in a collaborative editor: there
+	 * the undo stack is Yjs's (`createUndoManager`), which undoes only this
+	 * writer's edits. Lexical's would undo a partner's typing along with yours,
+	 * and the two stacks fighting over Ctrl+Z is worse than either.
+	 */
+	history?: boolean;
 }): RichTextEditorHandle {
 	const editor = createEditor({
 		namespace: options.namespace,
@@ -525,7 +541,6 @@ export function createRichTextEditor(options: {
 		// in priority, which is why it is registered after it here.
 		registerDecoratorBlockSelection(editor),
 		registerMendSplitBlocks(editor),
-		registerHistory(editor, createEmptyHistoryState(), 300),
 		registerAutoLink(editor, {
 			matchers: [linkifyMatcher],
 			changeHandlers: [],
@@ -544,6 +559,10 @@ export function createRichTextEditor(options: {
 			COMMAND_PRIORITY_NORMAL
 		)
 	];
+
+	if (options.history !== false) {
+		teardown.push(registerHistory(editor, createEmptyHistoryState(), 300));
+	}
 
 	if (options.features.includes('list')) {
 		teardown.push(registerList(editor));
