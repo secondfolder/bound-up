@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defined } from '../../testing/defined';
 import { RealtimeRoom } from './durable-object';
 import {
-	encodeSseEvent,
+	encodeSseFrame,
 	PRESENCE_TTL_MS,
 	type Presence,
 	SSE_KEEPALIVE,
@@ -36,7 +36,7 @@ function room() {
 	return new RealtimeRoom();
 }
 
-async function subscribe(instance: RealtimeRoom, query = 'user=u-1&stream=s-1') {
+async function subscribe(instance: RealtimeRoom, query = 'user=u-1&stream=s-1&topic=messages') {
 	const response = await instance.fetch(new Request(`${ORIGIN}/subscribe?${query}`));
 	const contentType = response.headers.get('content-type');
 	if (contentType !== 'text/event-stream') {
@@ -53,12 +53,12 @@ async function subscribe(instance: RealtimeRoom, query = 'user=u-1&stream=s-1') 
 	return reader;
 }
 
-function publish(instance: RealtimeRoom, body: unknown) {
+function publish(instance: RealtimeRoom, event: unknown, topic = 'messages') {
 	return instance.fetch(
 		new Request(`${ORIGIN}/publish`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(body)
+			body: JSON.stringify({ topic, data: JSON.stringify(event) })
 		})
 	);
 }
@@ -79,7 +79,7 @@ describe('RealtimeRoom', () => {
 
 		for (const reader of [a, b]) {
 			expect(decoder.decode((await reader.read()).value)).toBe(
-				encodeSseEvent({ kind: 'message', threadId: 't-7' })
+				encodeSseFrame('messages', JSON.stringify({ kind: 'message', threadId: 't-7' }))
 			);
 		}
 
@@ -113,7 +113,9 @@ describe('RealtimeRoom', () => {
 		// broadcast that threw on the dead writer would take the whole fan-out
 		// with it, so this is the assertion that matters.
 		expect((await publish(instance, { kind: 'reaction' })).status).toBe(200);
-		expect(decoder.decode((await staying.read()).value)).toBe(encodeSseEvent({ kind: 'reaction' }));
+		expect(decoder.decode((await staying.read()).value)).toBe(
+			encodeSseFrame('messages', JSON.stringify({ kind: 'reaction' }))
+		);
 
 		await staying.cancel();
 	});
@@ -122,8 +124,8 @@ describe('RealtimeRoom', () => {
 	it('reports who is watching after the broadcast, without anyone who hung up', async () => {
 		vi.useFakeTimers();
 		const instance = room();
-		const ada = await subscribe(instance, 'user=ada&device=d-ada&stream=s-ada');
-		const bo = await subscribe(instance, 'user=bo&stream=s-bo');
+		const ada = await subscribe(instance, 'user=ada&device=d-ada&stream=s-ada&topic=messages');
+		const bo = await subscribe(instance, 'user=bo&stream=s-bo&topic=messages');
 		await bo.cancel();
 
 		const response = await publish(instance, { kind: 'message', threadId: 't-1' });
@@ -153,7 +155,7 @@ describe('RealtimeRoom', () => {
 	 * renewed lease surviving. See `PRESENCE_TTL_MS`.
 	 */
 	describe('presence', () => {
-		const phone = 'user=ada&device=d-phone&stream=s-phone';
+		const phone = 'user=ada&device=d-phone&stream=s-phone&topic=messages';
 
 		function presence(instance: RealtimeRoom, body: Presence) {
 			return instance.fetch(
@@ -252,6 +254,122 @@ describe('RealtimeRoom', () => {
 			]);
 			await reader.cancel();
 		});
+	});
+
+	/**
+	 * Every realtime feature shares one room per scope, so the topic is all that
+	 * keeps a notebook edit off the message board's stream, and keeps a device
+	 * that only has a notebook page open from counting as watching the board,
+	 * which would cost it its push notifications.
+	 */
+	describe('topics', () => {
+		it('sends a frame only to streams that asked for its topic', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const board = await subscribe(instance, 'user=ada&stream=s-board&topic=messages');
+			const notebook = await subscribe(instance, 'user=ada&stream=s-note&topic=notebook');
+
+			await publish(instance, { kind: 'created' }, 'notebook');
+
+			expect(decoder.decode((await notebook.read()).value)).toBe(
+				encodeSseFrame('notebook', JSON.stringify({ kind: 'created' }))
+			);
+			const pending = await Promise.race([
+				board.read().then(() => 'delivered'),
+				Promise.resolve('nothing')
+			]);
+			expect(pending).toBe('nothing');
+
+			await board.cancel();
+			await notebook.cancel();
+		});
+
+		it('reports only the watchers of the topic published to', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const board = await subscribe(instance, 'user=ada&device=d-1&stream=s-board&topic=messages');
+			const notebook = await subscribe(instance, 'user=bo&device=d-2&stream=s-note&topic=notebook');
+
+			const response = await publish(instance, { kind: 'message' });
+			expect(await response.json()).toEqual({
+				watching: [{ userId: 'ada', deviceId: 'd-1', streamId: 's-board' }]
+			});
+
+			await board.cancel();
+			await notebook.cancel();
+		});
+
+		it('delivers to a stream subscribed to several topics', async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const reader = await subscribe(instance, 'user=ada&stream=s-1&topic=messages&topic=notebook');
+
+			await publish(instance, { kind: 'created' }, 'notebook');
+			await publish(instance, { kind: 'thread' }, 'messages');
+
+			expect(decoder.decode((await reader.read()).value)).toBe(
+				encodeSseFrame('notebook', JSON.stringify({ kind: 'created' }))
+			);
+			expect(decoder.decode((await reader.read()).value)).toBe(
+				encodeSseFrame('messages', JSON.stringify({ kind: 'thread' }))
+			);
+			await reader.cancel();
+		});
+	});
+
+	describe('evict', () => {
+		function evict(instance: RealtimeRoom, body: unknown) {
+			return instance.fetch(
+				new Request(`${ORIGIN}/evict`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify(body)
+				})
+			);
+		}
+
+		it("closes that user's streams on that topic, and nobody else's", async () => {
+			vi.useFakeTimers();
+			const instance = room();
+			const topic = 'notebook-entry:11111111-1111-1111-1111-111111111111';
+			const bosEntry = await subscribe(instance, `user=bo&stream=s-1&topic=${topic}`);
+			const bosBoard = await subscribe(instance, 'user=bo&stream=s-2&topic=messages');
+			const adasEntry = await subscribe(instance, `user=ada&stream=s-3&topic=${topic}`);
+
+			expect((await evict(instance, { userId: 'bo', topic })).status).toBe(204);
+
+			expect((await bosEntry.read()).done).toBe(true);
+			const response = await publish(instance, { kind: 'thread' });
+			expect(await response.json()).toEqual({
+				watching: [{ userId: 'bo', deviceId: null, streamId: 's-2' }]
+			});
+			await publish(instance, { kind: 'access' }, topic);
+			expect(decoder.decode((await adasEntry.read()).value)).toBe(
+				encodeSseFrame(topic, JSON.stringify({ kind: 'access' }))
+			);
+
+			await bosBoard.cancel();
+			await adasEntry.cancel();
+		});
+	});
+
+	/**
+	 * Notebook frames carry edits and can be tens of kilobytes, so a stalled
+	 * client is bounded by bytes as well as frames. See `SSE_QUEUE_BYTES`.
+	 */
+	it('drops a stream that has stopped reading once its queue passes the byte cap', async () => {
+		vi.useFakeTimers();
+		const instance = room();
+		const stalled = await subscribe(instance, 'user=ada&stream=s-1&topic=notebook');
+
+		const large = 'x'.repeat(300 * 1024);
+		for (let index = 0; index < 5; index += 1) {
+			await publish(instance, large, 'notebook');
+		}
+
+		const response = await publish(instance, 'one more', 'notebook');
+		expect(await response.json()).toEqual({ watching: [] });
+		await stalled.cancel();
 	});
 
 	it('404s an unknown path rather than throwing', async () => {

@@ -12,14 +12,18 @@ import { defined } from '$lib/testing/defined';
 
 vi.mock('$lib/push-client', () => ({ storedPushDeviceId: () => 'device-1' }));
 
-const { watchPartnership } = await import('./live');
+const { watchPartnership } = await import('$lib/messaging/live');
 
 class FakeEventSource {
 	static opened: FakeEventSource[] = [];
 	readonly url: string;
 	closed = false;
-	onmessage: ((message: { data: string }) => void) | null = null;
+	readonly listeners = new Map<string, (message: { data: string }) => void>();
+	onopen: (() => void) | null = null;
 	onerror: (() => void) | null = null;
+	addEventListener(type: string, listener: (message: { data: string }) => void) {
+		this.listeners.set(type, listener);
+	}
 	constructor(url: string) {
 		this.url = url;
 		FakeEventSource.opened.push(this);
@@ -31,7 +35,7 @@ class FakeEventSource {
 
 let visibility: 'visible' | 'hidden' = 'visible';
 const listeners = new Set<() => void>();
-const beacons: { url: string; body: { stream: string; present: boolean } }[] = [];
+const beacons: { url: string; body: { room: string; stream: string; present: boolean } }[] = [];
 
 beforeEach(() => {
 	vi.useFakeTimers();
@@ -78,7 +82,9 @@ describe('watchPartnership: presence', () => {
 		const stop = watchPartnership({ partnershipId: 'p-1', onChange: () => undefined });
 
 		const url = new URL(defined(FakeEventSource.opened[0], 'the stream').url, 'https://app.test');
-		expect(url.pathname).toBe('/api/partnerships/p-1/events');
+		expect(url.pathname).toBe('/api/realtime/events');
+		expect(url.searchParams.get('room')).toBe('partnership:p-1');
+		expect(url.searchParams.getAll('topic')).toEqual(['messages']);
 		expect(url.searchParams.get('stream')).toMatch(/^[0-9a-f-]{36}$/);
 		expect(url.searchParams.get('device')).toBe('device-1');
 		stop();
@@ -92,8 +98,8 @@ describe('watchPartnership: presence', () => {
 
 		expect(beacons).toEqual(
 			Array.from({ length: 3 }, () => ({
-				url: '/api/partnerships/p-1/events/presence',
-				body: { stream, present: true }
+				url: '/api/realtime/presence',
+				body: { room: 'partnership:p-1', stream, present: true }
 			}))
 		);
 		stop();
@@ -107,7 +113,9 @@ describe('watchPartnership: presence', () => {
 		stop();
 		vi.advanceTimersByTime(25_000 * 3);
 
-		expect(beacons.map((beacon) => beacon.body)).toEqual([{ stream, present: false }]);
+		expect(beacons.map((beacon) => beacon.body)).toEqual([
+			{ room: 'partnership:p-1', stream, present: false }
+		]);
 		expect(FakeEventSource.opened[0]?.closed).toBe(true);
 	});
 
@@ -116,13 +124,53 @@ describe('watchPartnership: presence', () => {
 		const first = streamOf(FakeEventSource.opened[0]);
 
 		setVisibility('hidden');
-		expect(beacons.map((beacon) => beacon.body)).toEqual([{ stream: first, present: false }]);
+		expect(beacons.map((beacon) => beacon.body)).toEqual([
+			{ room: 'partnership:p-1', stream: first, present: false }
+		]);
 
 		setVisibility('visible');
 		const second = streamOf(FakeEventSource.opened[1]);
 		// A new id, so a goodbye for the old stream can never close the new one,
 		// whichever reaches the server first.
 		expect(second).not.toBe(first);
+		stop();
+	});
+});
+
+describe('watchPartnership: frames', () => {
+	it('hands a message frame on, parsed', () => {
+		const events: unknown[] = [];
+		const stop = watchPartnership({
+			partnershipId: 'p-1',
+			onChange: (event) => events.push(event)
+		});
+		const source = defined(FakeEventSource.opened[0], 'the stream');
+
+		defined(
+			source.listeners.get('messages'),
+			'the messages listener'
+		)({
+			data: JSON.stringify({ kind: 'message', threadId: 't-1' })
+		});
+
+		expect(events).toEqual([{ kind: 'message', threadId: 't-1' }]);
+		stop();
+	});
+
+	it('catches up once a dropped stream opens again', () => {
+		const events: unknown[] = [];
+		const stop = watchPartnership({
+			partnershipId: 'p-1',
+			onChange: (event) => events.push(event)
+		});
+		defined(FakeEventSource.opened[0], 'the first stream').onerror?.();
+
+		vi.advanceTimersByTime(2000);
+		const second = defined(FakeEventSource.opened[1], 'the second stream');
+		expect(events).toEqual([]);
+		second.onopen?.();
+
+		expect(events).toEqual([null]);
 		stop();
 	});
 });

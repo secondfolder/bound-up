@@ -1,8 +1,9 @@
 import type { RealtimeNamespace } from './binding';
-import type { Notifier, Watcher } from './index';
+import type { Notifier, RoomKey, Watcher } from './index';
 
 /**
- * The production notifier: a Durable Object per partnership.
+ * The production notifier: a Durable Object per room (a partnership, or one
+ * account).
  *
  * This is the *worker* side — it talks to the object over `fetch`. The object
  * itself is `./durable-object.ts`, which nothing here imports: its only importer
@@ -18,15 +19,15 @@ import type { Notifier, Watcher } from './index';
 const ROOM_ORIGIN = 'https://realtime.invalid';
 
 export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notifier {
-	const room = (partnershipId: string) => namespace.get(namespace.idFromName(partnershipId));
+	const room = (key: RoomKey) => namespace.get(namespace.idFromName(key));
 
 	return {
-		async publish(partnershipId, event) {
+		async publish(key, topic, data) {
 			try {
-				const response = await room(partnershipId).fetch(`${ROOM_ORIGIN}/publish`, {
+				const response = await room(key).fetch(`${ROOM_ORIGIN}/publish`, {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify(event)
+					body: JSON.stringify({ topic, data })
 				});
 				const { watching } = (await response.json()) as { watching: Watcher[] };
 				return watching;
@@ -41,14 +42,17 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 			}
 		},
 
-		async stream(partnershipId, watcher) {
+		async stream(key, { watcher, topics }) {
 			const url = new URL(`${ROOM_ORIGIN}/subscribe`);
 			url.searchParams.set('user', watcher.userId);
 			url.searchParams.set('stream', watcher.streamId);
 			if (watcher.deviceId) {
 				url.searchParams.set('device', watcher.deviceId);
 			}
-			const response = await room(partnershipId).fetch(url.toString());
+			for (const topic of topics) {
+				url.searchParams.append('topic', topic);
+			}
+			const response = await room(key).fetch(url.toString());
 			// Rewrapped, because a stub's Response has immutable headers, and
 			// SvelteKit appends `Set-Cookie` to whatever an endpoint returns whenever
 			// the request set a cookie — a Better Auth session refresh, say. Returned
@@ -58,9 +62,9 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 			return new Response(response.body, response);
 		},
 
-		async presence(partnershipId, presence) {
+		async presence(key, presence) {
 			try {
-				await room(partnershipId).fetch(`${ROOM_ORIGIN}/presence`, {
+				await room(key).fetch(`${ROOM_ORIGIN}/presence`, {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify(presence)
@@ -69,6 +73,21 @@ export function createDurableObjectNotifier(namespace: RealtimeNamespace): Notif
 				// Swallowed like a failed publish: a lost renewal is covered by the
 				// next one, and a lost goodbye by the lease running out.
 				console.error('could not update realtime presence', error);
+			}
+		},
+
+		async evict(key, eviction) {
+			try {
+				await room(key).fetch(`${ROOM_ORIGIN}/evict`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify(eviction)
+				});
+			} catch (error) {
+				// Swallowed like a failed publish. The server has already stopped
+				// serving the topic, so the worst case is that an open page goes on
+				// receiving edits it can no longer load, until it next reconnects.
+				console.error('could not evict from a realtime room', error);
 			}
 		}
 	};

@@ -361,7 +361,7 @@ export function watchingDevices(watching: readonly Watcher[], recipientId: strin
  * Tells the other member of a partnership that something happened, by push,
  * unless push is off here or they are already watching on that device.
  *
- * Called by the send and reaction endpoints right after `notifier.publish`,
+ * Called by the send and reaction endpoints right after `publishMessagingEvent`,
  * whose return value is `watching`. Returns at once: the sending is handed to
  * `inBackground`.
  *

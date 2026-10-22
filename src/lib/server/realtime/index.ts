@@ -1,5 +1,5 @@
 /**
- * Telling the other device that something changed.
+ * Telling other devices that something changed: the app's one realtime room.
  *
  * An interface with two implementations, for the same reason
  * `src/lib/server/db/backend.ts` and `server/media/index.ts` have one each:
@@ -8,48 +8,96 @@
  * all. Production gets a Durable Object; dev gets a module-level `Map`, which
  * is genuinely correct there because dev is one Node process.
  *
- * **Events carry metadata only, and that is a rule rather than a convention.**
- * An event says *that* a partnership changed and, where it helps, which thread
- * — never who sent it and never a byte of content. The client's entire reaction
- * is to call `invalidate()` and re-run the load it already has. So the Durable
- * Object never handles message content, holds no storage, and knows nothing but
- * a partnership id. If a future event ever wants to carry a body, that is the
- * moment to stop and reconsider, not a small extension.
+ * **One room per scope, many topics per room.** A room is a partnership
+ * (`partnership:<id>`) or one account (`user:<id>`), and every realtime feature
+ * shares it: partner messaging and the notebook today. A stream names the
+ * topics it wants and is sent only those, so a device with a notebook entry
+ * open is neither sent message events nor counted as watching the board. One
+ * class rather than one per feature because a Durable Object is billed per
+ * open stream and request, not per class, and because the lease below is the
+ * subtle part, and there should be exactly one copy of it. See
+ * docs/realtime.md.
  *
- * The one thing a room does know about its listeners is *who* they are — a
- * user id, and the push device they are on if they have one — and only so that
- * `publish` can say who is watching. A device with the board open is already
- * being told; sending it a push notification as well would be noise. See
- * docs/notifications.md.
+ * **The room treats a frame as an opaque string.** What a frame may say is the
+ * publishing feature's rule, not the room's:
+ *
+ * - **`messages` frames are metadata only, and that is a rule rather than a
+ *   convention.** See `MessagingEvent` in `./messaging.ts`: an event says
+ *   *that* a partnership changed and, where it helps, which thread, never who
+ *   sent it and never a byte of content. The client's entire reaction is to
+ *   call `invalidate()`. If a future message event ever wants to carry a body,
+ *   that is the moment to stop and reconsider, not a small extension.
+ * - **Notebook entry frames carry sealed ciphertext**, because live co-editing
+ *   cannot wait for a refetch per keystroke. They are as opaque to the server
+ *   as to the room, and are never plaintext. See docs/notebook.md.
+ *
+ * The one thing a room does know about its listeners is *who* they are (a
+ * user id, and the push device they are on if they have one) and only so that
+ * `publish` can say who is watching a topic. A device with the board open is
+ * already being told; sending it a push notification as well would be noise.
+ * See docs/notifications.md.
  *
  * **SSE, not WebSocket**, and the reason is decisive rather than aesthetic:
  * `vite dev` cannot serve a WebSocket upgrade from a `+server.ts` at all, so a
- * socket would need a second client code path used only in development — and
+ * socket would need a second client code path used only in development, and
  * the Playwright suite would then never exercise the real one. An SSE stream is
  * a plain streaming `Response` and behaves identically in dev and on Workers.
+ *
+ * **The Durable Object imports this file**, so it stays alias-free (AGENTS.md
+ * invariant 15).
  */
 
 /**
- * What a change notification says.
+ * Which room: a partnership, or one account on its own.
  *
- * `kind` exists so a client can be told apart a board change from a thread
- * change and invalidate the narrower key; `threadId` is absent for anything
- * board-level. Both are unguessable-by-design UUIDs already known to whoever
- * is allowed to receive them.
- *
- * `thread` and `message` mean a message was written — a new thread, a reply —
- * and nothing else does: a tag change is `tags`. A thread page relies on
- * that to decide whether another thread is worth a toast, so a kind that is
- * not a new message must not borrow either of them.
- *
- * `read` means a member's read mark in a thread moved, so the other one's read
- * receipt may have. Only a thread page shows receipts, so the board ignores it.
+ * The key is what `idFromName` hashes, so both partners' devices (or all of
+ * one account's) derive the same object without an id being stored anywhere.
  */
-export type RealtimeEvent = {
-	kind: 'thread' | 'message' | 'reaction' | 'tags' | 'restore' | 'read';
-	/** Absent when the change is board-level rather than inside one thread. */
-	threadId?: string;
-};
+export type RoomKey = `partnership:${string}` | `user:${string}`;
+
+export function partnershipRoom(partnershipId: string): RoomKey {
+	return `partnership:${partnershipId}`;
+}
+
+export function userRoom(userId: string): RoomKey {
+	return `user:${userId}`;
+}
+
+/**
+ * Partnership ids are UUIDs; user ids are Better Auth's, which are not, so the
+ * id half is any short run of URL-safe characters rather than a UUID.
+ */
+const ROOM_PATTERN = /^(?:partnership|user):[A-Za-z0-9_-]{1,64}$/;
+
+/** A room key from a request, or `null` for anything that is not one. */
+export function parseRoomKey(value: string | null): RoomKey | null {
+	return value !== null && ROOM_PATTERN.test(value) ? (value as RoomKey) : null;
+}
+
+/** The two halves of a room key, for authorising it. */
+export function roomScope(room: RoomKey): { kind: 'partnership' | 'user'; id: string } {
+	const separator = room.indexOf(':');
+	return {
+		kind: room.slice(0, separator) as 'partnership' | 'user',
+		id: room.slice(separator + 1)
+	};
+}
+
+/**
+ * A topic: a feature's name, optionally narrowed to one record.
+ *
+ * `messages`, `notebook`, `notebook-entry:<uuid>`. Kept to a closed shape so a
+ * topic is always safe to write into an SSE `event:` line: a newline in one
+ * would let it forge frames.
+ */
+const TOPIC_PATTERN = /^[a-z][a-z-]{0,39}(?::[0-9a-f-]{36})?$/;
+
+export function isTopic(value: string): boolean {
+	return TOPIC_PATTERN.test(value);
+}
+
+/** The most topics one stream may name: enough for any page, not a firehose. */
+export const MAX_TOPICS_PER_STREAM = 8;
 
 /**
  * One open stream's listener.
@@ -59,12 +107,19 @@ export type RealtimeEvent = {
  * listener's own push subscription id, if it has one, as the browser reports
  * it; at worst a wrong one means a push that should have been skipped is sent.
  * `streamId` is random per connection, chosen by the browser, so a presence
- * update names exactly one stream — see `PRESENCE_TTL_MS`.
+ * update names exactly one stream; see `PRESENCE_TTL_MS`.
  */
 export type Watcher = {
 	userId: string;
 	deviceId: string | null;
 	streamId: string;
+};
+
+/** A stream as the room holds it: whose it is, and which topics it was let in to. */
+export type Subscription = {
+	watcher: Watcher;
+	/** Already authorised, one by one, by the events endpoint. */
+	topics: string[];
 };
 
 /**
@@ -79,26 +134,46 @@ export type Presence = {
 	present: boolean;
 };
 
+/**
+ * Closing one user's streams on one topic, because they may no longer read it.
+ *
+ * A notebook entry being hidden from a partner is the case: the server stops
+ * serving it at once, and this stops the room relaying its edits to a page
+ * that is already open. The stream as a whole is closed, not just unsubscribed,
+ * because a stream's topics are fixed when it opens; the page reconnects with
+ * the topics it may still have.
+ */
+export type Eviction = {
+	userId: string;
+	topic: string;
+};
+
 export type Notifier = {
 	/**
-	 * Announces a change to everyone currently watching a partnership, and
-	 * returns who that was.
+	 * Sends a frame to everyone in a room watching a topic, and returns who that
+	 * was.
+	 *
+	 * `data` is opaque to the room. It must be a single line, which
+	 * `JSON.stringify` always is; the publishing feature's own helper decides
+	 * what may go in it.
 	 *
 	 * Must never throw. A realtime failure has to be invisible: the write it
 	 * follows has already committed, and turning that into a 500 would make the
 	 * client retry a send that actually succeeded. A failure reports nobody
 	 * watching, which errs towards sending a push rather than losing one.
 	 */
-	publish: (partnershipId: string, event: RealtimeEvent) => Promise<Watcher[]>;
-	/** A long-lived SSE `Response` for one partnership. */
-	stream: (partnershipId: string, watcher: Watcher) => Promise<Response>;
+	publish: (room: RoomKey, topic: string, data: string) => Promise<Watcher[]>;
+	/** A long-lived SSE `Response` carrying a room's frames for some topics. */
+	stream: (room: RoomKey, subscription: Subscription) => Promise<Response>;
 	/**
 	 * Refreshes a stream's lease, or closes it when its page has gone.
 	 *
 	 * Never throws, like `publish`, and for a kindred reason: it is fire and
 	 * forget from a beacon, and the lease expiring is the fallback anyway.
 	 */
-	presence: (partnershipId: string, presence: Presence) => Promise<void>;
+	presence: (room: RoomKey, presence: Presence) => Promise<void>;
+	/** Closes a user's streams on a topic. Never throws, like `publish`. */
+	evict: (room: RoomKey, eviction: Eviction) => Promise<void>;
 };
 
 /**
@@ -116,16 +191,22 @@ export const SSE_HEADERS: Record<string, string> = {
 	'x-accel-buffering': 'no'
 };
 
-/** One SSE frame. */
-export function encodeSseEvent(event: RealtimeEvent): string {
-	return `data: ${JSON.stringify(event)}\n\n`;
+/**
+ * One SSE frame, named by its topic.
+ *
+ * A named event rather than a bare `data:` line, so a page with several
+ * topics open can tell them apart with `addEventListener(topic)` without the
+ * room having to wrap or parse the publisher's data.
+ */
+export function encodeSseFrame(topic: string, data: string): string {
+	return `event: ${topic}\ndata: ${data}\n\n`;
 }
 
 /**
  * A comment frame, sent as soon as a stream opens.
  *
  * Not optional. `EventSource` does not fire `onopen` until it has received
- * something, and neither do most proxies flush headers alone — so without this
+ * something, and neither do most proxies flush headers alone, so without this
  * a client cannot tell "connected, nothing happening yet" from "still
  * connecting", and its reconnect backoff never resets.
  */
@@ -135,14 +216,36 @@ export const SSE_PREAMBLE = ': connected\n\n';
 export const SSE_KEEPALIVE = ': ping\n\n';
 
 /**
- * Frames one client may have queued before it is disconnected.
+ * Small frames one client may have queued before it is disconnected.
  *
  * A client that has stopped reading is asleep, offline, or behind a proxy that
  * buffers `text/event-stream`. Hanging up on it is safe because reconnecting
- * refetches unconditionally (see `live.ts`), so the alternative — an unbounded
- * queue per stalled client inside a 128 MB Durable Object — buys nothing.
+ * refetches unconditionally (see `src/lib/realtime/live.ts`), so the
+ * alternative, an unbounded queue per stalled client inside a 128 MB Durable
+ * Object, buys nothing.
  */
 export const SSE_QUEUE_LIMIT = 16;
+
+/**
+ * Bytes one client may have queued before it is disconnected.
+ *
+ * Message frames are a few dozen bytes, so `SSE_QUEUE_LIMIT` is what binds
+ * them. A notebook frame carries an edit and can be tens of kilobytes, so a
+ * count alone would let sixteen of them hold megabytes per stalled client.
+ * `queuedSize` charges each frame at least an equal share of this, so both
+ * limits hold at once.
+ */
+export const SSE_QUEUE_BYTES = 1024 * 1024;
+
+/**
+ * What a frame counts against `SSE_QUEUE_BYTES`.
+ *
+ * Small frames are rounded up to a sixteenth of the budget, which is what
+ * makes the frame limit fall out of the byte limit for free.
+ */
+export function queuedSize(chunk: Uint8Array): number {
+	return Math.max(chunk.byteLength, SSE_QUEUE_BYTES / SSE_QUEUE_LIMIT);
+}
 
 /**
  * How often to send one.
@@ -158,7 +261,7 @@ export const SSE_KEEPALIVE_MS = 25_000;
  *
  * **A browser hanging up does not reach the room.** On Workers neither the
  * request's abort signal nor a failing write tells the Durable Object that a
- * client went away — measured on the preview, a phone that had left the board
+ * client went away. Measured on the preview, a phone that had left the board
  * was still listed as watching minutes later, so every push to it was
  * skipped. So a stream is a lease rather than a connection: the page renews it
  * every `PRESENCE_INTERVAL_MS` (in `live.ts`) while it is on screen, says when
@@ -167,8 +270,8 @@ export const SSE_KEEPALIVE_MS = 25_000;
  *
  * A little over two intervals, so one late or lost renewal does not cost a
  * live page its stream. This is also the longest a message can go unpushed
- * to a device that vanished without saying so — a phone locked before its
- * goodbye got out, say. See docs/notifications.md.
+ * to a device that vanished without saying so (a phone locked before its
+ * goodbye got out, say). See docs/notifications.md.
  */
 export const PRESENCE_TTL_MS = 60_000;
 

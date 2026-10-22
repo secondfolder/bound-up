@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defined } from '$lib/testing/defined';
 import type { RealtimeNamespace } from './binding';
+import { partnershipRoom } from './index';
 import { createDurableObjectNotifier } from './remote';
 
 /**
@@ -38,10 +39,9 @@ describe('createDurableObjectNotifier().stream', () => {
 		const { namespace } = fakeNamespace(
 			async () => await fetch('data:text/event-stream,:ok%0A%0A')
 		);
-		const response = await createDurableObjectNotifier(namespace).stream('p-1', {
-			userId: 'u-1',
-			deviceId: null,
-			streamId: 's-1'
+		const response = await createDurableObjectNotifier(namespace).stream(partnershipRoom('p-1'), {
+			watcher: { userId: 'u-1', deviceId: null, streamId: 's-1' },
+			topics: ['messages']
 		});
 
 		expect(() => response.headers.append('set-cookie', 'session=x')).not.toThrow();
@@ -52,10 +52,9 @@ describe('createDurableObjectNotifier().stream', () => {
 
 	it('names the user, device and stream to the room', async () => {
 		const { namespace, requested } = fakeNamespace(async () => new Response(''));
-		await createDurableObjectNotifier(namespace).stream('p-1', {
-			userId: 'u-1',
-			deviceId: 'd-1',
-			streamId: 's-1'
+		await createDurableObjectNotifier(namespace).stream(partnershipRoom('p-1'), {
+			watcher: { userId: 'u-1', deviceId: 'd-1', streamId: 's-1' },
+			topics: ['messages', 'notebook']
 		});
 
 		const url = new URL(defined(requested[0], 'the subscribe request'));
@@ -63,13 +62,30 @@ describe('createDurableObjectNotifier().stream', () => {
 		expect(url.searchParams.get('user')).toBe('u-1');
 		expect(url.searchParams.get('device')).toBe('d-1');
 		expect(url.searchParams.get('stream')).toBe('s-1');
+		expect(url.searchParams.getAll('topic')).toEqual(['messages', 'notebook']);
+	});
+
+	it('addresses the room by its scoped key', async () => {
+		const names: string[] = [];
+		const namespace: RealtimeNamespace = {
+			idFromName: (name) => {
+				names.push(name);
+				return { toString: () => name };
+			},
+			get: () => ({ fetch: async () => await Promise.resolve(new Response('')) })
+		};
+		await createDurableObjectNotifier(namespace).stream(partnershipRoom('p-1'), {
+			watcher: { userId: 'u-1', deviceId: null, streamId: 's-1' },
+			topics: ['messages']
+		});
+		expect(names).toEqual(['partnership:p-1']);
 	});
 });
 
 describe('createDurableObjectNotifier().presence', () => {
 	it('passes the update on to the room', async () => {
 		const { namespace, requested } = fakeNamespace(async () => new Response(null, { status: 204 }));
-		await createDurableObjectNotifier(namespace).presence('p-1', {
+		await createDurableObjectNotifier(namespace).presence(partnershipRoom('p-1'), {
 			userId: 'u-1',
 			streamId: 's-1',
 			present: false
@@ -82,10 +98,56 @@ describe('createDurableObjectNotifier().presence', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => undefined);
 		const { namespace } = fakeNamespace(() => Promise.reject(new Error('room unavailable')));
 		await expect(
-			createDurableObjectNotifier(namespace).presence('p-1', {
+			createDurableObjectNotifier(namespace).presence(partnershipRoom('p-1'), {
 				userId: 'u-1',
 				streamId: 's-1',
 				present: true
+			})
+		).resolves.toBeUndefined();
+	});
+});
+
+describe('createDurableObjectNotifier().publish', () => {
+	it('sends the topic and the opaque data, and returns who was watching', async () => {
+		const bodies: unknown[] = [];
+		const namespace: RealtimeNamespace = {
+			idFromName: (name) => ({ toString: () => name }),
+			get: () => ({
+				fetch: async (_input, init) => {
+					bodies.push(JSON.parse(String(init?.body)));
+					return await Promise.resolve(
+						Response.json({ watching: [{ userId: 'u-1', deviceId: null, streamId: 's-1' }] })
+					);
+				}
+			})
+		};
+		const watching = await createDurableObjectNotifier(namespace).publish(
+			partnershipRoom('p-1'),
+			'notebook',
+			'{"kind":"created"}'
+		);
+		expect(bodies).toEqual([{ topic: 'notebook', data: '{"kind":"created"}' }]);
+		expect(watching).toEqual([{ userId: 'u-1', deviceId: null, streamId: 's-1' }]);
+	});
+});
+
+describe('createDurableObjectNotifier().evict', () => {
+	it('passes the eviction on to the room', async () => {
+		const { namespace, requested } = fakeNamespace(async () => new Response(null, { status: 204 }));
+		await createDurableObjectNotifier(namespace).evict(partnershipRoom('p-1'), {
+			userId: 'u-1',
+			topic: 'notebook-entry:00000000-0000-0000-0000-000000000000'
+		});
+		expect(new URL(defined(requested[0], 'the evict request')).pathname).toBe('/evict');
+	});
+
+	it('never throws', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		const { namespace } = fakeNamespace(() => Promise.reject(new Error('room unavailable')));
+		await expect(
+			createDurableObjectNotifier(namespace).evict(partnershipRoom('p-1'), {
+				userId: 'u-1',
+				topic: 'notebook'
 			})
 		).resolves.toBeUndefined();
 	});

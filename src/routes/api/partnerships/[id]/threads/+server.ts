@@ -4,6 +4,7 @@ import { createMediaStore } from '$lib/server/media/backend';
 import { requireMembership, startThread } from '$lib/server/messaging';
 import { notifyPartner } from '$lib/server/push';
 import { createNotifier } from '$lib/server/realtime/backend';
+import { publishMessagingEvent } from '$lib/server/realtime/messaging';
 import { parseSend, sendFailureStatus } from '../send';
 import type { RequestHandler } from './$types';
 
@@ -74,7 +75,10 @@ export const POST: RequestHandler = async (event) => {
 	// own errors, because the message is already stored and a fan-out problem
 	// must not turn into a retryable 500 for a send that worked.
 	const notifier = await createNotifier({ platform });
-	const watching = await notifier.publish(params.id, { kind: 'thread', threadId: result.threadId });
+	const watching = await publishMessagingEvent(notifier, params.id, {
+		kind: 'thread',
+		threadId: result.threadId
+	});
 	notifyPartner(event, {
 		partnership: membership.partnership,
 		kind: 'thread',

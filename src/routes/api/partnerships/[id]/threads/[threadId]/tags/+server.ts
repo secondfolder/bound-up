@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { setThreadTags } from '$lib/server/messaging';
 import { createNotifier } from '$lib/server/realtime/backend';
+import { publishMessagingEvent } from '$lib/server/realtime/messaging';
 import type { RequestHandler } from './$types';
 
 export const PUT: RequestHandler = async ({ locals, params, request, platform }) => {
@@ -20,6 +21,6 @@ export const PUT: RequestHandler = async ({ locals, params, request, platform })
 		error(404, 'Not found');
 	}
 	const notifier = await createNotifier({ platform });
-	await notifier.publish(params.id, { kind: 'tags', threadId: params.threadId });
+	await publishMessagingEvent(notifier, params.id, { kind: 'tags', threadId: params.threadId });
 	return json({ ok: true });
 };

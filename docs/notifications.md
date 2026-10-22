@@ -154,14 +154,17 @@ A device with the board or thread open is already being told, live, by the SSE
 feed (see [messaging.md](messaging.md#realtime)), so a push to it as well is
 noise. The realtime room knows who is listening, so it answers the question:
 
-- `live.ts` opens the stream with `?device=<id>`, the id the server gave this
+- `watchRoom` (`src/lib/realtime/live.ts`) opens the stream with `?device=<id>`, the id the server gave this
   browser when it subscribed, kept in `localStorage` under `PUSH_DEVICE_ID_KEY`.
 - The events endpoint passes the room a watcher whose **user id comes from the
   session** and whose device id comes from that query. The query is only ever
   compared against that user's own subscriptions.
-- `Notifier.publish` returns the watchers, at no extra cost, from the request
-  it already makes. `watchingDevices` keeps only the recipient's own.
-  `sendPush` skips those.
+- `publishMessagingEvent` returns the watchers of the `messages` topic, at no
+  extra cost, from the request it already makes. Only that topic's: one room
+  serves every realtime feature (see [realtime.md](realtime.md)), and a device
+  with only a notebook page of the partnership open is not showing the board,
+  so it must still be pushed to. `watchingDevices` keeps only the recipient's
+  own. `sendPush` skips those.
 
 It is per device on purpose: a board open on a laptop says nothing about
 whether its owner is looking at their phone, so the phone is still told.
@@ -252,8 +255,9 @@ The Zod schemas are in `src/lib/schemas/pushSubscription.ts`.
   `$lib/push-client` mocked.
 - Whether a device counts as watching is covered at each layer: the lease
   rules per backend in `server/realtime/{durable-object,local}.test.ts`, the
-  presence endpoint in `api/partnerships/[id]/events/server.test.ts`, and the
-  page's renewals and goodbye in `messaging/live.test.ts`. None of them can
+  presence endpoint in `api/realtime/events/server.test.ts` (which also checks
+  that a notebook stream does not count as watching the board), and the page's
+  renewals and goodbye in `realtime/live.test.ts`. None of them can
   show that Workers never tells the room about a hang-up, which is why the
   lease exists at all; that was found on a deployed preview.
 - `e2e/notifications.spec.ts` drives the real screen, service worker and

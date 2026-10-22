@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { updateTagSchema } from '$lib/schemas/tag';
 import { updateTag } from '$lib/server/messaging';
 import { createNotifier } from '$lib/server/realtime/backend';
+import { publishMessagingEvent } from '$lib/server/realtime/messaging';
 import type { RequestHandler } from './$types';
 
 export const PATCH: RequestHandler = async ({ locals, params, request, platform }) => {
@@ -24,6 +25,6 @@ export const PATCH: RequestHandler = async ({ locals, params, request, platform 
 	}
 	const notifier = await createNotifier({ platform });
 	// Board-level: a renamed or recoloured tag can be on any thread.
-	await notifier.publish(params.id, { kind: 'tags' });
+	await publishMessagingEvent(notifier, params.id, { kind: 'tags' });
 	return json(result.tag);
 };

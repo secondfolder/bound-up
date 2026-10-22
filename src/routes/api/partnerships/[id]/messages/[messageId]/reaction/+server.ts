@@ -3,6 +3,7 @@ import { reactionSchema } from '$lib/schemas/messageForm';
 import { clearReaction, setReaction } from '$lib/server/messaging';
 import { notifyPartner } from '$lib/server/push';
 import { createNotifier } from '$lib/server/realtime/backend';
+import { publishMessagingEvent } from '$lib/server/realtime/messaging';
 import type { RequestHandler } from './$types';
 
 /** Sets or replaces the viewer's tapback. One per person per message. */
@@ -33,7 +34,7 @@ export const PUT: RequestHandler = async (event) => {
 	}
 
 	const notifier = await createNotifier({ platform });
-	const watching = await notifier.publish(params.id, {
+	const watching = await publishMessagingEvent(notifier, params.id, {
 		kind: 'reaction',
 		threadId: result.threadId
 	});
@@ -64,7 +65,7 @@ export const DELETE: RequestHandler = async ({ locals, params, platform }) => {
 	}
 
 	const notifier = await createNotifier({ platform });
-	await notifier.publish(params.id, { kind: 'reaction', threadId: result.threadId });
+	await publishMessagingEvent(notifier, params.id, { kind: 'reaction', threadId: result.threadId });
 
 	return json({ ok: true });
 };

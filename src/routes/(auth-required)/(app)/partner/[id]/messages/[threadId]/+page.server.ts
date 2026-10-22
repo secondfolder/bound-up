@@ -3,6 +3,7 @@ import { firstUnreadMessageId } from '$lib/messaging';
 import { getRecipientsForPartnership } from '$lib/server/keys';
 import { getThread, listTags, openThread, requireThreadMembership } from '$lib/server/messaging';
 import { createNotifier } from '$lib/server/realtime/backend';
+import { publishMessagingEvent } from '$lib/server/realtime/messaging';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, depends, platform }) => {
@@ -64,7 +65,7 @@ export const load: PageServerLoad = async ({ locals, params, depends, platform }
 	// `publish` never throws.
 	if (readMoved) {
 		const notifier = await createNotifier({ platform });
-		await notifier.publish(params.id, { kind: 'read', threadId: params.threadId });
+		await publishMessagingEvent(notifier, params.id, { kind: 'read', threadId: params.threadId });
 	}
 
 	// Every account has keys, so a partnership without both is broken data.

@@ -1,18 +1,20 @@
 import {
-	encodeSseEvent,
+	type Eviction,
+	encodeSseFrame,
 	isExpired,
 	type Presence,
-	type RealtimeEvent,
+	queuedSize,
 	SSE_HEADERS,
 	SSE_KEEPALIVE,
 	SSE_KEEPALIVE_MS,
 	SSE_PREAMBLE,
-	SSE_QUEUE_LIMIT,
+	SSE_QUEUE_BYTES,
 	type Watcher
 } from './index';
 
 /**
- * One room per partnership, holding only the open connections watching it.
+ * One room per scope (a partnership, or one account), holding only the open
+ * connections watching it and the topics each was let in to.
  *
  * **This file is a second alias-free zone.** It is bundled by wrangler's esbuild
  * rather than by vite — the `sveltekit-cloudflare-do` plugin appends
@@ -27,9 +29,10 @@ import {
  * overwrite the DOM's `Request`/`Response`/`fetch` for the whole project,
  * including the component test project. The classic style needs no types at all.
  *
- * The object holds **no storage** and never sees message content — see the note
- * on `RealtimeEvent`. Everything it knows is which sockets are open and whose
- * they are, which is why it can be discarded and recreated at any time with no
+ * The object holds **no storage** and reads no frame it relays: message frames
+ * are metadata only and notebook frames are ciphertext (see `./index.ts`).
+ * Everything it knows is which sockets are open, whose they are and which
+ * topics they asked for, which is why it can be discarded and recreated at any time with no
  * consequence beyond clients reconnecting.
  */
 
@@ -47,7 +50,7 @@ export class RealtimeRoom {
 	 */
 	readonly #writers = new Map<
 		WritableStreamDefaultWriter<Uint8Array>,
-		{ watcher: Watcher; lastSeen: number }
+		{ watcher: Watcher; topics: Set<string>; lastSeen: number }
 	>();
 
 	// No constructor. The runtime passes `(state, env)`, and this object
@@ -58,15 +61,17 @@ export class RealtimeRoom {
 		const url = new URL(request.url);
 
 		if (url.pathname === '/publish') {
-			const event = (await request.json()) as RealtimeEvent;
+			const { topic, data } = (await request.json()) as { topic: string; data: string };
 			// Expired leases go first, so a page that left without saying so is
 			// neither sent this nor reported as watching.
 			this.#dropExpired();
-			this.#broadcast(event);
+			this.#broadcast(topic, data);
 			// Who is watching *after* the broadcast, so a client it just dropped for
 			// not reading is not counted as having been told.
 			return Response.json({
-				watching: [...this.#writers.values()].map((entry) => entry.watcher)
+				watching: [...this.#writers.values()]
+					.filter((entry) => entry.topics.has(topic))
+					.map((entry) => entry.watcher)
 			});
 		}
 
@@ -79,8 +84,13 @@ export class RealtimeRoom {
 			return new Response(null, { status: 204 });
 		}
 
+		if (url.pathname === '/evict') {
+			this.#evict((await request.json()) as Eviction);
+			return new Response(null, { status: 204 });
+		}
+
 		// Unreachable through the app — `remote.ts` is the only caller and it only
-		// ever asks for these three paths. A 404 rather than a throw so a mistake
+		// ever asks for these four paths. A 404 rather than a throw so a mistake
 		// shows up as a bad response instead of an exception in the logs.
 		return new Response('Not found', { status: 404 });
 	}
@@ -100,10 +110,13 @@ export class RealtimeRoom {
 	 * Ordering per client is still guaranteed: writes queue on the writable in
 	 * call order whether or not anyone awaits them.
 	 */
-	#broadcast(event: RealtimeEvent): void {
-		const frame = encoder.encode(encodeSseEvent(event));
+	#broadcast(topic: string, data: string): void {
+		const frame = encoder.encode(encodeSseFrame(topic, data));
 		// Copied first: `#drop` mutates the set we would otherwise be iterating.
-		for (const writer of [...this.#writers.keys()]) {
+		for (const [writer, entry] of [...this.#writers]) {
+			if (!entry.topics.has(topic)) {
+				continue;
+			}
 			// A full queue means this client has stopped reading — asleep, offline,
 			// or behind a proxy that buffers. Disconnect it rather than growing a
 			// queue for it: it will reconnect when it can, and reconnecting
@@ -127,11 +140,12 @@ export class RealtimeRoom {
 	#subscribe(request: Request): Response {
 		// A queue deeper than the default 1, so `desiredSize` in `#broadcast` means
 		// "this client has genuinely stopped reading" rather than "has not read
-		// the frame sent a moment ago". Frames are a few dozen bytes, so the
-		// memory this permits is negligible next to the cost of being wrong.
+		// the frame sent a moment ago". Measured in bytes, with small frames
+		// rounded up, so a few large notebook edits and many tiny message events
+		// are both bounded; see `queuedSize`.
 		const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>(
 			{},
-			{ highWaterMark: SSE_QUEUE_LIMIT }
+			{ highWaterMark: SSE_QUEUE_BYTES, size: queuedSize }
 		);
 		const writer = writable.getWriter();
 		const url = new URL(request.url);
@@ -144,6 +158,8 @@ export class RealtimeRoom {
 				deviceId: url.searchParams.get('device'),
 				streamId: url.searchParams.get('stream') ?? ''
 			},
+			// Each one authorised by the events endpoint before it got here.
+			topics: new Set(url.searchParams.getAll('topic')),
 			// Opening is the first sign of life; the page renews it from there.
 			lastSeen: Date.now()
 		});
@@ -195,6 +211,15 @@ export class RealtimeRoom {
 			if (present) {
 				entry.lastSeen = Date.now();
 			} else {
+				this.#drop(writer);
+			}
+		}
+	}
+
+	/** Closes one user's streams on a topic they may no longer read. */
+	#evict({ userId, topic }: Eviction): void {
+		for (const [writer, entry] of [...this.#writers]) {
+			if (entry.watcher.userId === userId && entry.topics.has(topic)) {
 				this.#drop(writer);
 			}
 		}

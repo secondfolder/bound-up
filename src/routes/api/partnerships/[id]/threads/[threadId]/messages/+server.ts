@@ -4,6 +4,7 @@ import { createMediaStore } from '$lib/server/media/backend';
 import { requireThreadMembership, sendMessage } from '$lib/server/messaging';
 import { notifyPartner } from '$lib/server/push';
 import { createNotifier } from '$lib/server/realtime/backend';
+import { publishMessagingEvent } from '$lib/server/realtime/messaging';
 import { parseSend, sendFailureStatus } from '../../../send';
 import type { RequestHandler } from './$types';
 
@@ -54,7 +55,7 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const notifier = await createNotifier({ platform });
-	const watching = await notifier.publish(params.id, {
+	const watching = await publishMessagingEvent(notifier, params.id, {
 		kind: 'message',
 		threadId: params.threadId
 	});

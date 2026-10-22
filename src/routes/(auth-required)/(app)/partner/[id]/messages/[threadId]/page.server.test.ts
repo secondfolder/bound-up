@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNotifier } from '$lib/server/realtime/backend';
+import { partnershipRoom } from '$lib/server/realtime/index';
 import { createTestDb, type TestDb } from '$lib/testing/db';
 import { fakeEvent, runLoad } from '$lib/testing/events';
 import {
@@ -148,7 +149,11 @@ describe('/partner/[id]/messages/[threadId]', () => {
 
 		try {
 			await open();
-			expect(publish).toHaveBeenCalledExactlyOnceWith(partnershipId, { kind: 'read', threadId });
+			expect(publish).toHaveBeenCalledExactlyOnceWith(
+				partnershipRoom(partnershipId),
+				'messages',
+				JSON.stringify({ kind: 'read', threadId })
+			);
 
 			publish.mockClear();
 			await open();
@@ -156,7 +161,11 @@ describe('/partner/[id]/messages/[threadId]', () => {
 
 			await createTestMessage(harness.db, partnershipId, threadId, ada, { at: new Date(2000) });
 			await open();
-			expect(publish).toHaveBeenCalledExactlyOnceWith(partnershipId, { kind: 'read', threadId });
+			expect(publish).toHaveBeenCalledExactlyOnceWith(
+				partnershipRoom(partnershipId),
+				'messages',
+				JSON.stringify({ kind: 'read', threadId })
+			);
 		} finally {
 			publish.mockRestore();
 		}
