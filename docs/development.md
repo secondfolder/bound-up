@@ -71,8 +71,19 @@ schedule is `triggers.crons` in `wrangler.jsonc` and is applied by `deploy`. To
 run it by hand against `npm run preview`, start wrangler with
 `--test-scheduled` and request `/cdn-cgi/handler/scheduled`.
 
-Because wrangler needs no custom entry, Cloudflare's deploy-on-push works on its
-defaults — build command `npm run build`, deploy command `npx wrangler deploy`.
+Because wrangler needs no custom entry, deploying is plain `npm run build` then
+`npx wrangler deploy`.
+
+**Production deploys from CI, not from Cloudflare.** The `deploy` job in
+`.github/workflows/ci.yml` runs on a push to `main` only after every test has
+passed and the `release` job has tagged the version: it builds, runs
+`npm run db:migrate:production`, then `npx wrangler deploy`. A red run deploys
+nothing. It needs the repository secrets `CLOUDFLARE_API_TOKEN` (Workers, D1 and
+R2 edit) and `CLOUDFLARE_ACCOUNT_ID`. Cloudflare's own builds are switched off
+for the production branch in the dashboard (Workers & Pages → bound-up →
+Settings → Build) and left on for every other branch, which is what makes the
+Worker Previews below. Turning them back on for `main` would deploy every push
+twice, the first time untested.
 
 > **Why `overrides` in package.json:** `sveltekit-cloudflare-do@0.2.1` ships a
 > self-referential `"sveltekit-cloudflare-do": "link:"` dependency — a pnpm

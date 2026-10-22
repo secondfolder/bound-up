@@ -147,7 +147,8 @@ export default defineConfig(({ command, mode }) => {
 			 * path and `rimraf`s it before writing. Appending after the build is the
 			 * one arrangement that leaves the entry where wrangler expects it, so plain
 			 * `wrangler deploy` and `wrangler dev` stay correct — including the
-			 * `npx wrangler deploy` that Cloudflare's deploy-on-push runs for us.
+			 * the `npx wrangler deploy` that CI's deploy job and Cloudflare's preview
+			 * builds run.
 			 *
 			 * The plugin reads the class names out of the file (rather than emitting
 			 * `export *`) because wrangler only resolves `DurableObjectNamespace<T>` for

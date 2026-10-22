@@ -8,9 +8,10 @@ import releaseConfig from '../release.config.mjs';
  *
  * Nothing records the version in the repository — `package.json` stays at its
  * placeholder, and the version lives in the `v*` tag that the release job
- * pushes (see docs/self-hosting.md). But Cloudflare's deploy-on-push builds a
- * commit on `main` before CI has tagged it, so the tag cannot simply be read.
- * Instead this repeats semantic-release's own arithmetic: the highest `v*` tag
+ * pushes (see docs/self-hosting.md). Production is deployed by CI after that
+ * tag is pushed, so there this finds the tag on HEAD with nothing after it. A
+ * Worker Preview, `vite dev` or a local build has no tag of its own, though,
+ * so the tag cannot simply be read. Instead this repeats semantic-release's own arithmetic: the highest `v*` tag
  * the commit contains, bumped by semantic-release's commit analyzer, run with
  * the exact configuration from `release.config.mjs`, over the commits since.
  * The two therefore agree by construction, `{ breaking: true, release: 'minor' }`

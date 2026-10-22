@@ -2,7 +2,7 @@
  * Which platform `vite build` produces a server for.
  *
  * `cloudflare` (the default) is the Workers bundle that `wrangler deploy` and
- * Cloudflare's deploy-on-push expect, so a bare `npm run build` stays exactly
+ * Cloudflare's preview builds expect, so a bare `npm run build` stays exactly
  * what it was. `node` is the adapter-node server the Docker image runs.
  *
  * Read from the environment rather than a CLI flag because two separate

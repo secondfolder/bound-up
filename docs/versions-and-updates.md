@@ -14,9 +14,11 @@ muted text at the bottom.
 
 Every build works it out for itself instead, in
 `vite-plugins/app-version.ts`, and bakes it in as the `__APP_VERSION__`
-constant through `define` in `vite.config.ts`. The tag cannot simply be read,
-because Cloudflare's deploy-on-push builds a commit on `main` before CI has
-tested and tagged it. So the build does semantic-release's sums itself:
+constant through `define` in `vite.config.ts`. Production is deployed by CI
+after the `release` job, so its build finds the tag already on its commit and
+shows exactly that release. But a Worker Preview, `vite dev` and a local build
+are not released, and the tag cannot simply be read for them. So the build does
+semantic-release's sums itself:
 
 1. Take the highest `v*` tag the commit contains, by version.
 2. Run `@semantic-release/commit-analyzer`'s `analyzeCommits` over the commits

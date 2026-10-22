@@ -2,7 +2,7 @@
 
 Bound Up builds for two platforms from one codebase. Cloudflare Workers (D1,
 R2, a Durable Object, a cron trigger) is the default, and is what `npm run build`
-and Cloudflare's deploy-on-push produce. The **self-hosted** build is a plain
+and CI's deploy job produce. The **self-hosted** build is a plain
 Node server in a Docker image, over a SQLite file and a media directory, each on
 a Docker volume. This doc covers the second: how the build is selected, what
 runs in place of each Cloudflare service, how the image is put together and
@@ -279,7 +279,7 @@ Nothing is committed back to the repository: the version lives in the tag, the
 GitHub Release, the image's `org.opencontainers.image.version` label and its
 `APP_VERSION` variable, which the settings page shows.
 `package.json`'s `version` is a placeholder. Builds that semantic-release does
-not make (Cloudflare's, `vite dev`) work the same version out from the git
+not make (production's, Worker Previews, `vite dev`) work the same version out from the git
 history; see [versions-and-updates.md](versions-and-updates.md).
 
 Because the version depends on the commit messages, they are checked: the

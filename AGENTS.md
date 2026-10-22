@@ -319,7 +319,9 @@ site it applies to; go read that comment before deciding to break one.
       `durable_objects.bindings` and `exports`, and a new _file_ of classes
       needs adding to the plugin's `durableObjects` list. Wrangler then needs no
       custom entry: plain `wrangler dev` / `wrangler deploy` are correct, which
-      is what lets Cloudflare's deploy-on-push run on its default commands.
+      is what lets CI's deploy job and Cloudflare's preview builds run plain
+      `npm run build` and `npx wrangler deploy`. Production deploys only from
+      CI, after the release is tagged; see docs/development.md.
       (The `overrides` block in package.json exists only because that package
       publishes a broken `link:` self-dependency that npm rejects — see docs/development.md.)
     - **Durable Object class lifecycle is `exports`, and is not a database
