@@ -1122,12 +1122,14 @@ test.describe('IQ test', () => {
 		expect(await ticked()).toBe(false);
 
 		// Ticking it goes fullscreen at once; unticking it leaves.
+		// Each waited for, not sampled: the box follows the page's
+		// `fullscreenchange`, which can land after the poll above sees it.
 		await box.click();
 		await expect.poll(fullscreen).toBe(true);
-		expect(await ticked()).toBe(true);
+		await expect.poll(ticked).toBe(true);
 		await box.click();
 		await expect.poll(fullscreen).toBe(false);
-		expect(await ticked()).toBe(false);
+		await expect.poll(ticked).toBe(false);
 
 		// Leaving some other way unticks it.
 		await box.click();
