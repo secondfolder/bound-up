@@ -9,9 +9,9 @@
  *
  * Content, like the seed prose: data rather than logic. It is weighted
  * towards sex and kink, because that is what people come to a kink app's
- * daydreams for: the archetypes, premises and acts are the ones that recur
- * most in NSFW character cards, erotic audio, erotica and fantasy surveys
- * (docs/daydreams.md, "What the presets are drawn from"). It still runs the
+ * daydreams for: the archetypes, premises and acts are the ones popular
+ * erotic fantasy returns to most (docs/daydreams.md, "What the presets are
+ * drawn from"). It still runs the
  * whole range, with a few tame entries kept beside the explicit ones so a
  * story can start slow, and the starting points are ordered by heat and say
  * theirs on their buttons (`ideaLevel`, `characterLevel`), so nobody has to
@@ -43,8 +43,8 @@ import type { FieldExtras, WithoutId } from './presets/types';
  * Every character text the app knows: the core (type, appearance) and the
  * known kinds of field. Personality, how they talk and what they enjoy were
  * fixed fields once; what they hide, what they won't do and how they are won
- * over came from what the most popular character cards carry beyond a
- * standard sheet (docs/daydreams.md, "Fields").
+ * over go beyond a standard sheet, and are what makes someone a person
+ * (docs/daydreams.md, "Fields").
  */
 export const CHARACTER_FIELD_LABELS: Readonly<
 	Record<CharacterTextField, { label: string; hint: string }>

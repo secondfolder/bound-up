@@ -48,7 +48,11 @@ test('a SFW starting point keeps the story SFW, and the heat can be turned up mi
 	await clickWaButton(page, 'New idea');
 	// The host, not its role: `getByRole` lands on the inner button, which
 	// holds the slotted label but not as its own text (AGENTS.md).
-	const template = (name: string) => dialog(page).locator('wa-button').filter({ hasText: name });
+	// By the whole label: "The dungeon" is also the start of "The dungeon crawl".
+	const template = (name: string) =>
+		dialog(page)
+			.locator('wa-button')
+			.filter({ hasText: new RegExp(`^\\s*${name}\\s*(?:SFW|Flirty|Steamy|Explicit|Filthy)`) });
 	const oneBed = template('Only one bed');
 	await expect(oneBed.locator('.level')).toHaveText('SFW');
 	await expect(template('The dungeon').locator('.level')).toHaveText('Filthy · kinky');

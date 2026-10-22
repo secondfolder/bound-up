@@ -569,7 +569,7 @@ test.describe('daydreams', () => {
 		const summary = page.locator('.setup-summary');
 		const reads = (text: string) => expect.poll(() => selectedText(summary)).toContain(text);
 		const whole =
-			'Kept late in the empty office after you botched the presentation. Lady Vale, your boss, has a steamy punishment in mind for you to make up for it. It’s told in the characters’ own words, with no narrator.';
+			'Kept late in the empty office after you botched the pitch. Lady Vale, your boss, has a steamy way for you to make it up before the client calls back at nine. It starts from the beginning. It’s told in the characters’ own words, with no narrator.';
 		await reads(whole);
 		// And copied for real, exactly: the blanks' words used to be left out,
 		// as the text of buttons, and then each menu's blank broke the line.
@@ -583,7 +583,7 @@ test.describe('daydreams', () => {
 		await expect(page.getByRole('button', { name: 'How sexual: steamy' })).toBeAttached();
 		await summary.getByText('steamy', { exact: true }).click();
 		await page.getByRole('menuitem', { name: 'SFW' }).click();
-		await reads('has a SFW punishment in mind');
+		await reads('has a SFW way for you to make it up');
 
 		// Every control, with nothing lost, and how it's told last.
 		await clickWaButton(page, 'Customise everything');

@@ -518,9 +518,9 @@ type NamedField = z.output<typeof namedFieldSchema>;
 
 /**
  * How a suggestion may add a field of its own, or fill one the user named and
- * left empty (docs/daydreams.md, "Fields"). The kinds named are the ones the
- * most popular character cards carried beyond a standard sheet; a twist the
- * user should find in play goes in as a spoiler.
+ * left empty (docs/daydreams.md, "Fields"). The kinds named are the ones that
+ * go beyond a standard sheet and make someone a person; a twist the user
+ * should find in play goes in as a spoiler.
  */
 function newFieldsInstruction(target: RecordRequest['target']): string {
 	const examples =
@@ -633,9 +633,8 @@ const PARTS_KEY: AnswerKey = {
 
 /**
  * An idea's openings (docs/daydreams.md, "Openings"): other places its story
- * can start. Several named greetings were what most set the most-played
- * character cards apart — a scenario menu, a later point in the story, a
- * gentler or hotter way in — so a written idea gets a few to choose from.
+ * can start — a menu of situations, a later point in the story, a gentler
+ * or hotter way in — so a written idea gets a few to choose from.
  */
 const OPENINGS_INSTRUCTION = `Give it 2 to ${MAX_OPENINGS} openings: other places its story can start, each a short name ("Three weeks in", "The morning after") and a sentence or two on where the story picks up — a later point in it, a gentler or hotter way in, the same people somewhere else.`;
 
@@ -653,8 +652,8 @@ const OPENINGS_KEY: AnswerKey = {
 /**
  * An idea's trackers (docs/daydreams.md, "Trackers"): what the user watches
  * move as the story goes. Visible state that moves — a submission meter, the
- * days kept, the rules in force — is what held the longest sessions on the
- * character-card sites, but only where the idea is a progression: a tracker
+ * days kept, the rules in force — gives a long session something to play
+ * for, but only where the idea is a progression: a tracker
  * on a one-night idea is a number nothing moves, so none is the default.
  */
 const TRACKERS_INSTRUCTION = `Where the idea is a progression — a training, a debt paid down, days kept, trust won, rules piling up — give it 1 to ${MAX_TRACKERS} trackers: things the user watches move as the story goes. Each has a short name, a kind ("meter" from 0 to 100, "count", "list" or "text"), where it starts, and a sentence on what moves it and what happens at either end. None for an idea that is not one.`;
@@ -1303,9 +1302,9 @@ const MONOLOGUE_CAST =
 
 /**
  * Fields beyond the standard ones, for a whole daydream: the one or two
- * things that made the most popular character cards what they were — what
- * someone hides, the line they won't cross, how they are won over — and a
- * twist kept for play (docs/daydreams.md, "Fields").
+ * things that make someone who they are — what they hide, the line they
+ * won't cross, how they are won over — and a twist kept for play
+ * (docs/daydreams.md, "Fields").
  */
 const DAYDREAM_FIELDS = `Each character and the idea may have "fields" beyond the standard ones, each named in a few words: for a character, what they hide, what they won't do, how they are won over, or anything else that makes them who they are; for the idea, a rule of its world, a secret at its heart. Mark one "spoiler" when it is a twist the user should only find out in play. Add only the ones that make this daydream better — often one or two in all, often none.`;
 

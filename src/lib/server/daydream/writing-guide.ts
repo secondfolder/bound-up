@@ -56,8 +56,8 @@ ${GENDER}`;
 /**
  * Where a passage ends, when the user is in the story. Left to itself a
  * model ends on a pose or a summary, which leaves the user nothing to answer
- * but "Continue"; the most-played character cards end on a question, an
- * offer or a move made on the user. A watcher has nothing to answer, so they
+ * but "Continue", where a question, an offer or a move made on them hands
+ * them the turn. A watcher has nothing to answer, so they
  * are not given it: that is why it is not in every telling.
  */
 const HANDING_OVER =

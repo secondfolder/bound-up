@@ -225,7 +225,9 @@ describe('DaydreamStarter', () => {
 	});
 
 	it('narrows the stories to the side you are on, and back to either', async () => {
-		const { container } = await renderStarter();
+		// One of each side first, so the first few shown have both whatever
+		// order the catalog is in: its first ones are all no one's.
+		const { container } = await renderStarter({ starterOrder: ['your-office', 'after-hours'] });
 		const cards = () => container.querySelectorAll('.card');
 		const pick = (label: string) =>
 			[...container.querySelectorAll<HTMLLabelElement>('.side')]

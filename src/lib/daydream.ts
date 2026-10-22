@@ -350,10 +350,9 @@ export const UNSET_CHARACTER_DIALS: CharacterDials = {
 /**
  * The kinds of field a character can have that the app knows: each has a
  * label, a hint, a length cap and chips of its own (`daydream/catalog.ts`).
- * The last three came from what the most popular character cards carry
- * beyond a standard sheet — what someone hides, the line they won't cross,
- * what it takes to win them over — which made a character read as a person
- * (docs/daydreams.md, "Fields").
+ * The last three go beyond a standard sheet — what someone hides, the line
+ * they won't cross, what it takes to win them over — and are what makes a
+ * character read as a person (docs/daydreams.md, "Fields").
  */
 export const CHARACTER_FIELD_KINDS = [
 	'personality',
@@ -611,8 +610,8 @@ export type TrackerKind = (typeof TRACKER_KINDS)[number];
 /**
  * Something the story keeps track of, shown to the user as it moves: a
  * submission meter, the days kept, a debt paid down, the rules in force.
- * Visible state that moves with the story is what holds the longest sessions
- * on the character-card sites.
+ * Visible state that moves with the story gives a long session something to
+ * play for.
  */
 export type IdeaTracker = {
 	id: string;

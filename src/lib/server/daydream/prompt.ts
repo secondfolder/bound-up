@@ -469,9 +469,9 @@ function exampleMove(tracker: Tracker): number {
  * with none: what each is, and how the model moves them. In this daydream's
  * half of the prompt, since an idea's trackers are its own, so the general
  * half stays one every daydream told the same way shares. Told to move them
- * a step at a time, earned in the passage: state the user can see move is
- * what holds the longest sessions on the character-card sites, and a meter
- * that leaps or creeps every passage regardless says nothing. The example is
+ * a step at a time, earned in the passage: state the user can see move
+ * gives a long session something to play for, and a meter that leaps or
+ * creeps every passage regardless says nothing. The example is
  * the idea's own first number, since a placeholder in a format gets copied
  * back (`replyFormat`).
  */
@@ -583,8 +583,8 @@ export function describeSetup(setup: DaydreamSetupContent): string {
  * Whether the characters' unspoken thoughts are on the page (the thoughts
  * dial; docs/daydreams.md, "Thoughts"), or null for a voice they do not
  * apply to. Shown, they are a line now and then, best where someone thinks
- * other than they say — what the most-played character cards lean on a
- * thoughts block for — and not a running commentary. Hidden is the camera
+ * other than they say, which is where a thought earns its place, and not a
+ * running commentary. Hidden is the camera
  * kept outside every head, for a user who wants to read people only by what
  * they do.
  */
@@ -1058,9 +1058,8 @@ function render(turn: ContextTurn): { role: 'user' | 'assistant'; content: strin
  *
  * A story opens at the threshold and hands the turn over. "Set the scene"
  * got a wind-up — the room, the weather, the walk there — and an ending on a
- * pose; the openings of the most-played character cards on public card
- * sites, surveyed in October 2026, start just before the moment the idea
- * turns on and end on something the user has to answer. A watcher has nothing to answer, so
+ * pose, where an opening that starts just before the moment the idea turns
+ * on, and ends on something the user has to answer, pulls them straight in. A watcher has nothing to answer, so
  * theirs is only set moving: "end where the user can respond" was sent to
  * watchers too until then.
  */

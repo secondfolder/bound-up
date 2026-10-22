@@ -538,9 +538,10 @@ passage format asks for it in a thought tag naming the thinker,
 beside say and sound tags (`passageFormat` in `server/daydream/prompt.ts`),
 and the page draws it in that person's colour made quieter
 ([Reading a passage](#reading-a-passage)). A line of thought set against
-what someone says is what the most-played character cards lean on a
-thoughts block for. Thoughts used to be italics, which the page could not
-tell from emphasis, or give a thinker.
+what someone says is the cheapest source of dramatic irony there is: it is
+how one person is commanding and needy, or resisting and wanting, at once.
+Thoughts used to be italics, which the page could not tell from emphasis, or
+give a thinker.
 
 - **A story dial, Their thoughts: Shown or Hidden** (`StoryDials.thoughts`,
   `DaydreamDials.svelte`; shown by default, and for every setup from before
@@ -766,10 +767,10 @@ The character and idea dialogs (`DaydreamCharacterDialog.svelte`,
 Besides a small fixed core, everything a character or an idea says is a
 **field** (`DaydreamField` in `src/lib/daydream.ts`;
 `DaydreamFieldList.svelte`): a known kind, or one the user named. A
-standard sheet made every character read alike; the most popular character
-cards each carry the one or two things that make someone who they are —
-what they hide, the line they won't cross, what it takes to win them over —
-and a twist kept for play.
+standard sheet made every character read alike, when what makes someone
+who they are is one or two particular things — what they hide, the line
+they won't cross, what it takes to win them over — and a twist kept for
+play.
 
 - **The core is what code depends on.** A character's name, type
   (`archetype`: what a card, the library and the casting suggestion name
@@ -887,8 +888,8 @@ nested), and `onSubmit` replaces the whole post with the sealed record.
 The idea chips, the ready-made daydreams, the starting points and the field
 chips are weighted towards sex and kink, because that is what people open a
 kink app's daydreams for. Which themes they cover was decided from what
-recurs most, in October 2026, across NSFW roleplay character cards (Chub,
-Character Tavern, muah), r/gonewildaudio's tagged scripts (split by who they
+recurs most, in October 2026, across NSFW roleplay, r/gonewildaudio's
+tagged scripts (split by who they
 are for, which is the clearest read of what women and men each ask for),
 Pornhub's year-in-review searches, Literotica's categories and Lehmiller's
 and Joyal's fantasy surveys. The themes at the top were:
@@ -917,20 +918,45 @@ and who is led, since the data splits there (men-for-women scripts lean
 male-dominant, praise and aftercare; women-for-men lean female-dominant and
 the older lover).
 
-Three lines are kept on purpose:
+In late October 2026 the catalog grew from 44 ready-made daydreams to
+well over a hundred, and every one was reworked to use what daydreams can
+now express: openings, trackers, fields of their own and spoilers, and
+parts played by the story. The themes it gained are ones popular erotic
+fantasy keeps returning to and the catalog had little of: comedy, family
+and step-family taboo between adults, consent-erasing premises played
+straight (a licence, a law, rewritten common sense, a device), and story
+machines — a place or a system rather than a person, with a cast that
+comes and goes. What makes any of them go is the same: a specific trigger,
+a character with a contradiction or a secret, places to start, and state
+the user can see moving.
+
+**The catalog is a module per theme**, in `src/lib/daydream/presets/`:
+romance, power, supernatural, control, group, CNC, family, comedy and story
+machines, each with its own characters, ideas and ready-made daydreams,
+beside the shared characters (`characters.ts`) any of them can cast.
+`catalog.ts` and `starters.ts` gather them and put them in order of heat, so
+a theme can be reworked without touching the rest. A starting point may mark
+known fields as spoilers and carry fields of its own (`presets/types.ts`),
+each given a fixed id from its template and name (`ownFieldId`).
+
+Lines kept on purpose:
 
 - **One SFW slow burn stays.** "Only one bed" shows that the heat range
   exists and can be turned up mid-story, and a few tame chips stay so a
   story can start slow.
-- **Consensual non-consent is framed as agreed.** It is one of the most
-  common fantasies in every source. "The hunt", "The break-in" and "Free
-  use" each say in their premise that it was arranged beforehand and that a
-  safeword stops it, and "Trigger words" says the conditioning was agreed.
-  Inside the story the fantasy plays out as written; the framing is what
-  makes it one.
-- **Two things are absent from every source's tallies here.** Nothing is
-  minor-coded, and nothing rests on blood relations, however common either
-  is on the card sites.
+- **The agreed shape and the straight one both exist.** Consensual
+  non-consent framed as agreed — "The hunt", "The break-in" and "Free use"
+  each say in their premise that it was arranged beforehand and that a
+  safeword stops it, and "Trigger words" says the conditioning was agreed —
+  sits beside premises where consent is erased by the world itself, played
+  straight. A private daydream is a safe place to explore either.
+- **Family taboo is between adults, said plainly.** It is where youth-coding
+  most often creeps in, so every family daydream gives the younger
+  generation an adult life — an age, a job, a home of their own — and
+  nothing about school or a childhood bedroom.
+- **Nothing is minor-coded, ever**, however common it is elsewhere:
+  no school settings, no "just turned 18", no "looks young", no canon
+  characters under 18.
 
 ## The flow
 
@@ -1056,8 +1082,8 @@ An idea can carry up to `MAX_OPENINGS` (four) **openings**
 where the story picks up), written under **Where it can start** in the idea
 dialog. One idea then gives several stories — the first night, three weeks
 in, the morning after, a gentler or a hotter way in — without its premise
-being rewritten. Several named starting points were what most set the
-most-played character cards apart. Fill in the rest, Surprise me and a
+being rewritten: a menu of situations, a timeline, or a slow way in and a
+hot one. Fill in the rest, Surprise me and a
 whole daydream write two to four for an idea with none, and none for a
 monologue, which has no story to start (`OPENINGS_INSTRUCTION` in
 `suggest-prompt.ts`).
@@ -1340,8 +1366,8 @@ much as to a model.
 An idea can keep track of up to `MAX_TRACKERS` (four) things the user
 watches move as the story goes (`IdeaTracker`; `src/lib/daydream/trackers.ts`):
 a submission meter, the days kept, a debt paid down, the rules in force.
-Visible state that moves with the story is what holds the longest sessions
-on the character-card sites. Each has a name, a kind — a **meter** from 0
+Visible state that moves with the story gives a long session something to
+play for, and the user something to watch. Each has a name, a kind — a **meter** from 0
 to 100, a **count**, a **list** of short items, or a **line of text** —
 where it starts, as the user wrote it ("0", "3", "Kneel when spoken to;
 Eyes down"), and a sentence for the model on what moves it and what happens
@@ -2063,16 +2089,16 @@ to itself.
   left hanging for their reply — never on a pose, a summary or a moment
   with nothing in it for them, though not every passage needs a question;
   a roll ends at its moment instead. Left to itself a model ends on a pose,
-  which leaves nothing to answer but Continue; the most-played character
-  cards end on a handover. A watcher has nothing to answer, so they are
-  not given it.
+  which leaves nothing to answer but Continue, and a story the user is in
+  goes best when each passage hands them the turn. A watcher has nothing to
+  answer, so they are not given it.
 - **The opening** (`openingRequest`, `beginRequest`) starts at the
   threshold: just before the moment the idea turns on — an arrival, a
   discovery, the moment itself, not a wind-up — and, for a user in the
   story, ends on something they must answer. "Set the scene" got the room,
-  the weather and the walk there, and an ending on a pose; the openings of
-  the most-played cards, surveyed in October 2026, start just before the
-  turn and hand it over. A watcher's opening is only set moving: "end where
+  the weather and the walk there, and an ending on a pose, where an
+  opening that starts just before the turn and hands it over pulls the user
+  straight in. A watcher's opening is only set moving: "end where
   the user can respond" used to be sent to watchers too. The system voice
   is asked for its first notice instead, and a monologue to open straight
   into what the voice says (both in [How it's told](#how-its-told)). One

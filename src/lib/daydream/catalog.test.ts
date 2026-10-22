@@ -34,7 +34,9 @@ describe('the catalog', () => {
 			const withIds = {
 				...EMPTY_IDEA,
 				...idea,
-				parts: idea.parts.map((part) => ({ ...part, id: crypto.randomUUID() }))
+				parts: idea.parts.map((part) => ({ ...part, id: crypto.randomUUID() })),
+				openings: idea.openings.map((opening) => ({ ...opening, id: crypto.randomUUID() })),
+				trackers: idea.trackers.map((tracker) => ({ ...tracker, id: crypto.randomUUID() }))
 			};
 			expect(daydreamIdeaKind.latest.safeParse(withIds).success, idea.title).toBe(true);
 		}
