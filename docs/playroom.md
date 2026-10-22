@@ -229,7 +229,10 @@ which checks both that the level offers the option and that it is on:
 - `playsHypno` — "Hypno playing": from level 2 for bambi, whose bambicloud
   hypnos are audio, and from 3 for the rest, whose only hypnos are videos.
 - `showsPorn` — "Porn": the columns, the porn tab, and the media feed behind
-  them.
+  them. A gear button beside its info button opens "Porn options", a small
+  dialog of its own with one choice so far, `pornMedia`: both, pictures
+  only, or videos only (the default). It is not a toggle and belongs to no level;
+  it only shapes the porn the box turns on (see "Pictures, clips, or both").
 - `flashes` — "Subliminal messaging": pictures and taunts flashed over the
   page, ramping up. The taunts are the sub's, in the vibe, whatever the
   question-content box says; the teasing line above the question gives way to
@@ -509,7 +512,7 @@ a tag or a subreddit is named.
 
 | Source  | What is fetched                                                | Role     |
 | ------- | -------------------------------------------------------------- | -------- |
-| Redgifs | a tag search on its API, with a keyless anonymous token        | the main |
+| Redgifs | a tag search or a niche's feed, with a keyless anonymous token | the main |
 | reddit  | a subreddit's `top/.rss?t=week` Atom feed                      | a top-up |
 
 - **Why reddit is only a top-up.** Unauthenticated, reddit allows one feed
@@ -518,6 +521,15 @@ a tag or a subreddit is named.
   the minute's request, and denial, feminisation and degradation showed
   nothing. Every vibe now has Redgifs tags with thousands of results each, and
   the API showed no rate limit in use — from a home connection.
+- **Tags and niches.** A Redgifs source is a tag search
+  (`{ kind: 'redgifs', tags }`, trending first), where `tags` is one tag or a
+  list that must all match (sent comma-separated, which Redgifs reads as "all of", to narrow a tag
+  too broad on its own; it has no "any of", so breadth comes from separate
+  sources, interleaved), or a niche (`{ kind: 'redgifs', niche }`, the slug
+  in `redgifs.com/niches/…`, a community's curated feed). A niche answers in
+  the same shape as a search, so one parser reads both. It is asked for
+  `order=hot`, because a niche refuses `trending` with a 400 "BadOrder" even
+  though that error lists `trending` as allowed (checked 2026-10-22).
 - **From Workers, Redgifs is nearly always a 429.** Redgifs is itself behind
   Cloudflare, so every Worker and Durable Object reaches it from one shared
   address, `2a06:98c0:3600::103`, and its search limit is keyed to that
@@ -530,8 +542,11 @@ a tag or a subreddit is named.
   anywhere else is a `401 WrongSender`. A 401 drops the token and the search
   is tried once more with a new one at once, which is what keeps a switch to
   the tunnel from costing a request's pictures.
-- **`tags=`, not `search_text=`.** The search API accepts `search_text` and
-  ignores it, answering every query with the same front page.
+- **`query=`, not `search_text=`.** A search can be by free text as well as
+  tags (`{ kind: 'redgifs', query }`, alone or beside `tags`, all of which
+  must match). Text matches more loosely than a tag, taking in related tags.
+  The API also accepts `search_text` but ignores it, answering every search
+  with the same front page.
 - **What is kept.** Redgifs answers give an id (for the player) and a poster
   still on `media.redgifs.com` (shown as an image). Both are checked before
   they go to the browser. From reddit, only `i.redd.it` images and Redgifs
@@ -559,12 +574,17 @@ a tag or a subreddit is named.
   shows its Redgifs pictures, and picks up the reddit ones later.
 - **Fresh answers** last an hour. **One fetch per source** runs at a time, and
   a vibe's parallel tag searches share one token request.
-- **On a 429** the whole host is left alone until reddit's
-  `x-ratelimit-reset` says, or for a minute if it does not say.
+- **On a 429** what it counts against is left alone until reddit's
+  `x-ratelimit-reset` says, or for a minute if it does not say. That is
+  reddit, Redgifs' search, or Redgifs' niches: Redgifs limits niches apart
+  from searches (every niche answered 429 while searches answered 200, on
+  2026-10-22), so a niche's 429 leaves the searches running.
 - **Failures** are remembered for 5 minutes, and the source's last good answer
   is served meanwhile.
 - **An empty answer is never cached** (`no-store`). The page asks again 30s,
-  60s and 120s later while the test runs.
+  60s and 120s later while the test runs. Meanwhile it shows no porn rather
+  than the last theme's: kept up, the old pictures made a change of theme
+  look as if it had done nothing.
 
 **Random on every load.** The page shuffles the feed as it arrives. The
 server hands every visitor the same cached order, so without the shuffle every
@@ -616,6 +636,15 @@ A place can be **kept** (locked): the rotation, "New porn" and the end of its
 clip pass it by, and its clip loops; its own Next and Previous still work. A
 see-through, shadowed lock shows in its corner while the buttons are not up —
 deliberately unlike the solid buttons — and gives way to them when they are.
+
+**Pictures, clips, or both.** With `pornMedia` set to one kind, each column
+fills the same space with that kind alone, so the amount of porn on the page
+does not change. Pictures only drops the clip on top and fits pictures in its
+room. Videos only puts clips in the pictures' places, as many as fit, each
+moving on when it ends, and only the first in a column is heard. Level 4's
+backdrop follows the setting too. With pictures only it is a still picture
+from the far end of the feed, changing every 15 seconds. Flashes are
+subliminals, not the porn, and still draw on the pictures either way.
 
 **Swapping without a gap.** What replaces an item loads out of sight while
 the old one stays up, and takes its place only once ready — a picture once it
@@ -1015,6 +1044,11 @@ on the `hypno` channel. Browsers only start sound inside a gesture, so:
   was. The sound module does both synchronously inside the tap or drag
   (`data-pause-when-silent` and `data-wants-play` on the element), because
   that's the only moment a browser lets audio start again.
+  A PMVHaven video paused this way shows a play symbol in its middle among
+  the porn, since a still frame on its own looks broken. The symbol is only
+  a marker. Once the item's buttons show (hover, a tap, or keyboard focus) it
+  gives way to a Play among them, which unmutes the hypno at its last level
+  and so plays it on.
 
 **The controls** are the hypno tab of the media dock (below). Its icon is a
 spiral, drawn by [`SpiralIcon`](../src/lib/components/iq-test/SpiralIcon.svelte)

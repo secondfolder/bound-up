@@ -11,17 +11,49 @@ import type { Vibe } from './settings';
 /**
  * One place pictures come from.
  *
- * - `redgifs`: a tag search on Redgifs' own API. The main source: every vibe
- *   has tags with thousands of results, and the API showed no rate limit in
- *   use. Each result is a clip (id, SD file, whether it has sound) plus a
- *   poster still.
+ * - `redgifs`: a search on Redgifs' own API, or one of its niches (a
+ *   community's curated feed, by its slug in `redgifs.com/niches/…`). The
+ *   main source: every vibe has tags with thousands of results, and the API
+ *   showed no rate limit in use. Each result is a clip (id, SD file, whether
+ *   it has sound) plus a poster still; a niche answers in the same shape.
+ *   A search is by `tags`, a `query`, or both (see `RedgifsSearch`).
  * - `reddit`: a subreddit's weekly top feed. A top-up only. Unauthenticated,
  *   reddit allows one feed request a minute (`x-ratelimit-remaining: 0` after
  *   a single request, measured), so it cannot carry five vibes on its own —
  *   which is how denial, feminisation and degradation once showed nothing:
  *   whichever vibe asked first got the minute's request.
  */
-export type MediaSource = { kind: 'redgifs'; tag: string } | { kind: 'reddit'; subreddit: string };
+/**
+ * What a Redgifs search asks for: `tags`, a `query`, or both, which must all
+ * match.
+ *
+ * - `tags` is one tag, or a list searched for clips with every one of them,
+ *   to narrow a tag too broad on its own: Redgifs reads a comma-separated
+ *   list as "all of" (there is no "any of": a repeated `tags=` uses only the
+ *   first).
+ * - `query` is free text, matched more loosely than a tag: "mind control"
+ *   found 4,254 clips where the Mind Control tag had 3,361, taking in
+ *   related tags such as Hypnosis (checked 2026-10-22). For a tag too sparse
+ *   or too strict on its own.
+ */
+export type RedgifsSearch =
+	| { tags: string | readonly string[]; query?: string }
+	| { tags?: string | readonly string[]; query: string };
+
+export type MediaSource =
+	| ({ kind: 'redgifs' } & RedgifsSearch)
+	| { kind: 'redgifs'; niche: string }
+	| { kind: 'reddit'; subreddit: string };
+
+const SHARED_SOURCES: readonly MediaSource[] = [
+	{ kind: 'redgifs', tags: ['Caption', 'Goon'] },
+	{ kind: 'redgifs', tags: 'PMV' },
+	{ kind: 'redgifs', niche: 'rough-sex' },
+	{ kind: 'redgifs', niche: 'goonette' },
+	{ kind: 'redgifs', niche: 'triple-penetration' },
+	{ kind: 'redgifs', niche: 'oil-porn' },
+	{ kind: 'redgifs', niche: 'throatfucking' }
+];
 
 /**
  * The only sources the media endpoint will fetch, per vibe.
@@ -35,46 +67,40 @@ export const SOURCES: Record<Vibe, readonly MediaSource[]> = {
 	// Gooning itself, and the PMVs gooners loop. Checked 2026-10-11: every
 	// tag answers thousands, tagged on theme.
 	gooner: [
-		{ kind: 'redgifs', tag: 'Gooning' },
-		{ kind: 'redgifs', tag: 'PMV' },
-		{ kind: 'redgifs', tag: 'Gooner' }
+		...SHARED_SOURCES,
+		{ kind: 'redgifs', tags: 'Gooner' },
+		{ kind: 'redgifs', tags: ['caption', 'edging'] }
 	],
-	// Bambi's own corner: hypno, trance and mind-control porn, the bimbo PMVs
-	// her fans watch, and the handful tagged Bambi Sleep by name. Not the plain
-	// "Bambi" tag, which is mostly performers called Bambi, nor a generic
-	// "Bimbo". Checked 2026-10-11: "Bimbo Hypno" 386, "Mind Control" 3,361,
-	// "Brainwash" 72, "Trance" 86, "Bimbo PMV" 180, "Bambi Sleep" 9.
 	bambi: [
-		{ kind: 'redgifs', tag: 'Bimbo Hypno' },
-		{ kind: 'redgifs', tag: 'Mind Control' },
-		{ kind: 'redgifs', tag: 'Bimbo PMV' },
-		{ kind: 'redgifs', tag: 'Brainwash' },
-		{ kind: 'redgifs', tag: 'Trance' },
-		{ kind: 'redgifs', tag: 'Bambi Sleep' }
+		...SHARED_SOURCES,
+		{ kind: 'redgifs', niche: 'bimbo' },
+		{ kind: 'redgifs', tags: ['bimbo', 'hypno'] }
 	],
 	misogyny: [
-		{ kind: 'redgifs', tag: 'Housewife' },
-		{ kind: 'redgifs', tag: 'Submissive' },
-		{ kind: 'redgifs', tag: 'Slut' },
-		{ kind: 'reddit', subreddit: 'BimboFetish' }
+		...SHARED_SOURCES,
+		{ kind: 'redgifs', niche: 'misogyny' },
+		{ kind: 'redgifs', niche: 'cnc' },
+		{ kind: 'redgifs', niche: 'real-bdsm' },
+		{ kind: 'redgifs', niche: 'face-fucking' },
+		{ kind: 'redgifs', tags: ['housewife', 'cleaning'] }
 	],
 	denial: [
-		{ kind: 'redgifs', tag: 'Chastity' },
-		{ kind: 'redgifs', tag: 'Edging' },
-		{ kind: 'redgifs', tag: 'Orgasm Denial' },
-		{ kind: 'reddit', subreddit: 'chastity' }
+		...SHARED_SOURCES,
+		{ kind: 'redgifs', niche: 'female-chastity' },
+		{ kind: 'redgifs', tags: 'Chastity' }
 	],
 	feminisation: [
-		{ kind: 'redgifs', tag: 'Feminization' },
-		{ kind: 'redgifs', tag: 'Sissy' },
-		{ kind: 'redgifs', tag: 'Crossdressing' },
-		{ kind: 'reddit', subreddit: 'feminization' }
+		...SHARED_SOURCES,
+		{ kind: 'redgifs', tags: ['Feminization', 'hypno'] },
+		{ kind: 'redgifs', niche: 'feminizing-hypnosis' },
+		{ kind: 'redgifs', niche: 'trans-women' }
 	],
 	degradation: [
-		{ kind: 'redgifs', tag: 'Degradation' },
-		{ kind: 'redgifs', tag: 'Humiliation' },
-		{ kind: 'redgifs', tag: 'Face Slapping' },
-		{ kind: 'redgifs', tag: 'Cum Slut' }
+		...SHARED_SOURCES,
+		{ kind: 'redgifs', niche: 'real-bdsm' },
+		{ kind: 'redgifs', niche: 'face-fucking' },
+		{ kind: 'redgifs', niche: 'bodywriting' },
+		{ kind: 'redgifs', niche: 'cumslut' }
 	]
 };
 
@@ -156,7 +182,14 @@ export function redgifsPage(id: string): string {
 
 /** A stable cache key for a source. */
 export function sourceKey(source: MediaSource): string {
-	return source.kind === 'redgifs' ? `redgifs:${source.tag}` : `reddit:${source.subreddit}`;
+	if (source.kind === 'reddit') {
+		return `reddit:${source.subreddit}`;
+	}
+	if ('niche' in source) {
+		return `redgifs-niche:${source.niche}`;
+	}
+	const tags = `redgifs:${tagList(source.tags).join(',')}`;
+	return source.query === undefined ? tags : `${tags}?query=${source.query}`;
 }
 
 /** The feed URL for one subreddit: this week's top posts, as Atom. */
@@ -167,16 +200,45 @@ export function feedUrl(subreddit: string): string {
 /** Redgifs' anonymous token, which its search needs. Keyless, valid for a day. */
 export const REDGIFS_TOKEN_URL = 'https://api.redgifs.com/v2/auth/temporary';
 
-/** How many results one tag search asks for. */
+/** How many results one search asks for. */
 export const REDGIFS_PAGE = 40;
 
 /**
- * A tag search, trending first. `tags=` and not `search_text=`: the API
- * accepts the latter and ignores it, answering every query with the same
- * front page.
+ * A search of Redgifs' gifs (its clips), trending first. Text goes in
+ * `query=`, not `search_text=`: the API accepts the latter and ignores it,
+ * answering every search with the same front page.
  */
-export function redgifsSearchUrl(tag: string): string {
-	return `https://api.redgifs.com/v2/gifs/search?tags=${encodeURIComponent(tag)}&order=trending&count=${REDGIFS_PAGE}`;
+export function redgifsGifsSearchUrl(search: RedgifsSearch): string {
+	const tags = tagList(search.tags);
+	const params = [
+		...(tags.length > 0 ? [`tags=${tags.map(encodeURIComponent).join(',')}`] : []),
+		...(search.query === undefined ? [] : [`query=${encodeURIComponent(search.query)}`]),
+		'order=trending',
+		`count=${REDGIFS_PAGE}`
+	];
+	return `https://api.redgifs.com/v2/gifs/search?${params.join('&')}`;
+}
+
+/** A source's tags as a list: none, one, or several that must all match. */
+function tagList(tags: string | readonly string[] | undefined): readonly string[] {
+	if (tags === undefined) {
+		return [];
+	}
+	return typeof tags === 'string' ? [tags] : tags;
+}
+
+/**
+ * A niche's feed, hottest first. Not `trending`, which a niche refuses with
+ * a 400 ("BadOrder") although its own error message lists it as allowed;
+ * `hot` is the nearest it accepts (checked 2026-10-22).
+ */
+export function redgifsNicheUrl(niche: string): string {
+	return `https://api.redgifs.com/v2/niches/${encodeURIComponent(niche)}/gifs?order=hot&count=${REDGIFS_PAGE}`;
+}
+
+/** What to ask Redgifs for a source of its: a search or a niche's feed. */
+export function redgifsUrl(source: Extract<MediaSource, { kind: 'redgifs' }>): string {
+	return 'niche' in source ? redgifsNicheUrl(source.niche) : redgifsGifsSearchUrl(source);
 }
 
 /**

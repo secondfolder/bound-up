@@ -198,12 +198,23 @@ async function stubPmvs(page: Page): Promise<string[]> {
 	return asked;
 }
 
+/**
+ * Settings remembered on the device. Porn as pictures and clips both, not the
+ * default videos only: the specs' feeds are mostly pictures, served locally.
+ */
 async function rememberSettings(page: Page, intensity: number, vibe: string) {
 	await page.addInitScript(
 		([p, v]) =>
 			localStorage.setItem(
 				'playroom.iq-test.settings',
-				JSON.stringify({ role: 'sub', intensity: p, vibe: v, soberIq: null, targetIq: null })
+				JSON.stringify({
+					role: 'sub',
+					intensity: p,
+					vibe: v,
+					soberIq: null,
+					targetIq: null,
+					pornMedia: 'both'
+				})
 			),
 		[intensity, vibe]
 	);
@@ -469,6 +480,21 @@ test.describe('IQ test hypno', () => {
 		await page.keyboard.press('Escape');
 		await expect(enlarged).toHaveCount(0);
 
+		// Muted, it pauses, and says so with a play symbol over it; its buttons
+		// gain a Play, which unmutes it and plays it on.
+		const paused = () => video.evaluate((element: HTMLVideoElement) => element.paused);
+		const marker = page.getByTestId('hypno-item').getByTestId('hypno-paused');
+		const play = page.getByTestId('hypno-item').getByRole('button', { name: 'Play the hypno' });
+		await expect(play).toHaveCount(0);
+		await page.getByRole('button', { name: 'Mute hypno' }).click();
+		await expect.poll(paused).toBe(true);
+		await expect(marker).toBeVisible();
+		// Pointed at, the buttons show and the symbol gives way to them.
+		await pressOverlay(play);
+		await expect.poll(paused).toBe(false);
+		await expect(play).toHaveCount(0);
+		await expect(marker).toHaveCount(0);
+
 		// With no columns (back out to the intro) it plays on unseen, from where
 		// it was, rather than starting again.
 		const beforeExit = await position();
@@ -678,7 +704,8 @@ test.describe('IQ test', () => {
 					intensity: 3,
 					vibe: 'denial',
 					soberIq: null,
-					targetIq: null
+					targetIq: null,
+					pornMedia: 'both'
 				})
 			)
 		);

@@ -17,6 +17,8 @@ export const MEDIA_RETRIES = [30_000, 60_000, 120_000];
  */
 export class PornFeed {
 	feed = $state<MediaFeed>(EMPTY_FEED);
+	/** The vibe `feed` is for: an empty answer for another clears it. */
+	#feedVibe: Vibe | null = null;
 
 	/**
 	 * Fetch a vibe's feed (or, for none, empty it), retrying an empty one.
@@ -26,6 +28,7 @@ export class PornFeed {
 	follow(vibe: Vibe | null): () => void {
 		if (vibe === null) {
 			this.feed = EMPTY_FEED;
+			this.#feedVibe = null;
 			return () => undefined;
 		}
 		const controller = new AbortController();
@@ -50,7 +53,18 @@ export class PornFeed {
 						// cached order, so without this every reload showed the same
 						// pictures in the same places.
 						this.feed = shuffleFeed(next);
-					} else if (attempt < MEDIA_RETRIES.length) {
+						this.#feedVibe = vibe;
+						return;
+					}
+					// Nothing for this vibe yet: the last vibe's pictures are not
+					// kept up in its place. They were, and a change of theme seemed
+					// to change nothing whenever the new one's sources were
+					// backing off.
+					if (this.#feedVibe !== vibe) {
+						this.feed = EMPTY_FEED;
+						this.#feedVibe = vibe;
+					}
+					if (attempt < MEDIA_RETRIES.length) {
 						const wait = MEDIA_RETRIES[attempt] ?? 0;
 						mediaInfo(
 							`No pictures for "${vibe}" yet: every source is backing off. Asking again in ${wait / 1000}s.`

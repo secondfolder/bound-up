@@ -7,10 +7,17 @@
 
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { TOGGLE_HELP, TOGGLE_LABELS, VIBE_OPTIONS } from '$lib/playroom/iq-test/copy';
+	import {
+		PORN_MEDIA_OPTIONS,
+		PORN_OPTIONS_LABEL,
+		TOGGLE_HELP,
+		TOGGLE_LABELS,
+		VIBE_OPTIONS
+	} from '$lib/playroom/iq-test/copy';
 	import {
 		IQ_INPUT_MAX,
 		IQ_INPUT_MIN,
+		PORN_MEDIA,
 		type Toggle,
 		togglesAt,
 		VIBE_LEVEL,
@@ -168,6 +175,22 @@
 		});
 	}
 
+	/**
+	 * Whether the porn's own options are up. Mounted only while they are, so
+	 * the dialog opens as it mounts: an `open={false}` rendered on the server
+	 * would come out as `open="false"`, which Lit reads as open.
+	 */
+	let pornOptionsOpen = $state(false);
+
+	function pornMediaGroup(node: WaValue) {
+		return listen(node, () => {
+			const next = PORN_MEDIA.find((each) => each === node.value);
+			if (next && next !== value.pornMedia) {
+				change({ pornMedia: next });
+			}
+		});
+	}
+
 	function iqBox(which: 'sober' | 'target') {
 		return (node: WaValue) =>
 			listen(node, () => {
@@ -212,16 +235,33 @@
 		>
 			{TOGGLE_LABELS[toggle]}
 		</wa-checkbox>
-		<button
-			type="button"
-			class="info"
-			id="{uid}-info-{toggle}"
-			aria-label="About “{TOGGLE_LABELS[toggle]}”"
-			data-testid="info-{toggle}"
-		>
-			<!-- Solid: Font Awesome's free set has no regular circle-info, and drew nothing. -->
-			<wa-icon name="circle-info" variant="solid"></wa-icon>
-		</button>
+		<span class="buttons">
+			<button
+				type="button"
+				class="info"
+				id="{uid}-info-{toggle}"
+				aria-label="About “{TOGGLE_LABELS[toggle]}”"
+				data-testid="info-{toggle}"
+			>
+				<!-- Solid: Font Awesome's free set has no regular circle-info, and drew nothing. -->
+				<wa-icon name="circle-info" variant="solid"></wa-icon>
+			</button>
+			{#if toggle === 'porn'}
+				<!-- Native, to match the info button beside it. -->
+				<button
+					type="button"
+					class="info"
+					aria-label={PORN_OPTIONS_LABEL}
+					aria-haspopup="dialog"
+					data-testid="options-porn"
+					onclick={() => {
+						pornOptionsOpen = true;
+					}}
+				>
+					<wa-icon name="gear" variant="solid"></wa-icon>
+				</button>
+			{/if}
+		</span>
 		<wa-popover
 			for="{uid}-info-{toggle}"
 			placement="top"
@@ -247,6 +287,40 @@
 				{/each}
 			</dl>
 		</wa-popover>
+		{#if toggle === 'porn' && pornOptionsOpen}
+			<!--
+				Over the setup dialog when it is in it: a modal opened from a modal
+				stacks on top, and the setup dialog ignores the hide events that
+				bubble up from it (they are not its own).
+			-->
+			<wa-dialog
+				label={PORN_OPTIONS_LABEL}
+				open
+				light-dismiss
+				class="porn-options"
+				data-testid="porn-options"
+				onwa-after-hide={(event: Event) => {
+					if (event.target === event.currentTarget) {
+						pornOptionsOpen = false;
+					}
+				}}
+			>
+				<wa-radio-group
+					{@attach pornMediaGroup}
+					label="Show"
+					name="pornMedia"
+					value={value.pornMedia}
+					data-testid="porn-media"
+				>
+					{#each PORN_MEDIA_OPTIONS as option (option.id)}
+						<wa-radio value={option.id}>
+							{option.label}
+							<span class="radio-hint">{option.hint}</span>
+						</wa-radio>
+					{/each}
+				</wa-radio-group>
+			</wa-dialog>
+		{/if}
 		{#if toggle === 'subliminals'}
 			<!--
 				Straight under the box that turns them on, so it is read before
@@ -435,6 +509,14 @@
 		gap: 0 0.375rem;
 	}
 
+	/* The info button, and the porn's settings button after it. */
+	.buttons {
+		display: flex;
+		gap: 0.125rem;
+		/* Centred on the label's first line, which is the box's height. */
+		margin-block-start: calc((var(--wa-form-control-toggle-size) - 1.5rem) / 2);
+	}
+
 	/* A native button: small, round, and quiet until pointed at. */
 	.info {
 		flex: none;
@@ -442,8 +524,6 @@
 		place-items: center;
 		inline-size: 1.5rem;
 		block-size: 1.5rem;
-		/* Centred on the label's first line, which is the box's height. */
-		margin-block-start: calc((var(--wa-form-control-toggle-size) - 1.5rem) / 2);
 		padding: 0;
 		border: none;
 		border-radius: 50%;
@@ -521,6 +601,21 @@
 		wa-icon {
 			flex: none;
 		}
+	}
+
+	.porn-options {
+		--width: min(calc(100vw - 2rem), 24rem);
+
+		wa-radio-group::part(form-control-input) {
+			gap: 0.75rem;
+		}
+	}
+
+	/* Under the option's name, quieter. */
+	.radio-hint {
+		display: block;
+		font-size: var(--wa-font-size-s);
+		color: var(--wa-color-text-quiet);
 	}
 
 	.numbers {

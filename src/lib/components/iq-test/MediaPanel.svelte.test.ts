@@ -398,6 +398,35 @@ describe('MediaPanel', () => {
 		await expect.poll(() => slotCount(wide.container)).toBe(9);
 	});
 
+	it('fills its place with pictures and a clip, pictures only, or clips only, as asked', async () => {
+		// Known only from links, so they play in Redgifs' player, which the
+		// sealed-off test browser never loads: enough to count the places.
+		const clips = Array.from({ length: 6 }, (_, i) => ({
+			id: `clip${i}`,
+			video: null,
+			sound: false
+		}));
+		const kinds = (container: ParentNode) => ({
+			clips: container.querySelectorAll('[data-testid="clip-slot"]').length,
+			pictures: container.querySelectorAll('[data-testid="picture-slot"]').length
+		});
+
+		const both = renderPanel({ images, clips, offset: 0 });
+		await expect.poll(() => kinds(both.container).pictures).toBeGreaterThan(0);
+		expect(kinds(both.container).clips).toBe(1);
+		both.unmount();
+
+		const stills = renderPanel({ images, clips, offset: 0, media: 'images' });
+		// The same three a column of pictures alone holds (see "fills a column exactly").
+		await expect.poll(() => kinds(stills.container)).toEqual({ clips: 0, pictures: 3 });
+		stills.unmount();
+
+		const videos = renderPanel({ images, clips, offset: 0, media: 'videos' });
+		// 9:16 until learnt, so 533px each at 300px wide: two fill 1250px.
+		await expect.poll(() => kinds(videos.container)).toEqual({ clips: 2, pictures: 0 });
+		videos.unmount();
+	});
+
 	it('gives up after a few pictures in a row will not load, rather than trying the whole feed', async () => {
 		const broken = Array.from({ length: 30 }, (_, i) => `/missing-${i}.jpg`);
 		const { container } = renderPanel(

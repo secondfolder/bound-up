@@ -3,6 +3,7 @@
 	import { type Clip, type Origin, originKey } from '$lib/playroom/iq-test/media';
 	import { fitCount } from '$lib/playroom/iq-test/media-fit';
 	import { trackImage } from '$lib/playroom/iq-test/media-image';
+	import type { PornMedia } from '$lib/playroom/iq-test/settings';
 	import ClipPlayer from './ClipPlayer.svelte';
 	import ClipScrubber from './ClipScrubber.svelte';
 	import EnlargeableItem from './EnlargeableItem.svelte';
@@ -26,10 +27,15 @@
 	 * enlarged the column holds still — no picture rotates away, no clip moves
 	 * on underneath it, nothing is added or dropped — and catches up once it
 	 * is closed.
+	 *
+	 * With only one kind of porn wanted (`media`), the column fills the same
+	 * space with that kind alone: pictures with no clip on top, or clips in
+	 * the pictures' places, each moving on when it ends.
 	 */
 	let {
 		images,
 		clips,
+		media: kinds = 'both',
 		origins = {},
 		offset,
 		stride = 2,
@@ -37,11 +43,14 @@
 		gap = 8,
 		audible = false,
 		lead,
+		leadControls,
 		leadOrigin = null,
 		onenlarge
 	}: {
 		images: readonly string[];
 		clips: readonly Clip[];
+		/** Pictures and a clip, or only one of the two. */
+		media?: PornMedia;
 		/** Where each was posted, by `originKey`: linked over its buttons. */
 		origins?: Readonly<Record<string, Origin>>;
 		/** Where in the feed this column starts, so columns differ. */
@@ -62,6 +71,8 @@
 		audible?: boolean;
 		/** A video shown first, above the porn: the hypno, in the first column. */
 		lead?: Snippet;
+		/** More buttons for the hypno's row, before Enlarge, as `controls` are for the others. */
+		leadControls?: Snippet;
 		/** The hypno's title and page, over its buttons as each picture's are. */
 		leadOrigin?: Origin | null;
 		/** The clip was enlarged or put back, so the page can let it be the one heard. */
@@ -122,6 +133,9 @@
 		return withFiles.length > 0 ? withFiles : clips;
 	});
 	const clipsById = $derived(new Map(playable.map((candidate) => [candidate.id, candidate])));
+
+	/** What fills the column after the clip on top (if any): pictures, or clips for videos only. */
+	const filler = $derived<Slot['kind']>(kinds === 'videos' ? 'clip' : 'picture');
 
 	const wanted = (slot: Slot) => slot.history[slot.at] ?? '';
 
@@ -327,43 +341,67 @@
 	 * `fitCount`): more drawn as it grows, the last ones not locked let go as
 	 * it shrinks. The clip, and the hypno, always stay. Not while anything is
 	 * enlarged, which holds the column as it is.
+	 *
+	 * With one kind only, the other's places go: no clip on top for pictures
+	 * only, and for videos only the pictures' places are clips instead.
 	 */
 	$effect(() => {
 		const space = orientation === 'column' ? panelHeight : panelWidth;
 		if (enlarged > 0 || space <= 0) {
 			return;
 		}
+		const mixed = kinds === 'both';
+		const fill = filler;
 		untrack(() => {
-			const clipSlot = slots.find((slot) => slot.kind === 'clip');
-			if (!clipSlot && playable.length > 0) {
+			// Only ever reassigned when something goes: `slots` is read below,
+			// so a new array every run would run this again, for ever.
+			const without = (kind: Slot['kind']) => {
+				if (slots.some((slot) => slot.kind === kind)) {
+					slots = slots.filter((slot) => slot.kind !== kind);
+				}
+			};
+			if (kinds === 'images') {
+				without('clip');
+				return;
+			}
+			if (kinds === 'videos') {
+				without('picture');
+				return;
+			}
+			const clipSlots = slots.filter((slot) => slot.kind === 'clip');
+			if (clipSlots.length === 0 && playable.length > 0) {
 				const made = newSlot('clip');
 				if (made) {
 					slots = [made, ...slots];
 				}
-			} else if (clipSlot && playable.length === 0) {
-				slots = slots.filter((slot) => slot !== clipSlot);
+			} else if (playable.length === 0) {
+				without('clip');
+			} else if (clipSlots.length > 1) {
+				// Back from videos only: one clip on top again, the rest let go.
+				const [keep] = clipSlots;
+				slots = slots.filter((slot) => slot.kind !== 'clip' || slot === keep);
 			}
 		});
 		const fixed = [
 			...(lead ? [leadLength] : []),
-			...slots.filter((s) => s.kind === 'clip').map(slotLength)
+			...(mixed ? slots.filter((s) => s.kind === 'clip').map(slotLength) : [])
 		];
-		const pictures = slots.filter((slot) => slot.kind === 'picture');
-		const guess = lengthFor(GUESSED.picture);
+		const fillers = slots.filter((slot) => slot.kind === fill);
+		const guess = lengthFor(GUESSED[fill]);
 		const lengths = [
 			...fixed,
-			...pictures.map(slotLength),
-			...Array.from({ length: Math.max(0, MOST_PICTURES - pictures.length) }, () => guess)
+			...fillers.map(slotLength),
+			...Array.from({ length: Math.max(0, MOST_PICTURES - fillers.length) }, () => guess)
 		];
-		const wantedPictures = Math.min(
-			images.length,
+		const wantedFillers = Math.min(
+			fill === 'clip' ? playable.length : images.length,
 			fitCount(lengths, space, gap, Math.max(1, fixed.length)) - fixed.length
 		);
 		untrack(() => {
-			let current = slots.filter((slot) => slot.kind === 'picture').length;
+			let current = slots.filter((slot) => slot.kind === fill).length;
 			const added: Slot[] = [];
-			while (current + added.length < wantedPictures) {
-				const made = newSlot('picture');
+			while (current + added.length < wantedFillers) {
+				const made = newSlot(fill);
 				if (!made) {
 					break;
 				}
@@ -372,10 +410,10 @@
 				slots = [...slots, made];
 			}
 			current += added.length;
-			if (current > wantedPictures) {
-				let excess = current - wantedPictures;
+			if (current > wantedFillers) {
+				let excess = current - wantedFillers;
 				const keep = [...slots].reverse().filter((slot) => {
-					if (excess > 0 && slot.kind === 'picture' && !slot.locked) {
+					if (excess > 0 && slot.kind === fill && !slot.locked) {
 						excess -= 1;
 						return false;
 					}
@@ -391,6 +429,8 @@
 		...slots.filter((slot) => slot.kind === 'clip'),
 		...slots.filter((slot) => slot.kind === 'picture')
 	]);
+	/** The one clip in the column that may be heard: the first, with videos only. */
+	const heardClip = $derived(ordered.find((slot) => slot.kind === 'clip')?.id ?? null);
 
 	/**
 	 * A picture that will not load is passed over for another — but only a
@@ -536,7 +576,13 @@
 >
 	{#if lead}
 		<div class="slot" data-key="lead" style:flex-grow={Math.max(1, Math.round(leadLength))}>
-			<EnlargeableItem name="hypno" onchange={counted} testid="hypno-item" origin={leadOrigin}>
+			<EnlargeableItem
+				name="hypno"
+				onchange={counted}
+				testid="hypno-item"
+				origin={leadOrigin}
+				controls={leadControls}
+			>
 				{#snippet footer()}
 					<ClipScrubber name="hypno" />
 				{/snippet}
@@ -574,7 +620,9 @@
 					{#if clipsById.has(wanted(slot))}
 						<ClipPlayer
 							clip={clipsById.get(wanted(slot)) as Clip}
-							audible={audible && (clipsById.get(wanted(slot))?.sound ?? false)}
+							audible={audible &&
+								slot.id === heardClip &&
+								(clipsById.get(wanted(slot))?.sound ?? false)}
 							bind:loading={slot.loading}
 							onended={() => moveOn(slot, next)}
 						/>

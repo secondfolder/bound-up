@@ -7,6 +7,35 @@ import {
 	mediaFor
 } from './playroom-media';
 
+/**
+ * The vibes' sources, fixed here rather than read from `media.ts`: those are
+ * tuned by hand as Redgifs' tags and niches come and go, and a test about
+ * caching, tokens and rate limits should not fail when one is swapped. Tests
+ * that need a kind of source this lacks (a niche) set it themselves.
+ */
+vi.mock('$lib/playroom/iq-test/media', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/playroom/iq-test/media')>();
+	const redgifs = (...tags: string[]) =>
+		tags.map((tag) => ({ kind: 'redgifs', tags: tag }) as const);
+	const reddit = (subreddit: string) => ({ kind: 'reddit', subreddit }) as const;
+	const Sources: Record<string, readonly unknown[]> = {
+		gooner: redgifs('Gooning', 'PMV', 'Gooner'),
+		bambi: redgifs(
+			'Bimbo Hypno',
+			'Mind Control',
+			'Bimbo PMV',
+			'Brainwash',
+			'Trance',
+			'Bambi Sleep'
+		),
+		misogyny: [...redgifs('Housewife', 'Submissive', 'Slut'), reddit('BimboFetish')],
+		denial: [...redgifs('Chastity', 'Edging', 'Orgasm Denial'), reddit('chastity')],
+		feminisation: [...redgifs('Feminization', 'Sissy', 'Crossdressing'), reddit('feminization')],
+		degradation: redgifs('Degradation', 'Humiliation', 'Face Slapping', 'Cum Slut')
+	};
+	return { ...actual, SOURCES: Sources };
+});
+
 beforeEach(() => clearMediaCache());
 afterEach(() => clearMediaCache());
 
@@ -49,8 +78,13 @@ function fakeFetch(answers: {
 			return Promise.resolve(call(answers.token ?? Response.json({ token: 'tok' })));
 		}
 		if (url.hostname === 'api.redgifs.com') {
-			const tag = url.searchParams.get('tags') ?? '';
-			const id = tag.toLowerCase().replaceAll(' ', '');
+			// A tag search names its tag; a niche's feed is named in its path.
+			const niche: RegExpExecArray | null = /^\/v2\/niches\/(?<niche>[^/]+)\/gifs$/.exec(
+				url.pathname
+			);
+			const tag = niche?.groups?.niche ?? url.searchParams.get('tags') ?? '';
+			// Letters and digits only, as a Redgifs id is.
+			const id = tag.toLowerCase().replace(/[^a-z0-9]/g, '');
 			return Promise.resolve(call(answers.redgifs?.(tag) ?? Response.json(redgifsAnswer(id))));
 		}
 		return Promise.resolve(call(answers.reddit));
@@ -90,6 +124,49 @@ describe('mediaFor', () => {
 		);
 		const searches = fetchFn.mock.calls.filter(([input]) => String(input).includes('/gifs/search'));
 		expect(searches.length).toBeGreaterThan(0);
+	});
+
+	it("fetches a Redgifs niche's feed, hottest first, alongside the tag searches", async () => {
+		const original = SOURCES.feminisation;
+		SOURCES.feminisation = [
+			{ kind: 'redgifs', tags: 'Sissy' },
+			{ kind: 'redgifs', niche: 'beautiful-transwomen' }
+		];
+		try {
+			const fetchFn = fakeFetch({});
+			const feed = await mediaFor('feminisation', asFetch(fetchFn), 0);
+			expect(urls(fetchFn)).toContain(
+				'https://api.redgifs.com/v2/niches/beautiful-transwomen/gifs?order=hot&count=40'
+			);
+			expect(feed.clips.map((clip) => clip.id)).toEqual(['sissy', 'beautifultranswomen']);
+			expect(urls(fetchFn).filter((url) => url === REDGIFS_TOKEN_URL)).toHaveLength(1);
+		} finally {
+			SOURCES.feminisation = original;
+		}
+	});
+
+	it("keeps searching tags while Redgifs' niches are rate-limited, which it limits apart", async () => {
+		const original = { denial: SOURCES.denial, degradation: SOURCES.degradation };
+		SOURCES.denial = [
+			{ kind: 'redgifs', niche: 'female-chastity' },
+			{ kind: 'redgifs', tags: 'Chastity' }
+		];
+		SOURCES.degradation = [{ kind: 'redgifs', tags: 'Degradation' }];
+		try {
+			const fetchFn = fakeFetch({
+				redgifs: (tag) =>
+					tag === 'female-chastity'
+						? new Response('', { status: 429 })
+						: Response.json(redgifsAnswer(tag.toLowerCase()))
+			});
+			const denial = await mediaFor('denial', asFetch(fetchFn), 0);
+			expect(denial.clips.map((clip) => clip.id)).toEqual(['chastity']);
+			// Asked after the niche's 429, and still answered.
+			const degradation = await mediaFor('degradation', asFetch(fetchFn), 1);
+			expect(degradation.clips.map((clip) => clip.id)).toEqual(['degradation']);
+		} finally {
+			Object.assign(SOURCES, original);
+		}
 	});
 
 	it('still has pictures for a vibe whose reddit top-up is rate-limited', async () => {

@@ -51,6 +51,14 @@ export const VIBES = [
 ] as const;
 export type Vibe = (typeof VIBES)[number];
 
+/**
+ * What the porn around the questions is made of: pictures and clips mixed,
+ * or only one of the two. Either way a column fills the same space, with as
+ * many of that kind as fit it (see `MediaPanel`). Videos only to start with.
+ */
+export const PORN_MEDIA = ['both', 'images', 'videos'] as const;
+export type PornMedia = (typeof PORN_MEDIA)[number];
+
 /** Bounds for the optional sober and target IQs. Wider than any score the test gives. */
 export const IQ_INPUT_MIN = 40;
 export const IQ_INPUT_MAX = 200;
@@ -82,6 +90,8 @@ export const settingsSchema = z
 		themedQuestions: z.boolean().default(true),
 		/** From 3: porn around the questions. */
 		porn: z.boolean().default(true),
+		/** With the porn: pictures, clips, or both. Its own option, behind the porn box's settings button. */
+		pornMedia: z.enum(PORN_MEDIA).default('videos'),
 		/** From 2 for bambi, 3 for the rest: a hypno playing alongside. */
 		hypno: z.boolean().default(true),
 		/** At 4: pictures and taunts flashed over the page. */
@@ -104,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	themedLook: true,
 	themedQuestions: true,
 	porn: true,
+	pornMedia: 'videos',
 	hypno: true,
 	subliminals: true
 };

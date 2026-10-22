@@ -78,7 +78,12 @@
 		type Settings,
 		showsPorn
 	} from '$lib/playroom/iq-test/settings';
-	import { soundReachesClips, unmuteFromGesture } from '$lib/playroom/iq-test/sound.svelte';
+	import {
+		soundReachesClips,
+		soundVolume,
+		toggleMuted,
+		unmuteFromGesture
+	} from '$lib/playroom/iq-test/sound.svelte';
 	import { schemeClass, themeFor, themeStyle } from '$lib/playroom/iq-test/themes';
 	import { wideWindow } from '$lib/playroom/iq-test/wide-window.svelte';
 	import type { IqTestResultView } from '$lib/types';
@@ -353,6 +358,8 @@
 	 * always be stopped — it plays on through the results and a start-over.
 	 */
 	const showHypnoControls = $derived(hypno?.started === true);
+	/** The hypno started but held paused at zero volume: its Play shows. */
+	const hypnoSilenced = $derived(hypno?.started === true && soundVolume('hypno') === 0);
 	const showMedia = $derived(showsPorn(settings));
 	const showColumns = $derived(showMedia && stage === 'questions');
 	const showPornControls = $derived(showColumns && hasMedia(porn.feed));
@@ -372,7 +379,9 @@
 	 * player, which the volume cannot touch.
 	 */
 	const hasSoundClips = $derived(
-		soundReachesClips() && porn.feed.clips.some((clip) => clip.sound && clip.video !== null)
+		soundReachesClips() &&
+			settings.pornMedia !== 'images' &&
+			porn.feed.clips.some((clip) => clip.sound && clip.video !== null)
 	);
 
 	/**
@@ -595,9 +604,38 @@
 	The PMVHaven hypno, as one of the porn videos at the top of the first
 	column. Its video is moved in here and back out (see hypno-video-host.ts),
 	so it plays straight on.
+
+	At zero volume the sound module pauses it (`data-pause-when-silent`), which
+	left a still frame that looked broken. A play symbol in the middle says why
+	while its buttons are out of sight; once they show, it gives way to a Play
+	among them (`hypnoControls`), the one button that does it. The symbol is
+	only a picture, and takes no pointer: a tap on it is a tap on the item,
+	which shows the buttons on a touchscreen. A sibling of the slot rather than
+	its wrapper, which the column sizes the slot by; the item it sits in is
+	the positioned box.
 -->
 {#snippet hypnoLead()}
 	<div class="hypno-slot" {@attach hypnoSlot}></div>
+	{#if hypnoSilenced}
+		<span class="hypno-paused" aria-hidden="true" data-testid="hypno-paused">
+			<wa-icon name="play" variant="solid"></wa-icon>
+		</span>
+	{/if}
+{/snippet}
+
+<!-- Native, like the column's own buttons beside it (see `MediaPanel`). -->
+{#snippet hypnoControls()}
+	{#if hypnoSilenced}
+		<button
+			type="button"
+			class="control"
+			aria-label="Play the hypno"
+			data-caption="Turn the hypno's sound back on, which plays it"
+			onclick={() => toggleMuted('hypno')}
+		>
+			<wa-icon name="play" variant="solid"></wa-icon>
+		</button>
+	{/if}
 {/snippet}
 
 <!--
@@ -636,10 +674,12 @@
 	<PornLayout
 		feed={porn.feed}
 		intensity={settings.intensity}
+		media={settings.pornMedia}
 		show={showColumns}
 		backdrop={playsBackdrop(settings) && stage === 'questions'}
 		docked={showDock}
 		lead={hypno?.source === 'pmvhaven' && hypno.current ? hypnoLead : undefined}
+		leadControls={hypnoControls}
 		leadOrigin={hypno?.current ? { title: hypno.current.name, page: hypno.current.pageUrl } : null}
 		footer={pageFooter}
 	>
@@ -803,6 +843,35 @@
 </div>
 
 <style>
+	/* Over the middle of the paused hypno, while its buttons are not shown:
+	   the same three ways `ItemToolbar` shows them hide this. */
+	.hypno-paused {
+		position: absolute;
+		inset: 0;
+		margin: auto;
+		display: grid;
+		place-items: center;
+		inline-size: 3.5rem;
+		block-size: 3.5rem;
+		border-radius: 50%;
+		background: rgb(0 0 0 / 0.55);
+		color: #fff;
+		font-size: 1.5rem;
+		pointer-events: none;
+		transition: opacity 150ms ease;
+
+		:global(.item.revealed) > &,
+		:global(.item:has(.toolbar :focus-visible)) > & {
+			opacity: 0;
+		}
+
+		@media (hover: hover) {
+			:global(.item:hover) > & {
+				opacity: 0;
+			}
+		}
+	}
+
 	.iq-test {
 		/* So the overload backdrop, behind everything at z-index -1, still
 		   paints above this wrapper's own background. */

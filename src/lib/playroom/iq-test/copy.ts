@@ -4,6 +4,7 @@ import {
 	flashes,
 	type Intensity,
 	looksThemed,
+	type PornMedia,
 	type Role,
 	type Settings,
 	type SettingsLike,
@@ -76,6 +77,16 @@ export const TOGGLE_HELP: Record<Toggle, { about: string; on: string; off: strin
 		off: 'No flashes.'
 	}
 };
+
+/** The porn's own options, behind the settings button beside its box. */
+export const PORN_OPTIONS_LABEL = 'Porn options';
+
+/** What the porn can be made of, in the order offered. Videos only is the default (`DEFAULT_SETTINGS`). */
+export const PORN_MEDIA_OPTIONS: readonly { id: PornMedia; label: string; hint: string }[] = [
+	{ id: 'both', label: 'Both', hint: 'Pictures and clips together.' },
+	{ id: 'images', label: 'Pictures only', hint: 'No clips: pictures fill their place.' },
+	{ id: 'videos', label: 'Videos only', hint: 'No pictures: clips fill their place.' }
+];
 
 export const VIBE_OPTIONS: readonly { id: Vibe; label: string; description: string }[] = [
 	{

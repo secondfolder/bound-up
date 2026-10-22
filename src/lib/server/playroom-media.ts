@@ -8,7 +8,7 @@ import {
 	parseFeed,
 	parseRedgifs,
 	REDGIFS_TOKEN_URL,
-	redgifsSearchUrl,
+	redgifsUrl,
 	SOURCES,
 	sourceKey
 } from '$lib/playroom/iq-test/media';
@@ -31,7 +31,21 @@ export const RATE_LIMIT_FALLBACK_MS = 60 * 1000;
 /** Redgifs' temporary tokens last a day; renew well before that. */
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
-type Host = MediaSource['kind'];
+/**
+ * What a 429 backs off: reddit, Redgifs' search (and its token), or Redgifs'
+ * niches. The last two apart because Redgifs limits them apart: measured
+ * 2026-10-22, every niche answered 429 while tag searches still answered
+ * 200, and backing off Redgifs as a whole on a niche's 429 emptied every
+ * vibe whose searches had not yet been cached.
+ */
+type Limit = 'reddit' | 'redgifs' | 'redgifs-niches';
+
+function limitFor(source: MediaSource): Limit {
+	if (source.kind === 'reddit') {
+		return 'reddit';
+	}
+	return 'niche' in source ? 'redgifs-niches' : 'redgifs';
+}
 type Entry = { feed: MediaFeed; freshUntil: number };
 
 /**
@@ -47,7 +61,7 @@ type Entry = { feed: MediaFeed; freshUntil: number };
  */
 const cache = new Map<string, Entry>();
 const inFlight = new Map<string, Promise<MediaFeed>>();
-const backoffUntil = new Map<Host, number>();
+const backoffUntil = new Map<Limit, number>();
 let redgifsToken: { value: string; freshUntil: number } | null = null;
 
 /**
@@ -72,7 +86,7 @@ function fromSource(source: MediaSource, fetchFn: typeof fetch, now: number): Pr
 	if (hit && now < hit.freshUntil) {
 		return Promise.resolve(hit.feed);
 	}
-	if (now < (backoffUntil.get(source.kind) ?? 0)) {
+	if (now < (backoffUntil.get(limitFor(source)) ?? 0)) {
 		return Promise.resolve(hit?.feed ?? EMPTY_FEED);
 	}
 	// One fetch per source at a time: a burst of visitors on a cold isolate
@@ -112,18 +126,19 @@ async function fetchSource(
 			}
 			return response.ok ? parseFeed(await response.text()) : null;
 		}
-		let response = await searchRedgifs(source.tag, fetchFn, now);
+		const url = redgifsUrl(source);
+		let response = await searchRedgifs(url, fetchFn, now);
 		if (response?.status === 401) {
 			// Expired, revoked, or fetched from another address: a token is bound
 			// to the address that asked for it ("WrongSender"), and the tunnel
 			// fallback changes that address mid-isolate. Asked again at once, on
 			// the route the host is now on, so this request is not wasted.
-			response = await searchRedgifs(source.tag, fetchFn, now);
+			response = await searchRedgifs(url, fetchFn, now);
 		}
 		if (response === null || response.status === 401) {
 			return null;
 		}
-		if (!checkRateLimit('redgifs', response, now)) {
+		if (!checkRateLimit(limitFor(source), response, now)) {
 			return null;
 		}
 		return response.ok ? parseRedgifs(await response.json()) : null;
@@ -133,26 +148,26 @@ async function fetchSource(
 	}
 }
 
-/** False, and the host backed off, when a response is a 429. */
-function checkRateLimit(host: Host, response: Response, now: number): boolean {
+/** False, and what it counts against backed off, when a response is a 429. */
+function checkRateLimit(limit: Limit, response: Response, now: number): boolean {
 	if (response.status !== 429) {
 		return true;
 	}
 	const reset = Number(response.headers.get('x-ratelimit-reset'));
 	backoffUntil.set(
-		host,
+		limit,
 		now + (Number.isFinite(reset) && reset > 0 ? reset * 1000 : RATE_LIMIT_FALLBACK_MS)
 	);
 	return false;
 }
 
 /**
- * One Redgifs search with the shared token, null without one. A 401 drops
+ * One Redgifs search (a tag's, or a niche's feed) with the shared token, null without one. A 401 drops
  * the token it used, unless another search has already replaced it, so the
  * next call asks for a new one rather than every parallel search doing so.
  */
 async function searchRedgifs(
-	tag: string,
+	url: string,
 	fetchFn: typeof fetch,
 	now: number
 ): Promise<Response | null> {
@@ -160,7 +175,7 @@ async function searchRedgifs(
 	if (token === null) {
 		return null;
 	}
-	const response = await fetchFn(redgifsSearchUrl(tag), {
+	const response = await fetchFn(url, {
 		headers: { 'user-agent': USER_AGENT, authorization: `Bearer ${token}` }
 	});
 	if (response.status === 401 && redgifsToken?.value === token) {

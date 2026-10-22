@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import type { MediaFeed, Origin } from '$lib/playroom/iq-test/media';
 	import { pornSpacing, sideColumns, stripRows } from '$lib/playroom/iq-test/media-fit';
-	import type { Intensity } from '$lib/playroom/iq-test/settings';
+	import type { Intensity, PornMedia } from '$lib/playroom/iq-test/settings';
 	import { wideWindow } from '$lib/playroom/iq-test/wide-window.svelte';
 	import ClipPlayer from './ClipPlayer.svelte';
 	import MediaPanel from './MediaPanel.svelte';
@@ -37,16 +37,20 @@
 	let {
 		feed,
 		intensity,
+		media = 'both',
 		show,
 		backdrop,
 		docked,
 		lead,
+		leadControls,
 		leadOrigin = null,
 		children,
 		footer
 	}: {
 		feed: MediaFeed;
 		intensity: Intensity;
+		/** Pictures and clips, or only one of the two: every column, and the backdrop, follow it. */
+		media?: PornMedia;
 		/** Whether there is porn around the question at all. */
 		show: boolean;
 		/** Whether a clip plays behind everything (sensory overload). */
@@ -55,6 +59,8 @@
 		docked: boolean;
 		/** A video shown first, above the porn in the first column: the hypno's PMV. */
 		lead?: Snippet;
+		/** More buttons for the hypno's row, before Enlarge: its Play, while it is held at zero volume. */
+		leadControls?: Snippet;
 		/** The hypno's title and page, linked over its buttons. */
 		leadOrigin?: Origin | null;
 		/** The middle column: the heading and the question. */
@@ -134,6 +140,9 @@
 	 */
 	let backdropIndex = $state(0);
 	const backdropClip = $derived.by(() => {
+		if (media === 'images') {
+			return null;
+		}
 		const playable = feed.clips.filter((clip) => clip.video !== null);
 		if (playable.length === 0) {
 			return null;
@@ -141,12 +150,36 @@
 		const stride = columnCount + 1;
 		return playable[(columnCount + backdropIndex * stride) % playable.length] ?? null;
 	});
+
+	/** How long a picture is the backdrop, with pictures only, before the next. */
+	const BACKDROP_PICTURE_MS = 15_000;
+	/**
+	 * With pictures only, the backdrop is a picture instead, changing every
+	 * so often: from the far end of the feed, which the columns reach last.
+	 */
+	const backdropPicture = $derived.by(() => {
+		if (media !== 'images' || feed.images.length === 0) {
+			return null;
+		}
+		const count = feed.images.length;
+		return feed.images[(((count - 1 - backdropIndex) % count) + count) % count] ?? null;
+	});
+	$effect(() => {
+		if (!(backdrop && media === 'images')) {
+			return;
+		}
+		const timer = setInterval(() => {
+			backdropIndex += 1;
+		}, BACKDROP_PICTURE_MS);
+		return () => clearInterval(timer);
+	});
 </script>
 
 {#snippet column(offset: number, orientation: 'column' | 'row')}
 	<MediaPanel
 		images={feed.images}
 		clips={feed.clips}
+		{media}
 		origins={feed.origins}
 		{offset}
 		stride={columnCount}
@@ -154,6 +187,7 @@
 		gap={edge}
 		audible={enlargedColumn === null ? offset === 0 : enlargedColumn === offset}
 		lead={offset === 0 ? lead : undefined}
+		{leadControls}
 		{leadOrigin}
 		onenlarge={(open) => {
 			if (open) {
@@ -165,7 +199,12 @@
 	/>
 {/snippet}
 
-{#if backdrop && backdropClip}
+{#if backdrop && backdropPicture}
+	<!-- Pictures only: the same backdrop, still. -->
+	<div class="backdrop" aria-hidden="true" data-testid="overload-backdrop">
+		<img src={backdropPicture} alt="" referrerpolicy="no-referrer" decoding="async" />
+	</div>
+{:else if backdrop && backdropClip}
 	<!--
 		Sensory overload: a clip filling the window behind everything, muted,
 		dimmed under the page's own colour so the questions stay readable.
@@ -249,6 +288,12 @@
 		inset: 0;
 		z-index: -1;
 		overflow: hidden;
+
+		img {
+			inline-size: 100%;
+			block-size: 100%;
+			object-fit: cover;
+		}
 
 		&::after {
 			content: '';

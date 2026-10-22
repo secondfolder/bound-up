@@ -178,6 +178,47 @@ describe('SettingsFields', () => {
 		});
 	});
 
+	it('opens the porn options from a button beside its box, defaulting to videos only, and reports a choice', async () => {
+		const onchange = vi.fn();
+		const { container } = render(SettingsFields, {
+			initial: { ...initial, intensity: 3, vibe: 'denial' },
+			onchange
+		});
+		await waSettled(container);
+		// Only the porn box has options of its own.
+		expect(container.querySelectorAll('[data-testid^="options-"]')).toHaveLength(1);
+		expect(container.querySelector('[data-testid="porn-options"]')).toBeNull();
+
+		const open = defined(
+			container.querySelector<HTMLButtonElement>(
+				'[data-testid="option-porn"] [data-testid="options-porn"]'
+			),
+			'the porn options button'
+		);
+		expect(open).toHaveAccessibleName('Porn options');
+		open.click();
+		await tick();
+		await waSettled(container);
+		const dialog = defined(
+			container.querySelector('[data-testid="porn-options"]'),
+			'the porn options dialog'
+		);
+		expect(waProp(dialog, 'open')).toBe(true);
+		const group = dialog.querySelector('[data-testid="porn-media"]');
+		expect(waProp(group, 'value')).toBe('videos');
+		expect(
+			[...dialog.querySelectorAll('wa-radio')].map((radio) => radio.getAttribute('value'))
+		).toEqual(['both', 'images', 'videos']);
+
+		await set(group, 'value', 'images', 'the porn media group');
+		expect(onchange).toHaveBeenLastCalledWith({
+			...initial,
+			intensity: 3,
+			vibe: 'denial',
+			pornMedia: 'images'
+		});
+	});
+
 	it('drops the IQs below their level, keeps the vibe for going back up, and finds both again', async () => {
 		const onchange = vi.fn();
 		const { container } = render(SettingsFields, {
@@ -331,7 +372,7 @@ describe('SettingsFields', () => {
 			expect(info.closest('wa-checkbox')).toBeNull();
 			// Its `for` is a property, set by Svelte, so found beside it and checked.
 			const popover = defined(
-				info.parentElement?.querySelector('wa-popover'),
+				info.closest('.option')?.querySelector('wa-popover'),
 				`${toggle}'s popover`
 			);
 			expect(waProp(popover, 'for')).toBe(info.id);

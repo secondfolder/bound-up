@@ -11,8 +11,10 @@ import {
 	mergeFeeds,
 	parseFeed,
 	parseRedgifs,
+	redgifsUrl,
 	SOURCES,
-	shuffleFeed
+	shuffleFeed,
+	sourceKey
 } from './media';
 import {
 	DOM_CLOCK_SCALE,
@@ -692,6 +694,44 @@ describe('themes', () => {
 });
 
 describe('media', () => {
+	it('asks Redgifs for a tag by search and a niche by its feed, cached apart', () => {
+		const tag = { kind: 'redgifs', tags: 'Sissy Hypno' } as const;
+		const niche = { kind: 'redgifs', niche: 'beautiful-transwomen' } as const;
+		expect(redgifsUrl(tag)).toBe(
+			'https://api.redgifs.com/v2/gifs/search?tags=Sissy%20Hypno&order=trending&count=40'
+		);
+		expect(redgifsUrl(niche)).toBe(
+			'https://api.redgifs.com/v2/niches/beautiful-transwomen/gifs?order=hot&count=40'
+		);
+		expect(sourceKey(niche)).not.toBe(sourceKey({ kind: 'redgifs', tags: 'beautiful-transwomen' }));
+	});
+
+	it('asks for several tags at once as all of them, comma-separated, cached by the set', () => {
+		const pair = { kind: 'redgifs', tags: ['Mind Control', 'Bimbo'] } as const;
+		expect(redgifsUrl(pair)).toBe(
+			'https://api.redgifs.com/v2/gifs/search?tags=Mind%20Control,Bimbo&order=trending&count=40'
+		);
+		expect(sourceKey(pair)).not.toBe(sourceKey({ kind: 'redgifs', tags: 'Mind Control' }));
+		// A list of one is the same search as the tag alone, and shares its cache.
+		expect(sourceKey({ kind: 'redgifs', tags: ['Sissy'] })).toBe(
+			sourceKey({ kind: 'redgifs', tags: 'Sissy' })
+		);
+	});
+
+	it('searches by free text, alone or beside tags, cached apart from the tags alone', () => {
+		const text = { kind: 'redgifs', query: 'mind control' } as const;
+		const both = { kind: 'redgifs', tags: 'Chastity', query: 'sissy' } as const;
+		expect(redgifsUrl(text)).toBe(
+			'https://api.redgifs.com/v2/gifs/search?query=mind%20control&order=trending&count=40'
+		);
+		expect(redgifsUrl(both)).toBe(
+			'https://api.redgifs.com/v2/gifs/search?tags=Chastity&query=sissy&order=trending&count=40'
+		);
+		expect(
+			new Set([text, both, { kind: 'redgifs', tags: 'Chastity' } as const].map(sourceKey)).size
+		).toBe(3);
+	});
+
 	const xml = `<feed><entry><content type="html">&lt;a href=&quot;https://i.redd.it/abc123.jpeg&quot;&gt;[link]&lt;/a&gt;
 		&lt;img src=&quot;https://preview.redd.it/zzz.jpg?width=640&quot;&gt;
 		&lt;a href=&quot;https://www.redgifs.com/watch/HappyPinkBunny&quot;&gt;[link]&lt;/a&gt;
