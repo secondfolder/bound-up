@@ -229,6 +229,28 @@ which is one more reason the self-hosted build needs `ORIGIN` behind a proxy.
 `e2e/share-previews.spec.ts` reads the pages with JavaScript off, as a
 previewer does.
 
+## Skeletons
+
+A loading placeholder for anything bigger than a line is **built from several
+small `wa-skeleton`s, not one big one**: a title line and a few text lines of
+different widths for a block of text, one skeleton per row for a list. That
+also shows the shape of what is coming, which a single block cannot.
+
+One block-sized `wa-skeleton` is the trap. Its shimmer is the `indicator`
+part, a line high and **fully rounded by default**, and no custom property on
+the host reaches its radius, so stretched to a block it draws one giant pill
+with huge round ends. This has shipped more than once (the notebook's loading
+entry, and before it the daydream picture's frame). Where a single block
+really is right, a picture's frame being the one case so far, size and round
+the part itself, as `DaydreamPicture.svelte` does:
+
+```css
+wa-skeleton::part(indicator) {
+	block-size: 100%;
+	border-radius: var(--wa-border-radius-l);
+}
+```
+
 ## Adding to it
 
 A new component reaches for the semantic tokens, never a hex value. A new

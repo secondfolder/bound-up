@@ -629,6 +629,13 @@ CSS. For buttons in particular:
   `src/lib/components/details.ts`, which sets the property in the browser
   only.
 
+**A loading skeleton for anything bigger than a line is built from small
+`wa-skeleton`s**, a line each, never one stretched over the whole element: its
+shimmer is a fully rounded part no custom property reaches, so one big
+skeleton draws a giant pill. Where a single block really is right (a picture's
+frame), size and round its `::part(indicator)` yourself. See
+[docs/theme.md](docs/theme.md#skeletons).
+
 **Sliders are `Slider.svelte`, never a bare `wa-slider`.** The base slider
 drags freely and springs onto a notch, steps a notch from the keyboard, draws
 its notches, and can be left unset; a feature's own slider wraps it. Biome's
