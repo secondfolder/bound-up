@@ -59,3 +59,18 @@ export const E2E_DATABASE_URL = `file:${join(E2E_RUN_DIR, 'e2e.db')}`;
  * the next run finds and replaces what a killed one left behind.
  */
 export const E2E_CONTAINER = `bound-up-e2e-${E2E_PORT}`;
+
+/**
+ * What the suite runs against: `vite dev` (the default), a Docker image
+ * (`E2E_IMAGE`, `npm run test:e2e:image`), or the built worker under
+ * `wrangler dev` (`E2E_WORKER`, `npm run test:e2e:worker`). See
+ * docs/development.md.
+ */
+export type E2ETarget = 'vite' | 'image' | 'worker';
+
+export function e2eTarget(): E2ETarget {
+	if (process.env.E2E_IMAGE) {
+		return 'image';
+	}
+	return process.env.E2E_WORKER ? 'worker' : 'vite';
+}

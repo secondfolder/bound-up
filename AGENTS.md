@@ -73,6 +73,7 @@ npm run lint     # biome ci + the Svelte <script>/<style> format check
 npm test         # everything: vitest (node + browser projects), then playwright
 npm run test:e2e # playwright alone, real browser against vite dev
 npm run test:e2e:image # playwright against a fresh Docker build, as CI runs it
+npm run test:e2e:worker # playwright against the built worker under wrangler dev
 npm run format   # fixes everything `lint` complains about that is mechanical
 ```
 
@@ -187,9 +188,11 @@ If you add a behaviour worth protecting, add a test. `*.svelte.test.ts` runs in
 the browser project; everything else runs in the node project, which excludes
 `src/lib/server/**` from the client project only, not from node.
 
-`npm run preview` is the only local command that exercises the real
-Workers runtime. Run it before any change that touches `platform`, the bundle,
-`nodejs_compat`, or the D1 path.
+`npm run test:e2e:worker` runs the Playwright suite against the real Workers
+runtime: the built worker under `wrangler dev`, with the real Durable Object
+and local D1 and R2. Run it before any change that touches `platform`, the
+bundle, `nodejs_compat`, R2, the Durable Object or the D1 path. `npm run
+preview` is the same runtime by hand.
 
 ## Invariants
 
@@ -846,6 +849,22 @@ writes the database goes through `sql()` from `e2e/db.ts`**, never a
 container, because a SQLite file opened from both the host and a Docker
 Desktop VM corrupts writes on macOS. See
 [docs/self-hosting.md](docs/self-hosting.md#how-the-image-is-tested).
+
+With `E2E_WORKER` set (`npm run test:e2e:worker`) it builds the app for
+Cloudflare and runs the worker under `wrangler dev`, its D1 and R2 kept under
+the run directory. `sql()` reaches that D1 through wrangler's local explorer
+API, inside the worker's runtime: workerd's SQLite does not wait on another
+process's lock, so opening the file from the host made the server's own
+writes fail with `SQLITE_BUSY`.
+Three things differ there, each handled in `e2e/server.mjs`: **mail goes
+through Resend's real code path** to a stand-in in `e2e/model-stub.mjs`
+(`RESEND_BASE_URL`), because Resend is a worker's only transport, and lands in
+the same files `e2e/mail.ts` reads; **the settings are written before the
+worker starts**, because Workers caches them for a minute (`e2e/settings.mjs`
+holds them for both); and `--local-upstream` makes the worker see this run's
+host, not the production route's, which it otherwise put in every emailed
+link. The developer's `.dev.vars` is not loaded. See
+[docs/development.md](docs/development.md#the-workers-target).
 
 The port, the database and the media directory are derived from the checkout
 path (`e2e/run-paths.ts`), so separate worktrees run the suite at the same time

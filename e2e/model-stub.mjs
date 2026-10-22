@@ -1,7 +1,8 @@
 // A stand-in for OpenRouter, for the Playwright suite. Started by
 // `e2e/server.mjs` beside the app, which is pointed at it through
 // `OPENROUTER_BASE_URL`, so a Daydreams spec never calls (or pays) a real
-// model and its replies are predictable.
+// model and its replies are predictable. It also stands in for Runware
+// (`/runware`) and, for a Workers run, Resend (`/resend/emails`; see `email`).
 //
 // It speaks just enough of the OpenAI-compatible streaming API the reply
 // endpoint relays: `POST /v1/chat/completions` answered with `data:` events,
@@ -69,9 +70,13 @@
 // ", again", so "More ideas" has something new to add. The one with nobody in charge is a monologue.
 // The night train and the ideas both come with research notes of their own,
 // so a spec can see them kept on the idea, and carried to a picked idea.
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { join } from 'node:path';
+import { E2E_RESEND_KEY } from './settings.mjs';
 
-const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1' } = process.env;
+const { E2E_MODEL_PORT, E2E_MODEL_HOST = '127.0.0.1', E2E_RUN_DIR } = process.env;
 if (!E2E_MODEL_PORT) {
 	console.error('e2e/model-stub.mjs is started by e2e/server.mjs, which sets its environment.');
 	process.exit(2);
@@ -499,7 +504,43 @@ async function picture(request, response) {
 	);
 }
 
+/**
+ * A stand-in for Resend's `POST /emails`, for a Workers run (`E2E_WORKER`),
+ * whose only way to send mail is Resend; the app reaches it through
+ * `RESEND_BASE_URL`. Each message is written to the run's mail folder in the
+ * outbox's own format (`writeToOutbox`), so `e2e/mail.ts` reads it exactly as
+ * it reads a `vite dev` run's, and answers as Resend does: an id, or a 401
+ * naming the error for a wrong key.
+ */
+async function email(request, response) {
+	if (request.headers.authorization !== `Bearer ${E2E_RESEND_KEY}`) {
+		response.writeHead(401, { 'content-type': 'application/json' });
+		response.end(JSON.stringify({ statusCode: 401, name: 'invalid_api_key' }));
+		return;
+	}
+	const parts = [];
+	for await (const part of request) {
+		parts.push(part);
+	}
+	const { from, to, subject, text, html } = JSON.parse(Buffer.concat(parts).toString('utf8'));
+	const dir = join(E2E_RUN_DIR ?? '.', 'mail');
+	await mkdir(dir, { recursive: true });
+	const sentAt = new Date().toISOString();
+	for (const address of to) {
+		await writeFile(
+			join(dir, `${Date.now()}-${randomUUID()}.json`),
+			JSON.stringify({ from, sentAt, to: address, subject, text, html }, null, '\t')
+		);
+	}
+	response.writeHead(200, { 'content-type': 'application/json' });
+	response.end(JSON.stringify({ id: randomUUID() }));
+}
+
 const server = createServer(async (request, response) => {
+	if (request.method === 'POST' && request.url === '/resend/emails') {
+		await email(request, response);
+		return;
+	}
 	if (request.method === 'POST' && request.url === '/runware') {
 		await picture(request, response);
 		return;

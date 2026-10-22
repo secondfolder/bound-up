@@ -14,7 +14,7 @@ import {
 } from '$lib/schemas/serverSettingsForms';
 import { requireAdmin } from '$lib/server/admin';
 import { openrouterBaseUrl } from '$lib/server/daydream/config';
-import { createMailer } from '$lib/server/mail';
+import { createMailer, resendBaseUrl } from '$lib/server/mail';
 import { MAIL_NODE_TARGET, MailNotSetUpError, readMailConfig } from '$lib/server/mail/config';
 import { loadOpenRouterCatalogue } from '$lib/server/openrouter-models';
 import { defaultVapidSubject } from '$lib/server/push';
@@ -276,13 +276,13 @@ export const actions: Actions = {
 	 * admin pressing the button — and the whole point is to say whether it
 	 * worked.
 	 */
-	testEmail: async ({ locals, request }) => {
+	testEmail: async ({ locals, platform, request }) => {
 		const admin = requireAdmin(locals);
 		const testEmailForm = await superValidate(request, zod4(serverActionFormSchema), {
 			id: TEST_EMAIL_FORM
 		});
 		try {
-			await createMailer(readMailConfig(locals.settings)).send({
+			await createMailer(readMailConfig(locals.settings), fetch, resendBaseUrl(platform)).send({
 				to: admin.email,
 				subject: 'A test email from your server',
 				text: 'If you can read this, your server can send email.',

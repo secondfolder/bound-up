@@ -246,6 +246,7 @@ npm test                          # everything: vitest, then the Playwright suit
 npm run test:unit                 # vitest alone, in watch mode
 npm run test:e2e                  # the Playwright suite alone
 npm run test:e2e:image            # the Playwright suite against a fresh Docker build
+npm run test:e2e:worker           # the Playwright suite against the built worker
 ```
 
 The landing page's feature screenshots in `static/landing/` are real screens,
@@ -263,6 +264,23 @@ derived from the checkout's path, so it never touches your `local.db` or
 checkout is refused until the first finishes. The app fetches its icons from
 Font Awesome's CDN, so the Playwright suite expects a network connection.
 [AGENTS.md](../AGENTS.md) has the details of how each level is meant to be used.
+
+### The Workers target
+
+`npm run test:e2e:worker` runs the same Playwright suite against what
+production runs: the app built for Cloudflare, under `wrangler dev`, so in the
+workerd runtime with the real `RealtimeRoom` Durable Object and local D1 and
+R2. It is the only automated check of anything that behaves differently there:
+live updates through the Durable Object, R2's rules (it refuses a stream whose
+length it cannot know, which `vite dev` and the Docker image never would), the
+worker bundle, and the Lit remapping in `wrangler.jsonc`.
+
+It builds first, so it takes a few minutes longer than `npm run test:e2e`.
+Everything it keeps (D1, R2, the mail it sends) is under the run directory, so
+it never touches `.wrangler/state` or `npm run preview`'s data, and it ignores
+your `.dev.vars`. Email goes through the Resend code path to a stand-in that
+writes each message to a file, since a worker has no other way to send one.
+It is not part of `npm test` or CI yet.
 
 ### Pre-commit
 
@@ -297,6 +315,7 @@ other is half a script, is in
 | `check` / `lint` / `format` / `test`                          | svelte-check / Biome check / Biome write / all tests          |
 | `test:unit` / `test:e2e`                                      | Vitest in watch mode / Playwright against `vite dev`          |
 | `test:e2e:image`                                              | Build the Docker image, then Playwright against it            |
+| `test:e2e:worker`                                             | Build the worker, then Playwright against it on `wrangler dev` |
 | `screenshots:landing`                                         | Retake the landing page's feature screenshots (`static/landing/`) |
 | `brand-images`                                                | Redraw the favicons, app icons and share card in `static/`    |
 | `title-font`                                                  | Rebuild the title face from Rubik's sources (needs `uv`)      |

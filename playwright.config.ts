@@ -21,7 +21,8 @@ import {
  * from the checkout path (see `e2e/run-paths.ts`), so a local `local.db` is
  * never touched and runs in separate worktrees never touch each other. With
  * `E2E_IMAGE` set it runs against that Docker image on the same port and file
- * instead — see `e2e/server.mjs`.
+ * instead, and with `E2E_WORKER` set against the built worker under
+ * `wrangler dev` — see `e2e/server.mjs`.
  */
 
 export default defineConfig({
@@ -62,7 +63,8 @@ export default defineConfig({
 		reuseExistingServer: false,
 		stdout: 'pipe',
 		stderr: 'pipe',
-		timeout: 120_000,
+		// A Workers run builds the app first, which takes a few minutes.
+		timeout: process.env.E2E_WORKER ? 600_000 : 120_000,
 		// So that `e2e/server.mjs` gets to `docker stop` the container in image
 		// mode, rather than being killed and leaving it running. Harmless for
 		// `vite dev`, which it forwards the signal to.
@@ -95,7 +97,10 @@ export default defineConfig({
 			NO_HMR: '1',
 			// Set to a Docker image to run the suite against it instead of
 			// `vite dev` (`npm run test:e2e:image`; CI does this for every build).
-			...(process.env.E2E_IMAGE ? { E2E_IMAGE: process.env.E2E_IMAGE } : {})
+			...(process.env.E2E_IMAGE ? { E2E_IMAGE: process.env.E2E_IMAGE } : {}),
+			// Set to run it against the built worker under `wrangler dev` instead
+			// (`npm run test:e2e:worker`).
+			...(process.env.E2E_WORKER ? { E2E_WORKER: process.env.E2E_WORKER } : {})
 		}
 	}
 });

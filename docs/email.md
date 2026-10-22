@@ -179,6 +179,13 @@ The Playwright suite points it at its run directory (`e2e/global-setup.ts`
 writes the setting) and reads the links back with `e2e/mail.ts`, so `signUp`
 in `e2e/helpers.ts` follows the real link before signing in.
 
+**`RESEND_BASE_URL`** replaces Resend's API root (`https://api.resend.com`),
+from the worker's vars or the environment. Only the Playwright suite's Workers
+run sets it, to a stand-in in `e2e/model-stub.mjs` that writes each message in
+the outbox's format, since a worker cannot use the outbox itself. A test seam
+like `OPENROUTER_BASE_URL`, not a setting: everything else about sending is
+production's own code path.
+
 ## What an email says
 
 `mail/templates.ts`. **The app's name, a verb and one link — never what the

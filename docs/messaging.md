@@ -925,16 +925,12 @@ The honest boundary:
   again. Surviving that needs `user_keys.sealed_pins` (the pin list encrypted to
   your own key), which is a noted follow-up. The UI shows when a key was first
   seen so "a moment ago" is not mistaken for "two years ago".
-- **The Durable Object is not covered end to end.** The Playwright suite runs
-  against `vite dev`, so the live-update tests exercise the in-process notifier.
-  The object itself is covered by direct unit tests of the class
-  (`durable-object.test.ts`), and `npm run preview` confirms the custom
-  entry builds, the `REALTIME` binding registers as a SQLite-backed class, and
-  `GET /api/realtime/events` reaches the worker and refuses an unauthenticated caller. An
-  event has **not** been observed travelling through a real Durable Object,
-  because a page cannot currently be loaded on the built worker at all — see the
-  known bug at the end of AGENTS.md, which predates this work. Pointing
-  Playwright at `wrangler dev` would close both gaps and is not done.
+- **The Durable Object is covered end to end only on request.** `npm test` and
+  CI run the Playwright suite against `vite dev` and the Docker image, whose
+  live updates go through the in-process notifier. `npm run test:e2e:worker`
+  runs the same suite on the built worker, where they go through the real
+  `RealtimeRoom` (see [development.md](development.md#the-workers-target)); the
+  class is also covered by direct unit tests (`durable-object.test.ts`).
 - **Video is transcoded in unit tests, not end to end.** The browser project
   re-encodes a generated clip through the real VP9 path, but the Playwright
   suite only sends photos. A long phone video on a real phone, where the

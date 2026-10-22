@@ -133,6 +133,8 @@ declare global {
 				 */
 				OPENROUTER_BASE_URL?: string;
 				RUNWARE_BASE_URL?: string;
+				/** Likewise for Resend, so a Workers e2e run can read its mail. See `$lib/server/mail`. */
+				RESEND_BASE_URL?: string;
 				/**
 				 * TEMPORARY: what the server settings were before they moved into
 				 * the database. Read only by the one-time import

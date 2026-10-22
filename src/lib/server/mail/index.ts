@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { env as privateEnv } from '$env/dynamic/private';
 import { inBackground } from '../background';
 import type { MailConfig } from './config';
 
@@ -15,7 +16,27 @@ export type Mailer = {
 	send: (message: MailMessage) => Promise<void>;
 };
 
-const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+export const DEFAULT_RESEND_BASE_URL = 'https://api.resend.com';
+
+const TRAILING_SLASHES = /\/+$/;
+const HTTP_URL = /^https?:\/\//;
+
+/**
+ * Resend's API root: `RESEND_BASE_URL` if set, which only the e2e suite does,
+ * to point a Workers run at a stand-in (`e2e/model-stub.mjs`) and read the
+ * mail back. A test seam, like `OPENROUTER_BASE_URL`, not a setting: the
+ * sending code is otherwise exactly what production runs, which is the point.
+ */
+export function resendBaseUrl(platform: App.Platform | undefined): string {
+	const given = platform?.env?.RESEND_BASE_URL ?? privateEnv.RESEND_BASE_URL;
+	const baseUrl = (given?.trim() || DEFAULT_RESEND_BASE_URL).replace(TRAILING_SLASHES, '');
+	if (!HTTP_URL.test(baseUrl)) {
+		throw new Error(
+			`RESEND_BASE_URL must be an http(s) URL, such as ${DEFAULT_RESEND_BASE_URL}; it is "${baseUrl}". Unset it to use Resend itself.`
+		);
+	}
+	return baseUrl;
+}
 
 /**
  * Builds the mailer a config describes. See docs/email.md.
@@ -28,12 +49,16 @@ const RESEND_ENDPOINT = 'https://api.resend.com/emails';
  * `node:fs` are dead code in the worker bundle, where neither could load —
  * the same arrangement as `db/backend.ts`.
  */
-export function createMailer(config: MailConfig, fetchImpl: typeof fetch = fetch): Mailer {
+export function createMailer(
+	config: MailConfig,
+	fetchImpl: typeof fetch = fetch,
+	resendRoot = DEFAULT_RESEND_BASE_URL
+): Mailer {
 	const { transport } = config;
 	if (transport.kind === 'resend') {
 		return {
 			async send(message) {
-				const response = await fetchImpl(RESEND_ENDPOINT, {
+				const response = await fetchImpl(`${resendRoot}/emails`, {
 					method: 'POST',
 					headers: {
 						authorization: `Bearer ${transport.apiKey}`,

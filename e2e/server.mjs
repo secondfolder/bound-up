@@ -7,6 +7,11 @@
 // the specs that need the database reach it through `docker exec` (see
 // `e2e/db.ts` for why not a bind mount). See docs/self-hosting.md.
 //
+// With `E2E_WORKER` set (`npm run test:e2e:worker`) it builds the app for
+// Cloudflare and runs the built worker under `wrangler dev`: the real workerd
+// runtime, the real Durable Object, local D1 and R2 kept in the run directory.
+// See `serveWorker` below and docs/development.md.
+//
 // Why a lock at all: the port and run directory are derived from the checkout
 // path (see `e2e/run-paths.ts`), so a second run in the SAME checkout gets the
 // same ones — and would start by deleting the first run's database. Separate
@@ -22,11 +27,21 @@
 // file, and a stale one is told apart from a live one by trying to connect to
 // it — nothing is listening on a stale one.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
+import { join } from 'node:path';
+import { createClient } from '@libsql/client';
+import { e2eSettings, UPSERT_SETTING } from './settings.mjs';
 
-const { E2E_PORT, E2E_MODEL_PORT, E2E_RUN_DIR, E2E_MEDIA_DIR, E2E_LOCK_PATH, E2E_IMAGE } =
-	process.env;
+const {
+	E2E_PORT,
+	E2E_MODEL_PORT,
+	E2E_RUN_DIR,
+	E2E_MEDIA_DIR,
+	E2E_LOCK_PATH,
+	E2E_IMAGE,
+	E2E_WORKER
+} = process.env;
 if (!(E2E_PORT && E2E_MODEL_PORT && E2E_RUN_DIR && E2E_MEDIA_DIR && E2E_LOCK_PATH)) {
 	console.error('e2e/server.mjs is started by playwright.config.ts, which sets its environment.');
 	process.exit(2);
@@ -100,6 +115,8 @@ process.on('exit', () => modelStub.kill());
 
 if (E2E_IMAGE) {
 	await serveImage(E2E_IMAGE);
+} else if (E2E_WORKER) {
+	await serveWorker();
 } else {
 	await run('npx', ['drizzle-kit', 'migrate']);
 	// The prompt review page reads the generated catalogue, which is not
@@ -183,4 +200,86 @@ async function serveImage(image) {
 		});
 	}
 	container.once('exit', (code) => process.exit(code ?? 1));
+}
+
+/**
+ * Builds the worker and runs it under `wrangler dev`, on this run's port.
+ *
+ * Its D1 and R2 live under the run directory (`--persist-to`), so every run
+ * starts from the committed migrations. The specs reach that D1 through the
+ * worker's own runtime, not the file (`e2e/db.ts` says why); only the settings
+ * below are written to the file, before anything else has it open.
+ *
+ * The settings are written before the worker starts, not only by the
+ * globalSetup afterwards: on Workers they are cached per isolate for a minute
+ * (docs/server-settings.md), so a worker that read them before the globalSetup
+ * ran would go on without mail or models for that long.
+ *
+ * Mail goes through Resend's real code path to the stub (`RESEND_BASE_URL`),
+ * since Resend is the only transport a worker has. `--env-file` names an
+ * empty file so the developer's own `.dev.vars` (a tunnel, an old secret) never
+ * reaches the run; everything the run needs is passed with `--var`.
+ */
+async function serveWorker() {
+	const state = join(E2E_RUN_DIR, 'wrangler');
+	mkdirSync(state, { recursive: true });
+	await run('npm', ['run', 'build']);
+	await run('npx', [
+		'wrangler',
+		'd1',
+		'migrations',
+		'apply',
+		'DB',
+		'--local',
+		'--persist-to',
+		state
+	]);
+
+	const d1 = join(state, 'v3', 'd1', 'miniflare-D1DatabaseObject');
+	const [file] = readdirSync(d1).filter(
+		(name) => name.endsWith('.sqlite') && name !== 'metadata.sqlite'
+	);
+	const client = createClient({ url: `file:${join(d1, file)}` });
+	for (const [key, value] of Object.entries(e2eSettings({ target: 'worker', outboxDir: '' }))) {
+		await client.execute({ sql: UPSERT_SETTING, args: [key, value] });
+	}
+	client.close();
+
+	const noVars = join(E2E_RUN_DIR, 'no.dev.vars');
+	writeFileSync(noVars, '');
+	const stub = `http://127.0.0.1:${E2E_MODEL_PORT}`;
+	const worker = spawn(
+		'npx',
+		[
+			'wrangler',
+			'dev',
+			'--port',
+			E2E_PORT,
+			'--persist-to',
+			state,
+			'--env-file',
+			noVars,
+			'--show-interactive-dev-session=false',
+			// Otherwise the worker sees the production route's host as its own
+			// (wrangler.jsonc's `routes`), and Better Auth builds every emailed link
+			// for that host instead of this run's.
+			'--local-upstream',
+			`localhost:${E2E_PORT}`,
+			'--var',
+			`OPENROUTER_BASE_URL:${stub}/v1`,
+			'--var',
+			`RUNWARE_BASE_URL:${stub}/runware`,
+			'--var',
+			`RESEND_BASE_URL:${stub}/resend`,
+			// As for the image: every test signs up from one address, many times a
+			// minute, which the sign-in limit would refuse.
+			'--var',
+			'AUTH_RATE_LIMIT:off'
+		],
+		{ stdio: 'inherit' }
+	);
+	for (const signal of ['SIGINT', 'SIGTERM']) {
+		process.on(signal, () => worker.kill(signal));
+	}
+	worker.once('exit', (code) => process.exit(code ?? 1));
 }

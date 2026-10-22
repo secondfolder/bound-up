@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createMailer, type MailMessage, sendInBackground } from './index';
+import { createMailer, type MailMessage, resendBaseUrl, sendInBackground } from './index';
 
 const message: MailMessage = {
 	to: 'ada@example.test',
@@ -66,6 +66,19 @@ describe('Resend', () => {
 		const failure = await mailer.send(message).catch((error: unknown) => error);
 		expect(String(failure)).toContain('validation_error');
 		expect(String(failure)).not.toContain('ada@example.test');
+	});
+
+	/** The e2e suite's Workers run points this at a stand-in to read its mail. */
+	it('posts to another root when given one', async () => {
+		const fetchImpl = vi.fn((_url: string | URL | Request) =>
+			Promise.resolve(new Response('{"id":"1"}', { status: 200 }))
+		);
+		await createMailer(
+			{ from: 'x@example.test', transport: { kind: 'resend', apiKey: 're_123' } },
+			fetchImpl as unknown as typeof fetch,
+			'http://localhost:9999'
+		).send(message);
+		expect(fetchImpl.mock.calls[0]?.[0]).toBe('http://localhost:9999/emails');
 	});
 
 	it('says unknown for a body that is not a Resend error', async () => {
@@ -138,5 +151,23 @@ describe('sendInBackground', () => {
 		const platform = { ctx: { waitUntil } } as unknown as App.Platform;
 		sendInBackground(platform, { send: () => Promise.resolve() }, message, 'verification');
 		expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+	});
+});
+
+describe('resendBaseUrl', () => {
+	it('is Resend itself unless the test seam is set', () => {
+		expect(resendBaseUrl(undefined)).toBe('https://api.resend.com');
+	});
+
+	it('takes the seam from the platform, without a trailing slash', () => {
+		const platform = {
+			env: { RESEND_BASE_URL: 'http://localhost:4000/' }
+		} as unknown as App.Platform;
+		expect(resendBaseUrl(platform)).toBe('http://localhost:4000');
+	});
+
+	it('refuses something that is not an http(s) URL, saying how to fix it', () => {
+		const platform = { env: { RESEND_BASE_URL: 'ftp://nope' } } as unknown as App.Platform;
+		expect(() => resendBaseUrl(platform)).toThrow(/Unset it to use Resend itself/);
 	});
 });

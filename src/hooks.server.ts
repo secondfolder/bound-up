@@ -6,7 +6,7 @@ import { env as privateEnv } from '$env/dynamic/private';
 import { createAuth } from '$lib/server/auth';
 import type { Db } from '$lib/server/db';
 import { createDb, getLocalDb } from '$lib/server/db/backend';
-import { createMailer, type Mailer, sendInBackground } from '$lib/server/mail';
+import { createMailer, type Mailer, resendBaseUrl, sendInBackground } from '$lib/server/mail';
 import { readMailConfig } from '$lib/server/mail/config';
 import { getLocalMediaStore } from '$lib/server/media/backend';
 import {
@@ -40,12 +40,12 @@ const AUTH_PATH_PREFIX = '/api/auth';
  * account being recovered), so a send that failed the response would tell a
  * stranger which addresses have accounts.
  */
-function lazyMailer(settings: ServerSettings): Mailer {
+function lazyMailer(settings: ServerSettings, platform: App.Platform | undefined): Mailer {
 	let built: Mailer | undefined;
 	return {
 		send(message) {
 			try {
-				built ??= createMailer(readMailConfig(settings));
+				built ??= createMailer(readMailConfig(settings), fetch, resendBaseUrl(platform));
 			} catch (error) {
 				return Promise.reject(error);
 			}
@@ -90,7 +90,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const settings = await loadServerSettings(db, event.platform);
 	const secret = settings.serverSecret;
 
-	const mailer = lazyMailer(settings);
+	const mailer = lazyMailer(settings, event.platform);
 	const limitsOff = rateLimitsOff(event);
 	const emailRateLimit = limitsOff ? unlimitedEmail : onceEach(emailRateLimiter(db, secret));
 
