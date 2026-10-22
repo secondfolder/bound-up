@@ -3,6 +3,21 @@ import { clearMediaCache } from '$lib/server/playroom-media';
 import { fakeEvent } from '$lib/testing/events';
 import { GET } from './+server';
 
+/**
+ * Each vibe one reddit feed, fixed here rather than read from `media.ts`, as
+ * `playroom-media.test.ts` does: those sources are tuned by hand, and when
+ * every vibe went to Redgifs only, a test about this endpoint's status and
+ * cache header failed for want of the one feed its fake `fetch` answers.
+ */
+vi.mock('$lib/playroom/iq-test/media', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/playroom/iq-test/media')>();
+	const reddit = (subreddit: string) => [{ kind: 'reddit', subreddit }] as const;
+	return {
+		...actual,
+		SOURCES: { ...actual.SOURCES, misogyny: reddit('BimboFetish'), denial: reddit('chastity') }
+	};
+});
+
 afterEach(() => clearMediaCache());
 
 const FEED =

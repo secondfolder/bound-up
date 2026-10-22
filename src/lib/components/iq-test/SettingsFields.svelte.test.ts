@@ -389,7 +389,9 @@ describe('SettingsFields', () => {
 			'its info'
 		);
 		info.click();
-		const popover = defined(info.parentElement?.querySelector('wa-popover'), 'its popover');
+		// By the option, not the button's parent: the button sits in a group of
+		// its own beside the box, with the porn options' button.
+		const popover = defined(info.closest('.option')?.querySelector('wa-popover'), 'its popover');
 		await expect.poll(() => waProp(popover, 'open')).toBe(true);
 		expect(waProp(box, 'checked')).toBe(true);
 	});
