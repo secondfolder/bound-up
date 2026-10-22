@@ -39,7 +39,13 @@ test.describe('rewards', () => {
 		await clickWaButton(page, 'Add reward');
 		await page.waitForURL(/\/home\/rewards$/);
 
-		const edit = await page.getByRole('link', { name: 'Edit Long bath' }).getAttribute('href');
+		// Edit is in the reward's detail, which its row opens.
+		await waitForHydration(page);
+		await page.getByRole('button', { name: /Long bath/ }).click();
+		const edit = await page
+			.locator('wa-dialog')
+			.getByRole('link', { name: 'Edit' })
+			.getAttribute('href');
 		if (!edit) {
 			throw new Error('expected an edit link');
 		}
@@ -64,8 +70,9 @@ test.describe('rewards', () => {
 			await ada.page.getByRole('button', { name: 'Edit your reward credits' }).click();
 			await ada.page.getByLabel('Set your reward credits').fill('4');
 			await ada.page.getByRole('button', { name: 'Save your reward credits' }).click();
-			await expect(ada.page.locator('.self .title-row')).toContainText('Your rewards');
-			await expect(ada.page.locator('.self .title-row')).toContainText('Credits: 4');
+			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
+				'4'
+			);
 
 			await ada.page.getByRole('link', { name: 'Add a reward' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/add$/);
@@ -76,9 +83,15 @@ test.describe('rewards', () => {
 			await clickWaButton(ada.page, 'Add reward');
 			await ada.page.waitForURL(/\/home\/rewards$/);
 
-			await expect(ada.page.getByRole('heading', { name: 'Long bath' })).toBeVisible();
-			await clickWaButton(ada.page, 'Claim');
-			await expect(ada.page.locator('.self .title-row')).toContainText('Credits: 2');
+			// Claimed only from the reward's detail: a second, deliberate tap.
+			const within = ada.page.locator('.item-group').filter({ hasText: 'Within reach' });
+			await waitForHydration(ada.page);
+			await within.getByRole('button', { name: /Long bath/ }).click();
+			await expect(ada.page.locator('wa-dialog')).toContainText('2 credits left');
+			await clickWaButton(ada.page, /^Claim · 2 credits$/);
+			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
+				'2'
+			);
 
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
 			await ada.page.waitForURL(/\/home\/rewards\/history$/);
@@ -126,14 +139,19 @@ test.describe('rewards', () => {
 			await jun.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(jun.page, 'Add reward');
 			await jun.page.waitForURL(/\/rewards$/);
-			await expect(jun.page.getByRole('heading', { name: 'Tea service' })).toBeVisible();
+			// Jun set it, against Ada's balance: Jun sees whether Ada can afford it.
+			const affordable = jun.page.locator('.item-group').filter({ hasText: 'Ada can afford' });
+			await expect(affordable.getByRole('button', { name: /Tea service/ })).toBeVisible();
 
 			await ada.page.goto('/home/rewards');
-			await expect(ada.page.getByRole('heading', { name: 'Jun' })).toBeVisible();
-			await expect(ada.page.locator('.partner .title-row').first()).toContainText('Jun');
-			await expect(ada.page.locator('.partner .title-row').first()).toContainText('Credits: 4');
-			await clickWaButton(ada.page, 'Claim');
-			await expect(ada.page.locator('.partner .title-row').first()).toContainText('Credits: 2');
+			await expect(ada.page.getByRole('heading', { name: 'From Jun' })).toBeVisible();
+			const balance = ada.page.locator('.balances li').filter({ hasText: 'With Jun' });
+			await expect(balance).toContainText('4');
+			const teaService = ada.page.locator('.partner').getByRole('button', { name: /Tea service/ });
+			await waitForHydration(ada.page);
+			await teaService.click();
+			await clickWaButton(ada.page, /^Claim · 2 credits$/);
+			await expect(balance).toContainText('Credits: 2');
 
 			/**
 			 * Both waits name the partner's route, as tasks.spec.ts does. A bare
@@ -145,7 +163,9 @@ test.describe('rewards', () => {
 			 * `/\/rewards\/history$/` matched too, and "Claimed by you" never
 			 * came, because her self history is empty.
 			 */
-			await ada.page.getByRole('link', { name: 'Open full rewards' }).click();
+			// The whole list is a link in the reward's detail.
+			await teaService.click();
+			await ada.page.locator('wa-dialog').getByRole('link', { name: "Jun's rewards" }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards$/);
 			await ada.page.getByRole('link', { name: 'Claim history' }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/rewards\/history$/);

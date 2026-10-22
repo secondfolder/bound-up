@@ -14,7 +14,8 @@ import {
 } from '$lib/testing/fixtures';
 import { testPartnerView } from '$lib/testing/names';
 import type { PartnerView } from '$lib/types';
-import { actions, load } from './+page.server';
+import { load } from './+layout.server';
+import { actions } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -69,7 +70,7 @@ describe('load', () => {
 
 	it('degrades to an empty tasks page without a session', async () => {
 		await expect(runLoad(load(at(null)))).resolves.toEqual({
-			selfTasks: { tasks: [], completions: [] },
+			selfTasks: { tasks: [], completions: [], credits: 0 },
 			partnerTasks: []
 		});
 	});
@@ -97,6 +98,54 @@ describe('actions', () => {
 		await expect(readPartnershipRewardCreditRow(db, id, ada.id)).resolves.toMatchObject({
 			credits: 3
 		});
+	});
+
+	it('answers a completion with its id, which undoes it', async () => {
+		const task = await createTestSelfTask(db, ada, { creditsAwarded: 2 });
+		const completed = await run('selfCompleteTask', at(ada, { taskId: task.id }));
+		expect(completed).toMatchObject({ completionId: expect.any(String) });
+		const { completionId } = completed as { completionId: string };
+
+		const undone = await run('selfUndoCompletion', at(ada, { completionId }));
+		expect(undone).toMatchObject({ undone: true });
+		await expect(readSelfRewardCreditRow(db, ada.id)).resolves.toMatchObject({ credits: 0 });
+		await expect(readSelfTaskRow(db, task.id)).resolves.toMatchObject({ active: true });
+	});
+
+	it("refuses to undo someone else's completion, saying it is not there", async () => {
+		const task = await createTestSelfTask(db, ada);
+		const { completionId } = (await run('selfCompleteTask', at(ada, { taskId: task.id }))) as {
+			completionId: string;
+		};
+		const result = await run('selfUndoCompletion', at(jun, { completionId }));
+		expect(result).toMatchObject({
+			status: 404,
+			data: { error: 'That completion is no longer there to undo.' }
+		});
+	});
+
+	it('undoes a partner task completion from the home tasks hub', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
+		const task = await createTestPartnershipTask(db, id, jun, { creditsAwarded: 3 });
+		const partners = [testPartnerView(id, 'Jun')];
+		const { completionId } = (await run(
+			'partnerCompleteTask',
+			at(ada, { partnershipId: id, taskId: task.id }, partners)
+		)) as { completionId: string };
+
+		const result = await run(
+			'partnerUndoCompletion',
+			at(ada, { partnershipId: id, completionId }, partners)
+		);
+		expect(result).toMatchObject({ undone: true });
+		await expect(readPartnershipRewardCreditRow(db, id, ada.id)).resolves.toMatchObject({
+			credits: 0
+		});
+	});
+
+	it('refuses a malformed completion id', async () => {
+		const result = await run('selfUndoCompletion', at(ada, { completionId: 'nope' }));
+		expect(result).toMatchObject({ status: 400 });
 	});
 
 	it('401s without a session when an action runs', async () => {

@@ -4,14 +4,8 @@ import {
 	rewardClaimSchema,
 	rewardCreditsSchema
 } from '$lib/schemas/rewardForm';
-import {
-	claimPartnershipReward,
-	claimSelfReward,
-	getSelfRewardsSection,
-	listHomePartnerRewardSections,
-	setSelfRewardCredits
-} from '$lib/server/rewards';
-import type { Actions, PageServerLoad } from './$types';
+import { claimPartnershipReward, claimSelfReward, setSelfRewardCredits } from '$lib/server/rewards';
+import type { Actions } from './$types';
 
 function stringField(formData: FormData, key: string): string | undefined {
 	const value = formData.get(key);
@@ -34,23 +28,6 @@ function firstError(
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
-
-export const load: PageServerLoad = async ({ locals, parent, depends }) => {
-	if (!locals.user) {
-		return { selfRewards: { credits: 0, rewards: [], claims: [] }, partnerRewards: [] };
-	}
-
-	const { partners } = await parent();
-
-	depends('rewards:home');
-
-	const [selfRewards, partnerRewards] = await Promise.all([
-		getSelfRewardsSection(locals.db, locals.user.id),
-		listHomePartnerRewardSections(locals.db, locals.user.id, partners)
-	]);
-
-	return { selfRewards, partnerRewards };
-};
 
 export const actions: Actions = {
 	selfSetCredits: async ({ locals, request }) => {

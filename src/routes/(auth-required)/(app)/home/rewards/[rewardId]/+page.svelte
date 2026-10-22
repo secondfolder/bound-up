@@ -1,75 +1,30 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import RewardForm from '$lib/components/RewardForm.svelte';
-	import { openedReward } from '$lib/sealed-views.svelte';
+	import RewardEditorBody from '$lib/components/RewardEditorBody.svelte';
+	import RouteSheet from '$lib/components/RouteSheet.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-	const opened = $derived(openedReward(data.reward));
-	/**
-	 * The fields' starting values, taken once the reward is opened. Held rather
-	 * than derived for the reason `RewardForm` gives: its fields start from
-	 * these and are not held to them.
-	 */
-	let values = $state<{ title: string; description: string; cost: string; active: boolean } | null>(
-		null
-	);
-	$effect(() => {
-		if (values === null && opened) {
-			values = {
-				title: opened.title,
-				description: opened.description ?? '',
-				cost: String(data.reward.cost),
-				active: data.reward.active
-			};
-		}
-	});
-	const backHref = $derived(resolve('/(auth-required)/(app)/home/rewards'));
+	const listHref = $derived(resolve('/(auth-required)/(app)/home/rewards'));
+	let sheet: RouteSheet | undefined = $state();
+
+	/** Opened by its URL, with no list behind it in history: go to the list in its place. */
+	function leave() {
+		void goto(resolve('/(auth-required)/(app)/home/rewards'), {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
 </script>
 
-<section class="page">
-	<NestedPageHeader
-		{backHref}
-		backLabel="Back to rewards"
-		backText="Rewards"
-		title="Edit reward"
-		description="Change the title, description, cost, or whether it can be claimed."
-	/>
-
-	<div class="content">
-		{#if values}
-			<RewardForm
-				{values}
-				sealScope={{ kind: 'self' }}
-				reward={{ id: data.reward.id, revision: data.reward.revision }}
-				submitLabel="Save reward"
-			/>
-		{:else if opened === null}
-			<p class="quiet">This reward can't be shown on this device right now.</p>
-		{:else}
-			<p class="quiet">…</p>
-		{/if}
-	</div>
-</section>
-
-<style>
-	.page {
-		max-width: var(--page-width);
-		margin: 0 auto;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.content {
-		padding: 0 var(--page-gutter) var(--wa-space-l);
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.quiet {
-		color: var(--wa-color-text-quiet);
-	}
-</style>
+<!-- A sheet over the list, which is this route's parent layout (`RouteSheet`). -->
+<RouteSheet
+	bind:this={sheet}
+	label={'Edit reward'}
+	{listHref}
+	{leave}
+>
+	<RewardEditorBody reward={data.reward} onsaved={() => sheet?.close()} />
+</RouteSheet>

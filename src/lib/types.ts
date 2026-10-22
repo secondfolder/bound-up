@@ -136,6 +136,11 @@ export type SelfTaskView = {
 	lastCompletedAt: Date | null;
 	completedCount: number;
 	nextEligibleAt: Date | null;
+	/**
+	 * How many completions count against a rolling window's limit right now,
+	 * for "1 left"; null for a task with no such limit.
+	 */
+	windowCompletions: number | null;
 	canComplete: boolean;
 	createdAt: Date;
 	updatedAt: Date;
@@ -157,6 +162,8 @@ export type PartnershipTaskView = {
 	lastCompletedAt: Date | null;
 	completedCount: number;
 	nextEligibleAt: Date | null;
+	/** As on `SelfTaskView`. */
+	windowCompletions: number | null;
 	createdByMe: boolean;
 	canManage: boolean;
 	canComplete: boolean;
@@ -168,6 +175,8 @@ export type PartnershipTaskView = {
 export type SelfTasksSectionView = {
 	tasks: SelfTaskView[];
 	completions: TaskCompletionView[];
+	/** The owner's own balance, which completing a self task adds to. */
+	credits: number;
 };
 
 export type HomePartnerTasksSectionView = {
@@ -176,6 +185,8 @@ export type HomePartnerTasksSectionView = {
 	names: PartnerNamesSource;
 	image: string | null;
 	tasks: PartnershipTaskView[];
+	/** The viewer's balance in this partnership, which completing these adds to. */
+	credits: number;
 };
 
 /** The subset of a `guides` row that GuidesList.svelte / Guide.svelte consume. */

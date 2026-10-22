@@ -3,6 +3,7 @@
 	import type { Attachment } from 'svelte/attachments';
 	import { defaults } from 'sveltekit-superforms';
 	import { zod4Client } from 'sveltekit-superforms/adapters';
+	import { invalidateAll } from '$app/navigation';
 	import CheckboxField from '$lib/components/CheckboxField.svelte';
 	import InputField from '$lib/components/InputField.svelte';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
@@ -23,13 +24,22 @@
 		values,
 		submitLabel,
 		sealScope,
-		reward = null
+		reward = null,
+		action,
+		onsaved
 	}: {
 		values: RewardFormValues;
 		submitLabel: string;
 		sealScope: SealScope;
 		/** The reward being edited; null to create one. */
 		reward?: { id: string; revision: number } | null;
+		/**
+		 * Where it posts, when that is not the page it is on: the add or edit
+		 * route's action, from a sheet over the rewards list.
+		 */
+		action?: string;
+		/** Called once it has saved, instead of following the action's redirect. */
+		onsaved?: () => void;
 	} = $props();
 
 	let problem = $state<string | null>(null);
@@ -93,7 +103,16 @@
 					...(reward ? { expectedRevision: String(reward.revision) } : {})
 				});
 			},
-			onResult({ result, cancel }) {
+			async onResult({ result, cancel }) {
+				// Saved, in a sheet: the list under it is refreshed and the sheet
+				// closes, rather than the action's redirect navigating to the page
+				// the viewer is already on.
+				if (onsaved && (result.type === 'redirect' || result.type === 'success')) {
+					cancel();
+					await invalidateAll();
+					onsaved();
+					return;
+				}
 				// A refusal is a message, not a superform: there are no fields of the
 				// server's to send back, so it is shown here and the form kept as typed.
 				if (result.type === 'failure') {
@@ -162,6 +181,7 @@
 
 <form
 	method="POST"
+	{action}
 	class="panel reward-form add-form"
 	use:superform.enhance
 	{@attach hearEdits}
@@ -188,35 +208,49 @@
 		<InputField {superform} field="cost" title="Cost" type="number" min="0" step="1" required />
 		<CheckboxField {superform} field="active" title="Active" />
 	</div>
-	<!-- `disabled={x}`, never `disabled={x || undefined}`: see AGENTS.md invariant 11. -->
-	<wa-button
-		type="submit"
-		variant={canSave ? 'brand' : 'neutral'}
-		appearance={canSave ? 'accent' : 'outlined'}
-		disabled={$submitting}>{submitLabel}</wa-button
-	>
+	<div class="form-footer">
+		<!-- `disabled={x}`, never `disabled={x || undefined}`: see AGENTS.md invariant 11. -->
+		<wa-button
+			type="submit"
+			variant={canSave ? 'brand' : 'neutral'}
+			appearance={canSave ? 'accent' : 'outlined'}
+			disabled={$submitting}>{submitLabel}</wa-button
+		>
+	</div>
 </form>
 
 <style>
-	/* The same panel as the tasks and rewards pages' sections. Without a fill
-	   it was the one translucent card in the app, the wash showing through
-	   behind the fields. */
+	/*
+	 * The save button's own footer, stuck to the bottom of the sheet the form
+	 * opens in, so it stays in reach however far the form is scrolled. Sticky
+	 * inside the sheet's scrolling body rather than in the dialog's footer
+	 * slot, so the button stays inside the form and keeps its state (solid
+	 * once there is a valid change, disabled while saving) where it is worked
+	 * out. The negative margins take it out to the body's edges, over its
+	 * padding (`--spacing`, the dialog's), so the fields scroll under a
+	 * full-width bar rather than past a floating button.
+	 */
+	.form-footer {
+		position: sticky;
+		inset-block-end: calc(-1 * var(--spacing, 0px));
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.5rem;
+		margin: 0 calc(-1 * var(--spacing, 0px)) calc(-1 * var(--spacing, 0px));
+		padding: var(--wa-space-s) var(--spacing, 0px);
+		border-block-start: 1px solid var(--wa-color-surface-border);
+		background: var(--wa-color-surface-raised);
+	}
+
+	/* Straight in the sheet it opens in (`RouteSheet`), which is the panel: it
+	   used to be a bordered, filled card of its own on its own page, and a card
+	   inside a sheet was a box in a box. */
 	.panel {
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-panel-border-radius);
-		padding: var(--wa-space-l);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		background: color-mix(
-			in srgb,
-			var(--wa-color-surface-default) 94%,
-			var(--wa-color-brand-fill-quiet)
-		);
-
-		@media (width < 40rem) {
-			padding: var(--wa-space-m);
-		}
 	}
 
 	.editor-row {

@@ -1,11 +1,7 @@
 import { error, fail } from '@sveltejs/kit';
 import { rewardClaimSchema, rewardCreditsSchema } from '$lib/schemas/rewardForm';
-import {
-	claimPartnershipReward,
-	getPartnershipRewardsPage,
-	setPartnershipRewardCredits
-} from '$lib/server/rewards';
-import type { Actions, PageServerLoad } from './$types';
+import { claimPartnershipReward, setPartnershipRewardCredits } from '$lib/server/rewards';
+import type { Actions } from './$types';
 
 function stringField(formData: FormData, key: string): string | undefined {
 	const value = formData.get(key);
@@ -28,20 +24,6 @@ function firstError(
 	}
 	return formErrors[0] ?? 'Please check the form and try again.';
 }
-
-export const load: PageServerLoad = async ({ locals, params, depends }) => {
-	if (!locals.user) {
-		error(401, 'Not signed in');
-	}
-
-	depends(`rewards:partner:${params.id}`);
-
-	const page = await getPartnershipRewardsPage(locals.db, params.id, locals.user.id);
-	if (!page) {
-		error(404, 'Partner not found');
-	}
-	return page;
-};
 
 export const actions: Actions = {
 	setCredits: async ({ locals, params, request }) => {

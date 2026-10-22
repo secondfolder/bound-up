@@ -591,10 +591,11 @@
 				},
 				{
 					"id": "task-styling",
-					"title": "Nicer task cards",
-					"summary": "Tasks that look as good as they feel to finish.",
-					"status": "planned",
-					"icon": "wand-magic-sparkles"
+					"title": "Tasks as a to-do list",
+					"summary": "Tick tasks off a list made for it, and take back a mis-tap.",
+					"status": "shipped",
+					"icon": "wand-magic-sparkles",
+					"shippedOn": "2026-10-22"
 				},
 				{
 					"id": "punishments",

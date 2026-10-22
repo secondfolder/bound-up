@@ -78,6 +78,23 @@ function sealedSnapshot() {
 	};
 }
 
+/**
+ * What a task completion changed on its task, as it was before, so the
+ * completion can be undone exactly (docs/tasks.md, "Undoing a completion").
+ *
+ * Stored rather than recomputed: a scheduled task's next occurrence cannot be
+ * rebuilt once its schedule has been edited, and a one-off's `active` is lost
+ * the moment it completes. `previous_active` is NULL only on completions
+ * recorded before these columns existed, which are not undoable.
+ */
+function undoState() {
+	return {
+		previousActive: integer('previous_active', { mode: 'boolean' }),
+		previousNextEligibleAt: integer('previous_next_eligible_at', { mode: 'timestamp_ms' }),
+		previousLastCompletedAt: integer('previous_last_completed_at', { mode: 'timestamp_ms' })
+	};
+}
+
 export const guides = sqliteTable('guides', {
 	// Text ids to match Better Auth's own tables, so any future foreign key
 	// between app data and `user.id` is type-consistent. `crypto.randomUUID` is
@@ -490,6 +507,7 @@ export const selfTaskCompletions = sqliteTable(
 		/** Which of the snapshot's completion messages was picked, or NULL for none. */
 		completionMessageIndex: integer('completion_message_index'),
 		...sealedSnapshot(),
+		...undoState(),
 		...timestamps
 	},
 	(table) => [
@@ -589,6 +607,7 @@ export const partnershipTaskCompletions = sqliteTable(
 		/** Which of the snapshot's completion messages was picked, or NULL for none. */
 		completionMessageIndex: integer('completion_message_index'),
 		...sealedSnapshot(),
+		...undoState(),
 		...timestamps
 	},
 	(table) => [

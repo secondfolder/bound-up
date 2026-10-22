@@ -113,12 +113,10 @@ test('landing page feature screenshots', async ({ browser }) => {
 		await riley.page.goto('/home/tasks');
 		await waitForHydration(riley.page);
 		for (const title of ['Wear what I picked', 'Write me a letter']) {
-			await riley.page
-				.getByRole('article')
-				.filter({ hasText: title })
-				.getByRole('button', { name: 'Complete' })
-				.click();
-			await expect(riley.page.getByText('Task completed.')).toBeVisible();
+			await riley.page.getByRole('button', { name: `Complete ${title}` }).click();
+			await expect(
+				riley.page.locator('.item-row').filter({ hasText: title }).filter({ hasText: 'Completed' })
+			).toBeVisible();
 			await riley.page.reload();
 			await waitForHydration(riley.page);
 		}

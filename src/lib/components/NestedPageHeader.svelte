@@ -1,16 +1,24 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
+
 	let {
 		backHref,
 		backLabel,
 		backText,
 		title = null,
-		description = null
+		description = null,
+		actions
 	}: {
 		backHref: string;
 		backLabel: string;
 		backText: string;
 		title?: string | null;
 		description?: string | null;
+		/**
+		 * At the end of the title's line: the page's balances and an icon for its
+		 * history, say.
+		 */
+		actions?: Snippet;
 	} = $props();
 </script>
 
@@ -31,9 +39,14 @@
 		</a>
 	</div>
 
-	{#if title || description}
+	{#if title || description || actions}
 		<div class="copy">
-			{#if title}<h1>{title}</h1>{/if}
+			{#if title || actions}
+				<div class="title-line">
+					{#if title}<h1>{title}</h1>{/if}
+					{#if actions}<div class="actions">{@render actions()}</div>{/if}
+				</div>
+			{/if}
 			{#if description}<p>{description}</p>{/if}
 		</div>
 	{/if}
@@ -69,6 +82,25 @@
 		text-decoration: none;
 		color: inherit;
 		font-weight: var(--wa-font-weight-semibold, 600);
+	}
+
+	/* Wraps, the actions to the right of the next line, when they will not
+	   fit beside the title: a row of balances can be long. */
+	.title-line {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.25rem 0.5rem;
+		margin-inline-start: auto;
 	}
 
 	.copy {

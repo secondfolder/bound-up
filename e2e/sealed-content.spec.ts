@@ -39,7 +39,7 @@ test.describe('sealed tasks and rewards', () => {
 			await clickWaButton(ada.page, 'Add task');
 			await ada.page.waitForURL(/\/home\/tasks$/);
 			// Shown, which means opened in the browser: the server never had it.
-			await expect(ada.page.getByRole('heading', { name: 'Ninety lengths' })).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: /Ninety lengths/ })).toBeVisible();
 
 			await ada.page.goto('/home/rewards/add');
 			await waitForHydration(ada.page);
@@ -48,7 +48,7 @@ test.describe('sealed tasks and rewards', () => {
 			await ada.page.locator('.add-form wa-input[name="cost"] input').fill('2');
 			await clickWaButton(ada.page, 'Add reward');
 			await ada.page.waitForURL(/\/home\/rewards$/);
-			await expect(ada.page.getByRole('heading', { name: 'Sunday lie-in' })).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: /Sunday lie-in/ })).toBeVisible();
 
 			const tasks = await sql('SELECT * FROM self_tasks WHERE owner_id = ?', [adaId]);
 			const rewards = await sql('SELECT * FROM self_rewards WHERE owner_id = ?', [adaId]);
@@ -99,7 +99,7 @@ test.describe('sealed tasks and rewards', () => {
 
 			await ada.page.goto('/home/tasks');
 			await waitForKeyring(ada.page);
-			await expect(ada.page.getByRole('heading', { name: 'Old plank' })).toBeVisible();
+			await expect(ada.page.getByRole('button', { name: /Old plank/ })).toBeVisible();
 
 			await expect
 				.poll(async () => {
@@ -118,8 +118,14 @@ test.describe('sealed tasks and rewards', () => {
 
 			// Read back from the sealed copy now, the plain description converted.
 			await ada.page.reload();
-			await expect(ada.page.getByRole('heading', { name: 'Old plank' })).toBeVisible();
-			await expect(ada.page.getByText('Two minutes, written before rich text')).toBeVisible();
+			const row = ada.page.getByRole('button', { name: /Old plank/ });
+			await expect(row).toBeVisible();
+			// The description is in the task's detail, which its row opens.
+			await waitForHydration(ada.page);
+			await row.click();
+			await expect(
+				ada.page.locator('wa-dialog').getByText('Two minutes, written before rich text')
+			).toBeVisible();
 		} finally {
 			await ada.close();
 		}

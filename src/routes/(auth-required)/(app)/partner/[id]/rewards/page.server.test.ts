@@ -12,7 +12,8 @@ import {
 	readPartnershipRewardRows,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { actions, load } from './+page.server';
+import { load } from './+layout.server';
+import { actions } from './+page.server';
 
 let harness: TestDb;
 let db: Db;

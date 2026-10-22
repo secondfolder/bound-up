@@ -15,7 +15,8 @@ import {
 } from '$lib/testing/fixtures';
 import { testPartnerView } from '$lib/testing/names';
 import type { PartnerView } from '$lib/types';
-import { actions, load } from './+page.server';
+import { load } from './+layout.server';
+import { actions } from './+page.server';
 
 let harness: TestDb;
 let db: Db;

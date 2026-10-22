@@ -1,41 +1,39 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
 	import RewardClaimList from '$lib/components/RewardClaimList.svelte';
+	import RouteSheet from '$lib/components/RouteSheet.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-	const backHref = $derived(resolve('/(auth-required)/(app)/home/rewards'));
+	const listHref = $derived(resolve('/(auth-required)/(app)/home/rewards'));
+	let sheet: RouteSheet | undefined = $state();
+
+	/** Opened by its URL, with no list behind it in history: go to the list in its place. */
+	function leave() {
+		void goto(resolve('/(auth-required)/(app)/home/rewards'), {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
 </script>
 
-<section class="page">
-	<NestedPageHeader
-		{backHref}
-		backLabel="Back to rewards"
-		backText="Rewards"
-		title="Your reward history"
-		description="Each claim keeps the title and cost the reward had when you claimed it."
-	/>
-
-	<!-- No heading or panel of its own: see /home/tasks/history. -->
-	<div class="content">
-		<RewardClaimList claims={data.selfRewards.claims} />
-	</div>
-</section>
+<!-- A sheet over the list, which is this route's parent layout (`RouteSheet`). -->
+<RouteSheet
+	bind:this={sheet}
+	label={'Your reward history'}
+	{listHref}
+	{leave}
+	lightDismiss
+>
+	<p class="intro">Each claim keeps the title and cost the reward had when you claimed it.</p>
+	<RewardClaimList claims={data.selfRewards.claims} />
+</RouteSheet>
 
 <style>
-	.page {
-		max-width: var(--page-width-narrow);
-		margin: 0 auto;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.content {
-		padding: 0 var(--page-gutter) var(--wa-space-l);
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
+	.intro {
+		margin: 0 0 var(--wa-space-m);
+		color: var(--wa-color-text-quiet);
 	}
 </style>

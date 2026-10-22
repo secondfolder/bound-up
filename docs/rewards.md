@@ -93,54 +93,89 @@ cost so history does not rewrite when a reward changes later.
 | Route                              | What it shows                                                                                                  |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `/home`                            | The signed-in landing page, with a button through to the rewards hub.                                          |
-| `/home/rewards`                    | The rewards hub: self rewards plus a separate section for each partner.                                        |
-| `/home/rewards/add`                | The form for creating a self reward.                                                                           |
-| `/home/rewards/[rewardId]`         | The edit screen for one self reward, using the same form layout as add.                                        |
-| `/home/rewards/history`            | Self reward claim history.                                                                                     |
+| `/home/rewards`                    | The rewards hub: a wallet for the viewer's own balance, then one per partner.                                  |
+| `/home/rewards/add`                | The rewards hub, with the form for a new self reward in a sheet over it.                                      |
+| `/home/rewards/[rewardId]`         | The rewards hub, with one self reward's edit form in a sheet.                                                 |
+| `/home/rewards/history`            | The rewards hub, with the self claim history in a sheet.                                                      |
 | `/partner/[id]`                    | A summary page with links to Messages and Rewards.                                                             |
-| `/partner/[id]/rewards`            | The partnership reward list, current credits, and buttons through to adding rewards or opening reward history. |
-| `/partner/[id]/rewards/add`        | The form for creating a partnership reward.                                                                    |
-| `/partner/[id]/rewards/[rewardId]` | The edit screen for one partnership reward, using the same form layout as add.                                 |
-| `/partner/[id]/rewards/history`    | Partnership reward claim history.                                                                              |
+| `/partner/[id]/rewards`            | The partnership's rewards as wallets; a tab each for "For you" and "For them" under shared control.             |
+| `/partner/[id]/rewards/add`        | The partner's rewards, with the form for a new partnership reward in a sheet.                                 |
+| `/partner/[id]/rewards/[rewardId]` | The partner's rewards, with one partnership reward's edit form in a sheet.                                    |
+| `/partner/[id]/rewards/history`    | The partner's rewards, with the partnership's claim history in a sheet.                                       |
 
 The signed-in home page no longer carries the full rewards UI directly. It
 links to `/home/rewards`, which keeps the route shallow for the landing screen
 and gives rewards their own nested page structure, matching the partner flows.
 
-The home rewards page reuses the same credits panel and reward list components
-as the partner rewards page, so changes to those shared pieces land in both
-places together. Editing no longer happens inline in a rewards list. If a user
-may edit a reward, its card shows an Edit button (named "Edit <title>", so a
-list of them is not a list of identical links) that opens the same form layout
-used by the add screen, prefilled with the current values.
+### The wallet
 
-Each reward is the same `ItemCard` a task is (see
-[tasks.md](tasks.md#the-cards-and-the-complete-button)): its cost sits where a
-task's credits do, beside the Claim button. Claim is solid amber only when the
-reward can be claimed; otherwise it is a disabled outline, and the card says
-how far short the balance is ("5 more credits to go", `rewardClaimStatus` in
-`src/lib/credits.ts`) rather than repeating the cost. The list is handed the
-balance it is claimed against for that. Claiming is enhanced like completing a
-task: the button becomes a gift, the card flashes, then the page refreshes and
-the balance counts down to its new value (`RewardCreditsInline` tweens it and
-bumps it once). A Claim button that becomes affordable while the page is open —
-the balance edited up — glows once; one that was already affordable on load
-does not.
+Rewards are laid out around the balance they are paid from, because each reward
+is paid from exactly one: the viewer's own, or theirs within one partnership. A
+`RewardWallet` is one balance (its `RewardCreditsInline`, editable where the
+viewer may set it) and the rewards it pays for, grouped by what it can do:
 
-Claim history is always offered, on `/home/rewards` and the partner rewards
-page alike, as Completion history is for tasks: an empty history page says so,
-and the buttons do not move when the first claim lands. The partner rewards
-page is one list, so it has no panel and no section heading: the balance stands
-where the heading would be.
+| Group                                       | Order                                 |
+| ------------------------------------------- | ------------------------------------- |
+| Within reach (or "Jun can afford")          | cheapest first                        |
+| Saving up (or "Jun is saving up")           | closest first, with a bar and "6 more" |
+| Inactive, a closed `wa-details`             | as loaded                             |
+
+The grouping is decided against the balance, not `canClaim`, so it reads the
+same from both sides of a partnership: whoever set a reward never claims it but
+still wants to see whether their partner can. The rules are pure and
+node-tested in `src/lib/reward-list.ts`.
+
+`/home/rewards` shows a wallet for the viewer's own balance ("Yours", untitled
+when there are no partners) and one per partner ("From Jun"); a merged list,
+as the tasks page has, would hide which balance a cost comes out of. The
+balances themselves are the tasks pages' row of pills (`CreditBalances`): on
+`/home/rewards` "Yours", which the viewer may set, and "With Jun" for each
+partner, with their picture; on the partner page the viewer's own when they
+claim there and their partner's, editable, when they set rewards. The
+partner rewards page is one wallet for one-sided control — the claiming side's
+own balance, or the managing side's view of their partner's, editable — and
+under shared control the same pill-shaped segmented control as the tasks page
+(`SegmentedTabs`), "For you" and "For them". Adding a reward is the dashed "Add a reward" row on `/home/rewards` and the
+round amber button over the bottom of the partner page; claim history is the
+clock icon beside the page title, always there.
+
+The row of a reward whose detail is open stays lit behind it. Each reward is
+an `ItemRow` (the same row a task is; see
+[docs/theme.md](theme.md#lists-of-items)): its title, and its cost at the end
+in an amber pill when the balance covers it. A cost that becomes covered while
+the page is open — the balance edited up, a task completed — glows once; one
+already covered on load does not.
+
+### Claiming, from the detail only
+
+There is no Claim on the row. Tapping a reward opens `RewardDetailDialog` (a
+`ResponsiveDialog`: a sheet on a phone, a dialog wider): its description, what
+it costs, what the balance holds, and what will be left ("2 credits left") or
+still to go; in its footer, first and widest, **Claim · 4 credits**, then Edit where the viewer may
+edit it, and from `/home/rewards` a link to that partner's rewards. A claim
+spends credits and, unlike completing a task, cannot be undone, so it takes a
+second, deliberate tap rather than an undo; that is also why tasks have an undo
+and rewards do not.
+
+Claiming is enhanced (`ItemAction`): the button becomes a gift, the page's
+loads re-run, the dialog closes on the refreshed list and the balance counts
+down to its new value (`RewardCreditsInline` tweens it). A refusal is said in
+the dialog, since the page's own error line is behind it. Editing opens the
+same form layout as adding, prefilled.
+
+Claim history is a line per claim under the day it was made, with what it cost
+at the time. It, and the add and edit forms (`RewardEditorBody`), are sheets
+over the list with URLs of their own, as the tasks pages' are (`RouteSheet`;
+[docs/dialogs.md](dialogs.md#sheets-with-their-own-url)).
 
 The add and edit form's save button is outlined until the form holds a valid
 change (a title, and a whole-number cost), then solid amber — the app's save
 convention, which this form now follows too.
 
-The home rewards page's partner sections are intentionally claim-focused rather
-than a second management UI. Editing partnership rewards stays on the partner
-rewards screen, and creating rewards or reviewing claim history happens on the
-dedicated nested pages reached from buttons there.
+The home rewards page's partner wallets are claim-only rather than a second
+management UI. Editing partnership rewards stays on the partner rewards screen,
+and creating rewards or reviewing claim history happens on the dedicated nested
+pages reached from there.
 
 ## What the server can see
 

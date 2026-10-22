@@ -87,20 +87,94 @@ test.describe('tasks', () => {
 			await clickWaButton(ada.page, 'Add task');
 			await ada.page.waitForURL(/\/home\/tasks$/);
 
-			await expect(ada.page.getByRole('heading', { name: 'Long shower' })).toBeVisible();
-			// Complete submits in the background (use:enhance) and celebrates
+			const ready = ada.page.locator('.item-group').filter({ hasText: 'Ready' });
+			await expect(ready.getByRole('button', { name: /Long shower/ })).toBeVisible();
+
+			// The circle submits in the background (use:enhance) and celebrates
 			// before the list refreshes, so wait for the action's answer rather
 			// than the page: navigating straight away could cancel the request.
-			const completed = ada.page.waitForResponse(
-				(response) =>
-					response.request().method() === 'POST' && response.url().includes('/home/tasks')
-			);
-			await clickWaButton(ada.page, 'Complete');
+			const posted = (action: string) =>
+				ada.page.waitForResponse(
+					(response) => response.request().method() === 'POST' && response.url().includes(action)
+				);
+			await waitForHydration(ada.page);
+			let completed = posted('selfCompleteTask');
+			await ada.page.getByRole('button', { name: 'Complete Long shower' }).click();
 			expect((await completed).ok()).toBe(true);
-			await expect(ada.page.getByRole('heading', { name: 'Long shower' })).toBeVisible();
+
+			// The task's own line offers it back, where it was tapped.
+			const undoLine = ready.locator('.item-row').filter({ hasText: 'Completed · +2' });
+			await expect(undoLine).toContainText('Long shower');
+			await expect(ready.getByRole('button', { name: 'Complete Long shower' })).toHaveCount(0);
+
+			// Undo is real: the task is ready again and the credits are gone.
+			const undone = posted('selfUndoCompletion');
+			await undoLine.getByRole('button', { name: 'Undo' }).click();
+			expect((await undone).ok()).toBe(true);
+			await expect(ready.getByRole('button', { name: 'Complete Long shower' })).toBeVisible();
+
+			// The deliberate way: open the task and complete it from its detail.
+			await ready.getByRole('button', { name: /Long shower/ }).click();
+			const dialog = ada.page.locator('wa-dialog');
+			await expect(dialog).toContainText('Take your time');
+			completed = posted('selfCompleteTask');
+			await clickWaButton(ada.page, /^Complete · \+2$/);
+			expect((await completed).ok()).toBe(true);
+			await expect(undoLine).toBeVisible();
 
 			await ada.page.goto('/home/rewards');
-			await expect(ada.page.locator('.self .title-row')).toContainText('Credits: 2');
+			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
+				'2'
+			);
+		} finally {
+			await ada.close();
+		}
+	});
+
+	/**
+	 * A task's detail is a sheet on a phone and a dialog on a wider screen,
+	 * decided by CSS alone (`ResponsiveDialog`). Only a real page can show it
+	 * clear of the app shell and its nav, which a sheet pinned to the bottom of
+	 * the layout viewport would sit behind.
+	 */
+	test("a task's detail is a sheet on a phone and a dialog on a desktop", async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada', {
+			viewport: { width: 390, height: 844 },
+			hasTouch: true,
+			isMobile: true
+		});
+
+		try {
+			await signUp(ada.page, ada.who);
+			await ada.page.goto('/home/tasks/add');
+			await waitForHydration(ada.page);
+			await ada.page.locator('wa-input[name="title"] input').fill('Stretch');
+			await clickWaButton(ada.page, 'Add task');
+			await ada.page.waitForURL(/\/home\/tasks$/);
+
+			const panel = async () =>
+				await ada.page.locator('wa-dialog').evaluate(async (dialog) => {
+					await (dialog as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+					await new Promise((done) => requestAnimationFrame(done));
+					const rect = dialog.shadowRoot
+						?.querySelector('[part~="dialog"]')
+						?.getBoundingClientRect();
+					return rect && { left: rect.left, width: rect.width, bottom: rect.bottom };
+				});
+
+			await waitForHydration(ada.page);
+			await ada.page.getByRole('button', { name: /Stretch/ }).click();
+			await expect.poll(panel).toEqual({ left: 0, width: 390, bottom: expect.closeTo(844, 0) });
+
+			await ada.page.keyboard.press('Escape');
+			await expect(ada.page.locator('wa-dialog')).toHaveCount(0);
+
+			await ada.page.setViewportSize({ width: 1280, height: 800 });
+			await ada.page.getByRole('button', { name: /Stretch/ }).click();
+			await expect.poll(async () => (await panel())?.width).toBe(512);
+			const centred = await panel();
+			expect(centred?.left).toBeCloseTo((1280 - 512) / 2, 0);
+			expect(centred?.bottom).toBeLessThan(800);
 		} finally {
 			await ada.close();
 		}
@@ -167,6 +241,8 @@ test.describe('tasks', () => {
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');
 			await jun.page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
+			const partnerPage = new URL(jun.page.url()).pathname.replace('/partner/', '');
+			const adaPartnerTasks = `/partner/${partnerPage}/tasks`;
 
 			await jun.page.getByRole('link', { name: 'Tasks' }).click();
 			await jun.page.waitForURL(/\/tasks$/);
@@ -179,7 +255,10 @@ test.describe('tasks', () => {
 			await jun.page.locator('wa-textarea[name="completionMessagesText"] textarea').fill('Perfect');
 			await clickWaButton(jun.page, 'Add task');
 			await jun.page.waitForURL(/\/tasks$/);
-			await expect(jun.page.getByRole('heading', { name: 'Make tea' })).toBeVisible();
+			// Jun set it, so Jun watches it rather than ticks it.
+			const waiting = jun.page.getByRole('region', { name: 'Tasks set for Ada' });
+			await expect(waiting.getByRole('button', { name: /Make tea/ })).toBeVisible();
+			await expect(jun.page.getByRole('button', { name: 'Complete Make tea' })).toHaveCount(0);
 
 			/**
 			 * The bug the home cards shipped with: the tasks card read `selfTasks`
@@ -195,24 +274,34 @@ test.describe('tasks', () => {
 			await expect(tasksCard).not.toContainText('Nothing to do right now.');
 
 			await ada.page.goto('/home/tasks');
-			await expect(ada.page.locator('.partner-sections')).toContainText("Jun's tasks");
-			await clickWaButton(ada.page, 'Complete');
-			await expect(ada.page.getByText('Task completed.')).toBeVisible();
+			// In Ada's one list, marked as Jun's.
+			const row = ada.page.locator('.item-row').filter({ hasText: 'Make tea' });
+			await expect(row.locator('wa-avatar.who')).toHaveJSProperty('label', 'Jun');
+			await waitForHydration(ada.page);
+			await ada.page.getByRole('button', { name: 'Complete Make tea' }).click();
+			// Still in place, though a partner's inactive task is not listed here.
+			await expect(row).toContainText('Completed · +3');
 
-			await ada.page.getByRole('link', { name: 'Open full task list' }).click();
-			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/tasks$/);
-			await expect(ada.page.getByRole('heading', { name: 'Make tea' })).toBeVisible();
+			// Done, so it is inactive: on the partner page it waits, folded away.
+			await ada.page.goto(adaPartnerTasks);
+			await waitForHydration(ada.page);
+			await ada.page.locator('wa-details.collapsed').filter({ hasText: 'Inactive' }).click();
+			await expect(ada.page.getByRole('button', { name: /Make tea/ })).toBeVisible();
 			await ada.page.getByRole('link', { name: 'Completion history' }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/tasks\/history$/);
 			await expect(ada.page.getByText('Completed by you')).toBeVisible();
 
-			await ada.page.getByRole('link', { name: 'Back to tasks' }).click();
+			// History is a sheet over the list, with its own URL; closing it is
+			// going back to the list.
+			await ada.page.locator('wa-dialog').getByRole('button', { name: 'Close' }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}\/tasks$/);
 			await ada.page.getByRole('link', { name: 'Back to partner' }).click();
 			await ada.page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
 			await ada.page.getByRole('link', { name: 'Rewards' }).click();
 			await ada.page.waitForURL(/\/rewards$/);
-			await expect(ada.page.locator('.title-row').first()).toContainText('3');
+			await expect(ada.page.locator('.balances li').filter({ hasText: 'Yours' })).toContainText(
+				'3'
+			);
 		} finally {
 			await ada.close();
 			await jun.close();

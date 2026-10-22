@@ -21,7 +21,7 @@ import {
 	type TestUser
 } from '../testing/fixtures';
 import { testPartnerView } from '../testing/names';
-import { partnerships, selfTasks } from './db/schema';
+import { partnerships, selfRewardCredits, selfTaskCompletions, selfTasks } from './db/schema';
 import {
 	completePartnershipTask,
 	completeSelfTask,
@@ -34,6 +34,9 @@ import {
 	getSelfTasksSection,
 	listHomePartnerTaskSections,
 	requireTaskMembership,
+	UNDO_WINDOW_MS,
+	undoPartnershipTaskCompletion,
+	undoSelfTaskCompletion,
 	updatePartnershipTask,
 	updateSelfTask
 } from './tasks';
@@ -141,7 +144,8 @@ describe('self tasks', () => {
 		const { id } = await createTestSelfTask(harness.db, ada, { creditsAwarded: 4 });
 
 		await expect(completeSelfTask(harness.db, ada.id, ada.timezone, id)).resolves.toEqual({
-			ok: true
+			ok: true,
+			completionId: expect.any(String)
 		});
 		await expect(readSelfRewardCreditRow(harness.db, ada.id)).resolves.toMatchObject({
 			credits: 4
@@ -162,7 +166,8 @@ describe('self tasks', () => {
 		const vaultId = await ensureTestSelfVault(harness.db, ada.id);
 
 		await expect(completeSelfTask(harness.db, ada.id, ada.timezone, id)).resolves.toEqual({
-			ok: true
+			ok: true,
+			completionId: expect.any(String)
 		});
 
 		// Edited afterwards: the completion keeps what it was completed as.
@@ -576,7 +581,7 @@ describe('partnership tasks', () => {
 				userId: ada.id,
 				viewerTimezone: ada.timezone
 			})
-		).resolves.toEqual({ ok: true });
+		).resolves.toEqual({ ok: true, completionId: expect.any(String) });
 
 		await expect(
 			readPartnershipRewardCreditRow(harness.db, claimantView, ada.id)
@@ -868,5 +873,270 @@ describe('task widgets', () => {
 		expect(junsWidget.ready).toEqual([
 			expect.objectContaining({ id, context: testPartnerView(partnershipId, 'Ada').names })
 		]);
+	});
+});
+
+/** Completes a self task and hands back the completion's id, failing loudly if it did not complete. */
+async function completeSelf(taskId: string, now?: Date): Promise<string> {
+	const result = await completeSelfTask(harness.db, ada.id, ada.timezone, taskId, now);
+	if (!result.ok) {
+		throw new Error(`could not complete: ${result.reason}`);
+	}
+	return result.completionId;
+}
+
+describe('rolling window counts', () => {
+	const threeAWeek = {
+		mode: 'rolling-window',
+		limit: { completions: 3, every: 1, unit: 'week' }
+	} as const;
+
+	it("counts the completions still inside a self task's window", async () => {
+		const { id } = await createTestSelfTask(harness.db, ada, { schedule: threeAWeek });
+		const plain = await createTestSelfTask(harness.db, ada, { schedule: { mode: 'one-off' } });
+		await completeSelf(id, new Date(Date.now() - 8 * 24 * 60 * 60 * 1000));
+		await completeSelf(id);
+		await completeSelf(id);
+
+		const section = await getSelfTasksSection(harness.db, ada.id, ada.timezone);
+		const byId = new Map(section.tasks.map((task) => [task.id, task]));
+		expect(byId.get(id)?.windowCompletions).toBe(2);
+		expect(byId.get(plain.id)?.windowCompletions).toBeNull();
+	});
+
+	it('counts them for partnership tasks, on the partner page and on home', async () => {
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun, { control: 'them' }))
+			.id;
+		const { id } = await createTestPartnershipTask(harness.db, partnershipId, jun, {
+			schedule: threeAWeek
+		});
+		await completePartnershipTask(harness.db, {
+			partnershipId,
+			taskId: id,
+			userId: ada.id,
+			viewerTimezone: ada.timezone
+		});
+
+		const page = defined(
+			await getPartnershipTasksPage(harness.db, partnershipId, ada.id, ada.timezone),
+			'partner page'
+		);
+		expect(page.tasks.find((task) => task.id === id)?.windowCompletions).toBe(1);
+
+		const [section] = await listHomePartnerTaskSections(harness.db, ada.id, ada.timezone, [
+			testPartnerView(partnershipId, 'Jun')
+		]);
+		expect(section?.tasks.find((task) => task.id === id)?.windowCompletions).toBe(1);
+	});
+});
+
+describe('completing adds credits in SQL', () => {
+	it('adds to a balance that is already there rather than replacing it', async () => {
+		await harness.db
+			.insert(selfRewardCredits)
+			.values({ ownerId: ada.id, credits: 10, createdAt: new Date(), updatedAt: new Date() });
+		const { id } = await createTestSelfTask(harness.db, ada, { creditsAwarded: 3 });
+		await completeSelf(id);
+		await expect(readSelfRewardCreditRow(harness.db, ada.id)).resolves.toMatchObject({
+			credits: 13
+		});
+	});
+});
+
+describe('undoing a self task completion', () => {
+	it('records the task as it was on the completion', async () => {
+		const { id } = await createTestSelfTask(harness.db, ada);
+		await completeSelf(id);
+		const [row] = await readSelfTaskCompletionRows(harness.db, ada.id);
+		expect(row).toMatchObject({
+			previousActive: true,
+			previousNextEligibleAt: null,
+			previousLastCompletedAt: null
+		});
+	});
+
+	it('puts a one-off back as it was, and takes the credits back', async () => {
+		const { id } = await createTestSelfTask(harness.db, ada, { creditsAwarded: 4 });
+		const completionId = await completeSelf(id);
+
+		await expect(undoSelfTaskCompletion(harness.db, ada.id, completionId)).resolves.toEqual({
+			ok: true
+		});
+		await expect(readSelfTaskRow(harness.db, id)).resolves.toMatchObject({
+			active: true,
+			completedCount: 0,
+			lastCompletedAt: null,
+			nextEligibleAt: null
+		});
+		await expect(readSelfRewardCreditRow(harness.db, ada.id)).resolves.toMatchObject({
+			credits: 0
+		});
+		await expect(readSelfTaskCompletionRows(harness.db, ada.id)).resolves.toEqual([]);
+	});
+
+	it("restores a scheduled task's next occurrence even after its schedule was edited", async () => {
+		const schedule = {
+			mode: 'scheduled',
+			anchorLocal: '2026-01-05T09:00',
+			frequency: 'day',
+			interval: 1,
+			end: { kind: 'never' }
+		} as const;
+		const { id } = await createTestSelfTask(harness.db, ada, { schedule });
+		const before = defined(await readSelfTaskRow(harness.db, id), 'task').nextEligibleAt;
+		const completionId = await completeSelf(id);
+		const vaultId = defined((await readSelfTaskRow(harness.db, id))?.vaultId, 'vault');
+		await updateSelfTask(harness.db, ada.id, ada.timezone, id, {
+			...taskInput(vaultId, {
+				timezoneOwnerUserId: ada.id,
+				schedule: { ...schedule, frequency: 'week' }
+			}),
+			expectedRevision: 0
+		});
+
+		await undoSelfTaskCompletion(harness.db, ada.id, completionId);
+		expect(defined(await readSelfTaskRow(harness.db, id), 'task').nextEligibleAt).toEqual(before);
+	});
+
+	it('refuses anyone but the person who completed it', async () => {
+		const { id } = await createTestSelfTask(harness.db, ada);
+		const completionId = await completeSelf(id);
+		await expect(undoSelfTaskCompletion(harness.db, jun.id, completionId)).resolves.toEqual({
+			ok: false,
+			reason: 'not-yours'
+		});
+		await expect(undoSelfTaskCompletion(harness.db, ada.id, crypto.randomUUID())).resolves.toEqual({
+			ok: false,
+			reason: 'not-found'
+		});
+	});
+
+	it('refuses all but the newest completion of the task', async () => {
+		const { id } = await createTestSelfTask(harness.db, ada, {
+			schedule: { mode: 'rolling-window', limit: null }
+		});
+		const first = await completeSelf(id, new Date(Date.now() - 1000));
+		const second = await completeSelf(id);
+		await expect(undoSelfTaskCompletion(harness.db, ada.id, first)).resolves.toEqual({
+			ok: false,
+			reason: 'not-latest'
+		});
+		await expect(undoSelfTaskCompletion(harness.db, ada.id, second)).resolves.toEqual({
+			ok: true
+		});
+	});
+
+	it('refuses once the undo window has passed', async () => {
+		const { id } = await createTestSelfTask(harness.db, ada);
+		const completedAt = new Date();
+		const completionId = await completeSelf(id, completedAt);
+		const later = new Date(completedAt.getTime() + UNDO_WINDOW_MS + 1);
+		await expect(undoSelfTaskCompletion(harness.db, ada.id, completionId, later)).resolves.toEqual({
+			ok: false,
+			reason: 'too-old'
+		});
+	});
+
+	it('refuses a completion recorded before undo existed', async () => {
+		const { id } = await createTestSelfTask(harness.db, ada);
+		const completionId = await completeSelf(id);
+		await harness.db
+			.update(selfTaskCompletions)
+			.set({ previousActive: null })
+			.where(eq(selfTaskCompletions.id, completionId));
+		await expect(undoSelfTaskCompletion(harness.db, ada.id, completionId)).resolves.toEqual({
+			ok: false,
+			reason: 'not-undoable'
+		});
+	});
+
+	it('refuses when the credits it gave have been spent, and changes nothing', async () => {
+		const { id } = await createTestSelfTask(harness.db, ada, { creditsAwarded: 4 });
+		const completionId = await completeSelf(id);
+		await harness.db
+			.update(selfRewardCredits)
+			.set({ credits: 1 })
+			.where(eq(selfRewardCredits.ownerId, ada.id));
+		await expect(undoSelfTaskCompletion(harness.db, ada.id, completionId)).resolves.toEqual({
+			ok: false,
+			reason: 'credits-spent'
+		});
+		await expect(readSelfTaskRow(harness.db, id)).resolves.toMatchObject({ active: false });
+		await expect(readSelfTaskCompletionRows(harness.db, ada.id)).resolves.toHaveLength(1);
+	});
+});
+
+describe('undoing a partnership task completion', () => {
+	async function completed() {
+		const partnershipId = (await createTestPartnership(harness.db, ada, jun, { control: 'them' }))
+			.id;
+		const { id } = await createTestPartnershipTask(harness.db, partnershipId, jun, {
+			creditsAwarded: 5
+		});
+		const result = await completePartnershipTask(harness.db, {
+			partnershipId,
+			taskId: id,
+			userId: ada.id,
+			viewerTimezone: ada.timezone
+		});
+		if (!result.ok) {
+			throw new Error(`could not complete: ${result.reason}`);
+		}
+		return { partnershipId, taskId: id, completionId: result.completionId };
+	}
+
+	it("puts the task back and takes the completer's credits back", async () => {
+		const { partnershipId, taskId, completionId } = await completed();
+		await expect(
+			undoPartnershipTaskCompletion(harness.db, {
+				partnershipId,
+				completionId,
+				userId: ada.id,
+				viewerTimezone: ada.timezone
+			})
+		).resolves.toEqual({ ok: true });
+		await expect(readPartnershipTaskRow(harness.db, taskId)).resolves.toMatchObject({
+			active: true,
+			completedCount: 0
+		});
+		await expect(
+			readPartnershipRewardCreditRow(harness.db, partnershipId, ada.id)
+		).resolves.toMatchObject({ credits: 0 });
+		await expect(readPartnershipTaskCompletionRows(harness.db, partnershipId)).resolves.toEqual([]);
+	});
+
+	it('refuses the partner who did not complete it', async () => {
+		const { partnershipId, completionId } = await completed();
+		await expect(
+			undoPartnershipTaskCompletion(harness.db, {
+				partnershipId,
+				completionId,
+				userId: jun.id,
+				viewerTimezone: jun.timezone
+			})
+		).resolves.toEqual({ ok: false, reason: 'not-yours' });
+	});
+
+	it('refuses someone outside the partnership, and a completion from another one', async () => {
+		const { partnershipId, completionId } = await completed();
+		const eve = await createTestUser(harness.db, { name: 'Eve' });
+		await expect(
+			undoPartnershipTaskCompletion(harness.db, {
+				partnershipId,
+				completionId,
+				userId: eve.id,
+				viewerTimezone: eve.timezone
+			})
+		).resolves.toEqual({ ok: false, reason: 'not-a-member' });
+
+		const other = (await createTestPartnership(harness.db, ada, eve, { control: 'them' })).id;
+		await expect(
+			undoPartnershipTaskCompletion(harness.db, {
+				partnershipId: other,
+				completionId,
+				userId: ada.id,
+				viewerTimezone: ada.timezone
+			})
+		).resolves.toEqual({ ok: false, reason: 'not-found' });
 	});
 });

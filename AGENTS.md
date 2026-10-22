@@ -642,6 +642,19 @@ its notches, and can be left unset; a feature's own slider wraps it. Biome's
 plugins cannot match markup, so this one is on review. See
 [docs/sliders.md](docs/sliders.md).
 
+**A detail that opens over a list is `ResponsiveDialog`**: a sheet from the
+bottom on a phone, a dialog in the middle wider, one `wa-dialog` restyled by
+CSS. Do not restyle a bare `wa-dialog` into a sheet by hand again
+(`NewMessageDialog` predates it). A page that is a short task over a list
+(add, edit, history) is a child route whose page is a `RouteSheet`, with the
+list in the route's `+layout.svelte`, so it has a URL that survives a reload. The list itself is `ItemRow`s in
+`ItemGroup`s, a line per item rather than a card. A time shown at a glance
+is informal ("9am", "Tomorrow 6:30pm", `$lib/informal-time`), and a time on
+someone else's clock is `WhoseTime` ("Jun's time", with the detail in a
+tooltip). See
+[docs/dialogs.md](docs/dialogs.md) and
+[docs/theme.md](docs/theme.md#lists-of-items).
+
 **Save buttons start outlined and become solid only when there is something valid to save.**
 An idle save/submit action is secondary, not a call to act. When a form becomes dirty, if the contents is valid then
 promote its save/submit button to a solid brand style (appearance = accent). On `superForm(...)` screens,
@@ -1049,6 +1062,7 @@ Four places, split on scope:
 | [docs/prompt-review.md](docs/prompt-review.md)                                           | Every daydream prompt: axes, the committed snapshot, lint, the debug page, Claude review |
 | [docs/notebook.md](docs/notebook.md)                                                     | Journal and notes: live co-editing, encryption at rest, versions, the outbox, access |
 | [docs/realtime.md](docs/realtime.md)                                                     | The shared realtime room: scopes, topics, eviction, leases, cost, the DO export |
+| [docs/dialogs.md](docs/dialogs.md)                                                       | `ResponsiveDialog`: a sheet on a phone, a dialog wider, placed in the visual viewport |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

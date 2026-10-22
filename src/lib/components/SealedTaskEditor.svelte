@@ -22,7 +22,9 @@
 		sealScope,
 		task = null,
 		submitLabel,
-		timeZoneContext = null
+		timeZoneContext = null,
+		action,
+		onsaved
 	}: {
 		/** The settings, as the load prepared them. */
 		taskForm: SuperValidated<TaskEditorFormValues>;
@@ -31,6 +33,13 @@
 		task?: { id: string; revision: number; content: TaskContent } | null;
 		submitLabel: string;
 		timeZoneContext?: TimeZoneContext | null;
+		/**
+		 * Where it posts, when that is not the page it is on: the add or edit
+		 * route's action, from a sheet over the task list.
+		 */
+		action?: string;
+		/** Called once it has saved, instead of following the action's redirect. */
+		onsaved?: () => void;
 	} = $props();
 
 	/** The text fields, which are sealed and never posted as they are. */
@@ -124,6 +133,15 @@
 			});
 		},
 		async onResult({ result, cancel }) {
+			// Saved, in a sheet: the list under it is refreshed and the sheet
+			// closes, rather than an add's redirect navigating to the page the
+			// viewer is already on.
+			if (onsaved && (result.type === 'redirect' || result.type === 'success')) {
+				cancel();
+				await invalidateAll();
+				onsaved();
+				return;
+			}
 			// The action answers a sealed post with a message or `{ saved }`, not
 			// a superform — there are no fields of its to send back — so these two
 			// are handled here, and superforms keeps what was typed.
@@ -149,7 +167,7 @@
 	baseline and the save button goes back to outlined.
 -->
 {#key saved}
-	<TaskForm {superform} {submitLabel} {timeZoneContext} />
+	<TaskForm {superform} {submitLabel} {timeZoneContext} {action} />
 {/key}
 
 <style>

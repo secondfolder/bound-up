@@ -45,6 +45,51 @@ describe('TaskForm', () => {
 		});
 	});
 
+	it('says what each Every box counts, and where its period is counted from', async () => {
+		const shownFor = async (values: Partial<TaskEditorFormValues>, field: string) => {
+			const data = await superValidate(
+				{ ...taskEditorFormValuesForCreate('u1'), ...values },
+				zod4(taskEditorFormSchema),
+				{ errors: false }
+			);
+			const { container, unmount } = render(TaskFormHarness, { data, submitLabel: 'Add task' });
+			await waSettled(container);
+			const input = container.querySelector(`wa-input[name="${field}"]`);
+			const shown = {
+				label: waProp(input, 'label'),
+				placeholder: waProp(input, 'placeholder'),
+				hint: container.querySelector('.mode-hint')?.textContent
+			};
+			unmount();
+			return shown;
+		};
+
+		await expect(
+			shownFor({ scheduleMode: 'scheduled', scheduledFrequency: 'month' }, 'scheduledInterval')
+		).resolves.toEqual({
+			label: 'Repeat every this many months',
+			placeholder: 'Number of months',
+			hint: expect.stringContaining('fixed calendar from the start time')
+		});
+		await expect(
+			shownFor({ scheduleMode: 'after-completion', afterUnit: 'day' }, 'afterEvery')
+		).resolves.toEqual({
+			label: 'Repeat after this many days',
+			placeholder: 'Number of days',
+			hint: expect.stringContaining('from when it was last marked complete')
+		});
+		await expect(
+			shownFor(
+				{ scheduleMode: 'rolling-window', rollingLimitEnabled: true, rollingLimitUnit: 'hour' },
+				'rollingLimitEvery'
+			)
+		).resolves.toEqual({
+			label: 'Within this many hours',
+			placeholder: 'Number of hours',
+			hint: expect.stringContaining('the period rolls')
+		});
+	});
+
 	it('starts outlined on an edit form and stays outlined until something changes', async () => {
 		const data = await superValidate(editValues(), zod4(taskEditorFormSchema), { errors: false });
 		const { container } = render(TaskFormHarness, {

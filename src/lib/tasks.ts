@@ -117,3 +117,49 @@ export function canCompletePartnershipTask(
 	}
 	return isTaskCompletableAt(record, now);
 }
+
+type GroupableTask = {
+	active: boolean;
+	canComplete: boolean;
+	nextEligibleAt: Date | null;
+};
+
+function byNextEligible<T extends GroupableTask>(a: T, b: T): number {
+	return (
+		(a.nextEligibleAt?.getTime() ?? Number.POSITIVE_INFINITY) -
+		(b.nextEligibleAt?.getTime() ?? Number.POSITIVE_INFINITY)
+	);
+}
+
+/**
+ * A to-do list of the tasks the viewer does: what can be ticked off now, what
+ * opens later (soonest first), and what is inactive. Within "ready" the order
+ * they came in is kept. See docs/tasks.md, "The checklist".
+ */
+export function groupTasksToDo<T extends GroupableTask>(
+	tasks: T[]
+): { ready: T[]; later: T[]; inactive: T[] } {
+	return {
+		ready: tasks.filter((task) => task.active && task.canComplete),
+		later: tasks.filter((task) => task.active && !task.canComplete).sort(byNextEligible),
+		inactive: tasks.filter((task) => !task.active)
+	};
+}
+
+/**
+ * The tasks the viewer set for their partner, from the side that watches
+ * rather than ticks: what the partner can do now, what they have done for now
+ * (until it opens again), and what is inactive.
+ */
+export function groupTasksSet<T extends GroupableTask>(
+	tasks: T[],
+	now: Date = new Date()
+): { waiting: T[]; doneForNow: T[]; inactive: T[] } {
+	return {
+		waiting: tasks.filter((task) => isTaskCompletableAt(task, now)),
+		doneForNow: tasks
+			.filter((task) => task.active && !isTaskCompletableAt(task, now))
+			.sort(byNextEligible),
+		inactive: tasks.filter((task) => !task.active)
+	};
+}

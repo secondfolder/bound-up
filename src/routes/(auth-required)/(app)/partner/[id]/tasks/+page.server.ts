@@ -1,26 +1,11 @@
 import { error, fail } from '@sveltejs/kit';
-import { taskCompleteSchema } from '$lib/schemas/taskForm';
-import { completePartnershipTask, getPartnershipTasksPage } from '$lib/server/tasks';
-import type { Actions, PageServerLoad } from './$types';
-
-export const load: PageServerLoad = async ({ locals, params, depends }) => {
-	if (!locals.user) {
-		error(401, 'Not signed in');
-	}
-
-	depends(`tasks:partner:${params.id}`);
-
-	const page = await getPartnershipTasksPage(
-		locals.db,
-		params.id,
-		locals.user.id,
-		locals.user.timezone
-	);
-	if (!page) {
-		error(404, 'Partner not found');
-	}
-	return page;
-};
+import { taskCompleteSchema, taskUndoSchema } from '$lib/schemas/taskForm';
+import {
+	completePartnershipTask,
+	UNDO_REFUSALS,
+	undoPartnershipTaskCompletion
+} from '$lib/server/tasks';
+import type { Actions } from './$types';
 
 function stringField(formData: FormData, key: string): string | undefined {
 	const value = formData.get(key);
@@ -77,6 +62,40 @@ export const actions: Actions = {
 			});
 		}
 
-		return { message: 'Task completed.' };
+		return {
+			message: 'Task completed.',
+			completionId: result.completionId,
+			taskId: parsed.data.taskId
+		};
+	},
+
+	undoCompletion: async ({ locals, params, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const formData = await request.formData();
+		const parsed = taskUndoSchema.safeParse({
+			completionId: stringField(formData, 'completionId')
+		});
+		if (!parsed.success) {
+			const flat = parsed.error.flatten();
+			return fail(400, { error: firstError(flat.fieldErrors, flat.formErrors) });
+		}
+		const result = await undoPartnershipTaskCompletion(locals.db, {
+			partnershipId: params.id,
+			completionId: parsed.data.completionId,
+			userId: locals.user.id,
+			viewerTimezone: locals.user.timezone
+		});
+		if (!result.ok) {
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			return fail(result.reason === 'not-found' || result.reason === 'not-yours' ? 404 : 400, {
+				error: UNDO_REFUSALS[result.reason]
+			});
+		}
+		// Nothing to say: the task coming back in its place says it.
+		return { undone: true };
 	}
 };

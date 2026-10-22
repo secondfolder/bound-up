@@ -1,10 +1,12 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import type { PartnerNamesSource } from '../partnership';
 import { taskKind } from '../sealed-kinds/tasks';
 import {
+	completionsInWindow,
 	initialNextEligibleAt,
 	nextEligibleAtAfterCompletion,
-	scheduleReferenceDate
+	scheduleReferenceDate,
+	windowLowerBound
 } from '../task-schedule';
 import {
 	canCompleteFromPartnership,
@@ -204,9 +206,33 @@ export type PartnershipTasksPageView = {
 	};
 	tasks: PartnershipTaskView[];
 	completions: PartnershipTaskCompletionView[];
+	/** The viewer's balance in the partnership, and their partner's. */
+	viewerCredits: number;
+	counterpartCredits: number;
 };
 
 type TaskResult<TReason extends string> = { ok: true } | { ok: false; reason: TReason };
+
+/** A completion that went through, with its id, which is what undoing it names. */
+type CompleteTaskResult<TReason extends string> =
+	| { ok: true; completionId: string }
+	| { ok: false; reason: TReason };
+
+/**
+ * How long after completing a task it can still be undone. Long enough to
+ * notice a mis-tap and come back to it; short enough that the credits are
+ * unlikely to have gone anywhere and nobody has planned around the task
+ * being done. See docs/tasks.md, "Undoing a completion".
+ */
+export const UNDO_WINDOW_MS = 10 * 60 * 1000;
+
+export type UndoRefusal =
+	| 'not-found'
+	| 'not-yours'
+	| 'not-latest'
+	| 'too-old'
+	| 'not-undoable'
+	| 'credits-spent';
 
 /** Why the server refused the sealed half of a task write. */
 /**
@@ -323,7 +349,11 @@ function resolveTimeZoneForPartnershipTask(
 	return null;
 }
 
-function toSelfTaskView(row: SelfTaskRow, viewerTimezone: string): SelfTaskView {
+function toSelfTaskView(
+	row: SelfTaskRow,
+	viewerTimezone: string,
+	windowCompletions: number | null = null
+): SelfTaskView {
 	const noteDate =
 		taskReferenceDate(row.schedule, row) ??
 		(row.schedule.mode === 'one-off' ? null : scheduleReferenceDate(row.schedule, viewerTimezone));
@@ -341,6 +371,7 @@ function toSelfTaskView(row: SelfTaskRow, viewerTimezone: string): SelfTaskView 
 		lastCompletedAt: row.lastCompletedAt,
 		completedCount: row.completedCount,
 		nextEligibleAt: row.nextEligibleAt,
+		windowCompletions,
 		canComplete: isTaskCompletableAt(row),
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
@@ -354,7 +385,8 @@ function toSelfTaskView(row: SelfTaskRow, viewerTimezone: string): SelfTaskView 
 
 function toPartnershipTaskView(
 	row: PartnershipTaskRow,
-	membership: TaskMembership
+	membership: TaskMembership,
+	windowCompletions: number | null = null
 ): PartnershipTaskView {
 	const ownerTimeZone =
 		resolveTimeZoneForPartnershipTask(row, membership) ?? membership.viewerTimezone;
@@ -376,6 +408,7 @@ function toPartnershipTaskView(
 		lastCompletedAt: row.lastCompletedAt,
 		completedCount: row.completedCount,
 		nextEligibleAt: row.nextEligibleAt,
+		windowCompletions,
 		createdByMe,
 		canManage: membership.canManage,
 		canComplete: membership.canComplete && !createdByMe && isTaskCompletableAt(row),
@@ -450,6 +483,135 @@ async function recentPartnershipTaskCompletionTimes(
 	return rows.map((row) => row.createdAt);
 }
 
+/** Under D1's 100 bound parameters per statement, leaving room for the date. */
+const IN_CHUNK = 90;
+
+function chunked<T>(values: T[]): T[][] {
+	const chunks: T[][] = [];
+	for (let at = 0; at < values.length; at += IN_CHUNK) {
+		chunks.push(values.slice(at, at + IN_CHUNK));
+	}
+	return chunks;
+}
+
+/**
+ * The tasks with a rolling-window limit, and the earliest completion any of
+ * their windows could still hold — what one query for all of them needs.
+ */
+function windowQuery<T extends { id: string; schedule: TaskSchedule }>(rows: T[], now: Date) {
+	const limited = rows.filter((row) => windowLowerBound(row.schedule, now) !== null);
+	const bounds = limited.map((row) => windowLowerBound(row.schedule, now)?.getTime() ?? 0);
+	return { ids: limited.map((row) => row.id), since: new Date(Math.min(...bounds)) };
+}
+
+function countWindows<T extends { id: string; schedule: TaskSchedule }>(
+	rows: T[],
+	completions: { taskId: string; createdAt: Date }[],
+	timeZoneOf: (row: T) => string,
+	now: Date
+): Map<string, number> {
+	const byTask = new Map<string, Date[]>();
+	for (const completion of completions) {
+		const list = byTask.get(completion.taskId) ?? [];
+		list.push(completion.createdAt);
+		byTask.set(completion.taskId, list);
+	}
+	const counts = new Map<string, number>();
+	for (const row of rows) {
+		const count = completionsInWindow(row.schedule, timeZoneOf(row), byTask.get(row.id) ?? [], now);
+		if (count !== null) {
+			counts.set(row.id, count);
+		}
+	}
+	return counts;
+}
+
+/**
+ * Completions inside each self task's rolling window, for "1 left". One query
+ * (per 90 tasks) for the whole list rather than one per task, on the
+ * completions' task index.
+ */
+async function selfWindowCompletions(
+	db: Db,
+	rows: SelfTaskRow[],
+	timeZone: string,
+	now: Date = new Date()
+): Promise<Map<string, number>> {
+	const { ids, since } = windowQuery(rows, now);
+	if (ids.length === 0) {
+		return new Map();
+	}
+	const completions = (
+		await Promise.all(
+			chunked(ids).map((chunk) =>
+				db
+					.select({ taskId: selfTaskCompletions.taskId, createdAt: selfTaskCompletions.createdAt })
+					.from(selfTaskCompletions)
+					.where(
+						and(
+							inArray(selfTaskCompletions.taskId, chunk),
+							gt(selfTaskCompletions.createdAt, since)
+						)
+					)
+			)
+		)
+	).flat();
+	return countWindows(rows, completions, () => timeZone, now);
+}
+
+/** As `selfWindowCompletions`, each task's window in its own time zone owner's time. */
+async function partnershipWindowCompletions(
+	db: Db,
+	rows: PartnershipTaskRow[],
+	membershipOf: (row: PartnershipTaskRow) => TaskMembership | undefined,
+	now: Date = new Date()
+): Promise<Map<string, number>> {
+	const { ids, since } = windowQuery(rows, now);
+	if (ids.length === 0) {
+		return new Map();
+	}
+	const completions = (
+		await Promise.all(
+			chunked(ids).map((chunk) =>
+				db
+					.select({
+						taskId: partnershipTaskCompletions.taskId,
+						createdAt: partnershipTaskCompletions.createdAt
+					})
+					.from(partnershipTaskCompletions)
+					.where(
+						and(
+							inArray(partnershipTaskCompletions.taskId, chunk),
+							gt(partnershipTaskCompletions.createdAt, since)
+						)
+					)
+			)
+		)
+	).flat();
+	return countWindows(
+		rows,
+		completions,
+		(row) => {
+			const membership = membershipOf(row);
+			return membership ? scheduleTimeZone(row, membership) : 'UTC';
+		},
+		now
+	);
+}
+
+/**
+ * Whose time a partnership task's schedule runs in: its time zone owner's.
+ * The same rule completing it uses.
+ */
+function scheduleTimeZone(
+	row: Pick<PartnershipTaskRow, 'timezoneOwnerUserId'>,
+	membership: TaskMembership
+) {
+	return row.timezoneOwnerUserId === membership.viewerId
+		? membership.viewerTimezone
+		: membership.counterpartTimezone;
+}
+
 /** One of `count` completion messages, at random, or null when there are none. */
 function chooseCompletionIndex(count: number): number | null {
 	return count > 0 ? Math.floor(Math.random() * count) : null;
@@ -522,7 +684,7 @@ export async function getSelfTasksSection(
 	userId: string,
 	viewerTimezone: string
 ): Promise<SelfTasksSectionView> {
-	const [tasks, completions] = await Promise.all([
+	const [tasks, completions, credits] = await Promise.all([
 		db
 			.select(selfTaskColumns)
 			.from(selfTasks)
@@ -532,12 +694,15 @@ export async function getSelfTasksSection(
 			.select(selfTaskCompletionColumns)
 			.from(selfTaskCompletions)
 			.where(eq(selfTaskCompletions.ownerId, userId))
-			.orderBy(desc(selfTaskCompletions.createdAt), desc(selfTaskCompletions.id))
+			.orderBy(desc(selfTaskCompletions.createdAt), desc(selfTaskCompletions.id)),
+		readSelfRewardCredits(db, userId)
 	]);
 
+	const windows = await selfWindowCompletions(db, tasks, viewerTimezone);
 	return {
-		tasks: tasks.map((row) => toSelfTaskView(row, viewerTimezone)),
-		completions: completions.map(toTaskCompletionView)
+		tasks: tasks.map((row) => toSelfTaskView(row, viewerTimezone, windows.get(row.id) ?? null)),
+		completions: completions.map(toTaskCompletionView),
+		credits
 	};
 }
 
@@ -669,7 +834,7 @@ export async function getPartnershipTasksPage(
 			membership.partnership.role === 'invitee' ? membership.viewerId : membership.counterpartUserId
 	};
 
-	const [tasks, completions] = await Promise.all([
+	const [tasks, completions, viewerCredits, counterpartCredits] = await Promise.all([
 		db
 			.select(partnershipTaskColumns)
 			.from(partnershipTasks)
@@ -683,8 +848,24 @@ export async function getPartnershipTasksPage(
 			.select(partnershipTaskCompletionColumns)
 			.from(partnershipTaskCompletions)
 			.where(eq(partnershipTaskCompletions.partnershipId, partnershipId))
-			.orderBy(desc(partnershipTaskCompletions.createdAt), desc(partnershipTaskCompletions.id))
+			.orderBy(desc(partnershipTaskCompletions.createdAt), desc(partnershipTaskCompletions.id)),
+		readPartnershipRewardCredits(db, partnershipId, userId),
+		readPartnershipRewardCredits(db, partnershipId, membership.counterpartUserId)
 	]);
+
+	const visible = tasks.filter((row) =>
+		canViewPartnershipTask(
+			{
+				...visibilityRecord,
+				partnershipId: row.partnershipId,
+				createdByUserId: row.createdByUserId,
+				active: row.active,
+				nextEligibleAt: row.nextEligibleAt
+			},
+			userId
+		)
+	);
+	const windows = await partnershipWindowCompletions(db, visible, () => membership);
 
 	return {
 		partner: {
@@ -695,21 +876,12 @@ export async function getPartnershipTasksPage(
 			counterpartUserId: membership.counterpartUserId,
 			counterpartTimezone: membership.counterpartTimezone
 		},
-		tasks: tasks
-			.filter((row) =>
-				canViewPartnershipTask(
-					{
-						...visibilityRecord,
-						partnershipId: row.partnershipId,
-						createdByUserId: row.createdByUserId,
-						active: row.active,
-						nextEligibleAt: row.nextEligibleAt
-					},
-					userId
-				)
-			)
-			.map((row) => toPartnershipTaskView(row, membership)),
-		completions: completions.map((row) => toPartnershipTaskCompletionView(row, userId))
+		tasks: visible.map((row) =>
+			toPartnershipTaskView(row, membership, windows.get(row.id) ?? null)
+		),
+		completions: completions.map((row) => toPartnershipTaskCompletionView(row, userId)),
+		viewerCredits,
+		counterpartCredits
 	};
 }
 
@@ -886,13 +1058,22 @@ export async function updatePartnershipTask(
 	return { ok: true };
 }
 
+/** The task as it is before a completion changes it, stored on the completion for undo. */
+function undoStateOf(task: Pick<SelfTaskRow, 'active' | 'nextEligibleAt' | 'lastCompletedAt'>) {
+	return {
+		previousActive: task.active,
+		previousNextEligibleAt: task.nextEligibleAt,
+		previousLastCompletedAt: task.lastCompletedAt
+	};
+}
+
 export async function completeSelfTask(
 	db: Db,
 	userId: string,
 	viewerTimezone: string,
 	taskId: string,
 	now: Date = new Date()
-): Promise<TaskResult<'not-found' | 'inactive' | 'not-ready'>> {
+): Promise<CompleteTaskResult<'not-found' | 'inactive' | 'not-ready'>> {
 	const rows = await db
 		.select(selfTaskColumns)
 		.from(selfTasks)
@@ -924,14 +1105,16 @@ export async function completeSelfTask(
 		now,
 		recentCompletions
 	);
-	const nextCredits = (await readSelfRewardCredits(db, userId)) + task.creditsAwarded;
 	const nextActive = task.schedule.mode === 'one-off' ? false : task.active;
+	const completionId = crypto.randomUUID();
 
 	await db.batch([
 		db.insert(selfTaskCompletions).values({
+			id: completionId,
 			ownerId: userId,
 			taskId: task.id,
 			...completionSnapshot(task),
+			...undoStateOf(task),
 			creditsAwarded: task.creditsAwarded,
 			createdAt: now,
 			updatedAt: now
@@ -948,14 +1131,16 @@ export async function completeSelfTask(
 			.where(and(eq(selfTasks.id, taskId), eq(selfTasks.ownerId, userId))),
 		db
 			.insert(selfRewardCredits)
-			.values({ ownerId: userId, credits: nextCredits, createdAt: now, updatedAt: now })
+			.values({ ownerId: userId, credits: task.creditsAwarded, createdAt: now, updatedAt: now })
 			.onConflictDoUpdate({
 				target: selfRewardCredits.ownerId,
-				set: { credits: nextCredits, updatedAt: now }
+				// Added in SQL, not read and written back: two completions at once
+				// used to lose one award between the read and the write.
+				set: { credits: sql`${selfRewardCredits.credits} + ${task.creditsAwarded}`, updatedAt: now }
 			})
 	]);
 
-	return { ok: true };
+	return { ok: true, completionId };
 }
 
 export async function completePartnershipTask(
@@ -963,7 +1148,9 @@ export async function completePartnershipTask(
 	input: { partnershipId: string; taskId: string; userId: string; viewerTimezone: string },
 	now: Date = new Date()
 ): Promise<
-	TaskResult<'not-a-member' | 'not-found' | 'not-allowed' | 'inactive' | 'own-task' | 'not-ready'>
+	CompleteTaskResult<
+		'not-a-member' | 'not-found' | 'not-allowed' | 'inactive' | 'own-task' | 'not-ready'
+	>
 > {
 	const membership = await requireTaskMembership(
 		db,
@@ -1002,10 +1189,7 @@ export async function completePartnershipTask(
 		return { ok: false, reason: 'not-ready' };
 	}
 
-	const ownerTimeZone =
-		task.timezoneOwnerUserId === membership.viewerId
-			? membership.viewerTimezone
-			: membership.counterpartTimezone;
+	const ownerTimeZone = scheduleTimeZone(task, membership);
 	const recentCompletions =
 		task.schedule.mode === 'rolling-window' && task.schedule.limit
 			? await recentPartnershipTaskCompletionTimes(
@@ -1020,18 +1204,18 @@ export async function completePartnershipTask(
 		now,
 		recentCompletions
 	);
-	const nextCredits =
-		(await readPartnershipRewardCredits(db, input.partnershipId, input.userId)) +
-		task.creditsAwarded;
 	const nextActive = task.schedule.mode === 'one-off' ? false : task.active;
+	const completionId = crypto.randomUUID();
 
 	await db.batch([
 		db.insert(partnershipTaskCompletions).values({
+			id: completionId,
 			partnershipId: input.partnershipId,
 			taskId: task.id,
 			completedByUserId: input.userId,
 			createdByUserId: task.createdByUserId,
 			...completionSnapshot(task),
+			...undoStateOf(task),
 			creditsAwarded: task.creditsAwarded,
 			createdAt: now,
 			updatedAt: now
@@ -1056,16 +1240,223 @@ export async function completePartnershipTask(
 			.values({
 				partnershipId: input.partnershipId,
 				userId: input.userId,
-				credits: nextCredits,
+				credits: task.creditsAwarded,
 				createdAt: now,
 				updatedAt: now
 			})
 			.onConflictDoUpdate({
 				target: [partnershipRewardCredits.partnershipId, partnershipRewardCredits.userId],
-				set: { credits: nextCredits, updatedAt: now }
+				// In SQL, for the reason given in `completeSelfTask`.
+				set: {
+					credits: sql`${partnershipRewardCredits.credits} + ${task.creditsAwarded}`,
+					updatedAt: now
+				}
 			})
 	]);
 
+	return { ok: true, completionId };
+}
+
+/** What the person undoing is told when it is refused, by reason. */
+export const UNDO_REFUSALS: Record<UndoRefusal, string> = {
+	'not-found': 'That completion is no longer there to undo.',
+	'not-yours': 'That completion is no longer there to undo.',
+	'not-latest': 'Only the most recent completion of a task can be undone.',
+	'too-old': 'It is too late to undo that completion.',
+	'not-undoable': 'That completion was recorded before completions could be undone.',
+	'credits-spent': 'Those credits have already been spent, so it cannot be undone.'
+};
+
+/**
+ * Whether a completion may be undone, and if not why. The rules are the same
+ * for both scopes (docs/tasks.md, "Undoing a completion"): only the newest
+ * completion of its task, only within `UNDO_WINDOW_MS`, only one recorded with
+ * the task's previous state, and only while the credits it gave are unspent.
+ */
+function undoRefusal(
+	completion: { createdAt: Date; previousActive: boolean | null; creditsAwarded: number },
+	latestId: string | undefined,
+	completionId: string,
+	credits: number,
+	now: Date
+): UndoRefusal | null {
+	if (latestId !== completionId) {
+		return 'not-latest';
+	}
+	if (now.getTime() - completion.createdAt.getTime() > UNDO_WINDOW_MS) {
+		return 'too-old';
+	}
+	if (completion.previousActive === null) {
+		return 'not-undoable';
+	}
+	if (credits < completion.creditsAwarded) {
+		return 'credits-spent';
+	}
+	return null;
+}
+
+/**
+ * Takes back a self task completion: the completion goes, the task returns to
+ * the state it recorded, and the credits it gave are taken back. One batch,
+ * so none of it happens without the rest.
+ */
+export async function undoSelfTaskCompletion(
+	db: Db,
+	userId: string,
+	completionId: string,
+	now: Date = new Date()
+): Promise<TaskResult<UndoRefusal>> {
+	const [completion] = await db
+		.select({
+			taskId: selfTaskCompletions.taskId,
+			ownerId: selfTaskCompletions.ownerId,
+			creditsAwarded: selfTaskCompletions.creditsAwarded,
+			createdAt: selfTaskCompletions.createdAt,
+			previousActive: selfTaskCompletions.previousActive,
+			previousNextEligibleAt: selfTaskCompletions.previousNextEligibleAt,
+			previousLastCompletedAt: selfTaskCompletions.previousLastCompletedAt
+		})
+		.from(selfTaskCompletions)
+		.where(eq(selfTaskCompletions.id, completionId))
+		.limit(1);
+	if (!completion) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (completion.ownerId !== userId) {
+		return { ok: false, reason: 'not-yours' };
+	}
+	const [latest] = await db
+		.select({ id: selfTaskCompletions.id })
+		.from(selfTaskCompletions)
+		.where(eq(selfTaskCompletions.taskId, completion.taskId))
+		.orderBy(desc(selfTaskCompletions.createdAt), desc(selfTaskCompletions.id))
+		.limit(1);
+	const refusal = undoRefusal(
+		completion,
+		latest?.id,
+		completionId,
+		await readSelfRewardCredits(db, userId),
+		now
+	);
+	if (refusal) {
+		return { ok: false, reason: refusal };
+	}
+
+	await db.batch([
+		db.delete(selfTaskCompletions).where(eq(selfTaskCompletions.id, completionId)),
+		db
+			.update(selfTasks)
+			.set({
+				active: completion.previousActive ?? true,
+				nextEligibleAt: completion.previousNextEligibleAt,
+				lastCompletedAt: completion.previousLastCompletedAt,
+				completedCount: sql`max(${selfTasks.completedCount} - 1, 0)`,
+				updatedAt: now
+			})
+			.where(and(eq(selfTasks.id, completion.taskId), eq(selfTasks.ownerId, userId))),
+		db
+			.update(selfRewardCredits)
+			.set({
+				credits: sql`max(${selfRewardCredits.credits} - ${completion.creditsAwarded}, 0)`,
+				updatedAt: now
+			})
+			.where(eq(selfRewardCredits.ownerId, userId))
+	]);
+	return { ok: true };
+}
+
+/**
+ * As `undoSelfTaskCompletion`, for a partnership task. Only the person who
+ * completed it may undo it, and only while they are still on the completing
+ * side: it is their credits that come back out.
+ */
+export async function undoPartnershipTaskCompletion(
+	db: Db,
+	input: { partnershipId: string; completionId: string; userId: string; viewerTimezone: string },
+	now: Date = new Date()
+): Promise<TaskResult<UndoRefusal | 'not-a-member'>> {
+	const membership = await requireTaskMembership(
+		db,
+		input.partnershipId,
+		input.userId,
+		input.viewerTimezone
+	);
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	const [completion] = await db
+		.select({
+			taskId: partnershipTaskCompletions.taskId,
+			completedByUserId: partnershipTaskCompletions.completedByUserId,
+			creditsAwarded: partnershipTaskCompletions.creditsAwarded,
+			createdAt: partnershipTaskCompletions.createdAt,
+			previousActive: partnershipTaskCompletions.previousActive,
+			previousNextEligibleAt: partnershipTaskCompletions.previousNextEligibleAt,
+			previousLastCompletedAt: partnershipTaskCompletions.previousLastCompletedAt
+		})
+		.from(partnershipTaskCompletions)
+		.where(
+			and(
+				eq(partnershipTaskCompletions.id, input.completionId),
+				eq(partnershipTaskCompletions.partnershipId, input.partnershipId)
+			)
+		)
+		.limit(1);
+	if (!completion) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (completion.completedByUserId !== input.userId || !membership.canComplete) {
+		return { ok: false, reason: 'not-yours' };
+	}
+	const [latest] = await db
+		.select({ id: partnershipTaskCompletions.id })
+		.from(partnershipTaskCompletions)
+		.where(eq(partnershipTaskCompletions.taskId, completion.taskId))
+		.orderBy(desc(partnershipTaskCompletions.createdAt), desc(partnershipTaskCompletions.id))
+		.limit(1);
+	const refusal = undoRefusal(
+		completion,
+		latest?.id,
+		input.completionId,
+		await readPartnershipRewardCredits(db, input.partnershipId, input.userId),
+		now
+	);
+	if (refusal) {
+		return { ok: false, reason: refusal };
+	}
+
+	await db.batch([
+		db
+			.delete(partnershipTaskCompletions)
+			.where(eq(partnershipTaskCompletions.id, input.completionId)),
+		db
+			.update(partnershipTasks)
+			.set({
+				active: completion.previousActive ?? true,
+				nextEligibleAt: completion.previousNextEligibleAt,
+				lastCompletedAt: completion.previousLastCompletedAt,
+				completedCount: sql`max(${partnershipTasks.completedCount} - 1, 0)`,
+				updatedAt: now
+			})
+			.where(
+				and(
+					eq(partnershipTasks.id, completion.taskId),
+					eq(partnershipTasks.partnershipId, input.partnershipId)
+				)
+			),
+		db
+			.update(partnershipRewardCredits)
+			.set({
+				credits: sql`max(${partnershipRewardCredits.credits} - ${completion.creditsAwarded}, 0)`,
+				updatedAt: now
+			})
+			.where(
+				and(
+					eq(partnershipRewardCredits.partnershipId, input.partnershipId),
+					eq(partnershipRewardCredits.userId, input.userId)
+				)
+			)
+	]);
 	return { ok: true };
 }
 
@@ -1115,7 +1506,10 @@ export async function listHomePartnerTaskSections(
 	);
 	const tasksByPartnership = new Map<string, PartnershipTaskView[]>();
 	const partnerById = new Map(partners.map((partner) => [partner.id, partner]));
+	// Once per partnership, not once per task as it used to be.
+	const memberships = new Map<string, TaskMembership>();
 
+	const shown: PartnershipTaskRow[] = [];
 	for (const row of taskRows) {
 		if (!completablePartnerships.get(row.partnershipId)) {
 			continue;
@@ -1123,18 +1517,47 @@ export async function listHomePartnerTaskSections(
 		if (row.createdByUserId === userId) {
 			continue;
 		}
-		const partner = partnerById.get(row.partnershipId);
-		if (!partner) {
+		if (!partnerById.has(row.partnershipId)) {
 			continue;
 		}
-		const membership = await requireTaskMembership(db, row.partnershipId, userId, viewerTimezone);
+		if (!memberships.has(row.partnershipId)) {
+			const membership = await requireTaskMembership(db, row.partnershipId, userId, viewerTimezone);
+			if (membership) {
+				memberships.set(row.partnershipId, membership);
+			}
+		}
+		if (memberships.has(row.partnershipId)) {
+			shown.push(row);
+		}
+	}
+
+	const windows = await partnershipWindowCompletions(db, shown, (row) =>
+		memberships.get(row.partnershipId)
+	);
+	for (const row of shown) {
+		const membership = memberships.get(row.partnershipId);
 		if (!membership) {
 			continue;
 		}
 		const list = tasksByPartnership.get(row.partnershipId) ?? [];
-		list.push(toPartnershipTaskView(row, membership));
+		list.push(toPartnershipTaskView(row, membership, windows.get(row.id) ?? null));
 		tasksByPartnership.set(row.partnershipId, list);
 	}
+
+	// The viewer's balance in each, in one query: completing these adds to it.
+	const creditRows = await db
+		.select({
+			partnershipId: partnershipRewardCredits.partnershipId,
+			credits: partnershipRewardCredits.credits
+		})
+		.from(partnershipRewardCredits)
+		.where(
+			and(
+				inArray(partnershipRewardCredits.partnershipId, partnershipIds),
+				eq(partnershipRewardCredits.userId, userId)
+			)
+		);
+	const creditsByPartnership = new Map(creditRows.map((row) => [row.partnershipId, row.credits]));
 
 	return partners.flatMap((partner) => {
 		if (!completablePartnerships.get(partner.id)) {
@@ -1145,7 +1568,8 @@ export async function listHomePartnerTaskSections(
 				partnershipId: partner.id,
 				names: partner.names,
 				image: partner.image,
-				tasks: tasksByPartnership.get(partner.id) ?? []
+				tasks: tasksByPartnership.get(partner.id) ?? [],
+				credits: creditsByPartnership.get(partner.id) ?? 0
 			}
 		];
 	});

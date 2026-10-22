@@ -1,5 +1,6 @@
 import { Temporal } from '@js-temporal/polyfill';
 import { assertNever } from './assert-never';
+import { informalWhen } from './informal-time';
 import type {
 	TaskMonthlyPattern,
 	TaskRepeatUnit,
@@ -309,18 +310,26 @@ export function nextEligibleAtAfterCompletion(
 	}
 }
 
+/**
+ * A schedule in full, to follow the label "Repeats" in a task's detail:
+ * "Anytime, up to 3 times a week", "2 days after it was last done", "Weekdays".
+ * A row in a list says it shorter (`shortTaskSchedule`).
+ */
 export function describeTaskSchedule(schedule: TaskSchedule): string {
 	switch (schedule.mode) {
 		case 'one-off':
-			return 'One-off';
-		case 'rolling-window':
-			return schedule.limit
-				? `Repeat anytime, up to ${schedule.limit.completions} time${schedule.limit.completions === 1 ? '' : 's'} per ${schedule.limit.every} ${schedule.limit.unit}${schedule.limit.every === 1 ? '' : 's'}`
-				: 'Repeat anytime';
+			return 'No, just once';
+		case 'rolling-window': {
+			if (!schedule.limit) {
+				return 'Anytime, as often as you like';
+			}
+			const { completions, every, unit } = schedule.limit;
+			return `Anytime, up to ${completions === 1 ? 'once' : `${completions} times`} ${per(every, unit)}`;
+		}
 		case 'after-completion':
-			return `Repeats ${schedule.every} ${schedule.unit}${schedule.every === 1 ? '' : 's'} after completion`;
+			return `${schedule.every} ${unitNouns[schedule.unit]}${schedule.every === 1 ? '' : 's'} after it was last done`;
 		case 'scheduled':
-			return `Scheduled every ${schedule.interval} ${schedule.frequency}${schedule.interval === 1 ? '' : 's'}`;
+			return shortTaskSchedule(schedule);
 		default:
 			return assertNever(schedule, 'task schedule');
 	}
@@ -331,4 +340,154 @@ export function scheduleReferenceDate(schedule: TaskSchedule, timeZone: string):
 		return null;
 	}
 	return resolveTaskLocalDateTime(schedule.anchorLocal, timeZone);
+}
+
+/**
+ * How many of a task's completions still count against its rolling window's
+ * limit at `now`: those whose window has not yet run out. The same test
+ * `nextEligibleAtAfterCompletion` uses to decide when the task opens again.
+ * Null for a task with no such limit.
+ */
+export function completionsInWindow(
+	schedule: TaskSchedule,
+	timeZone: string,
+	completions: Date[],
+	now: Date
+): number | null {
+	if (schedule.mode !== 'rolling-window' || !schedule.limit) {
+		return null;
+	}
+	const { every, unit } = schedule.limit;
+	return completions.filter(
+		(completedAt) => addTaskDuration(completedAt, every, unit, timeZone).getTime() > now.getTime()
+	).length;
+}
+
+/**
+ * The earliest completion time that could still be in the window at `now`,
+ * with a day to spare, so a query can skip everything older. Time zones and
+ * month lengths shift a window's start by hours, never by a day, and the
+ * exact test is `completionsInWindow`.
+ */
+export function windowLowerBound(schedule: TaskSchedule, now: Date): Date | null {
+	if (schedule.mode !== 'rolling-window' || !schedule.limit) {
+		return null;
+	}
+	const start = addTaskDuration(now, -schedule.limit.every, schedule.limit.unit, 'UTC');
+	return new Date(start.getTime() - 24 * 60 * 60 * 1000);
+}
+
+const unitNouns: Record<TaskRepeatUnit, string> = {
+	minute: 'minute',
+	hour: 'hour',
+	day: 'day',
+	week: 'week',
+	month: 'month',
+	year: 'year'
+};
+
+function per(every: number, unit: TaskRepeatUnit): string {
+	if (every === 1) {
+		return `${unit === 'hour' ? 'an' : 'a'} ${unitNouns[unit]}`;
+	}
+	return `every ${every} ${unitNouns[unit]}s`;
+}
+
+const shortWeekdays: Record<TaskWeekday, string> = {
+	mo: 'Mon',
+	tu: 'Tue',
+	we: 'Wed',
+	th: 'Thu',
+	fr: 'Fri',
+	sa: 'Sat',
+	su: 'Sun'
+};
+
+const weekdayOrder: TaskWeekday[] = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su'];
+
+function describeWeekdays(weekdays: TaskWeekday[]): string | null {
+	const days = new Set(weekdays);
+	const has = (list: TaskWeekday[]) =>
+		list.length === days.size && list.every((day) => days.has(day));
+	if (days.size === 0) {
+		return null;
+	}
+	if (has(weekdayOrder)) {
+		return 'Daily';
+	}
+	if (has(['mo', 'tu', 'we', 'th', 'fr'])) {
+		return 'Weekdays';
+	}
+	if (has(['sa', 'su'])) {
+		return 'Weekends';
+	}
+	return weekdayOrder
+		.filter((day) => days.has(day))
+		.map((day) => shortWeekdays[day])
+		.join(', ');
+}
+
+/**
+ * A schedule in a few words, for a task's row in a list: "3× a week",
+ * "Weekdays", "2 days after the last". The whole sentence is
+ * `describeTaskSchedule`, for the task's detail.
+ */
+export function shortTaskSchedule(schedule: TaskSchedule): string {
+	switch (schedule.mode) {
+		case 'one-off':
+			return 'One-off';
+		case 'rolling-window': {
+			if (!schedule.limit) {
+				return 'Anytime';
+			}
+			const { completions, every, unit } = schedule.limit;
+			const times = completions === 1 ? 'Once' : `${completions}×`;
+			return `${times} ${per(every, unit)}`;
+		}
+		case 'after-completion':
+			return `${schedule.every} ${unitNouns[schedule.unit]}${schedule.every === 1 ? '' : 's'} after the last`;
+		case 'scheduled': {
+			const days =
+				schedule.frequency === 'week' && schedule.weekdays
+					? describeWeekdays(schedule.weekdays)
+					: null;
+			if (schedule.interval === 1) {
+				if (days) {
+					return days;
+				}
+				const plain = { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Yearly' };
+				return plain[schedule.frequency];
+			}
+			const every = `Every ${schedule.interval} ${schedule.frequency}s`;
+			return days && days !== 'Daily' ? `${every}, ${days}` : every;
+		}
+		default:
+			return assertNever(schedule, 'task schedule');
+	}
+}
+
+/**
+ * When a waiting task can next be done, said the way a to-do list says it:
+ * "in 20 min", "Today 6pm", "Tomorrow 9am", "Sat 7pm", "Nov 3". Lower-case
+ * with `capitalise: false`, for after a word: "Again tomorrow 9am".
+ *
+ * In the viewer's own time zone and locale, the time informal
+ * (`$lib/informal-time`); a task that belongs to someone else's time says so
+ * beside this.
+ */
+export function shortAvailability(
+	date: Date,
+	now: Date,
+	timeZone: string = Temporal.Now.timeZoneId(),
+	locale?: string,
+	{ capitalise = true }: { capitalise?: boolean } = {}
+): string {
+	const minutes = Math.ceil((date.getTime() - now.getTime()) / 60_000);
+	if (minutes < 60) {
+		return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(
+			Math.max(minutes, 1),
+			'minute'
+		);
+	}
+	return informalWhen(date, now, { timeZone, locale, capitalise, timeWhenFar: false });
 }

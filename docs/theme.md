@@ -251,6 +251,46 @@ wa-skeleton::part(indicator) {
 }
 ```
 
+## Lists of items
+
+Tasks, rewards and their histories are lists of lines, the way a to-do app
+shows them, built from two generic components:
+
+- **`ItemRow`** is one item, an `<li>`: something to act on at the start (a
+  circle, a clock), the title and one quiet line of meta under it, and
+  a number at the end in tabular figures (an award, a cost). Its `onopen` makes
+  the title a native button that opens the item's detail, which is where its
+  description and other actions live. Rows are divided by a hairline, not
+  boxed: border, padding and a heading per item were what made a card per task
+  fill a phone with two of them.
+  A row can be `quiet` (greyed: not doable yet), `dimmed` (inactive) or
+  `selected` (lit in amber while its detail is open). The title's button
+  covers the whole row with a pseudo-element, so a tap anywhere opens it,
+  while the row's own controls (a circle, a `WhoseTime`) sit above it.
+- **`ItemGroup`** is a labelled run of rows ("Ready", "Saving up", a day): a
+  small uppercase heading with its count in a round badge — a bare number
+  where a heading meets the right-hand column read, at a skim, as one more
+  row's credits — or with `collapsed` a closed `wa-details` for what most
+  people do not need to see (the inactive ones), or `headless` where
+  something else already names the rows (a tab). Callers leave out an empty
+  group.
+
+Around them: `CreditBalances`, the balances a page's items pay into, as a row
+of `CreditPill`s labelled by a coins icon at its start, a partner's marked with
+their picture and any the viewer may set editable in place; `SegmentedTabs`, a pill-shaped
+segmented control with a count on each tab, for a page split two or three ways
+that should read as one thing from different sides (native buttons with the
+ARIA tab pattern, since `wa-button` forwards no `aria-selected`); and
+`WhoseTime`, "Jun's time" with a tooltip giving the zone and both people's
+time, for any time that belongs to someone else's clock. Times a list shows
+are informal — "9am", "Tomorrow 6:30pm" — through `src/lib/informal-time.ts`.
+
+Over the bottom of a list page float the round amber add button
+(`FloatingAddButton`), in a `ListDock`: `position: sticky`
+at the end of the page, because inside the app shell the window does not
+scroll and `fixed` would not stay put. An item's detail is a `ResponsiveDialog`
+([docs/dialogs.md](dialogs.md)).
+
 ## Adding to it
 
 A new component reaches for the semantic tokens, never a hex value. A new

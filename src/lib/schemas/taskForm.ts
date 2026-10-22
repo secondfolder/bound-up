@@ -13,3 +13,12 @@ export const taskCompleteSchema = z.object({ taskId: taskIdSchema });
 export const partnerTaskCompleteSchema = taskCompleteSchema.extend({
 	partnershipId: partnershipIdSchema
 });
+
+/** Takes back a completion; the id is what the complete action answered with. */
+export const taskUndoSchema = z.object({
+	completionId: z.string().uuid('Malformed completion id')
+});
+
+export const partnerTaskUndoSchema = taskUndoSchema.extend({
+	partnershipId: partnershipIdSchema
+});

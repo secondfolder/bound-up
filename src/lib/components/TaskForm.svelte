@@ -22,11 +22,14 @@
 	let {
 		superform,
 		submitLabel,
-		timeZoneContext = null
+		timeZoneContext = null,
+		action
 	}: {
 		superform: SuperForm<Infer<TaskEditorFormSchema>>;
 		submitLabel: string;
 		timeZoneContext?: TimeZoneContext | null;
+		/** Where it posts, when that is not the page it is on (`SealedTaskEditor`). */
+		action?: string;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -163,6 +166,30 @@
 		{ value: 'after-completion', label: 'After completion' },
 		{ value: 'scheduled', label: 'On a schedule' }
 	];
+	/**
+	 * What an "Every" box counts, from the unit or frequency chosen beside it,
+	 * so an empty one says "Number of weeks" rather than nothing.
+	 */
+	function everyPlaceholder(unit: string): string {
+		return `Number of ${unit}s`;
+	}
+
+	/**
+	 * What each mode means, under the mode itself. The repeating ones measure
+	 * their period from different points, and "Every" alone did not say which,
+	 * so each says where it is counted from (`nextEligibleAtAfterCompletion` in
+	 * `$lib/task-schedule` is the rule each describes).
+	 */
+	const MODE_HINTS: Record<string, string> = {
+		'one-off': 'Done once, and then it is finished.',
+		'rolling-window':
+			"Can be done whenever. With a limit, the period rolls rather than following the calendar: each completion counts towards the limit for that long after it's marked complete.",
+		'after-completion':
+			'Counted from when it was last marked complete, so finishing it late moves the next one later too.',
+		scheduled:
+			"On a fixed calendar from the start time, not from when it's completed: finishing it late doesn't move the next one, and a missed one is skipped."
+	};
+
 	const FREQUENCY_OPTIONS = [
 		{ value: 'day', label: 'Daily' },
 		{ value: 'week', label: 'Weekly' },
@@ -197,7 +224,7 @@
 	];
 </script>
 
-<form method="POST" use:superform.enhance class="panel task-form" {@attach hearEdits}>
+<form method="POST" {action} use:superform.enhance class="panel task-form" {@attach hearEdits}>
 	<input type="hidden" name="timezoneOwnerUserId" value={$form.timezoneOwnerUserId} />
 
 	<InputField {superform} field="title" title="Title" type="text" maxlength="80" required />
@@ -249,6 +276,9 @@
 	<section class="schedule-section">
 		<h3>Repeat</h3>
 		<SelectField {superform} field="scheduleMode" title="Mode" options={MODE_OPTIONS} />
+		{#if MODE_HINTS[$form.scheduleMode]}
+			<p class="mode-hint">{MODE_HINTS[$form.scheduleMode]}</p>
+		{/if}
 
 		{#if $form.scheduleMode === 'rolling-window'}
 			<CheckboxField
@@ -269,7 +299,8 @@
 					<InputField
 						{superform}
 						field="rollingLimitEvery"
-						title="Every"
+						title={`Within this many ${$form.rollingLimitUnit}s`}
+						placeholder={everyPlaceholder($form.rollingLimitUnit)}
 						type="number"
 						min="1"
 						step="1"
@@ -281,7 +312,15 @@
 
 		{#if $form.scheduleMode === 'after-completion'}
 			<div class="editor-row">
-				<InputField {superform} field="afterEvery" title="Every" type="number" min="1" step="1" />
+				<InputField
+					{superform}
+					field="afterEvery"
+					title={`Repeat after this many ${$form.afterUnit}s`}
+					placeholder={everyPlaceholder($form.afterUnit)}
+					type="number"
+					min="1"
+					step="1"
+				/>
 				<SelectField {superform} field="afterUnit" title="Unit" options={UNIT_OPTIONS} />
 			</div>
 		{/if}
@@ -317,7 +356,8 @@
 				<InputField
 					{superform}
 					field="scheduledInterval"
-					title="Every"
+					title={`Repeat every this many ${$form.scheduledFrequency}s`}
+					placeholder={everyPlaceholder($form.scheduledFrequency)}
 					type="number"
 					min="1"
 					step="1"
@@ -412,37 +452,51 @@
 		{/if}
 	</section>
 
-	<wa-button
-		type="submit"
-		appearance={hasValidUnsavedChanges ? 'accent' : 'outlined'}
-		variant={hasValidUnsavedChanges ? 'brand' : 'neutral'}
-		disabled={$submitting}
-	>
-		{submitLabel}
-	</wa-button>
-	{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
+	<div class="form-footer">
+		{#if $errors._errors}<span class="invalid">{$errors._errors}</span>{/if}
+		<wa-button
+			type="submit"
+			appearance={hasValidUnsavedChanges ? 'accent' : 'outlined'}
+			variant={hasValidUnsavedChanges ? 'brand' : 'neutral'}
+			disabled={$submitting}
+		>
+			{submitLabel}
+		</wa-button>
+	</div>
 </form>
 
 <style>
-	/* The same panel as the tasks and rewards pages' sections. Without a fill
-	   it was the one translucent card in the app, the wash showing through
-	   behind the fields. */
+	/*
+	 * The save button's own footer, stuck to the bottom of the sheet the form
+	 * opens in, so it stays in reach however far the form is scrolled. Sticky
+	 * inside the sheet's scrolling body rather than in the dialog's footer
+	 * slot, so the button stays inside the form and keeps its state (solid
+	 * once there is a valid change, disabled while saving) where it is worked
+	 * out. The negative margins take it out to the body's edges, over its
+	 * padding (`--spacing`, the dialog's), so the fields scroll under a
+	 * full-width bar rather than past a floating button.
+	 */
+	.form-footer {
+		position: sticky;
+		inset-block-end: calc(-1 * var(--spacing, 0px));
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.5rem;
+		margin: 0 calc(-1 * var(--spacing, 0px)) calc(-1 * var(--spacing, 0px));
+		padding: var(--wa-space-s) var(--spacing, 0px);
+		border-block-start: 1px solid var(--wa-color-surface-border);
+		background: var(--wa-color-surface-raised);
+	}
+
+	/* Straight in the sheet it opens in (`RouteSheet`), which is the panel: it
+	   used to be a bordered, filled card of its own on its own page, and a card
+	   inside a sheet was a box in a box. */
 	.panel {
-		border: 1px solid var(--wa-color-surface-border);
-		border-radius: var(--wa-panel-border-radius);
-		padding: var(--wa-space-l);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		background: color-mix(
-			in srgb,
-			var(--wa-color-surface-default) 94%,
-			var(--wa-color-brand-fill-quiet)
-		);
-
-		@media (width < 40rem) {
-			padding: var(--wa-space-m);
-		}
 	}
 
 	fieldset {
@@ -457,6 +511,14 @@
 	legend {
 		padding-inline: 0.35rem;
 		font-weight: var(--wa-form-control-label-font-weight, var(--wa-font-weight-semibold, 600));
+	}
+
+	/* Its own line rather than the select's hint, which sat under the select
+	   and pushed it out of line with anything beside it. */
+	.mode-hint {
+		margin: -0.5rem 0 0;
+		font-size: var(--wa-font-size-s);
+		color: var(--wa-color-text-quiet);
 	}
 
 	.editor-row,
@@ -533,6 +595,12 @@
 		.schedule-row {
 			flex-direction: column;
 			align-items: stretch;
+
+			/* In a column a flex basis is a height: the shared row's 10rem left
+			   a tall gap round every short field (the Active checkbox most). */
+			> :global(*) {
+				flex: 0 0 auto;
+			}
 		}
 	}
 </style>

@@ -309,6 +309,13 @@
       "when": 1792635534789,
       "tag": "0043_add_notebook",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1792651055820,
+      "tag": "0044_add_task_completion_undo_state",
+      "breakpoints": true
     }
   ]
 }

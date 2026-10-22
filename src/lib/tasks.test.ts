@@ -5,6 +5,8 @@ import {
 	canCompletePartnershipTask,
 	canManagePartnershipTasks,
 	canViewPartnershipTask,
+	groupTasksSet,
+	groupTasksToDo,
 	isTaskCompletableAt,
 	type PartnershipTaskRecord
 } from './tasks';
@@ -154,5 +156,58 @@ describe('canViewPartnershipTask', () => {
 		expect(
 			canViewPartnershipTask(task({ control: 'inviter', createdByUserId: INVITEE }), INVITER)
 		).toBe(false);
+	});
+});
+
+describe('grouping tasks', () => {
+	const now = new Date('2026-10-22T12:00:00.000Z');
+	const groupable = (
+		id: string,
+		overrides: Partial<{ active: boolean; canComplete: boolean; nextEligibleAt: Date | null }>
+	) => ({
+		id,
+		active: true,
+		canComplete: true,
+		nextEligibleAt: null,
+		...overrides
+	});
+
+	it('splits a to-do list into ready, later (soonest first) and inactive', () => {
+		const groups = groupTasksToDo([
+			groupable('ready-1', {}),
+			groupable('later-far', {
+				canComplete: false,
+				nextEligibleAt: new Date('2026-10-30T00:00:00Z')
+			}),
+			groupable('off', { active: false, canComplete: false }),
+			groupable('ready-2', {}),
+			groupable('later-near', {
+				canComplete: false,
+				nextEligibleAt: new Date('2026-10-23T00:00:00Z')
+			})
+		]);
+		expect(groups.ready.map((t) => t.id)).toEqual(['ready-1', 'ready-2']);
+		expect(groups.later.map((t) => t.id)).toEqual(['later-near', 'later-far']);
+		expect(groups.inactive.map((t) => t.id)).toEqual(['off']);
+	});
+
+	it('splits tasks set for a partner into waiting on them, done for now and inactive', () => {
+		// `canComplete` is false on all of these: the viewer set them, so it is
+		// never theirs to tick. What matters is whether the partner can.
+		const groups = groupTasksSet(
+			[
+				groupable('open', { canComplete: false }),
+				groupable('done', { canComplete: false, nextEligibleAt: new Date('2026-10-23T00:00:00Z') }),
+				groupable('due-again', {
+					canComplete: false,
+					nextEligibleAt: new Date('2026-10-22T11:00:00Z')
+				}),
+				groupable('off', { active: false, canComplete: false })
+			],
+			now
+		);
+		expect(groups.waiting.map((t) => t.id)).toEqual(['open', 'due-again']);
+		expect(groups.doneForNow.map((t) => t.id)).toEqual(['done']);
+		expect(groups.inactive.map((t) => t.id)).toEqual(['off']);
 	});
 });

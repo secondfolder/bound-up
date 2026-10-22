@@ -1,69 +1,30 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
-	import SealedTaskEditor from '$lib/components/SealedTaskEditor.svelte';
-	import type { TaskContent } from '$lib/sealed-kinds/tasks';
-	import { openedTask } from '$lib/sealed-views.svelte';
+	import RouteSheet from '$lib/components/RouteSheet.svelte';
+	import TaskEditorBody from '$lib/components/TaskEditorBody.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-	const backHref = $derived(resolve('/(auth-required)/(app)/home/tasks'));
-	const opened = $derived(openedTask(data.task));
-	/**
-	 * The content as first opened, held so the editor is mounted once: a save
-	 * re-runs the load, and the new ciphertext reads as "still opening" for a
-	 * moment, which would otherwise unmount the form and lose its state.
-	 */
-	let content = $state<TaskContent | null | undefined>(undefined);
-	$effect(() => {
-		if (content === undefined && opened !== undefined) {
-			content = opened;
-		}
-	});
+	const listHref = $derived(resolve('/(auth-required)/(app)/home/tasks'));
+	let sheet: RouteSheet | undefined = $state();
+
+	/** Opened by its URL, with no list behind it in history: go to the list in its place. */
+	function leave() {
+		void goto(resolve('/(auth-required)/(app)/home/tasks'), {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
 </script>
 
-<section class="page">
-	<NestedPageHeader
-		{backHref}
-		backLabel="Back to tasks"
-		backText="Tasks"
-		title="Edit task"
-		description="Update your task details, schedule, and reward credits here."
-	/>
-
-	<div class="content">
-		{#if content === undefined}
-			<p class="quiet">…</p>
-		{:else if content === null}
-			<p class="quiet">This task can't be shown on this device right now.</p>
-		{:else}
-			<SealedTaskEditor
-				taskForm={data.taskForm}
-				sealScope={{ kind: 'self' }}
-				task={{ id: data.task.id, revision: data.task.revision, content }}
-				submitLabel="Save task"
-			/>
-		{/if}
-	</div>
-</section>
-
-<style>
-	.page {
-		max-width: var(--page-width);
-		margin: 0 auto;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.content {
-		padding: 0 var(--page-gutter) var(--wa-space-l);
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.quiet {
-		color: var(--wa-color-text-quiet);
-	}
-</style>
+<!-- A sheet over the list, which is this route's parent layout (`RouteSheet`). -->
+<RouteSheet
+	bind:this={sheet}
+	label={'Edit task'}
+	{listHref}
+	{leave}
+>
+	<TaskEditorBody taskForm={data.taskForm} task={data.task} onsaved={() => sheet?.close()} />
+</RouteSheet>

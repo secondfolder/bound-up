@@ -35,11 +35,9 @@ Self tasks are fully self-managed.
 - A one-off task deactivates itself after completion.
 - Repeatable tasks advance their own `next_eligible_at` instead.
 
-The home tasks page shows:
-
-- the owner's current self tasks
-- recent self-task completions
-- one section per partner containing partner tasks the viewer may complete
+The home tasks page shows one to-do list: the owner's self tasks and every
+partner task they may complete, each partner's marked with that partner's name
+(see "The checklist" below).
 
 ## Partnership tasks
 
@@ -238,6 +236,15 @@ Important fields on the live task rows:
   rows written before sealing and emptied when a device seals them (see
   [docs/temporary-code.md](temporary-code.md#tasks-and-rewards-in-plaintext))
 
+The task views add one thing worked out at load: `windowCompletions`, how many
+completions of a rolling-window task with a limit still count against it right
+now, which the list turns into "1 left" (or "2 of 3" for whoever set it). It is
+counted with one query per list on the completions' task index, from the
+earliest instant any of the list's windows could reach back to
+(`windowLowerBound`), and then exactly per task in its time zone owner's time
+(`completionsInWindow`, the same test `nextEligibleAtAfterCompletion` uses).
+Null for every other task.
+
 Completion rows snapshot:
 
 - the task's sealed record as it was when completed — a copy of its
@@ -247,6 +254,8 @@ Completion rows snapshot:
 - the credit award amount
 - who created the task for partnership rows
 - who completed it for partnership rows
+- the task's `active`, `next_eligible_at` and `last_completed_at` as they were
+  just before (`previous_*`), so the completion can be undone exactly
 
 The snapshot exists for the same reason as rewards history: visible history must
 stay truthful even if the live task is edited later. Copying the ciphertext is
@@ -257,44 +266,156 @@ completion can trigger it.
 
 | Route                          | What it shows                                                  |
 | ------------------------------ | -------------------------------------------------------------- |
-| `/home/tasks`                  | Self tasks plus one summary section per partner when any exist |
-| `/home/tasks/add`              | Create a self task (titled "Add a task": "self" is not a word users see) |
-| `/home/tasks/[taskId]`         | Edit one self task                                             |
-| `/home/tasks/history`          | Self task completion history                                   |
-| `/partner/[id]/tasks`          | Partnership tasks, split by assignee under shared control      |
-| `/partner/[id]/tasks/history`  | Partnership task completion history                            |
-| `/partner/[id]/tasks/add`      | Create a partnership task when this side controls tasks; the other side is redirected to the list (a direct post is still a 403) |
-| `/partner/[id]/tasks/[taskId]` | Edit one partnership task when this side controls tasks        |
+| `/home/tasks`                  | One to-do list: self tasks and the partner tasks the viewer completes |
+| `/home/tasks/add`              | The list, with the form for a new self task in a sheet over it (titled "Add a task": "self" is not a word users see) |
+| `/home/tasks/[taskId]`         | The list, with one self task's edit form in a sheet            |
+| `/home/tasks/history`          | The list, with the self task completion history in a sheet     |
+| `/partner/[id]/tasks`          | Partnership tasks; a tab each for "For them" and "For you" under shared control |
+| `/partner/[id]/tasks/history`  | The list, with the partnership's completion history in a sheet |
+| `/partner/[id]/tasks/add`      | The list, with the form for a new partnership task in a sheet, when this side controls tasks; the other side is redirected to the list (a direct post is still a 403) |
+| `/partner/[id]/tasks/[taskId]` | The list, with one partnership task's edit form in a sheet, when this side controls tasks |
 
-The home tasks page now uses the same section pattern as the partner page:
-self tasks always exist, partner sections appear only when there are incoming
-partner tasks to show, and a single section renders directly on the page rather
-than inside a panel. A page with a single list gives it no section heading of
-its own either, because the page title already names it. Completion history
-lives on dedicated routes for both self tasks and partnership tasks, as a list
-straight on the page with an empty state when there is nothing yet.
+The add, edit and history pages are sheets over the list with URLs of their
+own (`RouteSheet`; see [docs/dialogs.md](dialogs.md#sheets-with-their-own-url)):
+the list is each route's `+layout.svelte`, and a reload on `/home/tasks/add`
+shows the list with the add form open over it. The forms themselves are
+`TaskEditorBody`. History is reached by the clock icon beside the page title:
+a line per completion under the day it happened, with the completion message
+it gave.
 
-### The cards and the Complete button
+### The checklist
 
-Every task — and every reward, and every history entry — is an `ItemCard`
-(`src/lib/components/ItemCard.svelte`): the title and its quiet meta lines
-(schedule, time zone note) on the left; the credits and the actions in a column
-on the right, which drops under the text as a row when the card itself is
-narrow (a container query, since the same card sits in panels of different
-widths). The credits always sit in that column, even on a card with no button.
-Sections are `SectionPanel`s: title and anything that qualifies it (a balance)
-on the left, buttons on the right — history first, "Add" last — in equal
-columns under the title when narrow.
+The tasks pages are a to-do list, not a stack of cards: a card per task, with
+its whole description and two buttons, meant two tasks filled a phone screen.
+The pieces are generic (`ItemRow`, `ItemGroup`, `ResponsiveDialog`; see
+[docs/theme.md](theme.md#lists-of-items) and [docs/dialogs.md](dialogs.md)), and
+the task-specific ones are `TaskChecklist`, `TaskRow` and `TaskDetailDialog`.
+The wording rules are pure and node-tested: `src/lib/task-list.ts`,
+`groupTasksToDo` / `groupTasksSet` in `src/lib/tasks.ts`, and
+`shortTaskSchedule` / `shortAvailability` in `src/lib/task-schedule.ts`.
 
-Complete is the one amber (`accent`, `brand`) button on a card, and only appears
-when the task can be completed. Its form is enhanced (`ItemAction` in
-`src/lib/item-action.svelte.ts`) rather than posting natively, so the card can
-celebrate: on success the button becomes a check, the award rises off the
-credits, and the border flashes amber; the page's loads re-run
-`CELEBRATION_MS` later, and a card that the refreshed list no longer has slides
-shut. With reduced motion there is no wait and no motion. A refusal still shows
-the action's own error at the top of the page; an `error` result goes to the
-app-wide notice (docs/request-failures.md).
+A list is either the viewer's to do, or tasks they set for their partner, and
+is grouped by what can be done about each:
+
+| Mode    | Groups                                                     | At the start of a row |
+| ------- | ---------------------------------------------------------- | --------------------- |
+| `to-do` | Ready, Later (soonest first), Inactive                     | a circle to tick when it can be done; a dashed clock when it is not due yet |
+| `set`   | one unheaded list (still to do, then done for now), Inactive | nothing, and no column for it: the viewer cannot complete these, and a ring there was a control-shaped thing that did nothing |
+
+The `set` list has no heading of its own: the page's "For them" tab, or the
+page itself, already says whose these are. Inactive is a closed `wa-details`
+in both, there for whoever looks. A row that is not due yet (or, on the side
+that set it, done for now) has its title and award greyed: it cannot be
+completed before then (the server refuses), so it should not look like one
+that can.
+
+Each row is the title and one quiet line, with the award ("+2") at the end.
+The line, in the order shown, as the design proposal had it:
+
+- whose it is, on `/home/tasks` only: the partner's picture (`wa-avatar`,
+  named for a screen reader), which says it in a quarter of the room a name
+  took;
+- when it is due again, with a clock: "Tomorrow 9am", or on the side that set
+  it "Again tomorrow 9am";
+- the schedule, with a repeat icon for "Repeat anytime" and "After
+  completion" and a calendar for "On a schedule": "3× a week · 1 left" to
+  whoever does it, "1 of 3 this week" to whoever set it;
+- "Jun's time", when the task runs in the partner's time zone and that is not
+  the viewer's (`WhoseTime`: a button whose tooltip, on hover or tap, gives
+  the zone, the time for each of them and how far apart they are).
+
+Times are informal ("9am", "Tomorrow 6:30pm") through `src/lib/informal-time.ts`,
+which is built on `Intl.DateTimeFormat#formatToParts` and
+`Intl.RelativeTimeFormat`, so a 24-hour locale keeps its own form and "today"
+and "tomorrow" are in the reader's language.
+
+Above the list are the balances the tasks pay into (`CreditBalances`, a row
+of `CreditPill`s labelled by a coins icon at its start), kept
+apart rather than added up because they are spent on different rewards. On
+`/home/tasks`: "Yours", then "With Jun" for each partner, with their picture.
+On the partner page: the viewer's own when they complete tasks there, and the
+partner's when they set them.
+
+`/home/tasks` merges the viewer's own tasks with every partner's into the one
+`to-do` list; there used to be a panel per partner, each with buttons of its
+own. `/partner/[id]/tasks` is one list for one-sided control (`to-do` for the
+completing side, `set` for the managing side), and under shared control a
+pill-shaped segmented control (`SegmentedTabs`) with "For them" first and shown
+first, since setting tasks is what a side in control comes for, then "For you"
+and a count on each, which used to be two stacked panels. Adding a task is a
+dashed "Add a task" row on `/home/tasks` and the round amber button over the
+bottom of the partner page (`ListDock`, sticky rather than fixed, because the
+app shell's window does not scroll).
+
+Tapping a task opens its detail (`TaskDetailDialog`), and the row stays lit
+behind it so it is plain which one is open. The detail has the description,
+then: whose it is, "Repeats" (the whole schedule: "Anytime, up to 3 times a
+week"), the quota as squares ("This week"), when it is due again, when it was
+last done, whose time it runs in, and the award. In its footer **Complete**
+comes first and widest, then Edit, then the partner's whole task list (from
+`/home/tasks`). That Complete submits the row's own form (`requestSubmit`), so
+both ways of completing post the same thing and celebrate the same way.
+
+### The task form
+
+Each repeat mode says what it means right under the mode dropdown, including
+where its period is counted from, because the three repeating modes count from
+different points: "Repeat anytime" with a limit rolls (each completion counts
+for that long after it is marked complete), "After completion" counts from the
+last completion, and "On a schedule" is a fixed calendar from the start time.
+Each "Every" box is labelled for its unit ("Repeat after this many days") and
+its placeholder follows the unit chosen beside it ("Number of days").
+
+### Completing
+
+The circle is a native `<button>` in an enhanced form (`ItemAction` in
+`src/lib/item-action.svelte.ts`), named "Complete <title>" so a list of them is
+not a list of buttons all called "Complete". On success the circle fills with a
+check, the award rises off the credits, and the page's loads re-run
+`CELEBRATION_MS` later; a row the refreshed list puts in another group moves
+there. With reduced motion there is no wait and no motion. A refusal still
+shows the action's own error at the top of the page; an `error` result goes to
+the app-wide notice (docs/request-failures.md).
+
+### Undoing a completion
+
+A circle is far easier to tap by mistake than the button it replaced, and a
+completion pays out credits, so every completion can be taken back for a
+while. The complete actions answer with the new completion's id and the task's,
+and the task's own line becomes `TaskUndoRow` — "Completed · +2" and an Undo —
+for ten seconds, longer while it is hovered or focused, and then the task shows
+wherever the reload put it. The line goes where the circle was tapped, not
+where the task now belongs: `TaskChecklist` notes the task's group and place as
+the completion is posted (`ItemAction.pending`), because by the time the answer
+arrives a one-off has moved to Inactive, or off `/home/tasks` altogether. A
+toast at the bottom of the page came before it, and was a long way from the
+tap it was about. Undo posts to `selfUndoCompletion` / `partnerUndoCompletion`
+on `/home/tasks` or `undoCompletion` on the partner page, which call
+`undoSelfTaskCompletion` / `undoPartnershipTaskCompletion`, and answer
+`{ undone: true }` with no message: the task coming back in its place says it.
+
+The server allows it only when every one of these holds, and says which did
+not (`UNDO_REFUSALS`):
+
+- the viewer made the completion (and, for a partnership task, is still on the
+  completing side): it is their credits that come back out;
+- it is the task's newest completion, so the state it restores is the current
+  one;
+- it is under `UNDO_WINDOW_MS` (ten minutes) old: long enough to notice a
+  mis-tap, short enough that nobody has planned around the task being done;
+- it recorded the task's previous state (`previous_active` is set — completions
+  from before undo existed did not);
+- the balance still holds the award: credits already spent on a reward are not
+  clawed back.
+
+One `db.batch` then deletes the completion, puts the task's `active`,
+`next_eligible_at` and `last_completed_at` back as recorded, takes one off
+`completed_count`, and subtracts the award. The previous state is stored on the
+completion rather than recomputed because a scheduled task's next occurrence
+cannot be rebuilt once its schedule has been edited, and a one-off's `active` is
+gone the moment it completes. Completing and undoing both change the balance in
+SQL (`credits + n`, `credits - n`) rather than reading it and writing it back,
+which used to lose an award when two completions landed at once.
 
 The task form's save button follows the app's convention: outlined until the
 form holds a valid change, then solid amber.

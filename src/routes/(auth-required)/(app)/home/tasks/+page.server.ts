@@ -1,29 +1,18 @@
 import { error, fail } from '@sveltejs/kit';
-import { partnerTaskCompleteSchema, taskCompleteSchema } from '$lib/schemas/taskForm';
+import {
+	partnerTaskCompleteSchema,
+	partnerTaskUndoSchema,
+	taskCompleteSchema,
+	taskUndoSchema
+} from '$lib/schemas/taskForm';
 import {
 	completePartnershipTask,
 	completeSelfTask,
-	getSelfTasksSection,
-	listHomePartnerTaskSections
+	UNDO_REFUSALS,
+	undoPartnershipTaskCompletion,
+	undoSelfTaskCompletion
 } from '$lib/server/tasks';
-import type { Actions, PageServerLoad } from './$types';
-
-export const load: PageServerLoad = async ({ locals, parent, depends }) => {
-	if (!locals.user) {
-		return { selfTasks: { tasks: [], completions: [] }, partnerTasks: [] };
-	}
-
-	const { partners } = await parent();
-
-	depends('tasks:home');
-
-	const [selfTasks, partnerTasks] = await Promise.all([
-		getSelfTasksSection(locals.db, locals.user.id, locals.user.timezone),
-		listHomePartnerTaskSections(locals.db, locals.user.id, locals.user.timezone, partners)
-	]);
-
-	return { selfTasks, partnerTasks };
-};
+import type { Actions } from './$types';
 
 function stringField(formData: FormData, key: string): string | undefined {
 	const value = formData.get(key);
@@ -72,7 +61,11 @@ export const actions: Actions = {
 			});
 		}
 
-		return { message: 'Task completed.' };
+		return {
+			message: 'Task completed.',
+			completionId: result.completionId,
+			taskId: parsed.data.taskId
+		};
 	},
 
 	partnerCompleteTask: async ({ locals, request }) => {
@@ -112,6 +105,69 @@ export const actions: Actions = {
 			});
 		}
 
-		return { message: 'Task completed.' };
+		// The partnership goes back with the id: undoing it posts both.
+		return {
+			message: 'Task completed.',
+			completionId: result.completionId,
+			taskId: parsed.data.taskId,
+			partnershipId: parsed.data.partnershipId
+		};
+	},
+
+	selfUndoCompletion: async ({ locals, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const formData = await request.formData();
+		const parsed = taskUndoSchema.safeParse({
+			completionId: stringField(formData, 'completionId')
+		});
+		if (!parsed.success) {
+			const flat = parsed.error.flatten();
+			return fail(400, { error: firstError(flat.fieldErrors, flat.formErrors) });
+		}
+		const result = await undoSelfTaskCompletion(
+			locals.db,
+			locals.user.id,
+			parsed.data.completionId
+		);
+		if (!result.ok) {
+			return fail(result.reason === 'not-found' || result.reason === 'not-yours' ? 404 : 400, {
+				error: UNDO_REFUSALS[result.reason]
+			});
+		}
+		// Nothing to say: the task coming back in its place says it.
+		return { undone: true };
+	},
+
+	partnerUndoCompletion: async ({ locals, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const formData = await request.formData();
+		const parsed = partnerTaskUndoSchema.safeParse({
+			partnershipId: stringField(formData, 'partnershipId'),
+			completionId: stringField(formData, 'completionId')
+		});
+		if (!parsed.success) {
+			const flat = parsed.error.flatten();
+			return fail(400, { error: firstError(flat.fieldErrors, flat.formErrors) });
+		}
+		const result = await undoPartnershipTaskCompletion(locals.db, {
+			partnershipId: parsed.data.partnershipId,
+			completionId: parsed.data.completionId,
+			userId: locals.user.id,
+			viewerTimezone: locals.user.timezone
+		});
+		if (!result.ok) {
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			return fail(result.reason === 'not-found' || result.reason === 'not-yours' ? 404 : 400, {
+				error: UNDO_REFUSALS[result.reason]
+			});
+		}
+		// Nothing to say: the task coming back in its place says it.
+		return { undone: true };
 	}
 };

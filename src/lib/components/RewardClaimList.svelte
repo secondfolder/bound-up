@@ -1,23 +1,16 @@
 <script lang="ts">
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import ItemCard from '$lib/components/ItemCard.svelte';
-	import RichText from '$lib/components/RichText.svelte';
-	import { creditsLabel } from '$lib/credits';
+	import ItemGroup from '$lib/components/ItemGroup.svelte';
+	import ItemRow from '$lib/components/ItemRow.svelte';
+	import { groupByDay, timeOfDay } from '$lib/day-groups';
 	import { openedClaim, shownTitle } from '$lib/sealed-views.svelte';
 	import type { PartnershipRewardClaimView, RewardHistoryView } from '$lib/types';
 
 	/**
-	 * A reward claim history: the self one and the partnership one, which used
-	 * to be two hand-built lists with corners and padding of their own. Each
-	 * claim is the same card a reward is, so a claim reads as the reward it was.
+	 * A reward claim history, self or partnership: a line per claim under the
+	 * day it was made, with what it cost at the time, as the task history is.
 	 */
 	let { claims }: { claims: (RewardHistoryView | PartnershipRewardClaimView)[] } = $props();
-
-	function formatDateTime(date: Date): string {
-		return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-			date
-		);
-	}
 
 	function isPartnershipClaim(
 		claim: RewardHistoryView | PartnershipRewardClaimView
@@ -26,7 +19,12 @@
 	}
 
 	/** Each row with its content opened, or a placeholder while it opens (`sealed-views.svelte.ts`). */
-	const rows = $derived(claims.map((claim) => ({ claim, content: openedClaim(claim) })));
+	const days = $derived(
+		groupByDay(
+			claims.map((claim) => ({ claim, content: openedClaim(claim) })),
+			(row) => row.claim.createdAt
+		)
+	);
 </script>
 
 {#if claims.length === 0}
@@ -34,38 +32,39 @@
 		<p>Each reward claimed shows up here, with what it cost at the time.</p>
 	</EmptyState>
 {:else}
-	<ul class="history-list">
-		{#each rows as { claim, content } (claim.id)}
-			<li>
-				<ItemCard title={shownTitle(content)}>
-					{#snippet meta()}
-						<p>
-							{formatDateTime(claim.createdAt)}
+	<div class="days">
+		{#each days as day (day.key)}
+			<ItemGroup title={day.label}>
+				{#each day.items as { claim, content } (claim.id)}
+					<ItemRow title={shownTitle(content)}>
+						{#snippet meta()}
+							<span>{timeOfDay(claim.createdAt)}</span>
 							{#if isPartnershipClaim(claim)}
-								· {claim.mine ? 'Claimed by you' : 'Claimed by them'}
+								<span>{claim.mine ? 'Claimed by you' : 'Claimed by them'}</span>
 							{/if}
-						</p>
-					{/snippet}
-					{#snippet value()}{creditsLabel(claim.rewardCost)}{/snippet}
-
-					{#if content?.description}<RichText text={content.description} />{/if}
-				</ItemCard>
-			</li>
+						{/snippet}
+						{#snippet trailing()}
+							<span class="cost">
+								−{claim.rewardCost}<span class="wa-visually-hidden"
+									>{' '}credit{claim.rewardCost === 1 ? '' : 's'}</span
+								>
+							</span>
+						{/snippet}
+					</ItemRow>
+				{/each}
+			</ItemGroup>
 		{/each}
-	</ul>
+	</div>
 {/if}
 
 <style>
-	.history-list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
+	.days {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: var(--wa-space-l);
 	}
 
-	p {
-		margin: 0;
+	.cost {
+		color: var(--wa-color-text-quiet);
 	}
 </style>

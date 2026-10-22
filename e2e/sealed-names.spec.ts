@@ -130,7 +130,13 @@ test.describe('sealed partnership names', () => {
 			await clickWaButton(ada.page, 'Add task');
 			await ada.page.waitForURL(/\/home\/tasks$/);
 
-			const edit = await ada.page.getByRole('link', { name: 'Edit' }).first().getAttribute('href');
+			// Edit is in the task's detail, which its row opens.
+			await waitForHydration(ada.page);
+			await ada.page.getByRole('button', { name: /Lines, one hundred/ }).click();
+			const edit = await ada.page
+				.locator('wa-dialog')
+				.getByRole('link', { name: 'Edit' })
+				.getAttribute('href');
 			await ada.page.goto(edit ?? '');
 			await waitForHydration(ada.page);
 			// Opened in the browser and put in the form: the server sent it empty.

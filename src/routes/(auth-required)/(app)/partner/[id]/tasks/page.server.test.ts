@@ -10,7 +10,8 @@ import {
 	readPartnershipRewardCreditRow,
 	type TestUser
 } from '$lib/testing/fixtures';
-import { actions, load } from './+page.server';
+import { load } from './+layout.server';
+import { actions } from './+page.server';
 
 let harness: TestDb;
 let db: Db;
@@ -88,5 +89,30 @@ describe('actions', () => {
 
 		const result = await run('completeTask', at(id, ada, { taskId: task.id }));
 		expect(result.status).toBe(403);
+	});
+
+	it('undoes a completion for the person who made it, and only them', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
+		const task = await createTestPartnershipTask(db, id, jun, { creditsAwarded: 2 });
+		const completed = await run('completeTask', at(id, ada, { taskId: task.id }));
+		expect(completed).toMatchObject({ completionId: expect.any(String) });
+		const { completionId } = completed as { completionId: string };
+
+		const refused = await run('undoCompletion', at(id, jun, { completionId }));
+		expect(refused).toMatchObject({ status: 404 });
+
+		const undone = await run('undoCompletion', at(id, ada, { completionId }));
+		expect(undone).toMatchObject({ undone: true });
+		await expect(readPartnershipRewardCreditRow(db, id, ada.id)).resolves.toMatchObject({
+			credits: 0
+		});
+	});
+
+	it('404s an undo from outside the partnership', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
+		const result = await runAndCatch(() =>
+			run('undoCompletion', at(id, stranger, { completionId: crypto.randomUUID() }))
+		);
+		expect(result).toMatchObject({ type: 'error', status: 404 });
 	});
 });
