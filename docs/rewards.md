@@ -196,6 +196,11 @@ sealed record's envelope and every permission.
   description limits run in the browser and on every read.
 - **Edits are compare-and-swap** on `revision`, so a partner's newer edit is
   never overwritten unseen.
+- **A tick in the description** — a to-do item ticked in the reward's sheet —
+  re-seals the content and posts it alone to `?/selfRewardContent` or
+  `?/rewardContent`, under the same permission as an edit, so it cannot carry
+  a stale cost or active flag back with it. See
+  [rich-text.md](rich-text.md#to-do-lists).
 - **A claim** copies the reward's ciphertext as it stood (`snapshot_*`
   columns). The copy still opens as a reward, sealed to the reward's id, so
   either partner's claim can take the snapshot without reading it.

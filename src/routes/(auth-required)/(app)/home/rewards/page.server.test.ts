@@ -7,8 +7,11 @@ import {
 	createTestPartnershipReward,
 	createTestSelfReward,
 	createTestUser,
+	ensureTestSelfVault,
+	fakeSealed,
 	readPartnershipRewardClaimRows,
 	readSelfRewardCreditRow,
+	readSelfRewardRow,
 	setTestPartnershipRewardCredits,
 	setTestSelfRewardCredits,
 	type TestUser
@@ -130,5 +133,54 @@ describe('actions', () => {
 	it('401s without a session when an action runs', async () => {
 		const result = await runAndCatch(() => run('selfSetCredits', at(null, { credits: '1' })));
 		expect(result).toMatchObject({ type: 'error', status: 401 });
+	});
+});
+
+describe('selfRewardContent', () => {
+	/** The content a tick posts: the server stores it as it arrives. */
+	const Ticked = fakeSealed('ticked');
+
+	/** A tick as the reward's sheet posts it: the content re-sealed, and nothing else. */
+	async function contentPost(rewardId: string, expectedRevision = '0') {
+		return {
+			recordId: rewardId,
+			vaultId: await ensureTestSelfVault(db, ada.id),
+			ciphertext: Ticked,
+			payloadVersion: '1',
+			expectedRevision
+		};
+	}
+
+	it('saves the content alone, leaving the cost and whether it is active', async () => {
+		const reward = await createTestSelfReward(db, ada, { cost: 7, active: false });
+
+		const result = await run('selfRewardContent', at(ada, await contentPost(reward.id)));
+		expect(result).toEqual({ saved: true });
+		await expect(readSelfRewardRow(db, reward.id)).resolves.toMatchObject({
+			ciphertext: Ticked,
+			revision: 1,
+			cost: 7,
+			active: false
+		});
+	});
+
+	it('refuses a tick made on an out-of-date copy', async () => {
+		const reward = await createTestSelfReward(db, ada);
+		await run('selfRewardContent', at(ada, await contentPost(reward.id)));
+
+		const result = await run('selfRewardContent', at(ada, await contentPost(reward.id)));
+		expect(result).toMatchObject({ status: 409 });
+		const next = await run('selfRewardContent', at(ada, await contentPost(reward.id, '1')));
+		expect(next).toEqual({ saved: true });
+	});
+
+	it("does not find someone else's reward", async () => {
+		const reward = await createTestSelfReward(db, ada);
+		const post = {
+			...(await contentPost(reward.id)),
+			vaultId: await ensureTestSelfVault(db, jun.id)
+		};
+		const result = await runAndCatch(() => run('selfRewardContent', at(jun, post)));
+		expect(result).toMatchObject({ type: 'error', status: 404 });
 	});
 });

@@ -12,10 +12,12 @@
 		inlineLinkUrls,
 		parseStoredRichText,
 		type RichTextInlineNode,
+		withChecklistItem,
 		withInlineEmbeds
 	} from '$lib/richtext';
 	import { isWithinScrollport, scrollIntoViewWithin } from '$lib/scroll-parent';
 	import RichTextInline, { type InlineEmbedContext } from './RichTextInline.svelte';
+	import RichTextList from './RichTextList.svelte';
 	import SceneBlock from './scenes/SceneBlock.svelte';
 	import '$lib/richtext-headings.css';
 	import UrlEmbed from './UrlEmbed.svelte';
@@ -48,9 +50,18 @@
 		cachedEmbedsPending = false,
 		onEmbedActivated,
 		onRefreshEmbed,
+		onChecklistToggle,
 		viewerId = null
 	}: {
 		text: string;
+		/**
+		 * Saves the document with a to-do item ticked or unticked, as the stored
+		 * string, and resolves to whether it saved. Given only where the reader
+		 * may edit the document; without it every box is disabled. This is the
+		 * one way a document read here can change: see docs/rich-text.md,
+		 * "To-do lists".
+		 */
+		onChecklistToggle?: ((stored: string) => Promise<boolean>) | undefined;
 		/** Who is reading: a scene block hidden from them is drawn as a surprise (docs/scenes.md). */
 		viewerId?: string | null;
 		cachedEmbeds?: CachedEmbedDetails[];
@@ -60,7 +71,16 @@
 		onRefreshEmbed?: ((href: string) => void | Promise<void>) | undefined;
 	} = $props();
 
-	const doc = $derived(parseStoredRichText(text));
+	/**
+	 * What is shown: the stored text, or a tick on its way to being saved.
+	 *
+	 * A tick shows at once rather than after the round trip, and goes back to
+	 * what is stored if the save fails. A new `text` from the caller — the
+	 * save landing, or anything else — replaces it, being the derived's own
+	 * value again.
+	 */
+	let shownText = $derived(text);
+	const doc = $derived(parseStoredRichText(shownText));
 	const blocks = $derived(doc.root.children);
 	const cachedByHref = $derived(new Map(cachedEmbeds.map((embed) => [embed.href, embed])));
 
@@ -101,6 +121,19 @@
 
 	/** The URL of the most recent reveal, so only that one is scrolled to. */
 	let scrollTo: string | null = null;
+
+	async function toggleItem(block: number, item: number, checked: boolean) {
+		const next = withChecklistItem(doc, { block, item }, checked);
+		if (!(next && onChecklistToggle)) {
+			return;
+		}
+		const stored = JSON.stringify(next);
+		shownText = stored;
+		const saved = await onChecklistToggle(stored);
+		if (!saved) {
+			shownText = text;
+		}
+	}
 
 	function canReveal(blockIndex: number, url: string): boolean {
 		return !(embedded.has(url) || revealed.has(`${blockIndex}:${url}`)) && embedSpecFor(url) !== null;
@@ -201,19 +234,13 @@
 			/>
 		</p>
 	{:else if block.type === 'list'}
-		{#if block.listType === 'number'}
-			<ol start={block.start}>
-				{#each block.children as item, itemIndex (itemIndex)}
-					<li><RichTextInline nodes={item.children} {embeds} /></li>
-				{/each}
-			</ol>
-		{:else}
-			<ul>
-				{#each block.children as item, itemIndex (itemIndex)}
-					<li><RichTextInline nodes={item.children} {embeds} /></li>
-				{/each}
-			</ul>
-		{/if}
+		<RichTextList
+			list={block}
+			{embeds}
+			onToggle={onChecklistToggle
+				? (item, checked) => toggleItem(index, item, checked)
+				: undefined}
+		/>
 	{:else if block.type === 'heading'}
 		<!-- No whitespace inside: a newline there renders as a leading space. -->
 		<svelte:element this={block.tag} class="rt-{block.tag === 'h2' ? 'heading' : 'subheading'}"
@@ -252,27 +279,18 @@
 {/each}
 
 <style>
-	p,
-	ul,
-	ol {
-		margin: 0;
-	}
-
-	ul,
-	ol {
-		padding-inline-start: 1.5em;
-	}
-
-	/* Long URLs and unbroken strings must not widen a message bubble. */
 	p {
+		margin: 0;
+		/* Long URLs and unbroken strings must not widen a message bubble. */
 		overflow-wrap: anywhere;
 	}
 
+	/* The lists are `RichTextList`'s elements, so they are global here. */
 	p + p,
-	p + ul,
-	p + ol,
-	ul + p,
-	ol + p {
+	p + :global(ul),
+	p + :global(ol),
+	:global(ul) + p,
+	:global(ol) + p {
 		margin-block-start: 0.5em;
 	}
 </style>

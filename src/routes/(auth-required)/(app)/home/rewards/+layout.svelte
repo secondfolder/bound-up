@@ -25,7 +25,8 @@
 		data.selfRewards.rewards.map((reward) => ({
 			reward,
 			claimAction: '?/selfClaimReward',
-			editHref: resolve('/(auth-required)/(app)/home/rewards/[rewardId]', { rewardId: reward.id })
+			editHref: resolve('/(auth-required)/(app)/home/rewards/[rewardId]', { rewardId: reward.id }),
+			contentSave: { action: '?/selfRewardContent', scope: { kind: 'self' as const } }
 		}))
 	);
 

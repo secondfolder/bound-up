@@ -813,6 +813,50 @@ export async function updateSelfTask(
 	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
 }
 
+/**
+ * Replaces a self task's sealed content and nothing else.
+ *
+ * What ticking a to-do item in a task's description saves (docs/rich-text.md,
+ * "To-do lists"). Not `updateSelfTask` with the settings posted back: that
+ * works the schedule out again, so a task done today would be due again the
+ * moment a box in its description was ticked. Compare-and-swap on `revision`
+ * all the same.
+ */
+export async function updateSelfTaskContent(
+	db: Db,
+	userId: string,
+	taskId: string,
+	input: { content: SealedTaskContent; expectedRevision: number }
+): Promise<TaskResult<'not-found' | 'conflict' | ContentRefusal>> {
+	const problem = taskContentProblem(input.content, await selfVaultIdFor(db, userId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const rows = await db
+		.update(selfTasks)
+		.set({
+			...sealedTaskColumns(input.content, input.expectedRevision + 1),
+			updatedAt: new Date()
+		})
+		.where(
+			and(
+				eq(selfTasks.id, taskId),
+				eq(selfTasks.ownerId, userId),
+				eq(selfTasks.revision, input.expectedRevision)
+			)
+		)
+		.returning({ id: selfTasks.id });
+	if (rows.length > 0) {
+		return { ok: true };
+	}
+	const [exists] = await db
+		.select({ id: selfTasks.id })
+		.from(selfTasks)
+		.where(and(eq(selfTasks.id, taskId), eq(selfTasks.ownerId, userId)))
+		.limit(1);
+	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
+}
+
 export async function getPartnershipTasksPage(
 	db: Db,
 	partnershipId: string,
@@ -1056,6 +1100,58 @@ export async function updatePartnershipTask(
 		return { ok: false, reason: 'conflict' };
 	}
 	return { ok: true };
+}
+
+/**
+ * Replaces a partnership task's sealed content and nothing else, as
+ * `updateSelfTaskContent` does for a self task, under the same permission as
+ * editing it: the side that manages tasks, and only the task's creator.
+ */
+export async function updatePartnershipTaskContent(
+	db: Db,
+	partnershipId: string,
+	userId: string,
+	viewerTimezone: string,
+	taskId: string,
+	input: { content: SealedTaskContent; expectedRevision: number }
+): Promise<TaskResult<'not-a-member' | 'forbidden' | 'not-found' | 'conflict' | ContentRefusal>> {
+	const membership = await requireTaskMembership(db, partnershipId, userId, viewerTimezone);
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canManage) {
+		return { ok: false, reason: 'forbidden' };
+	}
+	const [existing] = await db
+		.select({ createdByUserId: partnershipTasks.createdByUserId })
+		.from(partnershipTasks)
+		.where(and(eq(partnershipTasks.id, taskId), eq(partnershipTasks.partnershipId, partnershipId)))
+		.limit(1);
+	if (!existing) {
+		return { ok: false, reason: 'not-found' };
+	}
+	if (existing.createdByUserId !== userId) {
+		return { ok: false, reason: 'forbidden' };
+	}
+	const problem = taskContentProblem(input.content, await partnershipVaultIdFor(db, partnershipId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const rows = await db
+		.update(partnershipTasks)
+		.set({
+			...sealedTaskColumns(input.content, input.expectedRevision + 1),
+			updatedAt: new Date()
+		})
+		.where(
+			and(
+				eq(partnershipTasks.id, taskId),
+				eq(partnershipTasks.partnershipId, partnershipId),
+				eq(partnershipTasks.revision, input.expectedRevision)
+			)
+		)
+		.returning({ id: partnershipTasks.id });
+	return rows.length > 0 ? { ok: true } : { ok: false, reason: 'conflict' };
 }
 
 /** The task as it is before a completion changes it, stored on the completion for undo. */

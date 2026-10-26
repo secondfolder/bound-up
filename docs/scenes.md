@@ -234,6 +234,36 @@ to scene (`MenuExtras`, stored on the menu as `scale` and `value`).
   unmanaged (`setDOMUnmanaged`), as the menu's frame is, or Lexical would
   undo the drawing as DOM it did not make.
 
+### To-do items
+
+An item can be a to-do, with a box before its words, ticked when it has
+been done, as a line of a to-do list can ([rich-text.md](rich-text.md#to-do-lists)).
+A menu's line is not a list item, so Lexical's check list does not reach it;
+the item carries `checked` instead (null when it is not a to-do), stored on
+`scene-menu-line`.
+
+- **Making one** is the same as in a paragraph: `[] `, `[ ] ` or `[x] ` typed
+  at the start of an item (a `TextNode` transform, since Lexical runs a
+  line's own transform only when the line itself changed, and only with the
+  caret right after the brackets, so a pasted line starting that way is left
+  alone), or the selection toolbar's To-do list button, which in a menu
+  makes the selected items to-dos, or plain items again, rather than
+  wrapping the menu's lines in a list (`setSelectedChecklist`). Headings
+  are never to-dos.
+- **Enter after a to-do** makes the next item an unticked one, and
+  **Backspace at its start** makes it a plain item, still in the menu, before
+  Backspace there would take the line out of it.
+- **The box** (`.menu-line-check`, `drawLineCheck` in `menu-frame.ts`) is
+  drawn beside the words, like the rating and number: a `role="checkbox"`
+  button named by the item's words, unmanaged by Lexical, ticking on a tap
+  only in an editor that can be edited. It is drawn in the menu's ink, an
+  outline and a tick, so it suits every design; a done item's words are
+  struck through. A stored version draws the same element as a picture
+  saying "Done" or "Not done".
+- **Turning a to-do list into a menu** keeps its items to-dos, ticked as they
+  were, and **converting a menu to plain text** puts its to-dos in to-do
+  lists, so nothing is lost either way.
+
 They are **element nodes**, not decorator blocks. Their text is ordinary
 Lexical text, so `@lexical/yjs` merges two people typing in one menu
 character by character, where a decorator's data is one property the last

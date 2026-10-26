@@ -3,6 +3,7 @@
 	import { isSurpriseFor, MAX_RATING, SECTION_LABELS } from '$lib/scenes/blocks';
 	import { courseArtFor, courseArtStyle, designTitle, menuDesign } from '$lib/scenes/menu-designs';
 	import RichTextInline from '../RichTextInline.svelte';
+	import RichTextList from '../RichTextList.svelte';
 	import MenuFrame from './MenuFrame.svelte';
 	import '$lib/scenes/scene-blocks.css';
 
@@ -46,11 +47,8 @@
 							><RichTextInline nodes={child.children} /></svelte:element
 						>
 					{:else}
-						<ul>
-							{#each child.children as item, itemIndex (itemIndex)}
-								<li><RichTextInline nodes={item.children} /></li>
-							{/each}
-						</ul>
+						<!-- Never tickable here: this is a version in a scene's history. -->
+						<RichTextList list={child} />
 					{/if}
 				{/each}
 			{/if}
@@ -83,10 +81,18 @@
 								class="scene-menu-line {line.role}"
 								class:surprise={hidden}
 								class:only-me={line.hiddenFrom !== null}
+								class:checked={item && line.checked === true}
 								data-rating={rated ? (line.rating ?? undefined) : undefined}
 								data-value={valued ? (line.value ?? undefined) : undefined}
 							>
-								{#if !hidden}<span class="menu-line-words"><RichTextInline nodes={line.children} /></span
+								<!-- The box the editor draws (`drawLineCheck`). A picture here, not a
+								     checkbox: a version is never ticked, so what it says is whether
+								     the item was done. -->
+								{#if item && line.checked !== null}<span
+										class="menu-line-check"
+										role="img"
+										aria-label={line.checked ? 'Done' : 'Not done'}
+									></span>{/if}{#if !hidden}<span class="menu-line-words"><RichTextInline nodes={line.children} /></span
 									><span class="menu-line-extras" contenteditable="false" hidden={!(rated || valued)}
 										>{#if rated}<span
 												class="menu-rates"

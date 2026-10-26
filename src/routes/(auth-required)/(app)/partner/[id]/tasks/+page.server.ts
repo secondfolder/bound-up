@@ -1,9 +1,11 @@
 import { error, fail } from '@sveltejs/kit';
 import { taskCompleteSchema, taskUndoSchema } from '$lib/schemas/taskForm';
+import { malformedSealed, readSealedTaskContent, sealedRefusal } from '$lib/server/sealed-submit';
 import {
 	completePartnershipTask,
 	UNDO_REFUSALS,
-	undoPartnershipTaskCompletion
+	undoPartnershipTaskCompletion,
+	updatePartnershipTaskContent
 } from '$lib/server/tasks';
 import type { Actions } from './$types';
 
@@ -97,5 +99,38 @@ export const actions: Actions = {
 		}
 		// Nothing to say: the task coming back in its place says it.
 		return { undone: true };
+	},
+
+	/**
+	 * A task's description with a to-do item ticked or unticked, as
+	 * `selfTaskContent` on `/home/tasks`: the sealed content alone, under the
+	 * permission to edit the task.
+	 */
+	taskContent: async ({ locals, params, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const submitted = await readSealedTaskContent(request);
+		if (!submitted) {
+			return malformedSealed('task');
+		}
+		const result = await updatePartnershipTaskContent(
+			locals.db,
+			params.id,
+			locals.user.id,
+			locals.user.timezone,
+			submitted.recordId,
+			{ content: submitted.content, expectedRevision: submitted.expectedRevision }
+		);
+		if (!result.ok) {
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			if (result.reason === 'not-found') {
+				error(404, 'Task not found');
+			}
+			return sealedRefusal(result.reason, 'task');
+		}
+		return { saved: true };
 	}
 };

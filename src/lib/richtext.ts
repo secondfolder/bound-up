@@ -103,11 +103,24 @@ export type RichTextHeadingNode = {
 	children: RichTextInlineNode[];
 };
 
+/**
+ * A bulleted, numbered or to-do list. A to-do list's items each carry
+ * `checked`; on any other list it is absent. See docs/rich-text.md, "To-do
+ * lists".
+ */
 export type RichTextListNode = {
 	type: 'list';
-	listType: 'bullet' | 'number';
+	listType: 'bullet' | 'number' | 'check';
 	start: number;
-	children: { type: 'listitem'; value: number; children: RichTextInlineNode[] }[];
+	children: RichTextListItemNode[];
+};
+
+export type RichTextListItemNode = {
+	type: 'listitem';
+	value: number;
+	/** Ticked or not, on a to-do list's item only. */
+	checked?: boolean | undefined;
+	children: RichTextInlineNode[];
 };
 
 /**
@@ -123,6 +136,8 @@ export type RichTextMenuLineNode = {
 	value: number | null;
 	kinkId: string | null;
 	hiddenFrom: string | null;
+	/** Ticked or not, on an item that is a to-do; null on one that is not (docs/scenes.md). */
+	checked: boolean | null;
 	children: RichTextInlineNode[];
 };
 
@@ -247,12 +262,15 @@ const headingNodeSchema = z.object({
 
 const listNodeSchema = z.object({
 	type: z.literal('list'),
-	listType: z.union([z.literal('bullet'), z.literal('number')]),
+	listType: z.union([z.literal('bullet'), z.literal('number'), z.literal('check')]),
 	start: z.number().int().min(1).catch(1),
 	children: z.array(
 		z.object({
 			type: z.literal('listitem'),
 			value: z.number().int().min(1).catch(1),
+			// Lexical writes `checked` on every item of a to-do list and leaves it
+			// out elsewhere. Anything but a boolean reads as not there.
+			checked: z.boolean().optional().catch(undefined),
 			children: z.array(inlineNodeSchema)
 		})
 	)
@@ -277,6 +295,7 @@ const menuLineNodeSchema = z.object({
 	value: z.number().finite().nullable().catch(null),
 	kinkId: z.string().max(80).nullable().catch(null),
 	hiddenFrom: hiddenFromSchema,
+	checked: z.boolean().nullable().catch(null),
 	children: z.array(inlineNodeSchema)
 });
 
@@ -618,6 +637,41 @@ export function inlineLinkUrls(nodes: RichTextInlineNode[]): string[] {
 	};
 	walk(nodes);
 	return urls;
+}
+
+/* ── to-do lists ────────────────────────────────────────────────────────── */
+
+/**
+ * Where a to-do item is: the index of its list among the root's blocks, and
+ * its own index in that list. Only a list at the root can be ticked outside
+ * an editor; one inside a scene's section is read-only there.
+ */
+export type ChecklistItemAddress = { block: number; item: number };
+
+/**
+ * The document with one to-do item ticked or unticked, or null when there is
+ * no to-do item at that address.
+ *
+ * What a reader that may edit the document calls when someone ticks a box,
+ * so the change saves without an editor: everything else in the document is
+ * the same objects, untouched. See docs/rich-text.md, "To-do lists".
+ */
+export function withChecklistItem(
+	doc: RichTextDocument,
+	at: ChecklistItemAddress,
+	checked: boolean
+): RichTextDocument | null {
+	const list = doc.root.children[at.block];
+	if (!(list?.type === 'list' && list.listType === 'check' && list.children[at.item])) {
+		return null;
+	}
+	const children = list.children.map((item, index) =>
+		index === at.item ? { ...item, checked } : item
+	);
+	const blocks = doc.root.children.map((block, index) =>
+		index === at.block ? { ...list, children } : block
+	);
+	return { root: { ...doc.root, children: blocks } };
 }
 
 /** True when a document holds nothing a reader would see. */

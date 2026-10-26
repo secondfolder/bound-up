@@ -203,6 +203,12 @@ is chosen by the browser, because the id is part of what the content is
 sealed to. The action answers with a message rather than a superform, since
 there are no text fields to send back.
 
+**A tick in the description is a content-only write.** Ticking a to-do item
+in a task's sheet re-seals the content and posts it alone to the list page's
+`?/selfTaskContent` or `?/taskContent`, under the same permission as an edit.
+Not the edit action, which would work the schedule out again and make a task
+done today due again. See [rich-text.md](rich-text.md#to-do-lists).
+
 **Edits are compare-and-swap.** Every sealed write bumps `revision`, and an
 edit names the revision it opened. If the other partner saved in between, the
 edit is refused with "changed somewhere else" rather than overwriting their

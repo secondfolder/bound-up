@@ -31,7 +31,8 @@
 			task,
 			completeAction: '?/selfCompleteTask',
 			undoAction: '?/selfUndoCompletion',
-			editHref: resolve('/(auth-required)/(app)/home/tasks/[taskId]', { taskId: task.id })
+			editHref: resolve('/(auth-required)/(app)/home/tasks/[taskId]', { taskId: task.id }),
+			contentSave: { action: '?/selfTaskContent', scope: { kind: 'self' as const } }
 		})),
 		...data.partnerTasks.flatMap((section) =>
 			section.tasks.map((task) => ({

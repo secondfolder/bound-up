@@ -1,6 +1,11 @@
 import { error, fail } from '@sveltejs/kit';
 import { rewardClaimSchema, rewardCreditsSchema } from '$lib/schemas/rewardForm';
-import { claimPartnershipReward, setPartnershipRewardCredits } from '$lib/server/rewards';
+import {
+	claimPartnershipReward,
+	setPartnershipRewardCredits,
+	updatePartnershipRewardContent
+} from '$lib/server/rewards';
+import { malformedSealed, readSealedRewardContent, sealedRefusal } from '$lib/server/sealed-submit';
 import type { Actions } from './$types';
 
 function stringField(formData: FormData, key: string): string | undefined {
@@ -113,5 +118,36 @@ export const actions: Actions = {
 		}
 
 		return { action: 'claimReward', message: 'Reward claimed.' };
+	},
+
+	/**
+	 * A reward's description with a to-do item ticked or unticked, as
+	 * `selfRewardContent` on `/home/rewards`, under the permission to edit it.
+	 */
+	rewardContent: async ({ locals, params, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const submitted = await readSealedRewardContent(request);
+		if (!submitted) {
+			return malformedSealed('reward');
+		}
+		const result = await updatePartnershipRewardContent(
+			locals.db,
+			params.id,
+			locals.user.id,
+			submitted.recordId,
+			{ content: submitted.content, expectedRevision: submitted.expectedRevision }
+		);
+		if (!result.ok) {
+			if (result.reason === 'not-a-member') {
+				error(404, 'Partner not found');
+			}
+			if (result.reason === 'not-found') {
+				error(404, 'Reward not found');
+			}
+			return sealedRefusal(result.reason, 'reward');
+		}
+		return { saved: true };
 	}
 };

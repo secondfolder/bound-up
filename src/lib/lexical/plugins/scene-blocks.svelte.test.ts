@@ -12,6 +12,7 @@ import {
 	type LexicalNode
 } from 'lexical';
 import { afterEach, describe, expect, it } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import { Awareness } from 'y-protocols/awareness';
 import { applyUpdate, Doc, encodeStateAsUpdate } from 'yjs';
 import { toStoredDocument } from '$lib/lexical/document-shape';
@@ -70,6 +71,7 @@ import {
 	setMenuHeading,
 	setMenuMascot,
 	setMenuPicture,
+	setSelectedChecklist,
 	setSelectedSurprise,
 	setStoryLine,
 	storyValues,
@@ -159,6 +161,11 @@ function linesOf(lines: RichTextMenuLineNode[]): [string, string][] {
 /** Every line of a stored menu, across its courses. */
 function allLines(block: RichTextDocument['root']['children'][number] | undefined) {
 	return block?.type === 'scene-menu' ? block.children.flatMap((course) => course.children) : [];
+}
+
+/** A text node as Lexical serialises it, for a document loaded straight into the editor. */
+function serialisedText(value: string) {
+	return { type: 'text', text: value, format: 0, detail: 0, mode: 'normal', style: '', version: 1 };
 }
 
 function lineOf(text: string) {
@@ -406,7 +413,8 @@ describe('a menu’s ratings and numbers', () => {
 		insertMenu(editor);
 		await settled(editor);
 		const { menuKey, item } = firstMenu(editor);
-		expect(item().querySelectorAll('button')).toHaveLength(0);
+		// The extras' buttons only: a hidden to-do box is a button too.
+		expect(item().querySelectorAll('.menu-line-extras button')).toHaveLength(0);
 
 		setMenuExtras(editor, menuKey, { scale: 'Intensity', value: 'Price' });
 		await settled(editor);
@@ -416,7 +424,7 @@ describe('a menu’s ratings and numbers', () => {
 
 		setMenuExtras(editor, menuKey, { scale: null, value: null });
 		await settled(editor);
-		expect(item().querySelectorAll('button')).toHaveLength(0);
+		expect(item().querySelectorAll('.menu-line-extras button')).toHaveLength(0);
 	});
 
 	it('asks the page for a rating when one is tapped, from a button that outlives the change', async () => {
@@ -492,6 +500,164 @@ describe('a menu’s ratings and numbers', () => {
 		const [menu] = stored(editor).root.children;
 		const items = allLines(menu).filter((line) => line.role === 'item');
 		expect(items.map((line) => line.hiddenFrom)).toEqual([null, 'bo']);
+	});
+});
+
+describe('a menu’s to-do items', () => {
+	/** Puts the caret at `offset` in the line whose words are `words`. */
+	function caretIn(editor: LexicalEditor, words: string, offset: number) {
+		editor.update(
+			() => {
+				const text = getRoot()
+					.getAllTextNodes()
+					.find((node) => node.getTextContent() === words);
+				defined(text, words).select(offset, offset);
+			},
+			{ discrete: true }
+		);
+	}
+
+	/** Every item of the page's first menu as [words, checked]. */
+	function items(editor: LexicalEditor): [string, boolean | null][] {
+		const [menu] = stored(editor).root.children;
+		return allLines(menu)
+			.filter((line) => line.role === 'item')
+			.map((line) => [linesOf([line])[0]?.[1] ?? '', line.checked]);
+	}
+
+	function boxOf(editor: LexicalEditor, words: string): HTMLElement {
+		const line = [...(editor.getRootElement()?.querySelectorAll('.scene-menu-line') ?? [])].find(
+			(each) => each.querySelector('.menu-line-words')?.textContent === words
+		);
+		return defined(line?.querySelector<HTMLElement>('.menu-line-check'), `the box of ${words}`);
+	}
+
+	it('makes an item a to-do from `[ ] ` or `[x] ` typed at its start, and the next one too', async () => {
+		const editor = sceneEditor();
+		insertMenuFrom(editor, [{ name: 'Starters', items: ['Massage'] }]);
+		await settled(editor);
+		caretIn(editor, 'Massage', 7);
+		editor.focus();
+		// `[` opens a key name in `keyboard`'s syntax, and `[[` is a bracket.
+		await userEvent.keyboard('{Enter}[[x] Blindfold{Enter}Ice');
+		await settled(editor);
+		expect(items(editor)).toEqual([
+			['Massage', null],
+			['Blindfold', true],
+			['Ice', false]
+		]);
+		expect(boxOf(editor, 'Blindfold').getAttribute('aria-checked')).toBe('true');
+		expect(boxOf(editor, 'Massage').hidden).toBe(true);
+	});
+
+	it('leaves a line that merely starts with brackets alone', async () => {
+		const editor = sceneEditor();
+		insertMenuFrom(editor, [{ name: 'Starters', items: ['[ ] pasted'] }]);
+		await settled(editor);
+		expect(items(editor)).toEqual([['[ ] pasted', null]]);
+	});
+
+	it('makes the selected items to-dos from the toolbar, and back', async () => {
+		const editor = sceneEditor();
+		insertMenuFrom(editor, [{ name: 'Starters', items: ['Massage', 'Blindfold'] }]);
+		await settled(editor);
+		caretIn(editor, 'Blindfold', 2);
+		setSelectedChecklist(editor, true);
+		await settled(editor);
+		expect(items(editor)).toEqual([
+			['Massage', null],
+			['Blindfold', false]
+		]);
+		setSelectedChecklist(editor, false);
+		await settled(editor);
+		expect(items(editor)).toEqual([
+			['Massage', null],
+			['Blindfold', null]
+		]);
+	});
+
+	it('ticks from its box, and not in a scene that cannot be edited', async () => {
+		const editor = sceneEditor();
+		insertMenuFrom(editor, [{ name: 'Starters', items: ['Massage'] }]);
+		await settled(editor);
+		caretIn(editor, 'Massage', 0);
+		setSelectedChecklist(editor, true);
+		await settled(editor);
+
+		boxOf(editor, 'Massage').click();
+		await settled(editor);
+		expect(items(editor)).toEqual([['Massage', true]]);
+		boxOf(editor, 'Massage').click();
+		await settled(editor);
+		expect(items(editor)).toEqual([['Massage', false]]);
+
+		editor.setEditable(false);
+		boxOf(editor, 'Massage').click();
+		await settled(editor);
+		expect(items(editor)).toEqual([['Massage', false]]);
+	});
+
+	it('is a plain item again after Backspace at its start, still in the menu', async () => {
+		const editor = sceneEditor();
+		insertMenuFrom(editor, [{ name: 'Starters', items: ['Massage', 'Blindfold'] }]);
+		await settled(editor);
+		caretIn(editor, 'Blindfold', 0);
+		setSelectedChecklist(editor, true);
+		caretIn(editor, 'Blindfold', 0);
+		editor.dispatchCommand(KEY_BACKSPACE_COMMAND, new KeyboardEvent('keydown'));
+		await settled(editor);
+		expect(items(editor)).toEqual([
+			['Massage', null],
+			['Blindfold', null]
+		]);
+	});
+
+	it('comes from a to-do list made a menu, and goes back to one as text, ticks and all', async () => {
+		const editor = sceneEditor();
+		const value = JSON.stringify({
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'list',
+						listType: 'check',
+						start: 1,
+						children: [
+							{ type: 'listitem', value: 1, checked: true, children: [serialisedText('Massage')] },
+							{
+								type: 'listitem',
+								value: 2,
+								checked: false,
+								children: [serialisedText('Blindfold')]
+							}
+						]
+					}
+				]
+			}
+		});
+		editor.setEditorState(editor.parseEditorState(value));
+		editor.update(
+			() => {
+				getRoot().select(0, getRoot().getChildrenSize());
+			},
+			{ discrete: true }
+		);
+		selectionToMenu(editor);
+		await settled(editor);
+		expect(items(editor)).toEqual([
+			['Massage', true],
+			['Blindfold', false]
+		]);
+
+		const menuKey = editor.getEditorState().read(() => getRoot().getFirstChild()?.getKey() ?? '');
+		blockToText(editor, menuKey);
+		await settled(editor);
+		const [list] = stored(editor).root.children;
+		expect(list).toMatchObject({
+			type: 'list',
+			listType: 'check',
+			children: [{ checked: true }, { checked: false }]
+		});
 	});
 });
 

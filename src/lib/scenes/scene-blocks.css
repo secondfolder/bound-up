@@ -254,6 +254,56 @@
 	min-inline-size: 0;
 }
 
+/* A to-do item's box, before its words (`drawLineCheck`), in the menu's own
+   ink so it suits every design: an outline, and a tick when done. A real
+   button in the editor, a span in a stored version. */
+.menu-line-check {
+	all: unset;
+	position: relative;
+	flex: none;
+	box-sizing: border-box;
+	inline-size: 0.95em;
+	block-size: 0.95em;
+	align-self: center;
+	border: 1.5px solid currentColor;
+	border-radius: 3px;
+	color: var(--menu-ink, currentColor);
+
+	&[hidden] {
+		display: none;
+	}
+
+	&:where(button) {
+		cursor: pointer;
+	}
+
+	/* Keyed on the line, which both the editor and a stored version mark. */
+	.scene-menu-line.checked > &::after {
+		content: '';
+		position: absolute;
+		inset-block-start: 0.08em;
+		inset-inline-start: 0.26em;
+		inline-size: 0.22em;
+		block-size: 0.45em;
+		border: solid currentColor;
+		border-width: 0 0.12em 0.12em 0;
+		transform: rotate(45deg);
+	}
+}
+
+/* Under the line's class, so it reads as more specific than the frame's
+   buttons' focus rule above, which it has nothing to do with. */
+.scene-menu-line > .menu-line-check:focus-visible {
+	outline: var(--wa-focus-ring);
+	outline-offset: var(--wa-focus-ring-offset);
+}
+
+/* A done item, as a done to-do anywhere: struck through, and quieter. */
+.scene-menu-line.checked > .menu-line-words {
+	text-decoration: line-through;
+	opacity: 0.6;
+}
+
 .scene-menu-line.heading {
 	font-weight: var(--wa-font-weight-semibold);
 }

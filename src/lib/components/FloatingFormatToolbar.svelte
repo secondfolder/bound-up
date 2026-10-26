@@ -17,6 +17,7 @@
 	import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
 	import { $isLinkNode as isLinkNode, $toggleLink as toggleLink } from '@lexical/link';
 	import {
+		INSERT_CHECK_LIST_COMMAND,
 		INSERT_ORDERED_LIST_COMMAND,
 		INSERT_UNORDERED_LIST_COMMAND,
 		$isListNode as isListNode,
@@ -38,6 +39,11 @@
 		$selectionBlockKind as selectionBlockKind,
 		$setBlockKind as setBlockKind
 	} from '$lib/lexical/block-kind';
+	import { sceneViewerOf } from '$lib/lexical/nodes/scene/viewer';
+	import {
+		$selectedMenuChecklist as selectedMenuChecklist,
+		setSelectedChecklist
+	} from '$lib/lexical/plugins/scene-blocks';
 	import type { RichTextFeature } from '$lib/richtext-editor';
 
 	/**
@@ -194,6 +200,25 @@
 					active.number ? REMOVE_LIST_COMMAND : INSERT_ORDERED_LIST_COMMAND,
 					undefined
 				)
+		},
+		{
+			// Handled by `registerCheckList`, which the `list` feature registers.
+			// In a scene's menu it makes the selected items to-dos instead, since
+			// a list command would wrap the menu's lines in a list.
+			feature: 'list',
+			label: 'To-do list',
+			icon: 'list-check',
+			active: () => active.check,
+			run: () => {
+				if (active.inMenu) {
+					setSelectedChecklist(editor, !active.check);
+					return;
+				}
+				editor.dispatchCommand(
+					active.check ? REMOVE_LIST_COMMAND : INSERT_CHECK_LIST_COMMAND,
+					undefined
+				);
+			}
 		}
 	];
 
@@ -260,6 +285,7 @@
 			const anchor = selection.anchor.getNode();
 			const list = findMatchingParent(anchor, isListNode);
 			const kind = selectionBlockKind();
+			const menu = selectedMenuChecklist(sceneViewerOf(editor));
 			active = {
 				heading: kind === 'heading',
 				subheading: kind === 'subheading',
@@ -270,7 +296,9 @@
 				code: selection.hasFormat('code'),
 				link: findMatchingParent(anchor, isLinkNode) !== null,
 				bullet: isListNode(list) && list.getListType() === 'bullet',
-				number: isListNode(list) && list.getListType() === 'number'
+				number: isListNode(list) && list.getListType() === 'number',
+				check: menu.items > 0 ? menu.allTodo : isListNode(list) && list.getListType() === 'check',
+				inMenu: menu.items > 0
 			};
 			offeredActions = actions.filter((action) => action.offered?.() ?? true);
 			hasRange = true;

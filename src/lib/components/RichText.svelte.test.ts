@@ -553,3 +553,143 @@ describe('RichText, revealing an embed the sender left out', () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
+
+describe('RichText, to-do lists', () => {
+	function checklist(...items: [string, boolean][]): string {
+		return stored([
+			{ type: 'paragraph', children: [text('Before we start:')] },
+			{
+				type: 'list',
+				listType: 'check',
+				start: 1,
+				children: items.map(([words, checked], index) => ({
+					type: 'listitem' as const,
+					value: index + 1,
+					checked,
+					children: [text(words)]
+				}))
+			}
+		]);
+	}
+
+	function boxes(container: HTMLElement): HTMLElement[] {
+		return [...container.querySelectorAll<HTMLElement>('wa-checkbox')];
+	}
+
+	/** The checkbox inside a `wa-checkbox`, which is what a person clicks. */
+	function control(box: HTMLElement): HTMLInputElement {
+		return defined(box.shadowRoot?.querySelector('input'), 'the checkbox input');
+	}
+
+	function ticks(value: string): (boolean | undefined)[] {
+		const [, list] = (JSON.parse(value) as RichTextDocument).root.children;
+		return list?.type === 'list' ? list.children.map((item) => item.checked) : [];
+	}
+
+	it('draws each item as a checkbox labelled by its words, ticked as stored', async () => {
+		const { container } = render(RichText, {
+			props: { text: checklist(['milk', false], ['eggs', true]) }
+		});
+		await waSettled(container);
+		const [milk, eggs] = boxes(container);
+		expect(milk?.textContent).toBe('milk');
+		expect(waProp(milk, 'checked')).toBe(false);
+		expect(waProp(eggs, 'checked')).toBe(true);
+	});
+
+	it('cannot be ticked by a reader who may not edit the document', async () => {
+		const { container } = render(RichText, { props: { text: checklist(['milk', false]) } });
+		await waSettled(container);
+		const [milk] = boxes(container);
+		expect(waProp(milk, 'disabled')).toBe(true);
+	});
+
+	it('saves the document with the item ticked, and shows it ticked straight away', async () => {
+		let release: (saved: boolean) => void = () => undefined;
+		const onChecklistToggle = vi.fn(
+			() =>
+				new Promise<boolean>((resolve) => {
+					release = resolve;
+				})
+		);
+		const { container } = render(RichText, {
+			props: { text: checklist(['milk', false], ['eggs', false]), onChecklistToggle }
+		});
+		await waSettled(container);
+		const eggs = defined(boxes(container)[1], 'the second box');
+		expect(waProp(eggs, 'disabled')).toBe(false);
+
+		control(eggs).click();
+		await waSettled(container);
+
+		expect(onChecklistToggle).toHaveBeenCalledOnce();
+		const [saved] = onChecklistToggle.mock.calls[0] as unknown as [string];
+		expect(ticks(saved)).toEqual([false, true]);
+		// Everything but the tick is as it was.
+		const [paragraph] = (JSON.parse(saved) as RichTextDocument).root.children;
+		const [unchanged] = (JSON.parse(checklist()) as RichTextDocument).root.children;
+		expect(paragraph).toEqual(unchanged);
+		expect(waProp(eggs, 'checked')).toBe(true);
+		expect(container.querySelectorAll('li.checked')).toHaveLength(1);
+		release(true);
+	});
+
+	it('puts the tick back when the save fails', async () => {
+		const onChecklistToggle = vi.fn(() => Promise.resolve(false));
+		const { container } = render(RichText, {
+			props: { text: checklist(['milk', true]), onChecklistToggle }
+		});
+		await waSettled(container);
+		const milk = defined(boxes(container)[0], 'the box');
+
+		control(milk).click();
+		await vi.waitFor(() => expect(onChecklistToggle).toHaveBeenCalledOnce());
+		const [saved] = onChecklistToggle.mock.calls[0] as unknown as [string];
+		expect(ticks(saved)).toEqual([false]);
+		await vi.waitFor(() => expect(waProp(milk, 'checked')).toBe(true));
+	});
+
+	it('shows a new stored value when one arrives', async () => {
+		const { container, rerender } = render(RichText, {
+			props: { text: checklist(['milk', false]), onChecklistToggle: () => Promise.resolve(true) }
+		});
+		await waSettled(container);
+		await rerender({ text: checklist(['milk', true]) });
+		await waSettled(container);
+		expect(waProp(boxes(container)[0], 'checked')).toBe(true);
+	});
+});
+
+describe('RichText, a menu’s to-do items', () => {
+	it('draws a to-do item’s box in a stored version, saying whether it was done', () => {
+		const line = (words: string, checked: boolean | null) => ({
+			type: 'scene-menu-line',
+			role: 'item',
+			checked,
+			children: [text(words)]
+		});
+		const { container } = render(RichText, {
+			props: {
+				text: JSON.stringify({
+					root: {
+						type: 'root',
+						children: [
+							{
+								type: 'scene-menu',
+								children: [
+									{
+										type: 'scene-menu-course',
+										children: [line('Massage', true), line('Ice', false), line('Wine', null)]
+									}
+								]
+							}
+						]
+					}
+				})
+			}
+		});
+		const boxes = [...container.querySelectorAll('.menu-line-check')];
+		expect(boxes.map((box) => box.getAttribute('aria-label'))).toEqual(['Done', 'Not done']);
+		expect(container.querySelectorAll('.scene-menu-line.checked')).toHaveLength(1);
+	});
+});

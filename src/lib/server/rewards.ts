@@ -416,6 +416,44 @@ export async function updateSelfReward(
 	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
 }
 
+/**
+ * Replaces a self reward's sealed content and nothing else: what ticking a
+ * to-do item in its description saves (docs/rich-text.md, "To-do lists"), so
+ * that the tick cannot carry a stale cost or active flag back with it.
+ * Compare-and-swap on `revision`, as `updateSelfReward`.
+ */
+export async function updateSelfRewardContent(
+	db: Db,
+	userId: string,
+	rewardId: string,
+	input: { content: RewardInput['content']; expectedRevision: number }
+): Promise<RewardResult<'not-found' | 'conflict' | ContentRefusal>> {
+	const problem = rewardContentProblem(input.content, await selfVaultIdFor(db, userId));
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const rows = await db
+		.update(selfRewards)
+		.set(sealedRewardColumns(input.content, input.expectedRevision + 1))
+		.where(
+			and(
+				eq(selfRewards.id, rewardId),
+				eq(selfRewards.ownerId, userId),
+				eq(selfRewards.revision, input.expectedRevision)
+			)
+		)
+		.returning({ id: selfRewards.id });
+	if (rows.length > 0) {
+		return { ok: true };
+	}
+	const [exists] = await db
+		.select({ id: selfRewards.id })
+		.from(selfRewards)
+		.where(and(eq(selfRewards.id, rewardId), eq(selfRewards.ownerId, userId)))
+		.limit(1);
+	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
+}
+
 export async function setSelfRewardCredits(db: Db, userId: string, credits: number): Promise<void> {
 	await db
 		.insert(selfRewardCredits)
@@ -635,6 +673,55 @@ export async function updatePartnershipReward(
 			cost: input.cost,
 			active: input.active
 		})
+		.where(
+			and(
+				eq(partnershipRewards.id, rewardId),
+				eq(partnershipRewards.partnershipId, partnershipId),
+				eq(partnershipRewards.revision, input.expectedRevision)
+			)
+		)
+		.returning({ id: partnershipRewards.id });
+	if (rows.length > 0) {
+		return { ok: true };
+	}
+	const [exists] = await db
+		.select({ id: partnershipRewards.id })
+		.from(partnershipRewards)
+		.where(
+			and(eq(partnershipRewards.id, rewardId), eq(partnershipRewards.partnershipId, partnershipId))
+		)
+		.limit(1);
+	return { ok: false, reason: exists ? 'conflict' : 'not-found' };
+}
+
+/**
+ * Replaces a partnership reward's sealed content and nothing else, as
+ * `updateSelfRewardContent`, under the same permission as editing it.
+ */
+export async function updatePartnershipRewardContent(
+	db: Db,
+	partnershipId: string,
+	userId: string,
+	rewardId: string,
+	input: { content: RewardInput['content']; expectedRevision: number }
+): Promise<RewardResult<'not-a-member' | 'forbidden' | 'not-found' | 'conflict' | ContentRefusal>> {
+	const membership = await requireRewardMembership(db, partnershipId, userId);
+	if (!membership) {
+		return { ok: false, reason: 'not-a-member' };
+	}
+	if (!membership.canManage) {
+		return { ok: false, reason: 'forbidden' };
+	}
+	const problem = rewardContentProblem(
+		input.content,
+		await partnershipVaultIdFor(db, partnershipId)
+	);
+	if (problem) {
+		return { ok: false, reason: problem };
+	}
+	const rows = await db
+		.update(partnershipRewards)
+		.set(sealedRewardColumns(input.content, input.expectedRevision + 1))
 		.where(
 			and(
 				eq(partnershipRewards.id, rewardId),

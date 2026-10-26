@@ -14,6 +14,7 @@ import {
 	parseStoredRichText,
 	type RichTextDocument,
 	richTextDocumentSchema,
+	withChecklistItem,
 	withInlineEmbeds
 } from './richtext';
 import { RICH_TEXT_NODES } from './richtext-editor';
@@ -446,6 +447,15 @@ describe('the stored shape', () => {
 			listType: 'number',
 			start: 2,
 			children: [{ type: 'listitem', value: 2, children: [text('a number')] }]
+		},
+		{
+			type: 'list',
+			listType: 'check',
+			start: 1,
+			children: [
+				{ type: 'listitem', value: 1, checked: false, children: [text('to do')] },
+				{ type: 'listitem', value: 2, checked: true, children: [text('done')] }
+			]
 		}
 	]);
 
@@ -507,7 +517,7 @@ describe('the stored shape', () => {
 
 	it('reads back as the prose it holds', () => {
 		expect(documentToPlainText(Golden)).toBe(
-			'plain bolditalicstruckcodeboth\nhttps://i.imgur.com/cat.jpglabelled\na bullet\na number'
+			'plain bolditalicstruckcodeboth\nhttps://i.imgur.com/cat.jpglabelled\na bullet\na number\nto do\ndone'
 		);
 		expect(documentEmbedUrls(Golden)).toEqual(['https://i.imgur.com/cat.jpg']);
 	});
@@ -550,5 +560,79 @@ describe('headings', () => {
 		);
 		const [heading] = parsed?.root.children ?? [];
 		expect(heading).toMatchObject({ type: 'heading', tag: 'h3' });
+	});
+});
+
+describe('to-do lists', () => {
+	const checklist = (...checked: (boolean | undefined)[]) =>
+		doc([
+			{ type: 'paragraph', children: [text('before')] },
+			{
+				type: 'list',
+				listType: 'check',
+				start: 1,
+				children: checked.map((each, index) => ({
+					type: 'listitem' as const,
+					value: index + 1,
+					checked: each,
+					children: [text(`item ${index + 1}`)]
+				}))
+			}
+		]);
+
+	/** Whether each item of the to-do list after the paragraph is ticked. */
+	function ticksOf(document: RichTextDocument | null): (boolean | undefined)[] | null {
+		const [, list] = document?.root.children ?? [];
+		return list?.type === 'list' ? list.children.map((item) => item.checked) : null;
+	}
+
+	it('stores whether each item is ticked', () => {
+		const parsed = parseRichTextDocument(JSON.stringify(checklist(false, true)));
+		const [, list] = parsed?.root.children ?? [];
+		expect(list).toMatchObject({
+			type: 'list',
+			listType: 'check',
+			children: [{ checked: false }, { checked: true }]
+		});
+	});
+
+	it('reads anything but a boolean as no tick at all, rather than refusing the document', () => {
+		const stored = JSON.stringify(checklist(false)).replace('"checked":false', '"checked":"yes"');
+		expect(ticksOf(parseRichTextDocument(stored))).toEqual([undefined]);
+	});
+
+	it('reads back as the prose it holds, ticked or not', () => {
+		expect(documentToPlainText(checklist(true, false))).toBe('before\nitem 1\nitem 2');
+	});
+
+	it('ticks one item and leaves the rest of the document as it was', () => {
+		const before = checklist(false, false);
+		const after = defined(withChecklistItem(before, { block: 1, item: 1 }, true), 'the ticked doc');
+		expect(ticksOf(after)).toEqual([false, true]);
+		// Untouched blocks are the same objects, and the original is not changed.
+		const [paragraphAfter] = after.root.children;
+		const [paragraphBefore] = before.root.children;
+		expect(paragraphAfter).toBe(paragraphBefore);
+		expect(ticksOf(before)).toEqual([false, false]);
+	});
+
+	it('unticks one', () => {
+		expect(ticksOf(withChecklistItem(checklist(true), { block: 1, item: 0 }, false))).toEqual([
+			false
+		]);
+	});
+
+	it('refuses an address with no to-do item at it', () => {
+		const bullets = doc([
+			{
+				type: 'list',
+				listType: 'bullet',
+				start: 1,
+				children: [{ type: 'listitem', value: 1, children: [text('a bullet')] }]
+			}
+		]);
+		expect(withChecklistItem(bullets, { block: 0, item: 0 }, true)).toBeNull();
+		expect(withChecklistItem(checklist(false), { block: 0, item: 0 }, true)).toBeNull();
+		expect(withChecklistItem(checklist(false), { block: 1, item: 5 }, true)).toBeNull();
 	});
 });

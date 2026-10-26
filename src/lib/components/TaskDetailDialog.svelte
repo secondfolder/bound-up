@@ -3,8 +3,10 @@
 	import RichText from '$lib/components/RichText.svelte';
 	import WhoseTime from '$lib/components/WhoseTime.svelte';
 	import { creditsLabel } from '$lib/credits';
+	import { type ContentSaveTarget, descriptionSaver } from '$lib/description-ticks';
 	import { informalWhen, sentenceCase } from '$lib/informal-time';
 	import type { ItemAction } from '$lib/item-action.svelte';
+	import { type TaskContent, taskKind } from '$lib/sealed-kinds/tasks';
 	import { openedTask, shownTitle } from '$lib/sealed-views.svelte';
 	import { opensLater, quotaPeriod, type TaskEntry, type TaskListMode } from '$lib/task-list';
 	import { describeTaskSchedule } from '$lib/task-schedule';
@@ -33,7 +35,55 @@
 	let dialog: ResponsiveDialog | undefined = $state();
 
 	const task = $derived(entry.task);
-	const content = $derived(openedTask(task));
+	/**
+	 * The task's content as last opened, held through a reload of the same
+	 * task: a tick saved from here re-runs the load, and the new ciphertext
+	 * reads as "still opening" for a moment, which would otherwise take the
+	 * description away from under the box just ticked.
+	 */
+	let held: { id: string; content: TaskContent | null } | null = null;
+	const content = $derived.by(() => {
+		const opened = openedTask(task);
+		if (opened !== undefined) {
+			held = { id: task.id, content: opened };
+		}
+		return held?.id === task.id ? held.content : undefined;
+	});
+
+	/** Why the last tick was not saved, when the server said. */
+	let refusal = $state<string | null>(null);
+
+	/**
+	 * Built on the first tick and kept: its queue has to outlive the reloads
+	 * its own saves cause (`descriptionSaver`).
+	 */
+	let saveDescription: ((description: string) => Promise<boolean>) | null = null;
+
+	function saveTick(target: ContentSaveTarget, description: string): Promise<boolean> {
+		refusal = null;
+		saveDescription ??= descriptionSaver({
+			kind: taskKind,
+			target,
+			recordId: task.id,
+			current: () => {
+				if (!content) {
+					throw new Error('The task is not open on this device.');
+				}
+				return { revision: task.revision, content };
+			},
+			fields: (saving) => ({ completionMessageCount: String(saving.completionMessages.length) }),
+			onRefused: (message) => {
+				refusal = message;
+			}
+		});
+		return saveDescription(description);
+	}
+
+	/** Ticks save only where the viewer may edit the task; elsewhere the boxes are disabled. */
+	const onChecklistToggle = $derived.by(() => {
+		const target = entry.contentSave;
+		return target ? (stored: string) => saveTick(target, stored) : undefined;
+	});
 	const title = $derived(shownTitle(content));
 	const canTick = $derived(mode === 'to-do' && entry.completeAction !== null && task.canComplete);
 	/** Whether there is anything for the footer: it is left out rather than drawn empty. */
@@ -70,7 +120,8 @@
 
 <ResponsiveDialog bind:this={dialog} label={title} {onclose} footer={hasActions ? actions : undefined}>
 	<div class="detail">
-		{#if content?.description}<RichText text={content.description} />{/if}
+		{#if content?.description}<RichText text={content.description} {onChecklistToggle} />{/if}
+		{#if refusal}<p class="refusal" role="alert">{refusal}</p>{/if}
 
 		<dl class="facts">
 			{#if entry.partnerName}
@@ -163,6 +214,11 @@
 
 	dd {
 		margin: 0;
+	}
+
+	.refusal {
+		margin: 0;
+		color: var(--wa-color-text-danger);
 	}
 
 	.quota {

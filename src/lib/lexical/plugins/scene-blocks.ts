@@ -14,6 +14,7 @@ import {
 	$addUpdateTag as addUpdateTag,
 	COMMAND_PRIORITY_CRITICAL,
 	COMMAND_PRIORITY_LOW,
+	COMMAND_PRIORITY_NORMAL,
 	CONTROLLED_TEXT_INSERTION_COMMAND,
 	CUT_COMMAND,
 	$createParagraphNode as createParagraphNode,
@@ -38,7 +39,8 @@ import {
 	mergeRegister,
 	PASTE_COMMAND,
 	REMOVE_TEXT_COMMAND,
-	SKIP_DOM_SELECTION_TAG
+	SKIP_DOM_SELECTION_TAG,
+	TextNode
 } from 'lexical';
 import { hasChip, toggleChip } from '$lib/daydream/chips';
 import { HEADING_TAGS } from '$lib/lexical/block-kind';
@@ -273,6 +275,42 @@ export function setSelectedSurprise(editor: LexicalEditor, hiddenFrom: string | 
 	});
 }
 
+/**
+ * Whether every menu item the selection touches is a to-do, and whether it
+ * touches any: what the toolbar's To-do list button shows and does in a
+ * menu. Called inside a read.
+ */
+export function $selectedMenuChecklist(viewerId: string | null): {
+	items: number;
+	allTodo: boolean;
+} {
+	const items = $selectedMenuItems(viewerId);
+	return { items: items.length, allTodo: items.every((item) => item.getChecked() !== null) };
+}
+
+/**
+ * Makes the selected menu items to-dos, unticked, or plain items again:
+ * the toolbar's To-do list button, in a menu, where Lexical's own list
+ * command would wrap the menu's lines in a list. See docs/scenes.md,
+ * "To-do items".
+ */
+export function setSelectedChecklist(editor: LexicalEditor, todo: boolean): void {
+	editor.update(() => {
+		for (const item of $selectedMenuItems(sceneViewerOf(editor))) {
+			if ((item.getChecked() !== null) !== todo) {
+				item.setChecked(todo ? false : null);
+			}
+		}
+	});
+}
+
+/**
+ * `[] `, `[ ] ` and `[x] ` typed at the start of a menu item, as in a
+ * paragraph: Lexical's own shortcut makes a to-do list there, and one never
+ * runs inside a menu's line.
+ */
+const CHECK_SHORTCUT = /^\[(?<tick>[ xX]?)\] /;
+
 /* ── keeping blocks well formed ──────────────────────────────────────────── */
 
 /** A line of text as a menu item, keeping its words, formatting and links. */
@@ -356,6 +394,14 @@ function registerTransforms(editor: LexicalEditor): () => void {
 				parent.insertAfter(next);
 				const rest = [line, ...line.getNextSiblings()];
 				next.append(...rest);
+			}
+		}),
+		// A line's own transform does not run for typing in it: Lexical runs an
+		// element's only when the element itself changed.
+		editor.registerNodeTransform(TextNode, (text) => {
+			const line = text.getParent();
+			if (isMenuLineNode(line) && text.is(line.getFirstChild())) {
+				$checkShortcut(line);
 			}
 		}),
 		editor.registerNodeTransform(SceneSectionNode, (section) => {
@@ -442,6 +488,68 @@ function registerEnter(editor: LexicalEditor): () => void {
 			return true;
 		},
 		COMMAND_PRIORITY_LOW
+	);
+}
+
+/**
+ * Turns `[ ] ` just typed at the start of a menu item into a to-do: only
+ * when the caret is right after it, so it is the typing that does it, as
+ * with Lexical's own shortcuts, and not a pasted line that starts that way.
+ */
+function $checkShortcut(line: MenuLineNode): void {
+	if (line.getRole() !== 'item' || line.getChecked() !== null) {
+		return;
+	}
+	const first = line.getFirstChild();
+	const selection = getSelection();
+	if (!(isTextNode(first) && isRangeSelection(selection) && selection.isCollapsed())) {
+		return;
+	}
+	const match: RegExpExecArray | null = CHECK_SHORTCUT.exec(first.getTextContent());
+	if (
+		!(match && selection.anchor.getNode().is(first) && selection.anchor.offset === match[0].length)
+	) {
+		return;
+	}
+	const rest = first.getTextContent().slice(match[0].length);
+	line.setChecked(match.groups?.tick?.toLowerCase() === 'x');
+	if (rest === '') {
+		first.remove();
+		line.selectStart();
+	} else {
+		first.setTextContent(rest);
+		first.select(0, 0);
+	}
+}
+
+/**
+ * Backspace at the very start of a to-do item makes it a plain item, as
+ * Backspace at the start of a to-do list's item makes it a paragraph. Above
+ * the handler below, which would otherwise take the line out of the menu.
+ */
+function registerCheckBackspace(editor: LexicalEditor): () => void {
+	return editor.registerCommand(
+		KEY_BACKSPACE_COMMAND,
+		(event) => {
+			const selection = getSelection();
+			if (!(isRangeSelection(selection) && selection.isCollapsed())) {
+				return false;
+			}
+			const anchor = selection.anchor.getNode();
+			const line = anchor.getTopLevelElement();
+			if (!(isMenuLineNode(line) && line.getChecked() !== null)) {
+				return false;
+			}
+			const atStart =
+				selection.anchor.offset === 0 && (anchor.is(line) || anchor.is(line.getFirstDescendant()));
+			if (!atStart) {
+				return false;
+			}
+			event?.preventDefault();
+			line.setChecked(null);
+			return true;
+		},
+		COMMAND_PRIORITY_NORMAL
 	);
 }
 
@@ -1355,6 +1463,7 @@ export function registerSceneBlocks(editor: LexicalEditor): () => void {
 		registerFrameText(editor),
 		registerEnter(editor),
 		registerBackspace(editor),
+		registerCheckBackspace(editor),
 		registerSurpriseGuard(editor)
 	);
 }
@@ -1515,23 +1624,32 @@ export function addMenuItem(
  * for turning it into one: a heading starts a course, a subheading stays
  * within one, and everything else is an item.
  */
-function linesOf(block: LexicalNode): { role: MenuLineRole; children: LexicalNode[] }[] {
+function linesOf(
+	block: LexicalNode
+): { role: MenuLineRole; checked: boolean | null; children: LexicalNode[] }[] {
 	if (isListNode(block)) {
+		// A to-do list's items stay to-dos, ticked as they were.
+		const todo = block.getListType() === 'check';
 		return block
 			.getChildren()
 			.filter(isListItemNode)
 			.map((item) => ({
 				role: 'item',
+				checked: todo ? item.getChecked() === true : null,
 				children: item.getChildren().filter((child) => !isListNode(child))
 			}));
 	}
 	if (isHeadingNode(block)) {
 		return [
-			{ role: block.getTag() === 'h2' ? 'heading' : 'subheading', children: block.getChildren() }
+			{
+				role: block.getTag() === 'h2' ? 'heading' : 'subheading',
+				checked: null,
+				children: block.getChildren()
+			}
 		];
 	}
 	if (isElementNode(block)) {
-		return [{ role: 'item', children: block.getChildren() }];
+		return [{ role: 'item', checked: null, children: block.getChildren() }];
 	}
 	return [];
 }
@@ -1566,8 +1684,12 @@ export function selectionToMenu(editor: LexicalEditor): void {
 		// One course to start with; the transforms divide it at its headings.
 		const course = createMenuCourseNode();
 		for (const block of blocks) {
-			for (const { role, children } of linesOf(block)) {
-				course.append(createMenuLineNode(role).append(...children));
+			for (const { role, checked, children } of linesOf(block)) {
+				course.append(
+					createMenuLineNode(role)
+						.setChecked(checked)
+						.append(...children)
+				);
 			}
 		}
 		const menu = createMenuNode().append(course);
@@ -1582,7 +1704,8 @@ export function selectionToMenu(editor: LexicalEditor): void {
 /**
  * Turns a block back into ordinary text, where it was. A section's lines are
  * kept as they are; a menu's headings and subheadings become headings, and its items a
- * bulleted list under each, each with its details written out, so nothing
+ * bulleted list under each (a to-do list for its to-dos, ticked as they
+ * were), each with its details written out, so nothing
  * set on it is lost.
  */
 export function blockToText(editor: LexicalEditor, key: string): void {
@@ -1614,11 +1737,15 @@ export function blockToText(editor: LexicalEditor, key: string): void {
 					out.push(createHeadingNode(HEADING_TAGS[role]).append(...line.getChildren()));
 					continue;
 				}
-				if (!list) {
-					list = createListNode('bullet');
+				// A to-do item goes into a to-do list, ticked as it was, and the
+				// items either side of a change of kind into lists of their own.
+				const checked = line.getChecked();
+				const kind = checked === null ? 'bullet' : 'check';
+				if (list?.getListType() !== kind) {
+					list = createListNode(kind);
 					out.push(list);
 				}
-				const item = createListItemNode().append(...line.getChildren());
+				const item = createListItemNode(checked ?? undefined).append(...line.getChildren());
 				const written = itemExtrasText(line.getItemProps(), extras, design.value);
 				if (written) {
 					item.append(createTextNode(written));

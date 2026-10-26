@@ -2,6 +2,7 @@
  * What a task's row in the checklist says, worked out away from the markup
  * so it can be tested in node. See docs/tasks.md, "The checklist".
  */
+import type { ContentSaveTarget } from './description-ticks';
 import type { PartnershipTaskView, SelfTaskView, TaskRepeatUnit } from './types';
 
 export type TaskView = SelfTaskView | PartnershipTaskView;
@@ -25,6 +26,8 @@ export type TaskEntry = {
 	partnerImage?: string | null;
 	/** Its edit page, when the viewer may edit it. */
 	editHref?: string | null;
+	/** Where ticking a to-do item in its description saves, beside `editHref`. */
+	contentSave?: ContentSaveTarget | null;
 	/** The whole list it comes from, from a list that mixes several. */
 	listHref?: string | null;
 };

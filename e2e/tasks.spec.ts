@@ -135,6 +135,77 @@ test.describe('tasks', () => {
 	});
 
 	/**
+	 * A to-do list in a description is ticked from the task's sheet, without
+	 * opening its edit form, and the tick is saved: the one place a document
+	 * shown read-only can change (docs/rich-text.md, "To-do lists").
+	 */
+	test("a to-do list in a task's description is ticked from its sheet, and stays ticked", async ({
+		browser
+	}) => {
+		const ada = await newSide(browser, 'Ada');
+
+		try {
+			await newAccount(ada.page, ada.who);
+			await ada.page.goto('/home/tasks/add');
+			await waitForHydration(ada.page);
+			await ada.page.locator('wa-input[name="title"] input').fill('Pack');
+			const form = ada.page.locator('.task-form');
+			// Typed, because `[ ] ` is a typing shortcut: it is what makes the list.
+			await typeRichText(form, '[ ] towel');
+			await ada.page.keyboard.press('Enter');
+			await ada.page.keyboard.type('snacks', { delay: 15 });
+			const editorItems = form.locator('.richtext-editor .surface li');
+			await expect(editorItems).toHaveText(['towel', 'snacks']);
+			await expect(editorItems.first()).toHaveAttribute('aria-checked', 'false');
+			await clickWaButton(ada.page, 'Add task');
+			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
+
+			const openSheet = async () => {
+				await waitForHydration(ada.page);
+				await ada.page.getByRole('button', { name: /^Pack/ }).click();
+				const dialog = ada.page.locator('wa-dialog');
+				await expect(dialog.locator('wa-checkbox')).toHaveCount(2);
+				return dialog;
+			};
+			let dialog = await openSheet();
+			const snacks = dialog.locator('wa-checkbox').filter({ hasText: 'snacks' });
+			await expect(snacks).toHaveJSProperty('checked', false);
+			await expect(snacks).toHaveJSProperty('disabled', false);
+
+			const saved = ada.page.waitForResponse(
+				(response) =>
+					response.request().method() === 'POST' && response.url().includes('selfTaskContent')
+			);
+			await snacks.click();
+			expect((await saved).ok()).toBe(true);
+			await expect(snacks).toHaveJSProperty('checked', true);
+
+			// Saved, not just drawn: a fresh page reads it ticked from the server.
+			await ada.page.reload();
+			dialog = await openSheet();
+			await expect(dialog.locator('wa-checkbox').filter({ hasText: 'snacks' })).toHaveJSProperty(
+				'checked',
+				true
+			);
+			await expect(dialog.locator('wa-checkbox').filter({ hasText: 'towel' })).toHaveJSProperty(
+				'checked',
+				false
+			);
+
+			// And the edit form opens on the ticked document, at the revision the
+			// tick wrote, so saving it from there is not refused as a conflict.
+			// A `wa-button` with an `href` is a link.
+			await dialog.getByRole('link', { name: 'Edit' }).click();
+			const items = ada.page.locator('.task-form .richtext-editor .surface li');
+			await expect(items.filter({ hasText: 'snacks' })).toHaveAttribute('aria-checked', 'true');
+			await clickWaButton(ada.page, 'Save task');
+			await waitForSheetClosed(ada.page, /\/home\/tasks$/);
+		} finally {
+			await ada.close();
+		}
+	});
+
+	/**
 	 * A task's detail is a sheet on a phone and a dialog on a wider screen,
 	 * decided by CSS alone (`ResponsiveDialog`). Only a real page can show it
 	 * clear of the app shell and its nav, which a sheet pinned to the bottom of

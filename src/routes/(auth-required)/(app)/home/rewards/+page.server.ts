@@ -4,7 +4,13 @@ import {
 	rewardClaimSchema,
 	rewardCreditsSchema
 } from '$lib/schemas/rewardForm';
-import { claimPartnershipReward, claimSelfReward, setSelfRewardCredits } from '$lib/server/rewards';
+import {
+	claimPartnershipReward,
+	claimSelfReward,
+	setSelfRewardCredits,
+	updateSelfRewardContent
+} from '$lib/server/rewards';
+import { malformedSealed, readSealedRewardContent, sealedRefusal } from '$lib/server/sealed-submit';
 import type { Actions } from './$types';
 
 function stringField(formData: FormData, key: string): string | undefined {
@@ -127,5 +133,31 @@ export const actions: Actions = {
 		}
 
 		return { action: 'partnerClaimReward', message: 'Reward claimed.' };
+	},
+
+	/**
+	 * A self reward's description with a to-do item ticked or unticked: its
+	 * sealed content alone, from the reward's sheet (docs/rich-text.md, "To-do
+	 * lists").
+	 */
+	selfRewardContent: async ({ locals, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const submitted = await readSealedRewardContent(request);
+		if (!submitted) {
+			return malformedSealed('reward');
+		}
+		const result = await updateSelfRewardContent(locals.db, locals.user.id, submitted.recordId, {
+			content: submitted.content,
+			expectedRevision: submitted.expectedRevision
+		});
+		if (!result.ok) {
+			if (result.reason === 'not-found') {
+				error(404, 'Reward not found');
+			}
+			return sealedRefusal(result.reason, 'reward');
+		}
+		return { saved: true };
 	}
 };

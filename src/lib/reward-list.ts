@@ -2,6 +2,7 @@
  * How a list of rewards is arranged, worked out away from the markup so it
  * can be tested in node. See docs/rewards.md, "The wallet".
  */
+import type { ContentSaveTarget } from './description-ticks';
 import type { PartnershipRewardView, SelfRewardView } from './types';
 
 export type RewardView = SelfRewardView | PartnershipRewardView;
@@ -17,6 +18,8 @@ export type RewardEntry = {
 	partnershipId?: string | null;
 	/** Its edit page, when the viewer may edit it. */
 	editHref?: string | null;
+	/** Where ticking a to-do item in its description saves, beside `editHref`. */
+	contentSave?: ContentSaveTarget | null;
 	/** The whole list it comes from, from a page that shows several. */
 	listHref?: string | null;
 	/** Whose list that is, to name the link. */

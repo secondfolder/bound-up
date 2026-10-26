@@ -74,6 +74,8 @@ cannot be cut at a character offset without corrupting it.
 | `src/lib/lexical/nodes/`                          | Editor-only nodes, one per file: the link classes and their shared "Show embed" button.         |
 | `src/lib/components/RichText.svelte`              | Renders a stored document. Walks JSON; no `{@html}`.                                           |
 | `src/lib/components/RichTextInline.svelte`        | The inline half of the renderer: text, breaks, links, embeds, the `Show` button.               |
+| `src/lib/components/RichTextList.svelte`          | One list in the renderer: bulleted, numbered, or to-do as `wa-checkbox`es.                     |
+| `src/lib/description-ticks.ts`                    | Saving a tick in a task's or reward's description from its sheet. Browser only.                |
 | `src/lib/components/ComposerEmbed.svelte`         | One embed inside the editor: the real `UrlEmbed` plus its remove button.                       |
 | `src/lib/components/RichTextEditor.svelte`        | The editor, in both moods.                                                                     |
 | `src/lib/components/FloatingFormatToolbar.svelte` | The selection toolbar, for descriptions only.                                                  |
@@ -85,8 +87,8 @@ description.
 
 ## The closed node set
 
-`paragraph`, `heading`, `text`, `linebreak`, `link`, `autolink`, `list`,
-`listitem`, `embed`, and a scene's blocks: `scene-section`, `scene-menu`,
+`paragraph`, `heading`, `text`, `linebreak`, `link`, `autolink`, `list`
+(bulleted, numbered or to-do), `listitem`, `embed`, and a scene's blocks: `scene-section`, `scene-menu`,
 `scene-menu-course` and `scene-menu-line` ([scenes.md](scenes.md#blocks)). A
 node type that is not registered in `RICH_TEXT_NODES` cannot be
 created, and one that is not in `richTextDocumentSchema` cannot be stored —
@@ -189,6 +191,77 @@ subheading.
 
 Messages have no headings (`MESSAGE_FEATURES`); descriptions, the notebook and
 scenes do (`DOCUMENT_FEATURES`).
+
+## To-do lists
+
+Beside bulleted and numbered lists, a list can be a **to-do list**: each item
+has a box, ticked or not. It is Lexical's own check list — a `list` with
+`listType: 'check'`, each `listitem` carrying `checked` — so it needs no node
+of ours, and it comes with the `list` feature, wherever bullets do (not in
+messages).
+
+- **Typing** `[] ` or `[ ] ` at the start of a line makes an unticked item,
+  and `[x] ` a ticked one (Lexical's `CHECK_LIST` shortcut). Enter on an item
+  makes the next one; Enter on an empty one ends the list, as for bullets.
+  `- [ ] ` is a bullet starting with brackets, because `- ` has made the
+  bullet before the brackets are typed and a shortcut never runs inside a
+  list item.
+- **The selection's toolbar** has a To-do list button beside Bulleted list
+  and Numbered list (`INSERT_CHECK_LIST_COMMAND`, handled by
+  `registerCheckList`); pressed on a to-do list, it turns the lines back into
+  paragraphs. In a scene's menu it makes the selected items to-dos instead:
+  a menu's items can be to-dos too, without being a list
+  ([scenes.md](scenes.md#to-do-items)).
+- **In the editor**, `registerCheckList` does the ticking: a click on the box,
+  or Space once the left arrow at the item's start has put the focus on it.
+  Lexical draws an item as a plain `<li role="checkbox">` and leaves the box
+  to the theme, so the box is the item's `::before` (`rt-checked` and
+  `rt-unchecked` in `RichTextEditor.svelte`), drawn with Web Awesome's
+  checkbox tokens. It has to stay the `::before` at the item's start: that is
+  where the plugin measures a click from. So the list, not the box, is inset
+  by the focus ring's reach, which keeps a focused box's ring from being cut
+  off by whatever clips the editor; the reader insets by the same. The plugin ticks only while the
+  editor is editable, so a notebook entry the reader may not change keeps its
+  ticks as they are.
+- **In the reader**, `RichTextList.svelte` draws each item as a real
+  `wa-checkbox` labelled by its words. A ticked item is struck through and
+  quieter in both.
+
+**A to-do list is the one thing a document shown read-only can change.**
+Everywhere else `RichText.svelte` displays and nothing more; a box, though, is
+there to be ticked, and making someone open the edit form to tick one would
+defeat it. So `RichText` takes an `onChecklistToggle`, given only where the
+reader may edit the document. With it, ticking a box shows the tick at once,
+hands the caller the stored document with that one item changed
+(`withChecklistItem` in `richtext.ts`, which leaves everything else as it
+was), and puts the tick back if the save fails. Without it every box is
+disabled — dimmed, with the words left readable — because a box that ticked
+and then quietly unticked would be worse than one that says up front it
+cannot. Only a list at the root of the document can be ticked this way; one
+inside a scene's section is shown in a version's preview only, which is never
+editable.
+
+Where that applies today:
+
+- **A task's and a reward's sheet** (`TaskDetailDialog`, `RewardDetailDialog`)
+  pass it when the list entry carries a `contentSave` — set beside `editHref`,
+  so exactly when the viewer may edit the record. The description is sealed
+  content, so a tick is a new sealed record: `descriptionSaver` in
+  `description-ticks.ts` re-seals the content as opened with the new
+  description and posts it to the list page's content action
+  (`?/selfTaskContent`, `?/taskContent`, `?/selfRewardContent`,
+  `?/rewardContent`). Those take the sealed content **alone**, never the
+  settings: the edit form's action works a task's schedule out again from
+  what it is given, so a tick through it would make a task done today due
+  again. The server applies the same permission as an edit and the same
+  compare-and-swap on `revision`. Saves go one at a time, and a tick
+  overtaken by a later one is not sent, since each posts the whole
+  description at the revision before it. A refusal (a newer edit elsewhere)
+  is said in the sheet; anything unexpected goes to the app-wide notice.
+- **The notebook and a scene's page** are editors, so their boxes tick through
+  `registerCheckList` and save as any edit does.
+- **A message** has no lists, and **a notebook version's preview** is history,
+  so neither can be ticked.
 
 ## Decorator blocks: objects in the text, not characters
 

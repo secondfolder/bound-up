@@ -7,6 +7,8 @@ import {
 	createTestPartnershipTask,
 	createTestSelfTask,
 	createTestUser,
+	ensureTestSelfVault,
+	fakeSealed,
 	readPartnershipRewardCreditRow,
 	readSelfRewardCreditRow,
 	readSelfTaskRow,
@@ -153,5 +155,76 @@ describe('actions', () => {
 			run('selfCompleteTask', at(null, { taskId: crypto.randomUUID() }))
 		);
 		expect(result).toMatchObject({ type: 'error', status: 401 });
+	});
+});
+
+describe('selfTaskContent', () => {
+	/** The content a tick posts: the server stores it as it arrives. */
+	const Ticked = fakeSealed('ticked');
+
+	/** A tick as the task's sheet posts it: the content re-sealed, and nothing else. */
+	async function contentPost(taskId: string, overrides: Record<string, string> = {}) {
+		return {
+			recordId: taskId,
+			vaultId: await ensureTestSelfVault(db, ada.id),
+			ciphertext: Ticked,
+			payloadVersion: '1',
+			completionMessageCount: '0',
+			expectedRevision: '0',
+			...overrides
+		};
+	}
+
+	it('saves the content alone, leaving a task already done as it was', async () => {
+		const task = await createTestSelfTask(db, ada, {
+			schedule: { mode: 'after-completion', every: 1, unit: 'day' }
+		});
+		await run('selfCompleteTask', at(ada, { taskId: task.id }));
+		const before = await readSelfTaskRow(db, task.id);
+
+		const result = await run('selfTaskContent', at(ada, await contentPost(task.id)));
+		expect(result).toEqual({ saved: true });
+		const after = await readSelfTaskRow(db, task.id);
+		expect(after).toMatchObject({
+			ciphertext: Ticked,
+			revision: 1,
+			active: before?.active,
+			nextEligibleAt: before?.nextEligibleAt,
+			lastCompletedAt: before?.lastCompletedAt,
+			creditsAwarded: before?.creditsAwarded
+		});
+		expect(after?.nextEligibleAt).not.toBeNull();
+	});
+
+	it('refuses a tick made on an out-of-date copy', async () => {
+		const task = await createTestSelfTask(db, ada);
+		await run('selfTaskContent', at(ada, await contentPost(task.id)));
+
+		const result = await run('selfTaskContent', at(ada, await contentPost(task.id)));
+		expect(result).toMatchObject({ status: 409 });
+	});
+
+	it("does not find someone else's task", async () => {
+		const task = await createTestSelfTask(db, ada);
+		const post = await contentPost(task.id, {
+			vaultId: await ensureTestSelfVault(db, jun.id)
+		});
+		const result = await runAndCatch(() => run('selfTaskContent', at(jun, post)));
+		expect(result).toMatchObject({ type: 'error', status: 404 });
+		await expect(readSelfTaskRow(db, task.id)).resolves.toMatchObject({ revision: 0 });
+	});
+
+	it('refuses content sealed into the wrong vault', async () => {
+		const task = await createTestSelfTask(db, ada);
+		const post = await contentPost(task.id, { vaultId: await ensureTestSelfVault(db, jun.id) });
+		const result = await run('selfTaskContent', at(ada, post));
+		expect(result).toMatchObject({ status: 409 });
+	});
+
+	it('refuses a malformed post', async () => {
+		const task = await createTestSelfTask(db, ada);
+		const post = await contentPost(task.id, { expectedRevision: '' });
+		const result = await run('selfTaskContent', at(ada, post));
+		expect(result).toMatchObject({ status: 400 });
 	});
 });

@@ -7,9 +7,10 @@ import {
 	LinkNode,
 	registerAutoLink
 } from '@lexical/link';
-import { ListItemNode, ListNode, registerList } from '@lexical/list';
+import { ListItemNode, ListNode, registerCheckList, registerList } from '@lexical/list';
 import {
 	BOLD_STAR,
+	CHECK_LIST,
 	type ElementTransformer,
 	INLINE_CODE,
 	ITALIC_UNDERSCORE,
@@ -70,6 +71,7 @@ export type RichTextFeature =
 	| 'strikethrough'
 	| 'code'
 	| 'link'
+	/** Bulleted, numbered and to-do lists: `- `, `1. ` and `[ ] ` as you type. */
 	| 'list'
 	/** Headings and subheadings: the toolbar's control, and `# ` and `## ` as you type. */
 	| 'heading'
@@ -175,7 +177,11 @@ const TRANSFORMERS_BY_FEATURE: Record<RichTextFeature, Transformer[]> = {
 	strikethrough: [STRIKETHROUGH, STRIKETHROUGH_SINGLE],
 	code: [INLINE_CODE],
 	link: [],
-	list: [UNORDERED_LIST, ORDERED_LIST],
+	// Lexical's own `CHECK_LIST` makes `[] `, `[ ] ` and `[x] ` a to-do item,
+	// unticked or ticked. `- [ ] ` is a bullet by the time the brackets are
+	// typed, since `- ` has already made one; a shortcut never runs inside a
+	// list item, so that one stays a bullet.
+	list: [CHECK_LIST, UNORDERED_LIST, ORDERED_LIST],
 	heading: [HEADING_SHORTCUT],
 	scene: []
 };
@@ -531,6 +537,17 @@ const EDITOR_THEME = {
 	 */
 	blockCursor: 'rt-block-cursor',
 	heading: { h2: 'rt-heading', h3: 'rt-subheading' },
+	/**
+	 * A to-do list and its items, ticked or not. Lexical draws an item as a
+	 * plain `<li>` and leaves its box to the theme, which draws it as the item's
+	 * `::before` — that is also where `registerCheckList` takes a click to
+	 * mean a tick. Styled in `RichTextEditor.svelte`.
+	 */
+	list: {
+		checklist: 'rt-checklist',
+		listitemChecked: 'rt-checked',
+		listitemUnchecked: 'rt-unchecked'
+	},
 	text: {
 		bold: 'rt-bold',
 		italic: 'rt-italic',
@@ -618,7 +635,9 @@ export function createRichTextEditor(options: {
 	}
 
 	if (options.features.includes('list')) {
-		teardown.push(registerList(editor));
+		// The check list plugin ticks only while the editor is editable, which
+		// is what keeps a read-only notebook entry's boxes as they are.
+		teardown.push(registerList(editor), registerCheckList(editor));
 	}
 
 	if (options.features.includes('scene')) {

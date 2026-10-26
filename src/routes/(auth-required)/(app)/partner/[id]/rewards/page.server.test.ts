@@ -7,8 +7,11 @@ import {
 	createTestPartnership,
 	createTestPartnershipReward,
 	createTestUser,
+	ensureTestPartnershipVault,
+	fakeSealed,
 	readPartnershipRewardClaimRows,
 	readPartnershipRewardCreditRow,
+	readPartnershipRewardRow,
 	readPartnershipRewardRows,
 	type TestUser
 } from '$lib/testing/fixtures';
@@ -110,5 +113,51 @@ describe('actions', () => {
 		const result = await run('claimReward', at(id, ada, { rewardId: reward.id }));
 		expect(result.status).toBe(403);
 		await expect(readPartnershipRewardClaimRows(db, id)).resolves.toEqual([]);
+	});
+});
+
+describe('rewardContent', () => {
+	/** The content a tick posts: the server stores it as it arrives. */
+	const Ticked = fakeSealed('ticked');
+
+	async function contentPost(partnershipId: string, rewardId: string) {
+		return {
+			recordId: rewardId,
+			vaultId: await ensureTestPartnershipVault(db, partnershipId),
+			ciphertext: Ticked,
+			payloadVersion: '1',
+			expectedRevision: '0'
+		};
+	}
+
+	it("saves a tick in the reward's content for the managing side", async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
+		const reward = await createTestPartnershipReward(db, id, jun, { cost: 4 });
+
+		const result = await run('rewardContent', at(id, jun, await contentPost(id, reward.id)));
+		expect(result).toEqual({ saved: true });
+		await expect(readPartnershipRewardRow(db, reward.id)).resolves.toMatchObject({
+			ciphertext: Ticked,
+			revision: 1,
+			cost: 4
+		});
+	});
+
+	it('refuses the side that only claims, as editing it would be', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
+		const reward = await createTestPartnershipReward(db, id, jun);
+
+		const result = await run('rewardContent', at(id, ada, await contentPost(id, reward.id)));
+		expect(result).toMatchObject({ status: 403 });
+		await expect(readPartnershipRewardRow(db, reward.id)).resolves.toMatchObject({ revision: 0 });
+	});
+
+	it('404s from outside the partnership', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'them' });
+		const reward = await createTestPartnershipReward(db, id, jun);
+		const post = await contentPost(id, reward.id);
+
+		const result = await runAndCatch(() => run('rewardContent', at(id, stranger, post)));
+		expect(result).toMatchObject({ type: 'error', status: 404 });
 	});
 });

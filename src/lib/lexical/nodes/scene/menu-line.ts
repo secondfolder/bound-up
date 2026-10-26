@@ -15,7 +15,12 @@ import {
 } from 'lexical';
 import { isRating, isSurpriseFor, type MenuExtras, type MenuLineRole } from '$lib/scenes/blocks';
 import { menuDesign, unsetValue } from '$lib/scenes/menu-designs';
-import { drawLineExtras, LINE_EXTRAS_CLASS } from '$lib/scenes/menu-frame';
+import {
+	drawLineCheck,
+	drawLineExtras,
+	LINE_CHECK_CLASS,
+	LINE_EXTRAS_CLASS
+} from '$lib/scenes/menu-frame';
 import { $isMenuNode } from './menu';
 import { drawSurprise, sceneViewerOf } from './viewer';
 
@@ -29,6 +34,10 @@ import { drawSurprise, sceneViewerOf } from './viewer';
  * beside the line's words (its DOM slot), and are set by tapping them: each
  * asks for a new one through `MENU_EXTRA_EVENT`, which the scene's page
  * answers beside it.
+ *
+ * An item can also be a to-do (`checked` is not null): a box before its
+ * words, likewise an element of its own, ticked by tapping it. See
+ * docs/scenes.md, "To-do items".
  */
 
 export type MenuItemProps = {
@@ -37,6 +46,8 @@ export type MenuItemProps = {
 	/** Its number: a price, mostly, however the design writes it. */
 	value: number | null;
 	kinkId: string | null;
+	/** Ticked or not, on an item that is a to-do; null on one that is not. */
+	checked: boolean | null;
 };
 
 export type SerializedMenuLineNode = Spread<
@@ -69,6 +80,7 @@ export class MenuLineNode extends ElementNode {
 	__value: number | null;
 	__kinkId: string | null;
 	__hiddenFrom: string | null;
+	__checked: boolean | null;
 
 	static getType(): string {
 		return 'scene-menu-line';
@@ -80,6 +92,7 @@ export class MenuLineNode extends ElementNode {
 		clone.__value = node.__value;
 		clone.__kinkId = node.__kinkId;
 		clone.__hiddenFrom = node.__hiddenFrom;
+		clone.__checked = node.__checked;
 		return clone;
 	}
 
@@ -96,6 +109,7 @@ export class MenuLineNode extends ElementNode {
 		this.__value = null;
 		this.__kinkId = null;
 		this.__hiddenFrom = null;
+		this.__checked = null;
 	}
 
 	override updateFromJSON(serialised: LexicalUpdateJSON<SerializedMenuLineNode>): this {
@@ -103,12 +117,19 @@ export class MenuLineNode extends ElementNode {
 			rating: isRating(serialised.rating) ? serialised.rating : null,
 			value: Number.isFinite(serialised.value) ? serialised.value : null,
 			kinkId: typeof serialised.kinkId === 'string' ? serialised.kinkId : null,
-			hiddenFrom: typeof serialised.hiddenFrom === 'string' ? serialised.hiddenFrom : null
+			hiddenFrom: typeof serialised.hiddenFrom === 'string' ? serialised.hiddenFrom : null,
+			checked: typeof serialised.checked === 'boolean' ? serialised.checked : null
 		});
 	}
 
 	createDOM(_config: EditorConfig, editor: LexicalEditor): HTMLElement {
 		const element = document.createElement('div');
+		const check = document.createElement('button');
+		check.type = 'button';
+		check.className = LINE_CHECK_CLASS;
+		check.contentEditable = 'false';
+		// Painted outside Lexical's reconciling, like the extras.
+		setDOMUnmanaged(check);
 		const words = document.createElement('span');
 		words.className = 'menu-line-words';
 		const extras = document.createElement('span');
@@ -117,15 +138,16 @@ export class MenuLineNode extends ElementNode {
 		// Redrawn outside an update when the menu changes (`redraw`), which
 		// Lexical would otherwise undo as DOM it did not make.
 		setDOMUnmanaged(extras);
-		element.append(words, extras);
+		element.append(check, words, extras);
 		listenForExtras(element, this.__key, editor);
+		listenForCheck(element, this.__key, editor);
 		this.#paint(element, sceneViewerOf(editor));
 		return element;
 	}
 
-	/** The words go in their own element, beside the rating and number. */
+	/** The words go in their own element, between the box and the rating and number. */
 	override getDOMSlot(element: HTMLElement) {
-		const [words] = element.children;
+		const words = element.querySelector(':scope > .menu-line-words');
 		return words instanceof HTMLElement
 			? super.getDOMSlot(element).withElement(words)
 			: super.getDOMSlot(element);
@@ -160,6 +182,11 @@ export class MenuLineNode extends ElementNode {
 		const valued = item && extras.value !== null;
 		setData(element, 'rating', rated && this.__rating !== null ? String(this.__rating) : null);
 		setData(element, 'value', valued && this.__value !== null ? String(this.__value) : null);
+		const checkElement = element.querySelector<HTMLElement>(`:scope > .${LINE_CHECK_CLASS}`);
+		if (checkElement) {
+			drawLineCheck(checkElement, item ? this.__checked : null, this.getTextContent());
+		}
+		element.classList.toggle('checked', item && this.__checked === true);
 		const extrasElement = element.querySelector<HTMLElement>(`:scope > .${LINE_EXTRAS_CLASS}`);
 		if (extrasElement) {
 			drawLineExtras(extrasElement, {
@@ -211,7 +238,8 @@ export class MenuLineNode extends ElementNode {
 			rating: latest.__rating,
 			value: latest.__value,
 			kinkId: latest.__kinkId,
-			hiddenFrom: latest.__hiddenFrom
+			hiddenFrom: latest.__hiddenFrom,
+			checked: latest.__checked
 		};
 	}
 
@@ -229,6 +257,9 @@ export class MenuLineNode extends ElementNode {
 		if (props.hiddenFrom !== undefined) {
 			self.__hiddenFrom = props.hiddenFrom;
 		}
+		if (props.checked !== undefined) {
+			self.__checked = props.checked;
+		}
 		return self;
 	}
 
@@ -240,9 +271,25 @@ export class MenuLineNode extends ElementNode {
 		return this.setItemProps({ hiddenFrom });
 	}
 
-	/** Enter makes another item, whatever this line is: a course is followed by what is in it. */
+	getChecked(): boolean | null {
+		return this.getLatest().__checked;
+	}
+
+	/** Ticks or unticks a to-do item, or makes an item one (a boolean) or not (null). */
+	setChecked(checked: boolean | null): this {
+		return this.setItemProps({ checked });
+	}
+
+	/**
+	 * Enter makes another item, whatever this line is: a course is followed by
+	 * what is in it. After a to-do item, the next is an unticked one, as in a
+	 * to-do list.
+	 */
 	override insertNewAfter(_selection: RangeSelection, restoreSelection = true): MenuLineNode {
 		const line = $createMenuLineNode('item');
+		if (this.__role === 'item' && this.getChecked() !== null) {
+			line.setChecked(false);
+		}
 		this.insertAfter(line, restoreSelection);
 		return line;
 	}
@@ -258,7 +305,8 @@ export class MenuLineNode extends ElementNode {
 			rating: this.__rating,
 			value: this.__value,
 			kinkId: this.__kinkId,
-			hiddenFrom: this.__hiddenFrom
+			hiddenFrom: this.__hiddenFrom,
+			checked: this.__checked
 		};
 	}
 }
@@ -313,6 +361,34 @@ function listenForExtras(element: HTMLElement, key: NodeKey, editor: LexicalEdit
 				})
 			);
 		}
+	});
+}
+
+/**
+ * Makes a to-do item's box tick when tapped, in an editor that can be edited.
+ * The press does nothing, so the caret stays where it was. On the line's
+ * element rather than the box, as the extras are, since the box is redrawn
+ * whenever the line is.
+ */
+function listenForCheck(element: HTMLElement, key: NodeKey, editor: LexicalEditor): void {
+	const box = (event: Event) =>
+		event.target instanceof Element ? event.target.closest(`.${LINE_CHECK_CLASS}`) : null;
+	element.addEventListener('mousedown', (event) => {
+		if (box(event)) {
+			event.preventDefault();
+		}
+	});
+	element.addEventListener('click', (event) => {
+		if (!(box(event) && editor.isEditable())) {
+			return;
+		}
+		event.preventDefault();
+		editor.update(() => {
+			const line = $getNodeByKey(key);
+			if ($isMenuLineNode(line) && line.getChecked() !== null) {
+				line.setChecked(!line.getChecked());
+			}
+		});
 	});
 }
 

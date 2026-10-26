@@ -4,8 +4,10 @@
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 	import RichText from '$lib/components/RichText.svelte';
 	import { creditsLabel } from '$lib/credits';
+	import { type ContentSaveTarget, descriptionSaver } from '$lib/description-ticks';
 	import type { ItemAction } from '$lib/item-action.svelte';
 	import type { RewardEntry, RewardListMode } from '$lib/reward-list';
+	import { type RewardContent, rewardKind } from '$lib/sealed-kinds/tasks';
 	import { openedReward, shownTitle } from '$lib/sealed-views.svelte';
 
 	/**
@@ -36,7 +38,47 @@
 	let refusal = $state<string | null>(null);
 
 	const reward = $derived(entry.reward);
-	const content = $derived(openedReward(reward));
+	/**
+	 * The reward's content as last opened, held through a reload of the same
+	 * reward, as on the task sheet: a tick saved from here re-runs the load,
+	 * and the new ciphertext reads as "still opening" for a moment.
+	 */
+	let held: { id: string; content: RewardContent | null } | null = null;
+	const content = $derived.by(() => {
+		const opened = openedReward(reward);
+		if (opened !== undefined) {
+			held = { id: reward.id, content: opened };
+		}
+		return held?.id === reward.id ? held.content : undefined;
+	});
+
+	/** Built on the first tick and kept, as on the task sheet (`descriptionSaver`). */
+	let saveDescription: ((description: string) => Promise<boolean>) | null = null;
+
+	function saveTick(target: ContentSaveTarget, description: string): Promise<boolean> {
+		refusal = null;
+		saveDescription ??= descriptionSaver({
+			kind: rewardKind,
+			target,
+			recordId: reward.id,
+			current: () => {
+				if (!content) {
+					throw new Error('The reward is not open on this device.');
+				}
+				return { revision: reward.revision, content };
+			},
+			onRefused: (message) => {
+				refusal = message;
+			}
+		});
+		return saveDescription(description);
+	}
+
+	/** Ticks save only where the viewer may edit the reward; elsewhere the boxes are disabled. */
+	const onChecklistToggle = $derived.by(() => {
+		const target = entry.contentSave;
+		return target ? (stored: string) => saveTick(target, stored) : undefined;
+	});
 	const title = $derived(shownTitle(content));
 	const canClaim = $derived(mode === 'claim' && entry.claimAction !== null && reward.canClaim);
 	const celebrating = $derived(claiming.celebrating === reward.id);
@@ -64,7 +106,7 @@
 
 <ResponsiveDialog bind:this={dialog} label={title} {onclose} footer={hasActions ? actions : undefined}>
 	<div class="detail">
-		{#if content?.description}<RichText text={content.description} />{/if}
+		{#if content?.description}<RichText text={content.description} {onChecklistToggle} />{/if}
 
 		<dl class="facts">
 			<dt>Costs</dt>

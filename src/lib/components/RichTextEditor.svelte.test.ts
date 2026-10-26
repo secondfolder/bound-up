@@ -11,11 +11,20 @@ import {
 } from 'lexical';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import { type CachedEmbedDetails, clearOembedCache } from '$lib/embeds';
 import { $isEmbedNode as isEmbedNode } from '$lib/lexical/nodes/embed';
-import { FORMAT_BOLD, FORMAT_ITALIC, FORMAT_STRIKETHROUGH } from '$lib/richtext';
+import {
+	FORMAT_BOLD,
+	FORMAT_ITALIC,
+	FORMAT_STRIKETHROUGH,
+	parseRichTextDocument,
+	type RichTextDocument
+} from '$lib/richtext';
+import { DOCUMENT_FEATURES } from '$lib/richtext-editor';
 import { defined } from '$lib/testing/defined';
 import { waProp } from '$lib/testing/web-awesome';
+import RichTextEditor from './RichTextEditor.svelte';
 import RichTextEditorHarness from './RichTextEditorHarness.svelte';
 
 /**
@@ -766,5 +775,157 @@ describe('RichTextEditor, embeds', () => {
 		await tick();
 
 		expect(linkWrapper(container)).not.toHaveClass('embed-available');
+	});
+});
+
+describe('RichTextEditor, to-do lists', () => {
+	/** Waits for the update the last keystroke or click queued to be committed. */
+	async function committed(container: HTMLElement) {
+		const editor = editorOf(container);
+		await new Promise<void>((resolve) => {
+			editor.update(() => undefined, { onUpdate: resolve });
+		});
+		await tick();
+	}
+
+	function stored(value: string): RichTextDocument {
+		return defined(parseRichTextDocument(value), 'the stored document');
+	}
+
+	function checklist(...items: [string, boolean][]): string {
+		return JSON.stringify({
+			root: {
+				type: 'root',
+				children: [
+					{
+						type: 'list',
+						listType: 'check',
+						start: 1,
+						children: items.map(([words, checked], index) => ({
+							type: 'listitem',
+							value: index + 1,
+							checked,
+							children: [{ type: 'text', text: words, format: 0 }]
+						}))
+					}
+				]
+			}
+		});
+	}
+
+	/** The item's box, which the theme draws as its `::before` at its start. */
+	async function clickBox(item: Element) {
+		await userEvent.click(item, { position: { x: 4, y: 8 } });
+	}
+
+	it.each([
+		['[] ', false],
+		['[ ] ', false],
+		['[x] ', true]
+	])('makes `%s` a to-do item, ticked when it says so', async (typed, checked) => {
+		const harness = render(RichTextEditorHarness);
+		await tick();
+		await userEvent.click(defined(harness.container.querySelector('.surface'), 'the surface'));
+		// `[` opens a key name in `keyboard`'s syntax, and `[[` is a bracket.
+		await userEvent.keyboard(`${typed.replaceAll('[', '[[')}milk`);
+		await committed(harness.container);
+
+		const [list] = stored(harness.component.current()).root.children;
+		expect(list).toMatchObject({
+			type: 'list',
+			listType: 'check',
+			children: [{ checked, children: [{ text: 'milk' }] }]
+		});
+	});
+
+	it('ticks and unticks an item from its box, and saves it', async () => {
+		const harness = render(RichTextEditorHarness, {
+			props: { initial: checklist(['milk', false], ['eggs', false]) }
+		});
+		await tick();
+		const items = harness.container.querySelectorAll('.surface li');
+		const second = defined(items[1], 'the second item');
+		expect(second.getAttribute('aria-checked')).toBe('false');
+
+		await clickBox(second);
+		await committed(harness.container);
+		expect(second.getAttribute('aria-checked')).toBe('true');
+		let [list] = stored(harness.component.current()).root.children;
+		expect(list?.type === 'list' && list.children.map((item) => item.checked)).toEqual([
+			false,
+			true
+		]);
+
+		await clickBox(second);
+		await committed(harness.container);
+		[list] = stored(harness.component.current()).root.children;
+		expect(list?.type === 'list' && list.children.map((item) => item.checked)).toEqual([
+			false,
+			false
+		]);
+	});
+
+	it('leaves the tick alone when the words are clicked', async () => {
+		const harness = render(RichTextEditorHarness, {
+			props: { initial: checklist(['a long enough item to click', false]) }
+		});
+		await tick();
+		const item = defined(harness.container.querySelector('.surface li'), 'the item');
+		await userEvent.click(item, { position: { x: 120, y: 8 } });
+		await committed(harness.container);
+		expect(item.getAttribute('aria-checked')).toBe('false');
+	});
+
+	it("makes the selected lines a to-do list from the toolbar's button, and back", async () => {
+		const value = JSON.stringify({
+			root: {
+				type: 'root',
+				children: [{ type: 'paragraph', children: [{ type: 'text', text: 'milk', format: 0 }] }]
+			}
+		});
+		const changes: string[] = [];
+		const { container } = render(RichTextEditor, {
+			props: {
+				value,
+				features: DOCUMENT_FEATURES,
+				toolbar: true,
+				onChange: (next: string) => changes.push(next)
+			}
+		});
+		await tick();
+		await userEvent.click(defined(container.querySelector('.surface'), 'the surface'));
+		await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}');
+		const button = defined(
+			await vi.waitFor(() => {
+				const found = document.querySelector<HTMLElement>('[aria-label="To-do list"]');
+				expect(found).not.toBeNull();
+				return found;
+			}),
+			'the To-do list button'
+		);
+		button.click();
+		await committed(container);
+		const [list] = stored(changes.at(-1) ?? value).root.children;
+		expect(list).toMatchObject({ type: 'list', listType: 'check', children: [{ checked: false }] });
+
+		button.click();
+		await committed(container);
+		const [line] = stored(changes.at(-1) ?? value).root.children;
+		expect(line).toMatchObject({ type: 'paragraph' });
+	});
+
+	it('cannot be ticked while the editor is read-only', async () => {
+		const { container } = render(RichTextEditor, {
+			props: {
+				value: checklist(['milk', false]),
+				features: DOCUMENT_FEATURES,
+				readOnly: true
+			}
+		});
+		await tick();
+		const item = defined(container.querySelector('.surface li'), 'the item');
+		await clickBox(item);
+		await tick();
+		expect(item.getAttribute('aria-checked')).toBe('false');
 	});
 });

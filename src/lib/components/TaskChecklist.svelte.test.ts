@@ -21,7 +21,11 @@ vi.mock('$app/forms', () => ({
 			event.preventDefault();
 			submit?.({ cancel: () => undefined, formElement: form, formData: new FormData(form) });
 		});
-	}
+	},
+	// The task sheet's ticks read an action result with it (`description-ticks.ts`).
+	// A browser refuses to link a module missing a named import, so it has to be
+	// here even though nothing in this file ticks one.
+	deserialize: () => ({ type: 'error', error: undefined })
 }));
 
 const { default: TaskChecklist } = await import('./TaskChecklist.svelte');

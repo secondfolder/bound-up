@@ -32,17 +32,23 @@
 	const hasSharedControl = $derived(data.partner.canManageTasks && data.partner.canCompleteTasks);
 
 	function entry(task: PartnershipTaskView): TaskEntry {
+		const canEdit = data.partner.canManageTasks && task.createdByMe;
 		return {
 			task,
 			completeAction: data.partner.canCompleteTasks && !task.createdByMe ? '?/completeTask' : null,
 			undoAction: '?/undoCompletion',
-			editHref:
-				data.partner.canManageTasks && task.createdByMe
-					? resolve('/(auth-required)/(app)/partner/[id]/tasks/[taskId]', {
-							id: data.partner.id,
-							taskId: task.id
-						})
-					: null
+			editHref: canEdit
+				? resolve('/(auth-required)/(app)/partner/[id]/tasks/[taskId]', {
+						id: data.partner.id,
+						taskId: task.id
+					})
+				: null,
+			contentSave: canEdit
+				? {
+						action: '?/taskContent',
+						scope: { kind: 'partnership', partnershipId: data.partner.id }
+					}
+				: null
 		};
 	}
 

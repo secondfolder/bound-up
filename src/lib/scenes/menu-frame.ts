@@ -401,6 +401,23 @@ export type LineExtras = {
 /** The class of the element holding an item's rating and number. */
 export const LINE_EXTRAS_CLASS = 'menu-line-extras';
 
+/** The class of a to-do item's box, before its words. */
+export const LINE_CHECK_CLASS = 'menu-line-check';
+
+/**
+ * Draws a menu line's box: hidden on a line that is not a to-do (`checked`
+ * null), ticked or not on one that is. A `role="checkbox"` button named by
+ * the item's words, which is what a reader is ticking. The stored version's
+ * reader (`SceneBlock.svelte`) draws the same element and classes, as a
+ * span, so `scene-blocks.css` styles both.
+ */
+export function drawLineCheck(box: HTMLElement, checked: boolean | null, words: string): void {
+	box.hidden = checked === null;
+	setAttribute(box, 'role', 'checkbox');
+	setAttribute(box, 'aria-checked', checked ? 'true' : 'false');
+	setAttribute(box, 'aria-label', words.trim() || 'To-do');
+}
+
 /**
  * Draws an item's rating and number into `extras`, the element at its
  * right. Every item of a rated menu shows the whole scale, set or not, in

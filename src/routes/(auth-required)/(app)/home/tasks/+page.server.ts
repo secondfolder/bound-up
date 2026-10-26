@@ -5,12 +5,14 @@ import {
 	taskCompleteSchema,
 	taskUndoSchema
 } from '$lib/schemas/taskForm';
+import { malformedSealed, readSealedTaskContent, sealedRefusal } from '$lib/server/sealed-submit';
 import {
 	completePartnershipTask,
 	completeSelfTask,
 	UNDO_REFUSALS,
 	undoPartnershipTaskCompletion,
-	undoSelfTaskCompletion
+	undoSelfTaskCompletion,
+	updateSelfTaskContent
 } from '$lib/server/tasks';
 import type { Actions } from './$types';
 
@@ -169,5 +171,31 @@ export const actions: Actions = {
 		}
 		// Nothing to say: the task coming back in its place says it.
 		return { undone: true };
+	},
+
+	/**
+	 * A self task's description with a to-do item ticked or unticked: its
+	 * sealed content alone, from the task's sheet (docs/rich-text.md, "To-do
+	 * lists"). The settings are not posted, so the schedule is left as it is.
+	 */
+	selfTaskContent: async ({ locals, request }) => {
+		if (!locals.user) {
+			error(401, 'Not signed in');
+		}
+		const submitted = await readSealedTaskContent(request);
+		if (!submitted) {
+			return malformedSealed('task');
+		}
+		const result = await updateSelfTaskContent(locals.db, locals.user.id, submitted.recordId, {
+			content: submitted.content,
+			expectedRevision: submitted.expectedRevision
+		});
+		if (!result.ok) {
+			if (result.reason === 'not-found') {
+				error(404, 'Task not found');
+			}
+			return sealedRefusal(result.reason, 'task');
+		}
+		return { saved: true };
 	}
 };

@@ -32,16 +32,22 @@
 	const hasSharedControl = $derived(data.partner.canManageRewards && data.partner.canClaimRewards);
 
 	function entry(reward: PartnershipRewardView): RewardEntry {
+		const canEdit = data.partner.canManageRewards && reward.createdByMe;
 		return {
 			reward,
 			claimAction: data.partner.canClaimRewards && !reward.createdByMe ? '?/claimReward' : null,
-			editHref:
-				data.partner.canManageRewards && reward.createdByMe
-					? resolve('/(auth-required)/(app)/partner/[id]/rewards/[rewardId]', {
-							id: data.partner.id,
-							rewardId: reward.id
-						})
-					: null
+			editHref: canEdit
+				? resolve('/(auth-required)/(app)/partner/[id]/rewards/[rewardId]', {
+						id: data.partner.id,
+						rewardId: reward.id
+					})
+				: null,
+			contentSave: canEdit
+				? {
+						action: '?/rewardContent',
+						scope: { kind: 'partnership', partnershipId: data.partner.id }
+					}
+				: null
 		};
 	}
 

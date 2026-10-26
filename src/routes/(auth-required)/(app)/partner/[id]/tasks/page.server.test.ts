@@ -7,7 +7,10 @@ import {
 	createTestPartnership,
 	createTestPartnershipTask,
 	createTestUser,
+	ensureTestPartnershipVault,
+	fakeSealed,
 	readPartnershipRewardCreditRow,
+	readPartnershipTaskRow,
 	type TestUser
 } from '$lib/testing/fixtures';
 import { load } from './+layout.server';
@@ -113,6 +116,55 @@ describe('actions', () => {
 		const result = await runAndCatch(() =>
 			run('undoCompletion', at(id, stranger, { completionId: crypto.randomUUID() }))
 		);
+		expect(result).toMatchObject({ type: 'error', status: 404 });
+	});
+});
+
+describe('taskContent', () => {
+	/** The content a tick posts: the server stores it as it arrives. */
+	const Ticked = fakeSealed('ticked');
+
+	async function contentPost(partnershipId: string, taskId: string) {
+		return {
+			recordId: taskId,
+			vaultId: await ensureTestPartnershipVault(db, partnershipId),
+			ciphertext: Ticked,
+			payloadVersion: '1',
+			completionMessageCount: '0',
+			expectedRevision: '0'
+		};
+	}
+
+	it("saves a tick in the task's content for the partner who set it", async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
+		const task = await createTestPartnershipTask(db, id, ada);
+
+		const result = await run('taskContent', at(id, ada, await contentPost(id, task.id)));
+		expect(result).toEqual({ saved: true });
+		await expect(readPartnershipTaskRow(db, task.id)).resolves.toMatchObject({
+			ciphertext: Ticked,
+			revision: 1
+		});
+	});
+
+	it('refuses the partner who did not set it, as editing it would be', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
+		const task = await createTestPartnershipTask(db, id, ada);
+
+		const result = await run('taskContent', at(id, jun, await contentPost(id, task.id)));
+		expect(result).toMatchObject({
+			status: 403,
+			data: { error: 'Only the partner who created a task can edit it.' }
+		});
+		await expect(readPartnershipTaskRow(db, task.id)).resolves.toMatchObject({ revision: 0 });
+	});
+
+	it('404s from outside the partnership', async () => {
+		const { id } = await createTestPartnership(db, ada, jun, { control: 'mix' });
+		const task = await createTestPartnershipTask(db, id, ada);
+
+		const post = await contentPost(id, task.id);
+		const result = await runAndCatch(() => run('taskContent', at(id, stranger, post)));
 		expect(result).toMatchObject({ type: 'error', status: 404 });
 	});
 });

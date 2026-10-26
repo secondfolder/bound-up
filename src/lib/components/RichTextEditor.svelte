@@ -393,6 +393,77 @@
 		padding-inline-start: 1.5em;
 	}
 
+	/* A to-do list (`list` in the editor's theme). Lexical draws its items as
+	   plain `<li>`s and leaves the box to the theme, so it is the item's
+	   `::before`, drawn with the tokens `wa-checkbox` uses: the reader shows a
+	   real `wa-checkbox` (`RichTextList.svelte`), and the two have to match.
+	   It must stay the `::before` and sit at the item's start, because that is
+	   where `registerCheckList` takes a click to mean a tick — it measures the
+	   pseudo-element's width from the item's edge. */
+	/* Inset by exactly the focus ring's reach, so a focused box's ring is not
+	   cut off by whatever clips the editor (the notebook's did). The inset is
+	   on the list, not the box: the box has to stay at the item's start for
+	   `registerCheckList` to find it. `RichTextList` insets by the same. */
+	.surface :global(.rt-checklist) {
+		padding-inline-start: calc(var(--wa-focus-ring-width) + var(--wa-focus-ring-offset));
+		list-style: none;
+	}
+
+	.surface :global(.rt-checked),
+	.surface :global(.rt-unchecked) {
+		position: relative;
+		padding-inline-start: calc(var(--wa-form-control-toggle-size) + 0.5em);
+		outline: none;
+	}
+
+	.surface :global(.rt-checked::before),
+	.surface :global(.rt-unchecked::before) {
+		content: '';
+		position: absolute;
+		inset-block-start: calc((1lh - var(--wa-form-control-toggle-size)) / 2);
+		inset-inline-start: 0;
+		box-sizing: border-box;
+		inline-size: var(--wa-form-control-toggle-size);
+		block-size: var(--wa-form-control-toggle-size);
+		border: var(--wa-form-control-border-width) var(--wa-border-style)
+			var(--wa-form-control-border-color);
+		border-radius: var(--wa-border-radius-s);
+		background: var(--wa-form-control-background-color);
+		cursor: pointer;
+	}
+
+	.surface :global(.rt-checked::before) {
+		border-color: var(--wa-form-control-activated-color);
+		background: var(--wa-form-control-activated-color);
+	}
+
+	/* The tick: two borders of a box turned on its side. */
+	.surface :global(.rt-checked::after) {
+		content: '';
+		position: absolute;
+		inset-block-start: calc((1lh - var(--wa-form-control-toggle-size)) / 2 + 0.2em);
+		inset-inline-start: calc(var(--wa-form-control-toggle-size) * 0.36);
+		inline-size: calc(var(--wa-form-control-toggle-size) * 0.28);
+		block-size: calc(var(--wa-form-control-toggle-size) * 0.5);
+		border: solid var(--wa-color-brand-on-loud);
+		border-width: 0 0.15em 0.15em 0;
+		transform: rotate(45deg);
+		pointer-events: none;
+	}
+
+	/* The item holds the focus when the keyboard is on its box (the left arrow
+	   at its start), so that is where the ring goes. */
+	.surface :global(.rt-checked:focus-visible::before),
+	.surface :global(.rt-unchecked:focus-visible::before) {
+		outline: var(--wa-focus-ring);
+		outline-offset: var(--wa-focus-ring-offset);
+	}
+
+	.surface :global(.rt-checked) {
+		color: var(--wa-color-text-quiet);
+		text-decoration: line-through;
+	}
+
 	.surface :global(a) {
 		color: inherit;
 		text-decoration: underline;
