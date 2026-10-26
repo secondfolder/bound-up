@@ -24,9 +24,12 @@
 		canRestore,
 		describeUser,
 		onRestore,
-		onclose
+		onclose,
+		viewerId = null
 	}: {
 		session: NotebookSession;
+		/** Who is looking, so a scene's surprise for them stays one in a preview. */
+		viewerId?: string | null;
 		entryId: string;
 		canRestore: boolean;
 		onclose: () => void;
@@ -155,7 +158,7 @@
 		<article class="preview" aria-label="Preview of this version">
 			<h3>{preview.title || 'Untitled'}</h3>
 			{#if preview.body}
-				<RichText text={JSON.stringify(preview.body)} />
+				<RichText text={JSON.stringify(preview.body)} {viewerId} />
 			{/if}
 		</article>
 	{/if}

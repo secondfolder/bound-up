@@ -1858,8 +1858,10 @@ own passage. A written-out turn goes back with the passage that wrote it.
 
 ## What the server sees
 
-This is the one feature whose content the server handles in plaintext, so
-the boundary is stated exactly.
+This is the one feature whose content the server routinely handles in
+plaintext, so the boundary is stated exactly. (A scene's help from the model
+is the other place a person's words go to a model, under these same rules and
+only on request: [scenes.md](scenes.md#help-from-the-model).)
 
 **Stored:** sealed records only, in the owner's self vault — the setup
 (`daydream-setup`), each turn (`daydream-turn`), each mark

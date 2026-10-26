@@ -123,8 +123,40 @@
 					"id": "scene-sessions",
 					"title": "Play and scene sessions",
 					"summary": "Plan and run a scene together, then optionally review it.",
-					"status": "planned",
-					"icon": "masks-theater"
+					"status": "in-progress",
+					"icon": "masks-theater",
+					"notes": [
+						"Plan as loosely or as carefully as you like: a page to write on, with ideas and prompts beside it",
+						"Nothing is ever required"
+					],
+					"children": [
+						{
+							"id": "scene-design",
+							"title": "Plan a scene",
+							"summary": "A notebook page with ideas, questions and what you’re both into beside it, blocks for signals, limits and aftercare, and a menu to order from in a design of your choice.",
+							"status": "shipped",
+							"shippedOn": "2026-10-26"
+						},
+						{
+							"id": "scene-surprises",
+							"title": "Surprises",
+							"summary": "Keep part of a plan, or one item on the menu, hidden from your partner until the scene.",
+							"status": "shipped",
+							"shippedOn": "2026-10-26"
+						},
+						{
+							"id": "scene-run",
+							"title": "Run a scene",
+							"summary": "Follow the plan as you play: what’s next, a timer, check-ins, and stop always within reach.",
+							"status": "planned"
+						},
+						{
+							"id": "scene-review",
+							"title": "Look back on a scene",
+							"summary": "Say what worked and what to change, each privately first, and check in the next day.",
+							"status": "planned"
+						}
+					]
 				},
 				{
 					"id": "focus-sessions",
@@ -350,6 +382,12 @@
 							"id": "notebook-recovery-bin",
 							"title": "Recovery bin",
 							"summary": "A deleted entry waits in a bin for a while before it's gone for good, so you can bring it back, unless you choose to delete it straight away.",
+							"status": "planned"
+						},
+						{
+							"id": "notebook-comments",
+							"title": "Comments",
+							"summary": "Comment on an entry, including one you can only read.",
 							"status": "planned"
 						}
 					]

@@ -85,15 +85,24 @@ description.
 
 ## The closed node set
 
-`paragraph`, `text`, `linebreak`, `link`, `autolink`, `list`, `listitem`,
-`embed`. A node type that is not registered in `RICH_TEXT_NODES` cannot be
+`paragraph`, `heading`, `text`, `linebreak`, `link`, `autolink`, `list`,
+`listitem`, `embed`, and a scene's blocks: `scene-section`, `scene-menu`,
+`scene-menu-course` and `scene-menu-line` ([scenes.md](scenes.md#blocks)). A
+node type that is not registered in `RICH_TEXT_NODES` cannot be
 created, and one that is not in `richTextDocumentSchema` cannot be stored —
-the same guarantee enforced from both ends. There are deliberately no
-headings, quotes or code blocks.
+the same guarantee enforced from both ends. There are deliberately no quotes
+or code blocks, and only two levels of heading (below).
 
 `embed` is the only one that appears in both halves of the schema: inline,
 where everything written now puts it, and block-level, which is where older
 documents have it. See below.
+
+The scene blocks are registered in every editor, since any editor can be
+handed a document that holds them (a version being restored), but only a
+scene's page (`SCENE_FEATURES`, the `scene` feature) has what makes them, their
+keys and their guards (`registerSceneBlocks`). They are element nodes, not
+decorator blocks, so two people typing in one menu merge character by
+character; scenes.md says why at more length.
 
 Messages allow a narrower set still (`MESSAGE_FEATURES`): no lists, because a
 chat box that turns "- " into a bullet because someone started a line with a
@@ -150,6 +159,36 @@ are both derived from that list, so a new editor-only node is a new file and one
 line in `index.ts`. Lexical transformers, when there are ones of our own, belong
 beside it in `src/lib/lexical/transformers/`, and anything shared between nodes
 and transformers in `src/lib/lexical/shared/`.
+
+## Headings
+
+A line can be a **heading**, a **subheading** or **body text**: Lexical's
+`HeadingNode` with the tag `h2` or `h3`, or an ordinary paragraph. Two levels
+and no more, because a page's own title is its `h1` and is never part of the
+document, and because deeper levels are more structure than a note, a
+description or a scene needs. A stored heading at any other level reads as a
+subheading.
+
+- **The selection's toolbar** has a text style menu (`FloatingFormatToolbar`,
+  the `heading` feature): Heading, Subheading or Body, each shown in its own
+  style, with the selection's current style (or "Mixed") on its trigger. It
+  is the toolbar's own small menu rather than a `wa-dropdown`, whose opening
+  would take focus out of the editor and collapse the selection under it.
+  **Typing** `# ` makes a heading and `## ` a subheading (`HEADING_SHORTCUT`),
+  as markdown would.
+- **`src/lib/lexical/block-kind.ts`** is the one place that knows what each
+  kind means in each kind of line, so the toolbar has one control for all of
+  them. An ordinary line swaps node (keeping its children, so the selection
+  stays put); a line of a scene's menu keeps its node and changes its role,
+  since a menu's headings are what divide it into courses
+  ([scenes.md](scenes.md#blocks)). A list is left alone: a bullet point is not
+  a heading.
+- **Their look** is `src/lib/richtext-headings.css`, shared by the editor
+  (whose theme names the classes) and the reader: the body's face, larger and
+  bolder, with room above. Only a page's title is set in the title face.
+
+Messages have no headings (`MESSAGE_FEATURES`); descriptions, the notebook and
+scenes do (`DOCUMENT_FEATURES`).
 
 ## Decorator blocks: objects in the text, not characters
 

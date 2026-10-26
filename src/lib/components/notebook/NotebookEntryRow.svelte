@@ -48,7 +48,7 @@
 				{:else if opened.title}
 					{opened.title}
 				{:else}
-					Untitled {entry.kind === 'journal' ? `entry, ${dayLabel}` : 'note'}
+					Untitled {entry.kind === 'journal' ? `entry, ${dayLabel}` : entry.kind}
 				{/if}
 			</span>
 			{#if opened?.excerpt}<span class="excerpt">{opened.excerpt}</span>{/if}

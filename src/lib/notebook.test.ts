@@ -4,6 +4,7 @@ import {
 	compactionBound,
 	entryAccessFor,
 	groupByMonth,
+	holdsAccessAuthority,
 	holdsControl,
 	isEntryDate,
 	type PartnerAccess,
@@ -23,8 +24,18 @@ function partnership(control: PartnershipForAccess['control']): PartnershipForAc
 	return { control, inviterId: ada, inviteeId: bo };
 }
 
-function shared(partnerAccess: PartnerAccess, setBy: string | null = null) {
-	return { scope: 'partnership' as const, partnerAccess, accessSetByUserId: setBy };
+/** A shared entry; Ada wrote it unless `createdBy` says otherwise. */
+function shared(
+	partnerAccess: PartnerAccess,
+	setBy: string | null = null,
+	createdBy: string | null = ada
+) {
+	return {
+		scope: 'partnership' as const,
+		partnerAccess,
+		accessSetByUserId: setBy,
+		createdByUserId: createdBy
+	};
 }
 
 describe('entryAccessFor', () => {
@@ -54,21 +65,50 @@ describe('entryAccessFor', () => {
 	});
 });
 
+describe('holdsAccessAuthority', () => {
+	it('is whoever holds control, whoever wrote the entry', () => {
+		expect(holdsAccessAuthority(shared('edit', null, bo), ada, partnership('inviter'))).toBe(true);
+		expect(holdsAccessAuthority(shared('edit', null, bo), bo, partnership('inviter'))).toBe(false);
+	});
+
+	/** Shared control gives the say over each entry to whoever created it. */
+	it('is the creator alone when control is shared', () => {
+		expect(holdsAccessAuthority(shared('edit', null, ada), ada, partnership('both'))).toBe(true);
+		expect(holdsAccessAuthority(shared('edit', null, ada), bo, partnership('both'))).toBe(false);
+		expect(holdsAccessAuthority(shared('edit', null, bo), bo, partnership('both'))).toBe(true);
+	});
+
+	/** An entry whose creator deleted their account must still have somebody with the say. */
+	it('falls back to either member when the creator is gone', () => {
+		expect(holdsAccessAuthority(shared('edit', null, null), ada, partnership('both'))).toBe(true);
+		expect(holdsAccessAuthority(shared('edit', null, null), bo, partnership('both'))).toBe(true);
+	});
+
+	it('is never for someone outside the partnership', () => {
+		expect(
+			holdsAccessAuthority(shared('edit', null, stranger), stranger, partnership('both'))
+		).toBe(false);
+	});
+});
+
 describe('canSetAccess', () => {
 	it('is for whoever holds control', () => {
 		expect(canSetAccess(shared('edit'), ada, partnership('inviter'))).toBe(true);
 		expect(canSetAccess(shared('edit'), bo, partnership('inviter'))).toBe(false);
 		expect(canSetAccess(shared('edit'), bo, partnership('invitee'))).toBe(true);
-		expect(canSetAccess(shared('edit'), ada, partnership('both'))).toBe(true);
-		expect(canSetAccess(shared('edit'), bo, partnership('both'))).toBe(true);
+	});
+
+	it('is only for the creator when control is shared', () => {
+		expect(canSetAccess(shared('edit', null, ada), ada, partnership('both'))).toBe(true);
+		expect(canSetAccess(shared('edit', null, ada), bo, partnership('both'))).toBe(false);
+		expect(canSetAccess(shared('edit', null, bo), bo, partnership('both'))).toBe(true);
 	});
 
 	it('is never for someone outside the partnership', () => {
 		expect(canSetAccess(shared('edit'), stranger, partnership('both'))).toBe(false);
 	});
 
-	/** With control shared, either may restrict, and the other may not undo it. */
-	it('does not let a member lift a restriction set against them by someone still in control', () => {
+	it('does not let a member lift a restriction set against them by someone who still has the say', () => {
 		expect(canSetAccess(shared('hidden', ada), bo, partnership('both'))).toBe(false);
 		expect(canSetAccess(shared('read', ada), bo, partnership('both'))).toBe(false);
 		expect(canSetAccess(shared('hidden', ada), ada, partnership('both'))).toBe(true);
@@ -78,6 +118,16 @@ describe('canSetAccess', () => {
 	it('lets the member now holding control lift a restriction once its setter has lost it', () => {
 		expect(canSetAccess(shared('hidden', ada), bo, partnership('invitee'))).toBe(true);
 		expect(canSetAccess(shared('hidden', ada), ada, partnership('invitee'))).toBe(false);
+	});
+
+	/**
+	 * Before only the creator could restrict under shared control, either
+	 * member could. Such a restriction must not be stuck: the creator, who has
+	 * the say now, may lift it.
+	 */
+	it('lets the creator lift a restriction the other member set under shared control', () => {
+		expect(canSetAccess(shared('hidden', bo, ada), ada, partnership('both'))).toBe(true);
+		expect(canSetAccess(shared('hidden', bo, ada), bo, partnership('both'))).toBe(false);
 	});
 });
 

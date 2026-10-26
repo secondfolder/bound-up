@@ -138,12 +138,18 @@ type EntryRow = {
 	createdAt: Date;
 };
 
-function forAccess(row: EntryRow): EntryForAccess {
+function forAccess(
+	row: Pick<
+		EntryRow,
+		'partnershipId' | 'ownerId' | 'partnerAccess' | 'accessSetByUserId' | 'createdByUserId'
+	>
+): EntryForAccess {
 	return row.partnershipId
 		? {
 				scope: 'partnership',
 				partnerAccess: row.partnerAccess,
-				accessSetByUserId: row.accessSetByUserId
+				accessSetByUserId: row.accessSetByUserId,
+				createdByUserId: row.createdByUserId
 			}
 		: { scope: 'self', ownerId: row.ownerId ?? '' };
 }
@@ -204,7 +210,8 @@ export async function getEntryContext(
 				{
 					scope: 'partnership',
 					partnerAccess: row.partnerAccess,
-					accessSetByUserId: row.accessSetByUserId
+					accessSetByUserId: row.accessSetByUserId,
+					createdByUserId: row.createdByUserId
 				},
 				userId,
 				partnership
@@ -271,7 +278,8 @@ export async function listEntries(
 				{
 					scope: 'partnership',
 					partnerAccess: row.partnerAccess,
-					accessSetByUserId: row.accessSetByUserId
+					accessSetByUserId: row.accessSetByUserId,
+					createdByUserId: row.createdByUserId
 				},
 				userId,
 				resolved.partnership
@@ -805,8 +813,8 @@ export async function setPartnerAccess(
 
 /**
  * Lifts a restriction set against `userId` on an entry hidden from them,
- * which is the one thing they can do with it. Only allowed once control has
- * moved away from whoever set it; see `canSetAccess`.
+ * which is the one thing they can do with it. Only allowed once the say over
+ * it has moved away from whoever set it; see `canSetAccess`.
  */
 export async function liftHiddenEntry(
 	db: Db,
@@ -821,7 +829,8 @@ export async function liftHiddenEntry(
 	const [row] = await db
 		.select({
 			partnerAccess: notebookEntries.partnerAccess,
-			accessSetByUserId: notebookEntries.accessSetByUserId
+			accessSetByUserId: notebookEntries.accessSetByUserId,
+			createdByUserId: notebookEntries.createdByUserId
 		})
 		.from(notebookEntries)
 		.where(and(eq(notebookEntries.id, entryId), eq(notebookEntries.partnershipId, partnershipId)))
@@ -833,7 +842,8 @@ export async function liftHiddenEntry(
 				{
 					scope: 'partnership',
 					partnerAccess: row.partnerAccess,
-					accessSetByUserId: row.accessSetByUserId
+					accessSetByUserId: row.accessSetByUserId,
+					createdByUserId: row.createdByUserId
 				},
 				userId,
 				partnership

@@ -197,6 +197,7 @@ test.describe('a shared note', () => {
 			await bo.page.goto(url);
 			await expect(surface(bo.page)).toContainText('Only for reading.');
 
+			await clickWaButton(ada.page, 'Settings');
 			await ada.page.locator('wa-select[name="access"]').click();
 			await ada.page.getByRole('option', { name: 'Bo can only read it' }).click();
 			await clickWaButton(ada.page, 'Save');
@@ -207,6 +208,7 @@ test.describe('a shared note', () => {
 				bo.page.locator('.richtext-editor .surface[contenteditable="false"]')
 			).toBeVisible();
 
+			await clickWaButton(ada.page, 'Settings');
 			await ada.page.locator('wa-select[name="access"]').click();
 			await ada.page.getByRole('option', { name: 'Hidden from Bo' }).click();
 			await clickWaButton(ada.page, 'Save');

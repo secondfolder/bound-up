@@ -11,7 +11,7 @@
 	import NotebookEntryRow from './NotebookEntryRow.svelte';
 
 	/**
-	 * A notebook's two lists, journal and notes, for either scope: the solo
+	 * A notebook's lists, journal, notes and scenes, for either scope: the solo
 	 * notebook and a partnership's are the same page with different data. The
 	 * route resolves every link it needs and hands it in, so this never builds
 	 * a path itself.
@@ -23,6 +23,7 @@
 	let {
 		journal,
 		notes,
+		scenes,
 		room,
 		today,
 		sealScope,
@@ -35,6 +36,7 @@
 	}: {
 		journal: NotebookEntryView[];
 		notes: NotebookEntryView[];
+		scenes: NotebookEntryView[];
 		room: RoomKey;
 		today: string;
 		sealScope: SealScope;
@@ -54,7 +56,11 @@
 
 	function initialTab(): NotebookKind {
 		try {
-			return globalThis.localStorage?.getItem(tabStorageKey) === 'note' ? 'note' : 'journal';
+			const saved = globalThis.localStorage?.getItem(tabStorageKey);
+			if (saved === 'note' || saved === 'scene') {
+				return saved;
+			}
+			return 'journal';
 		} catch {
 			return 'journal';
 		}
@@ -64,7 +70,7 @@
 
 	function rememberTab(event: Event) {
 		const name = (event as CustomEvent<{ name?: string }>).detail?.name;
-		if (name === 'journal' || name === 'note') {
+		if (name === 'journal' || name === 'note' || name === 'scene') {
 			tab = name;
 			try {
 				globalThis.localStorage?.setItem(tabStorageKey, name);
@@ -145,6 +151,7 @@
 		<wa-tab-group active={tab} onwa-tab-show={rememberTab}>
 			<wa-tab slot="nav" panel="journal">Journal</wa-tab>
 			<wa-tab slot="nav" panel="note">Notes</wa-tab>
+			<wa-tab slot="nav" panel="scene">Scenes</wa-tab>
 
 			<wa-tab-panel name="journal">
 				<div class="panel">
@@ -191,6 +198,30 @@
 										note={accessNote(entry)}
 										{showHiddenAction}
 									/>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			</wa-tab-panel>
+
+			<wa-tab-panel name="scene">
+				<div class="panel">
+					<NewEntryForm kind="scene" {today} {sealScope} />
+					{#if scenes.length === 0}
+						<EmptyState icon="masks-theater" title="No scenes yet">
+							Plan a scene: as loosely or as carefully as you like. Start one above.
+						</EmptyState>
+					{:else}
+						<ul class="entries">
+							{#each scenes as entry (entry.id)}
+								<NotebookEntryRow
+									{entry}
+									href={entryHref(entry.id)}
+									dayLabel={dayLabel(entry.entryDate)}
+									edited={editedLabel(entry)}
+									note={accessNote(entry)}
+									{showHiddenAction}
+								/>
 							{/each}
 						</ul>
 					{/if}

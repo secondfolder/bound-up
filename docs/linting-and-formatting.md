@@ -48,7 +48,13 @@ The exceptions are, roughly:
   schema barrel, the `--wa-*` custom properties that come from Web Awesome's
   stylesheet at runtime, Lexical's bitmask formats.
 
-The same override also carries the one rule that is configured rather than
+One override is for a single file: `noDescendingSpecificity` is off for the
+scene menu designs (`src/lib/scenes/menu-designs.css`). Every design's rules
+are scoped to its own `.design-<id>` class, and the rule compares selectors by
+their last compound alone, so it reported one design's `::before` as
+"descending" from another's, which can never match the same element.
+
+The first override also carries the one rule that is configured rather than
 switched off: `noRestrictedImports` refuses `superForm` from
 `sveltekit-superforms`, so every form goes through `$lib/superform` and shows
 a failed submit (see [request-failures.md](request-failures.md)). The wrapper

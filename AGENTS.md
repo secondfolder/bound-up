@@ -40,6 +40,7 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/lib/tree.ts`, `src/lib/components/tree/` | The generic tree drawing: the pure layout, dimming and folding rules, and `Tree.svelte`. See [docs/tree.md](docs/tree.md) |
 | `src/lib/roadmap/`            | The public roadmap's JSON and its validating loader. Alias-free. See [docs/roadmap.md](docs/roadmap.md) |
 | `src/lib/kink-list/`          | The kink list: the catalogue and its loader, answers and their rules (pure, alias-free), and the stores (browser). See [docs/kink-list.md](docs/kink-list.md) |
+| `src/lib/scenes/`, `src/lib/components/scenes/`, `src/lib/lexical/nodes/scene/` | Scenes: the prompt catalogue, story ideas, menu designs and help prompts (pure, alias-free), the column, and the scene blocks' nodes and plugin (`lexical/plugins/scene-blocks.ts`). See [docs/scenes.md](docs/scenes.md) |
 | `src/lib/playroom/`           | The Playroom's tool registry and the IQ test's engine: questions, rigging, copy. See [docs/playroom.md](docs/playroom.md) |
 | `src/lib/lexical/`            | Editor-only Lexical pieces, one per file. See [docs/rich-text.md](docs/rich-text.md)         |
 | `src/lib/vfx/`                | The Svelte layer over VFX-JS. See [docs/page-effects.md](docs/page-effects.md)               |
@@ -638,6 +639,17 @@ CSS. For buttons in particular:
   `src/lib/components/details.ts`, which sets the property in the browser
   only.
 
+**A field that can be cleared uses Web Awesome's `with-clear`**, on a
+`wa-input` or through `InputField` (which passes it on), never a clear button
+of our own, so every one looks and behaves the same. Its button sends `input`
+as well as `wa-clear`, so whatever already follows the field's typing sees it
+emptied.
+
+**A field whose value is wrong carries `aria-invalid="true"` and has a
+`FieldError` under it**, never a red style or error span of its own; the
+theme draws the invalid state from the attribute. A typed number is read
+with `readNumberText`. See [docs/theme.md](docs/theme.md#invalid-fields).
+
 **A loading skeleton for anything bigger than a line is built from small
 `wa-skeleton`s**, a line each, never one stretched over the whole element: its
 shimmer is a fully rounded part no custom property reaches, so one big
@@ -663,6 +675,10 @@ someone else's clock is `WhoseTime` ("Jun's time", with the detail in a
 tooltip). See
 [docs/dialogs.md](docs/dialogs.md) and
 [docs/theme.md](docs/theme.md#lists-of-items).
+
+**A panel that can be put away beside a page is `SidePanelLayout`**: beside
+the page where there is room, sliding over it where there is not, shown
+from a tab on the screen's edge. See [docs/theme.md](docs/theme.md#side-panels).
 
 **Save buttons start outlined and become solid only when there is something valid to save.**
 An idle save/submit action is secondary, not a call to act. When a form becomes dirty, if the contents is valid then
@@ -1086,6 +1102,7 @@ Four places, split on scope:
 | [docs/notebook.md](docs/notebook.md)                                                     | Journal and notes: live co-editing, encryption at rest, versions, the outbox, access |
 | [docs/realtime.md](docs/realtime.md)                                                     | The shared realtime room: scopes, topics, eviction, leases, cost, the DO export |
 | [docs/dialogs.md](docs/dialogs.md)                                                       | `ResponsiveDialog`: a sheet on a phone, a dialog wider, placed in the visual viewport |
+| [docs/scenes.md](docs/scenes.md)                                                         | Planning a scene: the prompt column, blocks, menus and their designs, surprises, model help |
 
 **Keeping these current is part of the change, not a follow-up to it.**
 

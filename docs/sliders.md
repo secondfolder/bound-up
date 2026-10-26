@@ -9,7 +9,7 @@ only makes sense for that feature.
 
 | Slider                                                               | What it adds                                                     |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`OptionalSlider`](../src/lib/components/OptionalSlider.svelte)      | A title row with the level in words, and Clear back to unset; `titleHidden` for one titled by its row |
+| [`OptionalSlider`](../src/lib/components/OptionalSlider.svelte)      | The level in words beside the base slider's Clear, following the knob; `titleHidden` for one titled by its row |
 | [`IntensitySlider`](../src/lib/components/iq-test/IntensitySlider.svelte) | The IQ test's level, changing as the knob passes each notch, and a compact form for the dock |
 | [`SoundControl`](../src/lib/components/iq-test/SoundControl.svelte)  | A volume: continuous, beside a mute toggle                       |
 | [`ListFilters`](../src/lib/components/kink-list/ListFilters.svelte)  | The kink list's two limits, each with its reading                |
@@ -51,6 +51,17 @@ sets the level it rests at, since it already looks like a level. The slider
 sends no `change` for a press that did not move it, so the base slider does,
 a task after the pointer comes up.
 
+**Clearable** (`onclear`): an unset slider that can go back to unset once
+set. A row above the track holds the title at the left and, at the right,
+Clear while there is a value, after any `status` (the level in words, in
+`OptionalSlider`). The row is drawn by the base slider rather than put in
+the slider's label, which is a `<label>`, and a button must not go in one:
+the slider keeps its label for its accessible name, out of sight, and the
+row's title is hidden from assistive tech instead. Clear's name ends in
+hidden text ("Clear heat"), so two on a page are told apart. `labelHidden`
+leaves the title out of the row and keeps Clear. The menu item's rating
+(docs/scenes.md) and every `OptionalSlider` use it.
+
 **Everything else:**
 
 - **Controlled.** `value` is the level; a new one is asked for through
@@ -79,5 +90,6 @@ the wrapper's own class, since the slider's scoped styles are its own.
 
 `components/Slider.svelte.test.ts`: dragging freely and telling of each notch
 once, springing onto the nearest notch, a whole notch from the keyboard, an
-unset slider set by a press, continuous, and a value set from outside. The
+unset slider set by a press, continuous, a value set from outside, and Clear
+on a clearable one, there only while it has a value. The
 features' own tests cover what each adds.

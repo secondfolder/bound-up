@@ -129,3 +129,21 @@ describe('create', () => {
 		expect(result).toMatchObject({ type: 'error', status: 404 });
 	});
 });
+
+/** Scenes are a kind of entry with a list of their own. See docs/scenes.md. */
+describe('scenes', () => {
+	it('lists scenes apart from notes', async () => {
+		const scene = await createTestNotebookEntry(harness.db, ada, { partnershipId, kind: 'scene' });
+		const data = await runLoad(load(at(bo)));
+		expect(data.scenes.map((entry: { id: string }) => entry.id)).toEqual([scene.id]);
+		expect(data.notes.map((entry: { id: string }) => entry.id)).not.toContain(scene.id);
+	});
+
+	it('creates a scene', async () => {
+		const vaultId = await ensureTestPartnershipVault(harness.db, partnershipId);
+		const { id, entry } = newEntry(vaultId, { kind: 'scene', entryDate: null });
+		const created = await runAndCatch(() => runAction(actions, 'create', at(ada, { entry })));
+		expect(created).toMatchObject({ type: 'redirect' });
+		expect((await readNotebookEntryRow(harness.db, id))?.kind).toBe('scene');
+	});
+});

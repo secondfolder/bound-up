@@ -4,7 +4,16 @@ import { zod4 } from 'sveltekit-superforms/adapters';
 import { entryTopic, isEntryDate, type PartnerAccess } from '../notebook';
 import { notebookCreateSchema, partnerAccessSchema } from '../schemas/notebook';
 import { calendarDayKey } from '../timezone';
-import type { NotebookEntryView, SealedRefView } from '../types';
+import type {
+	DaydreamLibraryItemView,
+	KinkListView,
+	NotebookEntryView,
+	SealedRefView
+} from '../types';
+import { readDaydreamConfig } from './daydream/config';
+import { listLibrary } from './daydreams';
+import { userHasFeature } from './features';
+import { getKinkList, getPartnerKinkList } from './kink-lists';
 import { createMediaStore } from './media/backend';
 import {
 	createEntry,
@@ -19,6 +28,8 @@ import {
 import { publishEntryFrame, publishListChange } from './notebook-live';
 import { createNotifier } from './realtime/backend';
 import type { RoomKey } from './realtime/index';
+import { getScenePreferences, type ScenePreferencesView } from './scene-preferences';
+import { hasAcceptedSceneHelp } from './scenes/help';
 import { sealedRef } from './sealed-content';
 
 /**
@@ -61,11 +72,23 @@ export function notebookPath(scope: NotebookScope): string {
 export type NotebookListData = {
 	journal: NotebookEntryView[];
 	notes: NotebookEntryView[];
+	scenes: NotebookEntryView[];
 	room: RoomKey;
 	viewerId: string;
 	/** Today in the viewer's timezone, for a new journal entry's date. */
 	today: string;
 };
+
+/** The other member of a partnership entry's partnership; null for a solo entry. */
+function otherMember(
+	partnership: { inviterId: string; inviteeId: string | null } | null,
+	userId: string
+): string | null {
+	if (!partnership) {
+		return null;
+	}
+	return partnership.inviterId === userId ? partnership.inviteeId : partnership.inviterId;
+}
 
 export async function loadNotebookList(
 	event: Pick<Event, 'locals' | 'depends'>,
@@ -77,13 +100,15 @@ export async function loadNotebookList(
 		error(404, 'Partner not found');
 	}
 	event.depends(notebookDependency(scope));
-	const [journal, notes] = await Promise.all([
+	const [journal, notes, scenes] = await Promise.all([
 		listEntries(event.locals.db, resolved, user.id, 'journal'),
-		listEntries(event.locals.db, resolved, user.id, 'note')
+		listEntries(event.locals.db, resolved, user.id, 'note'),
+		listEntries(event.locals.db, resolved, user.id, 'scene')
 	]);
 	return {
 		journal,
 		notes,
+		scenes,
 		room: resolved.room,
 		viewerId: user.id,
 		today: calendarDayKey(user.timezone, new Date())
@@ -173,7 +198,61 @@ export type NotebookEntryData = {
 	};
 	room: RoomKey;
 	viewerId: string;
+	/** A scene's extras; null for a journal entry or a note. */
+	scene: {
+		preferences: ScenePreferencesView | null;
+		/** Who a block can be hidden from; null in a solo scene. */
+		partnerId: string | null;
+		partnershipId: string | null;
+		/**
+		 * The kink lists the column's "What you're into" reads, all sealed: your
+		 * own, and in a shared scene your copy for the partner and theirs for
+		 * you, which only exist once each of you has shared. See docs/scenes.md.
+		 */
+		kinkLists: {
+			own: KinkListView | null;
+			mineForPartner: KinkListView | null;
+			theirs: KinkListView | null;
+		};
+		/** The viewer's daydream characters, to play as; empty without Daydreams. */
+		characters: DaydreamLibraryItemView[];
+		/**
+		 * Whether the server has a model to ask for help (none means no help
+		 * buttons at all), and whether this person has agreed to what that
+		 * sends.
+		 */
+		help: { available: boolean; accepted: boolean };
+	} | null;
 };
+
+async function sceneExtras(
+	event: Pick<Event, 'locals' | 'platform'>,
+	userId: string,
+	context: NonNullable<Awaited<ReturnType<typeof getEntryContext>>>
+): Promise<NonNullable<NotebookEntryData['scene']>> {
+	const { db } = event.locals;
+	const { partnershipId } = context.entry;
+	const available = readDaydreamConfig(event.locals.settings, event.platform) !== null;
+	const [preferences, own, mineForPartner, theirs, characters, accepted] = await Promise.all([
+		getScenePreferences(db, userId),
+		getKinkList(db, userId, 'self'),
+		partnershipId ? getKinkList(db, userId, { partnershipId }) : null,
+		partnershipId ? getPartnerKinkList(db, userId, partnershipId) : null,
+		// The library is a Daydreams thing; without the feature there is none.
+		userHasFeature(db, userId, 'daydreams').then((has) =>
+			has ? listLibrary(db, userId, 'characters') : []
+		),
+		available ? hasAcceptedSceneHelp(db, userId) : false
+	]);
+	return {
+		preferences,
+		partnerId: otherMember(context.partnership, userId),
+		partnershipId,
+		kinkLists: { own, mineForPartner, theirs: theirs?.ok ? theirs.list : null },
+		characters,
+		help: { available, accepted }
+	};
+}
 
 export async function loadNotebookEntry(
 	event: Pick<Event, 'locals' | 'params' | 'depends'>,
@@ -202,7 +281,8 @@ export async function loadNotebookEntry(
 			restrictedByViewer: entry.accessSetByUserId === user.id
 		},
 		room: context.room,
-		viewerId: user.id
+		viewerId: user.id,
+		scene: entry.kind === 'scene' ? await sceneExtras(event, user.id, context) : null
 	};
 }
 

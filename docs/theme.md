@@ -251,6 +251,61 @@ wa-skeleton::part(indicator) {
 }
 ```
 
+## Invalid fields
+
+A field whose value is wrong says so the same way everywhere: the control
+carries `aria-invalid="true"`, which `theme.css` turns red (its border and its
+focus ring, through Web Awesome's own custom properties, for `wa-input`,
+`wa-textarea` and `wa-select`), and `FieldError.svelte` sits under it with the
+message, announced as it appears. `InputField` does both from its form's
+errors; anything else sets the attribute and renders `FieldError` itself, as
+the menu item's number does.
+
+A number someone types is read by `readNumberText` (`$lib/number-text`):
+empty is none, anything else that is not a finite number is the error. Such a
+field is a text box with `inputmode="decimal"`, not `type="number"`, whose
+control quietly throws away what it cannot read and reports an empty value,
+so a mistake looked the same as nothing typed.
+
+## Side panels
+
+A page with a panel at its right that can be put away (the scene's ideas and
+prompts) is `SidePanelLayout.svelte`, the same way at every width:
+
+- **Beside the page** once the screen is 60rem wide: the page narrows to
+  make room, the panel sticks at the top as the page scrolls, and whether it
+  is there is remembered on the device (`storageKey`).
+- **Over the page** where it is narrower: the panel comes out of the page's
+  flow (`position: fixed`) and slides in over everything the page's
+  scroller shows, top to bottom, so over all the page but not the app's nav
+  below it. It never takes the whole width (`--side-panel-strip`, 3rem,
+  stays showing), and a backdrop dims the rest of the page; a press
+  anywhere outside the panel, or Escape, puts it away before anything under
+  it is touched. It always starts away there, whatever it was beside a
+  wider page, since it would cover the page someone came to see.
+- **Which of the two is a media query**, not the layout's own width: a
+  container query would make the layout contain fixed-position boxes, and
+  the panel over the page is one. Where the page scrolls (`<main>`, which no
+  viewport unit measures) is measured by the component and handed to the
+  CSS as `--side-panel-area-*`.
+- **It slides** in and out either way, and the page's width eases with it
+  beside it (none with reduced motion).
+- **The button that shows it is a tab on the screen's right edge**, a third
+  of the way down what the page shows, fixed there so it is in reach however
+  far the page is scrolled; the panel's own header has the button that
+  hides it. It runs on a little past the screen's edge, so it reads as
+  the end of something tucked away there. It is an icon until the screen is wide enough for the tab's
+  words to sit beside the widest page (92rem: `--page-width-wide` and about
+  10rem each side), and then says what it opens. When what it opens
+  changes (the scene's ideas becoming a menu's options as the caret goes
+  into one), it nudges in and back out, so the change is noticed with the
+  panel away.
+- `--side-panel-width` (20rem), `--side-panel-gap` and `--side-panel-speed`
+  can be set by the page.
+
+It replaced a column that folded to a strip on a wide screen and became a
+sheet from a floating button on a narrow one: two ways to do one thing.
+
 ## Lists of items
 
 Tasks, rewards and their histories are lists of lines, the way a to-do app

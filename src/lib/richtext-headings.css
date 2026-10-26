@@ -1,0 +1,35 @@
+/*
+ * Headings in a rich-text document, in the editor (Lexical's theme names
+ * these classes) and wherever a stored document is read (`RichText.svelte`)
+ * alike. Global, because Lexical makes the editor's elements. In the body's
+ * face rather than the title face: they divide a page's text, and the page's
+ * own title (its h1) is the only line set in the title face. See
+ * docs/rich-text.md, "Headings".
+ */
+
+.rt-heading,
+.rt-subheading {
+	margin: 0;
+	font-family: var(--wa-font-family-body);
+	line-height: 1.25;
+	text-wrap: balance;
+}
+
+.rt-heading {
+	font-size: 1.3em;
+	font-weight: var(--wa-font-weight-bold);
+}
+
+.rt-subheading {
+	font-size: 1.08em;
+	font-weight: var(--wa-font-weight-semibold);
+}
+
+/* Room above a heading, so it reads as the start of something. */
+:is(p, ul, ol, .rt-heading, .rt-subheading) + :is(.rt-heading, .rt-subheading) {
+	margin-block-start: 0.8em;
+}
+
+:is(.rt-heading, .rt-subheading) + :is(p, ul, ol) {
+	margin-block-start: 0.3em;
+}

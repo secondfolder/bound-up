@@ -39,6 +39,7 @@
 
 <NotebookEntryPage
 	entry={data.entry}
+	scene={data.scene}
 	room={data.room}
 	viewerId={data.viewerId}
 	sealScope={{ kind: 'partnership', partnershipId }}

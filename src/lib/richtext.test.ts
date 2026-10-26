@@ -17,6 +17,7 @@ import {
 	withInlineEmbeds
 } from './richtext';
 import { RICH_TEXT_NODES } from './richtext-editor';
+import { defined } from './testing/defined';
 
 function doc(children: RichTextDocument['root']['children']): RichTextDocument {
 	return { root: { type: 'root', children } };
@@ -89,7 +90,7 @@ describe('parseRichTextDocument', () => {
 
 	it('rejects a node type outside the closed set', () => {
 		const stored = JSON.stringify({
-			root: { type: 'root', children: [{ type: 'heading', tag: 'h1', children: [] }] }
+			root: { type: 'root', children: [{ type: 'quote', children: [] }] }
 		});
 		expect(parseRichTextDocument(stored)).toBeNull();
 	});
@@ -509,5 +510,45 @@ describe('the stored shape', () => {
 			'plain bolditalicstruckcodeboth\nhttps://i.imgur.com/cat.jpglabelled\na bullet\na number'
 		);
 		expect(documentEmbedUrls(Golden)).toEqual(['https://i.imgur.com/cat.jpg']);
+	});
+});
+
+describe('headings', () => {
+	it('stores a heading and a subheading, and reads them as text', () => {
+		const parsed = parseRichTextDocument(
+			JSON.stringify({
+				root: {
+					type: 'root',
+					children: [
+						{
+							type: 'heading',
+							tag: 'h2',
+							children: [{ type: 'text', text: 'Saturday', format: 0 }]
+						},
+						{ type: 'heading', tag: 'h3', children: [{ type: 'text', text: 'Before', format: 0 }] },
+						{ type: 'paragraph', children: [{ type: 'text', text: 'Tea first.', format: 0 }] }
+					]
+				}
+			})
+		);
+		expect(parsed?.root.children.map((block) => block.type)).toEqual([
+			'heading',
+			'heading',
+			'paragraph'
+		]);
+		expect(documentToPlainText(defined(parsed, 'the document'))).toBe(
+			'Saturday\nBefore\nTea first.'
+		);
+	});
+
+	/** A writer's browser may have stored a level the document does not have. */
+	it('reads any other level as a subheading', () => {
+		const parsed = parseRichTextDocument(
+			JSON.stringify({
+				root: { type: 'root', children: [{ type: 'heading', tag: 'h1', children: [] }] }
+			})
+		);
+		const [heading] = parsed?.root.children ?? [];
+		expect(heading).toMatchObject({ type: 'heading', tag: 'h3' });
 	});
 });

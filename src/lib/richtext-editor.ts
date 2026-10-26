@@ -10,6 +10,7 @@ import {
 import { ListItemNode, ListNode, registerList } from '@lexical/list';
 import {
 	BOLD_STAR,
+	type ElementTransformer,
 	INLINE_CODE,
 	ITALIC_UNDERSCORE,
 	ORDERED_LIST,
@@ -19,7 +20,7 @@ import {
 	type Transformer,
 	UNORDERED_LIST
 } from '@lexical/markdown';
-import { registerRichText } from '@lexical/rich-text';
+import { $createHeadingNode, HeadingNode, registerRichText } from '@lexical/rich-text';
 import {
 	$findMatchingParent,
 	$getRoot,
@@ -41,8 +42,13 @@ import { find as findLinks } from 'linkifyjs';
 import { embedSpecFor, isSafeHttpUrl } from '$lib/embeds';
 import { EDITOR_NODE_REPLACEMENTS } from '$lib/lexical/nodes';
 import { $createEmbedNode, $isEmbedNode, EmbedNode } from '$lib/lexical/nodes/embed';
+import { MenuNode } from '$lib/lexical/nodes/scene/menu';
+import { MenuCourseNode } from '$lib/lexical/nodes/scene/menu-course';
+import { MenuLineNode } from '$lib/lexical/nodes/scene/menu-line';
+import { SceneSectionNode } from '$lib/lexical/nodes/scene/section';
 import { EMBED_OFFER_CLASS } from '$lib/lexical/nodes/shared/embed-offer';
 import { registerDecoratorBlockSelection } from '$lib/lexical/plugins/decorator-block-selection';
+import { registerSceneBlocks } from '$lib/lexical/plugins/scene-blocks';
 import {
 	$markBlockContinuation,
 	registerMendSplitBlocks
@@ -58,7 +64,17 @@ import {
 
 /* ── features ──────────────────────────────────────────────────────────── */
 
-export type RichTextFeature = 'bold' | 'italic' | 'strikethrough' | 'code' | 'link' | 'list';
+export type RichTextFeature =
+	| 'bold'
+	| 'italic'
+	| 'strikethrough'
+	| 'code'
+	| 'link'
+	| 'list'
+	/** Headings and subheadings: the toolbar's control, and `# ` and `## ` as you type. */
+	| 'heading'
+	/** The scene designer's blocks: their keys, edits and guards (docs/scenes.md). */
+	| 'scene';
 
 /**
  * What a message may contain. No lists: a chat box that turns "- " into a
@@ -80,16 +96,32 @@ export const DOCUMENT_FEATURES: readonly RichTextFeature[] = [
 	'strikethrough',
 	'code',
 	'link',
-	'list'
+	'list',
+	'heading'
 ];
 
-/** Every node type the document may contain. A type absent here cannot exist. */
+/** A scene's page: a document, and the scene blocks. */
+export const SCENE_FEATURES: readonly RichTextFeature[] = [...DOCUMENT_FEATURES, 'scene'];
+
+/**
+ * Every node type the document may contain. A type absent here cannot exist.
+ *
+ * The scene blocks are in every editor, not only a scene's: any editor may be
+ * handed a document that holds them (a version of a scene being restored), and
+ * an editor that does not know a node's type throws on it. Only a scene's page
+ * registers what makes them (`registerSceneBlocks`).
+ */
 export const RICH_TEXT_NODES: readonly Klass<LexicalNode>[] = [
 	ListNode,
 	ListItemNode,
+	HeadingNode,
 	LinkNode,
 	AutoLinkNode,
-	EmbedNode
+	EmbedNode,
+	SceneSectionNode,
+	MenuNode,
+	MenuCourseNode,
+	MenuLineNode
 ];
 
 /* ── typing shortcuts ──────────────────────────────────────────────────── */
@@ -117,6 +149,24 @@ const STRIKETHROUGH_SINGLE: TextFormatTransformer = {
 	type: 'text-format'
 };
 
+/**
+ * `# ` makes a heading and `## ` a subheading, as markdown would, but no
+ * deeper: the document has those two levels and no more. Lexical's own
+ * `HEADING` would make an `h1` (the page's title) and down to `h6`.
+ */
+const HEADING_SHORTCUT: ElementTransformer = {
+	dependencies: [HeadingNode],
+	export: () => null,
+	regExp: /^#{1,2}\s/,
+	replace: (parentNode, children, match) => {
+		const heading = $createHeadingNode(match[0].startsWith('##') ? 'h3' : 'h2');
+		heading.append(...children);
+		parentNode.replace(heading);
+		heading.select(0, 0);
+	},
+	type: 'element'
+};
+
 const TRANSFORMERS_BY_FEATURE: Record<RichTextFeature, Transformer[]> = {
 	// `**` before `*`, so the double is matched as bold rather than as an empty
 	// single-star pair wrapping a star.
@@ -125,7 +175,9 @@ const TRANSFORMERS_BY_FEATURE: Record<RichTextFeature, Transformer[]> = {
 	strikethrough: [STRIKETHROUGH, STRIKETHROUGH_SINGLE],
 	code: [INLINE_CODE],
 	link: [],
-	list: [UNORDERED_LIST, ORDERED_LIST]
+	list: [UNORDERED_LIST, ORDERED_LIST],
+	heading: [HEADING_SHORTCUT],
+	scene: []
 };
 
 export function typingTransformersFor(features: readonly RichTextFeature[]): Transformer[] {
@@ -478,6 +530,7 @@ const EDITOR_THEME = {
 	 * arrangement exists to fix. Styled in `RichTextEditor.svelte`.
 	 */
 	blockCursor: 'rt-block-cursor',
+	heading: { h2: 'rt-heading', h3: 'rt-subheading' },
 	text: {
 		bold: 'rt-bold',
 		italic: 'rt-italic',
@@ -566,6 +619,10 @@ export function createRichTextEditor(options: {
 
 	if (options.features.includes('list')) {
 		teardown.push(registerList(editor));
+	}
+
+	if (options.features.includes('scene')) {
+		teardown.push(registerSceneBlocks(editor));
 	}
 
 	return {

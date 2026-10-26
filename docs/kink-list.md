@@ -620,6 +620,12 @@ using effective answers.
 - **Specifics** count only when either person answered them.
 - **"Where you overlap most"** counts kinks, not pairings, per category.
 
+A scene's "What you're into" chips read the same comparison, between the
+lists two partners share with each other, and offer only **You both want
+this** (and, further up, **Worth exploring**): never a limit or a mismatch,
+and only what you both want while either comparing is blind. See
+[scenes.md](scenes.md#what-youre-into).
+
 **Signed in**, a shared link's "Compare with mine" opens
 `/playroom/kink-list/compare#k1.…`, against the person's sealed list. **Signed
 out**, it compares on the shared page itself, against the list on the device.

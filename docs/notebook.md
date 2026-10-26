@@ -1,7 +1,8 @@
 # Notebook
 
-Somewhere to write things down. A notebook holds **journal entries** (dated)
-and **notes** (free pages), each a rich-text document with a title. Everyone
+Somewhere to write things down. A notebook holds **journal entries** (dated),
+**notes** (free pages) and **scenes** (plans for play, with ideas and prompts
+beside them: [scenes.md](scenes.md)), each a rich-text document with a title. Everyone
 has their own notebook at `/home/notebook`, and every partnership has a shared
 one at `/partner/[id]/notebook`. An entry is edited live by everyone who has it
 open, the way a shared online document is: each writer's edits merge into the
@@ -48,6 +49,9 @@ neither it nor the title appears in any of the entry's stored rows.
 An entry's content is a **Yjs document**, edited through Lexical with
 `@lexical/yjs`. It has two shared types: `root`, the body, which the binding
 keeps in step with the editor, and `title`, plain text the title field edits.
+A scene has a third, `prompts`, what has become of each of its prompts
+([scenes.md](scenes.md#where-the-prompts-state-lives)); the other kinds never
+touch it.
 Yjs merges concurrent edits deterministically, in any order, and ignores an
 update it already has, which is what everything below leans on: edits can be
 relayed, refetched and resent freely.
@@ -117,7 +121,9 @@ without loading every document, so the sealed **header** (`{ title, excerpt }`)
 is a cache: whichever page is editing rewrites it five seconds after a change,
 on leaving the page (with `keepalive`), and on opening an entry whose header is
 stale. Its revision is compare-and-swap; the loser is told the current revision
-and writes once more, since it is the one still editing.
+and writes once more, since it is the one still editing. A scene's excerpt
+leaves out anything hidden from either partner, since both lists show the same
+header ([scenes.md](scenes.md#surprises)).
 
 **Cost.** Every batch is one Worker request and one Durable Object request; at
 about two and a half a second while typing, an hour of steady typing is about
@@ -186,11 +192,18 @@ the stored rows on every load, action and endpoint (invariant 14).
   can make it **read-only** or **hidden** for the other: `partner_access` and
   `access_set_by_user_id`. The restriction binds only the member who did not set
   it.
-- With control shared, either may restrict, and the other cannot lift what was
-  set against them. Once control moves away from whoever set a restriction, the
-  member now holding it may lift it (`canSetAccess`), so handing control over
-  never locks anyone out of their own notebook. A hidden entry is listed for
-  them, without its header, with a button to show it again.
+- **With control shared, the say over an entry is its creator's**
+  (`holdsAccessAuthority`, from `created_by_user_id`). Shared control used to
+  let either member restrict any entry, and the other could not undo it, so
+  each could hide the other's writing from them. An entry whose creator has
+  deleted their account falls back to either member.
+- A restriction binds whoever did not set it for as long as its setter still
+  has the say. Once the say moves away from them (control is handed over, or
+  shared control makes the creator the one who decides), the member who has it
+  now may lift it (`canSetAccess`), so nobody is locked out of their own
+  notebook, and a restriction a non-creator set under shared control before
+  this rule is not stuck. A hidden entry is listed for them, without its
+  header, with a button to show it again.
 - **Hidden is withheld by the server, not by cryptography.** The other partner
   holds the partnership vault's key and could open the entry if the server
   handed it over; it does not: lists, every endpoint and the realtime topic
@@ -206,8 +219,9 @@ the stored rows on every load, action and endpoint (invariant 14).
 ## Data model
 
 - `notebook_entries`: one row per entry, scoped to `owner_id` **or**
-  `partnership_id` (a check constraint), with the header's ciphertext. Ordered
-  by `entry_date` for the journal and `last_edited_at` for notes.
+  `partnership_id` (a check constraint), with the header's ciphertext. `kind`
+  is `journal`, `note` or `scene`. Ordered by `entry_date` for the journal and
+  `last_edited_at` for notes and scenes.
 - `notebook_updates`: the batches of edits, by `seq`, deleted by compaction.
   Unique on the batch's own id, so a resend is stored once.
 - `notebook_versions`: one row per version, unique on `(entry_id, up_to_seq)`.
@@ -222,8 +236,8 @@ has to go with it.
 
 | Route | |
 | --- | --- |
-| `/home/notebook`, `/partner/[id]/notebook` | Journal and Notes tabs; a new entry; `?/create`, and `?/show` for a hidden entry the viewer may show again. |
-| `.../notebook/[entryId]` | The entry: title, editor, presence, history; `?/setAccess` and `?/delete`. |
+| `/home/notebook`, `/partner/[id]/notebook` | Journal, Notes and Scenes tabs; a new entry; `?/create`, and `?/show` for a hidden entry the viewer may show again. |
+| `.../notebook/[entryId]` | The entry: title (its save status, Settings, History and Delete at the end of its row, or on a row above it where they do not fit), editor, presence, history; `?/setAccess` (who else can see it, in the Settings popover, for whoever has the say over that) and `?/delete`. |
 | `api/notebook/entries/[entryId]/updates` | `GET` edits after a seq (with the latest version on open); `POST` a batch and/or a caret. |
 | `.../header` | `POST` the sealed header, compare-and-swap. |
 | `.../versions` | `GET` the history; `POST` a version. |

@@ -7,6 +7,7 @@
 		type LexicalEditor
 	} from 'lexical';
 	import { untrack } from 'svelte';
+	import '$lib/richtext-headings.css';
 	import { toEditorDocument, toStoredDocument } from '$lib/lexical/document-shape';
 	import { exportEditorDocument } from '$lib/lexical/nodes';
 	import { parseStoredRichText, richTextDocumentSchema } from '$lib/richtext';
@@ -18,7 +19,7 @@
 		type RichTextFeature
 	} from '$lib/richtext-editor';
 	import { registerEditorEmbeds } from './editor-embeds.svelte';
-	import FloatingFormatToolbar from './FloatingFormatToolbar.svelte';
+	import FloatingFormatToolbar, { type ToolbarAction } from './FloatingFormatToolbar.svelte';
 
 	/**
 	 * The one editor, in both of its moods.
@@ -57,6 +58,7 @@
 		placeholder = '',
 		features = MESSAGE_FEATURES,
 		toolbar = false,
+		toolbarActions = [],
 		ariaLabel,
 		editorClass = '',
 		collaborate,
@@ -69,6 +71,8 @@
 		placeholder?: string;
 		features?: readonly RichTextFeature[];
 		toolbar?: boolean;
+		/** Buttons of the caller's own on the selection toolbar (`ToolbarAction`). */
+		toolbarActions?: readonly ToolbarAction[];
 		ariaLabel?: string | undefined;
 		editorClass?: string;
 		collaborate?: (editor: LexicalEditor, cursorsContainer: HTMLElement) => () => void;
@@ -318,7 +322,7 @@
 		<div class="placeholder" aria-hidden="true">{placeholder}</div>
 	{/if}
 	{#if toolbar && handle && !readOnly}
-		<FloatingFormatToolbar editor={handle.editor} {features} />
+		<FloatingFormatToolbar editor={handle.editor} {features} actions={toolbarActions} />
 	{/if}
 </div>
 

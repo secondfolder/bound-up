@@ -31,6 +31,12 @@
 		entryDate: z.string().regex(ENTRY_DATE_PATTERN, 'Please choose a date')
 	});
 
+	const KIND_BUTTON: Record<NotebookKind, { icon: string; label: string }> = {
+		journal: { icon: 'feather', label: 'New journal entry' },
+		note: { icon: 'note-sticky', label: 'New note' },
+		scene: { icon: 'masks-theater', label: 'New scene' }
+	};
+
 	let problem = $state<string | null>(null);
 	/** Kept across attempts, so a retry after a lost response cannot create the entry twice. */
 	let entryId: string | null = null;
@@ -104,8 +110,8 @@
 		<InputField {superform} field="entryDate" type="date" title="Date" />
 	{/if}
 	<wa-button type="submit" variant="brand" appearance="accent" disabled={$submitting}>
-		<wa-icon slot="start" name={kind === 'journal' ? 'feather' : 'note-sticky'}></wa-icon>
-		{kind === 'journal' ? 'New journal entry' : 'New note'}
+		<wa-icon slot="start" name={KIND_BUTTON[kind].icon}></wa-icon>
+		{KIND_BUTTON[kind].label}
 	</wa-button>
 	{#if problem}<p class="invalid" role="alert">{problem}</p>{/if}
 </form>

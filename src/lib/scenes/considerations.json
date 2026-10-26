@@ -1,0 +1,262 @@
+{
+	"version": 1,
+	"considerations": [
+		{
+			"id": "what-are-you-craving",
+			"type": "think",
+			"group": "want",
+			"level": 1,
+			"title": "What are you each craving?",
+			"why": "Starting from what you both want, rather than from a list of acts, tends to give a scene a heart.",
+			"insert": { "section": "notes", "text": "What we're craving: " }
+		},
+		{
+			"id": "how-it-should-feel",
+			"type": "ask",
+			"group": "want",
+			"level": 1,
+			"title": "How should it feel?",
+			"why": "A word for the mood helps everything else fall into place.",
+			"answers": ["Playful", "Tender", "Intense", "Strict", "Scary", "Filthy", "Slow and dreamy"],
+			"insert": { "section": "notes", "text": "The feel: {answer}" }
+		},
+		{
+			"id": "who-leads",
+			"type": "ask",
+			"group": "want",
+			"level": 2,
+			"title": "Who leads?",
+			"why": "Knowing who is steering saves a moment of hesitation when it matters.",
+			"answers": ["I do", "You do", "We take turns", "We'll see"],
+			"insert": { "section": "notes", "text": "Leading: {answer}" }
+		},
+		{
+			"id": "how-long",
+			"type": "ask",
+			"group": "want",
+			"level": 3,
+			"title": "Roughly how long?",
+			"why": "A rough length helps you pace the build and leave time to come down.",
+			"answers": ["A quick one", "About an hour", "An evening", "All weekend"],
+			"insert": { "section": "notes", "text": "How long: {answer}" }
+		},
+		{
+			"id": "who-is-it-for",
+			"type": "think",
+			"group": "want",
+			"level": 4,
+			"title": "Who is each part for?",
+			"why": "Some things are done for the other person and some are taken for yourself; saying which keeps the scene feeling fair.",
+			"insert": { "section": "notes", "text": "Who each part is for: " }
+		},
+		{
+			"id": "limits-tonight",
+			"type": "think",
+			"group": "avoid",
+			"level": 1,
+			"title": "Anything off the table this time?",
+			"why": "Your usual limits still stand, and it can help to add anything that's a no just for today.",
+			"insert": { "section": "limits", "text": "Not this time: " }
+		},
+		{
+			"id": "talk-only",
+			"type": "think",
+			"group": "avoid",
+			"level": 2,
+			"title": "Anything fine to say but not to do?",
+			"why": "A threat, a tease or a fantasy can be hot to hear about without ever happening. It's worth agreeing which is which.",
+			"when": { "tags": ["consent-play", "degrading", "story"], "kinks": ["roleplay"] },
+			"insert": { "section": "limits", "text": "Say it, don't do it: " }
+		},
+		{
+			"id": "body-areas",
+			"type": "think",
+			"group": "avoid",
+			"level": 3,
+			"title": "Any parts of the body to leave alone?",
+			"why": "A sore shoulder, a ticklish spot or somewhere that just doesn't feel good: easier to say now than mid-scene.",
+			"insert": { "section": "limits", "text": "Leave alone: " }
+		},
+		{
+			"id": "visible-marks",
+			"type": "ask",
+			"group": "avoid",
+			"level": 2,
+			"title": "Are marks OK?",
+			"why": "Work, the gym or a family visit tomorrow can make a mark a problem.",
+			"when": { "tags": ["pain", "rough"], "kinks": ["bruising", "impact", "rope"] },
+			"answers": ["Anywhere", "Only where clothes cover", "None, please"],
+			"insert": { "section": "limits", "text": "Marks: {answer}" }
+		},
+		{
+			"id": "medical",
+			"type": "think",
+			"group": "avoid",
+			"level": 3,
+			"title": "Anything about your bodies to know?",
+			"why": "Allergies, asthma, a bad back, medication: small things that change what's safe.",
+			"insert": { "section": "limits", "text": "Good to know: " }
+		},
+		{
+			"id": "emotional-triggers",
+			"type": "think",
+			"group": "avoid",
+			"level": 4,
+			"title": "Any words or moments that could land badly?",
+			"why": "Some things hit harder than expected because of history. Naming them lets the other person steer around them.",
+			"insert": { "section": "limits", "text": "Steer around: " }
+		},
+		{
+			"id": "how-will-you-stop",
+			"type": "ask",
+			"group": "during",
+			"level": 1,
+			"title": "How will you stop if you need to?",
+			"why": "A word you'd never say by accident means anyone can stop at once, and nobody has to explain.",
+			"answers": ["Red / yellow / green", "A safeword of our own", "Just saying stop"],
+			"insert": { "section": "signals", "text": "To stop: {answer}" }
+		},
+		{
+			"id": "without-words",
+			"type": "think",
+			"group": "during",
+			"level": 1,
+			"title": "What if one of you can't speak?",
+			"why": "A gag, a mouth that's busy or simply being too far gone to find words: agree a signal you can make without them, like dropping something held, or three taps.",
+			"when": { "kinks": ["gags", "breath-play", "heavy-bondage", "sensory-deprivation"] },
+			"insert": { "section": "signals", "text": "Without words: " }
+		},
+		{
+			"id": "no-means-stop",
+			"type": "ask",
+			"group": "during",
+			"level": 1,
+			"title": "Does \"no\" mean stop this time?",
+			"why": "In a scene about resisting, \"no\" may be part of the play. If so, you need a separate way to really stop.",
+			"when": { "tags": ["consent-play"] },
+			"answers": ["Yes, no means stop", "No: we'll use our safeword instead"],
+			"insert": { "section": "signals", "text": "Does no mean stop: {answer}" }
+		},
+		{
+			"id": "check-ins",
+			"type": "think",
+			"group": "during",
+			"level": 2,
+			"title": "How will you check in?",
+			"why": "Asking for a colour, or a squeeze of the hand, keeps you in touch without breaking the mood. It matters most when someone is deep in it and might not speak up.",
+			"insert": { "section": "signals", "text": "Checking in: " }
+		},
+		{
+			"id": "practise-signal",
+			"type": "think",
+			"group": "during",
+			"level": 3,
+			"title": "Practise the signal before you start",
+			"why": "Using it once for real, before anything happens, makes it much easier to reach for when it counts.",
+			"insert": { "section": "ritual", "text": "Before we start: try the signal once" }
+		},
+		{
+			"id": "warm-up",
+			"type": "think",
+			"group": "during",
+			"level": 2,
+			"title": "How will you warm up?",
+			"why": "Bodies take more, and enjoy it more, after a gentle start: a hand before a paddle, light before heavy.",
+			"when": { "tags": ["pain", "rough"], "minIntensity": 3 },
+			"insert": { "section": "notes", "text": "Warming up: " }
+		},
+		{
+			"id": "risk-notes",
+			"type": "think",
+			"group": "during",
+			"level": 1,
+			"title": "Something here carries real risk",
+			"why": "It's your call to make, and it helps to make it knowing the risks: read up together, and agree how you'll keep it safer.",
+			"when": { "tags": ["risky"] },
+			"insert": { "section": "notes", "text": "Keeping it safer: " }
+		},
+		{
+			"id": "safety-kit",
+			"type": "think",
+			"group": "before",
+			"level": 2,
+			"title": "Anything to have within reach?",
+			"why": "Safety shears for rope, water, a towel, a phone: things you don't want to go looking for mid-scene.",
+			"when": { "kinks": ["rope", "bondage", "wax", "knife-play", "electro"] },
+			"insert": { "section": "prep", "text": "Within reach: " }
+		},
+		{
+			"id": "how-are-you-today",
+			"type": "ask",
+			"group": "before",
+			"level": 3,
+			"title": "How are you both feeling today?",
+			"why": "Tired, stressed, sore or a little tipsy, everyone takes less. It's fine to plan lighter.",
+			"answers": ["Great", "A bit tired", "Stressed", "Sore", "Let's go easy"],
+			"insert": { "section": "notes", "text": "Today: {answer}" }
+		},
+		{
+			"id": "build-up",
+			"type": "think",
+			"group": "before",
+			"level": 4,
+			"title": "Does it start before it starts?",
+			"why": "A message in the afternoon, something to wear, a rule for the day: anticipation is half the fun for many people.",
+			"insert": { "section": "prep", "text": "Beforehand: " }
+		},
+		{
+			"id": "opening-ritual",
+			"type": "think",
+			"group": "before",
+			"level": 4,
+			"title": "How will you know it's begun?",
+			"why": "A collar going on, a position or a phrase can mark the moment you step into the scene, and help you both get there.",
+			"insert": { "section": "ritual", "text": "To begin: " }
+		},
+		{
+			"id": "closing-ritual",
+			"type": "think",
+			"group": "after",
+			"level": 4,
+			"title": "How will you know it's over?",
+			"why": "Taking the collar off, a word or a hug can say clearly that the scene has ended and you're back to being you two.",
+			"insert": { "section": "ritual", "text": "To end: " }
+		},
+		{
+			"id": "aftercare-needs",
+			"type": "think",
+			"group": "after",
+			"level": 1,
+			"title": "What will each of you want afterwards?",
+			"why": "Cuddles, a snack, quiet, a shower, or some time alone: it differs a lot from person to person, so it's worth saying ahead of time.",
+			"insert": { "section": "aftercare", "text": "Afterwards: " }
+		},
+		{
+			"id": "top-aftercare",
+			"type": "think",
+			"group": "after",
+			"level": 3,
+			"title": "Whoever leads needs looking after too",
+			"why": "Being in charge can leave someone drained, or wondering whether they went too far.",
+			"insert": { "section": "aftercare", "text": "For whoever led: " }
+		},
+		{
+			"id": "next-day",
+			"type": "think",
+			"group": "after",
+			"level": 3,
+			"title": "Check in the next day",
+			"why": "A low can arrive a day or two later. A quick \"how are you feeling?\" goes a long way.",
+			"insert": { "section": "aftercare", "text": "Next day: check in" }
+		},
+		{
+			"id": "talk-about-it",
+			"type": "think",
+			"group": "after",
+			"level": 5,
+			"title": "Talk about it after",
+			"why": "What worked, what didn't, what to try next time: a few minutes once you've both come down makes the next one better.",
+			"insert": { "section": "aftercare", "text": "Talking it over: " }
+		}
+	]
+}

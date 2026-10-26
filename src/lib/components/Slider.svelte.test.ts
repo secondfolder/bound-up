@@ -77,4 +77,24 @@ describe('Slider', () => {
 		await rerender({ label: 'Level', value: 3, max: 4 });
 		await waitFor(() => expect(node.value).toBe(3));
 	});
+
+	it('offers Clear above the track while it has a value, when it can be cleared', async () => {
+		const onclear = vi.fn();
+		const { container, rerender } = render(Slider, {
+			label: 'Heat',
+			value: 3,
+			max: 5,
+			status: 'Hot',
+			onclear
+		});
+		await waSettled(container);
+		const clear = () => container.querySelector<HTMLElement>('.status wa-button');
+		expect(container.querySelector('.status')).toHaveTextContent('Hot');
+		expect(clear()).toHaveTextContent('Clear heat');
+		defined(clear(), 'Clear').click();
+		expect(onclear).toHaveBeenCalledOnce();
+
+		await rerender({ value: null });
+		expect(clear()).toBeNull();
+	});
 });

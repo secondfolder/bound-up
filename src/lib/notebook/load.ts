@@ -20,15 +20,21 @@ function browserOnly(): never {
 /** The entry page's live pieces: the session, the editor and the history drawer. */
 export const loadNotebookEditor = browser
 	? async () => {
-			const [session, editor, history] = await Promise.all([
+			const [session, editor, history, scenePrompts, sceneBlockBar] = await Promise.all([
 				import('./session.svelte'),
 				import('$lib/components/notebook/CollaborativeEditor.svelte'),
-				import('$lib/components/notebook/VersionHistory.svelte')
+				import('$lib/components/notebook/VersionHistory.svelte'),
+				// Lexical and the scene catalogue, for a scene's prompt column;
+				// loaded with the editor, which needs Lexical anyway.
+				import('$lib/components/scenes/ScenePrompts.svelte'),
+				import('$lib/components/scenes/SceneBlockBar.svelte')
 			]);
 			return {
 				NotebookSession: session.NotebookSession,
 				CollaborativeEditor: editor.default,
-				VersionHistory: history.default
+				VersionHistory: history.default,
+				ScenePrompts: scenePrompts.default,
+				SceneBlockBar: sceneBlockBar.default
 			};
 		}
 	: browserOnly;

@@ -94,6 +94,15 @@
 	},
 	"overrides": [
 		{
+			// The scene menu designs: each design's rules are scoped to its own
+			// `.design-<id>` class, but noDescendingSpecificity compares
+			// selectors by their last compound alone, so `.design-izakaya … i::before`
+			// "descends" from `.design-fine … .heading::before`, which can never
+			// match the same element. Every report in this file was that.
+			"includes": ["src/lib/scenes/menu-designs.css"],
+			"linter": { "rules": { "style": { "noDescendingSpecificity": "off" } } }
+		},
+		{
 			// The exceptions to "every rule, as an error". See the note on
 			// `linter.rules` above.
 			"includes": ["**"],

@@ -316,6 +316,20 @@
       "when": 1792651055820,
       "tag": "0044_add_task_completion_undo_state",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1792931995599,
+      "tag": "0045_add_scene_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "6",
+      "when": 1792934756467,
+      "tag": "0046_add_scene_help_consents",
+      "breakpoints": true
     }
   ]
 }

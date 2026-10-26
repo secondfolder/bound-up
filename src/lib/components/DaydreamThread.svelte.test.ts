@@ -954,7 +954,7 @@ describe('DaydreamThread', () => {
 		const heat = waByProp(container, 'wa-slider', 'label', 'Heat')[0] as HTMLElement & {
 			value: number;
 		};
-		const level = () => heat.closest('.dial')?.querySelector('.level')?.textContent;
+		const level = () => heat.closest('.clearable')?.querySelector('.status')?.textContent;
 		// Unset: a bare knob, its filled track hidden until it is moved.
 		const fill = () =>
 			getComputedStyle(defined(heat.shadowRoot?.querySelector('[part~="indicator"]'), 'the fill'))
@@ -979,7 +979,7 @@ describe('DaydreamThread', () => {
 		await waitFor(() => expect(waByProp(container, 'wa-slider', 'label', 'Heat')).toHaveLength(1));
 		await waSettled(container);
 		const heat = defined(waByProp(container, 'wa-slider', 'label', 'Heat')[0], 'the heat dial');
-		const level = () => heat.closest('.dial')?.querySelector('.level')?.textContent;
+		const level = () => heat.closest('.clearable')?.querySelector('.status')?.textContent;
 		// Held: the level the knob is on shows, and nothing is saved yet.
 		heat.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
 		await waitFor(() => expect(level()).not.toContain('Not set'));

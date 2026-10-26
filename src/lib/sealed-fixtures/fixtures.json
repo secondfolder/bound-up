@@ -1587,6 +1587,19 @@
 			"expected": {
 				"state": "AQGFsIHyBQAEAQV0aXRsZQZGcm96ZW4A"
 			}
+		},
+		{
+			"kind": "scene-preferences",
+			"version": 1,
+			"recordId": "00000000-0000-4000-8000-0000000000f1",
+			"ciphertext": "sb1.Yt-n5XBFsgCtkfR6xxV1lsu8Y_imB3WTkoQEPlKvRYC0lokyBv9XHmNfIudEBQ2SVsUaqNm9ng9XLGBSxbHruCCUNnd1-ynPMxFgOJFsYokMPHfaDg",
+			"expected": {
+				"levels": {
+					"think": 3,
+					"story": 0
+				},
+				"neverShow": ["next-day"]
+			}
 		}
 	]
 }

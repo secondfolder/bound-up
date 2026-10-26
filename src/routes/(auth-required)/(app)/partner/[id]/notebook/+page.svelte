@@ -50,6 +50,7 @@
 <NotebookList
 	journal={data.journal}
 	notes={data.notes}
+	scenes={data.scenes}
 	room={data.room}
 	today={data.today}
 	sealScope={{ kind: 'partnership', partnershipId }}

@@ -112,6 +112,24 @@ describe('setAccess', () => {
 		expect((await readNotebookEntryRow(harness.db, entry.id))?.partnerAccess).toBe('edit');
 	});
 
+	/** With control shared, the say over an entry is its creator's alone. */
+	it('is refused under shared control to the member who did not create the entry', async () => {
+		await harness.db
+			.update(partnerships)
+			.set({ control: 'both' })
+			.where(eq(partnerships.id, partnershipId));
+		const entry = await createTestNotebookEntry(harness.db, ada, { partnershipId });
+
+		expect((await runLoad(load(at(bo, entry.id)))).entry.canSetAccess).toBe(false);
+		const refused = await runAndCatch(() =>
+			runAction(actions, 'setAccess', at(bo, entry.id, { access: 'hidden' }))
+		);
+		expect(refused).toMatchObject({ type: 'error', status: 403 });
+
+		await runAction(actions, 'setAccess', at(ada, entry.id, { access: 'read' }));
+		expect((await readNotebookEntryRow(harness.db, entry.id))?.partnerAccess).toBe('read');
+	});
+
 	it('refuses an access level that is not one', async () => {
 		const entry = await createTestNotebookEntry(harness.db, ada, { partnershipId });
 		const result = await runAction(actions, 'setAccess', at(ada, entry.id, { access: 'secret' }));
@@ -138,5 +156,34 @@ describe('delete', () => {
 		const result = await runAndCatch(() => runAction(actions, 'delete', at(bo, entry.id)));
 		expect(result).toMatchObject({ type: 'error', status: 403 });
 		expect(await readNotebookEntryRow(harness.db, entry.id)).toBeDefined();
+	});
+});
+
+describe('a scene', () => {
+	it('opens for both partners, with the partner a block can be hidden from', async () => {
+		const scene = await createTestNotebookEntry(harness.db, ada, { partnershipId, kind: 'scene' });
+		const asAda = await runLoad(load(at(ada, scene.id)));
+		expect(asAda.entry.kind).toBe('scene');
+		expect(asAda.scene).toMatchObject({
+			preferences: null,
+			partnerId: bo.id,
+			partnershipId,
+			// Nobody has a kink list, and characters are a Daydreams thing.
+			kinkLists: { own: null, mineForPartner: null, theirs: null },
+			characters: []
+		});
+		expect((await runLoad(load(at(bo, scene.id)))).scene).toMatchObject({ partnerId: ada.id });
+	});
+
+	it('looks like nothing to someone outside the partnership', async () => {
+		const stranger = await createTestUser(harness.db, { name: 'Cy' });
+		const scene = await createTestNotebookEntry(harness.db, ada, { partnershipId, kind: 'scene' });
+		const result = await runAndCatch(() => runLoad(load(at(stranger, scene.id))));
+		expect(result).toMatchObject({ type: 'error', status: 404 });
+	});
+
+	it('has no scene extras for a note', async () => {
+		const note = await createTestNotebookEntry(harness.db, ada, { partnershipId });
+		expect((await runLoad(load(at(ada, note.id)))).scene).toBeNull();
 	});
 });

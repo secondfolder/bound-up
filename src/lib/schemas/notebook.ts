@@ -49,7 +49,7 @@ export const notebookVersionSchema = sealed(NOTEBOOK_LIMITS.snapshotCiphertext).
  */
 export const notebookCreateSchema = z.object({
 	id: clientId,
-	kind: z.string().refine(isNotebookKind, 'Expected a journal entry or a note'),
+	kind: z.string().refine(isNotebookKind, 'Expected a journal entry, a note or a scene'),
 	entryDate: z.string().nullable(),
 	header: sealed(NOTEBOOK_LIMITS.headerCiphertext),
 	firstUpdate: sealedUpdate

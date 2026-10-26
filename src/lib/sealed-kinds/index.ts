@@ -28,6 +28,7 @@ import {
 	notebookUpdateKind
 } from './notebook';
 import { partnershipInviteKind, partnershipNamesKind } from './partnerships';
+import { scenePreferencesKind } from './scenes';
 import { tagKind } from './tags';
 import { rewardKind, taskKind } from './tasks';
 
@@ -52,5 +53,6 @@ export const ALL_SEALED_KINDS: readonly SealedKind<unknown>[] = [
 	notebookEntryKind,
 	notebookUpdateKind,
 	notebookAwarenessKind,
-	notebookSnapshotKind
+	notebookSnapshotKind,
+	scenePreferencesKind
 ];

@@ -1,6 +1,23 @@
 import { z } from 'zod';
 // LEGACY-RICHTEXT — the one import of the legacy reader; see docs/temporary-code.md
 import { legacyTextToDocument } from '$lib/richtext-legacy';
+import {
+	MAX_EXTRA_LABEL,
+	MAX_MENU_SUBTITLE,
+	MAX_MENU_TITLE,
+	MAX_RATING,
+	type MenuLineRole,
+	SCENE_SECTIONS,
+	type SceneSection
+} from '$lib/scenes/blocks';
+import {
+	DEFAULT_MENU_DESIGN,
+	MAX_MENU_COPY,
+	MENU_DESIGN_IDS,
+	type MenuCopyOverrides,
+	type MenuDesignId,
+	type MenuPictureChoices
+} from '$lib/scenes/menu-designs';
 
 /**
  * The rich-text document: what every freetext field in the app stores, and
@@ -73,13 +90,85 @@ export type RichTextInlineNode =
 			children: RichTextInlineNode[];
 	  };
 
+export type RichTextParagraphNode = { type: 'paragraph'; children: RichTextInlineNode[] };
+
+/**
+ * A heading (`h2`) or subheading (`h3`): a line of its own, set larger. `h1`
+ * is the page's title, which is never part of the document. See
+ * docs/rich-text.md, "Headings".
+ */
+export type RichTextHeadingNode = {
+	type: 'heading';
+	tag: 'h2' | 'h3';
+	children: RichTextInlineNode[];
+};
+
+export type RichTextListNode = {
+	type: 'list';
+	listType: 'bullet' | 'number';
+	start: number;
+	children: { type: 'listitem'; value: number; children: RichTextInlineNode[] }[];
+};
+
+/**
+ * A line of a scene's menu: a heading (which starts a course), a subheading
+ * within one, or an item. See docs/scenes.md.
+ */
+export type RichTextMenuLineNode = {
+	type: 'scene-menu-line';
+	role: MenuLineRole;
+	/** Its place on the menu's scale, 1 to 5, shown only when the menu has one. */
+	rating: number | null;
+	/** Its number, shown only when the menu has one. */
+	value: number | null;
+	kinkId: string | null;
+	hiddenFrom: string | null;
+	children: RichTextInlineNode[];
+};
+
+/** A course of a scene's menu: its heading line, if it has one, then its items. */
+export type RichTextMenuCourseNode = {
+	type: 'scene-menu-course';
+	/** The picture chosen for it, per design id, on a design whose courses have one. */
+	art: Readonly<Record<string, string>>;
+	children: RichTextMenuLineNode[];
+};
+
 export type RichTextBlockNode =
-	| { type: 'paragraph'; children: RichTextInlineNode[] }
+	| RichTextParagraphNode
+	| RichTextHeadingNode
+	| RichTextListNode
+	/**
+	 * A scene's section (signals, limits, aftercare…): ordinary lines inside a
+	 * labelled block. `hiddenFrom` names the partner it is a surprise for.
+	 * Only a scene's page makes one. See docs/scenes.md, "Blocks".
+	 */
 	| {
-			type: 'list';
-			listType: 'bullet' | 'number';
-			start: number;
-			children: { type: 'listitem'; value: number; children: RichTextInlineNode[] }[];
+			type: 'scene-section';
+			section: SceneSection;
+			hiddenFrom: string | null;
+			children: (RichTextParagraphNode | RichTextHeadingNode | RichTextListNode)[];
+	  }
+	/** A scene's menu: courses, each a heading and the items under it, in one of the designs. */
+	| {
+			type: 'scene-menu';
+			/** Its own title in place of the design's; empty for the design's. */
+			title: string;
+			/** A line under the title; empty for none. */
+			subtitle: string;
+			hiddenFrom: string | null;
+			design: MenuDesignId;
+			/** The scale's name, or null when items are not rated. */
+			scale: string | null;
+			/** What an item's number means, or null when items have none. */
+			value: string | null;
+			/** What it has rewritten of its designs' own copy, per design. */
+			copy: MenuCopyOverrides;
+			/** The mascot chosen, per design, where a design has one. */
+			mascot: Readonly<Record<string, string>>;
+			/** The pictures chosen for a design's row, per design and place. */
+			pictures: MenuPictureChoices;
+			children: RichTextMenuCourseNode[];
 	  }
 	/**
 	 * A root-level embed, which is where every embed used to go: above the whole
@@ -149,6 +238,13 @@ const paragraphNodeSchema = z.object({
 	children: z.array(inlineNodeSchema)
 });
 
+// Any other level a writer's browser might store reads as a subheading.
+const headingNodeSchema = z.object({
+	type: z.literal('heading'),
+	tag: z.enum(['h2', 'h3']).catch('h3'),
+	children: z.array(inlineNodeSchema)
+});
+
 const listNodeSchema = z.object({
 	type: z.literal('list'),
 	listType: z.union([z.literal('bullet'), z.literal('number')]),
@@ -162,10 +258,57 @@ const listNodeSchema = z.object({
 	)
 });
 
+// A partner's browser wrote these, so every field is read leniently, as the
+// list's `start` is: a value this build does not know falls back rather than
+// throwing the whole document away.
+const hiddenFromSchema = z.string().max(64).nullable().catch(null);
+
+const sceneSectionNodeSchema = z.object({
+	type: z.literal('scene-section'),
+	section: z.enum(SCENE_SECTIONS).catch('notes'),
+	hiddenFrom: hiddenFromSchema,
+	children: z.array(z.union([paragraphNodeSchema, headingNodeSchema, listNodeSchema]))
+});
+
+const menuLineNodeSchema = z.object({
+	type: z.literal('scene-menu-line'),
+	role: z.enum(['heading', 'subheading', 'item']).catch('item'),
+	rating: z.number().int().min(1).max(MAX_RATING).nullable().catch(null),
+	value: z.number().finite().nullable().catch(null),
+	kinkId: z.string().max(80).nullable().catch(null),
+	hiddenFrom: hiddenFromSchema,
+	children: z.array(inlineNodeSchema)
+});
+
+const menuCourseNodeSchema = z.object({
+	type: z.literal('scene-menu-course'),
+	art: z.record(z.string().max(40), z.string().max(40)).catch({}),
+	children: z.array(menuLineNodeSchema)
+});
+
+const sceneMenuNodeSchema = z.object({
+	type: z.literal('scene-menu'),
+	title: z.string().max(MAX_MENU_TITLE).catch(''),
+	subtitle: z.string().max(MAX_MENU_SUBTITLE).catch(''),
+	hiddenFrom: hiddenFromSchema,
+	design: z.enum(MENU_DESIGN_IDS).catch(DEFAULT_MENU_DESIGN),
+	scale: z.string().max(MAX_EXTRA_LABEL).nullable().catch(null),
+	value: z.string().max(MAX_EXTRA_LABEL).nullable().catch(null),
+	copy: z
+		.record(z.string().max(40), z.record(z.string().max(40), z.string().max(MAX_MENU_COPY)))
+		.catch({}),
+	mascot: z.record(z.string().max(40), z.string().max(40)).catch({}),
+	pictures: z.record(z.string().max(40), z.record(z.string().max(4), z.string().max(40))).catch({}),
+	children: z.array(menuCourseNodeSchema)
+});
+
 const blockNodeSchema: z.ZodType<RichTextBlockNode> = z.union([
 	paragraphNodeSchema,
+	headingNodeSchema,
 	listNodeSchema,
-	embedNodeSchema
+	embedNodeSchema,
+	sceneSectionNodeSchema,
+	sceneMenuNodeSchema
 ]);
 
 export const richTextDocumentSchema: z.ZodType<RichTextDocument> = z.object({
@@ -357,14 +500,34 @@ export function plainTextToDocument(text: string): RichTextDocument {
  */
 export function documentToPlainText(doc: RichTextDocument): string {
 	const lines: string[] = [];
-	for (const block of doc.root.children) {
-		if (block.type === 'paragraph') {
+	const add = (block: RichTextBlockNode | RichTextMenuCourseNode | RichTextMenuLineNode) => {
+		if (
+			block.type === 'paragraph' ||
+			block.type === 'heading' ||
+			block.type === 'scene-menu-line'
+		) {
 			lines.push(inlineText(block.children));
 		} else if (block.type === 'list') {
 			for (const item of block.children) {
 				lines.push(inlineText(item.children));
 			}
+		} else if (
+			block.type === 'scene-section' ||
+			block.type === 'scene-menu' ||
+			block.type === 'scene-menu-course'
+		) {
+			// A menu's title and subtitle are someone's words too, unlike the
+			// design's title they stand in for.
+			if (block.type === 'scene-menu') {
+				lines.push(...[block.title, block.subtitle].filter(Boolean));
+			}
+			for (const child of block.children) {
+				add(child);
+			}
 		}
+	};
+	for (const block of doc.root.children) {
+		add(block);
 	}
 	return lines.join('\n').trim();
 }
@@ -406,16 +569,27 @@ export function documentEmbedUrls(doc: RichTextDocument): string[] {
 			}
 		}
 	};
-	for (const block of doc.root.children) {
+	const visit = (block: RichTextBlockNode | RichTextMenuCourseNode | RichTextMenuLineNode) => {
 		if (block.type === 'embed') {
 			seen.add(block.url);
-		} else if (block.type === 'paragraph') {
+		} else if (
+			block.type === 'paragraph' ||
+			block.type === 'heading' ||
+			block.type === 'scene-menu-line'
+		) {
 			walk(block.children);
-		} else {
+		} else if (block.type === 'list') {
 			for (const item of block.children) {
 				walk(item.children);
 			}
+		} else {
+			for (const child of block.children) {
+				visit(child);
+			}
 		}
+	};
+	for (const block of doc.root.children) {
+		visit(block);
 	}
 	return [...seen];
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import InlineButton from './InlineButton.svelte';
 
 	/**
 	 * Every slider in Bound Up: `wa-slider` with the behaviour this app wants
@@ -23,6 +24,14 @@
 	 * rather than something middling. The bare knob sits at `restingValue`
 	 * with no filled track, and pressing it without moving it sets the level
 	 * it sits at, since it already looks like a level.
+	 *
+	 * **Clearable** (`onclear`): an unset slider that can be taken back to
+	 * unset once set. A row above the track holds its title at the left and,
+	 * at the right, Clear while it has a value, after any `status` (the
+	 * level in words, say). The row is drawn here rather than in the slider's
+	 * label, which is a <label>, and a button must not go in one: the slider
+	 * keeps that label for its accessible name, out of sight, and the row's
+	 * title is hidden from assistive tech instead.
 	 *
 	 * Controlled: `value` is the level, and a new one is asked for through
 	 * `onchange` (and, while dragging, `oninput`). A value set from outside
@@ -49,7 +58,9 @@
 		reference,
 		oninput,
 		onchange,
-		ondrag
+		ondrag,
+		onclear,
+		status
 	}: {
 		/** Its accessible name, and its visible label unless `labelHidden`. */
 		label: string;
@@ -86,6 +97,10 @@
 		onchange?: (value: number) => void;
 		/** A drag began or ended: from the pointer going down on it to it coming up anywhere. */
 		ondrag?: (dragging: boolean) => void;
+		/** Asked to go back to unset, from its Clear (see "Clearable" above). */
+		onclear?: () => void;
+		/** Words beside Clear on a clearable slider: its level, said in words. */
+		status?: string;
 	} = $props();
 
 	type WaSlider = HTMLElement & { value: number; valueFormatter?: (value: number) => string };
@@ -316,30 +331,75 @@
 	}
 </script>
 
-<wa-slider
-	{@attach wire}
-	{@attach notches}
-	class="slider {className}"
-	class:label-hidden={labelHidden}
-	class:unset={value === null && !held}
-	{label}
-	{name}
-	{min}
-	{max}
-	step={notched ? step / DRAG_DIVISIONS : step}
-	value={startValue}
-	size={size ?? "m"}
->
-	{#if low !== undefined}
-		<span slot="reference">{low}</span>
-	{/if}
-	{#if high !== undefined}
-		<span slot="reference">{high}</span>
-	{/if}
-	{@render reference?.()}
-</wa-slider>
+{#snippet track()}
+	<wa-slider
+		{@attach wire}
+		{@attach notches}
+		class={["slider", onclear === undefined && className]}
+		class:label-hidden={labelHidden || onclear !== undefined}
+		class:unset={value === null && !held}
+		{label}
+		{name}
+		{min}
+		{max}
+		step={notched ? step / DRAG_DIVISIONS : step}
+		value={startValue}
+		size={size ?? "m"}
+	>
+		{#if low !== undefined}
+			<span slot="reference">{low}</span>
+		{/if}
+		{#if high !== undefined}
+			<span slot="reference">{high}</span>
+		{/if}
+		{@render reference?.()}
+	</wa-slider>
+{/snippet}
+
+{#if onclear}
+	<!-- Clear's name ends in hidden text, so each is told apart ("Clear heat"). -->
+	<div class={['clearable', className]}>
+		<div class="heading">
+			{#if !labelHidden}
+				<span class="title" aria-hidden="true">{label}</span>
+			{/if}
+			<!-- Clear inherits its size and colour from the status beside it. -->
+			<span class="status">
+				{status ?? ''}
+				{#if value !== null}
+					<InlineButton onclick={onclear}>
+						Clear <span class="wa-visually-hidden">{label.toLowerCase()}</span>
+					</InlineButton>
+				{/if}
+			</span>
+		</div>
+		{@render track()}
+	</div>
+{:else}
+	{@render track()}
+{/if}
 
 <style>
+	.clearable .heading {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		margin-block-end: 0.25rem;
+	}
+
+	.clearable .title {
+		flex: 1 1 auto;
+		font-weight: var(--wa-form-control-label-font-weight);
+		color: var(--wa-form-control-label-color);
+	}
+
+	/* At the right whether or not there is a title before it. */
+	.clearable .status {
+		margin-inline-start: auto;
+		font-size: 0.8125rem;
+		color: var(--wa-color-text-quiet);
+	}
+
 	.slider {
 		inline-size: 100%;
 

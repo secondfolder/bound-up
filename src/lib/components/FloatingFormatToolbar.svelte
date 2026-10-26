@@ -1,3 +1,18 @@
+<script module lang="ts">
+	/**
+	 * A button a caller adds to the toolbar: an action on the selection.
+	 * `offered`, when given, is asked on every selection change, inside a
+	 * read of the editor's state, whether the action makes sense for this
+	 * selection; a button that would do nothing is not shown.
+	 */
+	export type ToolbarAction = {
+		label: string;
+		icon: string;
+		run: () => void;
+		offered?: () => boolean;
+	};
+</script>
+
 <script lang="ts">
 	import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
 	import { $isLinkNode as isLinkNode, $toggleLink as toggleLink } from '@lexical/link';
@@ -18,6 +33,11 @@
 		type TextFormatType
 	} from 'lexical';
 	import { isSafeHttpUrl } from '$lib/embeds';
+	import {
+		type BlockKind,
+		$selectionBlockKind as selectionBlockKind,
+		$setBlockKind as setBlockKind
+	} from '$lib/lexical/block-kind';
 	import type { RichTextFeature } from '$lib/richtext-editor';
 
 	/**
@@ -43,8 +63,20 @@
 	 *    editor, or the selection collapses and the toolbar decides there is
 	 *    nothing to show.
 	 */
-	let { editor, features }: { editor: LexicalEditor; features: readonly RichTextFeature[] } =
-		$props();
+	let {
+		editor,
+		features,
+		actions = []
+	}: {
+		editor: LexicalEditor;
+		features: readonly RichTextFeature[];
+		/**
+		 * Buttons of the caller's own, after the formatting ones, for things a
+		 * particular editor can do with a selection (a scene's "Make a menu").
+		 * An action with no `active` is a plain button, not a toggle.
+		 */
+		actions?: readonly ToolbarAction[];
+	} = $props();
 
 	type Button = {
 		feature: RichTextFeature;
@@ -55,6 +87,8 @@
 	};
 
 	let visible = $state(false);
+	/** The caller's actions that suit the current selection. */
+	let offeredActions = $state.raw<readonly ToolbarAction[]>([]);
 	let active = $state<Record<string, boolean>>({});
 	let bar: HTMLDivElement | undefined = $state();
 
@@ -69,6 +103,39 @@
 	function format(type: TextFormatType) {
 		editor.dispatchCommand(FORMAT_TEXT_COMMAND, type);
 	}
+
+	/**
+	 * The style of the selected lines: a heading, a subheading or body text,
+	 * chosen from a small menu of its own. In a scene's menu this changes a
+	 * line's role, which is what divides the menu into courses
+	 * (`$setBlockKind`).
+	 *
+	 * Built here rather than as a `wa-dropdown`: opening that takes focus out
+	 * of the editor, the selection collapses, and the toolbar closes under the
+	 * menu. Native buttons that keep focus where it is, as the rest of the bar
+	 * does, leave the selection alone.
+	 */
+	const KINDS: { kind: BlockKind; label: string }[] = [
+		{ kind: 'heading', label: 'Heading' },
+		{ kind: 'subheading', label: 'Subheading' },
+		{ kind: 'body', label: 'Body' }
+	];
+
+	let kindsOpen = $state(false);
+
+	const currentKind = $derived(KINDS.find(({ kind }) => active[kind])?.label ?? 'Mixed');
+
+	function setKind(kind: BlockKind) {
+		editor.update(() => setBlockKind(kind));
+		kindsOpen = false;
+	}
+
+	// A closed toolbar takes its menu with it.
+	$effect(() => {
+		if (!visible) {
+			kindsOpen = false;
+		}
+	});
 
 	const BUTTONS: Button[] = [
 		{
@@ -192,7 +259,11 @@
 
 			const anchor = selection.anchor.getNode();
 			const list = findMatchingParent(anchor, isListNode);
+			const kind = selectionBlockKind();
 			active = {
+				heading: kind === 'heading',
+				subheading: kind === 'subheading',
+				body: kind === 'body',
 				bold: selection.hasFormat('bold'),
 				italic: selection.hasFormat('italic'),
 				strikethrough: selection.hasFormat('strikethrough'),
@@ -201,6 +272,7 @@
 				bullet: isListNode(list) && list.getListType() === 'bullet',
 				number: isListNode(list) && list.getListType() === 'number'
 			};
+			offeredActions = actions.filter((action) => action.offered?.() ?? true);
 			hasRange = true;
 		});
 
@@ -314,7 +386,7 @@
 	});
 </script>
 
-{#if shown.length > 0}
+{#if shown.length > 0 || actions.length > 0 || features.includes('heading')}
 	<div
 		bind:this={bar}
 		popover="manual"
@@ -323,6 +395,46 @@
 		role="toolbar"
 		aria-label="Text formatting"
 	>
+		{#if features.includes('heading')}
+			<div class="kinds">
+				<!-- A menu trigger, so a native button: wa-button forwards no aria-expanded. -->
+				<button
+					type="button"
+					class="kinds-trigger"
+					aria-haspopup="menu"
+					aria-expanded={kindsOpen}
+					aria-label="Text style: {currentKind}"
+					onpointerdown={(event) => event.preventDefault()}
+					onclick={() => {
+						kindsOpen = !kindsOpen;
+					}}
+					onkeydown={(event) => {
+						if (event.key === 'Escape') {
+							kindsOpen = false;
+						}
+					}}
+				>
+					{currentKind}
+					<wa-icon name="chevron-down" variant="solid"></wa-icon>
+				</button>
+				{#if kindsOpen}
+					<div class="kinds-menu" role="menu" aria-label="Text style">
+						{#each KINDS as { kind, label } (kind)}
+							<button
+								type="button"
+								role="menuitemradio"
+								aria-checked={active[kind] === true}
+								class="kind {kind}"
+								onpointerdown={(event) => event.preventDefault()}
+								onclick={() => setKind(kind)}
+							>
+								{label}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
 		{#each shown as button (button.label)}
 			<!-- Native on purpose: these are toggles, and `aria-pressed` is what tells
 			     a screen reader whether bold is on. `wa-button` does not forward ARIA
@@ -341,6 +453,23 @@
 				onclick={button.run}
 			>
 				<wa-icon name={button.icon} variant="solid"></wa-icon>
+			</button>
+		{/each}
+		{#each offeredActions as action (action.label)}
+			<!-- A plain button: an action, not a toggle, so it carries no
+			     aria-pressed. Native for the same focus handling as the rest. -->
+			<button
+				type="button"
+				class="action"
+				aria-label={action.label}
+				title={action.label}
+				onpointerdown={(event) => event.preventDefault()}
+				onclick={() => {
+					action.run();
+					visible = false;
+				}}
+			>
+				<wa-icon name={action.icon} variant="solid"></wa-icon>
 			</button>
 		{/each}
 	</div>
@@ -392,6 +521,63 @@
 
 		&.active {
 			background: var(--wa-color-brand-fill-quiet, rgb(37 99 235 / 18%));
+		}
+	}
+
+	/* The text style menu: a trigger as wide as its words, a divider after it,
+	   and its choices in a list below, each set in the style it applies. */
+	.kinds {
+		position: relative;
+		padding-inline-end: 0.25rem;
+		margin-inline-end: 0.125rem;
+		border-inline-end: 1px solid var(--wa-color-surface-border);
+	}
+
+	.kinds-trigger {
+		display: flex;
+		gap: 0.375rem;
+		inline-size: auto;
+		min-inline-size: 6.5rem;
+		justify-content: space-between;
+		padding-inline: 0.5rem;
+
+		wa-icon {
+			font-size: 0.625rem;
+		}
+	}
+
+	.kinds-menu {
+		position: absolute;
+		inset-block-start: calc(100% + 0.375rem);
+		inset-inline-start: 0;
+		display: flex;
+		flex-direction: column;
+		min-inline-size: 9rem;
+		padding: 0.25rem;
+		border-radius: 0.5rem;
+		border: 1px solid var(--wa-color-surface-border);
+		background: var(--wa-color-surface-raised, white);
+		box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 18%);
+	}
+
+	.kind {
+		display: block;
+		inline-size: 100%;
+		block-size: auto;
+		padding: 0.375rem 0.5rem;
+		text-align: start;
+
+		&[aria-checked='true'] {
+			background: var(--wa-color-brand-fill-quiet, rgb(37 99 235 / 18%));
+		}
+
+		&.heading {
+			font-size: 1.05rem;
+			font-weight: var(--wa-font-weight-bold);
+		}
+
+		&.subheading {
+			font-weight: var(--wa-font-weight-semibold);
 		}
 	}
 </style>

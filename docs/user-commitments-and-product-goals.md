@@ -148,7 +148,10 @@ for a link beside it. The scrollport wait that remains is about request volume,
 not consent.
 
 Daydreams are the one feature whose content the server, and a third party,
-routinely see in plaintext. A daydream's replies are written by a hosted
+routinely see in plaintext. (A scene's help from the model is the other place
+words go to a model, and only when someone presses a button that asks; it
+keeps the same commitments, with an agreement of its own:
+[scenes.md](scenes.md#help-from-the-model).) A daydream's replies are written by a hosted
 language model, and a model has to read the story to write it, so while
 someone plays, the setup and recent turns go through Bound Up to OpenRouter
 and a model provider — and so does a character or idea being set up, when

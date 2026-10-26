@@ -79,7 +79,7 @@ test('a SFW starting point keeps the story SFW, and the heat can be turned up mi
 		slider.value = 5;
 		slider.dispatchEvent(new Event('change'));
 	});
-	await expect(page.locator('wa-popover .level').first()).toContainText('Filthy');
+	await expect(page.locator('wa-popover .status').first()).toContainText('Filthy');
 	await page.keyboard.press('Escape');
 
 	const said = `I open the door ${randomUUID().slice(0, 8)}.`;

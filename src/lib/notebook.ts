@@ -10,13 +10,17 @@
 
 import { type PartnershipControl, roleOf } from './partnership';
 
-/** Journal entries are dated; notes are free pages. Otherwise they are the same thing. */
-export type NotebookKind = 'journal' | 'note';
+/**
+ * Journal entries are dated; notes are free pages; scenes are plans for play,
+ * with the scene designer's prompts beside them (docs/scenes.md). Otherwise
+ * they are the same thing.
+ */
+export type NotebookKind = 'journal' | 'note' | 'scene';
 
-export const NOTEBOOK_KINDS: readonly NotebookKind[] = ['journal', 'note'];
+export const NOTEBOOK_KINDS: readonly NotebookKind[] = ['journal', 'note', 'scene'];
 
 export function isNotebookKind(value: unknown): value is NotebookKind {
-	return value === 'journal' || value === 'note';
+	return value === 'journal' || value === 'note' || value === 'scene';
 }
 
 /**
@@ -47,6 +51,11 @@ export type EntryForAccess =
 			partnerAccess: PartnerAccess;
 			/** Who restricted it; the restriction applies to the other member. */
 			accessSetByUserId: string | null;
+			/**
+			 * Who wrote it first. With control shared, only they may restrict
+			 * it; null once their account is gone.
+			 */
+			createdByUserId: string | null;
 	  };
 
 /** A partnership as the rules need it. */
@@ -88,21 +97,47 @@ export function entryAccessFor(
 }
 
 /**
+ * Whether `userId` is the member who decides who else may see or edit
+ * `entry`: whoever holds the partnership's control, or, when control is
+ * shared, the member who created the entry.
+ *
+ * Shared control used to let either member restrict any entry, and the other
+ * could not undo it, so two people who had agreed to share control could
+ * each hide the other's writing from them. Giving the say to the creator
+ * keeps "it's mine, so I choose" without that. An entry whose creator has
+ * deleted their account falls back to either member, so it never has nobody
+ * who can lift a restriction on it.
+ */
+export function holdsAccessAuthority(
+	entry: Extract<EntryForAccess, { scope: 'partnership' }>,
+	userId: string,
+	partnership: PartnershipForAccess
+): boolean {
+	if (!holdsControl(partnership, userId)) {
+		return false;
+	}
+	if (partnership.control !== 'both' || entry.createdByUserId === null) {
+		return true;
+	}
+	return entry.createdByUserId === userId;
+}
+
+/**
  * Whether `viewerId` may change a partnership entry's access.
  *
- * They must hold control. And a restriction somebody else set binds them
- * (they cannot lift what was set against them) for as long as its setter
- * still holds control too, which is what `control: 'both'` means: either may
- * restrict, and the other cannot undo it. Once control has moved away from
- * the setter, the member now holding it may lift it, so handing control over
- * never leaves anyone locked out of their own partnership's notebook.
+ * The viewer needs the say themselves (`holdsAccessAuthority`). A
+ * restriction somebody else set also binds them for as long as its setter
+ * still has the say; once the say has moved, the member who has it now may
+ * lift it, so handing control over never leaves anyone locked out of their
+ * own partnership's notebook. That is also what frees an entry a non-creator
+ * restricted under shared control from before only the creator could.
  */
 export function canSetAccess(
 	entry: Extract<EntryForAccess, { scope: 'partnership' }>,
 	viewerId: string,
 	partnership: PartnershipForAccess
 ): boolean {
-	if (!holdsControl(partnership, viewerId)) {
+	if (!holdsAccessAuthority(entry, viewerId, partnership)) {
 		return false;
 	}
 	const restrictedByOther =
@@ -112,7 +147,7 @@ export function canSetAccess(
 	if (!restrictedByOther) {
 		return true;
 	}
-	return !holdsControl(partnership, entry.accessSetByUserId as string);
+	return !holdsAccessAuthority(entry, entry.accessSetByUserId as string, partnership);
 }
 
 /** Whether `access` lets its holder write. */

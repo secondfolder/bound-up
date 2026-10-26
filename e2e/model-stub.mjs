@@ -309,6 +309,14 @@ function suggestionFor(messages) {
 				}
 			]
 		};
+	} else if (ask.includes('{"ideas":[{"title":"…","why"')) {
+		// A scene's "What might we have missed?" (src/lib/scenes/model-help.ts).
+		content = {
+			ideas: [{ title: 'Stub: water within reach?', why: 'A stub reason.', section: 'prep' }]
+		};
+	} else if (ask.includes('{"courses"')) {
+		// A scene's "Suggest a menu".
+		content = { courses: [{ name: 'Stub starters', items: ['stub massage', 'stub kisses'] }] };
 	} else if (ask.includes('{"chips"')) {
 		content = { chips: ['stub idea', 'another stub idea'] };
 	} else if (ask.includes('Invent an idea')) {

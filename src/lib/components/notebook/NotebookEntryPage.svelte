@@ -1,16 +1,19 @@
 <script lang="ts">
+	import type { LexicalEditor } from 'lexical';
 	import { invalidate } from '$app/navigation';
 	import NestedPageHeader from '$lib/components/NestedPageHeader.svelte';
+	import SidePanelLayout from '$lib/components/SidePanelLayout.svelte';
 	import { currentKeyring } from '$lib/crypto/session.svelte';
-	import type { PartnerAccess } from '$lib/notebook';
+	import type { NotebookKind, PartnerAccess } from '$lib/notebook';
 	import type { CursorLabel } from '$lib/notebook/collab';
 	import { loadNotebookEditor } from '$lib/notebook/load';
 	import type { NotebookSession } from '$lib/notebook/session.svelte';
 	import { textChange } from '$lib/notebook/text-diff';
 	import type { RoomKey } from '$lib/realtime/live';
 	import type { RichTextDocument } from '$lib/richtext';
+	import type { ScenePreferencesData } from '$lib/scenes/preferences-store.svelte';
 	import type { SealScope } from '$lib/sealed-forms';
-	import type { SealedRefView } from '$lib/types';
+	import type { DaydreamLibraryItemView, KinkListView, SealedRefView } from '$lib/types';
 	import AccessControl from './AccessControl.svelte';
 	import type CollaborativeEditor from './CollaborativeEditor.svelte';
 	import EntryTitle from './EntryTitle.svelte';
@@ -24,7 +27,7 @@
 	type EntryData = {
 		id: string;
 		header: SealedRefView | null;
-		kind: 'journal' | 'note';
+		kind: NotebookKind;
 		entryDate: string | null;
 		vaultId: string;
 		revision: number;
@@ -36,6 +39,7 @@
 
 	let {
 		entry,
+		scene = null,
 		room,
 		viewerId,
 		sealScope,
@@ -47,6 +51,19 @@
 		onGone
 	}: {
 		entry: EntryData;
+		/** A scene's extras, for its prompt column; null for a journal entry or a note. */
+		scene?: {
+			preferences: ScenePreferencesData;
+			partnerId: string | null;
+			partnershipId: string | null;
+			kinkLists: {
+				own: KinkListView | null;
+				mineForPartner: KinkListView | null;
+				theirs: KinkListView | null;
+			};
+			characters: DaydreamLibraryItemView[];
+			help: { available: boolean; accepted: boolean };
+		} | null;
 		room: RoomKey;
 		viewerId: string;
 		sealScope: SealScope;
@@ -66,6 +83,12 @@
 	let live = $state<Awaited<ReturnType<typeof loadNotebookEditor>> | null>(null);
 	let session = $state<NotebookSession | null>(null);
 	let editor: CollaborativeEditor | undefined = $state();
+	/** The entry's settings popover, for its Cancel to close. */
+	let settings: (HTMLElement & { open: boolean }) | undefined = $state();
+	/** The bound Lexical editor, for a scene's prompt column to write into. */
+	let lexicalEditor = $state.raw<LexicalEditor | null>(null);
+	/** What a scene's column is showing, for its title. */
+	let columnMode = $state<'prompts' | 'menu'>('prompts');
 	let historyOpen = $state(false);
 	let deleteDialog: (HTMLElement & { open: boolean }) | undefined = $state();
 
@@ -203,6 +226,12 @@
 		}
 	}
 
+	const TITLE_PLACEHOLDER: Record<NotebookKind, string> = {
+		journal: 'Give this entry a title',
+		note: 'Untitled note',
+		scene: 'Name this scene'
+	};
+
 	const accessNote = $derived.by(() => {
 		if (entry.partnerAccess === 'edit') {
 			return null;
@@ -216,7 +245,36 @@
 	});
 </script>
 
-<section class="page">
+<!-- Stretched to the foot of the page, so a click anywhere below the text
+     lands in the editor rather than on nothing. -->
+{#snippet body()}
+	{#if scene && live && lexicalEditor}
+		<live.SceneBlockBar editor={lexicalEditor} partnerId={scene.partnerId} {readOnly} />
+	{/if}
+	<div class="entry-body">
+		{#if live && session}
+			{#key session}
+				<live.CollaborativeEditor
+					bind:this={editor}
+					{session}
+					userId={viewerId}
+					{cursorLabel}
+					{readOnly}
+					scene={entry.kind === 'scene'}
+					partnerId={scene?.partnerId ?? null}
+					placeholder={entry.kind === 'scene'
+						? 'Write as much or as little as you like. Ideas are beside you if you want them.'
+						: undefined}
+					onEditor={(bound) => {
+						lexicalEditor = bound;
+					}}
+				/>
+			{/key}
+		{/if}
+	</div>
+{/snippet}
+
+<section class="page" class:wide={entry.kind === 'scene'}>
 	<NestedPageHeader backHref={back.href} backLabel={back.label} backText={back.text} />
 
 	<div class="content">
@@ -237,28 +295,62 @@
 			</wa-callout>
 			<wa-button href={back.href} appearance="outlined">Back to the notebook</wa-button>
 		{:else}
-			<div class="toolbar">
-				<div class="status" aria-live="polite">
-					{#if entry.kind === 'journal'}<span class="date">{dateLabel(entry.entryDate)}</span>{/if}
-					<span class="save" class:problem={session.saveState === 'offline' || session.saveState === 'too-large'}
-						>{saveText}</span
-					>
-					{#if session.live === 'polling'}<span class="quiet">Live editing paused</span>{/if}
-					{#each presence as name (name)}
-						<wa-badge variant="brand" appearance="filled" pill>{name} is here</wa-badge>
-					{/each}
-				</div>
-				<div class="actions">
-					<wa-button size="s" appearance="outlined" onclick={openHistory}>
-						<wa-icon slot="start" name="clock-rotate-left"></wa-icon>
-						History
-					</wa-button>
-					{#if entry.canWrite}
-						<wa-button size="s" appearance="outlined" variant="danger" onclick={openDelete}>
-							<wa-icon slot="start" name="trash-can"></wa-icon>
-							Delete
+			<!-- The title, with the save status and the entry's buttons at its
+			     end: on one row where they fit, and where they do not, the
+			     buttons on a row of their own above it (`wrap-reverse`). -->
+			<div class="head">
+				<EntryTitle
+					text={session.title}
+					{readOnly}
+					placeholder={TITLE_PLACEHOLDER[entry.kind]}
+				/>
+				<div class="toolbar">
+					<div class="status" aria-live="polite">
+						{#if entry.kind === 'journal'}<span class="date">{dateLabel(entry.entryDate)}</span>{/if}
+						<span class="save" class:problem={session.saveState === 'offline' || session.saveState === 'too-large'}
+							>{saveText}</span
+						>
+						{#if session.live === 'polling'}<span class="quiet">Live editing paused</span>{/if}
+						{#each presence as name (name)}
+							<wa-badge variant="brand" appearance="filled" pill>{name} is here</wa-badge>
+						{/each}
+					</div>
+					<div class="actions">
+						{#if entry.canSetAccess}
+							<!-- The entry's settings, out of the way of the writing: who
+							     else can see it, for the member with the say over that. -->
+							<wa-button id="entry-settings" size="s" appearance="outlined">
+								<wa-icon slot="start" name="gear"></wa-icon>
+								Settings
+							</wa-button>
+							<wa-popover
+								for="entry-settings"
+								placement="bottom-end"
+								class="settings"
+								bind:this={settings}
+							>
+								<AccessControl
+									access={entry.partnerAccess}
+									partnerLabel={partnerLabel ?? 'Your partner'}
+									oncancel={() => {
+										if (settings) {
+											settings.open = false;
+										}
+									}}
+								/>
+							</wa-popover>
+						{/if}
+						<wa-button size="s" appearance="outlined" onclick={openHistory}>
+							<wa-icon slot="start" name="clock-rotate-left"></wa-icon>
+							History
 						</wa-button>
-					{/if}
+						{#if entry.canWrite}
+							<wa-button size="s" appearance="outlined" variant="danger" onclick={openDelete}>
+								<wa-icon slot="start" name="trash-can"></wa-icon>
+								Delete
+							</wa-button>
+						{/if}
+					</div>
 				</div>
 			</div>
 
@@ -271,31 +363,42 @@
 
 			{#if accessNote}<p class="quiet access-note">{accessNote}</p>{/if}
 
-			<EntryTitle
-				text={session.title}
-				{readOnly}
-				placeholder={entry.kind === 'journal' ? 'Give this entry a title' : 'Untitled note'}
-			/>
-
-			<!-- Stretched to the foot of the page, so a click anywhere below the
-			     text lands in the editor rather than on nothing. -->
-			<div class="entry-body">
-				{#if live}
-					{#key session}
-						<live.CollaborativeEditor
-							bind:this={editor}
-							{session}
+			{#if scene && live}
+				{const Prompts = $derived(live.ScenePrompts)}
+				{const current = $derived(session)}
+				<!-- The column's own place, out of the way of the page: beside it
+				     where there is room, over it where there is not, shown from a
+				     tab on the screen's edge. See docs/scenes.md. -->
+				<SidePanelLayout
+					title={columnMode === 'menu' ? 'Menu options' : 'Ideas and prompts'}
+					icon={columnMode === 'menu' ? 'utensils' : 'lightbulb'}
+					storageKey="bound-up:scene-prompts-beside"
+				>
+					{#snippet main()}
+						{@render body()}
+					{/snippet}
+					{#snippet panel()}
+						<Prompts
+							session={current}
+							editor={lexicalEditor}
+							preferences={scene.preferences}
+							partnershipId={scene.partnershipId}
+							kinkLists={scene.kinkLists}
+							characters={scene.characters}
+							help={scene.help}
+							partnerId={scene.partnerId}
+							onMode={(mode: 'prompts' | 'menu') => {
+								columnMode = mode;
+							}}
 							userId={viewerId}
-							{cursorLabel}
 							{readOnly}
 						/>
-					{/key}
-				{/if}
-			</div>
-
-			{#if entry.canSetAccess}
-				<AccessControl access={entry.partnerAccess} partnerLabel={partnerLabel ?? 'Your partner'} />
+					{/snippet}
+				</SidePanelLayout>
+			{:else}
+				{@render body()}
 			{/if}
+
 		{/if}
 	</div>
 </section>
@@ -306,6 +409,7 @@
 		{entryId}
 		canRestore={session.canWrite}
 		{describeUser}
+		{viewerId}
 		onRestore={restore}
 		onclose={closeHistory}
 	/>
@@ -333,12 +437,28 @@
 		gap: 1rem;
 	}
 
+	/* Room for the prompt column beside the page. */
+	.page.wide {
+		max-width: var(--page-width-wide);
+	}
+
 	.content {
 		flex: 1 1 auto;
 		display: flex;
 		flex-direction: column;
 		gap: var(--wa-space-m);
 		padding: 0 var(--page-gutter) var(--wa-space-l);
+
+		/* With a scene's prompts column beside the page, the space at the
+		   foot is the page's alone, so the column runs on to the app's nav
+		   rather than stopping short of it. */
+		&:has(> :global(.side-panel-layout)) {
+			padding-block-end: 0;
+
+			& > :global(.side-panel-layout > .main) {
+				padding-block-end: var(--wa-space-l);
+			}
+		}
 	}
 
 	.entry-body {
@@ -358,12 +478,28 @@
 		grid-template-rows: 1fr;
 	}
 
+	.head {
+		display: flex;
+		flex-wrap: wrap-reverse;
+		align-items: center;
+		gap: var(--wa-space-s) var(--wa-space-m);
+
+		/* The title takes the row, down to a width a title can be read at. */
+		& > :global(.entry-title) {
+			flex: 1 1 18rem;
+			min-inline-size: 0;
+		}
+	}
+
+	/* Everything at the end of its row, the status beside the buttons. */
 	.toolbar {
 		display: flex;
+		flex: 0 1 auto;
 		flex-wrap: wrap;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: var(--wa-space-s);
+		margin-inline-start: auto;
 	}
 
 	.status,
@@ -372,6 +508,15 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--wa-space-xs) var(--wa-space-s);
+	}
+
+	/* As wide as its choice needs and no wider, the same either side. */
+	.settings {
+		--max-width: 90vw;
+
+		& :global(.access) {
+			inline-size: min(18rem, 80vw);
+		}
 	}
 
 	.status {

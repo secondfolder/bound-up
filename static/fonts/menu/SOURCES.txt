@@ -1,0 +1,35 @@
+Fonts for the scene menu designs, Latin subsets, fetched by scripts/menu-fonts/fetch.mjs.
+SIL Open Font Licence 1.1: https://openfontlicense.org. Apache 2.0: https://www.apache.org/licenses/LICENSE-2.0.
+
+Alfa Slab One: Google Fonts (https://fonts.google.com/specimen/Alfa+Slab+One), OFL
+Amatic SC: Google Fonts (https://fonts.google.com/specimen/Amatic+SC), OFL
+Baloo 2: Google Fonts (https://fonts.google.com/specimen/Baloo+2), OFL
+Bebas Neue: Google Fonts (https://fonts.google.com/specimen/Bebas+Neue), OFL
+Caveat: Google Fonts (https://fonts.google.com/specimen/Caveat), OFL
+Cinzel: Google Fonts (https://fonts.google.com/specimen/Cinzel), OFL
+Cinzel Decorative: Google Fonts (https://fonts.google.com/specimen/Cinzel+Decorative), OFL
+Cormorant Garamond: Google Fonts (https://fonts.google.com/specimen/Cormorant+Garamond), OFL
+Fredericka the Great: Google Fonts (https://fonts.google.com/specimen/Fredericka+the+Great), OFL
+Fredoka: Google Fonts (https://fonts.google.com/specimen/Fredoka), OFL
+IBM Plex Mono: Google Fonts (https://fonts.google.com/specimen/IBM+Plex+Mono), OFL
+IBM Plex Sans: Google Fonts (https://fonts.google.com/specimen/IBM+Plex+Sans), OFL
+IM Fell English: Google Fonts (https://fonts.google.com/specimen/IM+Fell+English), OFL
+IM Fell English SC: Google Fonts (https://fonts.google.com/specimen/IM+Fell+English+SC), OFL
+Italiana: Google Fonts (https://fonts.google.com/specimen/Italiana), OFL
+Josefin Sans: Google Fonts (https://fonts.google.com/specimen/Josefin+Sans), OFL
+Jost: Google Fonts (https://fonts.google.com/specimen/Jost), OFL
+Kalam: Google Fonts (https://fonts.google.com/specimen/Kalam), OFL
+La Belle Aurore: Google Fonts (https://fonts.google.com/specimen/La+Belle+Aurore), OFL
+Monoton: Google Fonts (https://fonts.google.com/specimen/Monoton), OFL
+Oswald: Google Fonts (https://fonts.google.com/specimen/Oswald), OFL
+Pinyon Script: Google Fonts (https://fonts.google.com/specimen/Pinyon+Script), OFL
+Playfair Display: Google Fonts (https://fonts.google.com/specimen/Playfair+Display), OFL
+Poiret One: Google Fonts (https://fonts.google.com/specimen/Poiret+One), OFL
+Quicksand: Google Fonts (https://fonts.google.com/specimen/Quicksand), OFL
+Shrikhand: Google Fonts (https://fonts.google.com/specimen/Shrikhand), OFL
+Silkscreen: Google Fonts (https://fonts.google.com/specimen/Silkscreen), OFL
+Special Elite: Google Fonts (https://fonts.google.com/specimen/Special+Elite), Apache-2.0
+UnifrakturMaguntia: Google Fonts (https://fonts.google.com/specimen/UnifrakturMaguntia), OFL
+Yuji Syuku: Google Fonts (https://fonts.google.com/specimen/Yuji+Syuku), OFL
+Zen Old Mincho: Google Fonts (https://fonts.google.com/specimen/Zen+Old+Mincho), OFL
+Tan Pearl: Tan Type, as Build-a-Date uses it. NOT CHECKED: its licence for this app has not been confirmed.

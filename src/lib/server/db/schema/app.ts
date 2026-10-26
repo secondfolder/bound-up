@@ -2007,6 +2007,49 @@ export const notebookVersions = sqliteTable(
 export type NotebookVersionRow = typeof notebookVersions.$inferSelect;
 
 /**
+ * One person's settings for the scene designer's prompt column, sealed in
+ * their own vault (`scene-preferences`): how much of each type of prompt to
+ * show, and which prompts they never want to see. Sealed rather than columns
+ * because the prompts someone waves away say something about what they are
+ * into. One row per person; compare-and-swap on `revision`, so two devices
+ * saving at once merge rather than overwrite. See docs/scenes.md.
+ */
+export const scenePreferences = sqliteTable('scene_preferences', {
+	/** The sealed record's id, bound into its ciphertext. */
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.unique()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	ciphertext: text('ciphertext').notNull(),
+	vaultId: text('vault_id')
+		.notNull()
+		.references(() => vaults.id, { onDelete: 'cascade' }),
+	payloadVersion: integer('payload_version').notNull(),
+	revision: integer('revision').notNull().default(0),
+	...timestamps
+});
+
+export type ScenePreferencesRow = typeof scenePreferences.$inferSelect;
+
+/**
+ * That a person has read where a scene's text goes when they ask the model
+ * for help with it, and agreed. The server refuses to send anything to the
+ * model until there is a row: the one point where a scene's words leave
+ * Bound Up readable, so the agreeing is the server's to check, as the
+ * daydreams' disclosure is. See docs/scenes.md, "Help from the model".
+ */
+export const sceneHelpConsents = sqliteTable('scene_help_consents', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' })
+		.notNull()
+		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`),
+	...timestamps
+});
+
+/**
  * The server's own settings, edited from Admin → Server settings: its secrets,
  * how it sends email, and which model providers and models it uses. One row
  * per setting (`SERVER_SETTING_KEYS`), read through

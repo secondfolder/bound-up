@@ -254,6 +254,14 @@
 		background-image: var(--icon-caret);
 		background-blend-mode: normal;
 	}
+
+	/* A field whose value is wrong says so in red: its border and its focus
+	   ring, whenever the control carries `aria-invalid="true"`. Its message is
+	   `FieldError.svelte`, under it (docs/theme.md, "Invalid fields"). */
+	:is(wa-input, wa-textarea, wa-select)[aria-invalid='true'] {
+		--wa-form-control-border-color: var(--wa-color-danger-border-loud);
+		--wa-color-focus: var(--wa-color-danger-border-loud);
+	}
 }
 
 /*

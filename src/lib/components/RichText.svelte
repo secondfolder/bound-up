@@ -16,6 +16,8 @@
 	} from '$lib/richtext';
 	import { isWithinScrollport, scrollIntoViewWithin } from '$lib/scroll-parent';
 	import RichTextInline, { type InlineEmbedContext } from './RichTextInline.svelte';
+	import SceneBlock from './scenes/SceneBlock.svelte';
+	import '$lib/richtext-headings.css';
 	import UrlEmbed from './UrlEmbed.svelte';
 
 	/**
@@ -45,9 +47,12 @@
 		cachedEmbeds = [],
 		cachedEmbedsPending = false,
 		onEmbedActivated,
-		onRefreshEmbed
+		onRefreshEmbed,
+		viewerId = null
 	}: {
 		text: string;
+		/** Who is reading: a scene block hidden from them is drawn as a surprise (docs/scenes.md). */
+		viewerId?: string | null;
 		cachedEmbeds?: CachedEmbedDetails[];
 		cachedEmbedsPending?: boolean;
 		/** Called once per URL whose embed starts loading with nothing cached. */
@@ -209,6 +214,13 @@
 				{/each}
 			</ul>
 		{/if}
+	{:else if block.type === 'heading'}
+		<!-- No whitespace inside: a newline there renders as a leading space. -->
+		<svelte:element this={block.tag} class="rt-{block.tag === 'h2' ? 'heading' : 'subheading'}"
+			><RichTextInline nodes={block.children} {embeds} /></svelte:element
+		>
+	{:else if block.type === 'scene-section' || block.type === 'scene-menu'}
+		<SceneBlock {block} {viewerId} />
 	{:else}
 		{const spec = $derived(embedSpecFor(block.url))}
 		{#if spec}

@@ -1,0 +1,481 @@
+/*
+ * The scene blocks (docs/scenes.md, "Blocks"), wherever they are drawn: in a
+ * scene's editor, where Lexical makes the elements, and in a stored version
+ * read without one (`SceneBlock.svelte`), which draws the same elements and
+ * classes. Global, for that reason. A menu's look beyond the plain one is its
+ * design, in `menu-designs.css`.
+ *
+ * A section's label comes from a data attribute through ::before, so it
+ * reads as part of the block without being text anyone can edit; a menu's
+ * words of its own are its frame's, which nobody edits either.
+ */
+
+/* Each design lays its menu out by the width it has, not the screen's: the
+   same scene sits beside the prompts column, alone, or on a phone. */
+.scene-page,
+.notebook-editor {
+	container: scene-page / inline-size;
+}
+
+.scene-block {
+	margin-block: var(--wa-space-s);
+	padding: var(--wa-space-s) var(--wa-space-m);
+	border-inline-start: 3px solid var(--wa-color-brand-border-loud);
+	border-radius: var(--wa-border-radius-s);
+	background: var(--wa-color-surface-lowered);
+}
+
+.scene-block.only-me:not(.surprise, .scene-menu) {
+	border-inline-start-style: dashed;
+}
+
+/* A menu has no border of the block's own to dash, and a design's border is
+   its frame (the cork board's wood): its mark is a dashed line just inside
+   its edge instead, on every design alike. */
+.scene-menu.only-me:not(.surprise) {
+	outline: 2px dashed var(--wa-color-brand-border-loud);
+	outline-offset: -5px;
+}
+
+/* A section's label. */
+.scene-section::before {
+	content: attr(data-label);
+	display: block;
+	margin-block-end: var(--wa-space-2xs);
+	font-size: var(--wa-font-size-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--wa-color-text-quiet);
+	user-select: none;
+}
+
+.scene-section > p {
+	margin: 0;
+}
+
+/*
+ * A menu: the frame every design paints (`menu-frame.ts`), and what each
+ * line carries. The look itself is the design's (`menu-designs.css`); this
+ * is only what holds whichever one is chosen together.
+ */
+.scene-menu {
+	position: relative;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
+}
+
+.menu-filters {
+	position: absolute;
+	inline-size: 0;
+	block-size: 0;
+	overflow: hidden;
+}
+
+.menu-sheet {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--wa-space-s);
+}
+
+/* Drawings over the sheet, which each design places, sizes and paints. */
+.menu-art {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.menu-art > i {
+	position: absolute;
+	display: block;
+	background: no-repeat center / contain;
+}
+
+.menu-head,
+.menu-key {
+	user-select: none;
+}
+
+.menu-head {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+/* A menu with no subtitle has no line for one, whatever a design gives it;
+   not while it is being typed in, though, where it would take the focus
+   with it as it emptied. */
+.scene-menu .menu-head > .menu-subtitle:empty:not(:focus) {
+	display: none;
+}
+
+/* A design's own words (`menu-frame.ts`), kept to their lines. */
+.menu-copy {
+	white-space: pre-line;
+}
+
+/* Copy that is a form's fields (`MenuCopy.fields`): a line each, as its
+   words had them. */
+.menu-copy[data-fields] .copy-line {
+	display: block;
+}
+
+/* Words on a drawing can be tapped like any others. */
+.menu-art .menu-copy {
+	pointer-events: auto;
+}
+
+.menu-intro:not(:has(.menu-copy)) {
+	display: none;
+}
+
+/* Puts rewritten words back to the design's: floating over the page beside
+   them (a popover, placed by `scene-blocks.ts`), in the app's own look
+   rather than the design's. */
+.menu-copy-reset {
+	position: fixed;
+	inset: auto;
+	margin: 0;
+	padding: 0.15rem 0.6rem;
+	border: 1px solid var(--wa-color-surface-border);
+	border-radius: 999px;
+	background: var(--wa-color-surface-raised);
+	color: var(--wa-color-text-normal);
+	font: 600 0.75rem / 1.4 var(--wa-font-family-body);
+	box-shadow: var(--wa-shadow-s);
+	cursor: pointer;
+
+	/* Web Awesome's native button styles give every <button> a display,
+	   which beats the browser's own hiding of a closed popover: it showed
+	   under every menu. */
+	&:not(:popover-open) {
+		display: none;
+	}
+}
+
+/* The editor's "Add a section", there while the caret is in the menu
+   (`scene-blocks.ts`), in the design's own ink and type. */
+.menu-add-course {
+	display: none;
+	justify-content: center;
+	user-select: none;
+}
+
+.scene-menu.caret-in:not(.surprise) .menu-add-course {
+	display: flex;
+}
+
+/* In the app's look rather than the design's, like the menu's delete button:
+   a design's own ink and type (the cork board's marker on cork) were often
+   unreadable. Small and a little see-through until pointed at. */
+.menu-add-course button {
+	height: auto;
+	margin: 0;
+	padding: 0.25rem 0.8rem;
+	border: 1px solid var(--wa-color-surface-border);
+	border-radius: 999px;
+	background: var(--wa-color-surface-raised);
+	color: var(--wa-color-text-normal);
+	font: 600 0.75rem / 1.4 var(--wa-font-family-body);
+	letter-spacing: normal;
+	text-transform: none;
+	text-shadow: none;
+	box-shadow: var(--wa-shadow-s);
+	opacity: 0.8;
+	transform: none;
+	cursor: pointer;
+
+	&:hover,
+	&:focus-visible {
+		opacity: 1;
+	}
+
+	/* A no-break space: a flex item drops a plain one at its end. */
+	&::before {
+		content: '+\00a0';
+	}
+}
+
+.menu-note,
+.menu-foot {
+	display: none;
+}
+
+.scene-menu-courses {
+	display: flex;
+	flex-direction: column;
+	gap: var(--wa-space-s);
+}
+
+.scene-menu-course {
+	display: flex;
+	flex-direction: column;
+	gap: var(--wa-space-3xs);
+	min-inline-size: 0;
+}
+
+/* What a rating's mark and a number stand for, when the menu has them. */
+.menu-key {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.3rem 1.2rem;
+	font-size: 0.8em;
+}
+
+.menu-key-scale,
+.menu-key-value {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.35em;
+}
+
+.menu-key[hidden],
+.menu-key > [hidden] {
+	display: none;
+}
+
+/* Whatever display a design gives a line's extras: a heading's, and an
+   item's in a menu without a rating or a number, are not there. */
+.scene-menu-line > .menu-line-extras[hidden] {
+	display: none;
+}
+
+.scene-menu-line {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 0;
+}
+
+.menu-line-words {
+	flex: 1 1 auto;
+	min-inline-size: 0;
+}
+
+.scene-menu-line.heading {
+	font-weight: var(--wa-font-weight-semibold);
+}
+
+/* A subheading sits within its course: smaller than the course's heading,
+   set apart from the items under it. Designs restyle it to suit. */
+.scene-menu-line.subheading {
+	margin-block-start: var(--wa-space-2xs);
+	font-size: 0.92em;
+	font-style: italic;
+	opacity: 0.85;
+}
+
+/* An item's rating and number, at its right: buttons in the editor, marks
+   in a stored version. Each design gives the marks (`--rate-on`,
+   `--rate-off`) and the colours. */
+.menu-line-extras {
+	flex: none;
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.45rem;
+	font-size: 0.85em;
+	user-select: none;
+}
+
+.menu-rates {
+	display: inline-flex;
+	gap: 0.05em;
+}
+
+.menu-rates,
+.menu-rate,
+.menu-value {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	font-style: normal;
+	line-height: 1;
+}
+
+/* Undoes Web Awesome's native button: a form control's height, padding and
+   alignment, which would lift the marks off the line's baseline. */
+button.menu-rates,
+button.menu-value {
+	height: auto;
+	margin: 0;
+	border-radius: 0;
+	vertical-align: baseline;
+	white-space: nowrap;
+	transform: none;
+	transition: none;
+	cursor: pointer;
+
+	&:focus-visible {
+		outline: 2px solid currentColor;
+		outline-offset: 1px;
+	}
+}
+
+.menu-rate::before {
+	content: var(--rate-off, '○');
+}
+
+.menu-rate:not(.on) {
+	opacity: var(--rate-off-opacity, 0.45);
+}
+
+.menu-rate.on::before {
+	content: var(--rate-on, '●');
+}
+
+/* An unset number, in the editor: there to be tapped, but quiet. */
+.menu-value.unset {
+	opacity: 0.45;
+}
+
+/* An item its writer has made a surprise, as its writer sees it: wrapped,
+   with soft gift-wrap stripes behind its words and a present before them,
+   in the design's own ink. A dashed underline read as a link, or a
+   misspelling. */
+.scene-menu-line.only-me:not(.surprise) > .menu-line-words {
+	border-radius: 3px;
+	background: repeating-linear-gradient(
+		135deg,
+		color-mix(in srgb, currentColor 13%, transparent) 0 4px,
+		transparent 4px 8px
+	);
+	box-decoration-break: clone;
+
+	&::before {
+		content: '';
+		display: inline-block;
+		inline-size: 0.95em;
+		block-size: 0.95em;
+		margin-inline: 0.1em 0.3em;
+		vertical-align: -0.12em;
+		background: currentColor;
+		mask: url('/menu-art/gift.svg') no-repeat center / contain;
+		user-select: none;
+	}
+}
+
+/* A partner's surprise: there, but not readable, reachable or editable. The
+   text is still in the page (both partners hold the key), only not shown. */
+.surprise {
+	color: transparent;
+	user-select: none;
+}
+
+.surprise > * {
+	display: none;
+}
+
+.scene-menu.surprise {
+	padding: var(--wa-space-s) var(--wa-space-m);
+}
+
+.scene-block.surprise::before,
+.scene-menu-line.surprise::before {
+	/* A design can say it its own way ("…sealed…", "[ TBA ]"), in its own ink. */
+	content: var(--surprise-text, 'A surprise');
+	display: block;
+	inline-size: auto;
+	margin: 0;
+	color: var(--menu-ink, var(--wa-color-text-quiet));
+	opacity: 0.75;
+	font-style: italic;
+	text-transform: none;
+	letter-spacing: normal;
+}
+
+.scene-block.surprise::after,
+.scene-menu-line.surprise::after {
+	content: none;
+}
+
+/* The words on a menu's frame that can be rewritten on it, in the editor
+   (`scene-blocks.ts`): marked as such when pointed at or typed in, and an
+   emptied one shows the design's words until it is left. */
+.scene-menu [contenteditable='true']:is(.menu-title, .menu-subtitle, .menu-key-label, .menu-copy) {
+	border-radius: 2px;
+	outline-offset: 2px;
+	cursor: text;
+
+	&:hover {
+		outline: 1px dashed color-mix(in srgb, currentColor 45%, transparent);
+	}
+
+	&:focus {
+		outline: 1px solid currentColor;
+	}
+}
+
+/* An emptied title or subtitle shows the design's while it is typed in (it
+   is the design's again once left). Emptied copy is gone from the menu,
+   except while the caret is in it, where the design's words show in its
+   place, to be written over again. A `contenteditable` emptied by typing
+   can keep a stray <br>, which `scene-blocks.ts` clears so this matches. */
+.scene-menu [contenteditable='true']:is(.menu-title, .menu-subtitle, .menu-key-label):empty::before,
+.scene-menu.caret-in .menu-copy:empty::before {
+	content: attr(data-placeholder);
+	opacity: 0.45;
+}
+
+.scene-menu:not(.caret-in) .menu-copy:empty {
+	display: none;
+}
+
+.scene-menu:not(.caret-in) .menu-intro:not(:has(.menu-copy:not(:empty))) {
+	display: none;
+}
+
+/* Out of the menu being edited, an item shows only what it has: a rating or
+   a number it was given. Every item shows the whole scale and the number
+   to tap only while the caret is in the menu, and a stored version never.
+   The leader goes with them, where there is nothing left to lead to. */
+.scene-menu:not(.caret-in) .scene-menu-line.item {
+	&:not([data-rating]) .menu-rates,
+	&:not([data-value]) .menu-value {
+		display: none;
+	}
+
+	&:not([data-rating], [data-value]) {
+		--leader-display: none;
+
+		& > .menu-line-extras {
+			display: none;
+		}
+	}
+}
+
+/* The editor's button that deletes the whole menu, in its top corner while
+   the caret is in it (`scene-blocks.ts`), in the app's look rather than the
+   design's, like the Reset. Inside the corner, not over it: a menu clips
+   what its design draws past its edge. */
+.scene-menu > .menu-delete {
+	position: absolute;
+	inset-block-start: 0.4rem;
+	inset-inline-end: 0.4rem;
+	z-index: 5;
+	display: none;
+	place-items: center;
+	inline-size: 2rem;
+	block-size: 2rem;
+	margin: 0;
+	padding: 0;
+	border: 1px solid var(--wa-color-surface-border);
+	border-radius: 50%;
+	background: var(--wa-color-surface-raised);
+	color: var(--wa-color-text-normal);
+	font-size: 0.85rem;
+	box-shadow: var(--wa-shadow-s);
+	cursor: pointer;
+}
+
+.scene-menu.caret-in:not(.surprise) > .menu-delete {
+	display: grid;
+
+	&:hover,
+	&:focus-visible {
+		color: var(--wa-color-danger-on-quiet);
+	}
+}

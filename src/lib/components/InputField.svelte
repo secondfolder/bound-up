@@ -5,6 +5,7 @@
 <script lang="ts" generics="T extends Record<string, unknown>">
 	import type { Attachment } from 'svelte/attachments';
 	import { type FormPathLeaves, formFieldProxy, type SuperForm } from 'sveltekit-superforms';
+	import FieldError from './FieldError.svelte';
 
 	let {
 		superform,
@@ -182,7 +183,7 @@
 	{:else}
 		{`Unsupported type: ${type}`}
 	{/if}
-	{#if $errors}<span class="invalid">{$errors}</span>{/if}
+	<FieldError message={$errors ? String($errors) : null} />
 </div>
 
 <style>
@@ -197,10 +198,6 @@
 			margin-inline-end: 0.5rem;
 			padding-inline-end: 0.5rem;
 			border-inline-end: 1px solid var(--wa-color-surface-border);
-		}
-
-		.invalid {
-			color: var(--wa-color-text-danger);
 		}
 	}
 </style>
