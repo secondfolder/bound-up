@@ -8,9 +8,11 @@ describe('TaskTimeZoneOwnerToggle', () => {
 	it('shows the partner-relative toggle text when timezones differ', () => {
 		render(Toggle, {
 			viewerUserId: 'u1',
-			viewerTimezone: 'Europe/London',
+			// Two zones without daylight saving: London and New York change on
+			// different weeks, which made this 4 hours behind for a week a year.
+			viewerTimezone: 'Asia/Tokyo',
 			counterpartUserId: 'u2',
-			counterpartTimezone: 'America/New_York',
+			counterpartTimezone: 'Asia/Dubai',
 			counterpartName: 'Jun',
 			value: 'u2'
 		});

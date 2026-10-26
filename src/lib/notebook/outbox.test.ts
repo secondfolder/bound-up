@@ -60,12 +60,14 @@ describe('openOutbox', () => {
 		const ada = await owner();
 		const storage = memoryStorage();
 		const outbox = await openOutbox('entry-1', ada, storage);
-		outbox.add({ id: 'b1', update: 'c2VjcmV0IHdvcmRz' });
+		// An id with a '-' in it, which standard base64 never contains: a short
+		// one like 'b1' turned up by chance in the ciphertext often enough to fail CI.
+		outbox.add({ id: 'batch-secret', update: 'c2VjcmV0IHdvcmRz' });
 		await outbox.settled();
 
 		const stored = storage.entries.get(outboxStorageKey(ada, 'entry-1')) ?? '';
 		expect(stored).not.toContain('c2VjcmV0IHdvcmRz');
-		expect(stored).not.toContain('b1');
+		expect(stored).not.toContain('batch-secret');
 	});
 
 	it('opens to nothing for someone else’s key', async () => {
