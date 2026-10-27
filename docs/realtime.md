@@ -42,6 +42,14 @@ one room opens one stream, not two. The class is still `RealtimeRoom`: renaming
 a Durable Object class takes a one-way tombstone in `exports`, and the name is
 accurate as it is.
 
+**A list in Everyone opens no stream.** The notebook list and the messages
+board each show every partnership at once in the Everyone context
+([contexts.md](contexts.md)), and watching that would take a stream per
+partnership. They reload when their tab is looked at again instead
+([notebook.md](notebook.md#the-list-in-every-context),
+[messaging.md](messaging.md#realtime)). Fanning list events out to each
+member's `user:<id>` room, so one stream covers Everyone, is not built yet.
+
 **SSE, not WebSocket**, for a decisive reason: `vite dev` cannot serve a
 WebSocket upgrade from a `+server.ts` at all, so a socket would need a second
 client code path used only in development, and the Playwright suite would then

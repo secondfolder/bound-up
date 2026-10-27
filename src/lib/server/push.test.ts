@@ -63,7 +63,7 @@ async function subscribe(owner: TestUser, browser?: TestBrowserSubscription) {
 const message = {
 	kind: 'message' as const,
 	threadId: '0b5f6c1e-6a7d-4c43-9a3b-2f1f0e8d9c7b',
-	url: 'https://app.test/partner/p/messages/t'
+	url: 'https://app.test/messages/t'
 };
 
 describe('readVapidConfig', () => {
@@ -295,7 +295,7 @@ describe('notifyPartner', () => {
 						vapidSubject: vapid.subject
 					})
 				} as App.Locals,
-				url: new URL('https://app.test/api/partnerships/x/threads'),
+				url: new URL('https://app.test/api/spaces/x/threads'),
 				platform: {
 					ctx: { waitUntil: (task: Promise<unknown>) => tasks.push(task) }
 				} as unknown as App.Platform
@@ -309,8 +309,8 @@ describe('notifyPartner', () => {
 		expect(payload).toMatchObject({
 			notification: {
 				title: 'New message',
-				// The board, which sends an opened thread on and highlights a new one.
-				navigate: `https://app.test/partner/${id}/messages?thread=t-1`
+				// The thread's own page, whatever context the device is in.
+				navigate: 'https://app.test/messages/t-1'
 			}
 		});
 		expect(JSON.stringify(payload)).not.toMatch(/Ace|Bobby/);

@@ -220,14 +220,11 @@
 			return;
 		}
 		const reaction = await buildReaction(emoji, keys);
-		const response = await tryFetch(
-			`/api/partnerships/${partnershipId}/messages/${message.id}/reaction`,
-			{
-				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(reaction)
-			}
-		);
+		const response = await tryFetch(`/api/spaces/${partnershipId}/messages/${message.id}/reaction`, {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(reaction)
+		});
 		if (!response?.ok) {
 			reportRequestFailure(response);
 			return;
@@ -236,10 +233,9 @@
 	}
 
 	async function clearReaction(message: MessageView) {
-		const response = await tryFetch(
-			`/api/partnerships/${partnershipId}/messages/${message.id}/reaction`,
-			{ method: 'DELETE' }
-		);
+		const response = await tryFetch(`/api/spaces/${partnershipId}/messages/${message.id}/reaction`, {
+			method: 'DELETE'
+		});
 		if (!response?.ok) {
 			reportRequestFailure(response);
 			return;

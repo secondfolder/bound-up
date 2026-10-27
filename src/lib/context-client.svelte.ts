@@ -7,6 +7,7 @@
  * everywhere else.
  */
 
+import type { Attachment } from 'svelte/attachments';
 import { goto, invalidate } from '$app/navigation';
 import { type AppContext, CONTEXT_DEPENDENCY, serialiseContext } from './context';
 import { initialsFor } from './initials';
@@ -138,4 +139,28 @@ export async function followInContext(
 	// something it depends on was invalidated, and the cookie is not that.
 	// biome-ignore lint/plugin: `href` arrives resolved; see above.
 	await goto(href, { invalidate: [CONTEXT_DEPENDENCY] });
+}
+
+/**
+ * `followInContext` for a plain link: `{@attach inContext(context)}`, with
+ * `data-sveltekit-preload-data="off"` beside it, since a preload would fetch
+ * the list in the context as it was. The link's own `href`, resolved by its
+ * page, is where it goes.
+ *
+ * A listener on the link itself rather than an `onclick=`: Svelte delegates
+ * that to the root, where SvelteKit's router also listens for link clicks,
+ * so which ran first was down to registration order (as `SectionWidget`'s
+ * `onfollow`).
+ */
+export function inContext(context: AppContext): Attachment<HTMLAnchorElement> {
+	return (link) => {
+		const follow = (event: MouseEvent) => {
+			const href = link.getAttribute('href');
+			if (href) {
+				void followInContext(event, context, href);
+			}
+		};
+		link.addEventListener('click', follow);
+		return () => link.removeEventListener('click', follow);
+	};
 }

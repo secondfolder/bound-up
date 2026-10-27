@@ -136,10 +136,8 @@ test('landing page feature screenshots', async ({ browser }) => {
 		await expect(riley.page.getByText(/well earned/)).toBeVisible();
 		await capture(riley.page, 'messages');
 
-		// Riley's view of the partnership, from the thread's own URL.
-		const rileysPartnerPage = riley.page.url().replace(/\/messages\/.*$/, '');
-
-		await riley.page.goto(rileysPartnerPage);
+		// Riley's view of the partnership.
+		await riley.page.goto(`/partner/${partnershipId}`);
 		await capture(riley.page, 'partner');
 
 		await showContext(riley.page, partnershipId);

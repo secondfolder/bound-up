@@ -67,7 +67,7 @@ async function moveNames(
 	partnershipId: string,
 	writable: { vault: OpenVault; grant: WriteGrant }
 ): Promise<void> {
-	const path = `/api/partnerships/${partnershipId}/names`;
+	const path = `/api/spaces/${partnershipId}/names`;
 	const response = await quietFetch(path);
 	if (!response.ok) {
 		throw new Error(`Could not read the names to move (${response.status})`);

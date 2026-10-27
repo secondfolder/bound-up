@@ -87,6 +87,9 @@
 		return () => document.removeEventListener('visibilitychange', check);
 	});
 
+	/** The context the page on screen was rendered for: whose requests a board shows. */
+	const boardContext = $derived((page.data.context as AppContext | undefined) ?? data.context);
+
 	/**
 	 * A scene menu's own page fills the screen (docs/scenes.md, "A menu's own
 	 * page"): no nav and none of the notices, which would sit over or above
@@ -103,6 +106,9 @@
 		return (
 			routeId === '/(auth-required)/(app)/home' ||
 			routeId.startsWith('/(auth-required)/(app)/partner/') ||
+			// Messages were under the partner page, and kept the warning when
+			// they moved out of it.
+			routeId.startsWith('/(auth-required)/(app)/messages') ||
 			// Where tasks set in a partner's time are shown and set, as the
 			// partner's own task and reward pages were before they merged.
 			routeId.startsWith('/(auth-required)/(app)/tasks') ||
@@ -148,12 +154,13 @@
 		{#if !fullScreen}
 			<HelpRequestCallout
 				requests={data.helpRequests.filter(
-					// The board shows the full request; a second callout above it
-					// pointing at the page you are on would only be noise.
+					// The board shows the full request, in that partner's context or
+					// Everyone; a second callout above it pointing at the page you
+					// are on would only be noise.
 					(request) =>
 						!(
-							page.route.id === '/(auth-required)/(app)/partner/[id]/messages' &&
-							page.params.id === request.partnershipId
+							page.route.id === '/(auth-required)/(app)/messages' &&
+							(boardContext.kind === 'all' || boardContext.spaceId === request.partnershipId)
 						)
 				)}
 			/>

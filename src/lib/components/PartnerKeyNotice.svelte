@@ -28,12 +28,21 @@
 		trust,
 		partnerName,
 		verify,
-		accept
+		accept,
+		alertsOnly = false
 	}: {
 		trust: TrustView;
 		partnerName: string;
 		verify: () => Promise<void>;
 		accept: (which: 'partner' | 'own' | 'vault') => Promise<void>;
+		/**
+		 * Only a changed key, which stops a send and must be seen wherever it
+		 * can be: for a board showing several partnerships at once (Everyone),
+		 * where a quiet line and a "Check your safety number" per partner
+		 * would stack up above the threads. Each partnership's own board and
+		 * its threads still say the rest.
+		 */
+		alertsOnly?: boolean;
 	} = $props();
 
 	let showNumber = $state(false);
@@ -57,7 +66,7 @@
 	}
 </script>
 
-{#if trust.status === 'unavailable'}
+{#if trust.status === 'unavailable' && !alertsOnly}
 	<wa-callout variant="neutral" size="small">
 		<wa-icon slot="icon" name="triangle-exclamation" variant="solid"></wa-icon>
 		This browser will not remember which keys it has seen, so it cannot warn you if
@@ -146,7 +155,7 @@
 				Our numbers match — carry on
 			</wa-button>
 		</wa-callout>
-	{:else}
+	{:else if !alertsOnly}
 		<div class="quiet">
 			{#if trust.partner.kind === 'verified'}
 				<p class="line">

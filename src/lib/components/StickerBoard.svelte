@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ThreadStickerView } from '$lib/types';
+	import type { ContextSpaceView, ThreadStickerView } from '$lib/types';
 	import ThreadSticker from './ThreadSticker.svelte';
 
 	/**
@@ -16,12 +16,20 @@
 	 */
 	let {
 		threads,
-		partnershipId,
+		spaceOf = null,
+		empty = 'Nothing here yet. Write something only the two of you can read.',
 		highlightThreadId = null,
 		onHighlightEnd
 	}: {
 		threads: ThreadStickerView[];
-		partnershipId: string;
+		/**
+		 * Whose each thread is, on a board that mixes several partnerships
+		 * (Everyone): each sticker then wears that partner's chip. Null on one
+		 * partnership's board.
+		 */
+		spaceOf?: ((spaceId: string) => ContextSpaceView | null) | null;
+		/** What an empty board says. */
+		empty?: string;
 		/** A thread to draw attention to once. See `ThreadSticker`'s `highlighted`. */
 		highlightThreadId?: string | null;
 		onHighlightEnd?: (() => void) | undefined;
@@ -32,14 +40,14 @@
 </script>
 
 {#if threads.length === 0}
-	<p class="empty">Nothing here yet. Write something only the two of you can read.</p>
+	<p class="empty">{empty}</p>
 {:else}
 	{#if unread.length > 0}
 		<ul aria-label="Unread">
 			{#each unread as thread, index (thread.id)}
 				<ThreadSticker
 					{thread}
-					{partnershipId}
+					space={spaceOf?.(thread.spaceId) ?? null}
 					position={index + 1}
 					total={unread.length}
 					highlighted={thread.id === highlightThreadId}
@@ -62,7 +70,7 @@
 			{#each read as thread, index (thread.id)}
 				<ThreadSticker
 					{thread}
-					{partnershipId}
+					space={spaceOf?.(thread.spaceId) ?? null}
 					position={index + 1}
 					total={read.length}
 					highlighted={thread.id === highlightThreadId}

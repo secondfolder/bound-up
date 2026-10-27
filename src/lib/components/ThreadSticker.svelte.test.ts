@@ -68,6 +68,7 @@ function prose(text: string): string {
 function thread(overrides: Partial<ThreadStickerView> = {}): ThreadStickerView {
 	return {
 		id: 't1',
+		spaceId: 'p1',
 		icon: 'fire',
 		unread: false,
 		lastMessageAt: new Date('2026-09-13T14:15:00Z'),
@@ -112,7 +113,6 @@ describe('ThreadSticker', () => {
 		const { container, queryByText } = render(ThreadSticker, {
 			props: {
 				thread: thread({ unread: true, lastFullyReadAt: null }),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -128,7 +128,6 @@ describe('ThreadSticker', () => {
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
 				thread: thread({ unread: true, lastFullyReadAt: new Date('2026-09-12T18:00:00Z') }),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -144,7 +143,6 @@ describe('ThreadSticker', () => {
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
 				thread: thread(),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -186,7 +184,6 @@ describe('ThreadSticker', () => {
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
 				thread: thread({ preview: { ...bodyRef('ciphertext'), metadataCiphertext: 'metadata' } }),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -205,7 +202,6 @@ describe('ThreadSticker', () => {
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
 				thread: thread(),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -235,7 +231,6 @@ describe('ThreadSticker', () => {
 		const { container } = render(ThreadSticker, {
 			props: {
 				thread: thread(),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -278,7 +273,6 @@ describe('ThreadSticker', () => {
 		const { container, findByText } = render(ThreadSticker, {
 			props: {
 				thread: thread(),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -324,7 +318,6 @@ describe('ThreadSticker', () => {
 		const { container, findByRole } = render(ThreadSticker, {
 			props: {
 				thread: thread(),
-				partnershipId: 'p1',
 				position: 1,
 				total: 1
 			}
@@ -357,7 +350,7 @@ describe('ThreadSticker', () => {
 		});
 		const renderTile = (unseenMedia: ThreadStickerView['unseenMedia']) =>
 			render(ThreadSticker, {
-				props: { thread: unreadThread(unseenMedia), partnershipId: 'p1', position: 1, total: 1 }
+				props: { thread: unreadThread(unseenMedia), position: 1, total: 1 }
 			});
 
 		it('names the kind and the soonest expiry, even on a sealed tile', async () => {
@@ -469,7 +462,6 @@ describe('ThreadSticker', () => {
 			const { container } = render(ThreadSticker, {
 				props: {
 					thread: thread({ unread: true, lastFullyReadAt: null }),
-					partnershipId: 'p1',
 					position: 1,
 					total: 1,
 					highlighted: true,
@@ -490,7 +482,7 @@ describe('ThreadSticker', () => {
 		it('leaves an ordinary tile alone', () => {
 			const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
 			const { container } = render(ThreadSticker, {
-				props: { thread: thread(), partnershipId: 'p1', position: 1, total: 1 }
+				props: { thread: thread(), position: 1, total: 1 }
 			});
 			expect(container.querySelector('[data-highlighted]')).toBeNull();
 			expect(scrollIntoView).not.toHaveBeenCalled();

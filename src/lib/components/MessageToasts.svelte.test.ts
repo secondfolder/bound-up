@@ -13,7 +13,7 @@ const { default: MessageToasts } = await import('./MessageToasts.svelte');
  */
 
 function renderToasts() {
-	return render(MessageToasts, { partnershipId: 'p-1', partnerName: 'Sam <b>' }).component as {
+	return render(MessageToasts, { partnerName: 'Sam <b>' }).component as {
 		show: (threadId: string) => void;
 		dismiss: (threadId: string) => void;
 	};
@@ -26,7 +26,9 @@ describe('MessageToasts', () => {
 		const link = await screen.findByTestId('message-toast');
 		// Text, never HTML: the name is whatever somebody typed.
 		expect(link).toHaveTextContent('New message from Sam <b>');
-		expect(link.getAttribute('href')).toMatch(/\/partner\/p-1\/messages\?thread=t-1$/);
+		expect(link.getAttribute('href')).toMatch(/\/messages\/t-1$/);
+		// The thread page's load marks it read: never on a hover.
+		expect(link.getAttribute('data-sveltekit-preload-data')).toBe('off');
 	});
 
 	/** Two would be same-named links going to different threads. */
@@ -36,7 +38,7 @@ describe('MessageToasts', () => {
 		toasts.show('t-2');
 
 		await vi.waitFor(() => expect(screen.getAllByTestId('message-toast')).toHaveLength(1));
-		expect(screen.getByTestId('message-toast').getAttribute('href')).toMatch(/thread=t-2$/);
+		expect(screen.getByTestId('message-toast').getAttribute('href')).toMatch(/\/messages\/t-2$/);
 	});
 
 	it('takes a thread’s notice away, and leaves another thread’s alone', async () => {

@@ -386,14 +386,12 @@ export function notifyPartner(
 	// `paths.base`, and `resolve()` can return a path relative to the page being
 	// rendered, which is meaningless to a notification.
 	//
-	// The board with `?thread=`, not the thread itself: the board's load sends a
-	// thread the recipient has already opened straight on to it, and shows one
-	// they never have highlighted on the board instead. Decided at tap time,
-	// which a URL fixed now could not be.
-	const url = new URL(
-		`/partner/${input.partnership.id}/messages?thread=${encodeURIComponent(input.threadId)}`,
-		event.url.origin
-	).href;
+	// The thread's own page, which takes its partnership from the thread: the
+	// board follows the device's context, so a tap must not depend on what
+	// that happens to be when it lands (docs/contexts.md, "Items carry their
+	// own space"). Opening it is reading it, as tapping a thread on the board
+	// is.
+	const url = new URL(`/messages/${encodeURIComponent(input.threadId)}`, event.url.origin).href;
 	inBackground(
 		event.platform,
 		sendPush(event.locals.db, vapid, {

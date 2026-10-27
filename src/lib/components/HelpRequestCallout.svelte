@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { inContext } from '$lib/context-client.svelte';
 	import { partnerName } from '$lib/partner-names.svelte';
 	import type { HelpRequestView } from '$lib/types';
 
@@ -10,7 +11,8 @@
 	 * no way to message you about it — so the request has to find you wherever
 	 * you are. It only links to the messages board, where the code is compared
 	 * and the request answered (`RestoreRequests.svelte`); nothing is decided
-	 * from here. See docs/account-recovery.md.
+	 * from here. The board follows the context, so the link switches to that
+	 * partner on the way (`inContext`). See docs/account-recovery.md.
 	 */
 	let { requests }: { requests: HelpRequestView[] } = $props();
 </script>
@@ -21,9 +23,9 @@
 		<strong>{partnerName(request.names)} can't sign in and asked for your help</strong>
 		<p>
 			<a
-				href={resolve('/(auth-required)/(app)/partner/[id]/messages', {
-					id: request.partnershipId
-				})}
+				href={resolve('/(auth-required)/(app)/messages')}
+				data-sveltekit-preload-data="off"
+				{@attach inContext({ kind: 'space', spaceId: request.partnershipId })}
 			>
 				Help {partnerName(request.names)} sign in
 			</a>

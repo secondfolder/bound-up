@@ -8,9 +8,9 @@ ever reads it.
 
 Code says `solo`, `shared` and `all` ([spaces.md](spaces.md)); users see
 "Me", the partner's name and "Everyone". The notebook (`/notebook`,
-[notebook.md](notebook.md)), tasks (`/tasks`, [tasks.md](tasks.md)) and
-rewards (`/rewards`, [rewards.md](rewards.md)) follow the context; messages
-still live under `/partner/[id]`.
+[notebook.md](notebook.md)), tasks (`/tasks`, [tasks.md](tasks.md)),
+rewards (`/rewards`, [rewards.md](rewards.md)) and messages (`/messages`,
+[messaging.md](messaging.md#the-board-in-each-context)) follow the context.
 
 ## Where it lives: one cookie
 
@@ -54,7 +54,11 @@ move the next entry started in another tab — still showing your own notebook �
 into the partnership. Instead the notebook's create posts `spaceId`, and its
 "show again" posts the entry's space; `/notebook/page.server.test.ts` creates
 with the cookie pointing at one space and the form naming another, and e2e
-does the same across two real tabs. Adding a task or a reward posts `spaceId`
+does the same across two real tabs. A new message thread posts to
+`/api/spaces/[spaceId]/threads` for the partnership its dialog was opened
+for, which stays fixed while the dialog is open however the board under it
+reloads; `e2e/messages-contexts.spec.ts` switches in a second tab under an
+open dialog. Adding a task or a reward posts `spaceId`
 the same way, chosen under "For whom?" (`ForWhom`) when the context shows more
 than one space it could go to; completing, undoing, claiming and editing name
 the task, completion or reward, which carries its own space; setting credits
@@ -63,11 +67,18 @@ names the space and the member.
 ## Items carry their own space
 
 An item page (`/notebook/[entryId]` and its menus, `/tasks/[taskId]`,
-`/rewards/[rewardId]`) takes its space from the item, never from the context: opened while the switcher says someone else, it
+`/rewards/[rewardId]`, `/messages/[threadId]`) takes its space from the item, never from the context: opened while the switcher says someone else, it
 shows as whoever's it is (a chip at the top right), with that partnership's
 names and the actions its rules allow, and the context is left as it was. So
 a link to an item means the same thing to everyone who can open it, whatever
-their device's context is, and needs no context in its URL.
+their device's context is, and needs no context in its URL. A push
+notification's link is a thread's own page for exactly this reason
+([notifications.md](notifications.md)).
+
+**A feature a context does not have** shows its own empty state with a
+one-tap switch, and never switches by itself. Messages in Me is the first:
+"Messages are between you and a partner", with a "Switch to …" per partner
+([messaging.md](messaging.md#the-board-in-each-context)).
 
 ## Tabs share it
 
@@ -79,13 +90,16 @@ their device's context is, and needs no context in its URL.
   one context over a list of another.
 - **Back does not undo a switch.** History holds URLs, and switching does not
   change the URL: the same page re-runs its loads in place.
-- **A pasted list link** (`/notebook`, `/tasks`, `/rewards`) shows whatever
-  context the person opening it has.
+- **A pasted list link** (`/notebook`, `/tasks`, `/rewards`, `/messages`)
+  shows whatever context the person opening it has.
 - **A card's link switches first.** The `/home` and `/partner/[id]` cards for
   the notebook, tasks and rewards lead to a list that follows the context, so
   following one sets the context the card previewed and then navigates
-  (`followInContext` in `context-client.svelte.ts`): Everyone from `/home` for
-  tasks and rewards, Me for the notebook, the partnership from its page. A
+  (`followInContext` in `context-client.svelte.ts`, or `inContext` as an
+  attachment on a plain link): Everyone from `/home` for tasks and rewards, Me
+  for the notebook, the partnership from its page, and the partnership for
+  every link into messages that is about one partner (the /home unread rows,
+  the partner page's card, the help callout, the kink-list compare page). A
   deliberate choice of context, not a silent switch. A click that opens a new
   tab is left alone, and such links are not preloaded, since a preload would
   fetch the list in the old context
@@ -185,9 +199,10 @@ list.
 
 ## Not built yet
 
-- Messages following the context, and the Dashboard that replaces `/home`
-  and `/partner/[id]`.
-- A live Everyone list: it refreshes when looked at again rather than holding a
-  stream per partnership. Fanning list events out to each member's own room
-  would let one stream cover it ([notebook.md](notebook.md#the-list-in-every-context)).
+- The Dashboard that replaces `/home` and `/partner/[id]`.
+- A live Everyone list: the notebook list and the messages board refresh when
+  looked at again rather than holding a stream per partnership. Fanning list
+  events out to each member's own room would let one stream cover it
+  ([notebook.md](notebook.md#the-list-in-every-context),
+  [messaging.md](messaging.md#realtime)).
 - A dot on the control for something unread in another context.

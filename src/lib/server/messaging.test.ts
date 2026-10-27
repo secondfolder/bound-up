@@ -36,6 +36,7 @@ import { attachmentKey, partnershipMediaPrefix } from './media';
 import {
 	clearReaction,
 	declineHistoryRestore,
+	findThreadMembership,
 	getAttachmentForDownload,
 	getPartnerMessagesWidget,
 	getThread,
@@ -213,7 +214,7 @@ describe('startThread', () => {
 		expect(result).toEqual({ ok: false, reason: 'not-a-member' });
 		// Row counts, not just the return value: a refused send must not have
 		// written an object either.
-		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+		await expect(listBoard(harness.db, [partnershipId], ada.id)).resolves.toEqual([]);
 		expect(store.objects.size).toBe(0);
 	});
 
@@ -372,7 +373,7 @@ describe('startThread', () => {
 			})
 		).rejects.toThrow(/simulated/);
 
-		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+		await expect(listBoard(harness.db, [partnershipId], ada.id)).resolves.toEqual([]);
 	});
 });
 
@@ -440,7 +441,7 @@ describe('listBoard', () => {
 		// One Ada wrote herself, which is read for her by construction.
 		const mine = await createTestThread(harness.db, partnershipId, ada, { at: at(4000) });
 
-		const forAda = await listBoard(harness.db, partnershipId, ada.id);
+		const forAda = await listBoard(harness.db, [partnershipId], ada.id);
 		// Note where `mine` lands. Posting marks the thread read at the time that
 		// latest message was first read, so Ada's own thread was read at t=4000 —
 		// before she read the other two at 8000 and 9000. It therefore sorts below
@@ -458,7 +459,7 @@ describe('listBoard', () => {
 		expect(forAda.slice(3).some((t) => t.unread)).toBe(false);
 
 		// Jun sees the mirror image: everything Jun wrote is read, and Ada's is not.
-		const forJun = await listBoard(harness.db, partnershipId, jun.id);
+		const forJun = await listBoard(harness.db, [partnershipId], jun.id);
 		expect(forJun[0].id).toBe(mine.threadId);
 		expect(forJun[0].unread).toBe(true);
 		expect(forJun.filter((t) => t.unread)).toHaveLength(1);
@@ -471,7 +472,7 @@ describe('listBoard', () => {
 	 */
 	it('includes threads the viewer has never opened', async () => {
 		const { threadId } = await createTestThread(harness.db, partnershipId, jun);
-		const board = await listBoard(harness.db, partnershipId, ada.id);
+		const board = await listBoard(harness.db, [partnershipId], ada.id);
 		expect(board.map((t) => t.id)).toEqual([threadId]);
 		expect(board[0].lastFullyReadAt).toBeNull();
 		expect(board[0].unread).toBe(true);
@@ -482,7 +483,7 @@ describe('listBoard', () => {
 		await createTestThread(harness.db, partnershipId, jun, {
 			metadataCiphertext: 'sb1.bWV0YWRhdGE'
 		});
-		const [thread] = await listBoard(harness.db, partnershipId, ada.id);
+		const [thread] = await listBoard(harness.db, [partnershipId], ada.id);
 		expect(thread.preview.metadataCiphertext).toBe('sb1.bWV0YWRhdGE');
 	});
 
@@ -494,7 +495,7 @@ describe('listBoard', () => {
 		await markThreadOpened(harness.db, newer.threadId, ada.id, at(6000));
 		await markThreadOpened(harness.db, older.threadId, ada.id, at(9000));
 
-		const board = await listBoard(harness.db, partnershipId, ada.id);
+		const board = await listBoard(harness.db, [partnershipId], ada.id);
 		expect(board.map((thread) => thread.id)).toEqual([newer.threadId, older.threadId]);
 		expect(board[1].lastFullyReadAt?.getTime()).toBe(5000);
 	});
@@ -504,7 +505,7 @@ describe('listBoard', () => {
 		await markThreadOpened(harness.db, threadId, ada.id, at(2000));
 		await createTestMessage(harness.db, partnershipId, threadId, jun, { at: at(3000) });
 
-		const [thread] = await listBoard(harness.db, partnershipId, ada.id);
+		const [thread] = await listBoard(harness.db, [partnershipId], ada.id);
 		expect(thread.unread).toBe(true);
 		expect(thread.lastFullyReadAt?.getTime()).toBe(2000);
 	});
@@ -514,14 +515,14 @@ describe('listBoard', () => {
 			icon: 'pepper-hot'
 		});
 		await createTestMessage(harness.db, partnershipId, threadId, jun);
-		const [sticker] = await listBoard(harness.db, partnershipId, ada.id);
+		const [sticker] = await listBoard(harness.db, [partnershipId], ada.id);
 		expect(sticker.icon).toBe('pepper-hot');
 		expect(sticker.messageCount).toBe(2);
 	});
 
 	it('returns unread as a real boolean, never SQLite’s 0/1', async () => {
 		await createTestThread(harness.db, partnershipId, jun);
-		const [sticker] = await listBoard(harness.db, partnershipId, ada.id);
+		const [sticker] = await listBoard(harness.db, [partnershipId], ada.id);
 		expect(typeof sticker.unread).toBe('boolean');
 	});
 
@@ -529,7 +530,45 @@ describe('listBoard', () => {
 		const cas = await createTestUser(harness.db, { name: 'Cas' });
 		const other = await createTestPartnership(harness.db, ada, cas);
 		await createTestThread(harness.db, other.id, ada);
-		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+		await expect(listBoard(harness.db, [partnershipId], ada.id)).resolves.toEqual([]);
+	});
+
+	/** Everyone's board: several partnerships in one statement, in one order. */
+	it('merges several partnerships into one board, each thread saying whose it is', async () => {
+		const cas = await createTestUser(harness.db, { name: 'Cas' });
+		const other = await createTestPartnership(harness.db, ada, cas);
+		const withJun = await createTestThread(harness.db, partnershipId, jun, { at: at(1000) });
+		const withCas = await createTestThread(harness.db, other.id, cas, { at: at(2000) });
+		const read = await createTestThread(harness.db, other.id, cas, { at: at(500) });
+		await markThreadOpened(harness.db, read.threadId, ada.id, at(3000));
+
+		const board = await listBoard(harness.db, [partnershipId, other.id], ada.id);
+		expect(board.map((thread) => [thread.id, thread.spaceId])).toEqual([
+			[withCas.threadId, other.id],
+			[withJun.threadId, partnershipId],
+			[read.threadId, other.id]
+		]);
+	});
+
+	it('is empty for no partnerships at all', async () => {
+		await createTestThread(harness.db, partnershipId, jun);
+		await expect(listBoard(harness.db, [], ada.id)).resolves.toEqual([]);
+	});
+});
+
+describe('findThreadMembership', () => {
+	it('finds a thread’s own partnership for a member of it', async () => {
+		const { threadId } = await createTestThread(harness.db, partnershipId, jun);
+		const found = await findThreadMembership(harness.db, threadId, ada.id);
+		expect(found?.partnership.id).toBe(partnershipId);
+		expect(found?.threadId).toBe(threadId);
+	});
+
+	it('is null for someone outside it, and for no such thread', async () => {
+		const cas = await createTestUser(harness.db, { name: 'Cas' });
+		const { threadId } = await createTestThread(harness.db, partnershipId, jun);
+		await expect(findThreadMembership(harness.db, threadId, cas.id)).resolves.toBeNull();
+		await expect(findThreadMembership(harness.db, crypto.randomUUID(), ada.id)).resolves.toBeNull();
 	});
 });
 
@@ -949,7 +988,7 @@ describe('self-destructing media', () => {
 			await expect(sendWith(ttl)).resolves.toEqual({ ok: false, reason: 'bad-media-ttl' });
 		}
 		expect(store.objects.size).toBe(0);
-		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+		await expect(listBoard(harness.db, [partnershipId], ada.id)).resolves.toEqual([]);
 	});
 
 	it('refuses never-expiring media without the feature, before writing any object', async () => {
@@ -958,7 +997,7 @@ describe('self-destructing media', () => {
 			reason: 'needs-permanent-media'
 		});
 		expect(store.objects.size).toBe(0);
-		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+		await expect(listBoard(harness.db, [partnershipId], ada.id)).resolves.toEqual([]);
 	});
 
 	it('stores never-expiring media for an account holding the feature', async () => {
@@ -1093,7 +1132,7 @@ describe('the higher quality uploads byte budget', () => {
 			reason: 'needs-high-quality-media'
 		});
 		expect(store.objects.size).toBe(0);
-		await expect(listBoard(harness.db, partnershipId, ada.id)).resolves.toEqual([]);
+		await expect(listBoard(harness.db, [partnershipId], ada.id)).resolves.toEqual([]);
 	});
 
 	it('refuses it on a reply too', async () => {
@@ -1193,7 +1232,7 @@ describe('listBoard: unseen self-destructing media', () => {
 	}
 
 	const boardFor = async (viewer: TestUser, now: Date) => {
-		const [tile] = await listBoard(harness.db, partnershipId, viewer.id, now);
+		const [tile] = await listBoard(harness.db, [partnershipId], viewer.id, now);
 		return defined(tile, 'the board tile');
 	};
 

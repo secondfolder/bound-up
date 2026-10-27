@@ -9,15 +9,25 @@
 	// not have (see docs/request-failures.md).
 	const copy = $derived(errorCopy(page.status));
 	const partnerId = $derived(page.params.id);
-	const back = $derived(
-		partnerId && page.route.id?.startsWith('/(auth-required)/(app)/partner/')
-			? {
-					href: resolve('/(auth-required)/(app)/partner/[id]', { id: partnerId }),
-					text: 'Back',
-					label: 'Back to your partner'
-				}
-			: { href: resolve('/(auth-required)/(app)/home'), text: 'Home', label: 'Back to home' }
-	);
+	const back = $derived.by(() => {
+		if (partnerId && page.route.id?.startsWith('/(auth-required)/(app)/partner/')) {
+			return {
+				href: resolve('/(auth-required)/(app)/partner/[id]', { id: partnerId }),
+				text: 'Back',
+				label: 'Back to your partner'
+			};
+		}
+		// A thread that is gone, or not yours (an old notification's, say): the
+		// board, which shows whatever context this device is in.
+		if (page.route.id?.startsWith('/(auth-required)/(app)/messages/')) {
+			return {
+				href: resolve('/(auth-required)/(app)/messages'),
+				text: 'Messages',
+				label: 'Back to messages'
+			};
+		}
+		return { href: resolve('/(auth-required)/(app)/home'), text: 'Home', label: 'Back to home' };
+	});
 </script>
 
 <section class="page">

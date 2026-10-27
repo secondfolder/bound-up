@@ -1,5 +1,7 @@
 <script lang="ts">
 	import SectionWidget from '$lib/components/SectionWidget.svelte';
+	import type { AppContext } from '$lib/context';
+	import { followInContext } from '$lib/context-client.svelte';
 	import type { PartnerMessagesWidgetView } from '$lib/types';
 
 	/**
@@ -9,7 +11,23 @@
 	 * it does not hold — and decrypting one on this page would mean shipping the
 	 * whole unlock flow to it. The board behind the link is where that lives.
 	 */
-	let { messages, href }: { messages: PartnerMessagesWidgetView; href: string } = $props();
+	let {
+		messages,
+		href,
+		opensIn
+	}: {
+		messages: PartnerMessagesWidgetView;
+		href: string;
+		/**
+		 * The partnership's context: `/messages` follows the context, so the
+		 * card switches to it first, as the tasks card does (`followInContext`).
+		 */
+		opensIn: AppContext;
+	} = $props();
+
+	async function follow(event: MouseEvent) {
+		await followInContext(event, opensIn, href);
+	}
 
 	/**
 	 * A thread count is worth a line; "Nothing here yet." is not.
@@ -21,7 +39,13 @@
 	const hasBody = $derived(messages.totalThreads > 0);
 </script>
 
-<SectionWidget title="Messages" {href} icon="envelope" body={hasBody ? preview : undefined} />
+<SectionWidget
+	title="Messages"
+	{href}
+	icon="envelope"
+	onfollow={follow}
+	body={hasBody ? preview : undefined}
+/>
 
 {#snippet preview()}
 	{#if messages.unreadThreads > 0}

@@ -6,10 +6,10 @@
 	/**
 	 * The /home messages card: one row per partner with something waiting.
 	 *
-	 * Deliberately headed by plain text rather than a link. Messages are
-	 * per-partner, so there is no single page behind the word "Messages" — each
-	 * row carries its own link to that partner's board instead. `SectionWidget`
-	 * takes an optional `href` for exactly this case.
+	 * Deliberately headed by plain text rather than a link: each row carries
+	 * its own link, to the board in that partner's context, which is where
+	 * what it counts is. `SectionWidget` takes an optional `href` for exactly
+	 * this case.
 	 *
 	 * The whole card goes when nothing is unread — not just its body, which is
 	 * what every other card does. A "Messages" header on its own would still be

@@ -180,7 +180,7 @@ image CI tests and the one it publishes.
 
 `BODY_SIZE_LIMIT` deserves its note. adapter-node refuses bodies over 512 KB
 by default, which is every message with a photo. The routes enforce the real
-cap themselves (`MAX_REQUEST_BYTES` in `api/partnerships/[id]/send.ts`, with a
+cap themselves (`MAX_REQUEST_BYTES` in `api/spaces/[spaceId]/send.ts`, with a
 message that says what went wrong), so the image's limit only has to sit above
 it. `src/lib/server/self-hosted/dockerfile.test.ts` reads the Dockerfile and
 fails if it does not, so raising the attachment budget cannot silently break

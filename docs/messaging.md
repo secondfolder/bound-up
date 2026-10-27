@@ -16,8 +16,10 @@ Deliberately not a chat log. The unit is a **thread**: a small, self-contained
 exchange, a few replies at most, and next time you start a new one. The couple
 has another channel for ordinary conversation; this is for the other thing.
 
-A partner's messaging page is therefore a board of little stickers, one per
-thread, rather than a scrolling transcript.
+The messages page, `/messages`, is therefore a board of little stickers, one
+per thread, rather than a scrolling transcript. Which threads it shows follows
+the context switcher ([contexts.md](contexts.md)); see
+[The board in each context](#the-board-in-each-context).
 
 What the board shows depends on whether the recipient has ever opened that
 thread. A never-opened unread thread shows as a sealed envelope to the
@@ -144,6 +146,72 @@ derived data such as cached embed previews. It is separate so the app can add
 or backfill previews without rewriting the author-written body, and it is
 encrypted because a cached title or thumbnail URL is still content derived from
 plaintext the server must not keep in the clear.
+
+## The board in each context
+
+`/messages` follows the context, like the notebook and tasks
+([contexts.md](contexts.md)), and shows the switcher at the top right. Its
+load (`messages/board.server.ts`) reads the context's spaces and keeps the
+accepted partnerships among them:
+
+- **A partnership**: that partnership's board, as it always was — its
+  threads, its tags in the new-message dialog, its restore requests, its key
+  notices and live updates.
+- **Everyone**: every partnership's threads on one board, from one statement
+  (`listBoard` takes a list of partnerships, so the unified board costs what
+  a single one does and keeps the one sort order). Each sticker wears a chip
+  saying whose it is (`SpaceChip`), and its accessible name ends "with Jun".
+  With a single partner, Everyone is that partner's board without chips.
+- **Me**: no board. Messages are between two people, so the page says so and
+  offers a "Switch to Jun" button per partner. It never switches by itself:
+  the context is the whole device's, and changing it would change every other
+  list too.
+- **No partner at all**: the same words, with "Add a partner" instead.
+
+Each thread carries its partnership as `spaceId` (`ThreadStickerView`), which
+is where its link, its attachments and its chip come from. A partnership whose
+keys are missing is left off an Everyone board; alone in its own context it is
+a 404, as it was.
+
+**What belongs to one partnership** stays with it, drawn once per partnership
+the board shows:
+
+- **Restore requests** (`RestoreRequests`) are shown for each, in Everyone as
+  well, since a partner who cannot sign in needs an answer wherever the
+  viewer happens to be looking. The app shell hides its help callout on the
+  board for exactly the partnerships the board shows.
+- **Key notices** (`PartnerKeyNotice`) are shown in full on one partnership's
+  board. Over several, only a changed key, which stops a send, is shown
+  (`alertsOnly`): a "Check your safety number" line per partner would stack
+  up over the threads, and two buttons of the same name would be ambiguous.
+- **Tags** are managed where a thread is: the new-message dialog and the
+  thread page, each for its own partnership. The board only shows each
+  thread's tags.
+
+**A new thread names its partnership.** "Write something" opens the dialog
+for the board's partnership; in Everyone over several, the dialog asks "For
+whom?" first (`ForWhom`, remembered on the device as
+`bound-up:messages-for-whom`), among partners only, and the composer — with
+that partnership's own draft and tags (`NewThreadComposer`) — appears once it
+is answered. The partnerships it could go to are fixed when the dialog opens,
+and the send posts to `/api/spaces/[spaceId]/threads` for the one chosen. So
+another tab switching the context, which reloads this board when the tab
+comes back to the front, leaves an open dialog going where it was going
+([contexts.md](contexts.md#writes-name-their-space)). Me never offers it.
+
+**A thread's page takes its partnership from the thread**
+(`findThreadMembership`), never from the context: `/messages/[threadId]`
+opens the same thread whatever the device is looking at, shows whose it is in
+a chip at the top right, and leaves the context alone. That is what lets a
+notification's link be the thread's own URL.
+
+**Links into the board switch first.** The /home unread rows, the partner
+page's Messages card, the help callout and the kink-list compare page's
+"Talk about it in messages" each lead to `/messages` in their partnership's
+context (`followInContext`, or `inContext` for a plain link, in
+`context-client.svelte.ts`), with data preloading off, since a preload would
+fetch the board in the old one. A link to one thread — a sticker, a toast, a
+notification — goes straight to `/messages/[threadId]` and switches nothing.
 
 ## "Unread", defined once
 
@@ -677,7 +745,9 @@ the message is sent or its text deleted. The code is `src/lib/messaging/drafts.t
 
 - **One draft per composer.** Each thread's reply box has its own
   (`thread:<threadId>`), and so does each partnership's "Write something"
-  dialog (`new-thread:<partnershipId>`). Writing in one never touches another.
+  dialog (`new-thread:<partnershipId>`), wherever the dialog is opened from:
+  choosing another partner under "For whom?" opens theirs. Writing in one
+  never touches another.
   Daydreams' composer keeps its drafts the same way, under
   `daydream:<daydreamId>` ([docs/daydreams.md](daydreams.md)).
 - **Encrypted to the writer alone.** A draft is an age file encrypted to the
@@ -743,24 +813,33 @@ record can only be made by someone holding the vault key.
 
 | Route                               | What                                                                        |
 | ----------------------------------- | --------------------------------------------------------------------------- |
-| `/partner/[id]/messages`            | The board. The unopened-envelope state SSRs; previews decrypt after unlock. |
-| `/partner/[id]/messages?thread=…`   | Where a notification tap lands: a never-opened thread highlighted, else on. |
-| `/partner/[id]/messages/new`        | The board with its new-message dialog open, so a reload keeps it open.      |
-| `/partner/[id]/messages/[threadId]` | One thread. Its load also records the open, and publishes `read` if it moved. |
+| `/messages`                         | The board, in the current context. The unopened-envelope state SSRs; previews decrypt after unlock. |
+| `/messages?thread=…`                | A never-opened thread on the board highlighted, one opened before gone on to. |
+| `/messages/new`                     | The board with its new-message dialog open, so a reload keeps it open.      |
+| `/messages/[threadId]`              | One thread, wherever the context is. Its load also records the open, and publishes `read` if it moved. Where a notification's tap lands. |
 | `/home`                             | A link per partner with something waiting.                                  |
-| `api/partnerships/[id]/threads`     | `POST` multipart: a thread and its first message.                           |
+| `api/spaces/[spaceId]/threads`      | `POST` multipart: a thread and its first message.                           |
 | `.../threads/[threadId]/messages`   | `POST` multipart: a reply.                                                  |
-| `api/partnerships/[id]/tags`        | `GET` / `POST`: list or create partnership-scoped tags.                     |
+| `api/spaces/[spaceId]/tags`         | `GET` / `POST`: list or create partnership-scoped tags.                     |
 | `.../tags/[tagId]`                  | `PATCH`: rename or recolor a tag.                                           |
 | `.../threads/[threadId]/tags`       | `PUT`: replace the thread's tag assignments.                                |
 | `.../threads/[threadId]/unread`     | `GET`: whether the thread is unread for the viewer. For the in-app toast.   |
 | `.../messages/[messageId]/reaction` | `PUT` / `DELETE`.                                                           |
 | `.../attachments/[attachmentId]`    | `GET`, streams ciphertext. `410` once the media has self-destructed.        |
-| `.../ack-warning`                   | `POST`, the one-time warning acknowledgement.                               |
 | `.../restore`                       | `POST` the vault wrapped for the requester's new key, `DELETE` to decline.  |
 | `.../messages/[messageId]/metadata` | `PUT` a sealed sidecar, beside a sealed body only.                          |
 | `api/realtime/events`               | `GET`, the SSE feed, on the partnership's room and the `messages` topic. See [realtime.md](realtime.md). |
 | `api/realtime/presence`             | `POST`, a stream's lease renewal or goodbye. See [realtime.md](realtime.md#a-stream-is-a-lease). |
+
+**The API is under the space, `/api/spaces/[spaceId]/…`**, where it was under
+`/api/partnerships/[id]/…`, with no alias for the old paths. A shared space has
+its partnership's id ([spaces.md](spaces.md#ids-are-the-partnerships)), so
+every handler checks membership with `requireMembership`, which asks whether the
+viewer is a member of that space and the partnership is accepted: a solo space
+or someone else's is a 404 like any unknown id. A tab left open across the
+change gets a failure notice and an update prompt, and its drafts are on the
+device. `names` (a partnership's sealed names, [partners.md](partners.md)) and
+`restore` moved with the rest.
 
 **`src/routes/api/` sits outside both route groups deliberately.** A group guard
 is a layout `+layout.server.ts`, and layout loads never run for a `+server.ts`
@@ -801,7 +880,7 @@ Adding a tag is one button everywhere, a plain "Add tag" with a tag icon,
 in the dialog and at the top of a thread alike.
 
 **The new-message dialog is in the URL.** "Write something" shallow-routes to
-`/partner/[id]/messages/new` (`pushState`), so the board stays mounted under
+`/messages/new` (`pushState`), so the board stays mounted under
 the dialog and Back closes it. Loaded in full, `/new` is a route of its own
 that renders the same board component with the same load (`board.server.ts`),
 which opens the dialog because of the route; closed there, it `replaceState`s
@@ -832,8 +911,9 @@ primary key, so a client-chosen id cannot reach or overwrite an existing row.
 
 ## Realtime
 
-Both screens watch the partnership's realtime room on the **`messages`
-topic** and, on anything arriving, call `invalidate()` on the `depends()` key
+A board of one partnership, and a thread page, watch that partnership's
+realtime room on the **`messages` topic** (an Everyone board of several does
+not; see below) and, on anything arriving, call `invalidate()` on the `depends()` key
 the load already declares. So a live update takes exactly the same authorised
 path as a navigation. The room itself (one per partnership, shared with the
 notebook, with streams that are leases closed while the page is hidden) is
@@ -848,6 +928,17 @@ through `publishMessagingEvent` (`server/realtime/messaging.ts`), whose
 field by field so nothing else can ride along. A future event wanting to carry
 a body is a reason to stop and reconsider, not a small extension.
 
+**An Everyone board of several partnerships is not live.** Watching it would
+take one stream per partnership — a Durable Object request each, and a presence
+lease each — for a page that is mostly glanced at
+([realtime.md](realtime.md#hanging-up-when-hidden-is-a-billing-necessity)). It reloads instead whenever its tab
+comes back to the front or its window regains focus, ringing anything that
+arrived meanwhile the same way a live board does (`newlyArrived`), and a device
+with it open is not counted as watching, so it still gets its push. An
+Everyone board of one partnership, and every thread page, watch the one room as
+before. Fanning list events out to each member's own room, so one stream could
+cover Everyone, is a later step ([contexts.md](contexts.md#not-built-yet)).
+
 **Who is listening** is the one thing a room knows about its streams: the
 viewer's user id, from the session, and their push device id, if the browser
 has one. `publishMessagingEvent` returns the streams watching the `messages`
@@ -858,7 +949,7 @@ partnership open still gets one. See
 
 ### Notices while watching
 
-A device with the board or a thread open is sent no push notification (see
+A device with a watched board or a thread open is sent no push notification (see
 [notifications.md](notifications.md#not-telling-a-device-what-it-is-showing)),
 so the page tells the viewer itself:
 
@@ -870,9 +961,8 @@ so the page tells the viewer itself:
   together, the newest rings.
 - **In a thread, a new message in another thread is a toast**
   (`MessageToasts.svelte`, a `wa-toast`) reading "New message from Sam". Its
-  link is the URL a notification's tap opens, `?thread=` on the board, so the
-  board's load makes the same decision: straight to a thread opened before, or
-  the board with a never-opened one ringed. One toast shows at a time and the
+  link is the URL a notification's tap opens, that thread's own page, with
+  data preloading off like a sticker's. One toast shows at a time and the
   newest replaces the last, since two would be same-named links to different
   places. A message in the thread already open is a live update, not a toast.
   A reaction is not a toast either.

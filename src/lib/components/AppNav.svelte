@@ -39,9 +39,10 @@
 			'/(auth-required)/(app)/debug'
 		].some((prefix) => routeId?.startsWith(prefix) ?? false)
 	);
-	// A prefix match, like isHome and isSettings above: the partner tab owns
-	// child routes now (/partner/[id]/messages and the threads under it) and an
-	// exact match would make the tab go dark the moment you opened a message.
+	// A prefix match, like isHome and isSettings above. The partner page has no
+	// child routes since messages, tasks and rewards moved to pages of their
+	// own that follow the context (/messages, /tasks, /rewards), which light
+	// no tab until the nav is rebuilt around them.
 	const isPartner = $derived(
 		(id: string) =>
 			(routeId?.startsWith('/(auth-required)/(app)/partner/[id]') ?? false) && page.params.id === id

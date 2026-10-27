@@ -99,7 +99,7 @@
 			({ error: problem } = sealed);
 			return;
 		}
-		const response = await tryFetch(`/api/partnerships/${partnershipId}/tags`, {
+		const response = await tryFetch(`/api/spaces/${partnershipId}/tags`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ id, name: sealed.name, color: newColor })
@@ -143,7 +143,7 @@
 			}
 			({ name } = sealed);
 		}
-		const response = await tryFetch(`/api/partnerships/${partnershipId}/tags/${tagId}`, {
+		const response = await tryFetch(`/api/spaces/${partnershipId}/tags/${tagId}`, {
 			method: 'PATCH',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ name, color: draftColor })
@@ -173,7 +173,7 @@
 			saving = true;
 			// `tryFetch`, so a dropped connection cannot throw past `saving = false`
 			// and leave the picker stuck saving.
-			const response = await tryFetch(`/api/partnerships/${partnershipId}/threads/${threadId}/tags`, {
+			const response = await tryFetch(`/api/spaces/${partnershipId}/threads/${threadId}/tags`, {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ tagIds: selectedIds })

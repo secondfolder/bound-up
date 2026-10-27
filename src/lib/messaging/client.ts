@@ -249,8 +249,8 @@ export type SendOutcome =
 
 function endpointFor(target: SendTarget): string {
 	return target.kind === 'new-thread'
-		? `/api/partnerships/${target.partnershipId}/threads`
-		: `/api/partnerships/${target.partnershipId}/threads/${target.threadId}/messages`;
+		? `/api/spaces/${target.partnershipId}/threads`
+		: `/api/spaces/${target.partnershipId}/threads/${target.threadId}/messages`;
 }
 
 export async function sendMessage(
@@ -465,17 +465,14 @@ async function writeMessageMetadataEntry(
 		vault: keys.vault,
 		grant: keys.grant
 	});
-	const response = await fetch(
-		`/api/partnerships/${partnershipId}/messages/${message.id}/metadata`,
-		{
-			method: 'PUT',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({
-				metadataCiphertext: sealed.ciphertext,
-				metadataVersion: sealed.payloadVersion
-			})
-		}
-	);
+	const response = await fetch(`/api/spaces/${partnershipId}/messages/${message.id}/metadata`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({
+			metadataCiphertext: sealed.ciphertext,
+			metadataVersion: sealed.payloadVersion
+		})
+	});
 	if (!response.ok) {
 		return null;
 	}
@@ -506,7 +503,7 @@ export async function fetchAttachment(
 	partnershipId: string,
 	info: MessageAttachmentInfo
 ): Promise<{ url: string; blob: Blob }> {
-	const response = await fetch(`/api/partnerships/${partnershipId}/attachments/${info.id}`);
+	const response = await fetch(`/api/spaces/${partnershipId}/attachments/${info.id}`);
 	if (response.status === 410) {
 		throw new MediaExpiredError();
 	}

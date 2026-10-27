@@ -19,9 +19,9 @@
 	}: {
 		title: string;
 		/**
-		 * Omit for a section with nowhere to send anyone. The /home messages card
-		 * is the only one so far: messages are per-partner, so there is no single
-		 * page behind the word "Messages" — its rows carry the links instead.
+		 * Omit for a section whose rows carry the links. The /home messages card
+		 * is the only one so far: each row opens the board in its partner's
+		 * context.
 		 */
 		href?: string;
 		/** A Font Awesome name, as `wa-icon` takes it. */

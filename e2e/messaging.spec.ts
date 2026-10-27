@@ -339,8 +339,8 @@ test.describe('the board', () => {
 				.getByRole('list', { name: 'Unread' })
 				.getByRole('link', { name: /^Unread message/ });
 			await sticker.hover();
-			const control = jun.page.waitForRequest(/\/partner\/[0-9a-f-]{36}\/__data\.json/);
-			await jun.page.getByRole('link', { name: 'Back to partner' }).hover();
+			const control = jun.page.waitForRequest(/\/home\/__data\.json/);
+			await jun.page.getByRole('link', { name: 'Back to home' }).hover();
 			await control;
 			expect(threadData).toEqual([]);
 
@@ -861,7 +861,7 @@ test.describe('attachments', () => {
 			const statuses = await ada.page.evaluate(
 				async ([mine, other, id]) => {
 					const get = async (partnership: string) =>
-						(await fetch(`/api/partnerships/${partnership}/attachments/${id}`)).status;
+						(await fetch(`/api/spaces/${partnership}/attachments/${id}`)).status;
 					return { own: await get(mine), through: await get(other) };
 				},
 				[junPartnership, casPartnership, attachmentId] as [string, string, string]
@@ -956,10 +956,16 @@ test.describe('attachments', () => {
 
 			// And the download itself is refused, as gone rather than missing.
 			const attachmentId = String(defined(updated.rows[0], 'the updated attachment').id);
-			const status = await jun.page.evaluate(async (id) => {
-				const [, , partnership] = globalThis.location.pathname.split('/');
-				return (await fetch(`/api/partnerships/${partnership}/attachments/${id}`)).status;
-			}, attachmentId);
+			// The thread's own partnership: the page's URL names only the thread.
+			const { rows: owner } = await sql(
+				'SELECT partnership_id AS id FROM message_threads WHERE id = ?',
+				[new URL(jun.page.url()).pathname.split('/').at(-1) ?? '']
+			);
+			const status = await jun.page.evaluate(
+				async ([partnership, id]) =>
+					(await fetch(`/api/spaces/${partnership}/attachments/${id}`)).status,
+				[String(owner[0]?.id), attachmentId] as [string, string]
+			);
 			expect(status).toBe(410);
 
 			// On the board the tile learns it from the download's 410, and shows
@@ -1214,10 +1220,13 @@ test.describe('attachments', () => {
 
 			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
-			const [, , partnershipId] = new URL(ada.page.url()).pathname.split('/');
+			// Ada's one partnership, which the board was opened in.
+			const partnershipId = (await ada.page.context().cookies()).find(
+				(cookie) => cookie.name === 'context'
+			)?.value;
 
 			const status = await ada.page.evaluate(async (id) => {
-				const response = await fetch(`/api/partnerships/${id}/threads`, { method: 'POST' });
+				const response = await fetch(`/api/spaces/${id}/threads`, { method: 'POST' });
 				return response.status;
 			}, partnershipId);
 

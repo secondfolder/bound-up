@@ -34,15 +34,18 @@ describe('UnreadMessagesWidget', () => {
 		expect(container.querySelector('wa-card')).not.toBeInTheDocument();
 	});
 
-	it('heads the card with plain text, because there is no single messages page', () => {
+	it('heads the card with plain text, the rows carrying the links', () => {
 		render(UnreadMessagesWidget, { unread: [jun] });
 
 		expect(screen.getByRole('heading', { level: 2, name: 'Messages' })).toBeInTheDocument();
-		// The only link in the card is the row's, which goes to one partner's
-		// board. A header link would have nowhere to point.
+		// The only link in the card is the row's, to the board, which it opens
+		// in that partner's context.
 		const links = screen.getAllByRole('link');
 		expect(links).toHaveLength(1);
-		expect(links[0]).toHaveAttribute('href', '/(auth-required)/(app)/partner/p1/messages');
+		expect(links[0]).toHaveAttribute('href', '/(auth-required)/(app)/messages');
+		// It switches the context first, so a preload would fetch the board in
+		// the old one.
+		expect(links[0]).toHaveAttribute('data-sveltekit-preload-data', 'off');
 	});
 
 	it('names each row for its partner and count, distinctly from the nav tab', () => {

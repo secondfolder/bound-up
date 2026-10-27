@@ -8,7 +8,7 @@ import {
 } from './notifications';
 
 const threadId = '0b5f6c1e-6a7d-4c43-9a3b-2f1f0e8d9c7b';
-const url = 'https://app.test/partner/p/messages/t';
+const url = 'https://app.test/messages/t';
 
 describe('buildPushContent', () => {
 	it('says a message arrived, and nothing about who sent it or what it said', () => {

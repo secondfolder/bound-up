@@ -6,9 +6,9 @@
 	 *
 	 * A device with a thread open is watching the partnership, so the server
 	 * sends it no push notification (docs/notifications.md); this is what tells
-	 * it instead. A tap goes where a notification's tap goes — the board with
-	 * `?thread=`, whose load opens a thread read before and rings one never
-	 * opened — so the two cannot drift apart.
+	 * it instead. A tap goes where a notification's tap goes — the thread's
+	 * own page, `/messages/[threadId]`, which takes its partnership from the
+	 * thread — so the two cannot drift apart.
 	 *
 	 * The items are made by hand rather than rendered from Svelte state,
 	 * because a `wa-toast-item` removes itself from the DOM when it hides, and
@@ -17,7 +17,7 @@
 	 * somebody typed.
 	 */
 
-	let { partnershipId, partnerName }: { partnershipId: string; partnerName: string } = $props();
+	let { partnerName }: { partnerName: string } = $props();
 
 	/** Long enough to read and reach for; it pauses while hovered or focused. */
 	const TOAST_DURATION_MS = 8000;
@@ -52,7 +52,11 @@
 		item.duration = TOAST_DURATION_MS;
 
 		const link = document.createElement('a');
-		link.href = `${resolve('/(auth-required)/(app)/partner/[id]/messages', { id: partnershipId })}?thread=${encodeURIComponent(threadId)}`;
+		link.href = resolve('/(auth-required)/(app)/messages/[threadId]', { threadId });
+		// Not preloaded: the thread page's load is what marks a thread read, so
+		// a pointer resting on the toast would have read it (docs/messaging.md,
+		// "Read receipts").
+		link.dataset.sveltekitPreloadData = 'off';
 		link.textContent = `New message from ${partnerName}`;
 		link.dataset.testid = 'message-toast';
 		link.addEventListener('click', () => dismiss(threadId));

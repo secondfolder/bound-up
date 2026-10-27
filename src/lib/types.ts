@@ -346,6 +346,11 @@ export type MessageBodyRef = {
  */
 export type ThreadStickerView = {
 	id: string;
+	/**
+	 * The partnership's shared space the thread is in: where its link, its
+	 * attachments and its chip on an Everyone board come from.
+	 */
+	spaceId: string;
 	icon: ThreadIcon;
 	tags?: TagView[];
 	unread: boolean;
@@ -508,6 +513,22 @@ export type RestoreRequestView = {
 	 * code with them rather than trust whoever approved.
 	 */
 	signInApproved: boolean;
+};
+
+/**
+ * One partnership a message board shows: one in that partnership's context,
+ * each of them in Everyone. What the board needs beside its threads to send
+ * into it and to answer what is asked of the viewer in it. Its names are the
+ * switcher's (`ContextSpaceView`), so the two cannot call a partner different
+ * things.
+ */
+export type BoardPartnershipView = {
+	/** The partnership's id, which is its shared space's. */
+	id: string;
+	/** Public keys, `mine` included so a swapped one can be caught (docs/encryption.md). */
+	recipients: PartnerRecipientsView;
+	restoreRequests: RestoreRequestView[];
+	tags: TagView[];
 };
 
 /**

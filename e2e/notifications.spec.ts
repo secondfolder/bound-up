@@ -12,6 +12,7 @@ import {
 	newSide,
 	openBoard,
 	reply,
+	showContext,
 	waitForHydration,
 	writeThread
 } from './helpers';
@@ -203,13 +204,50 @@ test.describe('push notification settings', () => {
 });
 
 /**
- * Where a notification's tap lands: the board with `?thread=`. A thread never
- * opened stays on the board with its tile highlighted; one already opened goes
- * straight to it. Driven by visiting the URL `notifyPartner` builds, since the
- * suite cannot tap a real notification.
+ * Where a notification's tap lands: the thread's own page, `/messages/[id]`,
+ * which takes its partnership from the thread, so it opens the same thread
+ * whatever context the device is in, and leaves the context alone. Driven by
+ * visiting the URL `notifyPartner` builds, since the suite cannot tap a real
+ * notification. The board's `?thread=` is checked beside it: a never-opened
+ * thread is ringed there, an opened one goes straight on.
  */
 test.describe('tapping a message notification', () => {
-	test('highlights a never-opened thread on the board, and opens one already read', async ({
+	test('opens the thread whatever the context, and leaves the context be', async ({ browser }) => {
+		const ada = await newSide(browser, 'Ada');
+		const jun = await newSide(browser, 'Jun');
+		try {
+			await newAccounts(ada, jun);
+			await linkAccounts(ada, jun);
+
+			await ada.page.goto('/home');
+			await openBoard(ada.page, 'Jun');
+			await writeThread(ada.page, 'look what I found');
+			const thread = new URL(ada.page.url()).pathname.split('/').at(-1) ?? '';
+			const tapped = `/messages/${thread}`;
+
+			// Jun's device is looking at his own things, where there are no
+			// messages at all.
+			const { rows } = await sql(
+				`SELECT m.space_id AS id FROM space_members m JOIN spaces s ON s.id = m.space_id
+				  WHERE s.kind = 'solo' AND m.user_id = (SELECT id FROM user WHERE email = ?)`,
+				[jun.who.email.toLowerCase()]
+			);
+			const solo = String(rows[0]?.id);
+			await showContext(jun.page, solo);
+
+			await jun.page.goto(tapped);
+			await expect(jun.page.getByText('look what I found')).toBeVisible();
+			await expect(jun.page.getByTestId('thread-space')).toContainText('Ada');
+			// Still Me: an item never switches the context.
+			const cookie = (await jun.page.context().cookies()).find((each) => each.name === 'context');
+			expect(cookie?.value).toBe(solo);
+		} finally {
+			await ada.close();
+			await jun.close();
+		}
+	});
+
+	test('the board’s ?thread= rings a never-opened thread, and opens one already read', async ({
 		browser
 	}) => {
 		const ada = await newSide(browser, 'Ada');
@@ -221,31 +259,26 @@ test.describe('tapping a message notification', () => {
 			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'look what I found');
-			// Annotated for Biome, which believes `exec` never returns null.
-			const match: RegExpExecArray | null =
-				/\/partner\/(?<partnership>[0-9a-f-]{36})\/messages\/(?<thread>[0-9a-f-]{36})$/.exec(
-					new URL(ada.page.url()).pathname
-				);
-			const { partnership, thread } = match?.groups ?? {};
-			const tapped = `/partner/${partnership}/messages?thread=${thread}`;
+			const thread = new URL(ada.page.url()).pathname.split('/').at(-1) ?? '';
+			const tapped = `/messages?thread=${thread}`;
 
 			// Never opened: the board, with the tile ringed and the query gone so a
 			// reload does not highlight it again.
 			await jun.page.goto(tapped);
 			const highlighted = jun.page.locator('[data-highlighted]');
 			await expect(highlighted).toHaveCount(1);
-			await expect(jun.page).toHaveURL(`/partner/${partnership}/messages`);
+			await expect(jun.page).toHaveURL('/messages');
 			// Then it fades and goes, which takes about four seconds.
 			await expect(highlighted).toHaveCount(0, { timeout: 10_000 });
 
-			// Open it, and the same tap now goes straight to the thread.
+			// Open it, and the same link now goes straight to the thread.
 			// By href: the tile's accessible name is its timestamp and position.
 			await jun.page.locator(`a[href$="${thread}"]`).click();
-			await jun.page.waitForURL(`/partner/${partnership}/messages/${thread}`);
+			await jun.page.waitForURL(`/messages/${thread}`);
 			await expect(jun.page.getByText('look what I found')).toBeVisible();
 
 			await jun.page.goto(tapped);
-			await expect(jun.page).toHaveURL(`/partner/${partnership}/messages/${thread}`);
+			await expect(jun.page).toHaveURL(`/messages/${thread}`);
 		} finally {
 			await ada.close();
 			await jun.close();
@@ -256,8 +289,8 @@ test.describe('tapping a message notification', () => {
 /**
  * What a device that is watching gets instead of a push, since the server
  * sends none to a device with the board or a thread open: on the board, the
- * new thread's sticker is ringed; in another thread, a toast whose tap lands
- * where a notification's would.
+ * new thread's sticker is ringed; in another thread, a toast whose tap opens
+ * that thread, as a notification's would.
  */
 test.describe('in-app notices while watching', () => {
 	/** The thread id at the end of a thread page's URL. */
@@ -312,18 +345,14 @@ test.describe('in-app notices while watching', () => {
 			await expect(ada.page.getByText('in the same thread')).toBeVisible({ timeout: 20_000 });
 			await expect(ada.page.getByTestId('message-toast')).toHaveCount(0);
 
-			// A new thread elsewhere: a toast, and its tap rings the never-opened one.
+			// A new thread elsewhere: a toast, and its tap opens that thread.
 			await openBoard(jun.page, 'Ada');
 			await writeThread(jun.page, 'second thread');
 			const second = threadIdOf(jun.page.url());
 			const toast = ada.page.getByTestId('message-toast');
 			await expect(toast).toHaveText('New message from Jun', { timeout: 20_000 });
 			await toast.click();
-			await expect(ada.page).toHaveURL(/\/messages$/);
-			await expect(ada.page.locator('[data-highlighted]')).toHaveCount(1);
-
-			// Opened before: the tap goes straight to the thread.
-			await ada.page.locator(`a[href$="${second}"]`).click();
+			await expect(ada.page).toHaveURL(`/messages/${second}`);
 			await expect(ada.page.getByText('second thread')).toBeVisible();
 			await jun.page.goto(firstUrl);
 			await reply(jun.page, 'back to the first');

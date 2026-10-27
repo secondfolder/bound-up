@@ -3,6 +3,7 @@
 	import CompareView from '$lib/components/kink-list/CompareView.svelte';
 	import KinkListCrumbs from '$lib/components/kink-list/KinkListCrumbs.svelte';
 	import YourSideControl from '$lib/components/kink-list/YourSideControl.svelte';
+	import { inContext } from '$lib/context-client.svelte';
 	import { kinkListContext } from '$lib/kink-list/context';
 	import { asList, effectiveList, type PartnerPayload } from '$lib/kink-list/partner';
 	import { openPartnerCopy, type PartnerKinkList } from '$lib/kink-list/partner-store.svelte';
@@ -35,9 +36,9 @@
 
 	const blind = $derived(store.partner.blind.on || theirs?.blind.on === true);
 	const mine = $derived(effectiveList(store.solo.list, store.partner));
-	const messages = $derived(
-		resolve('/(auth-required)/(app)/partner/[id]/messages', { id: data.partnershipId })
-	);
+	// The board follows the context, so the link switches to this partner on
+	// the way (`inContext`, docs/contexts.md).
+	const messages = resolve('/(auth-required)/(app)/messages');
 </script>
 
 <svelte:head>
@@ -49,7 +50,11 @@
 	text="Your list for {name}"
 	label="Back to your list for {name}"
 >
-	<a href={messages}>Talk about it in messages</a>
+	<a
+		href={messages}
+		data-sveltekit-preload-data="off"
+		{@attach inContext({ kind: 'space', spaceId: data.partnershipId })}>Talk about it in messages</a
+	>
 </KinkListCrumbs>
 <h1>You and {name}</h1>
 

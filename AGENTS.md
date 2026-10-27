@@ -184,7 +184,7 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
 - `npm run test:e2e`: Playwright specs, about three and a half minutes for the
-  current ~255 of them at four workers against the built server (seven under
+  current ~265 of them at four workers against the built server (seven under
   `vite dev`), once the browser is installed (`npx playwright install
   chromium` first). A spec sitting at ~90 seconds is one hanging on its
   timeout, and the reported failure is usually the `finally` that could not

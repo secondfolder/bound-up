@@ -743,6 +743,12 @@
 					"icon": "message",
 					"children": [
 						{
+							"id": "messages-everyone",
+							"title": "All your messages on one page",
+							"summary": "Every partner's threads on one board, or just one partner's at a tap.",
+							"status": "in-progress"
+						},
+						{
 							"id": "message-tags",
 							"title": "Tags",
 							"summary": "Tag threads to keep conversations organised.",

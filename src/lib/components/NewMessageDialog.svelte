@@ -1,12 +1,8 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-	import { invalidate } from '$app/navigation';
-	import { unlockedIdentity } from '$lib/crypto/session.svelte';
+	import { type Snippet, untrack } from 'svelte';
 	import type { ComposedMessage } from '$lib/messaging/client';
-	import { type DraftSession, openDraft } from '$lib/messaging/drafts';
 	import type { TagView } from '$lib/types';
-	import MessageComposer from './MessageComposer.svelte';
-	import TagPicker from './TagPicker.svelte';
+	import NewThreadComposer from './NewThreadComposer.svelte';
 
 	let {
 		partnerName,
@@ -14,6 +10,7 @@
 		send,
 		close,
 		tags,
+		forWhom,
 		/**
 		 * Where on screen the dialog grows from: the button that opened it. Null
 		 * for a dialog that opens with the page, which simply appears.
@@ -24,67 +21,22 @@
 		/** Display only: offers a choice of quality. The server enforces a byte budget. */
 		highQualityMedia = false
 	}: {
-		partnerName: string;
-		partnershipId: string;
+		/** Who it goes to; null until `forWhom` has an answer. */
+		partnerName: string | null;
+		/** Where it goes, which the send names; null until `forWhom` has an answer. */
+		partnershipId: string | null;
 		send: (message: ComposedMessage, tagIds: string[]) => Promise<string | null>;
 		close: () => void;
 		tags: TagView[];
+		/**
+		 * "For whom?", over the composer, on a board that shows more than one
+		 * partnership (Everyone). The composer waits for its answer.
+		 */
+		forWhom?: Snippet;
 		origin?: { x: number; y: number } | null;
 		permanentMedia?: boolean;
 		highQualityMedia?: boolean;
 	} = $props();
-
-	let selectedTagIds = $state<string[]>([]);
-
-	/**
-	 * The draft for this partnership's "Write something" dialog.
-	 *
-	 * Tags are part of it, because until the thread exists they have nowhere
-	 * else to live — but only while there is text. `save()` drops a draft with
-	 * no visible text, tags and all, so a dialog emptied and closed comes back
-	 * with neither. See `src/lib/messaging/drafts.ts`.
-	 *
-	 * Read once, at mount: the picker and the composer both take their initial
-	 * state from it, and neither is rendered until it is in.
-	 */
-	let draft: DraftSession | null = $state(null);
-	/** Plain, not `$state`: only ever read inside `save`, never rendered. */
-	let text = '';
-
-	// svelte-ignore state_referenced_locally
-	void openDraft({ kind: 'new-thread', partnershipId }, unlockedIdentity()).then((opened) => {
-		// A tag deleted since the draft was saved would make the send fail as
-		// `no-such-tag`, so the restore keeps only the ones that still exist.
-		const known = new Set(tags.map((tag) => tag.id));
-		selectedTagIds = (opened.initial?.tagIds ?? []).filter((id) => known.has(id));
-		text = opened.initial?.text ?? '';
-		draft = opened;
-	});
-
-	function saveDraft() {
-		draft?.save({ text, tagIds: $state.snapshot(selectedTagIds) });
-	}
-
-	function onTextChange(next: string) {
-		text = next;
-		saveDraft();
-	}
-
-	// A tag change is a draft change too. With no text, `save()` removes the
-	// draft instead, which is what keeps tags from being stored on their own.
-	$effect(() => {
-		const tagIds = $state.snapshot(selectedTagIds);
-		draft?.save({ text, tagIds });
-	});
-
-	/**
-	 * A tag made here must be in `tags` the next time the dialog opens, or the
-	 * restore above filters it out of the draft. The board's `tags` only change
-	 * when the board reloads, so reload it.
-	 */
-	function onTagCreated() {
-		void invalidate(`messages:board:${partnershipId}`);
-	}
 
 	function onAfterHide(event: Event) {
 		// `wa-after-hide` bubbles from nested Web Awesome controls such as the tag
@@ -133,16 +85,6 @@
 			cancelled = true;
 		};
 	}
-
-	async function sendWithTags(message: ComposedMessage) {
-		// Held on to until the send has landed: a failed send keeps its draft.
-		const session = draft;
-		const failure = await send(message, selectedTagIds);
-		if (!failure) {
-			session?.clear();
-		}
-		return failure;
-	}
 </script>
 
 <!--
@@ -154,7 +96,7 @@
 	"picking a tag in the composer keeps the dialog open".
 -->
 <wa-dialog
-	label={`Send to ${partnerName}`}
+	label={partnerName ? `Send to ${partnerName}` : 'Write something'}
 	class="composer-dialog"
 	open
 	onwa-after-hide={onAfterHide}
@@ -165,43 +107,28 @@
 		     it to a screen reader, but its header is hidden to keep the panel
 		     small, and the placeholder alone went as soon as you typed. -->
 		<div class="top-row">
-			<p class="to">To <strong>{partnerName}</strong></p>
+			{#if forWhom}
+				<div class="for-whom">{@render forWhom()}</div>
+			{:else if partnerName}
+				<p class="to">To <strong>{partnerName}</strong></p>
+			{/if}
 			<wa-button appearance="plain" pill class="dialog-close" onclick={close}>
 				<wa-icon name="xmark" variant="solid" label="Close"></wa-icon>
 			</wa-button>
 		</div>
-		{#if draft}
-			<TagPicker
-				{partnershipId}
-				{tags}
-				bind:selectedIds={selectedTagIds}
-				startEditing
-				{onTagCreated}
-			/>
-		{/if}
-		{#if draft}
-			<!--
-		No autofocus. `<wa-textarea autofocus>` reaches for its inner textarea
-		before the shadow root exists and throws "Cannot read properties of null
-		(reading 'focus')" — an uncaught error during hydration, which stops
-		Svelte wiring up the rest of the component and leaves the whole composer
-		dead. Focusing the host by hand after `updateComplete` had the same
-		effect. The composer appears on a tap, so the user is already looking at
-		it.
-	-->
-			<MessageComposer
-				send={sendWithTags}
-				{permanentMedia}
-				{highQualityMedia}
-				placeholder={`Message to ${partnerName}`}
-				initialText={draft.initial?.text ?? ''}
-				{onTextChange}
-			/>
-		{:else}
-			<!-- Only while the draft is read, a moment. The composer is not shown
-			     empty first: whatever was typed before the draft arrived would be
-			     overwritten by it. -->
-			<div class="restoring" aria-busy="true"><wa-spinner></wa-spinner></div>
+		{#if partnershipId && partnerName}
+			<!-- Keyed, so choosing someone else under "For whom?" opens their
+			     own draft rather than carrying this one over to them. -->
+			{#key partnershipId}
+				<NewThreadComposer
+					{partnerName}
+					{partnershipId}
+					{tags}
+					{send}
+					{permanentMedia}
+					{highQualityMedia}
+				/>
+			{/key}
 		{/if}
 	</div>
 </wa-dialog>
@@ -246,17 +173,16 @@
 		gap: 0.375rem;
 	}
 
-	.restoring {
-		display: grid;
-		place-items: center;
-		padding: var(--wa-space-l);
-	}
-
 	.top-row {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		padding-inline-start: 0.5rem;
+	}
+
+	.for-whom {
+		flex: 1 1 auto;
+		min-inline-size: 0;
 	}
 
 	.to {

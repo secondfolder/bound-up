@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { inContext } from '$lib/context-client.svelte';
 	import { initialsFor } from '$lib/initials';
 	import { partnerName } from '$lib/partner-names.svelte';
 	import type { UnreadPartnerView } from '$lib/types';
 
 	/**
 	 * One link per partner with something waiting. Nothing at all otherwise.
+	 *
+	 * Each leads to `/messages`, which follows the context, so following one
+	 * switches to that partner first (`inContext`, docs/contexts.md): the
+	 * board then shows the threads the row counted.
 	 *
 	 * The card around it is `UnreadMessagesWidget`'s, not this component's —
 	 * which is why the rows below carry a background tint but no border of their
@@ -25,9 +30,9 @@
 					test locator ambiguous. Hence the count and the word "new".
 				-->
 				<a
-					href={resolve('/(auth-required)/(app)/partner/[id]/messages', {
-						id: partner.partnershipId
-					})}
+					href={resolve('/(auth-required)/(app)/messages')}
+					data-sveltekit-preload-data="off"
+					{@attach inContext({ kind: 'space', spaceId: partner.partnershipId })}
 				>
 					<wa-avatar
 						image={partner.image ?? undefined}

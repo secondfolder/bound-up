@@ -85,16 +85,16 @@ no loss: a tap opens the thread, where the name is.
   replies to a phone that was off arrives as one notification, and a newer one
   replaces an older one on screen. A reaction gets neither, so it can never
   replace a message notification nobody has read yet.
-- A tap opens the board at `?thread=<id>`, and the board's load decides at
-  tap time rather than at send time. A thread the recipient has opened before
-  redirects straight to its own page. One they have never opened stays on the
-  board, scrolled into view and ringed, the ring fading after about four
-  seconds. It is seen first as its sealed envelope, as every new thread is,
-  and opening it is still the recipient's own tap. Deciding at tap time means
-  a thread opened on another device in the meantime goes straight through.
-  The query is then dropped from the URL, so a reload does not highlight it
-  again. The service worker refuses to navigate off the app's own origin
-  whatever a payload says.
+- A tap opens the thread's own page, `/messages/<threadId>`, which takes its
+  partnership from the thread rather than from the device's context, so it
+  opens the same thread whatever the device was last looking at, and leaves
+  that alone ([contexts.md](contexts.md#items-carry-their-own-space)).
+  Opening it reads it, as tapping its sticker on the board would; it used to
+  open the board at `?thread=` and ring a never-opened thread there, which a
+  board that follows the context can no longer promise to show. Links in
+  notifications already delivered to the old `/partner/<id>/messages` 404,
+  and the error page links back to the board. The service worker refuses to
+  navigate off the app's own origin whatever a payload says.
 - `TTL` is a day: long enough for a phone off overnight, short enough that a
   week away does not end in a pile of stale banners.
 
@@ -168,7 +168,11 @@ noise. The realtime room knows who is listening, so it answers the question:
 
 It is per device on purpose: a board open on a laptop says nothing about
 whether its owner is looking at their phone, so the phone is still told.
-If the stored id is lost, the only cost is one redundant notification.
+If the stored id is lost, the only cost is one redundant notification. An
+Everyone board over several partners holds no stream
+([messaging.md](messaging.md#realtime)), so a device showing one is not
+watching and is still pushed to: it would not ring the sticker either until
+it is looked at again.
 
 What a watching device gets instead is in-page: its board rings the new
 thread's sticker, and a thread page shows a toast for a message in another

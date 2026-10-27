@@ -191,6 +191,29 @@ export async function requireThreadMembership(
 }
 
 /**
+ * A thread's own partnership, and the viewer's membership of it, for the
+ * thread's page: an item takes its space from itself, never from the URL or
+ * the context (docs/contexts.md, "Items carry their own space"). So a link to
+ * a thread — a notification's, say — opens the same thread whatever context
+ * the device is in.
+ *
+ * Null for no such thread and for one the viewer is not in alike, so the page
+ * 404s on both without saying which.
+ */
+export async function findThreadMembership(
+	db: Db,
+	threadId: string,
+	userId: string
+): Promise<(Membership & { threadId: string; icon: ThreadIcon }) | null> {
+	const [row] = await db
+		.select({ partnershipId: messageThreads.partnershipId })
+		.from(messageThreads)
+		.where(eq(messageThreads.id, threadId))
+		.limit(1);
+	return row ? await requireThreadMembership(db, row.partnershipId, threadId, userId) : null;
+}
+
+/**
  * Whether one thread is unread for the viewer, by the one definition of unread
  * (`isUnreadFor`).
  *
@@ -255,7 +278,12 @@ export async function requireMessageMembership(
 // ── reads ────────────────────────────────────────────────────────────────────
 
 /**
- * The board: every thread in a partnership, in the order it renders.
+ * The board: every thread in the given partnerships, in the order it renders.
+ * One partnership for a board in its context, several for Everyone — one
+ * statement either way, so the unified board costs what a single one does
+ * (docs/messaging.md, "Everyone"). The caller has already proven the viewer
+ * is in each of them: these come from the context's own spaces, never from a
+ * request.
  *
  * One statement for both halves. `unread` is defined once, as SQL, and reused
  * in the select and in both sort keys — the JS twin of it is `isUnreadFor` in
@@ -268,10 +296,14 @@ export async function requireMessageMembership(
  */
 export async function listBoard(
 	db: Db,
-	partnershipId: string,
+	partnershipIds: readonly string[],
 	viewerId: string,
 	now: Date = new Date()
 ): Promise<ThreadStickerView[]> {
+	// `in ()` is a syntax error in SQLite.
+	if (partnershipIds.length === 0) {
+		return [];
+	}
 	const unread = sql<number>`(
 		${messageThreads.lastMessageSenderId} <> ${viewerId}
 		and (
@@ -287,6 +319,7 @@ export async function listBoard(
 	const rows = await db
 		.select({
 			...threadStickerColumns,
+			partnershipId: messageThreads.partnershipId,
 			unread,
 			messageCount,
 			previewMessageId
@@ -299,7 +332,7 @@ export async function listBoard(
 			threadReads,
 			and(eq(threadReads.threadId, messageThreads.id), eq(threadReads.userId, viewerId))
 		)
-		.where(eq(messageThreads.partnershipId, partnershipId))
+		.where(inArray(messageThreads.partnershipId, [...partnershipIds]))
 		.orderBy(
 			// Requirement: unread first by newest message, then read by when that
 			// current latest message was first read. The CASE is what lets the two
@@ -345,6 +378,7 @@ export async function listBoard(
 
 	return rows.map((row) => ({
 		id: row.id,
+		spaceId: row.partnershipId,
 		icon: row.icon,
 		tags: tagsByThread.get(row.id) ?? [],
 		// SQLite has no boolean, so this arrives as 0/1. Normalised here so no

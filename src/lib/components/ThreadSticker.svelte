@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { shownSpace } from '$lib/context-client.svelte';
 	import type { MessageAttachmentInfo, MessagePayload } from '$lib/crypto/messages';
 	import { canDisplayAvif, canPlayVideo } from '$lib/media/support';
 	import { describeUnseenMedia, formatTimeLeft, neverOpened } from '$lib/messaging';
@@ -11,7 +12,8 @@
 	} from '$lib/messaging/client';
 	import { documentToPlainText, parseStoredRichText } from '$lib/richtext';
 	import { openedTagName, shownText } from '$lib/sealed-views.svelte';
-	import type { ThreadStickerView } from '$lib/types';
+	import type { ContextSpaceView, ThreadStickerView } from '$lib/types';
+	import SpaceChip from './context/SpaceChip.svelte';
 	import SelfDestructedMedia from './SelfDestructedMedia.svelte';
 
 	type PreviewMedia = {
@@ -48,7 +50,12 @@
 	 */
 	let {
 		thread,
-		partnershipId,
+		/**
+		 * Whose thread it is, on a board that mixes several partnerships
+		 * (Everyone): a chip on the tile and a word in its name. Null on one
+		 * partnership's own board, where it would say the same on every tile.
+		 */
+		space = null,
 		/** 1-based, for the accessible name. Two stickers can share a timestamp. */
 		position,
 		total,
@@ -56,7 +63,7 @@
 		onHighlightEnd
 	}: {
 		thread: ThreadStickerView;
-		partnershipId: string;
+		space?: ContextSpaceView | null;
 		position: number;
 		total: number;
 		/**
@@ -81,10 +88,7 @@
 	});
 
 	const href = $derived(
-		resolve('/(auth-required)/(app)/partner/[id]/messages/[threadId]', {
-			id: partnershipId,
-			threadId: thread.id
-		})
+		resolve('/(auth-required)/(app)/messages/[threadId]', { threadId: thread.id })
 	);
 	const sealed = $derived(thread.unread && neverOpened(thread));
 	// Opened through `sealedReader`: `undefined` until the vault is open, null
@@ -175,7 +179,7 @@
 					return { id: info.id, kind: info.kind, url: null, viewable };
 				}
 				try {
-					const result = await fetchAttachment(partnershipId, info);
+					const result = await fetchAttachment(thread.spaceId, info);
 					return { id: info.id, kind: info.kind, url: result.url, viewable };
 				} catch (error) {
 					if (error instanceof MediaExpiredError) {
@@ -297,8 +301,10 @@
 	// Two links must not share an accessible name (AGENTS.md), and on a board of
 	// similar previews the only distinguishing facts are the position and the
 	// timing — so both go in.
+	const whose = $derived(space ? shownSpace(space).name : null);
 	const label = $derived(
 		`${thread.unread ? 'Unread message' : 'Message'} ${position} of ${total}, ${when}` +
+			(whose ? `, with ${whose}` : '') +
 			(opened ? `, ${opened}` : '') +
 			(thread.messageCount > 1 ? `, ${thread.messageCount} messages` : '') +
 			(unseenLine ? `, ${unseenLine.toLowerCase()}` : '')
@@ -439,6 +445,7 @@
 			{/if}
 
 			<div class="meta">
+				{#if space}<span data-testid="sticker-space"><SpaceChip {space} /></span>{/if}
 				<span>{when}</span>
 				{#if opened}<span>{opened}</span>{/if}
 			</div>

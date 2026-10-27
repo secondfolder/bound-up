@@ -54,7 +54,7 @@ export async function runHistoryRestore(
 			return { ok: false, message: 'This device cannot open what you share. Try another device.' };
 		}
 		const escrowRelay = await relayEscrow(partnershipId, request, unlocked.identity);
-		const response = await fetch(`/api/partnerships/${partnershipId}/restore`, {
+		const response = await fetch(`/api/spaces/${partnershipId}/restore`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ requestId: request.id, vaultWrap, escrowRelay })
@@ -83,7 +83,7 @@ async function relayEscrow(
 	identity: CryptoKey | string
 ): Promise<{ escrowId: string; ciphertext: string } | undefined> {
 	const response = await fetch(
-		`/api/partnerships/${partnershipId}/restore?${new URLSearchParams({ requestId: request.id })}`
+		`/api/spaces/${partnershipId}/restore?${new URLSearchParams({ requestId: request.id })}`
 	);
 	if (!response.ok) {
 		throw new Error(`Could not read the escrow (${response.status})`);
@@ -109,7 +109,7 @@ export async function declineHistoryRestore(
 	partnershipId: string,
 	requestId: string
 ): Promise<boolean> {
-	const response = await tryFetch(`/api/partnerships/${partnershipId}/restore`, {
+	const response = await tryFetch(`/api/spaces/${partnershipId}/restore`, {
 		method: 'DELETE',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ requestId })

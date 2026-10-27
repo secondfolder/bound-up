@@ -41,7 +41,8 @@
 	<div class="widgets">
 		<PartnerMessagesWidget
 			messages={data.messages}
-			href={resolve('/(auth-required)/(app)/partner/[id]/messages', { id: partner.id })}
+			href={resolve('/(auth-required)/(app)/messages')}
+			opensIn={{ kind: 'space', spaceId: partner.id }}
 		/>
 
 		<!-- This partnership's alone, so they open their lists in its context. -->

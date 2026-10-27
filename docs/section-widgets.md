@@ -53,17 +53,19 @@ below.
 ## The unlinked header
 
 `SectionWidget`'s `href` is optional, and the `/home` messages card is why.
-Messages are per-partner: there is no single `/messages` page behind the word,
-so its title is plain text and each row carries its own link to that partner's
-board. Every other card links.
+It counts unread threads per partner, so its title is plain text and each row
+carries its own link: to `/messages` in that partner's context, where the
+threads it counted are. Every other card links.
 
-The Notebook, Tasks and Rewards cards link to `/notebook`, `/tasks` and
-`/rewards`, which show the current context ([contexts.md](contexts.md)) rather
-than one space, so following one switches the context to what the card
-previews first — Everyone from `/home` for tasks and rewards, the viewer's own
-space for the notebook, the partnership from `/partner/[id]` — through
-`followInContext` in `context-client.svelte.ts` (the cards' `opensIn` prop, and
-`SectionWidget`'s `onfollow`). A link opened in a new tab skips that and shows
+The Notebook, Tasks, Rewards and partner-page Messages cards link to
+`/notebook`, `/tasks`, `/rewards` and `/messages`, which show the current
+context ([contexts.md](contexts.md)) rather than one space, so following one
+switches the context to what the card previews first — Everyone from `/home`
+for tasks and rewards, the viewer's own space for the notebook, the
+partnership from `/partner/[id]` (and from each `/home` messages row) —
+through `followInContext` in `context-client.svelte.ts` (the cards' `opensIn`
+prop, and `SectionWidget`'s `onfollow`; `inContext` for the messages rows,
+which are plain links). A link opened in a new tab skips that and shows
 the context as it is. Such a link is not preloaded on hover
 (`data-sveltekit-preload-data="off"`): the preload would fetch the list in the
 old context, and the navigation then used it. It navigates with
@@ -72,8 +74,8 @@ does not otherwise re-run, follows too.
 
 That card goes away **entirely** when nothing is unread — the whole card, not
 just its body, which is what every other card drops. A "Messages" header on its
-own would still be chrome on a screen read at a glance, and unlike the others it
-links nowhere, so there would be nothing to do with it.
+own would still be chrome on a screen read at a glance, and its header links
+nowhere, so there would be nothing to do with it.
 
 It stays first on the page. Something waiting from a partner is the reason to
 have opened the app, and it should not be below the fold on a short phone.

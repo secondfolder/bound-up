@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MAX_REQUEST_BYTES } from '../../../routes/api/partnerships/[id]/send';
+import { MAX_REQUEST_BYTES } from '../../../routes/api/spaces/[spaceId]/send';
 
 /** adapter-node's own parsing of BODY_SIZE_LIMIT: bytes, or a K, M or G suffix. */
 function parseSize(value: string): number {

@@ -66,7 +66,7 @@ them back, and can read none of them. They live under two keys in turn:
    from the invite, seals them into the vault (kind `partnership-names`,
    columns `names_*`), and the invite and its key wrap are cleared, in one
    write: `invite-names.ts`, started by `EncryptionGate` once per partnership
-   per page load, through `GET` / `PUT /api/partnerships/[id]/names`
+   per page load, through `GET` / `PUT /api/spaces/[spaceId]/names`
    (`inviteNamesToMove` and `moveInviteNamesIntoVault` in
    `server/partnerships.ts`). The write matches only a row whose names are not
    in the vault yet, so two devices moving them at once write them once, and
@@ -268,8 +268,9 @@ token (`not-found`), an expired one (`expired`), the inviter's own link
 | `/settings/partners/[id]`          | `(auth-required)` | Who is whose role, then: pending, the link, share, renew; accepted, edit. Disconnect/cancel last, apart.  |
 | `/invite/[token]`                  | **`(public)`**    | The landing page for the person being invited.                                                            |
 | `/partner/[id]`                    | `(auth-required)` | The partner's own page. Accepted links only. Shows their local time, and date too when their day differs. |
+| `/messages`, `/messages/[threadId]` | `(auth-required)` | Messages, in the current context; the partner page's card opens them in the partnership's. See [messaging.md](messaging.md#the-board-in-each-context). |
 | `/playroom/kink-list/partner/[id]` | `(auth-required)` | Your kink list for that partner, linked from the partner page. See [kink-list.md](kink-list.md#partners). |
-| `/api/partnerships/[id]/names`     | own `locals.user` check | `GET` where to read names still under the invite, `PUT` them sealed into the vault. See above.         |
+| `/api/spaces/[spaceId]/names`     | own `locals.user` check | `GET` where to read names still under the invite, `PUT` them sealed into the vault. See above.         |
 
 ## Tasks and rewards
 
