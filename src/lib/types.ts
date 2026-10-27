@@ -214,10 +214,11 @@ export type ContextSpaceView = {
 };
 
 /**
- * The subset of a partnership that AppNav.svelte renders as a tab.
+ * The subset of a partnership the app shell hands every page: the context
+ * switcher's names, the help callout, Today's per-partner rows.
  *
  * `id` is the *partnership* id, not the other person's user id: it is what
- * `/partner/[id]` is keyed on, so no user id ever appears in a URL. `name` is
+ * `/settings/partners/[id]` is keyed on, so no user id ever appears in a URL. `name` is
  * already resolved to what this viewer calls them — see `viewPartnership` in
  * `src/lib/partnership.ts`, which is the only place the per-role name columns
  * are read.
@@ -441,7 +442,7 @@ export type ThreadView = {
 	seenMessageId: string | null;
 };
 
-/** One row on /home: a partner with something waiting. */
+/** One row on Today in Everyone: a partner with something waiting. */
 export type UnreadPartnerView = {
 	partnershipId: string;
 	/** Where the browser reads what the viewer calls them (`partner-names.svelte.ts`). */
@@ -564,7 +565,7 @@ export type WidgetItemView = {
 	/**
 	 * Whose section this row comes from on the full page, or null for your own.
 	 *
-	 * /home merges your things with every partner's into one list, so a row has
+	 * Today in Everyone merges your things with every partner's into one list, so a row has
 	 * to say which. Without it "Kneel at eight" and "Kneel at eight" from two
 	 * different partners are the same line twice. The partner's names, opened in
 	 * the browser, since the server cannot read them.
@@ -591,8 +592,8 @@ export type WidgetBalanceView = {
  *
  * `viewerActs` is false for the side of a partnership that manages tasks rather
  * than completing them; "ready to complete" means nothing to them, so the card
- * shows `activeCount` instead. It is always true on /home, where there is only
- * one side.
+ * shows `activeCount` instead. It is always true for your own space, where
+ * there is only one side.
  */
 export type TasksWidgetView = {
 	viewerActs: boolean;
@@ -607,7 +608,7 @@ export type TasksWidgetView = {
 /** What the rewards card previews. `viewerActs` as in `TasksWidgetView`. */
 export type RewardsWidgetView = {
 	viewerActs: boolean;
-	/** One entry per scope: your own on /home, the partnership on a partner page. */
+	/** One entry per space the card covers: every one in Everyone, one otherwise. */
 	balances: WidgetBalanceView[];
 	/** Affordable right now. Capped — `claimableCount` is the real total. */
 	claimable: WidgetItemView[];
@@ -635,7 +636,7 @@ export type DaydreamListItemView = {
 	createdAt: Date;
 };
 
-/** What the /home Daydreams card previews: the most recently played, and how many there are. */
+/** What Today's Daydreams card previews: the most recently played, and how many there are. */
 export type DaydreamsWidgetView = {
 	daydreams: DaydreamListItemView[];
 	total: number;
@@ -727,7 +728,7 @@ export type PartnerMessagesWidgetView = {
 };
 
 /**
- * One past IQ test, as the history list and the /home card show it.
+ * One past IQ test, as the history list and Today's Playroom card show it.
  *
  * The same shape whether it came from the account (a row of
  * `iq_test_results`) or from this device's own history, so the list does not

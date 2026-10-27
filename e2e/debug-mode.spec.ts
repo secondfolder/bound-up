@@ -27,7 +27,7 @@ test('the corner toggle switches debug mode on and off, and only for an account 
 	await expect(page.getByText('Debug mode on this device')).toHaveCount(0);
 
 	await grantFeature(who.email, 'debugMode');
-	await page.goto('/home');
+	await page.goto('/today');
 	await waitForHydration(page);
 
 	// There, but unseen until hovered.

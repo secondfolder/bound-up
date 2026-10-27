@@ -91,7 +91,7 @@ The page follows the context exactly as the tasks page does
 Tasks | Rewards pair of links (`ItemsTabs`) sits at the top. An edit sheet
 takes its space from the reward, so it opens whatever the context is. The old
 `/home/rewards` and `/partner/[id]/rewards` routes are gone, with no
-redirects.
+redirects. Today's Rewards card leads here in Today's own context.
 
 **Actions** live on `/rewards` and name what they act on, never the context:
 `?/claim` (`rewardId`), `?/setCredits` (`spaceId`, `targetUserId`,

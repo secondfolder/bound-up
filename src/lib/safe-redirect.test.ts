@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { redirectTargetOrHome, safeRedirect } from './safe-redirect';
+import { redirectTargetOrToday, safeRedirect } from './safe-redirect';
 
 describe('safeRedirect', () => {
 	it('accepts an ordinary in-app path', () => {
 		expect(safeRedirect('/invite/abc123')).toBe('/invite/abc123');
-		expect(safeRedirect('/home?x=1#y')).toBe('/home?x=1#y');
+		expect(safeRedirect('/today?x=1#y')).toBe('/today?x=1#y');
 	});
 
 	it('rejects an absolute URL', () => {
@@ -30,13 +30,13 @@ describe('safeRedirect', () => {
 	});
 
 	it('rejects any other control character', () => {
-		expect(safeRedirect('/home\u0000')).toBeNull();
-		expect(safeRedirect('/home\u007f')).toBeNull();
+		expect(safeRedirect('/today\u0000')).toBeNull();
+		expect(safeRedirect('/today\u007f')).toBeNull();
 	});
 
 	it('rejects a bare relative path', () => {
-		expect(safeRedirect('home')).toBeNull();
-		expect(safeRedirect('../home')).toBeNull();
+		expect(safeRedirect('today')).toBeNull();
+		expect(safeRedirect('../today')).toBeNull();
 	});
 
 	it('treats nothing as nothing', () => {
@@ -50,13 +50,13 @@ describe('safeRedirect', () => {
 	});
 });
 
-describe('redirectTargetOrHome', () => {
+describe('redirectTargetOrToday', () => {
 	it('passes a safe path through', () => {
-		expect(redirectTargetOrHome('/invite/abc')).toBe('/invite/abc');
+		expect(redirectTargetOrToday('/invite/abc')).toBe('/invite/abc');
 	});
 
-	it('falls back to /home for anything else', () => {
-		expect(redirectTargetOrHome('//evil.example')).toBe('/home');
-		expect(redirectTargetOrHome(null)).toBe('/home');
+	it('falls back to /today for anything else', () => {
+		expect(redirectTargetOrToday('//evil.example')).toBe('/today');
+		expect(redirectTargetOrToday(null)).toBe('/today');
 	});
 });

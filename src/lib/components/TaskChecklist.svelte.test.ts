@@ -180,7 +180,7 @@ describe('TaskChecklist', () => {
 						canComplete: false
 					}),
 					completeAction: null,
-					editHref: '/partner/p1/tasks/t1'
+					editHref: '/tasks/t1'
 				}
 			],
 			'set'

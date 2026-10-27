@@ -93,8 +93,8 @@ export type PartnershipCounterpart = {
 /**
  * One partnership as seen by one of its two members.
  *
- * `id` is the partnership id, not a user id: it is what `/partner/[id]` and
- * `/settings/partners/[id]` are keyed on, so that a link can be addressed
+ * `id` is the partnership id, not a user id: it is what
+ * `/settings/partners/[id]` and the partnership's space are keyed on, so that a link can be addressed
  * before the second user exists and so that neither member's user id is ever
  * put in a URL.
  *

@@ -10,6 +10,6 @@
 	}
 </script>
 
-<RouteSheet bind:this={sheet} label="Add a task" listHref="/home/tasks" {leave}>
+<RouteSheet bind:this={sheet} label="Add a task" listHref="/tasks" {leave}>
 	<p>The form</p>
 </RouteSheet>

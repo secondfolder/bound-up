@@ -29,7 +29,7 @@ describe('UnreadMessagesWidget', () => {
 	it('renders nothing at all when nothing is waiting', () => {
 		const { container } = render(UnreadMessagesWidget, { unread: [] });
 
-		// Not an empty card: /home is read at a glance, and a permanent
+		// Not an empty card: Today is read at a glance, and a permanent
 		// "Messages — nothing" card is noise on every visit.
 		expect(container.querySelector('wa-card')).not.toBeInTheDocument();
 	});

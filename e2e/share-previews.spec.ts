@@ -46,7 +46,7 @@ test.describe('link previews', () => {
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',

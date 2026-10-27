@@ -4,8 +4,8 @@ import { sql } from './db';
 import { test } from './fixtures';
 import {
 	clickWaButton,
+	contextNames,
 	createInvite,
-	navTabs,
 	newAccount,
 	newAccounts,
 	newSide,
@@ -47,8 +47,8 @@ test.describe('sealed partnership names', () => {
 
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');
-			await jun.page.waitForURL(/\/partner\//);
-			expect(await navTabs(jun.page)).toEqual(['Home', 'Handler', 'Settings']);
+			await jun.page.waitForURL((url) => url.pathname === '/today');
+			expect(await contextNames(jun.page)).toEqual(['Everyone', 'Me', 'Handler']);
 
 			// Jun's device, now in the app with the vault open, moves the names in
 			// and the invite goes.
@@ -69,8 +69,8 @@ test.describe('sealed partnership names', () => {
 			expect(JSON.stringify(linked.rows)).not.toMatch(/Pup|Handler|pet/);
 
 			// Both sides still read them, from the vault.
-			await ada.page.goto('/home');
-			expect(await navTabs(ada.page)).toEqual(['Home', 'Pup', 'Settings']);
+			await ada.page.goto('/today');
+			expect(await contextNames(ada.page)).toEqual(['Everyone', 'Me', 'Pup']);
 		} finally {
 			await Promise.all([ada.close(), jun.close()]);
 		}

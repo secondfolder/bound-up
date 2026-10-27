@@ -90,7 +90,7 @@ shared in that context.
 
 Current examples:
 
-- Partner pages can show counterpart information that is deliberately shared
+- Today in a partnership's context can show counterpart information that is deliberately shared
   through membership-checked partnership reads, such as the partner timezone
   display.
 - The public invite page does not reveal an email address, account id, or full

@@ -23,7 +23,7 @@ context, [contexts.md](contexts.md)) is one `space_id IN (…)` query.
 
 This feature is unrelated to the guide feature's ordered **edge tasks**.
 
-- Guides still contain ordered edge tasks under `/home/guides/[id]`.
+- Guides still contain ordered edge tasks under `/guides/[id]`.
 - User-managed tasks are the credit-awarding feature under `/tasks`.
 
 The codebase keeps those names separate on purpose so the two concepts do
@@ -318,6 +318,8 @@ pages, which read as one place since tasks are what pay for rewards. An edit
 sheet takes its space from the task, so a link to one opens whatever the
 context is ([contexts.md](contexts.md#items-carry-their-own-space)). The old
 `/home/tasks` and `/partner/[id]/tasks` routes are gone, with no redirects.
+Today's Tasks card leads here in Today's own context, and the nav's Tasks tab
+stays lit on `/tasks` and `/rewards` alike.
 
 **Actions** all live on `/tasks` and name what they act on — never the
 context, which another tab can change:

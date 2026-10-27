@@ -61,7 +61,7 @@ function signUp(settings = testSettings()) {
 		actions.default(
 			fakeEvent({
 				db: harness.db,
-				path: '/signup?redirectTo=%2Fhome',
+				path: '/signup?redirectTo=%2Ftoday',
 				formData: signup,
 				authApi: { signUpEmail },
 				cookies: {},
@@ -83,7 +83,7 @@ describe('the first account on a server with no email', () => {
 	it('is confirmed without a link, and sent to log in saying why', async () => {
 		expect(await signUp()).toMatchObject({
 			type: 'redirect',
-			location: '/login?setup=1&redirectTo=%2Fhome'
+			location: '/login?setup=1&redirectTo=%2Ftoday'
 		});
 		expect(await verified()).toBe(true);
 	});
@@ -94,14 +94,14 @@ describe('the first account on a server with no email', () => {
 		);
 		expect(result).toMatchObject({
 			type: 'redirect',
-			location: '/signup/check-email?redirectTo=%2Fhome'
+			location: '/signup/check-email?redirectTo=%2Ftoday'
 		});
 		expect(await verified()).toBe(false);
 	});
 
 	it('is not, for any account after the first', async () => {
 		await createTestUser(harness.db);
-		expect(await signUp()).toMatchObject({ location: '/signup/check-email?redirectTo=%2Fhome' });
+		expect(await signUp()).toMatchObject({ location: '/signup/check-email?redirectTo=%2Ftoday' });
 		expect(await verified()).toBe(false);
 	});
 });

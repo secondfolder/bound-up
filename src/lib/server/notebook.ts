@@ -191,8 +191,8 @@ export type EntryContext = {
  * notebook, and one hidden from them, alike. Every route answers null with
  * the same 404, so the three cannot be told apart.
  *
- * `scope`, when given, must match: a route under `/partner/[id]` may not
- * reach an entry of another partnership, or a solo one, by its id.
+ * `scope`, when given, must match: a caller that already knows the scope may
+ * not reach an entry of another partnership, or a solo one, by its id.
  */
 export async function getEntryContext(
 	db: Db,
@@ -326,7 +326,7 @@ export async function listEntries(
 	});
 }
 
-/** The few most recently edited entries, for the /home and /partner cards. */
+/** The few most recently edited entries, for Today's notebook cards. */
 export async function listRecentEntries(
 	db: Db,
 	resolved: ResolvedScope,
@@ -369,7 +369,7 @@ function widgetItems(entries: NotebookEntryView[]): WidgetItemView[] {
 }
 
 /**
- * The /home card: the solo notebook's most recently edited entries. A cheap
+ * Today's card in Everyone and Me: the solo notebook's most recently edited entries. A cheap
  * read of its own rather than the list page's, because D1 bills rows read.
  */
 export async function getHomeNotebookWidget(db: Db, userId: string): Promise<WidgetItemView[]> {
@@ -380,7 +380,7 @@ export async function getHomeNotebookWidget(db: Db, userId: string): Promise<Wid
 }
 
 /**
- * The /partner/[id] card: the shared notebook's most recently edited entries,
+ * Today's card in a partnership's context: the shared notebook's most recently edited entries,
  * leaving out any hidden from the viewer. Null for a non-member.
  */
 export async function getPartnershipNotebookWidget(

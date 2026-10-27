@@ -960,8 +960,8 @@ export async function undoTaskCompletion(
 const WIDGET_PREVIEW_LIMIT = 3;
 
 /**
- * The tasks card, for the spaces it covers: every space the viewer is in on
- * /home, one partnership's on its page. The same split as the tasks page, so
+ * The tasks card, for the spaces it covers: every space the viewer is in for
+ * Today in Everyone, one space's in Me or a partnership's context. The same split as the tasks page, so
  * the card previews what the link shows: the viewer's to-do list where they
  * have one, and otherwise a count of what they set for others.
  *

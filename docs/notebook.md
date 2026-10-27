@@ -263,9 +263,9 @@ switcher at the top right:
   whoever's it is (a chip at the top right), with the actions its partnership
   allows. Its links go back to `/notebook`, in whatever the context is.
 
-The /home and /partner cards link to `/notebook` and switch the context to
-their own space on the way (`NotebookWidget`), so following one shows what it
-previewed.
+Today's notebook card links to `/notebook` and sets the context to its own
+space on the way (`NotebookWidget`): your own in Everyone and Me, the
+partnership's in its context. Following it shows what it previewed.
 
 ## Screens and endpoints
 
@@ -279,8 +279,8 @@ previewed.
 | `.../versions` | `GET` the history; `POST` a version. |
 | `.../versions/[versionId]` | `GET` one version's sealed snapshot. |
 
-The live stream is the shared `api/realtime/events`, on the entry's topic. The
-/home and /partner cards show the three most recently edited entries
+The live stream is the shared `api/realtime/events`, on the entry's topic.
+Today's notebook card shows the three most recently edited entries
 (`NotebookWidget`), leaving out anything hidden from the viewer.
 
 The loads and actions are in `server/notebook-pages.ts`, and everything that

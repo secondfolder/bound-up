@@ -64,6 +64,8 @@ rewrite it, sanitise it, or reflow it (it is excluded from Biome in
 | `src/routes/(standalone)/`    | Public pages that should not look like Bound Up at all (the Playroom's tools). No shell      |
 | `src/routes/(auth-required)/` | Guarded by a group `+layout.server.ts` that redirects to `/login`                            |
 | `.../(auth-required)/(app)/`  | The signed-in app shell: fixed-viewport layout plus the `AppNav` bottom bar                  |
+| `.../(app)/today/`            | Today, the signed-in front page: cards that follow the context. See [docs/section-widgets.md](docs/section-widgets.md) |
+| `src/routes/home/`            | `LEGACY-SPACES`: a 307 from `/home` to `/today` for old home-screen installs, and nothing else. See [docs/temporary-code.md](docs/temporary-code.md#the-home-redirect) |
 | `drizzle/`                    | Generated migrations + snapshots. **Committed.** Never hand-edit                             |
 | `vite-plugins/`               | Local Vite plugins, run in Node at build time. Tests beside them run in the node project     |
 
@@ -184,7 +186,7 @@ accompanied by a keyboard event handler`` (`a11y_click_events_have_key_events`,
 - `npm test`: Partners, tasks, and the encryption keys are covered end to end
   at three levels — see **Testing** below. Outside those the net is still thin.
 - `npm run test:e2e`: Playwright specs, about three and a half minutes for the
-  current ~265 of them at four workers against the built server (seven under
+  current ~267 of them at four workers against the built server (seven under
   `vite dev`), once the browser is installed (`npx playwright install
   chromium` first). A spec sitting at ~90 seconds is one hanging on its
   timeout, and the reported failure is usually the `finally` that could not
@@ -704,7 +706,9 @@ the button follows the same definition of "unsaved changes" as the form logic.
 no header — each of its pages links onwards from its own content;
 `(auth-required)/(app)` renders a flex column fixed over the visual viewport
 (`$lib/visual-viewport.ts`, for iOS's keyboard) whose `<main>` scrolls and
-whose `AppNav` bottom bar does not; `(standalone)` renders nothing but
+whose `AppNav` bottom bar does not — five fixed places (Today, Tasks,
+Notebook, Messages, Settings) and no tab per partner, since whose things a
+page shows is the context switcher's job ([docs/contexts.md](docs/contexts.md)); `(standalone)` renders nothing but
 switches the page texture off, for public tools that should not look like the
 app. `theme.css` still loads there, so such a page re-themes a wrapper of its
 own — and must not give it the `wa-dark` class, which `theme.css` repaints in
@@ -714,17 +718,22 @@ it. Each shell sets the
 `body` rules it needs through `<svelte:head>`, so they are added and removed
 with the layout rather than fighting each other globally.
 
-**`/` is the landing page for everyone; `/home` is the signed-in app.** `/`
-does not bounce a session holder any more: its centred CTA says "Sign up"
-(with a "Log in" link under it) when logged out and "Open" → `/home` when
-logged in. Every post-auth redirect still points at `/home`. The guides live
-under it (`/home/guides`, `/home/guides/[id]`), behind the auth guard — the
-public surface is `/`, `/login`, `/signup`, `/roadmap` and the Playroom's
-standalone tools (`/playroom/iq-test`). `/playroom` itself is signed-in.
+**`/` is the landing page for everyone; `/today` is the signed-in app.** `/`
+does not bounce a session holder: its centred CTA says "Sign up" (with a "Log
+in" link under it) when logged out and "Open" → `/today` when logged in. Every
+post-auth redirect, the manifest's `start_url` and the service worker's
+fallback point at `/today`, which follows the context
+([docs/section-widgets.md](docs/section-widgets.md)). `/home` survives only as
+a temporary 307 to it, for old home-screen installs
+([docs/temporary-code.md](docs/temporary-code.md#the-home-redirect)); nothing
+links there. The guides are `/guides` and `/guides/[id]`, behind the auth
+guard — the public surface is `/`, `/login`, `/signup`, `/roadmap` and the
+Playroom's standalone tools (`/playroom/iq-test`). `/playroom` itself is
+signed-in.
 
 **Active nav state compares `page.route.id`, never a pathname.** During SSR
-`resolve()` returns a path relative to the page being rendered (`./home` on
-`/home`, `../home` on `/settings/security`), which never equals
+`resolve()` returns a path relative to the page being rendered (`./today` on
+`/today`, `../today` on `/settings/security`), which never equals
 `page.url.pathname` — comparing them left the current tab unhighlighted until
 hydration. Route ids are identical on both sides.
 
@@ -1080,7 +1089,7 @@ Four places, split on scope:
 
 | Doc                                                                                      | Feature                                                                      |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [docs/partners.md](docs/partners.md)                                                     | Linking two accounts: invites, the control permission, the nav tabs          |
+| [docs/partners.md](docs/partners.md)                                                     | Linking two accounts: invites, the control permission, accepting into Today  |
 | [docs/spaces.md](docs/spaces.md)                                                         | Solo and shared spaces: members, `can_manage`, ids, deleting, what is still pair-shaped |
 | [docs/user-commitments-and-product-goals.md](docs/user-commitments-and-product-goals.md) | What the app promises users: never losing their data, and privacy boundaries |
 | [docs/rewards.md](docs/rewards.md)                                                       | Rewards in a space: who sets and claims, wallets, credits, claims            |
@@ -1093,7 +1102,7 @@ Four places, split on scope:
 | [docs/embeds.md](docs/embeds.md)                                                         | URL linkification and inline embeds: providers, privacy gate, reddit path    |
 | [docs/messaging.md](docs/messaging.md)                                                   | Encrypted partner messages: threads, the board, unread, restore              |
 | [docs/rich-text.md](docs/rich-text.md)                                                   | The rich-text document: Lexical serialisation, the editors, embed blocks     |
-| [docs/section-widgets.md](docs/section-widgets.md)                                       | The /home and /partner cards: the shell, the per-section bodies, the data    |
+| [docs/section-widgets.md](docs/section-widgets.md)                                       | Today: its cards in each context, the partner header, the per-section bodies |
 | [docs/timezone.md](docs/timezone.md)                                                     | Account timezone storage, mismatch prompts, and device-local dismissal       |
 | [docs/temporary-code.md](docs/temporary-code.md)                                         | Temporary-code cleanup notes: the Temporal polyfill, kink list, env settings |
 | [docs/linting-and-formatting.md](docs/linting-and-formatting.md)                         | Biome: the rule policy, the Svelte formatter gap, the GritQL plugin          |

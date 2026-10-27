@@ -31,7 +31,7 @@ const BASE64_PADDING = /[=]+$/;
  * Every database access for the partners feature.
  *
  * Kept out of the route files because the same reads are needed from the app
- * shell layout, the settings screens, the partner page and the invite page, and
+ * shell layout, the settings screens, Today and the invite page, and
  * because the two-foreign-keys-to-`user` join below is the kind of thing that
  * should exist exactly once.
  */

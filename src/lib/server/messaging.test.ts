@@ -1598,7 +1598,7 @@ describe('getPartnerMessagesWidget', () => {
 		const junsWidget = await getPartnerMessagesWidget(harness.db, partnershipId, jun.id);
 		expect(junsWidget).toMatchObject({ totalThreads: 3, unreadThreads: 2 });
 
-		// The same number the /home card shows for the same partnership. These
+		// The same number Today's Everyone card shows for the same partnership. These
 		// two predicates have to stay identical or the two screens disagree.
 		const [fromHome] = await listUnreadCounts(harness.db, jun.id, [
 			{

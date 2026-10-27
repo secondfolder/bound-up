@@ -48,7 +48,7 @@ test.describe('vaults', () => {
 			await linkAccounts(ada, jun);
 			// Jun's device is the one that loads the shell first after accepting,
 			// so it makes the partnership's vault; Ada's opens it on her next load.
-			await ada.page.goto('/home');
+			await ada.page.goto('/today');
 			await waitForKeyring(ada.page);
 
 			await expect

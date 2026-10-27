@@ -28,7 +28,7 @@ afterEach(() => harness.close());
 const giveAdaGuides = () =>
 	grantFeature(db, { userId: ada.id, feature: 'guides', grantedByUserId: admin.id });
 
-describe('/home/guides', () => {
+describe('/guides', () => {
 	it('refuses an account without the guides feature', async () => {
 		const result = await runAndCatch(() => loadList(fakeEvent({ db, user: ada })));
 		expect(result).toMatchObject({ type: 'error', status: 403 });
@@ -41,7 +41,7 @@ describe('/home/guides', () => {
 	});
 });
 
-describe('/home/guides/[id]', () => {
+describe('/guides/[id]', () => {
 	// A 403 for a made-up id too: a 404 here would tell someone without access
 	// which ids are real.
 	it.each([

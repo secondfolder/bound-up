@@ -14,7 +14,7 @@ address.
 
 1. **Sign-up makes no session.** The action creates the account and its keys
    as before, then sends the browser to `/signup/check-email` instead of
-   `/home`. `autoSignIn` is off, and the sign-up form no longer stashes the
+   `/today`. `autoSignIn` is off, and the sign-up form no longer stashes the
    unlock material, because nothing follows that could use it.
 2. **The email** carries Better Auth's link, `/api/auth/verify-email?token=…`,
    a JWT signed with the server's auth secret and good for 24 hours

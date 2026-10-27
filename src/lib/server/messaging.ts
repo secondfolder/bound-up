@@ -657,9 +657,9 @@ export async function getThread(
 }
 
 /**
- * Per-partnership unread counts for `/home`.
+ * Per-partnership unread counts for Today in Everyone.
  *
- * Takes the partnership list rather than querying it, so `/home` costs no
+ * Takes the partnership list rather than querying it, so Today costs no
  * second read of `partnerships` — the app shell's layout has already loaded it.
  */
 export async function listUnreadCounts(
@@ -691,7 +691,7 @@ export async function listUnreadCounts(
 					partners.map((partner) => partner.id)
 				),
 				// Not mine, and newer than my read mark. The same predicate as the
-				// board's, and it has to stay that way or /home and the board would
+				// board's, and it has to stay that way or Today and the board would
 				// disagree about what "unread" means.
 				ne(messageThreads.lastMessageSenderId, userId),
 				sql`(${threadReads.lastReadMessageAt} is null
@@ -1991,14 +1991,14 @@ export async function purgePartnershipMedia(
 }
 
 /**
- * The /partner/[id] messages card.
+ * Today's messages card in a partnership's context.
  *
  * Counts only, and that is not a shortcut: every body is encrypted to keys the
  * server does not hold, so there is no preview text it could return. The board
  * itself decrypts in the browser — see docs/encryption.md.
  *
  * The unread predicate is `listUnreadCounts`'s, character for character. It has
- * to stay that way, or the partner card and /home would disagree about what
+ * to stay that way, or the two Today cards would disagree about what
  * "unread" means for the same partnership.
  */
 export async function getPartnerMessagesWidget(

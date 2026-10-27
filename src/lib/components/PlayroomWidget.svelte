@@ -3,7 +3,7 @@
 	import type { IqTestResultView } from '$lib/types';
 
 	/**
-	 * The Playroom's /home card. Its body is the last IQ test result, if there
+	 * The Playroom's card on Today. Its body is the last IQ test result, if there
 	 * is one; otherwise the card is just its header, which links to /playroom.
 	 */
 	let { latestIq, href }: { latestIq: IqTestResultView | null; href: string } = $props();

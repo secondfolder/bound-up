@@ -6,15 +6,15 @@
 	import type { WidgetItemView } from '$lib/types';
 
 	/**
-	 * The notebook's card on /home and /partner/[id]: the few most recently
-	 * edited entries, titles opened in the browser. No entries means no body
-	 * (see `SectionWidget`), but the card itself always shows, because it is
-	 * the way into the notebook.
+	 * The notebook's card on Today: the few most recently edited entries,
+	 * titles opened in the browser. No entries means no body (see
+	 * `SectionWidget`), but the card itself always shows, because it is the
+	 * way into the notebook.
 	 *
-	 * The card is one space's (your own on /home, the partnership's on its
-	 * page), and `/notebook` shows whatever the context is, so following it
-	 * switches the context to the card's space first: the list then shows
-	 * what the card previewed. A deliberate choice of that space, not a silent
+	 * The card is one space's (your own in Everyone and Me, the partnership's
+	 * in its context), and `/notebook` shows whatever the context is, so
+	 * following it switches the context to the card's space first: the list
+	 * then shows what the card previewed. A deliberate choice of that space, not a silent
 	 * switch. A link opened in a new tab skips this and shows the context as
 	 * it is. See docs/contexts.md.
 	 */

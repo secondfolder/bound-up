@@ -11,6 +11,7 @@ import {
 	newSide,
 	type Side,
 	settle,
+	switchTo,
 	typeRichText,
 	waitForHydration
 } from './helpers';
@@ -46,12 +47,16 @@ async function sharedNotebook(browser: Browser): Promise<{ ada: Side; bo: Side; 
 	const bo = await newSide(browser, 'Bo');
 	await newAccounts(ada, bo);
 	await linkAccounts(ada, bo, 'mix');
-	// The partner page's notebook card switches to the partnership's context
-	// on the way to /notebook (docs/contexts.md).
+	// Today in the partnership's context, whose notebook card sets that
+	// context on the way to /notebook (docs/contexts.md).
+	await bo.page.goto('/today');
 	// After hydration: before it the card is a plain link, which goes to
-	// /notebook without switching, in whatever context the device had.
+	// /notebook without setting the context.
 	await waitForHydration(bo.page);
-	await bo.page.getByRole('link', { name: 'Notebook' }).click();
+	await switchTo(bo.page, 'Ada');
+	await expect(bo.page.getByRole('heading', { level: 2, name: 'Ada', exact: true })).toBeVisible();
+	// The card, not the nav's tab of the same name.
+	await bo.page.getByRole('main').getByRole('link', { name: 'Notebook', exact: true }).click();
 	await bo.page.waitForURL(/\/notebook$/);
 	return { ada, bo, url: bo.page.url() };
 }

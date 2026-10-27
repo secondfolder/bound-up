@@ -7,8 +7,8 @@ import type { LayoutServerLoad } from './$types';
 /**
  * Your kink list for one partner: your copy for them, if you share one, and
  * theirs for you, if they do. Both are sealed in the partnership's vault.
- * A partnership the user is not in, or one still pending, is a 404, as on the
- * partner page.
+ * A partnership the user is not in, or one still pending, is a 404, as for
+ * any item that is not yours.
  */
 export const load: LayoutServerLoad = async ({ locals, params }) => {
 	if (!locals.user) {

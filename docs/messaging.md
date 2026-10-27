@@ -205,8 +205,8 @@ opens the same thread whatever the device is looking at, shows whose it is in
 a chip at the top right, and leaves the context alone. That is what lets a
 notification's link be the thread's own URL.
 
-**Links into the board switch first.** The /home unread rows, the partner
-page's Messages card, the help callout and the kink-list compare page's
+**Links into the board switch first.** Today's unread rows in Everyone, its
+Messages card in a partnership's context, the help callout and the kink-list compare page's
 "Talk about it in messages" each lead to `/messages` in their partnership's
 context (`followInContext`, or `inContext` for a plain link, in
 `context-client.svelte.ts`), with data preloading off, since a preload would
@@ -236,7 +236,7 @@ by the composer being unreachable from anywhere else, and it has its own test.
 
 The same predicate appears twice — as SQL in `listBoard`/`listUnreadCounts`, and
 as `isUnreadFor` in `src/lib/messaging.ts` for anything that needs it in
-JavaScript. They have to agree, or `/home` and the board would disagree about
+JavaScript. They have to agree, or Today and the board would disagree about
 what is waiting for you.
 
 ## Read receipts
@@ -333,7 +333,7 @@ it, and shows a pen: the paper plane is the composer's own Send.
 A sticker the live feed has just brought in, or a notification's tap points
 at, gets a ring that fades over four seconds and, motion allowed, two halo
 pulses as it arrives. An unread sticker's dot, and the dot beside "N unread
-threads" on the partner's page, pop in as they appear.
+threads" on Today's Messages card, pop in as they appear.
 
 ## The thread, in time
 
@@ -817,7 +817,7 @@ record can only be made by someone holding the vault key.
 | `/messages?thread=…`                | A never-opened thread on the board highlighted, one opened before gone on to. |
 | `/messages/new`                     | The board with its new-message dialog open, so a reload keeps it open.      |
 | `/messages/[threadId]`              | One thread, wherever the context is. Its load also records the open, and publishes `read` if it moved. Where a notification's tap lands. |
-| `/home`                             | A link per partner with something waiting.                                  |
+| `/today`                            | In Everyone, a link per partner with something waiting; in a partnership's context, its Messages card. |
 | `api/spaces/[spaceId]/threads`      | `POST` multipart: a thread and its first message.                           |
 | `.../threads/[threadId]/messages`   | `POST` multipart: a reply.                                                  |
 | `api/spaces/[spaceId]/tags`         | `GET` / `POST`: list or create partnership-scoped tags.                     |

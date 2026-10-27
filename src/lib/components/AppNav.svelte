@@ -3,77 +3,84 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { submitDebugToggle } from '$lib/debug-toggle';
-	import { initialsFor } from '$lib/initials';
-	import { partnerName } from '$lib/partner-names.svelte';
-	import type { PartnerView } from '$lib/types';
 
 	let {
-		partners,
 		debugAvailable = false,
 		debugOn = false
 	}: {
-		partners: PartnerView[];
 		/** The account holds `debugMode`, so the corner toggle is there at all. */
 		debugAvailable?: boolean;
 		/** Debug mode is on for this device. See docs/debug-mode.md. */
 		debugOn?: boolean;
 	} = $props();
 
-	const homeHref = resolve('/(auth-required)/(app)/home');
 	const settingsHref = resolve('/(auth-required)/(app)/settings');
+
+	const app = '/(auth-required)/(app)';
+
+	/**
+	 * The five places, and the routes each stays lit on. Exactly five, with no
+	 * tab per partner: whose things a page shows is the context switcher's
+	 * job now (docs/contexts.md), and a bottom bar stops being usable past
+	 * about five. Prefix matches, so a tab stays lit on its child routes.
+	 */
+	const tabs = [
+		{
+			label: 'Today',
+			icon: 'house',
+			href: resolve('/(auth-required)/(app)/today'),
+			// Guides, daydreams and the Playroom have no tab of their own: they
+			// are reached from Today's cards, so Today stays lit inside them
+			// rather than the nav showing no tab at all.
+			prefixes: [`${app}/today`, `${app}/guides`, `${app}/daydreams`, `${app}/playroom`]
+		},
+		{
+			label: 'Tasks',
+			icon: 'list-check',
+			href: resolve('/(auth-required)/(app)/tasks'),
+			// Rewards are a tab inside Tasks (`ItemsTabs`), so the one place.
+			prefixes: [`${app}/tasks`, `${app}/rewards`]
+		},
+		{
+			label: 'Notebook',
+			icon: 'book',
+			href: resolve('/(auth-required)/(app)/notebook'),
+			prefixes: [`${app}/notebook`]
+		},
+		{
+			label: 'Messages',
+			icon: 'envelope',
+			href: resolve('/(auth-required)/(app)/messages'),
+			prefixes: [`${app}/messages`]
+		},
+		{
+			label: 'Settings',
+			icon: 'gear',
+			href: settingsHref,
+			// Admin and debug are reached from Settings and have no tab of their
+			// own, likewise.
+			prefixes: [`${app}/settings`, `${app}/admin`, `${app}/debug`]
+		}
+	];
 
 	// The active tab is decided on `page.route.id`, NOT on a pathname compared
 	// against resolve()'s output: during SSR resolve() returns a path relative
-	// to the page being rendered ('./home', '../home'), which never equals
+	// to the page being rendered ('./today', '../today'), which never equals
 	// page.url.pathname, so the highlight was missing until hydration.
 	const routeId = $derived(page.route.id);
-	// Both tabs own child routes (/home/guides, /settings/security) and stay lit
-	// while you are inside them, so these are prefix matches rather than equality.
-	const isHome = $derived(routeId?.startsWith('/(auth-required)/(app)/home') ?? false);
-	// Admin and debug are reached from Settings and have no tab of their own,
-	// so Settings stays lit inside them rather than the nav showing no tab at all.
-	const isSettings = $derived(
-		[
-			'/(auth-required)/(app)/settings',
-			'/(auth-required)/(app)/admin',
-			'/(auth-required)/(app)/debug'
-		].some((prefix) => routeId?.startsWith(prefix) ?? false)
-	);
-	// A prefix match, like isHome and isSettings above. The partner page has no
-	// child routes since messages, tasks and rewards moved to pages of their
-	// own that follow the context (/messages, /tasks, /rewards), which light
-	// no tab until the nav is rebuilt around them.
-	const isPartner = $derived(
-		(id: string) =>
-			(routeId?.startsWith('/(auth-required)/(app)/partner/[id]') ?? false) && page.params.id === id
+	const isCurrent = $derived((prefixes: readonly string[]) =>
+		prefixes.some((prefix) => routeId === prefix || (routeId?.startsWith(`${prefix}/`) ?? false))
 	);
 </script>
 
 <nav aria-label="Primary">
 	<div class="tabs">
-		<a href={homeHref} aria-current={isHome ? 'page' : undefined}>
-			<wa-icon name="house" variant="solid"></wa-icon>
-			<span>Home</span>
-		</a>
-
-		{#each partners as partner (partner.id)}
-			{const href = $derived(resolve('/(auth-required)/(app)/partner/[id]', { id: partner.id }))}
-			<a {href} aria-current={isPartner(partner.id) ? 'page' : undefined}>
-				<!-- `image` is left off entirely when null: wa-avatar falls back to
-				     initials, and an empty image="" would render a broken image. -->
-				<wa-avatar
-					image={partner.image ?? undefined}
-					initials={initialsFor(partnerName(partner.names))}
-					label={partnerName(partner.names)}
-				></wa-avatar>
-				<span>{partnerName(partner.names)}</span>
+		{#each tabs as tab (tab.label)}
+			<a href={tab.href} aria-current={isCurrent(tab.prefixes) ? 'page' : undefined}>
+				<wa-icon name={tab.icon} variant="solid"></wa-icon>
+				<span>{tab.label}</span>
 			</a>
 		{/each}
-
-		<a href={settingsHref} aria-current={isSettings ? 'page' : undefined}>
-			<wa-icon name="gear" variant="solid"></wa-icon>
-			<span>Settings</span>
-		</a>
 	</div>
 
 	{#if debugAvailable}
@@ -101,8 +108,8 @@
 <style>
 	nav {
 		/* The tabs sit centred in the middle column, with the debug toggle in
-		   the right-hand one: a column of its own, so it never covers a tab
-		   however many partners there are. The left column only balances it. */
+		   the right-hand one: a column of its own, so it never covers a tab on
+		   a narrow phone. The left column only balances it. */
 		display: grid;
 		grid-template-columns: 1fr minmax(0, auto) 1fr;
 		align-items: stretch;
@@ -122,7 +129,7 @@
 
 		a {
 			/* Sized to their content rather than sharing the width out, so the
-			   tabs bunch in the middle; a long partner name still ellipsises. */
+			   tabs bunch in the middle. */
 			flex: 0 1 auto;
 			min-width: 3rem;
 			max-width: 6rem;
@@ -138,30 +145,14 @@
 			/* Kills the grey flash on tap that makes a web nav feel non-native. */
 			-webkit-tap-highlight-color: transparent;
 
-			/* One box for an icon and an avatar alike, so every label sits on
-			   the same line: the avatar is taller than an icon, and pushed its
-			   name a couple of pixels below the others. */
-			wa-icon,
-			wa-avatar {
+			/* One box per icon, so every label sits on the same line whatever
+			   the glyph's own height. */
+			wa-icon {
 				block-size: 1.75rem;
 				display: flex;
 				align-items: center;
 				justify-content: center;
-			}
-
-			wa-icon {
 				font-size: 1.5rem;
-			}
-
-			wa-avatar {
-				--size: 1.75rem;
-			}
-
-			&[aria-current='page'] wa-avatar {
-				/* The amber label alone is easy to miss next to a photo, so the
-				   active partner also gets a ring. */
-				outline: 2px solid currentColor;
-				outline-offset: -2px;
 			}
 
 			span {

@@ -398,8 +398,9 @@ no "Add to Home Screen".) `shouldOfferHomeScreen` in
 `src/lib/home-screen.ts` decides, and a dismissal is remembered per device by
 `DismissibleHint`, which `NotificationsHint` shares (see
 [notifications.md](notifications.md#ios)). The
-manifest's `start_url` is `/home`, so the Home Screen app opens the app rather
-than whatever page it was added from.
+manifest's `start_url` is `/today`, so the Home Screen app opens the app rather
+than whatever page it was added from. (An install from before that keeps
+`/home`, which redirects: [temporary-code.md](temporary-code.md#the-home-redirect).)
 
 **Asking the browser to keep it.** `navigator.storage.persist()` helps where the
 browser agrees — Chrome decides from engagement, Firefox asks the user. It is

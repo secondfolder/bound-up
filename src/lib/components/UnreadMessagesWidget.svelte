@@ -4,7 +4,7 @@
 	import type { UnreadPartnerView } from '$lib/types';
 
 	/**
-	 * The /home messages card: one row per partner with something waiting.
+	 * Today's messages card in Everyone: one row per partner with something waiting.
 	 *
 	 * Deliberately headed by plain text rather than a link: each row carries
 	 * its own link, to the board in that partner's context, which is where

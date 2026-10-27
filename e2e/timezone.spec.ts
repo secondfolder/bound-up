@@ -11,6 +11,7 @@ import {
 	logIn,
 	logInHere,
 	signUp,
+	switchTo,
 	waitForEnhancedForm
 } from './helpers';
 
@@ -27,7 +28,7 @@ function newDevice(browser: Browser, timezoneId: string) {
 }
 
 /**
- * Opens /home on a context built from another's `storageState`.
+ * Opens Today on a context built from another's `storageState`.
  *
  * That copies cookies and localStorage — the dismissal under test — but not
  * the message key, which lives in IndexedDB as a non-extractable `CryptoKey`
@@ -36,10 +37,10 @@ function newDevice(browser: Browser, timezoneId: string) {
  * is about survives that.
  */
 async function backOnCopiedProfile(page: Page, who: Account) {
-	await page.goto('/home');
-	await expectSentToSignIn(page, '/home');
+	await page.goto('/today');
+	await expectSentToSignIn(page, '/today');
 	await logInHere(page, who);
-	await page.waitForURL('/home');
+	await page.waitForURL('/today');
 }
 
 test.describe('timezone settings', () => {
@@ -87,7 +88,7 @@ test.describe('timezone settings', () => {
 		}
 	});
 
-	test('shows the mismatch banner on home, partner, and settings after logging in from a different timezone', async ({
+	test('shows the mismatch banner on Today, in a partner’s context, and in settings after logging in from a different timezone', async ({
 		browser
 	}) => {
 		const ada = account('Vera');
@@ -108,7 +109,7 @@ test.describe('timezone settings', () => {
 			});
 			await junPage.goto(invite);
 			await clickWaButton(junPage, 'Accept and link');
-			await junPage.waitForURL(/\/partner\//);
+			await junPage.waitForURL((url) => url.pathname === '/today');
 		} finally {
 			await setupA.close();
 			await setupB.close();
@@ -122,11 +123,9 @@ test.describe('timezone settings', () => {
 			await expect(page.getByText('This device is in a different timezone')).toBeVisible();
 			await expect(page.getByText(/account is set to Europe\/London/i)).toBeVisible();
 
-			await page
-				.getByRole('navigation', { name: 'Primary' })
-				.getByRole('link', { name: /Jun/ })
-				.click();
-			await page.waitForURL(/\/partner\//);
+			// Today in the partnership's context, where its header shows Jun's time.
+			await switchTo(page, 'Jun');
+			await expect(page.getByRole('heading', { level: 2, name: 'Jun', exact: true })).toBeVisible();
 			await expect(page.getByText('This device is in a different timezone')).toBeVisible();
 
 			await page.goto('/settings');

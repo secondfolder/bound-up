@@ -7,10 +7,16 @@ whose list follows it, and it is a view filter and nothing more: no write
 ever reads it.
 
 Code says `solo`, `shared` and `all` ([spaces.md](spaces.md)); users see
-"Me", the partner's name and "Everyone". The notebook (`/notebook`,
-[notebook.md](notebook.md)), tasks (`/tasks`, [tasks.md](tasks.md)),
-rewards (`/rewards`, [rewards.md](rewards.md)) and messages (`/messages`,
-[messaging.md](messaging.md#the-board-in-each-context)) follow the context.
+"Me", the partner's name and "Everyone". Today (`/today`, the signed-in
+front page, [section-widgets.md](section-widgets.md)), the notebook
+(`/notebook`, [notebook.md](notebook.md)), tasks (`/tasks`,
+[tasks.md](tasks.md)), rewards (`/rewards`, [rewards.md](rewards.md)) and
+messages (`/messages`, [messaging.md](messaging.md#the-board-in-each-context))
+follow the context. Those are the bottom nav's places too, beside Settings:
+`AppNav` has exactly five tabs — Today, Tasks (rewards are a tab inside it),
+Notebook, Messages, Settings — and no tab per partner, since whose things a
+page shows is the switcher's job. Playroom, Daydreams and the guides are
+reached from Today's cards, and light the Today tab.
 
 ## Where it lives: one cookie
 
@@ -90,20 +96,25 @@ one-tap switch, and never switches by itself. Messages in Me is the first:
   one context over a list of another.
 - **Back does not undo a switch.** History holds URLs, and switching does not
   change the URL: the same page re-runs its loads in place.
-- **A pasted list link** (`/notebook`, `/tasks`, `/rewards`, `/messages`)
-  shows whatever context the person opening it has.
-- **A card's link switches first.** The `/home` and `/partner/[id]` cards for
-  the notebook, tasks and rewards lead to a list that follows the context, so
-  following one sets the context the card previewed and then navigates
+- **A pasted list link** (`/today`, `/notebook`, `/tasks`, `/rewards`,
+  `/messages`) shows whatever context the person opening it has.
+- **A card's link switches first.** Today's cards for the notebook, tasks,
+  rewards and messages lead to a list that follows the context, so following
+  one sets the context the card previewed and then navigates
   (`followInContext` in `context-client.svelte.ts`, or `inContext` as an
-  attachment on a plain link): Everyone from `/home` for tasks and rewards, Me
-  for the notebook, the partnership from its page, and the partnership for
-  every link into messages that is about one partner (the /home unread rows,
-  the partner page's card, the help callout, the kink-list compare page). A
-  deliberate choice of context, not a silent switch. A click that opens a new
+  attachment on a plain link): Today's own context for tasks and rewards (not
+  a no-op: another tab may have switched since), Me for the notebook card in
+  Everyone and Me, the partnership for its notebook card, and the partnership
+  for every link into messages that is about one partner (Everyone's unread
+  rows, a partnership's Messages card, the help callout, the kink-list compare
+  page). A deliberate choice of context, not a silent switch. A click that opens a new
   tab is left alone, and such links are not preloaded, since a preload would
   fetch the list in the old context
   ([section-widgets.md](section-widgets.md#the-unlinked-header)).
+- **Accepting an invite switches too.** The accept action sets the context to
+  the new partnership's space and lands on Today, which then shows that
+  partnership's header and cards: what the two of you now share is the point
+  of having accepted. A failed accept leaves the context as it was.
 
 ## The switcher
 
@@ -199,10 +210,13 @@ list.
 
 ## Not built yet
 
-- The Dashboard that replaces `/home` and `/partner/[id]`.
 - A live Everyone list: the notebook list and the messages board refresh when
   looked at again rather than holding a stream per partnership. Fanning list
   events out to each member's own room would let one stream cover it
   ([notebook.md](notebook.md#the-list-in-every-context),
   [messaging.md](messaging.md#realtime)).
 - A dot on the control for something unread in another context.
+- An unread badge on the nav's Messages tab. Nothing the app shell already
+  loads says how many threads are unread, and counting them in the layout
+  would add a query to every page in the app; the counts are on Today
+  (Everyone's rows, a partnership's Messages card) and the board instead.

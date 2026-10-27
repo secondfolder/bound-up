@@ -3,7 +3,7 @@ import { APIError } from 'better-auth/api';
 import { fail, setError, superValidate } from 'sveltekit-superforms';
 import { zod4 } from 'sveltekit-superforms/adapters';
 import { verificationNotice, verifiedCallback } from '$lib/email-verification';
-import { redirectTargetOrHome, safeRedirect } from '$lib/safe-redirect';
+import { redirectTargetOrToday, safeRedirect } from '$lib/safe-redirect';
 import { loginFormSchema } from '$lib/schemas/loginForm';
 import { rateLimitMessage } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// page as a link.
 	const redirectTo = safeRedirect(url.searchParams.get('redirectTo'));
 	if (locals.user) {
-		redirect(303, redirectTo ?? '/home');
+		redirect(303, redirectTo ?? '/today');
 	}
 	// `reason=device` is the app sending someone back after their browser lost
 	// its key. It changes nothing on screen; the form passes it on so the
@@ -99,6 +99,6 @@ export const actions: Actions = {
 			return setError(loginForm, '', 'Could not login');
 		}
 
-		redirect(303, redirectTargetOrHome(url.searchParams.get('redirectTo')));
+		redirect(303, redirectTargetOrToday(url.searchParams.get('redirectTo')));
 	}
 };

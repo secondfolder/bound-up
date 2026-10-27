@@ -201,3 +201,50 @@ partnership's members already say what it says.
 What a pending invite offers: an invite has one member, so the offered
 control stays on the invite (the partnership row, or an invites table of its
 own).
+
+## The /home redirect
+
+`/home` was the signed-in app until the Dashboard became Today, at `/today`
+([section-widgets.md](section-widgets.md)). Every other old page address
+under `/home` and `/partner/[id]` simply 404s now, with no redirect: the worst
+case there is an old bookmark or notification landing on the error page and
+navigating on. `/home` itself is the one exception, and it is a **307 to
+`/today`** (the query string kept). Grep for `LEGACY-SPACES`.
+
+### Why it is kept
+
+An app added to the iOS Home Screen keeps the `start_url` it was installed
+with and never refetches the manifest. Every install from before the move
+launches at `/home`, so without the redirect each launch would be a 404 that
+reloading cannot fix — which fails the "worst case is a reload" rule the
+other removals were judged by. A 307 rather than a 308, so no browser caches
+it for good: this one is meant to go.
+
+### Where it lives
+
+- `src/routes/home/+server.ts` — the redirect, a `GET` with no page, so it runs
+  no layout loads and answers before the sign-in guard.
+- `src/routes/home/server.test.ts` — its test, and the `/home` checks in
+  `e2e/today.spec.ts` ("an app installed on the home screen before the move").
+
+`static/site.webmanifest`'s `start_url` is already `/today`, so a fresh install
+never touches it.
+
+### What removes the need for it
+
+The user and their partner (production's two accounts) have removed the app
+from their Home Screens and added it again, so both installs start at
+`/today`. There is no server-side query for this: the server cannot see which
+`start_url` an install launches with, beyond a `/home` request arriving.
+
+### What to remove
+
+1. `src/routes/home/` (the route and its test).
+2. The two `/home` tests in `e2e/today.spec.ts`, keeping the "old pages are
+   gone" one with `/home` added to its list of 404s.
+3. This section, and the mentions of the redirect in
+   `docs/section-widgets.md`, `docs/contexts.md` and AGENTS.md.
+
+### What should stay
+
+`/today` as the start URL and the post-sign-in default.

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { CONTEXT_COOKIE } from '$lib/context';
 import type { Db } from '$lib/server/db';
 import { listPartnersForNav } from '$lib/server/partnerships';
 import { createTestDb, type TestDb } from '$lib/testing/db';
@@ -30,8 +31,12 @@ beforeEach(async () => {
 
 afterEach(() => harness.close());
 
-const at = (token: string, user: TestUser | null, formData?: Record<string, string>) =>
-	fakeEvent({ db, user, params: { token }, formData, path: `/invite/${token}` });
+const at = (
+	token: string,
+	user: TestUser | null,
+	formData?: Record<string, string>,
+	cookies: Record<string, string> = {}
+) => fakeEvent({ db, user, params: { token }, formData, cookies, path: `/invite/${token}` });
 
 const accept = (event: never) => runAction(actions, 'default', event);
 
@@ -160,16 +165,25 @@ const confirmation = () => ({
 });
 
 describe('the accept action', () => {
-	it('links the accounts and lands on the new partner page', async () => {
+	it('links the accounts and lands on Today in the new partnership’s context', async () => {
 		const invite = await createTestInvite(db, ada, { control: 'mix' });
-		const result = await runAndCatch(() => accept(at(invite.inviteToken, jun, confirmation())));
+		// A device that was last looking at Everyone.
+		const jar: Record<string, string> = { [CONTEXT_COOKIE]: 'all' };
+		const result = await runAndCatch(() =>
+			accept(at(invite.inviteToken, jun, confirmation(), jar))
+		);
 
-		expect(result).toMatchObject({
-			type: 'redirect',
-			status: 303,
-			location: `/partner/${invite.id}`
-		});
+		expect(result).toMatchObject({ type: 'redirect', status: 303, location: '/today' });
+		// A partnership's space has the partnership's id.
+		expect(jar[CONTEXT_COOKIE]).toBe(invite.id);
 		expect((await readPartnershipRow(db, invite.id)).status).toBe('accepted');
+	});
+
+	it('leaves the context alone when the accept fails', async () => {
+		const invite = await createTestInvite(db, ada);
+		const jar: Record<string, string> = { [CONTEXT_COOKIE]: 'all' };
+		await runAndCatch(() => accept(at(invite.inviteToken, ada, confirmation(), jar)));
+		expect(jar[CONTEXT_COOKIE]).toBe('all');
 	});
 
 	it('accepts a read-only confirmation that posts nothing', async () => {

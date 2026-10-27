@@ -4,6 +4,7 @@ import { expect, type Page } from '@playwright/test';
 import { test } from './fixtures';
 import {
 	clickWaButton,
+	contextOf,
 	createInvite,
 	fillRichText,
 	newSide,
@@ -60,7 +61,7 @@ test('landing page feature screenshots', async ({ browser }) => {
 
 	try {
 		await signUp(riley.page, riley.who);
-		await riley.page.waitForURL('**/home');
+		await riley.page.waitForURL('**/today');
 		const link = await createInvite(riley.page, {
 			partnerName: 'Morgan',
 			yourName: 'Riley',
@@ -70,14 +71,13 @@ test('landing page feature screenshots', async ({ browser }) => {
 		});
 
 		await signUp(morgan.page, morgan.who);
-		await morgan.page.waitForURL('**/home');
+		await morgan.page.waitForURL('**/today');
 		await morgan.page.goto(link);
 		await clickWaButton(morgan.page, 'Accept and link');
-		await morgan.page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
-		const partnershipId = morgan.page.url().split('/').at(-1) ?? '';
-		// Tasks and rewards follow the context: Morgan adds them in the
-		// partnership's, so each is set for Riley.
-		await showContext(morgan.page, partnershipId);
+		// Accepting lands on Today in the new partnership's context, so what
+		// Morgan adds next (tasks and rewards follow the context) is set for Riley.
+		await morgan.page.waitForURL((url) => url.pathname === '/today');
+		const partnershipId = await contextOf(morgan.page);
 
 		const tasks: [string, string, string][] = [
 			['Morning check-in', 'Message me before 9 to say good morning.', '1'],
@@ -136,11 +136,11 @@ test('landing page feature screenshots', async ({ browser }) => {
 		await expect(riley.page.getByText(/well earned/)).toBeVisible();
 		await capture(riley.page, 'messages');
 
-		// Riley's view of the partnership.
-		await riley.page.goto(`/partner/${partnershipId}`);
+		// Riley's view of the partnership: Today in its context.
+		await showContext(riley.page, partnershipId);
+		await riley.page.goto('/today');
 		await capture(riley.page, 'partner');
 
-		await showContext(riley.page, partnershipId);
 		await riley.page.goto('/tasks');
 		await capture(riley.page, 'tasks');
 

@@ -18,11 +18,12 @@ The roadmap's toy collection and the like are planned for it.
   is a page in the signed-in app shell that lists the registry, as tiles side
   by side where there is room and one to a row on a phone. It has no load
   function and no feature flag. The kink list links back to it.
-- **Home card.** [`PlayroomWidget`](../src/lib/components/PlayroomWidget.svelte)
-  is the Playroom's card on `/home`. Its body is the last IQ result, read by
-  `latestIqTestResult` in the home load.
-- **No nav tab.** The bottom bar is left alone on purpose. The Playroom is
-  reached from the home card.
+- **Today card.** [`PlayroomWidget`](../src/lib/components/PlayroomWidget.svelte)
+  is the Playroom's card on Today, in Everyone and Me. Its body is the last
+  IQ result, read by `latestIqTestResult` in Today's load.
+- **No nav tab.** The bottom bar's five places are Today, Tasks, Notebook,
+  Messages and Settings; the Playroom is reached from Today's card, and lights
+  the Today tab while it is open.
 - **Two kinds of tool.** Adding one means a registry entry plus its routes.
   - **A standalone tool** (the IQ test) lives on its own page outside the app
     shell (see below), under `(standalone)/playroom/`, so it can be shared as

@@ -16,7 +16,7 @@ import { partnerships, passkey, userKeys, userKeyWraps, vaults } from './db/sche
  * imported from here (see AGENTS.md).
  *
  * Kept out of the route files because the same reads are needed from the
- * unlock endpoint, the Security page, the partner page, the messaging board
+ * unlock endpoint, the Security page, Today, the messaging board
  * and a partner-assisted sign-in.
  */
 

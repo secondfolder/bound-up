@@ -375,10 +375,36 @@ export async function createInvite(
 export async function navTabs(page: Page): Promise<string[]> {
 	const nav = page.getByRole('navigation', { name: 'Primary' });
 	await expect(nav).toBeVisible();
-	// Partner names are sealed and opened in the browser, so a tab reads "…"
-	// until its partnership's vault is open. Waited out, not sampled.
-	await expect(nav).not.toContainText('…');
 	return (await nav.getByRole('link').allTextContents()).map((text) => text.trim());
+}
+
+/**
+ * The contexts the switcher on the current page offers, in its order
+ * (Everyone, Me, then each partner), or none when it is not shown at all —
+ * which is what an account with no linked partner gets. Opens the fan to
+ * read them and closes it again. The page must be one with a switcher.
+ */
+export async function contextNames(page: Page): Promise<string[]> {
+	await waitForHydration(page);
+	const control = page.getByRole('button', { name: /^Showing / });
+	// Server-rendered with the page, so after hydration its absence is an
+	// answer rather than a moment too early.
+	if ((await control.count()) === 0) {
+		return [];
+	}
+	await control.click();
+	const fan = page.getByRole('group', { name: 'Whose to show' });
+	const labels = () =>
+		fan
+			.getByRole('button')
+			.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label') ?? ''));
+	// Partner names are sealed and read "…" until their vault is open. Waited
+	// out, not sampled.
+	await expect.poll(async () => (await labels()).some((label) => label.includes('…'))).toBe(false);
+	const names = (await labels()).map((label) => label.replace(/^Show /, ''));
+	await page.keyboard.press('Escape');
+	await expect(fan).toHaveCount(0);
+	return names;
 }
 
 export type Side = { page: Page; who: Account; close: () => Promise<void> };
@@ -408,14 +434,20 @@ export async function newSide(
 }
 
 /**
- * Links two signed-up accounts, leaving both on their own home page. Control
- * is shared unless `control` says otherwise, from the inviter's side.
+ * Links two signed-up accounts and returns the partnership's id (its space's
+ * id too). Control is shared unless `control` says otherwise, from the
+ * inviter's side.
+ *
+ * Accepting lands the invitee on Today in the new partnership's context, which
+ * is checked here; the invitee's context is then put back to Everyone, so
+ * every spec starts both sides where a fresh device starts and switches
+ * deliberately (`showContext`, `openBoard`) when it means a partnership.
  */
 export async function linkAccounts(
 	inviter: Side,
 	invitee: Side,
 	control: 'me' | 'them' | 'mix' = 'mix'
-): Promise<void> {
+): Promise<string> {
 	const link = await createInvite(inviter.page, {
 		partnerName: invitee.who.name,
 		yourName: inviter.who.name,
@@ -423,7 +455,17 @@ export async function linkAccounts(
 	});
 	await invitee.page.goto(link);
 	await clickWaButton(invitee.page, 'Accept and link');
-	await invitee.page.waitForURL(/\/partner\//);
+	await invitee.page.waitForURL((url) => url.pathname === '/today');
+	const id = await contextOf(invitee.page);
+	expect(id).toMatch(/^[0-9a-f-]{36}$/);
+	await showContext(invitee.page, 'all');
+	return id;
+}
+
+/** The context cookie a side's browser holds: `all`, or a space id. */
+export async function contextOf(page: Page): Promise<string> {
+	const cookies = await page.context().cookies();
+	return cookies.find((cookie) => cookie.name === 'context')?.value ?? 'all';
 }
 
 /**
@@ -437,25 +479,51 @@ export async function showContext(page: Page, context: string): Promise<void> {
 	expect(response.status()).toBe(204);
 }
 
-/** Opens a partner's messages board, and waits until it can be written on. */
+/**
+ * Opens a partner's messages board, and waits until it can be written on: as
+ * a person does, by switching Today to that partner and following its
+ * Messages card. The side's context is that partnership afterwards.
+ */
 export async function openBoard(page: Page, partnerName: string): Promise<void> {
-	// Scoped to the nav and matched loosely on purpose: the tab's accessible
-	// name is the partner's name TWICE ("Jun Jun"), because the avatar carries a
-	// label and the visible span repeats it. An exact match finds nothing.
-	await page
-		.getByRole('navigation', { name: 'Primary' })
-		.getByRole('link', { name: partnerName })
-		.click();
-	await page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
-	// A LINK, not a button: `<wa-button href=…>` renders an anchor, so
-	// getByRole('button') finds nothing. Same for any other wa-button with an
-	// href.
-	await page.getByRole('link', { name: 'Messages' }).click();
+	await page.goto('/today');
+	await waitForHydration(page);
+	await switchTo(page, partnerName);
+	// Today in the partnership's context, so the card below is its own.
+	await expect(
+		page.getByRole('heading', { level: 2, name: partnerName, exact: true })
+	).toBeVisible();
+	// The card, not the nav's tab of the same name: both go to /messages, but
+	// the card is what the person reading Today would follow.
+	await page.getByRole('main').getByRole('link', { name: 'Messages', exact: true }).click();
 	await page.waitForURL(/\/messages$/);
 
 	// The board shows a placeholder until the key is in hand, and only then the
 	// button — so this waits for it rather than sampling.
 	await expect(page.getByRole('button', { name: 'Write something' })).toBeVisible();
+}
+
+/**
+ * Switches the page's context with the switcher, as a person does: opens the
+ * fan and picks `name` ("Everyone", "Me" or a partner's name), then waits for
+ * the page's loads to re-run in the new context.
+ *
+ * The pill is not the signal: it shows the picked context as soon as it is
+ * picked, before the page's data has caught up, and a click on a card in that
+ * window followed the card of the context before. So this waits for the
+ * re-run's data too; a caller that then clicks something should still wait
+ * for something the new context draws (Today's partner header, say).
+ */
+export async function switchTo(page: Page, name: string): Promise<void> {
+	const control = page.getByRole('button', { name: /^Showing / });
+	// Partner names are sealed, so the pill reads "…" until they open.
+	await expect(control).not.toHaveAccessibleName(/…/);
+	if (!(await control.getAttribute('aria-label'))?.startsWith(`Showing ${name}.`)) {
+		const reloaded = page.waitForResponse((response) => response.url().includes('/__data.json'));
+		await control.click();
+		await page.getByRole('button', { name: `Show ${name}`, exact: true }).click();
+		await reloaded;
+	}
+	await expect(control).toHaveAccessibleName(new RegExp(`^Showing ${name}\\.`));
 }
 
 /**

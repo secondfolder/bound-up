@@ -31,15 +31,11 @@ test.describe('messages in every context', () => {
 		const bo = await newSide(browser, 'Bo');
 		const cy = await newSide(browser, 'Cy');
 		await newAccounts(ada, bo, cy);
-		await linkAccounts(ada, bo);
-		const withAda = bo.page.url().split('/').at(-1) ?? '';
-		await linkAccounts(cy, bo);
-		const withCy = bo.page.url().split('/').at(-1) ?? '';
+		const withAda = await linkAccounts(ada, bo);
+		const withCy = await linkAccounts(cy, bo);
 
-		await ada.page.goto('/home');
 		await openBoard(ada.page, 'Bo');
 		await writeThread(ada.page, 'from Ada');
-		await cy.page.goto('/home');
 		await openBoard(cy.page, 'Bo');
 		await writeThread(cy.page, 'from Cy');
 		return { ada, bo, cy, withAda, withCy };

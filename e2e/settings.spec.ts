@@ -115,11 +115,11 @@ test.describe('settings actions', () => {
 		await expect(page.locator('wa-input[data-field="oldPassword"] input')).toHaveValue('');
 
 		await evictKeyStorage(page);
-		await page.goto('/home');
-		await expectSentToSignIn(page, '/home');
+		await page.goto('/today');
+		await expectSentToSignIn(page, '/today');
 
 		await logInHere(page, { ...who, password: newPassword });
-		await page.waitForURL('/home');
+		await page.waitForURL('/today');
 		expect(await deviceHoldsKey(page)).toBe(true);
 	});
 

@@ -88,7 +88,7 @@ widths, and every page's content sits one gutter in from that column's edge.
   root centred with `margin-inline: auto` is a flex item with auto margins,
   which turns stretching off: it shrank to its content, so sibling pages with
   the same `max-width` came out different widths, a page changed width with
-  its data, and an unwrappable title pushed the partner page off a phone. The
+  its data, and an unwrappable title pushed the old partner page off a phone. The
   app layout gives every root `inline-size: 100%`, so `max-width` is the width.
 - **The header and the content share the gutter.** `NestedPageHeader` is
   inset by `--page-gutter` as a margin, so its divider is exactly as wide as

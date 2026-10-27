@@ -12,8 +12,8 @@
  * seals, and the columns are nullable only for history.
  *
  * Which vault to open with is the one the record names. A page does not get
- * to choose, so a partnership task shown on /home opens exactly as it does on
- * the partner's own page.
+ * to choose, so a partnership task shown in Everyone opens exactly as it does
+ * in the partnership's own context.
  */
 
 import { vaultById } from './crypto/vaults.svelte';

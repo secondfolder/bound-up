@@ -36,16 +36,16 @@ test('sends an already-signed-in visitor straight on to their destination', asyn
 	expect(result).toMatchObject({ type: 'redirect', location: '/invite/abc' });
 });
 
-test('sends an already-signed-in visitor home when there is nowhere to go back to', async () => {
+test('sends an already-signed-in visitor to Today when there is nowhere to go back to', async () => {
 	const result = await runAndCatch(() => runLoad(load(fakeEvent({ user, path: '/login' }))));
-	expect(result).toMatchObject({ type: 'redirect', location: '/home' });
+	expect(result).toMatchObject({ type: 'redirect', location: '/today' });
 });
 
 test('refuses to bounce a signed-in visitor off-site', async () => {
 	const result = await runAndCatch(() =>
 		load(fakeEvent({ user, path: '/login?redirectTo=https%3A%2F%2Fevil.example' }))
 	);
-	expect(result).toMatchObject({ type: 'redirect', location: '/home' });
+	expect(result).toMatchObject({ type: 'redirect', location: '/today' });
 });
 
 /**
@@ -103,7 +103,7 @@ test('counts every sign-in attempt, and lets one under the limit through', async
 	);
 	expect(authRateLimit).toHaveBeenCalledWith('sign-in');
 	expect(signInEmail).toHaveBeenCalledOnce();
-	expect(result).toMatchObject({ type: 'redirect', location: '/home' });
+	expect(result).toMatchObject({ type: 'redirect', location: '/today' });
 });
 
 /**

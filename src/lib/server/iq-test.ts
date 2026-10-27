@@ -61,7 +61,7 @@ export async function getIqTestResult(
 	return { result: view, isMine: viewerId !== null && ownerId === viewerId };
 }
 
-/** The newest result, for the /home card. */
+/** The newest result, for Today's Playroom card. */
 export async function latestIqTestResult(
 	db: Db,
 	ownerId: string

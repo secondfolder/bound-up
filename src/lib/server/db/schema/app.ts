@@ -111,7 +111,7 @@ export const edgeTasks = sqliteTable(
 		...timestamps
 	},
 	(table) => [
-		// The /home/guides/[id] load's hot path: where guide_id = ? order by "order".
+		// The /guides/[id] load's hot path: where guide_id = ? order by "order".
 		index('edge_tasks_guide_id_order_idx').on(table.guideId, table.order)
 	]
 );
@@ -769,7 +769,7 @@ export const messageThreads = sqliteTable(
 			table.partnershipId,
 			table.lastMessageAt
 		),
-		// /home's per-partner unread counts filter on the sender before the join.
+		// Today's per-partner unread counts filter on the sender before the join.
 		index('message_threads_partnership_sender_idx').on(
 			table.partnershipId,
 			table.lastMessageSenderId
@@ -1022,7 +1022,7 @@ export const threadReads = sqliteTable(
 	},
 	(table) => [
 		uniqueIndex('thread_reads_thread_user_unq').on(table.threadId, table.userId),
-		// The board's left join, and /home's aggregate, both look up (user, thread).
+		// The board's left join, and Today's aggregate, both look up (user, thread).
 		index('thread_reads_user_thread_idx').on(table.userId, table.threadId)
 	]
 );
@@ -1391,7 +1391,7 @@ export const iqTestResults = sqliteTable(
 		...timestamps
 	},
 	(table) => [
-		// The history list and the /home card: "this user's, newest first".
+		// The history list and Today's card: "this user's, newest first".
 		index('iq_test_results_owner_created_idx').on(table.ownerId, table.createdAt)
 	]
 );
@@ -1438,7 +1438,7 @@ export const daydreams = sqliteTable(
 		...timestamps
 	},
 	(table) => [
-		// The list and the /home card: "this user's, most recently played first".
+		// The list and Today's card: "this user's, most recently played first".
 		index('daydreams_owner_last_turn_idx').on(table.ownerId, table.lastTurnAt),
 		index('daydreams_space_id_idx').on(table.spaceId)
 	]

@@ -51,7 +51,7 @@ test.describe('email verification', () => {
 		await submitSignUp(page, who);
 		await expect(page.getByText(`We've sent a link to ${who.email}`)).toBeVisible();
 		// No session yet: the app is still out of reach.
-		await page.goto('/home');
+		await page.goto('/today');
 		await page.waitForURL((url) => url.pathname === '/login');
 
 		const mail = await waitForMailTo(who.email);
@@ -59,7 +59,7 @@ test.describe('email verification', () => {
 		await page.goto(linkIn(mail));
 		await expect(page.getByTestId('verification-notice')).toContainText('Your email is confirmed');
 		await logInHere(page, who);
-		await expect(page).toHaveURL(/\/home$/);
+		await expect(page).toHaveURL(/\/today$/);
 	});
 
 	test('signing in before confirming says so, and sends a fresh link', async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe('email verification', () => {
 		const fresh = await waitForMailTo(who.email, 2);
 		await page.goto(linkIn(fresh));
 		await logInHere(page, who);
-		await expect(page).toHaveURL(/\/home$/);
+		await expect(page).toHaveURL(/\/today$/);
 	});
 
 	test('a link that has been tampered with says so', async ({ page }) => {
@@ -145,8 +145,8 @@ test.describe('email verification', () => {
 			expect(notice.subject).toMatch(/tried to sign up/);
 			// The owner's account is untouched: still signed in, and still
 			// confirmed.
-			await ownerPage.goto('/home');
-			expect(new URL(ownerPage.url()).pathname).toBe('/home');
+			await ownerPage.goto('/today');
+			expect(new URL(ownerPage.url()).pathname).toBe('/today');
 		} finally {
 			await ownerContext.close();
 			await strangerContext.close();

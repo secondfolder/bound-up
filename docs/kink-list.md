@@ -709,8 +709,8 @@ import joins a list. Every importer produces the same `ImportResult`.
 
 ## Partners
 
-`/playroom/kink-list/partner/[partnershipId]`, linked from the partner page as
-"Kink lists". It is built on your own list
+`/playroom/kink-list/partner/[partnershipId]`, linked from Today in that
+partnership's context as "Kink lists". It is built on your own list
 ([`partner.ts`](../src/lib/kink-list/partner.ts) holds the rules,
 [`partner-store.svelte.ts`](../src/lib/kink-list/partner-store.svelte.ts) the
 store).

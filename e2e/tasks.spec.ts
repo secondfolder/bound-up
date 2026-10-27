@@ -5,6 +5,7 @@ import { sql } from './db';
 import { test } from './fixtures';
 import {
 	clickWaButton,
+	contextOf,
 	createInvite,
 	fillRichText,
 	linkAccounts,
@@ -62,13 +63,14 @@ test.describe('tasks', () => {
 		}
 	});
 
-	test('a user can manage and complete self tasks from home', async ({ browser }) => {
+	test('a user can manage and complete self tasks from Today', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
-			await ada.page.getByRole('link', { name: 'Tasks' }).click();
+			await ada.page.waitForURL('**/today');
+			// Today's card, not the nav's tab of the same name.
+			await ada.page.getByRole('main').getByRole('link', { name: 'Tasks', exact: true }).click();
 			await ada.page.waitForURL(/\/tasks$/);
 
 			await ada.page.getByRole('link', { name: 'Add a task' }).click();
@@ -259,7 +261,7 @@ test.describe('tasks', () => {
 	});
 
 	/**
-	 * The /home cards, which only this level can check.
+	 * Today's cards, which only this level can check.
 	 *
 	 * Checked against the real page: whether the header link survives the
 	 * custom element, and whether the body renders beside it. The accessible
@@ -267,12 +269,12 @@ test.describe('tasks', () => {
 	 * cards replaced `wa-button`s that every other spec here locates by these
 	 * exact words.
 	 */
-	test('the home cards preview what is behind them and still link there', async ({ browser }) => {
+	test('Today’s cards preview what is behind them and still link there', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 
 			/**
 			 * A fresh account has nothing in any section, so every card is a
@@ -307,7 +309,7 @@ test.describe('tasks', () => {
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -315,16 +317,17 @@ test.describe('tasks', () => {
 			});
 
 			await newAccount(jun.page, jun.who);
-			await jun.page.waitForURL('**/home');
+			await jun.page.waitForURL('**/today');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');
-			await jun.page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
-			const partnerPage = new URL(jun.page.url()).pathname.replace('/partner/', '');
+			// Into Today, in the new partnership's context.
+			await jun.page.waitForURL((url) => url.pathname === '/today');
+			const partnershipId = await contextOf(jun.page);
 
 			// After hydration: before it the card is a plain link, which would not
-			// switch to the partnership's context on the way.
+			// set the partnership's context on the way.
 			await waitForHydration(jun.page);
-			await jun.page.getByRole('link', { name: 'Tasks' }).click();
+			await jun.page.getByRole('main').getByRole('link', { name: 'Tasks', exact: true }).click();
 			await jun.page.waitForURL(/\/tasks$/);
 			await jun.page.getByRole('link', { name: 'Add a task' }).click();
 			await jun.page.waitForURL(/\/tasks\/add$/);
@@ -341,12 +344,12 @@ test.describe('tasks', () => {
 			await expect(jun.page.getByRole('button', { name: 'Complete Make tea' })).toHaveCount(0);
 
 			/**
-			 * The bug the home cards shipped with: the tasks card read the solo
+			 * The bug Today's cards (then /home's) shipped with: the tasks card read the solo
 			 * half only, so it said "Nothing to do right now." while this very
-			 * task sat assigned one tap away. /home's card covers every space,
+			 * task sat assigned one tap away. Today's card in Everyone covers every space,
 			 * as /tasks does in Everyone, which is where it leads.
 			 */
-			await ada.page.goto('/home');
+			await ada.page.goto('/today');
 			const tasksCard = ada.page.locator('wa-card').filter({ hasText: 'Tasks' });
 			await expect(tasksCard).toContainText('Make tea');
 			// Attributed, because two partners can name a task the same thing.
@@ -371,9 +374,10 @@ test.describe('tasks', () => {
 
 			// Done, so it is inactive: in the partnership's own context it waits,
 			// folded away, and the history says who did it.
-			await ada.page.goto(`/partner/${partnerPage}`);
+			await showContext(ada.page, partnershipId);
+			await ada.page.goto('/today');
 			await waitForHydration(ada.page);
-			await ada.page.getByRole('link', { name: 'Tasks' }).click();
+			await ada.page.getByRole('main').getByRole('link', { name: 'Tasks', exact: true }).click();
 			await ada.page.waitForURL(/\/tasks$/);
 			await ada.page.locator('wa-details.collapsed').filter({ hasText: 'Inactive' }).click();
 			await expect(ada.page.getByRole('button', { name: /^Make tea/ })).toBeVisible();
@@ -438,8 +442,7 @@ test.describe('tasks in every context', () => {
 		const jun = await newSide(browser, 'Jun');
 		try {
 			await newAccounts(ada, jun);
-			await linkAccounts(ada, jun, 'mix');
-			const partnershipId = jun.page.url().split('/').at(-1) ?? '';
+			const partnershipId = await linkAccounts(ada, jun, 'mix');
 			const tag = crypto.randomUUID().slice(0, 6);
 
 			await showContext(ada.page, 'all');
@@ -501,8 +504,7 @@ test.describe('tasks in every context', () => {
 		const jun = await newSide(browser, 'Jun');
 		try {
 			await newAccounts(ada, jun);
-			await linkAccounts(ada, jun, 'me');
-			const partnershipId = jun.page.url().split('/').at(-1) ?? '';
+			const partnershipId = await linkAccounts(ada, jun, 'me');
 			const tag = crypto.randomUUID().slice(0, 6);
 
 			await showContext(ada.page, partnershipId);

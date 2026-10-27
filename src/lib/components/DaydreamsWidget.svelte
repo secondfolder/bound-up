@@ -3,7 +3,7 @@
 	import WidgetItems from '$lib/components/WidgetItems.svelte';
 	import type { DaydreamsWidgetView } from '$lib/types';
 
-	/** The /home card for Daydreams: the most recently played, newest first. */
+	/** Today's card for Daydreams: the most recently played, newest first. */
 	let { daydreams, href }: { daydreams: DaydreamsWidgetView; href: string } = $props();
 
 	const items = $derived(

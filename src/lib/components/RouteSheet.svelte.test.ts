@@ -44,7 +44,7 @@ describe('RouteSheet', () => {
 	it('goes back when it was opened from its list, so Back does not reopen it', async () => {
 		const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
 		const { component, leave } = await renderSheet();
-		arrived('/home/tasks');
+		arrived('/tasks');
 		(component as unknown as { close: () => void }).close();
 		await expect.poll(() => back.mock.calls.length).toBe(1);
 		expect(leave).not.toHaveBeenCalled();
@@ -62,7 +62,7 @@ describe('RouteSheet', () => {
 	it('goes to its list, too, when it was reached from somewhere else', async () => {
 		const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
 		const { component, leave } = await renderSheet();
-		arrived('/home');
+		arrived('/today');
 		(component as unknown as { close: () => void }).close();
 		await expect.poll(() => leave.mock.calls.length).toBe(1);
 		expect(back).not.toHaveBeenCalled();

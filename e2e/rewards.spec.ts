@@ -59,12 +59,12 @@ test.describe('rewards', () => {
 		await expect(title).toHaveValue('Longer bath');
 	});
 
-	test('a user can manage and claim self rewards from home', async ({ browser }) => {
+	test('a user can manage and claim self rewards from Today', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			await ada.page.getByRole('link', { name: 'Rewards' }).click();
 			await ada.page.waitForURL(/\/rewards$/);
 
@@ -103,7 +103,7 @@ test.describe('rewards', () => {
 		}
 	});
 
-	test('a controller can create partner rewards and the other side can claim them from home', async ({
+	test('a controller can create partner rewards and the other side can claim them from Today', async ({
 		browser
 	}) => {
 		const ada = await newSide(browser, 'Ada');
@@ -111,7 +111,7 @@ test.describe('rewards', () => {
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			await ada.page.getByRole('link', { name: 'Rewards' }).click();
 			await ada.page.waitForURL(/\/rewards$/);
 			const link = await createInvite(ada.page, {
@@ -121,12 +121,13 @@ test.describe('rewards', () => {
 			});
 
 			await newAccount(jun.page, jun.who);
-			await jun.page.waitForURL('**/home');
+			await jun.page.waitForURL('**/today');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');
-			await jun.page.waitForURL(/\/partner\/[0-9a-f-]{36}$/);
+			// Into Today, in the new partnership's context.
+			await jun.page.waitForURL((url) => url.pathname === '/today');
 
-			// After hydration, so the card switches to the partnership's context.
+			// After hydration, so the card sets the partnership's context.
 			await waitForHydration(jun.page);
 			await jun.page.getByRole('link', { name: 'Rewards' }).click();
 			await jun.page.waitForURL(/\/rewards$/);

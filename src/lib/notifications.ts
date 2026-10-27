@@ -122,7 +122,7 @@ export function pushTopic(threadId: string): string {
  * even a payload we cannot read must still produce a notification.
  */
 export function parsePushPayload(data: unknown): DeclarativePush['notification'] {
-	const fallback = { title: 'Something new in Bound Up', navigate: '/home' };
+	const fallback = { title: 'Something new in Bound Up', navigate: '/today' };
 	if (typeof data !== 'object' || data === null) {
 		return fallback;
 	}

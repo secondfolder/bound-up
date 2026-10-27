@@ -272,7 +272,7 @@
 			});
 			pending = undefined;
 			await invalidateAll();
-			await goto(resolve('/(auth-required)/(app)/home'));
+			await goto(resolve('/(auth-required)/(app)/today'));
 		} catch (error) {
 			console.error(error);
 			end('You are back in, but logging in did not finish. Log in with your new password.');

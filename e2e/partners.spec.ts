@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 import { test } from './fixtures';
 import {
 	clickWaButton,
+	contextNames,
 	createInvite,
 	fillPassword,
 	LOG_IN_BUTTON,
@@ -30,10 +31,18 @@ test.describe('linking two accounts', () => {
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 
-			// A brand new account has no partner tabs.
-			expect(await navTabs(ada.page)).toEqual(['Home', 'Settings']);
+			// A brand new account has the five places, and no context switcher:
+			// with nobody to switch to, Everyone would just be Me.
+			expect(await navTabs(ada.page)).toEqual([
+				'Today',
+				'Tasks',
+				'Notebook',
+				'Messages',
+				'Settings'
+			]);
+			expect(await contextNames(ada.page)).toEqual([]);
 
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
@@ -43,11 +52,12 @@ test.describe('linking two accounts', () => {
 				control: 'mix'
 			});
 
-			// It shows as pending, and still not in the nav — there is nobody
-			// behind that tab until it is accepted.
+			// It shows as pending, and still not in the switcher — there is
+			// nobody to show until it is accepted.
 			await ada.page.goto('/settings/partners');
 			await expect(ada.page.getByText('Waiting for them to accept')).toBeVisible();
-			expect(await navTabs(ada.page)).toEqual(['Home', 'Settings']);
+			await ada.page.goto('/today');
+			expect(await contextNames(ada.page)).toEqual([]);
 
 			// Jun opens the link cold, with no account at all.
 			await jun.page.goto(link);
@@ -59,7 +69,7 @@ test.describe('linking two accounts', () => {
 			await jun.page.waitForURL(/\/signup\?redirectTo=/);
 			await signUp(jun.page, jun.who, jun.page.url());
 
-			// Signing up must land back on the invite, not on /home.
+			// Signing up must land back on the invite, not on Today.
 			await jun.page.waitForURL(/\/invite\//);
 			await expect(
 				jun.page.getByRole('heading', { name: 'Ada wants to add you as a partner' })
@@ -68,14 +78,18 @@ test.describe('linking two accounts', () => {
 			// Control is shared, so Jun may rewrite the names before accepting.
 			await expect(jun.page.locator('wa-input[name="partnerName"]')).toBeVisible();
 			await clickWaButton(jun.page, 'Accept and link');
-			await jun.page.waitForURL(/\/partner\/[0-9a-f-]{36}/);
+			// Into Today, in the new partnership's context: its header is Ada.
+			await jun.page.waitForURL((url) => url.pathname === '/today');
+			await expect(
+				jun.page.getByRole('heading', { level: 2, name: 'Ada', exact: true })
+			).toBeVisible();
+			await expect(jun.page.getByRole('button', { name: /^Showing Ada\./ })).toBeVisible();
+			await expect(jun.page.getByText("Jun's dom")).toBeVisible();
 
 			// Each side sees the other under the name that side chose.
-			await expect(jun.page.getByRole('heading', { name: 'Ada' })).toBeVisible();
-			expect(await navTabs(jun.page)).toEqual(['Home', 'Ada', 'Settings']);
-
-			await ada.page.goto('/home');
-			expect(await navTabs(ada.page)).toEqual(['Home', 'Jun', 'Settings']);
+			expect(await contextNames(jun.page)).toEqual(['Everyone', 'Me', 'Ada']);
+			await ada.page.goto('/today');
+			expect(await contextNames(ada.page)).toEqual(['Everyone', 'Me', 'Jun']);
 
 			// The link is spent.
 			await jun.page.goto(link);
@@ -92,7 +106,7 @@ test.describe('linking two accounts', () => {
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -100,7 +114,7 @@ test.describe('linking two accounts', () => {
 			});
 
 			await newAccount(jun.page, jun.who);
-			await jun.page.waitForURL('**/home');
+			await jun.page.waitForURL('**/today');
 			await jun.page.goto(link);
 
 			// Displayed, not editable — the requirement for "they're in control".
@@ -115,9 +129,10 @@ test.describe('linking two accounts', () => {
 			await expect(jun.page.locator('input[name="control"][type="radio"]')).toHaveCount(0);
 
 			await clickWaButton(jun.page, 'Accept and link');
-			await jun.page.waitForURL(/\/partner\//);
+			await jun.page.waitForURL((url) => url.pathname === '/today');
 
-			// And the settings screen offers no edit form either.
+			// And the settings screen, linked from Today's header, offers no
+			// edit form either.
 			await jun.page.getByRole('link', { name: 'Connection settings' }).click();
 			await expect(jun.page.getByText("They're in control of this link")).toBeVisible();
 			// Exact: the page also has the colour's "Save colour", which is Jun's own.
@@ -141,7 +156,7 @@ test.describe('linking two accounts', () => {
 			await logOut(jun.page);
 
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -158,7 +173,7 @@ test.describe('linking two accounts', () => {
 			await fillPassword(jun.page, 'password', jun.who.password);
 			await clickWaButton(jun.page, LOG_IN_BUTTON);
 
-			// Logging in must return them to the invite rather than to /home.
+			// Logging in must return them to the invite rather than to Today.
 			await jun.page.waitForURL(/\/invite\//);
 			await expect(jun.page.getByRole('button', { name: 'Accept and link' })).toBeVisible();
 		} finally {
@@ -169,13 +184,13 @@ test.describe('linking two accounts', () => {
 });
 
 test.describe('managing a link', () => {
-	test('disconnecting removes the partner from both navs', async ({ browser }) => {
+	test('disconnecting removes the partner from both switchers', async ({ browser }) => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -183,11 +198,11 @@ test.describe('managing a link', () => {
 			});
 
 			await newAccount(jun.page, jun.who);
-			await jun.page.waitForURL('**/home');
+			await jun.page.waitForURL('**/today');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');
-			await jun.page.waitForURL(/\/partner\//);
-			expect(await navTabs(jun.page)).toEqual(['Home', 'Ada', 'Settings']);
+			await jun.page.waitForURL((url) => url.pathname === '/today');
+			expect(await contextNames(jun.page)).toEqual(['Everyone', 'Me', 'Ada']);
 
 			// Jun does not hold control, and must still be able to leave.
 			await jun.page.goto('/settings/partners');
@@ -197,10 +212,14 @@ test.describe('managing a link', () => {
 			await jun.page.waitForURL('**/settings/partners');
 
 			await expect(jun.page.getByText('You have no partners yet.')).toBeVisible();
-			expect(await navTabs(jun.page)).toEqual(['Home', 'Settings']);
+			// Jun's device was left in that partnership's context, which no
+			// longer exists: an ambient context falls back to Everyone, never a 404.
+			await jun.page.goto('/today');
+			expect(await contextNames(jun.page)).toEqual([]);
+			await expect(jun.page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
 
-			await ada.page.goto('/home');
-			expect(await navTabs(ada.page)).toEqual(['Home', 'Settings']);
+			await ada.page.goto('/today');
+			expect(await contextNames(ada.page)).toEqual([]);
 		} finally {
 			await ada.close();
 			await jun.close();
@@ -213,7 +232,7 @@ test.describe('managing a link', () => {
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -239,7 +258,7 @@ test.describe('managing a link', () => {
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const first = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -263,13 +282,15 @@ test.describe('managing a link', () => {
 		}
 	});
 
-	test('the controlling side can rename the partner, and the nav follows', async ({ browser }) => {
+	test('the controlling side can rename the partner, and the switcher follows', async ({
+		browser
+	}) => {
 		const ada = await newSide(browser, 'Ada');
 		const jun = await newSide(browser, 'Jun');
 
 		try {
 			await newAccount(ada.page, ada.who);
-			await ada.page.waitForURL('**/home');
+			await ada.page.waitForURL('**/today');
 			const link = await createInvite(ada.page, {
 				partnerName: 'Jun',
 				yourName: 'Ada',
@@ -277,10 +298,10 @@ test.describe('managing a link', () => {
 			});
 
 			await newAccount(jun.page, jun.who);
-			await jun.page.waitForURL('**/home');
+			await jun.page.waitForURL('**/today');
 			await jun.page.goto(link);
 			await clickWaButton(jun.page, 'Accept and link');
-			await jun.page.waitForURL(/\/partner\//);
+			await jun.page.waitForURL((url) => url.pathname === '/today');
 
 			await ada.page.goto('/settings/partners');
 			await ada.page.getByRole('main').getByRole('link', { name: /Jun/ }).click();
@@ -290,13 +311,14 @@ test.describe('managing a link', () => {
 			// Not "Save colour", the other save on the page.
 			await clickWaButton(ada.page, /^Save$/);
 
-			await expect(async () => {
-				expect(await navTabs(ada.page)).toEqual(['Home', 'Junie', 'Settings']);
-			}).toPass();
+			// Saving goes back to the list, and the names are sealed again first.
+			await ada.page.waitForURL((url) => url.pathname === '/settings/partners');
+			await ada.page.goto('/today');
+			expect(await contextNames(ada.page)).toEqual(['Everyone', 'Me', 'Junie']);
 
-			// Jun's own tab is unaffected: it shows what Jun calls Ada.
-			await jun.page.goto('/home');
-			expect(await navTabs(jun.page)).toEqual(['Home', 'Ada', 'Settings']);
+			// Jun's own switcher is unaffected: it shows what Jun calls Ada.
+			await jun.page.goto('/today');
+			expect(await contextNames(jun.page)).toEqual(['Everyone', 'Me', 'Ada']);
 		} finally {
 			await ada.close();
 			await jun.close();

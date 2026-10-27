@@ -36,7 +36,7 @@ async function becomeRole(page: Page, who: Account, role: 'admin' | 'user') {
  * with it. Redirects are not followed, so a sign-in bounce is not read as 200.
  */
 async function guidesStatus(page: Page): Promise<number> {
-	return (await page.request.get('/home/guides', { maxRedirects: 0 })).status();
+	return (await page.request.get('/guides', { maxRedirects: 0 })).status();
 }
 
 async function openAccount(admin: Page, who: Account) {
@@ -54,7 +54,7 @@ test('an admin grants and revokes a feature, and makes another admin', async ({ 
 		await becomeRole(ada.page, ada.who, 'user');
 
 		// Without the feature: no card, and the pages refuse.
-		await ada.page.goto('/home');
+		await ada.page.goto('/today');
 		await expect(ada.page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
 		await expect(ada.page.getByRole('heading', { name: 'Guides' })).toHaveCount(0);
 		expect(await guidesStatus(ada.page)).toBe(403);
@@ -69,7 +69,7 @@ test('an admin grants and revokes a feature, and makes another admin', async ({ 
 		await expect(admin.page.getByText(`by ${admin.who.name}`)).toBeVisible();
 
 		expect(await guidesStatus(ada.page)).toBe(200);
-		await ada.page.goto('/home');
+		await ada.page.goto('/today');
 		await expect(ada.page.getByRole('heading', { name: 'Guides' })).toBeVisible();
 
 		// Revoked: gone again.

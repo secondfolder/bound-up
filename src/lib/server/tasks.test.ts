@@ -1155,7 +1155,7 @@ describe('the tasks widget', () => {
 	});
 
 	/**
-	 * /home is not a solo-only view, and this is the bug that proves it: the
+	 * Today in Everyone is not a solo-only view, and this is the bug that proves it: the
 	 * card said "nothing to do" while a partner task sat waiting one tap away,
 	 * because it only ever read the solo space. It has to match the tasks page,
 	 * which lists every space the context shows.

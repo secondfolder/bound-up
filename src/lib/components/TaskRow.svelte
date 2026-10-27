@@ -25,7 +25,7 @@
 		mode: TaskListMode;
 		/**
 		 * The partner the list is about, for "Jun's time" on a list that does not
-		 * name them on each row (the partner page).
+		 * name them on each row (/tasks in a partnership's context).
 		 */
 		partnerName?: string | null;
 		/** Its detail is open. */

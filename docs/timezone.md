@@ -42,8 +42,8 @@ If the browser cannot report a timezone, the client falls back to `UTC`.
 
 ## Partner-visible timezone use
 
-Accepted partner pages may show the other person's current local time when their
-timezone differs from the viewer's. That display is informational only, but it
+Today in an accepted partnership's context shows the other person's current
+local time in its header when their timezone differs from the viewer's. That display is informational only, but it
 also sets the visual language for task timezone notes elsewhere in the app.
 
 The key privacy boundary is that the app does not expose arbitrary account
@@ -67,7 +67,7 @@ user source that populates `locals.user`.
 
 The signed-in app shell mounts
 [src/lib/components/TimezoneWarning.svelte](../src/lib/components/TimezoneWarning.svelte)
-above page content on `/home`, `/partner/*`, `/tasks*`, `/rewards*` and `/settings*`. The banner is
+above page content on `/today` (in every context), `/messages*`, `/tasks*`, `/rewards*` and `/settings*`. The banner is
 shown when the current device timezone differs from `page.data.user.timezone`.
 
 It offers two actions:

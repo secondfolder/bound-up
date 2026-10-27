@@ -3,7 +3,7 @@
 	import type { Attachment } from 'svelte/attachments';
 
 	/**
-	 * The card shell every /home and /partner/[id] section is built from.
+	 * The card shell every section on Today is built from.
 	 *
 	 * A header whose title links to the section's own page, and a body the
 	 * caller fills with a preview of what is behind that link. This component
@@ -19,7 +19,7 @@
 	}: {
 		title: string;
 		/**
-		 * Omit for a section whose rows carry the links. The /home messages card
+		 * Omit for a section whose rows carry the links. Today's unread messages card
 		 * is the only one so far: each row opens the board in its partner's
 		 * context.
 		 */

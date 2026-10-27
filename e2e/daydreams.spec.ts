@@ -241,7 +241,7 @@ test.describe('daydreams', () => {
 		// Listed, and on the home screen's card.
 		await page.goto('/daydreams');
 		await expect(page.getByRole('link', { name: /The After hours story/ })).toBeVisible();
-		await page.goto('/home');
+		await page.goto('/today');
 		await expect(page.getByText('The After hours story')).toBeVisible();
 	});
 

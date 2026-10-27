@@ -2,8 +2,9 @@
 
 Two accounts can link with each other. One person answers a few questions, gets
 a link, and sends it out-of-band; the other opens it, signs in if they need to,
-confirms, and the two are linked. Each then sees the other as a tab in the
-bottom nav.
+confirms, and the two are linked. Each then sees the other in the context
+switcher ([contexts.md](contexts.md)), and accepting opens Today in the new
+partnership's context.
 
 This document is the current behaviour. For why it was built this way, see
 [`docs/historical-plans/2026-09-07-partners.md`](historical-plans/2026-09-07-partners.md) —
@@ -32,7 +33,7 @@ invitee from the moment they accept, and the row is the space's details — the
 invite and the names. Ending a partnership deletes the space and everything in
 it (`deletePartnership` → `deleteSpace`), and so does deleting either account,
 explicitly rather than by cascade — otherwise the other person would keep a
-nav tab pointing at nothing.
+partnership in their switcher with nothing behind it.
 
 `invite_token` has a unique index. SQLite allows many `NULL`s in a unique index,
 so clearing the token on acceptance also frees the inviter to send another
@@ -109,8 +110,8 @@ Partners are trusted to that extent.
   Bound Up"; the names appear only once the page has opened the invite.
 - Push notifications say "New message" or "New reaction", never from whom
   ([docs/notifications.md](notifications.md)).
-- Everything server-rendered — nav tabs, page titles, widget lines — shows "…"
-  until hydration opens the names.
+- Everything server-rendered — the switcher, Today's partner header, widget
+  lines — shows "…" until hydration opens the names.
 
 There are no plaintext name columns. The sealed ones are nullable, and a row
 with neither a sealed record nor an invite shows its names as "can't be
@@ -142,8 +143,8 @@ through it.
 
 ### `id` in a URL is always the partnership id
 
-`/partner/[id]` and `/settings/partners/[id]` are keyed on the partnership, not
-on a user. That way a link can be addressed before the second user exists, and
+`/settings/partners/[id]`, `/playroom/kink-list/partner/[id]` and the
+partnership's space are keyed on the partnership, not on a user. That way a link can be addressed before the second user exists, and
 no user id ever appears in a URL.
 
 ## The control question
@@ -267,18 +268,18 @@ token (`not-found`), an expired one (`expired`), the inviter's own link
 | `/settings/partners/new`           | `(auth-required)` | Name/Title, Roles, and the control question. Creates the pending row and the link.                        |
 | `/settings/partners/[id]`          | `(auth-required)` | Who is whose role, then: pending, the link, share, renew; accepted, edit. Disconnect/cancel last, apart.  |
 | `/invite/[token]`                  | **`(public)`**    | The landing page for the person being invited.                                                            |
-| `/partner/[id]`                    | `(auth-required)` | The partner's own page. Accepted links only. Shows their local time, and date too when their day differs. |
-| `/messages`, `/messages/[threadId]` | `(auth-required)` | Messages, in the current context; the partner page's card opens them in the partnership's. See [messaging.md](messaging.md#the-board-in-each-context). |
-| `/playroom/kink-list/partner/[id]` | `(auth-required)` | Your kink list for that partner, linked from the partner page. See [kink-list.md](kink-list.md#partners). |
+| `/today`, in a partnership's context | `(auth-required)` | The partnership's own place: a header with their avatar, name, role and local time (and date too when their day differs), and a link to its settings page, then its cards. Accepted links only, since the switcher offers no other. See [section-widgets.md](section-widgets.md). |
+| `/messages`, `/messages/[threadId]` | `(auth-required)` | Messages, in the current context; a partnership's Messages card on Today opens them in its context. See [messaging.md](messaging.md#the-board-in-each-context). |
+| `/playroom/kink-list/partner/[id]` | `(auth-required)` | Your kink list for that partner, linked from Today in the partnership's context. See [kink-list.md](kink-list.md#partners). |
 | `/api/spaces/[spaceId]/names`     | own `locals.user` check | `GET` where to read names still under the invite, `PUT` them sealed into the vault. See above.         |
 
 ## Tasks and rewards
 
 A partnership's tasks and rewards are in its shared space, on the same
 `/tasks` and `/rewards` pages as the viewer's own, shown when the context
-switcher names the partnership or Everyone ([contexts.md](contexts.md)). The
-partner page's Tasks and Rewards cards lead there, switching to the
-partnership's context on the way.
+switcher names the partnership or Everyone ([contexts.md](contexts.md)).
+Today's Tasks and Rewards cards in the partnership's context lead there, in
+that context.
 
 They follow `control` through the members' `can_manage`, never by reading the
 column:
@@ -328,7 +329,11 @@ not redundant.
 on the way in (so a hostile value never renders as a link) and on the way out.
 It rejects absolute URLs and protocol-relative ones — `//evil.example` and
 `/\evil.example` are both read as off-site by browsers — and falls back to
-`/home`.
+`/today`.
+
+Accepting the invite then sets the context cookie to the new partnership's
+space and redirects to `/today`, so the accepter lands on the partnership's
+own place. A failed accept sets nothing.
 
 The passkey sign-in path never touches the server action, so `LoginForm` applies
 the same destination itself; otherwise a passkey login would drop the invite.
@@ -338,17 +343,20 @@ carries `redirectTo` into that link — so someone who clicked "Log in" on the
 invite, then realised they have no account, can switch to signup and still land
 back on the invite after creating one.
 
-## The bottom nav
+## Partners in the app shell
 
 `(auth-required)/(app)/+layout.server.ts` calls `listPartnersForNav`, which
-returns one `PartnerView` per **accepted** partnership. Pending invites are
-excluded on purpose: until the other person accepts there is nobody behind the
-tab, and a tab that opens an empty page reads as a bug. They are visible in
-settings instead.
+returns one `PartnerView` per **accepted** partnership, and `locals.contextSpaces()`,
+which offers the same accepted partnerships to the context switcher. Pending
+invites are excluded on purpose: until the other person accepts there is
+nobody there, and a context that shows an empty page reads as a bug. They are
+visible in settings instead.
 
-Each tab shows the name _that viewer_ chose and, when the partner has one, their
-avatar. `AppNav` decides the active tab from `page.route.id`, never a pathname —
-see the note in `AGENTS.md`.
+The switcher shows the name _that viewer_ chose, in the colour that viewer
+gave the partnership. There is no tab per partner in the bottom nav any more:
+`AppNav` has five fixed places (Today, Tasks, Notebook, Messages, Settings),
+and a partnership's place is Today in its context. `AppNav` decides the active
+tab from `page.route.id`, never a pathname — see the note in `AGENTS.md`.
 
 ## Sharing the link
 
@@ -407,7 +415,7 @@ generated `schema/auth.ts`, where an edit would be lost on the next
 | --------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Pure      | `src/lib/partnership.test.ts`, `safe-redirect.test.ts`, `schemas/partnerForm.test.ts` | Permission rules, the per-viewer flip, the control round trip, validation |
 | Server    | `src/lib/server/partnerships.test.ts` plus a `page.server.test.ts` per route          | Every query and action against a real in-memory SQLite database           |
-| Component | `AppNav.svelte.test.ts`, `PartnerAcceptForm.svelte.test.ts`                           | Nav tabs and active state; editable vs read-only fields                   |
+| Component | `today/page.svelte.test.ts`, `PartnerAcceptForm.svelte.test.ts`                       | Today's partner header; editable vs read-only fields                      |
 | E2E       | `e2e/partners.spec.ts`, `e2e/sealed-names.spec.ts`                                    | The whole flow in a browser, across two session cookies; nothing in the database, the cut-off fragment, a swapped inviter key |
 
 `AGENTS.md` has the harness details — how to build a test database, how to fake
@@ -417,7 +425,5 @@ a `RequestEvent`, and the Playwright gotchas.
 
 - No decline action. The accept screen offers "Not now", which just leaves.
 - No notification to the inviter when an invite is accepted.
-- `/partner/[id]` has no shared content; it names the link and points at its
-  settings.
 - Permissions cover the names, the roles, and the control setting. They do not
   gate anything about guides or progress.

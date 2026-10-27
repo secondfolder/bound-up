@@ -410,7 +410,7 @@ describe('listEntries', () => {
 });
 
 describe('the cards', () => {
-	it('show your own notebook on /home and the shared one on the partner page, minus what is hidden', async () => {
+	it('show your own notebook in Me and the shared one in a partnership’s context, minus what is hidden', async () => {
 		await createTestNotebookEntry(db, ada);
 		const shared = await createTestNotebookEntry(db, ada, { partnershipId });
 		await createTestNotebookEntry(db, ada, { partnershipId, partnerAccess: 'hidden' });

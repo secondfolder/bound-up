@@ -8,13 +8,13 @@
 	let { guides } = $derived(data);
 </script>
 
-<!-- The same header as every other page under Home, with its way back: this
+<!-- The same header as every other page reached from Today, with its way back: this
      was the one that had none, a centred title alone over the wash. -->
 <section class="page">
 	<NestedPageHeader
-		backHref={resolve('/(auth-required)/(app)/home')}
-		backLabel="Back to home"
-		backText="Home"
+		backHref={resolve('/(auth-required)/(app)/today')}
+		backLabel="Back to Today"
+		backText="Today"
 		title="Guides"
 		description="Step-by-step guides to work through at your own pace."
 	/>

@@ -65,7 +65,7 @@ describe('parsePushPayload', () => {
 		for (const junk of [null, 'text', {}, { notification: { title: 3 } }]) {
 			expect(parsePushPayload(junk)).toEqual({
 				title: 'Something new in Bound Up',
-				navigate: '/home'
+				navigate: '/today'
 			});
 		}
 	});

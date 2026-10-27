@@ -45,9 +45,9 @@ sw.addEventListener('push', (event) => {
 sw.addEventListener('notificationclick', (event) => {
 	event.notification.close();
 	const navigate: unknown = event.notification.data?.navigate;
-	const target = new URL(typeof navigate === 'string' ? navigate : '/home', sw.location.origin);
+	const target = new URL(typeof navigate === 'string' ? navigate : '/today', sw.location.origin);
 	// Never leave the app's own origin, whatever a payload says.
-	const url = target.origin === sw.location.origin ? target.href : `${sw.location.origin}/home`;
+	const url = target.origin === sw.location.origin ? target.href : `${sw.location.origin}/today`;
 
 	event.waitUntil(
 		(async () => {

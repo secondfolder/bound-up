@@ -14,7 +14,7 @@ const goto = vi.fn().mockResolvedValue(undefined);
 vi.mock('$app/navigation', () => ({ goto }));
 
 vi.mock('$app/state', () => ({
-	page: { url: new URL('http://localhost/home/guides?tab=2') }
+	page: { url: new URL('http://localhost/guides?tab=2') }
 }));
 
 const signOut = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -69,7 +69,7 @@ describe('EncryptionGate', () => {
 		expect(url.pathname).toBe('/(public)/login');
 		// Back to where they were, and marked so the storage explanation can
 		// follow — but nothing about keys or messages in what is shown.
-		expect(url.searchParams.get('redirectTo')).toBe('/home/guides?tab=2');
+		expect(url.searchParams.get('redirectTo')).toBe('/guides?tab=2');
 		expect(url.searchParams.get('reason')).toBe('device');
 		// The email is kept on the device for the login page to pre-fill, never
 		// put in the URL.

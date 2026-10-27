@@ -976,7 +976,7 @@ Lines kept on purpose:
 ## Naming
 
 A daydream's `title` is empty until it has a name. Everywhere one is shown
-— the list, the story's heading, the home card — goes through
+— the list, the story's heading, Today's card — goes through
 `daydreamTitle`, which falls back to the idea's title, so an unnamed
 daydream is never blank.
 

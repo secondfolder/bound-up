@@ -93,7 +93,8 @@ no loss: a tap opens the thread, where the name is.
   open the board at `?thread=` and ring a never-opened thread there, which a
   board that follows the context can no longer promise to show. Links in
   notifications already delivered to the old `/partner/<id>/messages` 404,
-  and the error page links back to the board. The service worker refuses to
+  and the error page links back into the app. A notification with no link
+  of its own, and the service worker's fallback, open `/today`. The service worker refuses to
   navigate off the app's own origin whatever a payload says.
 - `TTL` is a day: long enough for a phone off overnight, short enough that a
   week away does not end in a pile of stale banners.

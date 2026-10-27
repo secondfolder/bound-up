@@ -41,7 +41,7 @@ test.describe('partner-assisted sign-in', () => {
 
 			// Ada's device holds her own vault in escrow with Jun once it sees the
 			// partnership. That escrow is what brings it back later.
-			await ada.page.goto('/home');
+			await ada.page.goto('/today');
 			await waitForKeyring(ada.page);
 			const ownVault = async () => {
 				const { rows } = await sql(
@@ -58,7 +58,6 @@ test.describe('partner-assisted sign-in', () => {
 			await expect.poll(async () => (await ownVault())?.escrowId ?? null).not.toBeNull();
 			const before = await ownVault();
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, ada.who.name);
 			await writeThread(jun.page, secret);
 			const threadPath = new URL(jun.page.url()).pathname;
@@ -81,7 +80,7 @@ test.describe('partner-assisted sign-in', () => {
 			const code = await requesterCode.textContent();
 
 			// ── Jun, wherever they happen to be ────────────────────────────────
-			await jun.page.goto('/home');
+			await jun.page.goto('/today');
 			await expect(jun.page.getByTestId('help-request')).toContainText(
 				`${ada.who.name} can't sign in and asked for your help`
 			);
@@ -116,7 +115,7 @@ test.describe('partner-assisted sign-in', () => {
 			await inbox.close();
 
 			// ── Ada is let in, with the history readable ───────────────────────
-			await requester.waitForURL('/home', { timeout: 20_000 });
+			await requester.waitForURL('/today', { timeout: 20_000 });
 			// Landing is not the end of signing in: going on before the shell has
 			// cached the key throws it away, and against the image's fast redirect
 			// the Security page was sent back to sign in every time.
@@ -139,7 +138,7 @@ test.describe('partner-assisted sign-in', () => {
 				.toEqual([true, 1, true]);
 
 			// ── and the lost device is signed out ──────────────────────────────
-			await ada.page.goto('/home');
+			await ada.page.goto('/today');
 			await ada.page.waitForURL((url) => url.pathname === '/login');
 
 			// Jun can still write to her: the new key was vouched for, not "changed".
@@ -170,7 +169,7 @@ test.describe('partner-assisted sign-in', () => {
 			await clickWaButton(requester, 'Ask my partner');
 			await expect(requester.locator('.safety .number')).toBeVisible({ timeout: 15_000 });
 
-			await jun.page.goto('/home');
+			await jun.page.goto('/today');
 			await jun.page.getByRole('link', { name: `Help ${ada.who.name} sign in` }).click();
 			await clickWaButton(jun.page, "It doesn't match");
 
@@ -178,8 +177,8 @@ test.describe('partner-assisted sign-in', () => {
 				timeout: 15_000
 			});
 			// Nothing changed: Ada's own session still works.
-			await ada.page.goto('/home');
-			expect(new URL(ada.page.url()).pathname).toBe('/home');
+			await ada.page.goto('/today');
+			expect(new URL(ada.page.url()).pathname).toBe('/today');
 		} finally {
 			await fresh.close();
 			await ada.close();
@@ -236,7 +235,7 @@ test.describe('partner-assisted sign-in', () => {
 			await scanner.close();
 
 			// Jun approves; the request still cannot finish.
-			await jun.page.goto('/home');
+			await jun.page.goto('/today');
 			await jun.page.getByRole('link', { name: `Help ${ada.who.name} sign in` }).click();
 			await clickWaButton(jun.page, 'The code matches — help them');
 			await expect(requester.getByText('Your partner confirmed it is you.')).toBeVisible({
@@ -245,8 +244,8 @@ test.describe('partner-assisted sign-in', () => {
 			await expect(requester.getByText(/We've emailed a link/)).toBeVisible();
 			expect(new URL(requester.url()).pathname).toBe('/login/recover');
 			// And Ada's old session is untouched.
-			await ada.page.goto('/home');
-			expect(new URL(ada.page.url()).pathname).toBe('/home');
+			await ada.page.goto('/today');
+			expect(new URL(ada.page.url()).pathname).toBe('/today');
 		} finally {
 			await fresh.close();
 			await ada.close();

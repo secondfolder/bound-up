@@ -33,7 +33,7 @@
 
 <style>
 	/* The app shell's <main> is the full-width scroll container, so the page
-	   carries its own column, as /home/guides does. */
+	   carries its own column, as /guides does. */
 	.page {
 		max-width: var(--page-width);
 		margin-inline: auto;

@@ -356,8 +356,7 @@ test.describe('with a partner', () => {
 		const jun = await newSide(browser, 'Jun');
 		try {
 			await newAccounts(ada, jun);
-			await linkAccounts(ada, jun);
-			const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
+			const partnershipId = await linkAccounts(ada, jun);
 			const partnerList = `/playroom/kink-list/partner/${partnershipId}`;
 
 			// Ada's own list: spanking Like, caning a hard limit.
@@ -433,8 +432,7 @@ test('a partner view starts you on your own list before offering to share it', a
 	const jun = await newSide(browser, 'Jun');
 	try {
 		await newAccounts(ada, jun);
-		await linkAccounts(ada, jun);
-		const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
+		const partnershipId = await linkAccounts(ada, jun);
 		await ada.page.goto(`/playroom/kink-list/partner/${partnershipId}`);
 		await waitForHydration(ada.page);
 		await expect(ada.page.getByText('Start your own kink list first.')).toBeVisible();
@@ -504,8 +502,7 @@ test('a partner view starts on the side who is in control puts you on', async ({
 	try {
 		await newAccounts(ada, jun);
 		// Ada is in control: with Jun, she is on the dom side.
-		await linkAccounts(ada, jun, 'me');
-		const partnershipId = new URL(jun.page.url()).pathname.split('/').at(-1) ?? '';
+		const partnershipId = await linkAccounts(ada, jun, 'me');
 		await openList(ada.page);
 		await answer(ada.page, 'Spanking, giving', 'Like');
 		await saved(ada.page);

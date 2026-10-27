@@ -51,14 +51,14 @@ unique on `(user_id, feature)`:
 
 **On the server, in every load and every action that serves the feature**, with
 `requireFeature(db, userId, feature)`, which throws a 403 naming the feature.
-It runs before anything is read — on `/home/guides/[id]` that means a made-up
+It runs before anything is read — on `/guides/[id]` that means a made-up
 id is a 403 too, so the 404 cannot be used to find out which ids are real.
 
 The app shell layout also returns `features` (and `isAdmin`) as page data.
 **That list decides what is shown, never what is allowed.** Loads run in
 parallel, so a page cannot count on the layout having run, and a form action
-runs before any load at all. The `/home` load uses it to decide whether to run
-the guides card's query; `/home/guides` still checks for itself.
+runs before any load at all. Today's load uses it to decide whether to run
+the guides card's query; `/guides` still checks for itself.
 
 Features are read from the database on every request, so a grant or a revoke
 applies on the next page load.
@@ -77,8 +77,8 @@ person has it. Sharing within a partnership would be a second check alongside
 
 ### Guides
 
-`/home/guides` and `/home/guides/[id]` require `guides`. The `/home` Guides card
-shows only when the account holds it — see
+`/guides` and `/guides/[id]` require `guides`. Today's Guides card (in
+Everyone and Me) shows only when the account holds it — see
 [section-widgets.md](section-widgets.md).
 
 ### Permanent media
@@ -133,7 +133,7 @@ characters or a narrator, whose passages are written by a hosted language
 model (see
 [daydreams.md](daydreams.md)). Every load, action and endpoint under
 `/daydreams` and `/api/daydreams` calls `requireFeature` itself, and the
-`/home` load reads the Daydreams card only for an account that holds it.
+Today load reads the Daydreams card only for an account that holds it.
 
 It is a grant rather than on for everyone for two reasons that are not about
 testing: every reply is paid for on the server's OpenRouter key, and using it

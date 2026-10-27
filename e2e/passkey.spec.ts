@@ -242,7 +242,7 @@ test.describe('signing in with a passkey', () => {
 				await page.goto('/login');
 				await signInWithPasskeyHere(page);
 				// With nowhere else to go, the same default as a password sign-in.
-				await page.waitForURL('/home');
+				await page.waitForURL('/today');
 				expect(await deviceHoldsKey(page)).toBe(true);
 			} finally {
 				await authenticator.forget();
@@ -311,7 +311,6 @@ test.describe('signing in with a passkey', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, ada.who.name);
 			await writeThread(jun.page, secret);
 			const threadPath = new URL(jun.page.url()).pathname;
@@ -346,7 +345,6 @@ test.describe('the messages screens without a key', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, jun.who.name);
 			await writeThread(ada.page, secret);
 			const threadPath = new URL(ada.page.url()).pathname;

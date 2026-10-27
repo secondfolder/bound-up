@@ -41,6 +41,6 @@ export function safeRedirect(value: string | null | undefined): string | null {
 }
 
 /** `next` if it is safe, otherwise the signed-in landing page. */
-export function redirectTargetOrHome(value: string | null | undefined): string {
-	return safeRedirect(value) ?? '/home';
+export function redirectTargetOrToday(value: string | null | undefined): string {
+	return safeRedirect(value) ?? '/today';
 }

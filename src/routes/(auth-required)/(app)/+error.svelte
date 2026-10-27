@@ -8,15 +8,7 @@
 	// link and the button are the way out that SvelteKit's bare error page did
 	// not have (see docs/request-failures.md).
 	const copy = $derived(errorCopy(page.status));
-	const partnerId = $derived(page.params.id);
 	const back = $derived.by(() => {
-		if (partnerId && page.route.id?.startsWith('/(auth-required)/(app)/partner/')) {
-			return {
-				href: resolve('/(auth-required)/(app)/partner/[id]', { id: partnerId }),
-				text: 'Back',
-				label: 'Back to your partner'
-			};
-		}
 		// A thread that is gone, or not yours (an old notification's, say): the
 		// board, which shows whatever context this device is in.
 		if (page.route.id?.startsWith('/(auth-required)/(app)/messages/')) {
@@ -26,7 +18,9 @@
 				label: 'Back to messages'
 			};
 		}
-		return { href: resolve('/(auth-required)/(app)/home'), text: 'Home', label: 'Back to home' };
+		// Anything else. (An old /partner/… or /home/… link matches no route
+		// any more, so it gets the root error page, outside the shell.)
+		return { href: resolve('/(auth-required)/(app)/today'), text: 'Today', label: 'Back to Today' };
 	});
 </script>
 

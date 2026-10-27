@@ -368,9 +368,9 @@
 
 <section class="page">
 	<NestedPageHeader
-		backHref={resolve('/(auth-required)/(app)/home')}
-		backLabel="Back to home"
-		backText="Home"
+		backHref={resolve('/(auth-required)/(app)/today')}
+		backLabel="Back to Today"
+		backText="Today"
 		title="Messages"
 		{description}
 	>
@@ -467,7 +467,7 @@
 
 			{#if sendable.length > 0}
 				<div class="new">
-					<!-- "Write something" rather than "New message": /home already has
+					<!-- "Write something" rather than "New message": Today already has
 					     a "new messages from …" link, and two controls must not share an
 					     accessible name. Named by its icon's label, which is what reaches
 					     the inner <button>. A pen, not the paper plane it used to be: a

@@ -58,7 +58,7 @@ test.describe('the password never leaves the browser', () => {
 		});
 
 		await signUp(page, who);
-		await page.waitForURL('**/home');
+		await page.waitForURL('**/today');
 
 		expect(bodies.length).toBeGreaterThan(0);
 		const posted = bodies.join('\n');
@@ -86,7 +86,7 @@ test.describe('the password never leaves the browser', () => {
 		});
 
 		await logIn(page, who);
-		await page.waitForURL('**/home');
+		await page.waitForURL('**/today');
 
 		const posted = bodies.join('\n');
 		expect(posted).not.toContain(who.password);
@@ -122,7 +122,7 @@ test.describe('what signing up stores', () => {
 	test('stores a public recipient and one sealed wrap', async ({ page }) => {
 		const who = account('Xanthe');
 		await signUp(page, who);
-		await page.waitForURL('**/home');
+		await page.waitForURL('**/today');
 
 		const keys = await sql(
 			`select k.recipient
@@ -312,7 +312,7 @@ test.describe('password manager autofill', () => {
 
 		await submitEnhancedForm(page, 'Sign up');
 		await finishSignUp(page, who);
-		await expect(page).toHaveURL(/\/home$/);
+		await expect(page).toHaveURL(/\/today$/);
 		await expect(page.getByText(/at least 12 characters/)).toBeHidden();
 	});
 
@@ -328,7 +328,7 @@ test.describe('password manager autofill', () => {
 		await autofillPassword(page, 'password', who.password);
 		await submitEnhancedForm(page, LOG_IN_BUTTON);
 
-		await expect(page).toHaveURL(/\/home$/);
+		await expect(page).toHaveURL(/\/today$/);
 	});
 
 	/**
@@ -348,7 +348,7 @@ test.describe('password manager autofill', () => {
 
 		await submitEnhancedForm(page, 'Sign up');
 		await finishSignUp(page, who);
-		await expect(page).toHaveURL(/\/home$/);
+		await expect(page).toHaveURL(/\/today$/);
 	});
 });
 
@@ -390,7 +390,7 @@ test.describe('signing in is what unlocks', () => {
 	}) => {
 		const who = account('Cleo');
 		await signUp(page, who);
-		await page.waitForURL('**/home');
+		await page.waitForURL('**/today');
 
 		await evictKeyStorage(page);
 		await page.goto('/tasks');
@@ -551,10 +551,10 @@ test.describe('asking the browser to keep the key', () => {
 	/** What eviction costs: the key goes, and the next page load signs in again. */
 	async function evictAndSignIn(page: import('@playwright/test').Page, who: Account) {
 		await evictKeyStorage(page);
-		await page.goto('/home');
-		await expectSentToSignIn(page, '/home');
+		await page.goto('/today');
+		await expectSentToSignIn(page, '/today');
 		await logInHere(page, who);
-		await page.waitForURL('/home');
+		await page.waitForURL('/today');
 	}
 
 	test('explains after a sign-in the browser forced, and asks only on OK', async ({ browser }) => {
@@ -563,7 +563,7 @@ test.describe('asking the browser to keep the key', () => {
 		try {
 			const page = await context.newPage();
 			await signUp(page, who);
-			await page.waitForURL('**/home');
+			await page.waitForURL('**/today');
 
 			// An ordinary sign-in: no explanation, and nothing asked.
 			expect(await deviceHoldsKey(page)).toBe(true);
@@ -599,7 +599,7 @@ test.describe('asking the browser to keep the key', () => {
 		try {
 			const page = await context.newPage();
 			await signUp(page, who);
-			await page.waitForURL('**/home');
+			await page.waitForURL('**/today');
 
 			await evictAndSignIn(page, who);
 			await expect(explanation(page)).toBeVisible();

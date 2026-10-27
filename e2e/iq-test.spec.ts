@@ -1408,14 +1408,14 @@ test.describe('IQ test', () => {
 		await page.keyboard.press('Escape');
 		await expect(page.getByTestId('iq-history').locator('li')).toHaveCount(1);
 
-		// And the /home card shows it.
-		await page.goto('/home');
+		// And Today's card shows it.
+		await page.goto('/today');
 		await expect(page.getByText(/Last IQ test: \d+/)).toBeVisible();
 	});
 
-	test('is reached from the Playroom card on /home', async ({ page }) => {
+	test('is reached from the Playroom card on Today', async ({ page }) => {
 		await newAccount(page, account('Player'));
-		await page.goto('/home');
+		await page.goto('/today');
 		await waitForHydration(page);
 		await page.getByRole('link', { name: 'Playroom' }).click();
 		await page.waitForURL('**/playroom');

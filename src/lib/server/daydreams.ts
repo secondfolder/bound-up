@@ -186,7 +186,7 @@ export async function listDaydreams(db: Db, userId: string): Promise<DaydreamLis
 	return rows.map(toListItem);
 }
 
-/** The /home card: the top of the same list, limited in SQL, and how many there are in all. */
+/** Today's card: the top of the same list, limited in SQL, and how many there are in all. */
 export async function getDaydreamsWidget(
 	db: Db,
 	userId: string,

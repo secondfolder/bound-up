@@ -1,19 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/svelte';
-import { testPartnerView } from '$lib/testing/names';
 import { waSettled } from '$lib/testing/web-awesome';
-import type { PartnerView } from '$lib/types';
-
-// Titles and names are sealed; these open them by record id (sealed-refs.ts).
-vi.mock('$lib/crypto/sealed', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/crypto/sealed')>()),
-	openRecord: (await import('$lib/testing/sealed-refs')).openTestRecord
-}));
-vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/crypto/vaults.svelte')>()),
-	vaultById: (id: string) => ({ id })
-}));
 
 /**
  * `$app/state` is a live store fed by the router, and `resolve()` needs the
@@ -21,7 +9,7 @@ vi.mock('$lib/crypto/vaults.svelte', async (importOriginal) => ({
  * are mocked so the test is about what the nav decides, not about SvelteKit.
  */
 const pageState = {
-	route: { id: '/(auth-required)/(app)/home' },
+	route: { id: '/(auth-required)/(app)/today' },
 	params: {} as Record<string, string>
 };
 
@@ -34,94 +22,66 @@ vi.mock('$app/paths', () => import('$lib/testing/app-paths'));
 
 const { default: AppNav } = await import('./AppNav.svelte');
 
-const partners: PartnerView[] = [
-	// Sealed names, which the mocks above open by record id: a component test
-	// has no vault of its own.
-	testPartnerView('p-ada', 'Ada'),
-	testPartnerView('p-jun', 'Jun', '/jun.png')
-];
-
 function renderNav(routeId: string, params: Record<string, string> = {}) {
 	pageState.route.id = routeId;
 	pageState.params = params;
-	return render(AppNav, { partners });
+	return render(AppNav, {});
+}
+
+/** The labels of the tabs that are lit: one, or none. */
+function lit(): string[] {
+	return screen
+		.getAllByRole('link')
+		.filter((link) => link.getAttribute('aria-current') === 'page')
+		.map((link) => link.textContent?.trim() ?? '');
 }
 
 describe('AppNav', () => {
-	it('renders one tab per partner, between Home and Settings', async () => {
-		renderNav('/(auth-required)/(app)/home');
-
-		// The names are sealed, so a tab says "…" until they have opened.
-		await vi.waitFor(() => {
-			const labels = screen.getAllByRole('link').map((link) => link.textContent?.trim());
-			expect(labels).toEqual(['Home', 'Ada', 'Jun', 'Settings']);
-		});
+	it('has exactly the five places, in order, and no tab per partner', () => {
+		renderNav('/(auth-required)/(app)/today');
+		const labels = screen.getAllByRole('link').map((link) => link.textContent?.trim());
+		expect(labels).toEqual(['Today', 'Tasks', 'Notebook', 'Messages', 'Settings']);
 	});
 
-	it('renders no partner tabs when there are none', () => {
-		pageState.route.id = '/(auth-required)/(app)/home';
-		render(AppNav, { partners: [] });
-		expect(screen.getAllByRole('link')).toHaveLength(2);
+	it('links each tab to its place', () => {
+		renderNav('/(auth-required)/(app)/today');
+		const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+		expect(hrefs).toEqual([
+			'/(auth-required)/(app)/today',
+			'/(auth-required)/(app)/tasks',
+			'/(auth-required)/(app)/notebook',
+			'/(auth-required)/(app)/messages',
+			'/(auth-required)/(app)/settings'
+		]);
 	});
 
-	it('links each tab by partnership id', () => {
-		renderNav('/(auth-required)/(app)/home');
-		expect(screen.getByRole('link', { name: /Ada/ })).toHaveAttribute(
-			'href',
-			'/(auth-required)/(app)/partner/p-ada'
-		);
-	});
-
-	it('marks Home current on a child route, not just the index', () => {
-		// Both tabs own child routes, which is why the check is a prefix match.
-		renderNav('/(auth-required)/(app)/home/guides/[id]', { id: 'g1' });
-		expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
-	});
-
-	it('marks Settings current inside the partners screens', () => {
-		renderNav('/(auth-required)/(app)/settings/partners/[id]', { id: 'p-ada' });
-		expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
-		// The partner tab must NOT light up just because a partner id is in the
-		// params — the settings screens are not the partner page.
-		expect(screen.getByRole('link', { name: /Ada/ })).not.toHaveAttribute('aria-current');
-	});
-
-	it('marks Settings current inside admin and debug, which are reached from it', () => {
-		for (const routeId of [
-			'/(auth-required)/(app)/admin/users/[id]',
-			'/(auth-required)/(app)/debug/prompts'
-		]) {
-			const { unmount } = renderNav(routeId, { id: 'u1' });
-			expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute(
-				'aria-current',
-				'page'
-			);
-			expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
-			unmount();
-		}
-	});
-
-	it('marks only the partner whose page is open', () => {
-		renderNav('/(auth-required)/(app)/partner/[id]', { id: 'p-jun' });
-		expect(screen.getByRole('link', { name: /Jun/ })).toHaveAttribute('aria-current', 'page');
-		expect(screen.getByRole('link', { name: /Ada/ })).not.toHaveAttribute('aria-current');
-		expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
-	});
-
-	it('falls back to initials when a partner has no picture', async () => {
-		const { container } = renderNav('/(auth-required)/(app)/home');
-		await waSettled(container);
-		const [ada, jun] = [...container.querySelectorAll('wa-avatar')];
-
-		// What the avatar actually draws. An empty image="" would render as a
-		// broken image, so for Ada the image is left off and the initials show.
-		expect(ada.shadowRoot?.querySelector('img')).toBeNull();
-		expect(ada.shadowRoot?.textContent).toContain('A');
-		expect(jun.shadowRoot?.querySelector('img')?.getAttribute('src')).toBe('/jun.png');
+	it.each([
+		['/(auth-required)/(app)/today', 'Today'],
+		// Reached from Today's cards, with no tab of their own.
+		['/(auth-required)/(app)/guides/[id]', 'Today'],
+		['/(auth-required)/(app)/daydreams/[id]', 'Today'],
+		['/(auth-required)/(app)/playroom/kink-list/partner/[partnershipId]', 'Today'],
+		['/(auth-required)/(app)/tasks', 'Tasks'],
+		['/(auth-required)/(app)/tasks/[taskId]', 'Tasks'],
+		// Rewards are a tab inside Tasks.
+		['/(auth-required)/(app)/rewards', 'Tasks'],
+		['/(auth-required)/(app)/rewards/history', 'Tasks'],
+		['/(auth-required)/(app)/notebook', 'Notebook'],
+		['/(auth-required)/(app)/notebook/[entryId]', 'Notebook'],
+		['/(auth-required)/(app)/messages', 'Messages'],
+		['/(auth-required)/(app)/messages/[threadId]', 'Messages'],
+		['/(auth-required)/(app)/settings', 'Settings'],
+		['/(auth-required)/(app)/settings/partners/[id]', 'Settings'],
+		// Reached from Settings, likewise.
+		['/(auth-required)/(app)/admin/users/[id]', 'Settings'],
+		['/(auth-required)/(app)/debug/prompts', 'Settings']
+	])('lights the right tab on %s', (routeId, tab) => {
+		renderNav(routeId, { id: 'x' });
+		expect(lit()).toEqual([tab]);
 	});
 
 	it('bunches the tabs in the middle, at least 1em apart', async () => {
-		const { container } = renderNav('/(auth-required)/(app)/home');
+		const { container } = renderNav('/(auth-required)/(app)/today');
 		await waSettled(container);
 		const nav = container.querySelector('nav');
 		const links = screen.getAllByRole('link');
@@ -144,13 +104,13 @@ describe('AppNav', () => {
 	});
 
 	it('has no debug toggle for an account without debug mode', () => {
-		renderNav('/(auth-required)/(app)/home');
+		renderNav('/(auth-required)/(app)/today');
 		expect(screen.queryByRole('button', { name: 'Debug mode' })).not.toBeInTheDocument();
 	});
 
 	it('offers the debug toggle, hidden until hovered while off and shown while on', () => {
-		pageState.route.id = '/(auth-required)/(app)/home';
-		const off = render(AppNav, { partners, debugAvailable: true, debugOn: false });
+		pageState.route.id = '/(auth-required)/(app)/today';
+		const off = render(AppNav, { debugAvailable: true, debugOn: false });
 		const toggle = screen.getByRole('button', { name: 'Debug mode' });
 		expect(toggle).toHaveAttribute('aria-pressed', 'false');
 		expect(getComputedStyle(toggle).opacity).toBe('0');
@@ -158,7 +118,7 @@ describe('AppNav', () => {
 		expect(off.container.querySelector('input[name="on"]')).toHaveValue('true');
 		off.unmount();
 
-		const on = render(AppNav, { partners, debugAvailable: true, debugOn: true });
+		const on = render(AppNav, { debugAvailable: true, debugOn: true });
 		const shown = screen.getByRole('button', { name: 'Debug mode' });
 		expect(shown).toHaveAttribute('aria-pressed', 'true');
 		expect(getComputedStyle(shown).opacity).toBe('1');

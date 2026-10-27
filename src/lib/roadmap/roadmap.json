@@ -910,6 +910,14 @@
 					"icon": "table-cells-large"
 				},
 				{
+					"id": "today-everyone-or-one",
+					"title": "Today, for everyone or just one of you",
+					"summary": "One front page and five tabs, showing everyone's things, just yours, or one partner's at a tap.",
+					"status": "shipped",
+					"shippedOn": "2026-10-28",
+					"icon": "house"
+				},
+				{
 					"id": "add-to-home-screen",
 					"title": "Add to home screen",
 					"summary": "A hint showing how to install the app on your phone.",
@@ -962,7 +970,7 @@
 				{
 					"id": "home-sections",
 					"title": "Home screen sections",
-					"summary": "Choose what your home screen and partner page show.",
+					"summary": "Choose what Today shows, for everyone and for each partner.",
 					"status": "planned",
 					"icon": "grip",
 					"children": [

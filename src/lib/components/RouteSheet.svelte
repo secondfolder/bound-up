@@ -4,7 +4,7 @@
 	import ResponsiveDialog from '$lib/components/ResponsiveDialog.svelte';
 
 	/**
-	 * A page that is a sheet over its list: `/home/tasks/add` is the task list
+	 * A page that is a sheet over its list: `/tasks/add` is the task list
 	 * with the add form open over it, and reloading it, or opening it from a
 	 * link, shows exactly that. The list is the route's `+layout.svelte`, so it
 	 * stays put underneath; this is the child route's whole page. See

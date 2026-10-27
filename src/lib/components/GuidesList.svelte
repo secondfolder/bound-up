@@ -10,7 +10,7 @@
 <ul>
 	{#each guides as guide (guide.id)}
 		<li>
-			<a href={resolve('/(auth-required)/(app)/home/guides/[id]', { id: guide.id })}>
+			<a href={resolve('/(auth-required)/(app)/guides/[id]', { id: guide.id })}>
 				<wa-icon name="book-open" variant="solid"></wa-icon>
 				<span class="title">{guide.title}</span>
 				<wa-icon class="go" name="chevron-right" variant="solid"></wa-icon>

@@ -219,7 +219,6 @@ test.describe('tapping a message notification', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'look what I found');
 			const thread = new URL(ada.page.url()).pathname.split('/').at(-1) ?? '';
@@ -256,7 +255,6 @@ test.describe('tapping a message notification', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'look what I found');
 			const thread = new URL(ada.page.url()).pathname.split('/').at(-1) ?? '';
@@ -304,9 +302,7 @@ test.describe('in-app notices while watching', () => {
 		try {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 
 			await writeThread(jun.page, 'look up');
@@ -328,14 +324,12 @@ test.describe('in-app notices while watching', () => {
 		try {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await writeThread(jun.page, 'first thread');
 			const first = threadIdOf(jun.page.url());
 			const firstUrl = new URL(jun.page.url()).pathname;
 
 			// Ada reads the first thread, and stays in it.
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await ada.page.locator(`a[href$="${first}"]`).click();
 			await expect(ada.page.getByText('first thread')).toBeVisible();

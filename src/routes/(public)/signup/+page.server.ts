@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// See the note in the login load: this is how an invite survives signup.
 	const redirectTo = safeRedirect(url.searchParams.get('redirectTo'));
 	if (locals.user) {
-		redirect(303, redirectTo ?? '/home');
+		redirect(303, redirectTo ?? '/today');
 	}
 	return { signupForm: await superValidate(zod4(signupFormSchema)), redirectTo };
 };

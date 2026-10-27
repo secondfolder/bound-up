@@ -20,6 +20,7 @@ import {
 	scrollShellTo,
 	settle,
 	shellScroll,
+	showContext,
 	typeRichText,
 	writeThread
 } from './helpers';
@@ -46,7 +47,6 @@ test.describe('a message between partners', () => {
 			await linkAccounts(ada, jun);
 
 			// ── Ada writes ──────────────────────────────────────────────────────
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await expect(ada.page.getByText(/Nothing here yet/)).toBeVisible();
 
@@ -55,7 +55,7 @@ test.describe('a message between partners', () => {
 			await expect(ada.page.getByText(secret)).toBeVisible();
 
 			// ── Jun is told ─────────────────────────────────────────────────────
-			await jun.page.goto('/home');
+			await jun.page.goto('/today');
 			const link = jun.page.getByRole('link', { name: /1 new message from Ada/ });
 			await expect(link).toBeVisible();
 
@@ -77,7 +77,11 @@ test.describe('a message between partners', () => {
 			await expect(jun.page.getByText(secret)).toBeVisible();
 
 			// ── and it is no longer unread ──────────────────────────────────────
-			await jun.page.goto('/home');
+			// In Everyone, where the unread rows are: following one set Jun's
+			// context to the partnership on the way to the board.
+			await showContext(jun.page, 'all');
+			await jun.page.goto('/today');
+			await expect(jun.page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
 			await expect(jun.page.getByRole('link', { name: /new message from Ada/ })).toBeHidden();
 		} finally {
 			await ada.close();
@@ -104,7 +108,6 @@ test.describe('a message between partners', () => {
 				}
 			});
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, secret);
 
@@ -129,12 +132,10 @@ test.describe('a thread', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'are you free tonight');
 
 			// Jun opens the thread and replies.
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -177,7 +178,6 @@ test.describe('a short thread', () => {
 		try {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'one line');
 			await expect(ada.page.locator('.messages > li')).toHaveCount(1);
@@ -208,7 +208,6 @@ test.describe('opening a thread', () => {
 			await linkAccounts(ada, jun);
 
 			const long = 'Something long enough to wrap over several lines of the thread. '.repeat(5);
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, `The oldest unread. ${long}`);
 			for (let at = 0; at < 5; at += 1) {
@@ -216,7 +215,6 @@ test.describe('opening a thread', () => {
 			}
 
 			await jun.page.setViewportSize({ width: 400, height: 600 });
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('list', { name: 'Unread' }).getByRole('link').first().click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -256,13 +254,11 @@ test.describe('the board', () => {
 			await linkAccounts(ada, jun);
 
 			// Two threads from Ada, in order.
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'the first one');
 			await ada.page.goBack();
 			await writeThread(ada.page, 'the second one');
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 
 			// Both unread, newest at the top, and no seam yet.
@@ -322,11 +318,9 @@ test.describe('the board', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'just looking');
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			const threadData: string[] = [];
 			jun.page.on('request', (request) => {
@@ -339,8 +333,8 @@ test.describe('the board', () => {
 				.getByRole('list', { name: 'Unread' })
 				.getByRole('link', { name: /^Unread message/ });
 			await sticker.hover();
-			const control = jun.page.waitForRequest(/\/home\/__data\.json/);
-			await jun.page.getByRole('link', { name: 'Back to home' }).hover();
+			const control = jun.page.waitForRequest(/\/today\/__data\.json/);
+			await jun.page.getByRole('link', { name: 'Back to Today' }).hover();
 			await control;
 			expect(threadData).toEqual([]);
 
@@ -368,7 +362,6 @@ test.describe('the board', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			const shell = ada.page.locator('wa-dialog.composer-dialog');
 			await expect(shell).toHaveCount(0);
@@ -477,13 +470,11 @@ test.describe('live updates', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'thinking about you');
 			// Ada is now sitting on the thread she just wrote, and stays there.
 			const adaThreadUrl = ada.page.url();
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -533,7 +524,6 @@ test.describe('live updates', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			const long = 'a message long enough to wrap over several lines of the thread, '.repeat(3);
 			await writeThread(ada.page, `1 ${long}`);
@@ -583,7 +573,6 @@ test.describe('live updates', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await writeThread(ada.page, 'thinking about you');
 			const message = (text: string) => ada.page.locator('ul.messages > li', { hasText: text });
@@ -591,7 +580,6 @@ test.describe('live updates', () => {
 			await expect(message('thinking about you')).toBeVisible();
 			await expect(seen).toHaveCount(0);
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -622,9 +610,7 @@ test.describe('live updates', () => {
 			await linkAccounts(ada, jun);
 
 			// Both get past the one-time warning, then Ada waits on her board.
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			const adaBoardUrl = ada.page.url();
 			await expect(ada.page.getByRole('link', { name: /message/ })).toHaveCount(0);
@@ -664,7 +650,6 @@ test.describe('attachments', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await expect(ada.page.locator('wa-dialog.composer-dialog')).toHaveCount(0);
 			await clickWaButton(ada.page, 'Write something');
@@ -702,7 +687,6 @@ test.describe('attachments', () => {
 
 			// Jun reads it and the decrypted image renders from a blob: URL, which
 			// is the proof it was decrypted in the browser rather than served.
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -728,7 +712,6 @@ test.describe('attachments', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await clickWaButton(ada.page, 'Write something');
 			await fillRichText(ada.page, 'look at these');
@@ -833,7 +816,6 @@ test.describe('attachments', () => {
 				}
 			});
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await expect(ada.page.locator('wa-dialog.composer-dialog')).toHaveCount(0);
 			await clickWaButton(ada.page, 'Write something');
@@ -900,7 +882,6 @@ test.describe('attachments', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await clickWaButton(ada.page, 'Write something');
 			// No choice to make until there is a file to make it for.
@@ -923,7 +904,6 @@ test.describe('attachments', () => {
 			await expect(ada.page.getByText('in 1 hour', { exact: true })).toBeVisible();
 
 			// Jun reads it, with the countdown over it.
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -1006,7 +986,6 @@ test.describe('attachments', () => {
 
 			/** Opens the self-destruct menu with a file attached, and returns its trigger. */
 			const openPicker = async (page: Page, partner: string) => {
-				await page.goto('/home');
 				await openBoard(page, partner);
 				await clickWaButton(page, 'Write something');
 				await page
@@ -1121,7 +1100,6 @@ test.describe('attachments', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await clickWaButton(ada.page, 'Write something');
 			await ada.page
@@ -1133,7 +1111,6 @@ test.describe('attachments', () => {
 			await clickWaButton(ada.page, 'Send');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -1166,7 +1143,6 @@ test.describe('attachments', () => {
 				[randomUUID(), ada.who.email]
 			);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await clickWaButton(ada.page, 'Write something');
 			await ada.page
@@ -1192,7 +1168,6 @@ test.describe('attachments', () => {
 			await clickWaButton(ada.page, 'Send');
 			await ada.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
 
-			await jun.page.goto('/home');
 			await openBoard(jun.page, 'Ada');
 			await jun.page.getByRole('link', { name: /^Unread message/ }).click();
 			await jun.page.waitForURL(/\/messages\/[0-9a-f-]{36}$/);
@@ -1218,7 +1193,6 @@ test.describe('attachments', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			// Ada's one partnership, which the board was opened in.
 			const partnershipId = (await ada.page.context().cookies()).find(
@@ -1251,7 +1225,6 @@ test.describe('thread tags', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 
 			await clickWaButton(ada.page, 'Write something');
@@ -1322,7 +1295,6 @@ test.describe('thread tags', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			const board = new URL(ada.page.url()).pathname;
 			const composer = ada.page.getByLabel('Message to Jun');
@@ -1398,7 +1370,6 @@ test.describe('embeds', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			// Every supported URL in a body embeds, so both can share one message.
 			await writeThread(
@@ -1463,7 +1434,6 @@ test.describe('embeds', () => {
 
 			// Narrowed only now: the invite round trip is not what is under test.
 			await ada.page.setViewportSize({ width: 390, height: 844 });
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			// The trailing word is load-bearing. An embed node is only inserted
 			// once the caret leaves its link, so a message that *ends* with the
@@ -1569,7 +1539,6 @@ test.describe('embeds', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await clickWaButton(ada.page, 'Write something');
 
@@ -1965,7 +1934,6 @@ test.describe('embeds', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			await clickWaButton(ada.page, 'Write something');
 
@@ -2098,7 +2066,6 @@ test.describe('drafts', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 			const board = ada.page.url();
 			await writeThread(ada.page, 'the first thread');
@@ -2184,7 +2151,6 @@ test.describe('drafts', () => {
 			await newAccounts(ada, jun);
 			await linkAccounts(ada, jun);
 
-			await ada.page.goto('/home');
 			await openBoard(ada.page, 'Jun');
 
 			const dialog = ada.page.locator('wa-dialog');

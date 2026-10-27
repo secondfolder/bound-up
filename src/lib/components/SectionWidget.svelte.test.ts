@@ -10,13 +10,13 @@ import SectionWidgetHarness from './SectionWidgetHarness.svelte';
  */
 describe('SectionWidget', () => {
 	it('links the title when it has somewhere to go', () => {
-		render(SectionWidgetHarness, { title: 'Tasks', href: '/home/tasks', body: 'two ready' });
+		render(SectionWidgetHarness, { title: 'Tasks', href: '/tasks', body: 'two ready' });
 
 		// The bare word, not "Tasks chevron-right": the chevron carries no label,
 		// so it contributes nothing. The e2e suite locates these cards by exactly
 		// this name, which the wa-buttons they replaced also had.
 		const link = screen.getByRole('link', { name: 'Tasks' });
-		expect(link).toHaveAttribute('href', '/home/tasks');
+		expect(link).toHaveAttribute('href', '/tasks');
 		expect(screen.getByRole('heading', { level: 2 })).toContainElement(link);
 	});
 

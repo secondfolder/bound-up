@@ -7,9 +7,11 @@
 
 	/**
 	 * The tasks card. `/tasks` shows whatever the context is, so following the
-	 * card switches to the context it previews first — Everyone on /home, the
-	 * partnership on its page — as the notebook's card does
-	 * (`followInContext`, docs/contexts.md).
+	 * card sets the context it previews first, as the notebook's card does
+	 * (`followInContext`, docs/contexts.md). On Today that is the page's own
+	 * context, but still not a no-op: another tab may have switched the
+	 * device since this one rendered, and the list should show what the card
+	 * did.
 	 */
 	let {
 		tasks,

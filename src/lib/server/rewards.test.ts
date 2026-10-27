@@ -872,7 +872,7 @@ describe('the rewards widget', () => {
 		});
 	});
 
-	/** The rewards half of the same bug: /home showed solo rewards only. */
+	/** The rewards half of the same bug: the Everyone card showed solo rewards only. */
 	it('merges rewards you can claim in a shared space with your own, naming whose is whose', async () => {
 		const shared = await partnership('them');
 		await setTestBalance(harness.db, adaSolo, ada, ada, 5);

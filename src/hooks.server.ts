@@ -120,8 +120,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = null;
 
 	// Cheap gate: skip the session lookup entirely for anonymous traffic. The
-	// public surface is now just /, /login and /signup — the guides moved under
-	// /home when the app shell landed, so they sit behind the group guard.
+	// public surface is small (/, /login, /signup, /roadmap and the Playroom's
+	// standalone tools); everything else sits behind the group guard.
 	if (getSessionCookie(event.request)) {
 		const result = await auth.api.getSession({ headers: event.request.headers });
 		if (result) {

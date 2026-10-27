@@ -15,11 +15,12 @@ export const load: LayoutServerLoad = async ({ locals, cookies, depends }) => {
 	// along with the page's own loads. See docs/contexts.md.
 	depends(CONTEXT_DEPENDENCY);
 
-	// Loaded in the layout rather than per page because the bottom nav renders
-	// one tab per partner on every screen in this group. The group's own guard
-	// has already run by the time a layout load does, so `locals.user` is set —
-	// but this narrows for TypeScript and degrades to an empty nav rather than
-	// throwing if that ever stops being true.
+	// Loaded in the layout rather than per page because every screen in this
+	// group needs the partners: the context switcher's names, the help
+	// callout, and Today's and the boards' per-partner rows. The group's own
+	// guard has already run by the time a layout load does, so `locals.user`
+	// is set — but this narrows for TypeScript and degrades to an empty shell
+	// rather than throwing if that ever stops being true.
 	if (!locals.user) {
 		return {
 			partners: [],

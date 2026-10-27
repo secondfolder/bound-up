@@ -99,9 +99,9 @@
 
 <section class="page">
 	<NestedPageHeader
-		backHref={resolve('/(auth-required)/(app)/home')}
-		backLabel="Back to home"
-		backText="Home"
+		backHref={resolve('/(auth-required)/(app)/today')}
+		backLabel="Back to Today"
+		backText="Today"
 		title="Rewards"
 		{description}
 	>

@@ -1,10 +1,16 @@
 # Section widgets
 
-`/home` and `/partner/[id]` are hubs: neither does anything itself, both send
-you somewhere else. They used to do that with a row of buttons, which told you a
-destination existed and nothing about whether it was worth opening. Each is now
-a row of **cards** — a header that links to the section, and a body that
-previews what is behind it.
+**Today** (`/today`) is the signed-in app's front page and a hub: it does
+nothing itself, it sends you somewhere else. It does that with a column of
+**cards** — a header that links to the section, and a body that previews what
+is behind it — rather than the row of buttons the first version had, which
+told you a destination existed and nothing about whether it was worth opening.
+
+Today follows the context ([contexts.md](contexts.md)): which cards it shows,
+and what they cover, is the switcher's choice. It replaced two pages, `/home`
+(now Today in Everyone) and the partner page `/partner/[id]` (now Today in that
+partnership's context); neither exists any more, except `/home` as a temporary
+redirect for old home-screen installs ([temporary-code.md](temporary-code.md#the-home-redirect)).
 
 ## The shape
 
@@ -17,55 +23,77 @@ SectionWidget            the card: wa-card, header, optional header link, body
 ├─ TasksWidget           tasks ready to complete now
 ├─ RewardsWidget         credit balance + rewards claimable now
 ├─ PartnerMessagesWidget unread / total threads for one partnership
-├─ UnreadMessagesWidget  one row per partner with unread — /home only
-└─ PlayroomWidget        the last IQ test score — /home only
+├─ UnreadMessagesWidget  one row per partner with unread — Everyone only
+└─ PlayroomWidget        the last IQ test score — Everyone and Me
 ```
 
 `SectionWidget` knows nothing about tasks, rewards or messages. The widgets know
 nothing about card chrome. `WidgetItems` renders the title-plus-note list that
 Guides, Tasks and Rewards all want, so that list exists once.
 
-| Page            | Cards                                                                                           |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| `/home`         | Messages (conditional), Guides (conditional), Daydreams (conditional), Tasks, Rewards, Notebook, Playroom |
-| `/partner/[id]` | Messages, Tasks, Rewards, Notebook, Kink lists (header only)                                              |
+| Context        | Cards                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------- |
+| Everyone       | Messages (conditional), Guides (conditional), Daydreams (conditional), Tasks, Rewards, Notebook, Playroom |
+| Me             | Tasks, Rewards, Notebook, Daydreams (conditional), Playroom, Guides (conditional)                          |
+| A partnership  | its header, then Messages, Tasks, Rewards, Notebook, Kink lists (header only)                             |
+
+The load (`(app)/today/+page.server.ts`) depends on `app:context` and returns
+`today`, a union on `kind` (`all`, `solo`, `shared`), so each context's data
+carries only its own cards. **Me carries nothing of a partner's at all** — no
+unread rows, no partnership's tasks, rewards or ids — not merely nothing
+shown: Me is what a screen shown to someone else can be left on, and load data
+is serialised into the page. A cookie naming a partnership that has since
+ended reads as Everyone, as every ambient context does.
 
 The Guides card shows **only to an account that holds the `guides` feature**
-(see [features-and-admin.md](features-and-admin.md)). The `/home` load reads
+(see [features-and-admin.md](features-and-admin.md)). The load reads
 `features` from the app shell layout and skips the guides query entirely
 otherwise — D1 charges for rows read by a card nobody sees — returning
-`guides: null`. That layout list only decides what is shown; `/home/guides`
+`guides: null`. That layout list only decides what is shown; `/guides`
 refuses an account without the feature by itself. The Daydreams card works
 the same way with the `daydreams` feature, returning `daydreams: null`
 without it; its titles are sealed, so `WidgetItems` opens them in the browser
 like a task's.
 
-On `/partner/[id]` the cards sit in the same `--card-column-width` column as
-on `/home`, so the one component is one width on both. Kink lists is a bare
-`SectionWidget`, header and no body: it has no summary worth a preview, and
-what it shows is sealed until its page opens it, but as a lone link under
-three cards it read as an afterthought. Connection settings stays a quiet link
-at the foot, since it is not a section of the relationship.
+The page's title row is an `h1` "Today" with the context switcher at its
+end, inset like `NestedPageHeader` but with no back link: this is where back
+goes. In a partnership's context a **header** sits above the cards: the
+partner's avatar in the colour the viewer gave them (`ContextAvatar`, the same
+initials and colour as the switcher), their name through `partnerName()` and
+"*your name*'s *their role*" through `viewerNames()` (sealed, "…" until the
+vault opens), their local time (`TimeZoneDisplay`, shown only when it differs
+from yours), and a quiet link to the partnership's settings page — "Edit this
+connection" or "Connection settings" by who may edit it. It is the old partner
+page's header, moved.
 
-Every `/home` card shows self **and** partner data wherever both exist — see
+The cards sit in one `--card-column-width` column in every context, so a
+component is one width everywhere. Kink lists is a bare `SectionWidget`, header
+and no body: it has no summary worth a preview, and what it shows is sealed
+until its page opens it, but as a lone link under four cards it read as an
+afterthought.
+
+Every Everyone card shows self **and** partner data wherever both exist — see
 below.
 
 ## The unlinked header
 
-`SectionWidget`'s `href` is optional, and the `/home` messages card is why.
+`SectionWidget`'s `href` is optional, and Everyone's messages card is why.
 It counts unread threads per partner, so its title is plain text and each row
 carries its own link: to `/messages` in that partner's context, where the
 threads it counted are. Every other card links.
 
-The Notebook, Tasks, Rewards and partner-page Messages cards link to
+The Notebook, Tasks, Rewards and partnership Messages cards link to
 `/notebook`, `/tasks`, `/rewards` and `/messages`, which show the current
 context ([contexts.md](contexts.md)) rather than one space, so following one
-switches the context to what the card previews first — Everyone from `/home`
-for tasks and rewards, the viewer's own space for the notebook, the
-partnership from `/partner/[id]` (and from each `/home` messages row) —
+sets the context to what the card previews first — Today's own context for
+tasks, rewards and a partnership's messages, the viewer's own space for the
+notebook in Everyone (that card is their own notebook's), and the partner's
+for each Everyone messages row —
 through `followInContext` in `context-client.svelte.ts` (the cards' `opensIn`
 prop, and `SectionWidget`'s `onfollow`; `inContext` for the messages rows,
-which are plain links). A link opened in a new tab skips that and shows
+which are plain links). Setting the context Today already shows is not a
+no-op: another tab can have switched the device since this one rendered, and
+the list should show what the card did. A link opened in a new tab skips that and shows
 the context as it is. Such a link is not preloaded on hover
 (`data-sveltekit-preload-data="off"`): the preload would fetch the list in the
 old context, and the navigation then used it. It navigates with
@@ -80,17 +108,17 @@ nowhere, so there would be nothing to do with it.
 It stays first on the page. Something waiting from a partner is the reason to
 have opened the app, and it should not be below the fold on a short phone.
 
-## /home is an overview of every space
+## Everyone is an overview of every space
 
-The Tasks and Rewards cards on `/home` cover **every space the viewer is in** —
+The Tasks and Rewards cards in Everyone cover **every space the viewer is in** —
 their own and each partnership's — which is what `/tasks` and `/rewards` show
 in the Everyone context, where those cards lead. That is load-bearing: a card
 that read only the viewer's own tasks reported "Nothing to do right now." while
 a partner's task sat waiting one tap away, which is the opposite of what the
-cards are for. On `/partner/[id]` the same cards cover that one partnership's
-space.
+cards are for. In Me and in a partnership's context the same cards cover that
+one space.
 
-Both pages call the same readers, `getTasksWidget` and `getRewardsWidget`, with
+Every context calls the same readers, `getTasksWidget` and `getRewardsWidget`, with
 the space ids to cover, and they sort rows onto a side with the same rules the
 full pages use (`taskListFor`, `rewardListFor`; see
 [tasks.md](tasks.md#to-do-and-set-for-others)):
@@ -99,9 +127,9 @@ full pages use (`taskListFor`, `rewardListFor`; see
 - never a row they wrote themselves, since authorship is independent of who
   manages.
 
-What a viewer sets for a partner adds nothing to the `/home` preview. Their own
-space is always among `/home`'s spaces and they always act in it, which is why
-`viewerActs` is always true there.
+What a viewer sets for a partner adds nothing to the Everyone preview. Their
+own space is always among Everyone's spaces and they always act in it, which is
+why `viewerActs` is always true there and in Me.
 
 Rows from several spaces carry a `context`: the partner's name, or null for the
 viewer's own. Without it two partners naming a task the same thing are the same
@@ -122,8 +150,9 @@ A space's credits buy that space's rewards and nothing else, so one
 total would state a spending power nobody has — and would offer a claim the
 claim path then refuses. Each row is priced against **its own** balance.
 
-A partner page has one space, so one unlabelled balance, and reads exactly as a
-single number. `/home` labels each partnership's with the partner's name.
+Me and a partnership's context have one space, so one unlabelled balance, which
+reads exactly as a single number. Everyone labels each partnership's with the
+partner's name.
 
 ## No empty states
 
@@ -198,7 +227,8 @@ opens as), and `WidgetItems` opens it with `openedWidgetTitle` from
 `title` is empty. Guides are the app's own content, never sealed: their rows
 have `kind: 'guide'`, no `sealed`, and the title itself.
 
-`viewerActs` is always true on `/home`, where there is only one side.
+`viewerActs` is always true in Everyone and Me, where the viewer's own space
+has only one side.
 
 ## The data
 
@@ -209,7 +239,7 @@ only what the preview shows:
 | --------------------------- | ----------------------------------------------------- | --------------------- |
 | `TasksWidgetView`           | `getTasksWidget`, over the card's space ids           | `server/tasks.ts`     |
 | `RewardsWidgetView`         | `getRewardsWidget`, over the card's space ids         | `server/rewards.ts`   |
-| `GuidesWidgetView`          | `loadGuidesCard`, only with the guides feature        | the `/home` load      |
+| `GuidesWidgetView`          | `loadGuidesCard`, only with the guides feature        | the Today load        |
 | `DaydreamsWidgetView`       | `getDaydreamsWidget`, only with the daydreams feature | `server/daydreams.ts` |
 | `PartnerMessagesWidgetView` | `getPartnerMessagesWidget`                            | `server/messaging.ts` |
 | `IqTestResultView`          | `latestIqTestResult` (one row)                        | `server/iq-test.ts`   |
@@ -237,8 +267,9 @@ could return: every body is encrypted to keys the server does not hold. Previews
 on the board are decrypted in the browser — see [encryption.md](encryption.md).
 
 Its unread predicate is `listUnreadCounts`'s, character for character. It has to
-stay that way, or the partner card and `/home` would disagree about what
-"unread" means for the same partnership. A test asserts the two agree.
+stay that way, or Today's two messages cards (a partnership's, and Everyone's
+row for it) would disagree about what "unread" means for the same partnership.
+A test asserts the two agree.
 
 ## Things that will bite
 

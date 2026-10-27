@@ -76,7 +76,7 @@
 		     screened twice — once live and once as a static ghost under it. -->
 	<div class="cta" data-vfx-capture-ignore="true">
 		{#if user}
-			<a class="big" href={resolve('/(auth-required)/(app)/home')}>Open</a>
+			<a class="big" href={resolve('/(auth-required)/(app)/today')}>Open</a>
 		{:else}
 			<!-- The aria-label says where the big "Sign up" goes, since on its own
 			     the word is a verb with no object for anyone navigating by link

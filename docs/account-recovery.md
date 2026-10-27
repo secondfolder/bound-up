@@ -90,7 +90,7 @@ with a 409 while either half is missing. In one `db.batch()` the server:
 - marks the request `completed`.
 
 The page then signs in with Better Auth's ordinary email sign-in, stashes the
-new identity the way signup does, and lands on `/home` with the key in hand.
+new identity the way signup does, and lands on `/today` with the key in hand.
 
 **More than one partner.** Every partner is asked, and whichever finishes first
 approves the sign-in. The others' requests stay open, and each shares their

@@ -12,6 +12,7 @@ import {
 	partnerAcceptFormSchema,
 	partnerAcceptSealedSchema
 } from '$lib/schemas/partnerForm';
+import { setContextCookie } from '$lib/server/context';
 import { getUserRecipient } from '$lib/server/keys';
 import {
 	acceptInvite,
@@ -111,7 +112,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ locals, params, request }) => {
+	default: async ({ locals, params, request, cookies }) => {
 		// `(public)` means anyone can reach this, and actions run before layout
 		// loads regardless — so this is the only session check there is.
 		if (!locals.user) {
@@ -144,7 +145,12 @@ export const actions: Actions = {
 			});
 		}
 
-		redirect(303, `/partner/${result.id}`);
+		// Into Today in the new partnership's context: what the two of you share
+		// is the point of having accepted. Setting the context here is the
+		// accepter's deliberate choice, like following a card (docs/contexts.md);
+		// a partnership's space has the partnership's id.
+		setContextCookie(cookies, { kind: 'space', spaceId: result.id });
+		redirect(303, '/today');
 	}
 };
 

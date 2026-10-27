@@ -31,7 +31,7 @@
 				<span class="title">{shownText(openedWidgetTitle(item))}</span>
 				{#if item.context}
 					<!-- Which section this row came from on the page the header links
-					     to. /home merges your things with every partner's, and two
+					     to. Today in Everyone merges your things with every partner's, and two
 					     partners can name a task the same thing.
 
 					     A sibling of the title rather than inside it, so a long title

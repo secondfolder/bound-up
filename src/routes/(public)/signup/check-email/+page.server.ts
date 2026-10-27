@@ -26,7 +26,7 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const redirectTo = safeRedirect(url.searchParams.get('redirectTo'));
 	if (locals.user) {
-		redirect(303, redirectTo ?? '/home');
+		redirect(303, redirectTo ?? '/today');
 	}
 	const sent = readCheckEmailCookie(cookies.get(CHECK_EMAIL_COOKIE));
 	const email = sent?.email ?? null;

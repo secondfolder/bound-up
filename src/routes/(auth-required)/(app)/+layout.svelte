@@ -104,8 +104,9 @@
 		}
 
 		return (
-			routeId === '/(auth-required)/(app)/home' ||
-			routeId.startsWith('/(auth-required)/(app)/partner/') ||
+			// Today in a partnership's context is what the partner page was,
+			// with the partner's time in its header.
+			routeId === '/(auth-required)/(app)/today' ||
 			// Messages were under the partner page, and kept the warning when
 			// they moved out of it.
 			routeId.startsWith('/(auth-required)/(app)/messages') ||
@@ -175,7 +176,6 @@
 	</main>
 	{#if !fullScreen}
 		<AppNav
-			partners={data.partners}
 			debugAvailable={hasFeature(data.features, 'debugMode')}
 			debugOn={data.debug}
 		/>
@@ -214,7 +214,7 @@
 			   margins, which turns off stretching: it shrank to fit its content,
 			   so sibling pages with the same max-width came out different widths
 			   (tasks 830px, rewards 525px), a page changed width with its data,
-			   and a long unwrappable title pushed the partner page off the side
+			   and a long unwrappable title pushed a page off the side
 			   of a phone. */
 			> :global(*) {
 				inline-size: 100%;

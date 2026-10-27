@@ -62,9 +62,9 @@ default `update()`: the nav's form posts from whatever page is open, and
 success it re-runs the loads, so `page.data.debug` follows. A failure goes to
 the app-wide notice.
 
-The bottom nav's tabs are centred, at least 1em apart, in the middle column of
-a three-column grid. The toggle has the right-hand column to itself, so it
-never covers a tab however many partners there are.
+The bottom nav's five tabs are centred, at least 1em apart, in the middle
+column of a three-column grid. The toggle has the right-hand column to itself,
+so it never covers a tab on a narrow phone.
 
 ## Where it reaches the page
 
